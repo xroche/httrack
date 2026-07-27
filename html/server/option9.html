@@ -98,6 +98,14 @@ ${do:end-if}
 <input type="hidden" name="redirect" value="">
 <input type="hidden" name="closeme" value="">
 
+<!-- clear if not checked -->
+<input type="hidden" name="warc" value="">
+<input type="hidden" name="changes" value="">
+<input type="hidden" name="norecatch" value="">
+<input type="hidden" name="logf" value="">
+<input type="hidden" name="index" value="">
+<input type="hidden" name="index2" value="">
+
 <input type="checkbox" name="cache2" ${checked:cache2}
 			title='${html:LANG_I1e}' onMouseOver="info('${html:LANG_I1e}'); return true" onMouseOut="info('&nbsp;'); return true"
 > ${LANG_I61}
@@ -112,6 +120,11 @@ ${LANG_WARCFILE}
 <input name="warcfile" value="${warcfile}" size="40"
 			title='${html:LANG_WARCFILETIP}' onMouseOver="info('${html:LANG_WARCFILETIP}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
+<br><br>
+
+<input type="checkbox" name="changes" ${checked:changes}
+			title='${html:LANG_CHANGESTIP}' onMouseOver="info('${html:LANG_CHANGESTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+> ${LANG_CHANGES}
 <br><br>
 
 <input type="checkbox" name="norecatch" ${checked:norecatch}

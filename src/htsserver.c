@@ -318,6 +318,18 @@ typedef struct {
   error_redirect = "/server/error.html"; \
 } while(0)
 
+/* Longest error message shown on the error page; the rest is clipped. */
+#define ERROR_MESSAGE_MAX 1024
+
+/* SET_ERROR() with a printf format. Clips: these messages quote posted fields,
+   whose length the client picks. */
+#define SET_ERRORF(...)                                                        \
+  do {                                                                         \
+    char errbuf[ERROR_MESSAGE_MAX];                                            \
+    slprintfbuff_clip(errbuf, sizeof(errbuf), __VA_ARGS__);                    \
+    SET_ERROR(errbuf);                                                         \
+  } while (0)
+
 /* Longest "sid" value worth unescaping: the expected one is an md5 hex digest,
    so anything near this is already invalid and is rejected unread. */
 #define SID_VALUE_MAX 64
@@ -725,7 +737,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           fp = fopen(StringBuff(fspath), "rb");
           if (fp) {
             /* Read file */
-            while(!feof(fp)) {
+            while (!feof(fp) && !ferror(fp)) {
               char *str = line;
               char *pos;
 
@@ -879,28 +891,18 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           commandEnd = 1;
                         }
                       } else {
-                        char tmp[1024];
-
-                        sprintf(tmp,
-                                "Unable to write %d bytes in the the init file %s",
-                                count, StringBuff(fspath));
-                        SET_ERROR(tmp);
+                        SET_ERRORF(
+                            "Unable to write %d bytes in the the init file %s",
+                            count, StringBuff(fspath));
                       }
                       fclose(fp);
                     } else {
-                      char tmp[1024];
-
-                      sprintf(tmp, "Unable to create the init file %s",
-                              StringBuff(fspath));
-                      SET_ERROR(tmp);
+                      SET_ERRORF("Unable to create the init file %s",
+                                 StringBuff(fspath));
                     }
                   } else {
-                    char tmp[1024];
-
-                    sprintf(tmp,
-                            "Unable to create the directory structure in %s",
-                            StringBuff(fspath));
-                    SET_ERROR(tmp);
+                    SET_ERRORF("Unable to create the directory structure in %s",
+                               StringBuff(fspath));
                   }
 
                 } else {
@@ -978,10 +980,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             }
           }
 
-          /* path itself may hold ".." (webhttrack passes "<bin>/../share"), so
-             only the untrusted halves are checked: file here, website above. */
-          if (fsfile[0] && strstr(file, "..") == NULL
-              && (fp = fopen(fsfile, "rb"))) {
+          /* Regular files only: reading a directory or FIFO never ends, and
+             "path" may hold "..", so only the untrusted halves are checked. */
+          if (fsfile[0] && strstr(file, "..") == NULL && fexist(fsfile) &&
+              (fp = fopen(fsfile, "rb"))) {
             char ok[] =
               "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
               "Server: httrack-small-server\r\n" "Content-type: text/html\r\n"
@@ -1040,7 +1042,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               int outputmode = 0;
 
               StringMemcat(headers, ok, sizeof(ok) - 1);
-              while(!feof(fp)) {
+              while (!feof(fp) && !ferror(fp)) {
                 char *str = line;
                 int prevlen = (int) StringLength(output);
                 int nocr = 0;
@@ -1474,14 +1476,15 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               while(!feof(fp)) {
                 int n = (int) fread(line, 1, sizeof(line) - 2, fp);
 
-                if (n > 0) {
-                  StringMemcat(output, line, n);
+                if (n <= 0) {
+                  break; /* short read: EOF or error, never a retry */
                 }
+                StringMemcat(output, line, n);
               }
             }
             fclose(fp);
-          } else if (strcmp(file, "/ping") == 0
-                     || strncmp(file, "/ping?", 6) == 0) {
+          } else if (strcmp(file, "/ping") == 0 ||
+                     strncmp(file, "/ping?", 6) == 0) {
             char error_hdr[] =
               "HTTP/1.0 200 Pong\r\n" "Server: httrack small server\r\n"
               "Content-type: text/html\r\n";

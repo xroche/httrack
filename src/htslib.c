@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htssitemap.h"
 #include "htswarc.h"
+#include "htschanges.h"
 
 /* specific definitions */
 #include "htsbase.h"
@@ -2538,15 +2539,6 @@ void fil_simplifie(char *f) {
   }
 }
 
-void htsblk_failf(htsblk *r, const char *fmt, ...) {
-  va_list args;
-
-  va_start(args, fmt);
-  // deliberate clip: the reason is quoted from a remote reply
-  (void) vslprintfbuff(r->msg, sizeof(r->msg), fmt, args);
-  va_end(args);
-}
-
 // fermer liaison fichier ou socket
 void deletehttp(htsblk * r) {
 #if HTS_DEBUG_CLOSESOCK
@@ -2706,6 +2698,24 @@ void time_gmt_rfc822(char *s) {
   if (A == NULL)
     A = localtime(&tt);
   time_rfc822(s, A);
+}
+
+void hts_now_iso8601(char out[32]) {
+  time_t t = time(NULL);
+  struct tm tmv;
+
+#if defined(_WIN32)
+  struct tm *g = gmtime(&t);
+
+  if (g != NULL)
+    tmv = *g;
+  else
+    memset(&tmv, 0, sizeof(tmv));
+#else
+  if (gmtime_r(&t, &tmv) == NULL)
+    memset(&tmv, 0, sizeof(tmv));
+#endif
+  strftime(out, 32, "%Y-%m-%dT%H:%M:%SZ", &tmv);
 }
 
 // heure actuelle, format rfc (taille buffer 256o)
@@ -6022,6 +6032,8 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->warc_file, "");
   StringCopy(opt->sitemap_url, "");
   opt->warc_max_size = 0; /* no rotation unless --warc-max-size sets it */
+  opt->changes = HTS_FALSE;
+  opt->changes_state = NULL;
   StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;
   opt->pause_max_ms = 0;
@@ -6176,6 +6188,8 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->warc_file);
     StringFree(opt->sitemap_url);
     hts_sitemap_free(opt); /* backstop: httpmirror's early-return paths */
+
+    hts_changes_free_opt(opt);
 
     StringFree(opt->path_html);
     StringFree(opt->path_html_utf8);

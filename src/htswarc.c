@@ -462,22 +462,6 @@ static void warc_make_id(warc_writer *w, char out[64]) {
            b[11], b[12], b[13], b[14], b[15]);
 }
 
-static void warc_now_iso8601(char out[32]) {
-  time_t t = time(NULL);
-  struct tm tmv;
-#if defined(_WIN32)
-  struct tm *g = gmtime(&t);
-  if (g != NULL)
-    tmv = *g;
-  else
-    memset(&tmv, 0, sizeof(tmv));
-#else
-  if (gmtime_r(&t, &tmv) == NULL)
-    memset(&tmv, 0, sizeof(tmv));
-#endif
-  strftime(out, 32, "%Y-%m-%dT%H:%M:%SZ", &tmv);
-}
-
 /* Case-insensitive "is this the header named name?" test, tolerating optional
    whitespace before the ':' (non-compliant "Name : value" is still matched). */
 static int header_is(const char *line, size_t line_len, const char *name) {
@@ -1063,7 +1047,7 @@ static void warc_wacz_package(warc_writer *w) {
   wbuf_free(&pages);
 
   /* datapackage.json listing every stored file with its sha256 + size. */
-  warc_now_iso8601(created);
+  hts_now_iso8601(created);
   memset(&dp, 0, sizeof(dp));
   if (!err &&
       (wbuf_printf(&dp,
@@ -1166,7 +1150,7 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
 
   memset(&hdr, 0, sizeof(hdr));
   warc_make_id(w, id);
-  warc_now_iso8601(date);
+  hts_now_iso8601(date);
 
 #if HTS_USEOPENSSL
   /* Block digest over the whole block, in one streaming pass. */
@@ -1670,7 +1654,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
     char date[32];
     char *slot;
     size_t need;
-    warc_now_iso8601(date);
+    hts_now_iso8601(date);
     need = strlen(target_uri) + 1 + strlen(date) + 1;
     slot = malloct(need);
     if (slot != NULL) {

@@ -433,7 +433,8 @@ void help_catchurl(const char *dest_path) {
       }
       // former URL!
       {
-        char BIGSTK finalurl[HTS_URLMAXSIZE * 2];
+        /* url and dest are each HTS_URLMAXSIZE*2, plus the POSTTOK marker */
+        char BIGSTK finalurl[HTS_URLMAXSIZE * 4 + 32];
 
         inplace_escape_check_url(dest, sizeof(dest));
         snprintf(finalurl, sizeof(finalurl), "%s" POSTTOK "file:%s", url, dest);
@@ -612,6 +613,8 @@ void help(const char *app, int more) {
           "output name, --warc-max-size N rotates segments past N bytes, "
           "--warc-cdx also writes a sorted CDXJ index, --wacz packages it all "
           "as a WACZ file");
+  infomsg(" %d  write hts-changes.json listing what this crawl left new, "
+          "changed, unchanged and gone compared to the previous mirror");
   infomsg(" %n  do not re-download locally erased files");
   infomsg
     (" %v  display on screen filenames downloaded (in realtime) - * %v1 short version - %v2 full animation");

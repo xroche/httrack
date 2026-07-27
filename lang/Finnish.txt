@@ -966,6 +966,10 @@ WARC archive name:
 WARC-arkiston nimi:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Valinnainen WARC-arkiston perusnimi; jätä tyhjäksi, jotta se nimetään automaattisesti tulostehakemistoon.
+Report what changed since the previous mirror
+Raportoi, mikä on muuttunut edellisen peilauksen jälkeen
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Kirjoita myös hts-changes.json, joka luettelee, mikä on edelliseen peilaukseen verrattuna uutta, muuttunutta, muuttumatonta tai kadonnutta.
 Seed the crawl from the site's sitemap
 Aloita haku sivuston sivukartasta
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

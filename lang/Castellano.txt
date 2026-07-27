@@ -964,6 +964,10 @@ WARC archive name:
 Nombre del archivo WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Nombre base opcional para el archivo WARC; déjelo en blanco para nombrarlo automáticamente en el directorio de salida.
+Report what changed since the previous mirror
+Informar de los cambios desde la copia anterior
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Escribir también hts-changes.json con la lista de lo que esta captura deja como nuevo, modificado, sin cambios o desaparecido respecto a la copia anterior.
 Seed the crawl from the site's sitemap
 Iniciar el rastreo desde el mapa del sitio
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

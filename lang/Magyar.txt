@@ -964,6 +964,10 @@ WARC archive name:
 WARC archívum neve:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 A WARC archívum opcionális alapneve; hagyja üresen az automatikus elnevezéshez a kimeneti könyvtárban.
+Report what changed since the previous mirror
+Jelentés arról, mi változott az elõzõ tükrözés óta
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+A hts-changes.json fájl írása is, amely felsorolja, mi új, mi változott, mi maradt változatlan és mi tûnt el az elõzõ tükrözéshez képest.
 Seed the crawl from the site's sitemap
 A letöltés indítása a webhely webhelytérképérõl
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

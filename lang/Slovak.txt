@@ -964,6 +964,10 @@ WARC archive name:
 Názov archívu WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Voliteµný základný názov archívu WARC; ponechajte prázdne pre automatické pomenovanie vo výstupnom adresári.
+Report what changed since the previous mirror
+Oznámi», èo sa od predchádzajúceho zrkadlenia zmenilo
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Zapísa» aj hts-changes.json so zoznamom toho, èo je oproti predchádzajúcemu zrkadleniu nové, zmenené, nezmenené alebo chýbajúce.
 Seed the crawl from the site's sitemap
 Zaèa» prehliadanie z mapy stránok
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

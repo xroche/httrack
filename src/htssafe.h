@@ -461,6 +461,25 @@ static HTS_INLINE HTS_UNUSED const char *htsbuff_str(const htsbuff *b) {
 }
 
 /**
+ * Copy src into dest (capacity size, NUL included), truncating to fit and
+ * always NUL-terminating. Unlike strlcpybuff() it never aborts, so it suits a
+ * value read back from a cache, a header or the wire, where refusing the whole
+ * record is worse than keeping a clipped one. Returns HTS_TRUE if it all fit;
+ * callers that clip on purpose ignore that, so it is not HTS_CHECK_RESULT.
+ */
+static HTS_INLINE HTS_UNUSED hts_boolean strclipbuff(char *dest, size_t size,
+                                                     const char *src) {
+  size_t len, copy;
+
+  assertf(dest != NULL && src != NULL && size != 0);
+  len = strlen(src);
+  copy = len < size ? len : size - 1;
+  memcpy(dest, src, copy);
+  dest[copy] = '\0';
+  return copy == len ? HTS_TRUE : HTS_FALSE;
+}
+
+/**
  * Callers that deliberately ignore truncation use this instead of
  * slprintfbuff(), so it is not HTS_CHECK_RESULT.
  */
@@ -469,6 +488,9 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 0) hts_boolean
   int ret;
 
   assertf(dest != NULL && size != 0);
+  /* a vsnprintf failing outright may write nothing at all, leaving whatever
+     the caller had on the stack for it to publish */
+  dest[0] = '\0';
   ret = vsnprintf(dest, size, fmt, args);
   /* pre-C99 runtimes (msvcrt _vsnprintf) return -1 and do not terminate */
   dest[size - 1] = '\0';
@@ -490,6 +512,20 @@ static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
   ret = vslprintfbuff(dest, size, fmt, args);
   va_end(args);
   return ret;
+}
+
+/**
+ * slprintfbuff() for diagnostics quoting remote or client text, which are
+ * meant to be clipped: nothing to act on, hence not HTS_CHECK_RESULT. A (void)
+ * cast on slprintfbuff() is no substitute, GCC warns through it.
+ */
+static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 4) void slprintfbuff_clip(
+    char *dest, size_t size, const char *fmt, ...) {
+  va_list args;
+
+  va_start(args, fmt);
+  (void) vslprintfbuff(dest, size, fmt, args);
+  va_end(args);
 }
 
 /**

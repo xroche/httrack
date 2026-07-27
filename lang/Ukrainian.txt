@@ -964,6 +964,10 @@ WARC archive name:
 Ім'я WARC-архіву:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Необов'язкова базова назва WARC-архіву; залиште порожнім для автоматичного найменування у вихідному каталозі.
+Report what changed since the previous mirror
+Повідомляти, що змінилося з попереднього дзеркала
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Також записувати hts-changes.json зі списком того, що порівняно з попереднім дзеркалом є новим, зміненим, незміненим або зниклим.
 Seed the crawl from the site's sitemap
 Починати обхід з карти сайту
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

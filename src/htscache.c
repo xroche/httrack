@@ -142,10 +142,12 @@ struct cache_back_zip_entry {
   int compressionMethod;
 };
 
+/* A corrupt cache can carry a field wider than ours; clipping it keeps the
+   entry, where aborting would take the crawl down. */
 #define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
   do {                                                                         \
     if (line[0] != '\0' && strfield2(line, refline)) {                         \
-      strlcpybuff(refvalue, value, refvalue_size);                             \
+      (void) strclipbuff(refvalue, refvalue_size, value);                      \
       line[0] = '\0';                                                          \
     }                                                                          \
   } while (0)

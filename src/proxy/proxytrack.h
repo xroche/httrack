@@ -368,7 +368,11 @@ HTS_UNUSED static struct tm PT_GetTime(time_t t) {
   if (tm != NULL)
     return *tm;
   else {
+    /* an all-zero tm has tm_mday == 0, which the ARC date field prints as a
+       day of "00"; the epoch is the conventional "date unknown" */
     memset(&tmbuf, 0, sizeof(tmbuf));
+    tmbuf.tm_year = 70;
+    tmbuf.tm_mday = 1;
     return tmbuf;
   }
 }

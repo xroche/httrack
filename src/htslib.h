@@ -201,7 +201,8 @@ T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
                    int waitconnect, int addr_index, int *addr_count);
 /* Clips the formatted failure reason into r->msg, which also round-trips
    through the cache as X-StatusMessage. Leaves r->statuscode to the caller. */
-void htsblk_failf(htsblk *r, const char *fmt, ...) HTS_PRINTF_FUN(2, 3);
+#define htsblk_failf(R, ...)                                                   \
+  slprintfbuff_clip((R)->msg, sizeof((R)->msg), __VA_ARGS__)
 
 HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
@@ -257,6 +258,10 @@ void sec2str(char *s, TStamp t);
 
 void time_gmt_rfc822(char *s);
 void time_local_rfc822(char *s);
+
+/* Current UTC time as "YYYY-MM-DDThh:mm:ssZ". */
+void hts_now_iso8601(char out[32]);
+
 struct tm *convert_time_rfc822(struct tm *buffer, const char *s);
 int set_filetime(const char *file, struct tm *tm_time);
 int set_filetime_rfc822(const char *file, const char *date);
