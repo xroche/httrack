@@ -2176,9 +2176,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       "could not decode URI '%s' with charset '%s'", lien, charset);
                   }
 
-                  // decode query string entities with page charset; decoded
-                  // out-of-place because a reference the charset can not
-                  // represent is percent-escaped, and grows (#854)
+                  // decode query entities with the page charset, out-of-place
+                  // because the escape grows it (#854)
                   if (hasCharset) {
                     char BIGSTK decoded[sizeof(query)];
 

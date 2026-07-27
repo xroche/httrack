@@ -1,7 +1,8 @@
 #!/bin/bash
 # Issue #854: a character reference the page charset can not represent must be
 # percent-escaped in a query string (%26%23<decimal>%3B), not left as source
-# text whose '&' and '#' split the query into extra parameters.
+# text whose '&' and '#' split the query into extra parameters. A reference the
+# charset does represent must still go out as its encoded bytes.
 set -eu
 
 : "${top_srcdir:=..}"
@@ -50,28 +51,44 @@ test -n "$port" || {
     --timeout=30 --retries=0 "http://127.0.0.1:${port}/charref/index.html" \
     >"${tmpdir}/crawl.log" 2>&1 || true
 
-# Assert the request-target the origin saw, per source page.
+# check <label> <page> <want-parameter-count> <acceptable-query>...
+# The count is the origin's own parse of the wire bytes, independent of the
+# expected string. More than one query is acceptable where iconv and Windows
+# encode the same code point differently (ISO-2022-JP's shift back to ASCII).
 check() {
-    local label="$1" page="$2" want="$3" wantcount="$4"
-    local got count
+    local label="$1" page="$2" wantcount="$3" got count want ok=
+    shift 3
     printf '[%s] ..\t' "$label"
-    got=$(grep -F "/charref/${page}?" "$reqlog" | sed "s|^/charref/${page}?||" | sort -u) || got=
-    if test "$got" != "$want"; then
-        echo "FAIL: expected query '${want}', got '${got}'"
+    got=$(grep -F "/charref/${page}.html?" "$reqlog" | cut -f1 |
+        sed "s|^/charref/${page}.html?||" | sort -u) || got=
+    count=$(grep -F "/charref/${page}.html?" "$reqlog" | cut -f2 | sort -u) || count=
+    for want in "$@"; do
+        if test "$got" == "$want"; then
+            ok=1
+        fi
+    done
+    if test -z "$ok"; then
+        echo "FAIL: expected query '$1', got '${got}'"
         exit 1
     fi
-    # Parameter count the origin would parse out of that query.
-    count=$(printf '%s' "$got" | tr '&' '\n' | grep -c .) || count=0
-    if test "$count" -ne "$wantcount"; then
-        echo "FAIL: origin sees ${count} parameters, expected ${wantcount}"
+    if test "$count" != "$wantcount"; then
+        echo "FAIL: origin parsed '${count}' parameters, expected ${wantcount}"
         exit 1
     fi
     echo "OK (${count} parameters)"
 }
 
 # iso-8859-1 fallback: € is unrepresentable (named and numeric alike), é is not.
-check "charset-less page" qnone.html \
-    'a=%26%238364%3B&b=%26%238364%3B&c=%e9&d=x' 4
+check "charset-less page" qnone 4 \
+    'a=%26%238364%3B&b=%26%238364%3B&c=%e9&d=x'
 # Control: utf-8 represents both, so they go out as their encoded bytes.
-check "declared utf-8 page" qutf8.html \
-    'a=%e2%82%ac&b=%e2%82%ac&c=%c3%a9&d=x' 4
+check "declared utf-8 page" qutf8 4 \
+    'a=%e2%82%ac&b=%e2%82%ac&c=%c3%a9&d=x'
+# Multi-byte: あ and 〜 must survive as their encoded bytes, only € gets escaped.
+# 〜 (U+301C) is the one glibc's shift_jis table does not map back to itself, and
+# iso-2022-jp encodes both of them 7-bit clean.
+check "declared shift_jis page" qsjis 4 \
+    'a=%82%a0&c=%81`&b=%26%238364%3B&d=x'
+check "declared iso-2022-jp page" qjis 4 \
+    "a=%1b\$B\$%22&c=%1b\$B!A&b=%26%238364%3B&d=x" \
+    "a=%1b\$B\$%22%1b(B&c=%1b\$B!A%1b(B&b=%26%238364%3B&d=x"

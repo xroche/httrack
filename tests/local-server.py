@@ -1196,36 +1196,39 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    # Character references in a query string (#854). The charset-less page falls
-    # back to iso-8859-1, which represents é but not €; CHARREF_LOG collects the
-    # request-target the origin actually saw.
+    # Character references in a query string (#854). CHARREF_LOG collects the
+    # request-target the origin saw, plus the parameter count it parses out of
+    # it. Per page: a reference the declared charset represents (é, あ) and one
+    # it does not (€).
     CHARREF_QUERY = "?a=&euro;&b=&#8364;&c=&eacute;&d=x"
+    CHARREF_MB_QUERY = "?a=&#12354;&c=&#12316;&b=&euro;&d=x"
+    CHARREF_PAGES = {
+        "none": ("text/html", CHARREF_QUERY),
+        "utf8": ("text/html; charset=utf-8", CHARREF_QUERY),
+        "sjis": ("text/html; charset=shift_jis", CHARREF_MB_QUERY),
+        "jis": ("text/html; charset=iso-2022-jp", CHARREF_MB_QUERY),
+    }
 
     def record_charref(self):
         log = os.environ.get("CHARREF_LOG")
         if log:
+            fields = [f for f in urlsplit(self.path).query.split("&") if f]
             with open(log, "a") as fp:
-                fp.write(self.path + "\n")
+                fp.write("%s\t%d\n" % (self.path, len(fields)))
 
     def route_charref(self):
-        path = urlsplit(self.path).path
-        if path == "/charref/index.html":
-            self.send_raw(
-                b'<html><body><a href="none.html">n</a>'
-                b'<a href="utf8.html">u</a></body></html>',
-                "text/html",
+        name = urlsplit(self.path).path[len("/charref/") :]
+        variant = name[: -len(".html")] if name.endswith(".html") else ""
+        if variant == "index":
+            body = "".join(
+                '<a href="%s.html">%s</a>' % (v, v) for v in self.CHARREF_PAGES
             )
-        elif path in ("/charref/none.html", "/charref/utf8.html"):
-            target = "qnone.html" if path.endswith("none.html") else "qutf8.html"
-            ctype = (
-                "text/html" if target == "qnone.html" else "text/html; charset=utf-8"
-            )
-            body = '<html><body><a href="%s%s">q</a></body></html>' % (
-                target,
-                self.CHARREF_QUERY,
-            )
-            self.send_raw(body.encode(), ctype)
-        elif path in ("/charref/qnone.html", "/charref/qutf8.html"):
+            self.send_raw(("<html><body>%s</body></html>" % body).encode(), "text/html")
+        elif variant in self.CHARREF_PAGES:
+            ctype, query = self.CHARREF_PAGES[variant]
+            body = '<a href="q%s.html%s">q</a>' % (variant, query)
+            self.send_raw(("<html><body>%s</body></html>" % body).encode(), ctype)
+        elif variant[1:] in self.CHARREF_PAGES:
             self.send_raw(b"<html><body>q</body></html>", "text/html")
         else:
             self.send_response(404)

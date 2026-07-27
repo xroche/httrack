@@ -62,19 +62,6 @@ static int get_hex_value(char c) {
     (HASH) *= HASH_PRIME;                                                      \
   } while (0)
 
-/* Did converting utf8 to charset preserve the code point? Windows substitutes
-   '?' for one the charset lacks rather than failing, so only converting back
-   tells a real conversion from a lossy one. */
-static hts_boolean charset_represents(const char *utf8, const char *converted,
-                                      const char *charset) {
-  char *back = hts_convertStringToUTF8(converted, strlen(converted), charset);
-  const hts_boolean same =
-      back != NULL && strcmp(back, utf8) == 0 ? HTS_TRUE : HTS_FALSE;
-
-  freet(back);
-  return same;
-}
-
 int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t max, const char *charset) {
   return hts_unescapeEntitiesWithCharsetSpecial(src, dest, max, charset, 0);
 }
@@ -140,12 +127,17 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
             char buffer[32];
             len = 0;
             if ( ( ulen = hts_writeUTF8(uc, buffer, sizeof(buffer)) ) != 0) {
+              const hts_boolean urlQuery =
+                  (flags & UNESCAPE_ENTITIES_URL_QUERY) != 0;
               char *s;
               buffer[ulen] = '\0';
-              s = hts_convertStringFromUTF8(buffer, strlen(buffer), charset);
-              if (s != NULL && (flags & UNESCAPE_ENTITIES_URL_QUERY) != 0 &&
-                  !charset_represents(buffer, s, charset)) {
-                freet(s);
+              /* Strict for a query only: a substituted '?' must not pass for
+                 the code point the document wrote. */
+              if (urlQuery) {
+                s = hts_convertStringFromUTF8Strict(buffer, strlen(buffer),
+                                                    charset);
+              } else {
+                s = hts_convertStringFromUTF8(buffer, strlen(buffer), charset);
               }
               if (s != NULL) {
                 const size_t sLen = strlen(s);
@@ -155,7 +147,7 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
                   len = sLen;
                 }
                 freet(s);
-              } else if ((flags & UNESCAPE_ENTITIES_URL_QUERY) != 0) {
+              } else if (urlQuery) {
                 /* URL Standard: an unrepresentable code point is written
                    %26%23<decimal>%3B rather than left as source text. */
                 char esc[32];

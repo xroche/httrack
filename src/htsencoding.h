@@ -70,14 +70,14 @@ extern int hts_unescapeEntitiesWithCharset(const char *src,
                                            const char *charset);
 
 /**
- * Flags for hts_unescapeEntitiesWithCharsetSpecial().
+ * Flags for hts_unescapeEntitiesWithCharsetSpecial(). Values stay distinct from
+ * unescapeFlags above: both reach their function as a plain int.
  **/
 typedef enum unescapeEntitiesFlags {
-  /** The destination is a URL query string: emit a character reference the
-      charset can not represent as %26%23<decimal>%3B, as the URL Standard's
-      percent-encode-after-encoding step demands, instead of leaving literal
-      source text whose '&' and '#' would re-split the query. **/
-  UNESCAPE_ENTITIES_URL_QUERY = 1
+  /** The destination is a URL query string: write a reference the charset can
+      not represent as %26%23<decimal>%3B (URL Standard), instead of source text
+      whose '&' and '#' would re-split the query. **/
+  UNESCAPE_ENTITIES_URL_QUERY = 2
 } unescapeEntitiesFlags;
 
 /**

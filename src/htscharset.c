@@ -296,16 +296,41 @@ LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int *pwsize) {
   return hts_convertStringToUCS2(s, size, CP_UTF8, pwsize);
 }
 
-char *hts_convertUCS2StringToCP(LPWSTR woutput, int wsize, UINT cp) {
+/* WideCharToMultiByte rejects lpUsedDefaultChar on the Unicode, ISO-2022, HZ,
+   GB18030 and ISCII codepages, where a substitution stays invisible. */
+static hts_boolean cp_reports_default_char(UINT cp) {
+  if (cp == 42 /* CP_SYMBOL */ || cp == CP_UTF7 || cp == CP_UTF8 ||
+      cp == 52936 || cp == 54936 || (cp >= 50220 && cp <= 50229) ||
+      (cp >= 57002 && cp <= 57011)) {
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* When plossy is non-NULL, *plossy reports that the codepage lacked a character
+   and a substitute was emitted for it. */
+static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
+                                         hts_boolean *plossy) {
   const int usize =
-    WideCharToMultiByte(cp, 0, woutput, wsize, NULL, 0, NULL, FALSE);
+      WideCharToMultiByte(cp, 0, woutput, wsize, NULL, 0, NULL, NULL);
+
+  if (plossy != NULL) {
+    *plossy = HTS_FALSE;
+  }
   if (usize > 0) {
     char *const uoutput = malloc((usize + 1) * sizeof(char));
 
     if (uoutput != NULL) {
-      if (WideCharToMultiByte
-          (cp, 0, woutput, wsize, uoutput, usize, NULL, FALSE) == usize) {
+      BOOL usedDefault = FALSE;
+      LPBOOL const pUsedDefault =
+          plossy != NULL && cp_reports_default_char(cp) ? &usedDefault : NULL;
+
+      if (WideCharToMultiByte(cp, 0, woutput, wsize, uoutput, usize, NULL,
+                              pUsedDefault) == usize) {
         uoutput[usize] = '\0';
+        if (plossy != NULL && usedDefault) {
+          *plossy = HTS_TRUE;
+        }
         return uoutput;
       } else {
         free(uoutput);
@@ -313,6 +338,10 @@ char *hts_convertUCS2StringToCP(LPWSTR woutput, int wsize, UINT cp) {
     }
   }
   return NULL;
+}
+
+char *hts_convertUCS2StringToCP(LPWSTR woutput, int wsize, UINT cp) {
+  return hts_convertUCS2StringToCPEx(woutput, wsize, cp, NULL);
 }
 
 char *hts_convertUCS2StringToUTF8(LPWSTR woutput, int wsize) {
@@ -346,7 +375,11 @@ char *hts_convertStringCPToUTF8(const char *s, size_t size, UINT cp) {
   return NULL;
 }
 
-char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
+static char *hts_convertStringCPFromUTF8Ex(const char *s, size_t size, UINT cp,
+                                           hts_boolean *plossy) {
+  if (plossy != NULL) {
+    *plossy = HTS_FALSE;
+  }
   /* Empty string ? */
   if (size == 0) {
     return hts_stringMemCopy(s, size);
@@ -362,7 +395,8 @@ char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
     LPWSTR woutput = hts_convertStringToUCS2(s, (int) size, CP_UTF8, &wsize);
 
     if (woutput != NULL) {
-      char *const uoutput = hts_convertUCS2StringToCP(woutput, wsize, cp);
+      char *const uoutput =
+          hts_convertUCS2StringToCPEx(woutput, wsize, cp, plossy);
 
       free(woutput);
       return uoutput;
@@ -371,6 +405,10 @@ char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
 
   /* Error, charset not found! */
   return NULL;
+}
+
+char *hts_convertStringCPFromUTF8(const char *s, size_t size, UINT cp) {
+  return hts_convertStringCPFromUTF8Ex(s, size, cp, NULL);
 }
 
 HTSEXT_API char *hts_convertStringToUTF8(const char *s, size_t size,
@@ -384,6 +422,19 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
   const UINT cp = hts_getCodepage(charset);
 
   return hts_convertStringCPFromUTF8(s, size, cp);
+}
+
+char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
+                                      const char *charset) {
+  hts_boolean lossy = HTS_FALSE;
+  char *const out =
+      hts_convertStringCPFromUTF8Ex(s, size, hts_getCodepage(charset), &lossy);
+
+  if (lossy) {
+    free(out);
+    return NULL;
+  }
+  return out;
 }
 
 HTSEXT_API char *hts_convertStringSystemToUTF8(const char *s, size_t size) {
@@ -588,6 +639,13 @@ char *hts_convertStringFromUTF8(const char *s, size_t size, const char *charset)
   else {
     return hts_convertStringCharset(s, size, charset, "utf-8");
   }
+}
+
+char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
+                                      const char *charset) {
+  /* No transliteration is requested of iconv, so an unrepresentable code point
+     already fails the conversion outright. */
+  return hts_convertStringFromUTF8(s, size, charset);
 }
 
 #endif
