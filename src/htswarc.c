@@ -1403,16 +1403,8 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     char ts[32];
     time_t t = time(NULL);
     struct tm tmv;
-#if defined(_WIN32)
-    struct tm *g = gmtime(&t);
-    if (g != NULL)
-      tmv = *g;
-    else
+    if (!hts_gmtime(t, &tmv))
       memset(&tmv, 0, sizeof(tmv));
-#else
-    if (gmtime_r(&t, &tmv) == NULL)
-      memset(&tmv, 0, sizeof(tmv));
-#endif
     strftime(ts, sizeof(ts), "%Y%m%d%H%M%S", &tmv);
     snprintf(catbuff, sizeof(catbuff), "httrack-%s.warc.gz", ts);
     path =

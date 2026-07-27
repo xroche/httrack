@@ -71,7 +71,8 @@ grep -qE 'st_strsafe|strcpy_safe_' "$oracle" || {
 # The payload. Dropping the raw frames first is what makes it specific: both
 # names are static, so .dynsym could never have carried them. Not anchored on
 # the "0xOFF:" line, the inline chain puts the name on either half.
-grep -v "$rawframe" "$out" | grep -qE 'st_strsafe|strcpy_safe_' || {
+symbolized=$(grep -v "$rawframe" "$out" || true)
+grep -qE 'st_strsafe|strcpy_safe_' <<<"$symbolized" || {
     echo "the handler did not name the hidden frames:" >&2
     cat "$out" >&2
     exit 1
