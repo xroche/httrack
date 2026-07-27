@@ -6664,10 +6664,10 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
      Out of range for a 64-bit time_t: NULL from gmtime_r, EINVAL from
      _gmtime64_s. */
   if (sizeof(time_t) >= 8) {
-    const time_t far = (time_t) INT64_MAX;
+    const time_t beyond = (time_t) INT64_MAX;
     struct tm tmv;
 
-    if (hts_gmtime(far, &tmv)) {
+    if (hts_gmtime(beyond, &tmv)) {
       fprintf(stderr,
               "gmtime: an out-of-range time_t was reported converted\n");
       err = 1;
