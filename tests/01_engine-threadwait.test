@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_threadwait_st.XXXXXX") || exit 1
+trap 'rm -rf "$tmpdir"' EXIT HUP INT QUIT PIPE TERM
+
+# No pipe into grep: SIGPIPE would mask a failing exit status.
+expect_ok() {
+    local label="$1" out
+    shift
+    out=$("$@" 2>&1) || {
+        echo "FAIL: ${label} exited non-zero: ${out}"
+        exit 1
+    }
+    case "$out" in
+    *"${label}: OK"*) ;;
+    *)
+        echo "FAIL: ${out}"
+        exit 1
+        ;;
+    esac
+}
+
+# A thread is outstanding from the moment hts_newthread() returns, so a wait
+# that follows the spawn joins it, and wait_n(n) still leaves n behind (#747).
+expect_ok "threadwait self-test" httrack -O "${tmpdir}/o1" -#test=threadwait

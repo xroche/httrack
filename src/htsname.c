@@ -43,9 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsencoding.h"
 #include "htssniff.h"
 #include "htscodec.h"
-#if HTS_USEZLIB
 #include "htszlib.h"
-#endif
 #include <ctype.h>
 #include <limits.h>
 

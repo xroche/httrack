@@ -964,16 +964,6 @@ static zipFile wacz_zip_open(const char *path) {
   return zipOpen2_64(path, 0 /*create*/, NULL, &ff);
 }
 
-/* Move src onto dst (UTF-8/Windows-safe); RENAME won't clobber on Windows, so
-   fall back to unlink+rename. Returns 0 on success. */
-static int wacz_rename_over(const char *src, const char *dst) {
-  char cs[CATBUFF_SIZE], cd[CATBUFF_SIZE];
-  if (RENAME(fconv(cs, sizeof(cs), src), fconv(cd, sizeof(cd), dst)) == 0)
-    return 0;
-  (void) UNLINK(fconv(cd, sizeof(cd), dst));
-  return RENAME(fconv(cs, sizeof(cs), src), fconv(cd, sizeof(cd), dst));
-}
-
 /* Package the segment(s) + .cdx + a generated pages.jsonl into <base>.wacz at
    crawl end (the archive file(s) and .cdx are already closed on disk). */
 static void warc_wacz_package(warc_writer *w) {
@@ -1092,7 +1082,7 @@ static void warc_wacz_package(warc_writer *w) {
     hts_log_print(w->opt, LOG_WARNING,
                   "WACZ: packaging failed, kept existing %s untouched",
                   waczpath);
-  } else if (wacz_rename_over(tmppath, waczpath) != 0) {
+  } else if (!hts_rename_over(tmppath, waczpath)) {
     (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmppath));
     hts_log_print(w->opt, LOG_WARNING | LOG_ERRNO,
                   "WACZ: could not finalize %s", waczpath);
