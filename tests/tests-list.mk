@@ -195,6 +195,7 @@ TESTS += 96_local-refetch-keep.test
 TESTS += 97_local-warc-update-keep.test
 TESTS += 98_local-warc-segments.test
 TESTS += 99_local-robots-error.test
+TESTS += 120_local-proxytrack-webdav-default.test
 TESTS += 107_local-bak-collision.test
 TESTS += 108_engine-refetch-backup.test
 TESTS += 122_local-warc-revisit-headers.test

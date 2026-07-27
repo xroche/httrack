@@ -748,7 +748,8 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
             const char *thisUrl = list[i];
             const char *mimeType = "application/octet-stream";
             unsigned int thisUrlLen = (unsigned int) strlen(thisUrl);
-            int thisIsDir = (thisUrl[thisUrlLen - 1] == '/') ? 1 : 0;
+            /* the folder's default document is enumerated as an empty name */
+            int thisIsDir = (hts_lastchar(thisUrl) == '/') ? 1 : 0;
 
             /* Item URL */
             StringRoom(itemUrl,
@@ -853,8 +854,7 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
     for(isDir = 1; isDir >= 0; isDir--) {
       for(i = 0; list[i] != NULL; i++) {
         char *thisUrl = list[i];
-        unsigned int thisUrlLen = (unsigned int) strlen(thisUrl);
-        int thisIsDir = (thisUrl[thisUrlLen - 1] == '/') ? 1 : 0;
+        int thisIsDir = (hts_lastchar(thisUrl) == '/') ? 1 : 0;
 
         if (thisIsDir == isDir) {
           if (isDir)
