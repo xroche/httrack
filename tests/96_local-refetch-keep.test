@@ -1,19 +1,16 @@
 #!/bin/bash
 #
-# A re-fetch cut mid-header must leave the mirrored file alone (#748): unfixed,
-# the aborted read's leftover buffer lands on it. err.bin is the control, an
-# HTTP 500 on the same resource already keeping its copy; stay.bin answers
-# normally with a new body, so a fix that stopped overwriting anything fails.
-#
-# Purging is off: an update purge deletes both files for an unrelated reason
-# (#746), which would hide what this asserts.
+# A re-fetch cut mid-header must leave the mirrored file alone (#748) and keep
+# it out of the update purge (#746). err.bin is the control, an HTTP 500 on the
+# same resource already surviving both; stay.bin answers normally with a new
+# body, so a fix that stopped overwriting anything fails.
 
 set -euo pipefail
 
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" \
-    --rerun-args '--update --purge-old=0' \
+    --rerun-args '--update' \
     --log-found 'after 2 retries at link .*keep/page\.html' \
     --log-found 'after 2 retries at link .*keep/data\.bin' \
     --file-matches 'keep/page.html' 'KEEP-PAGE-V1' \
