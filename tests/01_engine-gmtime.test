@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_gmtime_st.XXXXXX") || exit 1
+trap 'set +e; rm -rf "$tmpdir"' EXIT
+trap 'rm -rf "$tmpdir"' HUP INT QUIT PIPE TERM
+
+# No pipe into grep: SIGPIPE would mask a failing exit status.
+expect_ok() {
+    local label="$1" out
+    shift
+    out=$("$@" 2>&1) || {
+        echo "FAIL: ${label} exited non-zero: ${out}"
+        exit 1
+    }
+    case "$out" in
+    *"${label}: OK"*) ;;
+    *)
+        echo "FAIL: ${out}"
+        exit 1
+        ;;
+    esac
+}
+
+# Concurrent conversions do not tread on each other the way gmtime()'s shared
+# static does (#794).
+expect_ok "gmtime self-test" httrack -O "${tmpdir}/o1" -#test=gmtime

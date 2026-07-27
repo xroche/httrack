@@ -6524,6 +6524,102 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #794: hts_gmtime() must own its output. The table is an independent oracle;
+   the threaded phase is what corrupts if it ever goes back to gmtime()'s
+   shared static. */
+#define GMTIME_THREADS 8
+#define GMTIME_ROUNDS 50000
+
+static const struct {
+  time_t t;
+  int year, mon, mday, hour, min, sec, wday, yday;
+} gmtime_refs[] = {
+    {(time_t) 0, 70, 0, 1, 0, 0, 0, 4, 0},
+    {(time_t) 951782400, 100, 1, 29, 0, 0, 0, 2, 59}, /* a leap day */
+    {(time_t) 1000000000, 101, 8, 9, 1, 46, 40, 0, 251},
+    {(time_t) 2147483647, 138, 0, 19, 3, 14, 7, 2, 18}, /* 32-bit ceiling */
+};
+
+#define GMTIME_REFS ((int) (sizeof(gmtime_refs) / sizeof(gmtime_refs[0])))
+
+static hts_boolean gmtime_ref_matches(int i, const struct tm *tm) {
+  if (tm->tm_year != gmtime_refs[i].year || tm->tm_mon != gmtime_refs[i].mon ||
+      tm->tm_mday != gmtime_refs[i].mday ||
+      tm->tm_hour != gmtime_refs[i].hour || tm->tm_min != gmtime_refs[i].min ||
+      tm->tm_sec != gmtime_refs[i].sec || tm->tm_wday != gmtime_refs[i].wday ||
+      tm->tm_yday != gmtime_refs[i].yday)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
+static htsmutex gmtime_lock = HTSMUTEX_INIT;
+static int gmtime_bad = 0;
+
+static void gmtime_thread(void *arg) {
+  const int i = *(const int *) arg;
+  int bad = 0, round;
+
+  for (round = 0; round < GMTIME_ROUNDS; round++) {
+    struct tm tmv;
+
+    if (!hts_gmtime(gmtime_refs[i].t, &tmv) || !gmtime_ref_matches(i, &tmv))
+      bad++;
+  }
+  hts_mutexlock(&gmtime_lock);
+  gmtime_bad += bad;
+  hts_mutexrelease(&gmtime_lock);
+}
+
+static int st_gmtime(httrackp *opt, int argc, char **argv) {
+  static int idx[GMTIME_THREADS];
+  struct tm first, second;
+  int err = 0, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < GMTIME_REFS; i++) {
+    struct tm tmv;
+
+    if (!hts_gmtime(gmtime_refs[i].t, &tmv)) {
+      fprintf(stderr, "gmtime: conversion #%d failed\n", i);
+      err = 1;
+    } else if (!gmtime_ref_matches(i, &tmv)) {
+      fprintf(stderr,
+              "gmtime: #%d gave %04d-%02d-%02d %02d:%02d:%02d (wday %d, "
+              "yday %d)\n",
+              i, tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday, tmv.tm_hour,
+              tmv.tm_min, tmv.tm_sec, tmv.tm_wday, tmv.tm_yday);
+      err = 1;
+    }
+  }
+
+  /* the first result must survive the second call */
+  if (hts_gmtime(gmtime_refs[0].t, &first) &&
+      hts_gmtime(gmtime_refs[1].t, &second) && !gmtime_ref_matches(0, &first)) {
+    fprintf(stderr, "gmtime: a second conversion disturbed the first\n");
+    err = 1;
+  }
+
+  for (i = 0; i < GMTIME_THREADS; i++) {
+    idx[i] = i % GMTIME_REFS;
+    if (hts_newthread(gmtime_thread, &idx[i]) != 0) {
+      fprintf(stderr, "gmtime: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+  if (gmtime_bad != 0) {
+    fprintf(stderr, "gmtime: %d/%d concurrent conversions were corrupt\n",
+            gmtime_bad, GMTIME_THREADS * GMTIME_ROUNDS);
+    err = 1;
+  }
+
+  printf("gmtime self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -6790,6 +6886,8 @@ static const struct selftest_entry {
      st_changes_race},
     {"threadwait", "", "htsthread_wait() joins threads spawned just before it",
      st_threadwait},
+    {"gmtime", "",
+     "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
