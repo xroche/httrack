@@ -1463,6 +1463,10 @@ static hts_boolean rename_over_aside(httrackp *opt, const char *csrc,
   char caside[CATBUFF_SIZE];
   int err;
 
+  /* Only a regular file may be parked: a directory in the way is not what the
+     caller asked to replace, and parking it orphans it (UNLINK cannot drop). */
+  if (!fexist_utf8(cdst))
+    return HTS_FALSE;
   if (!rename_park_aside(caside, sizeof(caside), cdst))
     return HTS_FALSE;
   if (RENAME(csrc, cdst) == 0) {
