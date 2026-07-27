@@ -149,6 +149,61 @@ void ftp_split_userpass(const char *src, const char *end, char *user,
   }
 }
 
+/* Build "<verb> <path>", quoting a path the server could not parse bare. */
+static void ftp_command(char *line, size_t line_size, const char *verb,
+                        const char *path) {
+  if (strchr(path, ' ') != NULL || strchr(path, '\"') != NULL ||
+      strchr(path, '\'') != NULL)
+    snprintf(line, line_size, "%s \"%s\"", verb, path);
+  else
+    snprintf(line, line_size, "%s %s", verb, path);
+}
+
+/* MDTM reply "213 YYYYMMDDHHMMSS[.frac]" (RFC 3659, UTC) into tm_time. */
+static hts_boolean ftp_parse_mdtm(const char *line, struct tm *tm_time) {
+  int year, mon, mday, hour, min, sec;
+
+  if (sscanf(line, "213 %4d%2d%2d%2d%2d%2d", &year, &mon, &mday, &hour, &min,
+             &sec) != 6)
+    return HTS_FALSE;
+  if (year < 1900 || mon < 1 || mon > 12 || mday < 1 || mday > 31 || hour < 0 ||
+      hour > 23 || min < 0 || min > 59 || sec < 0 || sec > 60)
+    return HTS_FALSE;
+  memset(tm_time, 0, sizeof(*tm_time));
+  tm_time->tm_year = year - 1900;
+  tm_time->tm_mon = mon - 1;
+  tm_time->tm_mday = mday;
+  tm_time->tm_hour = hour;
+  tm_time->tm_min = min;
+  tm_time->tm_sec = sec;
+  tm_time->tm_isdst = 0;
+  return HTS_TRUE;
+}
+
+/* Whether the local copy can still be a prefix of the remote file. FTP has no
+   conditional fetch, so an unprovable answer has to be no (#823). */
+static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
+                                  time_t remote_mtime) {
+  const time_t local_mtime = get_filetime(back->url_sav);
+
+  if (back->r.totalsize <= back->range_req_size) {
+    hts_log_print(opt, LOG_DEBUG,
+                  "FTP: not resuming %s%s, the local copy is not shorter",
+                  back->url_adr, back->url_fil);
+    return HTS_FALSE;
+  }
+  /* Equality, not ordering: a copy this code did not stamp carries a local
+     clock time newer than any MDTM, which "not newer" would wave through. */
+  if (remote_mtime == (time_t) -1 || local_mtime == (time_t) -1 ||
+      remote_mtime != local_mtime) {
+    hts_log_print(opt, LOG_DEBUG,
+                  "FTP: not resuming %s%s, the copy is not dated as the remote",
+                  back->url_adr, back->url_fil);
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 // la véritable fonction une fois lancées les routines thread/fork
 int run_launch_ftp(FTPDownloadStruct * pStruct) {
   lien_back *back = pStruct->pBack;
@@ -184,6 +239,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   strcpybuff(back->r.msg, "");
   back->r.statuscode = 0;
   back->r.size = 0;
+  back->r.lastmodified[0] = '\0'; // a retry must not stamp the previous MDTM
 
   // récupérer user et pass si présents, et sauter user:id@ dans adr
   real_adr = strchr(back->url_adr, ':');
@@ -458,14 +514,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               char catbuff[CATBUFF_SIZE];
               char *ua = unescape_http(catbuff, sizeof(catbuff), ftp_filename);
 
-              if ((strchr(ua, ' '))
-                  || (strchr(ua, '\"'))
-                  || (strchr(ua, '\''))
-                ) {
-                snprintf(line, sizeof(line), "SIZE \"%s\"", ua);
-              } else {
-                snprintf(line, sizeof(line), "SIZE %s", ua);
-              }
+              ftp_command(line, sizeof(line), "SIZE", ua);
 
               // SIZE?
               strcpybuff(back->info, "size");
@@ -474,6 +523,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               _CHECK_HALT_FTP;
               if (line[0] == '2') {     // SIZE compris, ALORS tester REST (sinon pas tester: cf probleme des txt.gz decompresses a la volee)
                 char *szstr = strchr(line, ' ');
+                time_t remote_mtime = (time_t) -1;
+                struct tm remote_tm;
 
                 if (szstr) {
                   LLint size = 0;
@@ -483,16 +534,40 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                     back->r.totalsize = size;
                   }
                 }
-                // REST?
-                if (fexist(back->url_sav) && (transfer_list == 0)) {
+
+                // MDTM?
+                ftp_command(line, sizeof(line), "MDTM", ua);
+                strcpybuff(back->info, "mdtm");
+                send_line(soc_ctl, line);
+                get_ftp_line(soc_ctl, line, sizeof(line), timeout);
+                _CHECK_HALT_FTP;
+                if (ftp_parse_mdtm(line, &remote_tm)) {
+                  char date[256];
+
+                  time_rfc822(date, &remote_tm);
+                  /* Stamp the mirror as the HTTP path does, so a later pass
+                     compares server-clock times instead of crossing clocks. */
+                  back->r.lastmodified[0] = '\0';
+                  strlncatbuff(back->r.lastmodified, date,
+                               sizeof(back->r.lastmodified),
+                               sizeof(back->r.lastmodified) - 1);
+                  remote_mtime = timegm(&remote_tm);
+                }
+
+                /* Only over a copy back_add() judged partial: on --update every
+                   mirrored file exists, and resuming a complete one splices the
+                   old body into the new (#798). */
+                if (back->range_req_size > 0 && (transfer_list == 0) &&
+                    ftp_may_resume(opt, back, remote_mtime)) {
                   strcpybuff(back->info, "rest");
-                  snprintf(line, sizeof(line), "REST " LLintP, (LLint) fsize(back->url_sav));
+                  snprintf(line, sizeof(line), "REST " LLintP,
+                           (LLint) back->range_req_size);
                   send_line(soc_ctl, line);
                   get_ftp_line(soc_ctl, line, sizeof(line), timeout);
                   _CHECK_HALT_FTP;
                   if ((line[0] == '3') || (line[0] == '2')) {   // ok
                     rest_understood = 1;
-                  }             // sinon tant pis 
+                  } // else never mind
                 }
               }                 // sinon tant pis 
             }
@@ -617,9 +692,12 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         // Ok, connexion initiée
         //
         if (soc_dat != INVALID_SOCKET) {
-          if (rest_understood) {        // REST envoyée et comprise
+          if (rest_understood) { // REST sent and understood
             file_notify(opt, back->url_adr, back->url_fil, back->url_sav, 0, 1,
                         0);
+            /* The bytes already on disk count too, or the completeness check
+               below rejects every resumed transfer (#798). */
+            back->r.size = back->range_req_size;
             back->r.fp = fileappend(&opt->state.strc, back->url_sav);
           } else {
             file_notify(opt, back->url_adr, back->url_fil, back->url_sav, 1, 1,
@@ -689,6 +767,10 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               fclose(back->r.fp);
               back->r.fp = NULL;
             }
+            /* back_flush_output() stamps only r.is_write transfers, which FTP
+               never is; a partial needs the remote's date too (#823). */
+            if (strnotempty(back->r.lastmodified))
+              set_filetime_rfc822(back->url_sav, back->r.lastmodified);
           } else {
             strcpybuff(back->r.msg, "Unable to write file");
             back->r.statuscode = STATUSCODE_INVALID;

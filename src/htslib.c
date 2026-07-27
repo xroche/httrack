@@ -2697,17 +2697,8 @@ void hts_now_iso8601(char out[32]) {
   time_t t = time(NULL);
   struct tm tmv;
 
-#if defined(_WIN32)
-  struct tm *g = gmtime(&t);
-
-  if (g != NULL)
-    tmv = *g;
-  else
+  if (!hts_gmtime(t, &tmv))
     memset(&tmv, 0, sizeof(tmv));
-#else
-  if (gmtime_r(&t, &tmv) == NULL)
-    memset(&tmv, 0, sizeof(tmv));
-#endif
   strftime(out, 32, "%Y-%m-%dT%H:%M:%SZ", &tmv);
 }
 
@@ -2849,6 +2840,15 @@ int set_filetime_rfc822(const char *file, const char *date) {
     return set_filetime(file, tm_s);
   } else
     return -1;
+}
+
+/* Note: utf-8 */
+time_t get_filetime(const char *file) {
+  STRUCT_STAT buf;
+
+  if (STAT(file, &buf) != 0)
+    return (time_t) -1;
+  return (time_t) buf.st_mtime;
 }
 
 /* Note: utf-8 */

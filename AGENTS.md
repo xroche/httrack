@@ -19,7 +19,7 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   (`request_queue_size`) so macOS/BSD don't drop connections under a parallel
   `-c16` bigcrawl the way Python's default backlog of 5 did.
   Or run `sh build.sh` to do bootstrap + configure + make in one shot.
-- A `tests/NN_*.test` runs only if listed in `tests/Makefile.am`'s `TESTS`; an
+- A `tests/NN_*.test` runs only if listed in `tests/tests-list.mk`; an
   unregistered file is silently skipped.
 - `make check` prepends the build's `src/` to `PATH`, but a hand-run `.test` does
   not — an installed `/usr/bin/httrack` then shadows your build. Run via `make
@@ -30,12 +30,14 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   failing cleanup command becomes the test's exit status (#773). Keep the other
   signals on their own `trap` line, or errexit stays off for the rest of the run.
   The guard also resets `$?`, so save it first if teardown reads it.
-- Never assert with `cmd | grep -q MARKER && fail`. Under `pipefail` the
-  pipeline is non-zero both when `cmd` fails and when `grep -q` matches early
-  and SIGPIPEs it, so the `&&` never fires and a probe that proved nothing reads
-  as "marker absent". Capture the reply, assert the status line it must carry
-  (an empty, truncated or redirected one is marker-free too), then match with a
-  here-string.
+- Never pipe into `grep -q`: it exits on the first match, so whatever the
+  producer had left to write takes SIGPIPE, and under `pipefail` that becomes
+  the pipeline's status. `cmd | grep -q M && fail` then never fires and a probe
+  that proved nothing reads as "marker absent"; `cmd | grep -q M || fail` fails
+  a test whose marker was present. bash issues one `write()` per line, so any
+  match that is not on the last line is exposed. Capture the reply, assert the
+  status line it must carry (an empty, truncated or redirected one is
+  marker-free too), then match with a here-string: `grep -q M <<<"$reply"`.
 
 ## Hard invariants
 - **Generated autotools files are NOT in git.** `configure`, every

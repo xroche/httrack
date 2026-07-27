@@ -211,7 +211,8 @@ jobs:
           pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
           for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test \
                    *_local-*.test 13_crawl_proxy_https.test 58_watchdog.test \
-                   60_crawl-log-salvage.test 116_engine-rtrim.test; do
+                   60_crawl-log-salvage.test 116_engine-rtrim.test \
+                   106_engine-repair-rename.test; do
             elapsed=$((SECONDS - started))
             if [ "$elapsed" -ge "$suite_deadline" ]; then
               echo "::error::suite deadline: ${elapsed}s elapsed, stopping before $t"
@@ -262,8 +263,9 @@ jobs:
           # crange pending #581;
           # webdav-mime needs a reapable background listener, which MSYS cannot give it;
           # badmtime needs a filesystem that stores an mtime past gmtime's range;
-          # single-file ends on a GUI half needing htsserver, which this job does not build.
-          expected_skips=" 01_engine-footer-overflow.test 100_local-purge-longpath.test 48_local-crange-memresume.test 71_local-crange-repaircache.test 79_local-proxytrack-webdav-mime.test 88_local-proxytrack-badmtime.test 94_local-single-file.test"
+          # single-file ends on a GUI half needing htsserver, which this job does not build;
+          # update-304-leak needs a LeakSanitizer build, which MSVC has no equivalent of.
+          expected_skips=" 01_engine-footer-overflow.test 100_local-purge-longpath.test 114_local-update-304-leak.test 48_local-crange-memresume.test 71_local-crange-repaircache.test 79_local-proxytrack-webdav-mime.test 88_local-proxytrack-badmtime.test 94_local-single-file.test"
           # First, or the deadline reads as an unexplained shortfall in the gates below.
           [ "$deadline" -eq 0 ] || { echo "::error::suite did not finish within ${suite_deadline}s"; exit 1; }
           [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
