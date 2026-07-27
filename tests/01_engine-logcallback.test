@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+# a log callback consumed the va_list the log file's vfprintf() still needed (#801).
+
+set -euo pipefail
+
+httrack -O /dev/null -#test=logcallback | grep -q "logcallback self-test OK"
