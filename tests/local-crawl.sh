@@ -34,6 +34,9 @@
 # httrack via --cookies-file, to exercise preloaded cookies.
 # --rerun-dead re-runs with the server stopped: the no-data rollback must
 # restore the previous hts-cache generation byte-identical.
+# --archive-kept-on-rerun inverts the usual repackaging check: the second pass
+# must leave the first pass's .warc[.gz]/.cdx/.wacz byte-identical, because a
+# cache-served pass holds no bodies to replace them with (#759).
 
 set -u
 
@@ -54,6 +57,7 @@ outdir_intl=
 rerun=
 rerun_args=
 rerun_dead=
+archive_kept=
 tmpdir=
 serverpid=
 crawlpid=
@@ -118,6 +122,8 @@ while test "$pos" -lt "$nargs"; do
     --debug) verbose=1 ;;
     --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
+    # the second pass must leave the first pass's archive files untouched
+    --archive-kept-on-rerun) archive_kept=1 ;;
     # validate the produced .warc.gz (see the validation block near the end)
     --warc-validate) warc_validate=1 ;;
     # validate the produced .wacz package (stdlib, plus py-wacz/pywb if present)
@@ -274,10 +280,24 @@ if test -n "$warc_validate"; then
     test -z "$w1" || cp "$w1" "${tmpdir}/warc-pass1.gz"
 fi
 
+# --archive-kept-on-rerun: snapshot everything the second pass must not touch.
+declare -a kept_files=()
+if test -n "$archive_kept"; then
+    while read -r f; do
+        test -n "$f" || continue
+        cp "$f" "${tmpdir}/kept-${#kept_files[@]}" || die "could not snapshot $f"
+        kept_files+=("$f")
+    done < <(find "$mirrorroot" -maxdepth 2 \
+        \( -name '*.warc.gz' -o -name '*.warc' -o -name '*.cdx' -o -name '*.wacz' \) \
+        2>/dev/null | sort)
+    test "${#kept_files[@]}" -gt 0 ||
+        die "--archive-kept-on-rerun: the first pass produced no archive to keep"
+fi
+
 # Poison the first-pass .wacz when a second pass follows: repackaging moves the
 # new archive over it, so the marker must be gone afterwards (#726). Poisoning
 # beats comparing the two packages, which can come out byte-identical.
-if test -n "$wacz_validate" && test -n "${rerun}${rerun_args}"; then
+if test -z "$archive_kept" && test -n "$wacz_validate" && test -n "${rerun}${rerun_args}"; then
     wacz_poisoned=$(find "$mirrorroot" -maxdepth 2 -name '*.wacz' 2>/dev/null | sort | tail -n1)
     test -z "$wacz_poisoned" || echo "$wacz_poison" >"$wacz_poisoned"
 fi
@@ -324,6 +344,26 @@ if test -n "$rerun_args"; then
         exit 1
     }
     result "OK (second pass)"
+fi
+
+# --- optional: the second pass must not have touched the archive -------------
+if test "${#kept_files[@]}" -gt 0; then
+    i=0
+    for f in "${kept_files[@]}"; do
+        info "checking the second pass kept $(basename "$f")"
+        if cmp -s "${tmpdir}/kept-${i}" "$f"; then
+            result "OK"
+        else
+            result "rewritten: the previous archive was destroyed"
+            exit 1
+        fi
+        i=$((i + 1))
+    done
+    # A leftover in-progress file is as bad: the next pass would silently eat it.
+    info "checking no in-progress archive was left behind"
+    leftover=$(find "$mirrorroot" -maxdepth 2 -name '*.warc.gz.tmp' -o -maxdepth 2 -name '*.warc.tmp' 2>/dev/null | head -n1)
+    test -z "$leftover" || die "left behind $leftover"
+    result "OK"
 fi
 
 # --- optional dead pass: server stopped, the cache must survive the rollback --
@@ -397,14 +437,18 @@ if test -n "$warc_validate"; then
         die "fresh WARC validation failed"
     result "OK"
 
-    # Final file: after an update pass the unchanged assets must be revisits.
-    if test -n "$rerun"; then
+    # After an update pass the unchanged assets must be revisits. The pass has
+    # to write its own archive (named by WARC_VALIDATE_UPDATE): a pass that only
+    # revisits never replaces the archive holding the bodies it strands (#759).
+    if test -n "${WARC_VALIDATE_UPDATE:-}"; then
+        upd=$(find "$mirrorroot" -maxdepth 2 -name "$WARC_VALIDATE_UPDATE" 2>/dev/null | head -n1)
+        test -n "$upd" || die "no $WARC_VALIDATE_UPDATE produced under $mirrorroot"
         declare -a revargs=(--expect-revisit)
         for sub in ${WARC_VALIDATE_NORESP:-}; do
             revargs+=(--no-response-for "$sub")
         done
         info "validating update WARC (revisits)"
-        "$python" "$validator" "$(nativepath "$warc")" "${revargs[@]}" >&2 ||
+        "$python" "$validator" "$(nativepath "$upd")" "${revargs[@]}" >&2 ||
             die "update WARC validation failed"
         result "OK"
     fi
