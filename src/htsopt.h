@@ -551,6 +551,12 @@ struct httrackp {
                               the previous mirror. Tail: ABI */
   void *changes_state;   /**< live change-report accumulator (hts_changes*),
                               engine-owned. Tail: ABI */
+  hts_boolean single_file; /**< --single-file: once the mirror is done, rewrite
+                                each saved page with its assets inlined as
+                                data: URIs. Tail: ABI */
+  LLint single_file_max_size; /**< --single-file-max-size: per-asset cap in
+                                   bytes; a bigger asset stays a link.
+                                   Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

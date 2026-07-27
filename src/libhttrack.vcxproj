@@ -131,6 +131,7 @@
     <ClCompile Include="htsproxy.c" />
     <ClCompile Include="htsrobots.c" />
     <ClCompile Include="htsselftest.c" />
+    <ClCompile Include="htssinglefile.c" />
     <ClCompile Include="htssniff.c" />
     <ClCompile Include="htsthread.c" />
     <ClCompile Include="htstools.c" />

@@ -191,6 +191,7 @@ TESTS = \
 	90_webhttrack-checkbox-clear.test \
 	91_webhttrack-directory.test \
 	92_local-proxytrack-ndx-fields.test \
-	93_local-changes.test
+	93_local-changes.test \
+	94_local-single-file.test
 
 CLEANFILES = check-network_sh.cache

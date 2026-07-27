@@ -968,3 +968,11 @@ Report what changed since the previous mirror
 Rapporteren wat er sinds de vorige spiegeling is gewijzigd
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 Ook hts-changes.json schrijven met een overzicht van wat deze doorloop nieuw, gewijzigd, ongewijzigd of verdwenen laat ten opzichte van de vorige spiegeling.
+Inline assets as data: URIs (self-contained pages)
+Bronnen insluiten als data:-URI's (op zichzelf staande pagina's)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Zodra de spiegeling klaar is, elke opgeslagen pagina herschrijven met ingesloten stijlbladen, scripts, afbeeldingen en lettertypen, zodat een pagina ook los geopend kan worden.
+Largest inlined asset (bytes):
+Grootste ingesloten bron (bytes):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+Een bron boven deze grootte houdt een gewone koppeling; laat leeg voor de standaardwaarde van 10485760 bytes.

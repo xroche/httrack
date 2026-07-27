@@ -968,3 +968,11 @@ Report what changed since the previous mirror
 Porocaj, kaj se je spremenilo od prejsnjega zrcaljenja
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 Zapisi tudi hts-changes.json s seznamom tega, kar je v primerjavi s prejsnjim zrcaljenjem novo, spremenjeno, nespremenjeno ali izginilo.
+Inline assets as data: URIs (self-contained pages)
+Vgradi vire kot data: URI (samostojne strani)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Ko je zrcaljenje koncano, se vsaka shranjena stran prepise z vgrajenimi slogovnimi listi, skripti, slikami in pisavami, tako da jo je mogoce odpreti tudi samostojno.
+Largest inlined asset (bytes):
+Najvecji vgrajeni vir (bajti):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+Vir, vecji od te velikosti, ohrani obicajno povezavo; pustite prazno za privzetih 10485760 bajtov.

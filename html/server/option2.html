@@ -104,6 +104,7 @@ ${do:end-if}
 <input type="hidden" name="hidepwd" value="">
 <input type="hidden" name="hidequery" value="">
 <input type="hidden" name="nopurge" value="">
+<input type="hidden" name="singlefile" value="">
 
 ${LANG_I33}
 <br>
@@ -143,6 +144,13 @@ ${listid:build:LISTDEF_3}
 <tr><td><input type="checkbox" name="nopurge"   ${checked:nopurge}  
 			title='${html:LANG_I1a}' onMouseOver="info('${html:LANG_I1a}'); return true" onMouseOut="info('&nbsp;'); return true"
 > ${LANG_I57}</td></tr>
+<tr><td><input type="checkbox" name="singlefile" ${checked:singlefile}
+			title='${html:LANG_SINGLEFILETIP}' onMouseOver="info('${html:LANG_SINGLEFILETIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+> ${LANG_SINGLEFILE}</td></tr>
+<tr><td>${LANG_SINGLEFILEMAX}
+<input name="singlefilemax" value="${singlefilemax}" size="12"
+			title='${html:LANG_SINGLEFILEMAXTIP}' onMouseOver="info('${html:LANG_SINGLEFILEMAXTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+></td></tr>
 </table>
 
 <tr><td>

@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htswarc.h"
 #include "htschanges.h"
+#include "htssinglefile.h"
 
 /* specific definitions */
 #include "htsbase.h"
@@ -2206,6 +2207,10 @@ int httpmirror(char *url1, httrackp * opt) {
   }
   // fin purge!
 
+  /* --single-file: inline each page's assets now the tree is final, after the
+     purge has deleted whatever this run dropped. */
+  singlefile_process_mirror(opt);
+
   // Indexation
   if (opt->kindex)
     index_finish(StringBuff(opt->path_html), opt->kindex);
@@ -3675,6 +3680,10 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   to->warc_cdx = from->warc_cdx;
   to->warc_wacz = from->warc_wacz;
   to->changes = from->changes;
+
+  to->single_file = from->single_file;
+  if (from->single_file_max_size > 0)
+    to->single_file_max_size = from->single_file_max_size;
 
   if (from->pause_max_ms > 0) {
     to->pause_min_ms = from->pause_min_ms;
