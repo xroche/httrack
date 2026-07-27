@@ -1730,16 +1730,12 @@ int httpmirror(char *url1, httrackp * opt) {
               if (charset != NULL)
                 free(charset);
             }
-            /* Could not detect charset: could it be UTF-8 ? */
-            /* No, we can not do that: browsers do not do it
-               (and it would break links). */
-            /* Could not detect charset */
+            /* Left empty when the document declared none: guessing UTF-8 here
+               would break links, and the parser picks its own fallback */
             if (page_charset[0] == '\0') {
               hts_log_print(opt, LOG_INFO,
                             "Warning: could not detect encoding for: %s%s",
                             urladr(), urlfil());
-              /* Fallback to ISO-8859-1 (~== identity) ; accents will look weird */
-              strcpy(page_charset, "iso-8859-1");
             }
           }
 
@@ -1772,7 +1768,9 @@ int httpmirror(char *url1, httrackp * opt) {
             /* */
             str.ptr_ = &ptr;
             /* */
-            str.page_charset_ = page_charset[0] != '\0' ? page_charset : NULL;
+            /* NULL when conversion is off, empty when the document declared no
+               charset; the parser tells the two apart */
+            str.page_charset_ = opt->convert_utf8 ? page_charset : NULL;
             /* */
             /* */
             stre.r_ = &r;

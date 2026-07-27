@@ -279,6 +279,20 @@ static void url_drop_fragment(char *const url) {
     *frag = '\0';
 }
 
+/* Charset to decode the page with, or NULL when conversion is off. *declared
+   tells a charset the document named from the iso-8859-1 guess standing in. */
+static const char *page_charset(const htsmoduleStruct *str,
+                                hts_boolean *declared) {
+  const char *const charset = str->page_charset_;
+
+  if (charset == NULL) {
+    *declared = HTS_FALSE;
+    return NULL;
+  }
+  *declared = *charset != '\0' ? HTS_TRUE : HTS_FALSE;
+  return *declared ? charset : "iso-8859-1";
+}
+
 /* True if [s, s+len) is exactly an HTTP method token (XHR.open's first
    argument is a method, not a URL: #218). Case-insensitive. */
 static int is_http_method(const char *s, size_t len) {
@@ -685,14 +699,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
 
                         // Decode title with encoding
-                        if (str->page_charset_ != NULL &&
-                            *str->page_charset_ != '\0') {
-                          char *sUtf = hts_convertStringToUTF8(
-                              s, strlen(s), str->page_charset_);
-                          if (sUtf != NULL) {
-                            /* UTF-8 can expand past s[]; truncate to fit */
-                            snprintf(s, sizeof(s), "%s", sUtf);
-                            freet(sUtf);
+                        {
+                          hts_boolean declared;
+                          const char *const charset =
+                              page_charset(str, &declared);
+
+                          // Guessed charset: never re-encode valid UTF-8 (#833)
+                          if (charset != NULL && !hts_isCharsetUTF8(charset) &&
+                              (declared || !hts_isStringUTF8(s, strlen(s)))) {
+                            char *sUtf =
+                                hts_convertStringToUTF8(s, strlen(s), charset);
+
+                            if (sUtf != NULL) {
+                              /* UTF-8 can expand past s[]; truncate to fit */
+                              snprintf(s, sizeof(s), "%s", sUtf);
+                              freet(sUtf);
+                            }
                           }
                         }
 
@@ -2110,9 +2132,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 /* Unescape/escape %20 and other &nbsp; */
                 {
                   // NULL when UTF-8 conversion is off (-%T0)
-                  const char *const charset = str->page_charset_;
-                  const int hasCharset = charset != NULL 
-                    && *charset != '\0';
+                  hts_boolean declared;
+                  const char *const charset = page_charset(str, &declared);
+                  const int hasCharset = charset != NULL;
                   char BIGSTK query[HTS_URLMAXSIZE * 2];
 
                   // cut query string
