@@ -62,6 +62,15 @@ test "$pathmax" -ge $((need + ${#work} + 128)) || {
     exit 77
 }
 
+# Same on Win32, where MAX_PATH clamps the save path; getconf answers for the
+# MSYS emulation, not the Win32 API httrack calls, so it cannot see this.
+case "$(uname -s)" in
+MINGW* | MSYS* | CYGWIN*)
+    echo "Win32 MAX_PATH cannot hold a $need-byte save path; skipping" >&2
+    exit 77
+    ;;
+esac
+
 urlpath=""
 while test $((need - ${#urlpath})) -gt 60; do
     urlpath="${urlpath}$(printf 'd%02d' ${#urlpath})$(printf 'a%.0s' $(seq 1 46))/"
