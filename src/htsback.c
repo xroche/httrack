@@ -391,6 +391,56 @@ int back_selftest_slot_swap(void) {
   CHECK(0, "the dummy test slot");
 #undef CHECK
 
+  /* The swap round-trip must not lose the size of a slot whose body is already
+     at url_sav, or the link writer blanks the file (#797). */
+  {
+    static const char body[] = "swapped body";
+    int c;
+
+    for (c = 0; c < 2; c++) {
+      const hts_boolean inmemory = c == 0 ? HTS_TRUE : HTS_FALSE;
+      FILE *const fp = tmpfile();
+      lien_back *copy = NULL;
+
+      memset(&back, 0, sizeof(back));
+      back.status = STATUS_READY;
+      strcpybuff(back.url_sav, "/tmp/httrack-selftest.bin");
+      back.r.size = (LLint) sizeof(body) - 1;
+      if (inmemory) {
+        back.r.adr = strdupt(body);
+      }
+      if (fp == NULL || back_serialize(fp, &back) != 0 ||
+          fseek(fp, 0, SEEK_SET) != 0 || back_unserialize(fp, &copy) != 0) {
+        fprintf(stderr, "backswap: round-trip failed for a %s slot\n",
+                inmemory ? "buffered" : "direct-to-disk");
+        err = 1;
+      } else {
+        if (copy->r.size != back.r.size) {
+          fprintf(stderr,
+                  "backswap: %s slot came back with size " LLintP
+                  ", expected " LLintP "\n",
+                  inmemory ? "buffered" : "direct-to-disk", copy->r.size,
+                  back.r.size);
+          err = 1;
+        }
+        if (inmemory && (copy->r.adr == NULL ||
+                         memcmp(copy->r.adr, body, sizeof(body) - 1) != 0)) {
+          fprintf(stderr, "backswap: buffered slot lost its body\n");
+          err = 1;
+        }
+        if (!inmemory && copy->r.adr != NULL) {
+          fprintf(stderr, "backswap: direct-to-disk slot gained a body\n");
+          err = 1;
+        }
+        back_clear_entry(copy);
+        freet(copy);
+      }
+      if (fp != NULL)
+        fclose(fp);
+      freet(back.r.adr);
+    }
+  }
+
   printf("backswap self-test: %s\n", err ? "FAIL" : "OK");
   return err;
 }
@@ -1236,6 +1286,13 @@ void back_connxfr(htsblk * src, htsblk * dst) {
   src->debugid = 0;
 }
 
+/* Release the buffers a response owns. The connection members are left alone:
+   back_connxfr() moves those, and the file handles are closed elsewhere. */
+static void back_free_response(htsblk *r) {
+  deleteaddr(r);
+  warc_free_request(r);
+}
+
 void back_move(lien_back * src, lien_back * dst) {
   memcpy(dst, src, sizeof(lien_back));
   memset(src, 0, sizeof(lien_back));
@@ -1329,7 +1386,10 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     (*dst)->r.ssl_con = NULL;
 #endif
     if (back_data_unserialize(fp, (void **) &(*dst)->r.adr, &size) == 0) {
-      (*dst)->r.size = size;
+      /* A bodyless slot already wrote its bytes to url_sav (FTP, direct to
+         disk); zeroing r.size makes the writer blank that file (#797). */
+      if ((*dst)->r.adr != NULL)
+        (*dst)->r.size = size;
       (*dst)->r.headers = NULL;
       if (back_string_unserialize(fp, &(*dst)->r.headers) == 0)
         return 0;               /* ok */
@@ -1768,10 +1828,7 @@ int back_clear_entry(lien_back * back) {
       back->r.soc = INVALID_SOCKET;
     }
 
-    if (back->r.adr != NULL) {  // reste un bloc à désallouer
-      freet(back->r.adr);
-      back->r.adr = NULL;
-    }
+    back_free_response(&back->r);
     if (back->chunk_adr != NULL) {      // reste un bloc à désallouer
       freet(back->chunk_adr);
       back->chunk_adr = NULL;
@@ -1785,12 +1842,6 @@ int back_clear_entry(lien_back * back) {
       back_tmpdir_drop(back->tmpfile);
       back->tmpfile = NULL;
     }
-    // headers
-    if (back->r.headers != NULL) {
-      freet(back->r.headers);
-      back->r.headers = NULL;
-    }
-    warc_free_request(&back->r);
     // Tout nettoyer
     memset(back, 0, sizeof(lien_back));
     back->r.soc = INVALID_SOCKET;
@@ -4095,6 +4146,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                       memset(&tmp, 0, sizeof(tmp));
                       back_connxfr(&back[i].r, &tmp);
+                      /* the cache entry overwrites the whole struct, so drop
+                         what the 304 response still owns first (#782) */
+                      back_free_response(&back[i].r);
                       back[i].r =
                         cache_read(opt, cache, back[i].url_adr, back[i].url_fil,
                                    back[i].url_sav, back[i].location_buffer);

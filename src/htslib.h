@@ -157,6 +157,19 @@ struct t_dnscache {
   char host_addr[HTS_MAXADDRNUM][HTS_MAXADDRLEN];
 };
 
+/* Break t down as UTC into the caller's buffer, HTS_FALSE if that failed.
+   gmtime()'s static is shared, and both the engine and ProxyTrack convert on
+   worker threads. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_gmtime(time_t t,
+                                                    struct tm *tmbuf) {
+#ifdef _WIN32
+  /* Microsoft's gmtime_s takes the destination first, unlike C11 Annex K. */
+  return gmtime_s(tmbuf, &t) == 0 ? HTS_TRUE : HTS_FALSE;
+#else
+  return gmtime_r(&t, tmbuf) != NULL ? HTS_TRUE : HTS_FALSE;
+#endif
+}
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
@@ -265,6 +278,8 @@ void hts_now_iso8601(char out[32]);
 struct tm *convert_time_rfc822(struct tm *buffer, const char *s);
 int set_filetime(const char *file, struct tm *tm_time);
 int set_filetime_rfc822(const char *file, const char *date);
+/* File mtime as a UTC time_t, or (time_t) -1 if it can not be read. */
+time_t get_filetime(const char *file);
 int get_filetime_rfc822(const char *file, char *date);
 HTS_INLINE void time_rfc822(char *s, struct tm *A);
 HTS_INLINE void time_rfc822_local(char *s, struct tm *A);

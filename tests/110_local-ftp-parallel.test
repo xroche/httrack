@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# A completed FTP transfer used to end as a 0-byte file when its ready backlog
+# slot was swapped to the on-disk table (#797): the FTP worker writes url_sav
+# itself and leaves no in-memory body, and the swap round-trip zeroed the slot's
+# size, so the link writer then created an empty file over the bytes.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+server=$(nativepath "${testdir}/ftp-server.py")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+root="${tmpdir}/root"
+out="${tmpdir}/crawl"
+mkdir -p "$root" "$out"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+ok() { echo "OK: $*"; }
+size_of() { wc -c <"$1" | tr -d '[:space:]'; }
+
+# Distinct bodies and lengths, so a mirror that mixed two of them up cannot
+# compare equal.
+names=""
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+    names="${names} f${i}"
+    "$python" -c 'import sys; sys.stdout.buffer.write(
+        ("BODY-%s " % sys.argv[1]).encode() + sys.argv[1].encode() * (400 * int(sys.argv[1])))' \
+        "$i" >"${root}/f${i}.bin"
+done
+
+serverlog="${tmpdir}/server.out"
+"$python" "$server" --root "$(nativepath "$root")" >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 300); do
+    line=$(grep -m1 '^PORT ' "$serverlog" 2>/dev/null) && port="${line#PORT }" && break
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "ftp server exited early: $(cat "$serverlog")" >&2
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover ftp server port: $(cat "$serverlog")" >&2
+    exit 1
+}
+host="127.0.0.1_${port}"
+
+urls=()
+for name in $names; do
+    urls+=("ftp://127.0.0.1:${port}/${name}.bin")
+done
+
+# -c8, never -c1: a slot is only swapped out while other transfers keep the
+# parser from picking it up. -Z because the swap only logs at debug level, and
+# the run below proves nothing unless it happened. Bounded like every crawl
+# pass: a wedge must fail the test, not hang the job until CI discards the log.
+run_with_timeout 300 httrack "${urls[@]}" -O "$out" --quiet -Z -c8 \
+    --disable-security-limits --robots=0 --timeout=20 --max-time=120 --retries=1 \
+    >"${tmpdir}/log" 2>&1
+
+swapped=$(grep -ac 'slots ready moved to background' "${out}/hts-log.txt" || true)
+test "${swapped:-0}" -gt 0 ||
+    fail "no ready slot was swapped to disk; this run never reached the bug"
+ok "the crawl swapped ready slots to the on-disk table ${swapped} times"
+
+for name in $names; do
+    test -f "${out}/${host}/${name}.bin" || fail "${name}.bin was not mirrored"
+    cmp -s "${out}/${host}/${name}.bin" "${root}/${name}.bin" ||
+        fail "${name}.bin has $(size_of "${out}/${host}/${name}.bin") of the" \
+            "$(size_of "${root}/${name}.bin") bytes served"
+done
+ok "every FTP transfer landed on disk intact"
+
+errors=$(grep -a 'Error:' "${out}/hts-log.txt" || true)
+test -z "$errors" || fail "the crawl reported errors: ${errors}"
+ok "no transfer was reported failed"

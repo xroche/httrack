@@ -2659,8 +2659,11 @@ static int st_logcallback(httrackp *opt, int argc, char **argv) {
   strcpybuff(seen, st_log_callback_seen);
 
   rewind(fp);
-  line[0] = '\0';
-  (void) fgets(line, (int) sizeof(line), fp);
+  if (fgets(line, (int) sizeof(line), fp) == NULL) {
+    fprintf(stderr, "logcallback: log file is empty, nothing was written\n");
+    fclose(fp);
+    return 1;
+  }
   fclose(fp);
 
   /* The callback runs above the level filter and without a log file at all;
@@ -5598,12 +5601,20 @@ static int sf_nesting(const char *hay, const char *mime) {
 static const char sf_png[] = "\x89PNG\r\n\x1a\n\x00\x01\x02\xff";
 #define SF_PNG_LEN 12
 
+static const char sf_svg[] = "<svg><g id=\"icon-a\"/></svg>";
+
 static const char sf_page[] =
     "<html><head>\n"
     "<link rel=\"stylesheet\" href=\"css/main.css\">\n"
     "<link rel=\"canonical\" href=\"other.html\">\n"
     "<title>t</title>\n"
-    "<style>body { background: url(\"img/a%20b.png\"); }</style>\n"
+    "<style>body { background: url(\"img/a%20b.png\"); }\n"
+    /* Everything the escape set has to neutralise before a fragment reaches an
+       unquoted url() token: whitespace, '<'/'>', then a quote, a paren, a
+       backslash and a high byte together. */
+    "b { background: url('img/sprite.svg#w x'); }\n"
+    "i { background: url('img/sprite.svg#lt<s>gt'); }\n"
+    "u { background: url(\"img/sprite.svg#z'(\\\xC3\xA9\"); }</style>\n"
     "</head><body>\n"
     "<img src=\"img/a%20b.png\" srcset=\"img/a%20b.png 1x, img/big.png 2x\">\n"
     "<link rel=\"icon\" href=\"icon.png\">\n"
@@ -5635,6 +5646,19 @@ static const char sf_page[] =
     "<script src=\"js/app.js\"></script>\n"
     "<script>var s = \"</scripting>\"; var t = \"<img src='img/a%20b.png'>\";"
     "</script>\n"
+    /* A fragment selects inside the asset, so it has to survive onto the
+       data: URI; the query named the remote resource and must not. */
+    "<img src=\"img/sprite.svg#icon-a\">\n"
+    "<img srcset=\"img/sprite.svg#icon-b 2x\">\n"
+    "<svg><image xlink:href=\"img/sprite.svg#icon-c\"/></svg>\n"
+    "<div style=\"background:url(img/sprite.svg#icon-d)\"></div>\n"
+    "<div style=\"background:url('img/sprite.svg#i)e')\"></div>\n"
+    "<img src=\"img/sprite.svg?v=1#icon-f\">\n"
+    /* Already carries the document's own escapes: re-encoding either would
+       make the browser look for a different id. */
+    "<img src=\"img/sprite.svg#g&amp;h%2Di\">\n"
+    /* A '"' left raw here would end the attribute the rewriter re-quotes. */
+    "<img src='img/sprite.svg#q\"z'>\n"
     "<img src=\"missing.png\" >\n"
     "<!--><img src=\"img/a%20b.png\">\n"
     "<div style=\"background:url(img/a%20b.png)\"></div>\n"
@@ -5653,6 +5677,10 @@ static void sf_fixture(const char *root) {
       "@font-face { font-family: f; src: url(../font/f.woff2); }\n"
       "body { background: url(../img/a b.png); }\n"
       "div { background: url(../img/big.png); }\n"
+      "div.s { background: url(../img/big-sprite.svg#icon-g); }\n"
+      /* A name whose escapes the rebase has to put back, unlike a fragment's;
+         the '#' has to come back encoded or it reads as one. */
+      "div.h { background: url(../img/b&amp;c%25d%23e.png); }\n"
       "/* url(../img/never.png) */\n";
   static const char nested[] = "div { background: url(../../img/a b.png); }\n";
   static const char two[] = "p { background: url(../../img/a b.png); }\n";
@@ -5672,6 +5700,9 @@ static void sf_fixture(const char *root) {
   sf_put(root, "js/app.js", js, sizeof(js) - 1);
   sf_put(root, "img/a b.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/big.png", big, sizeof(big));
+  sf_put(root, "img/sprite.svg", sf_svg, sizeof(sf_svg) - 1);
+  sf_put(root, "img/big-sprite.svg", big, sizeof(big));
+  sf_put(root, "img/b&c%d#e.png", big, sizeof(big));
   sf_put(root, "img/in.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/po.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/sv.png", sf_png, SF_PNG_LEN);
@@ -5808,6 +5839,29 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
                NULL,
            "quote inside a rewritten style attribute not escaped");
 
+  /* Fragments: kept on the replacement, escaped where they would close the
+     url() token, and never joined by the query the mirrored name dropped. */
+  sf_check(strstr(out, "img/sprite.svg") == NULL,
+           "a fragment-bearing reference was left a link");
+  sf_check(sf_count(out, "#icon-a\"") == 1, "img src fragment dropped");
+  sf_check(sf_count(out, "#icon-b 2x\"") == 1, "srcset fragment dropped");
+  sf_check(sf_count(out, "#icon-c\"") == 1, "xlink:href fragment dropped");
+  sf_check(sf_count(out, "#icon-d)") == 1, "style url() fragment dropped");
+  sf_check(sf_count(out, "#i%29e)") == 1,
+           "a fragment closing the url() token was not escaped");
+  sf_check(sf_count(out, "#icon-f\"") == 1, "fragment after a query dropped");
+  sf_check(strstr(out, "?v=1") == NULL, "query carried onto the data: URI");
+  sf_check(sf_count(out, "#g&amp;h%2Di\"") == 1,
+           "an escape the document already carried was encoded again");
+  sf_check(sf_count(out, "#q%22z\"") == 1,
+           "a quote in a fragment was not escaped");
+  sf_check(sf_count(out, "#w%20x)") == 1,
+           "whitespace in a fragment was not escaped");
+  sf_check(sf_count(out, "#lt%3Cs%3Egt)") == 1,
+           "'<'/'>' in a fragment were not escaped");
+  sf_check(sf_count(out, "#z%27%28%5C%C3%A9)") == 1,
+           "a quote, paren, backslash or high byte was left raw");
+
   sf_check(strstr(out, "img/big.png 2x") != NULL, "over-cap asset inlined");
   sf_check(strstr(out, " 1x") != NULL, "srcset descriptor lost");
   sf_check(sf_count(out, "img/a%20b.png") ==
@@ -5834,6 +5888,10 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
        root, so it has to come back out as img/big.png or it dangles. */
     sf_check(strstr(css, "url(img/big.png)") != NULL,
              "over-cap url() not rebased onto the page's directory");
+    sf_check(strstr(css, "url(img/big-sprite.svg#icon-g)") != NULL,
+             "a rebased url() lost its fragment");
+    sf_check(strstr(css, "url(img/b%26c%25d%23e.png)") != NULL,
+             "a rebased name came back unescaped");
     nested = sf_decode(css, "text/css", NULL);
     sf_check(nested != NULL &&
                  strstr(nested, "url(data:image/png;base64,") != NULL,
@@ -6775,6 +6833,109 @@ static int st_threadwait(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #794: hts_gmtime() must own its output. The table is an independent oracle;
+   the threaded phase is what corrupts if it ever goes back to gmtime()'s
+   shared static. */
+#define GMTIME_THREADS 8
+#define GMTIME_ROUNDS 50000
+
+static const struct {
+  time_t t;
+  int year, mon, mday, hour, min, sec, wday, yday;
+} gmtime_refs[] = {
+    {(time_t) 0, 70, 0, 1, 0, 0, 0, 4, 0},
+    {(time_t) 951782400, 100, 1, 29, 0, 0, 0, 2, 59}, /* a leap day */
+    {(time_t) 1000000000, 101, 8, 9, 1, 46, 40, 0, 251},
+    {(time_t) 2147483647, 138, 0, 19, 3, 14, 7, 2, 18}, /* 32-bit ceiling */
+};
+
+#define GMTIME_REFS ((int) (sizeof(gmtime_refs) / sizeof(gmtime_refs[0])))
+
+static hts_boolean gmtime_ref_matches(int i, const struct tm *tm) {
+  if (tm->tm_year != gmtime_refs[i].year || tm->tm_mon != gmtime_refs[i].mon ||
+      tm->tm_mday != gmtime_refs[i].mday ||
+      tm->tm_hour != gmtime_refs[i].hour || tm->tm_min != gmtime_refs[i].min ||
+      tm->tm_sec != gmtime_refs[i].sec || tm->tm_wday != gmtime_refs[i].wday ||
+      tm->tm_yday != gmtime_refs[i].yday)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
+static htsmutex gmtime_lock = HTSMUTEX_INIT;
+static int gmtime_bad = 0;
+
+static void gmtime_thread(void *arg) {
+  const int i = *(const int *) arg;
+  int bad = 0, round;
+
+  for (round = 0; round < GMTIME_ROUNDS; round++) {
+    struct tm tmv;
+
+    if (!hts_gmtime(gmtime_refs[i].t, &tmv) || !gmtime_ref_matches(i, &tmv))
+      bad++;
+  }
+  hts_mutexlock(&gmtime_lock);
+  gmtime_bad += bad;
+  hts_mutexrelease(&gmtime_lock);
+}
+
+static int st_gmtime(httrackp *opt, int argc, char **argv) {
+  static int idx[GMTIME_THREADS];
+  int err = 0, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < GMTIME_REFS; i++) {
+    struct tm tmv;
+
+    if (!hts_gmtime(gmtime_refs[i].t, &tmv)) {
+      fprintf(stderr, "gmtime: conversion #%d failed\n", i);
+      err = 1;
+    } else if (!gmtime_ref_matches(i, &tmv)) {
+      fprintf(stderr,
+              "gmtime: #%d gave %04d-%02d-%02d %02d:%02d:%02d (wday %d, "
+              "yday %d)\n",
+              i, tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday, tmv.tm_hour,
+              tmv.tm_min, tmv.tm_sec, tmv.tm_wday, tmv.tm_yday);
+      err = 1;
+    }
+  }
+
+  /* the return is the only failure signal the callers have, so a helper that
+     always claims success leaves them formatting an uninitialised struct tm.
+     Out of range for a 64-bit time_t: NULL from gmtime_r, EINVAL from
+     _gmtime64_s. */
+  if (sizeof(time_t) >= 8) {
+    const time_t beyond = (time_t) INT64_MAX;
+    struct tm tmv;
+
+    if (hts_gmtime(beyond, &tmv)) {
+      fprintf(stderr,
+              "gmtime: an out-of-range time_t was reported converted\n");
+      err = 1;
+    }
+  }
+
+  for (i = 0; i < GMTIME_THREADS; i++) {
+    idx[i] = i % GMTIME_REFS;
+    if (hts_newthread(gmtime_thread, &idx[i]) != 0) {
+      fprintf(stderr, "gmtime: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+  if (gmtime_bad != 0) {
+    fprintf(stderr, "gmtime: %d/%d concurrent conversions were corrupt\n",
+            gmtime_bad, GMTIME_THREADS * GMTIME_ROUNDS);
+    err = 1;
+  }
+
+  printf("gmtime self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -7041,6 +7202,8 @@ static const struct selftest_entry {
      st_changes_race},
     {"threadwait", "", "htsthread_wait() joins threads spawned just before it",
      st_threadwait},
+    {"gmtime", "",
+     "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
