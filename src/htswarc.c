@@ -1684,6 +1684,10 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
   if (is_update_unchanged) {
     is_revisit = 1;
     profile = "http://netpreserve.org/warc/1.1/revisit/server-not-modified";
+    /* Replay resolves a revisit by this field alone, and a 304 stands in for
+       the same URL. No WARC-Refers-To-Date to go with it: the cache keeps the
+       document's Last-Modified, never the previous capture time. */
+    refers_uri = target_uri;
     /* Served from cache: the payload sits in the previous archive, not here. */
     w->unbacked_revisits++;
   } else if (have_pdig && w->seen != NULL) {
