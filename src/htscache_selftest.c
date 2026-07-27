@@ -309,6 +309,72 @@ static int disk_fallback_selftest(httrackp *opt) {
   return fail;
 }
 
+/* A cache miss sends cache_read_including_broken() to the serialized reference
+   of an interrupted transfer, whose entry it then frees: what it returns must
+   not point into that entry (#826). */
+static int broken_ref_selftest(httrackp *opt) {
+  int fail = 0;
+  cache_back cache;
+  lien_back *entry;
+  htsblk r;
+  char save[HTS_URLMAXSIZE * 2];
+  const char *const adr = "example.com";
+  const char *const fil = "/interrupted.html";
+  static const char body[] = "<html><body>half a p";
+  static const char headers[] =
+      "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n";
+
+  entry = calloct(1, sizeof(lien_back));
+  strcpybuff(entry->url_adr, adr);
+  strcpybuff(entry->url_fil, fil);
+  concat(entry->url_sav, sizeof(entry->url_sav),
+         StringBuff(opt->path_html_utf8), "example.com/interrupted.html");
+  hts_init_htsblk(&entry->r);
+  entry->r.statuscode = 200;
+  entry->r.size = (LLint) (sizeof(body) - 1);
+  strcpybuff(entry->r.msg, "OK");
+  strcpybuff(entry->r.contenttype, "text/html");
+  entry->r.location = entry->location_buffer;
+  entry->r.adr = strdupt(body);
+  entry->r.headers = strdupt(headers);
+  if (back_serialize_ref(opt, entry) != 0) {
+    fprintf(stderr, "%s: broken-ref: cannot write the reference\n",
+            selftest_tag);
+    fail++;
+  }
+  freet(entry->r.adr);
+  freet(entry->r.headers);
+  freet(entry);
+
+  selftest_open_for_read(&cache, opt);
+  save[0] = '\0';
+  r = cache_read_including_broken(opt, &cache, adr, fil, save);
+  selftest_close(&cache);
+
+  if (r.statuscode != 200 || strcmp(r.contenttype, "text/html") != 0) {
+    fprintf(stderr,
+            "%s: broken-ref: statuscode %d type '%s', want 200/text/html"
+            " (reference not read back)\n",
+            selftest_tag, r.statuscode, r.contenttype);
+    fail++;
+  }
+  if (strstr(save, "interrupted.html") == NULL) {
+    fprintf(stderr, "%s: broken-ref: save name '%s' lost\n", selftest_tag,
+            save);
+    fail++;
+  }
+  /* the entry owned all three and is gone, so a non-NULL one is dangling */
+  if (r.adr != NULL || r.headers != NULL || r.location != NULL) {
+    fprintf(stderr,
+            "%s: broken-ref: returned freed adr/headers/location"
+            " (%p/%p/%p)\n",
+            selftest_tag, (void *) r.adr, (void *) r.headers,
+            (void *) r.location);
+    fail++;
+  }
+  return fail;
+}
+
 typedef struct {
   size_t budget;  /**< bytes allowed through before writes start failing */
   int fail_errno; /**< errno set on the failing write (ENOSPC, EIO, ...) */
@@ -799,6 +865,9 @@ int cache_selftests(httrackp *opt, const char *dir) {
 
   /* pass 5: the disk-fallback read path (X-In-Cache: 0, body on disk) */
   failures += disk_fallback_selftest(opt);
+
+  /* pass 6: the broken-transfer reference fallback */
+  failures += broken_ref_selftest(opt);
 
   for (i = 0; i < large_count; i++) {
     freet(large_body[i]);

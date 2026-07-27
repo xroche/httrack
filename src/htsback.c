@@ -4146,6 +4146,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                       memset(&tmp, 0, sizeof(tmp));
                       back_connxfr(&back[i].r, &tmp);
+                      /* a real 304's headers belong to the revisit record, so
+                         they must survive the swap (#826); a forced one has
+                         none */
+                      if (server_sent_304)
+                        warc_move_request(&back[i].r, &tmp);
                       /* the cache entry overwrites the whole struct, so drop
                          what the 304 response still owns first (#782) */
                       back_free_response(&back[i].r);
@@ -4154,6 +4159,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                    back[i].url_sav, back[i].location_buffer);
                       back[i].r.location = back[i].location_buffer;
                       back_connxfr(&tmp, &back[i].r);
+                      warc_move_request(&tmp, &back[i].r);
                     }
 
                     // hack:
