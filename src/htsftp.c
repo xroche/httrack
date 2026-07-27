@@ -483,16 +483,19 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                     back->r.totalsize = size;
                   }
                 }
-                // REST?
-                if (fexist(back->url_sav) && (transfer_list == 0)) {
+                /* Only over a copy back_add() judged partial: on --update every
+                   mirrored file exists, and resuming a complete one splices the
+                   old body into the new (#798). */
+                if (back->range_req_size > 0 && (transfer_list == 0)) {
                   strcpybuff(back->info, "rest");
-                  snprintf(line, sizeof(line), "REST " LLintP, (LLint) fsize(back->url_sav));
+                  snprintf(line, sizeof(line), "REST " LLintP,
+                           (LLint) back->range_req_size);
                   send_line(soc_ctl, line);
                   get_ftp_line(soc_ctl, line, sizeof(line), timeout);
                   _CHECK_HALT_FTP;
                   if ((line[0] == '3') || (line[0] == '2')) {   // ok
                     rest_understood = 1;
-                  }             // sinon tant pis 
+                  } // else never mind
                 }
               }                 // sinon tant pis 
             }
@@ -617,9 +620,12 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         // Ok, connexion initiée
         //
         if (soc_dat != INVALID_SOCKET) {
-          if (rest_understood) {        // REST envoyée et comprise
+          if (rest_understood) { // REST sent and understood
             file_notify(opt, back->url_adr, back->url_fil, back->url_sav, 0, 1,
                         0);
+            /* The bytes already on disk count too, or the completeness check
+               below rejects every resumed transfer (#798). */
+            back->r.size = back->range_req_size;
             back->r.fp = fileappend(&opt->state.strc, back->url_sav);
           } else {
             file_notify(opt, back->url_adr, back->url_fil, back->url_sav, 1, 1,
