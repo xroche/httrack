@@ -1068,16 +1068,15 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           char flags[32];
           char s[256];
           time_t tt;
-          struct tm *A;
+          struct tm tmv;
 
           tt = time(NULL);
-          A = localtime(&tt);
-          if (A == NULL) {
+          if (!hts_localtime(tt, &tmv)) {
             int localtime_returned_null = 0;
 
             assertf(localtime_returned_null);
           }
-          strftime(s, 250, "%H:%M:%S", A);
+          strftime(s, 250, "%H:%M:%S", &tmv);
 
           flags[0] = '\0';
           /* input flags */

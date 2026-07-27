@@ -1045,13 +1045,14 @@ int httpmirror(char *url1, httrackp * opt) {
     {
       TStamp tl = 0;
       time_t tt;
-      struct tm *A;
+      struct tm tmv;
 
       tt = time(NULL);
-      A = localtime(&tt);
-      tl += A->tm_sec;
-      tl += A->tm_min * 60;
-      tl += A->tm_hour * 60 * 60;
+      if (hts_localtime(tt, &tmv)) {
+        tl += tmv.tm_sec;
+        tl += tmv.tm_min * 60;
+        tl += tmv.tm_hour * 60 * 60;
+      }
       if (tl > opt->waittime)   // attendre minuit
         rollover = 1;
     }
@@ -1061,13 +1062,14 @@ int httpmirror(char *url1, httrackp * opt) {
     do {
       TStamp tl = 0;
       time_t tt;
-      struct tm *A;
+      struct tm tmv;
 
       tt = time(NULL);
-      A = localtime(&tt);
-      tl += A->tm_sec;
-      tl += A->tm_min * 60;
-      tl += A->tm_hour * 60 * 60;
+      if (hts_localtime(tt, &tmv)) {
+        tl += tmv.tm_sec;
+        tl += tmv.tm_min * 60;
+        tl += tmv.tm_hour * 60 * 60;
+      }
 
       if (rollover) {
         if (tl <= opt->waittime)
@@ -1728,16 +1730,12 @@ int httpmirror(char *url1, httrackp * opt) {
               if (charset != NULL)
                 free(charset);
             }
-            /* Could not detect charset: could it be UTF-8 ? */
-            /* No, we can not do that: browsers do not do it
-               (and it would break links). */
-            /* Could not detect charset */
+            /* Left empty when the document declared none: guessing UTF-8 here
+               would break links, and the parser picks its own fallback */
             if (page_charset[0] == '\0') {
               hts_log_print(opt, LOG_INFO,
                             "Warning: could not detect encoding for: %s%s",
                             urladr(), urlfil());
-              /* Fallback to ISO-8859-1 (~== identity) ; accents will look weird */
-              strcpy(page_charset, "iso-8859-1");
             }
           }
 
@@ -1770,7 +1768,9 @@ int httpmirror(char *url1, httrackp * opt) {
             /* */
             str.ptr_ = &ptr;
             /* */
-            str.page_charset_ = page_charset[0] != '\0' ? page_charset : NULL;
+            /* NULL when conversion is off, empty when the document declared no
+               charset; the parser tells the two apart */
+            str.page_charset_ = opt->convert_utf8 ? page_charset : NULL;
             /* */
             /* */
             stre.r_ = &r;
@@ -3148,16 +3148,15 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
   if (fp != NULL) {
     char s[256];
     time_t tt;
-    struct tm *A;
+    struct tm tmv;
 
     tt = time(NULL);
-    A = localtime(&tt);
-    if (A == NULL) {
+    if (!hts_localtime(tt, &tmv)) {
       int localtime_returned_null = 0;
 
       assertf(localtime_returned_null);
     }
-    strftime(s, 250, "%H:%M:%S", A);
+    strftime(s, 250, "%H:%M:%S", &tmv);
     if (strnotempty(type))
       fprintf(fp, "%s\t%c%s: \t", s, hichar(*type), type + 1);
     else
