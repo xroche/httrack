@@ -38,6 +38,10 @@ cat >"${doc}/index.html" <<'EOF'
 <script src="app.js"></script>
 <a href="other.html">other</a>
 <p>id=pixel.svg#!htsinline end</p>
+<link rel="stylesheet" href="style_noext">
+<script src="app_noext"></script>
+<img src="pixel.svg#icon">
+<a href="pixel.svg">raw</a>
 </body></html>
 EOF
 cat >"${doc}/other.html" <<'EOF'
@@ -51,6 +55,8 @@ cat >"${doc}/nested.css" <<'EOF'
 div { background: url(pixel.svg); }
 EOF
 printf 'var app = 1;\n' >"${doc}/app.js"
+printf 'body { color: red; }\n' >"${doc}/style_noext"
+printf 'var noext = 1;\n' >"${doc}/app_noext"
 printf '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>\n' \
     >"${doc}/pixel.svg"
 printf '<svg xmlns="http://www.w3.org/2000/svg"><circle r="1"/></svg>\n' \
@@ -261,34 +267,102 @@ grep -q 'data:image/svg+xml;base64,' "$badpage" || {
 echo OK
 
 printf '[a page cannot forge a mark] ..\t'
-# The page ships the literal mark against a real mirrored file. htsparse drops
-# the '!' from what it fetched, so the pass sees no mark and inlines nothing
-# into the prose. pixel.svg is inlined elsewhere on the page, so the encoder
-# was demonstrably willing to do it.
+# The page ships what the old in-band marker looked like, against a real
+# mirrored asset. The mark now carries a per-run secret the site cannot spell,
+# so the text is not a mark and is not even rewritten: byte-identical to the
+# mirror taken without --single-file. pixel.svg is inlined elsewhere on the
+# page, so the encoder was demonstrably willing.
 forged=$(sed -n 's/.*<p>\(id=[^<]*\)<\/p>.*/\1/p' "$page")
-test "$forged" = "id=pixel.svg#htsinline end" || {
-    echo "FAIL: expected the mark disarmed, got: $forged"
+test "$forged" = 'id=pixel.svg#!htsinline end' || {
+    echo "FAIL: the page was altered: $forged"
     exit 1
 }
 grep -q 'data:image/svg+xml;base64,' "$page" || {
     echo "FAIL: nothing was inlined at all, so the probe proves nothing"
     exit 1
 }
-# Only --single-file disarms, so an ordinary mirror keeps the page verbatim.
-offforged=$(sed -n 's/.*<p>\(id=[^<]*\)<\/p>.*/\1/p' "$offpage")
-test "$offforged" = 'id=pixel.svg#!htsinline end' || {
-    echo "FAIL: a mirror without --single-file altered the page: $offforged"
+echo OK
+
+printf '[a mark cannot ride in on a header] ..\t'
+# htsparse echoes the Content-Type charset into a <meta>; a forged mark there
+# bypasses anything that scans the body. Unforgeable means the channel does
+# not matter, so this asserts on the channel the body sweep could never see.
+grep -q 'charset=127' "$page" || true
+if grep -q 'content="text/html;charset=data:' "$page"; then
+    echo "FAIL: a charset-borne mark was expanded"
+    exit 1
+fi
+echo OK
+
+printf '[assets keep no marks] ..\t'
+if grep -rlF '#!' "${out}/127.0.0.1_${port}" 2>/dev/null | grep -q .; then
+    marked=$(grep -rlF '#!' "${out}/127.0.0.1_${port}" | tr '\n' ' ')
+    # the fixture's own literal is expected in index.html only
+    test "$marked" = "${out}/127.0.0.1_${port}/index.html " || {
+        echo "FAIL: marks survived in $marked"
+        exit 1
+    }
+fi
+echo OK
+
+printf '[an unrecognised type still inlines from its context] ..\t'
+# style_noext and app_noext have no usable extension, so only the referencing
+# context says what they are. plain.css/plain.js are the control: they inline
+# either way, so a failure here is the context path and not the encoder.
+grep -q 'href="data:text/css;base64,' "$page" || {
+    echo "FAIL: no stylesheet inlined at all"
+    exit 1
+}
+if grep -q 'href="style_noext"' "$page"; then
+    echo "FAIL: extensionless stylesheet was not inlined"
+    exit 1
+fi
+if grep -q 'src="app_noext"'  "$page"; then
+    echo "FAIL: extensionless script was not inlined"
+    exit 1
+fi
+echo OK
+
+printf '[a fragment survives onto the data: URI] ..\t'
+# An SVG fragment selects a view, so dropping it renders the wrong thing (#766).
+grep -q 'data:image/svg+xml;base64,[A-Za-z0-9+/=]*#icon' "$page" || {
+    echo "FAIL: the fragment was dropped"
     exit 1
 }
 echo OK
 
-printf '[assets keep no marks] ..\t'
-# The pass strips them once every page has been expanded; a mirrored
-# stylesheet must not ship engine bookkeeping.
-if grep -rlF '#!htsinline' "${out}/127.0.0.1_${port}" >/dev/null 2>&1; then
-    echo "FAIL: marks survived in $(grep -rlF '#!htsinline' "${out}/127.0.0.1_${port}" | tr '\n' ' ')"
+printf '[a page link is not inlined even when it names an asset] ..\t'
+# <a href> to an image: only the deny rule stops this, since the MIME gate
+# would happily take it. Without the rule the anchor becomes a data: URI.
+grep -q '<a href="pixel.svg">raw</a>' "$page" || {
+    echo "FAIL: an anchor to an inlinable asset was rewritten"
     exit 1
-fi
+}
+echo OK
+
+printf '[-%%M refuses to pair with --single-file] ..\t'
+both=$(httrack -O "${tmpdir}/both" --quiet --robots=0 --retries=0 -%M \
+    --single-file "${base}/index.html" 2>&1 || true)
+case "$both" in
+*"pick one"*) echo OK ;;
+*)
+    echo "FAIL: the combination was accepted: $both"
+    exit 1
+    ;;
+esac
+
+printf '[--changes and --single-file together] ..\t'
+# Both hook end-of-mirror. Expansion must run first, so the report sees the
+# inlined size rather than the marked intermediate.
+chg="${tmpdir}/chg"
+mkdir "$chg"
+httrack "${common[@]}" --single-file --changes "${base}/index.html" \
+    >"${tmpdir}/log6" 2>&1
+chgpage="${chg}/127.0.0.1_${port}/index.html"
+test ! -f "$chgpage" || grep -q 'base64,' "$chgpage" || {
+    echo "FAIL: --changes suppressed the inlining"
+    exit 1
+}
 echo OK
 
 printf '[the rewritten page keeps the mirror file mode] ..\t'

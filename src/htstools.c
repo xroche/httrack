@@ -41,8 +41,14 @@ Please visit our Website: http://www.httrack.com
 #include "htsstrings.h"
 #include "htscharset.h"
 #ifdef _WIN32
+/* before <stdlib.h>, which is what declares rand_s under it */
+#define _CRT_RAND_S
 #include "windows.h"
 #else
+#include <errno.h>
+#ifdef HAVE_SYS_RANDOM_H
+#include <sys/random.h>
+#endif
 #include <dirent.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -1442,6 +1448,50 @@ HTSEXT_API hts_boolean hts_findissystem(find_handle find) {
 #endif
   }
   return 0;
+}
+
+hts_boolean hts_random_bytes(void *buf, size_t len) {
+  unsigned char *const p = (unsigned char *) buf;
+
+#ifdef _WIN32
+  size_t i;
+
+  /* rand_s() is the CRT's wrapper over the system CSPRNG, and unlike
+     BCryptGenRandom it needs no extra import library. */
+  for (i = 0; i < len; i += sizeof(unsigned int)) {
+    const size_t left = len - i;
+    unsigned int v;
+
+    if (rand_s(&v) != 0)
+      return HTS_FALSE;
+    memcpy(p + i, &v, left < sizeof(v) ? left : sizeof(v));
+  }
+  return HTS_TRUE;
+#else
+  size_t got = 0;
+  FILE *fp;
+
+#ifdef HAVE_GETRANDOM
+  while (got < len) {
+    const ssize_t n = getrandom(p + got, len - got, 0);
+
+    if (n < 0) {
+      if (errno == EINTR)
+        continue;
+      break; /* pre-3.17 kernel or a seccomp filter: try /dev/urandom */
+    }
+    got += (size_t) n;
+  }
+  if (got == len)
+    return HTS_TRUE;
+#endif
+  fp = fopen("/dev/urandom", "rb");
+  if (fp == NULL)
+    return HTS_FALSE;
+  got += fread(p + got, 1, len - got, fp);
+  fclose(fp);
+  return got == len ? HTS_TRUE : HTS_FALSE;
+#endif
 }
 
 hts_boolean hts_rename_over(const char *src, const char *dst) {

@@ -5201,9 +5201,45 @@ static hts_boolean sf_try_put(const char *dir, const char *rel,
   return HTS_TRUE;
 }
 
+/* Expand a fixture: \001<ref>\002 becomes <ref> plus this run's mark for it.
+   The secret is random per run, so a fixture cannot spell a mark itself. */
+static void sf_expand_fixture(httrackp *opt, const char *in, size_t len,
+                              String *out) {
+  size_t i, start = 0;
+
+  StringClear(*out);
+  for (i = 0; i < len; i++) {
+    if (in[i] == '\001') {
+      start = StringLength(*out);
+    } else if (in[i] == '\002') {
+      char mark[SINGLEFILE_MARK_MAX];
+
+      StringCat(*out,
+                singlefile_mark(opt, mark, sizeof(mark), SINGLEFILE_CLASS_ANY,
+                                StringLength(*out) - start));
+    } else {
+      StringAddchar(*out, in[i]);
+    }
+  }
+}
+
 static void sf_put(const char *dir, const char *rel, const void *data,
                    size_t len) {
   assertf(sf_try_put(dir, rel, data, len));
+}
+
+/* sf_put() for a text fixture, expanding its \001<ref>\002 delimiters. Binary
+   fixtures must not go through here: sf_png carries those very bytes. */
+static size_t sf_put_marked(httrackp *opt, const char *dir, const char *rel,
+                            const void *data, size_t len) {
+  String body = STRING_EMPTY;
+  size_t written;
+
+  sf_expand_fixture(opt, (const char *) data, len, &body);
+  assertf(sf_try_put(dir, rel, StringBuff(body), StringLength(body)));
+  written = StringLength(body);
+  StringFree(body);
+  return written;
 }
 
 /* Number of times needle occurs in hay. */
@@ -5315,80 +5351,80 @@ static const char sf_png[] = "\x89PNG\r\n\x1a\n\x00\x01\x02\xff";
 
 static const char sf_page[] =
     "<html><head>\n"
-    "<link rel=\"stylesheet\" href=\"css/main.css#!htsinline\">\n"
-    "<link rel=\"canonical\" href=\"other.html#!htsinline\">\n"
+    "<link rel=\"stylesheet\" href=\"\001css/main.css\002\">\n"
+    "<link rel=\"canonical\" href=\"\001other.html\002\">\n"
     "<title>t</title>\n"
-    "<style>body { background: url(\"img/a%20b.png#!htsinline\"); }</style>\n"
+    "<style>body { background: url(\"\001img/a%20b.png\002\"); }</style>\n"
     "</head><body>\n"
-    "<img src=\"img/a%20b.png#!htsinline\" srcset=\"img/a%20b.png#!htsinline "
-    "1x, img/big.png#!htsinline 2x\">\n"
-    "<link rel=\"icon\" href=\"icon.png#!htsinline\">\n"
-    "<link rel=\"preload\" as=\"font\" href=\"font/f.woff2#!htsinline\">\n"
+    "<img src=\"\001img/a%20b.png\002\" srcset=\"\001img/a%20b.png\002 "
+    "1x, \001img/big.png\002 2x\">\n"
+    "<link rel=\"icon\" href=\"\001icon.png\002\">\n"
+    "<link rel=\"preload\" as=\"font\" href=\"\001font/f.woff2\002\">\n"
     "<img src=\"data:image/gif;base64,QUJD\">\n"
     /* Each has a real file where its guard's removal would land it; without
        that they stay links either way, the target merely being absent. */
     "<img src=\"http://example.com/x.png\">\n"
     "<img src=\"//example.com/x.png\">\n"
-    "<input type=\"image\" src=\"img/in.png#!htsinline\">\n"
+    "<input type=\"image\" src=\"\001img/in.png\002\">\n"
     /* Lazy loading: src is the placeholder, the real image rides data-src. */
-    "<img src=\"img/ph.png#!htsinline\" data-src=\"img/lz.png#!htsinline\" "
-    "data-srcset=\"img/lz2.png#!htsinline 2x\" "
-    "lowsrc=\"img/low.png#!htsinline\">\n"
-    "<object data=\"img/ob.png#!htsinline\"></object>\n"
-    "<embed src=\"img/em.png#!htsinline\">\n"
-    "<img data-src=\"other.html#!htsinline\">\n"
+    "<img src=\"\001img/ph.png\002\" data-src=\"\001img/lz.png\002\" "
+    "data-srcset=\"\001img/lz2.png\002 2x\" "
+    "lowsrc=\"\001img/low.png\002\">\n"
+    "<object data=\"\001img/ob.png\002\"></object>\n"
+    "<embed src=\"\001img/em.png\002\">\n"
+    "<img data-src=\"\001other.html\002\">\n"
     /* What a first pass emits: re-resolving it is what a second pass must not
        do, and the fallback type would inline whatever the walk found. */
     "<link rel=\"stylesheet\" href=\"data:text/css;base64,QUJD\">\n"
-    "<video poster=\"img/po.png#!htsinline\" controls>"
-    "<source src=\"v.mp4#!htsinline\" type=\"video/mp4\"></video>\n"
-    "<svg><image href=\"img/sv.png#!htsinline\"/></svg>\n"
-    "<table background=\"img/bg.png#!htsinline\"><tr><td>x</td></tr></table>\n"
+    "<video poster=\"\001img/po.png\002\" controls>"
+    "<source src=\"\001v.mp4\002\" type=\"video/mp4\"></video>\n"
+    "<svg><image href=\"\001img/sv.png\002\"/></svg>\n"
+    "<table background=\"\001img/bg.png\002\"><tr><td>x</td></tr></table>\n"
     /* The second is what bites: drop the clamp and its leading ".." lands it
        back on <root>/img/a b.png. The first can only 404 either way. */
-    "<img src=\"../escape.png#!htsinline\">\n"
-    "<img src=\"../img/a%20b.png#!htsinline\">\n"
+    "<img src=\"\001../escape.png\002\">\n"
+    "<img src=\"\001../img/a%20b.png\002\">\n"
     "<a href=\"img/a%20b.png\">link</a>\n"
-    "<script src=\"js/app.js#!htsinline\"></script>\n"
+    "<script src=\"\001js/app.js\002\"></script>\n"
     "<script>var s = \"</scripting>\"; var t = \"<img src='img/a%20b.png'>\";"
     "</script>\n"
-    "<img src=\"missing.png#!htsinline\" >\n"
-    "<!--><img src=\"img/a%20b.png#!htsinline\">\n"
-    "<div style=\"background:url(img/a%20b.png#!htsinline)\"></div>\n"
+    "<img src=\"\001missing.png\002\" >\n"
+    "<!--><img src=\"\001img/a%20b.png\002\">\n"
+    "<div style=\"background:url(\001img/a%20b.png\002)\"></div>\n"
     "<div style='content:\"x\"; "
-    "background:url(img/a%20b.png#!htsinline)'></div>\n"
+    "background:url(\001img/a%20b.png\002)'></div>\n"
     "</body></html>\n";
 
 /* Lay a small mirror down under root. */
-static void sf_fixture(const char *root) {
+static void sf_fixture(httrackp *opt, const char *root) {
   /* The over-cap url() is what drives the rebase fallback: a reference an
      inlined stylesheet could not embed has to come out relative to the page,
      not to the stylesheet, or it dangles. */
   static const char css[] =
-      "@import \"sub/nested.css#!htsinline\";\n"
-      "@import url(\"sub/two.css#!htsinline\");\n"
+      "@import \"\001sub/nested.css\002\";\n"
+      "@import url(\"\001sub/two.css\002\");\n"
       "@import \"a\\\"url(../img/a b.png)b.css\";\n"
-      "@font-face { font-family: f; src: url(../font/f.woff2#!htsinline); }\n"
-      "body { background: url(../img/a%20b.png#!htsinline); }\n"
-      "div { background: url(../img/big.png#!htsinline); }\n"
+      "@font-face { font-family: f; src: url(\001../font/f.woff2\002); }\n"
+      "body { background: url(\001../img/a%20b.png\002); }\n"
+      "div { background: url(\001../img/big.png\002); }\n"
       "/* url(../img/never.png) */\n";
   static const char nested[] =
-      "div { background: url(../../img/a%20b.png#!htsinline); }\n";
+      "div { background: url(\001../../img/a%20b.png\002); }\n";
   static const char two[] =
-      "p { background: url(../../img/a%20b.png#!htsinline); }\n";
+      "p { background: url(\001../../img/a%20b.png\002); }\n";
   static const char deep[] = "<html><head><link rel=\"stylesheet\" "
-                             "href=\"../../css/main.css#!htsinline\">\n"
+                             "href=\"\001../../css/main.css\002\">\n"
                              "</head><body>d</body></html>\n";
   static const char js[] = "var app = 1;\n";
   char big[4096];
 
   memset(big, 'B', sizeof(big));
-  sf_put(root, "page.html", sf_page, sizeof(sf_page) - 1);
-  sf_put(root, "deep/sub/page.html", deep, sizeof(deep) - 1);
+  sf_put_marked(opt, root, "page.html", sf_page, sizeof(sf_page) - 1);
+  sf_put_marked(opt, root, "deep/sub/page.html", deep, sizeof(deep) - 1);
   sf_put(root, "other.html", "<html>o</html>", 14);
-  sf_put(root, "css/main.css", css, sizeof(css) - 1);
-  sf_put(root, "css/sub/nested.css", nested, sizeof(nested) - 1);
-  sf_put(root, "css/sub/two.css", two, sizeof(two) - 1);
+  sf_put_marked(opt, root, "css/main.css", css, sizeof(css) - 1);
+  sf_put_marked(opt, root, "css/sub/nested.css", nested, sizeof(nested) - 1);
+  sf_put_marked(opt, root, "css/sub/two.css", two, sizeof(two) - 1);
   sf_put(root, "js/app.js", js, sizeof(js) - 1);
   sf_put(root, "img/a b.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/big.png", big, sizeof(big));
@@ -5426,7 +5462,7 @@ static void sf_fixture(const char *root) {
     }
     StringCat(wide,
               " title=\"> <img src=img/a%20b.png> \">end</p></body></html>");
-    sf_put(root, "wide.html", StringBuff(wide), StringLength(wide));
+    sf_put_marked(opt, root, "wide.html", StringBuff(wide), StringLength(wide));
     StringFree(wide);
   }
   sf_put(root, "v.mp4",
@@ -5452,7 +5488,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   sf_put(argv[0], "escape.png", sf_png,
          SF_PNG_LEN); /* just outside the mirror */
   fconcat(root, sizeof(root), argv[0], "mirror/");
-  sf_fixture(root);
+  sf_fixture(opt, root);
   fconcat(page, sizeof(page), root, "page.html");
 
   /* Cap between the small assets and big.png. */
@@ -5607,7 +5643,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
 
   /* Same page, a cap above big.png: it now inlines. */
   fconcat(root, sizeof(root), argv[0], "mirror2/");
-  sf_fixture(root);
+  sf_fixture(opt, root);
   fconcat(page, sizeof(page), root, "page.html");
   opt->single_file_max_size = 1024 * 1024;
   sf_check(singlefile_rewrite_file(opt, root, page),
@@ -5621,25 +5657,37 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   /* Nothing inlines, so the rewriter must be byte transparent. Assert on its
      output: the file it declined to write could not have changed regardless. */
   fconcat(root, sizeof(root), argv[0], "mirror3/");
-  sf_fixture(root);
+  sf_fixture(opt, root);
   fconcat(page, sizeof(page), root, "page.html");
   opt->single_file_max_size = 1;
-  sf_check(!singlefile_rewrite_file(opt, root, page), "one-byte cap inlined");
+  /* The page is still rewritten: nothing inlines, but the marks must go. */
+  sf_check(singlefile_rewrite_file(opt, root, page),
+           "one-byte cap left the marks in place");
+  {
+    char *capped = readfile_utf8(page);
+
+    /* Only the two data: URIs the fixture itself ships. */
+    sf_check(capped != NULL && sf_count(capped, ";base64,") == 2,
+             "one-byte cap inlined");
+    freet(capped);
+  }
   {
     String verbatim = STRING_EMPTY;
 
     StringClear(verbatim);
-    (void) singlefile_rewrite_html(opt, root, page, sf_page,
-                                   sizeof(sf_page) - 1,
+    String marked = STRING_EMPTY;
+
+    sf_expand_fixture(opt, sf_page, sizeof(sf_page) - 1, &marked);
+    (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
+                                   StringLength(marked),
                                    SINGLEFILE_MAX_PAGE_SIZE, &verbatim);
     /* Mark-transparent, not byte-transparent: a reference that cannot be
        inlined loses its mark and keeps everything else. */
-    sf_check(StringLength(verbatim) == sizeof(sf_page) - 1 -
-                                           sf_count(sf_page, SINGLEFILE_MARK) *
-                                               (int) strlen(SINGLEFILE_MARK),
-             "a page with nothing to inline was re-serialized differently");
-    sf_check(strstr(StringBuff(verbatim), SINGLEFILE_MARK) == NULL,
+    sf_check(StringLength(verbatim) < StringLength(marked),
+             "a page with nothing to inline kept its marks");
+    sf_check(strstr(StringBuff(verbatim), singlefile_intro(opt)) == NULL,
              "an un-inlinable reference kept its mark");
+    StringFree(marked);
     StringFree(verbatim);
   }
   (void) outlen;
@@ -5649,27 +5697,28 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
      cut short by the budget and not by the fixture. */
   {
     static const char bomb_css[] =
-        "@import \"b.css#!htsinline\";@import \"b.css#!htsinline\";"
-        "@import \"b.css#!htsinline\";@import \"b.css#!htsinline\";\n";
+        "@import \"\001b.css\002\";@import \"\001b.css\002\";"
+        "@import \"\001b.css\002\";@import \"\001b.css\002\";\n";
     static const char bomb_html[] =
         "<html><head>"
-        "<link rel=\"stylesheet\" href=\"b.css#!htsinline\">"
+        "<link rel=\"stylesheet\" href=\"\001b.css\002\">"
         "</head></html>\n";
-    const size_t css_len = sizeof(bomb_css) - 1;
-    String small = STRING_EMPTY, large = STRING_EMPTY;
+    size_t css_len;
+    String small = STRING_EMPTY, large = STRING_EMPTY, bomb = STRING_EMPTY;
 
     fconcat(root, sizeof(root), argv[0], "bomb/");
-    sf_put(root, "b.css", bomb_css, css_len);
+    css_len = sf_put_marked(opt, root, "b.css", bomb_css, sizeof(bomb_css) - 1);
     fconcat(page, sizeof(page), root, "page.html");
     opt->single_file_max_size = 1024 * 1024;
     StringClear(small);
     StringClear(large);
-    (void) singlefile_rewrite_html(opt, root, page, bomb_html,
-                                   sizeof(bomb_html) - 1, (LLint) css_len * 3,
+    sf_expand_fixture(opt, bomb_html, sizeof(bomb_html) - 1, &bomb);
+    (void) singlefile_rewrite_html(opt, root, page, StringBuff(bomb),
+                                   StringLength(bomb), (LLint) css_len * 3,
                                    &small);
-    (void) singlefile_rewrite_html(opt, root, page, bomb_html,
-                                   sizeof(bomb_html) - 1,
-                                   SINGLEFILE_MAX_PAGE_SIZE, &large);
+    (void) singlefile_rewrite_html(opt, root, page, StringBuff(bomb),
+                                   StringLength(bomb), SINGLEFILE_MAX_PAGE_SIZE,
+                                   &large);
     sf_check(StringLength(large) > 4096, "the @import bomb did not fan out");
     sf_check(StringLength(small) < StringLength(large) / 8,
              "the per-page budget did not cut the fan-out short");
@@ -5679,6 +5728,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
              "the per-page budget was not charged as each asset was taken");
     StringFree(small);
     StringFree(large);
+    StringFree(bomb);
   }
 
   if (!sf_colon_ok)

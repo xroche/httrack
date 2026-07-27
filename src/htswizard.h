@@ -56,6 +56,19 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
                                hts_boolean filters_decided,
                                hts_boolean filters_refused);
 
+/* A (tag, attribute) pair naming a reference kind. */
+#ifndef HTS_DEF_DEFSTRUCT_htspair_t
+#define HTS_DEF_DEFSTRUCT_htspair_t
+
+typedef struct htspair_t {
+  const char *tag;
+  const char *attr;
+} htspair_t;
+#endif
+
+/* HTS_TRUE if tag starts with the whole token cmp; NULL tag never matches. */
+hts_boolean hts_cmp_tag_token(const char *tag, const char *cmp);
+
 int hts_acceptlink(httrackp * opt, int ptr,
                    const char *adr, const char *fil,
                    const char *tag, const char *attribute,

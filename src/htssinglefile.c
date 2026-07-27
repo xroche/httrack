@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htssafe.h"
 #include "htstools.h"
+#include "htswizard.h"
 
 #include <ctype.h>
 #include <stdint.h>
@@ -74,74 +75,144 @@ typedef struct sf_ctx {
   int *warn_budget;
   LLint budget; /* bytes this page may still inline */
   int inlined;
+  int marks; /* marks consumed: the file changed even when none inlined */
 } sf_ctx;
 
 /* ------------------------------------------------------------ */
 /* Marks                                                         */
 /* ------------------------------------------------------------ */
 
-/* (tag, attribute) pairs htsparse detects that name a page or a media stream
-   rather than an asset; a NULL tag matches any. Everything else it detects is
-   offered to the pass, which decides from the referenced file's own MIME
-   type, so a new row in hts_detect[] is covered without a change here. */
-static const struct sf_deny_rule {
-  const char *tag;
-  const char *attr;
-} sf_deny_rules[] = {
-    {"a", "href"},      {"area", "href"},   {"iframe", "src"},
-    {"frame", "src"},   {"applet", "code"}, {NULL, "longdesc"},
-    {NULL, "usemap"},   {NULL, "archive"},  {NULL, "profile"},
-    {NULL, "codebase"},
+/* This run's mark secret. In memory only: persisting it would put a forgery
+   key inside a tree people publish. */
+struct hts_singlefile_state {
+  char intro[sizeof(SINGLEFILE_MARK_INTRO) + SINGLEFILE_SECRET_HEX];
 };
 
-hts_boolean singlefile_may_inline(const char *tag_start, const char *attr) {
+void singlefile_free(httrackp *opt) {
+  if (opt != NULL && opt->singlefile_state != NULL) {
+    freet(opt->singlefile_state);
+    opt->singlefile_state = NULL;
+  }
+}
+
+const char *singlefile_intro(httrackp *opt) {
+  static const char hex[] = "0123456789abcdef";
+  struct hts_singlefile_state *st;
+  unsigned char raw[SINGLEFILE_SECRET_HEX / 2];
   size_t i;
 
-  if (attr == NULL)
-    return HTS_FALSE;
-  for (i = 0; i < sizeof(sf_deny_rules) / sizeof(sf_deny_rules[0]); i++) {
-    const struct sf_deny_rule *const r = &sf_deny_rules[i];
+  if (opt->singlefile_state != NULL)
+    return ((struct hts_singlefile_state *) opt->singlefile_state)->intro;
+  if (!hts_random_bytes(raw, sizeof(raw))) {
+    /* A guessable mark is a forgeable one, so there is no safe fallback. */
+    hts_log_print(opt, LOG_ERROR,
+                  "single-file: no secure random source, nothing will be "
+                  "inlined");
+    return NULL;
+  }
+  st = (struct hts_singlefile_state *) calloct(1, sizeof(*st));
+  if (st == NULL)
+    return NULL;
+  strcpybuff(st->intro, SINGLEFILE_MARK_INTRO);
+  for (i = 0; i < sizeof(raw); i++) {
+    st->intro[sizeof(SINGLEFILE_MARK_INTRO) - 1 + i * 2] = hex[raw[i] >> 4];
+    st->intro[sizeof(SINGLEFILE_MARK_INTRO) + i * 2] = hex[raw[i] & 15];
+  }
+  opt->singlefile_state = st;
+  return st->intro;
+}
 
-    if (r->tag != NULL && (tag_start == NULL || !check_tag(tag_start, r->tag)))
-      continue;
-    if (rech_tageq(attr, r->attr))
+hts_boolean singlefile_may_mark(httrackp *opt, const char *body, size_t len) {
+  const char *const intro = singlefile_intro(opt);
+  size_t introlen, i;
+
+  if (intro == NULL)
+    return HTS_FALSE;
+  introlen = strlen(intro);
+  for (i = 0; i + introlen <= len; i++) {
+    if (memcmp(body + i, intro, introlen) == 0) {
+      hts_log_print(opt, LOG_ERROR,
+                    "single-file: document already carries this run's mark, "
+                    "leaving it alone");
       return HTS_FALSE;
+    }
   }
   return HTS_TRUE;
 }
 
-/* The mark ends a reference; these end the token it was appended to. */
-static int sf_is_ref_delim(int c) {
-  return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f' ||
-         c == '"' || c == '\'' || c == '(' || c == ')' || c == '=' ||
-         c == ',' || c == '<' || c == '>' || c == ';';
+const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
+                            size_t reflen) {
+  const char *const intro = singlefile_intro(opt);
+
+  buf[0] = '\0';
+  if (intro != NULL)
+    snprintf(buf, bufsize, "%s.%c.%d", intro, cls, (int) reflen);
+  return buf;
 }
 
-hts_boolean singlefile_ref_is_markable(const char *ref) {
+/* (tag, attribute) pairs htsparse detects that name a page or a media stream
+   rather than an asset; a NULL tag matches any. Everything else it detects is
+   offered to the pass, which decides from the referenced file's own MIME
+   type, so a new row in hts_detect[] is covered without a change here. */
+static const htspair_t sf_deny_rules[] = {
+    {"a", "href"},      {"area", "href"},   {"iframe", "src"},
+    {"frame", "src"},   {"applet", "code"}, {NULL, "longdesc"},
+    {NULL, "usemap"},   {NULL, "archive"},  {NULL, "profile"},
+    {NULL, "codebase"}, {NULL, NULL},
+};
+
+/* HTS_TRUE if the start tag at tag_name carries rel="...stylesheet...". */
+static hts_boolean sf_rel_is_stylesheet(const char *tag_name) {
   size_t i;
 
-  for (i = 0; ref[i] != '\0'; i++) {
-    if (sf_is_ref_delim((unsigned char) ref[i]))
-      return HTS_FALSE;
+  for (i = 0; i < HTS_URLMAXSIZE && tag_name[i] != '\0' && tag_name[i] != '>';
+       i++) {
+    int p;
+
+    if (i != 0 && !is_space(tag_name[i - 1]))
+      continue;
+    p = rech_tageq(tag_name + i, "rel");
+    if (p != 0)
+      return strstrcase(tag_name + i + p, "stylesheet") != NULL ? HTS_TRUE
+                                                                : HTS_FALSE;
   }
-  return i != 0 ? HTS_TRUE : HTS_FALSE;
+  return HTS_FALSE;
 }
 
-size_t singlefile_disarm_marks(char *body, size_t len) {
-  const size_t marklen = strlen(SINGLEFILE_MARK);
-  size_t r, w = 0;
+/* The deny table's own matcher rather than htswizard's: a NULL tag here means
+   "any tag", where there it terminates the table. */
+static hts_boolean sf_denied(const char *tag_name, const char *attr) {
+  size_t i;
 
-  for (r = 0; r < len; r++) {
-    body[w++] = body[r];
-    /* Tested after every byte written, so no mark survives anywhere, and the
-       rewrite only shortens: w never overtakes r. */
-    if (w >= marklen &&
-        memcmp(body + w - marklen, SINGLEFILE_MARK, marklen) == 0) {
-      memmove(body + w - marklen + 1, body + w - marklen + 2, marklen - 2);
-      w--;
-    }
+  for (i = 0; i < sizeof(sf_deny_rules) / sizeof(sf_deny_rules[0]); i++) {
+    const htspair_t *const r = &sf_deny_rules[i];
+
+    if (r->attr == NULL)
+      break;
+    if (r->tag != NULL && !hts_cmp_tag_token(tag_name, r->tag))
+      continue;
+    if (hts_cmp_tag_token(attr, r->attr))
+      return HTS_TRUE;
   }
-  return w;
+  return HTS_FALSE;
+}
+
+char singlefile_ref_class(const char *tag_name, const char *attr) {
+  if (attr == NULL)
+    return 0;
+  if (sf_denied(tag_name, attr))
+    return 0;
+  if (tag_name == NULL) {
+    /* A stylesheet or a script body: only @import names another stylesheet. */
+    return rech_tageq(attr, "import") != 0 ? SINGLEFILE_CLASS_CSS
+                                           : SINGLEFILE_CLASS_ANY;
+  }
+  if (hts_cmp_tag_token(tag_name, "script") && rech_tageq(attr, "src") != 0)
+    return SINGLEFILE_CLASS_JS;
+  if (hts_cmp_tag_token(tag_name, "link") && rech_tageq(attr, "href") != 0)
+    return sf_rel_is_stylesheet(tag_name) ? SINGLEFILE_CLASS_CSS
+                                          : SINGLEFILE_CLASS_ANY;
+  return SINGLEFILE_CLASS_ANY;
 }
 
 /* ------------------------------------------------------------ */
@@ -390,6 +461,19 @@ static void sf_append_escaped_path(String *out, const char *p) {
   }
 }
 
+/* The context said one type and the file is another: a marked reference that
+   resolved to the wrong thing, which is a bug rather than a policy decision. */
+static void sf_warn_mismatch(sf_ctx *ctx, const char *path, char want,
+                             const char *mime) {
+  if (*ctx->warn_budget <= 0)
+    return;
+  (*ctx->warn_budget)--;
+  hts_log_print(
+      ctx->opt, LOG_WARNING,
+      "single-file: %s is %s but was referenced as %s, left as a link", path,
+      mime, want == SINGLEFILE_CLASS_CSS ? "a stylesheet" : "a script");
+}
+
 static void sf_warn_oversize(sf_ctx *ctx, const char *path, LLint size,
                              LLint cap) {
   if (*ctx->warn_budget <= 0)
@@ -419,7 +503,7 @@ static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
    a lenient resolver's base. Returns HTS_TRUE if out received a data: URI. */
 static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
                              size_t reflen, const char *rebase_dir, int depth,
-                             hts_boolean *resolved, String *out) {
+                             char want, hts_boolean *resolved, String *out) {
   String path = STRING_EMPTY;
   char mime[HTS_MIMETYPE_SIZE];
   char *file;
@@ -434,6 +518,21 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
     return HTS_FALSE;
   }
   cls = sf_mime_class(ctx->opt, StringBuff(path), mime, sizeof(mime));
+  /* The referencing context is the authority when the name carries no usable
+     type, and a contradiction between the two is a bug, not something to
+     paper over by inlining whatever was found. */
+  if (want != SINGLEFILE_CLASS_ANY) {
+    const int wanted = want == SINGLEFILE_CLASS_CSS ? SF_C_CSS : SF_C_JS;
+
+    if (cls == 0) {
+      cls = wanted;
+      strlcpybuff(mime, wanted == SF_C_CSS ? "text/css" : "text/javascript",
+                  sizeof(mime));
+    } else if (cls != wanted) {
+      sf_warn_mismatch(ctx, StringBuff(path), want, mime);
+      cls = 0;
+    }
+  }
   cap = ctx->opt->single_file_max_size;
   size = fsize_utf8(StringBuff(path));
   if (cls == 0 || size < 0)
@@ -506,56 +605,87 @@ fallback:
 }
 
 /* A mark htsparse wrote always names a file it had just saved, so failing to
-   resolve one means the reference reaching here is not the one it wrote: the
-   no-delimiter contract broke, or the file went away after the page did. */
+   resolve one means the mirror moved under us since the page was written. */
 static void sf_warn_unresolved(sf_ctx *ctx, const char *ref, size_t reflen) {
   if (*ctx->warn_budget <= 0)
     return;
-  if (--(*ctx->warn_budget) == 0) {
-    hts_log_print(ctx->opt, LOG_NOTICE,
-                  "single-file: further unresolved marks not reported");
-    return;
-  }
+  (*ctx->warn_budget)--;
   hts_log_print(ctx->opt, LOG_WARNING,
                 "single-file: marked reference \"%.*s\" resolves to no "
                 "mirrored file, left as a link",
                 (int) reflen, ref);
 }
 
+/* Parse the mark at [p,end): "<intro>.<class>.<len>". Returns its length, or 0
+   if it is not one. */
+static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
+                            size_t avail, char *cls, size_t *reflen) {
+  size_t i = introlen;
+  size_t n = 0;
+  int digits = 0;
+
+  if (avail < introlen || memcmp(p, intro, introlen) != 0)
+    return 0;
+  if (i + 3 >= avail || p[i] != '.')
+    return 0;
+  *cls = p[++i];
+  if (*cls != SINGLEFILE_CLASS_ANY && *cls != SINGLEFILE_CLASS_CSS &&
+      *cls != SINGLEFILE_CLASS_JS)
+    return 0;
+  if (++i >= avail || p[i++] != '.')
+    return 0;
+  while (i < avail && p[i] >= '0' && p[i] <= '9') {
+    if (n > SF_MAX_REF) /* a length this big cannot name a mirrored file */
+      return 0;
+    n = n * 10 + (size_t) (p[i++] - '0');
+    digits++;
+  }
+  if (digits == 0)
+    return 0;
+  *reflen = n;
+  return i;
+}
+
 /* Copy [body,body+len) to out, replacing each marked reference by its data:
-   URI, or by the bare reference when it cannot be inlined. Substitution is in
-   place, so a value keeps the quoting htsparse gave it; an unquoted attribute
+   URI, or by the bare reference when it cannot be inlined. The mark carries
+   the reference's byte length, so nothing here has to guess where it begins;
+   whatever follows the mark (an author's fragment, a kept query string) is
+   left untouched and so survives onto the data: URI. Substitution is in place,
+   so a value keeps the quoting htsparse gave it -- an unquoted attribute
    therefore ends up holding base64 padding, which every parser reads back but
    the HTML grammar does not allow. */
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
                       const char *body, size_t len, String *out) {
-  const size_t marklen = strlen(SINGLEFILE_MARK);
-  size_t i = 0, flushed = 0;
+  const char *const intro = singlefile_intro(ctx->opt);
+  size_t introlen, i = 0, flushed = 0;
 
-  while (i + marklen <= len) {
+  if (intro == NULL) {
+    StringMemcat(*out, body, len);
+    return;
+  }
+  introlen = strlen(intro);
+  while (i + introlen <= len) {
     hts_boolean resolved = HTS_FALSE;
-    size_t start, tail;
+    size_t marklen, reflen = 0;
+    char cls = SINGLEFILE_CLASS_ANY;
 
-    if (memcmp(body + i, SINGLEFILE_MARK, marklen) != 0) {
+    marklen = sf_parse_mark(intro, introlen, body + i, len - i, &cls, &reflen);
+    /* We wrote the length, but the file may have been truncated since; a
+       reference reaching back before what we have is not one of ours. */
+    if (marklen == 0 || reflen > i - flushed) {
       i++;
       continue;
     }
-    for (start = i; start > flushed && !sf_is_ref_delim(body[start - 1]);
-         start--)
-      ;
-    /* htsparse writes the fragment and the kept query string after the mark;
-       a data: URI has no use for either. */
-    for (tail = i + marklen; tail < len && !sf_is_ref_delim(body[tail]); tail++)
-      ;
-    StringMemcat(*out, body + flushed, start - flushed);
-    if (!sf_inline(ctx, base_dir, body + start, i - start,
-                   depth > 0 ? ctx->page_dir : NULL, depth, &resolved, out)) {
+    StringMemcat(*out, body + flushed, i - reflen - flushed);
+    if (!sf_inline(ctx, base_dir, body + i - reflen, reflen,
+                   depth > 0 ? ctx->page_dir : NULL, depth, cls, &resolved,
+                   out)) {
       if (!resolved)
-        sf_warn_unresolved(ctx, body + start, i - start);
-      StringMemcat(*out, body + start, i - start);
-      StringMemcat(*out, body + i + marklen, tail - i - marklen);
+        sf_warn_unresolved(ctx, body + i - reflen, reflen);
+      StringMemcat(*out, body + i - reflen, reflen);
     }
-    i = tail;
+    ctx->marks++;
+    i += marklen;
     flushed = i;
   }
   StringMemcat(*out, body + flushed, len - flushed);
@@ -585,11 +715,14 @@ hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
   ctx.warn_budget = &budget;
   ctx.budget = page_budget;
   ctx.inlined = 0;
+  ctx.marks = 0;
   sf_expand(&ctx, StringBuff(dir), 0, html, html_len, out);
   StringFree(nroot);
   StringFree(npage);
   StringFree(dir);
-  return ctx.inlined > 0 ? HTS_TRUE : HTS_FALSE;
+  /* Any mark consumed means the bytes changed, even if nothing inlined: the
+     marks themselves must never survive into the delivered mirror. */
+  return ctx.marks > 0 ? HTS_TRUE : HTS_FALSE;
 }
 
 /* Overwrite path with body. Spools then renames: a half-written file would
@@ -650,18 +783,27 @@ hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
   return ok;
 }
 
-/* Delete every mark from the file, keeping the reference and any fragment it
-   carried. Returns HTS_TRUE if the file changed. */
+/* Delete every mark from the file, keeping the reference and anything that
+   followed it. Returns HTS_TRUE if the file changed. */
 static hts_boolean sf_strip_marks_file(httrackp *opt, const char *path) {
-  const size_t marklen = strlen(SINGLEFILE_MARK);
-  size_t len = 0, r, w = 0;
-  char *body = sf_readfile(path, &len);
+  const char *const intro = singlefile_intro(opt);
+  size_t introlen, len = 0, r, w = 0;
+  char *body;
   hts_boolean ok;
 
+  if (intro == NULL)
+    return HTS_FALSE;
+  introlen = strlen(intro);
+  body = sf_readfile(path, &len);
   if (body == NULL)
     return HTS_FALSE;
   for (r = 0; r < len;) {
-    if (len - r >= marklen && memcmp(body + r, SINGLEFILE_MARK, marklen) == 0)
+    char cls;
+    size_t reflen;
+    const size_t marklen =
+        sf_parse_mark(intro, introlen, body + r, len - r, &cls, &reflen);
+
+    if (marklen != 0)
       r += marklen;
     else
       body[w++] = body[r++];

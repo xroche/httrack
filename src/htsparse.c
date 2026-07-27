@@ -385,6 +385,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
     FILE *fp = NULL;                  // fichier écrit localement 
     const char *html = r->adr;        // pointeur (on parcours)
     const char *lastsaved;            // adresse du dernier octet sauvé + 1
+    hts_boolean sf_may_mark = HTS_FALSE; // --single-file: mark this one?
 
     hts_log_print(opt, LOG_DEBUG, "scanning file %s%s (%s)..", urladr(), urlfil(),
                   savename());
@@ -400,12 +401,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           r->adr[i] = ' ';
         }
       }
-      /* --single-file: a document shipping the literal mark could otherwise
-         forge one and have the pass inline a mirrored file into its own text.
-         Disarming here, before any of it is copied out, is what leaves us the
-         only writer of a mark. */
+      /* --single-file: RFC 2046 makes the generator responsible for a
+         boundary that cannot collide with what it encapsulates. Same duty
+         here, and the same negligible odds: only chance can put this run's
+         secret in a fetched document, since no site can spell it. */
       if (opt->single_file) {
-        r->size = (LLint) singlefile_disarm_marks(r->adr, (size_t) r->size);
+        sf_may_mark = singlefile_may_mark(opt, r->adr, (size_t) r->size);
       }
     }
 
@@ -3052,30 +3053,30 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
 
                           /* --single-file: tag the reference for the
-                             end-of-mirror pass. The tag is a fragment, so the
-                             mirror stays valid if that pass never runs. */
-                          if (opt->single_file && !in_media && p_type == 0 &&
-                              !p_searchMETAURL &&
-                              singlefile_may_inline(
-                                  intag_start_valid ? intag_start : NULL,
-                                  tag_attr_start)) {
-                            /* The pass finds the reference by walking back to
-                               a delimiter, so a marked one may not contain
-                               any; escaping above is what guarantees it. */
-                            if (singlefile_ref_is_markable(tempo)) {
-                              strcatbuff(tempo, SINGLEFILE_MARK);
-                            } else {
-                              hts_log_print(
-                                  opt, LOG_WARNING,
-                                  "single-file: not marking \"%s\": the saved "
-                                  "reference was not escaped",
-                                  tempo);
-                            }
-                          }
+                             end-of-mirror pass. A fragment, so a mirror left
+                             marked by an interrupted run still browses. */
+                          const char sf_class =
+                              (opt->single_file && sf_may_mark && !in_media &&
+                               p_type == 0 && !p_searchMETAURL)
+                                  ? singlefile_ref_class(
+                                        intag_start_valid ? intag_name : NULL,
+                                        tag_attr_start)
+                                  : 0;
+                          const size_t sf_start = TypedArraySize(output_buffer);
 
                           // écrire le lien modifié, relatif
                           // Note: escape all chars, even >127 (no UTF)
                           HT_ADD_HTMLESCAPED_FULL(tempo);
+
+                          /* Measured on what was appended, not on tempo: the
+                             escape above is free to change the length. */
+                          if (sf_class != 0) {
+                            char sf_mark[SINGLEFILE_MARK_MAX];
+
+                            HT_ADD(singlefile_mark(
+                                opt, sf_mark, sizeof(sf_mark), sf_class,
+                                TypedArraySize(output_buffer) - sf_start));
+                          }
 
                           // Add query-string, for informational purpose only
                           // Useless, because all parameters-pages are saved into different targets

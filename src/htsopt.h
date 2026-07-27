@@ -564,6 +564,8 @@ struct httrackp {
      rather than in htsoptstate because that struct is embedded by value, so
      growing it would shift every httrackp field declared after it. */
   void *sitemap_state; /**< hts_sitemap_state*, or NULL. Tail: ABI */
+  void *singlefile_state; /**< hts_singlefile_state*, or NULL; holds this run's
+                               mark secret, never persisted. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

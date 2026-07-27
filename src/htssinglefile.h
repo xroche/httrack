@@ -55,27 +55,50 @@ extern "C" {
    so a few hundred bytes of hostile CSS can otherwise ask for gigabytes. */
 #define SINGLEFILE_MAX_PAGE_SIZE (64 * 1024 * 1024)
 
-/* Fragment htsparse appends to a saved reference the pass may inline. A
-   fragment and not a scheme, so the mirror still resolves if the pass never
-   runs, and so a mirrored .css or .js keeps its marks across an --update. */
-#define SINGLEFILE_MARK "#!htsinline"
+/* The mark htsparse appends to a saved reference the pass may inline:
 
-/* HTS_TRUE if a reference htsparse detected in this context may become a
-   data: URI. tag_start points at the '<' of the enclosing start tag, or NULL
-   when there is none (inside a stylesheet or a script); attr at the attribute
-   name. Everything htsparse detects is inlinable unless it names a page. */
-hts_boolean singlefile_may_inline(const char *tag_start, const char *attr);
+     #!<16-hex secret>.<class>.<len>
 
-/* Drop the '!' from every mark already present in [body,body+len), in place,
-   returning the new length (never longer). Call on a fetched document before
-   parsing it: a page that shipped the literal mark could otherwise forge one
-   and have the pass inline a mirrored file into its own text. */
-size_t singlefile_disarm_marks(char *body, size_t len);
+   A fragment, so a mirror left marked by an interrupted run still browses.
+   The secret is 64 CSPRNG bits drawn once per run and never written to disk,
+   which is what makes the mark unforgeable: a site cannot spell one, so no
+   sanitiser has to keep hostile bytes away from it. <len> is the byte length
+   of the reference text immediately preceding the mark, so the pass never has
+   to guess where that reference starts. <class> is the context htsparse saw,
+   checked against the resolved type so a mismatch fails loudly. */
+#define SINGLEFILE_MARK_INTRO "#!"
+#define SINGLEFILE_SECRET_HEX 16
 
-/* HTS_TRUE if ref may carry a mark, i.e. holds no byte the pass reads as the
-   end of a reference. htsparse percent-escapes what it saves, so this holds;
-   it is checked because nothing else enforces it across the two files. */
-hts_boolean singlefile_ref_is_markable(const char *ref);
+/* <class>: what the referencing context expects. */
+#define SINGLEFILE_CLASS_ANY '-'
+#define SINGLEFILE_CLASS_CSS 'c'
+#define SINGLEFILE_CLASS_JS 'j'
+
+/* Enough for the intro, the secret, both separators and a 20-digit length. */
+#define SINGLEFILE_MARK_MAX 64
+
+/* Release this run's secret. */
+void singlefile_free(httrackp *opt);
+
+/* "#!<secret>" for this run, or NULL if no CSPRNG was available (in which case
+   nothing may be marked). Draws the secret on first use. */
+const char *singlefile_intro(httrackp *opt);
+
+/* HTS_FALSE if [body,len) already contains this run's intro, in which case the
+   document must not be marked: RFC 2046 gives the generator the same duty for
+   a MIME boundary. Only a 2^-64 coincidence can trip it, since the intro is
+   not something fetched content can spell. */
+hts_boolean singlefile_may_mark(httrackp *opt, const char *body, size_t len);
+
+/* Write the mark for a reference of reflen bytes into buf; returns buf. */
+const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
+                            size_t reflen);
+
+/* The class a reference in this context may inline as, or 0 to leave it alone.
+   tag_name points just past the '<' of the enclosing start tag, or NULL when
+   there is none (inside a stylesheet or a script); attr at the attribute name.
+   Everything htsparse detects is inlinable unless it names a page. */
+char singlefile_ref_class(const char *tag_name, const char *attr);
 
 /* Rewrite every HTML page the mirror produced, then strip the marks left in
    the assets. No-op unless opt->single_file; call once the tree is final,

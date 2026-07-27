@@ -141,6 +141,10 @@ HTSEXT_API hts_boolean hts_findissystem(find_handle find);
    paths are fconv()'d. */
 hts_boolean hts_rename_over(const char *src, const char *dst);
 
+/* Fill buf with len cryptographically strong random bytes. HTS_FALSE when no
+   such source is available: the caller must fail, never fall back to rand(). */
+hts_boolean hts_random_bytes(void *buf, size_t len);
+
 #endif
 
 #endif

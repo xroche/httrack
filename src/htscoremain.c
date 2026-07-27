@@ -1221,6 +1221,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   opt->mimehtml = 0;
                   com++;
                 }
+                if (opt->mimehtml && opt->single_file) {
+                  HTS_PANIC_PRINTF(
+                      "-%M and --single-file are two ways to make one "
+                      "self-contained file, so pick one: MIME (-%M) carries "
+                      "text parts without the base64 tax and stores a shared "
+                      "asset once; single-file HTML opens anywhere by "
+                      "double-click.");
+                  htsmain_free();
+                  return -1;
+                }
                 break;
               case 'k':
                 opt->nokeepalive = 0;
@@ -1831,6 +1841,16 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     opt->single_file = HTS_FALSE;
                     com++;
                   }
+                }
+                if (opt->single_file && opt->mimehtml) {
+                  HTS_PANIC_PRINTF(
+                      "-%M and --single-file are two ways to make one "
+                      "self-contained file, so pick one: MIME (-%M) carries "
+                      "text parts without the base64 tax and stores a shared "
+                      "asset once; single-file HTML opens anywhere by "
+                      "double-click.");
+                  htsmain_free();
+                  return -1;
                 }
                 break;
               case 'm': // sitemap / sitemap-url: seed the crawl from sitemaps

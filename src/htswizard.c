@@ -61,11 +61,6 @@ Please visit our Website: http://www.httrack.com
     assertf((*opt->filters.filptr) < opt->maxfilter);                          \
   } while (0)
 
-typedef struct htspair_t {
-  const char *tag;
-  const char *attr;
-} htspair_t;
-
 /* "embedded" */
 htspair_t hts_detect_embed[] = {
   {"img", "src"},
@@ -133,11 +128,13 @@ int hts_acceptlink(httrackp * opt, int ptr,
   return forbidden_url;
 }
 
-static int cmp_token(const char *tag, const char *cmp) {
+hts_boolean hts_cmp_tag_token(const char *tag, const char *cmp) {
   int p;
 
-  return (strncasecmp(tag, cmp, (p = (int) strlen(cmp))) == 0
-          && !isalnum((unsigned char) tag[p]));
+  return (tag != NULL && strncasecmp(tag, cmp, (p = (int) strlen(cmp))) == 0 &&
+          !isalnum((unsigned char) tag[p]))
+             ? HTS_TRUE
+             : HTS_FALSE;
 }
 
 /* TRUE if (tag, attribute) matches an embedded-asset pair in the table */
@@ -145,7 +142,8 @@ static hts_boolean is_embed_pair(const htspair_t *table, const char *tag,
                                  const char *attribute) {
   int i;
   for (i = 0; table[i].tag != NULL; i++) {
-    if (cmp_token(tag, table[i].tag) && cmp_token(attribute, table[i].attr))
+    if (hts_cmp_tag_token(tag, table[i].tag) &&
+        hts_cmp_tag_token(attribute, table[i].attr))
       return HTS_TRUE;
   }
   return HTS_FALSE;
