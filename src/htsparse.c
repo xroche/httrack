@@ -59,6 +59,7 @@ Please visit our Website: http://www.httrack.com
 
 // parser
 #include "htsparse.h"
+#include "htssinglefile.h"
 #include "htsback.h"
 
 // arrays
@@ -3042,6 +3043,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
 
                         if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
+
+                          /* --single-file: tag the reference for the
+                             end-of-mirror pass. The tag is a fragment, so the
+                             mirror stays valid if that pass never runs. */
+                          if (opt->single_file && !in_media && p_type == 0
+                              && !p_searchMETAURL
+                              && singlefile_may_inline(intag_start_valid ?
+                                                       intag_start : NULL,
+                                                       tag_attr_start)) {
+                            strcatbuff(tempo, SINGLEFILE_MARK);
+                          }
 
                           // écrire le lien modifié, relatif
                           // Note: escape all chars, even >127 (no UTF)
