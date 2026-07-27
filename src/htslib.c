@@ -5078,7 +5078,7 @@ static int hts_dns_resolve_nocache_list(const char *const hostname,
   if (!strnotempty(hostname) || max <= 0) {
     return 0;
   }
-  if ((hostname[0] == '[') && (hostname[strlen(hostname) - 1] == ']')) {
+  if ((hostname[0] == '[') && (hts_lastchar(hostname) == ']')) {
     size_t size = strlen(hostname);
     char *copy = malloct(size + 1);
     int count;
@@ -5491,9 +5491,8 @@ void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
               size_t pname_size) {
   path[0] = pname[0] = '\0';
   if (strnotempty(fullpath)) {
-    if ((fullpath[strlen(fullpath) - 1] == '/')
-        || (fullpath[strlen(fullpath) - 1] == '\\'))
-      fullpath[strlen(fullpath) - 1] = '\0';
+    if (!hts_striplastchar(fullpath, '/'))
+      hts_striplastchar(fullpath, '\\');
     if (strlen(fullpath) > 1) {
       char *a;
 

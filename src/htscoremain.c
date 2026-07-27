@@ -357,7 +357,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           char BIGSTK tempo[HTS_CDLMAXSIZE];
 
           strcpybuff(tempo, argv[na] + 1);
-          if (tempo[0] == '\0' || tempo[strlen(tempo) - 1] != '"') {
+          if (hts_lastchar(tempo) != '"') {
             char BIGSTK s[HTS_CDLMAXSIZE];
 
             sprintf(s, "Missing quote in %s", argv[na]);
@@ -365,7 +365,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             htsmain_free();
             return -1;
           }
-          tempo[strlen(tempo) - 1] = '\0';
+          hts_choplastchar(tempo);
           /* tempo is argv[na] minus its surrounding quotes, so it fits in place
            */
           strlcpybuff(argv[na], tempo, strlen(argv[na]) + 1);
@@ -863,7 +863,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         char BIGSTK tempo[HTS_CDLMAXSIZE + 256];
 
         strcpybuff(tempo, argv[na] + 1);
-        if (tempo[0] == '\0' || tempo[strlen(tempo) - 1] != '"') {
+        if (hts_lastchar(tempo) != '"') {
           char s[HTS_CDLMAXSIZE + 256];
 
           sprintf(s, "Missing quote in %s", argv[na]);
@@ -871,7 +871,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           htsmain_free();
           return -1;
         }
-        tempo[strlen(tempo) - 1] = '\0';
+        hts_choplastchar(tempo);
         /* tempo is argv[na] minus its surrounding quotes, so it fits in place
          */
         strlcpybuff(argv[na], tempo, strlen(argv[na]) + 1);
@@ -2724,10 +2724,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       char *a;
 
       strcpybuff(rpath, StringBuff(opt->path_html));
-      if (rpath[0]) {
-        if (rpath[strlen(rpath) - 1] == '/')
-          rpath[strlen(rpath) - 1] = '\0';
-      }
+      hts_striplastchar(rpath, '/');
       a = strrchr(rpath, '/');
       if (a) {
         *a = '\0';
