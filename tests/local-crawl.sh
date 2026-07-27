@@ -461,7 +461,8 @@ debug "host root: $hostroot"
 
 # --- optional WARC validation (stdlib validator, no warcio) ------------------
 # WARC_VALIDATE_BODY="URLSUB=HEX" byte-checks a fresh-crawl response body;
-# WARC_VALIDATE_NORESP="URLSUB..." asserts those assets are revisits post-update.
+# WARC_VALIDATE_NORESP="URLSUB..." asserts those assets are revisits post-update;
+# WARC_VALIDATE_EXCHANGE=1 asserts each revisit carries its 304 request/response.
 if test -n "$warc_validate"; then
     validator=$(nativepath "${testdir}/warc-validate.py")
     warc=$(find "$mirrorroot" -maxdepth 2 \( -name '*.warc.gz' -o -name '*.warc' \) 2>/dev/null | sort | tail -n1)
@@ -479,7 +480,10 @@ if test -n "$warc_validate"; then
     # body and keeps Content-Encoding, instead of expecting a decoded body.
     test -n "${WARC_VALIDATE_VERBATIM:-}" && bodyargs+=(--verbatim)
     info "validating fresh WARC (response bodies)"
-    "$python" "$validator" "$(nativepath "$fresh")" "${bodyargs[@]}" >&2 ||
+    # macOS bash 3.2 calls an empty array unbound under set -u, and a caller
+    # asking only for the revisit checks leaves this one empty.
+    "$python" "$validator" "$(nativepath "$fresh")" \
+        ${bodyargs[@]+"${bodyargs[@]}"} >&2 ||
         die "fresh WARC validation failed"
     result "OK"
 
@@ -493,6 +497,7 @@ if test -n "$warc_validate"; then
         for sub in ${WARC_VALIDATE_NORESP:-}; do
             revargs+=(--no-response-for "$sub")
         done
+        test -n "${WARC_VALIDATE_EXCHANGE:-}" && revargs+=(--revisit-exchange)
         info "validating update WARC (revisits)"
         "$python" "$validator" "$(nativepath "$upd")" "${revargs[@]}" >&2 ||
             die "update WARC validation failed"

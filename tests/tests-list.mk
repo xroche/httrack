@@ -196,5 +196,6 @@ TESTS += 97_local-warc-update-keep.test
 TESTS += 98_local-warc-segments.test
 TESTS += 99_local-robots-error.test
 TESTS += 120_local-proxytrack-webdav-default.test
+TESTS += 122_local-warc-revisit-headers.test
 TESTS += 119_local-proxytrack-ndx-fields2.test
 TESTS += 118_local-proxytrack-arcwrite.test
