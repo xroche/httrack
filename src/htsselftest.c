@@ -5580,6 +5580,9 @@ static const char sf_page[] =
     "<div style=\"background:url(img/sprite.svg#icon-d)\"></div>\n"
     "<div style=\"background:url('img/sprite.svg#i)e')\"></div>\n"
     "<img src=\"img/sprite.svg?v=1#icon-f\">\n"
+    /* Already carries the document's own escapes: re-encoding either would
+       make the browser look for a different id. */
+    "<img src=\"img/sprite.svg#g&amp;h%2Di\">\n"
     "<img src=\"missing.png\" >\n"
     "<!--><img src=\"img/a%20b.png\">\n"
     "<div style=\"background:url(img/a%20b.png)\"></div>\n"
@@ -5599,6 +5602,9 @@ static void sf_fixture(const char *root) {
       "body { background: url(../img/a b.png); }\n"
       "div { background: url(../img/big.png); }\n"
       "div.s { background: url(../img/big-sprite.svg#icon-g); }\n"
+      /* A name whose escapes the rebase has to put back, unlike a fragment's;
+         the '#' has to come back encoded or it reads as one. */
+      "div.h { background: url(../img/b&amp;c%25d%23e.png); }\n"
       "/* url(../img/never.png) */\n";
   static const char nested[] = "div { background: url(../../img/a b.png); }\n";
   static const char two[] = "p { background: url(../../img/a b.png); }\n";
@@ -5620,6 +5626,7 @@ static void sf_fixture(const char *root) {
   sf_put(root, "img/big.png", big, sizeof(big));
   sf_put(root, "img/sprite.svg", sf_svg, sizeof(sf_svg) - 1);
   sf_put(root, "img/big-sprite.svg", big, sizeof(big));
+  sf_put(root, "img/b&c%d#e.png", big, sizeof(big));
   sf_put(root, "img/in.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/po.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/sv.png", sf_png, SF_PNG_LEN);
@@ -5768,6 +5775,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
            "a fragment closing the url() token was not escaped");
   sf_check(sf_count(out, "#icon-f\"") == 1, "fragment after a query dropped");
   sf_check(strstr(out, "?v=1") == NULL, "query carried onto the data: URI");
+  sf_check(sf_count(out, "#g&amp;h%2Di\"") == 1,
+           "an escape the document already carried was encoded again");
 
   sf_check(strstr(out, "img/big.png 2x") != NULL, "over-cap asset inlined");
   sf_check(strstr(out, " 1x") != NULL, "srcset descriptor lost");
@@ -5797,6 +5806,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
              "over-cap url() not rebased onto the page's directory");
     sf_check(strstr(css, "url(img/big-sprite.svg#icon-g)") != NULL,
              "a rebased url() lost its fragment");
+    sf_check(strstr(css, "url(img/b%26c%25d%23e.png)") != NULL,
+             "a rebased name came back unescaped");
     nested = sf_decode(css, "text/css", NULL);
     sf_check(nested != NULL &&
                  strstr(nested, "url(data:image/png;base64,") != NULL,

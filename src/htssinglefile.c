@@ -367,9 +367,10 @@ static hts_boolean sf_append_base64(String *out, char *data, size_t len) {
 }
 
 /* Append [p,p+len), escaping what an unquoted CSS url(), an HTML attribute or
-   an appended fragment could choke on; keep_pct spares an existing escape. */
+   an appended fragment could choke on. preencoded text already carries the
+   document's own '%' and '&' escapes, and encoding those again changes it. */
 static void sf_append_escaped(String *out, const char *p, size_t len,
-                              hts_boolean keep_pct) {
+                              hts_boolean preencoded) {
   static const char hex[] = "0123456789ABCDEF";
   size_t i;
 
@@ -377,8 +378,8 @@ static void sf_append_escaped(String *out, const char *p, size_t len,
     const unsigned char c = (unsigned char) p[i];
 
     if (c <= 32 || c >= 127 || c == '"' || c == '\'' || c == '(' || c == ')' ||
-        c == '\\' || c == '<' || c == '>' || c == '&' || c == '#' ||
-        (c == '%' && !keep_pct)) {
+        c == '\\' || c == '<' || c == '>' || c == '#' ||
+        (!preencoded && (c == '%' || c == '&'))) {
       StringAddchar(*out, '%');
       StringAddchar(*out, hex[c >> 4]);
       StringAddchar(*out, hex[c & 15]);
