@@ -1,11 +1,9 @@
 #!/bin/bash
 #
 # Issue #782: a 304 during --update overwrote the whole response struct with the
-# cache entry, dropping the 8 KB header buffer it owned -- once per unchanged
-# URL. Only a leak checker sees it, and the sanitized CI leg runs with
-# detect_leaks off, so this leg turns it back on around a two-pass mini304
-# crawl. The fresh first pass is the control: it never had a cache entry to
-# read back, and must be clean either way.
+# cache entry, dropping the 8 KB header buffer it owned. Only a leak checker
+# sees it and the sanitized CI leg runs with detect_leaks off, so this one turns
+# it back on around a two-pass mini304 crawl; the fresh pass is the control.
 
 set -eu
 
