@@ -1452,9 +1452,9 @@ hts_boolean hts_rename_over(const char *src, const char *dst) {
   if (RENAME(csrc, cdst) == 0)
     return HTS_TRUE;
   /* Unlink only for the failure the fallback exists for: a dst in the way,
-     which Windows' rename() reports as EACCES (POSIX replaces it silently). A
-     src that was never written must leave dst alone, whatever errno says --
-     the CRT does not promise ENOENT over EACCES when both hold. */
+     which Windows' rename() reports as EACCES. The errno test alone is not
+     enough, the CRT does not promise ENOENT over EACCES when src is missing
+     too. */
   const int err = errno;
 
   if ((err != EACCES && err != EEXIST) || !fexist_utf8(src))
