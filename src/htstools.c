@@ -985,10 +985,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
       && toptemplate_bodycat) {
 
     strcpybuff(rpath, path);
-    if (rpath[0]) {
-      if (rpath[strlen(rpath) - 1] == '/')
-        rpath[strlen(rpath) - 1] = '\0';
-    }
+    hts_striplastchar(rpath, '/');
 
     fpo = fopen(fconcat(catbuff, sizeof(catbuff), rpath, "/index.html"), "wb");
     if (fpo) {
@@ -1201,11 +1198,8 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
   find_handle h;
   coucal hashCateg = NULL;
 
-  if (rpath[0]) {
-    if (rpath[strlen(rpath) - 1] == '/') {
-      rpath[strlen(rpath) - 1] = '\0';  /* note: patching stored (inhash) value */
-    }
-  }
+  /* note: patching stored (inhash) value */
+  hts_striplastchar(rpath, '/');
   h = hts_findfirst(rpath);
   if (h) {
     String iname = STRING_EMPTY;
@@ -1302,7 +1296,7 @@ HTSEXT_API find_handle hts_findfirst(char *path) {
 
           strcpybuff(rpath, path);
           if (rpath[0]) {
-            if (rpath[strlen(rpath) - 1] != '\\')
+            if (hts_lastchar(rpath) != '\\')
               strcatbuff(rpath, "\\");
           }
           strcatbuff(rpath, "*.*");
@@ -1314,7 +1308,7 @@ HTSEXT_API find_handle hts_findfirst(char *path) {
         strcpybuff(find->path, path);
         {
           if (find->path[0]) {
-            if (find->path[strlen(find->path) - 1] != '/')
+            if (hts_lastchar(find->path) != '/')
               strcatbuff(find->path, "/");
           }
         }
@@ -1451,7 +1445,14 @@ hts_boolean hts_rename_over(const char *src, const char *dst) {
   fconv(cdst, sizeof(cdst), dst);
   if (RENAME(csrc, cdst) == 0)
     return HTS_TRUE;
-  /* RENAME does not clobber an existing target on Windows. */
+  /* Only a dst in the way is something the unlink can clear, and the CRT maps
+     that to EEXIST; it keeps EACCES for a src another process holds, where
+     removing dst would lose a file the retry cannot replace (#790). The src
+     check covers a CRT that reports neither. */
+  const int err = errno;
+
+  if (err != EEXIST || !fexist_utf8(src))
+    return HTS_FALSE;
   (void) UNLINK(cdst);
   return RENAME(csrc, cdst) == 0 ? HTS_TRUE : HTS_FALSE;
 }

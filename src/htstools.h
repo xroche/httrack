@@ -138,7 +138,9 @@ HTSEXT_API hts_boolean hts_findisfile(find_handle find);
 HTSEXT_API hts_boolean hts_findissystem(find_handle find);
 
 /* Move src onto dst, replacing an existing dst; HTS_TRUE on success. Both
-   paths are fconv()'d. */
+   paths are fconv()'d. dst is removed only to make room for a src that exists,
+   so a caller whose src was never written keeps its dst; a retry that still
+   fails does not (#790). */
 hts_boolean hts_rename_over(const char *src, const char *dst);
 
 #endif

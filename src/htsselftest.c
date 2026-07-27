@@ -5955,6 +5955,104 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static void ro_put(const char *path, const char *data) {
+  FILE *const fp = FOPEN(path, "wb");
+
+  assertf(fp != NULL);
+  assertf(fwrite(data, 1, strlen(data), fp) == strlen(data));
+  fclose(fp);
+}
+
+/* HTS_TRUE if path holds exactly data. */
+static hts_boolean ro_is(const char *path, const char *data) {
+  char buf[64];
+  FILE *const fp = FOPEN(path, "rb");
+  size_t n;
+
+  if (fp == NULL)
+    return HTS_FALSE;
+  n = fread(buf, 1, sizeof(buf), fp);
+  fclose(fp);
+  return n == strlen(data) && memcmp(buf, data, n) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+// -#test=renameover <dir>: hts_rename_over() must replace an existing dst and
+// never delete one it did not replace (#779). Which half is live depends on
+// what rename() does to an existing target, so probe that and name the regime.
+static int st_renameover(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "renameover: needs a writable base dir\n");
+    return 1;
+  }
+  char src[HTS_URLMAXSIZE * 2], dst[HTS_URLMAXSIZE * 2];
+  int err = 0;
+
+  fconcat(src, sizeof(src), argv[0], "renameover-src.bin");
+  fconcat(dst, sizeof(dst), argv[0], "renameover-dst.bin");
+
+  (void) UNLINK(src);
+  (void) UNLINK(dst);
+  ro_put(src, "probe");
+  ro_put(dst, "probe");
+
+  const int probe = RENAME(src, dst) == 0 ? 0 : errno;
+  /* Only a target in the way is something the unlink can clear. */
+  const hts_boolean replaceable = probe == 0 || probe == EEXIST;
+
+  printf("renameover: regime %s\n",
+         probe == 0 ? "clobber" : (probe == EEXIST ? "fallback" : "refused"));
+
+  (void) UNLINK(src);
+  (void) UNLINK(dst);
+  ro_put(src, "new");
+  ro_put(dst, "old");
+  if (replaceable) {
+    /* An existing dst must still be replaced: the unlink is for this. */
+    if (!hts_rename_over(src, dst)) {
+      fprintf(stderr, "renameover: replacing an existing dst failed: %s\n",
+              strerror(errno));
+      err++;
+    } else if (!ro_is(dst, "new") || fexist_utf8(src)) {
+      fprintf(stderr, "renameover: dst was not replaced by src\n");
+      err++;
+    }
+  } else {
+    /* A failure the unlink cannot fix must leave dst as it was. */
+    if (hts_rename_over(src, dst)) {
+      fprintf(stderr, "renameover: an unfixable failure reported success\n");
+      err++;
+    }
+    if (!ro_is(dst, "old")) {
+      fprintf(stderr, "renameover: an unfixable failure destroyed dst\n");
+      err++;
+    }
+  }
+
+  /* A missing src must leave dst alone and report failure. */
+  (void) UNLINK(src);
+  ro_put(dst, "keep");
+  if (hts_rename_over(src, dst)) {
+    fprintf(stderr, "renameover: a missing src reported success\n");
+    err++;
+  }
+  if (!ro_is(dst, "keep")) {
+    fprintf(stderr, "renameover: a missing src destroyed dst\n");
+    err++;
+  }
+
+  /* Same, with dst absent too: nothing to lose, still a failure. */
+  (void) UNLINK(dst);
+  if (hts_rename_over(src, dst)) {
+    fprintf(stderr, "renameover: a missing src and dst reported success\n");
+    err++;
+  }
+
+  (void) UNLINK(dst);
+  printf("renameover: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 // -#test=direnum <dir>: enumerate a long+non-ASCII directory via the
 // opendir/readdir wrappers; children must round-trip as UTF-8 (#133,#630).
 static int st_direnum(httrackp *opt, int argc, char **argv) {
@@ -6381,7 +6479,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   strcpybuff(base, argv[0]);
-  if (base[0] != '\0' && base[strlen(base) - 1] != '/')
+  if (base[0] != '\0' && hts_lastchar(base) != '/')
     strcatbuff(base, "/");
   StringCopy(opt->path_html, base);
   StringCopy(opt->path_html_utf8, base);
@@ -6452,6 +6550,88 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The x[strlen(x) - 1] class (#770). The string starts mid-arena so the byte
+   it must not touch is a real neighbour; poisoned with '#', not 0, or a stray
+   NUL terminator would read as untouched. */
+static int st_lastchar(httrackp *opt, int argc, char **argv) {
+  enum { off = 8 };
+
+  char arena[16];
+  char *const s = &arena[off];
+  const int guard = off - 1; /* what the old idiom clobbers */
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+#define REPOISON(str)                                                          \
+  do {                                                                         \
+    memset(arena, '#', sizeof(arena));                                         \
+    strlcpybuff(s, (str), sizeof(arena) - off);                                \
+  } while (0)
+#define CHECK(cond)                                                            \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  /* the empty string: every helper must report "nothing" and touch nothing */
+  REPOISON("");
+  CHECK(hts_lastchar(s) == '\0');
+  CHECK(arena[guard] == '#');
+  REPOISON("");
+  CHECK(hts_striplastchar(s, '/') == HTS_FALSE);
+  CHECK(arena[guard] == '#');
+  CHECK(s[0] == '\0');
+  REPOISON("");
+  CHECK(hts_choplastchar(s) == HTS_FALSE);
+  CHECK(arena[guard] == '#');
+  CHECK(s[0] == '\0');
+
+  /* a '/' sitting where the underflow would land must not be mistaken for the
+     string's own last byte -- this is the #768 shape */
+  REPOISON("");
+  arena[guard] = '/';
+  CHECK(hts_lastchar(s) == '\0');
+  CHECK(hts_striplastchar(s, '/') == HTS_FALSE);
+  CHECK(arena[guard] == '/');
+
+  /* non-empty: ordinary behaviour */
+  REPOISON("ab/");
+  CHECK(hts_lastchar(s) == '/');
+  CHECK(hts_striplastchar(s, '/') == HTS_TRUE);
+  CHECK(strcmp(s, "ab") == 0);
+  CHECK(hts_striplastchar(s, '/') == HTS_FALSE);
+  CHECK(strcmp(s, "ab") == 0);
+  CHECK(hts_choplastchar(s) == HTS_TRUE);
+  CHECK(strcmp(s, "a") == 0);
+  CHECK(hts_choplastchar(s) == HTS_TRUE);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  /* one-character string: the boundary the guards get wrong */
+  REPOISON("/");
+  CHECK(hts_lastchar(s) == '/');
+  CHECK(hts_striplastchar(s, '/') == HTS_TRUE);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  /* control: the canary must be able to fail, or the checks above prove
+     nothing. Clobber it exactly as the unguarded idiom would. */
+  REPOISON("");
+  s[-1] = '\0';
+  CHECK(arena[guard] != '#');
+
+#undef REPOISON
+#undef CHECK
+
+  printf("lastchar self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -6507,6 +6687,8 @@ static const struct selftest_entry {
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
+    {"lastchar", "", "last-char helpers never index before the buffer (#770)",
+     st_lastchar},
     {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
      st_changes},
     {"changes-race", "<dir>", "--changes under a late transfer thread (#714)",
@@ -6612,6 +6794,10 @@ static const struct selftest_entry {
     {"mirrorio", "<dir>",
      "round-trip a long+non-ASCII path through the mirror I/O wrappers",
      st_mirrorio},
+    {"renameover", "<dir>",
+     "hts_rename_over(): replace dst, but never delete a dst it did not "
+     "replace",
+     st_renameover},
     {"direnum", "<dir>",
      "enumerate a long+non-ASCII directory through opendir/readdir",
      st_direnum},

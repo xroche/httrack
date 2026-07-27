@@ -676,7 +676,7 @@ int cache_selftests(httrackp *opt, const char *dir) {
     char base[HTS_URLMAXSIZE];
 
     strcpybuff(base, dir);
-    if (base[0] != '\0' && base[strlen(base) - 1] != '/') {
+    if (base[0] != '\0' && hts_lastchar(base) != '/') {
       strcatbuff(base, "/");
     }
     StringCopy(opt->path_log, base);
@@ -856,7 +856,7 @@ static void golden_setup(httrackp *opt, const char *dir) {
   char base[HTS_URLMAXSIZE];
 
   strcpybuff(base, dir);
-  if (base[0] != '\0' && base[strlen(base) - 1] != '/') {
+  if (base[0] != '\0' && hts_lastchar(base) != '/') {
     strcatbuff(base, "/");
   }
   StringCopy(opt->path_log, base);

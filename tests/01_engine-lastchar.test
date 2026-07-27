@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# Runs the lastchar self-test (#770), then keeps the idiom it replaced from
+# coming back: x[strlen(x) - 1] indexes one byte before the buffer when x is
+# empty, and the guard is never where the index is.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+out=$(httrack -#test=lastchar) || {
+    echo "httrack -#test=lastchar exited non-zero: $out" >&2
+    exit 1
+}
+
+# Exact-match the success line so a renamed/removed test can't pass silently.
+test "$out" = "lastchar self-test: OK" || {
+    echo "expected 'lastchar self-test: OK', got: $out" >&2
+    exit 1
+}
+
+# The self-test only covers the helpers, so guard the class at the source: the
+# lone survivor is inside a comment block in htsname.c. coucal is vendored, so
+# its idioms are not ours to police.
+hits=$(command grep -rn 'strlen([^)]*) *- *1\]' "$top_srcdir/src" \
+    --include='*.c' --include='*.h' --exclude-dir=coucal |
+    grep -v 'htsname\.c:.*save\[strlen(save)-1\]' |
+    grep -v 'Replaces s\[strlen(s) - 1\]' |
+    grep -v 'The x\[strlen(x) - 1\] class' || true)
+
+test -z "$hits" || {
+    echo "x[strlen(x) - 1] reintroduced; use hts_lastchar/hts_striplastchar/hts_choplastchar:" >&2
+    echo "$hits" >&2
+    exit 1
+}

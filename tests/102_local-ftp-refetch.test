@@ -95,7 +95,10 @@ EOF
 }
 
 # --- pass 1: a healthy mirror ------------------------------------------------
-httrack "${urls[@]}" -O "$out" "${common[@]}" >"${tmpdir}/log1" 2>&1
+# Bounded like every local-crawl.sh pass: a wedged crawl must fail the test, not
+# hang the job until CI cancels it and discards the log (#796).
+run_with_timeout 300 httrack "${urls[@]}" -O "$out" "${common[@]}" \
+    >"${tmpdir}/log1" 2>&1
 for name in keep empty stay; do
     test -s "${out}/${host}/${name}.bin" || fail "pass 1 did not mirror ${name}.bin"
 done
@@ -112,7 +115,8 @@ cat >"$mode" <<'EOF'
 /empty.bin empty norest
 /stay.bin norest
 EOF
-httrack "${urls[@]}" -O "$out" "${common[@]}" --update >"${tmpdir}/log2" 2>&1
+run_with_timeout 300 httrack "${urls[@]}" -O "$out" "${common[@]}" --update \
+    >"${tmpdir}/log2" 2>&1
 
 # Both failures have to be the transfer dying mid-body: a connect or lookup
 # failure never opens the file, and everything below would pass vacuously.
