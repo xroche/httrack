@@ -2160,8 +2160,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'R':
                 {
                   char *name;
-                  uLong repaired = 0;
-                  uLong repairedBytes = 0;
+                  const char *why;
+                  unsigned long repaired = 0;
+                  unsigned long repairedBytes = 0;
 
                   if (fexist_utf8(fconcat(
                           OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -2184,33 +2185,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     return 1;
                   }
                   fprintf(stderr, "Cache: trying to repair %s\n", name);
-                  if (unzRepair
-                      (name,
-                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                               "hts-cache/repair.zip"),
-                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                               "hts-cache/repair.tmp"), &repaired,
-                       &repairedBytes) == Z_OK) {
-                    /* Announcing the recovery before checking the move left the
-                       entries in repair.zip, a name nothing reads (#786). */
-                    if (!hts_rename_over(fconcat(OPT_GET_BUFF(opt),
-                                                 OPT_GET_BUFF_SIZE(opt),
-                                                 StringBuff(opt->path_log),
-                                                 "hts-cache/repair.zip"),
-                                         name)) {
-                      fprintf(stderr,
-                              "Cache: could not put the repaired cache in "
-                              "place: %s\n",
-                              strerror(errno));
-                      return 1;
-                    }
-                    fprintf(stderr,
-                            "Cache: %d bytes successfully recovered in %d entries\n",
-                            (int) repairedBytes, (int) repaired);
-                  } else {
-                    fprintf(stderr, "Cache: could not repair the cache\n");
+                  why = cache_repair(opt, name, &repaired, &repairedBytes);
+                  if (why != NULL) {
+                    fprintf(stderr, "Cache: %s\n", why);
                     return 1;
                   }
+                  fprintf(
+                      stderr,
+                      "Cache: %d bytes successfully recovered in %d entries\n",
+                      (int) repairedBytes, (int) repaired);
                 }
                 return 0;
                 break;

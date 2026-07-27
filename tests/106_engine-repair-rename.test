@@ -1,8 +1,9 @@
 #!/bin/bash
 #
 # #786: both cache-repair paths moved the recovered zip onto the cache without
-# checking the move, and announced success either way. A refused rename must be
-# reported, and the recovery must still be there to retry.
+# checking the move, and announced success either way. #824: they also committed
+# a recovery holding no entry at all. Neither may replace the cache, and both
+# must be reported.
 
 set -euo pipefail
 
@@ -41,6 +42,28 @@ test ! -e "${proj}/hts-cache/repair.zip" || {
 }
 test "$(wc -c <"${proj}/hts-cache/new.zip")" -gt 31 || {
     echo "FAIL: new.zip is still the damaged one"
+    exit 1
+}
+echo "OK"
+
+# --- #824: nothing was recoverable, so nothing may be committed --------------
+printf '[-#R refuses an empty recovery] ..\t'
+proj="${tmpdir}/empty"
+rm -rf "$proj"
+mkdir -p "$proj/hts-cache"
+printf 'not a zip at all, some bytes' >"$proj/hts-cache/new.zip"
+rc=0
+out=$(httrack -O "$proj" -#R "$dead" 2>&1) || rc=$?
+test "$rc" -ne 0 || {
+    echo "FAIL: an empty recovery exited 0: $out"
+    exit 1
+}
+if grep -q 'successfully recovered' <<<"$out"; then
+    echo "FAIL: an empty recovery claimed success: $out"
+    exit 1
+fi
+test "$(wc -c <"${proj}/hts-cache/new.zip")" -eq 28 || {
+    echo "FAIL: the damaged cache was replaced by the empty recovery"
     exit 1
 }
 echo "OK"
@@ -118,6 +141,33 @@ if grep -q 'successfully recovered' "$log"; then
 fi
 test -s "${proj}/hts-cache/repair.zip" || {
     echo "FAIL: the recovery was not kept for a retry"
+    exit 1
+}
+echo "OK"
+
+# --- the move is refused the way Windows refuses it --------------------------
+# The destination always exists there, so every repair takes hts_rename_over()'s
+# fallback. Before #790 that fallback removed the cache and then failed.
+printf '[a refused fallback keeps the cache] ..\t'
+proj="${tmpdir}/eexist"
+plant_damaged_cache "$proj"
+rc=0
+out=$(RENAMEFAIL_MODE=repair-eexist httrack -O "$proj" -#R "$dead" 2>&1) || rc=$?
+test "$rc" -ne 0 || {
+    echo "FAIL: a refused fallback exited 0: $out"
+    exit 1
+}
+test "$(wc -c <"${proj}/hts-cache/new.zip")" -eq 31 || {
+    echo "FAIL: the fallback destroyed the cache"
+    exit 1
+}
+test -s "${proj}/hts-cache/repair.zip" || {
+    echo "FAIL: the recovery was not kept for a retry"
+    exit 1
+}
+leftover=$(find "${proj}/hts-cache" -name '*.hts-old*' | head -1)
+test -z "$leftover" || {
+    echo "FAIL: the parked copy was left behind: $leftover"
     exit 1
 }
 echo "OK"
