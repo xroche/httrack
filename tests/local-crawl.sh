@@ -40,6 +40,9 @@
 # rewritten. Both also require no *.tmp left behind, and take an optional
 # --archive-min-files N guarding against a scenario that silently stopped
 # producing the segments it means to check.
+# --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
+# directory at PATH under the host root between the passes, to hand the second
+# pass leftovers a killed run would have left (#758).
 
 set -u
 
@@ -68,6 +71,7 @@ serverpid=
 crawlpid=
 wacz_poisoned=
 wacz_poison="stale-wacz-that-a-second-pass-must-replace"
+plant_poison="stale-leftover-that-a-second-pass-must-clobber"
 
 function warning {
     echo "** $*" >&2
@@ -96,6 +100,18 @@ function cleanup {
     fi
 }
 
+hostroot=
+function find_hostroot {
+    local cand
+    for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
+        if test -d "$cand"; then
+            hostroot="$cand"
+            return 0
+        fi
+    done
+    die "could not find host root under $out"
+}
+
 function assert_equals {
     info "$1"
     if test ! "$2" == "$3"; then
@@ -118,6 +134,7 @@ tmpdir=$(mktemp -d "${tmptopdir}/httrack_local.XXXXXX") || die "could not create
 # --- parse leading control flags --------------------------------------------
 declare -a audit=()
 declare -a cookies=()
+declare -a plants=()
 scheme=http
 pos=0
 args=("$@")
@@ -156,6 +173,10 @@ while test "$pos" -lt "$nargs"; do
     --cookie)
         pos=$((pos + 1))
         cookies+=("${args[$pos]}")
+        ;;
+    --plant-file | --plant-dir)
+        plants+=("${args[$pos]}" "${args[$((pos + 1))]}")
+        pos=$((pos + 1))
         ;;
     --rerun-args)
         pos=$((pos + 1))
@@ -314,6 +335,23 @@ if test -z "$archive_kept" && test -n "$wacz_validate" && test -n "${rerun}${rer
     test -z "$wacz_poisoned" || echo "$wacz_poison" >"$wacz_poisoned"
 fi
 
+# --- plant leftovers the second pass has to deal with ------------------------
+if test "${#plants[@]}" -gt 0; then
+    find_hostroot
+    i=0
+    while test "$i" -lt "${#plants[@]}"; do
+        path="${hostroot}/${plants[$((i + 1))]}"
+        info "planting ${plants[$i]} ${plants[$((i + 1))]}"
+        if test "${plants[$i]}" = "--plant-dir"; then
+            mkdir -p "$path" || die "could not create $path"
+        else
+            echo "$plant_poison" >"$path" || die "could not write $path"
+        fi
+        result "OK"
+        i=$((i + 2))
+    done
+fi
+
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
 if test -n "$rerun"; then
     info "re-running httrack (update pass)"
@@ -418,14 +456,7 @@ if test -n "$rerun_dead"; then
 fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------
-hostroot=
-for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
-    if test -d "$cand"; then
-        hostroot="$cand"
-        break
-    fi
-done
-test -n "$hostroot" || die "could not find host root under $out"
+find_hostroot
 debug "host root: $hostroot"
 
 # --- optional WARC validation (stdlib validator, no warcio) ------------------
