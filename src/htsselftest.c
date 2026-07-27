@@ -5050,7 +5050,8 @@ static const char sf_page[] =
     "<title>t</title>\n"
     "<style>body { background: url(\"img/a%20b.png#!htsinline\"); }</style>\n"
     "</head><body>\n"
-    "<img src=\"img/a%20b.png#!htsinline\" srcset=\"img/a%20b.png#!htsinline 1x, img/big.png#!htsinline 2x\">\n"
+    "<img src=\"img/a%20b.png#!htsinline\" srcset=\"img/a%20b.png#!htsinline "
+    "1x, img/big.png#!htsinline 2x\">\n"
     "<link rel=\"icon\" href=\"icon.png#!htsinline\">\n"
     "<link rel=\"preload\" as=\"font\" href=\"font/f.woff2#!htsinline\">\n"
     "<img src=\"data:image/gif;base64,QUJD\">\n"
@@ -5061,7 +5062,8 @@ static const char sf_page[] =
     "<input type=\"image\" src=\"img/in.png#!htsinline\">\n"
     /* Lazy loading: src is the placeholder, the real image rides data-src. */
     "<img src=\"img/ph.png#!htsinline\" data-src=\"img/lz.png#!htsinline\" "
-    "data-srcset=\"img/lz2.png#!htsinline 2x\" lowsrc=\"img/low.png#!htsinline\">\n"
+    "data-srcset=\"img/lz2.png#!htsinline 2x\" "
+    "lowsrc=\"img/low.png#!htsinline\">\n"
     "<object data=\"img/ob.png#!htsinline\"></object>\n"
     "<embed src=\"img/em.png#!htsinline\">\n"
     "<img data-src=\"other.html#!htsinline\">\n"
@@ -5083,7 +5085,8 @@ static const char sf_page[] =
     "<img src=\"missing.png#!htsinline\" >\n"
     "<!--><img src=\"img/a%20b.png#!htsinline\">\n"
     "<div style=\"background:url(img/a%20b.png#!htsinline)\"></div>\n"
-    "<div style='content:\"x\"; background:url(img/a%20b.png#!htsinline)'></div>\n"
+    "<div style='content:\"x\"; "
+    "background:url(img/a%20b.png#!htsinline)'></div>\n"
     "</body></html>\n";
 
 /* Lay a small mirror down under root. */
@@ -5099,11 +5102,13 @@ static void sf_fixture(const char *root) {
       "body { background: url(../img/a%20b.png#!htsinline); }\n"
       "div { background: url(../img/big.png#!htsinline); }\n"
       "/* url(../img/never.png) */\n";
-  static const char nested[] = "div { background: url(../../img/a%20b.png#!htsinline); }\n";
-  static const char two[] = "p { background: url(../../img/a%20b.png#!htsinline); }\n";
-  static const char deep[] =
-      "<html><head><link rel=\"stylesheet\" href=\"../../css/main.css#!htsinline\">\n"
-      "</head><body>d</body></html>\n";
+  static const char nested[] =
+      "div { background: url(../../img/a%20b.png#!htsinline); }\n";
+  static const char two[] =
+      "p { background: url(../../img/a%20b.png#!htsinline); }\n";
+  static const char deep[] = "<html><head><link rel=\"stylesheet\" "
+                             "href=\"../../css/main.css#!htsinline\">\n"
+                             "</head><body>d</body></html>\n";
   static const char js[] = "var app = 1;\n";
   char big[4096];
 
@@ -5359,10 +5364,9 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
                                    SINGLEFILE_MAX_PAGE_SIZE, &verbatim);
     /* Mark-transparent, not byte-transparent: a reference that cannot be
        inlined loses its mark and keeps everything else. */
-    sf_check(StringLength(verbatim) ==
-                 sizeof(sf_page) - 1 -
-                     sf_count(sf_page, SINGLEFILE_MARK) *
-                         (int) strlen(SINGLEFILE_MARK),
+    sf_check(StringLength(verbatim) == sizeof(sf_page) - 1 -
+                                           sf_count(sf_page, SINGLEFILE_MARK) *
+                                               (int) strlen(SINGLEFILE_MARK),
              "a page with nothing to inline was re-serialized differently");
     sf_check(strstr(StringBuff(verbatim), SINGLEFILE_MARK) == NULL,
              "an un-inlinable reference kept its mark");
@@ -5374,11 +5378,13 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
      run is the control: it proves the fan-out is real, so the small one was
      cut short by the budget and not by the fixture. */
   {
-    static const char bomb_css[] = "@import \"b.css#!htsinline\";@import \"b.css#!htsinline\";"
-                                   "@import \"b.css#!htsinline\";@import \"b.css#!htsinline\";\n";
-    static const char bomb_html[] = "<html><head>"
-                                    "<link rel=\"stylesheet\" href=\"b.css#!htsinline\">"
-                                    "</head></html>\n";
+    static const char bomb_css[] =
+        "@import \"b.css#!htsinline\";@import \"b.css#!htsinline\";"
+        "@import \"b.css#!htsinline\";@import \"b.css#!htsinline\";\n";
+    static const char bomb_html[] =
+        "<html><head>"
+        "<link rel=\"stylesheet\" href=\"b.css#!htsinline\">"
+        "</head></html>\n";
     const size_t css_len = sizeof(bomb_css) - 1;
     String small = STRING_EMPTY, large = STRING_EMPTY;
 

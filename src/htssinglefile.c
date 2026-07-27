@@ -88,9 +88,9 @@ static const struct sf_deny_rule {
   const char *tag;
   const char *attr;
 } sf_deny_rules[] = {
-    {"a", "href"},   {"area", "href"},   {"iframe", "src"},
-    {"frame", "src"}, {"applet", "code"}, {NULL, "longdesc"},
-    {NULL, "usemap"}, {NULL, "archive"},  {NULL, "profile"},
+    {"a", "href"},      {"area", "href"},   {"iframe", "src"},
+    {"frame", "src"},   {"applet", "code"}, {NULL, "longdesc"},
+    {NULL, "usemap"},   {NULL, "archive"},  {NULL, "profile"},
     {NULL, "codebase"},
 };
 
