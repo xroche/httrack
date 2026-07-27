@@ -6,3 +6,8 @@
 # bash die on $'\r' on every line of them.
 *.test text eol=lf
 *.sh text eol=lf
+
+# Every new test appends to the TESTS list, so two branches in flight always
+# collide on its last line. A union merge keeps both entries; automake does not
+# care about order.
+tests/Makefile.am merge=union
