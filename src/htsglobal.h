@@ -138,10 +138,11 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DOSNAME 0
 #endif
 
-// utiliser zlib?
+// zlib is mandatory: the cache is a zip and minizip calls it regardless
 #ifndef HTS_USEZLIB
-// autoload
 #define HTS_USEZLIB 1
+#elif !HTS_USEZLIB
+#error HTS_USEZLIB=0 is not a supported configuration
 #endif
 
 // brotli and zstd content codings; off unless the build opted in (configure,

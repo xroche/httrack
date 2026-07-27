@@ -46,10 +46,32 @@ jobs:
       - name: Configure
         run: |
           set -euo pipefail
-          # Regenerate from configure.ac/Makefile.am to validate them; the
-          # committed generated files already let a plain checkout build.
+          # Regenerate: configure and the Makefile.in's are not tracked.
           autoreconf -fi
+          # Disabling zlib must fail here rather than at link with a pile of
+          # undefined minizip references (#735). Both spellings, so a rewrite
+          # cannot keep one and lose the other. Probed out-of-tree to leave
+          # nothing behind.
+          nozlib="$RUNNER_TEMP/nozlib"
+          for arg in --without-zlib --with-zlib=no; do
+            rm -rf "$nozlib" && mkdir -p "$nozlib"
+            if (cd "$nozlib" && "$GITHUB_WORKSPACE/configure" "$arg" >out.log 2>&1); then
+              echo "::error::configure $arg succeeded; it must be rejected"
+              exit 1
+            fi
+            # ... and for the stated reason, not an unrelated configure failure.
+            grep -q "zlib cannot be disabled" "$nozlib/out.log" \
+              || { cat "$nozlib/out.log"; exit 1; }
+          done
           ./configure
+          # Same dead end from the compile side. The bare compile is the
+          # control: without it a broken probe would pass vacuously.
+          hdr='#include "htsglobal.h"'
+          echo "$hdr" | $CC -I. -Isrc -fsyntax-only -xc -
+          if echo "$hdr" | $CC -DHTS_USEZLIB=0 -I. -Isrc -fsyntax-only -xc - 2>/dev/null; then
+            echo "::error::-DHTS_USEZLIB=0 compiled; htsglobal.h must reject it"
+            exit 1
+          fi
           # a missing decoder would silently drop the coding from Accept-Encoding
           grep -q "define HTS_USEBROTLI 1" config.h
           grep -q "define HTS_USEZSTD 1" config.h

@@ -48,11 +48,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsftp.h"
 #include "htscodec.h"
 #include "htsproxy.h"
-#if HTS_USEZLIB
-#include "htszlib.h"
-#else
-#error HTS_USEZLIB not defined
-#endif
 
 #ifdef _WIN32
 #ifndef __cplusplus
