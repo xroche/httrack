@@ -55,18 +55,27 @@ extern "C" {
    so a few hundred bytes of hostile CSS can otherwise ask for gigabytes. */
 #define SINGLEFILE_MAX_PAGE_SIZE (64 * 1024 * 1024)
 
+/* Fragment htsparse appends to a saved reference the pass may inline. A
+   fragment and not a scheme, so the mirror still resolves if the pass never
+   runs, and so a mirrored .css or .js keeps its marks across an --update. */
+#define SINGLEFILE_MARK "#!htsinline"
+
+/* HTS_TRUE if a reference htsparse detected in this context may become a
+   data: URI. tag_start points at the '<' of the enclosing start tag, or NULL
+   when there is none (inside a stylesheet or a script); attr at the attribute
+   name. Everything htsparse detects is inlinable unless it names a page. */
+hts_boolean singlefile_may_inline(const char *tag_start, const char *attr);
+
 /* Rewrite every HTML page the mirror produced. No-op unless opt->single_file;
    call once the tree is final, after the update purge. */
 void singlefile_process_mirror(httrackp *opt);
 
-/* Rewrite one HTML document held in memory, appending the result to out.
-   root is the mirror directory that references may not escape; page_path is
-   the document's own path under it (both UTF-8, '/' or native separators).
-   page_budget caps the total inlined bytes, since nested @import fans out
+/* Expand the marks in the document held in memory, appending the result to
+   out. root is the mirror directory that references may not escape; page_path
+   is the document's own path under it (both UTF-8, '/' or native separators).
+   page_budget caps the total inlined bytes, since a nested @import fans out
    multiplicatively; the mirror pass passes SINGLEFILE_MAX_PAGE_SIZE.
-   Returns HTS_TRUE if at least one reference was replaced; out may still
-   differ from the input when that is HTS_FALSE, since a style or srcset value
-   is re-serialized in place. */
+   Returns HTS_TRUE if at least one reference was replaced. */
 hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
                                     const char *page_path, const char *html,
                                     size_t html_len, LLint page_budget,

@@ -27,9 +27,11 @@ Please visit our Website: http://www.httrack.com
 
 /* ------------------------------------------------------------ */
 /* --single-file asset inliner. See htssinglefile.h.
-   Runs on the finished tree, so resolving a reference is path arithmetic
-   clamped to the mirror root; anything else (absolute, scheme-bearing, already
-   data:) is left alone, which is what makes a second --update run a no-op. */
+   htsparse marked every inlinable reference while saving, so this is a
+   substitution over those marks: no HTML and no CSS is parsed here. Resolving
+   a mark is path arithmetic clamped to the mirror root; anything the mark
+   cannot be resolved to keeps its link, which is what makes a second --update
+   run a no-op. */
 /* ------------------------------------------------------------ */
 
 #define HTS_INTERNAL_BYTECODE
@@ -50,23 +52,15 @@ Please visit our Website: http://www.httrack.com
 #define SF_C_FONT 2
 #define SF_C_CSS 4
 #define SF_C_JS 8
-#define SF_C_ANY (SF_C_IMAGE | SF_C_FONT | SF_C_CSS | SF_C_JS)
 
-/* Shape of an attribute value. */
-#define SF_V_URL 0    /* one URL */
-#define SF_V_SRCSET 1 /* HTML srcset candidate list */
-#define SF_V_CSS 2    /* CSS declarations (style="...") */
-
-/* @import chains deeper than this keep their links. */
+/* An asset that carries marks of its own (a stylesheet importing another) is
+   expanded before encoding; deeper than this it keeps its links. */
 #define SF_MAX_CSS_DEPTH 4
 
 /* Bounds on hostile input: a longer reference, or one resolving to more
    components than this, is left alone. */
 #define SF_MAX_REF 4096
 #define SF_MAX_COMPONENTS 128
-
-/* Attributes collected from one start tag before it is re-emitted. */
-#define SF_MAX_ATTRS 64
 
 /* Over-cap assets reported per pass; beyond that the log would carry one line
    per referencing page. */
@@ -83,7 +77,41 @@ typedef struct sf_ctx {
 } sf_ctx;
 
 /* ------------------------------------------------------------ */
-/* Spans                                                         */
+/* Marks                                                         */
+/* ------------------------------------------------------------ */
+
+/* (tag, attribute) pairs htsparse detects that name a page or a media stream
+   rather than an asset; a NULL tag matches any. Everything else it detects is
+   offered to the pass, which decides from the referenced file's own MIME
+   type, so a new row in hts_detect[] is covered without a change here. */
+static const struct sf_deny_rule {
+  const char *tag;
+  const char *attr;
+} sf_deny_rules[] = {
+    {"a", "href"},   {"area", "href"},   {"iframe", "src"},
+    {"frame", "src"}, {"applet", "code"}, {NULL, "longdesc"},
+    {NULL, "usemap"}, {NULL, "archive"},  {NULL, "profile"},
+    {NULL, "codebase"},
+};
+
+hts_boolean singlefile_may_inline(const char *tag_start, const char *attr) {
+  size_t i;
+
+  if (attr == NULL)
+    return HTS_FALSE;
+  for (i = 0; i < sizeof(sf_deny_rules) / sizeof(sf_deny_rules[0]); i++) {
+    const struct sf_deny_rule *const r = &sf_deny_rules[i];
+
+    if (r->tag != NULL && (tag_start == NULL || !check_tag(tag_start, r->tag)))
+      continue;
+    if (rech_tageq(attr, r->attr))
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* ------------------------------------------------------------ */
+/* Paths                                                         */
 /* ------------------------------------------------------------ */
 
 static int sf_is_space(int c) {
@@ -91,45 +119,6 @@ static int sf_is_space(int c) {
 }
 
 static int sf_is_sep(int c) { return c == '/' || c == '\\'; }
-
-/* Case-insensitive equality between the span [p,p+n) and a lowercase literal.
- */
-static hts_boolean sf_span_eq(const char *p, size_t n, const char *lit) {
-  size_t i;
-
-  for (i = 0; i < n; i++) {
-    if (lit[i] == '\0' || tolower((unsigned char) p[i]) != lit[i])
-      return HTS_FALSE;
-  }
-  return lit[n] == '\0' ? HTS_TRUE : HTS_FALSE;
-}
-
-/* Case-insensitive "does the span start with the lowercase literal". */
-static hts_boolean sf_span_starts(const char *p, size_t n, const char *lit) {
-  size_t i;
-
-  for (i = 0; lit[i] != '\0'; i++) {
-    if (i >= n || tolower((unsigned char) p[i]) != lit[i])
-      return HTS_FALSE;
-  }
-  return HTS_TRUE;
-}
-
-/* Case-insensitive search for a lowercase literal inside a span. */
-static hts_boolean sf_span_has(const char *p, size_t n, const char *lit) {
-  const size_t l = strlen(lit);
-  size_t i;
-
-  for (i = 0; l <= n && i + l <= n; i++) {
-    if (sf_span_starts(p + i, n - i, lit))
-      return HTS_TRUE;
-  }
-  return HTS_FALSE;
-}
-
-/* ------------------------------------------------------------ */
-/* Paths                                                         */
-/* ------------------------------------------------------------ */
 
 /* Copy path into out with '/' separators and no trailing one. */
 static void sf_normalize_path(const char *path, String *out) {
@@ -382,24 +371,25 @@ static void sf_warn_oversize(sf_ctx *ctx, const char *path, LLint size,
                 path, size, cap);
 }
 
-static void sf_rewrite_css(sf_ctx *ctx, const char *base_dir, int depth,
-                           const char *css, size_t len, String *out);
+/* ------------------------------------------------------------ */
+/* Substitution                                                  */
+/* ------------------------------------------------------------ */
+
+static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
+                      const char *body, size_t len, String *out);
 
 /* Replace the reference [ref,ref+reflen), resolved against base_dir, with its
-   data: URI appended to out. classes gates the acceptable MIME classes;
-   fallback_mime types an asset whose class cannot be guessed (NULL: give up).
-   rebase_dir re-expresses an un-inlinable asset relative to that directory.
-   A data: URL's path is opaque, so nothing relative inside an inlined
-   stylesheet resolves anyway; this only aims it at a lenient resolver's base.
-   Returns HTS_TRUE if out received a replacement. */
+   data: URI appended to out. rebase_dir re-expresses an un-inlinable asset
+   relative to that directory: a data: URL's path is opaque, so nothing
+   relative inside an inlined stylesheet resolves anyway; this only aims it at
+   a lenient resolver's base. Returns HTS_TRUE if out received a data: URI. */
 static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
-                             size_t reflen, int classes,
-                             const char *fallback_mime, const char *rebase_dir,
-                             int depth, String *out) {
+                             size_t reflen, const char *rebase_dir, int depth,
+                             String *out) {
   String path = STRING_EMPTY;
   char mime[HTS_MIMETYPE_SIZE];
-  char *body;
-  size_t body_len = 0;
+  char *file;
+  size_t file_len = 0;
   LLint size, cap;
   int cls;
   hts_boolean done = HTS_FALSE;
@@ -409,13 +399,9 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
     return HTS_FALSE;
   }
   cls = sf_mime_class(ctx->opt, StringBuff(path), mime, sizeof(mime));
-  if (cls == 0 && fallback_mime != NULL) {
-    cls = classes;
-    strlcpybuff(mime, fallback_mime, sizeof(mime));
-  }
   cap = ctx->opt->single_file_max_size;
   size = fsize_utf8(StringBuff(path));
-  if ((cls & classes) == 0 || size < 0)
+  if (cls == 0 || size < 0)
     goto fallback;
   if (size > cap || size > SINGLEFILE_HARD_MAX_SIZE) {
     sf_warn_oversize(ctx, StringBuff(path), size, cap);
@@ -425,11 +411,11 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
     sf_warn_oversize(ctx, StringBuff(path), size, ctx->budget);
     goto fallback;
   }
-  body = sf_readfile(StringBuff(path), &body_len);
-  if (body == NULL)
+  file = sf_readfile(StringBuff(path), &file_len);
+  if (file == NULL)
     goto fallback;
-  /* Charged before the nested rewrite: an @import chain otherwise spends what
-     its ancestors already claimed, and the budget ends up negative. */
+  /* Charged before the nested expansion: an @import chain otherwise spends
+     what its ancestors already claimed, and the budget ends up negative. */
   ctx->budget -= size;
   /* Encode into a scratch String: a failed encode must leave out untouched,
      not a truncated "data:...;base64," with no payload. */
@@ -437,20 +423,20 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
     String payload = STRING_EMPTY;
 
     StringClear(payload);
-    if ((cls & SF_C_CSS) != 0 && depth < SF_MAX_CSS_DEPTH) {
+    if ((cls & (SF_C_CSS | SF_C_JS)) != 0 && depth < SF_MAX_CSS_DEPTH) {
       String nested = STRING_EMPTY;
       String nested_dir = STRING_EMPTY;
 
       sf_dirname(StringBuff(path), &nested_dir);
       StringClear(nested);
-      sf_rewrite_css(ctx, StringBuff(nested_dir), depth + 1, body, body_len,
-                     &nested);
+      sf_expand(ctx, StringBuff(nested_dir), depth + 1, file, file_len,
+                &nested);
       done = sf_append_base64(&payload, StringBuffRW(nested),
                               StringLength(nested));
       StringFree(nested);
       StringFree(nested_dir);
     } else {
-      done = sf_append_base64(&payload, body, body_len);
+      done = sf_append_base64(&payload, file, file_len);
     }
     if (done) {
       StringCat(*out, "data:");
@@ -460,7 +446,7 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
     }
     StringFree(payload);
   }
-  freet(body);
+  freet(file);
   if (done) {
     ctx->inlined++;
     StringFree(path);
@@ -484,547 +470,37 @@ fallback:
   return done;
 }
 
-/* ------------------------------------------------------------ */
-/* CSS                                                           */
-/* ------------------------------------------------------------ */
-
-/* Rewrite the CSS in [css,css+len) into out, resolving its references against
-   base_dir. depth counts the @import nesting. */
-static void sf_rewrite_css(sf_ctx *ctx, const char *base_dir, int depth,
-                           const char *css, size_t len, String *out) {
-  size_t i = 0;
-  int importing = 0; /* set for exactly one iteration: see the @import branch */
-
-  while (i < len) {
-    const int is_import = importing;
-
-    importing = 0;
-    /* A comment or a string is copied verbatim: a url( inside either is not a
-       reference. */
-    if (css[i] == '/' && i + 1 < len && css[i + 1] == '*') {
-      const size_t start = i;
-
-      i += 2;
-      while (i + 1 < len && !(css[i] == '*' && css[i + 1] == '/'))
-        i++;
-      i = i + 1 < len ? i + 2 : len;
-      StringMemcat(*out, css + start, i - start);
-      continue;
-    }
-    if (css[i] == '@' && sf_span_starts(css + i, len - i, "@import")) {
-      size_t j = i + 7;
-
-      while (j < len && sf_is_space((unsigned char) css[j]))
-        j++;
-      /* url(...) here names a stylesheet, so hand it to the url( branch with
-         the import's class rather than the image/font one. */
-      if (j < len && sf_span_starts(css + j, len - j, "url(")) {
-        StringMemcat(*out, css + i, j - i);
-        i = j;
-        importing = 1;
-        continue;
-      }
-      if (j < len && (css[j] == '"' || css[j] == '\'')) {
-        const char quote = css[j];
-        const size_t vstart = j + 1;
-        size_t vend = vstart;
-
-        while (vend < len && css[vend] != quote && css[vend] != '\n') {
-          if (css[vend] == '\\' && vend + 1 < len)
-            vend++; /* an escaped quote does not end the string */
-          vend++;
-        }
-        if (vend < len && css[vend] == quote) {
-          String repl = STRING_EMPTY;
-
-          StringClear(repl);
-          StringMemcat(*out, css + i, j - i);
-          if (sf_inline(ctx, base_dir, css + vstart, vend - vstart, SF_C_CSS,
-                        "text/css", NULL, depth, &repl)) {
-            StringCat(*out, "\"");
-            StringMemcat(*out, StringBuff(repl), StringLength(repl));
-            StringCat(*out, "\"");
-          } else {
-            StringMemcat(*out, css + j, vend + 1 - j);
-          }
-          StringFree(repl);
-          i = vend + 1;
-          continue;
-        }
-      }
-      StringMemcat(*out, css + i, 7);
-      i += 7;
-      continue;
-    }
-    if ((css[i] == 'u' || css[i] == 'U') &&
-        sf_span_starts(css + i, len - i, "url(") &&
-        (i == 0 || (!isalnum((unsigned char) css[i - 1]) && css[i - 1] != '-' &&
-                    css[i - 1] != '_'))) {
-      const size_t start = i;
-      size_t j = i + 4, vstart, vend;
-      char quote = '\0';
-
-      while (j < len && sf_is_space((unsigned char) css[j]))
-        j++;
-      if (j < len && (css[j] == '"' || css[j] == '\'')) {
-        quote = css[j];
-        j++;
-      }
-      vstart = j;
-      while (j < len && (quote != '\0' ? css[j] != quote : css[j] != ')') &&
-             css[j] != '\n') {
-        if (quote != '\0' && css[j] == '\\' && j + 1 < len)
-          j++; /* an escaped quote does not end the string */
-        j++;
-      }
-      vend = j;
-      if (quote != '\0' && j < len && css[j] == quote) {
-        j++;
-        while (j < len && sf_is_space((unsigned char) css[j]))
-          j++;
-      }
-      if (j < len && css[j] == ')') {
-        String repl = STRING_EMPTY;
-
-        j++;
-        StringClear(repl);
-        /* Emit unquoted: the CSS could be a style="..." attribute value, where
-           a quote would end the attribute. A data: payload and an escaped path
-           both stay inside the unquoted url-token alphabet. */
-        if (sf_inline(ctx, base_dir, css + vstart, vend - vstart,
-                      is_import ? SF_C_CSS : SF_C_IMAGE | SF_C_FONT,
-                      is_import ? "text/css" : NULL,
-                      !is_import && depth > 0 ? ctx->page_dir : NULL, depth,
-                      &repl)) {
-          StringCat(*out, "url(");
-          StringMemcat(*out, StringBuff(repl), StringLength(repl));
-          StringCat(*out, ")");
-        } else {
-          StringMemcat(*out, css + start, j - start);
-        }
-        StringFree(repl);
-        i = j;
-        continue;
-      }
-      StringMemcat(*out, css + start, 4); /* unterminated url(: leave it */
-      i = start + 4;
-      continue;
-    }
-    if (css[i] == '"' || css[i] == '\'') {
-      const char quote = css[i];
-      const size_t start = i;
-
-      i++;
-      while (i < len && css[i] != quote && css[i] != '\n') {
-        if (css[i] == '\\' && i + 1 < len)
-          i++;
-        i++;
-      }
-      if (i < len && css[i] == quote)
-        i++;
-      StringMemcat(*out, css + start, i - start);
-      continue;
-    }
-    StringAddchar(*out, css[i]);
-    i++;
-  }
+/* The mark ends a reference; these end the token the mark was appended to. */
+static int sf_is_ref_delim(int c) {
+  return sf_is_space(c) || c == '"' || c == '\'' || c == '(' || c == ')' ||
+         c == '=' || c == ',' || c == '<' || c == '>' || c == ';';
 }
 
-/* ------------------------------------------------------------ */
-/* HTML                                                          */
-/* ------------------------------------------------------------ */
+/* Copy [body,body+len) to out, replacing each marked reference by its data:
+   URI, or by the bare reference when it cannot be inlined. */
+static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
+                      const char *body, size_t len, String *out) {
+  const size_t marklen = strlen(SINGLEFILE_MARK);
+  size_t i = 0, flushed = 0;
 
-/* srcset is "url [descriptor]" candidates separated by commas. Per the HTML
-   candidate-parsing rules the URL token runs to the next whitespace and may
-   carry trailing commas, so an emitted "data:...;base64,AAAA 2x" round-trips.
- */
-static void sf_rewrite_srcset(sf_ctx *ctx, const char *v, size_t len,
-                              String *out) {
-  size_t i = 0;
-  int first = 1;
+  while (i + marklen <= len) {
+    size_t start;
 
-  while (i < len) {
-    size_t ustart, uend, dstart, dend;
-
-    while (i < len && (sf_is_space((unsigned char) v[i]) || v[i] == ','))
-      i++;
-    if (i >= len)
-      break;
-    ustart = i;
-    while (i < len && !sf_is_space((unsigned char) v[i]))
-      i++;
-    uend = i;
-    while (uend > ustart && v[uend - 1] == ',')
-      uend--;
-    dstart = dend = i;
-    if (uend == i) { /* no trailing comma, so a descriptor may follow */
-      while (i < len && v[i] != ',')
-        i++;
-      dstart = uend;
-      dend = i;
-      while (dend > dstart && sf_is_space((unsigned char) v[dend - 1]))
-        dend--;
-      while (dstart < dend && sf_is_space((unsigned char) v[dstart]))
-        dstart++;
-    }
-    if (!first)
-      StringCat(*out, ", ");
-    first = 0;
-    if (!sf_inline(ctx, ctx->page_dir, v + ustart, uend - ustart, SF_C_IMAGE,
-                   NULL, NULL, 0, out))
-      StringMemcat(*out, v + ustart, uend - ustart);
-    if (dend > dstart) {
-      StringAddchar(*out, ' ');
-      StringMemcat(*out, v + dstart, dend - dstart);
-    }
-  }
-}
-
-/* (tag, attribute) pairs naming an inlinable asset; a NULL tag matches any.
-   Deliberately absent though hts_detect[] downloads them: a@href, iframe@src
-   and longdesc name pages, dynsrc and non-image source@src name media,
-   track@src has no inlinable MIME class, usemap is a same-document fragment,
-   archive lists applet jars. link@href is decided from its rel
-   (sf_link_classes); base@href needs no rule, htsparse drops it when saving. */
-static const struct sf_attr_rule {
-  const char *tag;
-  const char *attr;
-  int classes;
-  int shape;
-} sf_attr_rules[] = {
-    {"img", "src", SF_C_IMAGE, SF_V_URL},
-    {"img", "srcset", SF_C_IMAGE, SF_V_SRCSET},
-    {"source", "src", SF_C_IMAGE, SF_V_URL},
-    {"source", "srcset", SF_C_IMAGE, SF_V_SRCSET},
-    {"input", "src", SF_C_IMAGE, SF_V_URL},
-    {"video", "poster", SF_C_IMAGE, SF_V_URL},
-    {"image", "href", SF_C_IMAGE, SF_V_URL},
-    {"image", "xlink:href", SF_C_IMAGE, SF_V_URL},
-    {"object", "data", SF_C_IMAGE, SF_V_URL},
-    {"embed", "src", SF_C_IMAGE, SF_V_URL},
-    {"script", "src", SF_C_JS, SF_V_URL},
-    /* Lazy loading: src is a placeholder and the real image rides one of
-       these. The image class keeps a lazy <iframe> or <script> a link. */
-    {NULL, "data-src", SF_C_IMAGE, SF_V_URL},
-    {NULL, "data-srcset", SF_C_IMAGE, SF_V_SRCSET},
-    {NULL, "lowsrc", SF_C_IMAGE, SF_V_URL},
-    {NULL, "background", SF_C_IMAGE, SF_V_URL},
-    {NULL, "style", 0, SF_V_CSS},
-};
-
-typedef struct sf_attr {
-  const char *pre; /* whitespace before the attribute */
-  size_t pre_len;
-  const char *raw; /* name plus value, with the original quoting */
-  size_t raw_len;
-  const char *name;
-  size_t name_len;
-  const char *value;
-  size_t value_len;
-  hts_boolean has_value;
-} sf_attr;
-
-/* Accepted classes and fallback type for <link href>, read from its rel: a
-   navigational rel (canonical, alternate, next) yields 0 and keeps the link. */
-static int sf_link_classes(const sf_attr *attrs, int nattrs,
-                           const char **fallback) {
-  int i;
-
-  *fallback = NULL;
-  for (i = 0; i < nattrs; i++) {
-    if (!sf_span_eq(attrs[i].name, attrs[i].name_len, "rel"))
-      continue;
-    if (sf_span_has(attrs[i].value, attrs[i].value_len, "stylesheet")) {
-      *fallback = "text/css";
-      return SF_C_CSS;
-    }
-    if (sf_span_has(attrs[i].value, attrs[i].value_len, "icon"))
-      return SF_C_IMAGE;
-    if (sf_span_has(attrs[i].value, attrs[i].value_len, "preload") ||
-        sf_span_has(attrs[i].value, attrs[i].value_len, "prefetch"))
-      return SF_C_ANY;
-    return 0;
-  }
-  return 0;
-}
-
-static const struct sf_attr_rule *sf_find_rule(const char *tag, size_t tag_len,
-                                               const char *attr,
-                                               size_t attr_len) {
-  size_t i;
-
-  for (i = 0; i < sizeof(sf_attr_rules) / sizeof(sf_attr_rules[0]); i++) {
-    const struct sf_attr_rule *const r = &sf_attr_rules[i];
-
-    if (r->tag != NULL && !sf_span_eq(tag, tag_len, r->tag))
-      continue;
-    if (sf_span_eq(attr, attr_len, r->attr))
-      return r;
-  }
-  return NULL;
-}
-
-/* Emit one attribute, substituting its value when a rule applies. */
-static void sf_emit_attr(sf_ctx *ctx, const char *tag, size_t tag_len,
-                         const sf_attr *a, int link_classes,
-                         const char *link_fallback, String *out) {
-  const struct sf_attr_rule *rule = NULL;
-  const char *fallback = NULL;
-  String repl = STRING_EMPTY;
-  hts_boolean done = HTS_FALSE;
-  int classes;
-
-  StringMemcat(*out, a->pre, a->pre_len);
-  if (!a->has_value) {
-    StringMemcat(*out, a->raw, a->raw_len);
-    return;
-  }
-  if (sf_span_eq(tag, tag_len, "link") &&
-      sf_span_eq(a->name, a->name_len, "href")) {
-    classes = link_classes;
-    fallback = link_fallback;
-  } else {
-    rule = sf_find_rule(tag, tag_len, a->name, a->name_len);
-    classes = rule != NULL ? rule->classes : 0;
-    if (rule != NULL && rule->classes == SF_C_JS)
-      fallback = "text/javascript";
-  }
-  if (rule == NULL && classes == 0) {
-    StringMemcat(*out, a->raw, a->raw_len);
-    return;
-  }
-  StringClear(repl);
-  if (rule != NULL && (rule->shape == SF_V_SRCSET || rule->shape == SF_V_CSS)) {
-    /* These always produce a value; substitute only when it really differs, so
-       an untouched attribute keeps its original spelling and quoting. */
-    if (rule->shape == SF_V_SRCSET)
-      sf_rewrite_srcset(ctx, a->value, a->value_len, &repl);
-    else
-      sf_rewrite_css(ctx, ctx->page_dir, 0, a->value, a->value_len, &repl);
-    done = StringLength(repl) != a->value_len ||
-                   memcmp(StringBuff(repl), a->value, a->value_len) != 0
-               ? HTS_TRUE
-               : HTS_FALSE;
-  } else {
-    done = sf_inline(ctx, ctx->page_dir, a->value, a->value_len, classes,
-                     fallback, NULL, 0, &repl);
-  }
-  if (done) {
-    size_t n;
-
-    /* Always re-quote with '"', so a value carrying a literal quote (a CSS
-       declaration that was single-quoted in the source) must be escaped. */
-    StringMemcat(*out, a->name, a->name_len);
-    StringCat(*out, "=\"");
-    for (n = 0; n < StringLength(repl); n++) {
-      const char c = StringSub(repl, n);
-
-      if (c == '"')
-        StringCat(*out, "&quot;");
-      else
-        StringAddchar(*out, c);
-    }
-    StringCat(*out, "\"");
-  } else {
-    StringMemcat(*out, a->raw, a->raw_len);
-  }
-  StringFree(repl);
-}
-
-/* Elements whose content is raw text, never markup. */
-static const char *const sf_rawtext_tags[] = {"script", "style", "textarea",
-                                              "title"};
-
-/* The raw-text tag matching [tag,tag+len), or NULL. */
-static const char *sf_rawtext_tag(const char *tag, size_t len) {
-  size_t i;
-
-  for (i = 0; i < sizeof(sf_rawtext_tags) / sizeof(sf_rawtext_tags[0]); i++) {
-    if (sf_span_eq(tag, len, sf_rawtext_tags[i]))
-      return sf_rawtext_tags[i];
-  }
-  return NULL;
-}
-
-static void sf_rewrite_html_(sf_ctx *ctx, const char *p, size_t len,
-                             String *out) {
-  size_t i = 0;
-
-  while (i < len) {
-    sf_attr attrs[SF_MAX_ATTRS];
-    const char *tag, *rawtext, *link_fallback = NULL;
-    size_t tag_len, tag_start;
-    int nattrs = 0, k, link_classes = 0;
-    hts_boolean selfclose = HTS_FALSE, overflow = HTS_FALSE;
-
-    if (p[i] != '<') {
-      StringAddchar(*out, p[i]);
+    if (memcmp(body + i, SINGLEFILE_MARK, marklen) != 0) {
       i++;
       continue;
     }
-    if (i + 4 <= len && memcmp(p + i, "<!--", 4) == 0) {
-      const size_t start = i;
-
-      i += 4;
-      /* "<!-->" and "<!--->" are empty comments, not unterminated ones. */
-      if (i < len && p[i] == '>')
-        i++;
-      else if (i + 2 <= len && memcmp(p + i, "->", 2) == 0)
-        i += 2;
-      else {
-        while (i + 3 <= len && memcmp(p + i, "-->", 3) != 0)
-          i++;
-        i = i + 3 <= len ? i + 3 : len;
-      }
-      StringMemcat(*out, p + start, i - start);
-      continue;
-    }
-    if (i + 1 >= len || !isalpha((unsigned char) p[i + 1])) {
-      const size_t start = i; /* doctype, processing instruction, end tag */
-
-      i++;
-      while (i < len && p[i] != '>') {
-        /* A '>' inside a quoted value does not close the tag. */
-        if (p[i] == '"' || p[i] == '\'') {
-          const char q = p[i++];
-
-          while (i < len && p[i] != q)
-            i++;
-        }
-        if (i < len)
-          i++;
-      }
-      if (i < len)
-        i++;
-      StringMemcat(*out, p + start, i - start);
-      continue;
-    }
-
-    /* Start tag. Collect every attribute before deciding: <link href> depends
-       on the rel, which may come after it. */
-    tag_start = i;
-    i++;
-    tag = p + i;
-    while (i < len && !sf_is_space((unsigned char) p[i]) && p[i] != '>' &&
-           p[i] != '/')
-      i++;
-    tag_len = (size_t) (p + i - tag);
-    while (i < len) {
-      const char *const pre = p + i;
-      size_t pre_len;
-      sf_attr *a;
-
-      while (i < len && sf_is_space((unsigned char) p[i]))
-        i++;
-      pre_len = (size_t) (p + i - pre);
-      if (i >= len || p[i] == '>' ||
-          (p[i] == '/' && i + 1 < len && p[i + 1] == '>')) {
-        i = (size_t) (pre - p); /* the caller copies this whitespace */
-        break;
-      }
-      if (nattrs == SF_MAX_ATTRS) {
-        overflow = HTS_TRUE; /* keep parsing, but stop recording */
-        nattrs--;
-      }
-      a = &attrs[nattrs++];
-      a->pre = pre;
-      a->pre_len = pre_len;
-      a->name = p + i;
-      a->raw = p + i;
-      a->has_value = HTS_FALSE;
-      a->value = NULL;
-      a->value_len = 0;
-      while (i < len && !sf_is_space((unsigned char) p[i]) && p[i] != '=' &&
-             p[i] != '>' && !(p[i] == '/' && i + 1 < len && p[i + 1] == '>'))
-        i++;
-      a->name_len = (size_t) (p + i - a->name);
-      if (a->name_len == 0) { /* a stray '=' or '/': copy it and move on */
-        i++;
-        a->name_len = 1;
-        a->raw_len = 1;
-        continue;
-      }
-      {
-        const size_t save = i;
-
-        while (i < len && sf_is_space((unsigned char) p[i]))
-          i++;
-        if (i >= len || p[i] != '=') {
-          i = save;
-          a->raw_len = a->name_len;
-          continue;
-        }
-      }
-      i++;
-      while (i < len && sf_is_space((unsigned char) p[i]))
-        i++;
-      if (i < len && (p[i] == '"' || p[i] == '\'')) {
-        const char quote = p[i];
-
-        i++;
-        a->value = p + i;
-        while (i < len && p[i] != quote)
-          i++;
-        a->value_len = (size_t) (p + i - a->value);
-        if (i < len)
-          i++;
-      } else {
-        a->value = p + i;
-        while (i < len && !sf_is_space((unsigned char) p[i]) && p[i] != '>')
-          i++;
-        a->value_len = (size_t) (p + i - a->value);
-      }
-      a->has_value = HTS_TRUE;
-      a->raw_len = (size_t) (p + i - a->raw);
-    }
-    if (overflow) { /* pathological tag: copy the whole of it untouched */
-      StringMemcat(*out, p + tag_start, i - tag_start);
-    } else {
-      if (sf_span_eq(tag, tag_len, "link"))
-        link_classes = sf_link_classes(attrs, nattrs, &link_fallback);
-      StringAddchar(*out, '<');
-      StringMemcat(*out, tag, tag_len);
-      for (k = 0; k < nattrs; k++)
-        sf_emit_attr(ctx, tag, tag_len, &attrs[k], link_classes, link_fallback,
-                     out);
-    }
-    while (i < len && sf_is_space((unsigned char) p[i])) {
-      StringAddchar(*out, p[i]);
-      i++;
-    }
-    if (i < len && p[i] == '/') {
-      selfclose = HTS_TRUE;
-      StringAddchar(*out, '/');
-      i++;
-    }
-    if (i < len && p[i] == '>') {
-      StringAddchar(*out, '>');
-      i++;
-    }
-
-    rawtext = selfclose ? NULL : sf_rawtext_tag(tag, tag_len);
-    if (rawtext != NULL) {
-      const size_t body = i;
-      size_t end = i;
-
-      while (end < len) {
-        if (p[end] == '<' && end + 2 < len && p[end + 1] == '/' &&
-            sf_span_starts(p + end + 2, len - end - 2, rawtext)) {
-          const size_t after = end + 2 + strlen(rawtext);
-
-          if (after >= len || sf_is_space((unsigned char) p[after]) ||
-              p[after] == '>' || p[after] == '/')
-            break;
-        }
-        end++;
-      }
-      if (sf_span_eq(tag, tag_len, "style"))
-        sf_rewrite_css(ctx, ctx->page_dir, 0, p + body, end - body, out);
-      else
-        StringMemcat(*out, p + body, end - body);
-      i = end;
-    }
+    for (start = i; start > flushed && !sf_is_ref_delim(body[start - 1]);
+         start--)
+      ;
+    StringMemcat(*out, body + flushed, start - flushed);
+    if (!sf_inline(ctx, base_dir, body + start, i - start,
+                   depth > 0 ? ctx->page_dir : NULL, depth, out))
+      StringMemcat(*out, body + start, i - start);
+    i += marklen;
+    flushed = i;
   }
+  StringMemcat(*out, body + flushed, len - flushed);
 }
 
 /* ------------------------------------------------------------ */
@@ -1051,15 +527,7 @@ hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
   ctx.warn_budget = &budget;
   ctx.budget = page_budget;
   ctx.inlined = 0;
-  /* A UTF-16/32 page is not ASCII-delimited, so byte scanning would corrupt
-     it; every ASCII-compatible charset is safe. */
-  if (html_len >= 2 &&
-      (((unsigned char) html[0] == 0xff && (unsigned char) html[1] == 0xfe) ||
-       ((unsigned char) html[0] == 0xfe && (unsigned char) html[1] == 0xff))) {
-    StringMemcat(*out, html, html_len);
-  } else {
-    sf_rewrite_html_(&ctx, html, html_len, out);
-  }
+  sf_expand(&ctx, StringBuff(dir), 0, html, html_len, out);
   StringFree(nroot);
   StringFree(npage);
   StringFree(dir);
