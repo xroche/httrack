@@ -90,9 +90,10 @@ offline browser : copy websites to a local directory</p>
 ] [ <b>-%m, --sitemap</b> ] [ <b>-NN, --structure[=N]</b> ]
 [ <b>-%N, --delayed-type-check</b> ] [ <b>-%D,
 --cached-delayed-type-check</b> ] [ <b>-%M, --mime-html</b>
-] [ <b>-LN, --long-names[=N]</b> ] [ <b>-KN,
---keep-links[=N]</b> ] [ <b>-x, --replace-external</b> ] [
-<b>-%x, --disable-passwords</b> ] [ <b>-%q,
+] [ <b>-%Z, --single-file</b> ] [ <b>-LN,
+--long-names[=N]</b> ] [ <b>-KN, --keep-links[=N]</b> ] [
+<b>-x, --replace-external</b> ] [ <b>-%x,
+--disable-passwords</b> ] [ <b>-%q,
 --include-query-string</b> ] [ <b>-%g, --strip-query</b> ] [
 <b>-o, --generate-errors</b> ] [ <b>-X, --purge-old[=N]</b>
 ] [ <b>-%p, --preserve</b> ] [ <b>-%T, --utf8-conversion</b>
@@ -660,6 +661,24 @@ don&rsquo;t wait) (--cached-delayed-type-check)</p></td></tr>
 
 <p>generate a RFC MIME-encapsulated full-archive (.mht)
 (--mime-html)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
+<p>-%Z</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>after the mirror, rewrite each saved page with its
+stylesheets, scripts, images and fonts inlined as data:
+URIs, so any page opens by double-click anywhere (links
+between pages stay relative; audio and video stay links);
+--single-file-max-size N caps each asset (default 10485760
+bytes). %M is the better container where a Chromium-family
+browser is a given: one archive, no base64 tax on text, a
+shared asset stored once (--single-file)</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">

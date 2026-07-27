@@ -968,6 +968,14 @@ Report what changed since the previous mirror
 Отчет за промените спрямо предишното огледало
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 Записване и на hts-changes.json със списък на новите, променените, непроменените и изчезналите файлове спрямо предишното огледало.
+Inline assets as data: URIs (self-contained pages)
+Вграждане на ресурсите като data: URI (самостоятелни страници)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+След завършване на огледалото всяка запазена страница се презаписва с вградени стилове, скриптове, изображения и шрифтове, така че страницата да може да се отвори и самостоятелно.
+Largest inlined asset (bytes):
+Най-голям вграден ресурс (байтове):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+Ресурс над този размер запазва обикновена връзка; оставете празно за стойността по подразбиране от 10485760 байта.
 Seed the crawl from the site's sitemap
 Започване на обхождането от картата на сайта
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

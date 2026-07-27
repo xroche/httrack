@@ -968,6 +968,14 @@ Report what changed since the previous mirror
 前回のミラーからの変更点を報告する
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 hts-changes.json も書き出し、前回のミラーと比べて新規、変更、変更なし、消滅となったものを一覧にします。
+Inline assets as data: URIs (self-contained pages)
+リソースを data: URI として埋め込む (単独で開けるページ)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+ミラーの完了後、保存された各ページを、スタイルシート、スクリプト、画像、フォントを埋め込んだ形で書き直します。ページ単体でも開けるようになります。
+Largest inlined asset (bytes):
+埋め込む最大サイズ (バイト):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+このサイズを超えるリソースは通常のリンクのままになります。空欄にすると既定値の 10485760 バイトになります。
 Seed the crawl from the site's sitemap
 サイトマップからミラーリングを開始する
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

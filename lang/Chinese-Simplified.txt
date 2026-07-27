@@ -968,6 +968,14 @@ Report what changed since the previous mirror
 报告自上次镜像以来的变更
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 同时写入 hts-changes.json，列出本次抓取相对于上次镜像的新增、更改、未更改和消失的项目。
+Inline assets as data: URIs (self-contained pages)
+将资源内嵌为 data: URI（独立网页）
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+镜像完成后，重写每个已保存的网页，将样式表、脚本、图片和字体内嵌其中，使网页也能单独打开。
+Largest inlined asset (bytes):
+内嵌资源大小上限（字节）：
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+超过此大小的资源会保留普通链接；留空则使用默认的 10485760 字节。
 Seed the crawl from the site's sitemap
 从网站的 Sitemap 开始抓取
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

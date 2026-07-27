@@ -968,6 +968,14 @@ Report what changed since the previous mirror
 回報自上次鏡射以來的變更
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 同時寫入 hts-changes.json，列出這次擷取相對於上次鏡射的新增、變更、未變更與消失的項目。
+Inline assets as data: URIs (self-contained pages)
+將資源內嵌為 data: URI（獨立網頁）
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+鏡射完成後，重寫每個已儲存的網頁，將樣式表、指令碼、圖片與字型內嵌其中，讓網頁也能單獨開啟。
+Largest inlined asset (bytes):
+內嵌資源大小上限（位元組）：
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+超過此大小的資源會保留一般連結；留空則使用預設的 10485760 位元組。
 Seed the crawl from the site's sitemap
 從網站的 Sitemap 開始擷取
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

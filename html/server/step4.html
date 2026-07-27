@@ -193,6 +193,8 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:warc:--warc}
 	${test:warcfile:--warc-file "}${arg:warcfile}${test:warcfile:"}
 	${test:changes:--changes}
+	${test:singlefile:--single-file}
+	${test:singlefilemax:--single-file-max-size=}${unquoted:singlefilemax}
 	${test:norecatch:--do-not-recatch}
 	${test:logf:--single-log}
 	${test:logtype:::--extra-log:--debug-log}
@@ -248,6 +250,8 @@ SitemapUrl=${sitemapurl}
 Warc=${ztest:warc:0:1}
 WarcFile=${warcfile}
 Changes=${ztest:changes:0:1}
+SingleFile=${ztest:singlefile:0:1}
+SingleFileMaxSize=${singlefilemax}
 LogType=${logtype}
 UseHTTPProxyForFTP=${ztest:ftpprox:0:1}
 ProxyType=${proxytype}

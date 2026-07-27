@@ -968,6 +968,14 @@ Report what changed since the previous mirror
 Raporteaza ce s-a schimbat fata de copia anterioara
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 Scrie si hts-changes.json, care listeaza ce este nou, modificat, nemodificat sau disparut fata de copia anterioara.
+Inline assets as data: URIs (self-contained pages)
+Încorporeaza resursele ca URI data: (pagini de sine statatoare)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Dupa terminarea copiei, fiecare pagina salvata este rescrisa cu foile de stil, scripturile, imaginile si fonturile încorporate, astfel încât pagina sa poata fi deschisa si singura.
+Largest inlined asset (bytes):
+Cea mai mare resursa încorporata (octeti):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+O resursa mai mare decât aceasta dimensiune pastreaza o legatura obisnuita; lasati gol pentru valoarea implicita de 10485760 de octeti.
 Seed the crawl from the site's sitemap
 Porneste explorarea de la harta sitului
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

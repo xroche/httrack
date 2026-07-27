@@ -968,6 +968,14 @@ Report what changed since the previous mirror
 Informar de los cambios desde la copia anterior
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 Escribir también hts-changes.json con la lista de lo que esta captura deja como nuevo, modificado, sin cambios o desaparecido respecto a la copia anterior.
+Inline assets as data: URIs (self-contained pages)
+Incrustar los recursos como URI data: (páginas autónomas)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Una vez terminada la copia, reescribir cada página guardada con sus hojas de estilo, scripts, imágenes y fuentes incrustadas, de modo que una página también pueda abrirse por sí sola.
+Largest inlined asset (bytes):
+Tamaño máximo del recurso incrustado (bytes):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+Un recurso mayor que este tamaño conserva un enlace normal; déjelo vacío para el valor predeterminado de 10485760 bytes.
 Seed the crawl from the site's sitemap
 Iniciar el rastreo desde el mapa del sitio
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
