@@ -201,3 +201,4 @@ TESTS += 108_engine-refetch-backup.test
 TESTS += 122_local-warc-revisit-headers.test
 TESTS += 119_local-proxytrack-ndx-fields2.test
 TESTS += 118_local-proxytrack-arcwrite.test
+TESTS += 133_engine-reentrant-time.test

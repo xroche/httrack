@@ -2684,13 +2684,15 @@ HTSEXT_API void qsec2str(char *st, TStamp t) {
 // heure actuelle, GMT, format rfc (taille buffer 256o)
 void time_gmt_rfc822(char *s) {
   time_t tt;
-  struct tm *A;
+  struct tm tmv;
 
   tt = time(NULL);
-  A = gmtime(&tt);
-  if (A == NULL)
-    A = localtime(&tt);
-  time_rfc822(s, A);
+  /* no local-time fallback: it would format local time and still label it GMT
+   * (#806) */
+  if (hts_gmtime(tt, &tmv))
+    time_rfc822(s, &tmv);
+  else
+    s[0] = '\0';
 }
 
 void hts_now_iso8601(char out[32]) {
@@ -2705,11 +2707,13 @@ void hts_now_iso8601(char out[32]) {
 // heure actuelle, format rfc (taille buffer 256o)
 void time_local_rfc822(char *s) {
   time_t tt;
-  struct tm *A;
+  struct tm tmv;
 
   tt = time(NULL);
-  A = localtime(&tt);
-  time_rfc822_local(s, A);
+  if (hts_localtime(tt, &tmv))
+    time_rfc822_local(s, &tmv);
+  else
+    s[0] = '\0';
 }
 
 /* convertir une chaine en temps */
@@ -2857,14 +2861,13 @@ int get_filetime_rfc822(const char *file, char *date) {
 
   date[0] = '\0';
   if (STAT(file, &buf) == 0) {
-    struct tm *A;
+    struct tm tmv;
     time_t tt = buf.st_mtime;
 
-    A = gmtime(&tt);
-    if (A == NULL)
-      A = localtime(&tt);
-    if (A != NULL) {
-      time_rfc822(date, A);
+    /* no local-time fallback: it would format local time and still label it GMT
+     * (#806) */
+    if (hts_gmtime(tt, &tmv)) {
+      time_rfc822(date, &tmv);
       return 1;
     }
   }
