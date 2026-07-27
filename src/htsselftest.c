@@ -6461,6 +6461,13 @@ static void threadwait_gated_thread(void *arg) {
   hts_mutexrelease(&threadwait_lock);
 }
 
+static int st_backswap(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  return back_selftest_slot_swap();
+}
+
 static int st_threadwait(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i, round;
@@ -6783,6 +6790,8 @@ static const struct selftest_entry {
      st_changes_race},
     {"threadwait", "", "htsthread_wait() joins threads spawned just before it",
      st_threadwait},
+    {"backswap", "", "which backlog slots may be swapped to the ready table",
+     st_backswap},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},

@@ -139,6 +139,12 @@ int back_trylive(httrackp * opt, cache_back * cache, struct_back * sback,
                  const int p);
 int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   const int p);
+/* Move the previous copy of back->url_sav to back->tmpfile so back_finalize()
+   can put it back when the re-fetch fails (#77 follow-up). Call right before
+   truncating url_sav; tmpfile stays NULL when there is nothing to save. */
+void back_refetch_backup(httrackp *opt, lien_back *const back);
+/* -#test=backswap: slots eligible for the on-disk ready table. */
+int back_selftest_slot_swap(void);
 void back_info(struct_back * sback, int i, int j, FILE * fp);
 void back_infostr(struct_back *sback, int i, int j, char *s, size_t size);
 LLint back_transferred(LLint add, struct_back * sback);
