@@ -1000,6 +1000,62 @@ class Handler(SimpleHTTPRequestHandler):
         v = 1 if self.refetch_pass() == 1 else 2
         self.send_raw(b"<html><body><p>STAY-V%d</p></body></html>" % v, "text/html")
 
+    # --- re-fetch that dies before a complete response (#746, #748) ---------
+    # Pass 1 mirrors each resource; every later fetch hangs up partway through
+    # the status line, so nothing is ever received to store.
+    KEEP_PAGE = b"<html><body><p>KEEP-PAGE-V1</p></body></html>"
+    KEEP_BIN = b"KEEP-BIN-V1\n" + b"\x51\x52\x53\x54" * 512
+    KEEP_ERR = b"KEEP-ERR-V1\n" + b"\x61\x62\x63\x64" * 512
+
+    def send_cut_headers(self):
+        """Hang up mid-header: the response never becomes parseable."""
+        self.close_connection = True
+        try:
+            self.wfile.write(b"HTTP/1.0 200 OK\r\nContent-Ty")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.connection.close()
+
+    def route_keep_index(self):
+        self.refetch_pass()
+        self.send_html(
+            '\t<a href="page.html">page</a>\n'
+            '\t<a href="data.bin">data</a>\n'
+            '\t<a href="err.bin">err</a>\n'
+            '\t<a href="stay.bin">stay</a>\n'
+        )
+
+    def route_keep_page(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.KEEP_PAGE, "text/html")
+        else:
+            self.send_cut_headers()
+
+    def route_keep_data(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.KEEP_BIN, "application/octet-stream")
+        else:
+            self.send_cut_headers()
+
+    # Control: an HTTP error on the same resource already keeps the copy, so
+    # the cut-header routes above must end up indistinguishable from it.
+    def route_keep_err(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.KEEP_ERR, "application/octet-stream")
+        else:
+            self.send_response(500)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    # Control: served identically on every pass.
+    def route_keep_stay(self):
+        self.refetch_pass()
+        self.send_raw(
+            b"KEEP-STAY-V1\n" + b"\x71\x72\x73\x74" * 512, "application/octet-stream"
+        )
+
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
         self.send_raw(
@@ -1950,6 +2006,11 @@ class Handler(SimpleHTTPRequestHandler):
         "/uptrunc/page.html": route_uptrunc_page,
         "/uptrunc/file.bin": route_uptrunc_file,
         "/uptrunc/stay.html": route_uptrunc_stay,
+        "/keep/index.html": route_keep_index,
+        "/keep/page.html": route_keep_page,
+        "/keep/data.bin": route_keep_data,
+        "/keep/err.bin": route_keep_err,
+        "/keep/stay.bin": route_keep_stay,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
         "/types/photo.png": route_types,
