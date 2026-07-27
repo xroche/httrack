@@ -1451,10 +1451,10 @@ hts_boolean hts_rename_over(const char *src, const char *dst) {
   fconv(cdst, sizeof(cdst), dst);
   if (RENAME(csrc, cdst) == 0)
     return HTS_TRUE;
-  /* Only a dst standing in the way is something the unlink can clear, and the
-     CRT reports that as EEXIST (ERROR_ALREADY_EXISTS); it keeps EACCES for a
-     src another process holds, where removing dst would destroy a file the
-     retry then cannot replace. The src check covers a CRT that disagrees. */
+  /* Only a dst in the way is something the unlink can clear, and the CRT maps
+     that to EEXIST; it keeps EACCES for a src another process holds, where
+     removing dst would lose a file the retry cannot replace (#790). The src
+     check covers a CRT that reports neither. */
   const int err = errno;
 
   if (err != EEXIST || !fexist_utf8(src))
