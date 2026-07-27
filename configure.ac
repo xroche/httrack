@@ -175,7 +175,7 @@ AX_CHECK_ALIGNED_ACCESS_REQUIRED
 # check for various headers
 AC_CHECK_HEADERS([execinfo.h sys/ioctl.h])
 
-### zlib
+### zlib (mandatory)
 CHECK_ZLIB()
 
 ### brotli and zstd content codings (optional)
