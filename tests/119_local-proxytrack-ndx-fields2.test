@@ -1,0 +1,155 @@
+#!/bin/bash
+# Two bounds in the .ndx/.dat reader: a position field that did not parse left
+# "pos" holding the previous entry's offset, or the stack on the first entry,
+# and the base path and index filenames were copied with strncat calls bounded
+# by the source path instead of by their 1024-byte destinations.
+
+set -euo pipefail
+export LC_ALL=C
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+dir=$(mktemp -d)
+cleanup() { rm -rf "$dir"; }
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT TERM
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+enc() { printf '%d\n%s' "${#1}" "$1"; }
+
+# One version-1.4 .dat record in cache_rstr() framing, field by field:
+# $1 content-type, $2 status message, $3 body.
+record() {
+    enc 200
+    enc "${#3}"
+    enc "$2"
+    enc "$1"
+    enc ""
+    enc ""
+    enc ""
+    enc ""
+    enc ""
+    enc ""
+    enc ""
+    enc ""
+    enc HTS
+    enc "${#3}"
+    printf '%s' "$3"
+}
+
+# Two records in $1.dat, and in $1.ndx two entries with positions $2 and $3.
+# The parser walks the index a line at a time and skips one line per entry, so
+# each block leads with a filler line.
+build_cache() {
+    record audio/midi ZERO ZEROBODY >"$dir/r0"
+    record image/gif ALPHA ALPHABODY >"$dir/ra"
+    cat "$dir/r0" "$dir/ra" >"$1.dat"
+    {
+        enc CACHE-1.4
+        enc "Wed, 01 Jan 2025 00:00:00 GMT"
+        printf 'X\nexample.com/a.html\n\n%s\n' "$2"
+        printf 'X\nexample.com/b.html\n\n%s\n' "$3"
+    } >"$1.ndx"
+}
+
+# Content-type proxytrack wrote for URL $2 of the .arc $1, or "none".
+mime_of() {
+    local rec
+    rec=$(grep -a -m1 "^http://$2 " "$1") || {
+        echo none
+        return
+    }
+    awk '{ print $4 }' <<<"$rec"
+}
+
+# Offset of the second record: the position an entry must not inherit.
+record audio/midi ZERO ZEROBODY >"$dir/r0"
+posA=$(wc -c <"$dir/r0")
+
+convert() {
+    proxytrack --convert "$dir/out.arc" "$1" >"$dir/log" 2>&1 ||
+        fail "$2: proxytrack died on the cache"
+}
+
+# Control: both positions parse, so each URL resolves to its own record and a
+# broken probe cannot pass as a fixed reader.
+build_cache "$dir/ctl" 0 "$posA"
+convert "$dir/ctl.ndx" "control"
+test "$(mime_of "$dir/out.arc" example.com/a.html)" = audio/midi ||
+    fail "control: a.html did not resolve to the record at offset 0"
+test "$(mime_of "$dir/out.arc" example.com/b.html)" = image/gif ||
+    fail "control: b.html did not resolve to the record at offset $posA"
+
+# A field that does not parse must read as offset 0, not as the offset the
+# entry before it left behind.
+build_cache "$dir/carry" "$posA" Z
+convert "$dir/carry.ndx" "carry-over"
+test "$(mime_of "$dir/out.arc" example.com/b.html)" = audio/midi ||
+    fail "an unparseable position inherited the previous entry's offset"
+
+# Same on the first entry, where there is no previous value and the read came
+# off the stack.
+build_cache "$dir/first" Z "$posA"
+convert "$dir/first.ndx" "first entry"
+test "$(mime_of "$dir/out.arc" example.com/a.html)" = audio/midi ||
+    fail "an unparseable position on the first entry did not read as 0"
+
+# The .ndx name reaches the copy before anything opens it, so no file needed.
+long=$(printf '%3000s' '' | tr ' ' 'x')
+convert "$dir/$long.ndx" "over-long .ndx name"
+
+if is_windows; then
+    echo "deep paths need a POSIX filesystem; index name half only" >&2
+    exit 0
+fi
+
+comp=$(printf '%200s' '' | tr ' ' 'd')
+
+# A path just short of the 1024-byte destinations must still load: refusing
+# these is as wrong as overflowing them.
+fits="$dir/$comp/$comp/$comp"
+mkdir -p "$fits"
+build_cache "$fits/c" 0 "$posA"
+convert "$fits/c.ndx" "path that fits"
+test "$(mime_of "$dir/out.arc" example.com/b.html)" = image/gif ||
+    fail "a cache at a $((${#fits} + 6))-byte path was dropped"
+
+# Past them, the base path and both index filenames each overshoot.
+deep="$fits/$comp/$comp/$comp"
+mkdir -p "$deep" 2>/dev/null || {
+    echo "filesystem will not hold a ${#deep}-byte path; deep half skipped" >&2
+    exit 0
+}
+build_cache "$deep/c" 0 "$posA"
+convert "$deep/c.ndx" "path past the destinations"
+
+# The zip reader keeps its own copy of that base-path code, and only reaches it
+# once the archive opens, so this one needs a real zip at the deep path.
+python=$(find_python) || {
+    echo "python3 not found; zip half skipped" >&2
+    exit 0
+}
+"$python" - "$deep/c.zip" <<'EOF'
+import sys, zipfile
+
+zi = zipfile.ZipInfo("example.com/page.html")
+zi.compress_type = zipfile.ZIP_STORED
+zi.extra = (
+    "X-In-Cache: 1\r\nX-StatusCode: 200\r\nX-StatusMessage: OK\r\n"
+    "X-Size: 5\r\nContent-Type: text/html\r\n"
+    "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\nX-Save: out/page.html\r\n"
+).encode()
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr(zi, b"hello")
+EOF
+convert "$deep/c.zip" "zip at a path past the base buffer"
+test "$(mime_of "$dir/out.arc" example.com/page.html)" = text/html ||
+    fail "the zip entry was dropped instead of keeping an empty base path"
+
+echo "OK: an unparseable .ndx position reads as 0, and an over-long cache path is refused"

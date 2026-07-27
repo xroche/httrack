@@ -374,8 +374,8 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         forbidden_url = 1;
       break;                    // interdicton de sortir au dela de l'adresse
     case HTS_TRAVEL_SAME_DOMAIN: {
-      size_t i = strlen(adr) - 1;
-      size_t j = strlen(urladr()) - 1;
+      size_t i = hts_lastcharoffset(adr);
+      size_t j = hts_lastcharoffset(urladr());
 
       if ((i > 0) && (j > 0)) {
         while ((i > 0) && (adr[i] != '.'))
@@ -411,8 +411,8 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         forbidden_url = 1;
     } break;
     case HTS_TRAVEL_SAME_TLD: {
-      size_t i = strlen(adr) - 1;
-      size_t j = strlen(urladr()) - 1;
+      size_t i = hts_lastcharoffset(adr);
+      size_t j = hts_lastcharoffset(urladr());
 
       while ((i > 0) && (adr[i] != '.'))
         i--;
@@ -728,7 +728,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       case 1: // forbid the whole directory and subdirs: adr/path/*
         forbidden_url = 1;
         {
-          size_t i = strlen(fil) - 1;
+          size_t i = hts_lastcharoffset(fil);
 
           while((fil[i] != '/') && (i > 0))
             i--;
@@ -794,7 +794,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
       case 5: // allow the whole directory and its children
         if ((opt->seeker & HTS_SEEKER_UP) == 0) { // not allowed to go up
-          size_t i = strlen(fil) - 1;
+          size_t i = hts_lastcharoffset(fil);
 
           while((fil[i] != '/') && (i > 0))
             i--;
@@ -836,7 +836,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         //
       case 7: // allow this directory
       {
-        size_t i = strlen(fil) - 1;
+        size_t i = hts_lastcharoffset(fil);
 
         while ((fil[i] != '/') && (i > 0))
           i--;

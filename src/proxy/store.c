@@ -888,6 +888,31 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
 	} \
 } while(0)
 
+/* Set path (capacity size) to filename's parent directory, separator included,
+   from an absolute filename. Empty when there is none, or when it would not
+   fit: a truncated prefix names a different directory. */
+static void index_base_path(char *path, size_t size, const char *filename) {
+  const char *abpath;
+  int slashes;
+
+  for (slashes = 2, abpath = hts_lastcharptr(filename);
+       abpath > filename &&
+       ((*abpath != '/' && *abpath != '\\') || --slashes > 0);
+       abpath--)
+    ;
+  path[0] = '\0';
+  if (slashes == 0 && *abpath != 0 && (size_t) (abpath - filename) < size - 1) {
+    int i;
+
+    strlncatbuff(path, filename, size, (size_t) (abpath - filename) + 1);
+    for (i = 0; path[i] != 0; i++) {
+      if (path[i] == '\\') {
+        path[i] = '/';
+      }
+    }
+  }
+}
+
 int PT_LoadCache__New(PT_Index index_, const char *filename) {
   if (index_ != NULL && filename != NULL) {
     PT_Index__New index = &index_->slots.formatNew;
@@ -898,27 +923,9 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
 
     // Opened ?
     if (zFile != NULL) {
-      const char *abpath;
-      int slashes;
       coucal hashtable = index->hash;
 
-      /* Compute base path for this index - the filename MUST be absolute! */
-      for (slashes = 2, abpath = hts_lastcharptr(filename);
-           abpath > filename &&
-           ((*abpath != '/' && *abpath != '\\') || --slashes > 0);
-           abpath--)
-        ;
-      index->path[0] = '\0';
-      if (slashes == 0 && *abpath != 0) {
-        int i;
-
-        strncat(index->path, filename, (int) (abpath - filename) + 1);
-        for(i = 0; index->path[i] != 0; i++) {
-          if (index->path[i] == '\\') {
-            index->path[i] = '/';
-          }
-        }
-      }
+      index_base_path(index->path, sizeof(index->path), filename);
 
       /* Ready directory entries */
       if (unzGoToFirstFile(zFile) == Z_OK) {
@@ -1490,42 +1497,23 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 
     cache->filenameDat[0] = '\0';
     cache->filenameNdx[0] = '\0';
-    cache->path[0] = '\0';
 
-    {
-      PT_Index__Old index = cache;
-      const char *abpath;
-      int slashes;
-
-      /* -------------------- COPY OF THE __New() CODE -------------------- */
-      /* Compute base path for this index - the filename MUST be absolute! */
-      for (slashes = 2, abpath = hts_lastcharptr(filename);
-           abpath > filename &&
-           ((*abpath != '/' && *abpath != '\\') || --slashes > 0);
-           abpath--)
-        ;
-      index->path[0] = '\0';
-      if (slashes == 0 && *abpath != 0) {
-        int i;
-
-        strncat(index->path, filename, (int) (abpath - filename) + 1);
-        for(i = 0; index->path[i] != 0; i++) {
-          if (index->path[i] == '\\') {
-            index->path[i] = '/';
-          }
-        }
-      }
-      /* -------------------- END OF COPY OF THE __New() CODE -------------------- */
-    }
+    index_base_path(cache->path, sizeof(cache->path), filename);
 
     /* Index/data filenames */
     if (pos != NULL) {
-      int nLen = (int) (pos - filename);
+      const size_t nLen = (size_t) (pos - filename);
 
-      strncat(cache->filenameDat, filename, nLen);
-      strncat(cache->filenameNdx, filename, nLen);
-      strcat(cache->filenameDat, ".dat");
-      strcat(cache->filenameNdx, ".ndx");
+      /* a base clipped to fit would name a different pair of files */
+      if (nLen > sizeof(cache->filenameDat) - sizeof(".dat")) {
+        return 0;
+      }
+      strlncatbuff(cache->filenameDat, filename, sizeof(cache->filenameDat),
+                   nLen);
+      strlncatbuff(cache->filenameNdx, filename, sizeof(cache->filenameNdx),
+                   nLen);
+      strcatbuff(cache->filenameDat, ".dat");
+      strcatbuff(cache->filenameNdx, ".ndx");
     }
     ndxSize = filesize(cache->filenameNdx);
     cache->timestamp = file_timestamp(cache->filenameDat);
@@ -1588,7 +1576,10 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
               }
               /* read position */
               a += binput(a, linepos, 200);
-              sscanf(linepos, "%d", &pos);
+              /* an unparseable field must not carry the previous entry's
+                 offset over, nor read the stack on the first one */
+              if (sscanf(linepos, "%d", &pos) != 1)
+                pos = 0;
 
               /* Add entry */
               coucal_add(cache->hash, line, pos);

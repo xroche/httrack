@@ -6973,10 +6973,10 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* The x[strlen(x) - 1] class (#770) and its pointer spelling x + strlen(x) - 1
-   (#781). The string starts mid-arena so the byte it must not touch is a real
-   neighbour; poisoned with '#', not 0, or a stray NUL terminator would read as
-   untouched. */
+/* The x[strlen(x) - 1] class (#770), its pointer spelling x + strlen(x) - 1
+   (#781) and its size_t index spelling (#821). The string starts mid-arena so
+   the byte it must not touch is a real neighbour; poisoned with '#', not 0, or
+   a stray NUL terminator would read as untouched. */
 static int st_lastchar(httrackp *opt, int argc, char **argv) {
   enum { off = 8 };
 
@@ -7080,6 +7080,36 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
   CHECK(hts_lastcharptr(s) == s);
   CHECK(*hts_lastcharptr(s) == '/');
   CHECK(arena[guard] == '#');
+
+  /* the size_t index spelling (#821): (i > 0) cannot reject SIZE_MAX, so only
+     a safe seed stops the sites' walk-back */
+  REPOISON("");
+  {
+    const size_t vacuous = strlen(s) - 1;
+    size_t i = hts_lastcharoffset(s);
+    int steps = 0;
+
+    CHECK(vacuous > 0);
+    CHECK(i == 0);
+    /* step-capped so a bad seed fails the count instead of running off */
+    while ((i > 0) && (steps < 8) && (s[i] != '/'))
+      i--, steps++;
+    CHECK(steps == 0);
+    CHECK(s[i] != '/');
+    CHECK(arena[guard] == '#');
+  }
+
+  /* and the same loop must still find the real byte on a non-empty string */
+  REPOISON("a/b");
+  {
+    size_t i = hts_lastcharoffset(s);
+    int steps = 0;
+
+    while ((i > 0) && (steps < 8) && (s[i] != '/'))
+      i--, steps++;
+    CHECK(i == 1);
+    CHECK(arena[guard] == '#');
+  }
 
   /* control: the canary must be able to fail, or the checks above prove
      nothing. Clobber it exactly as the unguarded idiom would. */
@@ -7238,7 +7268,7 @@ static const struct selftest_entry {
      "bounded string-op self-test", st_strsafe},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"lastchar", "",
-     "last-char helpers never index before the buffer (#770, #781)",
+     "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
     {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
