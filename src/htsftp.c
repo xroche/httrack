@@ -624,8 +624,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           } else {
             file_notify(opt, back->url_adr, back->url_fil, back->url_sav, 1, 1,
                         0);
-            /* Without this every failure exit below leaves the mirrored file
-               truncated (#771); the resume branch appends, so it needs none. */
+            /* Every failure exit below would else leave the mirror truncated
+               (#771); the resume branch appends and needs no backup. */
             back_refetch_backup(opt, back);
             back->r.fp = filecreate(&opt->state.strc, back->url_sav);
           }

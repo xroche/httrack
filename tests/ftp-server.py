@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Minimal FTP server for the crawl tests: PASV only, binary RETR, LIST.
 
-Prints "PORT <n>" once bound, like local-server.py. --mode-file names a file
-re-read before every transfer, so a test can make one path answer well on the
-first pass and fail on the second without moving the port (the port is part of
-the mirror directory name).
-
-Each line of that file is "<path> <mode>...", path "*" matching everything:
+Prints "PORT <n>" once bound, like local-server.py. --mode-file is re-read
+before every transfer, so a test can flip one path's behaviour between passes
+without restarting the server and moving the port (which names the mirror
+directory). Each line is "<path> <mode>...", path "*" matching everything:
 
   truncate  send a prefix of the body, then drop the data connection
   empty     open the data connection and send nothing
@@ -93,7 +91,6 @@ class Session(threading.Thread):
         except OSError:
             pass
         data.close()
-        # A failed transfer never reaches "226 Transfer complete".
         if modes & {"empty", "truncate"}:
             reply(self.conn, "426 transfer aborted")
         else:
@@ -216,6 +213,7 @@ def main():
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind(("127.0.0.1", 0))
     srv.listen(16)
+    sys.stdout.reconfigure(newline="\n")  # the launcher parses PORT, CRLF breaks it
     sys.stdout.write("PORT %d\n" % srv.getsockname()[1])
     sys.stdout.flush()
 

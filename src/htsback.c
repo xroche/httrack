@@ -340,10 +340,59 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
 }
 
 static int slot_can_be_cached_on_disk(const lien_back * back) {
+  /* A pending backup or spool means the slot is not finalized, and the swap
+     would unlink it through back_clear_entry() (#771). */
+  if (back->tmpfile != NULL && back->tmpfile[0] != '\0')
+    return 0;
   return (back->status == STATUS_READY && back->locked == 0
           && back->url_sav[0] != '\0'
           && strcmp(back->url_sav, BACK_ADD_TEST) != 0);
   /* Note: not checking !IS_DELAYED_EXT(back->url_sav) or it will quickly cause the slots to be filled! */
+}
+
+int back_selftest_slot_swap(void) {
+  lien_back back;
+  int err = 0;
+
+#define CHECK(want, why)                                                       \
+  do {                                                                         \
+    if (slot_can_be_cached_on_disk(&back) != (want)) {                         \
+      fprintf(stderr, "backswap: expected %d for %s\n", (want), (why));        \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  memset(&back, 0, sizeof(back));
+  back.status = STATUS_READY;
+  strcpybuff(back.url_sav, "/tmp/httrack-selftest.bin");
+  CHECK(1, "a plain ready slot");
+
+  back.tmpfile = back.tmpfile_buffer;
+  strcpybuff(back.tmpfile_buffer, "/tmp/httrack-selftest.bin.bak");
+  CHECK(0, "a slot still holding a re-fetch backup");
+
+  /* Callers clear a spent temporary by emptying the name, not the pointer. */
+  back.tmpfile_buffer[0] = '\0';
+  CHECK(1, "a slot whose temporary was already dropped");
+
+  back.tmpfile = NULL;
+  back.locked = 1;
+  CHECK(0, "a locked slot");
+  back.locked = 0;
+
+  back.status = STATUS_TRANSFER;
+  CHECK(0, "a slot still transferring");
+  back.status = STATUS_READY;
+
+  back.url_sav[0] = '\0';
+  CHECK(0, "a slot with no save name");
+
+  strcpybuff(back.url_sav, BACK_ADD_TEST);
+  CHECK(0, "the dummy test slot");
+#undef CHECK
+
+  printf("backswap self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
 }
 
 /* Put all backing entries that are ready in the storage hashtable to spare space and CPU */
