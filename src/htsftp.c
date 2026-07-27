@@ -192,10 +192,12 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
                   back->url_adr, back->url_fil);
     return HTS_FALSE;
   }
+  /* Equality, not ordering: a copy this code did not stamp carries a local
+     clock time newer than any MDTM, which "not newer" would wave through. */
   if (remote_mtime == (time_t) -1 || local_mtime == (time_t) -1 ||
-      remote_mtime > local_mtime) {
+      remote_mtime != local_mtime) {
     hts_log_print(opt, LOG_DEBUG,
-                  "FTP: not resuming %s%s, the remote may have changed",
+                  "FTP: not resuming %s%s, the copy is not dated as the remote",
                   back->url_adr, back->url_fil);
     return HTS_FALSE;
   }
@@ -765,8 +767,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               fclose(back->r.fp);
               back->r.fp = NULL;
             }
-            /* back_flush_output() only stamps r.out writers; a partial needs
-               the remote's date too, or the next pass cannot date it (#823). */
+            /* back_flush_output() stamps only r.is_write transfers, which FTP
+               never is; a partial needs the remote's date too (#823). */
             if (strnotempty(back->r.lastmodified))
               set_filetime_rfc822(back->url_sav, back->r.lastmodified);
           } else {

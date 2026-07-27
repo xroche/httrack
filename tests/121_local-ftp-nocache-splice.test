@@ -58,8 +58,18 @@ with open(path, "wb") as fp:
     fp.write(("%s-BODY " % tag).encode() + tag[:1].encode() * int(fill))
 os.utime(path, (int(stamp), int(stamp)))' "${root}/a.bin" "$1" "$2" "$3"
 }
-old_stamp=1767225600 # 2026-01-01Z
-new_stamp=1769904000 # 2026-02-01Z
+# A copy this engine did not stamp: an archive restore, a cp without -p, or any
+# mirror predating the fix. Content is stale, so a splice fails cmp.
+plant_stale() {
+    "$python" -c 'import os, sys
+path, fill, stamp = sys.argv[1:4]
+with open(path, "wb") as fp:
+    fp.write(b"STALE-BODY " + b"S" * int(fill))
+os.utime(path, (int(stamp), int(stamp)))' "$mirror" "$1" "$2"
+}
+old_stamp=1767225600    # 2026-01-01Z
+new_stamp=1769904000    # 2026-02-01Z
+future_stamp=1772582400 # 2026-03-04Z, later than any remote below
 
 write_body OLD 8000 "$old_stamp"
 echo '/a.bin truncate' >"$mode"
@@ -144,8 +154,9 @@ no_errors "pass 4"
 ok "the same-length change replaced the mirror"
 
 # --- pass 5: a server with no MDTM cannot prove anything, so no resume -------
-"$python" -c 'import os, sys; os.truncate(sys.argv[1], 4000)' "$mirror"
+# The copy is dated exactly as the remote, so only the missing MDTM refuses it.
 write_body NEW 12000 "$new_stamp"
+plant_stale 4000 "$new_stamp"
 echo '/a.bin nomdtm' >"$mode"
 : >"$cmds"
 crawl >"${tmpdir}/log5" 2>&1
@@ -158,3 +169,20 @@ cmp -s "$mirror" "${root}/a.bin" ||
     fail "the mirror is $(size_of "$mirror") bytes, served $(size_of "${root}/a.bin")"
 no_errors "pass 5"
 ok "the unprovable resume was re-fetched whole"
+
+# --- pass 6: a copy this engine never stamped, so dated by the local clock ---
+# Every mirror made before the fix looks like this. "Not newer than the remote"
+# waves it through, which is why the date has to match rather than merely lead.
+: >"$mode"
+plant_stale 4000 "$future_stamp"
+: >"$cmds"
+crawl >"${tmpdir}/log6" 2>&1
+case "$(sent)" in
+*REST*) fail "resumed over a copy dated by the local clock: $(sent)" ;;
+*RETR*) ok "the unstamped copy was re-fetched whole" ;;
+*) fail "pass 6 never reached RETR; commands were: $(sent)" ;;
+esac
+cmp -s "$mirror" "${root}/a.bin" ||
+    fail "the mirror is $(size_of "$mirror") bytes, served $(size_of "${root}/a.bin")"
+no_errors "pass 6"
+ok "a newer local mtime does not license a resume"
