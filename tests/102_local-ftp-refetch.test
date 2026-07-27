@@ -152,13 +152,15 @@ ok "the kept copies survived the update purge"
 # --- the change report is the mirror's own account of the pass ----------------
 test -s "$report" || fail "pass 2 wrote no ${report}"
 test -z "$(listed gone)" || fail "the report calls something gone: $(listed gone)"
+unchanged=$(listed unchanged)
+changed=$(listed changed)
 for name in keep empty; do
-    listed unchanged | grep -qx "${host}/${name}.bin:$(size_of "${tmpdir}/snap/${name}.bin")" ||
+    grep -qx "${host}/${name}.bin:$(size_of "${tmpdir}/snap/${name}.bin")" <<<"$unchanged" ||
         fail "${name}.bin is not reported unchanged at its previous size"
-    if listed changed | grep -q "^${host}/${name}.bin:"; then
+    if grep -q "^${host}/${name}.bin:" <<<"$changed"; then
         fail "${name}.bin is reported changed as well"
     fi
 done
-listed changed | grep -qx "${host}/stay.bin:$(size_of "${out}/${host}/stay.bin")" ||
+grep -qx "${host}/stay.bin:$(size_of "${out}/${host}/stay.bin")" <<<"$changed" ||
     fail "stay.bin is not reported changed"
 ok "the change report calls the kept files unchanged and the refreshed one changed"

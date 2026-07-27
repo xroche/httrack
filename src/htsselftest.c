@@ -2659,8 +2659,11 @@ static int st_logcallback(httrackp *opt, int argc, char **argv) {
   strcpybuff(seen, st_log_callback_seen);
 
   rewind(fp);
-  line[0] = '\0';
-  (void) fgets(line, (int) sizeof(line), fp);
+  if (fgets(line, (int) sizeof(line), fp) == NULL) {
+    fprintf(stderr, "logcallback: log file is empty, nothing was written\n");
+    fclose(fp);
+    return 1;
+  }
   fclose(fp);
 
   /* The callback runs above the level filter and without a log file at all;
