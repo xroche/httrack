@@ -1980,10 +1980,9 @@ int httpmirror(char *url1, httrackp * opt) {
           }
 
           // ATTENTION C'EST ICI QU'ON SAUVE LE FICHIER!!
-          // An empty body must not overwrite the file when the transfer failed
-          // (statuscode <= 0, e.g. an -M hard-stop): it would truncate a good
-          // copy to 0 (#77 follow-up).
-          if (r.adr != NULL || (r.size == 0 && r.statuscode > 0)) {
+          // A failed transfer has no body: r.adr holds debris from the aborted
+          // read, which would destroy the copy being re-fetched (#748).
+          if (r.statuscode > 0 && (r.adr != NULL || r.size == 0)) {
             file_notify(opt, urladr(), urlfil(), savename(), 1, 1, r.notmodified);
             if (filesave(opt, r.adr, (int) r.size, savename(), urladr(), urlfil()) !=
                 0) {
@@ -2693,7 +2692,11 @@ HTSEXT_API int structcheck(const char *path) {
       if (!S_ISDIR(st.st_mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
-          sprintf(tmpbuf, "%s.txt", file);
+          /* bounded here, not by the path-length guard far above */
+          if (!sprintfbuff(tmpbuf, "%s.txt", file)) {
+            errno = ENAMETOOLONG;
+            return -1;
+          }
           if (rename(file, tmpbuf) != 0) {      /* Can't rename regular file */
             return -1;
           }
@@ -2801,7 +2804,11 @@ HTSEXT_API int structcheck_utf8(const char *path) {
       if (!S_ISDIR(st.st_mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
-          sprintf(tmpbuf, "%s.txt", file);
+          /* bounded here, not by the path-length guard far above */
+          if (!sprintfbuff(tmpbuf, "%s.txt", file)) {
+            errno = ENAMETOOLONG;
+            return -1;
+          }
           if (RENAME(file, tmpbuf) != 0) {      /* Can't rename regular file */
             return -1;
           }
@@ -3821,11 +3828,12 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
         strcpybuff(codebase, heap(ptr)->fil);
       else
         strcpybuff(codebase, heap(heap(ptr)->precedent)->fil);
-      a = codebase + strlen(codebase) - 1;
+      // empty codebase has no last char; codebase-1 would underflow
+      a = codebase[0] != '\0' ? codebase + strlen(codebase) - 1 : codebase;
       while((*a) && (*a != '/') && (a > codebase))
         a--;
       if (*a == '/')
-        *(a + 1) = '\0';        // couper
+        *(a + 1) = '\0';        // cut
     } else {                    // couper http:// éventuel
       if (strfield(codebase, "http://")) {
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];

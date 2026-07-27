@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+# an empty current path underflowed htsAddLink's codebase walk (#730).
+
+set -euo pipefail
+
+httrack -O /dev/null -#test=addlink | grep -q "addlink self-test OK"
