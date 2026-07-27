@@ -5315,45 +5315,45 @@ static const char sf_png[] = "\x89PNG\r\n\x1a\n\x00\x01\x02\xff";
 
 static const char sf_page[] =
     "<html><head>\n"
-    "<link rel=\"stylesheet\" href=\"css/main.css\">\n"
-    "<link rel=\"canonical\" href=\"other.html\">\n"
+    "<link rel=\"stylesheet\" href=\"css/main.css#!htsinline\">\n"
+    "<link rel=\"canonical\" href=\"other.html#!htsinline\">\n"
     "<title>t</title>\n"
-    "<style>body { background: url(\"img/a%20b.png\"); }</style>\n"
+    "<style>body { background: url(\"img/a%20b.png#!htsinline\"); }</style>\n"
     "</head><body>\n"
-    "<img src=\"img/a%20b.png\" srcset=\"img/a%20b.png 1x, img/big.png 2x\">\n"
-    "<link rel=\"icon\" href=\"icon.png\">\n"
-    "<link rel=\"preload\" as=\"font\" href=\"font/f.woff2\">\n"
+    "<img src=\"img/a%20b.png#!htsinline\" srcset=\"img/a%20b.png#!htsinline 1x, img/big.png#!htsinline 2x\">\n"
+    "<link rel=\"icon\" href=\"icon.png#!htsinline\">\n"
+    "<link rel=\"preload\" as=\"font\" href=\"font/f.woff2#!htsinline\">\n"
     "<img src=\"data:image/gif;base64,QUJD\">\n"
     /* Each has a real file where its guard's removal would land it; without
        that they stay links either way, the target merely being absent. */
     "<img src=\"http://example.com/x.png\">\n"
     "<img src=\"//example.com/x.png\">\n"
-    "<input type=\"image\" src=\"img/in.png\">\n"
+    "<input type=\"image\" src=\"img/in.png#!htsinline\">\n"
     /* Lazy loading: src is the placeholder, the real image rides data-src. */
-    "<img src=\"img/ph.png\" data-src=\"img/lz.png\" "
-    "data-srcset=\"img/lz2.png 2x\" lowsrc=\"img/low.png\">\n"
-    "<object data=\"img/ob.png\"></object>\n"
-    "<embed src=\"img/em.png\">\n"
-    "<img data-src=\"other.html\">\n"
+    "<img src=\"img/ph.png#!htsinline\" data-src=\"img/lz.png#!htsinline\" "
+    "data-srcset=\"img/lz2.png#!htsinline 2x\" lowsrc=\"img/low.png#!htsinline\">\n"
+    "<object data=\"img/ob.png#!htsinline\"></object>\n"
+    "<embed src=\"img/em.png#!htsinline\">\n"
+    "<img data-src=\"other.html#!htsinline\">\n"
     /* What a first pass emits: re-resolving it is what a second pass must not
        do, and the fallback type would inline whatever the walk found. */
     "<link rel=\"stylesheet\" href=\"data:text/css;base64,QUJD\">\n"
-    "<video poster=\"img/po.png\" controls>"
-    "<source src=\"v.mp4\" type=\"video/mp4\"></video>\n"
-    "<svg><image href=\"img/sv.png\"/></svg>\n"
-    "<table background=\"img/bg.png\"><tr><td>x</td></tr></table>\n"
+    "<video poster=\"img/po.png#!htsinline\" controls>"
+    "<source src=\"v.mp4#!htsinline\" type=\"video/mp4\"></video>\n"
+    "<svg><image href=\"img/sv.png#!htsinline\"/></svg>\n"
+    "<table background=\"img/bg.png#!htsinline\"><tr><td>x</td></tr></table>\n"
     /* The second is what bites: drop the clamp and its leading ".." lands it
        back on <root>/img/a b.png. The first can only 404 either way. */
-    "<img src=\"../escape.png\">\n"
-    "<img src=\"../img/a%20b.png\">\n"
+    "<img src=\"../escape.png#!htsinline\">\n"
+    "<img src=\"../img/a%20b.png#!htsinline\">\n"
     "<a href=\"img/a%20b.png\">link</a>\n"
-    "<script src=\"js/app.js\"></script>\n"
+    "<script src=\"js/app.js#!htsinline\"></script>\n"
     "<script>var s = \"</scripting>\"; var t = \"<img src='img/a%20b.png'>\";"
     "</script>\n"
-    "<img src=\"missing.png\" >\n"
-    "<!--><img src=\"img/a%20b.png\">\n"
-    "<div style=\"background:url(img/a%20b.png)\"></div>\n"
-    "<div style='content:\"x\"; background:url(img/a%20b.png)'></div>\n"
+    "<img src=\"missing.png#!htsinline\" >\n"
+    "<!--><img src=\"img/a%20b.png#!htsinline\">\n"
+    "<div style=\"background:url(img/a%20b.png#!htsinline)\"></div>\n"
+    "<div style='content:\"x\"; background:url(img/a%20b.png#!htsinline)'></div>\n"
     "</body></html>\n";
 
 /* Lay a small mirror down under root. */
@@ -5362,17 +5362,17 @@ static void sf_fixture(const char *root) {
      inlined stylesheet could not embed has to come out relative to the page,
      not to the stylesheet, or it dangles. */
   static const char css[] =
-      "@import \"sub/nested.css\";\n"
-      "@import url(\"sub/two.css\");\n"
+      "@import \"sub/nested.css#!htsinline\";\n"
+      "@import url(\"sub/two.css#!htsinline\");\n"
       "@import \"a\\\"url(../img/a b.png)b.css\";\n"
-      "@font-face { font-family: f; src: url(../font/f.woff2); }\n"
-      "body { background: url(../img/a b.png); }\n"
-      "div { background: url(../img/big.png); }\n"
+      "@font-face { font-family: f; src: url(../font/f.woff2#!htsinline); }\n"
+      "body { background: url(../img/a%20b.png#!htsinline); }\n"
+      "div { background: url(../img/big.png#!htsinline); }\n"
       "/* url(../img/never.png) */\n";
-  static const char nested[] = "div { background: url(../../img/a b.png); }\n";
-  static const char two[] = "p { background: url(../../img/a b.png); }\n";
+  static const char nested[] = "div { background: url(../../img/a%20b.png#!htsinline); }\n";
+  static const char two[] = "p { background: url(../../img/a%20b.png#!htsinline); }\n";
   static const char deep[] =
-      "<html><head><link rel=\"stylesheet\" href=\"../../css/main.css\">\n"
+      "<html><head><link rel=\"stylesheet\" href=\"../../css/main.css#!htsinline\">\n"
       "</head><body>d</body></html>\n";
   static const char js[] = "var app = 1;\n";
   char big[4096];
@@ -5515,13 +5515,10 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   sf_check(strstr(out, "var t = \"<img src='img/a%20b.png'>\";") != NULL,
            "script body rewritten past a </scripting> lookalike");
 
-  /* Nothing an attribute value cannot hold: url() stays unquoted, and a quote
-     that was already in the CSS is escaped. */
-  sf_check(strstr(out, "url(\"data:") == NULL,
-           "a quoted url() would end a style attribute");
-  sf_check(strstr(out, "style=\"content:&quot;x&quot;; background:url(data:") !=
-               NULL,
-           "quote inside a rewritten style attribute not escaped");
+  /* Only the marked reference is touched: the value keeps its own quoting, so
+     nothing can be emitted that the attribute could not already hold. */
+  sf_check(strstr(out, "style='content:\"x\"; background:url(data:") != NULL,
+           "style attribute re-quoted instead of substituted in place");
 
   sf_check(strstr(out, "img/big.png 2x") != NULL, "over-cap asset inlined");
   sf_check(strstr(out, " 1x") != NULL, "srcset descriptor lost");
@@ -5541,7 +5538,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
              "url() inside a CSS comment was rewritten");
     sf_check(strstr(css, "url(data:font/woff2;base64,") != NULL,
              "@font-face src not inlined");
-    sf_check(strstr(css, "@import url(data:text/css;base64,") != NULL,
+    sf_check(strstr(css, "@import url(\"data:text/css;base64,") != NULL,
              "@import url() form not inlined");
     sf_check(strstr(css, "url(../img/a b.png)b.css") != NULL,
              "url() inside a string with an escaped quote was rewritten");
@@ -5630,10 +5627,15 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
     (void) singlefile_rewrite_html(opt, root, page, sf_page,
                                    sizeof(sf_page) - 1,
                                    SINGLEFILE_MAX_PAGE_SIZE, &verbatim);
-    sf_check(StringLength(verbatim) == sizeof(sf_page) - 1 &&
-                 memcmp(StringBuff(verbatim), sf_page, sizeof(sf_page) - 1) ==
-                     0,
+    /* Mark-transparent, not byte-transparent: a reference that cannot be
+       inlined loses its mark and keeps everything else. */
+    sf_check(StringLength(verbatim) ==
+                 sizeof(sf_page) - 1 -
+                     sf_count(sf_page, SINGLEFILE_MARK) *
+                         (int) strlen(SINGLEFILE_MARK),
              "a page with nothing to inline was re-serialized differently");
+    sf_check(strstr(StringBuff(verbatim), SINGLEFILE_MARK) == NULL,
+             "an un-inlinable reference kept its mark");
     StringFree(verbatim);
   }
   (void) outlen;
@@ -5642,10 +5644,10 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
      run is the control: it proves the fan-out is real, so the small one was
      cut short by the budget and not by the fixture. */
   {
-    static const char bomb_css[] = "@import \"b.css\";@import \"b.css\";"
-                                   "@import \"b.css\";@import \"b.css\";\n";
+    static const char bomb_css[] = "@import \"b.css#!htsinline\";@import \"b.css#!htsinline\";"
+                                   "@import \"b.css#!htsinline\";@import \"b.css#!htsinline\";\n";
     static const char bomb_html[] = "<html><head>"
-                                    "<link rel=\"stylesheet\" href=\"b.css\">"
+                                    "<link rel=\"stylesheet\" href=\"b.css#!htsinline\">"
                                     "</head></html>\n";
     const size_t css_len = sizeof(bomb_css) - 1;
     String small = STRING_EMPTY, large = STRING_EMPTY;
