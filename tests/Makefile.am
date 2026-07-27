@@ -231,5 +231,6 @@ TESTS = \
 	110_local-ftp-parallel.test \
 	111_local-ftp-update-rest.test \
 	121_local-ftp-nocache-splice.test
+	114_local-update-304-leak.test
 
 CLEANFILES = check-network_sh.cache

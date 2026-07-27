@@ -1114,7 +1114,7 @@ static void warc_wacz_package(warc_writer *w) {
     hts_log_print(w->opt, LOG_WARNING,
                   "WACZ: packaging failed, kept existing %s untouched",
                   waczpath);
-  } else if (!hts_rename_over(tmppath, waczpath)) {
+  } else if (!hts_rename_over(w->opt, tmppath, waczpath)) {
     (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmppath));
     hts_log_print(w->opt, LOG_WARNING | LOG_ERRNO,
                   "WACZ: could not finalize %s", waczpath);
@@ -1581,7 +1581,7 @@ static hts_boolean warc_commit(warc_writer *w) {
     for (s = 0; s < nseg; s++) {
       const char *final = warc_seg_path(w, s, finalbuf, sizeof(finalbuf));
       snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX, final);
-      if (!hts_rename_over(tmpbuf, final)) {
+      if (!hts_rename_over(w->opt, tmpbuf, final)) {
         hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
                       "WARC: could not replace %s", final);
         return HTS_FALSE;
