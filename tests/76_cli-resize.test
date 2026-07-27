@@ -23,7 +23,8 @@ cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 serverlog="${tmpdir}/server.log"
 : >"$serverlog"

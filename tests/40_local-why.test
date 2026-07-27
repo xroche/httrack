@@ -6,7 +6,7 @@ set -euo pipefail
 # --why: report which +/- filter rule decides for a URL, without crawling.
 
 tmpdir="$(mktemp -d)"
-trap 'rm -rf "$tmpdir"' EXIT
+trap 'set +e; rm -rf "$tmpdir"' EXIT
 
 why() {
     local want="$1" out

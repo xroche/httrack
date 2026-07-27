@@ -40,9 +40,8 @@ serverpid=
 cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
-    return 0
 }
-trap cleanup EXIT
+trap 'set +e; cleanup' EXIT
 
 # bind the live server to 127.0.0.1 only, so 127.0.0.2 refuses the connect
 "$python" "$server" --root "$root" --bind 127.0.0.1 >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &

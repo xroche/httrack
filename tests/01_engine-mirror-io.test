@@ -7,6 +7,6 @@ set -euo pipefail
 # (>MAX_PATH) and non-ASCII, exercising the mirror I/O wrappers the engine's
 # raw file ops now route to on Windows (#133, #630). Positive control on POSIX.
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 httrack -O /dev/null -#test=mirrorio "$dir" | grep -q "mirrorio:.*OK"

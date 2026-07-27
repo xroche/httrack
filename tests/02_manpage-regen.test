@@ -29,7 +29,7 @@ command -v httrack >/dev/null 2>&1 || {
 tmp=$(mktemp) || exit 1
 committed_clean=$(mktemp) || exit 1
 generated_clean=$(mktemp) || exit 1
-trap 'rm -f "$tmp" "$committed_clean" "$generated_clean"' EXIT
+trap 'set +e; rm -f "$tmp" "$committed_clean" "$generated_clean"' EXIT
 
 README="$top_srcdir/README" bash "$gen" httrack >"$tmp" 2>/dev/null || {
     echo "makeman.sh failed" >&2

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 httrack -O /dev/null -#test=structcheck "$dir" |
     grep -q "structcheck self-test OK"

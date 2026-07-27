@@ -9,7 +9,7 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 . "${testdir}/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 pad() { printf "%${1}s" '' | tr ' ' "$2"; }
 

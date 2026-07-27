@@ -12,7 +12,7 @@ httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
 
 # scratch dir: body= and cached= write temp files (st-savename-body.tmp, hts-cache/)
 scratch=$(mktemp -d)
-trap 'rm -rf "$scratch"' EXIT
+trap 'set +e; rm -rf "$scratch"' EXIT
 cd "$scratch"
 
 run() {

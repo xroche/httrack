@@ -33,7 +33,8 @@ cleanup() {
     wait "${srv}" 2>/dev/null || true # absorb bash's async "Killed" notice
     rm -rf "${work}" "${srvlog}"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 # An isolated HOME keeps a stray ~/.httrack.ini out of the served settings.
 sport=$("${python}" -c 'import socket

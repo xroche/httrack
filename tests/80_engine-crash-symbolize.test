@@ -17,7 +17,8 @@ command -v httrack >/dev/null || {
 }
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_symbolize.XXXXXX") || exit 1
-trap 'rm -rf "$tmpdir"' EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; rm -rf "$tmpdir"' EXIT
+trap 'rm -rf "$tmpdir"' HUP INT QUIT PIPE TERM
 out="${tmpdir}/trace"
 raw="${tmpdir}/trace-optout"
 overflow="this string is far too long for the buffer"

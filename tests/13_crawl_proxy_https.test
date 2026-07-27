@@ -31,7 +31,7 @@ cleanup() {
     done
     rm -rf "$tmpdir"
 }
-trap cleanup EXIT
+trap 'set +e; cleanup' EXIT
 
 # self-signed cert for the local TLS origin (httrack does not verify certs)
 openssl req -x509 -newkey rsa:2048 -keyout "$tmpdir/key.pem" \

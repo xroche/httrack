@@ -27,7 +27,8 @@ cleanup() {
     test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
     rm -f "${log}"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 freeport() {
     python3 -c 'import socket

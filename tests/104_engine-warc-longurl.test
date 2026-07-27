@@ -8,6 +8,6 @@ set -e
 : "${top_srcdir:=..}"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_longurl.XXXXXX")
-trap 'rm -rf "$tmp"' EXIT
+trap 'set +e; rm -rf "$tmp"' EXIT
 
 httrack -O "$tmp/out" "-#test=warc-longurl" "$tmp"

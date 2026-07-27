@@ -5,7 +5,7 @@
 set -euo pipefail
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # The first length-prefixed field declares far more than firstline[256] holds;
 # cache_brstr must clamp the copy to the destination, not the declared length.

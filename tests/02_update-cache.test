@@ -14,7 +14,7 @@ set -euo pipefail
 
 site=$(mktemp -d)
 out=$(mktemp -d)
-trap 'rm -rf "$site" "$out"' EXIT
+trap 'set +e; rm -rf "$site" "$out"' EXIT
 
 cat >"$site/index.html" <<EOF
 <a href="a.html">a</a> <a href="sub/b.html">b</a>

@@ -30,7 +30,7 @@ test -n "$httrack_bin" || {
 httrack_bin=$(cd "$(dirname "$httrack_bin")" && pwd)/$(basename "$httrack_bin")
 
 work=$(mktemp -d)
-trap 'kill -9 "${spid:-}" 2>/dev/null || true; rm -rf "$work"' EXIT
+trap 'set +e; kill -9 "${spid:-}" 2>/dev/null || true; rm -rf "$work"' EXIT
 
 mkdir -p "$work/root" "$work/proj"
 

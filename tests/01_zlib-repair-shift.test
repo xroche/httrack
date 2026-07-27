@@ -11,7 +11,7 @@
 set -eu
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 out=$(httrack -#test=zip-repair-shift "$dir")
 

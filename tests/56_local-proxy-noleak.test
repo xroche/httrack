@@ -29,9 +29,8 @@ serverpid=
 cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
-    return 0
 }
-trap cleanup EXIT
+trap 'set +e; cleanup' EXIT
 
 # decoy origin: it must stay silent. LOCAL_SERVER_VERBOSE logs any request it gets.
 LOCAL_SERVER_VERBOSE=1 "$python" "$server" --root "$root" --bind 127.0.0.1 \

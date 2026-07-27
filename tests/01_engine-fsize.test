@@ -6,7 +6,7 @@
 set -euo pipefail
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 rc=0
 out=$(httrack -#test=fsize "$dir") || rc=$?

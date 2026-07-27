@@ -9,7 +9,7 @@ set -euo pipefail
 
 httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
 scratch=$(mktemp -d)
-trap 'rm -rf "$scratch"' EXIT
+trap 'set +e; rm -rf "$scratch"' EXIT
 cd "$scratch"
 
 # ~300 chars: over the old 236 ceiling, well under any POSIX PATH_MAX. The

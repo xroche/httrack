@@ -25,10 +25,11 @@ srv=
 cleanup() {
     test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 log=$(mktemp)
-trap 'cleanup; rm -f "${log}"' EXIT
+trap 'set +e; cleanup; rm -f "${log}"' EXIT
 
 # Ask htsserver for its rendered default base path, under the given $HOME
 # ("-" = leave $HOME unset).
