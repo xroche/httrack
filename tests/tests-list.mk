@@ -194,3 +194,4 @@ TESTS += 96_local-refetch-keep.test
 TESTS += 97_local-warc-update-keep.test
 TESTS += 98_local-warc-segments.test
 TESTS += 99_local-robots-error.test
+TESTS += 118_local-proxytrack-arcwrite.test
