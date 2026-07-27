@@ -1048,14 +1048,21 @@ void cache_init(cache_back * cache, httrackp * opt) {
                                                       StringBuff(opt->path_log),
                                                       "hts-cache/repair.tmp"),
              &repaired, &repairedBytes) == Z_OK) {
-          UNLINK(name);
-          RENAME(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                         StringBuff(opt->path_log), "hts-cache/repair.zip"),
-                 name);
-          cache->zipInput = hts_unzOpen_utf8(name);
-          hts_log_print(opt, LOG_WARNING,
-                        "Cache: %d bytes successfully recovered in %d entries",
-                        (int) repairedBytes, (int) repaired);
+          /* Announcing the recovery before checking the move left the entries
+             in repair.zip, a name nothing reads, and no cache at all (#786). */
+          if (hts_rename_over(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                      StringBuff(opt->path_log),
+                                      "hts-cache/repair.zip"),
+                              name)) {
+            cache->zipInput = hts_unzOpen_utf8(name);
+            hts_log_print(
+                opt, LOG_WARNING,
+                "Cache: %d bytes successfully recovered in %d entries",
+                (int) repairedBytes, (int) repaired);
+          } else {
+            hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                          "Cache: could not put the repaired cache in place");
+          }
         } else {
           hts_log_print(opt, LOG_WARNING, "Cache: could not repair the cache");
         }

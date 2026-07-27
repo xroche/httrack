@@ -19,14 +19,18 @@ SHIM_EXPORT int rename(const char *oldpath, const char *newpath);
 SHIM_EXPORT int rename(const char *oldpath, const char *newpath) {
   static int (*real_rename)(const char *, const char *) = NULL;
   const char *const mode = getenv("RENAMEFAIL_MODE");
+  const char *const base = strrchr(oldpath, '/');
   const int locked = mode != NULL && strcmp(mode, "locked") == 0;
+  /* =repair narrows the refusal to the cache-repair move (#786). */
+  const int repair = mode != NULL && strcmp(mode, "repair") == 0;
   struct stat st;
 
-  if (locked) {
+  if (locked || (repair && strcmp(base != NULL ? base + 1 : oldpath,
+                                  "repair.zip") == 0)) {
     errno = EACCES;
     return -1;
   }
-  if (stat(newpath, &st) == 0) {
+  if (!repair && stat(newpath, &st) == 0) {
     errno = EEXIST;
     return -1;
   }

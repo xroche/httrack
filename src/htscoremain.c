@@ -2191,16 +2191,25 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                        fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
                                "hts-cache/repair.tmp"), &repaired,
                        &repairedBytes) == Z_OK) {
-                    UNLINK(name);
-                    RENAME(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                   StringBuff(opt->path_log),
-                                   "hts-cache/repair.zip"),
-                           name);
+                    /* Announcing the recovery before checking the move left the
+                       entries in repair.zip, a name nothing reads (#786). */
+                    if (!hts_rename_over(fconcat(OPT_GET_BUFF(opt),
+                                                 OPT_GET_BUFF_SIZE(opt),
+                                                 StringBuff(opt->path_log),
+                                                 "hts-cache/repair.zip"),
+                                         name)) {
+                      fprintf(stderr,
+                              "Cache: could not put the repaired cache in "
+                              "place: %s\n",
+                              strerror(errno));
+                      return 1;
+                    }
                     fprintf(stderr,
                             "Cache: %d bytes successfully recovered in %d entries\n",
                             (int) repairedBytes, (int) repaired);
                   } else {
                     fprintf(stderr, "Cache: could not repair the cache\n");
+                    return 1;
                   }
                 }
                 return 0;
