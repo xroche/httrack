@@ -4,4 +4,5 @@
 set -euo pipefail
 
 # ftp_split_userpass bounds an over-long user:pass@ from a hostile ftp:// URL.
-httrack -O /dev/null -#test=ftp-userpass run | grep -q "ftp-userpass self-test OK"
+out=$(httrack -O /dev/null -#test=ftp-userpass run)
+grep -q "ftp-userpass self-test OK" <<<"$out"
