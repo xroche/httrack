@@ -424,6 +424,11 @@ htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
 
     if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
       r = itemback->r;
+      /* header fields only, like cache_readex(): the entry torn down below
+         owns these (#826) */
+      r.adr = NULL;
+      r.headers = NULL;
+      r.location = NULL;
       if (return_save != NULL)
         strlcpybuff(return_save, itemback->url_sav, HTS_URLMAXSIZE * 2);
       /* cleanup */

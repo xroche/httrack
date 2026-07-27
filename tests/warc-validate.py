@@ -11,6 +11,10 @@
 #                             WARC-Payload-Digest matching sha1(body) when present
 #   --no-response-for SUB     the asset containing SUB must be a revisit: no
 #                             response may target it, and a revisit must
+#   --revisit-exchange        every server-not-modified revisit carries the 304
+#                             exchange it stands for: a 304 status line in its
+#                             block, and a concurrent request record holding the
+#                             conditional header that drew it
 #   --verbatim                compressed asset: --expect-body-hex instead keeps
 #                             Content-Encoding, checks the HTTP Content-Length is
 #                             the stored (compressed) length, asserts the stored
@@ -101,6 +105,7 @@ def check_body_verbatim(rec, http_hdr, body, sub, want, digests_emitted):
 def main():
     argv = sys.argv[1:]
     expect_revisit = "--expect-revisit" in argv
+    revisit_exchange = "--revisit-exchange" in argv
     verbatim = "--verbatim" in argv
     body_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-body-hex")]
     no_resp = opt_values(argv, "--no-response-for")
@@ -116,6 +121,8 @@ def main():
     total = revisits = responses = infos = 0
     body_hits = {sub: False for sub, _ in body_specs}
     revisit_hits = {sub: False for sub in no_resp}
+    requests = {}  # WARC-Concurrent-To -> request block
+    exchanges = []  # (shown uri, record id) of the server-not-modified revisits
     for rec in records(data):
         total += 1
         if not rec.startswith(b"WARC/1."):
@@ -176,6 +183,26 @@ def main():
             for sub in no_resp:
                 if sub.encode() in uri:
                     revisit_hits[sub] = True
+            if revisit_exchange and b"server-not-modified" in profile:
+                block = rec[hdr_end : hdr_end + block_len]
+                status = block.split(b"\r\n", 1)[0].split()
+                if len(status) < 2 or status[1] != b"304":
+                    sys.exit(
+                        "revisit for %s does not carry the 304 it stands for: %r"
+                        % (shown, block.split(b"\r\n", 1)[0])
+                    )
+                exchanges.append((shown, field(header, b"WARC-Record-ID")))
+        elif wtype == b"request":
+            conc = field(header, b"WARC-Concurrent-To")
+            if conc is not None:
+                requests[conc] = rec[hdr_end : hdr_end + block_len].lower()
+
+    for shown, rec_id in exchanges:
+        req = requests.get(rec_id)
+        if req is None:
+            sys.exit("revisit for %s has no request record" % shown)
+        if b"if-modified-since:" not in req and b"if-none-match:" not in req:
+            sys.exit("request record for %s carries no conditional header" % shown)
 
     if total < 1:
         sys.exit("no records found")

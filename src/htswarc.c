@@ -1360,6 +1360,17 @@ void warc_free_request(htsblk *r) {
   }
 }
 
+void warc_move_request(htsblk *src, htsblk *dst) {
+  if (src == NULL || dst == NULL || src == dst)
+    return;
+  freet(dst->warc_reqhdr);
+  freet(dst->warc_resphdr);
+  dst->warc_reqhdr = src->warc_reqhdr;
+  dst->warc_resphdr = src->warc_resphdr;
+  src->warc_reqhdr = NULL;
+  src->warc_resphdr = NULL;
+}
+
 void warc_adopt_rawspool(htsblk *r, const char *tmpfile_path) {
   if (r != NULL) {
     LLint rawsize;
@@ -1672,8 +1683,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *ip, const char *req_hdr,
                            const char *resp_hdr, const char *body,
                            size_t body_len, const char *body_path,
-                           int statuscode, int is_update_unchanged,
-                           int truncated) {
+                           const char *content_type, int statuscode,
+                           int is_update_unchanged, int truncated) {
   wbuf http;
   char resp_id[64];
   char pdig[33];
@@ -1696,6 +1707,9 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
    */
   snprintf(statusbuf, sizeof(statusbuf), "%d", statuscode);
   http_header_value(resp_hdr, "Content-Type", mimebuf, sizeof(mimebuf));
+  /* a 304 declares no type, so index the one only the caller knows */
+  if (mimebuf[0] == '\0' && content_type != NULL)
+    strlncatbuff(mimebuf, content_type, sizeof(mimebuf), sizeof(mimebuf) - 1);
 
   /* A payload exists (for digesting) unless this is a bodyless 304. */
   has_payload = (body_len > 0 && (body != NULL || body_path != NULL) &&
@@ -1899,6 +1913,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   }
 
   warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr, body,
-                         body_len, body_path, back->r.statuscode, is_unchanged,
+                         body_len, body_path, back->r.contenttype,
+                         back->r.statuscode, is_unchanged,
                          back->r.warc_truncated);
 }

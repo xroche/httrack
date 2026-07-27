@@ -227,6 +227,7 @@ TESTS = \
 	103_teardown-status.test \
 	104_engine-warc-longurl.test \
 	105_suite-timeout.test \
-	114_local-update-304-leak.test
+	114_local-update-304-leak.test \
+	122_local-warc-revisit-headers.test
 
 CLEANFILES = check-network_sh.cache
