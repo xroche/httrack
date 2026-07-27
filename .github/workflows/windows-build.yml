@@ -269,15 +269,13 @@ jobs:
           # badmtime needs a filesystem that stores an mtime past gmtime's range;
           # single-file ends on a GUI half needing htsserver, which this job does not build;
           # update-304-leak needs a LeakSanitizer build, which MSVC has no equivalent of;
-          # crash-symbolize needs backtrace(), which Windows has no equivalent of;
-          # longpath-posix: TODO(#852), the last path segment isn't capped on Windows.
+          # crash-symbolize needs backtrace(), which Windows has no equivalent of.
           expected_skips="01_engine-footer-overflow.test
           100_local-purge-longpath.test
           114_local-update-304-leak.test
           120_local-proxytrack-webdav-default.test
           48_local-crange-memresume.test
           71_local-crange-repaircache.test
-          75_engine-longpath-posix.test
           79_local-proxytrack-webdav-mime.test
           80_engine-crash-symbolize.test
           88_local-proxytrack-badmtime.test
