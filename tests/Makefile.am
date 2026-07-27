@@ -76,6 +76,7 @@ TESTS = \
 	01_engine-escape-room.test \
 	01_engine-inplace-escape.test \
 	01_engine-lastchar.test \
+	01_engine-logcallback.test \
 	01_engine-makeindex.test \
 	01_engine-mime.test \
 	01_engine-parse.test \
