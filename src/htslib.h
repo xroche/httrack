@@ -265,6 +265,8 @@ void hts_now_iso8601(char out[32]);
 struct tm *convert_time_rfc822(struct tm *buffer, const char *s);
 int set_filetime(const char *file, struct tm *tm_time);
 int set_filetime_rfc822(const char *file, const char *date);
+/* File mtime as a UTC time_t, or (time_t) -1 if it can not be read. */
+time_t get_filetime(const char *file);
 int get_filetime_rfc822(const char *file, char *date);
 HTS_INLINE void time_rfc822(char *s, struct tm *A);
 HTS_INLINE void time_rfc822_local(char *s, struct tm *A);

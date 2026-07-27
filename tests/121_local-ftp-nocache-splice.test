@@ -1,0 +1,160 @@
+#!/bin/bash
+#
+# With no cache entry an FTP transfer resumed on the strength of the local
+# file's mere existence, so a changed remote got its tail spliced onto the old
+# head (#823). Resuming now needs SIZE and MDTM to agree that the remote can
+# still extend the local copy; pass 2 proves a genuine partial still resumes.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+server=$(nativepath "${testdir}/ftp-server.py")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+root="${tmpdir}/root"
+out="${tmpdir}/crawl"
+mode="${tmpdir}/mode"
+cmds="${tmpdir}/cmds"
+mkdir -p "$root" "$out"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+ok() { echo "OK: $*"; }
+size_of() { wc -c <"$1" | tr -d '[:space:]'; }
+# hts-log.txt is rewritten per pass, so this only ever sees the pass just run.
+no_errors() {
+    local errors
+    errors=$(grep -a 'Error:' "${out}/hts-log.txt" || true)
+    test -z "$errors" || fail "$1 reported errors: ${errors}"
+}
+# Commands the server saw since the last pass; each pass starts by emptying it.
+sent() { cat "$cmds"; }
+
+# Generations differ in their first bytes, so a splice shows wherever it lands;
+# the mtime is explicit because the fix decides on it, and a race would not do.
+write_body() {
+    "$python" -c 'import os, sys
+path, tag, fill, stamp = sys.argv[1:5]
+with open(path, "wb") as fp:
+    fp.write(("%s-BODY " % tag).encode() + tag[:1].encode() * int(fill))
+os.utime(path, (int(stamp), int(stamp)))' "${root}/a.bin" "$1" "$2" "$3"
+}
+old_stamp=1767225600 # 2026-01-01Z
+new_stamp=1769904000 # 2026-02-01Z
+
+write_body OLD 8000 "$old_stamp"
+echo '/a.bin truncate' >"$mode"
+
+serverlog="${tmpdir}/server.out"
+"$python" "$server" --root "$(nativepath "$root")" \
+    --mode-file "$(nativepath "$mode")" --log "$(nativepath "$cmds")" \
+    >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 300); do
+    line=$(grep -m1 '^PORT ' "$serverlog" 2>/dev/null) && port="${line#PORT }" && break
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "ftp server exited early: $(cat "$serverlog")" >&2
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover ftp server port: $(cat "$serverlog")" >&2
+    exit 1
+}
+host="127.0.0.1_${port}"
+url="ftp://127.0.0.1:${port}/a.bin"
+mirror="${out}/${host}/a.bin"
+# --cache=0 is the whole point: no cache entry to tell a partial from a stale
+# copy. Bounded like every crawl pass, so a wedge fails instead of hanging.
+crawl() { run_with_timeout 300 httrack "$url" -O "$out" --quiet \
+    --disable-security-limits --robots=0 --timeout=20 --max-time=120 --retries=1 \
+    --cache=0; }
+
+# --- pass 1: the transfer dies mid-body and leaves a partial -----------------
+crawl >"${tmpdir}/log1" 2>&1 || true
+test -f "$mirror" || fail "pass 1 mirrored nothing to resume"
+partial=$(size_of "$mirror")
+whole=$(size_of "${root}/a.bin")
+if test "$partial" -le 0 || test "$partial" -ge "$whole"; then
+    fail "pass 1 left ${partial} bytes, wanted a partial of ${whole}"
+fi
+ok "pass 1 left a ${partial}-byte partial copy"
+
+# --- pass 2: an untouched remote is still resumed ----------------------------
+: >"$mode"
+: >"$cmds"
+crawl >"${tmpdir}/log2" 2>&1
+case "$(sent)" in
+*"REST ${partial}"*) ok "pass 2 resumed at the partial's ${partial} bytes" ;;
+*) fail "pass 2 sent no REST ${partial}; commands were: $(sent)" ;;
+esac
+cmp -s "$mirror" "${root}/a.bin" ||
+    fail "the resumed copy is $(size_of "$mirror") bytes, served $(size_of "${root}/a.bin")"
+no_errors "pass 2"
+ok "the resumed transfer produced the served body and no error"
+
+# --- pass 3: a longer, newer remote over that complete copy ------------------
+write_body NEW 12000 "$new_stamp"
+: >"$cmds"
+crawl >"${tmpdir}/log3" 2>&1
+case "$(sent)" in
+*REST*) fail "resumed over a remote that had changed: $(sent)" ;;
+*RETR*) ok "the changed remote was re-fetched whole" ;;
+*) fail "pass 3 never reached RETR; commands were: $(sent)" ;;
+esac
+cmp -s "$mirror" "${root}/a.bin" ||
+    fail "the mirror is $(size_of "$mirror") bytes, served $(size_of "${root}/a.bin")"
+no_errors "pass 3"
+ok "the mirror holds the new body, not a splice of both"
+
+# --- pass 4: a remote that changed without changing length or mtime ----------
+# MDTM cannot see this one: only the size test refuses it.
+write_body ALT 12000 "$new_stamp"
+: >"$cmds"
+crawl >"${tmpdir}/log4" 2>&1
+case "$(sent)" in
+*REST*) fail "resumed over a copy the remote can no longer extend: $(sent)" ;;
+*RETR*) ok "the same-length remote was re-fetched whole" ;;
+*) fail "pass 4 never reached RETR; commands were: $(sent)" ;;
+esac
+cmp -s "$mirror" "${root}/a.bin" ||
+    fail "the mirror is $(size_of "$mirror") bytes, served $(size_of "${root}/a.bin")"
+no_errors "pass 4"
+ok "the same-length change replaced the mirror"
+
+# --- pass 5: a server with no MDTM cannot prove anything, so no resume -------
+"$python" -c 'import os, sys; os.truncate(sys.argv[1], 4000)' "$mirror"
+write_body NEW 12000 "$new_stamp"
+echo '/a.bin nomdtm' >"$mode"
+: >"$cmds"
+crawl >"${tmpdir}/log5" 2>&1
+case "$(sent)" in
+*REST*) fail "resumed against a server that answers no MDTM: $(sent)" ;;
+*RETR*) ok "no MDTM, no resume" ;;
+*) fail "pass 5 never reached RETR; commands were: $(sent)" ;;
+esac
+cmp -s "$mirror" "${root}/a.bin" ||
+    fail "the mirror is $(size_of "$mirror") bytes, served $(size_of "${root}/a.bin")"
+no_errors "pass 5"
+ok "the unprovable resume was re-fetched whole"
