@@ -425,10 +425,11 @@ int main(int argc, char **argv) {
       fail(io_error);
     if (feof(stdin))
       fail(invalid_input);
-    input_length = strlen(input) - 1;
-    if (input[input_length] != '\n')
+    /* a leading NUL byte leaves strlen() at 0, so trim before subtracting */
+    input_length = strlen(input);
+    if (input_length == 0 || input[input_length - 1] != '\n')
       fail(too_big);
-    input[input_length] = 0;
+    input[--input_length] = 0;
 
     for(p = input; *p != 0; ++p) {
       pp = strchr(print_ascii, *p);
