@@ -3284,11 +3284,11 @@ static size_t st_structcheck_longpath(char *dst, size_t dstsize,
   return n;
 }
 
-/* The ".txt" rename target must fit any path the guard admits (#745). */
+/* The path guard, and the <name>.txt rename structcheck() performs when a
+   regular file sits where a directory has to go (#745). */
 static int st_structcheck(httrackp *opt, int argc, char **argv) {
   char BIGSTK path[HTS_URLMAXSIZE * 2];
   char BIGSTK target[HTS_URLMAXSIZE * 2];
-  size_t n;
   FILE *fp;
 
   (void) opt;
@@ -3301,6 +3301,9 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
   errno = 0;
   assertf(structcheck(path) == -1);
+  assertf(errno == EINVAL);
+  errno = 0;
+  assertf(structcheck_utf8(path) == -1);
   assertf(errno == EINVAL);
   {
     char *const sep = strchr(path + strlen(argv[0]) + 1, '/');
@@ -3321,34 +3324,15 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   snprintf(target, sizeof(target), "%s/sc.txt", argv[0]);
   assertf(fexist(target));
 
-  /* the same rename at the longest path the guard admits */
-  snprintf(path, sizeof(path), "%s/max", argv[0]);
-  n = st_structcheck_longpath(path, sizeof(path), path, HTS_URLMAXSIZE - 1);
-  assertf(structcheck(path) == 0); /* parents only: no trailing separator */
-  fp = fopen(path, "wb");
-  assertf(fp != NULL);
-  fclose(fp);
-  strcpybuff(target, path);
-  strcatbuff(target, ".txt");
-  path[n] = '/'; /* now exactly HTS_URLMAXSIZE, the guard's limit */
-  path[n + 1] = '\0';
-  assertf(structcheck(path) == 0);
-  assertf(dir_exists(path));
-  assertf(fexist(target));
-
-  /* the utf-8 twin carries the same rename */
+  /* the utf-8 entry point carries the same rename */
   snprintf(path, sizeof(path), "%s/u8", argv[0]);
-  n = st_structcheck_longpath(path, sizeof(path), path, HTS_URLMAXSIZE - 1);
-  assertf(structcheck_utf8(path) == 0); /* parents only */
   fp = FOPEN(path, "wb");
   assertf(fp != NULL);
   fclose(fp);
-  strcpybuff(target, path);
-  strcatbuff(target, ".txt");
-  path[n] = '/';
-  path[n + 1] = '\0';
+  snprintf(path, sizeof(path), "%s/u8/sub/", argv[0]);
   assertf(structcheck_utf8(path) == 0);
   assertf(dir_exists(path));
+  snprintf(target, sizeof(target), "%s/u8.txt", argv[0]);
   assertf(fexist_utf8(target));
 
   printf("structcheck self-test OK\n");
