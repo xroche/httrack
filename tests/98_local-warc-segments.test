@@ -1,23 +1,24 @@
 #!/bin/bash
 #
 # The same keep/replace rule under --warc-max-size, where the archive is several
-# segments: a cache-served pass must leave every one of them alone, and a
-# cacheless pass must swap every one in. Half a swap is the corruption a single
-# rename loop can produce, and only a rotated archive can expose it (#759).
+# segments: a cache-served pass must leave every one alone, a cacheless pass must
+# swap every one in. Half a swap is the corruption one rename loop can produce,
+# and only a rotated archive exposes it (#759). --archive-min-files pins the two
+# segments plus the .cdx, so a shrinking crawl cannot quietly stop rotating.
 
 set -eu
 
 : "${top_srcdir:=..}"
 
-# The one Error: line is the keep notice; a second would mean the pass also failed.
+# The one Error: line is the keep notice; a second means the pass also failed.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 1 --archive-kept-on-rerun \
-    --rerun --log-found 'WARC: this pass revisited' \
+    --archive-min-files 3 --rerun --log-found 'WARC: this pass revisited' \
     --found 'mini304/index.html' --found 'mini304/page.html' \
     httrack 'BASEURL/mini304/index.html' --warc-file warc-out --warc-cdx \
-    --warc-max-size 2000
+    --warc-max-size 600
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --archive-replaced-on-rerun \
-    --rerun-args '-C0' \
+    --archive-min-files 3 --rerun-args '-C0' \
     --found 'mini304/index.html' --found 'mini304/page.html' \
     httrack 'BASEURL/mini304/index.html' --warc-file warc-out --warc-cdx \
-    --warc-max-size 2000
+    --warc-max-size 600

@@ -37,7 +37,9 @@
 # --archive-kept-on-rerun: the second pass must leave the first pass's
 # .warc[.gz]/.cdx/.wacz byte-identical, having no bodies to replace them (#759).
 # --archive-replaced-on-rerun is its mirror: every one of them must have been
-# rewritten. Both also require no *.tmp left behind.
+# rewritten. Both also require no *.tmp left behind, and take an optional
+# --archive-min-files N guarding against a scenario that silently stopped
+# producing the segments it means to check.
 
 set -u
 
@@ -60,6 +62,7 @@ rerun_args=
 rerun_dead=
 archive_kept=
 archive_replaced=
+archive_min_files=0
 tmpdir=
 serverpid=
 crawlpid=
@@ -127,6 +130,10 @@ while test "$pos" -lt "$nargs"; do
     # the second pass must leave the first pass's archive files untouched
     --archive-kept-on-rerun) archive_kept=1 ;;
     --archive-replaced-on-rerun) archive_replaced=1 ;; # ...or rewrite all of them
+    --archive-min-files)
+        pos=$((pos + 1))
+        archive_min_files="${args[$pos]}"
+        ;;
     # validate the produced .warc.gz (see the validation block near the end)
     --warc-validate) warc_validate=1 ;;
     # validate the produced .wacz package (stdlib, plus py-wacz/pywb if present)
@@ -295,6 +302,8 @@ if test -n "${archive_kept}${archive_replaced}"; then
         2>/dev/null | sort)
     test "${#kept_files[@]}" -gt 0 ||
         die "the first pass produced no archive to compare against"
+    test "${#kept_files[@]}" -ge "$archive_min_files" ||
+        die "only ${#kept_files[@]} archive file(s), wanted $archive_min_files: ${kept_files[*]}"
 fi
 
 # Poison the first-pass .wacz when a second pass follows: repackaging moves the
