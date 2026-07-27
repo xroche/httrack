@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# The end-of-mirror purge read old.lst with linput(fp, line, 1000), which caps a
+# chunk at 999 bytes. filenote() writes "[<save path>]", so a 998-byte save path
+# makes a 1000-byte line that comes back as 999 bytes plus a one-byte "]" tail.
+# For that tail `line + 1` is empty, and with no -O so is path_html, so the purge
+# indexed file[-1] (#770). Needs no -O, hence not local-crawl.sh.
+#
+# The OOB write lands in stack padding, so only the sanitized CI leg fails on
+# unfixed code; the length assertion below is what keeps this from passing
+# vacuously if the save path ever stops landing on the chunk boundary.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# Resolve httrack now: the harness prepends a RELATIVE dir to PATH, so the cd
+# below would otherwise silently fall through to an installed copy.
+httrack_bin=$(command -v httrack)
+test -n "$httrack_bin" || {
+    echo "httrack not on PATH" >&2
+    exit 1
+}
+httrack_bin=$(cd "$(dirname "$httrack_bin")" && pwd)/$(basename "$httrack_bin")
+
+work=$(mktemp -d)
+trap 'kill -9 "${spid:-}" 2>/dev/null || true; rm -rf "$work"' EXIT
+
+mkdir -p "$work/root" "$work/proj"
+
+python3 "$top_srcdir/tests/local-server.py" --root "$work/root" \
+    >"$work/server.out" 2>"$work/server.err" &
+spid=$!
+
+port=
+for _ in $(seq 1 100); do
+    port=$(sed -n 's/^PORT \([0-9]*\)$/\1/p' "$work/server.out" 2>/dev/null || true)
+    test -n "$port" && break
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "local-server.py did not announce a port" >&2
+    exit 1
+}
+
+# Save path is "127.0.0.1_<port>/" + the URL path; target 998 bytes total.
+prefix="127.0.0.1_${port}/"
+need=$((998 - ${#prefix}))
+
+urlpath=""
+while test $((need - ${#urlpath})) -gt 60; do
+    urlpath="${urlpath}$(printf 'd%02d' ${#urlpath})$(printf 'a%.0s' $(seq 1 46))/"
+done
+urlpath="${urlpath}$(printf 'f%.0s' $(seq 1 $((need - ${#urlpath} - 5)))).html"
+test ${#urlpath} -eq "$need"
+
+mkdir -p "$work/root/$(dirname "$urlpath")"
+printf '<html><body>leaf</body></html>\n' >"$work/root/$urlpath"
+printf '<html><body><a href="/%s">x</a></body></html>\n' "$urlpath" \
+    >"$work/root/index.html"
+
+cd "$work/proj" # no -O: opt->path_html stays empty
+
+"$httrack_bin" "http://127.0.0.1:$port/" -q -%v0 -s0 -r3 >"$work/crawl1.log" 2>&1 || true
+
+lst=$work/proj/hts-cache/new.lst
+test -f "$lst" || {
+    echo "pass 1 produced no new.lst" >&2
+    exit 1
+}
+# Arms the test: without a line of exactly 1000 bytes linput() never splits and
+# the purge never sees a one-byte tail.
+awk 'length == 1000 { found = 1 } END { exit !found }' "$lst" || {
+    echo "no 1000-byte line in new.lst; the chunk split is not exercised" >&2
+    awk '{ print length }' "$lst" | sort -n | tail -3 >&2
+    echo "--- urlpath len ${#urlpath}, prefix $prefix" >&2
+    tail -20 "$work/crawl1.log" >&2
+    exit 1
+}
+
+# Pass 2 renames new.lst to old.lst and runs it through the purge loop.
+"$httrack_bin" "http://127.0.0.1:$port/" -q -%v0 -s0 -r3 >"$work/crawl2.log" 2>&1
+
+test -s "$work/proj/$prefix$urlpath" || {
+    echo "the mirrored leaf did not survive the purge" >&2
+    exit 1
+}

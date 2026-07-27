@@ -41,9 +41,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsnet.h"
 #include "htslib.h"
 #include "htscharset.h"
-#define HTS_INTERNAL_BYTECODE
-#include "htstools.h"
-#undef HTS_INTERNAL_BYTECODE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

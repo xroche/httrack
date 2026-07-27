@@ -2190,8 +2190,8 @@ int httpmirror(char *url1, httrackp * opt) {
                   continue;
                 strcpybuff(file, StringBuff(opt->path_html));
                 strcatbuff(file, line + 1);
-                /* drop filenote()'s wrapping ']'; a linput() chunk split leaves
-                   a tail with none, which used to underflow file when 1 byte */
+                /* strip filenote()'s ']', absent when linput() truncated the
+                   line */
                 hts_striplastchar(file, ']');
                 hts_changes_previous(opt, file + StringLength(opt->path_html));
                 if (!strstr(adr, line)) { // not found in the new list?

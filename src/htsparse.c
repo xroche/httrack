@@ -2006,7 +2006,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               if (eadr - html - 1 < HTS_URLMAXSIZE) {        // pas trop long?
                 strncpy(lien, html, eadr - html - 1);
                 lien[eadr - html - 1] = '\0';
-                // strip trailing spaces
                 while (hts_striplastchar(lien, ' ')) {
                 }
 

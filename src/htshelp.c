@@ -42,7 +42,6 @@ Please visit our Website: http://www.httrack.com
 #include "htscatchurl.h"
 #include "htslib.h"
 #include "htsalias.h"
-#include "htstools.h"
 #include "htsmodules.h"
 #ifdef _WIN32
 #else
