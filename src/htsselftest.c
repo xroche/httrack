@@ -4944,6 +4944,74 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* A URL longer than the old 1024-byte header-format buffer must still reach the
+   archive: the record used to be abandoned whole, silently (#785). */
+static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
+  static const char resp_hdr[] =
+      "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n";
+  static const char body[] = "<html><body>long</body></html>\n";
+  char path[HTS_URLMAXSIZE * 2];
+  char *uri;
+  warc_writer *w;
+  FILE *fp;
+  char *blob;
+  LLint fsz;
+  size_t urilen = 4000, n;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-longurl: need a writable directory\n");
+    return 1;
+  }
+  snprintf(path, sizeof(path), "%s/longurl.warc", argv[0]);
+
+  uri = malloct(urilen + 1);
+  if (uri == NULL)
+    return 1;
+  memcpy(uri, "http://example.com/", 19);
+  memset(uri + 19, 'a', urilen - 19);
+  uri[urilen] = '\0';
+
+  w = warc_open(opt, path);
+  if (w == NULL) {
+    fprintf(stderr, "warc-longurl: could not create %s\n", path);
+    freet(uri);
+    return 1;
+  }
+  if (warc_write_transaction(w, uri, NULL, NULL, resp_hdr, body,
+                             sizeof(body) - 1, NULL, 200, 0, 0) != 0) {
+    fprintf(stderr, "warc-longurl: warc_write_transaction failed\n");
+    err = 1;
+  }
+  warc_close(w);
+
+  fsz = fsize_utf8(path);
+  blob = (fsz > 0) ? malloct((size_t) fsz + 1) : NULL;
+  if (blob == NULL) {
+    fprintf(stderr, "warc-longurl: no archive written\n");
+    freet(uri);
+    return 1;
+  }
+  fp = FOPEN(path, "rb");
+  n = (fp != NULL) ? fread(blob, 1, (size_t) fsz, fp) : 0;
+  if (fp != NULL)
+    fclose(fp);
+  blob[n] = '\0';
+
+  if (strstr(blob, "WARC-Type: response") == NULL) {
+    fprintf(stderr, "warc-longurl: the response record was dropped\n");
+    err = 1;
+  } else if (strstr(blob, uri) == NULL) {
+    fprintf(stderr, "warc-longurl: WARC-Target-URI truncated or missing\n");
+    err = 1;
+  }
+
+  freet(blob);
+  freet(uri);
+  printf("warc-longurl: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* End-to-end CDXJ: crawl a handful of records with --warc-cdx, then verify the
    .cdx is sorted, has exactly one line per response/revisit/resource (none for
    warcinfo/request), and each offset/length points at a gzip member that
@@ -6596,6 +6664,9 @@ static const struct selftest_entry {
      st_warc_verbatim},
     {"warc-surt", "", "SURT canonicalization of the CDXJ sort key",
      st_warc_surt},
+    {"warc-longurl", "<dir>",
+     "a URL past the header-format buffer still reaches the archive",
+     st_warc_longurl},
     {"longpath", "<dir>",
      "round-trip a >MAX_PATH file through the _w* wrappers (\\\\?\\ on "
      "Windows)",
