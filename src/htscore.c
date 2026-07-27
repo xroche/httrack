@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 
 /* File defs */
 #include "htscore.h"
+#include "htssitemap.h"
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htssinglefile.h"
@@ -949,6 +950,22 @@ int httpmirror(char *url1, httrackp * opt) {
     heap_top()->premier = heap_top_index();        // premier lien, objet-père=objet              
     heap_top()->precedent = heap_top_index();      // lien précédent
 
+    /* --sitemap: queue the sitemap probe just after the seeds, so its URLs are
+       injected before the crawl gets far. */
+    hts_sitemap_free(opt); /* an earlier mirror may have left a doc list */
+    if (opt->sitemap || StringNotEmpty(opt->sitemap_url)) {
+      char BIGSTK first[HTS_URLMAXSIZE * 2];
+      const char *const eol = strchr(primary, '\n');
+      const size_t len = eol != NULL ? (size_t) (eol - primary) : 0;
+
+      first[0] = '\0';
+      if (len > 0 && len < sizeof(first)) {
+        memcpy(first, primary, len);
+        first[len] = '\0';
+      }
+      hts_sitemap_seed(opt, first);
+    }
+
     // Initialiser cache
     {
       opt->state._hts_in_html_parsing = 4;
@@ -1593,11 +1610,21 @@ int httpmirror(char *url1, httrackp * opt) {
         stre.maketrack_fp = maketrack_fp;
 
         /* Parse */
-        if (hts_mirror_check_moved(&str, &stre) != 0) {
-          XH_uninit;
-          return -1;
-        }
+        {
+          const int nlinks = opt->lien_tot;
 
+          if (hts_mirror_check_moved(&str, &stre) != 0) {
+            XH_uninit;
+            return -1;
+          }
+          /* A redirect re-queues the target as a fresh link; without carrying
+             the marking over, a moved sitemap is fetched and then ignored. */
+          if (opt->sitemap_state != NULL && opt->lien_tot > nlinks &&
+              hts_sitemap_pending(opt, urladr(), urlfil())) {
+            hts_sitemap_redirect(opt, urladr(), urlfil(), heap_top()->adr,
+                                 heap_top()->fil);
+          }
+        }
       }
 
     }                           // if !error
@@ -1614,6 +1641,29 @@ int httpmirror(char *url1, httrackp * opt) {
 
       /* Load file and decode if necessary, after redirect check. */
       LOAD_IN_MEMORY_IF_NECESSARY();
+
+      /* Sitemap document: turn its <loc> URLs into top-level seeds. They go
+         through htsAddLink, so the wizard's filters and scope rules decide, and
+         this link's max depth leaves them the full budget. */
+      if (opt->sitemap_state != NULL &&
+          hts_sitemap_pending(opt, urladr(), urlfil())) {
+        htsmoduleStruct BIGSTK smstr;
+        int smptr = ptr;
+
+        memset(&smstr, 0, sizeof(smstr));
+        smstr.opt = opt;
+        smstr.sback = sback;
+        smstr.cache = &cache;
+        smstr.hashptr = hashptr;
+        smstr.numero_passe = numero_passe;
+        smstr.ptr_ = &smptr; /* scratch: the ingester retargets the wizard */
+        smstr.addLink = htsAddLink;
+        smstr.url_host = urladr();
+        smstr.url_file = urlfil();
+        smstr.mime = r.contenttype;
+        hts_sitemap_ingest(opt, &smstr, urladr(), urlfil(), r.adr,
+                           r.adr != NULL && r.size > 0 ? (size_t) r.size : 0);
+      }
 
       // ------------------------------------------------------
       // ok, fichier chargé localement
@@ -1825,6 +1875,9 @@ int httpmirror(char *url1, httrackp * opt) {
 
         if (strnotempty(savename()) == 0) {       // pas de chemin de sauvegarde
           if (strcmp(urlfil(), "/robots.txt") == 0) {     // robots.txt
+            char BIGSTK sitemaps[8192];
+
+            sitemaps[0] = '\0';
             if (r.adr) {
               char BIGSTK infobuff[8192];
 #ifdef IGNORE_RESTRICTIVE_ROBOTS
@@ -1836,7 +1889,8 @@ int httpmirror(char *url1, httrackp * opt) {
 #endif
 
               robots_parse(&robots, urladr(), r.adr, r.size, infobuff,
-                           sizeof(infobuff), keep_root);
+                           sizeof(infobuff), keep_root, sitemaps,
+                           sizeof(sitemaps));
               if (strnotempty(infobuff)) {
                 hts_log_print(opt, LOG_INFO,
                               "Note: robots.txt forbidden links for %s are: %s",
@@ -1846,6 +1900,10 @@ int httpmirror(char *url1, httrackp * opt) {
                               urladr(), infobuff);
               }
             }
+            /* After robots_parse, so the rules this very body carries already
+               gate the sitemap fetch. Runs even on a failed probe, which is
+               what falls back to the well-known location. */
+            hts_sitemap_robots(opt, urladr(), sitemaps);
           }
         } else if (r.is_write) {        // déja sauvé sur disque
           /*
@@ -2286,6 +2344,7 @@ int httpmirror(char *url1, httrackp * opt) {
   usercommand(opt, 0, NULL, NULL, NULL, NULL);
   warc_close_opt(opt);
   hts_changes_close_opt(opt);
+  hts_sitemap_free(opt);
 
   // désallocation mémoire & buffers
   XH_uninit;
@@ -3684,6 +3743,10 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   to->single_file = from->single_file;
   if (from->single_file_max_size > 0)
     to->single_file_max_size = from->single_file_max_size;
+  if (from->sitemap)
+    to->sitemap = from->sitemap;
+  if (StringNotEmpty(from->sitemap_url))
+    StringCopyS(to->sitemap_url, from->sitemap_url);
 
   if (from->pause_max_ms > 0) {
     to->pause_min_ms = from->pause_min_ms;

@@ -1,0 +1,10 @@
+#!/bin/bash
+#
+# Sitemap parser self-test: <loc> extraction, entity decoding, URL and length
+# rejections, the URL cap, gzip framing and robots.txt Sitemap: records.
+
+set -euo pipefail
+
+out=$(httrack -O /dev/null '-#test=sitemap')
+echo "$out"
+test "$out" = "sitemap self-test OK"

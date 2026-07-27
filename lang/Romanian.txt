@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Cea mai mare resursa încorporata (octeti):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 O resursa mai mare decât aceasta dimensiune pastreaza o legatura obisnuita; lasati gol pentru valoarea implicita de 10485760 de octeti.
+Seed the crawl from the site's sitemap
+Porneste explorarea de la harta sitului
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Citeste harta sitului (liniile Sitemap: din robots.txt, apoi /sitemap.xml) si adauga fiecare URL listat ca adresa de pornire.
+Sitemap address:
+Adresa hartii sitului:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adresa unei harti a sitului care sa fie citita în loc de sondarea sitului; lasati gol pentru a sonda robots.txt, apoi /sitemap.xml.

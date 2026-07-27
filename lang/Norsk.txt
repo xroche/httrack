@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Største innebygde ressurs (byte):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 En ressurs over denne størrelsen beholder en vanlig lenke; la feltet stå tomt for standardverdien på 10485760 byte.
+Seed the crawl from the site's sitemap
+Start gjennomgangen fra nettstedets nettstedskart
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Les nettstedets nettstedskart (Sitemap:-linjer i robots.txt, deretter /sitemap.xml) og legg til hver oppført URL som startadresse.
+Sitemap address:
+Adresse til nettstedskart:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adressen til et nettstedskart som skal leses i stedet for å undersøke nettstedet; la feltet stå tomt for å undersøke robots.txt og deretter /sitemap.xml.

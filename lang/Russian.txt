@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Ќаибольший встраиваемый ресурс (байты):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 –есурс больше этого размера сохран€ет обычную ссылку; оставьте пустым дл€ значени€ по умолчанию 10485760 байт.
+Seed the crawl from the site's sitemap
+Ќачинать обход с карты сайта
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+ѕрочитать карту сайта (строки Sitemap: в robots.txt, затем /sitemap.xml) и добавить каждый указанный в ней URL как начальный адрес.
+Sitemap address:
+јдрес карты сайта:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+јдрес карты сайта, которую нужно прочитать вместо опроса сайта; оставьте пустым, чтобы проверить robots.txt, затем /sitemap.xml.

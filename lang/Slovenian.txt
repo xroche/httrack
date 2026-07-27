@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Najvecji vgrajeni vir (bajti):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Vir, vecji od te velikosti, ohrani obicajno povezavo; pustite prazno za privzetih 10485760 bajtov.
+Seed the crawl from the site's sitemap
+Zacni zajem z zemljevidom spletnega mesta
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Preberi zemljevid spletnega mesta (vrstice Sitemap: v robots.txt, nato /sitemap.xml) in dodaj vsak navedeni URL kot zacetni naslov.
+Sitemap address:
+Naslov zemljevida spletnega mesta:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Naslov zemljevida spletnega mesta, ki naj se prebere namesto preverjanja mesta; pustite prazno za preverjanje robots.txt in nato /sitemap.xml.

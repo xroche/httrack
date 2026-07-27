@@ -306,8 +306,8 @@ int main(int argc, char **argv) {
     fprintf(stderr, "* %s\n", hts_errmsg(opt));
   }
   global_opt = NULL;
+  htsthread_wait(); /* pending threads still read opt */
   hts_free_opt(opt);
-  htsthread_wait();             /* wait for pending threads */
   hts_uninit();
 
 #ifdef _WIN32

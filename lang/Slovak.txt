@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Najväè¹í vlo¾ený zdroj (bajty):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Zdroj väè¹í ne¾ táto veµkos» si ponechá be¾ný odkaz; ponechajte prázdne pre predvolených 10485760 bajtov.
+Seed the crawl from the site's sitemap
+Zaèa» prehliadanie z mapy stránok
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Naèíta» mapu stránok (riadky Sitemap: v súbore robots.txt, potom /sitemap.xml) a prida» ka¾dú uvedenú adresu URL ako poèiatoènú.
+Sitemap address:
+Adresa mapy stránok:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adresa mapy stránok, ktorá sa má naèíta» namiesto zis»ovania na stránke; ponechajte prázdne na zistenie z robots.txt a potom /sitemap.xml.

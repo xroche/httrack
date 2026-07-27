@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 // Fichier librairie .c
 
 #include "htscore.h"
+#include "htssitemap.h"
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htssinglefile.h"
@@ -6030,6 +6031,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   StringCopy(opt->strip_query, "");
   StringCopy(opt->cookies_file, "");
   StringCopy(opt->warc_file, "");
+  StringCopy(opt->sitemap_url, "");
   opt->warc_max_size = 0; /* no rotation unless --warc-max-size sets it */
   opt->changes = HTS_FALSE;
   opt->changes_state = NULL;
@@ -6187,6 +6189,8 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->cookies_file);
     StringFree(opt->why_url);
     StringFree(opt->warc_file);
+    StringFree(opt->sitemap_url);
+    hts_sitemap_free(opt); /* backstop: httpmirror's early-return paths */
 
     hts_changes_free_opt(opt);
 

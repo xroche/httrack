@@ -526,6 +526,11 @@ void help(const char *app, int more) {
     (" %L <file> add all URL located in this text file (one URL per line)");
   infomsg
     (" %S <file> add all scan rules located in this text file (one scan rule per line)");
+  infomsg(" %m  seed the crawl from the site's sitemap (robots.txt Sitemap:, "
+          "then /sitemap.xml); --sitemap-url URL names one explicitly. A "
+          "sitemap you name, or one the site declares, is fetched even under "
+          "robots.txt Disallow; only the guessed /sitemap.xml obeys it. The "
+          "URLs found still pass every filter and scope rule");
   infomsg("");
   infomsg("Build options:");
   infomsg("  NN structure type (0 *original structure, 1+: see below)");

@@ -163,7 +163,25 @@ the index" problems disappear.</p>
   <tr><td><tt>--near (-n)</tt></td><td>Also fetch non-HTML files "near" a followed link, such as an image linked from a page you kept but hosted elsewhere.</td></tr>
   <tr><td><tt>--ext-depth (-%e)</tt></td><td>How many levels of external links to follow once the crawl leaves your scope (default 0).</td></tr>
   <tr><td><tt>--test (-t)</tt></td><td>Also HEAD-test links that fall outside the scope, which are normally refused, without downloading them: a way to see what scope is excluding.</td></tr>
+  <tr><td><tt>--sitemap (-%m), --sitemap-url URL (-%mu)</tt></td><td>Also take start URLs from the site's sitemap, for pages nothing links to. Off by default.</td></tr>
 </table>
+
+<p>Link-following only finds what something links to. Anything a site publishes
+solely in its sitemap is invisible to HTTrack unless you ask for it.
+<tt>--sitemap</tt> reads the start host's <tt>robots.txt</tt> for
+<tt>Sitemap:</tt> lines and falls back to <tt>/sitemap.xml</tt>;
+<tt>--sitemap-url</tt> names one directly. Nested <tt>sitemapindex</tt> files
+and gzipped <tt>.xml.gz</tt> sitemaps are followed. The URLs found become start
+URLs with the full depth budget, but they still go through your filters and
+scope rules, so a sitemap cannot widen a crawl you deliberately narrowed. It is
+off by default because a sitemap can list thousands of pages nothing links
+to.</p>
+
+<p>One surprise worth knowing: a sitemap you name with <tt>--sitemap-url</tt>,
+and one the site itself declares in <tt>robots.txt</tt>, are fetched even when
+<tt>robots.txt</tt> disallows that path, because naming or declaring a sitemap
+is an invitation to read it. Only the guessed <tt>/sitemap.xml</tt> obeys a
+<tt>Disallow</tt>. The URLs listed inside are gated normally either way.</p>
 
 <p>The single most common surprise is "only the home page came down." That is
 usually not a scope option at all: it is an off-host redirect. A start URL of

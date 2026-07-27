@@ -44,8 +44,17 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
+/* Outstanding threads, counted at spawn rather than by the child at entry, so
+   that a caller which spawns and immediately waits still joins them (#747). */
 static int process_chain = 0;
 static htsmutex process_chain_mutex = HTSMUTEX_INIT;
+
+static void process_chain_add(int delta) {
+  hts_mutexlock(&process_chain_mutex);
+  process_chain += delta;
+  assertf(process_chain >= 0);
+  hts_mutexrelease(&process_chain_mutex);
+}
 
 HTSEXT_API void htsthread_wait(void) {
   htsthread_wait_n(0);
@@ -99,20 +108,12 @@ static void *hts_entry_point(void *tharg)
   void *const arg = s_args->arg;
   void (*fun) (void *arg) = s_args->fun;
 
-  free(tharg);
-
-  hts_mutexlock(&process_chain_mutex);
-  process_chain++;
-  assertf(process_chain > 0);
-  hts_mutexrelease(&process_chain_mutex);
+  freet(tharg);
 
   /* run */
   fun(arg);
 
-  hts_mutexlock(&process_chain_mutex);
-  process_chain--;
-  assertf(process_chain >= 0);
-  hts_mutexrelease(&process_chain_mutex);
+  process_chain_add(-1);
 #ifdef _WIN32
   return 0;
 #else
@@ -122,18 +123,20 @@ static void *hts_entry_point(void *tharg)
 
 /* create a thread */
 HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
-  hts_thread_s *s_args = malloc(sizeof(hts_thread_s));
+  hts_thread_s *s_args = malloct(sizeof(hts_thread_s));
 
   assertf(s_args != NULL);
   s_args->arg = arg;
   s_args->fun = fun;
+  process_chain_add(1);
 #ifdef _WIN32
   {
     unsigned int idt;
     HANDLE handle =
       (HANDLE) _beginthreadex(NULL, 0, hts_entry_point, s_args, 0, &idt);
     if (handle == 0) {
-      free(s_args);
+      process_chain_add(-1);
+      freet(s_args);
       return -1;
     } else {
       /* detach the thread from the main process so that is can be independent */
@@ -151,7 +154,8 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
         || pthread_attr_setstacksize(&attr, stackSize) != 0
         || (retcode =
             pthread_create(&handle, &attr, hts_entry_point, s_args)) != 0) {
-      free(s_args);
+      process_chain_add(-1);
+      freet(s_args);
       return -1;
     } else {
       /* detach the thread from the main process so that is can be independent */

@@ -978,3 +978,11 @@ Largest inlined asset (bytes):
 Μέγιστος ενσωματωμένος πόρος (byte):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Πόρος μεγαλύτερος από αυτό το μέγεθος διατηρεί κανονικό σύνδεσμο. Αφήστε το κενό για την προεπιλογή των 10485760 byte.
+Seed the crawl from the site's sitemap
+Έναρξη της ανίχνευσης από τον χάρτη του ιστότοπου
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Ανάγνωση του χάρτη του ιστότοπου (γραμμές Sitemap: στο robots.txt, έπειτα /sitemap.xml) και προσθήκη κάθε διεύθυνσης URL που περιέχει ως αρχικής διεύθυνσης.
+Sitemap address:
+Διεύθυνση χάρτη ιστότοπου:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Διεύθυνση χάρτη ιστότοπου προς ανάγνωση αντί για αναζήτηση στον ιστότοπο. Αφήστε το κενό για έλεγχο του robots.txt και έπειτα του /sitemap.xml.
