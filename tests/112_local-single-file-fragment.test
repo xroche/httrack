@@ -1,10 +1,8 @@
 #!/bin/bash
-# Issue #766: --single-file resolves a reference by cutting it at '#', then
-# substitutes the whole thing. The fragment has to come back: on an SVG it
-# selects what renders, so losing it draws the entire sprite sheet.
+# Issue #766: --single-file substituted the whole reference, dropping the '#'
+# fragment an SVG sprite selector needs to pick one icon out of the sheet.
 set -e
 
-: "${top_srcdir:=..}"
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
