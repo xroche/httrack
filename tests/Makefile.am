@@ -206,6 +206,7 @@ TESTS = \
 	96_local-refetch-keep.test \
 	97_local-warc-update-keep.test \
 	98_local-warc-segments.test \
+	99_local-robots-error.test \
 	99_suite-timeout.test \
 	101_local-update-stale-bak.test
 

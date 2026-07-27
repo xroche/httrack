@@ -555,10 +555,22 @@ class Handler(SimpleHTTPRequestHandler):
     # ... and one that points the sitemap at the site root, to check a subtree
     # crawl is not widened by where the site chooses to put its sitemap.
     SCOPE_SITEMAP_UA = "scopesitemap"
+    # ... and one whose probe fails, with a body past the 1070 bytes that
+    # issue #769's over-read needed.
+    ERROR_ROBOTS_UA = "errorrobots"
 
     def route_robots(self):
         # The Sitemap: record is group-independent; only --sitemap acts on it.
         ua = self.headers.get("User-Agent") or ""
+        if self.ERROR_ROBOTS_UA in ua:
+            body = b"# " + b"x" * 4000 + b"\n"
+            self.send_response(404, "Not Found")
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
+            return
         host = self.headers.get("Host")
         body = "User-agent: *\nDisallow:\n"
         if self.DENY_DECLARED_UA in ua:
