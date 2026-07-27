@@ -113,9 +113,28 @@ if grep -q 'No stack trace available on this OS' "$out"; then
     echo "suite timeout OK (no backtrace() on this platform)"
     exit 0
 fi
-# The engine's SIGABRT handler prints this to its own stderr; reaching our log
-# proves the signal, the handler and the crawl-log salvage all connected up.
-grep -q '^Caught signal ' "$out" || fail "no engine backtrace was salvaged"
-grep -qE 'httrack|libhttrack' "$out" || fail "the backtrace names no engine frame"
+
+# Each platform's mechanism has its own marker, and the marker is what proves the
+# whole chain connected up rather than the dump merely running.
+case "$(uname -s)" in
+Linux)
+    # sig_fatal writes to the engine's own stderr, so this reaching our log also
+    # proves the crawl-log salvage worked.
+    grep -q '^Caught signal ' "$out" || fail "no engine backtrace was salvaged"
+    ;;
+Darwin)
+    grep -q '^Call graph:' "$out" || fail "sample(1) produced no call graph"
+    ;;
+*)
+    grep -q 'no stack mechanism known' "$out" ||
+        fail "unknown platform reported neither a stack nor its absence"
+    echo "suite timeout OK (no stack mechanism on $(uname -s))"
+    exit 0
+    ;;
+esac
+# A stalled crawl is necessarily inside httpmirror, so these frames must appear.
+# Matching "httrack" alone would pass on the process list above.
+grep -qE '\b(back_wait|httpmirror|hts_main_internal)\b' "$out" ||
+    fail "the stack names no engine frame"
 
 echo "suite timeout OK (named the test, dumped a stack, exited 124)"

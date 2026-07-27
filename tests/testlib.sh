@@ -185,7 +185,10 @@ request_engine_backtraces() {
             ;;
         Darwin)
             if test -x /usr/bin/sample; then
-                /usr/bin/sample "$p" 2 -mayDie -file /dev/stdout 2>&1 ||
+                # Drop the trailing image map: ~40 lines of load addresses that
+                # say nothing about the hang.
+                /usr/bin/sample "$p" 2 -mayDie -file /dev/stdout 2>&1 |
+                    sed '/^Binary Images:/,$d' ||
                     printf 'pid %s: sample(1) failed\n' "$p"
             else
                 printf 'pid %s: no stack, /usr/bin/sample is absent\n' "$p"
