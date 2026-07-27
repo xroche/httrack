@@ -2635,6 +2635,8 @@ static void st_log_callback(httrackp *opt, int type, const char *format,
 /* The callback must not consume the va_list the log file's vfprintf() needs. */
 static int st_logcallback(httrackp *opt, int argc, char **argv) {
   static const char want[] = "42 sentinel";
+  static const char want_filtered[] = "7 filtered";
+  char BIGSTK seen[sizeof(st_log_callback_seen)];
   char BIGSTK line[256];
   FILE *fp;
   int rc = 1;
@@ -2649,23 +2651,34 @@ static int st_logcallback(httrackp *opt, int argc, char **argv) {
   }
   opt->log = fp;
   opt->debug = LOG_NOTICE;
+  st_log_callback_seen[0] = '\0';
   hts_set_log_vprint_callback(st_log_callback);
   hts_log_print(opt, LOG_NOTICE, "%d %s", 42, "sentinel");
   hts_set_log_vprint_callback(NULL);
   opt->log = NULL;
+  strcpybuff(seen, st_log_callback_seen);
 
   rewind(fp);
   line[0] = '\0';
   (void) fgets(line, (int) sizeof(line), fp);
   fclose(fp);
 
+  /* The callback runs above the level filter and without a log file at all;
+     the front-ends that install one usually have no opt->log open. */
+  st_log_callback_seen[0] = '\0';
+  hts_set_log_vprint_callback(st_log_callback);
+  hts_log_print(opt, LOG_DEBUG, "%d %s", 7, "filtered");
+  hts_set_log_vprint_callback(NULL);
+
   /* Same arguments both ways; the file line carries a level prefix. */
-  if (strcmp(st_log_callback_seen, want) != 0)
-    fprintf(stderr, "logcallback: callback got '%s' want '%s'\n",
-            st_log_callback_seen, want);
+  if (strcmp(seen, want) != 0)
+    fprintf(stderr, "logcallback: callback got '%s' want '%s'\n", seen, want);
   else if (strstr(line, want) == NULL)
     fprintf(stderr, "logcallback: log file got '%s' want it to carry '%s'\n",
             line, want);
+  else if (strcmp(st_log_callback_seen, want_filtered) != 0)
+    fprintf(stderr, "logcallback: unfiltered callback got '%s' want '%s'\n",
+            st_log_callback_seen, want_filtered);
   else
     rc = 0;
 
