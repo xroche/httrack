@@ -480,7 +480,10 @@ if test -n "$warc_validate"; then
     # body and keeps Content-Encoding, instead of expecting a decoded body.
     test -n "${WARC_VALIDATE_VERBATIM:-}" && bodyargs+=(--verbatim)
     info "validating fresh WARC (response bodies)"
-    "$python" "$validator" "$(nativepath "$fresh")" "${bodyargs[@]}" >&2 ||
+    # macOS bash 3.2 calls an empty array unbound under set -u, and a caller
+    # asking only for the revisit checks leaves this one empty.
+    "$python" "$validator" "$(nativepath "$fresh")" \
+        ${bodyargs[@]+"${bodyargs[@]}"} >&2 ||
         die "fresh WARC validation failed"
     result "OK"
 
