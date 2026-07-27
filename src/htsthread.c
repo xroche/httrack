@@ -148,20 +148,23 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
     const size_t stackSize = 1024 * 1024 * 8;
     pthread_attr_t attr;
     pthread_t handle = 0;
-    int retcode;
+    hts_boolean created;
 
-    if (pthread_attr_init(&attr) != 0
-        || pthread_attr_setstacksize(&attr, stackSize) != 0
-        || (retcode =
-            pthread_create(&handle, &attr, hts_entry_point, s_args)) != 0) {
+    /* init kept apart: destroying an uninitialised attr is undefined (#772) */
+    if (pthread_attr_init(&attr) == 0) {
+      created = pthread_attr_setstacksize(&attr, stackSize) == 0 &&
+                pthread_create(&handle, &attr, hts_entry_point, s_args) == 0;
+      pthread_attr_destroy(&attr); /* create() copied what it needed */
+    } else {
+      created = HTS_FALSE;
+    }
+    if (!created) {
       process_chain_add(-1);
       freet(s_args);
       return -1;
-    } else {
-      /* detach the thread from the main process so that is can be independent */
-      pthread_detach(handle);
-      pthread_attr_destroy(&attr);
     }
+    /* detach the thread from the main process so that it can be independent */
+    pthread_detach(handle);
   }
 #endif
   return 0;

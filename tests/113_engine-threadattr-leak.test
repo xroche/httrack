@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# Issue #772: hts_newthread() destroyed the pthread attributes object only when
+# the thread started, so a failed pthread_create() left it initialised forever.
+# glibc allocates nothing for a default attr, so no leak checker sees it: the
+# interposer counts the init/destroy imbalance instead.
+
+set -euo pipefail
+
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "threadattr: LD_PRELOAD interposition is Linux-only here, skipping"
+    exit 0
+fi
+# A --disable-shared build has nothing to preload; anything else missing is a
+# build problem, not a skip, or the leg would pass vacuously.
+if [ ! -r "${THREADATTRFAIL_LA:-}" ]; then
+    echo "threadattr: ${THREADATTRFAIL_LA:-\$THREADATTRFAIL_LA} was not built" >&2
+    exit 1
+fi
+if grep -q "^dlname=''" "$THREADATTRFAIL_LA"; then
+    echo "threadattr: static-only build, skipping"
+    exit 0
+fi
+if [ ! -r "${THREADATTRFAIL_LIB:-}" ]; then
+    echo "threadattr: ${THREADATTRFAIL_LIB:-\$THREADATTRFAIL_LIB} was not built" >&2
+    exit 1
+fi
+
+dir=$(mktemp -d)
+trap 'set +e; rm -rf "$dir"' EXIT
+trap 'rm -rf "$dir"' HUP INT QUIT PIPE TERM
+
+# An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
+# refuses by default. The shim allocates nothing, so the ordering is harmless.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
+# The self-test spawns threads and gives up on the first refusal; it is the
+# driver here, so its failure is expected and not the verdict.
+log="$dir/counts"
+THREADATTRFAIL=1 THREADATTRFAIL_LOG="$log" LD_PRELOAD="$THREADATTRFAIL_LIB" \
+    httrack -O "$dir/o" -#test=threadwait >"$dir/out" 2>&1 || true
+
+test -r "$log" || {
+    echo "threadattr: the interposer wrote no counts" >&2
+    cat "$dir/out" >&2
+    exit 1
+}
+sabotaged=$(sed -n 's/^sabotaged //p' "$log")
+undestroyed=$(sed -n 's/^undestroyed //p' "$log")
+
+# Teeth: with no refused create there is nothing to leak, and the check below
+# would pass on any build.
+test "${sabotaged:-0}" -ge 1 || {
+    echo "threadattr: no pthread_create() was refused, nothing was tested" >&2
+    cat "$dir/out" >&2
+    exit 1
+}
+test "${undestroyed:-1}" -eq 0 || {
+    echo "threadattr: $undestroyed of $sabotaged attributes objects survived a refused pthread_create()" >&2
+    exit 1
+}
+echo "OK: a refused pthread_create() destroys the attributes object ($sabotaged refused)"
