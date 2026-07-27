@@ -226,6 +226,7 @@ TESTS = \
 	102_local-ftp-refetch.test \
 	103_teardown-status.test \
 	104_engine-warc-longurl.test \
-	105_suite-timeout.test
+	105_suite-timeout.test \
+	119_local-proxytrack-ndx-fields2.test
 
 CLEANFILES = check-network_sh.cache
