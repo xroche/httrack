@@ -37,6 +37,7 @@ cat >"${doc}/index.html" <<'EOF'
 <img src="pixel.svg" data-src="lazy.svg" alt="l">
 <script src="app.js"></script>
 <a href="other.html">other</a>
+<p>id=pixel.svg#!htsinline end</p>
 </body></html>
 EOF
 cat >"${doc}/other.html" <<'EOF'
@@ -257,8 +258,35 @@ grep -q 'data:image/svg+xml;base64,' "$badpage" || {
     echo "FAIL: a rejected cap did not fall back to the default"
     exit 1
 }
-if grep -q 'src="big.svg"' "$badpage"; then
-    echo "FAIL: the default cap did not cover big.svg"
+echo OK
+
+printf '[a page cannot forge a mark] ..\t'
+# The page ships the literal mark against a real mirrored file. htsparse drops
+# the '!' from what it fetched, so the pass sees no mark and inlines nothing
+# into the prose. pixel.svg is inlined elsewhere on the page, so the encoder
+# was demonstrably willing to do it.
+forged=$(sed -n 's/.*<p>\(id=[^<]*\)<\/p>.*/\1/p' "$page")
+test "$forged" = "id=pixel.svg#htsinline end" || {
+    echo "FAIL: expected the mark disarmed, got: $forged"
+    exit 1
+}
+grep -q 'data:image/svg+xml;base64,' "$page" || {
+    echo "FAIL: nothing was inlined at all, so the probe proves nothing"
+    exit 1
+}
+# Only --single-file disarms, so an ordinary mirror keeps the page verbatim.
+offforged=$(sed -n 's/.*<p>\(id=[^<]*\)<\/p>.*/\1/p' "$offpage")
+test "$offforged" = 'id=pixel.svg#!htsinline end' || {
+    echo "FAIL: a mirror without --single-file altered the page: $offforged"
+    exit 1
+}
+echo OK
+
+printf '[assets keep no marks] ..\t'
+# The pass strips them once every page has been expanded; a mirrored
+# stylesheet must not ship engine bookkeeping.
+if grep -rlF '#!htsinline' "${out}/127.0.0.1_${port}" >/dev/null 2>&1; then
+    echo "FAIL: marks survived in $(grep -rlF '#!htsinline' "${out}/127.0.0.1_${port}" | tr '\n' ' ')"
     exit 1
 fi
 echo OK

@@ -110,6 +110,40 @@ hts_boolean singlefile_may_inline(const char *tag_start, const char *attr) {
   return HTS_TRUE;
 }
 
+/* The mark ends a reference; these end the token it was appended to. */
+static int sf_is_ref_delim(int c) {
+  return c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '\f' ||
+         c == '"' || c == '\'' || c == '(' || c == ')' || c == '=' ||
+         c == ',' || c == '<' || c == '>' || c == ';';
+}
+
+hts_boolean singlefile_ref_is_markable(const char *ref) {
+  size_t i;
+
+  for (i = 0; ref[i] != '\0'; i++) {
+    if (sf_is_ref_delim((unsigned char) ref[i]))
+      return HTS_FALSE;
+  }
+  return i != 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+size_t singlefile_disarm_marks(char *body, size_t len) {
+  const size_t marklen = strlen(SINGLEFILE_MARK);
+  size_t r, w = 0;
+
+  for (r = 0; r < len; r++) {
+    body[w++] = body[r];
+    /* Tested after every byte written, so no mark survives anywhere, and the
+       rewrite only shortens: w never overtakes r. */
+    if (w >= marklen &&
+        memcmp(body + w - marklen, SINGLEFILE_MARK, marklen) == 0) {
+      memmove(body + w - marklen + 1, body + w - marklen + 2, marklen - 2);
+      w--;
+    }
+  }
+  return w;
+}
+
 /* ------------------------------------------------------------ */
 /* Paths                                                         */
 /* ------------------------------------------------------------ */
@@ -385,7 +419,7 @@ static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
    a lenient resolver's base. Returns HTS_TRUE if out received a data: URI. */
 static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
                              size_t reflen, const char *rebase_dir, int depth,
-                             String *out) {
+                             hts_boolean *resolved, String *out) {
   String path = STRING_EMPTY;
   char mime[HTS_MIMETYPE_SIZE];
   char *file;
@@ -394,7 +428,8 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
   int cls;
   hts_boolean done = HTS_FALSE;
 
-  if (!sf_resolve(ctx, base_dir, ref, reflen, &path)) {
+  *resolved = sf_resolve(ctx, base_dir, ref, reflen, &path);
+  if (!*resolved) {
     StringFree(path);
     return HTS_FALSE;
   }
@@ -470,20 +505,35 @@ fallback:
   return done;
 }
 
-/* The mark ends a reference; these end the token the mark was appended to. */
-static int sf_is_ref_delim(int c) {
-  return sf_is_space(c) || c == '"' || c == '\'' || c == '(' || c == ')' ||
-         c == '=' || c == ',' || c == '<' || c == '>' || c == ';';
+/* A mark htsparse wrote always names a file it had just saved, so failing to
+   resolve one means the reference reaching here is not the one it wrote: the
+   no-delimiter contract broke, or the file went away after the page did. */
+static void sf_warn_unresolved(sf_ctx *ctx, const char *ref, size_t reflen) {
+  if (*ctx->warn_budget <= 0)
+    return;
+  if (--(*ctx->warn_budget) == 0) {
+    hts_log_print(ctx->opt, LOG_NOTICE,
+                  "single-file: further unresolved marks not reported");
+    return;
+  }
+  hts_log_print(ctx->opt, LOG_WARNING,
+                "single-file: marked reference \"%.*s\" resolves to no "
+                "mirrored file, left as a link",
+                (int) reflen, ref);
 }
 
 /* Copy [body,body+len) to out, replacing each marked reference by its data:
-   URI, or by the bare reference when it cannot be inlined. */
+   URI, or by the bare reference when it cannot be inlined. Substitution is in
+   place, so a value keeps the quoting htsparse gave it; an unquoted attribute
+   therefore ends up holding base64 padding, which every parser reads back but
+   the HTML grammar does not allow. */
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
                       const char *body, size_t len, String *out) {
   const size_t marklen = strlen(SINGLEFILE_MARK);
   size_t i = 0, flushed = 0;
 
   while (i + marklen <= len) {
+    hts_boolean resolved = HTS_FALSE;
     size_t start, tail;
 
     if (memcmp(body + i, SINGLEFILE_MARK, marklen) != 0) {
@@ -499,7 +549,9 @@ static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
       ;
     StringMemcat(*out, body + flushed, start - flushed);
     if (!sf_inline(ctx, base_dir, body + start, i - start,
-                   depth > 0 ? ctx->page_dir : NULL, depth, out)) {
+                   depth > 0 ? ctx->page_dir : NULL, depth, &resolved, out)) {
+      if (!resolved)
+        sf_warn_unresolved(ctx, body + start, i - start);
       StringMemcat(*out, body + start, i - start);
       StringMemcat(*out, body + i + marklen, tail - i - marklen);
     }
@@ -540,15 +592,51 @@ hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
   return ctx.inlined > 0 ? HTS_TRUE : HTS_FALSE;
 }
 
+/* Overwrite path with body. Spools then renames: a half-written file would
+   destroy a complete mirror file that nothing is going to re-fetch. */
+static hts_boolean sf_replace_file(httrackp *opt, const char *path,
+                                   const char *body, size_t len) {
+  char catbuff[CATBUFF_SIZE];
+  String tmp = STRING_EMPTY;
+  hts_boolean ok = HTS_TRUE;
+  FILE *fp;
+
+  StringCopy(tmp, path);
+  StringCat(tmp, ".sfnew");
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), StringBuff(tmp)), "wb");
+  if (fp == NULL) {
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "single-file: could not rewrite %s", path);
+    StringFree(tmp);
+    return HTS_FALSE;
+  }
+  if (len > 0 && fwrite(body, 1, len, fp) != len)
+    ok = HTS_FALSE;
+  if (fclose(fp) != 0)
+    ok = HTS_FALSE;
+#ifndef _WIN32
+  /* The spool bypassed filecreate(), which is what chmods every other mirrored
+     file; without this the file keeps the umask's mode. */
+  if (ok)
+    (void) chmod(fconv(catbuff, sizeof(catbuff), StringBuff(tmp)),
+                 HTS_ACCESS_FILE);
+#endif
+  if (ok)
+    ok = hts_rename_over(StringBuff(tmp), path);
+  if (!ok) {
+    hts_log_print(opt, LOG_ERROR, "single-file: could not rewrite %s", path);
+    (void) UNLINK(StringBuff(tmp));
+  }
+  StringFree(tmp);
+  return ok;
+}
+
 hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
                                     const char *page_path) {
-  char catbuff[CATBUFF_SIZE];
   String out = STRING_EMPTY;
-  String tmp = STRING_EMPTY;
   size_t len = 0;
   char *html = sf_readfile(page_path, &len);
   hts_boolean ok;
-  FILE *fp;
 
   if (html == NULL)
     return HTS_FALSE;
@@ -556,42 +644,34 @@ hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
   ok = singlefile_rewrite_html(opt, root, page_path, html, len,
                                SINGLEFILE_MAX_PAGE_SIZE, &out);
   freet(html);
-  if (!ok) {
-    StringFree(out);
+  if (ok)
+    ok = sf_replace_file(opt, page_path, StringBuff(out), StringLength(out));
+  StringFree(out);
+  return ok;
+}
+
+/* Delete every mark from the file, keeping the reference and any fragment it
+   carried. Returns HTS_TRUE if the file changed. */
+static hts_boolean sf_strip_marks_file(httrackp *opt, const char *path) {
+  const size_t marklen = strlen(SINGLEFILE_MARK);
+  size_t len = 0, r, w = 0;
+  char *body = sf_readfile(path, &len);
+  hts_boolean ok;
+
+  if (body == NULL)
+    return HTS_FALSE;
+  for (r = 0; r < len;) {
+    if (len - r >= marklen && memcmp(body + r, SINGLEFILE_MARK, marklen) == 0)
+      r += marklen;
+    else
+      body[w++] = body[r++];
+  }
+  if (w == len) {
+    freet(body);
     return HTS_FALSE;
   }
-  /* Spool then rename: a half-written page would destroy a complete mirror
-     file that nothing is going to re-fetch. */
-  StringCopy(tmp, page_path);
-  StringCat(tmp, ".sfnew");
-  fp = FOPEN(fconv(catbuff, sizeof(catbuff), StringBuff(tmp)), "wb");
-  if (fp == NULL) {
-    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                  "single-file: could not rewrite %s", page_path);
-    ok = HTS_FALSE;
-  } else {
-    if (StringLength(out) > 0 &&
-        fwrite(StringBuff(out), 1, StringLength(out), fp) != StringLength(out))
-      ok = HTS_FALSE;
-    if (fclose(fp) != 0)
-      ok = HTS_FALSE;
-#ifndef _WIN32
-    /* The spool bypassed filecreate(), which is what chmods every other
-       mirrored file; without this the page keeps the umask's mode. */
-    if (ok)
-      (void) chmod(fconv(catbuff, sizeof(catbuff), StringBuff(tmp)),
-                   HTS_ACCESS_FILE);
-#endif
-    if (ok)
-      ok = hts_rename_over(StringBuff(tmp), page_path);
-    if (!ok) {
-      hts_log_print(opt, LOG_ERROR, "single-file: could not rewrite %s",
-                    page_path);
-      (void) UNLINK(StringBuff(tmp));
-    }
-  }
-  StringFree(tmp);
-  StringFree(out);
+  ok = sf_replace_file(opt, path, body, w);
+  freet(body);
   return ok;
 }
 
@@ -613,6 +693,18 @@ void singlefile_process_mirror(httrackp *opt) {
       continue;
     if (singlefile_rewrite_file(opt, root, link->sav))
       pages++;
+  }
+  /* Only once every page has been through the pass: a stylesheet is expanded
+     from the marks in the copy on disk, so stripping it earlier would cost the
+     pages that had not read it yet. */
+  for (i = 0; i < opt->lien_tot; i++) {
+    const lien_url *const link = opt->liens[i];
+
+    if (link == NULL || link->sav == NULL || link->sav[0] == '\0')
+      continue;
+    if (ishtml(opt, link->sav) == 1 || !fexist_utf8(link->sav))
+      continue;
+    (void) sf_strip_marks_file(opt, link->sav);
   }
   if (pages == 0) {
     /* Nothing to inline means the saved pages carry no relative asset links,

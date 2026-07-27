@@ -66,8 +66,20 @@ extern "C" {
    name. Everything htsparse detects is inlinable unless it names a page. */
 hts_boolean singlefile_may_inline(const char *tag_start, const char *attr);
 
-/* Rewrite every HTML page the mirror produced. No-op unless opt->single_file;
-   call once the tree is final, after the update purge. */
+/* Drop the '!' from every mark already present in [body,body+len), in place,
+   returning the new length (never longer). Call on a fetched document before
+   parsing it: a page that shipped the literal mark could otherwise forge one
+   and have the pass inline a mirrored file into its own text. */
+size_t singlefile_disarm_marks(char *body, size_t len);
+
+/* HTS_TRUE if ref may carry a mark, i.e. holds no byte the pass reads as the
+   end of a reference. htsparse percent-escapes what it saves, so this holds;
+   it is checked because nothing else enforces it across the two files. */
+hts_boolean singlefile_ref_is_markable(const char *ref);
+
+/* Rewrite every HTML page the mirror produced, then strip the marks left in
+   the assets. No-op unless opt->single_file; call once the tree is final,
+   after the update purge. */
 void singlefile_process_mirror(httrackp *opt);
 
 /* Expand the marks in the document held in memory, appending the result to

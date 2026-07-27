@@ -400,6 +400,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           r->adr[i] = ' ';
         }
       }
+      /* --single-file: a document shipping the literal mark could otherwise
+         forge one and have the pass inline a mirrored file into its own text.
+         Disarming here, before any of it is copied out, is what leaves us the
+         only writer of a mark. */
+      if (opt->single_file) {
+        r->size = (LLint) singlefile_disarm_marks(r->adr, (size_t) r->size);
+      }
     }
 
     // Indexing!
@@ -3052,7 +3059,16 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               singlefile_may_inline(
                                   intag_start_valid ? intag_start : NULL,
                                   tag_attr_start)) {
-                            strcatbuff(tempo, SINGLEFILE_MARK);
+                            /* The pass finds the reference by walking back to
+                               a delimiter, so a marked one may not contain
+                               any; escaping above is what guarantees it. */
+                            if (singlefile_ref_is_markable(tempo)) {
+                              strcatbuff(tempo, SINGLEFILE_MARK);
+                            } else {
+                              hts_log_print(opt, LOG_WARNING,
+                                            "single-file: not marking \"%s\": the saved reference was not escaped",
+                                            tempo);
+                            }
                           }
 
                           // écrire le lien modifié, relatif
