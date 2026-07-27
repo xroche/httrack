@@ -1451,13 +1451,13 @@ hts_boolean hts_rename_over(const char *src, const char *dst) {
   fconv(cdst, sizeof(cdst), dst);
   if (RENAME(csrc, cdst) == 0)
     return HTS_TRUE;
-  /* Unlink only for the failure the fallback exists for: a dst in the way,
-     which Windows' rename() reports as EACCES (POSIX replaces it silently). A
-     src that was never written must leave dst alone, whatever errno says --
-     the CRT does not promise ENOENT over EACCES when both hold. */
+  /* Only a dst standing in the way is something the unlink can clear, and the
+     CRT reports that as EEXIST (ERROR_ALREADY_EXISTS); it keeps EACCES for a
+     src another process holds, where removing dst would destroy a file the
+     retry then cannot replace. The src check covers a CRT that disagrees. */
   const int err = errno;
 
-  if ((err != EACCES && err != EEXIST) || !fexist_utf8(src))
+  if (err != EEXIST || !fexist_utf8(src))
     return HTS_FALSE;
   (void) UNLINK(cdst);
   return RENAME(csrc, cdst) == 0 ? HTS_TRUE : HTS_FALSE;

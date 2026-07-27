@@ -6648,8 +6648,7 @@ int hts_rename_utf8(const char *oldpath, const char *newpath) {
   LPWSTR wnewpath = hts_pathToUCS2(newpath);
   if (woldpath != NULL && wnewpath != NULL) {
     const int result = _wrename(woldpath, wnewpath);
-    /* Callers decide from errno whether the target was in the way (#779), and
-       free() is not required to leave it alone. */
+    /* Save errno: callers key off it (#779) and free() may clobber it. */
     const int err = errno;
 
     free(woldpath);

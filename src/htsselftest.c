@@ -5976,10 +5976,9 @@ static hts_boolean ro_is(const char *path, const char *data) {
   return n == strlen(data) && memcmp(buf, data, n) == 0 ? HTS_TRUE : HTS_FALSE;
 }
 
-// -#test=renameover <dir>: hts_rename_over() must replace an existing dst, and
-// must never delete a dst it did not replace (#779). POSIX rename() clobbers on
-// its own, so the unlink fallback is only reached under the LD_PRELOAD shim the
-// test also runs this under.
+// -#test=renameover <dir>: hts_rename_over() must replace an existing dst and
+// never delete one it did not replace (#779). Which half is live depends on
+// what rename() does to an existing target, so probe that and name the regime.
 static int st_renameover(httrackp *opt, int argc, char **argv) {
   (void) opt;
   if (argc < 1) {
@@ -5992,28 +5991,42 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
   fconcat(src, sizeof(src), argv[0], "renameover-src.bin");
   fconcat(dst, sizeof(dst), argv[0], "renameover-dst.bin");
 
-  /* Tell the harness whether the unlink fallback is reachable at all here: it
-     is dead unless rename() refuses an existing target, as Windows' does. */
   (void) UNLINK(src);
   (void) UNLINK(dst);
   ro_put(src, "probe");
   ro_put(dst, "probe");
-  if (RENAME(src, dst) != 0)
-    printf("renameover: fallback exercised, rename refuses an existing "
-           "target\n");
 
-  /* An existing dst must still be replaced: that is what the unlink is for. */
+  const int probe = RENAME(src, dst) == 0 ? 0 : errno;
+  /* Only a target in the way is something the unlink can clear. */
+  const hts_boolean replaceable = probe == 0 || probe == EEXIST;
+
+  printf("renameover: regime %s\n",
+         probe == 0 ? "clobber" : (probe == EEXIST ? "fallback" : "refused"));
+
   (void) UNLINK(src);
   (void) UNLINK(dst);
   ro_put(src, "new");
   ro_put(dst, "old");
-  if (!hts_rename_over(src, dst)) {
-    fprintf(stderr, "renameover: replacing an existing dst failed: %s\n",
-            strerror(errno));
-    err++;
-  } else if (!ro_is(dst, "new") || fexist_utf8(src)) {
-    fprintf(stderr, "renameover: dst was not replaced by src\n");
-    err++;
+  if (replaceable) {
+    /* An existing dst must still be replaced: the unlink is for this. */
+    if (!hts_rename_over(src, dst)) {
+      fprintf(stderr, "renameover: replacing an existing dst failed: %s\n",
+              strerror(errno));
+      err++;
+    } else if (!ro_is(dst, "new") || fexist_utf8(src)) {
+      fprintf(stderr, "renameover: dst was not replaced by src\n");
+      err++;
+    }
+  } else {
+    /* A failure the unlink cannot fix must leave dst as it was. */
+    if (hts_rename_over(src, dst)) {
+      fprintf(stderr, "renameover: an unfixable failure reported success\n");
+      err++;
+    }
+    if (!ro_is(dst, "old")) {
+      fprintf(stderr, "renameover: an unfixable failure destroyed dst\n");
+      err++;
+    }
   }
 
   /* A missing src must leave dst alone and report failure. */

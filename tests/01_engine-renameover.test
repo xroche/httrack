@@ -4,26 +4,39 @@
 set -euo pipefail
 
 # Drives -#test=renameover: hts_rename_over() must replace an existing dst, and
-# must leave dst alone when src is missing (#779). The second run interposes a
-# rename() with the Windows shape (refuses an existing target with EACCES),
-# which is the only way to reach the unlink fallback on POSIX.
+# must leave dst alone when the rename failed for a reason removing dst cannot
+# fix (#779). The selftest prints the regime it detected; pin it per platform so
+# a leg cannot pass having tested the other half.
 dir=$(mktemp -d)
 trap 'rm -rf "$dir"' EXIT
 
-httrack -O /dev/null -#test=renameover "$dir" | grep -q "renameover: OK"
+case "$(uname -s)" in
+MINGW* | MSYS_NT*) want=fallback ;; # native rename() refuses an existing target
+*) want=clobber ;;
+esac
+
+out=$(httrack -O /dev/null -#test=renameover "$dir")
+echo "$out" | grep -q "renameover: OK"
+echo "$out" | grep -q "renameover: regime $want"
 
 if [ "$(uname -s)" != "Linux" ]; then
     echo "renameover: LD_PRELOAD interposition is Linux-only here, skipping"
     exit 0
 fi
-# Not a skip on Linux: a missing module would make the leg vacuous.
+# Not a skip on Linux: a missing module would make the interposed legs vacuous.
 if [ ! -r "${RENAMEFAIL_LIB:-}" ]; then
     echo "renameover: ${RENAMEFAIL_LIB:-\$RENAMEFAIL_LIB} was not built" >&2
     exit 1
 fi
 
+# The unlink fallback is dead code on POSIX, so borrow Windows' rename().
 out=$(LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \
     -#test=renameover "$dir")
 echo "$out" | grep -q "renameover: OK"
-# A shim that never fired would make the leg vacuous.
-echo "$out" | grep -q "renameover: fallback exercised"
+echo "$out" | grep -q "renameover: regime fallback"
+
+# A source another process holds fails with EACCES, which dst had no part in.
+out=$(RENAMEFAIL_MODE=locked LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \
+    -#test=renameover "$dir")
+echo "$out" | grep -q "renameover: OK"
+echo "$out" | grep -q "renameover: regime refused"
