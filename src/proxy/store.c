@@ -2014,7 +2014,12 @@ static time_t getGMT(struct tm *tm) {   /* hey, time_t is local! */
     /* BSD does not have static "timezone" declared */
 #if (defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
     time_t now = time(NULL);
-    time_t timezone = -localtime(&now)->tm_gmtoff;
+    struct tm nowtm;
+    time_t timezone;
+
+    if (!hts_localtime(now, &nowtm))
+      return (time_t) -1;
+    timezone = -nowtm.tm_gmtoff;
 #elif defined(_MSC_VER)
     /* MSVC spells it _timezone */
     const time_t timezone = _timezone;

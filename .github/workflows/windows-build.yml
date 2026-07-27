@@ -212,7 +212,7 @@ jobs:
           # Globbed, not enumerated: a new NNN_engine-*.test or NNN_local-*.test
           # is picked up automatically instead of silently getting zero coverage.
           for t in 00_runnable.test *_engine-*.test *_zlib-*.test \
-                   *_local-*.test 13_crawl_proxy_https.test 58_watchdog.test \
+                   *_local-*.test *_watchdog*.test 13_crawl_proxy_https.test \
                    60_crawl-log-salvage.test; do
             elapsed=$((SECONDS - started))
             if [ "$elapsed" -ge "$suite_deadline" ]; then
@@ -265,7 +265,7 @@ jobs:
           # cause a false mismatch either.
           # footer-overflow and purge-longpath skip on Windows (need a path past MAX_PATH);
           # crange pending #581;
-          # webdav-mime needs a reapable background listener, which MSYS cannot give it;
+          # webdav-default and webdav-mime need a reapable background listener, which MSYS cannot give them;
           # badmtime needs a filesystem that stores an mtime past gmtime's range;
           # single-file ends on a GUI half needing htsserver, which this job does not build;
           # update-304-leak needs a LeakSanitizer build, which MSVC has no equivalent of;
@@ -274,6 +274,7 @@ jobs:
           expected_skips="01_engine-footer-overflow.test
           100_local-purge-longpath.test
           114_local-update-304-leak.test
+          120_local-proxytrack-webdav-default.test
           48_local-crange-memresume.test
           71_local-crange-repaircache.test
           75_engine-longpath-posix.test
