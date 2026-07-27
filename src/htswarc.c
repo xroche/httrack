@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 #include "htslib.h"
+#include "htsback.h"
 #include "htstools.h"
 #include "htssafe.h"
 #include "htszlib.h"
@@ -1354,6 +1355,7 @@ void warc_free_request(htsblk *r) {
     freet(r->warc_resphdr);
     if (r->warc_rawpath != NULL) {
       (void) UNLINK(r->warc_rawpath); /* owns the verbatim spool file */
+      back_tmpdir_drop(r->warc_rawpath);
       freet(r->warc_rawpath);
       r->warc_rawpath = NULL;
     }
