@@ -307,7 +307,9 @@ int main(int argc, char *argv[]) {
   /* launch */
   ret = help_server(argv[1], defaultPort, bindAddr);
 
-  htsthread_wait_n(background_threads - 1);
+  /* background_threads is what we must NOT wait for; one less than that waits
+     for the pinger, which never returns (#753). */
+  htsthread_wait_n(background_threads);
   hts_uninit();
 
 #ifdef _WIN32

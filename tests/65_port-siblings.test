@@ -79,6 +79,29 @@ done
 # 65535 is a valid port the old "< 65535" bound refused
 web_accepted 65535
 
+# --- htsserver returns from main() instead of blocking at exit -------------
+# The exit wait must exclude exactly the threads that never return (#753). It
+# excluded one more than that: with no --ppid pinger to exclude it asked for a
+# negative count, which the counter can never reach, and with one it waited on
+# the pinger itself. $tmp holds no lang.def, so the server fails right after it
+# announces and main() reaches the wait on its own.
+
+web_exits() {
+    local rc=0
+
+    : >"$tmp/exit.log"
+    run_with_timeout 30 htsserver "$tmp" "$@" >"$tmp/exit.log" 2>&1 || rc=$?
+    grep -q "^EXITED" "$tmp/exit.log" ||
+        ! echo "FAIL: #753: htsserver ${*:-(no options)} never finished serving" || exit 1
+    test "$rc" -ne 124 ||
+        ! echo "FAIL: #753: htsserver ${*:-(no options)} hung at exit" || exit 1
+}
+
+# no pinger: the excluded count went negative
+web_exits
+# a pinger, which never returns and so must stay excluded
+web_exits --ppid $$
+
 # --- proxytrack <proxy-addr:port> <ICP-addr:port> --------------------------
 # A bad argument falls through to the usage screen; it had no range check at
 # all, so 65616 quietly listened on port 80. A valid one binds and blocks.
