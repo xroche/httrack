@@ -495,7 +495,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   _CHECK_HALT_FTP;
                   if ((line[0] == '3') || (line[0] == '2')) {   // ok
                     rest_understood = 1;
-                  }             // else never mind
+                  } // else never mind
                 }
               }                 // sinon tant pis 
             }
@@ -620,7 +620,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         // Ok, connexion initiée
         //
         if (soc_dat != INVALID_SOCKET) {
-          if (rest_understood) {        // REST sent and understood
+          if (rest_understood) { // REST sent and understood
             file_notify(opt, back->url_adr, back->url_fil, back->url_sav, 0, 1,
                         0);
             /* The bytes already on disk count too, or the completeness check
