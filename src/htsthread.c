@@ -150,8 +150,7 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
     pthread_t handle = 0;
     hts_boolean created;
 
-    /* the init is told apart from the rest: destroying an attributes object it
-       never initialised would be undefined (#772) */
+    /* init kept apart: destroying an uninitialised attr is undefined (#772) */
     if (pthread_attr_init(&attr) == 0) {
       created = pthread_attr_setstacksize(&attr, stackSize) == 0 &&
                 pthread_create(&handle, &attr, hts_entry_point, s_args) == 0;
@@ -164,7 +163,7 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
       freet(s_args);
       return -1;
     }
-    /* detach the thread from the main process so that is can be independent */
+    /* detach the thread from the main process so that it can be independent */
     pthread_detach(handle);
   }
 #endif

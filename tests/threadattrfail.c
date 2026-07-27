@@ -14,6 +14,8 @@
 /* The tree builds with -fvisibility=hidden, which would hide the interposer. */
 #define SHIM_EXPORT __attribute__((visibility("default")))
 
+/* Every create is refused in the only mode this shim runs in, so the process
+   stays single-threaded: unlocked counters and a fixed 64 slots are enough. */
 #define PENDING_MAX 64
 
 static const void *pending[PENDING_MAX];
@@ -30,9 +32,12 @@ SHIM_EXPORT int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
                             void *(*) (void *), void *) = NULL;
 
   if (getenv("THREADATTRFAIL") != NULL) {
-    sabotaged++;
-    if (attr != NULL && pending_n < PENDING_MAX)
-      pending[pending_n++] = attr;
+    /* only an attr-bearing spawn can leak one, so only those count as tested */
+    if (attr != NULL) {
+      sabotaged++;
+      if (pending_n < PENDING_MAX)
+        pending[pending_n++] = attr;
+    }
     return EAGAIN;
   }
   if (real_create == NULL) {
