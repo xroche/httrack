@@ -118,6 +118,8 @@ function find_hostroot {
 
 # Does the cache hold an entry whose URL ends with $1? An unreadable index is a
 # hard failure, else --cache-not-found would pass on a cache that never existed.
+# Suffix match over the whole key, so a URL with a query string needs the query
+# spelled out; a bare path would silently match nothing.
 function cache_has {
     local rc
     "$python" -c '

@@ -19,6 +19,8 @@ import gzip
 import hashlib
 import os
 import re
+import socket
+import struct
 import sys
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -1574,6 +1576,8 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="stay.html">stay</a>\n'
             '\t<a href="file.bin">file</a>\n'
             '\t<a href="always.bin">alwaysbin</a>\n'
+            '\t<a href="hostile.html">hostile</a>\n'
+            '\t<a href="reset.bin">reset</a>\n'
         )
 
     def send_chunked(self, body, terminate, ctype="text/html; charset=utf-8"):
@@ -1625,6 +1629,52 @@ class Handler(SimpleHTTPRequestHandler):
     def route_chunktrunc_stay(self):
         v = 1 if self.refetch_pass() == 1 else 2
         self.send_chunked(b"<html><body><p>CHUNKSTAY-V%d</p></body></html>" % v, True)
+
+    # The update pass declares a chunk of 0x80000000, which sscanf("%x") lands in
+    # an int as INT_MIN: it must not read as the terminating chunk, and the sum
+    # it drives negative must not read as a complete body either.
+    def route_chunktrunc_hostile(self):
+        if self.refetch_pass() == 1:
+            self.send_chunked(b"<html><body><p>CHUNKHOSTILE-V1</p></body></html>", True)
+            return
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            self.wfile.write(b"80000000\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    # Aborts the chunked body with an RST, so the read fails rather than seeing a
+    # clean EOF and the transfer is already in error before the framing check.
+    def route_chunktrunc_reset(self):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            body = b"CHUNKRESET\n" + b"\x31\x32\x33\xcd" * 4096
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+            self.wfile.flush()
+            time.sleep(0.5)  # let the client consume the chunk first
+            self.connection.setsockopt(
+                socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0)
+            )
+            self.connection.close()
+        except OSError:
+            pass
+        self.close_connection = True
 
     # Content-Disposition naming: the attachment filename replaces the
     # URL-derived name; path components in it are stripped (RFC 2616).
@@ -2217,6 +2267,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/chunktrunc/file.bin": route_chunktrunc_file,
         "/chunktrunc/always.bin": route_chunktrunc_alwaysbin,
         "/chunktrunc/stay.html": route_chunktrunc_stay,
+        "/chunktrunc/hostile.html": route_chunktrunc_hostile,
+        "/chunktrunc/reset.bin": route_chunktrunc_reset,
         "/errpage/index.html": route_errpage_index,
         "/errpage/good.html": route_errpage_good,
         "/errpage/missing.html": route_errpage_missing,

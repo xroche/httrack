@@ -3634,7 +3634,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     if (sscanf(chunk_data, "%x", &chunk_size) == 1) {
                       if (chunk_size > 0)
                         back[i].chunk_blocksize = chunk_size;   /* the data block chunk size */
-                      else
+                      /* only a real 0 ends the stream: "80000000" lands in an
+                         int as INT_MIN, whose sentinel plus negative totalsize
+                         would walk past both #840 guards */
+                      else if (chunk_size == 0)
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
                       if (back[i].r.adr != NULL || !back[i].r.is_write) {       // Not to disk
