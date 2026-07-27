@@ -557,9 +557,9 @@ struct httrackp {
   LLint single_file_max_size; /**< --single-file-max-size: per-asset cap in
                                    bytes; a bigger asset stays a link.
                                    Tail: ABI */
-  hts_boolean sitemap;   /**< --sitemap: probe the start host's robots.txt for
-                              Sitemap: lines, else /sitemap.xml. Tail: ABI */
-  String sitemap_url;    /**< --sitemap-url: sitemap to ingest. Tail: ABI */
+  hts_boolean sitemap; /**< --sitemap: probe the start host's robots.txt for
+                            Sitemap: lines, else /sitemap.xml. Tail: ABI */
+  String sitemap_url;  /**< --sitemap-url: sitemap to ingest. Tail: ABI */
   /* Live state, not an option: copy_htsopt must leave it alone. It sits here
      rather than in htsoptstate because that struct is embedded by value, so
      growing it would shift every httrackp field declared after it. */
