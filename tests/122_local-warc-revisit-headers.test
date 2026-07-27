@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# A server-not-modified revisit stands for a 304 exchange, so its record has to
+# carry it: the 304 response block plus the concurrent request record holding the
+# conditional header that drew it (#826). The update pass archives under a name
+# of its own, or a revisit-only pass keeps the previous file instead (#759).
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+export WARC_VALIDATE_UPDATE="warc-revisit.warc.gz"
+export WARC_VALIDATE_NORESP="index.html page.html"
+export WARC_VALIDATE_EXCHANGE=1
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --warc-validate \
+    --rerun-args '--warc-file warc-revisit' \
+    --log-found 'no files updated' \
+    --found 'mini304/index.html' --found 'mini304/page.html' \
+    httrack 'BASEURL/mini304/index.html' --warc-file warc-out

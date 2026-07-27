@@ -345,6 +345,7 @@ if test "${#plants[@]}" -gt 0; then
         if test "${plants[$i]}" = "--plant-dir"; then
             mkdir -p "$path" || die "could not create $path"
         else
+            mkdir -p "$(dirname "$path")" || die "could not create ${path%/*}"
             echo "$plant_poison" >"$path" || die "could not write $path"
         fi
         result "OK"
@@ -461,7 +462,8 @@ debug "host root: $hostroot"
 
 # --- optional WARC validation (stdlib validator, no warcio) ------------------
 # WARC_VALIDATE_BODY="URLSUB=HEX" byte-checks a fresh-crawl response body;
-# WARC_VALIDATE_NORESP="URLSUB..." asserts those assets are revisits post-update.
+# WARC_VALIDATE_NORESP="URLSUB..." asserts those assets are revisits post-update;
+# WARC_VALIDATE_EXCHANGE=1 asserts each revisit carries its 304 request/response.
 if test -n "$warc_validate"; then
     validator=$(nativepath "${testdir}/warc-validate.py")
     warc=$(find "$mirrorroot" -maxdepth 2 \( -name '*.warc.gz' -o -name '*.warc' \) 2>/dev/null | sort | tail -n1)
@@ -479,7 +481,10 @@ if test -n "$warc_validate"; then
     # body and keeps Content-Encoding, instead of expecting a decoded body.
     test -n "${WARC_VALIDATE_VERBATIM:-}" && bodyargs+=(--verbatim)
     info "validating fresh WARC (response bodies)"
-    "$python" "$validator" "$(nativepath "$fresh")" "${bodyargs[@]}" >&2 ||
+    # macOS bash 3.2 calls an empty array unbound under set -u, and a caller
+    # asking only for the revisit checks leaves this one empty.
+    "$python" "$validator" "$(nativepath "$fresh")" \
+        ${bodyargs[@]+"${bodyargs[@]}"} >&2 ||
         die "fresh WARC validation failed"
     result "OK"
 
@@ -493,6 +498,7 @@ if test -n "$warc_validate"; then
         for sub in ${WARC_VALIDATE_NORESP:-}; do
             revargs+=(--no-response-for "$sub")
         done
+        test -n "${WARC_VALIDATE_EXCHANGE:-}" && revargs+=(--revisit-exchange)
         info "validating update WARC (revisits)"
         "$python" "$validator" "$(nativepath "$upd")" "${revargs[@]}" >&2 ||
             die "update WARC validation failed"
@@ -529,9 +535,25 @@ if test -n "$wacz_validate"; then
 fi
 
 # No crawl, even a cancelled one, may leave engine temporaries: .delayed (#107,
-# #483), or the .z/.u content-coding temps (#557).
+# #483), the .z/.u content-coding temps (#557), or the hts-tmp directory those
+# and the re-fetch backup live in (#774). Only a test that planted something in
+# hts-tmp itself owns what is left there, so only that case skips the scan.
 info "checking for leftover engine temporaries"
-leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \) 2>/dev/null | head -5)
+scan_tmpdir=1
+i=0
+while test "$i" -lt "${#plants[@]}"; do
+    case "${plants[$((i + 1))]}" in
+    */hts-tmp/*) scan_tmpdir=0 ;;
+    esac
+    i=$((i + 2))
+done
+if test "$scan_tmpdir" -eq 1; then
+    leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \
+        -o -name 'hts-tmp' \) 2>/dev/null | head -5)
+else
+    leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \) \
+        2>/dev/null | head -5)
+fi
 if test -z "$leftovers"; then result "OK"; else
     result "leftover: $leftovers"
     exit 1

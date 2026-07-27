@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+# Drives -#test=refetchbackup: the #77 re-fetch backup must leave a copy of the
+# resource whatever happens, and must not build its temporary name inside the
+# mirror namespace (#774, #775).
+
+set -euo pipefail
+
+dir=$(mktemp -d)
+trap 'set +e; rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"; exit 1' HUP INT QUIT PIPE TERM
+
+rc=0
+out=$(httrack -O /dev/null -#test=refetchbackup "$dir" 2>&1) || rc=$?
+if test "$rc" -ne 0 || ! grep -q "refetchbackup: OK" <<<"$out"; then
+    echo "FAIL (exit $rc): $out" >&2
+    exit 1
+fi
+
+# The temporaries live in hts-tmp and the last user removes it.
+leftovers=$(find "$dir" -mindepth 1 | head -5)
+test -z "$leftovers" || {
+    echo "FAIL: leftover temporaries: $leftovers" >&2
+    exit 1
+}

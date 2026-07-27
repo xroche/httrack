@@ -1045,13 +1045,14 @@ int httpmirror(char *url1, httrackp * opt) {
     {
       TStamp tl = 0;
       time_t tt;
-      struct tm *A;
+      struct tm tmv;
 
       tt = time(NULL);
-      A = localtime(&tt);
-      tl += A->tm_sec;
-      tl += A->tm_min * 60;
-      tl += A->tm_hour * 60 * 60;
+      if (hts_localtime(tt, &tmv)) {
+        tl += tmv.tm_sec;
+        tl += tmv.tm_min * 60;
+        tl += tmv.tm_hour * 60 * 60;
+      }
       if (tl > opt->waittime)   // attendre minuit
         rollover = 1;
     }
@@ -1061,13 +1062,14 @@ int httpmirror(char *url1, httrackp * opt) {
     do {
       TStamp tl = 0;
       time_t tt;
-      struct tm *A;
+      struct tm tmv;
 
       tt = time(NULL);
-      A = localtime(&tt);
-      tl += A->tm_sec;
-      tl += A->tm_min * 60;
-      tl += A->tm_hour * 60 * 60;
+      if (hts_localtime(tt, &tmv)) {
+        tl += tmv.tm_sec;
+        tl += tmv.tm_min * 60;
+        tl += tmv.tm_hour * 60 * 60;
+      }
 
       if (rollover) {
         if (tl <= opt->waittime)
@@ -3146,16 +3148,15 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
   if (fp != NULL) {
     char s[256];
     time_t tt;
-    struct tm *A;
+    struct tm tmv;
 
     tt = time(NULL);
-    A = localtime(&tt);
-    if (A == NULL) {
+    if (!hts_localtime(tt, &tmv)) {
       int localtime_returned_null = 0;
 
       assertf(localtime_returned_null);
     }
-    strftime(s, 250, "%H:%M:%S", A);
+    strftime(s, 250, "%H:%M:%S", &tmv);
     if (strnotempty(type))
       fprintf(fp, "%s\t%c%s: \t", s, hichar(*type), type + 1);
     else
