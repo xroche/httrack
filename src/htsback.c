@@ -483,18 +483,27 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
-        int fsz = (int) strlen(back[i].url_sav);
-        char *filename = malloc(fsz + 8 + 1);
+        /* +16: room for the ".tmp" the url_sav form appends to a full-length
+           save name, so one buffer holds both shapes */
+        char BIGSTK tmpname[HTS_URLMAXSIZE * 2 + 16];
+        char *filename;
+        hts_boolean named;
+
+        /* the -p0 name is not derived from url_sav, so it needs a buffer of
+           its own size rather than the save name's */
+        if (opt->getmode != 0) {
+          named =
+              slprintfbuff(tmpname, sizeof(tmpname), "%s.tmp", back[i].url_sav);
+        } else {
+          named = slprintfbuff(tmpname, sizeof(tmpname), "%stmpfile%d.tmp",
+                               StringBuff(opt->path_html_utf8),
+                               opt->state.tmpnameid++);
+        }
+        filename = named ? strdupt(tmpname) : NULL;
 
         if (filename != NULL) {
           FILE *fp;
 
-          if (opt->getmode != 0) {
-            sprintf(filename, "%s.tmp", back[i].url_sav);
-          } else {
-            sprintf(filename, "%stmpfile%d.tmp",
-                    StringBuff(opt->path_html_utf8), opt->state.tmpnameid++);
-          }
           /* Security check */
           if (fexist_utf8(filename)) {
             hts_log_print(opt, LOG_WARNING,
@@ -525,11 +534,12 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
                           "file does not exist");
           }
           if (filename != NULL)
-            free(filename);
+            freet(filename);
         } else {
           hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                        "engine: warning: serialize error for %s%s: memory full",
-                        back[i].url_adr, back[i].url_fil);
+                        "engine: warning: serialize error for %s%s: %s",
+                        back[i].url_adr, back[i].url_fil,
+                        named ? "memory full" : "temporary filename too long");
         }
       }
 #else

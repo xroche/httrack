@@ -205,4 +205,5 @@ TESTS += 134_local-warc-revisit-ip.test
 TESTS += 135_local-warc-forced-notmodified.test
 TESTS += 136_local-warc-cache-priority.test
 TESTS += 137_local-charsetless-encoding.test
+TESTS += 138_local-spool-name-overflow.test
 TESTS += 133_engine-reentrant-time.test
