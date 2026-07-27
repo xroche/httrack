@@ -21,6 +21,7 @@ TESTS_ENVIRONMENT += BROTLI_ENABLED=$(BROTLI_ENABLED)
 TESTS_ENVIRONMENT += ZSTD_ENABLED=$(ZSTD_ENABLED)
 TESTS_ENVIRONMENT += V6_SUPPORT=$(V6_SUPPORT)
 TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
+TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
 
 # rename() interposer for 01_engine-renameover.test; -rpath is what makes
