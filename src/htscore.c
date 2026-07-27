@@ -1819,60 +1819,6 @@ int httpmirror(char *url1, httrackp * opt) {
         // -- -- --
         // sauver fichier
 
-        /* En cas d'erreur, vérifier que fichier d'erreur existe */
-        if (strnotempty(savename()) == 0) {       // chemin de sauvegarde existant
-          if (strcmp(urlfil(), "/robots.txt") == 0) {     // pas robots.txt
-            if (store_errpage) {        // c'est une page d'erreur
-              int create_html_warning = 0;
-              int create_gif_warning = 0;
-
-              switch (ishtml(opt, urlfil())) {    /* pas fichier html */
-              case 0:          /* non html */
-                {
-                  char buff[256];
-
-                  guess_httptype_sized(opt, buff, sizeof(buff), urlfil());
-                  if (strcmp(buff, "image/gif") == 0)
-                    create_gif_warning = 1;
-                }
-                break;
-              case 1:          /* html */
-                if (!r.adr) {
-                }
-                break;
-              default:         /* don't know.. */
-                break;
-              }
-              /* Créer message d'erreur ? */
-              if (create_html_warning) {
-                char *adr =
-                  (char *) malloct(strlen(HTS_DATA_ERROR_HTML) + 1100);
-                hts_log_print(opt, LOG_INFO, "Creating HTML warning file (%s)",
-                              r.msg);
-                if (adr) {
-                  if (r.adr) {
-                    freet(r.adr);
-                    r.adr = NULL;
-                  }
-                  sprintf(adr, HTS_DATA_ERROR_HTML, r.msg);
-                  r.adr = adr;
-                }
-              } else if (create_gif_warning) {
-                char *adr = (char *) malloct(HTS_DATA_UNKNOWN_GIF_LEN);
-
-                hts_log_print(opt, LOG_INFO, "Creating GIF dummy file (%s)",
-                              r.msg);
-                if (r.adr) {
-                  freet(r.adr);
-                  r.adr = NULL;
-                }
-                memcpy(adr, HTS_DATA_UNKNOWN_GIF, HTS_DATA_UNKNOWN_GIF_LEN);
-                r.adr = adr;
-              }
-            }
-          }
-        }
-
         if (strnotempty(savename()) == 0) {       // pas de chemin de sauvegarde
           if (strcmp(urlfil(), "/robots.txt") == 0) {     // robots.txt
             char BIGSTK sitemaps[8192];
