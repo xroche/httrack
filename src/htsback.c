@@ -391,6 +391,56 @@ int back_selftest_slot_swap(void) {
   CHECK(0, "the dummy test slot");
 #undef CHECK
 
+  /* The swap round-trip must not lose the size of a slot whose body is already
+     at url_sav, or the link writer blanks the file (#797). */
+  {
+    static const char body[] = "swapped body";
+    int c;
+
+    for (c = 0; c < 2; c++) {
+      const hts_boolean inmemory = c == 0 ? HTS_TRUE : HTS_FALSE;
+      FILE *const fp = tmpfile();
+      lien_back *copy = NULL;
+
+      memset(&back, 0, sizeof(back));
+      back.status = STATUS_READY;
+      strcpybuff(back.url_sav, "/tmp/httrack-selftest.bin");
+      back.r.size = (LLint) sizeof(body) - 1;
+      if (inmemory) {
+        back.r.adr = strdupt(body);
+      }
+      if (fp == NULL || back_serialize(fp, &back) != 0 ||
+          fseek(fp, 0, SEEK_SET) != 0 || back_unserialize(fp, &copy) != 0) {
+        fprintf(stderr, "backswap: round-trip failed for a %s slot\n",
+                inmemory ? "buffered" : "direct-to-disk");
+        err = 1;
+      } else {
+        if (copy->r.size != back.r.size) {
+          fprintf(stderr,
+                  "backswap: %s slot came back with size " LLintP
+                  ", expected " LLintP "\n",
+                  inmemory ? "buffered" : "direct-to-disk", copy->r.size,
+                  back.r.size);
+          err = 1;
+        }
+        if (inmemory && (copy->r.adr == NULL ||
+                         memcmp(copy->r.adr, body, sizeof(body) - 1) != 0)) {
+          fprintf(stderr, "backswap: buffered slot lost its body\n");
+          err = 1;
+        }
+        if (!inmemory && copy->r.adr != NULL) {
+          fprintf(stderr, "backswap: direct-to-disk slot gained a body\n");
+          err = 1;
+        }
+        back_clear_entry(copy);
+        freet(copy);
+      }
+      if (fp != NULL)
+        fclose(fp);
+      freet(back.r.adr);
+    }
+  }
+
   printf("backswap self-test: %s\n", err ? "FAIL" : "OK");
   return err;
 }
@@ -1266,7 +1316,10 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     (*dst)->r.ssl_con = NULL;
 #endif
     if (back_data_unserialize(fp, (void **) &(*dst)->r.adr, &size) == 0) {
-      (*dst)->r.size = size;
+      /* A bodyless slot already wrote its bytes to url_sav (FTP, direct to
+         disk); zeroing r.size makes the writer blank that file (#797). */
+      if ((*dst)->r.adr != NULL)
+        (*dst)->r.size = size;
       (*dst)->r.headers = NULL;
       if (back_string_unserialize(fp, &(*dst)->r.headers) == 0)
         return 0;               /* ok */

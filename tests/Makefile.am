@@ -64,6 +64,7 @@ TESTS = \
 	01_engine-filterdual.test \
 	01_engine-ftp-line.test \
 	01_engine-ftp-userpass.test \
+	01_engine-gmtime.test \
 	01_engine-backswap.test \
 	01_engine-cacheindex.test \
 	01_engine-hashtable.test \
@@ -228,6 +229,7 @@ TESTS = \
 	104_engine-warc-longurl.test \
 	105_suite-timeout.test \
 	106_engine-repair-rename.test \
+	110_local-ftp-parallel.test \
 	111_local-ftp-update-rest.test
 
 CLEANFILES = check-network_sh.cache
