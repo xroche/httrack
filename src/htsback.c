@@ -585,6 +585,17 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
   return 0;
 }
 
+/* Note: utf-8 */
+void back_refetch_backup(httrackp *opt, lien_back *const back) {
+  back->tmpfile = NULL;
+  if (fexist_utf8(back->url_sav)) {
+    if (create_back_tmpfile(opt, back, "bak") != 0 ||
+        RENAME(back->url_sav, back->tmpfile) != 0) {
+      back->tmpfile = NULL;
+    }
+  }
+}
+
 /* Did the fetch fail to produce a response, as opposed to the engine
    deliberately passing the resource over? Only the latter may be purged. */
 static hts_boolean back_transfer_failed(const int statuscode) {
@@ -3164,20 +3175,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                           back[i].url_sav, 1, 1,
                                           back[i].r.notmodified);
                               back[i].r.compressed = 0;
-                              /* Re-fetch over an existing file (#77 follow-up):
-                                 move the good copy aside before truncating it
-                                 so an aborted transfer can restore it. url_sav
-                                 is still written normally (file list intact).
-                               */
-                              back[i].tmpfile = NULL;
-                              if (fexist_utf8(back[i].url_sav)) {
-                                if (create_back_tmpfile(opt, &back[i], "bak") !=
-                                        0 ||
-                                    RENAME(back[i].url_sav, back[i].tmpfile) !=
-                                        0) {
-                                  back[i].tmpfile = NULL;
-                                }
-                              }
+                              back_refetch_backup(opt, &back[i]);
                               if ((back[i].r.out =
                                    filecreate(&opt->state.strc,
                                               back[i].url_sav)) == NULL) {
