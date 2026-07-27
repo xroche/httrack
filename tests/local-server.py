@@ -1196,6 +1196,54 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # A charset-less page falls back to iso-8859-1 (#833): whatever the engine
+    # takes out of it must not be re-encoded when it already is UTF-8.
+    # variant -> (Content-Type, title bytes, body bytes)
+    TITLEENC_PAGES = {
+        "u8": (
+            "text/html",
+            "Café-u8".encode(),
+            '<img src="s.svg#café"><a href="né.txt">leaf</a>'.encode(),
+        ),
+        # genuine latin-1: the conversion must still happen
+        "l1": (
+            "text/html",
+            "Café-l1".encode("latin-1"),
+            b'<a href="l1.txt">leaf</a>',
+        ),
+        "declared": ("text/html; charset=utf-8", "Café-declared".encode(), b"x"),
+    }
+
+    def route_titleenc(self):
+        name = unquote(urlsplit(self.path).path)[len("/titleenc/") :]
+        variant = name[: -len(".html")] if name.endswith(".html") else None
+        if variant in self.TITLEENC_PAGES:
+            ctype, title, body = self.TITLEENC_PAGES[variant]
+            self.send_raw(
+                b"<html><head><title>"
+                + title
+                + b"</title></head><body>"
+                + body
+                + b"</body></html>",
+                ctype,
+            )
+            return
+        if name == "s.svg":
+            self.send_raw(
+                (
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<symbol id="café"><rect/></symbol></svg>'
+                ).encode(),
+                "image/svg+xml",
+            )
+            return
+        if name in ("né.txt", "l1.txt"):
+            self.send_raw(b"leaf\n", "text/plain")
+            return
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     # resume / 416 loop (#206): the first GET stalls after a prefix so the crawl
     # can be interrupted (partial + temp-ref); every later request is 416.
     RESUME_PREFIX = b"PARTIAL-" + b"x" * 4096  # flushed before the stall
@@ -2324,6 +2372,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/charset/"):
             self.route_charset()
+            return True
+        if path.startswith("/titleenc/"):
+            self.route_titleenc()
             return True
         # Match percent-encoded paths (accented #157 route) by their decoded form.
         handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))

@@ -684,9 +684,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           *(s + (b - a) + 1) = '\0';
                         }
 
-                        // Decode title with encoding
+                        // Decode title with encoding, but not when the bytes
+                        // already are valid UTF-8: a charset-less page falls
+                        // back to iso-8859-1, which would double-encode them
                         if (str->page_charset_ != NULL &&
-                            *str->page_charset_ != '\0') {
+                            *str->page_charset_ != '\0' &&
+                            !hts_isStringUTF8(s, strlen(s))) {
                           char *sUtf = hts_convertStringToUTF8(
                               s, strlen(s), str->page_charset_);
                           if (sUtf != NULL) {
