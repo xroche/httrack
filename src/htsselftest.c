@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsmodules.h"
 #include "htsback.h"
 #include "htsdefines.h"
 #include "htslib.h"
@@ -2620,6 +2621,62 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   if (body != NULL)
     (void) UNLINK(bodyfile);
   printf("savename: %s\n", afs.save);
+  return 0;
+}
+
+/* an empty fil started htsAddLink's codebase walk before the buffer (#730) */
+static int st_addlink(httrackp *opt, int argc, char **argv) {
+  htsmoduleStruct BIGSTK str;
+  cache_back cache;
+  struct_back *sback;
+  hash_struct hash;
+  char link[] = "sub/page.html";
+  int ptr = 0;
+  int i;
+
+  (void) argc;
+  (void) argv;
+
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = (void *) coucal_new(0);
+  sback = back_new(opt, opt->maxsoc * 32 + 1024);
+  /* same wiring as hts_mirror (htscore.c) */
+  hash_init(opt, &hash, opt->urlhack);
+  hash.liens = (const lien_url *const *const *) &opt->liens;
+  opt->hash = &hash;
+  hts_record_init(opt);
+
+  memset(&str, 0, sizeof(str));
+  str.opt = opt;
+  str.sback = sback;
+  str.cache = &cache;
+  str.hashptr = &hash;
+  str.ptr_ = &ptr;
+  str.addLink = htsAddLink;
+
+  /* fil[0] is the underflow, fil[1] the control that the trim is unchanged */
+  for (i = 0; i < 2; i++) {
+    static const char *const fil[2] = {"", "/dir/page.html"};
+    static const char *const want[2] = {
+        "untouched", "http://www.example.com/dir/sub/page.html"};
+    char BIGSTK loc[HTS_URLMAXSIZE * 2];
+
+    strcpybuff(loc, "untouched");
+    str.localLink = loc;
+    str.localLinkSize = (int) sizeof(loc);
+    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", ""))
+      return 1;
+    ptr = heap_top_index();
+    str.url_host = heap(ptr)->adr;
+    str.url_file = heap(ptr)->fil;
+    assertf(htsAddLink(&str, link) == 0); /* refused by the wizard either way */
+    if (strcmp(loc, want[i]) != 0) {
+      fprintf(stderr, "addlink[%d]: got '%s' want '%s'\n", i, loc, want[i]);
+      return 1;
+    }
+  }
+
+  printf("addlink self-test OK\n");
   return 0;
 }
 
@@ -6307,6 +6364,8 @@ static const struct selftest_entry {
     {"fsize", "<dir>", "file size past the 2GB signed-32-bit wrap", st_fsize},
     {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
      st_growsize},
+    {"addlink", "", "htsAddLink codebase walk over an empty current path",
+     st_addlink},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cacheindex", "", "cache-index (.ndx) parse must stay in bounds",
      st_cacheindex},
