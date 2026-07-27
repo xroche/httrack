@@ -1131,12 +1131,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
       // Compression accepted ?
       if (retour->req.http11) {
-        hts_boolean compressible = HTS_FALSE;
+        hts_boolean compressible =
+            (!retour->req.range_used && !retour->req.nocompression);
         hts_boolean secure = HTS_FALSE;
 
-#if HTS_USEZLIB
-        compressible = (!retour->req.range_used && !retour->req.nocompression);
-#endif
 #if HTS_USEOPENSSL
         secure = retour->ssl ? HTS_TRUE : HTS_FALSE;
 #endif

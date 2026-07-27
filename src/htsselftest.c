@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsmodules.h"
 #include "htsback.h"
 #include "htsdefines.h"
 #include "htslib.h"
@@ -63,9 +64,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htssinglefile.h"
-#if HTS_USEZLIB
 #include "htszlib.h"
-#endif
 #if HTS_USEZSTD
 #include <zstd.h>
 #endif
@@ -2623,6 +2622,68 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* an empty fil started htsAddLink's codebase walk before the buffer (#730) */
+static int st_addlink(httrackp *opt, int argc, char **argv) {
+  htsmoduleStruct BIGSTK str;
+  cache_back cache;
+  struct_back *sback;
+  hash_struct hash;
+  int ptr = 0;
+  int i;
+
+  (void) argc;
+  (void) argv;
+
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = (void *) coucal_new(0);
+  sback = back_new(opt, opt->maxsoc * 32 + 1024);
+  /* same wiring as hts_mirror (htscore.c) */
+  hash_init(opt, &hash, opt->urlhack);
+  hash.liens = (const lien_url *const *const *) &opt->liens;
+  opt->hash = &hash;
+  hts_record_init(opt);
+
+  memset(&str, 0, sizeof(str));
+  str.opt = opt;
+  str.sback = sback;
+  str.cache = &cache;
+  str.hashptr = &hash;
+  str.ptr_ = &ptr;
+  str.addLink = htsAddLink;
+
+  /* [0] is the underflow; [1] and [2] are controls that the trim is unchanged.
+     A query-only link is the one that notices the trim at all: for the others
+     ident_url_relatif() re-derives the directory from the path it is given. */
+  for (i = 0; i < 3; i++) {
+    static const char *const fil[3] = {"", "/dir/page.html", "/dir/page.html"};
+    static const char *const lnk[3] = {"sub/page.html", "sub/page.html",
+                                       "?x=1"};
+    static const char *const want[3] = {
+        "untouched", "http://www.example.com/dir/sub/page.html",
+        "http://www.example.com/dir/?x=1"};
+    char BIGSTK loc[HTS_URLMAXSIZE * 2];
+    char BIGSTK link[HTS_URLMAXSIZE];
+
+    strcpybuff(loc, "untouched");
+    strcpybuff(link, lnk[i]);
+    str.localLink = loc;
+    str.localLinkSize = (int) sizeof(loc);
+    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", ""))
+      return 1;
+    ptr = heap_top_index();
+    str.url_host = heap(ptr)->adr;
+    str.url_file = heap(ptr)->fil;
+    assertf(htsAddLink(&str, link) == 0); /* refused by the wizard either way */
+    if (strcmp(loc, want[i]) != 0) {
+      fprintf(stderr, "addlink[%d]: got '%s' want '%s'\n", i, loc, want[i]);
+      return 1;
+    }
+  }
+
+  printf("addlink self-test OK\n");
+  return 0;
+}
+
 static int st_cache(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -3264,6 +3325,81 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Build a path of exactly len chars under base; returns that length. */
+static size_t st_structcheck_longpath(char *dst, size_t dstsize,
+                                      const char *base, size_t len) {
+  size_t n = strlen(base);
+
+  assertf(len < dstsize && n + 2 <= len);
+  memmove(dst, base, n);
+  while (n < len) {
+    size_t seg = len - n - 1;
+
+    if (seg > 200) /* stay under the usual 255-byte component limit */
+      seg = len - n == 202 ? 199 : 200; /* never leave a bare separator */
+    dst[n++] = '/';
+    memset(dst + n, 'x', seg);
+    n += seg;
+  }
+  dst[n] = '\0';
+  return n;
+}
+
+/* The path guard, and the <name>.txt rename structcheck() performs when a
+   regular file sits where a directory has to go (#745). */
+static int st_structcheck(httrackp *opt, int argc, char **argv) {
+  char BIGSTK path[HTS_URLMAXSIZE * 2];
+  char BIGSTK target[HTS_URLMAXSIZE * 2];
+  FILE *fp;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=structcheck <writable directory>\n");
+    return 1;
+  }
+
+  /* over the guard: refused before a single directory is created */
+  st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
+  errno = 0;
+  assertf(structcheck(path) == -1);
+  assertf(errno == EINVAL);
+  errno = 0;
+  assertf(structcheck_utf8(path) == -1);
+  assertf(errno == EINVAL);
+  {
+    char *const sep = strchr(path + strlen(argv[0]) + 1, '/');
+
+    assertf(sep != NULL);
+    sep[1] = '\0'; /* the outermost component it would have created */
+    assertf(!dir_exists(path));
+  }
+
+  /* a regular file where a directory belongs is renamed to <name>.txt */
+  snprintf(path, sizeof(path), "%s/sc", argv[0]);
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  snprintf(path, sizeof(path), "%s/sc/sub/", argv[0]);
+  assertf(structcheck(path) == 0);
+  assertf(dir_exists(path));
+  snprintf(target, sizeof(target), "%s/sc.txt", argv[0]);
+  assertf(fexist(target));
+
+  /* the utf-8 entry point carries the same rename */
+  snprintf(path, sizeof(path), "%s/u8", argv[0]);
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  snprintf(path, sizeof(path), "%s/u8/sub/", argv[0]);
+  assertf(structcheck_utf8(path) == 0);
+  assertf(dir_exists(path));
+  snprintf(target, sizeof(target), "%s/u8.txt", argv[0]);
+  assertf(fexist_utf8(target));
+
+  printf("structcheck self-test OK\n");
+  return 0;
+}
+
 /* Each inplace_escape_*() must equal escape_*() on a copy. */
 static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
   /* >255 bytes forces the helper's malloct path, not the stack buffer */
@@ -3377,7 +3513,6 @@ static int st_status(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-#if HTS_USEZLIB
 /* Deflate src->path at windowBits (16+ gzip, + zlib, - raw); 0 on success. */
 static int ae_write_packed(const char *path, int windowBits,
                            const unsigned char *src, size_t len) {
@@ -3451,7 +3586,6 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   freet(buf);
   return ok ? 0 : 1;
 }
-#endif
 
 /* Write src[0..len) to path as-is; 0 on success. */
 static int ae_write_raw(const char *path, const unsigned char *src,
@@ -3501,7 +3635,6 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
   assertf(strstr(on, "br") == NULL && strstr(on, "zstd") == NULL);
   assertf((strstr(tls, ", br") != NULL) == (HTS_USEBROTLI != 0));
   assertf((strstr(tls, "zstd") != NULL) == (HTS_USEZSTD != 0));
-#if HTS_USEZLIB
   if (argc >= 1) {
     static const int windowBits[] = {16 + MAX_WBITS, MAX_WBITS, -MAX_WBITS};
     const unsigned char small[] =
@@ -3580,10 +3713,6 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
     }
     freet(body);
   }
-#else
-  (void) argc;
-  (void) argv;
-#endif
   printf("acceptencoding self-test OK: %s\n", on);
   return 0;
 }
@@ -3928,7 +4057,6 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     freet(big);
   }
 
-#if HTS_USEZLIB
   /* A highly compressible document decodes without running away: the ratio
      budget cannot bind (deflate tops out near 1032:1), so this pins the
      decompression path itself rather than the 64 MiB ceiling. */
@@ -3979,13 +4107,11 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     freet(z);
     freet(x);
   }
-#endif
 
   /* An unterminated <loc> at end of buffer must not read past it. */
   assertf(sm_scan("<urlset><loc>http://h.test/a", 100, &idx, &c) == 0);
   assertf(sm_scan("<urlset><lo", 100, &idx, &c) == 0);
 
-#if HTS_USEZLIB
   /* A gzip-framed document is decompressed before scanning. */
   {
     const char *const xml =
@@ -4015,7 +4141,6 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     assertf(hts_sitemap_scan(z, 4, 100, &idx, sm_take, &c) == -1);
     freet(z);
   }
-#endif
 
   /* robots.txt: only Sitemap: records, comments stripped, case-insensitive,
      and group-independent (no User-agent line needed). */
@@ -6089,6 +6214,116 @@ static int st_changes(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #747: a thread is outstanding from the moment hts_newthread() returns, not
+   from the moment it starts running, or a wait right after the spawn joins
+   nothing. One thread per round is what makes the old bug visible: the wait
+   had to find the counter at zero, and a batch of spawns gives the earlier
+   threads time to raise it. Unfixed, one round in two caught it, so the round
+   count is what turns that into a reliable failure. */
+#define THREADWAIT_N 8
+#define THREADWAIT_ROUNDS 16
+#define THREADWAIT_SLEEP_MS 50
+#define THREADWAIT_GATE_MS 10000
+
+static htsmutex threadwait_lock = HTSMUTEX_INIT;
+static int threadwait_done = 0;
+static hts_boolean threadwait_gated = HTS_FALSE;
+
+static int threadwait_count(void) {
+  int n;
+
+  hts_mutexlock(&threadwait_lock);
+  n = threadwait_done;
+  hts_mutexrelease(&threadwait_lock);
+  return n;
+}
+
+static void threadwait_thread(void *arg) {
+  (void) arg;
+  Sleep(THREADWAIT_SLEEP_MS);
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done++;
+  hts_mutexrelease(&threadwait_lock);
+}
+
+/* Stays outstanding until the gate clears, so wait_n() can be asked to leave a
+   known number of live threads behind. Bounded: a wait_n() that wrongly drains
+   them would otherwise never return, and hang the suite instead of failing. */
+static void threadwait_gated_thread(void *arg) {
+  int waited;
+
+  (void) arg;
+  for (waited = 0; waited < THREADWAIT_GATE_MS; waited += 10) {
+    hts_boolean gated;
+
+    hts_mutexlock(&threadwait_lock);
+    gated = threadwait_gated;
+    hts_mutexrelease(&threadwait_lock);
+    if (!gated)
+      break;
+    Sleep(10);
+  }
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done++;
+  hts_mutexrelease(&threadwait_lock);
+}
+
+static int st_threadwait(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+  int i, round;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* htsthread_wait() joins a thread spawned just before it */
+  for (round = 0; round < THREADWAIT_ROUNDS && !err; round++) {
+    hts_mutexlock(&threadwait_lock);
+    threadwait_done = 0;
+    hts_mutexrelease(&threadwait_lock);
+    if (hts_newthread(threadwait_thread, NULL) != 0) {
+      fprintf(stderr, "threadwait: cannot spawn\n");
+      return 1;
+    }
+    htsthread_wait();
+    if (threadwait_count() != 1) {
+      fprintf(stderr, "threadwait: round %d returned before the thread ran\n",
+              round);
+      err = 1;
+    }
+  }
+
+  /* htsthread_wait_n(n) leaves n behind rather than draining everything */
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done = 0;
+  threadwait_gated = HTS_TRUE;
+  hts_mutexrelease(&threadwait_lock);
+  for (i = 0; i < THREADWAIT_N; i++) {
+    if (hts_newthread(threadwait_gated_thread, NULL) != 0) {
+      fprintf(stderr, "threadwait: cannot spawn a gated thread\n");
+      return 1;
+    }
+  }
+  htsthread_wait_n(THREADWAIT_N);
+  if (threadwait_count() != 0) {
+    fprintf(stderr, "threadwait: wait_n(%d) joined %d gated threads\n",
+            THREADWAIT_N, threadwait_count());
+    err = 1;
+  }
+  hts_mutexlock(&threadwait_lock);
+  threadwait_gated = HTS_FALSE;
+  hts_mutexrelease(&threadwait_lock);
+  htsthread_wait();
+  if (threadwait_count() != THREADWAIT_N) {
+    fprintf(stderr, "threadwait: wait left %d/%d gated threads running\n",
+            THREADWAIT_N - threadwait_count(), THREADWAIT_N);
+    err = 1;
+  }
+
+  printf("threadwait self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -6103,11 +6338,8 @@ static void changes_race_notify(httrackp *opt, int n) {
   hts_changes_notify(opt, "race.example", fil, save, HTS_TRUE, HTS_FALSE);
 }
 
-/* htsthread_wait() counts a thread only once it is running, so it can return
-   before any of them started; join on our own counter instead. */
 static htsmutex changes_race_lock = HTSMUTEX_INIT;
 static int changes_race_started = 0;
-static int changes_race_live = 0;
 
 static int changes_race_count(int *which) {
   int n;
@@ -6127,9 +6359,6 @@ static void changes_race_thread(void *arg) {
   hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < CHANGES_RACE_ROUNDS; i++)
     changes_race_notify(opt, i % CHANGES_RACE_FILES);
-  hts_mutexlock(&changes_race_lock);
-  changes_race_live--;
-  hts_mutexrelease(&changes_race_lock);
 }
 
 /* A transfer thread the crawl never joins (FTP) reaches hts_changes_notify()
@@ -6184,7 +6413,6 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
      threads reaching a fresh one together race on the init itself. */
   hts_mutexlock(&changes_race_lock);
   changes_race_started = 0;
-  changes_race_live = 4;
   hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < 4; i++) {
     if (hts_newthread(changes_race_thread, opt) != 0) {
@@ -6198,8 +6426,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < 64; i++)
     hts_changes_report(opt, &out);
   hts_changes_close_opt(opt);
-  while (changes_race_count(&changes_race_live) > 0)
-    Sleep(10);
+  htsthread_wait();
 
   /* Sealed: a straggler must be dropped, not start a report nobody writes. */
   changes_race_notify(opt, CHANGES_RACE_FILES + 1);
@@ -6277,6 +6504,8 @@ static const struct selftest_entry {
      st_changes},
     {"changes-race", "<dir>", "--changes under a late transfer thread (#714)",
      st_changes_race},
+    {"threadwait", "", "htsthread_wait() joins threads spawned just before it",
+     st_threadwait},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},
@@ -6307,6 +6536,8 @@ static const struct selftest_entry {
     {"fsize", "<dir>", "file size past the 2GB signed-32-bit wrap", st_fsize},
     {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
      st_growsize},
+    {"addlink", "", "htsAddLink codebase walk over an empty current path",
+     st_addlink},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cacheindex", "", "cache-index (.ndx) parse must stay in bounds",
      st_cacheindex},
@@ -6330,6 +6561,9 @@ static const struct selftest_entry {
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
+    {"structcheck", "<dir>",
+     "structcheck path guard and the <name>.txt rename it performs",
+     st_structcheck},
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},

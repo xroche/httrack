@@ -598,14 +598,6 @@ static hts_boolean back_transfer_failed(const int statuscode) {
   }
 }
 
-/* Move src onto dst; RENAME does not clobber an existing target on Windows. */
-static hts_boolean replace_file(const char *src, const char *dst) {
-  if (RENAME(src, dst) == 0)
-    return HTS_TRUE;
-  (void) UNLINK(dst);
-  return RENAME(src, dst) == 0 ? HTS_TRUE : HTS_FALSE;
-}
-
 /* Commit or restore a re-fetch backup (#77 follow-up): a re-fetch over an
    existing file moved the good copy to back->tmpfile before truncating url_sav.
    commit keeps the new file and drops the backup; else restore it so an aborted
@@ -623,7 +615,7 @@ static void back_finalize_backup(httrackp *opt, lien_back *const back,
     }
     /* On failure keep the backup: an orphaned temp beats losing the good copy.
      */
-    if (!replace_file(back->tmpfile, back->url_sav))
+    if (!hts_rename_over(back->tmpfile, back->url_sav))
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "could not restore %s; previous copy kept as %s",
                     back->url_sav, back->tmpfile);
@@ -754,7 +746,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                                  "Read error when decompressing");
                     }
                     UNLINK(unpacked);
-                  } else if (replace_file(unpacked, back[p].url_sav)) {
+                  } else if (hts_rename_over(unpacked, back[p].url_sav)) {
                     /* The temp bypassed filecreate(), which is what chmods. */
 #ifndef _WIN32
                     chmod(back[p].url_sav, HTS_ACCESS_FILE);
