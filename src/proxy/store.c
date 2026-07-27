@@ -903,10 +903,11 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
       coucal hashtable = index->hash;
 
       /* Compute base path for this index - the filename MUST be absolute! */
-      for(slashes = 2, abpath = filename + (int) strlen(filename) - 1;
-          abpath > filename && ((*abpath != '/' && *abpath != '\\')
-                                || --slashes > 0);
-          abpath--) ;
+      for (slashes = 2, abpath = hts_lastcharptr(filename);
+           abpath > filename &&
+           ((*abpath != '/' && *abpath != '\\') || --slashes > 0);
+           abpath--)
+        ;
       index->path[0] = '\0';
       if (slashes == 0 && *abpath != 0) {
         int i;
@@ -1498,10 +1499,11 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 
       /* -------------------- COPY OF THE __New() CODE -------------------- */
       /* Compute base path for this index - the filename MUST be absolute! */
-      for(slashes = 2, abpath = filename + (int) strlen(filename) - 1;
-          abpath > filename && ((*abpath != '/' && *abpath != '\\')
-                                || --slashes > 0);
-          abpath--) ;
+      for (slashes = 2, abpath = hts_lastcharptr(filename);
+           abpath > filename &&
+           ((*abpath != '/' && *abpath != '\\') || --slashes > 0);
+           abpath--)
+        ;
       index->path[0] = '\0';
       if (slashes == 0 && *abpath != 0) {
         int i;
@@ -2371,11 +2373,28 @@ typedef struct PT_SaveCache__Arc_t {
   char md5[32 + 2];
 } PT_SaveCache__Arc_t;
 
+/* Append src to an .arc header block of capacity size, clipping what does not
+   fit: the values come from a cache entry, so shortening beats dropping it.
+   HTS_FALSE when it had to clip. */
+static hts_boolean arc_headers_cat(char *headers, size_t size,
+                                   const char *src) {
+  const size_t used = strlen(headers);
+  const size_t left = used < size - 1 ? size - used - 1 : 0;
+
+  if (left != 0) {
+    strlncatbuff(headers, src, size, left);
+  }
+  return strlen(src) <= left ? HTS_TRUE : HTS_FALSE;
+}
+
 static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element) {
   PT_SaveCache__Arc_t *st = (PT_SaveCache__Arc_t *) arg;
   FILE *const fp = st->fp;
   struct tm *tm = convert_time_rfc822(&st->buff, element->lastmodified);
   struct tm unknown_date;
+  /* the two strcatbuff calls closing the block rely on these 4 bytes */
+  const size_t room = sizeof(st->headers) - 4;
+  hts_boolean fit;
   int size_headers;
 
   /* a cached entry with no parseable Last-Modified must not take the writer
@@ -2387,34 +2406,42 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
     tm = &unknown_date;
   }
 
-  sprintf(st->headers,
-          "HTTP/1.0 %d %s"
-          "\r\n"
-          "X-Server: ProxyTrack " PROXYTRACK_VERSION "\r\n"
-          "Content-type: %s%s%s%s"
-          "\r\n"
-          "Last-modified: %s"
-          "\r\n"
-          "Content-length: %d"
-          "\r\n",
-          element->statuscode, element->msg,
-          /**/ hts_effective_mime(element->contenttype),
-          (element->charset[0] ? "; charset=\"" : ""),
-          (element->charset[0] ? element->charset : ""),
-          (element->charset[0] ? "\"" : ""), /**/ element->lastmodified,
-          (int) element->size);
+  fit = slprintfbuff(st->headers, room,
+                     "HTTP/1.0 %d %s"
+                     "\r\n"
+                     "X-Server: ProxyTrack " PROXYTRACK_VERSION "\r\n"
+                     "Content-type: %s%s%s%s"
+                     "\r\n"
+                     "Last-modified: %s"
+                     "\r\n"
+                     "Content-length: %d"
+                     "\r\n",
+                     element->statuscode, element->msg,
+                     /**/ hts_effective_mime(element->contenttype),
+                     (element->charset[0] ? "; charset=\"" : ""),
+                     (element->charset[0] ? element->charset : ""),
+                     (element->charset[0] ? "\"" : ""),
+                     /**/ element->lastmodified, (int) element->size);
   if (element->location != NULL && element->location[0] != '\0') {
-    sprintf(st->headers + strlen(st->headers), "Location: %s" "\r\n",
-            element->location);
-  }
-  if (element->headers != NULL) {
-    if (strlen(element->headers) <
-        sizeof(st->headers) - strlen(element->headers) - 1) {
-      strcat(st->headers, element->headers);
+    if (!arc_headers_cat(st->headers, room, "Location: ") ||
+        !arc_headers_cat(st->headers, room, element->location) ||
+        !arc_headers_cat(st->headers, room, "\r\n")) {
+      fit = HTS_FALSE;
     }
   }
-  strcat(st->headers, "\r\n");
+  if (element->headers != NULL &&
+      !arc_headers_cat(st->headers, room, element->headers)) {
+    fit = HTS_FALSE;
+  }
+  /* a clip landing mid-line must still end it, or the body reads as a header */
+  if (hts_lastchar(st->headers) != '\n') {
+    strcatbuff(st->headers, "\r\n");
+  }
+  strcatbuff(st->headers, "\r\n");
   size_headers = (int) strlen(st->headers);
+  if (!fit) {
+    fprintf(stderr, "Headers of %s clipped to %d bytes" LF, url, size_headers);
+  }
 
   /* doc == <nl><URL-record><nl><network_doc> */
 

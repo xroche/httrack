@@ -13,11 +13,6 @@ trap 'set +e; rm -rf "$dir"' EXIT
 
 pad() { printf "%${1}s" '' | tr ' ' "$2"; }
 
-# Longest surviving run of char $2 in file $1, or 0.
-runlen() {
-    grep -ao "$2\\+" "$1" | awk '{ print length($0) }' | sort -rn | head -n1 || true
-}
-
 # --- ARC reader (HTTP_READFIELD_STRING), no python needed -------------------
 # Each header overshoots its own destination, so a per-field clip is the only
 # way to get every expected length right at once.

@@ -24,6 +24,12 @@ nativepath() {
     fi
 }
 
+# Longest surviving run of char $2 in file $1, or 0: the length a field was
+# clipped to, read back out of a binary artifact.
+runlen() {
+    grep -ao "$2\\+" "$1" | awk '{ print length($0) }' | sort -rn | head -n1 || true
+}
+
 # Run an engine self-test and require its "<label>: OK" line. No pipe into grep:
 # SIGPIPE would mask a failing exit status.
 expect_ok() {

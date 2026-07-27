@@ -2057,7 +2057,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                   q = strchr(a, '?');   // ne pas traiter après '?'
                   if (!q)
-                    q = a + strlen(a) - 1;
+                    q = hts_lastcharptr(a);
                   while((p = strstr(a, "//")) && (!done)) {     // remplacer // par /
                     if (p > q) {    // après le ? (toto.cgi?param=1//2.3)
                       done = 1; // stopper
@@ -2208,7 +2208,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // OUI!!
 #if HTS_TILDE_SLASH
                 if (hts_lastchar(lien) != '/') {
-                  char *a = lien + strlen(lien) - 1;
+                  char *a = hts_lastcharptr(lien);
 
                   // éviter aussi index~1.html
                   while(a > lien && (*a != '~') && (*a != '/')
@@ -2254,7 +2254,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // vérifier que l'on ne doit pas ajouter de .class
                 if (!error) {
                   if (add_class) {
-                    char *a = lien + strlen(lien) - 1;
+                    char *a = hts_lastcharptr(lien);
 
                     while((a > lien) && (*a != '/') && (*a != '.'))
                       a--;
@@ -2309,7 +2309,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         {
                           char *a;
 
-                          a = lien + strlen(lien) - 1;
+                          a = hts_lastcharptr(lien);
                           while((*a) && (*a != '/') && (a > lien))
                             a--;
                           if (*a == '/') {
@@ -2320,8 +2320,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
 
                     if (!error) {       // pas d'erreur?
-                      if (p_type == 2) {        // code ET PAS codebase      
-                        char *a = lien + strlen(lien) - 1;
+                      if (p_type == 2) { // code ET PAS codebase
+                        char *a = hts_lastcharptr(lien);
                         char *start_of_filename = jump_identification(lien);
 
                         if (start_of_filename != NULL
