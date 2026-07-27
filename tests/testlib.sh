@@ -103,7 +103,11 @@ kill_tree() {
             taskkill /F /IM httrack.exe >/dev/null 2>&1 || true
             taskkill /F /IM python.exe >/dev/null 2>&1 || true
         fi
+        return 0
     fi
+    # No caller puts $pid in its own group on Windows (set -m is skipped there),
+    # so -"$pid" here would target whatever real group $pid's number collides
+    # with -- possibly the harness's own -- and taskkill above already reaped it.
     kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
 }
 
