@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 內嵌資源大小上限（位元組）：
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 超過此大小的資源會保留一般連結；留空則使用預設的 10485760 位元組。
+Seed the crawl from the site's sitemap
+從網站的 Sitemap 開始擷取
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+讀取網站的 Sitemap（robots.txt 中的 Sitemap: 行，然後 /sitemap.xml），並將其中列出的每個網址加入為起始網址。
+Sitemap address:
+Sitemap 位址：
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+要讀取的 Sitemap 位址，用來取代自動探測；留空則先探測 robots.txt 再探測 /sitemap.xml。

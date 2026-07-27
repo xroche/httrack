@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Najwiêkszy osadzony zasób (bajty):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Zasób wiêkszy ni¿ ten rozmiar zachowuje zwyk³y odno¶nik; pozostaw puste, aby u¿yæ domy¶lnych 10485760 bajtów.
+Seed the crawl from the site's sitemap
+Rozpocznij pobieranie od mapy witryny
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Odczytaj mapê witryny (wiersze Sitemap: w pliku robots.txt, nastêpnie /sitemap.xml) i dodaj ka¿dy wymieniony adres URL jako adres pocz±tkowy.
+Sitemap address:
+Adres mapy witryny:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adres mapy witryny do odczytania zamiast sondowania witryny; pozostaw puste, aby sprawdziæ robots.txt, a nastêpnie /sitemap.xml.

@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Tamaño máximo del recurso incrustado (bytes):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Un recurso mayor que este tamaño conserva un enlace normal; déjelo vacío para el valor predeterminado de 10485760 bytes.
+Seed the crawl from the site's sitemap
+Iniciar el rastreo desde el mapa del sitio
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Leer el mapa del sitio (líneas Sitemap: de robots.txt, luego /sitemap.xml) y añadir como dirección inicial cada URL que incluya.
+Sitemap address:
+Dirección del mapa del sitio:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Dirección de un mapa del sitio que leer en lugar de sondear el sitio; déjelo vacío para sondear robots.txt y luego /sitemap.xml.

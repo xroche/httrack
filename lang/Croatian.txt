@@ -978,3 +978,11 @@ Largest inlined asset (bytes):
 Najveæi ugraðeni resurs (bajtovi):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Resurs veæi od ove velièine zadr¾ava obiènu poveznicu; ostavite prazno za zadanih 10485760 bajtova.
+Seed the crawl from the site's sitemap
+Pokreni pretra¾ivanje iz karte web-mjesta
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Proèitaj kartu web-mjesta (retke Sitemap: iz robots.txt, zatim /sitemap.xml) i dodaj svaki navedeni URL kao poèetnu adresu.
+Sitemap address:
+Adresa karte web-mjesta:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adresa karte web-mjesta koju treba proèitati umjesto ispitivanja web-mjesta; ostavite prazno za ispitivanje robots.txt pa /sitemap.xml.
