@@ -127,24 +127,32 @@ static void wbuf_free(wbuf *b) {
   b->len = b->cap = 0;
 }
 
-/* Append n bytes; returns 0 on success, -1 on OOM/overflow. */
-static int wbuf_add(wbuf *b, const void *p, size_t n) {
+/* Make room for n more bytes; returns 0 on success, -1 on OOM/overflow. */
+static int wbuf_reserve(wbuf *b, size_t n) {
+  size_t ncap;
+  char *nd;
   if (n > (size_t) -1 - b->len)
     return -1;
-  if (b->len + n > b->cap) {
-    size_t ncap = b->cap ? b->cap : 256;
-    char *nd;
-    while (ncap < b->len + n) {
-      if (ncap > (size_t) -1 / 2)
-        return -1;
-      ncap *= 2;
-    }
-    nd = realloct(b->data, ncap);
-    if (nd == NULL)
+  if (b->len + n <= b->cap)
+    return 0;
+  ncap = b->cap ? b->cap : 256;
+  while (ncap < b->len + n) {
+    if (ncap > (size_t) -1 / 2)
       return -1;
-    b->data = nd;
-    b->cap = ncap;
+    ncap *= 2;
   }
+  nd = realloct(b->data, ncap);
+  if (nd == NULL)
+    return -1;
+  b->data = nd;
+  b->cap = ncap;
+  return 0;
+}
+
+/* Append n bytes; returns 0 on success, -1 on OOM/overflow. */
+static int wbuf_add(wbuf *b, const void *p, size_t n) {
+  if (wbuf_reserve(b, n) != 0)
+    return -1;
   memcpy(b->data + b->len, p, n);
   b->len += n;
   return 0;
@@ -156,16 +164,32 @@ static int wbuf_puts(wbuf *b, const char *s) {
 
 static int wbuf_printf(wbuf *b, const char *fmt, ...) HTS_PRINTF_FUN(2, 3);
 
+/* A header line carrying a URL has no useful bound, and giving up here loses
+   the whole record, so anything past the stack buffer is formatted into the
+   wbuf itself rather than rejected (#785). */
 static int wbuf_printf(wbuf *b, const char *fmt, ...) {
   char tmp[1024];
+  size_t need;
   int n;
   va_list ap;
   va_start(ap, fmt);
   n = vsnprintf(tmp, sizeof(tmp), fmt, ap);
   va_end(ap);
-  if (n < 0 || (size_t) n >= sizeof(tmp))
+  if (n < 0)
     return -1;
-  return wbuf_add(b, tmp, (size_t) n);
+  if ((size_t) n < sizeof(tmp))
+    return wbuf_add(b, tmp, (size_t) n);
+  need = (size_t) n + 1; /* +1: vsnprintf always writes the NUL */
+  if (wbuf_reserve(b, need) != 0)
+    return -1;
+  va_start(ap, fmt);
+  n = vsnprintf(b->data + b->len, need, fmt, ap);
+  va_end(ap);
+  /* Never advance past what was reserved, whatever the second pass returns. */
+  if (n < 0 || (size_t) n >= need)
+    return -1;
+  b->len += (size_t) n; /* the NUL is scratch, overwritten by the next append */
+  return 0;
 }
 
 /* ---- gzip-per-record member writer (mirrors ae_write_packed) ---- */

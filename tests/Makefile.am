@@ -217,6 +217,7 @@ TESTS = \
 	99_local-robots-error.test \
 	100_local-purge-longpath.test \
 	101_local-update-stale-bak.test \
-	102_local-ftp-refetch.test
+	102_local-ftp-refetch.test \
+	104_engine-warc-longurl.test
 
 CLEANFILES = check-network_sh.cache
