@@ -437,9 +437,7 @@ int url_savename(lien_adrfilsave *const afs,
 
       strcpybuff(fil_complete_patche, normfil);
       // Version avec ou sans /
-      if (fil_complete_patche[strlen(fil_complete_patche) - 1] == '/')
-        fil_complete_patche[strlen(fil_complete_patche) - 1] = '\0';
-      else
+      if (!hts_striplastchar(fil_complete_patche, '/'))
         strcatbuff(fil_complete_patche, "/");
       i = hash_read(hash, normadr, fil_complete_patche, HASH_STRUCT_ORIGINAL_ADR_PATH);       // recherche table 2 (former->adr+former->fil)
       if (i >= 0) {
@@ -515,7 +513,8 @@ int url_savename(lien_adrfilsave *const afs,
         && protocol != PROTOCOL_FTP
       ) {
       // tester type avec requète HEAD si on ne connait pas le type du fichier
-      if (!((opt->check_type == 1) && (fil[strlen(fil) - 1] == '/')))   // slash doit être html?
+      if (!((opt->check_type == 1) &&
+            (hts_lastchar(fil) == '/'))) // slash doit être html?
         if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD ||
             ishtml(opt, fil) < 0) { // unsure whether it's html or a file
           // lire dans le cache
@@ -810,7 +809,7 @@ int url_savename(lien_adrfilsave *const afs,
   // - - - DEBUT NOMMAGE - - -
 
   // Donner nom par défaut?
-  if (fil[strlen(fil) - 1] == '/') {
+  if (hts_lastchar(fil) == '/') {
     if (!strfield(adr_complete, "ftp://")
       ) {
       strcatbuff(fil, DEFAULT_HTML);    // nommer page par défaut!!
@@ -1284,7 +1283,7 @@ int url_savename(lien_adrfilsave *const afs,
 
     hts_lowcase(afs->save);
 
-    if (afs->save[strlen(afs->save) - 1] == '/')
+    if (hts_lastchar(afs->save) == '/')
       strcatbuff(afs->save, DEFAULT_HTML);   // nommer page par défaut!!
   }
 

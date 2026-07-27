@@ -1576,8 +1576,8 @@ static hts_boolean warc_commit(warc_writer *w) {
   if (!w->protect_prev)
     return HTS_TRUE; /* nothing was there to lose: written in place */
 
-  /* hts_rename_over unlinks its destination when the source is missing, so
-     every segment has to be on disk before the first rename. */
+  /* All or nothing: a swap stopping halfway would mix this run's segments with
+     the previous one's, so require every temp before renaming any. */
   swap = w->opened && !w->failed && w->unbacked_revisits == 0;
   for (s = 0; s < nseg && swap; s++) {
     snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX,
