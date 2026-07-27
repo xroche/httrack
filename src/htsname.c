@@ -65,21 +65,31 @@ Please visit our Website: http://www.httrack.com
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
 /* Based on linux/fs/umsdos/mangle.c */
+/* clang-format off: hand-grouped table, reflowed into a blob otherwise. */
+/* clang-format off */
 static const char *hts_tbdev[] = {
-  "/prn", "/con", "/aux", "/nul",
-  "/lpt1", "/lpt2", "/lpt3", "/lpt4",
-  "/com1", "/com2", "/com3", "/com4",
-  "/clock$",
-  "/emmxxxx0", "/xmsxxxx0", "/setverxx",
+  "prn", "con", "aux", "nul",
+  "lpt1", "lpt2", "lpt3", "lpt4",
+  "com1", "com2", "com3", "com4",
+  "clock$",
+  "emmxxxx0", "xmsxxxx0", "setverxx",
   ""
 };
+/* clang-format on */
 
-/* Directories the engine owns inside the mirror. A URL able to name one lands
-   on the cache or on another slot's temporary and destroys it (#774), so they
-   are escaped like the DOS devices are. */
-static const char *hts_tbreserved[] = {"/hts-cache", "/hts-tmp", ""};
+/* Directories the engine owns inside the mirror: a URL naming one lands on the
+   cache and destroys it (#774). Defence in depth; the temporaries themselves
+   live where no savename can spell them (HTS_TMPDIR in htsback.c). */
+static const char *hts_tbreserved[] = {"hts-cache", "hts-tmp", ""};
 
-/* Replace /foo/<reserved>/bar by /foo/<reserved>_/bar, matching a whole path
+/* True once the component holds only what cleanEndingSpaceOrDot() strips. */
+static hts_boolean strippedToComponentEnd(const char *s) {
+  while (*s == ' ' || *s == '.')
+    s++;
+  return *s == '\0' || *s == '/' ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Replace foo/<reserved>/bar by foo/<reserved>_/bar, matching a whole path
    component only (case-insensitively: the filesystem may be too). */
 static void escapeReservedNames(char *save, size_t size,
                                 const char *const *names) {
@@ -90,10 +100,24 @@ static void escapeReservedNames(char *save, size_t size,
     const size_t len = strlen(names[i]);
 
     while ((a = strstrcase(a, names[i]))) {
-      switch ((int) a[len]) {
-      case '\0':
-      case '/':
-      case '.': {
+      hts_boolean reserved = HTS_FALSE;
+
+      /* offset 0 opens a component too: save has had its leading '/' stripped
+         above, so anchoring the table on one never saw the first one (#842) */
+      if (a == save || a[-1] == '/') {
+        switch ((int) a[len]) {
+        case '\0':
+        case '/':
+        case '.':
+          reserved = HTS_TRUE;
+          break;
+        case ' ':
+          /* cleanEndingSpaceOrDot() runs after us and hands the name back */
+          reserved = strippedToComponentEnd(a + len);
+          break;
+        }
+      }
+      if (reserved) {
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
         tempo[0] = '\0';
@@ -102,7 +126,6 @@ static void escapeReservedNames(char *save, size_t size,
         strcatbuff(tempo, a + len);
         /* clip rather than abort: the name comes from the wire */
         (void) strclipbuff(save, size, tempo);
-      } break;
       }
       a += len;
     }

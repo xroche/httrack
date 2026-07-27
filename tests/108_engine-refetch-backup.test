@@ -17,7 +17,7 @@ if test "$rc" -ne 0 || ! grep -q "refetchbackup: OK" <<<"$out"; then
     exit 1
 fi
 
-# The temporaries live in hts-tmp and the last user removes it.
+# The temporaries live in ~hts-tmp and the last user removes it.
 leftovers=$(find "$dir" -mindepth 1 | head -5)
 test -z "$leftovers" || {
     echo "FAIL: leftover temporaries: $leftovers" >&2

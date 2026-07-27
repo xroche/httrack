@@ -198,5 +198,7 @@ TESTS += 99_local-robots-error.test
 TESTS += 107_local-bak-collision.test
 TESTS += 108_engine-refetch-backup.test
 TESTS += 122_local-warc-revisit-headers.test
+TESTS += 131_local-savename-reserved.test
+TESTS += 132_local-bak-space-collision.test
 TESTS += 119_local-proxytrack-ndx-fields2.test
 TESTS += 118_local-proxytrack-arcwrite.test

@@ -6386,9 +6386,8 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
 }
 
 // -#test=refetchbackup <dir>: the #77 re-fetch backup must build its temporary
-// inside the reserved hts-tmp directory, whose segment url_savename escapes so
-// no mirrored file can ever sit there (#774), and must never leave the resource
-// without a copy (#775).
+// inside the ~hts-tmp directory, which no save name can spell (#774), and must
+// never leave the resource without a copy (#775).
 static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
   lien_back *back;
   char want[HTS_URLMAXSIZE * 2 + 32];
@@ -6406,10 +6405,10 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
   /* explicit separator: fconcat() joins without one, which would put the
      temporary in the parent of the directory under test */
   snprintf(back->url_sav, sizeof(back->url_sav), "%s/refetch.bin", argv[0]);
-  snprintf(want, sizeof(want), "%s/hts-tmp/refetch.bin.bak", argv[0]);
+  snprintf(want, sizeof(want), "%s/~hts-tmp/refetch.bin.bak", argv[0]);
 
-  /* #774: pin the name, so moving the temporary out of the reserved directory
-     cannot pass without url_savename reserving wherever it went instead. */
+  /* #774: pin the name, so moving the temporary back into the mirror namespace
+     cannot pass unnoticed. */
   ro_put(back->url_sav, "old");
   back_refetch_backup(opt, back);
   if (back->tmpfile == NULL || fexist_utf8(back->url_sav)) {
