@@ -203,4 +203,5 @@ TESTS += 119_local-proxytrack-ndx-fields2.test
 TESTS += 118_local-proxytrack-arcwrite.test
 TESTS += 134_local-warc-revisit-ip.test
 TESTS += 135_local-warc-forced-notmodified.test
+TESTS += 137_local-charsetless-encoding.test
 TESTS += 133_engine-reentrant-time.test
