@@ -773,7 +773,7 @@ int httpmirror(char *url1, httrackp * opt) {
         // sauter les + sans rien après..
         if (strnotempty(tempo)) {
           if ((plus == 0) && (type == 1)) {     // implicite: *www.edf.fr par exemple
-            if (tempo[strlen(tempo) - 1] != '*') {
+            if (hts_lastchar(tempo) != '*') {
               strcatbuff(tempo, "*");   // ajouter un *
             }
           }
@@ -1819,60 +1819,6 @@ int httpmirror(char *url1, httrackp * opt) {
         // -- -- --
         // sauver fichier
 
-        /* En cas d'erreur, vérifier que fichier d'erreur existe */
-        if (strnotempty(savename()) == 0) {       // chemin de sauvegarde existant
-          if (strcmp(urlfil(), "/robots.txt") == 0) {     // pas robots.txt
-            if (store_errpage) {        // c'est une page d'erreur
-              int create_html_warning = 0;
-              int create_gif_warning = 0;
-
-              switch (ishtml(opt, urlfil())) {    /* pas fichier html */
-              case 0:          /* non html */
-                {
-                  char buff[256];
-
-                  guess_httptype_sized(opt, buff, sizeof(buff), urlfil());
-                  if (strcmp(buff, "image/gif") == 0)
-                    create_gif_warning = 1;
-                }
-                break;
-              case 1:          /* html */
-                if (!r.adr) {
-                }
-                break;
-              default:         /* don't know.. */
-                break;
-              }
-              /* Créer message d'erreur ? */
-              if (create_html_warning) {
-                char *adr =
-                  (char *) malloct(strlen(HTS_DATA_ERROR_HTML) + 1100);
-                hts_log_print(opt, LOG_INFO, "Creating HTML warning file (%s)",
-                              r.msg);
-                if (adr) {
-                  if (r.adr) {
-                    freet(r.adr);
-                    r.adr = NULL;
-                  }
-                  sprintf(adr, HTS_DATA_ERROR_HTML, r.msg);
-                  r.adr = adr;
-                }
-              } else if (create_gif_warning) {
-                char *adr = (char *) malloct(HTS_DATA_UNKNOWN_GIF_LEN);
-
-                hts_log_print(opt, LOG_INFO, "Creating GIF dummy file (%s)",
-                              r.msg);
-                if (r.adr) {
-                  freet(r.adr);
-                  r.adr = NULL;
-                }
-                memcpy(adr, HTS_DATA_UNKNOWN_GIF, HTS_DATA_UNKNOWN_GIF_LEN);
-                r.adr = adr;
-              }
-            }
-          }
-        }
-
         if (strnotempty(savename()) == 0) {       // pas de chemin de sauvegarde
           if (strcmp(urlfil(), "/robots.txt") == 0) {     // robots.txt
             char BIGSTK sitemaps[8192];
@@ -2190,7 +2136,9 @@ int httpmirror(char *url1, httrackp * opt) {
                   continue;
                 strcpybuff(file, StringBuff(opt->path_html));
                 strcatbuff(file, line + 1);
-                file[strlen(file) - 1] = '\0';
+                /* strip filenote()'s ']', absent when linput() truncated the
+                   line */
+                hts_striplastchar(file, ']');
                 hts_changes_previous(opt, file + StringLength(opt->path_html));
                 if (!strstr(adr, line)) { // not found in the new list?
                   if (fexist_utf8(file)) { // still on disk
@@ -2217,12 +2165,11 @@ int httpmirror(char *url1, httrackp * opt) {
                 fseek(old_lst, 0, SEEK_SET);
                 while(!feof(old_lst)) {
                   linput(old_lst, line, 1000);
-                  while(strnotempty(line) && (line[strlen(line) - 1] != '/')
-                        && (line[strlen(line) - 1] != '\\')) {
-                    line[strlen(line) - 1] = '\0';
+                  while (strnotempty(line) && (hts_lastchar(line) != '/') &&
+                         (hts_lastchar(line) != '\\')) {
+                    hts_choplastchar(line);
                   }
-                  if (strnotempty(line))
-                    line[strlen(line) - 1] = '\0';
+                  hts_choplastchar(line);
                   if (strnotempty(line))
                     if (!strstr(adr, line)) {   // non trouvé?
                       char BIGSTK file[HTS_URLMAXSIZE * 2];
@@ -2235,13 +2182,12 @@ int httpmirror(char *url1, httrackp * opt) {
                         if (opt->log) {
                           hts_log_print(opt, LOG_INFO, "Purging directory %s/",
                                         file);
-                          while(strnotempty(file)
-                                && (file[strlen(file) - 1] != '/')
-                                && (file[strlen(file) - 1] != '\\')) {
-                            file[strlen(file) - 1] = '\0';
+                          while (strnotempty(file) &&
+                                 (hts_lastchar(file) != '/') &&
+                                 (hts_lastchar(file) != '\\')) {
+                            hts_choplastchar(file);
                           }
-                          if (strnotempty(file))
-                            file[strlen(file) - 1] = '\0';
+                          hts_choplastchar(file);
                         }
                       }
                     }

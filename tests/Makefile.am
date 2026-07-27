@@ -1,7 +1,7 @@
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) crawl-test.sh run-all-tests.sh check-network.sh \
+EXTRA_DIST = $(TESTS) renamefail.c crawl-test.sh run-all-tests.sh check-network.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	pty-resize.py \
@@ -21,6 +21,15 @@ TESTS_ENVIRONMENT += BROTLI_ENABLED=$(BROTLI_ENABLED)
 TESTS_ENVIRONMENT += ZSTD_ENABLED=$(ZSTD_ENABLED)
 TESTS_ENVIRONMENT += V6_SUPPORT=$(V6_SUPPORT)
 TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
+TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
+TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
+
+# rename() interposer for 01_engine-renameover.test; -rpath is what makes
+# libtool build a shared module rather than a static-only convenience library.
+check_LTLIBRARIES = librenamefail.la
+librenamefail_la_SOURCES = renamefail.c
+librenamefail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+librenamefail_la_LIBADD = $(DL_LIBS)
 
 TEST_EXTENSIONS = .test
 # Run each .test through bash instead of execve()ing it. This lets "make check"
@@ -59,6 +68,7 @@ TESTS = \
 	01_engine-identabs.test \
 	01_engine-escape-room.test \
 	01_engine-inplace-escape.test \
+	01_engine-lastchar.test \
 	01_engine-makeindex.test \
 	01_engine-mime.test \
 	01_engine-parse.test \
@@ -74,6 +84,7 @@ TESTS = \
 	01_engine-direnum.test \
 	01_engine-cookieimport.test \
 	01_engine-relative.test \
+	01_engine-renameover.test \
 	01_engine-robots.test \
 	01_engine-savename.test \
 	01_engine-selftest-dispatch.test \
@@ -201,6 +212,9 @@ TESTS = \
 	96_local-refetch-keep.test \
 	97_local-warc-update-keep.test \
 	98_local-warc-segments.test \
-	99_engine-warc-longurl.test
+	99_local-robots-error.test \
+	100_local-purge-longpath.test \
+	101_local-update-stale-bak.test \
+	102_engine-warc-longurl.test
 
 CLEANFILES = check-network_sh.cache
