@@ -520,12 +520,13 @@ static void proxytrack_add_DAV_Item(String * item, String * buff,
                                     const char *filename, size_t size,
                                     time_t timestamp, const char *mime,
                                     int isDir, int isRoot, int isDefault) {
-  struct tm *timetm;
+  struct tm timetmbuf;
+  struct tm *timetm = &timetmbuf;
 
   if (timestamp == (time_t) 0 || timestamp == (time_t) - 1) {
     timestamp = time(NULL);
   }
-  if ((timetm = gmtime(&timestamp)) != NULL) {
+  if (hts_gmtime(timestamp, timetm)) {
     char tms[256 + 1];
     const char *name;
 

@@ -53,13 +53,13 @@ echo "stub browser invoked with: \$1" >&2
 opturl="\${1%/}/server/option2.html"
 warcurl="\${1%/}/server/option9.html"
 smurl="\${1%/}/server/option8.html"
-if body="\$(curl -fsSL --max-time 20 "\$1")" && printf '%s' "\$body" | grep -qai httrack && printf '%s' "\$body" | grep -qaF step2.html &&
-    opt="\$(curl -fsSL --max-time 20 "\$opturl")" && printf '%s' "\$opt" | grep -qaF "title='" &&
-    printf '%s' "\$opt" | grep -qaF 'name="singlefile"' && printf '%s' "\$opt" | grep -qaF 'name="singlefilemax"' &&
-    ! printf '%s' "\$opt" | grep -qaF '\${LANG_SINGLEFILE}' &&
-    warc="\$(curl -fsSL --max-time 20 "\$warcurl")" && printf '%s' "\$warc" | grep -qaF 'name="warcfile"' && printf '%s' "\$warc" | grep -qaF WARC &&
-    printf '%s' "\$warc" | grep -qaF 'name="changes"' && printf '%s' "\$warc" | grep -qaF hts-changes.json &&
-    sm="\$(curl -fsSL --max-time 20 "\$smurl")" && printf '%s' "\$sm" | grep -qaF 'name="sitemapurl"' && printf '%s' "\$sm" | grep -qaF 'name="sitemap"'; then
+if body="\$(curl -fsSL --max-time 20 "\$1")" && grep -qai httrack <<<"\$body" && grep -qaF step2.html <<<"\$body" &&
+    opt="\$(curl -fsSL --max-time 20 "\$opturl")" && grep -qaF "title='" <<<"\$opt" &&
+    grep -qaF 'name="singlefile"' <<<"\$opt" && grep -qaF 'name="singlefilemax"' <<<"\$opt" &&
+    ! grep -qaF '\${LANG_SINGLEFILE}' <<<"\$opt" &&
+    warc="\$(curl -fsSL --max-time 20 "\$warcurl")" && grep -qaF 'name="warcfile"' <<<"\$warc" && grep -qaF WARC <<<"\$warc" &&
+    grep -qaF 'name="changes"' <<<"\$warc" && grep -qaF hts-changes.json <<<"\$warc" &&
+    sm="\$(curl -fsSL --max-time 20 "\$smurl")" && grep -qaF 'name="sitemapurl"' <<<"\$sm" && grep -qaF 'name="sitemap"' <<<"\$sm"; then
     echo PASS >"$marker"
 else
     echo "FAIL: unexpected response from \$1" >"$marker"
