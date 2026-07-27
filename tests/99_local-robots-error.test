@@ -1,13 +1,17 @@
 #!/bin/bash
-# Issue #769: -o1 with .txt assumed image/gif was the one input reaching the
-# removed --errpage placeholder block, which over-read in robots_parse.
+# Issue #769: a failed robots.txt probe under -o1, with .txt assumed image/gif,
+# still drives the --sitemap fallback and substitutes no placeholder body.
 
 set -eu
 
 : "${top_srcdir:=..}"
 
+# -Z: both the removed block's own log line and the failed probe that gates
+# this test's coverage are debug-level.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'sitemapdir/orphan1.html' \
+    --log-found 'No robots\.txt rules at' \
     --log-found 'listed by 127\.0\.0\.1:[0-9]+/sitemap\.xml' \
-    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 -o1 \
+    --log-not-found 'Creating GIF dummy file' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 -o1 -Z \
     --assume 'txt=image/gif' -F 'errorrobots-agent'

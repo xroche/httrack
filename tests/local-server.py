@@ -555,8 +555,8 @@ class Handler(SimpleHTTPRequestHandler):
     # ... and one that points the sitemap at the site root, to check a subtree
     # crawl is not widened by where the site chooses to put its sitemap.
     SCOPE_SITEMAP_UA = "scopesitemap"
-    # ... and one that fails the probe with a body larger than the 1070-byte
-    # placeholder GIF the --errpage block used to substitute (issue #769).
+    # ... and one whose probe fails, with a body past the 1070 bytes that
+    # issue #769's over-read needed.
     ERROR_ROBOTS_UA = "errorrobots"
 
     def route_robots(self):
