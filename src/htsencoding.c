@@ -62,7 +62,27 @@ static int get_hex_value(char c) {
     (HASH) *= HASH_PRIME;                                                      \
   } while (0)
 
+/* Did converting utf8 to charset preserve the code point? Windows substitutes
+   '?' for one the charset lacks rather than failing, so only converting back
+   tells a real conversion from a lossy one. */
+static hts_boolean charset_represents(const char *utf8, const char *converted,
+                                      const char *charset) {
+  char *back = hts_convertStringToUTF8(converted, strlen(converted), charset);
+  const hts_boolean same =
+      back != NULL && strcmp(back, utf8) == 0 ? HTS_TRUE : HTS_FALSE;
+
+  freet(back);
+  return same;
+}
+
 int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t max, const char *charset) {
+  return hts_unescapeEntitiesWithCharsetSpecial(src, dest, max, charset, 0);
+}
+
+int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
+                                           const size_t max,
+                                           const char *charset,
+                                           const int flags) {
   size_t i, j, ampStart, ampStartDest;
   int uc;
   int hex;
@@ -123,6 +143,10 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
               char *s;
               buffer[ulen] = '\0';
               s = hts_convertStringFromUTF8(buffer, strlen(buffer), charset);
+              if (s != NULL && (flags & UNESCAPE_ENTITIES_URL_QUERY) != 0 &&
+                  !charset_represents(buffer, s, charset)) {
+                freet(s);
+              }
               if (s != NULL) {
                 const size_t sLen = strlen(s);
                 if (sLen < maxOut) {
@@ -130,7 +154,18 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
                   memcpy(&dest[ampStartDest], s, sLen);
                   len = sLen;
                 }
-                free(s);
+                freet(s);
+              } else if ((flags & UNESCAPE_ENTITIES_URL_QUERY) != 0) {
+                /* URL Standard: an unrepresentable code point is written
+                   %26%23<decimal>%3B rather than left as source text. */
+                char esc[32];
+                const int escLen =
+                    snprintf(esc, sizeof(esc), "%%26%%23%d%%3B", uc);
+
+                if (escLen > 0 && (size_t) escLen < maxOut) {
+                  memcpy(&dest[ampStartDest], esc, (size_t) escLen);
+                  len = (size_t) escLen;
+                }
               }
             }
           }

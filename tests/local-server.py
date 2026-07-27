@@ -1196,6 +1196,42 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # Character references in a query string (#854). The charset-less page falls
+    # back to iso-8859-1, which represents é but not €; CHARREF_LOG collects the
+    # request-target the origin actually saw.
+    CHARREF_QUERY = "?a=&euro;&b=&#8364;&c=&eacute;&d=x"
+
+    def record_charref(self):
+        log = os.environ.get("CHARREF_LOG")
+        if log:
+            with open(log, "a") as fp:
+                fp.write(self.path + "\n")
+
+    def route_charref(self):
+        path = urlsplit(self.path).path
+        if path == "/charref/index.html":
+            self.send_raw(
+                b'<html><body><a href="none.html">n</a>'
+                b'<a href="utf8.html">u</a></body></html>',
+                "text/html",
+            )
+        elif path in ("/charref/none.html", "/charref/utf8.html"):
+            target = "qnone.html" if path.endswith("none.html") else "qutf8.html"
+            ctype = (
+                "text/html" if target == "qnone.html" else "text/html; charset=utf-8"
+            )
+            body = '<html><body><a href="%s%s">q</a></body></html>' % (
+                target,
+                self.CHARREF_QUERY,
+            )
+            self.send_raw(body.encode(), ctype)
+        elif path in ("/charref/qnone.html", "/charref/qutf8.html"):
+            self.send_raw(b"<html><body>q</body></html>", "text/html")
+        else:
+            self.send_response(404)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
     # resume / 416 loop (#206): the first GET stalls after a prefix so the crawl
     # can be interrupted (partial + temp-ref); every later request is 416.
     RESUME_PREFIX = b"PARTIAL-" + b"x" * 4096  # flushed before the stall
@@ -2362,6 +2398,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/charset/"):
             self.route_charset()
             return True
+        if path.startswith("/charref/"):
+            self.route_charref()
+            return True
         # Match percent-encoded paths (accented #157 route) by their decoded form.
         handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))
         if handler is None:
@@ -2377,6 +2416,9 @@ class Handler(SimpleHTTPRequestHandler):
         return False
 
     def do_GET(self):
+        # Before reject_fragment(), so an unescaped '#' still shows up recorded.
+        if self.path.startswith("/charref/"):
+            self.record_charref()
         if self.reject_fragment():
             return
         if not self.dispatch():
