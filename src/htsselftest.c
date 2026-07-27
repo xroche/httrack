@@ -6637,7 +6637,6 @@ static void gmtime_thread(void *arg) {
 
 static int st_gmtime(httrackp *opt, int argc, char **argv) {
   static int idx[GMTIME_THREADS];
-  struct tm first, second;
   int err = 0, i;
 
   (void) opt;
@@ -6660,11 +6659,19 @@ static int st_gmtime(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* the first result must survive the second call */
-  if (hts_gmtime(gmtime_refs[0].t, &first) &&
-      hts_gmtime(gmtime_refs[1].t, &second) && !gmtime_ref_matches(0, &first)) {
-    fprintf(stderr, "gmtime: a second conversion disturbed the first\n");
-    err = 1;
+  /* the return is the only failure signal the callers have, so a helper that
+     always claims success leaves them formatting an uninitialised struct tm.
+     Out of range for a 64-bit time_t: NULL from gmtime_r, EINVAL from
+     _gmtime64_s. */
+  if (sizeof(time_t) >= 8) {
+    const time_t far = (time_t) INT64_MAX;
+    struct tm tmv;
+
+    if (hts_gmtime(far, &tmv)) {
+      fprintf(stderr,
+              "gmtime: an out-of-range time_t was reported converted\n");
+      err = 1;
+    }
   }
 
   for (i = 0; i < GMTIME_THREADS; i++) {

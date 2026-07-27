@@ -24,6 +24,24 @@ nativepath() {
     fi
 }
 
+# Run an engine self-test and require its "<label>: OK" line. No pipe into grep:
+# SIGPIPE would mask a failing exit status.
+expect_ok() {
+    local label="$1" out
+    shift
+    out=$("$@" 2>&1) || {
+        echo "FAIL: ${label} exited non-zero: ${out}"
+        exit 1
+    }
+    case "$out" in
+    *"${label}: OK"*) ;;
+    *)
+        echo "FAIL: ${out}"
+        exit 1
+        ;;
+    esac
+}
+
 is_windows() {
     case "$(uname -s)" in
     MINGW* | MSYS* | CYGWIN*) return 0 ;;
