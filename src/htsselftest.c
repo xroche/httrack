@@ -5955,6 +5955,91 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static void ro_put(const char *path, const char *data) {
+  FILE *const fp = FOPEN(path, "wb");
+
+  assertf(fp != NULL);
+  assertf(fwrite(data, 1, strlen(data), fp) == strlen(data));
+  fclose(fp);
+}
+
+/* HTS_TRUE if path holds exactly data. */
+static hts_boolean ro_is(const char *path, const char *data) {
+  char buf[64];
+  FILE *const fp = FOPEN(path, "rb");
+  size_t n;
+
+  if (fp == NULL)
+    return HTS_FALSE;
+  n = fread(buf, 1, sizeof(buf), fp);
+  fclose(fp);
+  return n == strlen(data) && memcmp(buf, data, n) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+// -#test=renameover <dir>: hts_rename_over() must replace an existing dst, and
+// must never delete a dst it did not replace (#779). POSIX rename() clobbers on
+// its own, so the unlink fallback is only reached under the LD_PRELOAD shim the
+// test also runs this under.
+static int st_renameover(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "renameover: needs a writable base dir\n");
+    return 1;
+  }
+  char src[HTS_URLMAXSIZE * 2], dst[HTS_URLMAXSIZE * 2];
+  int err = 0;
+
+  fconcat(src, sizeof(src), argv[0], "renameover-src.bin");
+  fconcat(dst, sizeof(dst), argv[0], "renameover-dst.bin");
+
+  /* Tell the harness whether the unlink fallback is reachable at all here: it
+     is dead unless rename() refuses an existing target, as Windows' does. */
+  (void) UNLINK(src);
+  (void) UNLINK(dst);
+  ro_put(src, "probe");
+  ro_put(dst, "probe");
+  if (RENAME(src, dst) != 0)
+    printf("renameover: fallback exercised, rename refuses an existing "
+           "target\n");
+
+  /* An existing dst must still be replaced: that is what the unlink is for. */
+  (void) UNLINK(src);
+  (void) UNLINK(dst);
+  ro_put(src, "new");
+  ro_put(dst, "old");
+  if (!hts_rename_over(src, dst)) {
+    fprintf(stderr, "renameover: replacing an existing dst failed: %s\n",
+            strerror(errno));
+    err++;
+  } else if (!ro_is(dst, "new") || fexist_utf8(src)) {
+    fprintf(stderr, "renameover: dst was not replaced by src\n");
+    err++;
+  }
+
+  /* A missing src must leave dst alone and report failure. */
+  (void) UNLINK(src);
+  ro_put(dst, "keep");
+  if (hts_rename_over(src, dst)) {
+    fprintf(stderr, "renameover: a missing src reported success\n");
+    err++;
+  }
+  if (!ro_is(dst, "keep")) {
+    fprintf(stderr, "renameover: a missing src destroyed dst\n");
+    err++;
+  }
+
+  /* Same, with dst absent too: nothing to lose, still a failure. */
+  (void) UNLINK(dst);
+  if (hts_rename_over(src, dst)) {
+    fprintf(stderr, "renameover: a missing src and dst reported success\n");
+    err++;
+  }
+
+  (void) UNLINK(dst);
+  printf("renameover: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 // -#test=direnum <dir>: enumerate a long+non-ASCII directory via the
 // opendir/readdir wrappers; children must round-trip as UTF-8 (#133,#630).
 static int st_direnum(httrackp *opt, int argc, char **argv) {
@@ -6603,6 +6688,10 @@ static const struct selftest_entry {
     {"mirrorio", "<dir>",
      "round-trip a long+non-ASCII path through the mirror I/O wrappers",
      st_mirrorio},
+    {"renameover", "<dir>",
+     "hts_rename_over(): replace dst, but never delete a dst it did not "
+     "replace",
+     st_renameover},
     {"direnum", "<dir>",
      "enumerate a long+non-ASCII directory through opendir/readdir",
      st_direnum},

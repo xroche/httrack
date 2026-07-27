@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Drives -#test=renameover: hts_rename_over() must replace an existing dst, and
+# must leave dst alone when src is missing (#779). The second run interposes a
+# rename() with the Windows shape (refuses an existing target with EACCES),
+# which is the only way to reach the unlink fallback on POSIX.
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=renameover "$dir" | grep -q "renameover: OK"
+
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "renameover: LD_PRELOAD interposition is Linux-only here, skipping"
+    exit 0
+fi
+# Not a skip on Linux: a missing module would make the leg vacuous.
+if [ ! -r "${RENAMEFAIL_LIB:-}" ]; then
+    echo "renameover: ${RENAMEFAIL_LIB:-\$RENAMEFAIL_LIB} was not built" >&2
+    exit 1
+fi
+
+out=$(LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \
+    -#test=renameover "$dir")
+echo "$out" | grep -q "renameover: OK"
+# A shim that never fired would make the leg vacuous.
+echo "$out" | grep -q "renameover: fallback exercised"

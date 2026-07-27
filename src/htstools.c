@@ -1451,7 +1451,14 @@ hts_boolean hts_rename_over(const char *src, const char *dst) {
   fconv(cdst, sizeof(cdst), dst);
   if (RENAME(csrc, cdst) == 0)
     return HTS_TRUE;
-  /* RENAME does not clobber an existing target on Windows. */
+  /* Unlink only for the failure the fallback exists for: a dst in the way,
+     which Windows' rename() reports as EACCES (POSIX replaces it silently). A
+     src that was never written must leave dst alone, whatever errno says --
+     the CRT does not promise ENOENT over EACCES when both hold. */
+  const int err = errno;
+
+  if ((err != EACCES && err != EEXIST) || !fexist_utf8(src))
+    return HTS_FALSE;
   (void) UNLINK(cdst);
   return RENAME(csrc, cdst) == 0 ? HTS_TRUE : HTS_FALSE;
 }
