@@ -4,7 +4,7 @@
 EXTRA_DIST = $(TESTS) renamefail.c crawl-test.sh run-all-tests.sh check-network.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
-	pty-resize.py \
+	pty-resize.py test-timeout.sh \
 	local-crawl.sh local-server.py ftp-server.py testlib.sh \
 	server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
@@ -37,7 +37,12 @@ TEST_EXTENSIONS = .test
 # work when the source tree sits on a noexec filesystem (the driver would
 # otherwise fail with "Permission denied"), and removes any reliance on the
 # scripts' executable bit. The scripts are #!/bin/bash and use bash features.
-TEST_LOG_COMPILER = $(BASH)
+#
+# test-timeout.sh wraps that in a wall-clock budget: a wedged test must fail
+# named, with diagnostics, rather than hang the job until CI cancels it -- a
+# cancelled step keeps neither its log nor its artifacts, so today a hang tells
+# us nothing at all. HTTRACK_TEST_TIMEOUT overrides the budget; 0 disables it.
+TEST_LOG_COMPILER = $(BASH) $(srcdir)/test-timeout.sh
 TESTS = \
 	00_runnable.test \
 	01_engine-addlink.test \
@@ -218,6 +223,7 @@ TESTS = \
 	100_local-purge-longpath.test \
 	101_local-update-stale-bak.test \
 	102_local-ftp-refetch.test \
-	104_engine-warc-longurl.test
+	104_engine-warc-longurl.test \
+	105_suite-timeout.test
 
 CLEANFILES = check-network_sh.cache
