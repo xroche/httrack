@@ -5605,7 +5605,13 @@ static const char sf_page[] =
     "<link rel=\"stylesheet\" href=\"css/main.css\">\n"
     "<link rel=\"canonical\" href=\"other.html\">\n"
     "<title>t</title>\n"
-    "<style>body { background: url(\"img/a%20b.png\"); }</style>\n"
+    "<style>body { background: url(\"img/a%20b.png\"); }\n"
+    /* Everything the escape set has to neutralise before a fragment reaches an
+       unquoted url() token: whitespace, '<'/'>', then a quote, a paren, a
+       backslash and a high byte together. */
+    "b { background: url('img/sprite.svg#w x'); }\n"
+    "i { background: url('img/sprite.svg#lt<s>gt'); }\n"
+    "u { background: url(\"img/sprite.svg#z'(\\\xC3\xA9\"); }</style>\n"
     "</head><body>\n"
     "<img src=\"img/a%20b.png\" srcset=\"img/a%20b.png 1x, img/big.png 2x\">\n"
     "<link rel=\"icon\" href=\"icon.png\">\n"
@@ -5648,6 +5654,8 @@ static const char sf_page[] =
     /* Already carries the document's own escapes: re-encoding either would
        make the browser look for a different id. */
     "<img src=\"img/sprite.svg#g&amp;h%2Di\">\n"
+    /* A '"' left raw here would end the attribute the rewriter re-quotes. */
+    "<img src='img/sprite.svg#q\"z'>\n"
     "<img src=\"missing.png\" >\n"
     "<!--><img src=\"img/a%20b.png\">\n"
     "<div style=\"background:url(img/a%20b.png)\"></div>\n"
@@ -5842,6 +5850,14 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   sf_check(strstr(out, "?v=1") == NULL, "query carried onto the data: URI");
   sf_check(sf_count(out, "#g&amp;h%2Di\"") == 1,
            "an escape the document already carried was encoded again");
+  sf_check(sf_count(out, "#q%22z\"") == 1,
+           "a quote in a fragment was not escaped");
+  sf_check(sf_count(out, "#w%20x)") == 1,
+           "whitespace in a fragment was not escaped");
+  sf_check(sf_count(out, "#lt%3Cs%3Egt)") == 1,
+           "'<'/'>' in a fragment were not escaped");
+  sf_check(sf_count(out, "#z%27%28%5C%C3%A9)") == 1,
+           "a quote, paren, backslash or high byte was left raw");
 
   sf_check(strstr(out, "img/big.png 2x") != NULL, "over-cap asset inlined");
   sf_check(strstr(out, " 1x") != NULL, "srcset descriptor lost");
