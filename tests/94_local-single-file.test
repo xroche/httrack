@@ -1,0 +1,379 @@
+#!/bin/bash
+# Issue #713: --single-file inlines each page's assets as data: URIs. End to
+# end over a real crawl, decoding the payloads against what the server served.
+set -e
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_713.XXXXXX") || exit 1
+serverpid=
+htssrv=
+cleanup() {
+    stop_server "$serverpid"
+    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
+    test -z "$htssrv" || kill -9 "$htssrv" 2>/dev/null || true
+    wait "$htssrv" 2>/dev/null || true # absorb bash's async "Killed" notice
+    htssrv=
+    rm -rf "$tmpdir"
+}
+trap cleanup EXIT HUP INT QUIT PIPE TERM
+
+# --- the site ---------------------------------------------------------------
+doc="${tmpdir}/doc"
+mkdir -p "$doc"
+cat >"${doc}/index.html" <<'EOF'
+<html><head>
+<link rel="stylesheet" href="style.css">
+<link rel="canonical" href="other.html">
+</head><body>
+<img src="pixel.svg" alt="p">
+<img src="big.svg" alt="b">
+<img src="pixel.svg" data-src="lazy.svg" alt="l">
+<script src="app.js"></script>
+<a href="other.html">other</a>
+</body></html>
+EOF
+cat >"${doc}/other.html" <<'EOF'
+<html><body><a href="index.html">back</a></body></html>
+EOF
+cat >"${doc}/style.css" <<'EOF'
+@import "nested.css";
+body { background: url(pixel.svg); }
+EOF
+cat >"${doc}/nested.css" <<'EOF'
+div { background: url(pixel.svg); }
+EOF
+printf 'var app = 1;\n' >"${doc}/app.js"
+printf '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>\n' \
+    >"${doc}/pixel.svg"
+printf '<svg xmlns="http://www.w3.org/2000/svg"><circle r="1"/></svg>\n' \
+    >"${doc}/lazy.svg"
+{
+    printf '<svg xmlns="http://www.w3.org/2000/svg"><!--'
+    head -c 20000 /dev/zero | tr '\0' 'x'
+    printf '%s\n' '--><rect width="1" height="1"/></svg>'
+} >"${doc}/big.svg"
+
+# --- server -----------------------------------------------------------------
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+"$python" "$server" --root "$(nativepath "$doc")" >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$serverlog" 2>/dev/null)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "server exited early: $(cat "$serverlog")"
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover server port"
+    exit 1
+}
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+
+# --- crawl ------------------------------------------------------------------
+# The cap sits between pixel.svg and big.svg, so one inlines and one must not.
+out="${tmpdir}/crawl"
+mkdir "$out"
+common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0)
+httrack "${common[@]}" --single-file --single-file-max-size 4096 \
+    "${base}/index.html" >"${tmpdir}/log1" 2>&1
+
+page="${out}/127.0.0.1_${port}/index.html"
+test -f "$page" || {
+    echo "FAIL: no mirrored page at $page"
+    exit 1
+}
+
+# --- what must be inlined, byte for byte ------------------------------------
+# The decoder is python, not httrack, so a broken encoder cannot agree with
+# itself here.
+extract() {
+    "$python" - "$1" "$2" "$3" <<'PY'
+import base64, re, sys
+html = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
+m = re.search(r'data:%s;base64,([A-Za-z0-9+/=]*)' % re.escape(sys.argv[2]), html)
+if m is None:
+    sys.exit(1)
+open(sys.argv[3], "wb").write(base64.b64decode(m.group(1)))
+PY
+}
+
+printf '[image inlined and identical] ..\t'
+extract "$page" "image/svg+xml" "${tmpdir}/got.svg" || {
+    echo "FAIL: no inlined image"
+    exit 1
+}
+cmp -s "${doc}/pixel.svg" "${tmpdir}/got.svg" || {
+    echo "FAIL: inlined image differs from the served file"
+    exit 1
+}
+echo OK
+
+printf '[script inlined and identical] ..\t'
+extract "$page" "application/x-javascript" "${tmpdir}/got.js" || {
+    echo "FAIL: no inlined script"
+    exit 1
+}
+cmp -s "${doc}/app.js" "${tmpdir}/got.js" || {
+    echo "FAIL: inlined script differs from the served file"
+    exit 1
+}
+echo OK
+
+printf '[lazy-loaded image inlined] ..\t'
+# src is the placeholder a real page ships; the asset rides data-src.
+grep -q 'data-src="data:image/svg+xml;base64,' "$page" || {
+    echo "FAIL: data-src was not inlined"
+    exit 1
+}
+if grep -q 'data-src="lazy.svg"' "$page"; then
+    echo "FAIL: data-src kept its link"
+    exit 1
+fi
+test -f "${out}/127.0.0.1_${port}/lazy.svg" || {
+    echo "FAIL: the lazy image was never downloaded, so nothing was proven"
+    exit 1
+}
+echo OK
+
+printf '[stylesheet inlined, recursively] ..\t'
+extract "$page" "text/css" "${tmpdir}/got.css" || {
+    echo "FAIL: no inlined stylesheet"
+    exit 1
+}
+grep -q 'url(data:image/svg+xml;base64,' "${tmpdir}/got.css" || {
+    echo "FAIL: url() inside the inlined stylesheet was not inlined"
+    exit 1
+}
+extract "${tmpdir}/got.css" "text/css" "${tmpdir}/got2.css" || {
+    echo "FAIL: @import was not inlined"
+    exit 1
+}
+grep -q 'url(data:image/svg+xml;base64,' "${tmpdir}/got2.css" || {
+    echo "FAIL: url() inside the @import'ed stylesheet was not inlined"
+    exit 1
+}
+echo OK
+
+# --- what must keep its link ------------------------------------------------
+printf '[page links stay relative] ..\t'
+grep -q 'href="other.html"' "$page" || {
+    echo "FAIL: the link to another page was not left relative"
+    exit 1
+}
+test -f "${out}/127.0.0.1_${port}/other.html" || {
+    echo "FAIL: the linked page is missing from the mirror"
+    exit 1
+}
+echo OK
+
+printf '[over-cap asset stays a link] ..\t'
+grep -q 'src="big.svg"' "$page" || {
+    echo "FAIL: the over-cap asset did not keep its link"
+    exit 1
+}
+test -f "${out}/127.0.0.1_${port}/big.svg" || {
+    echo "FAIL: the over-cap asset is missing from the mirror"
+    exit 1
+}
+grep -q 'over the 4096-byte cap' "${out}/hts-log.txt" || {
+    echo "FAIL: the over-cap asset was not reported in the log"
+    exit 1
+}
+echo OK
+
+printf '[the mirror still works] ..\t'
+if grep -q 'href="style.css"' "$page"; then
+    echo "FAIL: the stylesheet link survived"
+    exit 1
+fi
+test -f "${out}/127.0.0.1_${port}/style.css" || {
+    echo "FAIL: the mirror lost the standalone stylesheet"
+    exit 1
+}
+echo OK
+
+# --- a second run must not re-encode ----------------------------------------
+printf '[idempotent under --update] ..\t'
+# HTTrack stamps the time into its own footer comment, so compare without it.
+grep -v 'Mirrored from' "$page" >"${tmpdir}/page1.html"
+httrack "${common[@]}" --single-file --single-file-max-size 4096 --update \
+    "${base}/index.html" >"${tmpdir}/log2" 2>&1
+grep -v 'Mirrored from' "$page" >"${tmpdir}/page2.html"
+cmp -s "${tmpdir}/page1.html" "${tmpdir}/page2.html" || {
+    echo "FAIL: the second run changed the page"
+    exit 1
+}
+# A double-encoded payload would decode to another data: URI, not to the SVG.
+extract "$page" "image/svg+xml" "${tmpdir}/got2.svg" || {
+    echo "FAIL: no inlined image after the second run"
+    exit 1
+}
+cmp -s "${doc}/pixel.svg" "${tmpdir}/got2.svg" || {
+    echo "FAIL: the second run re-encoded the inlined image"
+    exit 1
+}
+echo OK
+
+printf '[-%%Z0 and a bad cap] ..\t'
+# -%Z0 turns it back off, so the page must come out exactly as the crawl left
+# it; a non-numeric cap is rejected and the built-in default used instead.
+off="${tmpdir}/off"
+mkdir "$off"
+httrack -O "$off" --quiet --disable-security-limits --robots=0 --timeout=30 \
+    --retries=0 -%Z0 "${base}/index.html" >"${tmpdir}/log3" 2>&1
+offpage="${off}/127.0.0.1_${port}/index.html"
+if grep -q 'base64,' "$offpage"; then
+    echo "FAIL: -%Z0 still inlined"
+    exit 1
+fi
+bad="${tmpdir}/bad"
+mkdir "$bad"
+httrack -O "$bad" --quiet --disable-security-limits --robots=0 --timeout=30 \
+    --retries=0 --single-file-max-size notanumber "${base}/index.html" \
+    >"${tmpdir}/log4" 2>&1
+badpage="${bad}/127.0.0.1_${port}/index.html"
+# The default cap is 10 MB, so everything here inlines, big.svg included.
+grep -q 'data:image/svg+xml;base64,' "$badpage" || {
+    echo "FAIL: a rejected cap did not fall back to the default"
+    exit 1
+}
+if grep -q 'src="big.svg"' "$badpage"; then
+    echo "FAIL: the default cap did not cover big.svg"
+    exit 1
+fi
+echo OK
+
+printf '[the rewritten page keeps the mirror file mode] ..\t'
+# The rewrite spools to a temp and renames, bypassing the engine's chmod.
+if is_windows; then
+    echo "SKIP (no POSIX file modes)"
+else
+    umaskdir="${tmpdir}/umask"
+    mkdir "$umaskdir"
+    (
+        umask 077
+        httrack -O "$umaskdir" --quiet --disable-security-limits --robots=0 \
+            --timeout=30 --retries=0 --single-file "${base}/index.html" \
+            >"${tmpdir}/log5" 2>&1
+    )
+    umaskroot="${umaskdir}/127.0.0.1_${port}"
+    mode() { "$python" -c 'import os,sys
+print("%04o" % (os.stat(sys.argv[1]).st_mode & 0o777))' "$1"; }
+    pagemode=$(mode "${umaskroot}/index.html")
+    assetmode=$(mode "${umaskroot}/big.svg")
+    test "$pagemode" = "$assetmode" || {
+        echo "FAIL: page is $pagemode, the asset beside it is $assetmode"
+        exit 1
+    }
+    echo OK
+fi
+
+# --- the rewriter in isolation, over a hand-built mirror --------------------
+# After the crawl assertions, so a failure here cannot hide them: the two cover
+# different ground (this one reaches media, anchors and the mirror-root clamp).
+printf '[engine self-test] ..\t'
+st=$(httrack -O /dev/null "-#test=singlefile" "${tmpdir}/st/" 2>/dev/null)
+case "$st" in
+*": OK") echo OK ;;
+*)
+    echo "FAIL: $st"
+    exit 1
+    ;;
+esac
+
+# --- the web GUI must emit the same options ---------------------------------
+distdir=$(cd "${top_srcdir}" && pwd)
+printf '[project reload maps the keys back] ..\t'
+grep -q 'do:copy:SingleFile:singlefile' "${distdir}/html/server/step2.html" || {
+    echo "FAIL: step2.html does not restore SingleFile"
+    exit 1
+}
+grep -q 'do:copy:SingleFileMaxSize:singlefilemax' "${distdir}/html/server/step2.html" || {
+    echo "FAIL: step2.html does not restore SingleFileMaxSize"
+    exit 1
+}
+echo OK
+
+printf '[webhttrack renders the options] ..\t'
+# The Windows job builds httrack.exe only and reaches this file through its
+# *_local-*.test glob, so report a skip there rather than a pass.
+if ! command -v htsserver >/dev/null; then
+    echo "SKIP (no htsserver in PATH)"
+    exit 77
+fi
+sport=$("$python" -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
+srvlog="${tmpdir}/htsserver.log"
+(
+    trap '' TERM TTOU
+    export HOME="${tmpdir}/home"
+    mkdir -p "$HOME"
+    exec htsserver "${distdir}/" --port "${sport}" >"${srvlog}" 2>&1
+) &
+htssrv=$!
+url=
+for _ in $(seq 1 40); do
+    url=$(sed -n 's/^URL=//p' "$srvlog" 2>/dev/null) && test -n "$url" && break
+    kill -0 "$htssrv" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${url:-}" || {
+    echo "FAIL: htsserver did not start: $(cat "$srvlog")"
+    exit 1
+}
+"$python" - "$url" <<'PY' || exit 1
+import re, sys, urllib.parse, urllib.request
+
+url = sys.argv[1]
+form = urllib.request.urlopen(url + "server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("FAIL: no session id in server/index.html")
+fields = [("sid", m.group(1).decode()), ("singlefile", "on"),
+          ("singlefilemax", "5000")]
+body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
+req = urllib.request.Request(url + "server/step4.html",
+                             data=body.encode("latin-1"), method="POST")
+page = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+
+
+def textarea(name):
+    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
+    if m is None:
+        sys.exit("FAIL: no %s textarea in the rendered step4.html" % name)
+    return m.group(1)
+
+
+cmd = textarea("command")
+for want in ("--single-file", "--single-file-max-size=5000"):
+    if want not in cmd:
+        sys.exit("FAIL: %s missing from the command line\n%s" % (want, cmd))
+ini = textarea("winprofile").replace("\r\n", "\n")
+for want in ("\nSingleFile=1\n", "\nSingleFileMaxSize=5000\n"):
+    if want not in ini:
+        sys.exit("FAIL: %r missing from winprofile.ini\n%s" % (want, ini))
+PY
+echo OK

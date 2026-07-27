@@ -970,3 +970,11 @@ Report what changed since the previous mirror
 Raportoi, mikä on muuttunut edellisen peilauksen jälkeen
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 Kirjoita myös hts-changes.json, joka luettelee, mikä on edelliseen peilaukseen verrattuna uutta, muuttunutta, muuttumatonta tai kadonnutta.
+Inline assets as data: URIs (self-contained pages)
+Upota resurssit data:-URI-osoitteina (itsenäiset sivut)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Kun peilaus on valmis, kirjoita jokainen tallennettu sivu uudelleen niin, että sen tyylitiedostot, komentosarjat, kuvat ja fontit upotetaan, jolloin sivun voi avata myös yksinään.
+Largest inlined asset (bytes):
+Suurin upotettu resurssi (tavua):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+Tätä suurempi resurssi säilyttää tavallisen linkin; jätä tyhjäksi, jolloin käytetään oletusarvoa 10485760 tavua.

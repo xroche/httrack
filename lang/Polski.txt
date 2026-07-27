@@ -968,3 +968,11 @@ Report what changed since the previous mirror
 Zg³o¶, co zmieni³o siê od poprzedniej kopii
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 Zapisz równie¿ plik hts-changes.json z list± tego, co w porównaniu z poprzedni± kopi± jest nowe, zmienione, niezmienione lub usuniête.
+Inline assets as data: URIs (self-contained pages)
+Osad¼ zasoby jako identyfikatory data: URI (samodzielne strony)
+Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
+Po zakoñczeniu tworzenia kopii przepisz ka¿d± zapisan± stronê z osadzonymi arkuszami stylów, skryptami, obrazami i czcionkami, aby stronê mo¿na by³o otworzyæ równie¿ samodzielnie.
+Largest inlined asset (bytes):
+Najwiêkszy osadzony zasób (bajty):
+An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
+Zasób wiêkszy ni¿ ten rozmiar zachowuje zwyk³y odno¶nik; pozostaw puste, aby u¿yæ domy¶lnych 10485760 bajtów.

@@ -157,6 +157,7 @@ BOXES = [
     ("index", "Index", None, None),
     ("index2", "WordIndex", "--search-index", None),
     ("ftpprox", "UseHTTPProxyForFTP", "--httpproxy-ftp", None),
+    ("singlefile", "SingleFile", "--single-file", None),
 ]
 
 for field, key, when_set, when_clear in BOXES:
