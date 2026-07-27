@@ -52,7 +52,7 @@ which httrack >/dev/null || {
 }
 
 # One crawl per variant: the generated top index carries the seed page's title.
-for variant in u8 l1 declared; do
+for variant in u8 l1 declared gb2312 l1decl; do
     mkdir "${tmpdir}/${variant}"
     httrack -O "${tmpdir}/${variant}" --quiet --disable-security-limits \
         --robots=0 --timeout=30 --retries=0 \
@@ -101,6 +101,15 @@ check("no mirrored name was double-encoded", not any("Ã" in n for n in names))
 check("Latin-1 title converted", "Café-l1".encode() in rd("l1", "index.html"))
 check("declared UTF-8 title untouched",
       "Café-declared".encode() in rd("declared", "index.html"))
+
+# Both titles below are valid UTF-8 already, and must still be decoded from the
+# charset the page declares.
+gb = rd("gb2312", "index.html")
+check("declared gb2312 title decoded", "图片-gb".encode() in gb)
+check("declared gb2312 title not left raw", "图片".encode("gb2312") + b"-gb" not in gb)
+l1d = rd("l1decl", "index.html")
+check("declared Latin-1 title decoded", "Ã©-l1d".encode() in l1d)
+check("declared Latin-1 title not left raw", "Ã©".encode("latin-1") + b"-l1d" not in l1d)
 
 if failed:
     sys.exit("FAILED: %s" % ", ".join(failed))

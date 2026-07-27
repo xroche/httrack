@@ -1196,22 +1196,27 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
-    # A charset-less page falls back to iso-8859-1 (#833): whatever the engine
-    # takes out of it must not be re-encoded when it already is UTF-8.
-    # variant -> (Content-Type, title bytes, body bytes)
+    # variant -> (Content-Type, title bytes, body bytes); the gb2312 and l1decl
+    # titles are valid UTF-8 as bytes, so only the declared charset decodes them
     TITLEENC_PAGES = {
         "u8": (
             "text/html",
             "Café-u8".encode(),
             '<img src="s.svg#café"><a href="né.txt">leaf</a>'.encode(),
         ),
-        # genuine latin-1: the conversion must still happen
+        # genuine latin-1: the guess must still be applied
         "l1": (
             "text/html",
             "Café-l1".encode("latin-1"),
             b'<a href="l1.txt">leaf</a>',
         ),
         "declared": ("text/html; charset=utf-8", "Café-declared".encode(), b"x"),
+        "gb2312": ("text/html; charset=gb2312", "图片".encode("gb2312") + b"-gb", b"x"),
+        "l1decl": (
+            "text/html; charset=iso-8859-1",
+            "Ã©".encode("latin-1") + b"-l1d",
+            b"x",
+        ),
     }
 
     def route_titleenc(self):
