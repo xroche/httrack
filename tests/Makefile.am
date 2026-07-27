@@ -81,6 +81,7 @@ TESTS = \
 	01_engine-status.test \
 	01_engine-stripquery.test \
 	01_engine-strsafe.test \
+	01_engine-structcheck.test \
 	01_engine-syscharset.test \
 	01_engine-threadwait.test \
 	01_engine-topindex.test \
