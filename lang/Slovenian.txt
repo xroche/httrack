@@ -964,3 +964,7 @@ WARC archive name:
 Ime arhiva WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Neobvezno osnovno ime arhiva WARC; pustite prazno za samodejno poimenovanje v izhodni mapi.
+Report what changed since the previous mirror
+Porocaj, kaj se je spremenilo od prejsnjega zrcaljenja
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Zapisi tudi hts-changes.json s seznamom tega, kar je v primerjavi s prejsnjim zrcaljenjem novo, spremenjeno, nespremenjeno ali izginilo.

@@ -547,6 +547,10 @@ struct httrackp {
                              archive. Tail: ABI */
   hts_boolean warc_wacz; /**< --wacz: package archive+index+pages as a WACZ zip
                               (implies --warc + --warc-cdx). Tail: ABI */
+  hts_boolean changes;   /**< --changes: report what this crawl changed against
+                              the previous mirror. Tail: ABI */
+  void *changes_state;   /**< live change-report accumulator (hts_changes*),
+                              engine-owned. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

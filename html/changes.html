@@ -1,0 +1,263 @@
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
+	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
+	<title>HTTrack Website Copier - Change report format specification</title>
+
+	<style type="text/css">
+	<!--
+
+body {
+	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
+	background: #77b;
+}
+body, td {
+	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
+	}
+
+#subTitle {
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	}
+
+#siteNavigation a, #siteNavigation .current {
+	font-weight: bold;  color: #448;
+	}
+#siteNavigation a:link    { text-decoration: none; }
+#siteNavigation a:visited { text-decoration: none; }
+
+#siteNavigation .current { background-color: #ccd; }
+
+#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
+#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
+
+
+a:link    { text-decoration: underline;  color: #00f; }
+a:visited { text-decoration: underline;  color: #000; }
+a:hover   { text-decoration: underline;  color: #c00; }
+a:active  { text-decoration: underline; }
+
+#pageContent {
+	clear: both;
+	border-bottom: 6px solid #000;
+	padding: 10px;  padding-top: 20px;
+	line-height: 1.65em;
+	background-image: url(images/bg_rings.gif);
+	background-repeat: no-repeat;
+	background-position: top right;
+	}
+
+#pageContent, #siteNavigation {
+	background-color: #ccd;
+	}
+
+
+.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
+.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
+
+hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
+
+h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
+h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
+h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
+h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
+
+.blak { background-color: #000; }
+.hide { display: none; }
+.tableWidth { min-width: 400px; }
+
+.tblRegular       { border-collapse: collapse; }
+.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
+.tblHeaderColor, .tblHeaderColor td { background: #99c; }
+.tblNoBorder td   { border: 0; }
+
+
+// -->
+</style>
+
+</head>
+
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+	<tr>
+	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
+	<tr>
+	<td id="subTitle">Open Source offline browser</td>
+	</tr>
+</table>
+<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
+<tr class="blak">
+<td>
+	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
+	<tr>
+	<td colspan="6"> 
+		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
+		<tr> 
+		<td id="pageContent"> 
+<!-- ==================== End prologue ==================== -->
+
+<h2 align="center"><em>Change report format specification</em></h2>
+
+<br />
+
+Run with <tt>--changes</tt> (<tt>-%d</tt>), HTTrack writes <tt>hts-changes.json</tt>
+in the project directory, next to <tt>hts-log.txt</tt>, describing what the crawl
+left new, changed, unchanged and gone compared to the previous mirror. The file is
+rewritten from scratch at the end of every run, and the log carries a one-line
+summary of the same counts.
+
+<br /><br />
+
+<h3>What "changed" means</h3>
+
+A resource is changed when its bytes differ, not when the server merely re-sent
+it. HTTrack compares the payload it just received against the copy the previous
+run left behind: for pages it parses, the previous payload comes from the cache
+(the file on disk carries the mirror footer and its crawl date, so its bytes
+differ on every run); for everything else, the mirrored file is the payload
+verbatim and is compared directly.
+
+<br /><br />
+
+Where no digest can be taken on either side, because the cache is disabled or
+the previous copy is gone, the report falls back to the transfer signal, and a
+server that answers 200 rather than 304 reads as changed. Keeping the cache on
+(the default) is what makes the report precise.
+
+<br /><br />
+
+<h3>With the cache off</h3>
+
+<tt>--cache=0</tt> costs the report more than the digest of a parsed page. The
+mirror's file index (<tt>hts-cache/new.lst</tt>) is what records which files a
+run produced, so without it there is no previous mirror to subtract from: nothing
+is reported <tt>gone</tt>, and whether the run is a first crawl cannot be decided
+at all, which <tt>first_crawl</tt> states as <tt>null</tt> rather than guess. What
+is on disk is still compared byte for byte, so the other three lists stay
+meaningful, except for the pages HTTrack parses: those have no cached payload to
+compare against and fall back to the transfer signal.
+
+<br /><br />
+
+<h3>Fields</h3>
+
+<ul>
+<li><tt>schema</tt>: format version, currently <tt>1</tt>. It is bumped only
+on an incompatible change; new fields may appear without one.</li>
+<li><tt>generator</tt>: the HTTrack build that wrote the file.</li>
+<li><tt>date</tt>: when the report was written, UTC, <tt>YYYY-MM-DDThh:mm:ssZ</tt>.</li>
+<li><tt>first_crawl</tt>: true when no index of a previous mirror
+(<tt>hts-cache/old.lst</tt>) was found, so there was nothing to compare against and
+everything is listed as new. Null when the run kept no index at all and the
+question cannot be answered (see above).</li>
+<li><tt>partial</tt>: true when the report ran out of memory and lists only
+part of the mirror.</li>
+<li><tt>purged</tt>: true when <tt>--purge-old</tt> was in effect, so the
+files under <tt>gone</tt> were also deleted from disk.</li>
+<li><tt>counts</tt>: the size of each of the four lists.</li>
+<li><tt>new</tt>, <tt>changed</tt>, <tt>unchanged</tt>, <tt>gone</tt>: the
+lists themselves. Every mirrored file appears in exactly one of them.</li>
+</ul>
+
+Each entry is an object:
+
+<ul>
+<li><tt>url</tt>: the absolute URL the file came from. Empty under
+<tt>gone</tt>: deletions are computed from the mirror's file index, which records
+paths, not URLs.</li>
+<li><tt>file</tt>: the path relative to the mirror root, with forward
+slashes. This is the entry's identity: a URL and a redirect that resolve to the
+same local file are one entry, not two.</li>
+<li><tt>size</tt>: the mirrored file's size in bytes, absent when the file
+is not on disk.</li>
+<li><tt>previous_size</tt>: under <tt>changed</tt> only, the size of the
+copy the previous run left.</li>
+</ul>
+
+<br />
+
+<h3>Encoding</h3>
+
+The file is JSON, UTF-8. URLs and local paths reach HTTrack as raw bytes and are
+not guaranteed to be valid UTF-8; any byte sequence that is not becomes
+U+FFFD (<tt>\ufffd</tt>), so the file always parses. Compare on <tt>file</tt>
+rather than on <tt>url</tt> when a mirror is known to carry legacy-charset URLs.
+
+<br /><br />
+
+<h3>Example</h3>
+
+<pre>
+{
+  "schema": 1,
+  "generator": "HTTrack Website Copier/3.49-14",
+  "date": "2026-07-26T15:29:03Z",
+  "first_crawl": false,
+  "partial": false,
+  "purged": true,
+  "counts": { "new": 1, "changed": 1, "unchanged": 1, "gone": 1 },
+  "new": [
+    { "url": "http://example.com/d.html", "file": "example.com/d.html", "size": 280 }
+  ],
+  "changed": [
+    { "url": "http://example.com/a.html", "file": "example.com/a.html", "size": 281, "previous_size": 273 }
+  ],
+  "unchanged": [
+    { "url": "http://example.com/b.html", "file": "example.com/b.html", "size": 277 }
+  ],
+  "gone": [
+    { "url": "", "file": "example.com/c.html" }
+  ]
+}
+</pre>
+
+<br /><br />
+
+<h3>Notes</h3>
+
+<ul>
+<li>A file listed under <tt>gone</tt> is only deleted when <tt>--purge-old</tt> is
+on. Left in place it drops out of the mirror's index, so it is reported once and
+not again.</li>
+<li>A resource whose local file name changed since the previous mirror (a new
+MIME type, say) is reported as <tt>new</tt> under its new name; the old name is
+reported as <tt>gone</tt> only if the file is still on disk. The two entries are
+not paired.</li>
+<li>A resource this run tried and failed to transfer also drops out of the
+mirror's index, but its previous copy is untouched, so it is reported
+<tt>unchanged</tt>. Under <tt>--purge-old</tt> that copy is deleted anyway, and
+the report says <tt>gone</tt> to match.</li>
+<li>A run that transfers no data at all is rolled back: HTTrack restores the
+previous cache generation and leaves the previous report in place, so a lost
+connection does not overwrite a good report with an empty one.</li>
+<li>Content diffs, and keeping the previous copy of a changed page, are out of
+scope: both change what a mirror directory contains.</li>
+</ul>
+
+<br /><br />
+
+<!-- ==================== Start epilogue ==================== -->
+		</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+</td>
+</tr>
+</table>
+
+<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
+	<tr>
+	<td id="footer"><small>&copy; 1998-2026 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
+	</tr>
+</table>
+
+</body>
+
+</html>
+
+

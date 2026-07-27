@@ -964,3 +964,7 @@ WARC archive name:
 Nome dell'archivio WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Nome di base facoltativo per l'archivio WARC; lascia vuoto per assegnarlo automaticamente nella directory di output.
+Report what changed since the previous mirror
+Segnala che cosa è cambiato dalla copia precedente
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Scrive anche hts-changes.json, che elenca ciò che questa scansione lascia come nuovo, modificato, invariato o scomparso rispetto alla copia precedente.

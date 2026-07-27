@@ -1042,3 +1042,7 @@ LANG_WARCFILE
 WARC archive name:
 LANG_WARCFILETIP
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+LANG_CHANGES
+Report what changed since the previous mirror
+LANG_CHANGESTIP
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
