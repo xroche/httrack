@@ -19,7 +19,7 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   (`request_queue_size`) so macOS/BSD don't drop connections under a parallel
   `-c16` bigcrawl the way Python's default backlog of 5 did.
   Or run `sh build.sh` to do bootstrap + configure + make in one shot.
-- A `tests/NN_*.test` runs only if listed in `tests/Makefile.am`'s `TESTS`; an
+- A `tests/NN_*.test` runs only if listed in `tests/tests-list.mk`; an
   unregistered file is silently skipped.
 - `make check` prepends the build's `src/` to `PATH`, but a hand-run `.test` does
   not — an installed `/usr/bin/httrack` then shadows your build. Run via `make
