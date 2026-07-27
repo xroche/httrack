@@ -6140,7 +6140,6 @@ static hts_boolean ro_is(const char *path, const char *data) {
 // never lose one it did not replace (#779, #790). Which half is live depends on
 // what rename() does to an existing target, so probe that and name the regime.
 static int st_renameover(httrackp *opt, int argc, char **argv) {
-  (void) opt;
   if (argc < 1) {
     fprintf(stderr, "renameover: needs a writable base dir\n");
     return 1;
@@ -6169,7 +6168,7 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
   ro_put(dst, "old");
   if (replaceable) {
     /* An existing dst must still be replaced: the unlink is for this. */
-    if (!hts_rename_over(src, dst)) {
+    if (!hts_rename_over(opt, src, dst)) {
       fprintf(stderr, "renameover: replacing an existing dst failed: %s\n",
               strerror(errno));
       err++;
@@ -6179,7 +6178,7 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
     }
   } else {
     /* A failure the unlink cannot fix must leave dst as it was. */
-    if (hts_rename_over(src, dst)) {
+    if (hts_rename_over(opt, src, dst)) {
       fprintf(stderr, "renameover: an unfixable failure reported success\n");
       err++;
     }
@@ -6192,7 +6191,7 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
   /* A missing src must leave dst alone and report failure. */
   (void) UNLINK(src);
   ro_put(dst, "keep");
-  if (hts_rename_over(src, dst)) {
+  if (hts_rename_over(opt, src, dst)) {
     fprintf(stderr, "renameover: a missing src reported success\n");
     err++;
   }
@@ -6203,7 +6202,7 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
 
   /* Same, with dst absent too: nothing to lose, still a failure. */
   (void) UNLINK(dst);
-  if (hts_rename_over(src, dst)) {
+  if (hts_rename_over(opt, src, dst)) {
     fprintf(stderr, "renameover: a missing src and dst reported success\n");
     err++;
   }
@@ -6219,7 +6218,7 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
     (void) UNLINK(keep);
     ro_put(src, "new");
     ro_put(dst, "old");
-    if (!hts_rename_over_aside_selftest(src, dst)) {
+    if (!hts_rename_over_aside_selftest(opt, src, dst)) {
       fprintf(stderr, "renameover: the aside fallback failed: %s\n",
               strerror(errno));
       err++;
@@ -6228,27 +6227,30 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
       err++;
     }
 
-    /* #790: the retry fails (no src). dst must come back, not vanish. */
+    /* #790: the retry fails (no src). The old content must survive, back at dst
+       or, when the move back fails too, under the parked name it is logged as.
+       Name the outcome so a leg cannot pass having tested the other one. */
     (void) UNLINK(src);
     ro_put(dst, "old");
-    if (hts_rename_over_aside_selftest(src, dst)) {
+    if (hts_rename_over_aside_selftest(opt, src, dst)) {
       fprintf(stderr, "renameover: a failed aside retry reported success\n");
       err++;
     }
-    if (!ro_is(dst, "old")) {
-      fprintf(stderr, "renameover: a failed aside retry lost dst\n");
-      err++;
-    }
-    if (fexist_utf8(aside)) {
-      fprintf(stderr,
-              "renameover: a failed aside retry left the parked copy\n");
+    if (ro_is(dst, "old") && !fexist_utf8(aside)) {
+      printf("renameover: restore back\n");
+    } else if (ro_is(aside, "old") && !fexist_utf8(dst)) {
+      printf("renameover: restore parked\n");
+      (void) UNLINK(aside);
+      ro_put(dst, "old");
+    } else {
+      fprintf(stderr, "renameover: a failed aside retry lost the old copy\n");
       err++;
     }
 
     /* An unrelated file already sitting on the aside name must survive. */
     ro_put(src, "new");
     ro_put(aside, "mine");
-    if (!hts_rename_over_aside_selftest(src, dst)) {
+    if (!hts_rename_over_aside_selftest(opt, src, dst)) {
       fprintf(stderr, "renameover: a taken aside name failed the move: %s\n",
               strerror(errno));
       err++;
@@ -6258,6 +6260,26 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
       err++;
     }
     (void) UNLINK(aside);
+    (void) UNLINK(keep);
+
+    /* A directory there reads as free to the probe, so the park must skip it
+       on the refusal rather than give up. */
+    ro_put(src, "new");
+    ro_put(dst, "old");
+    if (MKDIR(aside) == 0) {
+      if (!hts_rename_over_aside_selftest(opt, src, dst)) {
+        fprintf(stderr,
+                "renameover: a directory on the aside name blocked the "
+                "move: %s\n",
+                strerror(errno));
+        err++;
+      } else if (!ro_is(dst, "new") || fexist_utf8(keep)) {
+        fprintf(stderr, "renameover: a directory on the aside name was not "
+                        "skipped\n");
+        err++;
+      }
+      (void) RMDIR(aside);
+    }
     (void) UNLINK(keep);
   }
 

@@ -5,8 +5,8 @@ set -euo pipefail
 
 # Drives -#test=renameover: hts_rename_over() must replace an existing dst, and
 # must leave dst alone when the rename failed for a reason moving dst aside
-# cannot fix (#779, #790). The selftest prints the regime it detected; pin it per platform so
-# a leg cannot pass having tested the other half.
+# cannot fix (#779, #790). The selftest prints the regime and the restore
+# outcome it took; pin both per leg so none can pass having tested another.
 dir=$(mktemp -d)
 trap 'set +e; rm -rf "$dir"' EXIT
 
@@ -18,6 +18,7 @@ esac
 out=$(httrack -O /dev/null -#test=renameover "$dir")
 echo "$out" | grep -q "renameover: OK"
 echo "$out" | grep -q "renameover: regime $want"
+echo "$out" | grep -q "renameover: restore back"
 
 if [ "$(uname -s)" != "Linux" ]; then
     echo "renameover: LD_PRELOAD interposition is Linux-only here, skipping"
@@ -47,6 +48,21 @@ out=$(LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \
     -#test=renameover "$dir")
 echo "$out" | grep -q "renameover: OK"
 echo "$out" | grep -q "renameover: regime fallback"
+echo "$out" | grep -q "renameover: restore back"
+
+# #790: the move back out of the parked name fails once. Without the retry the
+# old copy stays parked and dst is left absent.
+out=$(RENAMEFAIL_ASIDE_FAILS=1 LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \
+    -#test=renameover "$dir")
+echo "$out" | grep -q "renameover: OK"
+echo "$out" | grep -q "renameover: restore back"
+
+# It keeps failing: the old copy must survive under the parked name, never be
+# deleted, and the call must still report failure.
+out=$(RENAMEFAIL_ASIDE_FAILS=9 LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \
+    -#test=renameover "$dir")
+echo "$out" | grep -q "renameover: OK"
+echo "$out" | grep -q "renameover: restore parked"
 
 # A source another process holds fails with EACCES, which dst had no part in.
 out=$(RENAMEFAIL_MODE=locked LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \

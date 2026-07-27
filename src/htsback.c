@@ -646,7 +646,7 @@ void back_refetch_backup(httrackp *opt, lien_back *const back) {
       if (fexist_utf8(back->tmpfile))
         hts_log_print(opt, LOG_WARNING, "replacing leftover backup %s",
                       back->tmpfile);
-      saved = hts_rename_over(back->url_sav, back->tmpfile);
+      saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
     }
     if (!saved) {
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
@@ -687,7 +687,7 @@ static void back_finalize_backup(httrackp *opt, lien_back *const back,
     }
     /* On failure keep the backup: an orphaned temp beats losing the good copy.
      */
-    if (!hts_rename_over(back->tmpfile, back->url_sav))
+    if (!hts_rename_over(opt, back->tmpfile, back->url_sav))
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "could not restore %s; previous copy kept as %s",
                     back->url_sav, back->tmpfile);
@@ -818,7 +818,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                                  "Read error when decompressing");
                     }
                     UNLINK(unpacked);
-                  } else if (hts_rename_over(unpacked, back[p].url_sav)) {
+                  } else if (hts_rename_over(opt, unpacked, back[p].url_sav)) {
                     /* The temp bypassed filecreate(), which is what chmods. */
 #ifndef _WIN32
                     chmod(back[p].url_sav, HTS_ACCESS_FILE);
