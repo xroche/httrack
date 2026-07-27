@@ -3150,13 +3150,21 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                */
                               back[i].tmpfile = NULL;
                               if (fexist_utf8(back[i].url_sav)) {
-                                /* clobber a .bak a killed run left behind:
-                                   refusing it disables the guard for good
-                                   (#758) */
-                                if (create_back_tmpfile(opt, &back[i], "bak") !=
-                                        0 ||
-                                    !hts_rename_over(back[i].url_sav,
-                                                     back[i].tmpfile)) {
+                                hts_boolean saved = HTS_FALSE;
+
+                                if (create_back_tmpfile(opt, &back[i], "bak") ==
+                                    0) {
+                                  /* clobber a .bak a killed run left behind,
+                                     or the guard stays off for good (#758) */
+                                  if (fexist_utf8(back[i].tmpfile))
+                                    hts_log_print(
+                                        opt, LOG_WARNING,
+                                        "replacing leftover backup %s",
+                                        back[i].tmpfile);
+                                  saved = hts_rename_over(back[i].url_sav,
+                                                          back[i].tmpfile);
+                                }
+                                if (!saved) {
                                   hts_log_print(
                                       opt, LOG_WARNING | LOG_ERRNO,
                                       "could not back up %s; an aborted "

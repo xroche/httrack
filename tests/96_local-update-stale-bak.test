@@ -1,12 +1,11 @@
 #!/bin/bash
 #
 # A .bak left behind by a killed run must not disable the #77 re-fetch backup
-# (#758). Both bigtrunc files are re-fetched under -M in pass 2:
-#   - slow.bin.bak is planted as a stale regular file; the backup has to clobber
-#     it, so the -M abort still restores the complete pass-1 copy. Only armed on
-#     Windows, where rename() refuses an existing target.
-#   - fast.bin.bak is planted as a directory, so no backup can be made at all;
-#     the engine must say so instead of truncating with no safety net.
+# (#758): a leftover file (slow.bin.bak) has to be clobbered so the -M abort can
+# still restore the pass-1 copy, and a leftover the engine cannot clobber
+# (fast.bin.bak, planted as a directory) has to be reported instead of silently
+# truncating with no safety net. Only the Windows leg arms the first half:
+# POSIX rename() clobbers on its own.
 
 set -euo pipefail
 
@@ -16,10 +15,13 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --plant-file bigtrunc/slow.bin.bak \
     --plant-dir bigtrunc/fast.bin.bak \
     --rerun-args '--update -M400000' \
+    --log-found 'More than 400000 bytes have been transferred.. giving up' \
+    --log-found 'replacing leftover backup .*slow\.bin\.bak' \
     --log-found 'could not back up .*fast\.bin' \
     --log-not-found 'could not back up .*slow\.bin' \
     --log-not-found 'could not restore' \
     --found bigtrunc/slow.bin \
+    --found bigtrunc/fast.bin \
     --file-min-bytes bigtrunc/slow.bin 655360 \
     --file-not-matches bigtrunc/slow.bin 'stale-leftover' \
     httrack 'BASEURL/bigtrunc/index.html' -c2

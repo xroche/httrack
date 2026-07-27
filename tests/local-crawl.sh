@@ -91,7 +91,6 @@ function cleanup {
     fi
 }
 
-# The random port leaks into the mirror directory name, so resolve it at runtime.
 hostroot=
 function find_hostroot {
     local cand
@@ -311,7 +310,6 @@ if test "${#plants[@]}" -gt 0; then
     while test "$i" -lt "${#plants[@]}"; do
         path="${hostroot}/${plants[$((i + 1))]}"
         info "planting ${plants[$i]} ${plants[$((i + 1))]}"
-        rm -rf "$path"
         if test "${plants[$i]}" = "--plant-dir"; then
             mkdir -p "$path" || die "could not create $path"
         else
