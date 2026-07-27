@@ -8,7 +8,7 @@ set -euo pipefail
 # fix (#779). The selftest prints the regime it detected; pin it per platform so
 # a leg cannot pass having tested the other half.
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 case "$(uname -s)" in
 MINGW* | MSYS_NT*) want=fallback ;; # native rename() refuses an existing target
