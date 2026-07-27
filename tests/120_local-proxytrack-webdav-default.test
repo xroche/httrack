@@ -92,6 +92,19 @@ grep -q '<displayname>Default Document for the Folder</displayname>' <<<"$resp" 
     printf '%s\n' "$resp"
     exit 1
 }
+# The name alone would still pass on a truncated or garbage URL, so pin the
+# href: the default document is the collection path plus an empty name.
+grep -q '<href>/webdav/example\.com/page\.html/</href>' <<<"$resp" || {
+    echo "FAIL: the default document was listed under the wrong href"
+    printf '%s\n' "$resp"
+    exit 1
+}
+responses=$(grep -c '<response ' <<<"$resp" || true)
+test "$responses" -eq 2 || {
+    echo "FAIL: expected the root and its default document, got $responses responses"
+    printf '%s\n' "$resp"
+    exit 1
+}
 
 # The crash killed the process, so a second request is the liveness proof.
 resp=$(propfind "") || {
