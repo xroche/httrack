@@ -14,8 +14,8 @@ set -euo pipefail
 
 bash "$top_srcdir/tests/local-crawl.sh" \
     --rerun-args '--update --purge-old=0' \
-    --log-found '"Interrupted transfer" \(-4\).*keep/page\.html' \
-    --log-found '"Interrupted transfer" \(-4\).*keep/data\.bin' \
+    --log-found 'after 2 retries at link .*keep/page\.html' \
+    --log-found 'after 2 retries at link .*keep/data\.bin' \
     --file-matches 'keep/page.html' 'KEEP-PAGE-V1' \
     --file-not-matches 'keep/page.html' 'HTTP/1\.0 200' \
     --file-matches 'keep/data.bin' 'KEEP-BIN-V1' \
