@@ -598,8 +598,7 @@ static HTS_INLINE HTS_UNUSED size_t hts_lastcharoffset(const char *s) {
 }
 
 /* Address of the last character of S, or of its terminating NUL when S is
-   empty. Replaces S + strlen(S) - 1, which points before the buffer on an
-   empty string. S is evaluated twice, so pass an lvalue. */
+   empty. S is evaluated twice, so pass an lvalue. */
 #define hts_lastcharptr(S) ((S) + hts_lastcharoffset(S))
 
 /* Thin aliases over the libc allocator/memcpy (historical "t" suffix); no
