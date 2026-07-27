@@ -46,13 +46,15 @@ cat >"$stubdir/x-www-browser" <<EOF
 echo "stub browser invoked with: \$1" >&2
 # Also fetch an option page and require a rendered title='' tooltip: proves the
 # option template expands and the \${html:} filter escapes into the attribute.
-# option9/option8 additionally prove the WARC and sitemap controls render.
+# option9 additionally proves the WARC and change-report controls, and
+# option8 the sitemap ones, render with their expanded labels.
 opturl="\${1%/}/server/option2.html"
 warcurl="\${1%/}/server/option9.html"
 smurl="\${1%/}/server/option8.html"
 if body="\$(curl -fsSL --max-time 20 "\$1")" && printf '%s' "\$body" | grep -qai httrack && printf '%s' "\$body" | grep -qaF step2.html &&
     opt="\$(curl -fsSL --max-time 20 "\$opturl")" && printf '%s' "\$opt" | grep -qaF "title='" &&
     warc="\$(curl -fsSL --max-time 20 "\$warcurl")" && printf '%s' "\$warc" | grep -qaF 'name="warcfile"' && printf '%s' "\$warc" | grep -qaF WARC &&
+    printf '%s' "\$warc" | grep -qaF 'name="changes"' && printf '%s' "\$warc" | grep -qaF hts-changes.json &&
     sm="\$(curl -fsSL --max-time 20 "\$smurl")" && printf '%s' "\$sm" | grep -qaF 'name="sitemapurl"' && printf '%s' "\$sm" | grep -qaF 'name="sitemap"'; then
     echo PASS >"$marker"
 else

@@ -1012,6 +1012,10 @@ WARC archive name:
 WARC archive name:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+Report what changed since the previous mirror
+Report what changed since the previous mirror
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
 Seed the crawl from the site's sitemap
 Seed the crawl from the site's sitemap
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.

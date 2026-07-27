@@ -964,3 +964,7 @@ WARC archive name:
 WARC 归档名称：
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 WARC 归档的可选基本名称；留空则在输出目录中自动命名。
+Report what changed since the previous mirror
+报告自上次镜像以来的变更
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+同时写入 hts-changes.json，列出本次抓取相对于上次镜像的新增、更改、未更改和消失的项目。

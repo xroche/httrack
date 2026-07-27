@@ -1,0 +1,37 @@
+#!/bin/bash
+# The two halves of an .ndx entry's URL share one buffer, so the second must be
+# bounded by what the first left. The sanitizer CI build turns a regression
+# here into a hard stack-buffer-overflow.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+# each field fills binput's own bound, so together they run one past line[]
+"$python" - "$dir/foo.ndx" <<'EOF'
+import sys
+
+with open(sys.argv[1], "w") as f:
+    f.write("CACHE-1.4\n")
+    f.write("Wed, 01 Jan 2025 00:00:00 GMT\n")
+    f.write("h" * 1024 + "\n" + "f" * 1024 + "\n" + "0\n")
+    # a trailing entry keeps the walk inside the buffer, so this exercises the
+    # field bound alone
+    f.write("tail/entry\nx\n1\n")
+EOF
+: >"$dir/foo.dat" # the reader only proceeds when the sibling .dat opens
+
+proxytrack --convert "$dir/out.arc" "$dir/foo.ndx" >/dev/null 2>&1 || {
+    echo "FAIL: proxytrack crashed on an .ndx with two full-length URL fields" >&2
+    exit 1
+}

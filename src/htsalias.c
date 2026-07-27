@@ -114,6 +114,8 @@ const char *hts_optalias[][4] = {
    "strip [host/pattern=]key1,key2,... from URLs"},
   {"cookies-file", "-%K", "param1",
    "load extra cookies from a Netscape cookies.txt"},
+  {"changes", "-%d", "single",
+   "write hts-changes.json: what this crawl changed vs. the previous mirror"},
   {"sitemap", "-%m", "single",
    "seed the crawl from the start host's sitemap (robots.txt, then "
    "/sitemap.xml)"},

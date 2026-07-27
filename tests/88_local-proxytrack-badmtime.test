@@ -1,0 +1,69 @@
+#!/bin/bash
+# A cache file whose mtime is beyond what gmtime can represent must not put a
+# day of "00" in the ARC filedesc date: PT_GetTime fell back to an all-zero tm.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+dir=$(mktemp -d)
+trap 'rm -rf "$dir"' EXIT
+
+rc=0
+"$python" - "$dir/in.zip" <<'EOF' || rc=$?
+import os, sys, zipfile
+
+body = b"hello world"
+meta = (
+    "X-In-Cache: 1\r\n"
+    "X-StatusCode: 200\r\n"
+    "X-StatusMessage: OK\r\n"
+    "X-Size: %d\r\n"
+    "Content-Type: text/html\r\n"
+    "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n"
+    "X-Save: out/page.html\r\n" % len(body)
+).encode()
+
+zi = zipfile.ZipInfo("example.com/page.html")
+zi.compress_type = zipfile.ZIP_STORED
+zi.extra = meta
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr(zi, body)
+
+# past gmtime's range; the index timestamp is this file's mtime
+huge = 4611686018427387903
+try:
+    os.utime(sys.argv[1], (huge, huge))
+except OSError:
+    sys.exit(77)
+if int(os.stat(sys.argv[1]).st_mtime) < huge:
+    sys.exit(77)  # filesystem clamped it, nothing to test
+EOF
+test "$rc" -eq 0 || {
+    test "$rc" -eq 77 || {
+        echo "FAIL: could not build the cache (python exit $rc)" >&2
+        exit 1
+    }
+    echo "filesystem will not hold an out-of-range mtime; skipping" >&2
+    exit 77
+}
+
+proxytrack --convert "$dir/out.arc" "$dir/in.zip" >/dev/null 2>&1 || {
+    echo "FAIL: proxytrack failed on a cache with an out-of-range mtime" >&2
+    exit 1
+}
+
+# field 3 of the filedesc line is YYYYMMDDhhmmss; the epoch stands in for
+# "unknown", and 14 digits with a real day is the point (00 is what broke)
+date=$(head -n1 "$dir/out.arc" | awk '{ print $3 }')
+test "$date" = 19700101000000 || {
+    echo "FAIL: filedesc date is '$date', expected 19700101000000" >&2
+    exit 1
+}

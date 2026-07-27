@@ -1726,6 +1726,167 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(body)
 
+    # --changes (#714). Every route answers 200 with no validators, so the
+    # transfer signal alone would call the whole site changed on pass 2; only a
+    # payload comparison can tell stable.html and stable.bin from moved.*.
+    def route_changes_index(self):
+        links = "".join(
+            '\t<a href="%s">%s</a>\n' % (name, name)
+            for name in (
+                "stable.html",
+                "moved.html",
+                "stable.bin",
+                "moved.bin",
+                "redir.html",
+                "flaky.bin",
+                "coded.bin",
+                "codedstable.bin",
+                "sized.html",
+                "reset.bin",
+            )
+        )
+        seen = self.refetch_pass()
+        if seen == 1:
+            links += '\t<a href="doomed.html">doomed</a>\n'
+        else:
+            links += '\t<a href="fresh.html">fresh</a>\n'
+        # transient.html appears on pass 2 only, so pass 3 has a deletion of
+        # its own to purge.
+        if seen == 2:
+            links += '\t<a href="transient.html">transient</a>\n'
+        self.send_html(links)
+
+    def route_changes_stable(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>CHANGES-STABLE</p></body></html>", "text/html")
+
+    def route_changes_moved(self):
+        pass1 = self.refetch_pass() == 1
+        self.send_raw(
+            b"<html><body><p>CHANGES-MOVED-V%d</p></body></html>" % (1 if pass1 else 2),
+            "text/html",
+        )
+
+    def route_changes_stable_bin(self):
+        self.refetch_pass()
+        self.send_raw(
+            b"CHANGES-STABLE-BIN\n" + b"\x00\x01\x02\xff" * 512,
+            "application/octet-stream",
+        )
+
+    def route_changes_moved_bin(self):
+        pass1 = self.refetch_pass() == 1
+        self.send_raw(
+            b"CHANGES-MOVED-BIN-V%d\n" % (1 if pass1 else 2)
+            + b"\x03\x02\x01\xfe" * 512,
+            "application/octet-stream",
+        )
+
+    def route_changes_doomed(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>CHANGES-DOOMED</p></body></html>", "text/html")
+
+    def route_changes_fresh(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>CHANGES-FRESH</p></body></html>", "text/html")
+
+    def route_changes_redir(self):
+        self.send_response(302)
+        self.send_header("Location", "/changes/redirtarget.html")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_changes_redirtarget(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>CHANGES-REDIR</p></body></html>", "text/html")
+
+    # Direct-to-disk, and the first body fetch of each pass dies mid-transfer:
+    # the retry notifies the same file a second time, so the accumulator has to
+    # keep the pre-run sample from the first notify.
+    FLAKY = b"CHANGES-FLAKY\n" + b"\x07\x06\x05\x04" * 512
+
+    # A page whose payload never changes, linking through a redirect whose
+    # target is renamed between passes: the rewritten link makes the file on
+    # disk change length while the payload is byte-identical. Only a payload
+    # comparison can call it unchanged.
+    SIZED_SHORT = "s.html"
+    SIZED_LONG = "s" * 40 + ".html"
+
+    def route_changes_sized(self):
+        self.refetch_pass()
+        self.send_raw(
+            b'<html><body><a href="sizedredir.html">t</a></body></html>',
+            "text/html",
+        )
+
+    def route_changes_sizedredir(self):
+        target = self.SIZED_SHORT if self.refetch_pass() == 1 else self.SIZED_LONG
+        self.send_response(302)
+        self.send_header("Location", "/changes/" + target)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_changes_sizedtarget(self):
+        self.refetch_pass()
+        self.send_raw(b"<html><body><p>SIZED-TARGET</p></body></html>", "text/html")
+
+    # Content-Encoding on a direct-to-disk body: the decoded temp is renamed
+    # over the mirror file, so the previous copy has to be sampled before the
+    # rename. Same length on both passes, so only a digest can tell them apart.
+    def route_changes_coded(self):
+        pass1 = self.refetch_pass() == 1
+        body = b"CHANGES-CODED-V%d\n" % (1 if pass1 else 2) + b"\x11\x22" * 1024
+        self.send_coded(self.gzipped(body), "application/octet-stream")
+
+    # Control: same coding, same bytes on both passes.
+    def route_changes_coded_stable(self):
+        self.refetch_pass()
+        body = b"CHANGES-CODED-STABLE\n" + b"\x33\x44" * 1024
+        self.send_coded(self.gzipped(body), "application/octet-stream")
+
+    def route_changes_flaky(self):
+        if self.refetch_pass() % 2 == 1:
+            self.send_truncated(self.FLAKY, "application/octet-stream")
+        else:
+            self.send_raw(self.FLAKY, "application/octet-stream")
+
+    def route_changes_transient(self):
+        self.refetch_pass()
+        self.send_raw(
+            b"<html><body><p>CHANGES-TRANSIENT</p></body></html>", "text/html"
+        )
+
+    # Answers once, then hangs up before sending anything on every later
+    # attempt, retries included: nothing is written, so the file never reaches
+    # new.lst while its mirrored copy stays intact.
+    RESET = b"CHANGES-RESET\n" + b"\x21\x22\x23\x24" * 512
+
+    def route_changes_reset(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.RESET, "application/octet-stream")
+        else:
+            self.close_connection = True
+            self.connection.close()
+
+    # A second, independent mirror crawled with the cache off: nothing but the
+    # bytes on disk can tell stable2 from ticker2, whose body differs every
+    # fetch at a constant length.
+    def route_changes2_index(self):
+        self.refetch_pass()
+        self.send_html('\t<a href="stable2.bin">s</a>\n\t<a href="ticker2.bin">t</a>\n')
+
+    def route_changes2_stable(self):
+        self.refetch_pass()
+        self.send_raw(
+            b"CHANGES2-STABLE-00\n" + b"\x55\xaa" * 512, "application/octet-stream"
+        )
+
+    def route_changes2_ticker(self):
+        self.send_raw(
+            b"CHANGES2-TICKER-%02d\n" % (self.refetch_pass() % 100) + b"\x55\xaa" * 512,
+            "application/octet-stream",
+        )
+
     ROUTES = {
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
@@ -1758,6 +1919,27 @@ class Handler(SimpleHTTPRequestHandler):
         "/codec/bad.html": route_codec_bad,
         "/codec/bin.dat": route_codec_bin,
         "/codec/ae.html": route_codec_ae,
+        "/changes/index.html": route_changes_index,
+        "/changes/stable.html": route_changes_stable,
+        "/changes/moved.html": route_changes_moved,
+        "/changes/stable.bin": route_changes_stable_bin,
+        "/changes/moved.bin": route_changes_moved_bin,
+        "/changes/doomed.html": route_changes_doomed,
+        "/changes/fresh.html": route_changes_fresh,
+        "/changes/redir.html": route_changes_redir,
+        "/changes/redirtarget.html": route_changes_redirtarget,
+        "/changes/flaky.bin": route_changes_flaky,
+        "/changes/coded.bin": route_changes_coded,
+        "/changes/sized.html": route_changes_sized,
+        "/changes/sizedredir.html": route_changes_sizedredir,
+        "/changes/" + SIZED_SHORT: route_changes_sizedtarget,
+        "/changes/" + SIZED_LONG: route_changes_sizedtarget,
+        "/changes/codedstable.bin": route_changes_coded_stable,
+        "/changes/transient.html": route_changes_transient,
+        "/changes/reset.bin": route_changes_reset,
+        "/changes2/index.html": route_changes2_index,
+        "/changes2/stable2.bin": route_changes2_stable,
+        "/changes2/ticker2.bin": route_changes2_ticker,
         "/upcodec/index.html": route_upcodec_index,
         "/upcodec/mem.html": route_upcodec_mem,
         "/upcodec/disk.bin": route_upcodec_disk,
