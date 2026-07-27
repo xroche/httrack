@@ -1545,6 +1545,7 @@ int url_savename(lien_adrfilsave *const afs,
 #endif
 #define MIN_LAST_SEG_RESERVE 12
 #define MAX_LAST_SEG_RESERVE 24
+#define MAX_EXT_LEN 12 /* longest tail kept across a cut, sans the dot */
   if (hts_stringLengthUTF8(afs->save) +
       hts_stringLengthUTF8(StringBuff(opt->path_html_utf8)) >=
       HTS_MAX_PATH_LEN) {
@@ -1613,9 +1614,26 @@ int url_savename(lien_adrfilsave *const afs,
           markStart = (p > lastSeg && p < extDot && wsave[p - 1] == '.')
                           ? p - 1
                           : extDot;
+        } else {
+          // #852: reserve a plain extension too, or the cut costs the page
+          // the ".html" the mirror is browsed by.
+          size_t p = wsaveLen;
+
+          while (p > lastSeg && wsave[p - 1] != '.')
+            p--;
+          if (p > lastSeg + 1 && wsaveLen - p <= MAX_EXT_LEN) {
+            markStart = p - 1;
+          }
         }
-        // head, bounded so the marker still fits, then the marker itself
-        for (i = lastSeg; i < markStart && j + (wsaveLen - markStart) < maxLen;
+        // #852: clamp the name like any directory segment; it was bounded by
+        // the whole path alone, so one component could run to maxLen.
+        const size_t tailLen = wsaveLen - markStart;
+        const size_t headLen =
+            tailLen < MAX_SEG_LEN ? MAX_SEG_LEN - tailLen : 0;
+
+        // head, bounded so the reserved tail still fits, then the tail itself
+        for (i = lastSeg; i < markStart && i - lastSeg < headLen &&
+                          j < maxLen && tailLen < maxLen - j;
              i++)
           wsave[j++] = wsave[i];
         for (i = markStart; i < wsaveLen && j < maxLen; i++)
@@ -1668,6 +1686,7 @@ int url_savename(lien_adrfilsave *const afs,
 #undef MAX_UTF8_SEQ_CHARS
 #undef MIN_LAST_SEG_RESERVE
 #undef MAX_LAST_SEG_RESERVE
+#undef MAX_EXT_LEN
 #undef MAX_SEG_LEN
 #undef HTS_MAX_PATH_LEN
 #undef HTS_PATH_TAIL_RESERVE
