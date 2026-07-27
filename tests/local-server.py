@@ -1000,9 +1000,7 @@ class Handler(SimpleHTTPRequestHandler):
         v = 1 if self.refetch_pass() == 1 else 2
         self.send_raw(b"<html><body><p>STAY-V%d</p></body></html>" % v, "text/html")
 
-    # --- re-fetch that dies before a complete response (#746, #748) ---------
-    # Pass 1 mirrors each resource; every later fetch hangs up partway through
-    # the status line, so nothing is ever received to store.
+    # --- re-fetch cut mid-header, so nothing is stored (#746, #748) ---------
     KEEP_PAGE = b"<html><body><p>KEEP-PAGE-V1</p></body></html>"
     KEEP_BIN = b"KEEP-BIN-V1\n" + b"\x51\x52\x53\x54" * 512
     KEEP_ERR = b"KEEP-ERR-V1\n" + b"\x61\x62\x63\x64" * 512
@@ -1049,11 +1047,13 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
 
-    # Control: served identically on every pass.
+    # Control: answers normally, with a new body on pass 2, so a fix that
+    # stopped overwriting mirrored files altogether would be caught.
     def route_keep_stay(self):
-        self.refetch_pass()
+        v = 1 if self.refetch_pass() == 1 else 2
         self.send_raw(
-            b"KEEP-STAY-V1\n" + b"\x71\x72\x73\x74" * 512, "application/octet-stream"
+            b"KEEP-STAY-V%d\n" % v + b"\x71\x72\x73\x74" * 512,
+            "application/octet-stream",
         )
 
     # Echo what httrack advertised, so a crawl can assert the header.

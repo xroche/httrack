@@ -1,11 +1,9 @@
 #!/bin/bash
 #
-# A re-fetch that dies before a complete response must leave the mirrored copy
-# alone (#748). Pass 2 hangs up in the middle of the status line, so nothing is
-# received; unfixed, the aborted read's leftover buffer lands on both files as
-# raw header text (an empty file on macOS). err.bin is the control: an HTTP 500
-# on the same resource already keeps its copy, and the cut connection must end
-# up indistinguishable from it.
+# A re-fetch cut mid-header must leave the mirrored file alone (#748): unfixed,
+# the aborted read's leftover buffer lands on it. err.bin is the control, an
+# HTTP 500 on the same resource already keeping its copy; stay.bin answers
+# normally with a new body, so a fix that stopped overwriting anything fails.
 #
 # Purging is off: an update purge deletes both files for an unrelated reason
 # (#746), which would hide what this asserts.
@@ -16,6 +14,8 @@ set -euo pipefail
 
 bash "$top_srcdir/tests/local-crawl.sh" \
     --rerun-args '--update --purge-old=0' \
+    --log-found '"Interrupted transfer" \(-4\).*keep/page\.html' \
+    --log-found '"Interrupted transfer" \(-4\).*keep/data\.bin' \
     --file-matches 'keep/page.html' 'KEEP-PAGE-V1' \
     --file-not-matches 'keep/page.html' 'HTTP/1\.0 200' \
     --file-matches 'keep/data.bin' 'KEEP-BIN-V1' \
@@ -23,6 +23,6 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --file-min-bytes 'keep/data.bin' 2048 \
     --file-matches 'keep/err.bin' 'KEEP-ERR-V1' \
     --file-min-bytes 'keep/err.bin' 2048 \
-    --file-matches 'keep/stay.bin' 'KEEP-STAY-V1' \
+    --file-matches 'keep/stay.bin' 'KEEP-STAY-V2' \
     --file-min-bytes 'keep/stay.bin' 2048 \
     httrack 'BASEURL/keep/index.html' --retries=2

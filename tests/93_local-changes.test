@@ -94,7 +94,7 @@ expect_counts_match() {
     echo "OK"
 }
 lines() { printf '%s\n' "$@" | sort; }
-bytes() { wc -c <"$1" | tr -d '[:space:]'; }
+digest() { cksum <"$1" | tr -d '[:space:]'; }
 
 # --- pass 1: nothing to compare against --------------------------------------
 httrack "${common[@]}" -O "$out" --purge-old=0 "${base}/changes/index.html" \
@@ -117,7 +117,7 @@ grep -aq "first crawl" "${out}/hts-log.txt" || {
 }
 
 host="127.0.0.1_${port}"
-resetsize=$(bytes "${out}/${host}/changes/reset.bin")
+resetdigest=$(digest "${out}/${host}/changes/reset.bin")
 # A leftover from some earlier failed attempt, at a name pass 2 fetches for the
 # first time: on disk, but never part of the previous mirror, so it is new.
 printf 'leftover junk' >"${out}/${host}/changes/fresh.html"
@@ -147,8 +147,8 @@ expect "changed is exactly the four moved resources" \
 # through a failed transfer and a retry, so its file is notified twice;
 # redirtarget.html arrives behind a 302. sized.html has a byte-identical
 # payload, but the rewritten link to the renamed redirect target makes the file
-# on disk change length. reset.bin never completes a transfer at all (#746), so
-# its previous copy stands and the crawl left it alone.
+# on disk change length. reset.bin never completes a transfer (#746), so its
+# previous copy stands.
 expect "unchanged is exactly the seven stable resources" \
     "$(lines "${host}/changes/codedstable.bin" "${host}/changes/flaky.bin" \
         "${host}/changes/redirtarget.html" "${host}/changes/reset.bin" \
@@ -188,8 +188,8 @@ test -f "${out}/${host}/changes/doomed.html" || {
     exit 1
 }
 echo "OK"
-expect "a failed transfer keeps its bytes" "$resetsize" \
-    "$(bytes "${out}/${host}/changes/reset.bin")"
+expect "a failed transfer keeps its bytes" "$resetdigest" \
+    "$(digest "${out}/${host}/changes/reset.bin")"
 
 # --- pass 3: the same run with purging on ------------------------------------
 httrack "${common[@]}" -O "$out" --update "${base}/changes/index.html" \
