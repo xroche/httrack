@@ -1,0 +1,164 @@
+#!/bin/bash
+#
+# An FTP re-fetch used to truncate the mirror before the transfer, so a failed
+# one destroyed the previous copy (#771). keep.bin is cut short and empty.bin
+# gets nothing; both must keep their old bytes. stay.bin takes the same path and
+# completes, so a fix that merely stopped writing would fail here.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+server=$(nativepath "${testdir}/ftp-server.py")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+root="${tmpdir}/root"
+out="${tmpdir}/crawl"
+mode="${tmpdir}/mode"
+report="${out}/hts-changes.json"
+mkdir -p "$root" "$out"
+
+# The two generations differ in length, or a re-fetch that resumed at EOF
+# instead of truncating would leave the same bytes and pass for the wrong reason.
+write_bodies() {
+    local gen="$1" fill="$2" name
+    for name in keep empty stay; do
+        "$python" -c 'import sys; sys.stdout.buffer.write(
+            ("%s-FTP-%s " % (sys.argv[1].upper(), sys.argv[2])).encode()
+            + sys.argv[2][-1].encode() * int(sys.argv[3]))' "$name" "$gen" "$fill" \
+            >"${root}/${name}.bin"
+    done
+}
+write_bodies V1 4096
+: >"$mode"
+
+serverlog="${tmpdir}/server.out"
+"$python" "$server" --root "$(nativepath "$root")" \
+    --mode-file "$(nativepath "$mode")" >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 300); do
+    line=$(grep -m1 '^PORT ' "$serverlog" 2>/dev/null) && port="${line#PORT }" && break
+    kill -0 "$serverpid" 2>/dev/null || {
+        echo "ftp server exited early: $(cat "$serverlog")" >&2
+        exit 1
+    }
+    sleep 0.1
+done
+test -n "$port" || {
+    echo "could not discover ftp server port: $(cat "$serverlog")" >&2
+    exit 1
+}
+host="127.0.0.1_${port}"
+urls=()
+for name in keep empty stay; do
+    urls+=("ftp://127.0.0.1:${port}/${name}.bin")
+done
+# -c1: a parallel FTP crawl loses whole transfers to a separate, older bug in
+# the backlog slot swap (#797), which would flake this test on a loaded runner.
+common=(--quiet --disable-security-limits --robots=0 --timeout=20 --max-time=120
+    --retries=1 -c1 --changes)
+
+fail() {
+    echo "FAIL: $*" >&2
+    test ! -f "$report" || cat "$report" >&2
+    exit 1
+}
+ok() { echo "OK: $*"; }
+size_of() { wc -c <"$1" | tr -d '[:space:]'; }
+# Files listed under a report bucket, one "file:size" per line.
+listed() {
+    "$python" - "$report" "$1" <<'EOF' | tr -d '\r'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as fp:
+    report = json.load(fp)
+for entry in report[sys.argv[2]]:
+    print("%s:%s" % (entry["file"], entry.get("size", "none")))
+EOF
+}
+
+# --- pass 1: a healthy mirror ------------------------------------------------
+# Bounded like every local-crawl.sh pass: a wedged crawl must fail the test, not
+# hang the job until CI cancels it and discards the log (#796).
+run_with_timeout 300 httrack "${urls[@]}" -O "$out" "${common[@]}" \
+    >"${tmpdir}/log1" 2>&1
+for name in keep empty stay; do
+    test -s "${out}/${host}/${name}.bin" || fail "pass 1 did not mirror ${name}.bin"
+done
+mkdir "${tmpdir}/snap"
+cp "${out}/${host}"/*.bin "${tmpdir}/snap/"
+ok "pass 1 mirrored three files"
+
+# --- pass 2: the same three re-fetched, two of them failing -------------------
+# norest throughout: an accepted REST sends the client down the append path,
+# which is not the one that truncates.
+write_bodies V2 6000
+cat >"$mode" <<'EOF'
+/keep.bin truncate norest
+/empty.bin empty norest
+/stay.bin norest
+EOF
+run_with_timeout 300 httrack "${urls[@]}" -O "$out" "${common[@]}" --update \
+    >"${tmpdir}/log2" 2>&1
+
+# Both failures have to be the transfer dying mid-body: a connect or lookup
+# failure never opens the file, and everything below would pass vacuously.
+for name in keep empty; do
+    grep -aqE "Error:.*\"FTP file incomplete\".*${name}\.bin" "${out}/hts-log.txt" ||
+        fail "${name}.bin did not fail during the transfer"
+done
+ok "both re-fetches reached the body and failed there"
+
+for name in keep empty; do
+    cmp -s "${out}/${host}/${name}.bin" "${tmpdir}/snap/${name}.bin" ||
+        fail "${name}.bin differs from the copy pass 1 left ($(size_of \
+            "${out}/${host}/${name}.bin") bytes now)"
+done
+ok "a failed FTP transfer left the previously mirrored bytes alone"
+
+grep -aq "FTP-V2 " "${out}/${host}/stay.bin" ||
+    fail "stay.bin was not refreshed; the re-fetch writes nothing at all now"
+ok "a successful FTP re-fetch still replaces the file"
+
+leftover=$(find "${out}/${host}" -name '*.bak')
+test -z "$leftover" || fail "backup left behind: ${leftover}"
+ok "no backup temporary survived the pass"
+
+# --purge-old is on by default: a kept file the run never replaced must still be
+# in new.lst, or it is deleted as gone (#746).
+for name in keep empty stay; do
+    test -f "${out}/${host}/${name}.bin" || fail "${name}.bin was purged"
+done
+ok "the kept copies survived the update purge"
+
+# --- the change report is the mirror's own account of the pass ----------------
+test -s "$report" || fail "pass 2 wrote no ${report}"
+test -z "$(listed gone)" || fail "the report calls something gone: $(listed gone)"
+for name in keep empty; do
+    listed unchanged | grep -qx "${host}/${name}.bin:$(size_of "${tmpdir}/snap/${name}.bin")" ||
+        fail "${name}.bin is not reported unchanged at its previous size"
+    if listed changed | grep -q "^${host}/${name}.bin:"; then
+        fail "${name}.bin is reported changed as well"
+    fi
+done
+listed changed | grep -qx "${host}/stay.bin:$(size_of "${out}/${host}/stay.bin")" ||
+    fail "stay.bin is not reported changed"
+ok "the change report calls the kept files unchanged and the refreshed one changed"

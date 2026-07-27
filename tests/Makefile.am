@@ -5,7 +5,8 @@ EXTRA_DIST = $(TESTS) renamefail.c crawl-test.sh run-all-tests.sh check-network.
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	pty-resize.py \
-	local-crawl.sh local-server.py testlib.sh server.crt server.key \
+	local-crawl.sh local-server.py ftp-server.py testlib.sh \
+	server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \
 	server-root/fraglink/index.html server-root/fraglink/target.html \
@@ -58,6 +59,7 @@ TESTS = \
 	01_engine-filterdual.test \
 	01_engine-ftp-line.test \
 	01_engine-ftp-userpass.test \
+	01_engine-backswap.test \
 	01_engine-cacheindex.test \
 	01_engine-hashtable.test \
 	01_engine-header.test \
@@ -215,6 +217,7 @@ TESTS = \
 	99_local-robots-error.test \
 	100_local-purge-longpath.test \
 	101_local-update-stale-bak.test \
+	102_local-ftp-refetch.test \
 	103_teardown-status.test
 
 CLEANFILES = check-network_sh.cache
