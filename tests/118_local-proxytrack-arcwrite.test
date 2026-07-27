@@ -26,11 +26,6 @@ fail() {
 
 pad() { printf "%${1}s" '' | tr ' ' "$2"; }
 
-# Longest surviving run of char $2 in file $1, or 0.
-runlen() {
-    grep -ao "$2\\+" "$1" | awk '{ print length($0) }' | sort -rn | head -n1 || true
-}
-
 P1000=$(pad 1000 P)
 
 # Header lines contributing exactly $1 bytes to the entry's stored headers: the
@@ -75,7 +70,7 @@ build_arc() {
 # last_alen to the record's declared length.
 convert_check() {
     local rec off alen total dataoff
-    proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 ||
+    proxytrack --convert "$dir/out.arc" "$dir/in.arc" >"$dir/log" 2>&1 ||
         fail "$1: proxytrack died writing the .arc"
     rec=$(grep -a -m1 '^http://example.com/p.html ' "$dir/out.arc") ||
         fail "$1: entry dropped from the .arc"
@@ -85,8 +80,8 @@ convert_check() {
     dataoff=$((off + ${#rec} + 1))
     test "$((total - dataoff))" -eq "$alen" ||
         fail "$1: record declares $alen bytes, wrote $((total - dataoff))"
-    test "$((alen - ${#BODY}))" -le "$HDRMAX" ||
-        fail "$1: header block is $((alen - ${#BODY})) bytes, cap is $HDRMAX"
+    test "$((alen - ${#BODY}))" -lt "$HDRMAX" ||
+        fail "$1: header block is $((alen - ${#BODY})) bytes, cap is $((HDRMAX - 1))"
     # a clip landing mid-line must still close it, or the body reads as headers
     tail -c $((${#BODY} + 4)) "$dir/out.arc" >"$dir/got.tail"
     printf '\r\n\r\n%s' "$BODY" >"$dir/want.tail"
@@ -105,6 +100,8 @@ fixed=$((last_alen - ${#BODY}))
 # The reported bug: 12000 bytes wrap "sizeof - strlen - 1", so the guard passes.
 build_arc OK "" 12000
 convert_check "over-long cached headers"
+grep -q 'clipped to' "$dir/log" ||
+    fail "a clipped header block was not reported on stderr"
 
 # Three sources at once, each with its own limit: the reason phrase is cut at
 # msg[1024], the shorter location not at all, the passthrough takes what is
