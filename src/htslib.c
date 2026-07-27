@@ -5784,7 +5784,8 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
   if (hts_log_print_callback != NULL) {
     va_list args_copy;
     va_copy(args_copy, args);
-    hts_log_print_callback(opt, type, format, args);
+    /* the copy, so the vfprintf() below still has an unread list */
+    hts_log_print_callback(opt, type, format, args_copy);
     va_end(args_copy);
   }
   if (opt != NULL && opt->log != NULL) {

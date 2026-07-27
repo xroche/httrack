@@ -33,13 +33,17 @@ out=$("$bin" -#test=rtrim) || fail "httrack -#test=rtrim exited non-zero: $out"
 test "$out" = "rtrim self-test: OK" || fail "expected 'rtrim self-test: OK', got: $out"
 
 # --- 2. collision rename over an all-digit name -----------------------------
-# Flat naming (-g) makes both files 2024.html, so the second one goes through
-# the -<n> rename; the digit scan then has nothing but digits to walk over.
+# Two pages with the same all-digit name save to 2024.html, so the second goes
+# through the -<n> rename and the digit scan has nothing but digits to walk
+# over. Driven twice, because the two routes differ in who picks the URLs.
 site="$tmp/site"
 mkdir -p "$site/a" "$site/b"
+printf '%s\n' '<html><body><a href="a/2024.html">a</a> <a href="b/2024.html">b</a></body></html>' \
+    >"$site/index.html"
 echo '<html><body>A</body></html>' >"$site/a/2024.html"
 echo '<html><body>B</body></html>' >"$site/b/2024.html"
 
+# -g flattens the tree, and pins depth to 0: the operator supplies both URLs.
 out1="$tmp/out1"
 mkdir -p "$out1"
 (cd "$out1" && "$bin" -g "file://$site/a/2024.html" "file://$site/b/2024.html" \
@@ -47,6 +51,16 @@ mkdir -p "$out1"
 
 test -f "$out1/2024.html" || fail "2024.html not mirrored"
 test -f "$out1/2024-2.html" || fail "colliding name was not renamed to 2024-2.html"
+
+# -N "%n.%t" collides the same way with depth unrestricted, so one starting URL
+# is enough and the crawled page picks both colliding names itself.
+out3="$tmp/out3"
+mkdir -p "$out3"
+(cd "$out3" && "$bin" "file://$site/index.html" -N "%n.%t" --quiet -n >.log 2>&1) ||
+    fail "userdef-savename crawl exited non-zero: $(tail -3 "$out3/.log")"
+test -f "$out3/2024.html" || fail "2024.html not mirrored under -N '%n.%t'"
+test -f "$out3/2024-2.html" ||
+    fail "colliding name was not renamed under -N '%n.%t' (links followed, not argv)"
 
 # The rename must keep counting, not restart: a third collision is -3.
 mkdir -p "$site/c"
@@ -69,6 +83,7 @@ cp "$rcdir/.httrackrc" "$rcdir/httrackrc"
 rc=0
 log=$( (cd "$rcdir" && "$bin" "file://$rcdir/index.html" --quiet -n 2>&1)) || rc=$?
 test "$rc" -eq 0 || fail "rc-file crawl exited $rc: $log"
+log=${log//$'\r'/} # the empty-option check below must not miss a CRLF line
 
 # The line after the blank one must still be read, or this proves nothing.
 case "$log" in
