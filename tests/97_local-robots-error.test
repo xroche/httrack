@@ -1,0 +1,14 @@
+#!/bin/bash
+# Issue #769: a failed robots.txt under -o1, with .txt assumed image/gif, was
+# the one input reaching the --errpage placeholder block, which swapped r.adr
+# for a 1070-byte GIF but left r.size alone: robots_parse then over-read it.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --log-found 'listed by 127\.0\.0\.1:[0-9]+/sitemap\.xml' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 -o1 \
+    --assume 'txt=image/gif' -F 'errorrobots-agent'
