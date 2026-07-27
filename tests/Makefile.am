@@ -197,6 +197,7 @@ TESTS = \
 	92_local-proxytrack-ndx-fields.test \
 	93_local-changes.test \
 	94_local-single-file.test \
-	95_local-sitemap.test
+	95_local-sitemap.test \
+	96_local-refetch-keep.test
 
 CLEANFILES = check-network_sh.cache
