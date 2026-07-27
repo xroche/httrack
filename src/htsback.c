@@ -745,6 +745,13 @@ static void back_finalize_backup(httrackp *opt, lien_back *const back,
   back->tmpfile = NULL;
 }
 
+/* The terminating zero-length chunk is part of the framing, so a stream that
+   ended without it is truncated by definition (#840). chunk_blocksize is reset
+   per response and only reaches -1 once that chunk header was parsed. */
+static hts_boolean back_chunked_unterminated(const lien_back *const back) {
+  return back->is_chunk && back->chunk_blocksize != -1 ? HTS_TRUE : HTS_FALSE;
+}
+
 // objet (lien) téléchargé ou transféré depuis le cache
 //
 // fermer les paramètres de transfert,
@@ -764,9 +771,22 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
     /* Don't store broken files. Note: check is done before compression.
        If the file is partial, the next run will attempt to continue it with compression too.
      */
-    if (back[p].r.totalsize >= 0 && back[p].r.statuscode > 0
-        && back[p].r.size != back[p].r.totalsize && !opt->tolerant) {
-      if (back[p].status == STATUS_READY) {
+    const hts_boolean cut_chunked = back_chunked_unterminated(&back[p]);
+    const hts_boolean short_body =
+        back[p].r.totalsize >= 0 && back[p].r.size != back[p].r.totalsize
+            ? HTS_TRUE
+            : HTS_FALSE;
+
+    if ((short_body || cut_chunked) && back[p].r.statuscode > 0 &&
+        !opt->tolerant) {
+      if (cut_chunked) {
+        hts_log_print(
+            opt, LOG_WARNING,
+            "truncated chunked transfer (terminating chunk missing, got " LLintP
+            " bytes): file not cached, will be retried on the next"
+            " update (use -%%B to cache anyway): %s%s",
+            back[p].r.size, back[p].url_adr, back[p].url_fil);
+      } else if (back[p].status == STATUS_READY) {
         hts_log_print(opt, LOG_WARNING,
                       "incomplete transfer (expected " LLintP
                       " bytes, got " LLintP
@@ -3470,6 +3490,25 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back_finalize(opt, cache, sback, i);
             }
 
+            /* Same treatment for an unterminated chunked stream: the byte count
+               agrees with the chunks that arrived, the framing does not. */
+            if (back_chunked_unterminated(&back[i])) {
+              if (!opt->tolerant) {
+                deleteaddr(&back[i].r);
+                back[i].r.statuscode = STATUSCODE_CONNERROR; // recatch
+                htsblk_failf(&back[i].r,
+                             "Truncated chunked transfer (" LLintP
+                             " Bytes, terminating chunk missing)",
+                             (LLint) back[i].r.size);
+              } else {
+                hts_log_print(opt, LOG_WARNING,
+                              "Truncated chunked transfer (" LLintP
+                              " Bytes, terminating chunk missing) for %s%s",
+                              (LLint) back[i].r.size, back[i].url_adr,
+                              back[i].url_fil);
+              }
+            }
+
             if (back[i].r.totalsize >= 0) { // tester totalsize
               if (back[i].r.totalsize != back[i].r.size) {      // pas la même!
                 if (!opt->tolerant) {
@@ -3532,7 +3571,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     if (sscanf(chunk_data, "%x", &chunk_size) == 1) {
                       if (chunk_size > 0)
                         back[i].chunk_blocksize = chunk_size;   /* the data block chunk size */
-                      else
+                      /* an illegal negative size must leave the sentinel unset,
+                         so the stream still reads as truncated (#840) */
+                      else if (chunk_size == 0)
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
                       if (back[i].r.adr != NULL || !back[i].r.is_write) {       // Not to disk

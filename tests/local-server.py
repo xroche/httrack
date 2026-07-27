@@ -1507,6 +1507,50 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(b"%X\r\n" % len(piece) + piece + b"\r\n")
         self.wfile.write(b"0\r\n\r\n")
 
+    # #840: a chunked stream cut before its terminating zero-length chunk.
+    CHUNKTRUNC_V1 = b"<html><body><p>CHUNKTRUNC-PAGE-V1</p></body></html>"
+    CHUNKTRUNC_V2 = b"<html><body><p>CHUNKTRUNC-PAGE-V2</p></body></html>"
+
+    def route_chunktrunc_index(self):
+        self.send_html(
+            '\t<a href="page.html">page</a>\n'
+            '\t<a href="always.html">always</a>\n'
+            '\t<a href="stay.html">stay</a>\n'
+        )
+
+    def send_chunked(self, body, terminate):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+            if terminate:
+                self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    def route_chunktrunc_page(self):
+        if self.refetch_pass() == 1:
+            self.send_chunked(self.CHUNKTRUNC_V1, True)
+        else:
+            self.send_chunked(self.CHUNKTRUNC_V2, False)
+
+    # Truncated on every pass: nothing may be mirrored, even on a first crawl.
+    def route_chunktrunc_always(self):
+        self.send_chunked(b"<html><body><p>CHUNKTRUNC-ALWAYS</p></body></html>", False)
+
+    # Control: terminated on both passes, so a normal --update still lands.
+    def route_chunktrunc_stay(self):
+        v = 1 if self.refetch_pass() == 1 else 2
+        self.send_chunked(b"<html><body><p>CHUNKSTAY-V%d</p></body></html>" % v, True)
+
     # Content-Disposition naming: the attachment filename replaces the
     # URL-derived name; path components in it are stripped (RFC 2616).
     CDISPO_NAMES = {
@@ -2059,6 +2103,10 @@ class Handler(SimpleHTTPRequestHandler):
         "/size/oversize.bin": route_size_oversize,
         "/chunked/index.html": route_chunked_index,
         "/chunked/page.html": route_chunked_page,
+        "/chunktrunc/index.html": route_chunktrunc_index,
+        "/chunktrunc/page.html": route_chunktrunc_page,
+        "/chunktrunc/always.html": route_chunktrunc_always,
+        "/chunktrunc/stay.html": route_chunktrunc_stay,
         "/errpage/index.html": route_errpage_index,
         "/errpage/good.html": route_errpage_good,
         "/errpage/missing.html": route_errpage_missing,
