@@ -1322,7 +1322,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       p++;                      // sauter espaces
     if ((int) strlen(rcvd + p) < 250) { // pas trop long?
       char tmp[256];
-      char *a = NULL, *b = NULL;
+      char *a = NULL;
 
       strcpybuff(tmp, rcvd + p);
       a = strstr(tmp, "filename=");
@@ -1335,15 +1335,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 
           while((c = strchr(a, '/')))   /* skip all / (see RFC2616) */
             a = c + 1;
-          b = a + strlen(a) - 1;
-          while(is_space(*b))
-            b--;
-          b++;
-          if (b) {
-            *b = '\0';
-            if ((int) strlen(a) < 200) {        // pas trop long?
-              strcpybuff(retour->cdispo, a);
-            }
+          hts_rtrim(a, HTS_SPACES);
+          if ((int) strlen(a) < 200) { // pas trop long?
+            strcpybuff(retour->cdispo, a);
           }
         }
       }
@@ -3315,8 +3309,9 @@ int ishtml(httrackp * opt, const char *fil) {
   }
 
   /* Search for known ext */
-  for(a = fil_noquery + strlen(fil_noquery) - 1;
-      *a != '.' && *a != '/' && a > fil_noquery; a--) ;
+  for (a = hts_lastcharptr(fil_noquery);
+       *a != '.' && *a != '/' && a > fil_noquery; a--)
+    ;
   if (*a == '.') {              // a une extension
     char BIGSTK fil_noquery[HTS_URLMAXSIZE * 2];
     char *b;
@@ -4253,9 +4248,8 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
     return 1;
   } else {
     /* Check html -> text/html */
-    const char *a = fil + strlen(fil) - 1;
+    const char *a = hts_lastcharptr(fil);
 
-    /* a < fil when fil is empty: bound before dereferencing */
     while ((a > fil) && (*a != '.') && (*a != '/'))
       a--;
     if (a >= fil && *a == '.' && strlen(a) < 32) {

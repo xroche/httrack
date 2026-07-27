@@ -501,13 +501,11 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
       /* read line */
       linput(fp, line, 250);
       hts_lowcase(line);
+      /* trim first: a blank line is skipped, not parsed as an option */
+      hts_rtrim(line, HTS_REALSPACES);
       if (strnotempty(line)) {
         /* no comment line: # // ; */
         if (strchr("#/;", line[0]) == NULL) {
-          /* right trim */
-          a = line + strlen(line) - 1;
-          while(is_realspace(*a))
-            *(a--) = '\0';
           /* jump "set " and spaces */
           a = line;
           while(is_realspace(*a))
@@ -577,7 +575,6 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
             }
           }
         }
-
       }
     }
     fclose(fp);
