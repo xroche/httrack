@@ -210,3 +210,4 @@ TESTS += 136_local-warc-cache-priority.test
 TESTS += 137_local-charsetless-encoding.test
 TESTS += 138_local-spool-name-overflow.test
 TESTS += 133_engine-reentrant-time.test
+TESTS += 139_local-query-charref.test

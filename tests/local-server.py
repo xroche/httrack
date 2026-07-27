@@ -1198,6 +1198,45 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # Character references in a query string (#854). CHARREF_LOG collects the
+    # request-target the origin saw, plus the parameter count it parses out of
+    # it. Per page: a reference the declared charset represents (é, あ) and one
+    # it does not (€).
+    CHARREF_QUERY = "?a=&euro;&b=&#8364;&c=&eacute;&d=x"
+    CHARREF_MB_QUERY = "?a=&#12354;&c=&#12316;&b=&euro;&d=x"
+    CHARREF_PAGES = {
+        "none": ("text/html", CHARREF_QUERY),
+        "utf8": ("text/html; charset=utf-8", CHARREF_QUERY),
+        "sjis": ("text/html; charset=shift_jis", CHARREF_MB_QUERY),
+        "jis": ("text/html; charset=iso-2022-jp", CHARREF_MB_QUERY),
+    }
+
+    def record_charref(self):
+        log = os.environ.get("CHARREF_LOG")
+        if log:
+            fields = [f for f in urlsplit(self.path).query.split("&") if f]
+            with open(log, "a") as fp:
+                fp.write("%s\t%d\n" % (self.path, len(fields)))
+
+    def route_charref(self):
+        name = urlsplit(self.path).path[len("/charref/") :]
+        variant = name[: -len(".html")] if name.endswith(".html") else ""
+        if variant == "index":
+            body = "".join(
+                '<a href="%s.html">%s</a>' % (v, v) for v in self.CHARREF_PAGES
+            )
+            self.send_raw(("<html><body>%s</body></html>" % body).encode(), "text/html")
+        elif variant in self.CHARREF_PAGES:
+            ctype, query = self.CHARREF_PAGES[variant]
+            body = '<a href="q%s.html%s">q</a>' % (variant, query)
+            self.send_raw(("<html><body>%s</body></html>" % body).encode(), ctype)
+        elif variant[1:] in self.CHARREF_PAGES:
+            self.send_raw(b"<html><body>q</body></html>", "text/html")
+        else:
+            self.send_response(404)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
     # variant -> (Content-Type, title bytes, body bytes); the gb2312 and l1decl
     # titles are valid UTF-8 as bytes, so only the declared charset decodes them
     TITLEENC_PAGES = {
@@ -2571,6 +2610,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/charset/"):
             self.route_charset()
             return True
+        if path.startswith("/charref/"):
+            self.route_charref()
+            return True
         if path.startswith("/titleenc/"):
             self.route_titleenc()
             return True
@@ -2589,6 +2631,9 @@ class Handler(SimpleHTTPRequestHandler):
         return False
 
     def do_GET(self):
+        # Before reject_fragment(), so an unescaped '#' still shows up recorded.
+        if self.path.startswith("/charref/"):
+            self.record_charref()
         if self.reject_fragment():
             return
         if not self.dispatch():

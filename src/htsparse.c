@@ -2176,13 +2176,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       "could not decode URI '%s' with charset '%s'", lien, charset);
                   }
 
-                  // decode query string entities with page charset
+                  // decode query entities with the page charset, out-of-place
+                  // because the escape grows it (#854)
                   if (hasCharset) {
-                    if (hts_unescapeEntitiesWithCharset(query, 
-                                                        query, strlen(query) + 1,
-                                                        charset) != 0) {
-                        hts_log_print(opt, LOG_WARNING,
-                          "could not decode query string '%s' with charset '%s'", query, charset);
+                    char BIGSTK decoded[sizeof(query)];
+
+                    if (hts_unescapeEntitiesWithCharsetSpecial(
+                            query, decoded, sizeof(decoded), charset,
+                            UNESCAPE_ENTITIES_URL_QUERY) == 0) {
+                      strcpybuff(query, decoded);
+                    } else {
+                      hts_log_print(opt, LOG_WARNING,
+                                    "could not decode query string '%s' with "
+                                    "charset '%s'",
+                                    query, charset);
                     }
                   }
 
