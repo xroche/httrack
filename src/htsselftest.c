@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsmodules.h"
 #include "htsback.h"
 #include "htsdefines.h"
 #include "htslib.h"
@@ -2621,6 +2622,68 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* an empty fil started htsAddLink's codebase walk before the buffer (#730) */
+static int st_addlink(httrackp *opt, int argc, char **argv) {
+  htsmoduleStruct BIGSTK str;
+  cache_back cache;
+  struct_back *sback;
+  hash_struct hash;
+  int ptr = 0;
+  int i;
+
+  (void) argc;
+  (void) argv;
+
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = (void *) coucal_new(0);
+  sback = back_new(opt, opt->maxsoc * 32 + 1024);
+  /* same wiring as hts_mirror (htscore.c) */
+  hash_init(opt, &hash, opt->urlhack);
+  hash.liens = (const lien_url *const *const *) &opt->liens;
+  opt->hash = &hash;
+  hts_record_init(opt);
+
+  memset(&str, 0, sizeof(str));
+  str.opt = opt;
+  str.sback = sback;
+  str.cache = &cache;
+  str.hashptr = &hash;
+  str.ptr_ = &ptr;
+  str.addLink = htsAddLink;
+
+  /* [0] is the underflow; [1] and [2] are controls that the trim is unchanged.
+     A query-only link is the one that notices the trim at all: for the others
+     ident_url_relatif() re-derives the directory from the path it is given. */
+  for (i = 0; i < 3; i++) {
+    static const char *const fil[3] = {"", "/dir/page.html", "/dir/page.html"};
+    static const char *const lnk[3] = {"sub/page.html", "sub/page.html",
+                                       "?x=1"};
+    static const char *const want[3] = {
+        "untouched", "http://www.example.com/dir/sub/page.html",
+        "http://www.example.com/dir/?x=1"};
+    char BIGSTK loc[HTS_URLMAXSIZE * 2];
+    char BIGSTK link[HTS_URLMAXSIZE];
+
+    strcpybuff(loc, "untouched");
+    strcpybuff(link, lnk[i]);
+    str.localLink = loc;
+    str.localLinkSize = (int) sizeof(loc);
+    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", ""))
+      return 1;
+    ptr = heap_top_index();
+    str.url_host = heap(ptr)->adr;
+    str.url_file = heap(ptr)->fil;
+    assertf(htsAddLink(&str, link) == 0); /* refused by the wizard either way */
+    if (strcmp(loc, want[i]) != 0) {
+      fprintf(stderr, "addlink[%d]: got '%s' want '%s'\n", i, loc, want[i]);
+      return 1;
+    }
+  }
+
+  printf("addlink self-test OK\n");
+  return 0;
+}
+
 static int st_cache(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -3259,6 +3322,81 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   rmdir(path);
   rmdir(topdir);
   printf("topindex self-test OK\n");
+  return 0;
+}
+
+/* Build a path of exactly len chars under base; returns that length. */
+static size_t st_structcheck_longpath(char *dst, size_t dstsize,
+                                      const char *base, size_t len) {
+  size_t n = strlen(base);
+
+  assertf(len < dstsize && n + 2 <= len);
+  memmove(dst, base, n);
+  while (n < len) {
+    size_t seg = len - n - 1;
+
+    if (seg > 200) /* stay under the usual 255-byte component limit */
+      seg = len - n == 202 ? 199 : 200; /* never leave a bare separator */
+    dst[n++] = '/';
+    memset(dst + n, 'x', seg);
+    n += seg;
+  }
+  dst[n] = '\0';
+  return n;
+}
+
+/* The path guard, and the <name>.txt rename structcheck() performs when a
+   regular file sits where a directory has to go (#745). */
+static int st_structcheck(httrackp *opt, int argc, char **argv) {
+  char BIGSTK path[HTS_URLMAXSIZE * 2];
+  char BIGSTK target[HTS_URLMAXSIZE * 2];
+  FILE *fp;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=structcheck <writable directory>\n");
+    return 1;
+  }
+
+  /* over the guard: refused before a single directory is created */
+  st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
+  errno = 0;
+  assertf(structcheck(path) == -1);
+  assertf(errno == EINVAL);
+  errno = 0;
+  assertf(structcheck_utf8(path) == -1);
+  assertf(errno == EINVAL);
+  {
+    char *const sep = strchr(path + strlen(argv[0]) + 1, '/');
+
+    assertf(sep != NULL);
+    sep[1] = '\0'; /* the outermost component it would have created */
+    assertf(!dir_exists(path));
+  }
+
+  /* a regular file where a directory belongs is renamed to <name>.txt */
+  snprintf(path, sizeof(path), "%s/sc", argv[0]);
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  snprintf(path, sizeof(path), "%s/sc/sub/", argv[0]);
+  assertf(structcheck(path) == 0);
+  assertf(dir_exists(path));
+  snprintf(target, sizeof(target), "%s/sc.txt", argv[0]);
+  assertf(fexist(target));
+
+  /* the utf-8 entry point carries the same rename */
+  snprintf(path, sizeof(path), "%s/u8", argv[0]);
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  snprintf(path, sizeof(path), "%s/u8/sub/", argv[0]);
+  assertf(structcheck_utf8(path) == 0);
+  assertf(dir_exists(path));
+  snprintf(target, sizeof(target), "%s/u8.txt", argv[0]);
+  assertf(fexist_utf8(target));
+
+  printf("structcheck self-test OK\n");
   return 0;
 }
 
@@ -6398,6 +6536,8 @@ static const struct selftest_entry {
     {"fsize", "<dir>", "file size past the 2GB signed-32-bit wrap", st_fsize},
     {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
      st_growsize},
+    {"addlink", "", "htsAddLink codebase walk over an empty current path",
+     st_addlink},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cacheindex", "", "cache-index (.ndx) parse must stay in bounds",
      st_cacheindex},
@@ -6421,6 +6561,9 @@ static const struct selftest_entry {
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
+    {"structcheck", "<dir>",
+     "structcheck path guard and the <name>.txt rename it performs",
+     st_structcheck},
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
