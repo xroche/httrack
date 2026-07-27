@@ -2628,7 +2628,6 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
   cache_back cache;
   struct_back *sback;
   hash_struct hash;
-  char link[] = "sub/page.html";
   int ptr = 0;
   int i;
 
@@ -2652,14 +2651,21 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
   str.ptr_ = &ptr;
   str.addLink = htsAddLink;
 
-  /* fil[0] is the underflow, fil[1] the control that the trim is unchanged */
-  for (i = 0; i < 2; i++) {
-    static const char *const fil[2] = {"", "/dir/page.html"};
-    static const char *const want[2] = {
-        "untouched", "http://www.example.com/dir/sub/page.html"};
+  /* [0] is the underflow; [1] and [2] are controls that the trim is unchanged.
+     A query-only link is the one that notices the trim at all: for the others
+     ident_url_relatif() re-derives the directory from the path it is given. */
+  for (i = 0; i < 3; i++) {
+    static const char *const fil[3] = {"", "/dir/page.html", "/dir/page.html"};
+    static const char *const lnk[3] = {"sub/page.html", "sub/page.html",
+                                       "?x=1"};
+    static const char *const want[3] = {
+        "untouched", "http://www.example.com/dir/sub/page.html",
+        "http://www.example.com/dir/?x=1"};
     char BIGSTK loc[HTS_URLMAXSIZE * 2];
+    char BIGSTK link[HTS_URLMAXSIZE];
 
     strcpybuff(loc, "untouched");
+    strcpybuff(link, lnk[i]);
     str.localLink = loc;
     str.localLinkSize = (int) sizeof(loc);
     if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", ""))
