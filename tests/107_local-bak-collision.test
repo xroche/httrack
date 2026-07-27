@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# #774: the re-fetch backup used to be <path>.bak beside the mirrored file, so a
+# site serving that very name had its copy taken as the backup and then unlinked
+# on commit. a.bin drives the re-fetch, a.bin.bak is the collateral.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --rerun-args '--update' \
+    --file-matches 'bakname/a.bin' 'BAKNAME-MAIN-V2' \
+    --file-matches 'bakname/a.bin.bak' 'BAKNAME-SIBLING' \
+    --file-min-bytes 'bakname/a.bin.bak' 2048 \
+    --log-not-found 'could not back up' \
+    --log-not-found 'could not restore' \
+    httrack 'BASEURL/bakname/index.html'

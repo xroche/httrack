@@ -143,6 +143,9 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
    can put it back when the re-fetch fails (#77 follow-up). Call right before
    truncating url_sav; tmpfile stays NULL when there is nothing to save. */
 void back_refetch_backup(httrackp *opt, lien_back *const back);
+/* Remove the reserved directory a temporary sat in, once the last slot sharing
+   it is done; a non-empty one just refuses. No-op outside that directory. */
+void back_tmpdir_drop(const char *tmp);
 /* -#test=backswap: slots eligible for the on-disk ready table. */
 int back_selftest_slot_swap(void);
 void back_info(struct_back * sback, int i, int j, FILE * fp);

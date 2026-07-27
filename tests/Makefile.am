@@ -227,6 +227,7 @@ TESTS = \
 	103_teardown-status.test \
 	104_engine-warc-longurl.test \
 	105_suite-timeout.test \
-	106_engine-repair-rename.test
+	106_engine-repair-rename.test \
+	107_local-bak-collision.test
 
 CLEANFILES = check-network_sh.cache

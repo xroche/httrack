@@ -596,6 +596,41 @@ int back_nsoc_overall(const struct_back * sback) {
   return n;
 }
 
+/* Reserved subdirectory holding a mirrored file's temporaries, beside it. */
+#define HTS_TMPDIR "hts-tmp"
+
+/* Build save's temporary as <dir>/hts-tmp/<name>.<ext>. Appending the extension
+   to save instead put it in the mirror namespace, so a site serving <path>.bak
+   had its copy taken as the backup and then unlinked (#774). HTS_FALSE (dest
+   emptied) if it would not fit. Note: utf-8. */
+static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
+                                const char *ext) {
+  const char *const slash = strrchr(save, '/');
+  const int dirlen = slash != NULL ? (int) (slash - save) + 1 : 0;
+
+  if (!slprintfbuff(dest, size, "%.*s" HTS_TMPDIR "/%s.%s", dirlen, save,
+                    slash != NULL ? slash + 1 : save, ext)) {
+    dest[0] = '\0';
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* Note: utf-8 */
+void back_tmpdir_drop(const char *tmp) {
+  char BIGSTK dir[HTS_URLMAXSIZE * 2];
+  const char *slash;
+
+  if (tmp == NULL || (slash = strrchr(tmp, '/')) == NULL)
+    return;
+  if (!strclipbuff(dir, sizeof(dir), tmp))
+    return;
+  dir[slash - tmp] = '\0';
+  slash = strrchr(dir, '/');
+  if (strcmp(slash != NULL ? slash + 1 : dir, HTS_TMPDIR) == 0)
+    (void) RMDIR(dir);
+}
+
 /* generate temporary file on lien_back */
 /* Note: utf-8 */
 static int create_back_tmpfile(httrackp *opt, lien_back *const back,
@@ -603,12 +638,10 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
   // do not use tempnam() but a regular filename
   back->tmpfile_buffer[0] = '\0';
   if (back->url_sav[0] != '\0') {
-    /* same capacity as url_sav, so truncation drops the extension and aliases
-       the temp name onto the live file that back_finalize_backup() UNLINKs */
-    if (!sprintfbuff(back->tmpfile_buffer, "%s.%s", back->url_sav, ext)) {
+    if (!back_tmpname(back->tmpfile_buffer, sizeof(back->tmpfile_buffer),
+                      back->url_sav, ext)) {
       hts_log_print(opt, LOG_WARNING, "temporary filename too long for %s",
                     back->url_sav);
-      back->tmpfile_buffer[0] = '\0';
       return -1;
     }
     back->tmpfile = back->tmpfile_buffer;
@@ -680,6 +713,7 @@ static void back_finalize_backup(httrackp *opt, lien_back *const back,
     return;
   if (commit) {
     (void) UNLINK(back->tmpfile); /* new copy is good; drop the backup */
+    back_tmpdir_drop(back->tmpfile);
   } else {
     if (back->r.out != NULL) {
       fclose(back->r.out);
@@ -691,6 +725,8 @@ static void back_finalize_backup(httrackp *opt, lien_back *const back,
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "could not restore %s; previous copy kept as %s",
                     back->url_sav, back->tmpfile);
+    else
+      back_tmpdir_drop(back->tmpfile);
   }
   back->tmpfile = NULL;
 }
@@ -794,12 +830,17 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     hts_codec_parse(back[p].r.contentencoding);
                 /* Never decode over url_sav: a failed decode would destroy the
                    copy an --update re-fetch is supposed to refresh (#557). */
-                char BIGSTK unpacked[HTS_URLMAXSIZE * 2 + 4]; // room for ".u"
+                char BIGSTK unpacked[HTS_URLMAXSIZE * 2];
                 LLint size;
 
-                snprintf(unpacked, sizeof(unpacked), "%s.u", back[p].url_sav);
-                if ((size = hts_codec_unpack(codec, back[p].tmpfile,
-                                             unpacked)) >= 0) {
+                /* fits whenever the .z temp it decodes from did */
+                if (!back_tmpname(unpacked, sizeof(unpacked), back[p].url_sav,
+                                  "u")) {
+                  back[p].r.statuscode = STATUSCODE_INVALID;
+                  strcpybuff(back[p].r.msg, "Error when decompressing (the "
+                                            "temporary filename is too long)");
+                } else if ((size = hts_codec_unpack(codec, back[p].tmpfile,
+                                                    unpacked)) >= 0) {
                   back[p].r.size = back[p].r.totalsize = size;
                   if (back[p].r.is_write) {
                     /* Sample the previous copy now: the rename below replaces
@@ -871,6 +912,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
               /* ensure that no remaining temporary file exists */
               if (back[p].tmpfile != NULL) {
                 unlink(back[p].tmpfile);
+                back_tmpdir_drop(back[p].tmpfile); /* the .u went with it */
                 back[p].tmpfile = NULL;
               }
             }
@@ -1719,6 +1761,7 @@ int back_clear_entry(lien_back * back) {
     // only for security
     if (back->tmpfile && back->tmpfile[0] != '\0') {
       (void) unlink(back->tmpfile);
+      back_tmpdir_drop(back->tmpfile);
       back->tmpfile = NULL;
     }
     // headers
