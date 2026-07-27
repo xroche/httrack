@@ -1892,6 +1892,14 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
 
   is_unchanged = (back->r.notmodified && opt->is_update) ? 1 : 0;
 
+  /* notmodified without a stashed 304 response means the engine forced it
+     (same-size hack, #176 error-ignore, ...): no server-not-modified
+     exchange happened, and this run never re-fetched a body to compare, so
+     write nothing rather than a revisit for an exchange that never occurred
+     (#839). */
+  if (is_unchanged && back->r.warc_resphdr == NULL)
+    return;
+
   /* Prefer the stashed raw headers; synthesize a minimal status line for the
      header-less (HTTP/0.9-style) responses that never carried a header block.
    */

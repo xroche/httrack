@@ -11,6 +11,10 @@
 #                             WARC-Payload-Digest matching sha1(body) when present
 #   --no-response-for SUB     the asset containing SUB must be a revisit: no
 #                             response may target it, and a revisit must
+#   --no-record-for SUB       no record of any type (response/revisit/resource)
+#                             may target an asset containing SUB
+#   --expect-ip SUB           a response or revisit targeting SUB must carry a
+#                             non-empty WARC-IP-Address
 #   --revisit-exchange        every server-not-modified revisit carries the 304
 #                             exchange it stands for: a 304 status line in its
 #                             block, and a concurrent request record holding the
@@ -109,6 +113,8 @@ def main():
     verbatim = "--verbatim" in argv
     body_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-body-hex")]
     no_resp = opt_values(argv, "--no-response-for")
+    no_record = opt_values(argv, "--no-record-for")
+    ip_specs = opt_values(argv, "--expect-ip")
     path = [a for a in argv if not a.startswith("--") and "=" not in a][0]
     data = open(path, "rb").read()
 
@@ -121,6 +127,7 @@ def main():
     total = revisits = responses = infos = 0
     body_hits = {sub: False for sub, _ in body_specs}
     revisit_hits = {sub: False for sub in no_resp}
+    ip_hits = {sub: False for sub in ip_specs}
     requests = {}  # WARC-Concurrent-To -> request block
     exchanges = []  # (shown uri, record id) of the server-not-modified revisits
     for rec in records(data):
@@ -145,6 +152,21 @@ def main():
             sys.exit("record %d: missing \\r\\n\\r\\n trailer" % total)
         wtype = field(header, b"WARC-Type")
         uri = field(header, b"WARC-Target-URI") or b""
+        if wtype in (b"response", b"revisit", b"resource"):
+            for sub in no_record:
+                if sub.encode() in uri:
+                    sys.exit(
+                        "unexpected %s record for %s (want no record)"
+                        % (wtype.decode(), sub)
+                    )
+        if wtype in (b"response", b"revisit"):
+            for sub in ip_specs:
+                if sub.encode() in uri:
+                    if not field(header, b"WARC-IP-Address"):
+                        sys.exit(
+                            "%s for %s has no WARC-IP-Address" % (wtype.decode(), sub)
+                        )
+                    ip_hits[sub] = True
         if wtype == b"warcinfo":
             infos += 1
         elif wtype == b"response":
@@ -216,6 +238,9 @@ def main():
     for sub, hit in revisit_hits.items():
         if not hit:
             sys.exit("no revisit record found for unchanged asset %s" % sub)
+    for sub, hit in ip_hits.items():
+        if not hit:
+            sys.exit("no response/revisit record found for --expect-ip %s" % sub)
     print(
         "warc-validate: %d records OK (%d response, %d revisit)"
         % (total, responses, revisits)

@@ -1221,6 +1221,7 @@ void back_connxfr(htsblk * src, htsblk * dst) {
   src->keep_alive_t = 0;
   dst->debugid = src->debugid;
   src->debugid = 0;
+  dst->address = src->address; // peer IP survives the cache-entry swap (#838)
 }
 
 /* Release the buffers a response owns. The connection members are left alone:

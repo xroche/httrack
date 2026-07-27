@@ -462,6 +462,8 @@ debug "host root: $hostroot"
 # --- optional WARC validation (stdlib validator, no warcio) ------------------
 # WARC_VALIDATE_BODY="URLSUB=HEX" byte-checks a fresh-crawl response body;
 # WARC_VALIDATE_NORESP="URLSUB..." asserts those assets are revisits post-update;
+# WARC_VALIDATE_NORECORD="URLSUB..." asserts those assets have no record at all;
+# WARC_VALIDATE_IP="URLSUB..." asserts a WARC-IP-Address on the matching record;
 # WARC_VALIDATE_EXCHANGE=1 asserts each revisit carries its 304 request/response.
 if test -n "$warc_validate"; then
     validator=$(nativepath "${testdir}/warc-validate.py")
@@ -496,6 +498,12 @@ if test -n "$warc_validate"; then
         declare -a revargs=(--expect-revisit)
         for sub in ${WARC_VALIDATE_NORESP:-}; do
             revargs+=(--no-response-for "$sub")
+        done
+        for sub in ${WARC_VALIDATE_NORECORD:-}; do
+            revargs+=(--no-record-for "$sub")
+        done
+        for sub in ${WARC_VALIDATE_IP:-}; do
+            revargs+=(--expect-ip "$sub")
         done
         test -n "${WARC_VALIDATE_EXCHANGE:-}" && revargs+=(--revisit-exchange)
         info "validating update WARC (revisits)"
