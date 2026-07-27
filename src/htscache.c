@@ -957,6 +957,35 @@ htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,
     return NULL;
 }
 
+const char *cache_repair(httrackp *opt, const char *name,
+                         unsigned long *entries, unsigned long *bytes) {
+  char BIGSTK repairname[HTS_URLMAXSIZE * 2];
+  unzFile zip;
+
+  *entries = 0;
+  *bytes = 0;
+  if (!slprintfbuff(repairname, sizeof(repairname), "%s%s",
+                    StringBuff(opt->path_log), "hts-cache/repair.zip"))
+    return "the repair path is too long";
+  if (unzRepair(name, repairname,
+                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                        StringBuff(opt->path_log), "hts-cache/repair.tmp"),
+                entries, bytes) != Z_OK)
+    return "could not repair the cache";
+  /* unzRepair writes an end-of-central-directory record whatever it found, so
+     an input holding no local file header at all yields a valid empty archive
+     and a short write yields a truncated one. Only an archive that holds
+     something and opens may replace the cache (#824). */
+  if (*entries == 0)
+    return "the repaired cache holds no entry, keeping the damaged one";
+  if ((zip = hts_unzOpen_utf8(repairname)) == NULL)
+    return "the repaired cache does not open, keeping the damaged one";
+  unzClose(zip);
+  if (!hts_rename_over(opt, repairname, name))
+    return "could not put the repaired cache in place";
+  return NULL;
+}
+
 // Initialisation du cache: créer nouveau, renomer ancien, charger..
 void cache_init(cache_back * cache, httrackp * opt) {
   // ---
@@ -985,6 +1014,7 @@ void cache_init(cache_back * cache, httrackp * opt) {
               StringBuff(opt->path_log),
               "hts-cache/new.zip")))) { // a previous cache exists.. rename it
         if (!hts_rename_over(
+                opt,
                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                         StringBuff(opt->path_log), "hts-cache/new.zip"),
                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -1025,8 +1055,9 @@ void cache_init(cache_back * cache, httrackp * opt) {
       // Corrupted ZIP file ? Try to repair!
       if (cache->zipInput == NULL && !cache->ro) {
         char *name;
-        uLong repaired = 0;
-        uLong repairedBytes = 0;
+        const char *why;
+        unsigned long repaired = 0;
+        unsigned long repairedBytes = 0;
 
         if (!cache->ro) {
           name =
@@ -1039,32 +1070,16 @@ void cache_init(cache_back * cache, httrackp * opt) {
         }
         hts_log_print(opt, LOG_WARNING,
                       "Cache: damaged cache, trying to repair");
-        /* mztools has no UTF-8 hook, so repairing a corrupt cache under a
-           non-ASCII path_log fails cleanly (re-crawl), never forks a twin. */
-        if (unzRepair
-            (name,
-             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                     "hts-cache/repair.zip"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                                      StringBuff(opt->path_log),
-                                                      "hts-cache/repair.tmp"),
-             &repaired, &repairedBytes) == Z_OK) {
-          /* Announcing the recovery before checking the move left the entries
-             in repair.zip, a name nothing reads, and no cache at all (#786). */
-          if (hts_rename_over(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                      StringBuff(opt->path_log),
-                                      "hts-cache/repair.zip"),
-                              name)) {
-            cache->zipInput = hts_unzOpen_utf8(name);
-            hts_log_print(
-                opt, LOG_WARNING,
-                "Cache: %d bytes successfully recovered in %d entries",
-                (int) repairedBytes, (int) repaired);
-          } else {
-            hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                          "Cache: could not put the repaired cache in place");
-          }
+        why = cache_repair(opt, name, &repaired, &repairedBytes);
+        if (why != NULL) {
+          hts_log_print(opt, LOG_WARNING | LOG_ERRNO, "Cache: %s", why);
+        } else if ((cache->zipInput = hts_unzOpen_utf8(name)) != NULL) {
+          hts_log_print(opt, LOG_WARNING,
+                        "Cache: %d bytes successfully recovered in %d entries",
+                        (int) repairedBytes, (int) repaired);
         } else {
-          hts_log_print(opt, LOG_WARNING, "Cache: could not repair the cache");
+          hts_log_print(opt, LOG_WARNING,
+                        "Cache: the repaired cache could not be reopened");
         }
       }
       // Opened ?
