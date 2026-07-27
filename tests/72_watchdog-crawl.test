@@ -21,7 +21,7 @@ test "$rc" -ne 77 || {
     echo "SKIP: local crawl prerequisites missing" >&2
     exit 77
 }
-if printf '%s\n' "$out" | grep -q "could not discover server port"; then
+if grep -q "could not discover server port" <<<"$out"; then
     echo "SKIP: server port announce raced" >&2
     exit 77
 fi
@@ -30,7 +30,7 @@ fi
 # together they pin the fast exit on the 3s watchdog, not httrack giving up.
 test "$rc" -ne 0 || fail "stalled crawl reported success"
 test "$elapsed" -lt 25 || fail "watchdog fired late (${elapsed}s)"
-printf '%s\n' "$out" | grep -q "watchdog fired" ||
+grep -q "watchdog fired" <<<"$out" ||
     fail "crawl failed but not via the watchdog: $out"
 
 echo "crawl watchdog OK (reaped in ${elapsed}s)"
