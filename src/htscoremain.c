@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdefines.h"
 #include "htsalias.h"
 #include "htswarc.h"
+#include "htschanges.h"
 #include "htsbauth.h"
 #include "htswrap.h"
 #include "htsmodules.h"
@@ -1745,6 +1746,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     return -1;
                   }
                   StringCopy(opt->cookies_file, argv[na]);
+                }
+                break;
+              case 'd': // --changes: report what this crawl changed
+                opt->changes = HTS_TRUE;
+                if (*(com + 1) == '0') {
+                  opt->changes = HTS_FALSE;
+                  com++;
                 }
                 break;
               case 'r': // warc / warc-file: write an ISO-28500 WARC archive

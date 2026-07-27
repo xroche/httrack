@@ -483,6 +483,15 @@ add <tt>--warc-cdx</tt> for a sorted CDXJ index, or <tt>--wacz</tt> to bundle th
 archive, index and pages into one WACZ for replay tools such as
 replayweb.page.</small></p>
 
+<h4>See what a re-crawl changed</h4>
+<p><tt>httrack https://example.com/ --update --changes --path mydir</tt><br>
+<small>Writes <tt>hts-changes.json</tt> in the project folder, listing every
+mirrored file as new, changed, unchanged or gone, plus a one-line summary in the
+log. &quot;Changed&quot; means the bytes really differ: a server that answers 200
+with the same content it served last time lands in <tt>unchanged</tt>. Deletions
+are reported whether or not <tt>--purge-old</tt> is deleting them. The format is
+documented in <a href="changes.html">the change report specification</a>.</small></p>
+
 <h4>Pages you can hand to someone as one file</h4>
 <p><tt>httrack https://example.com/ --single-file --path mydir</tt><br>
 <small>Rewrites each saved page after the crawl so its stylesheets, scripts,
@@ -510,7 +519,8 @@ all disabled.</small></p>
 <p><br>For the complete, always-current option list, see
 <a href="httrack.man.html">the manual page</a>. For the filter language, see
 <a href="filters.html">filters</a>; for the cache and updates, see
-<a href="cache.html">cache</a>.</p>
+<a href="cache.html">cache</a>; for the change report, see
+<a href="changes.html">changes</a>.</p>
 
 <!-- ==================== Start epilogue ==================== -->
 		</td>

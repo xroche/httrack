@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_changes_st.XXXXXX") || exit 1
+trap 'rm -rf "$tmpdir"' EXIT HUP INT QUIT PIPE TERM
+
+# No pipe into grep: SIGPIPE would mask a failing exit status.
+expect_ok() {
+    local label="$1" out
+    shift
+    out=$("$@" 2>&1) || {
+        echo "FAIL: ${label} exited non-zero: ${out}"
+        exit 1
+    }
+    case "$out" in
+    *"${label}: OK"*) ;;
+    *)
+        echo "FAIL: ${out}"
+        exit 1
+        ;;
+    esac
+}
+
+# --changes bucket accounting and JSON escaping (#714).
+expect_ok "changes self-test" httrack -O "${tmpdir}/o1" -#test=changes run
+# The report must hold against a transfer thread the crawl never joins.
+expect_ok "changes-race self-test" httrack -O "${tmpdir}/o2" \
+    -#test=changes-race "${tmpdir}/race"

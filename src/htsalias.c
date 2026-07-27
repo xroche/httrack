@@ -114,6 +114,8 @@ const char *hts_optalias[][4] = {
    "strip [host/pattern=]key1,key2,... from URLs"},
   {"cookies-file", "-%K", "param1",
    "load extra cookies from a Netscape cookies.txt"},
+  {"changes", "-%d", "single",
+   "write hts-changes.json: what this crawl changed vs. the previous mirror"},
   {"warc", "-%r", "single", "write an ISO-28500 WARC/1.1 archive of the crawl"},
   {"warc-file", "-%rf", "param1", "write a WARC archive to the given base name"},
   {"warc-max-size", "-%rs", "param1",

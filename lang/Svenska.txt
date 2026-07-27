@@ -964,6 +964,10 @@ WARC archive name:
 WARC-arkivets namn:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Valfritt basnamn för WARC-arkivet; lämna tomt för att namnge det automatiskt i utdatakatalogen.
+Report what changed since the previous mirror
+Rapportera vad som ändrats sedan föregående spegling
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Skriv även hts-changes.json som listar vad den här genomgången lämnar som nytt, ändrat, oförändrat eller försvunnet jämfört med föregående spegling.
 Inline assets as data: URIs (self-contained pages)
 Bädda in resurser som data:-URI:er (fristående sidor)
 Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.

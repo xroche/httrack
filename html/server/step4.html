@@ -190,6 +190,7 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:cache2:--store-all-in-cache}
 	${test:warc:--warc}
 	${test:warcfile:--warc-file "}${arg:warcfile}${test:warcfile:"}
+	${test:changes:--changes}
 	${test:singlefile:--single-file}
 	${test:singlefilemax:--single-file-max-size=}${unquoted:singlefilemax}
 	${test:norecatch:--do-not-recatch}
@@ -244,6 +245,7 @@ StripQuery=${stripquery}
 StoreAllInCache=${ztest:cache2:0:1}
 Warc=${ztest:warc:0:1}
 WarcFile=${warcfile}
+Changes=${ztest:changes:0:1}
 SingleFile=${ztest:singlefile:0:1}
 SingleFileMaxSize=${singlefilemax}
 LogType=${logtype}

@@ -964,6 +964,10 @@ WARC archive name:
 Nazwa archiwum WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
 Opcjonalna nazwa bazowa archiwum WARC; pozostaw puste, aby nazwaæ je automatycznie w katalogu wyj¶ciowym.
+Report what changed since the previous mirror
+Zg³o¶, co zmieni³o siê od poprzedniej kopii
+Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
+Zapisz równie¿ plik hts-changes.json z list± tego, co w porównaniu z poprzedni± kopi± jest nowe, zmienione, niezmienione lub usuniête.
 Inline assets as data: URIs (self-contained pages)
 Osad¼ zasoby jako identyfikatory data: URI (samodzielne strony)
 Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.

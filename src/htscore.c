@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 /* File defs */
 #include "htscore.h"
 #include "htswarc.h"
+#include "htschanges.h"
 #include "htssinglefile.h"
 
 /* specific definitions */
@@ -489,6 +490,7 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
                           const char *adr, const char *fil, const char *save) {
   {
     file_notify(opt, adr, fil, save, 1, 1, r->notmodified);
+    hts_changes_html(opt, cache, r, adr, fil, save);
     *fp = filecreate(&opt->state.strc, save);
     if (*fp) {
       if (ht_len > 0 && fwrite(ht_buff, 1, ht_len, *fp) != ht_len) {
@@ -691,6 +693,9 @@ int httpmirror(char *url1, httrackp * opt) {
 
   // hash table
   opt->hash = &hash;
+
+  // a change report left by a previous crawl on this opt is not this one's
+  hts_changes_free_opt(opt);
 
   // initialize link heap
   hts_record_init(opt);
@@ -2090,9 +2095,12 @@ int httpmirror(char *url1, httrackp * opt) {
   if (cache.lst) {
     fclose(cache.lst);
     cache.lst = opt->state.strc.lst = NULL;
-    if (opt->delete_old) {
+    /* old.lst minus new.lst is the set of files the previous mirror had and
+       this one does not. --changes reports it; only --purge-old acts on it. */
+    if (opt->delete_old || opt->changes) {
       FILE *old_lst, *new_lst;
 
+      hts_changes_indexed(opt);
       //
       opt->state._hts_in_html_parsing = 3;
       //
@@ -2118,21 +2126,37 @@ int httpmirror(char *url1, httrackp * opt) {
               int purge = 0;
 
               while(!feof(old_lst)) {
-                linput(old_lst, line, 1000);
-                if (!strstr(adr, line)) { // not found in the new list?
-                  char BIGSTK file[HTS_URLMAXSIZE * 2];
+                char BIGSTK file[HTS_URLMAXSIZE * 2];
 
-                  strcpybuff(file, StringBuff(opt->path_html));
-                  strcatbuff(file, line + 1);
-                  file[strlen(file) - 1] = '\0';
-                  if (fexist_utf8(file)) { // toujours sur disque: virer
-                    hts_log_print(opt, LOG_INFO, "Purging %s", file);
-                    UNLINK(file);
-                    purge = 1;
+                linput(old_lst, line, 1000);
+                if (!strnotempty(line))
+                  continue;
+                strcpybuff(file, StringBuff(opt->path_html));
+                strcatbuff(file, line + 1);
+                file[strlen(file) - 1] = '\0';
+                hts_changes_previous(opt, file + StringLength(opt->path_html));
+                if (!strstr(adr, line)) { // not found in the new list?
+                  if (fexist_utf8(file)) { // still on disk
+                    /* A link this crawl did try but never wrote (a transfer
+                       killed mid-flight) also drops out of new.lst. Unless it
+                       is about to be purged, its previous copy stands and the
+                       file is not gone. */
+                    const hts_boolean kept =
+                        !opt->delete_old &&
+                        hash_read(opt->hash, file, NULL,
+                                  HASH_STRUCT_FILENAME) >= 0;
+
+                    hts_changes_dropped(
+                        opt, file + StringLength(opt->path_html), kept);
+                    if (opt->delete_old) {
+                      hts_log_print(opt, LOG_INFO, "Purging %s", file);
+                      UNLINK(file);
+                      purge = 1;
+                    }
                   }
                 }
               }
-              {
+              if (opt->delete_old) { // emptied directories go with the files
                 fseek(old_lst, 0, SEEK_SET);
                 while(!feof(old_lst)) {
                   linput(old_lst, line, 1000);
@@ -2167,7 +2191,7 @@ int httpmirror(char *url1, httrackp * opt) {
                 }
               }
               //
-              if (!purge) {
+              if (opt->delete_old && !purge) {
                 hts_log_print(opt, LOG_INFO, "No files purged");
               }
             }
@@ -2261,6 +2285,7 @@ int httpmirror(char *url1, httrackp * opt) {
   // ending
   usercommand(opt, 0, NULL, NULL, NULL, NULL);
   warc_close_opt(opt);
+  hts_changes_close_opt(opt);
 
   // désallocation mémoire & buffers
   XH_uninit;
@@ -2886,6 +2911,17 @@ int filecreateempty(filenote_strc * strc, const char *filename) {
     return 0;
 }
 
+void hts_savename_listed(const char *root, const char *s, char *dest,
+                         size_t destsize) {
+  char catbuff[CATBUFF_SIZE];
+
+  strlcpybuff(dest, fslash(catbuff, sizeof(catbuff), s), destsize);
+  if (strnotempty(root) && strncmp(fslash(catbuff, sizeof(catbuff), root), dest,
+                                   strlen(root)) == 0) {
+    strlcpybuff(dest, s + strlen(root), destsize);
+  }
+}
+
 // noter fichier
 int filenote(filenote_strc * strc, const char *s, filecreate_params * params) {
   // gestion du fichier liste liste
@@ -2895,15 +2931,8 @@ int filenote(filenote_strc * strc, const char *s, filecreate_params * params) {
     return 0;
   } else if (strc->lst) {
     char BIGSTK savelst[HTS_URLMAXSIZE * 2];
-    char catbuff[CATBUFF_SIZE];
 
-    strcpybuff(savelst, fslash(catbuff, sizeof(catbuff), s));
-    // couper chemin?
-    if (strnotempty(strc->path)) {
-      if (strncmp(fslash(catbuff, sizeof(catbuff), strc->path), savelst, strlen(strc->path)) == 0) {     // couper
-        strcpybuff(savelst, s + strlen(strc->path));
-      }
-    }
+    hts_savename_listed(strc->path, s, savelst, sizeof(savelst));
     fprintf(strc->lst, "[%s]" LF, savelst);
     fflush(strc->lst);
   }
@@ -2913,6 +2942,9 @@ int filenote(filenote_strc * strc, const char *s, filecreate_params * params) {
 /* Note: utf-8 */
 void file_notify(httrackp * opt, const char *adr, const char *fil,
                  const char *save, int create, int modify, int not_updated) {
+  hts_changes_notify(opt, adr, fil, save,
+                     (create || modify) ? HTS_TRUE : HTS_FALSE,
+                     not_updated ? HTS_TRUE : HTS_FALSE);
   RUN_CALLBACK6(opt, filesave2, adr, fil, save, create, modify, not_updated);
 }
 
@@ -3647,6 +3679,7 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
   to->warc_max_size = from->warc_max_size;
   to->warc_cdx = from->warc_cdx;
   to->warc_wacz = from->warc_wacz;
+  to->changes = from->changes;
 
   to->single_file = from->single_file;
   if (from->single_file_max_size > 0)

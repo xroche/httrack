@@ -150,6 +150,7 @@ BOXES = [
     ("toler", "TolerantRequests", "--tolerant", None),
     ("http10", "HTTP10", "--http-10", None),
     ("warc", "Warc", "--warc", None),
+    ("changes", "Changes", "--changes", None),
     ("norecatch", "NoRecatch", "--do-not-recatch", None),
     ("logf", "Log", "--single-log", None),
     ("index", "Index", None, None),

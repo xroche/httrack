@@ -615,6 +615,8 @@ void help(const char *app, int more) {
           "output name, --warc-max-size N rotates segments past N bytes, "
           "--warc-cdx also writes a sorted CDXJ index, --wacz packages it all "
           "as a WACZ file");
+  infomsg(" %d  write hts-changes.json listing what this crawl left new, "
+          "changed, unchanged and gone compared to the previous mirror");
   infomsg(" %n  do not re-download locally erased files");
   infomsg
     (" %v  display on screen filenames downloaded (in realtime) - * %v1 short version - %v2 full animation");
