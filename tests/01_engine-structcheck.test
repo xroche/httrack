@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# structcheck(): the path-length guard, and the <name>.txt rename that used to
-# build its target with an unbounded sprintf (#745).
+# structcheck(): the path-length guard, and the <name>.txt rename that once
+# built its target with an unbounded sprintf (#745).
 
 set -euo pipefail
 

@@ -3264,19 +3264,18 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Build a path of exactly len characters under base, split into components a
-   filesystem accepts. Returns the length written. */
+/* Build a path of exactly len chars under base; returns that length. */
 static size_t st_structcheck_longpath(char *dst, size_t dstsize,
                                       const char *base, size_t len) {
   size_t n = strlen(base);
 
-  assertf(len < dstsize && n + 2 < len);
+  assertf(len < dstsize && n + 2 <= len);
   memmove(dst, base, n);
   while (n < len) {
-    size_t seg = len - n - 1; /* what follows the separator */
+    size_t seg = len - n - 1;
 
     if (seg > 200) /* stay under the usual 255-byte component limit */
-      seg = 200;
+      seg = len - n == 202 ? 199 : 200; /* never leave a bare separator */
     dst[n++] = '/';
     memset(dst + n, 'x', seg);
     n += seg;
@@ -3285,8 +3284,7 @@ static size_t st_structcheck_longpath(char *dst, size_t dstsize,
   return n;
 }
 
-/* structcheck() renames a regular file out of a directory's way; that
-   ".txt" target must fit whatever path the guard admits (#745). */
+/* The ".txt" rename target must fit any path the guard admits (#745). */
 static int st_structcheck(httrackp *opt, int argc, char **argv) {
   char BIGSTK path[HTS_URLMAXSIZE * 2];
   char BIGSTK target[HTS_URLMAXSIZE * 2];
@@ -3299,12 +3297,18 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
     return 1;
   }
 
-  /* over the guard: refused, and errno says why */
-  n = st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
+  /* over the guard: refused before a single directory is created */
+  st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
   errno = 0;
   assertf(structcheck(path) == -1);
   assertf(errno == EINVAL);
-  assertf(!fexist(path));
+  {
+    char *const sep = strchr(path + strlen(argv[0]) + 1, '/');
+
+    assertf(sep != NULL);
+    sep[1] = '\0'; /* the outermost component it would have created */
+    assertf(!dir_exists(path));
+  }
 
   /* a regular file where a directory belongs is renamed to <name>.txt */
   snprintf(path, sizeof(path), "%s/sc", argv[0]);
@@ -3317,10 +3321,8 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   snprintf(target, sizeof(target), "%s/sc.txt", argv[0]);
   assertf(fexist(target));
 
-  /* same rename at the longest path the guard lets through: the target runs
-     four bytes past it and must still be written whole */
+  /* the same rename at the longest path the guard admits */
   snprintf(path, sizeof(path), "%s/max", argv[0]);
-  assertf(structcheck(path) == 0);
   n = st_structcheck_longpath(path, sizeof(path), path, HTS_URLMAXSIZE - 1);
   assertf(structcheck(path) == 0); /* parents only: no trailing separator */
   fp = fopen(path, "wb");
@@ -3336,9 +3338,8 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
 
   /* the utf-8 twin carries the same rename */
   snprintf(path, sizeof(path), "%s/u8", argv[0]);
-  assertf(structcheck_utf8(path) == 0);
   n = st_structcheck_longpath(path, sizeof(path), path, HTS_URLMAXSIZE - 1);
-  assertf(structcheck_utf8(path) == 0);
+  assertf(structcheck_utf8(path) == 0); /* parents only */
   fp = FOPEN(path, "wb");
   assertf(fp != NULL);
   fclose(fp);
@@ -3347,6 +3348,7 @@ static int st_structcheck(httrackp *opt, int argc, char **argv) {
   path[n] = '/';
   path[n + 1] = '\0';
   assertf(structcheck_utf8(path) == 0);
+  assertf(dir_exists(path));
   assertf(fexist_utf8(target));
 
   printf("structcheck self-test OK\n");
