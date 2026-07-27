@@ -89,11 +89,10 @@ struct warc_writer {
   char *base_path;      /* resolved archive path minus .warc[.gz] suffix */
   const char *base_ext; /* ".warc.gz" or ".warc" (static) */
   char *arc_path;    /* full single-file archive path (NULL under rotation) */
-  /* A re-run must not destroy an archive it cannot replace (#759): with a
-     previous archive on disk this run builds into WARC_TMP_SUFFIX files and
-     only swaps them in at close, if it can stand alone. */
-  hts_boolean protect_prev;   /* previous archive present: build aside */
+  /* A re-run must not destroy an archive it cannot replace (#759). */
+  hts_boolean protect_prev;   /* previous archive present: build in a temp */
   hts_boolean opened;         /* open completed; a failed one swaps nothing */
+  hts_boolean failed;         /* a record or segment was lost: swap nothing */
   uint64_t unbacked_revisits; /* revisits whose payload no file here holds */
   char **page_lines; /* one JSON page line per 200 text/html response, owned */
   size_t page_count;
@@ -1138,13 +1137,17 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
      never split a record, and never rotate a warcinfo (it opens a segment). */
   if (w->max_size > 0 && w->seg_base != NULL && w->offset >= w->max_size &&
       strcmp(type, "warcinfo") != 0) {
-    if (warc_rotate(w) != 0)
+    if (warc_rotate(w) != 0) {
+      w->failed = HTS_TRUE;
       return -1;
+    }
   }
 
   /* F4: overflow-safe block length; http_hdr_len+sep is provably small. */
-  if (payload > (size_t) -1 - http_hdr_len - sep)
+  if (payload > (size_t) -1 - http_hdr_len - sep) {
+    w->failed = HTS_TRUE;
     return -1;
+  }
   block_len = http_hdr_len + sep + payload;
 
   memset(&hdr, 0, sizeof(hdr));
@@ -1250,6 +1253,8 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   rc = 0;
 done:
   wbuf_free(&hdr);
+  if (rc != 0)
+    w->failed = HTS_TRUE; /* a truncated run must not replace a whole one */
   return rc;
 }
 
@@ -1278,18 +1283,21 @@ static int warc_rotate(warc_writer *w) {
   char namebuf[HTS_URLMAXSIZE * 2];
   char openbuf[HTS_URLMAXSIZE * 2 + sizeof(WARC_TMP_SUFFIX)];
   char catbuff[CATBUFF_SIZE];
-  if (w->f != NULL) {
-    fclose(w->f);
-    w->f = NULL;
-  }
-  w->seg++;
-  snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, w->seg,
+  const unsigned next = w->seg + 1;
+  FILE *f;
+  snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, next,
            w->seg_ext);
-  w->f = FOPEN(fconv(catbuff, sizeof(catbuff),
-                     warc_open_path(w, namebuf, openbuf, sizeof(openbuf))),
-               "wb");
-  if (w->f == NULL)
+  /* Open before advancing: w->seg must only ever name a segment that exists,
+     or close-time packaging and swapping would work on a missing file. */
+  f = FOPEN(fconv(catbuff, sizeof(catbuff),
+                  warc_open_path(w, namebuf, openbuf, sizeof(openbuf))),
+            "wb");
+  if (f == NULL)
     return -1;
+  if (w->f != NULL)
+    fclose(w->f);
+  w->f = f;
+  w->seg = next;
   w->offset = 0;
   if (w->cdx_on) {
     freet(w->cur_seg);
@@ -1501,9 +1509,7 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     warc_close(w);
     return NULL;
   }
-  /* An archive is already there: build this run beside it and only swap it in
-     at close, once we know the result can stand on its own (#759). Set after
-     the path is recorded, so a half-built writer never tries to swap. */
+  /* Set only once arc_path is recorded, so a half-built writer never swaps. */
   w->protect_prev = fsize_utf8(path) > 0 ? HTS_TRUE : HTS_FALSE;
   w->f = FOPEN(fconv(catbuff, sizeof(catbuff),
                      warc_open_path(w, path, openbuf, sizeof(openbuf))),
@@ -1532,22 +1538,30 @@ static const char *warc_seg_path(warc_writer *w, unsigned s, char *buf,
   return buf;
 }
 
-/* Swap this run's archive into place, or keep the previous one when this run
-   only revisited URLs it did not re-download: those revisit records name
-   payloads no file would then hold, so installing them destroys the only copy
-   (#759). Returns HTS_FALSE when the previous archive was kept, in which case
-   its .cdx and .wacz must be left alone too. */
+/* Swap this run's archive into place, unless it only holds revisits naming
+   bodies the previous archive still has and this one does not (#759).
+   HTS_FALSE: the previous archive was kept, so leave its .cdx and .wacz too. */
 static hts_boolean warc_commit(warc_writer *w) {
   char finalbuf[HTS_URLMAXSIZE * 2];
   char tmpbuf[HTS_URLMAXSIZE * 2 + sizeof(WARC_TMP_SUFFIX)];
   char catbuff[CATBUFF_SIZE];
   const unsigned nseg = (w->max_size > 0) ? w->seg + 1 : 1;
+  hts_boolean swap;
   unsigned s;
 
   if (!w->protect_prev)
     return HTS_TRUE; /* nothing was there to lose: written in place */
 
-  if (w->opened && w->unbacked_revisits == 0) {
+  /* hts_rename_over unlinks its destination when the source is missing, so
+     every segment has to be on disk before the first rename. */
+  swap = w->opened && !w->failed && w->unbacked_revisits == 0;
+  for (s = 0; s < nseg && swap; s++) {
+    snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX,
+             warc_seg_path(w, s, finalbuf, sizeof(finalbuf)));
+    swap = fsize_utf8(tmpbuf) > 0;
+  }
+
+  if (swap) {
     for (s = 0; s < nseg; s++) {
       const char *final = warc_seg_path(w, s, finalbuf, sizeof(finalbuf));
       snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX, final);
@@ -1568,10 +1582,9 @@ static hts_boolean warc_commit(warc_writer *w) {
   if (w->unbacked_revisits > 0)
     hts_log_print(
         w->opt, LOG_ERROR,
-        "WARC: this pass revisited %llu URL(s) without re-downloading "
-        "them, so its archive would reference bodies no file holds; "
-        "kept %s from the previous pass and dropped this one (re-run "
-        "with -C0, or --warc-file with a name of its own)",
+        "WARC: this pass revisited %llu URL(s) without re-downloading them, so "
+        "its archive would name bodies no file holds; kept the previous %s "
+        "(re-run with -C0, or --warc-file with a name of its own)",
         (unsigned long long) w->unbacked_revisits,
         warc_seg_path(w, 0, finalbuf, sizeof(finalbuf)));
   return HTS_FALSE;

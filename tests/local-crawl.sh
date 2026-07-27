@@ -34,9 +34,10 @@
 # httrack via --cookies-file, to exercise preloaded cookies.
 # --rerun-dead re-runs with the server stopped: the no-data rollback must
 # restore the previous hts-cache generation byte-identical.
-# --archive-kept-on-rerun inverts the usual repackaging check: the second pass
-# must leave the first pass's .warc[.gz]/.cdx/.wacz byte-identical, because a
-# cache-served pass holds no bodies to replace them with (#759).
+# --archive-kept-on-rerun: the second pass must leave the first pass's
+# .warc[.gz]/.cdx/.wacz byte-identical, having no bodies to replace them (#759).
+# --archive-replaced-on-rerun is its mirror: every one of them must have been
+# rewritten. Both also require no *.tmp left behind.
 
 set -u
 
@@ -58,6 +59,7 @@ rerun=
 rerun_args=
 rerun_dead=
 archive_kept=
+archive_replaced=
 tmpdir=
 serverpid=
 crawlpid=
@@ -124,6 +126,7 @@ while test "$pos" -lt "$nargs"; do
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
     # the second pass must leave the first pass's archive files untouched
     --archive-kept-on-rerun) archive_kept=1 ;;
+    --archive-replaced-on-rerun) archive_replaced=1 ;; # ...or rewrite all of them
     # validate the produced .warc.gz (see the validation block near the end)
     --warc-validate) warc_validate=1 ;;
     # validate the produced .wacz package (stdlib, plus py-wacz/pywb if present)
@@ -280,9 +283,9 @@ if test -n "$warc_validate"; then
     test -z "$w1" || cp "$w1" "${tmpdir}/warc-pass1.gz"
 fi
 
-# --archive-kept-on-rerun: snapshot everything the second pass must not touch.
+# Snapshot the archive files the second pass must keep (or must replace).
 declare -a kept_files=()
-if test -n "$archive_kept"; then
+if test -n "${archive_kept}${archive_replaced}"; then
     while read -r f; do
         test -n "$f" || continue
         cp "$f" "${tmpdir}/kept-${#kept_files[@]}" || die "could not snapshot $f"
@@ -291,7 +294,7 @@ if test -n "$archive_kept"; then
         \( -name '*.warc.gz' -o -name '*.warc' -o -name '*.cdx' -o -name '*.wacz' \) \
         2>/dev/null | sort)
     test "${#kept_files[@]}" -gt 0 ||
-        die "--archive-kept-on-rerun: the first pass produced no archive to keep"
+        die "the first pass produced no archive to compare against"
 fi
 
 # Poison the first-pass .wacz when a second pass follows: repackaging moves the
@@ -346,22 +349,25 @@ if test -n "$rerun_args"; then
     result "OK (second pass)"
 fi
 
-# --- optional: the second pass must not have touched the archive -------------
+# --- optional: did the second pass keep, or replace, the whole archive? ------
 if test "${#kept_files[@]}" -gt 0; then
     i=0
     for f in "${kept_files[@]}"; do
-        info "checking the second pass kept $(basename "$f")"
-        if cmp -s "${tmpdir}/kept-${i}" "$f"; then
-            result "OK"
+        if test -n "$archive_kept"; then
+            info "checking the second pass kept $(basename "$f")"
+            cmp -s "${tmpdir}/kept-${i}" "$f" ||
+                die "$(basename "$f") was rewritten: the previous archive was destroyed"
         else
-            result "rewritten: the previous archive was destroyed"
-            exit 1
+            info "checking the second pass replaced $(basename "$f")"
+            cmp -s "${tmpdir}/kept-${i}" "$f" &&
+                die "$(basename "$f") still holds the first pass's bytes"
         fi
+        result "OK"
         i=$((i + 1))
     done
     # A leftover in-progress file is as bad: the next pass would silently eat it.
     info "checking no in-progress archive was left behind"
-    leftover=$(find "$mirrorroot" -maxdepth 2 -name '*.warc.gz.tmp' -o -maxdepth 2 -name '*.warc.tmp' 2>/dev/null | head -n1)
+    leftover=$(find "$mirrorroot" -maxdepth 2 \( -name '*.warc.gz.tmp' -o -name '*.warc.tmp' \) 2>/dev/null | head -n1)
     test -z "$leftover" || die "left behind $leftover"
     result "OK"
 fi
@@ -437,9 +443,9 @@ if test -n "$warc_validate"; then
         die "fresh WARC validation failed"
     result "OK"
 
-    # After an update pass the unchanged assets must be revisits. The pass has
-    # to write its own archive (named by WARC_VALIDATE_UPDATE): a pass that only
-    # revisits never replaces the archive holding the bodies it strands (#759).
+    # After an update pass the unchanged assets must be revisits, in an archive
+    # of the pass's own (WARC_VALIDATE_UPDATE): a revisit-only pass never
+    # replaces the archive holding the bodies it would strand (#759).
     if test -n "${WARC_VALIDATE_UPDATE:-}"; then
         upd=$(find "$mirrorroot" -maxdepth 2 -name "$WARC_VALIDATE_UPDATE" 2>/dev/null | head -n1)
         test -n "$upd" || die "no $WARC_VALIDATE_UPDATE produced under $mirrorroot"

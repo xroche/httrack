@@ -6,11 +6,10 @@
 # the datapackage-digest chain (plus py-wacz/pywb when importable). The crawl
 # skips cleanly on a build without OpenSSL (no conformant SHA-256 -> no package).
 #
-# The second pass is cacheless (-C0) because re-downloading is what earns the
-# right to replace the package: it repackages over the .wacz the first one left,
-# and the clobber, not the happy rename, is what breaks when a platform refuses
-# to rename onto an existing file (#726). The cache-served pass that must keep
-# the previous package instead is 96_local-warc-update-keep.
+# The cacheless (-C0) second pass repackages over the .wacz the first one left:
+# the clobber, not the happy rename, is what breaks when a platform refuses to
+# rename onto an existing file (#726). A cache-served pass keeps the previous
+# package instead, which is 97_local-warc-update-keep.
 
 set -eu
 
