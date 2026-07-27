@@ -3631,12 +3631,21 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   if (back[i].r.totalsize < 0)
                     back[i].r.totalsize = 0;    // initialiser à 0 (-1 == unknown)
                   if (back[i].status == STATUS_CHUNK_WAIT) {    // "real" chunk
-                    if (sscanf(chunk_data, "%x", &chunk_size) == 1) {
+                    /* The chunk-size line is hostile input, so parse it wide
+                       and unsigned and drop anything an int cannot hold: sscanf
+                       "%x" lands 80000000 on INT_MIN, which sign-extends into a
+                       16EB realloc below and drives totalsize negative. */
+                    char *chunk_end = NULL;
+                    const unsigned long long chunk_value =
+                        strtoull(chunk_data, &chunk_end, 16);
+
+                    if (chunk_end != chunk_data && *chunk_end == '\0' &&
+                        chunk_value <= (unsigned long long) INT32_MAX) {
+                      chunk_size = (int) chunk_value;
                       if (chunk_size > 0)
                         back[i].chunk_blocksize = chunk_size;   /* the data block chunk size */
-                      /* only a real 0 ends the stream: "80000000" lands in an
-                         int as INT_MIN, whose sentinel plus negative totalsize
-                         would walk past both #840 guards */
+                      /* only a real 0 ends the stream; the bound above keeps a
+                         negative from ever claiming the sentinel (#840) */
                       else if (chunk_size == 0)
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille

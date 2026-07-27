@@ -31,12 +31,15 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     httrack 'BASEURL/chunktrunc/index.html'
 
 # --update: page.html and file.bin come back cut, hostile.html comes back with a
-# 0x80000000 chunk-size line, stay.html is the control.
+# 0x80000000 chunk-size line (rejected outright, since as an int it is INT_MIN
+# and would otherwise reach realloc sign-extended), stay.html is the control.
 bash "$top_srcdir/tests/local-crawl.sh" \
     --rerun-args '--update' \
     --log-found 'truncated chunked transfer.*chunktrunc/page\.html' \
     --log-found 'truncated chunked transfer.*chunktrunc/file\.bin' \
     --log-found 'truncated chunked transfer.*chunktrunc/hostile\.html' \
+    --log-found 'Illegal chunk \(80000000\) for .*chunktrunc/hostile\.html' \
+    --log-not-found 'not enough memory \(-' \
     --file-matches 'chunktrunc/page.html' 'CHUNKTRUNC-PAGE-V1' \
     --file-not-matches 'chunktrunc/page.html' 'CHUNKTRUNC-PAGE-V2' \
     --file-matches 'chunktrunc/file.bin' 'CHUNKTRUNC-BIN-V1' \
