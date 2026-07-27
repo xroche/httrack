@@ -51,16 +51,20 @@ test -n "$port" || {
     --timeout=30 --retries=0 "http://127.0.0.1:${port}/charref/index.html" \
     >"${tmpdir}/crawl.log" 2>&1 || true
 
+query_of() {
+    grep -F "/charref/$1.html?" "$reqlog" | cut -f1 |
+        sed "s|^/charref/$1.html?||" | sort -u
+}
+
 # check <label> <page> <want-parameter-count> <acceptable-query>...
 # The count is the origin's own parse of the wire bytes, independent of the
 # expected string. More than one query is acceptable where iconv and Windows
-# encode the same code point differently (ISO-2022-JP's shift back to ASCII).
+# encode the same code point differently.
 check() {
     local label="$1" page="$2" wantcount="$3" got count want ok=
     shift 3
     printf '[%s] ..\t' "$label"
-    got=$(grep -F "/charref/${page}.html?" "$reqlog" | cut -f1 |
-        sed "s|^/charref/${page}.html?||" | sort -u) || got=
+    got=$(query_of "$page") || got=
     count=$(grep -F "/charref/${page}.html?" "$reqlog" | cut -f2 | sort -u) || count=
     for want in "$@"; do
         if test "$got" == "$want"; then
@@ -85,10 +89,37 @@ check "charset-less page" qnone 4 \
 check "declared utf-8 page" qutf8 4 \
     'a=%e2%82%ac&b=%e2%82%ac&c=%c3%a9&d=x'
 # Multi-byte: あ and 〜 must survive as their encoded bytes, only € gets escaped.
-# 〜 (U+301C) is the one glibc's shift_jis table does not map back to itself, and
-# iso-2022-jp encodes both of them 7-bit clean.
+# The two cp932 tables disagree about 〜 (U+301C): iconv encodes it, Windows maps
+# 0x8160 to U+FF5E instead and reports the substitution, so both are correct.
 check "declared shift_jis page" qsjis 4 \
-    'a=%82%a0&c=%81`&b=%26%238364%3B&d=x'
-check "declared iso-2022-jp page" qjis 4 \
-    "a=%1b\$B\$%22&c=%1b\$B!A&b=%26%238364%3B&d=x" \
-    "a=%1b\$B\$%22%1b(B&c=%1b\$B!A%1b(B&b=%26%238364%3B&d=x"
+    'a=%82%a0&c=%81`&b=%26%238364%3B&d=x' \
+    'a=%82%a0&c=%26%2312316%3B&b=%26%238364%3B&d=x'
+
+# iso-2022-jp encodes both references 7-bit clean, where a round-trip check saw
+# every one of them as unrepresentable. Asserted per field: iconv and Windows
+# differ on the trailing shift back to ASCII, so the bytes are not one string.
+printf '[declared iso-2022-jp page] ..\t'
+jis=$(query_of qjis) || jis=
+jiscount=$(grep -F "/charref/qjis.html?" "$reqlog" | cut -f2 | sort -u) || jiscount=
+for field in ${jis//&/ }; do
+    case "$field" in
+    a=%1b\$B* | c=%1b\$B*)
+        case "$field" in
+        *%26%23*)
+            echo "FAIL: '$field' escaped a reference iso-2022-jp represents"
+            exit 1
+            ;;
+        esac
+        ;;
+    b=%26%238364%3B | d=x) ;;
+    *)
+        echo "FAIL: unexpected field '$field' in '$jis'"
+        exit 1
+        ;;
+    esac
+done
+if test "$jiscount" != 4; then
+    echo "FAIL: origin parsed '${jiscount}' parameters, expected 4"
+    exit 1
+fi
+echo "OK (${jiscount} parameters)"
