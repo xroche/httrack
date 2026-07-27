@@ -539,6 +539,36 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 4) void slprintfbuff_clip(
 #define sprintfbuff(ARR, ...) slprintfbuff((ARR), sizeof(ARR), __VA_ARGS__)
 #endif
 
+/* Last character of s, or '\0' when s is empty. Replaces s[strlen(s) - 1],
+   which indexes one byte before the buffer on an empty string. */
+static HTS_INLINE HTS_UNUSED char hts_lastchar(const char *s) {
+  const size_t len = strlen(s);
+
+  return len != 0 ? s[len - 1] : '\0';
+}
+
+/* Drop a trailing c from s if present; HTS_TRUE if one was dropped. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_striplastchar(char *s, char c) {
+  const size_t len = strlen(s);
+
+  if (len != 0 && s[len - 1] == c) {
+    s[len - 1] = '\0';
+    return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* Drop the last character of s whatever it is; HTS_TRUE if s was not empty. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
+  const size_t len = strlen(s);
+
+  if (len != 0) {
+    s[len - 1] = '\0';
+    return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 /* Thin aliases over the libc allocator/memcpy (historical "t" suffix); no
    added bounds checking. freet() also NULLs the freed pointer and tolerates
    NULL. memcpybuff() despite the name is a raw memcpy: the caller owns the

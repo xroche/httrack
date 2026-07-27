@@ -64,6 +64,7 @@ TESTS = \
 	01_engine-identabs.test \
 	01_engine-escape-room.test \
 	01_engine-inplace-escape.test \
+	01_engine-lastchar.test \
 	01_engine-makeindex.test \
 	01_engine-mime.test \
 	01_engine-parse.test \
@@ -208,6 +209,7 @@ TESTS = \
 	98_local-warc-segments.test \
 	99_local-robots-error.test \
 	99_suite-timeout.test \
+	100_local-purge-longpath.test \
 	101_local-update-stale-bak.test
 
 CLEANFILES = check-network_sh.cache
