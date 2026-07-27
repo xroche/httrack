@@ -91,6 +91,7 @@ TESTS += 102_local-ftp-refetch.test
 TESTS += 103_teardown-status.test
 TESTS += 104_engine-warc-longurl.test
 TESTS += 105_suite-timeout.test
+TESTS += 106_engine-repair-rename.test
 TESTS += 10_crawl-simple.test
 TESTS += 110_local-ftp-parallel.test
 TESTS += 111_local-ftp-update-rest.test
