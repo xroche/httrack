@@ -3264,6 +3264,95 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Build a path of exactly len characters under base, split into components a
+   filesystem accepts. Returns the length written. */
+static size_t st_structcheck_longpath(char *dst, size_t dstsize,
+                                      const char *base, size_t len) {
+  size_t n = strlen(base);
+
+  assertf(len < dstsize && n + 2 < len);
+  memmove(dst, base, n);
+  while (n < len) {
+    size_t seg = len - n - 1; /* what follows the separator */
+
+    if (seg > 200) /* stay under the usual 255-byte component limit */
+      seg = 200;
+    dst[n++] = '/';
+    memset(dst + n, 'x', seg);
+    n += seg;
+  }
+  dst[n] = '\0';
+  return n;
+}
+
+/* structcheck() renames a regular file out of a directory's way; that
+   ".txt" target must fit whatever path the guard admits (#745). */
+static int st_structcheck(httrackp *opt, int argc, char **argv) {
+  char BIGSTK path[HTS_URLMAXSIZE * 2];
+  char BIGSTK target[HTS_URLMAXSIZE * 2];
+  size_t n;
+  FILE *fp;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=structcheck <writable directory>\n");
+    return 1;
+  }
+
+  /* over the guard: refused, and errno says why */
+  n = st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
+  errno = 0;
+  assertf(structcheck(path) == -1);
+  assertf(errno == EINVAL);
+  assertf(!fexist(path));
+
+  /* a regular file where a directory belongs is renamed to <name>.txt */
+  snprintf(path, sizeof(path), "%s/sc", argv[0]);
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  snprintf(path, sizeof(path), "%s/sc/sub/", argv[0]);
+  assertf(structcheck(path) == 0);
+  assertf(dir_exists(path));
+  snprintf(target, sizeof(target), "%s/sc.txt", argv[0]);
+  assertf(fexist(target));
+
+  /* same rename at the longest path the guard lets through: the target runs
+     four bytes past it and must still be written whole */
+  snprintf(path, sizeof(path), "%s/max", argv[0]);
+  assertf(structcheck(path) == 0);
+  n = st_structcheck_longpath(path, sizeof(path), path, HTS_URLMAXSIZE - 1);
+  assertf(structcheck(path) == 0); /* parents only: no trailing separator */
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  strcpybuff(target, path);
+  strcatbuff(target, ".txt");
+  path[n] = '/'; /* now exactly HTS_URLMAXSIZE, the guard's limit */
+  path[n + 1] = '\0';
+  assertf(structcheck(path) == 0);
+  assertf(dir_exists(path));
+  assertf(fexist(target));
+
+  /* the utf-8 twin carries the same rename */
+  snprintf(path, sizeof(path), "%s/u8", argv[0]);
+  assertf(structcheck_utf8(path) == 0);
+  n = st_structcheck_longpath(path, sizeof(path), path, HTS_URLMAXSIZE - 1);
+  assertf(structcheck_utf8(path) == 0);
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  strcpybuff(target, path);
+  strcatbuff(target, ".txt");
+  path[n] = '/';
+  path[n + 1] = '\0';
+  assertf(structcheck_utf8(path) == 0);
+  assertf(fexist_utf8(target));
+
+  printf("structcheck self-test OK\n");
+  return 0;
+}
+
 /* Each inplace_escape_*() must equal escape_*() on a copy. */
 static int st_inplace_escape(httrackp *opt, int argc, char **argv) {
   /* >255 bytes forces the helper's malloct path, not the stack buffer */
@@ -6330,6 +6419,9 @@ static const struct selftest_entry {
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
+    {"structcheck", "<dir>",
+     "structcheck path guard and the <name>.txt rename it performs",
+     st_structcheck},
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
