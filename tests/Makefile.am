@@ -229,6 +229,7 @@ TESTS = \
 	105_suite-timeout.test \
 	106_engine-repair-rename.test \
 	107_local-bak-collision.test \
-	108_engine-refetch-backup.test
+	108_engine-refetch-backup.test \
+	111_local-ftp-update-rest.test
 
 CLEANFILES = check-network_sh.cache

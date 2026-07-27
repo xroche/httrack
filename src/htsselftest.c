@@ -6188,6 +6188,32 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
     }
   }
 
+  /* A directory in the way is not something the caller asked to replace: it
+     must be refused, never parked aside and orphaned. */
+  (void) UNLINK(dst);
+  ro_put(src, "new");
+  if (MKDIR(dst) == 0) {
+    char parked[sizeof(dst) + 16];
+
+    snprintf(parked, sizeof(parked), "%s.hts-old0", dst);
+    if (hts_rename_over(opt, src, dst)) {
+      fprintf(stderr, "renameover: a directory at dst reported success\n");
+      err++;
+    }
+    if (!ro_is(src, "new")) {
+      fprintf(stderr, "renameover: a directory at dst consumed src\n");
+      err++;
+    }
+    /* RMDIR only succeeds on a directory that is there, so it doubles as the
+       probe: the parked name must not exist at all. */
+    if (RMDIR(parked) == 0 || fexist_utf8(parked)) {
+      fprintf(stderr, "renameover: a directory at dst was parked aside\n");
+      err++;
+    }
+    (void) RMDIR(dst);
+  }
+  (void) UNLINK(src);
+
   /* A missing src must leave dst alone and report failure. */
   (void) UNLINK(src);
   ro_put(dst, "keep");

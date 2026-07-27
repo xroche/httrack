@@ -237,7 +237,7 @@ Build options:
   x  replace external html links by error pages (--replace-external)
  %x  do not include any password for external password protected websites (%x0 include) (--no-passwords)
  %q *include query string for local files (useless, for information purpose only) (%q0 don't include) (--include-query-string)
-  o *generate output html file in case of error (404..) (o0 don't generate) (--generate-errors)
+  o *save the server's error pages (404..) (o0 discard them) (--generate-errors)
   X *purge old files after update (X0 keep delete) (--purge-old[=N])
 
 Spider options:
@@ -413,7 +413,7 @@ site. Specifically, the defauls are:
   NN  name conversion type (0 *original structure, 1+: see below)
   LN  long names (L1 *long names / L0 8-3 conversion)
   K   keep original links (e.g. http://www.adr/link) (K0 *relative link)
-  o *generate output html file in case of error (404..) (o0 don't generate)
+  o *save the server's error pages (404..) (o0 discard them)
   X *purge old files after update (X0 keep delete)
   bN  accept cookies in cookies.txt (0=do not accept,* 1=accept)
   u check document type if unknown (cgi,asp..) (u0 don't check, * u1 check but /, u2 check always)
@@ -473,11 +473,11 @@ store them with the same names used on the web site.
 URLs within this web site are adjusted to point to the files in the
 mirror.
 
-<pre><b><i>  o *generate output html file in case of error (404..) (o0 don't generate) </i></b></pre>
+<pre><b><i>  o *save the server's error pages (404..) (o0 discard them) </i></b></pre>
 
-<p align=justify> IF there are errors in downloading, create a file that
-indicates that the URL was not found.  This makes browsing go a lot
-smoother.
+<p align=justify> IF a page cannot be downloaded, the error page the
+server sent is saved in its place, so a broken link still lands on the
+site's own 'not found' page.  This makes browsing go a lot smoother.
 
 <pre><b><i>  X *purge old files after update (X0 keep delete) </i></b></pre>
 
@@ -1011,7 +1011,7 @@ Build options:
   LN  long names (L1 *long names / L0 8-3 conversion)
   K   keep original links (e.g. http://www.adr/link) (K0 *relative link)
   x   replace external html links by error pages
-  o *generate output html file in case of error (404..) (o0 don't generate)
+  o *save the server's error pages (404..) (o0 discard them)
   X *purge old files after update (X0 keep delete)
   %x  do not include any password for external password protected websites (%x0 include) (--no-passwords)
   %q *include query string for local files (information only) (%q0 don't include) (--include-query-string)
@@ -1118,9 +1118,9 @@ deactivated byt his process.
 httrack http://www.shoesizes.com -O /tmp/shoesizes -x
 </i></b></pre>
 
-<p align=justify> This option prevents the generation of '404' error
-files to replace files that were not found even though there were URLs
-pointing to them.  It is useful for saving space as well as eliminating
+<p align=justify> This option keeps the server's '404' error pages out
+of the mirror, even though there were URLs pointing to the missing
+files.  It is useful for saving space as well as eliminating
 unnecessary files in operations where a working web site is not the
 desired result. 
 
