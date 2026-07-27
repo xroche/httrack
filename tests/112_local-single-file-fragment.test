@@ -1,0 +1,110 @@
+#!/bin/bash
+# Issue #766: --single-file resolves a reference by cutting it at '#', then
+# substitutes the whole thing. The fragment has to come back: on an SVG it
+# selects what renders, so losing it draws the entire sprite sheet.
+set -e
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_766.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+fail() {
+    echo "FAIL: $1"
+    exit 1
+}
+
+# --- the site ---------------------------------------------------------------
+doc="${tmpdir}/doc"
+mkdir -p "$doc"
+cat >"${doc}/index.html" <<'EOF'
+<html><head><link rel="stylesheet" href="style.css"></head><body>
+<img src="sprite.svg#icon-foo" alt="f">
+<img srcset="sprite.svg#icon-set 2x" alt="s">
+</body></html>
+EOF
+cat >"${doc}/style.css" <<'EOF'
+body { background: url(sprite.svg#icon-css); }
+div { background: url(big.svg#icon-big); }
+EOF
+printf '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon-foo"/></svg>\n' \
+    >"${doc}/sprite.svg"
+{
+    printf '<svg xmlns="http://www.w3.org/2000/svg"><!--'
+    head -c 20000 /dev/zero | tr '\0' 'x'
+    printf '%s\n' '--><g id="icon-big"/></svg>'
+} >"${doc}/big.svg"
+
+# --- server -----------------------------------------------------------------
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+"$python" "$server" --root "$(nativepath "$doc")" >"$serverlog" 2>&1 &
+serverpid=$!
+port=
+for _ in $(seq 1 50); do
+    line=$(head -n1 "$serverlog" 2>/dev/null)
+    if test "${line%% *}" == "PORT"; then
+        port="${line#PORT }"
+        break
+    fi
+    kill -0 "$serverpid" 2>/dev/null || fail "server exited: $(cat "$serverlog")"
+    sleep 0.1
+done
+test -n "$port" || fail "could not discover server port"
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || fail "could not find httrack"
+
+# --- crawl ------------------------------------------------------------------
+# The cap sits between sprite.svg and big.svg, so one inlines and one is left
+# for the rebase path.
+out="${tmpdir}/crawl"
+mkdir "$out"
+httrack -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 \
+    --retries=0 --single-file --single-file-max-size 4096 \
+    "${base}/index.html" >"${tmpdir}/log" 2>&1
+
+root="${out}/127.0.0.1_${port}"
+page="${root}/index.html"
+test -f "$page" || fail "no mirrored page at $page"
+test -f "${root}/big.svg" || fail "the over-cap asset never reached the mirror"
+
+b64='[A-Za-z0-9+/=]+'
+
+printf '[fragment survives onto the data: URI] ..\t'
+# Matching the data: prefix as well is what makes this more than "#icon-foo is
+# somewhere in the page": an un-inlined reference would carry it too.
+grep -Eq "src=\"data:image/svg\\+xml;base64,${b64}#icon-foo\"" "$page" ||
+    fail "img src lost its fragment: $(grep -o 'src="[^"]*"' "$page" | head -n2)"
+grep -Eq "srcset=\"data:image/svg\\+xml;base64,${b64}#icon-set 2x\"" "$page" ||
+    fail "srcset lost its fragment or its descriptor"
+echo OK
+
+printf '[fragment survives inside an inlined stylesheet] ..\t'
+"$python" - "$page" "${tmpdir}/got.css" <<'PY' || fail "no inlined stylesheet"
+import base64, re, sys
+html = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
+m = re.search(r'data:text/css;base64,([A-Za-z0-9+/=]*)', html)
+if m is None:
+    sys.exit(1)
+open(sys.argv[2], "wb").write(base64.b64decode(m.group(1)))
+PY
+grep -Eq "url\\(data:image/svg\\+xml;base64,${b64}#icon-css\\)" "${tmpdir}/got.css" ||
+    fail "url() lost its fragment: $(cat "${tmpdir}/got.css")"
+# Over the cap, so it stays a link, rebased onto the page's directory: it still
+# names the sprite sheet, so it still needs the selector.
+grep -q 'url(big.svg#icon-big)' "${tmpdir}/got.css" ||
+    fail "the rebased over-cap url() lost its fragment"
+echo OK

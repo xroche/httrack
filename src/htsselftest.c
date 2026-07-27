@@ -5533,6 +5533,8 @@ static int sf_nesting(const char *hay, const char *mime) {
 static const char sf_png[] = "\x89PNG\r\n\x1a\n\x00\x01\x02\xff";
 #define SF_PNG_LEN 12
 
+static const char sf_svg[] = "<svg><g id=\"icon-a\"/></svg>";
+
 static const char sf_page[] =
     "<html><head>\n"
     "<link rel=\"stylesheet\" href=\"css/main.css\">\n"
@@ -5570,6 +5572,14 @@ static const char sf_page[] =
     "<script src=\"js/app.js\"></script>\n"
     "<script>var s = \"</scripting>\"; var t = \"<img src='img/a%20b.png'>\";"
     "</script>\n"
+    /* A fragment selects inside the asset, so it has to survive onto the
+       data: URI; the query named the remote resource and must not. */
+    "<img src=\"img/sprite.svg#icon-a\">\n"
+    "<img srcset=\"img/sprite.svg#icon-b 2x\">\n"
+    "<svg><image xlink:href=\"img/sprite.svg#icon-c\"/></svg>\n"
+    "<div style=\"background:url(img/sprite.svg#icon-d)\"></div>\n"
+    "<div style=\"background:url('img/sprite.svg#i)e')\"></div>\n"
+    "<img src=\"img/sprite.svg?v=1#icon-f\">\n"
     "<img src=\"missing.png\" >\n"
     "<!--><img src=\"img/a%20b.png\">\n"
     "<div style=\"background:url(img/a%20b.png)\"></div>\n"
@@ -5588,6 +5598,7 @@ static void sf_fixture(const char *root) {
       "@font-face { font-family: f; src: url(../font/f.woff2); }\n"
       "body { background: url(../img/a b.png); }\n"
       "div { background: url(../img/big.png); }\n"
+      "div.s { background: url(../img/big-sprite.svg#icon-g); }\n"
       "/* url(../img/never.png) */\n";
   static const char nested[] = "div { background: url(../../img/a b.png); }\n";
   static const char two[] = "p { background: url(../../img/a b.png); }\n";
@@ -5607,6 +5618,8 @@ static void sf_fixture(const char *root) {
   sf_put(root, "js/app.js", js, sizeof(js) - 1);
   sf_put(root, "img/a b.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/big.png", big, sizeof(big));
+  sf_put(root, "img/sprite.svg", sf_svg, sizeof(sf_svg) - 1);
+  sf_put(root, "img/big-sprite.svg", big, sizeof(big));
   sf_put(root, "img/in.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/po.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/sv.png", sf_png, SF_PNG_LEN);
@@ -5743,6 +5756,19 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
                NULL,
            "quote inside a rewritten style attribute not escaped");
 
+  /* Fragments: kept on the replacement, escaped where they would close the
+     url() token, and never joined by the query the mirrored name dropped. */
+  sf_check(strstr(out, "img/sprite.svg") == NULL,
+           "a fragment-bearing reference was left a link");
+  sf_check(sf_count(out, "#icon-a\"") == 1, "img src fragment dropped");
+  sf_check(sf_count(out, "#icon-b 2x\"") == 1, "srcset fragment dropped");
+  sf_check(sf_count(out, "#icon-c\"") == 1, "xlink:href fragment dropped");
+  sf_check(sf_count(out, "#icon-d)") == 1, "style url() fragment dropped");
+  sf_check(sf_count(out, "#i%29e)") == 1,
+           "a fragment closing the url() token was not escaped");
+  sf_check(sf_count(out, "#icon-f\"") == 1, "fragment after a query dropped");
+  sf_check(strstr(out, "?v=1") == NULL, "query carried onto the data: URI");
+
   sf_check(strstr(out, "img/big.png 2x") != NULL, "over-cap asset inlined");
   sf_check(strstr(out, " 1x") != NULL, "srcset descriptor lost");
   sf_check(sf_count(out, "img/a%20b.png") ==
@@ -5769,6 +5795,8 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
        root, so it has to come back out as img/big.png or it dangles. */
     sf_check(strstr(css, "url(img/big.png)") != NULL,
              "over-cap url() not rebased onto the page's directory");
+    sf_check(strstr(css, "url(img/big-sprite.svg#icon-g)") != NULL,
+             "a rebased url() lost its fragment");
     nested = sf_decode(css, "text/css", NULL);
     sf_check(nested != NULL &&
                  strstr(nested, "url(data:image/png;base64,") != NULL,

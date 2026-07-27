@@ -92,6 +92,30 @@ static int sf_is_space(int c) {
 
 static int sf_is_sep(int c) { return c == '/' || c == '\\'; }
 
+/* Drop the whitespace surrounding a reference. */
+static void sf_trim(const char **ref, size_t *reflen) {
+  while (*reflen > 0 && sf_is_space((unsigned char) **ref)) {
+    (*ref)++;
+    (*reflen)--;
+  }
+  while (*reflen > 0 && sf_is_space((unsigned char) (*ref)[*reflen - 1]))
+    (*reflen)--;
+}
+
+/* Text after a reference's first '#', or NULL when it carries no fragment. */
+static const char *sf_fragment(const char *ref, size_t reflen, size_t *len) {
+  size_t i;
+
+  sf_trim(&ref, &reflen);
+  for (i = 0; i < reflen; i++) {
+    if (ref[i] == '#') {
+      *len = reflen - i - 1;
+      return ref + i + 1;
+    }
+  }
+  return NULL;
+}
+
 /* Case-insensitive equality between the span [p,p+n) and a lowercase literal.
  */
 static hts_boolean sf_span_eq(const char *p, size_t n, const char *lit) {
@@ -202,12 +226,7 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
   size_t i, n;
   int sp = 0, part;
 
-  while (reflen > 0 && sf_is_space((unsigned char) *ref)) {
-    ref++;
-    reflen--;
-  }
-  while (reflen > 0 && sf_is_space((unsigned char) ref[reflen - 1]))
-    reflen--;
+  sf_trim(&ref, &reflen);
   /* A mirrored name carries no query or fragment. */
   for (n = 0; n < reflen; n++) {
     if (ref[n] == '#' || ref[n] == '?')
@@ -347,17 +366,19 @@ static hts_boolean sf_append_base64(String *out, char *data, size_t len) {
   return HTS_TRUE;
 }
 
-/* Append a mirror-relative path, percent-escaping everything an unquoted CSS
-   url() or an HTML attribute could choke on. */
-static void sf_append_escaped_path(String *out, const char *p) {
+/* Append [p,p+len), escaping what an unquoted CSS url(), an HTML attribute or
+   an appended fragment could choke on; keep_pct spares an existing escape. */
+static void sf_append_escaped(String *out, const char *p, size_t len,
+                              hts_boolean keep_pct) {
   static const char hex[] = "0123456789ABCDEF";
   size_t i;
 
-  for (i = 0; p[i] != '\0'; i++) {
+  for (i = 0; i < len; i++) {
     const unsigned char c = (unsigned char) p[i];
 
     if (c <= 32 || c >= 127 || c == '"' || c == '\'' || c == '(' || c == ')' ||
-        c == '\\' || c == '<' || c == '>' || c == '&' || c == '%') {
+        c == '\\' || c == '<' || c == '>' || c == '&' || c == '#' ||
+        (c == '%' && !keep_pct)) {
       StringAddchar(*out, '%');
       StringAddchar(*out, hex[c >> 4]);
       StringAddchar(*out, hex[c & 15]);
@@ -365,6 +386,13 @@ static void sf_append_escaped_path(String *out, const char *p) {
       StringAddchar(*out, (char) c);
     }
   }
+}
+
+/* Re-attach a fragment: it selects inside the asset (an SVG sprite id) rather
+   than naming it, so the replacement needs it too. */
+static void sf_append_fragment(String *out, const char *frag, size_t len) {
+  StringAddchar(*out, '#');
+  sf_append_escaped(out, frag, len, HTS_TRUE);
 }
 
 static void sf_warn_oversize(sf_ctx *ctx, const char *path, LLint size,
@@ -399,7 +427,8 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
   String path = STRING_EMPTY;
   char mime[HTS_MIMETYPE_SIZE];
   char *body;
-  size_t body_len = 0;
+  size_t body_len = 0, frag_len = 0;
+  const char *const frag = sf_fragment(ref, reflen, &frag_len);
   LLint size, cap;
   int cls;
   hts_boolean done = HTS_FALSE;
@@ -457,6 +486,8 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
       StringCat(*out, mime);
       StringCat(*out, ";base64,");
       StringMemcat(*out, StringBuff(payload), StringLength(payload));
+      if (frag != NULL)
+        sf_append_fragment(out, frag, frag_len);
     }
     StringFree(payload);
   }
@@ -475,7 +506,9 @@ fallback:
     StringClear(rel);
     sf_relative_from(rebase_dir, StringBuff(path), &rel);
     if (StringLength(rel) > 0) {
-      sf_append_escaped_path(out, StringBuff(rel));
+      sf_append_escaped(out, StringBuff(rel), StringLength(rel), HTS_FALSE);
+      if (frag != NULL)
+        sf_append_fragment(out, frag, frag_len);
       done = HTS_TRUE;
     }
     StringFree(rel);
