@@ -585,6 +585,21 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
   return 0;
 }
 
+/* Did the transfer die on the wire, as opposed to being deliberately skipped
+   (too big, MIME-excluded, cancelled)? Same set htsparse.c retries on. */
+static hts_boolean back_transfer_broke(const int statuscode) {
+  switch (statuscode) {
+  case STATUSCODE_TIMEOUT:
+  case STATUSCODE_SLOW:
+  case STATUSCODE_CONNERROR:
+  case STATUSCODE_NON_FATAL:
+  case STATUSCODE_SSL_HANDSHAKE:
+    return HTS_TRUE;
+  default:
+    return HTS_FALSE;
+  }
+}
+
 /* Move src onto dst; RENAME does not clobber an existing target on Windows. */
 static hts_boolean replace_file(const char *src, const char *dst) {
   if (RENAME(src, dst) == 0)
@@ -1039,6 +1054,14 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
   /* Aborted, error, or not ready: url_sav (if written) is broken; restore the
      previous copy from the backup. */
   back_finalize_backup(opt, &back[p], HTS_FALSE);
+  /* The restored copy is still the mirror's: note it, or the update purge (in
+     old.lst, absent from new.lst) deletes what this run never replaced (#746). */
+  if (!back[p].testmode && back_transfer_broke(back[p].r.statuscode) &&
+      back[p].url_sav[0] != '\0' && fexist_utf8(back[p].url_sav)) {
+    filenote(&opt->state.strc, back[p].url_sav, NULL);
+    file_notify(opt, back[p].url_adr, back[p].url_fil, back[p].url_sav, 0, 0,
+                back[p].r.notmodified);
+  }
   return -1;
 }
 
