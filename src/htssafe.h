@@ -590,6 +590,17 @@ static HTS_INLINE HTS_UNUSED void hts_rtrim(char *s, const char *set) {
   s[hts_rtrimlen(s, set)] = '\0';
 }
 
+/* Offset of the last character of s, or 0 when s is empty. */
+static HTS_INLINE HTS_UNUSED size_t hts_lastcharoffset(const char *s) {
+  const size_t len = strlen(s);
+
+  return len != 0 ? len - 1 : 0;
+}
+
+/* Address of the last character of S, or of its terminating NUL when S is
+   empty. S is evaluated twice, so pass an lvalue. */
+#define hts_lastcharptr(S) ((S) + hts_lastcharoffset(S))
+
 /* Thin aliases over the libc allocator/memcpy (historical "t" suffix); no
    added bounds checking. freet() also NULLs the freed pointer and tolerates
    NULL. memcpybuff() despite the name is a raw memcpy: the caller owns the

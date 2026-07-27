@@ -491,7 +491,7 @@ char *bauth_prefix(char *prefix, const char *adr, const char *fil) {
   if (a)
     *a = '\0';
   if (strchr(prefix, '/')) {
-    a = prefix + strlen(prefix) - 1;
+    a = hts_lastcharptr(prefix);
     while(*a != '/')
       a--;
     *(a + 1) = '\0';

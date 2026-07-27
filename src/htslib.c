@@ -3300,8 +3300,9 @@ int ishtml(httrackp * opt, const char *fil) {
   }
 
   /* Search for known ext */
-  for(a = fil_noquery + strlen(fil_noquery) - 1;
-      *a != '.' && *a != '/' && a > fil_noquery; a--) ;
+  for (a = hts_lastcharptr(fil_noquery);
+       *a != '.' && *a != '/' && a > fil_noquery; a--)
+    ;
   if (*a == '.') {              // a une extension
     char BIGSTK fil_noquery[HTS_URLMAXSIZE * 2];
     char *b;
@@ -4238,9 +4239,8 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
     return 1;
   } else {
     /* Check html -> text/html */
-    const char *a = fil + strlen(fil) - 1;
+    const char *a = hts_lastcharptr(fil);
 
-    /* a < fil when fil is empty: bound before dereferencing */
     while ((a > fil) && (*a != '.') && (*a != '/'))
       a--;
     if (a >= fil && *a == '.' && strlen(a) < 32) {
