@@ -1223,6 +1223,13 @@ void back_connxfr(htsblk * src, htsblk * dst) {
   src->debugid = 0;
 }
 
+/* Release the buffers a response owns. The connection members are left alone:
+   back_connxfr() moves those, and the file handles are closed elsewhere. */
+static void back_free_response(htsblk *r) {
+  deleteaddr(r);
+  warc_free_request(r);
+}
+
 void back_move(lien_back * src, lien_back * dst) {
   memcpy(dst, src, sizeof(lien_back));
   memset(src, 0, sizeof(lien_back));
@@ -1758,10 +1765,7 @@ int back_clear_entry(lien_back * back) {
       back->r.soc = INVALID_SOCKET;
     }
 
-    if (back->r.adr != NULL) {  // reste un bloc à désallouer
-      freet(back->r.adr);
-      back->r.adr = NULL;
-    }
+    back_free_response(&back->r);
     if (back->chunk_adr != NULL) {      // reste un bloc à désallouer
       freet(back->chunk_adr);
       back->chunk_adr = NULL;
@@ -1774,12 +1778,6 @@ int back_clear_entry(lien_back * back) {
       (void) unlink(back->tmpfile);
       back->tmpfile = NULL;
     }
-    // headers
-    if (back->r.headers != NULL) {
-      freet(back->r.headers);
-      back->r.headers = NULL;
-    }
-    warc_free_request(&back->r);
     // Tout nettoyer
     memset(back, 0, sizeof(lien_back));
     back->r.soc = INVALID_SOCKET;
@@ -4084,6 +4082,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                       memset(&tmp, 0, sizeof(tmp));
                       back_connxfr(&back[i].r, &tmp);
+                      /* the cache entry overwrites the whole struct, so drop
+                         what the 304 response still owns first (#782) */
+                      back_free_response(&back[i].r);
                       back[i].r =
                         cache_read(opt, cache, back[i].url_adr, back[i].url_fil,
                                    back[i].url_sav, back[i].location_buffer);
