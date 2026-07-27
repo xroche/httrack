@@ -211,7 +211,8 @@ jobs:
           pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
           for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test \
                    *_local-*.test 13_crawl_proxy_https.test 58_watchdog.test \
-                   60_crawl-log-salvage.test 116_engine-rtrim.test; do
+                   60_crawl-log-salvage.test 116_engine-rtrim.test \
+                   106_engine-repair-rename.test; do
             elapsed=$((SECONDS - started))
             if [ "$elapsed" -ge "$suite_deadline" ]; then
               echo "::error::suite deadline: ${elapsed}s elapsed, stopping before $t"
