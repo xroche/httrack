@@ -217,7 +217,6 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
 
         if (filename != NULL) {
           (void) UNLINK(filename);
-          back_tmpdir_drop(filename);
         }
 #else
         /* clear entry content (but not yet the entry) */
@@ -312,7 +311,6 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
                       adr, fil, sav);
       }
       (void) UNLINK(fileback);
-      back_tmpdir_drop(fileback);
 #else
       itemback = (lien_back *) ptr;
 #endif
@@ -447,13 +445,6 @@ int back_selftest_slot_swap(void) {
   return err;
 }
 
-/* Subdirectory holding a mirrored file's temporaries, beside it. url_savename()
-   maps '~' to '_', so no URL can ever be mirrored inside it (#774, #842). */
-#define HTS_TMPDIR "~hts-tmp"
-
-static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
-                                const char *ext);
-
 /* Put all backing entries that are ready in the storage hashtable to spare space and CPU */
 int back_cleanup_background(httrackp * opt, cache_back * cache,
                             struct_back * sback) {
@@ -492,26 +483,18 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
-        char BIGSTK tmpname[HTS_URLMAXSIZE * 2];
-        char *filename;
-        hts_boolean named;
-
-        /* Out of the mirror namespace: a site serving <path>.tmp had its copy
-           truncated here (#774). The old buffer was sized on url_sav alone,
-           which the path_html form below overran. */
-        if (opt->getmode != 0 && back[i].url_sav[0] != '\0') {
-          named =
-              back_tmpname(tmpname, sizeof(tmpname), back[i].url_sav, "tmp");
-        } else {
-          named = slprintfbuff(
-              tmpname, sizeof(tmpname), "%s/" HTS_TMPDIR "/tmpfile%d.tmp",
-              StringBuff(opt->path_html_utf8), opt->state.tmpnameid++);
-        }
-        filename = named ? strdupt(tmpname) : NULL;
+        int fsz = (int) strlen(back[i].url_sav);
+        char *filename = malloc(fsz + 8 + 1);
 
         if (filename != NULL) {
           FILE *fp;
 
+          if (opt->getmode != 0) {
+            sprintf(filename, "%s.tmp", back[i].url_sav);
+          } else {
+            sprintf(filename, "%stmpfile%d.tmp",
+                    StringBuff(opt->path_html_utf8), opt->state.tmpnameid++);
+          }
           /* Security check */
           if (fexist_utf8(filename)) {
             hts_log_print(opt, LOG_WARNING,
@@ -542,12 +525,11 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
                           "file does not exist");
           }
           if (filename != NULL)
-            freet(filename);
+            free(filename);
         } else {
           hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                        "engine: warning: serialize error for %s%s: %s",
-                        back[i].url_adr, back[i].url_fil,
-                        named ? "memory full" : "temporary filename too long");
+                        "engine: warning: serialize error for %s%s: memory full",
+                        back[i].url_adr, back[i].url_fil);
         }
       }
 #else
@@ -664,6 +646,10 @@ int back_nsoc_overall(const struct_back * sback) {
   return n;
 }
 
+/* Subdirectory holding a mirrored file's temporaries, beside it. url_savename()
+   maps '~' to '_', so no URL can ever be mirrored inside it (#774, #842). */
+#define HTS_TMPDIR "~hts-tmp"
+
 /* Build save's temporary as <dir>/<HTS_TMPDIR>/<name>.<ext>. Appending the
    extension to save instead put it in the mirror namespace, so a site serving
    <path>.bak had its copy taken as the backup and then unlinked (#774).
@@ -713,11 +699,13 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
     if (structcheck(back->tmpfile) != 0) {
       hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
                     back->tmpfile);
+      back->tmpfile_buffer[0] = '\0';
+      back->tmpfile = NULL;
       return -1;
     }
   } else {
-    /* Same directory as the named case, so back_tmpdir_drop() only ever
-       removes one the engine made (#842). */
+    /* same directory as the named case, so back_tmpdir_drop() only removes one
+       the engine made (#842) */
     /* truncation here would collide distinct tmpnameid's onto one name */
     if (!sprintfbuff(back->tmpfile_buffer, "%s/" HTS_TMPDIR "/tmp%d.%s",
                      StringBuff(opt->path_html_utf8), opt->state.tmpnameid++,

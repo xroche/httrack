@@ -1,11 +1,7 @@
 #!/bin/bash
 #
-# url_savename must not hand a URL a name inside a directory the engine owns
-# (#842). Three shapes used to get past the reserved-segment escape: a trailing
-# space the later cleanup stripped back off, the first path component (which
-# carries no leading '/' for the table to anchor on), and a single-label
-# hostname, which is that same first component. Asserted on the tail only, so
-# the -O root's rendering stays out of it.
+# url_savename must not name a URL into a directory the engine owns (#842).
+# Asserted on the tail only, so the -O root's rendering stays out of it.
 
 set -euo pipefail
 
@@ -31,25 +27,23 @@ tail_is() {
     esac
 }
 
-# A trailing space, on shipped defaults: escaped before cleanEndingSpaceOrDot()
-# gets to strip it. Unescaped, that is byte-identical to a re-fetch backup name.
+# A trailing space: cleanEndingSpaceOrDot() strips it again after the check.
 tail_is '/d/hts-tmp%20/a.bin.bak' 'd/hts-tmp_/a.bin.bak'
 tail_is '/d/hts-cache%20/new.zip' 'd/hts-cache_/new.zip'
 tail_is '/d/hts-cache%20%20./new.zip' 'd/hts-cache_/new.zip'
 
-# The first component, exposed by any structure putting the URL path first.
+# The first component, which the table's leading '/' never reached.
 tail_is '/hts-cache/new.zip' 'hts-cache_/new.zip' type=100
 tail_is '/hts-tmp/a.bin' 'hts-tmp_/a.bin' type=100
 # Wider than the engine directories: the DOS devices share the table.
 tail_is '/nul/x.bin' 'nul_/x.bin' type=100
 
-# A single-label hostname is that same first component, on the default
-# structure.
+# A single-label hostname sits in that same first component.
 tail_is '/a.bin.bak' 'hts-tmp_/a.bin.bak' adr=hts-tmp
 tail_is '/x.bin' 'nul_/x.bin' adr=nul
 
 # '~' never survives the forbidden-character pass, which is what puts the
-# engine's temporaries out of reach whatever the escape above does.
+# temporaries out of reach whatever the escape above does.
 tail_is '/~hts-tmp/a.bin' '_hts-tmp/a.bin'
 tail_is '/~hts-tmp/a.bin' '_hts-tmp/a.bin' type=100
 
@@ -58,3 +52,11 @@ tail_is '/hts-tmpfoo/a.bin' 'hts-tmpfoo/a.bin'
 tail_is '/xhts-cache/a.bin' 'xhts-cache/a.bin'
 tail_is '/con%20ference/a.bin' 'con ference/a.bin'
 tail_is '/d/a.bin' 'www.example.com/d/a.bin'
+
+# A hostname label is not a reserved name, and renaming one would move an
+# existing mirror out from under --update.
+tail_is '/d/a.bin' 'aux.example.com/d/a.bin' adr=aux.example.com
+tail_is '/d/a.bin' 'nul.example.com/d/a.bin' adr=nul.example.com
+tail_is '/d/a.bin' 'hts-cache.example.com/d/a.bin' adr=hts-cache.example.com
+# But a trailing run still resolves back to the bare name.
+tail_is '/a.bin' 'hts-tmp_/a.bin' adr='hts-tmp.'

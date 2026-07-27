@@ -65,7 +65,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
 /* Based on linux/fs/umsdos/mangle.c */
-/* clang-format off: hand-grouped table, reflowed into a blob otherwise. */
+/* Hand-grouped rows; clang-format reflows the table into a blob. */
 /* clang-format off */
 static const char *hts_tbdev[] = {
   "prn", "con", "aux", "nul",
@@ -102,9 +102,13 @@ static void escapeReservedNames(char *save, size_t size,
     while ((a = strstrcase(a, names[i]))) {
       hts_boolean reserved = HTS_FALSE;
 
-      /* offset 0 opens a component too: save has had its leading '/' stripped
-         above, so anchoring the table on one never saw the first one (#842) */
-      if (a == save || a[-1] == '/') {
+      if (a == save) {
+        /* save has had its leading '/' stripped above, so the table's anchor
+           never reached the first component (#842). It usually holds the
+           hostname, so only a trailing run may end it here: '.' would rename
+           aux.example.com. */
+        reserved = strippedToComponentEnd(a + len);
+      } else if (a[-1] == '/') {
         switch ((int) a[len]) {
         case '\0':
         case '/':

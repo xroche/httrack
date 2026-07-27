@@ -1,10 +1,8 @@
 #!/bin/bash
 #
 # #842/#774 end to end: the site serves a.bin and a sibling at "hts-tmp /",
-# whose save name used to come back as the plain reserved directory once the
-# trailing space was stripped, i.e. the exact path the re-fetch backup of a.bin
-# is renamed to. The update then destroyed the sibling and reported success.
-# Asserting the escaped name is what makes this fail with the bug live.
+# which used to resolve to the very path the re-fetch backup of a.bin is
+# renamed to, so the update destroyed the sibling and reported success.
 
 set -euo pipefail
 
@@ -12,6 +10,8 @@ set -euo pipefail
 
 bash "$top_srcdir/tests/local-crawl.sh" \
     --rerun-args '--update' \
+    --plant-file 'tmpspace/~hts-tmp/a.bin.bak' \
+    --log-found 'replacing leftover backup .*/~hts-tmp/a\.bin\.bak' \
     --file-matches 'tmpspace/a.bin' 'BAKNAME-MAIN-V2' \
     --file-matches 'tmpspace/hts-tmp_/a.bin.bak' 'BAKNAME-SIBLING' \
     --file-min-bytes 'tmpspace/hts-tmp_/a.bin.bak' 2048 \
