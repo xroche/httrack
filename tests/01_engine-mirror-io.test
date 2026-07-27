@@ -9,4 +9,5 @@ set -euo pipefail
 dir=$(mktemp -d)
 trap 'set +e; rm -rf "$dir"' EXIT
 
-httrack -O /dev/null -#test=mirrorio "$dir" | grep -q "mirrorio:.*OK"
+out=$(httrack -O /dev/null -#test=mirrorio "$dir")
+grep -q "mirrorio:.*OK" <<<"$out"

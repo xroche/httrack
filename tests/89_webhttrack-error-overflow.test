@@ -169,7 +169,8 @@ test "${written}" -lt "${#profile}" ||
     fail "the file-size limit did not stop the write (${written} bytes landed)"
 check_clipped "Unable to write ${#profile} bytes in the the init file " "${path}/p"
 
-get "${port}" /server/index.html | grep -q '200 OK' ||
+reply=$(get "${port}" /server/index.html || true)
+grep -q '200 OK' <<<"$reply" ||
     fail "the server stopped answering after the refused saves"
 
 echo "PASS"

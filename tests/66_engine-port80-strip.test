@@ -9,4 +9,5 @@ set -euo pipefail
 # (#614) was stripped as if it were the default. The default is scheme-aware
 # (#638): an explicit :80 on https/ftp stays, :443/:21 strip under their own
 # scheme. All assertions live in the engine self-test.
-httrack -O /dev/null -#test=stripport | grep -q "stripport self-test OK"
+out=$(httrack -O /dev/null -#test=stripport)
+grep -q "stripport self-test OK" <<<"$out"
