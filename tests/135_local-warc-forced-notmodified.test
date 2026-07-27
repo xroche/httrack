@@ -1,17 +1,13 @@
 #!/bin/bash
-#
-# An engine-forced not-modified (the #176 error-ignore hack here) is not a 304
-# the server ever sent: back_wait() must not archive it as a server-not-modified
-# revisit, which would claim an exchange that never happened (#839). A genuine
-# 304 (mini304) must still come out as a revisit with its exchange intact.
-
+# An engine-forced not-modified is not a 304 the server sent (#839).
 set -eu
 
 : "${top_srcdir:=..}"
 
+# Scenario 1: real 304 (mini304) and engine-forced (errmask) side by side.
 export WARC_VALIDATE_UPDATE="warc-forced.warc.gz"
-export WARC_VALIDATE_NORESP="mini304/index.html mini304/page.html"
-export WARC_VALIDATE_NORECORD="errmask/keep.dat"
+export WARC_VALIDATE_NORESP="mini304/index.html mini304/page.html errmask/keep.dat"
+export WARC_VALIDATE_PROFILE="errmask/keep.dat=identical-payload-digest"
 export WARC_VALIDATE_EXCHANGE=1
 
 bash "$top_srcdir/tests/local-crawl.sh" --warc-validate \
@@ -20,3 +16,10 @@ bash "$top_srcdir/tests/local-crawl.sh" --warc-validate \
     --file-matches 'errmask/keep.dat' '^KEEP' \
     --file-not-matches 'errmask/keep.dat' 'error 403' \
     httrack 'BASEURL/mini304/index.html' 'BASEURL/errmask/index.html' --warc-file warc-out
+
+# Scenario 2: an all-forced pass, same archive name as pass 1, must not
+# replace the previous archive with an (almost) empty one (#777's shape).
+bash "$top_srcdir/tests/local-crawl.sh" --wacz-validate --archive-kept-on-rerun \
+    --archive-min-files 2 --rerun \
+    --found 'errmask/keep.dat' \
+    httrack 'BASEURL/errmask/index.html' --warc-file warc-out --wacz

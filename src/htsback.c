@@ -4122,6 +4122,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       back[i].status = STATUS_READY;    // OK prêt
                       back_set_finished(sback, i);
                       back[i].r.notmodified = 1;        // NON modifié!
+                      // WARC must not claim a 304 the server never sent (#839)
+                      back[i].r.warc_forced_notmodified =
+                          server_sent_304 ? HTS_FALSE : HTS_TRUE;
                       hts_log_print(opt, LOG_DEBUG,
                                     "File loaded after test from cache: %s%s",
                                     back[i].url_adr, back[i].url_fil);

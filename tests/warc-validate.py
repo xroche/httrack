@@ -11,10 +11,10 @@
 #                             WARC-Payload-Digest matching sha1(body) when present
 #   --no-response-for SUB     the asset containing SUB must be a revisit: no
 #                             response may target it, and a revisit must
-#   --no-record-for SUB       no record of any type (response/revisit/resource)
-#                             may target an asset containing SUB
-#   --expect-ip SUB           a response or revisit targeting SUB must carry a
-#                             non-empty WARC-IP-Address
+#   --expect-ip SUB=IP        a response or revisit targeting SUB must carry
+#                             WARC-IP-Address: IP exactly
+#   --expect-revisit-profile SUB=SUBSTR  a revisit targeting SUB must carry a
+#                             WARC-Profile containing SUBSTR
 #   --revisit-exchange        every server-not-modified revisit carries the 304
 #                             exchange it stands for: a 304 status line in its
 #                             block, and a concurrent request record holding the
@@ -113,8 +113,10 @@ def main():
     verbatim = "--verbatim" in argv
     body_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-body-hex")]
     no_resp = opt_values(argv, "--no-response-for")
-    no_record = opt_values(argv, "--no-record-for")
-    ip_specs = opt_values(argv, "--expect-ip")
+    ip_specs = [s.split("=", 1) for s in opt_values(argv, "--expect-ip")]
+    profile_specs = [
+        s.split("=", 1) for s in opt_values(argv, "--expect-revisit-profile")
+    ]
     path = [a for a in argv if not a.startswith("--") and "=" not in a][0]
     data = open(path, "rb").read()
 
@@ -127,7 +129,8 @@ def main():
     total = revisits = responses = infos = 0
     body_hits = {sub: False for sub, _ in body_specs}
     revisit_hits = {sub: False for sub in no_resp}
-    ip_hits = {sub: False for sub in ip_specs}
+    ip_hits = {sub: False for sub, _ in ip_specs}
+    profile_hits = {sub: False for sub, _ in profile_specs}
     requests = {}  # WARC-Concurrent-To -> request block
     exchanges = []  # (shown uri, record id) of the server-not-modified revisits
     for rec in records(data):
@@ -152,19 +155,14 @@ def main():
             sys.exit("record %d: missing \\r\\n\\r\\n trailer" % total)
         wtype = field(header, b"WARC-Type")
         uri = field(header, b"WARC-Target-URI") or b""
-        if wtype in (b"response", b"revisit", b"resource"):
-            for sub in no_record:
-                if sub.encode() in uri:
-                    sys.exit(
-                        "unexpected %s record for %s (want no record)"
-                        % (wtype.decode(), sub)
-                    )
         if wtype in (b"response", b"revisit"):
-            for sub in ip_specs:
+            for sub, want_ip in ip_specs:
                 if sub.encode() in uri:
-                    if not field(header, b"WARC-IP-Address"):
+                    got = field(header, b"WARC-IP-Address") or b""
+                    if got.decode("ascii", "replace") != want_ip:
                         sys.exit(
-                            "%s for %s has no WARC-IP-Address" % (wtype.decode(), sub)
+                            "%s for %s: WARC-IP-Address %r != %r"
+                            % (wtype.decode(), sub, got, want_ip)
                         )
                     ip_hits[sub] = True
         if wtype == b"warcinfo":
@@ -205,6 +203,14 @@ def main():
             for sub in no_resp:
                 if sub.encode() in uri:
                     revisit_hits[sub] = True
+            for sub, want_sub in profile_specs:
+                if sub.encode() in uri:
+                    if want_sub.encode() not in profile:
+                        sys.exit(
+                            "revisit for %s: WARC-Profile %r lacks %r"
+                            % (shown, profile, want_sub)
+                        )
+                    profile_hits[sub] = True
             if revisit_exchange and b"server-not-modified" in profile:
                 block = rec[hdr_end : hdr_end + block_len]
                 status = block.split(b"\r\n", 1)[0].split()
@@ -241,6 +247,9 @@ def main():
     for sub, hit in ip_hits.items():
         if not hit:
             sys.exit("no response/revisit record found for --expect-ip %s" % sub)
+    for sub, hit in profile_hits.items():
+        if not hit:
+            sys.exit("no revisit record found for --expect-revisit-profile %s" % sub)
     print(
         "warc-validate: %d records OK (%d response, %d revisit)"
         % (total, responses, revisits)

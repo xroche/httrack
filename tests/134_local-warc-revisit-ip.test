@@ -1,16 +1,12 @@
 #!/bin/bash
-#
-# A 304 revisit record must name the peer it revisited: back_connxfr() moves
-# the connection across the cache-entry swap but dropped the address field,
-# so every revisit came out with no WARC-IP-Address (#838).
-
+# A 304 revisit record must name the peer it revisited (#838).
 set -eu
 
 : "${top_srcdir:=..}"
 
 export WARC_VALIDATE_UPDATE="warc-revisit.warc.gz"
 export WARC_VALIDATE_NORESP="mini304/index.html mini304/page.html"
-export WARC_VALIDATE_IP="mini304/index.html mini304/page.html"
+export WARC_VALIDATE_IP="mini304/index.html=127.0.0.1 mini304/page.html=127.0.0.1"
 
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --warc-validate \
     --rerun-args '--warc-file warc-revisit' \
