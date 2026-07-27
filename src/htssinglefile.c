@@ -484,7 +484,7 @@ static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
   size_t i = 0, flushed = 0;
 
   while (i + marklen <= len) {
-    size_t start;
+    size_t start, tail;
 
     if (memcmp(body + i, SINGLEFILE_MARK, marklen) != 0) {
       i++;
@@ -493,11 +493,17 @@ static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
     for (start = i; start > flushed && !sf_is_ref_delim(body[start - 1]);
          start--)
       ;
+    /* htsparse writes the fragment and the kept query string after the mark;
+       a data: URI has no use for either. */
+    for (tail = i + marklen; tail < len && !sf_is_ref_delim(body[tail]); tail++)
+      ;
     StringMemcat(*out, body + flushed, start - flushed);
     if (!sf_inline(ctx, base_dir, body + start, i - start,
-                   depth > 0 ? ctx->page_dir : NULL, depth, out))
+                   depth > 0 ? ctx->page_dir : NULL, depth, out)) {
       StringMemcat(*out, body + start, i - start);
-    i += marklen;
+      StringMemcat(*out, body + i + marklen, tail - i - marklen);
+    }
+    i = tail;
     flushed = i;
   }
   StringMemcat(*out, body + flushed, len - flushed);
