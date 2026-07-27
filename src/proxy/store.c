@@ -895,7 +895,7 @@ static void index_base_path(char *path, size_t size, const char *filename) {
   const char *abpath;
   int slashes;
 
-  for (slashes = 2, abpath = filename + (int) strlen(filename) - 1;
+  for (slashes = 2, abpath = hts_lastcharptr(filename);
        abpath > filename &&
        ((*abpath != '/' && *abpath != '\\') || --slashes > 0);
        abpath--)
