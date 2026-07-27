@@ -2849,6 +2849,15 @@ int set_filetime_rfc822(const char *file, const char *date) {
 }
 
 /* Note: utf-8 */
+time_t get_filetime(const char *file) {
+  STRUCT_STAT buf;
+
+  if (STAT(file, &buf) != 0)
+    return (time_t) -1;
+  return (time_t) buf.st_mtime;
+}
+
+/* Note: utf-8 */
 int get_filetime_rfc822(const char *file, char *date) {
   STRUCT_STAT buf;
 
