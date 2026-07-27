@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Найбільший вбудований ресурс (байти):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Ресурс, більший за цей розмір, зберігає звичайне посилання; залиште порожнім для типового значення 10485760 байтів.
+Seed the crawl from the site's sitemap
+Починати обхід з карти сайту
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Прочитати карту сайту (рядки Sitemap: у robots.txt, потім /sitemap.xml) і додати кожну вказану в ній URL-адресу як початкову.
+Sitemap address:
+Адреса карти сайту:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Адреса карти сайту, яку слід прочитати замість опитування сайту; залиште порожнім, щоб перевірити robots.txt, а потім /sitemap.xml.

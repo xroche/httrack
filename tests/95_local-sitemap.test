@@ -1,0 +1,134 @@
+#!/bin/bash
+#
+# --sitemap seeds the crawl from robots.txt -> sitemapindex -> gzipped urlset.
+# start.html links to nothing, so orphan*.html can only arrive through the
+# sitemap; deep1.html proves the seeds keep a full depth budget under -r2, and
+# the off-host page and child sitemap must both be refused.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+crawl() { bash "$top_srcdir/tests/local-crawl.sh" "$@"; }
+
+# robots.txt Sitemap: -> index -> .xml.gz, seeds behaving like -r2 seeds. The
+# log assertions pin which route was taken: the two documents are served from
+# both /sitemapdir/index.xml and the well-known /sitemap.xml, so "some sitemap
+# was read" would pass either way. --not-found pins ingestion-only: the sitemap
+# documents feed the crawl but never land in the mirror.
+# --rerun also walks the update path over a mirror holding sitemap seeds.
+crawl --errors 0 --rerun \
+    --found 'sitemapdir/orphan1.html' \
+    --found 'sitemapdir/orphan2.html' \
+    --found 'sitemapdir/deep1.html' \
+    --not-found 'sitemapdir/index.xml' \
+    --not-found 'sitemapdir/pages.xml.gz' \
+    --log-found '2 of 3 URL\(s\) added from 127\.0\.0\.1:[0-9]+/sitemapdir/pages\.xml\.gz' \
+    --log-found '1 of 2 child sitemap\(s\) listed by 127\.0\.0\.1:[0-9]+/sitemapdir/index\.xml' \
+    --log-found 'ignoring off-host child sitemap' \
+    --log-not-found '/sitemap\.xml' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2
+
+# Negative control: without the option nothing but the start page is reached.
+crawl --errors 0 \
+    --found 'sitemapdir/start.html' \
+    --not-found 'sitemapdir/orphan1.html' \
+    --not-found 'sitemapdir/orphan2.html' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2
+
+# Sitemap URLs are not a filter bypass: a -*orphan2* rule still rejects one.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --not-found 'sitemapdir/orphan2.html' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 '-*orphan2*'
+
+# A robots.txt naming no sitemap falls back to the well-known /sitemap.xml.
+# The test server drops its Sitemap: record for this User-Agent.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --log-found 'listed by 127\.0\.0\.1:[0-9]+/sitemap\.xml' \
+    --log-not-found 'sitemapdir/index\.xml' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 -F 'nositemap-agent'
+
+# --sitemap-url alone reads the named document and probes nothing.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --found 'sitemapdir/orphan2.html' \
+    --log-not-found 'sitemapdir/index\.xml' \
+    --log-not-found '/sitemap\.xml' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/pages.xml.gz'
+
+# The two options are additive: an unfetchable --sitemap-url is parsed as an
+# empty document and does not stop --sitemap from seeding the crawl.
+crawl --errors-content 1 \
+    --found 'sitemapdir/orphan1.html' \
+    --log-found 'Sitemap: 0 of 0 URL\(s\) added' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/missing.xml'
+
+# The sitemapindex nesting cap stops the chain before its deepest urlset. The
+# positive control is the page one level inside the cap: without it, a cap
+# mutated to 0 (nothing followed) would pass this just as well.
+crawl --errors 0 \
+    --found 'sitemapdir/cap3.html' \
+    --not-found 'sitemapdir/cap4.html' \
+    --log-found 'Sitemap: cap reached' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/chain0.xml'
+
+# A site cannot widen a subtree crawl by putting its sitemap at the root: the
+# page below the start directory is seeded, the one above it is refused.
+crawl --errors 0 \
+    --found 'deep/dir/below.html' \
+    --not-found 'elsewhere/updir.html' \
+    httrack 'BASEURL/deep/dir/start.html' --sitemap -r3 -F 'scopesitemap-agent'
+
+# How far a sitemap fetch is gated depends on who asked for it, so the three
+# cases below have to differ: one "robots is honoured" assertion would hide a
+# regression in either direction. The harness disables robots, hence -s2 here.
+
+# We guessed /sitemap.xml, so a Disallow on it wins.
+crawl --errors 0 \
+    --not-found 'sitemapdir/orphan1.html' \
+    --log-found 'Sitemap: robots.txt forbids' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 -s2 \
+    -F 'denysitemap-agent'
+
+# The site declared it through a Sitemap: line, which the same Disallow does
+# not retract.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --log-not-found 'Sitemap: robots.txt forbids' \
+    httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 -s2 \
+    -F 'denydeclared-agent'
+
+# The user named it, which is the same intent as a start URL: not refused
+# either, even though robots.txt forbids that exact path.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --log-not-found 'Sitemap: robots.txt forbids' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 -s2 -F 'denysitemap-agent' \
+    --sitemap-url 'BASEURL/sitemap.xml'
+
+# A child sitemap is a fetch like any other: a filter rejecting it stops the
+# whole subtree, so the page only it lists is never reached.
+crawl --errors 0 \
+    --not-found 'sitemapdir/gated.html' \
+    --log-found 'Sitemap: filter rule #[0-9]+ refuses' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 '-*filtered.xml*' \
+    --sitemap-url 'BASEURL/sitemapdir/gatedindex.xml'
+
+# Control: without that filter the same chain does reach the page.
+crawl --errors 0 \
+    --found 'sitemapdir/gated.html' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/gatedindex.xml'
+
+# A redirected sitemap is still ingested: the marking follows the 301.
+crawl --errors 0 \
+    --found 'sitemapdir/orphan1.html' \
+    --log-found 'moved\.xml redirects to .*pages\.xml\.gz' \
+    --log-found 'URL\(s\) added from 127\.0\.0\.1:[0-9]+/sitemapdir/pages\.xml\.gz' \
+    httrack 'BASEURL/sitemapdir/start.html' -r2 \
+    --sitemap-url 'BASEURL/sitemapdir/moved.xml'

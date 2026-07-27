@@ -101,8 +101,8 @@ static void htsweb_sig_brpipe(int code) {
   /* ignore */
 }
 
-/* Number of background threads */
-static int background_threads = 0;
+/* Threads that never return; no wait may count on them draining. */
+static int nonjoinable_threads = 0;
 
 /* Server/client ping handling */
 static htsmutex pingMutex = HTSMUTEX_INIT;
@@ -299,17 +299,19 @@ int main(int argc, char *argv[]) {
 
   /* pinger */
   if (parentPid > 0) {
-    hts_newthread(client_ping, (void *) (uintptr_t) parentPid);
-    background_threads++; /* Do not wait for this thread! */
+    if (hts_newthread(client_ping, (void *) (uintptr_t) parentPid) == 0) {
+#ifndef _WIN32
+      nonjoinable_threads++; /* client_ping() only ever leaves through exit() */
+#endif
+    }
     smallserver_setpinghandler(pingHandler, NULL);
   }
 
   /* launch */
   ret = help_server(argv[1], defaultPort, bindAddr);
 
-  /* background_threads is what we must NOT wait for; one less than that waits
-     for the pinger, which never returns (#753). */
-  htsthread_wait_n(background_threads);
+  /* Drain everything a mirror may still have in flight, the pinger aside. */
+  htsthread_wait_n(nonjoinable_threads);
   hts_uninit();
 
 #ifdef _WIN32
@@ -384,7 +386,6 @@ void webhttrack_main(char *cmd) {
   commandRunning = 1;
   DEBUG(fprintf(stderr, "commandRunning=1\n"));
   hts_newthread(back_launch_cmd, (void *) strdup(cmd));
-  background_threads++; /* Do not wait for this thread! */
 }
 
 void webhttrack_lock(void) {
@@ -425,8 +426,8 @@ static int webhttrack_runmain(httrackp * opt, int argc, char **argv) {
   /* Rock'in! */
   ret = hts_main2(argc, argv, opt);
 
-  /* Wait for pending threads to finish */
-  htsthread_wait_n(background_threads);
+  /* Wait for pending threads to finish; the pinger and this thread stay. */
+  htsthread_wait_n(nonjoinable_threads + 1);
 
   return ret;
 }

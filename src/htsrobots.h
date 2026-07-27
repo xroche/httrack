@@ -56,10 +56,12 @@ int checkrobots(robots_wizard * robots, const char *adr, const char *fil);
 void checkrobots_free(robots_wizard * robots);
 int checkrobots_set(robots_wizard * robots, const char *adr, const char *data);
 /* Parse robots.txt `body` for `adr`, storing the HTTrack group's rules; `info`
-   gets a disallow summary, `keep_root_disallow` FALSE drops "Disallow: /". */
+   gets a disallow summary, `keep_root_disallow` FALSE drops "Disallow: /", and
+   `sitemaps` (optional) collects the Sitemap: URLs, one per line. */
 void robots_parse(robots_wizard *robots, const char *adr, const char *body,
                   size_t bodysize, char *info, size_t infosize,
-                  hts_boolean keep_root_disallow);
+                  hts_boolean keep_root_disallow, char *sitemaps,
+                  size_t sitemapsize);
 #endif
 
 #endif

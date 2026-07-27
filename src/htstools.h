@@ -61,6 +61,11 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 int ident_url_relatif(const char *lien, const char *origin_adr,
                       const char *origin_fil,
                       lien_adrfil* const adrfil);
+/* Bounded substring search over data that may hold NUL bytes; NULL if absent.
+ */
+const char *hts_memstr(const char *hay, size_t haylen, const char *needle,
+                       size_t nlen);
+
 int lienrelatif(char *s, size_t ssize, const char *link, const char *curr);
 int link_has_authority(const char *lien);
 int link_has_authorization(const char *lien);

@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 En büyük gömülü kaynak (bayt):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Bu boyutun üzerindeki bir kaynak sýradan baðlantýsýný korur; 10485760 baytlýk varsayýlan için boþ býrakýn.
+Seed the crawl from the site's sitemap
+Taramayý sitenin site haritasýndan baþlat
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Sitenin site haritasýný oku (robots.txt içindeki Sitemap: satýrlarý, ardýndan /sitemap.xml) ve listelenen her URL'yi baþlangýç adresi olarak ekle.
+Sitemap address:
+Site haritasý adresi:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Siteyi yoklamak yerine okunacak site haritasýnýn adresi; robots.txt ve ardýndan /sitemap.xml yoklamasý için boþ býrakýn.

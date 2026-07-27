@@ -91,6 +91,7 @@ TESTS = \
 	01_engine-xfread.test \
 	01_zlib-acceptencoding.test \
 	01_zlib-warc.test \
+	01_zlib-sitemap.test \
 	01_zlib-warc-cdx.test \
 	01_zlib-warc-wacz.test \
 	01_zlib-contentcodings.test \
@@ -192,6 +193,7 @@ TESTS = \
 	91_webhttrack-directory.test \
 	92_local-proxytrack-ndx-fields.test \
 	93_local-changes.test \
-	94_local-single-file.test
+	94_local-single-file.test \
+	95_local-sitemap.test
 
 CLEANFILES = check-network_sh.cache

@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Eng katta joylangan resurs (bayt):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Bu o’lchamdan katta resurs oddiy havolani saqlab qoladi; standart 10485760 bayt uchun bo’sh qoldiring.
+Seed the crawl from the site's sitemap
+Yig’ishni saytning sayt xaritasidan boshlash
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Saytning sayt xaritasini o’qish (robots.txt dagi Sitemap: qatorlari, so’ngra /sitemap.xml) va unda ko’rsatilgan har bir URL manzilni boshlang’ich manzil sifatida qo’shish.
+Sitemap address:
+Sayt xaritasi manzili:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Saytni tekshirish o’rniga o’qiladigan sayt xaritasi manzili; robots.txt, so’ngra /sitemap.xml ni tekshirish uchun bo’sh qoldiring.

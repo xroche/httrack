@@ -1833,6 +1833,26 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   }
                 }
                 break;
+              case 'm': // sitemap / sitemap-url: seed the crawl from sitemaps
+                if (*(com + 1) == 'u') { // --sitemap-url URL: explicit sitemap
+                  com++;
+                  if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                    HTS_PANIC_PRINTF(
+                        "Option sitemap-url needs a blank space and a URL");
+                    htsmain_free();
+                    return -1;
+                  }
+                  na++;
+                  if (strlen(argv[na]) >= HTS_URLMAXSIZE) {
+                    HTS_PANIC_PRINTF("Sitemap URL too long");
+                    htsmain_free();
+                    return -1;
+                  }
+                  StringCopy(opt->sitemap_url, argv[na]);
+                } else { // --sitemap: robots.txt probe, then /sitemap.xml
+                  opt->sitemap = HTS_TRUE;
+                }
+                break;
               case 'Y': // why: explain the filter verdict for a URL, no crawl
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                   HTS_PANIC_PRINTF("Option why needs a blank space and a URL");

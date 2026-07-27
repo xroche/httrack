@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Suurim manustatud ressurss (baiti):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Sellest suurem ressurss säilitab tavalise lingi; jäta tühjaks vaikeväärtuse 10485760 baiti jaoks.
+Seed the crawl from the site's sitemap
+Alusta kogumist saidi saidikaardist
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Loe saidi saidikaarti (robots.txt-i Sitemap:-read, seejärel /sitemap.xml) ja lisa iga seal loetletud URL alguslingina.
+Sitemap address:
+Saidikaardi aadress:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Saidikaardi aadress, mida lugeda saidi sondeerimise asemel; jäta tühjaks, et kontrollida robots.txt-i ja seejärel /sitemap.xml-i.

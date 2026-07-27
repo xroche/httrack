@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Најголем вграден ресурс (бајти):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Ресурс поголем од оваа големина задржува обична врска; оставете празно за стандардните 10485760 бајти.
+Seed the crawl from the site's sitemap
+Започни го пребарувањето од картата на сајтот
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+Прочитај ја картата на сајтот (редовите Sitemap: во robots.txt, потоа /sitemap.xml) и додај ја секоја наведена URL адреса како почетна.
+Sitemap address:
+Адреса на картата на сајтот:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Адреса на карта на сајтот што треба да се прочита наместо испитување на сајтот; оставете празно за да се испита robots.txt, па /sitemap.xml.

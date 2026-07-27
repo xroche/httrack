@@ -151,6 +151,23 @@ static hts_boolean is_embed_pair(const htspair_t *table, const char *tag,
   return HTS_FALSE;
 }
 
+/* The engine's robots.txt verdict for (adr,fil). Under HTS_ROBOTS_SOMETIMES an
+   explicit filter acceptance overrides the ban, which is why the filter outcome
+   is an input; the sitemap fetcher asks the same question outside the wizard.
+ */
+hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
+                               hts_boolean filters_decided,
+                               hts_boolean filters_refused) {
+  if (!opt->robots || opt->robotsptr == NULL)
+    return HTS_FALSE;
+  if (checkrobots((robots_wizard *) opt->robotsptr, adr, fil) != -1)
+    return HTS_FALSE;
+  if (filters_decided && !filters_refused &&
+      opt->robots == HTS_ROBOTS_SOMETIMES)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
 static int hts_acceptlink_(httrackp * opt, int ptr,
                            const char *adr, const char *fil, const char *tag,
                            const char *attribute, int *set_prio_to,
@@ -576,30 +593,26 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       }
     }
     // vérifier robots.txt
-    if (opt->robots) {
-      int r = checkrobots(_ROBOTS, adr, fil);
-
-      if (r == -1) {            // interdiction
+    if (opt->robots && checkrobots(_ROBOTS, adr, fil) == -1) {
 #if DEBUG_ROBOTS
-        printf("robots.txt forbidden: %s%s\n", adr, fil);
+      printf("robots.txt forbidden: %s%s\n", adr, fil);
 #endif
-        // question résolue, par les filtres, et mode robot non strict
-        if ((!question) && (filters_answer) &&
-            (opt->robots == HTS_ROBOTS_SOMETIMES) && (forbidden_url != 1)) {
-          r = 0;                // annuler interdiction des robots
-          if (!forbidden_url) {
-            hts_log_print(opt, LOG_DEBUG,
-                          "Warning link followed against robots.txt: link %s at %s%s",
-                          l, adr, fil);
-          }
+      if (!hts_robots_forbids(opt, adr, fil,
+                              (!question && filters_answer) ? HTS_TRUE
+                                                            : HTS_FALSE,
+                              (forbidden_url == 1) ? HTS_TRUE : HTS_FALSE)) {
+        if (!forbidden_url) {
+          hts_log_print(
+              opt, LOG_DEBUG,
+              "Warning link followed against robots.txt: link %s at %s%s", l,
+              adr, fil);
         }
-        if (r == -1) {          // interdire
-          forbidden_url = 1;
-          question = 0;
-          hts_log_print(opt, LOG_DEBUG,
-                        "(robots.txt) forbidden link: link %s at %s%s", l, adr,
-                        fil);
-        }
+      } else {
+        forbidden_url = 1;
+        question = 0;
+        hts_log_print(opt, LOG_DEBUG,
+                      "(robots.txt) forbidden link: link %s at %s%s", l, adr,
+                      fil);
       }
     }
 

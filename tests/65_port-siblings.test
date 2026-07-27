@@ -80,11 +80,9 @@ done
 web_accepted 65535
 
 # --- htsserver returns from main() instead of blocking at exit -------------
-# The exit wait must exclude exactly the threads that never return (#753). It
-# excluded one more than that: with no --ppid pinger to exclude it asked for a
-# negative count, which the counter can never reach, and with one it waited on
-# the pinger itself. $tmp holds no lang.def, so the server fails right after it
-# announces and main() reaches the wait on its own.
+# The exit wait must exclude exactly the threads that never return (#753).
+# $tmp has no lang.def, so the server fails right after announcing and main()
+# reaches the wait on its own; rc, not EXITED, carries the verdict.
 
 web_exits() {
     local rc=0
@@ -93,8 +91,10 @@ web_exits() {
     run_with_timeout 30 htsserver "$tmp" "$@" >"$tmp/exit.log" 2>&1 || rc=$?
     grep -q "^EXITED" "$tmp/exit.log" ||
         ! echo "FAIL: #753: htsserver ${*:-(no options)} never finished serving" || exit 1
-    test "$rc" -ne 124 ||
-        ! echo "FAIL: #753: htsserver ${*:-(no options)} hung at exit" || exit 1
+    # exactly 1, not merely "not 124": a crash or an assertf abort also escapes
+    # the wait, and would otherwise read as a pass
+    test "$rc" -eq 1 ||
+        ! echo "FAIL: #753: htsserver ${*:-(no options)} exited $rc, want 1" || exit 1
 }
 
 # no pinger: the excluded count went negative

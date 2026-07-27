@@ -976,3 +976,11 @@ Largest inlined asset (bytes):
 Grootste ingesloten bron (bytes):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
 Een bron boven deze grootte houdt een gewone koppeling; laat leeg voor de standaardwaarde van 10485760 bytes.
+Seed the crawl from the site's sitemap
+De crawl starten vanaf de sitemap van de site
+Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
+De sitemap van de site lezen (Sitemap:-regels in robots.txt, daarna /sitemap.xml) en elke vermelde URL als startadres toevoegen.
+Sitemap address:
+Sitemap-adres:
+Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
+Adres van een sitemap die gelezen moet worden in plaats van de site te onderzoeken; laat leeg om robots.txt en daarna /sitemap.xml te controleren.
