@@ -627,7 +627,12 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin \
             "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
-          base="origin/${{ github.base_ref }}"
+          # Merge base, not the branch tip: master moves during a run, and a
+          # tip-relative diff blames its new C on this PR.
+          if ! base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"; then
+            echo "::error::no merge base with origin/${{ github.base_ref }}; cannot scope the check."
+            exit 1
+          fi
           set +e
           diff="$(git clang-format --binary clang-format-19 --style=file \
                     --diff --extensions c,h "$base")"
@@ -669,6 +674,8 @@ jobs:
           git fetch --no-tags origin \
             "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
           base="origin/${{ github.base_ref }}"
+          # Three dots: merge-base scoped, so commits landing on master mid-run
+          # are not counted as this PR's.
           changed="$(git diff --name-only "$base"...HEAD)"
           has() { printf '%s\n' "$changed" | grep -qx "$1"; }
           if has man/httrack.1 && ! has html/httrack.man.html; then
