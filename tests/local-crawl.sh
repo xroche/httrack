@@ -17,6 +17,7 @@
 #       --errors N --errors-content N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
 #       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
+#       --cache-found URLTAIL ... --cache-not-found URLTAIL ... \
 #       --file-min-bytes PATH N --file-mode PATH OCTAL --max-mirror-bytes N \
 #       httrack BASEURL/some/path [httrack-args...]
 # --errors counts every "Error:" log line; --errors-content drops transient
@@ -25,6 +26,9 @@
 # --max/--min-mirror-bytes bound the mirrored content bytes (host root).
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
 # host root), to assert rewritten link/content survived the crawl.
+# --cache-found/--cache-not-found assert whether hts-cache/new.zip holds an
+# entry whose URL ends with URLTAIL, e.g. /dir/page.html; being mirrored and
+# being cached are separate outcomes (#840).
 # --file-min-bytes asserts a mirrored file (PATH) is at least N bytes.
 # --file-mode asserts its octal permissions (e.g. 644); POSIX hosts only.
 # --rerun-args runs a second pass (same server and mirror dir) with the given
@@ -110,6 +114,23 @@ function find_hostroot {
         fi
     done
     die "could not find host root under $out"
+}
+
+# Does the cache hold an entry whose URL ends with $1? An unreadable index is a
+# hard failure, else --cache-not-found would pass on a cache that never existed.
+function cache_has {
+    local rc
+    "$python" -c '
+import sys, zipfile
+try:
+    names = zipfile.ZipFile(sys.argv[1]).namelist()
+except Exception:
+    sys.exit(2)
+sys.exit(0 if any(n.endswith(sys.argv[2]) for n in names) else 1)
+' "${logroot}/hts-cache/new.zip" "$1"
+    rc=$?
+    test "$rc" -le 1 || die "cannot read cache index ${logroot}/hts-cache/new.zip"
+    return "$rc"
 }
 
 function assert_equals {
@@ -200,7 +221,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --found | --not-found | --directory | --log-found | --log-not-found | --max-mirror-bytes | --min-mirror-bytes)
+    --found | --not-found | --directory | --log-found | --log-not-found | --max-mirror-bytes | --min-mirror-bytes | --cache-found | --cache-not-found)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
@@ -590,6 +611,22 @@ while test "$i" -lt "${#audit[@]}"; do
             result "cache not under logroot (mangled twin?)"
             exit 1
         fi
+        ;;
+    --cache-found)
+        i=$((i + 1))
+        info "checking cache holds ${audit[$i]}"
+        if cache_has "${audit[$i]}"; then result "OK"; else
+            result "not cached"
+            exit 1
+        fi
+        ;;
+    --cache-not-found)
+        i=$((i + 1))
+        info "checking cache lacks ${audit[$i]}"
+        if cache_has "${audit[$i]}"; then
+            result "cached"
+            exit 1
+        else result "OK"; fi
         ;;
     --found)
         i=$((i + 1))

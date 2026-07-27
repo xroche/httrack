@@ -791,9 +791,8 @@ hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
   return commit == wanted ? HTS_TRUE : HTS_FALSE;
 }
 
-/* The terminating zero-length chunk is part of the framing, so a stream that
-   ended without it is truncated by definition (#840). chunk_blocksize is reset
-   per response and only reaches -1 once that chunk header was parsed. */
+/* A chunked body is framed by its terminating zero-length chunk (#840);
+   chunk_blocksize is reset per response and reaches -1 only once it is seen. */
 static hts_boolean back_chunked_unterminated(const lien_back *const back) {
   return back->is_chunk && back->chunk_blocksize != -1 ? HTS_TRUE : HTS_FALSE;
 }
@@ -3555,7 +3554,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
             /* Same treatment for an unterminated chunked stream: the byte count
                agrees with the chunks that arrived, the framing does not. */
-            if (back_chunked_unterminated(&back[i])) {
+            if (back[i].r.statuscode > 0 &&
+                back_chunked_unterminated(&back[i])) {
               if (!opt->tolerant) {
                 deleteaddr(&back[i].r);
                 back[i].r.statuscode = STATUSCODE_CONNERROR; // recatch
@@ -3634,9 +3634,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     if (sscanf(chunk_data, "%x", &chunk_size) == 1) {
                       if (chunk_size > 0)
                         back[i].chunk_blocksize = chunk_size;   /* the data block chunk size */
-                      /* an illegal negative size must leave the sentinel unset,
-                         so the stream still reads as truncated (#840) */
-                      else if (chunk_size == 0)
+                      else
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
                       if (back[i].r.adr != NULL || !back[i].r.is_write) {       // Not to disk
