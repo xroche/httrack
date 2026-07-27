@@ -230,6 +230,7 @@ TESTS = \
 	105_suite-timeout.test \
 	110_local-ftp-parallel.test \
 	111_local-ftp-update-rest.test \
+	114_local-update-304-leak.test \
 	117_local-proxytrack-ndx-cursor.test
 
 CLEANFILES = check-network_sh.cache
