@@ -855,13 +855,6 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
   return r;
 }
 
-// lecture d'un fichier dans le cache
-// si save==null alors test unqiquement
-static int hts_rename(httrackp * opt, const char *a, const char *b) {
-  hts_log_print(opt, LOG_DEBUG, "Cache: rename %s -> %s (%p %p)", a, b, a, b);
-  return RENAME(a, b);
-}
-
 /* Open the cache ZIP via hts_fopen_utf8 so a non-ASCII path_log isn't mangled
    to ANSI (#630); 64-bit funcs keep multi-GB caches whole on Windows LLP64. */
 static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const void *filename,
@@ -991,29 +984,16 @@ void cache_init(cache_back * cache, httrackp * opt) {
               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
               StringBuff(opt->path_log),
               "hts-cache/new.zip")))) { // a previous cache exists.. rename it
-        /* Remove OLD cache */
-        if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                StringBuff(opt->path_log),
-                                "hts-cache/old.zip"))) {
-          if (UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                             StringBuff(opt->path_log), "hts-cache/old.zip")) !=
-              0) {
-            hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                          "Cache: error while moving previous cache");
-          }
-        }
-
-        /* Rename */
-        if (hts_rename
-            (opt,
-             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                     "hts-cache/new.zip"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                                   StringBuff(opt->path_log),
-                                                   "hts-cache/old.zip")) != 0) {
+        /* hts_rename_over() drops any leftover old.zip itself. */
+        if (!hts_rename_over(
+                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                        StringBuff(opt->path_log), "hts-cache/new.zip"),
+                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                        StringBuff(opt->path_log), "hts-cache/old.zip"))) {
           hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                         "Cache: error while moving previous cache");
         } else {
-          hts_log_print(opt, LOG_DEBUG, "Cache: successfully renamed");
+          hts_log_print(opt, LOG_DEBUG, "Cache: rotated new.zip to old.zip");
         }
       }
     } else {

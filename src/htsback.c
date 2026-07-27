@@ -3150,10 +3150,18 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                */
                               back[i].tmpfile = NULL;
                               if (fexist_utf8(back[i].url_sav)) {
+                                /* clobber a .bak a killed run left behind:
+                                   refusing it disables the guard for good
+                                   (#758) */
                                 if (create_back_tmpfile(opt, &back[i], "bak") !=
                                         0 ||
-                                    RENAME(back[i].url_sav, back[i].tmpfile) !=
-                                        0) {
+                                    !hts_rename_over(back[i].url_sav,
+                                                     back[i].tmpfile)) {
+                                  hts_log_print(
+                                      opt, LOG_WARNING | LOG_ERRNO,
+                                      "could not back up %s; an aborted "
+                                      "re-fetch will lose it",
+                                      back[i].url_sav);
                                   back[i].tmpfile = NULL;
                                 }
                               }
