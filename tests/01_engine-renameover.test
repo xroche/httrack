@@ -4,8 +4,8 @@
 set -euo pipefail
 
 # Drives -#test=renameover: hts_rename_over() must replace an existing dst, and
-# must leave dst alone when the rename failed for a reason removing dst cannot
-# fix (#779). The selftest prints the regime it detected; pin it per platform so
+# must leave dst alone when the rename failed for a reason moving dst aside
+# cannot fix (#779, #790). The selftest prints the regime it detected; pin it per platform so
 # a leg cannot pass having tested the other half.
 dir=$(mktemp -d)
 trap 'set +e; rm -rf "$dir"' EXIT
@@ -42,7 +42,7 @@ fi
 # refuses by default. The shim allocates nothing, so the ordering is harmless.
 export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
 
-# The unlink fallback is dead code on POSIX, so borrow Windows' rename().
+# The aside fallback is dead code on POSIX, so borrow Windows' rename().
 out=$(LD_PRELOAD="$RENAMEFAIL_LIB" httrack -O /dev/null \
     -#test=renameover "$dir")
 echo "$out" | grep -q "renameover: OK"

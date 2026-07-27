@@ -1,5 +1,5 @@
 /* Borrows Windows' rename() for 01_engine-renameover.test, since POSIX cannot
-   reach hts_rename_over()'s unlink fallback: an existing target is refused with
+   reach hts_rename_over()'s aside fallback: an existing target is refused with
    EEXIST, and RENAMEFAIL_MODE=locked reports EACCES instead, as the CRT does
    for a source another process holds. */
 

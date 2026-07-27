@@ -6137,7 +6137,7 @@ static hts_boolean ro_is(const char *path, const char *data) {
 }
 
 // -#test=renameover <dir>: hts_rename_over() must replace an existing dst and
-// never delete one it did not replace (#779). Which half is live depends on
+// never lose one it did not replace (#779, #790). Which half is live depends on
 // what rename() does to an existing target, so probe that and name the regime.
 static int st_renameover(httrackp *opt, int argc, char **argv) {
   (void) opt;
@@ -6208,6 +6208,60 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
     err++;
   }
 
+  /* The aside fallback, driven directly: a clobbering rename() never reaches
+     it. Skipped in the refused regime, where no rename at all succeeds. */
+  if (replaceable) {
+    char aside[sizeof(dst) + 16], keep[sizeof(dst) + 16];
+
+    snprintf(aside, sizeof(aside), "%s.hts-old0", dst);
+    snprintf(keep, sizeof(keep), "%s.hts-old1", dst);
+    (void) UNLINK(aside);
+    (void) UNLINK(keep);
+    ro_put(src, "new");
+    ro_put(dst, "old");
+    if (!hts_rename_over_aside_selftest(src, dst)) {
+      fprintf(stderr, "renameover: the aside fallback failed: %s\n",
+              strerror(errno));
+      err++;
+    } else if (!ro_is(dst, "new") || fexist_utf8(src) || fexist_utf8(aside)) {
+      fprintf(stderr, "renameover: the aside fallback did not replace dst\n");
+      err++;
+    }
+
+    /* #790: the retry fails (no src). dst must come back, not vanish. */
+    (void) UNLINK(src);
+    ro_put(dst, "old");
+    if (hts_rename_over_aside_selftest(src, dst)) {
+      fprintf(stderr, "renameover: a failed aside retry reported success\n");
+      err++;
+    }
+    if (!ro_is(dst, "old")) {
+      fprintf(stderr, "renameover: a failed aside retry lost dst\n");
+      err++;
+    }
+    if (fexist_utf8(aside)) {
+      fprintf(stderr,
+              "renameover: a failed aside retry left the parked copy\n");
+      err++;
+    }
+
+    /* An unrelated file already sitting on the aside name must survive. */
+    ro_put(src, "new");
+    ro_put(aside, "mine");
+    if (!hts_rename_over_aside_selftest(src, dst)) {
+      fprintf(stderr, "renameover: a taken aside name failed the move: %s\n",
+              strerror(errno));
+      err++;
+    } else if (!ro_is(dst, "new") || !ro_is(aside, "mine") ||
+               fexist_utf8(keep)) {
+      fprintf(stderr, "renameover: a taken aside name was not skipped\n");
+      err++;
+    }
+    (void) UNLINK(aside);
+    (void) UNLINK(keep);
+  }
+
+  (void) UNLINK(src);
   (void) UNLINK(dst);
   printf("renameover: %s\n", err ? "FAIL" : "OK");
   return err;

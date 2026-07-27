@@ -1438,6 +1438,39 @@ HTSEXT_API hts_boolean hts_findissystem(find_handle find) {
   return 0;
 }
 
+/* Free scratch name beside dst to park it under. */
+static hts_boolean rename_aside_name(char *dest, size_t size, const char *dst) {
+  int i;
+
+  for (i = 0; i < 16; i++) {
+    if ((size_t) snprintf(dest, size, "%s.hts-old%d", dst, i) >= size)
+      return HTS_FALSE;
+    if (!fexist(dest))
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* dst is in the way of the move: park it, retry, and put it back if the retry
+   fails too. Unlinking it instead would leave nothing at all (#790). */
+static hts_boolean rename_over_aside(const char *csrc, const char *cdst) {
+  char caside[CATBUFF_SIZE];
+  int err;
+
+  if (!rename_aside_name(caside, sizeof(caside), cdst))
+    return HTS_FALSE;
+  if (RENAME(cdst, caside) != 0)
+    return HTS_FALSE;
+  if (RENAME(csrc, cdst) == 0) {
+    (void) UNLINK(caside);
+    return HTS_TRUE;
+  }
+  err = errno;
+  (void) RENAME(caside, cdst);
+  errno = err;
+  return HTS_FALSE;
+}
+
 hts_boolean hts_rename_over(const char *src, const char *dst) {
   char csrc[CATBUFF_SIZE], cdst[CATBUFF_SIZE];
 
@@ -1445,14 +1478,21 @@ hts_boolean hts_rename_over(const char *src, const char *dst) {
   fconv(cdst, sizeof(cdst), dst);
   if (RENAME(csrc, cdst) == 0)
     return HTS_TRUE;
-  /* Only a dst in the way is something the unlink can clear, and the CRT maps
-     that to EEXIST; it keeps EACCES for a src another process holds, where
-     removing dst would lose a file the retry cannot replace (#790). The src
-     check covers a CRT that reports neither. */
+  /* Only a dst in the way is something the fallback can clear, and the CRT maps
+     that to EEXIST; it keeps EACCES for a src another process holds, where the
+     retry would fail the same way. The src check covers a CRT that reports
+     neither. */
   const int err = errno;
 
   if (err != EEXIST || !fexist_utf8(src))
     return HTS_FALSE;
-  (void) UNLINK(cdst);
-  return RENAME(csrc, cdst) == 0 ? HTS_TRUE : HTS_FALSE;
+  return rename_over_aside(csrc, cdst);
+}
+
+hts_boolean hts_rename_over_aside_selftest(const char *src, const char *dst) {
+  char csrc[CATBUFF_SIZE], cdst[CATBUFF_SIZE];
+
+  fconv(csrc, sizeof(csrc), src);
+  fconv(cdst, sizeof(cdst), dst);
+  return rename_over_aside(csrc, cdst);
 }
