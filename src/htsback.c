@@ -483,12 +483,14 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
-        char BIGSTK tmpname[HTS_URLMAXSIZE * 2];
+        /* +16: room for the ".tmp" the url_sav form appends to a full-length
+           save name, so one buffer holds both shapes */
+        char BIGSTK tmpname[HTS_URLMAXSIZE * 2 + 16];
         char *filename;
         hts_boolean named;
 
-        /* The path_html form is not derived from url_sav, so a buffer sized
-           from url_sav overran it whenever -p0 selected that branch. */
+        /* the -p0 name is not derived from url_sav, so it needs a buffer of
+           its own size rather than the save name's */
         if (opt->getmode != 0) {
           named =
               slprintfbuff(tmpname, sizeof(tmpname), "%s.tmp", back[i].url_sav);
