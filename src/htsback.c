@@ -1283,6 +1283,7 @@ void back_connxfr(htsblk * src, htsblk * dst) {
   src->keep_alive_t = 0;
   dst->debugid = src->debugid;
   src->debugid = 0;
+  dst->address = src->address; // peer IP survives the cache-entry swap (#838)
 }
 
 /* Release the buffers a response owns. The connection members are left alone:
@@ -2138,6 +2139,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                             back[p].url_adr, back[p].url_fil);
             }
             back[p].r.notmodified = 1;  // fichier non modifié
+            // no request was sent at all, so this is never a server 304 (#839)
+            back[p].r.warc_forced_notmodified = HTS_TRUE;
             back[p].status = STATUS_READY; // OK prêt
             back_set_finished(sback, p);
 
@@ -4184,6 +4187,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       back[i].status = STATUS_READY;    // OK prêt
                       back_set_finished(sback, i);
                       back[i].r.notmodified = 1;        // NON modifié!
+                      // WARC must not claim a 304 the server never sent (#839)
+                      back[i].r.warc_forced_notmodified =
+                          server_sent_304 ? HTS_FALSE : HTS_TRUE;
                       hts_log_print(opt, LOG_DEBUG,
                                     "File loaded after test from cache: %s%s",
                                     back[i].url_adr, back[i].url_fil);

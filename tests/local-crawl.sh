@@ -463,6 +463,11 @@ debug "host root: $hostroot"
 # --- optional WARC validation (stdlib validator, no warcio) ------------------
 # WARC_VALIDATE_BODY="URLSUB=HEX" byte-checks a fresh-crawl response body;
 # WARC_VALIDATE_NORESP="URLSUB..." asserts those assets are revisits post-update;
+# WARC_VALIDATE_NORECORD="URLSUB..." asserts those assets have no record at all;
+# WARC_VALIDATE_IP="URLSUB=IP..." asserts the exact WARC-IP-Address on the record;
+# WARC_VALIDATE_PROFILE="URLSUB=SUBSTR..." asserts a revisit's WARC-Profile;
+# WARC_VALIDATE_NO_REVISIT=1 skips the "at least one revisit" requirement (a
+# no-OpenSSL leg where the only unchanged assets end up with no record at all);
 # WARC_VALIDATE_EXCHANGE=1 asserts each revisit carries its 304 request/response.
 if test -n "$warc_validate"; then
     validator=$(nativepath "${testdir}/warc-validate.py")
@@ -494,9 +499,19 @@ if test -n "$warc_validate"; then
     if test -n "${WARC_VALIDATE_UPDATE:-}"; then
         upd=$(find "$mirrorroot" -maxdepth 2 -name "$WARC_VALIDATE_UPDATE" 2>/dev/null | head -n1)
         test -n "$upd" || die "no $WARC_VALIDATE_UPDATE produced under $mirrorroot"
-        declare -a revargs=(--expect-revisit)
+        declare -a revargs=()
+        test -z "${WARC_VALIDATE_NO_REVISIT:-}" && revargs+=(--expect-revisit)
         for sub in ${WARC_VALIDATE_NORESP:-}; do
             revargs+=(--no-response-for "$sub")
+        done
+        for sub in ${WARC_VALIDATE_NORECORD:-}; do
+            revargs+=(--no-record-for "$sub")
+        done
+        for spec in ${WARC_VALIDATE_IP:-}; do
+            revargs+=(--expect-ip "$spec")
+        done
+        for spec in ${WARC_VALIDATE_PROFILE:-}; do
+            revargs+=(--expect-revisit-profile "$spec")
         done
         test -n "${WARC_VALIDATE_EXCHANGE:-}" && revargs+=(--revisit-exchange)
         info "validating update WARC (revisits)"

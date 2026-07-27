@@ -1,0 +1,37 @@
+#!/bin/bash
+# An engine-forced not-modified is not a 304 the server sent (#839).
+set -eu
+
+: "${top_srcdir:=..}"
+
+# Scenario 1: real 304 (mini304) and engine-forced (errmask) side by side.
+export WARC_VALIDATE_UPDATE="warc-forced.warc.gz"
+export WARC_VALIDATE_EXCHANGE=1
+if test "${HTTPS_SUPPORT:-}" = "no"; then
+    # no OpenSSL: no payload digest to point a revisit at, so no record.
+    export WARC_VALIDATE_NORESP="mini304/index.html mini304/page.html"
+    export WARC_VALIDATE_NORECORD="errmask/keep.dat errmask/empty.dat"
+    export WARC_VALIDATE_PROFILE="mini304/index.html=server-not-modified mini304/page.html=server-not-modified"
+else
+    # empty.dat is a genuinely zero-length body: it still has a well-defined
+    # digest and must get its own revisit, not fall into the no-crypto case.
+    export WARC_VALIDATE_NORESP="mini304/index.html mini304/page.html errmask/keep.dat errmask/empty.dat"
+    export WARC_VALIDATE_PROFILE="mini304/index.html=server-not-modified mini304/page.html=server-not-modified errmask/keep.dat=identical-payload-digest errmask/empty.dat=identical-payload-digest"
+fi
+
+bash "$top_srcdir/tests/local-crawl.sh" --warc-validate \
+    --rerun-args '--warc-file warc-forced' \
+    --found 'mini304/index.html' --found 'mini304/page.html' \
+    --found 'errmask/keep.dat' --found 'errmask/empty.dat' \
+    --file-matches 'errmask/keep.dat' '^KEEP' \
+    --file-not-matches 'errmask/keep.dat' 'error 403' \
+    httrack 'BASEURL/mini304/index.html' 'BASEURL/errmask/index.html' --warc-file warc-out
+
+# Scenario 2: an all-forced pass, same archive name as pass 1, must not
+# replace the previous archive with an (almost) empty one (#777's shape).
+# No --wacz: that needs OpenSSL and would skip this scenario on a build
+# without it, hiding the one thing it exists to catch.
+bash "$top_srcdir/tests/local-crawl.sh" --archive-kept-on-rerun \
+    --archive-min-files 2 --rerun \
+    --found 'errmask/keep.dat' \
+    httrack 'BASEURL/errmask/index.html' --warc-file warc-out --warc-cdx
