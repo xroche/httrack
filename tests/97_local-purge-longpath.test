@@ -53,6 +53,15 @@ test -n "$port" || {
 prefix="127.0.0.1_${port}/"
 need=$((998 - ${#prefix}))
 
+# macOS caps PATH_MAX at 1024, so neither the docroot nor the mirror can hold a
+# 998-byte path, and httrack's own HTS_MAX_PATH_LEN clamps below it too. The
+# trigger is simply not reachable there.
+pathmax=$(getconf PATH_MAX / 2>/dev/null || echo 4096)
+test "$pathmax" -ge $((need + ${#work} + 128)) || {
+    echo "PATH_MAX $pathmax too small for a $need-byte path; skipping" >&2
+    exit 77
+}
+
 urlpath=""
 while test $((need - ${#urlpath})) -gt 60; do
     urlpath="${urlpath}$(printf 'd%02d' ${#urlpath})$(printf 'a%.0s' $(seq 1 46))/"
