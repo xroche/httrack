@@ -1050,9 +1050,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 if (!linput(fp, line, sizeof(line) - 2)) {
                   *str = '\0';
                 }
-                if (*str && str[strlen(str) - 1] == '\\') {
+                if (hts_lastchar(str) == '\\') {
                   nocr = 1;
-                  str[strlen(str) - 1] = '\0';
+                  hts_striplastchar(str, '\\');
                 }
                 while(*str) {
                   char *pos;
@@ -1169,11 +1169,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           char *rpath = (char *) adr;
 
                           //find_handle h;
-                          if (rpath[0]) {
-                            if (rpath[strlen(rpath) - 1] == '/') {
-                              rpath[strlen(rpath) - 1] = '\0';  /* note: patching stored (inhash) value */
-                            }
-                          }
+                          /* note: patching stored (inhash) value */
+                          hts_striplastchar(rpath, '/');
                           {
                             const char *profiles = hts_getcategories(rpath, 0);
                             const char *categ = hts_getcategories(rpath, 1);
