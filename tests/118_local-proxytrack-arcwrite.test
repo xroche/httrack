@@ -71,7 +71,8 @@ build_arc() {
     } >"$dir/in.arc"
 }
 
-# Convert $dir/in.arc and check the emitted record, $1 naming the case.
+# Convert $dir/in.arc and check the emitted record, $1 naming the case. Sets
+# last_alen to the record's declared length.
 convert_check() {
     local rec off alen total dataoff
     proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 ||
@@ -91,11 +92,15 @@ convert_check() {
     printf '\r\n\r\n%s' "$BODY" >"$dir/want.tail"
     cmp -s "$dir/got.tail" "$dir/want.tail" ||
         fail "$1: header block does not end on a blank line"
+    last_alen=$alen
 }
 
 # Control: nothing overshoots, so a broken probe cannot pass as a clean bound.
+last_alen=0
 build_arc OK "" 0
 convert_check "short entry"
+# what the writer adds on its own, so the sweep below can bracket the cap
+fixed=$((last_alen - ${#BODY}))
 
 # The reported bug: 12000 bytes wrap "sizeof - strlen - 1", so the guard passes.
 build_arc OK "" 12000
@@ -113,7 +118,7 @@ test "${got:-0}" = 1500 || fail "location kept ${got:-0} bytes, expected 1500"
 
 # An off-by-one in the room held back for the closing blank line shows up only
 # on the exact boundary, so walk the block across its cap byte by byte.
-for n in $(seq 7950 8250); do
+for n in $(seq $((HDRMAX - fixed - 32)) $((HDRMAX - fixed + 32))); do
     build_arc OK "" "$n"
     convert_check "passthrough of $n bytes"
 done
