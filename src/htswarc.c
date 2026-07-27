@@ -169,6 +169,7 @@ static int wbuf_printf(wbuf *b, const char *fmt, ...) HTS_PRINTF_FUN(2, 3);
    wbuf itself rather than rejected (#785). */
 static int wbuf_printf(wbuf *b, const char *fmt, ...) {
   char tmp[1024];
+  size_t need;
   int n;
   va_list ap;
   va_start(ap, fmt);
@@ -178,12 +179,14 @@ static int wbuf_printf(wbuf *b, const char *fmt, ...) {
     return -1;
   if ((size_t) n < sizeof(tmp))
     return wbuf_add(b, tmp, (size_t) n);
-  if (wbuf_reserve(b, (size_t) n + 1) != 0) /* +1: vsnprintf writes the NUL */
+  need = (size_t) n + 1; /* +1: vsnprintf always writes the NUL */
+  if (wbuf_reserve(b, need) != 0)
     return -1;
   va_start(ap, fmt);
-  n = vsnprintf(b->data + b->len, (size_t) n + 1, fmt, ap);
+  n = vsnprintf(b->data + b->len, need, fmt, ap);
   va_end(ap);
-  if (n < 0)
+  /* Never advance past what was reserved, whatever the second pass returns. */
+  if (n < 0 || (size_t) n >= need)
     return -1;
   b->len += (size_t) n; /* the NUL is scratch, overwritten by the next append */
   return 0;
