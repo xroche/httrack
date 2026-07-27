@@ -1428,3 +1428,15 @@ HTSEXT_API hts_boolean hts_findissystem(find_handle find) {
   }
   return 0;
 }
+
+hts_boolean hts_rename_over(const char *src, const char *dst) {
+  char csrc[CATBUFF_SIZE], cdst[CATBUFF_SIZE];
+
+  fconv(csrc, sizeof(csrc), src);
+  fconv(cdst, sizeof(cdst), dst);
+  if (RENAME(csrc, cdst) == 0)
+    return HTS_TRUE;
+  /* RENAME does not clobber an existing target on Windows. */
+  (void) UNLINK(cdst);
+  return RENAME(csrc, cdst) == 0 ? HTS_TRUE : HTS_FALSE;
+}
