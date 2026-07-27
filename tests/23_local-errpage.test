@@ -13,7 +13,10 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
     --not-found 'errpage/missing.html' \
     httrack 'BASEURL/errpage/index.html' '-o0'
 
-# Control -o1 (default): the 404 error page is written.
+# Control -o1 (default): the 404 body is the server's verbatim, no HTTrack marker (#787); good.html proves the marker check can fire.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 1 \
     --found 'errpage/missing.html' \
+    --file-matches 'errpage/missing.html' '404 error body' \
+    --file-not-matches 'errpage/missing.html' 'HTTrack' \
+    --file-matches 'errpage/good.html' 'HTTrack' \
     httrack 'BASEURL/errpage/index.html' '-o1'

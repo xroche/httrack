@@ -50,7 +50,7 @@ httrack "file://$deep/index.html" -O "$mir" -%F "$footer" -q -s0 -%v0 \
 
 # The crawled page must exist (proves the URL wasn't rejected for length, so the
 # footer path ran). Look under file/, not $mir, to skip the makeindex top index.
-find "$mir/file" -name index.html | grep -q . || {
+test -n "$(find "$mir/file" -name index.html)" || {
     echo "page not mirrored; the oversized-footer path was not exercised" >&2
     exit 1
 }
