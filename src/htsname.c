@@ -1851,4 +1851,3 @@ hts_boolean url_savename_refname_remove(httrackp *opt, const char *adr,
 
   return UNLINK(filename) == 0 ? HTS_TRUE : HTS_FALSE;
 }
-
