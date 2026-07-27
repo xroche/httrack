@@ -101,6 +101,12 @@ void warc_close(warc_writer *w);
    success, -1 on error or truncation. Exposed for the -#test=warc-surt test. */
 int warc_surt(const char *url, char *out, size_t outsz);
 
+/* unchanged_kind for warc_write_transaction. */
+#define WARC_UNCHANGED_NONE 0       /* a fresh exchange: a full response */
+#define WARC_UNCHANGED_SERVER_304 1 /* the server itself answered 304 */
+#define WARC_UNCHANGED_ENGINE_FORCED                                           \
+  2 /* the engine, not the server, decided nothing changed (#839) */
+
 /* Write one transaction's request + response (or revisit) records.
    target_uri:  absolute URL fetched.
    ip:          numeric peer IP, or NULL/"" to omit.
@@ -110,7 +116,9 @@ int warc_surt(const char *url, char *out, size_t outsz);
    body_path:   file re-read for the body when body==NULL (may be NULL).
    content_type: CDXJ mime when resp_hdr declares none, as a 304 does; NULL
                 to leave the index line without one.
-   is_update_unchanged: nonzero for a 304 server-not-modified revisit.
+   unchanged_kind: WARC_UNCHANGED_*; SERVER_304 writes a server-not-modified
+                revisit, ENGINE_FORCED a self-referencing identical-payload-
+                digest one (no 304 to claim), both unbacked (#839).
    truncated: a WARC_TRUNC_* reason to tag a cap-truncated body, else 0.
    The body is stored verbatim: Content-Encoding is kept and Content-Length set
    to body_len, so body/body_len must be the as-received (coded) bytes.
@@ -120,7 +128,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *resp_hdr, const char *body,
                            size_t body_len, const char *body_path,
                            const char *content_type, int statuscode,
-                           int is_update_unchanged, int truncated);
+                           int unchanged_kind, int truncated);
 
 /* Write one non-HTTP capture as a single WARC 'resource' record: the block is
    the raw payload (no HTTP envelope), Content-Type is the payload's own MIME.

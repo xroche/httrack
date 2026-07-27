@@ -94,7 +94,8 @@ struct warc_writer {
   hts_boolean protect_prev;   /* previous archive present: build in a temp */
   hts_boolean opened;         /* open completed; a failed one swaps nothing */
   hts_boolean failed;         /* a record or segment was lost: swap nothing */
-  uint64_t unbacked_revisits; /* revisits whose payload no file here holds */
+  uint64_t unbacked_revisits; /* URLs this pass didn't capture here: an
+                                  unbacked revisit, or nothing written at all */
   char **page_lines; /* one JSON page line per 200 text/html response, owned */
   size_t page_count;
   size_t page_cap;
@@ -1612,7 +1613,7 @@ static hts_boolean warc_commit(warc_writer *w) {
     hts_log_print(
         w->opt, LOG_ERROR,
         "WARC: this pass revisited %llu URL(s) without re-downloading them, so "
-        "its archive would name bodies no file holds; kept the previous %s "
+        "this archive doesn't hold their current content; kept the previous %s "
         "(re-run with -C0, or --warc-file with a name of its own)",
         (unsigned long long) w->unbacked_revisits,
         warc_seg_path(w, 0, finalbuf, sizeof(finalbuf)));
@@ -1678,7 +1679,7 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *resp_hdr, const char *body,
                            size_t body_len, const char *body_path,
                            const char *content_type, int statuscode,
-                           int is_update_unchanged, int truncated) {
+                           int unchanged_kind, int truncated) {
   wbuf http;
   char resp_id[64];
   char pdig[33];
@@ -1707,13 +1708,13 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
 
   /* A payload exists (for digesting) unless this is a bodyless 304. */
   has_payload = (body_len > 0 && (body != NULL || body_path != NULL) &&
-                 !is_update_unchanged);
+                 unchanged_kind != WARC_UNCHANGED_SERVER_304);
 
   /* Payload digest drives identical-payload-digest dedup (OpenSSL only). */
   have_pdig =
       has_payload ? payload_digest_b32(body, body_len, body_path, pdig) : 0;
 
-  if (is_update_unchanged) {
+  if (unchanged_kind == WARC_UNCHANGED_SERVER_304) {
     is_revisit = 1;
     profile = "http://netpreserve.org/warc/1.1/revisit/server-not-modified";
     /* Replay resolves a revisit by this field alone, and a 304 stands in for
@@ -1722,6 +1723,22 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
     refers_uri = target_uri;
     /* Served from cache: the payload sits in the previous archive, not here. */
     w->unbacked_revisits++;
+  } else if (unchanged_kind == WARC_UNCHANGED_ENGINE_FORCED) {
+    /* has_payload requires body_len>0, so a genuinely empty body looks
+       digest-less too; it still has a well-defined digest (sha1 of nothing),
+       so compute it here rather than treat it as a missing-crypto case. */
+    if (!have_pdig && body_len == 0 && (body != NULL || body_path != NULL))
+      have_pdig = payload_digest_b32(body, body_len, body_path, pdig);
+    /* Served from cache with no exchange either way: still unbacked. */
+    w->unbacked_revisits++;
+    /* No digest (no OpenSSL) means nothing to point a revisit at, and there
+       was no real exchange to record as a response; write nothing (#839). */
+    if (!have_pdig)
+      return 0;
+    is_revisit = 1;
+    profile =
+        "http://netpreserve.org/warc/1.1/revisit/identical-payload-digest";
+    refers_uri = target_uri;
   } else if (have_pdig && w->seen != NULL) {
     void *prev = NULL;
     if (coucal_read_pvoid(w->seen, pdig, &prev) && prev != NULL) {
@@ -1831,7 +1848,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   const char *body_path;
   const char *resp_hdr;
   char synth[512];
-  int is_unchanged;
+  int unchanged_kind;
   int is_ftp;
 
   if (opt->state.warc == WARC_DISABLED)
@@ -1892,7 +1909,12 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
     body_len = (size_t) back->r.warc_rawsize;
   }
 
-  is_unchanged = (back->r.notmodified && opt->is_update) ? 1 : 0;
+  if (!back->r.notmodified || !opt->is_update)
+    unchanged_kind = WARC_UNCHANGED_NONE;
+  else if (back->r.warc_forced_notmodified)
+    unchanged_kind = WARC_UNCHANGED_ENGINE_FORCED;
+  else
+    unchanged_kind = WARC_UNCHANGED_SERVER_304;
 
   /* Prefer the stashed raw headers; synthesize a minimal status line for the
      header-less (HTTP/0.9-style) responses that never carried a header block.
@@ -1908,6 +1930,6 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
 
   warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr, body,
                          body_len, body_path, back->r.contenttype,
-                         back->r.statuscode, is_unchanged,
+                         back->r.statuscode, unchanged_kind,
                          back->r.warc_truncated);
 }
