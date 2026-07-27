@@ -10,7 +10,7 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
 
-tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_repairrename.XXXXXX")
+tmpdir=$(mktemp -d) # honors the Windows-shaped TMPDIR the MSYS suite exports
 cleanup() { rm -rf "$tmpdir"; }
 trap 'set +e; cleanup' EXIT
 trap 'set +e; cleanup; exit 1' HUP INT QUIT PIPE TERM
