@@ -1,6 +1,6 @@
-# The test list lives here, one entry per line, so two branches adding a test
-# union cleanly instead of colliding. Never use backslash continuations: a
-# unioned continuation drops an entry silently (#844).
+# One entry per line, never a backslash continuation: unioning a continued list
+# drops an entry silently (#844). A deletion merged alongside another branch's
+# append is restored by the union -- remove a test in a commit of its own.
 TESTS =
 TESTS += 00_runnable.test
 TESTS += 01_engine-addlink.test

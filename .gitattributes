@@ -7,6 +7,5 @@
 *.test text eol=lf
 *.sh text eol=lf
 
-# Appends from two branches union cleanly; scoped to this file so a union can
-# never touch build logic.
+# Scoped to this file so a union can never touch build logic.
 tests/tests-list.mk merge=union
