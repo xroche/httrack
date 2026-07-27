@@ -189,25 +189,53 @@ jobs:
           # A wedged crawl must not eat the job's timeout budget. timeout(1)'s
           # signals can't reap a native httrack.exe (MSYS signals don't reach it),
           # so a hang orphaned processes that starved the runner; run_with_timeout
-          # TerminateProcess-es the whole tree. 600s clears the slowest multi-pass
-          # crawl (a few passes at --max-time=120 each).
+          # TerminateProcess-es the whole tree. 600s is unchanged: it clears the
+          # 540s a three-pass crawl may legitimately take under local-crawl.sh's
+          # own watchdogs, against a slowest healthy test here of 39s.
           . ./testlib.sh
+          per_test=600
 
-          pass=0 fail=0 skip=0 failed="" skipped=""
+          # The whole suite must give up before the step timeout above. A cancelled
+          # step keeps neither its log nor the artifacts the later if:always()
+          # steps would upload, so an overrun that ends in a cancel tells us
+          # nothing; failing on our own terms keeps both. Healthy runs take 8-9
+          # min. The check sits between tests, so the step can still reach 25 min
+          # plus one per-test budget, and that worst case stays inside the 45.
+          suite_deadline=1500
+          started=$SECONDS
+
+          # Survives into the artifact even if the tail of the step log does not.
+          progress=suite-progress.log
+          : >"$progress"
+
+          pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
           for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test \
                    *_local-*.test 13_crawl_proxy_https.test 58_watchdog.test \
                    60_crawl-log-salvage.test; do
+            elapsed=$((SECONDS - started))
+            if [ "$elapsed" -ge "$suite_deadline" ]; then
+              echo "::error::suite deadline: ${elapsed}s elapsed, stopping before $t"
+              echo "DEADLINE before $t after ${elapsed}s" >>"$progress"
+              # Per-test start times, so the slow ones are named rather than guessed.
+              sed 's/^/      /' "$progress"
+              deadline=1
+              break
+            fi
+            echo "RUN $t at ${elapsed}s" >>"$progress"
             rc=0
-            run_with_timeout 600 bash "$t" >"$t.log" 2>&1 || rc=$?
+            # Same guard "make check" uses on POSIX, so a wedge is diagnosed the
+            # same way on every platform. It dumps before it kills, which a bare
+            # run_with_timeout cannot: by the time that returns, the tree whose
+            # stack we wanted is already gone.
+            HTTRACK_TEST_TIMEOUT=$per_test bash ./test-timeout.sh "$t" >"$t.log" 2>&1 || rc=$?
             case "$rc" in
               0) pass=$((pass + 1)); echo "PASS $t" ;;
               77) skip=$((skip + 1)) skipped="$skipped $t"; echo "SKIP $t" ;;
               124)
                 fail=$((fail + 1)) failed="$failed $t"
+                # test-timeout.sh has already written the process list, the stacks
+                # and the killed crawl's own logs into $t.log.
                 echo "FAIL $t (timed out, tree killed)"
-                # Re-running a wedge traced would just hang again: salvage the
-                # killed crawl's own logs into the artifact instead.
-                dump_crawl_logs >>"$t.log"
                 tail -n 25 "$t.log" | sed 's/^/      /'
                 ;;
               *)
@@ -215,10 +243,15 @@ jobs:
                 echo "FAIL $t (exit $rc)"
                 # These assert with `test "$(...)" == "..." || exit 1`, which
                 # says nothing at all on failure. Re-run traced, still bounded.
-                run_with_timeout 600 bash -x "$t" >>"$t.log" 2>&1 || true
+                run_with_timeout "$per_test" bash -x "$t" >>"$t.log" 2>&1 || true
                 tail -n 25 "$t.log" | sed 's/^/      /'
                 ;;
             esac
+            echo "$rc $t" >>"$progress"
+            # An orphaned native httrack.exe spins and starves the runner, which
+            # is how this job dies with "lost communication" rather than a plain
+            # timeout. Clear them between tests and name whoever leaked them.
+            reap_leftover_processes "$t" | tee -a "$progress"
           done
           echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
             tee -a "$GITHUB_STEP_SUMMARY"
@@ -230,6 +263,8 @@ jobs:
           # badmtime needs a filesystem that stores an mtime past gmtime's range;
           # single-file ends on a GUI half needing htsserver, which this job does not build.
           expected_skips=" 01_engine-footer-overflow.test 48_local-crange-memresume.test 71_local-crange-repaircache.test 79_local-proxytrack-webdav-mime.test 88_local-proxytrack-badmtime.test 94_local-single-file.test"
+          # First, or the deadline reads as an unexplained shortfall in the gates below.
+          [ "$deadline" -eq 0 ] || { echo "::error::suite did not finish within ${suite_deadline}s"; exit 1; }
           [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
           [ "$skipped" = "$expected_skips" ] || { echo "::error::unexpected skips:$skipped"; exit 1; }
           [ "$fail" -eq 0 ] || { echo "::error::failing:$failed"; exit 1; }

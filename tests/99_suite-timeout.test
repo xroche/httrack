@@ -1,0 +1,121 @@
+#!/bin/bash
+#
+# The harness timeout (tests/test-timeout.sh) must name the test it killed, say
+# what was still running, and exit 124 -- otherwise a wedge only ever shows up as
+# a cancelled CI step, which keeps no log and no artifact.
+
+set -eu
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+driver="${testdir}/test-timeout.sh"
+test -r "$driver" || {
+    echo "no test-timeout.sh next to $0" >&2
+    exit 1
+}
+
+fail() {
+    echo "FAIL: $*" >&2
+    test -z "${out:-}" || sed 's/^/  | /' <"$out" >&2
+    exit 1
+}
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_sutmo.XXXXXX") || exit 1
+trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+out="$tmp/out"
+
+# --- a hanging test is killed, named, and reported 124 ----------------------
+cat >"$tmp/90_wedged.test" <<'EOF'
+echo "marker: the wedged test started"
+sleep 300
+EOF
+
+start=$SECONDS
+rc=0
+HTTRACK_TEST_TIMEOUT=5 bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
+elapsed=$((SECONDS - start))
+
+test "$rc" -eq 124 || fail "wedged test reported $rc, want 124"
+# Never before the budget, or a slow-but-healthy test would be killed too.
+test "$elapsed" -ge 5 || fail "the guard fired early (${elapsed}s of a 5s budget)"
+test "$elapsed" -lt 30 || fail "the guard fired late (${elapsed}s)"
+grep -q 'marker: the wedged test started' "$out" || fail "the test's own output was lost"
+# The header, not a bare name: the process list quotes the test's path too, so a
+# wrapper that named nothing would still match that.
+grep -q '^===== TIMEOUT: 90_wedged.test exceeded' "$out" ||
+    fail "the diagnostics do not name the test"
+grep -q "own process tree" "$out" || fail "no process list in the diagnostics"
+
+# The budget is read, not hard-coded: well under it, the same shape survives.
+printf 'sleep 3\necho "slow but healthy"\n' >"$tmp/92_slow.test"
+rc=0
+HTTRACK_TEST_TIMEOUT=45 bash "$driver" "$tmp/92_slow.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "a healthy 3s test under a 45s budget reported $rc"
+grep -q 'slow but healthy' "$out" || fail "healthy test output lost"
+! grep -q 'TIMEOUT' "$out" || fail "the guard fired on a healthy test"
+
+# The killed tree must really be gone, or the next test inherits its ports.
+sleep 1
+! grep -q "$tmp/90_wedged.test" <<<"$(ps -A -o args 2>/dev/null)" ||
+    fail "the wedged test survived the guard"
+
+# --- exit status and output of a healthy test pass straight through ----------
+# 77 is automake's SKIP and 99 its hard error, so both have to survive the wrapper.
+for want in 0 1 77 99; do
+    printf 'echo "ran with %s"\nexit %s\n' "$want" "$want" >"$tmp/91_plain.test"
+    rc=0
+    HTTRACK_TEST_TIMEOUT=60 bash "$driver" "$tmp/91_plain.test" >"$out" 2>&1 || rc=$?
+    test "$rc" -eq "$want" || fail "exit $want came back as $rc"
+    grep -q "ran with $want" "$out" || fail "output lost for exit $want"
+    ! grep -q 'TIMEOUT' "$out" || fail "the guard fired on a test that exited at once"
+done
+
+# A budget of 0 disables the guard: the test still runs, and is not killed. Its
+# own file, so the assertion cannot ride on whatever the loop above left behind.
+printf 'echo "guard off"\nexit 3\n' >"$tmp/93_off.test"
+rc=0
+HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/93_off.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 3 || fail "disabled guard changed the exit status ($rc)"
+grep -q 'guard off' "$out" || fail "output lost with the guard disabled"
+
+# --- a wedged crawl yields a symbolized engine stack ------------------------
+# The whole point of the dump: name the frame the engine is stuck in. Windows has
+# neither half (MSYS signals do not reach a native httrack.exe, and that build has
+# no backtrace()), so only assert it where the machinery exists.
+if is_windows; then
+    echo "suite timeout OK (no stack capture on Windows)"
+    exit 0
+fi
+command -v httrack >/dev/null || {
+    echo "SKIP: no httrack on PATH for the stack half" >&2
+    exit 77
+}
+
+# /watchdog/stall never answers, so the crawl wedges for real. CRAWL_DEADLINE is
+# raised past our budget so the guard under test is what fires, not local-crawl's.
+cat >"$tmp/92_stalled.test" <<EOF
+CRAWL_DEADLINE=600 bash "${testdir}/local-crawl.sh" --errors 0 \\
+    httrack 'BASEURL/watchdog/stall'
+EOF
+
+rc=0
+HTTRACK_TEST_TIMEOUT=20 bash "$driver" "$tmp/92_stalled.test" >"$out" 2>&1 || rc=$?
+
+if grep -qE 'python3 not found|could not discover server port' "$out"; then
+    echo "SKIP: local crawl prerequisites missing" >&2
+    exit 77
+fi
+test "$rc" -eq 124 || fail "stalled crawl reported $rc, want 124"
+
+if grep -q 'No stack trace available on this OS' "$out"; then
+    echo "suite timeout OK (no backtrace() on this platform)"
+    exit 0
+fi
+# The engine's SIGABRT handler prints this to its own stderr; reaching our log
+# proves the signal, the handler and the crawl-log salvage all connected up.
+grep -q '^Caught signal ' "$out" || fail "no engine backtrace was salvaged"
+grep -qE 'httrack|libhttrack' "$out" || fail "the backtrace names no engine frame"
+
+echo "suite timeout OK (named the test, dumped a stack, exited 124)"
