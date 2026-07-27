@@ -12,8 +12,8 @@ set -euo pipefail
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" \
-    --plant-file bigtrunc/hts-tmp/slow.bin.bak \
-    --plant-dir bigtrunc/hts-tmp/fast.bin.bak \
+    --plant-file bigtrunc/~hts-tmp/slow.bin.bak \
+    --plant-dir bigtrunc/~hts-tmp/fast.bin.bak \
     --rerun-args '--update -M400000' \
     --log-found 'More than 400000 bytes have been transferred.. giving up' \
     --log-found 'replacing leftover backup .*slow\.bin\.bak' \

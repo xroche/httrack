@@ -1640,6 +1640,15 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(self.BAKNAME_SIB)
 
+    # --- /tmpspace/: #842 — same collision, reached through the trailing-space
+    # bypass of the reserved-segment escape. "hts-tmp%20" was escaped by nothing
+    # and then had its space stripped, so the sibling landed on the backup's own
+    # name on shipped defaults.
+    def route_tmpspace_index(self):
+        self.send_html(
+            '\t<a href="a.bin">a</a>\n' '\t<a href="hts-tmp%20/a.bin.bak">bak</a>\n'
+        )
+
     # --- /errmask/: issue #176 — a page that 200'd on the first crawl but 403s
     # on the update fetch must keep its good copy, not be overwritten nor purged.
     ERRMASK_GOOD = b"KEEP" + b"." * 1020  # 1024 B distinctive non-HTML body
@@ -2244,6 +2253,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/bakname/index.html": route_bakname_index,
         "/bakname/a.bin": route_bakname_main,
         "/bakname/hts-tmp/a.bin.bak": route_bakname_sibling,
+        "/tmpspace/index.html": route_tmpspace_index,
+        "/tmpspace/a.bin": route_bakname_main,
+        "/tmpspace/hts-tmp /a.bin.bak": route_bakname_sibling,
         "/mini304/index.html": route_mini304_index,
         "/mini304/page.html": route_mini304_page,
         "/errmask/index.html": route_errmask_index,

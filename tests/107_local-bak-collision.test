@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# #774: the re-fetch backup lives in an hts-tmp directory beside the mirrored
-# file, so the site here serves that exact path. url_savename must escape the
-# reserved segment, landing the sibling in hts-tmp_ where the backup of a.bin
-# cannot consume it. Asserting the unescaped path instead would pass with the
-# bug live, which is how the first attempt at this test missed it.
+# #774: the site serves hts-tmp/, the reserved segment url_savename must escape
+# so a mirrored file cannot sit where the engine writes. Asserting the unescaped
+# path would pass with the bug live, which is how a first attempt missed it.
 
 set -euo pipefail
 

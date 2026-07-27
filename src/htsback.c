@@ -656,13 +656,14 @@ int back_nsoc_overall(const struct_back * sback) {
   return n;
 }
 
-/* Reserved subdirectory holding a mirrored file's temporaries, beside it. */
-#define HTS_TMPDIR "hts-tmp"
+/* Subdirectory holding a mirrored file's temporaries, beside it. url_savename()
+   maps '~' to '_', so no URL can ever be mirrored inside it (#774, #842). */
+#define HTS_TMPDIR "~hts-tmp"
 
-/* Build save's temporary as <dir>/hts-tmp/<name>.<ext>. Appending the extension
-   to save instead put it in the mirror namespace, so a site serving <path>.bak
-   had its copy taken as the backup and then unlinked (#774). HTS_FALSE (dest
-   emptied) if it would not fit. Note: utf-8. */
+/* Build save's temporary as <dir>/<HTS_TMPDIR>/<name>.<ext>. Appending the
+   extension to save instead put it in the mirror namespace, so a site serving
+   <path>.bak had its copy taken as the backup and then unlinked (#774).
+   HTS_FALSE (dest emptied) if it would not fit. Note: utf-8. */
 static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
                                 const char *ext) {
   const char *const slash = strrchr(save, '/');
@@ -708,11 +709,15 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
     if (structcheck(back->tmpfile) != 0) {
       hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
                     back->tmpfile);
+      back->tmpfile_buffer[0] = '\0';
+      back->tmpfile = NULL;
       return -1;
     }
   } else {
+    /* same directory as the named case, so back_tmpdir_drop() only removes one
+       the engine made (#842) */
     /* truncation here would collide distinct tmpnameid's onto one name */
-    if (!sprintfbuff(back->tmpfile_buffer, "%s/tmp%d.%s",
+    if (!sprintfbuff(back->tmpfile_buffer, "%s/" HTS_TMPDIR "/tmp%d.%s",
                      StringBuff(opt->path_html_utf8), opt->state.tmpnameid++,
                      ext)) {
       hts_log_print(opt, LOG_WARNING, "temporary filename too long in %s",
@@ -721,6 +726,13 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
       return -1;
     }
     back->tmpfile = back->tmpfile_buffer;
+    if (structcheck(back->tmpfile) != 0) {
+      hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
+                    back->tmpfile);
+      back->tmpfile_buffer[0] = '\0';
+      back->tmpfile = NULL;
+      return -1;
+    }
   }
   /* OK */
   hts_log_print(opt, LOG_TRACE, "produced temporary name %s", back->tmpfile);
