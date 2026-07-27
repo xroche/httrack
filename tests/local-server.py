@@ -1555,12 +1555,16 @@ class Handler(SimpleHTTPRequestHandler):
 
     # --- /bakname/: #774 — a mirrored file named like a re-fetch backup ----
     # a.bin gets a new body every pass, so the update re-fetches it and takes a
-    # backup; a.bin.bak carries a validator, so it only revalidates and must
-    # still be there afterwards.
+    # backup. The sibling carries a validator, so it only revalidates and must
+    # still be there afterwards. It is served under hts-tmp/, the directory the
+    # backup lives in, so the crawl asks for the exact path the engine writes.
     BAKNAME_SIB = b"BAKNAME-SIBLING\n" + b"\x41\x42\x43\x44" * 512
 
     def route_bakname_index(self):
-        self.send_html('\t<a href="a.bin">a</a>\n\t<a href="a.bin.bak">bak</a>\n')
+        self.send_html(
+            '\t<a href="a.bin">a</a>\n'
+            '\t<a href="hts-tmp/a.bin.bak">bak</a>\n'
+        )
 
     def route_bakname_main(self):
         v = 1 if self.refetch_pass() == 1 else 2
@@ -2166,7 +2170,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/redir/target.html": route_redir_target,
         "/bakname/index.html": route_bakname_index,
         "/bakname/a.bin": route_bakname_main,
-        "/bakname/a.bin.bak": route_bakname_sibling,
+        "/bakname/hts-tmp/a.bin.bak": route_bakname_sibling,
         "/mini304/index.html": route_mini304_index,
         "/mini304/page.html": route_mini304_page,
         "/errmask/index.html": route_errmask_index,

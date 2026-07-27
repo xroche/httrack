@@ -6289,12 +6289,13 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-// -#test=refetchbackup <dir>: the #77 re-fetch backup must never leave the
-// resource without a copy, and must not take its temporary name from the mirror
-// namespace (#774, #775).
+// -#test=refetchbackup <dir>: the #77 re-fetch backup must build its temporary
+// inside the reserved hts-tmp directory, whose segment url_savename escapes so
+// no mirrored file can ever sit there (#774), and must never leave the resource
+// without a copy (#775).
 static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
   lien_back *back;
-  char sib[HTS_URLMAXSIZE * 2 + 8];
+  char want[HTS_URLMAXSIZE * 2 + 32];
   int err = 0;
 
   if (argc < 1) {
@@ -6306,15 +6307,21 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "refetchbackup: out of memory\n");
     return 1;
   }
-  fconcat(back->url_sav, sizeof(back->url_sav), argv[0], "refetch.bin");
-  snprintf(sib, sizeof(sib), "%s.bak", back->url_sav);
+  /* explicit separator: fconcat() joins without one, which would put the
+     temporary in the parent of the directory under test */
+  snprintf(back->url_sav, sizeof(back->url_sav), "%s/refetch.bin", argv[0]);
+  snprintf(want, sizeof(want), "%s/hts-tmp/refetch.bin.bak", argv[0]);
 
-  /* #774: the previous name of the backup is one the mirror can hold. */
+  /* #774: pin the name, so moving the temporary out of the reserved directory
+     cannot pass without url_savename reserving wherever it went instead. */
   ro_put(back->url_sav, "old");
-  ro_put(sib, "sibling");
   back_refetch_backup(opt, back);
   if (back->tmpfile == NULL || fexist_utf8(back->url_sav)) {
     fprintf(stderr, "refetchbackup: the previous copy was not moved aside\n");
+    err++;
+  } else if (strcmp(back->tmpfile, want) != 0) {
+    fprintf(stderr, "refetchbackup: temporary is %s, want %s\n", back->tmpfile,
+            want);
     err++;
   }
   ro_put(back->url_sav, "new"); /* what filecreate() + the transfer produce */
@@ -6323,17 +6330,30 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "refetchbackup: the committed copy is not the new one\n");
     err++;
   }
-  if (!ro_is(sib, "sibling")) {
-    fprintf(stderr, "refetchbackup: a mirrored <path>.bak was destroyed\n");
+
+  /* #758: only a killed run can leave something there, and it must be replaced
+     rather than disable the backup for good. */
+  if (structcheck(want) != 0) {
+    fprintf(stderr, "refetchbackup: cannot create %s\n", want);
+    freet(back);
+    return 1;
+  }
+  ro_put(want, "leftover");
+  back_refetch_backup(opt, back);
+  if (back->tmpfile == NULL || !ro_is(want, "new")) {
+    fprintf(stderr, "refetchbackup: a leftover temporary blocked the backup\n");
     err++;
   }
 
-  /* #775: filecreate() failed, so there is nothing to commit to. */
-  ro_put(back->url_sav, "old");
-  back_refetch_backup(opt, back);
+  /* #775: filecreate() failed, so there is nothing to commit to. Saying so is
+     load-bearing: the caller must not cache this response against the old
+     body, or the next --update gets a 304 pinning it. */
   (void) UNLINK(back->url_sav);
-  back_finalize_backup(opt, back, HTS_TRUE);
-  if (!ro_is(back->url_sav, "old")) {
+  if (back_finalize_backup(opt, back, HTS_TRUE)) {
+    fprintf(stderr, "refetchbackup: a commit that restored reported success\n");
+    err++;
+  }
+  if (!ro_is(back->url_sav, "new")) {
     fprintf(stderr, "refetchbackup: a commit with no new copy lost both\n");
     err++;
   }
@@ -6342,13 +6362,12 @@ static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
   back_refetch_backup(opt, back);
   ro_put(back->url_sav, "partial");
   back_finalize_backup(opt, back, HTS_FALSE);
-  if (!ro_is(back->url_sav, "old")) {
+  if (!ro_is(back->url_sav, "new")) {
     fprintf(stderr, "refetchbackup: an aborted re-fetch kept the partial\n");
     err++;
   }
 
   (void) UNLINK(back->url_sav);
-  (void) UNLINK(sib);
   freet(back);
   printf("refetchbackup: %s\n", err ? "FAIL" : "OK");
   return err;

@@ -74,6 +74,41 @@ static const char *hts_tbdev[] = {
   ""
 };
 
+/* Directories the engine owns inside the mirror. A URL able to name one lands
+   on the cache or on another slot's temporary and destroys it (#774), so they
+   are escaped like the DOS devices are. */
+static const char *hts_tbreserved[] = {"/hts-cache", "/hts-tmp", ""};
+
+/* Replace /foo/<reserved>/bar by /foo/<reserved>_/bar, matching a whole path
+   component only (case-insensitively: the filesystem may be too). */
+static void escapeReservedNames(char *save, size_t size,
+                                const char *const *names) {
+  int i;
+
+  for (i = 0; names[i][0] != '\0'; i++) {
+    const char *a = save;
+    const size_t len = strlen(names[i]);
+
+    while ((a = strstrcase(a, names[i]))) {
+      switch ((int) a[len]) {
+      case '\0':
+      case '/':
+      case '.': {
+        char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+
+        tempo[0] = '\0';
+        strncatbuff(tempo, save, (int) (a - save) + (int) len);
+        strcatbuff(tempo, "_");
+        strcatbuff(tempo, a + len);
+        /* clip rather than abort: the name comes from the wire */
+        (void) strclipbuff(save, size, tempo);
+      } break;
+      }
+      a += len;
+    }
+  }
+}
+
 /* Strip all // */
 static void cleanDoubleSlash(char *s) {
   int i, j;
@@ -1369,35 +1404,12 @@ int url_savename(lien_adrfilsave *const afs,
   // éliminer les // (comme ftp://)
   cleanDoubleSlash(afs->save);
 
+  /* Runs on every platform, and before path_html is prepended below, so the
+     user's own output directory is never renamed. */
+  escapeReservedNames(afs->save, sizeof(afs->save), hts_tbreserved);
+
 #if HTS_OVERRIDE_DOS_FOLDERS
-  /* Replace /foo/nul/bar by /foo/nul_/bar */
-  {
-    int i = 0;
-
-    while(hts_tbdev[i][0]) {
-      const char *a = afs->save;
-
-      while((a = strstrcase(a, hts_tbdev[i]))) {
-        switch ((int) a[strlen(hts_tbdev[i])]) {
-        case '\0':
-        case '/':
-        case '.':
-          {
-            char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-            tempo[0] = '\0';
-            strncatbuff(tempo, afs->save, (int) (a - afs->save) + strlen(hts_tbdev[i]));
-            strcatbuff(tempo, "_");
-            strcatbuff(tempo, a + strlen(hts_tbdev[i]));
-            strcpybuff(afs->save, tempo);
-          }
-          break;
-        }
-        a += strlen(hts_tbdev[i]);
-      }
-      i++;
-    }
-  }
+  escapeReservedNames(afs->save, sizeof(afs->save), hts_tbdev);
 
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(afs->save);

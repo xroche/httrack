@@ -680,6 +680,10 @@ void back_refetch_backup(httrackp *opt, lien_back *const back) {
         hts_log_print(opt, LOG_WARNING, "replacing leftover backup %s",
                       back->tmpfile);
       saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
+      /* Another slot sharing the directory may have removed it between the
+         structcheck above and the rename: recreate it and try once more. */
+      if (!saved && structcheck(back->tmpfile) == 0)
+        saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
     }
     if (!saved) {
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
@@ -703,10 +707,12 @@ static hts_boolean back_transfer_failed(const int statuscode) {
   }
 }
 
-void back_finalize_backup(httrackp *opt, lien_back *const back,
-                          hts_boolean commit) {
+hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
+                                 hts_boolean commit) {
+  const hts_boolean wanted = commit;
+
   if (back->tmpfile == NULL || back->r.compressed)
-    return;
+    return HTS_TRUE;
   /* Nothing to commit to: filecreate() can fail after the backup was taken,
      and dropping it then loses both copies (#775). */
   if (commit && !fexist_utf8(back->url_sav)) {
@@ -732,6 +738,7 @@ void back_finalize_backup(httrackp *opt, lien_back *const back,
       back_tmpdir_drop(back->tmpfile);
   }
   back->tmpfile = NULL;
+  return commit == wanted ? HTS_TRUE : HTS_FALSE;
 }
 
 // objet (lien) téléchargé ou transféré depuis le cache
@@ -842,6 +849,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   back[p].r.statuscode = STATUSCODE_INVALID;
                   strcpybuff(back[p].r.msg, "Error when decompressing (the "
                                             "temporary filename is too long)");
+                  /* as the decode-failure branch below: never let the coded
+                     bytes be committed as the page */
+                  if (!back[p].r.is_write)
+                    deleteaddr(&back[p].r);
                 } else if ((size = hts_codec_unpack(codec, back[p].tmpfile,
                                                     unpacked)) >= 0) {
                   back[p].r.size = back[p].r.totalsize = size;
@@ -928,7 +939,14 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
         }
         /* Body fully received: keep the freshly written url_sav, drop the
            backup of the previous copy. */
-        back_finalize_backup(opt, &back[p], HTS_TRUE);
+        if (!back_finalize_backup(opt, &back[p], HTS_TRUE)) {
+          /* The previous copy is back because the new one was never created;
+             caching this response's validators against it would pin the stale
+             body on every later --update. */
+          if (fexist_utf8(back[p].url_sav))
+            filenote(&opt->state.strc, back[p].url_sav, NULL);
+          return -1;
+        }
         /* Write mode to disk */
         if (back[p].r.is_write && back[p].r.adr != NULL) {
           freet(back[p].r.adr);

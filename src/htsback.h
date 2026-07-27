@@ -147,9 +147,11 @@ void back_refetch_backup(httrackp *opt, lien_back *const back);
    existing file moved the good copy to back->tmpfile before truncating url_sav.
    commit keeps the new file and drops the backup, unless url_sav was never
    created; else restore it so an aborted transfer leaves the previous copy
-   intact. Skips the zlib .z temp. */
-void back_finalize_backup(httrackp *opt, lien_back *const back,
-                          hts_boolean commit);
+   intact. Skips the zlib .z temp. HTS_FALSE when a requested commit had to
+   restore instead: the caller then holds the OLD body and must not cache this
+   response's validators against it. */
+hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
+                                 hts_boolean commit);
 /* Remove the reserved directory a temporary sat in, once the last slot sharing
    it is done; a non-empty one just refuses. No-op outside that directory. */
 void back_tmpdir_drop(const char *tmp);

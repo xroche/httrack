@@ -165,3 +165,20 @@ MINGW* | MSYS* | CYGWIN*)
     name "/$(printf 'a%.0s' {1..300}).php" 'text/html' "$(printf 'a%.0s' {1..300}).html"
     ;;
 esac
+
+# #774: the engine owns hts-cache/ and hts-tmp/ inside the mirror, so a URL must
+# never be able to name one; a site serving them gets the /nul -> nul_ treatment.
+full '/hts-tmp/a.bin' 'application/octet-stream' \
+    '/dev/null/www.example.com/hts-tmp_/a.bin'
+full '/hts-cache/new.zip' 'application/octet-stream' \
+    '/dev/null/www.example.com/hts-cache_/new.zip'
+full '/d/hts-tmp/a.bin.bak' 'application/octet-stream' \
+    '/dev/null/www.example.com/d/hts-tmp_/a.bin.bak'
+# A whole component only, and case-insensitively: the filesystem may be too.
+full '/hts-tmpfoo/a.bin' 'application/octet-stream' \
+    '/dev/null/www.example.com/hts-tmpfoo/a.bin'
+full '/HTS-TMP/a.bin' 'application/octet-stream' \
+    '/dev/null/www.example.com/HTS-TMP_/a.bin'
+# Control: the DOS device names this reuses must still be escaped.
+full '/nul/x.bin' 'application/octet-stream' \
+    '/dev/null/www.example.com/nul_/x.bin'
