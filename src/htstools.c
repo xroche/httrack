@@ -1438,21 +1438,75 @@ HTSEXT_API hts_boolean hts_findissystem(find_handle find) {
   return 0;
 }
 
-hts_boolean hts_rename_over(const char *src, const char *dst) {
+/* Park cdst under a free sibling name; caside receives it. */
+static hts_boolean rename_park_aside(char *caside, size_t size,
+                                     const char *cdst) {
+  int i;
+
+  for (i = 0; i < 16; i++) {
+    if (!slprintfbuff(caside, size, "%s.hts-old%d", cdst, i))
+      return HTS_FALSE;
+    /* Skip a name the mirror already holds: POSIX rename() would clobber it
+       (#774). A non-regular entry reads as free and the rename refuses it. */
+    if (fexist_utf8(caside))
+      continue;
+    if (RENAME(cdst, caside) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* cdst is in the way of the move: park it, retry, and put it back if the retry
+   fails too. Unlinking it instead would leave nothing at all (#790). */
+static hts_boolean rename_over_aside(httrackp *opt, const char *csrc,
+                                     const char *cdst) {
+  char caside[CATBUFF_SIZE];
+  int err;
+
+  /* Only a regular file may be parked: a directory in the way is not what the
+     caller asked to replace, and parking it orphans it (UNLINK cannot drop). */
+  if (!fexist_utf8(cdst))
+    return HTS_FALSE;
+  if (!rename_park_aside(caside, sizeof(caside), cdst))
+    return HTS_FALSE;
+  if (RENAME(csrc, cdst) == 0) {
+    (void) UNLINK(caside);
+    return HTS_TRUE;
+  }
+  err = errno;
+  /* Retry once, then name the parked copy: nothing else on disk or in the log
+     points at it, and an --update purge would delete it unnoticed. */
+  if (RENAME(caside, cdst) != 0 && RENAME(caside, cdst) != 0)
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "could not put %s back; its previous content is now %s", cdst,
+                  caside);
+  errno = err;
+  return HTS_FALSE;
+}
+
+hts_boolean hts_rename_over(httrackp *opt, const char *src, const char *dst) {
   char csrc[CATBUFF_SIZE], cdst[CATBUFF_SIZE];
 
   fconv(csrc, sizeof(csrc), src);
   fconv(cdst, sizeof(cdst), dst);
   if (RENAME(csrc, cdst) == 0)
     return HTS_TRUE;
-  /* Only a dst in the way is something the unlink can clear, and the CRT maps
-     that to EEXIST; it keeps EACCES for a src another process holds, where
-     removing dst would lose a file the retry cannot replace (#790). The src
-     check covers a CRT that reports neither. */
+  /* Only a dst in the way is something the fallback can clear, and the CRT maps
+     that to EEXIST; it keeps EACCES for a src another process holds, where the
+     retry would fail the same way. The src check covers a CRT that reports
+     neither. */
   const int err = errno;
 
   if (err != EEXIST || !fexist_utf8(src))
     return HTS_FALSE;
-  (void) UNLINK(cdst);
-  return RENAME(csrc, cdst) == 0 ? HTS_TRUE : HTS_FALSE;
+  return rename_over_aside(opt, csrc, cdst);
+}
+
+hts_boolean hts_rename_over_aside_selftest(httrackp *opt, const char *src,
+                                           const char *dst) {
+  char csrc[CATBUFF_SIZE], cdst[CATBUFF_SIZE];
+
+  fconv(csrc, sizeof(csrc), src);
+  fconv(cdst, sizeof(cdst), dst);
+  return rename_over_aside(opt, csrc, cdst);
 }

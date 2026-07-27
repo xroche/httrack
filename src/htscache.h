@@ -80,6 +80,14 @@ htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, htsblk * r);
 void cache_init(cache_back * cache, httrackp * opt);
 
+/* Recover the damaged cache at name into hts-cache/repair.zip and move it over
+   name, storing what was recovered in *entries and *bytes. Returns NULL on
+   success, else a reason the caller reports: a recovery that is empty or does
+   not open never replaces the cache, and neither does one that cannot be moved
+   into place (#786, #824). Note: utf-8. */
+const char *cache_repair(httrackp *opt, const char *name,
+                         unsigned long *entries, unsigned long *bytes);
+
 /* Which hts-cache/ generation (new.* vs old.*) is authoritative. */
 typedef enum {
   CACHE_RECONCILE_PROMOTE,     /* no new cache: promote the old generation */
