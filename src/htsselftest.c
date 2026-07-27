@@ -6727,6 +6727,91 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
+   the byte below it is poisoned with '#' rather than 0, or the stray NUL the
+   old loop wrote there would read as untouched. */
+static int st_rtrim(httrackp *opt, int argc, char **argv) {
+  enum { off = 8 };
+
+  char arena[24];
+  char *const s = &arena[off];
+  const int guard = off - 1;
+  int err = 0;
+  int c;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+#define REPOISON(str)                                                          \
+  do {                                                                         \
+    memset(arena, '#', sizeof(arena));                                         \
+    strlcpybuff(s, (str), sizeof(arena) - off);                                \
+  } while (0)
+#define CHECK(cond)                                                            \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  /* nothing but spaces: the case that ran the old loop off the front */
+  REPOISON("   ");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  /* a space sitting below the string must not be eaten as if it were part of
+     it, which is exactly what the old loop did */
+  REPOISON("   ");
+  arena[guard] = ' ';
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == ' ');
+
+  REPOISON("");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  REPOISON("a b \t\r\n");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(strcmp(s, "a b") == 0);
+  CHECK(arena[guard] == '#');
+
+  REPOISON("ab");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(strcmp(s, "ab") == 0);
+
+  /* quotes count as space for is_space() but not for is_realspace() */
+  REPOISON("v\" ");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(strcmp(s, "v\"") == 0);
+  REPOISON("v\" ");
+  hts_rtrim(s, HTS_SPACES);
+  CHECK(strcmp(s, "v") == 0);
+
+  /* the sets must stay the macros they stand for */
+  for (c = 1; c < 256; c++) {
+    const char b = (char) c;
+
+    CHECK((strchr(HTS_SPACES, b) != NULL) == (is_space(b) != 0));
+    CHECK((strchr(HTS_REALSPACES, b) != NULL) == (is_realspace(b) != 0));
+  }
+
+  /* control: the canary must be able to fail */
+  REPOISON("   ");
+  s[-1] = '\0';
+  CHECK(arena[guard] != '#');
+
+#undef REPOISON
+#undef CHECK
+
+  printf("rtrim self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -6784,6 +6869,7 @@ static const struct selftest_entry {
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"lastchar", "", "last-char helpers never index before the buffer (#770)",
      st_lastchar},
+    {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
     {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
      st_changes},
     {"changes-race", "<dir>", "--changes under a late transfer thread (#714)",

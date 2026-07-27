@@ -569,6 +569,27 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
   return HTS_FALSE;
 }
 
+/* htslib.h's is_space() and is_realspace() as hts_rtrim() sets; -#test=rtrim
+   keeps them in sync. */
+#define HTS_SPACES " \"\n\r\t\f\v'"
+#define HTS_REALSPACES " \n\r\t\f\v"
+
+/* Length of s once its trailing bytes from set are dropped; 0 if they all are.
+   Counts down from the end, so it stops at s rather than below the buffer. */
+static HTS_INLINE HTS_UNUSED size_t hts_rtrimlen(const char *s,
+                                                 const char *set) {
+  size_t len = strlen(s);
+
+  while (len != 0 && strchr(set, s[len - 1]) != NULL)
+    len--;
+  return len;
+}
+
+/* Drop the trailing bytes of s that occur in set. */
+static HTS_INLINE HTS_UNUSED void hts_rtrim(char *s, const char *set) {
+  s[hts_rtrimlen(s, set)] = '\0';
+}
+
 /* Thin aliases over the libc allocator/memcpy (historical "t" suffix); no
    added bounds checking. freet() also NULLs the freed pointer and tolerates
    NULL. memcpybuff() despite the name is a raw memcpy: the caller owns the

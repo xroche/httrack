@@ -1322,7 +1322,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       p++;                      // sauter espaces
     if ((int) strlen(rcvd + p) < 250) { // pas trop long?
       char tmp[256];
-      char *a = NULL, *b = NULL;
+      char *a = NULL;
 
       strcpybuff(tmp, rcvd + p);
       a = strstr(tmp, "filename=");
@@ -1335,15 +1335,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 
           while((c = strchr(a, '/')))   /* skip all / (see RFC2616) */
             a = c + 1;
-          b = a + strlen(a) - 1;
-          while(is_space(*b))
-            b--;
-          b++;
-          if (b) {
-            *b = '\0';
-            if ((int) strlen(a) < 200) {        // pas trop long?
-              strcpybuff(retour->cdispo, a);
-            }
+          hts_rtrim(a, HTS_SPACES);
+          if ((int) strlen(a) < 200) { // pas trop long?
+            strcpybuff(retour->cdispo, a);
           }
         }
       }

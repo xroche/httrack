@@ -1677,7 +1677,7 @@ int url_savename(lien_adrfilsave *const afs,
         } else {                // utilisé par un AUTRE, changer de nom
           char BIGSTK tempo[HTS_URLMAXSIZE * 2];
           char *a = afs->save + strlen(afs->save) - 1;
-          char *b;
+          size_t stem;
           int n = 2;
           char collisionSeparator =
               ((opt->savename_83 != HTS_SAVENAME_83_ISO9660) ? '-' : '_');
@@ -1699,12 +1699,10 @@ int url_savename(lien_adrfilsave *const afs,
             strcatbuff(tempo, afs->save);
 
           // tester la présence d'un -xx (ex: index-2.html -> index-3.html)
-          b = tempo + strlen(tempo) - 1;
-          while(isdigit((unsigned char) *b))
-            b--;
-          if (*b == collisionSeparator) {
-            sscanf(b + 1, "%d", &n);
-            *b = '\0';          // couper
+          stem = hts_rtrimlen(tempo, "0123456789");
+          if (stem != 0 && tempo[stem - 1] == collisionSeparator) {
+            sscanf(tempo + stem, "%d", &n);
+            tempo[stem - 1] = '\0'; // couper
             n++;                // plus un
           }
           // en plus il faut gérer le 8-3 .. pas facile le client
