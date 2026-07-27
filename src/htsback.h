@@ -143,6 +143,13 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
    can put it back when the re-fetch fails (#77 follow-up). Call right before
    truncating url_sav; tmpfile stays NULL when there is nothing to save. */
 void back_refetch_backup(httrackp *opt, lien_back *const back);
+/* Commit or restore a re-fetch backup (#77 follow-up): a re-fetch over an
+   existing file moved the good copy to back->tmpfile before truncating url_sav.
+   commit keeps the new file and drops the backup, unless url_sav was never
+   created; else restore it so an aborted transfer leaves the previous copy
+   intact. Skips the zlib .z temp. */
+void back_finalize_backup(httrackp *opt, lien_back *const back,
+                          hts_boolean commit);
 /* Remove the reserved directory a temporary sat in, once the last slot sharing
    it is done; a non-empty one just refuses. No-op outside that directory. */
 void back_tmpdir_drop(const char *tmp);

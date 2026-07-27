@@ -6213,6 +6213,71 @@ static int st_renameover(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+// -#test=refetchbackup <dir>: the #77 re-fetch backup must never leave the
+// resource without a copy, and must not take its temporary name from the mirror
+// namespace (#774, #775).
+static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
+  lien_back *back;
+  char sib[HTS_URLMAXSIZE * 2 + 8];
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "refetchbackup: needs a writable base dir\n");
+    return 1;
+  }
+  back = calloct(1, sizeof(lien_back));
+  if (back == NULL) {
+    fprintf(stderr, "refetchbackup: out of memory\n");
+    return 1;
+  }
+  fconcat(back->url_sav, sizeof(back->url_sav), argv[0], "refetch.bin");
+  snprintf(sib, sizeof(sib), "%s.bak", back->url_sav);
+
+  /* #774: the previous name of the backup is one the mirror can hold. */
+  ro_put(back->url_sav, "old");
+  ro_put(sib, "sibling");
+  back_refetch_backup(opt, back);
+  if (back->tmpfile == NULL || fexist_utf8(back->url_sav)) {
+    fprintf(stderr, "refetchbackup: the previous copy was not moved aside\n");
+    err++;
+  }
+  ro_put(back->url_sav, "new"); /* what filecreate() + the transfer produce */
+  back_finalize_backup(opt, back, HTS_TRUE);
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: the committed copy is not the new one\n");
+    err++;
+  }
+  if (!ro_is(sib, "sibling")) {
+    fprintf(stderr, "refetchbackup: a mirrored <path>.bak was destroyed\n");
+    err++;
+  }
+
+  /* #775: filecreate() failed, so there is nothing to commit to. */
+  ro_put(back->url_sav, "old");
+  back_refetch_backup(opt, back);
+  (void) UNLINK(back->url_sav);
+  back_finalize_backup(opt, back, HTS_TRUE);
+  if (!ro_is(back->url_sav, "old")) {
+    fprintf(stderr, "refetchbackup: a commit with no new copy lost both\n");
+    err++;
+  }
+
+  /* An aborted transfer restores, as before. */
+  back_refetch_backup(opt, back);
+  ro_put(back->url_sav, "partial");
+  back_finalize_backup(opt, back, HTS_FALSE);
+  if (!ro_is(back->url_sav, "old")) {
+    fprintf(stderr, "refetchbackup: an aborted re-fetch kept the partial\n");
+    err++;
+  }
+
+  (void) UNLINK(back->url_sav);
+  (void) UNLINK(sib);
+  freet(back);
+  printf("refetchbackup: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 // -#test=direnum <dir>: enumerate a long+non-ASCII directory via the
 // opendir/readdir wrappers; children must round-trip as UTF-8 (#133,#630).
 static int st_direnum(httrackp *opt, int argc, char **argv) {
@@ -6963,6 +7028,9 @@ static const struct selftest_entry {
      "hts_rename_over(): replace dst, but never delete a dst it did not "
      "replace",
      st_renameover},
+    {"refetchbackup", "<dir>",
+     "the re-fetch backup always leaves a copy, and stays out of the mirror",
+     st_refetchbackup},
     {"direnum", "<dir>",
      "enumerate a long+non-ASCII directory through opendir/readdir",
      st_direnum},

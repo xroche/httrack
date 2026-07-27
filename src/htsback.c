@@ -703,14 +703,17 @@ static hts_boolean back_transfer_failed(const int statuscode) {
   }
 }
 
-/* Commit or restore a re-fetch backup (#77 follow-up): a re-fetch over an
-   existing file moved the good copy to back->tmpfile before truncating url_sav.
-   commit keeps the new file and drops the backup; else restore it so an aborted
-   transfer leaves the previous copy intact. Skips the zlib .z temp. */
-static void back_finalize_backup(httrackp *opt, lien_back *const back,
-                                 const hts_boolean commit) {
+void back_finalize_backup(httrackp *opt, lien_back *const back,
+                          hts_boolean commit) {
   if (back->tmpfile == NULL || back->r.compressed)
     return;
+  /* Nothing to commit to: filecreate() can fail after the backup was taken,
+     and dropping it then loses both copies (#775). */
+  if (commit && !fexist_utf8(back->url_sav)) {
+    hts_log_print(opt, LOG_WARNING, "%s was never created; restoring %s",
+                  back->url_sav, back->tmpfile);
+    commit = HTS_FALSE;
+  }
   if (commit) {
     (void) UNLINK(back->tmpfile); /* new copy is good; drop the backup */
     back_tmpdir_drop(back->tmpfile);
