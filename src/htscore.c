@@ -3774,8 +3774,7 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
         strcpybuff(codebase, heap(ptr)->fil);
       else
         strcpybuff(codebase, heap(heap(ptr)->precedent)->fil);
-      // empty codebase has no last char; codebase-1 would underflow
-      a = codebase[0] != '\0' ? codebase + strlen(codebase) - 1 : codebase;
+      a = hts_lastcharptr(codebase);
       while((*a) && (*a != '/') && (a > codebase))
         a--;
       if (*a == '/')

@@ -324,8 +324,7 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
   curr = _curr;
   strlcpybuff(curr, curr_fil, sizeof(_curr));
   if ((a = strchr(curr, '?')) == NULL) { // cut at the ? (query parameters)
-    // an empty path has no last character: curr-1 would read before the buffer
-    a = curr[0] != '\0' ? curr + strlen(curr) - 1 : curr;
+    a = hts_lastcharptr(curr);
   }
   while((*a != '/') && (a > curr))
     a--;                        // chercher dernier / du chemin courant

@@ -823,7 +823,7 @@ int url_savename(lien_adrfilsave *const afs,
   // Change the extension? e.g. php3 saved as html, cgi as html or gif/xbm
   // depending on the resolved type.
   if (ext_chg && !opt->no_type_change) {
-    char *a = fil + strlen(fil) - 1;
+    char *a = hts_lastcharptr(fil);
 
     if ((opt->debug > 1) && (opt->log != NULL)) {
       if (ext_chg == 1)
@@ -858,7 +858,7 @@ int url_savename(lien_adrfilsave *const afs,
   }
   // Rechercher premier / et dernier .
   {
-    const char *a = fil + strlen(fil) - 1;
+    const char *a = hts_lastcharptr(fil);
 
     // passer structures
     start_pos = fil;
@@ -1203,29 +1203,29 @@ int url_savename(lien_adrfilsave *const afs,
     switch (opt->savename_type % 100) {
     case 4:
     case 5:{                   // séparer par types
-        const char *a = fil + strlen(fil) - 1;
+      const char *a = hts_lastcharptr(fil);
 
-        // passer structures
-        while((a > fil) && (*a != '/') && (*a != '\\'))
+      // passer structures
+      while ((a > fil) && (*a != '/') && (*a != '\\'))
+        a--;
+      if ((*a == '/') || (*a == '\\'))
+        a++;
+
+      // html?
+      if ((ext_chg != 0) ? (ishtml_ext(ext) == 1) : (ishtml(opt, fil) == 1)) {
+        if (opt->savename_type % 100 == 5)
+          strcatbuff(afs->save, "html/");
+      } else {
+        const char *a = hts_lastcharptr(fil);
+
+        while ((a > fil) && (*a != '/') && (*a != '.'))
           a--;
-        if ((*a == '/') || (*a == '\\'))
-          a++;
-
-        // html?
-        if ((ext_chg != 0) ? (ishtml_ext(ext) == 1) : (ishtml(opt, fil) == 1)) {
-          if (opt->savename_type % 100 == 5)
-            strcatbuff(afs->save, "html/");
-        } else {
-          const char *a = fil + strlen(fil) - 1;
-
-          while((a > fil) && (*a != '/') && (*a != '.'))
-            a--;
-          if (*a != '.')
-            strcatbuff(afs->save, "other");
-          else
-            strcatbuff(afs->save, a + 1);
-          strcatbuff(afs->save, "/");
-        }
+        if (*a != '.')
+          strcatbuff(afs->save, "other");
+        else
+          strcatbuff(afs->save, a + 1);
+        strcatbuff(afs->save, "/");
+      }
         /*strcatbuff(save,a); */
         /* add name */
         ADD_STANDARD_NAME(0);
@@ -1258,7 +1258,7 @@ int url_savename(lien_adrfilsave *const afs,
         }
         afs->save[i + j] = '\0';
         // ajouter extension
-        a = fil + strlen(fil) - 1;
+        a = hts_lastcharptr(fil);
         while((a > fil) && (*a != '/') && (*a != '.'))
           a--;
         if (*a == '.') {
@@ -1303,7 +1303,7 @@ int url_savename(lien_adrfilsave *const afs,
   // cela évite les /chez/toto et les /chez/toto/index.html incompatibles
   if (opt->savename_type != -1 &&
       opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD) {
-    char *a = afs->save + strlen(afs->save) - 1;
+    char *a = hts_lastcharptr(afs->save);
 
     while((a > afs->save) && (*a != '.') && (*a != '/'))
       a--;
@@ -1420,8 +1420,10 @@ int url_savename(lien_adrfilsave *const afs,
   if (opt->savename_83 > 0) {
     char *a, *last;
 
-    for(last = afs->save + strlen(afs->save) - 1;
-        last != afs->save && *last != '/' && *last != '\\' && *last != '.'; last--) ;
+    for (last = hts_lastcharptr(afs->save);
+         last != afs->save && *last != '/' && *last != '\\' && *last != '.';
+         last--)
+      ;
     if (*last != '.') {
       last = NULL;
     }
@@ -1676,7 +1678,7 @@ int url_savename(lien_adrfilsave *const afs,
 #endif
         } else {                // utilisé par un AUTRE, changer de nom
           char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-          char *a = afs->save + strlen(afs->save) - 1;
+          char *a = hts_lastcharptr(afs->save);
           size_t stem;
           int n = 2;
           char collisionSeparator =
@@ -1708,7 +1710,7 @@ int url_savename(lien_adrfilsave *const afs,
           // en plus il faut gérer le 8-3 .. pas facile le client
           if (opt->savename_83) {
             int max;
-            char *a = tempo + strlen(tempo) - 1;
+            char *a = hts_lastcharptr(tempo);
 
             while((a > tempo) && (*a != '/'))
               a--;

@@ -903,10 +903,11 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
       coucal hashtable = index->hash;
 
       /* Compute base path for this index - the filename MUST be absolute! */
-      for(slashes = 2, abpath = filename + (int) strlen(filename) - 1;
-          abpath > filename && ((*abpath != '/' && *abpath != '\\')
-                                || --slashes > 0);
-          abpath--) ;
+      for (slashes = 2, abpath = hts_lastcharptr(filename);
+           abpath > filename &&
+           ((*abpath != '/' && *abpath != '\\') || --slashes > 0);
+           abpath--)
+        ;
       index->path[0] = '\0';
       if (slashes == 0 && *abpath != 0) {
         int i;
@@ -1499,10 +1500,11 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 
       /* -------------------- COPY OF THE __New() CODE -------------------- */
       /* Compute base path for this index - the filename MUST be absolute! */
-      for(slashes = 2, abpath = filename + (int) strlen(filename) - 1;
-          abpath > filename && ((*abpath != '/' && *abpath != '\\')
-                                || --slashes > 0);
-          abpath--) ;
+      for (slashes = 2, abpath = hts_lastcharptr(filename);
+           abpath > filename &&
+           ((*abpath != '/' && *abpath != '\\') || --slashes > 0);
+           abpath--)
+        ;
       index->path[0] = '\0';
       if (slashes == 0 && *abpath != 0) {
         int i;

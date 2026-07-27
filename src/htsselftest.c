@@ -6645,9 +6645,10 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* The x[strlen(x) - 1] class (#770). The string starts mid-arena so the byte
-   it must not touch is a real neighbour; poisoned with '#', not 0, or a stray
-   NUL terminator would read as untouched. */
+/* The x[strlen(x) - 1] class (#770) and its pointer spelling x + strlen(x) - 1
+   (#781). The string starts mid-arena so the byte it must not touch is a real
+   neighbour; poisoned with '#', not 0, or a stray NUL terminator would read as
+   untouched. */
 static int st_lastchar(httrackp *opt, int argc, char **argv) {
   enum { off = 8 };
 
@@ -6714,10 +6715,51 @@ static int st_lastchar(httrackp *opt, int argc, char **argv) {
   CHECK(s[0] == '\0');
   CHECK(arena[guard] == '#');
 
+  /* the pointer spelling (#781): on an empty string the address must be the
+     terminating NUL, never the byte before it */
+  REPOISON("");
+  CHECK(hts_lastcharoffset(s) == 0);
+  CHECK(hts_lastcharptr(s) == s);
+  CHECK(*hts_lastcharptr(s) == '\0');
+  *hts_lastcharptr(s) = 'Z'; /* a write through it must stay inside s */
+  CHECK(arena[guard] == '#');
+  CHECK(s[0] == 'Z');
+
+  /* the neighbour must not be mistaken for the string's own last byte */
+  REPOISON("");
+  arena[guard] = '/';
+  CHECK(hts_lastcharptr(s) == s);
+  CHECK(*hts_lastcharptr(s) != '/');
+  CHECK(arena[guard] == '/');
+
+  /* the walk-back loops the sites use must stop at once on an empty string */
+  REPOISON("");
+  {
+    const char *p = hts_lastcharptr(s);
+    int steps = 0;
+
+    while (p > s && *p != '/')
+      p--, steps++;
+    CHECK(steps == 0);
+    CHECK(p == s);
+  }
+
+  REPOISON("ab/");
+  CHECK(hts_lastcharoffset(s) == 2);
+  CHECK(hts_lastcharptr(s) == s + 2);
+  CHECK(*hts_lastcharptr(s) == '/');
+  REPOISON("/");
+  CHECK(hts_lastcharptr(s) == s);
+  CHECK(*hts_lastcharptr(s) == '/');
+  CHECK(arena[guard] == '#');
+
   /* control: the canary must be able to fail, or the checks above prove
      nothing. Clobber it exactly as the unguarded idiom would. */
   REPOISON("");
   s[-1] = '\0';
+  CHECK(arena[guard] != '#');
+  REPOISON("");
+  *(s + strlen(s) - 1) = 'X';
   CHECK(arena[guard] != '#');
 
 #undef REPOISON
@@ -6867,7 +6909,8 @@ static const struct selftest_entry {
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
-    {"lastchar", "", "last-char helpers never index before the buffer (#770)",
+    {"lastchar", "",
+     "last-char helpers never index before the buffer (#770, #781)",
      st_lastchar},
     {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
     {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
