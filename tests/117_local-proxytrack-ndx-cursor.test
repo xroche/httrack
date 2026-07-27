@@ -99,8 +99,9 @@ got=$(items "$dir/tail.ndx")
 test "$got" = 1 || fail "index ending on a full-length entry gave $got keys, expected 1"
 
 # A NUL at offset 0 stops the header field with nothing behind it to inspect.
-printf '\000' >"$dir/nul.ndx"
-got=$(items "$dir/nul.ndx")
+# Not named nul.ndx: Windows resolves NUL.anything to the null device.
+printf '\000' >"$dir/zerobyte.ndx"
+got=$(items "$dir/zerobyte.ndx")
 test "$got" = 0 || fail "NUL-only index gave $got keys, expected 0"
 
 echo "OK: an .ndx field ending on its bound or on the buffer end keeps the walk in place"
