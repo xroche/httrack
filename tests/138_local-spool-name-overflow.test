@@ -28,23 +28,7 @@ serverlog="${tmpdir}/server.log"
 "$python" "$server" --root "$(nativepath "${testdir}/server-root")" \
     >"$serverlog" 2>&1 &
 serverpid=$!
-port=
-for _ in $(seq 1 50); do
-    line=$(head -n1 "$serverlog" 2>/dev/null)
-    if test "${line%% *}" == "PORT"; then
-        port="${line#PORT }"
-        break
-    fi
-    kill -0 "$serverpid" 2>/dev/null || {
-        echo "server exited early: $(cat "$serverlog")"
-        exit 1
-    }
-    sleep 0.1
-done
-test -n "$port" || {
-    echo "could not discover server port"
-    exit 1
-}
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 
 which httrack >/dev/null || {
     echo "could not find httrack"
