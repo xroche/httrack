@@ -986,3 +986,15 @@ Sitemap address:
 Διεύθυνση χάρτη ιστότοπου:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Διεύθυνση χάρτη ιστότοπου προς ανάγνωση αντί για αναζήτηση στον ιστότοπο. Αφήστε το κενό για έλεγχο του robots.txt και έπειτα του /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Εγγραφή ευρετηρίου CDXJ του αρχείου WARC
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Εγγραφή και ταξινομημένου ευρετηρίου CDXJ με όλες τις εγγραφές του αρχείου WARC, για εργαλεία αναπαραγωγής.
+Package the crawl as a WACZ file
+Συσκευασία της ανίχνευσης σε αρχείο WACZ
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Συγκέντρωση του αρχείου WARC, του ευρετηρίου CDXJ και των ειδώλων σελίδων σε ένα αρχείο WACZ. Ενεργοποιεί και το αρχείο WARC και το ευρετήριο CDXJ.
+WARC segment size limit:
+Μέγιστο μέγεθος τμήματος WARC:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Έναρξη νέου τμήματος WARC μόλις το τρέχον ξεπεράσει αυτόν τον αριθμό byte. Αφήστε κενό ή 0 για ένα ενιαίο αρχείο.

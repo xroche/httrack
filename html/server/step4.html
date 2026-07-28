@@ -192,6 +192,9 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:sitemapurl:--sitemap-url "}${html:sitemapurl}${test:sitemapurl:"}
 	${test:warc:--warc}
 	${test:warcfile:--warc-file "}${arg:warcfile}${test:warcfile:"}
+	${test:warcmaxsize:--warc-max-size=}${unquoted:warcmaxsize}
+	${test:warccdx:--warc-cdx}
+	${test:wacz:--wacz}
 	${test:changes:--changes}
 	${test:singlefile:--single-file}
 	${test:singlefilemax:--single-file-max-size=}${unquoted:singlefilemax}
@@ -249,6 +252,9 @@ Sitemap=${ztest:sitemap:0:1}
 SitemapUrl=${sitemapurl}
 Warc=${ztest:warc:0:1}
 WarcFile=${warcfile}
+WarcMaxSize=${warcmaxsize}
+WarcCdx=${ztest:warccdx:0:1}
+Wacz=${ztest:wacz:0:1}
 Changes=${ztest:changes:0:1}
 SingleFile=${ztest:singlefile:0:1}
 SingleFileMaxSize=${singlefilemax}

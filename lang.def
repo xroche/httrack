@@ -1042,6 +1042,18 @@ LANG_WARCFILE
 WARC archive name:
 LANG_WARCFILETIP
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
+LANG_WARCCDX
+Write a CDXJ index of the WARC archive
+LANG_WARCCDXTIP
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+LANG_WACZ
+Package the crawl as a WACZ file
+LANG_WACZTIP
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+LANG_WARCMAXSIZE
+WARC segment size limit:
+LANG_WARCMAXSIZETIP
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 LANG_CHANGES
 Report what changed since the previous mirror
 LANG_CHANGESTIP
