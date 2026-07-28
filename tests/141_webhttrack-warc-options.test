@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# The WARC controls on the "Log, index, cache" tab must reach the engine: the
-# generated command line and the winprofile.ini the reload path reads back.
+# The WARC controls must reach both the generated command line and winprofile.ini.
 
 set -euo pipefail
 
