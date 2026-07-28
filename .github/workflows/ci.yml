@@ -178,8 +178,14 @@ jobs:
 
       - name: Test
         timeout-minutes: 20
+        # Each test holds a python server plus a crawl, so the ceiling is memory,
+        # not cores: at ncpu*2 macos-15 SIGKILLs test servers and the -E/-M timing
+        # tests miss their budgets. Stay at ncpu. The echo is here because the
+        # image's core count is what decides this, and it is not otherwise logged.
         run: |
-          jobs=$(( $(sysctl -n hw.ncpu) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          ncpu=$(sysctl -n hw.ncpu)
+          echo "ncpu=$ncpu memsize=$(sysctl -n hw.memsize)"
+          jobs=$ncpu; [ "$jobs" -le 8 ] || jobs=8
           make check -j"$jobs"
 
       - name: Print the test log on failure
