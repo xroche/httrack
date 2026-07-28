@@ -20,9 +20,12 @@ assert_crash() {
     test "$rc" -eq 134 || exit 1
     grep -q "Deliberate '$kind' crash requested" <<<"$out" || exit 1
     grep -q "^Caught signal $signum$" <<<"$out" || exit 1
-    # Symbol names are unreliable under -fvisibility=hidden; match the frame
-    # address form only.
-    grep -q '\[0x[0-9a-f][0-9a-f]*\]' <<<"$out" || exit 1
+    # A frame, or the notice where the OS has no backtrace() (anything but
+    # Linux). Symbol names are unreliable under -fvisibility=hidden, and the
+    # frame format is libc-specific, so match an address only.
+    grep -qE '0x[0-9a-f]+|No stack trace available' <<<"$out" || exit 1
+    # The handler ran to its end rather than faulting midway.
+    grep -q "Please report the problem" <<<"$out" || exit 1
 }
 
 assert_crash segv 11
