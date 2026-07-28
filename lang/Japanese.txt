@@ -984,3 +984,15 @@ Sitemap address:
 サイトマップのアドレス:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 サイトを探索する代わりに読み込むサイトマップのアドレス。空欄にすると robots.txt、次に /sitemap.xml を探索します。
+Write a CDXJ index of the WARC archive
+WARC アーカイブの CDXJ インデックスを書き出す
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+WARC アーカイブの全レコードを列挙したソート済み CDXJ インデックスも書き出します。リプレイツール向けです。
+Package the crawl as a WACZ file
+クロールを WACZ ファイルにまとめる
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+WARC アーカイブ、CDXJ インデックス、ミラーしたページを 1 つの WACZ ファイルにまとめます。WARC アーカイブと CDXJ インデックスも有効になります。
+WARC segment size limit:
+WARC セグメントの最大サイズ:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+現在のセグメントがこのバイト数を超えたら新しい WARC セグメントを開始します。空欄または 0 で単一ファイルのままにします。

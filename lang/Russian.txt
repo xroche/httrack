@@ -984,3 +984,15 @@ Sitemap address:
 Адрес карты сайта:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Адрес карты сайта, которую нужно прочитать вместо опроса сайта; оставьте пустым, чтобы проверить robots.txt, затем /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Записать CDXJ-индекс WARC-архива
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Также записывать отсортированный CDXJ-индекс со всеми записями WARC-архива для средств воспроизведения.
+Package the crawl as a WACZ file
+Упаковать обход в файл WACZ
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Объединить WARC-архив, его CDXJ-индекс и страницы зеркала в один файл WACZ; включает WARC-архив и CDXJ-индекс.
+WARC segment size limit:
+Максимальный размер сегмента WARC:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Начинать новый сегмент WARC, когда текущий превысит указанное число байт; оставьте пустым или 0 для одного файла.
