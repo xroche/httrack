@@ -443,6 +443,36 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # OpenSSL 4.0 removes the API 3.x deprecated. Building with that set hidden
+  # keeps the engine ready for it: a deprecated call fails here rather than the
+  # day a distro moves. Compile-only, since the headers are what is under test.
+  openssl-no-deprecated:
+    name: build (OpenSSL, no deprecated API)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Configure (deprecated OpenSSL API hidden)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CPPFLAGS=-DOPENSSL_NO_DEPRECATED
+          # A build with https off would pass this job vacuously.
+          grep -q "define HTS_USEOPENSSL 1" config.h
+
+      - name: Build
+        run: make -j"$(nproc)"
+
   # Validate the Debian packaging via the same script maintainers release with.
   # One amd64/gcc run is enough: packaging (control/rules/manifest/lintian/quilt
   # source build) is arch- and compiler-independent, and the build matrix above
