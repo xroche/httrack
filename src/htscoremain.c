@@ -48,6 +48,7 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 #include "htscharset.h"
 #include "htsselftest.h"
+#include "htscrashtest.h"
 #include "htsmd5.h"
 
 #include <ctype.h>
@@ -92,19 +93,6 @@ extern int IPV6_resolver;
     } \
   } \
 } while(0)
-
-#ifdef HTS_CRASH_TEST
-static __attribute__ ((noinline)) void fourty_two(void) {
-  char *const ptr = (char*) (uintptr_t) 0x42;
-  (*ptr)++;
-}
-static __attribute__ ((noinline)) void do_really_crash(void) {
-  fourty_two();
-}
-static __attribute__ ((noinline)) void do_crash(void) {
-  do_really_crash();
-}
-#endif
 
 HTSEXT_API int hts_main(int argc, char **argv) {
   httrackp *opt = hts_create_opt();
@@ -688,6 +676,29 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
         htsmain_free();
         return code;
+      }
+    }
+  }
+
+  /* -#c[=KIND]: crash on purpose, to test crash handlers only (see
+     htscrashtest.h). Handled here so it needs no dummy URL either. */
+  {
+    int k;
+
+    for (k = 1; k < argc; k++) {
+      const char *const a = argv[k];
+
+      if (a[0] == '-' && a[1] == '#' && a[2] == 'c' &&
+          (a[3] == '\0' || a[3] == '=')) {
+        if (!hts_crash_test(a[3] == '=' ? a + 4 : NULL)) {
+          char s[256];
+
+          snprintf(s, sizeof(s), "Option #c expects one of: %s",
+                   hts_crash_test_kinds());
+          HTS_PANIC_PRINTF(s);
+        }
+        htsmain_free();
+        return -1;
       }
     }
   }
@@ -2267,12 +2278,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 fprintf(stderr, "** AUTOCHECK OK\n");
                 return 0;
                 break;
-
-#ifdef HTS_CRASH_TEST
-              case 'c':  /* crash test */
-                do_crash();
-                break;
-#endif
 
               default:
                 printf("Internal option %c not recognized\n", *com);
