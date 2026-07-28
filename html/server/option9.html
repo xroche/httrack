@@ -100,6 +100,8 @@ ${do:end-if}
 
 <!-- clear if not checked -->
 <input type="hidden" name="warc" value="">
+<input type="hidden" name="warccdx" value="">
+<input type="hidden" name="wacz" value="">
 <input type="hidden" name="changes" value="">
 <input type="hidden" name="norecatch" value="">
 <input type="hidden" name="logf" value="">
@@ -120,6 +122,22 @@ ${LANG_WARCFILE}
 <input name="warcfile" value="${warcfile}" size="40"
 			title='${html:LANG_WARCFILETIP}' onMouseOver="info('${html:LANG_WARCFILETIP}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
+<br><br>
+
+${LANG_WARCMAXSIZE}
+<input name="warcmaxsize" value="${warcmaxsize}" size="12"
+			title='${html:LANG_WARCMAXSIZETIP}' onMouseOver="info('${html:LANG_WARCMAXSIZETIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>
+<br><br>
+
+<input type="checkbox" name="warccdx" ${checked:warccdx}
+			title='${html:LANG_WARCCDXTIP}' onMouseOver="info('${html:LANG_WARCCDXTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+> ${LANG_WARCCDX}
+<br><br>
+
+<input type="checkbox" name="wacz" ${checked:wacz}
+			title='${html:LANG_WACZTIP}' onMouseOver="info('${html:LANG_WACZTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+> ${LANG_WACZ}
 <br><br>
 
 <input type="checkbox" name="changes" ${checked:changes}

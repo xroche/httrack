@@ -984,3 +984,15 @@ Sitemap address:
 Adresa hartii sitului:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Adresa unei harti a sitului care sa fie citita în loc de sondarea sitului; lasati gol pentru a sonda robots.txt, apoi /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Scrie un index CDXJ al arhivei WARC
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Scrie si un index CDXJ sortat cu toate inregistrarile arhivei WARC, pentru instrumentele de redare.
+Package the crawl as a WACZ file
+Impacheteaza parcurgerea intr-un fisier WACZ
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Reuneste arhiva WARC, indexul sau CDXJ si paginile oglindite intr-un singur fisier WACZ; implica arhiva WARC si indexul CDXJ.
+WARC segment size limit:
+Dimensiunea maxima a unui segment WARC:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Incepe un nou segment WARC cand cel curent depaseste acest numar de octeti; lasati gol sau 0 pentru un singur fisier.

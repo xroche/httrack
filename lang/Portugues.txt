@@ -984,3 +984,15 @@ Sitemap address:
 Endereço do mapa do site:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Endereço de um mapa do site a ler em vez de sondar o site; deixe em branco para sondar robots.txt e depois /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Escrever um índice CDXJ do arquivo WARC
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Escrever também um índice CDXJ ordenado com todos os registos do arquivo WARC, para ferramentas de reprodução.
+Package the crawl as a WACZ file
+Empacotar o rastreio num ficheiro WACZ
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Juntar o arquivo WARC, o seu índice CDXJ e as páginas do espelho num único ficheiro WACZ; implica o arquivo WARC e o índice CDXJ.
+WARC segment size limit:
+Tamanho máximo do segmento WARC:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Iniciar um novo segmento WARC quando o atual ultrapassar este número de bytes; deixe em branco ou 0 para um único ficheiro.

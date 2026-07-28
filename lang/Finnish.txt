@@ -986,3 +986,15 @@ Sitemap address:
 Sivukartan osoite:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Luettavan sivukartan osoite sivuston luotaamisen sijaan; jätä tyhjäksi, jolloin tarkistetaan robots.txt ja sitten /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Kirjoita WARC-arkiston CDXJ-hakemisto
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Kirjoita myös lajiteltu CDXJ-hakemisto, jossa on kaikki WARC-arkiston tietueet, toistotyökaluja varten.
+Package the crawl as a WACZ file
+Paketoi imurointi WACZ-tiedostoksi
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Kokoa WARC-arkisto, sen CDXJ-hakemisto ja peilatut sivut yhteen WACZ-tiedostoon; ottaa käyttöön myös WARC-arkiston ja CDXJ-hakemiston.
+WARC segment size limit:
+WARC-osan enimmäiskoko:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Aloita uusi WARC-osa, kun nykyinen ylittää tämän tavumäärän; jätä tyhjäksi tai 0, jolloin tiedosto pysyy yhtenä.

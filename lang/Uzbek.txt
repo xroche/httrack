@@ -984,3 +984,15 @@ Sitemap address:
 Sayt xaritasi manzili:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Saytni tekshirish o’rniga o’qiladigan sayt xaritasi manzili; robots.txt, so’ngra /sitemap.xml ni tekshirish uchun bo’sh qoldiring.
+Write a CDXJ index of the WARC archive
+WARC arxivining CDXJ indeksini yozish
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+WARC arxividagi barcha yozuvlarni ro’yxatlovchi tartiblangan CDXJ indeksini ham yozish, qayta ijro vositalari uchun.
+Package the crawl as a WACZ file
+Qidiruvni WACZ fayliga paketlash
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+WARC arxivi, uning CDXJ indeksi va ko’zgu sahifalarini bitta WACZ fayliga jamlash; WARC arxivi va CDXJ indeksini yoqadi.
+WARC segment size limit:
+WARC segmentining eng katta hajmi:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Joriy segment shu baytlar sonidan oshganda yangi WARC segmentini boshlash; bitta fayl uchun bo’sh qoldiring yoki 0 kiriting.

@@ -984,3 +984,15 @@ Sitemap address:
 Sitemap 地址：
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 要读取的 Sitemap 地址，用来代替自动探测；留空则先探测 robots.txt 再探测 /sitemap.xml。
+Write a CDXJ index of the WARC archive
+写入 WARC 归档的 CDXJ 索引
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+同时写入一个排序的 CDXJ 索引，列出 WARC 归档中的每条记录，供回放工具使用。
+Package the crawl as a WACZ file
+将本次抓取打包为 WACZ 文件
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+将 WARC 归档、CDXJ 索引和镜像页面打包成一个 WACZ 文件；这会同时启用 WARC 归档和 CDXJ 索引。
+WARC segment size limit:
+WARC 分段大小上限：
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+当前分段超过该字节数时开始新的 WARC 分段；留空或填 0 则保持单个文件。
