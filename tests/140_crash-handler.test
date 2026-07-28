@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# -#c crashes on purpose so the fatal-signal handler can be tested. Checks the
+# handler still catches, announces and backtraces each fault it claims to
+# handle. Not in the Windows glob: MSVC's abort() can raise a modal fault
+# dialog, which would wedge the runner rather than fail.
+
+set -eu
+
+ulimit -c 0 # a deliberate crash must not litter the box with cores
+
+# Dies from a caught fault, announcing it was deliberate and printing the
+# handler's own report. The handler ends in abort(), so the shell always sees
+# SIGABRT (134) whatever the original signal was.
+assert_crash() {
+    local kind="$1" signum="$2"
+    local out rc=0
+
+    out=$(httrack "-#c=$kind" 2>&1) || rc=$?
+    test "$rc" -eq 134 || exit 1
+    grep -q "Deliberate '$kind' crash requested" <<<"$out" || exit 1
+    grep -q "^Caught signal $signum$" <<<"$out" || exit 1
+    # Symbol names are unreliable under -fvisibility=hidden; match the frame
+    # address form only.
+    grep -q '\[0x[0-9a-f][0-9a-f]*\]' <<<"$out" || exit 1
+}
+
+assert_crash segv 11
+assert_crash abort 6
+
+# No kind means segv.
+rc=0
+out=$(httrack -#c 2>&1) || rc=$?
+test "$rc" -eq 134 || exit 1
+grep -q "Deliberate 'segv' crash requested" <<<"$out" || exit 1
+
+# An unknown kind is a usage error: the exit is the usual panic 255, not a
+# death, and the diagnostic names the kinds.
+rc=0
+err=$(httrack -#c=bogus 2>&1) || rc=$?
+test "$rc" -eq 255 || exit 1
+grep -q "expects one of:" <<<"$err" || exit 1
+grep -q "segv" <<<"$err" || exit 1
+if grep -q "Deliberate" <<<"$err"; then
+    exit 1
+fi
+
+# -#C (capital) is the cache lister and must not be swallowed by -#c.
+rc=0
+err=$(httrack -#C 2>&1) || rc=$?
+test "$rc" -eq 255 || exit 1
+if grep -q "Deliberate" <<<"$err"; then
+    exit 1
+fi
