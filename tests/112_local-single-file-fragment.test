@@ -50,17 +50,7 @@ serverlog="${tmpdir}/server.log"
 : >"$serverlog"
 "$python" "$server" --root "$(nativepath "$doc")" >"$serverlog" 2>&1 &
 serverpid=$!
-port=
-for _ in $(seq 1 50); do
-    line=$(head -n1 "$serverlog" 2>/dev/null)
-    if test "${line%% *}" == "PORT"; then
-        port="${line#PORT }"
-        break
-    fi
-    kill -0 "$serverpid" 2>/dev/null || fail "server exited: $(cat "$serverlog")"
-    sleep 0.1
-done
-test -n "$port" || fail "could not discover server port"
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 base="http://127.0.0.1:${port}"
 
 which httrack >/dev/null || fail "could not find httrack"

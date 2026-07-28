@@ -66,6 +66,27 @@ stop_server() {
     return 0
 }
 
+# Echo the port local-server.py announces on $1 (its log), $2 being its pid.
+# Waits 30s: a cold Python start under a parallel `make check -jN` lags well
+# past a second, and 5s was tight enough that macos-15 missed it on 15 tests.
+# Matches anywhere, since a warning merged via 2>&1 can precede the line.
+discover_server_port() {
+    local log=$1 pid=$2 line _i
+    for _i in $(seq 1 300); do
+        if line=$(grep -m1 '^PORT ' "$log" 2>/dev/null); then
+            printf '%s\n' "${line#PORT }"
+            return 0
+        fi
+        kill -0 "$pid" 2>/dev/null || {
+            echo "server exited early: $(cat "$log" 2>/dev/null)" >&2
+            return 1
+        }
+        sleep 0.1
+    done
+    echo "could not discover server port: $(cat "$log" 2>/dev/null)" >&2
+    return 1
+}
+
 # Dump and clear the crawl logs a hard-killed test leaves in TMPDIR (its cleanup
 # trap never ran): hts-log.txt alone records "More than N seconds passed.. giving
 # up", so a wedge past --max-time is undiagnosable without it (#605).
