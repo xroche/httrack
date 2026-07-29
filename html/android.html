@@ -158,21 +158,28 @@ interface. It needs Android 7.0 or later, and is available on
     <li><small><b>Limits</b>: caps on depth, size, time, speed, and number of connections.</small></li>
     <li><small><b>Flow Control</b>: simultaneous connections, timeouts, and retries.</small></li>
     <li><small><b>Links</b>: how far to follow links, and which extra files to fetch.</small></li>
-    <li><small><b>Build</b>: how the saved files and folders are named.</small></li>
+    <li><small><b>Build</b>: how the saved files and folders are named, and whether
+    assets are inlined into the page as <tt>data:</tt> URIs.</small></li>
     <li><small><b>Browser ID</b>: the user-agent, language, and headers sent to servers.</small></li>
-    <li><small><b>Spider</b>: cookies, robots.txt handling, and request behavior.</small></li>
-    <li><small><b>Proxy address</b>: proxy host and port.</small></li>
-    <li><small><b>Log, Index, Cache</b>: log files, the search index, and the update cache.</small></li>
+    <li><small><b>Spider</b>: cookies, robots.txt policy, sitemap seeding, and request behavior.</small></li>
+    <li><small><b>Proxy address</b>: the proxy protocol (HTTP, SOCKS5, or an HTTP
+    CONNECT tunnel), its address, and its port.</small></li>
+    <li><small><b>Log, Index, Cache</b>: log files, the top index, the update cache,
+    a WARC archive of the crawl, and a report of what changed since the previous
+    mirror.</small></li>
     <li><small><b>Type/MIME associations</b>: map file extensions to MIME types.</small></li>
     <li><small><b>Experts Only</b>: scan mode, how far the crawl may travel, and link rewriting.</small></li>
   </ul>
-  <br><center><img src="img/android_scanrules.png" width="320" alt="Scan Rules tab" border="0"></center>
-  <br><center><img src="img/android_experts.png" width="320" alt="Experts Only tab" border="0"></center>
+  <br><center><img src="img/android_scanrules.png" width="320" alt="Scan Rules tab" border="0"><br><small>Scan Rules</small></center>
+  <br><center><img src="img/android_build.png" width="320" alt="Build tab" border="0"><br><small>Build</small></center>
+  <br><center><img src="img/android_spider.png" width="320" alt="Spider tab" border="0"><br><small>Spider</small></center>
+  <br><center><img src="img/android_logindexcache.png" width="320" alt="Log, Index, Cache tab" border="0"><br><small>Log, Index, Cache</small></center>
+  <br><center><img src="img/android_experts.png" width="320" alt="Experts Only tab" border="0"><br><small>Experts Only</small></center>
   <br><small>The <a href="step9.html">desktop option reference</a> describes every
-  setting in full. A few desktop options are missing or fixed on Android: the proxy
-  tab has a host and port but no login and password, the download folder is fixed
-  inside the app's storage so there is no output-path setting, and the MIME table
-  holds up to eight entries.</small>
+  setting in full. A few desktop options are missing or narrower on Android: the
+  proxy tab has no login and password, the download folder stays inside the app's
+  own storage so tapping <b>Base path</b> browses within it but cannot leave it, and
+  the MIME table holds up to eight entries.</small>
 <br><br>
 
   <li><b>Run the mirror</b></li>
