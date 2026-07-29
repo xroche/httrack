@@ -1,0 +1,72 @@
+# Documentation screenshots: drive the WebHTTrack UI and capture every screen.
+# Manual, and deliberately not part of the build gate -- run it after adding or
+# changing a UI page, and the artifact is the new set of shots.
+name: screenshots
+
+on:
+  # A push trigger as well as the button: workflow_dispatch is only offered for
+  # workflows that already exist on the default branch.
+  push:
+    paths:
+      - '.github/workflows/screenshots.yml'
+      - 'tools/screenshot-walk.py'
+  workflow_dispatch:
+    inputs:
+      lang:
+        description: 'lang.indexes number to render the UI in (1 = English)'
+        default: '1'
+      scale:
+        description: 'device pixel ratio'
+        default: '2'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+          make -j"$(nproc)" -C src htsserver
+
+      - name: Install the browser
+        run: |
+          set -euo pipefail
+          pip install --quiet playwright
+          playwright install --with-deps chromium
+
+      - name: Capture
+        env:
+          LANGN: ${{ inputs.lang || '1' }}
+          SCALE: ${{ inputs.scale || '2' }}
+        run: |
+          set -euo pipefail
+          # --root is the dist root; the source tree already holds every piece
+          # htsserver reads, so this needs no install.
+          python3 tools/screenshot-walk.py --htsserver src/htsserver --root . \
+            --lang "$LANGN" --scale "$SCALE" --out shots
+
+      - name: Upload the screens
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: screenshots
+          path: shots
+          if-no-files-found: error
