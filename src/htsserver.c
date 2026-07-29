@@ -113,18 +113,21 @@ static const struct {
     {"css", "text/css"},
     {"js", "text/javascript"},
     {"txt", "text/plain"},
-    {"xml", "text/xml"},
+    {"xml", "application/xml"},
     {"gif", "image/gif"},
     {"png", "image/png"},
     {"jpg", "image/jpeg"},
     {"jpeg", "image/jpeg"},
+    {"webp", "image/webp"},
+    {"avif", "image/avif"},
     {"svg", "image/svg+xml"},
+    /* x-icon, not the registered vnd.microsoft.icon: what browsers send. */
     {"ico", "image/x-icon"},
     {NULL, NULL},
 };
 
-/* Content type of file, NULL if its extension is unlisted. Matched on the real
-   extension: a bare strstr() also fires on "foo.js.bak" and on a directory. */
+/* Content type of file, NULL if its extension is unlisted. Matched on the last
+   segment's whole extension, never on a substring of the path. */
 static const char *server_content_type(const char *file) {
   const char *const slash = strrchr(file, '/');
   const char *const dot = strrchr(slash != NULL ? slash : file, '.');
