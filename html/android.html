@@ -148,31 +148,11 @@ interface. It needs Android 7.0 or later, and is available on
 <br><br>
 
   <li><b>Options (optional)</b></li>
-  <br><small>The <b>Options</b> screen holds the crawl settings, grouped into
-  eleven tabs. It uses the same profile format as the desktop version, so a tab you
-  know from WinHTTrack behaves the same way here.</small>
+  <br><small>The <b>Options</b> screen holds the crawl settings, grouped into eleven
+  tabs. The defaults suit a first mirror, so you can leave the whole screen alone
+  and tap <b>Start</b>. Every setting is described in the
+  <a href="#optionreference">option reference</a> at the end of this page.</small>
   <br><br><center><img src="img/android_options.png" width="320" alt="Options tab list" border="0"></center>
-  <br><small>The tabs are:</small>
-  <ul>
-    <li><small><b>Scan Rules</b>: wildcard filters for the addresses to keep or skip.</small></li>
-    <li><small><b>Limits</b>: caps on depth, size, time, speed, and number of connections.</small></li>
-    <li><small><b>Flow Control</b>: simultaneous connections, timeouts, and retries.</small></li>
-    <li><small><b>Links</b>: how far to follow links, and which extra files to fetch.</small></li>
-    <li><small><b>Build</b>: how the saved files and folders are named.</small></li>
-    <li><small><b>Browser ID</b>: the user-agent, language, and headers sent to servers.</small></li>
-    <li><small><b>Spider</b>: cookies, robots.txt handling, and request behavior.</small></li>
-    <li><small><b>Proxy address</b>: proxy host and port.</small></li>
-    <li><small><b>Log, Index, Cache</b>: log files, the search index, and the update cache.</small></li>
-    <li><small><b>Type/MIME associations</b>: map file extensions to MIME types.</small></li>
-    <li><small><b>Experts Only</b>: scan mode, how far the crawl may travel, and link rewriting.</small></li>
-  </ul>
-  <br><center><img src="img/android_scanrules.png" width="320" alt="Scan Rules tab" border="0"></center>
-  <br><center><img src="img/android_experts.png" width="320" alt="Experts Only tab" border="0"></center>
-  <br><small>The <a href="step9.html">desktop option reference</a> describes every
-  setting in full. A few desktop options are missing or fixed on Android: the proxy
-  tab has a host and port but no login and password, the download folder is fixed
-  inside the app's storage so there is no output-path setting, and the MIME table
-  holds up to eight entries.</small>
 <br><br>
 
   <li><b>Run the mirror</b></li>
@@ -197,6 +177,246 @@ interface. It needs Android 7.0 or later, and is available on
   <tt>index.html</tt> there browses a mirror without the app.</small>
 
 </ol>
+
+<br><br>
+<hr>
+<h3><a name="optionreference"></a>Option reference</h3>
+
+<p><small>Every setting on the <b>Options</b> screen, tab by tab, in the order the
+tabs appear. Anything left empty keeps the engine's default, which is what an
+unmodified project uses.</small></p>
+
+<p><small>Three things work differently from the desktop version: the proxy tab has
+no login and password, the download folder stays inside the app's own storage so
+tapping <b>Base path</b> browses within it but cannot leave it, and the MIME table
+holds eight rows rather than an unbounded list.</small></p>
+
+<h4><a name="opt_scanrules"></a>Scan Rules</h4>
+<center><img src="img/android_scanrules.png" width="320" alt="Scan Rules tab" border="0"></center>
+<p><small>Filters decide which addresses the crawl keeps and which it drops, and
+they are the setting most worth learning: a mirror that grabs too much or misses
+its images is nearly always a filter problem. Type the rules into the single field,
+separated by spaces, as many as you like on one line.</small></p>
+<p><small>A rule starts with <tt>+</tt> to accept or <tt>-</tt> to reject, and
+<tt>*</tt> matches any run of characters. Later rules win over earlier ones, so put
+the general rule first and the exception after it. <tt>+*.png</tt> takes every PNG,
+<tt>-ad.doubleclick.net/*</tt> drops a whole host, and <tt>-mime:application/foobar</tt>
+filters on the type the server reports rather than on the address. The
+<a href="filters.html">filter reference</a> covers the full syntax.</small></p>
+
+<h4><a name="opt_limits"></a>Limits</h4>
+<center><img src="img/android_limits.png" width="320" alt="Limits tab" border="0"></center>
+<ul>
+<li><small><b>Maximum link scanning depth</b>: how many clicks from the start pages
+the crawl may travel. Empty means no limit, which is safe because the travel
+settings still hold the crawl to the site you asked for.</small></li>
+<li><small><b>Maximum external depth</b>: how far to follow links that leave the
+site or that the filters rejected. Zero never leaves. This overrides the filters,
+so raise it in small steps.</small></li>
+<li><small><b>Max size of any HTML file (B)</b> and <b>Max size of any non-HTML
+file</b>: per-file ceilings in bytes. A file above the ceiling is skipped, not
+truncated.</small></li>
+<li><small><b>Max site size</b>: total bytes the whole mirror may reach.</small></li>
+<li><small><b>Max time</b>: seconds the mirror may run before it stops.</small></li>
+<li><small><b>Max transfer rate</b>: bytes per second, so HTTrack does not take the
+whole connection.</small></li>
+<li><small><b>Max connections / seconds</b>: how often a new connection may be
+opened. Fractions work, so <tt>0.1</tt> is one connection every ten seconds. This
+is the main courtesy to the server you are copying.</small></li>
+<li><small><b>Maximum number of links</b>: how many addresses the engine tracks at
+once. The crawl stops dead when it hits this, and a large value costs
+memory.</small></li>
+</ul>
+
+<h4><a name="opt_flowcontrol"></a>Flow Control</h4>
+<center><img src="img/android_flowcontrol.png" width="320" alt="Flow Control tab" border="0"></center>
+<ul>
+<li><small><b>Max simultaneous connections</b>: parallel transfers. Lower it to one
+or two when the files are large or the server is fragile.</small></li>
+<li><small><b>Persistent connections (Keep-Alive)</b>: reuse one connection for
+several files. Worth keeping on, especially over mobile data, where setting up a
+connection costs more than the file.</small></li>
+<li><small><b>File timeout</b>: seconds to wait for a server that has gone
+quiet.</small></li>
+<li><small><b>Cancel all links from host if timeout occurs</b>: one timeout
+abandons every remaining file on that host. Blunt, and easy to regret on a slow
+connection.</small></li>
+<li><small><b>Retries</b>: attempts after a recoverable error. It will not rescue a
+404.</small></li>
+<li><small><b>Minimum admissible transfer rate</b>: a transfer slower than this is
+given up on.</small></li>
+<li><small><b>Cancel all links from host if too slow</b>: the same blunt rule
+applied to slow hosts.</small></li>
+<li><small><b>Pause between downloads (sec, MIN:MAX)</b>: wait a random time
+between files. <tt>2:5</tt> waits two to five seconds, which keeps a small site
+from noticing you at all.</small></li>
+</ul>
+
+<h4><a name="opt_links"></a>Links</h4>
+<center><img src="img/android_links.png" width="320" alt="Links tab" border="0"></center>
+<ul>
+<li><small><b>Try to catch all URLs (even in unknown tags/code)</b>: hunt for
+addresses inside script and unknown markup. Finds links nothing else will, at the
+cost of some requests for things that were never addresses.</small></li>
+<li><small><b>Get non-HTML files related to a link</b>: fetch the images, archives
+and other assets a page refers to, including ones hosted
+elsewhere.</small></li>
+<li><small><b>Test all links (even forbidden ones)</b>: request every link just to
+see whether it resolves, and record the failures in the log. Slow, and only useful
+when checking a site rather than copying it.</small></li>
+<li><small><b>Get HTML files first!</b>: fetch pages before images, so the shape of
+the site is known early.</small></li>
+<li><small><b>Keep www. prefix</b>, <b>Keep double slashes</b>, <b>Keep query-string
+order</b>: each switches off one part of the URL-hack normalisation on the
+<a href="#opt_spider">Spider</a> tab. Turn one on only when the site genuinely
+serves different content for <tt>www.example.com</tt> and <tt>example.com</tt>, for
+a doubled slash, or for reordered query parameters.</small></li>
+</ul>
+
+<h4><a name="opt_build"></a>Build</h4>
+<center><img src="img/android_build.png" width="320" alt="Build tab" border="0"></center>
+<ul>
+<li><small><b>Structure type (how links are saved)</b>: fifteen layouts for the
+local copy. The default keeps the site's own folder tree; the others sort files by
+kind, or drop the domain from the path.</small></li>
+<li><small><b>DOS names (8+3)</b> and <b>ISO9660 names (CDROM)</b>: cut filenames
+down for old filesystems and for burning to disc.</small></li>
+<li><small><b>No error pages</b>: skip writing a local page where the server
+answered with an error.</small></li>
+<li><small><b>No external pages</b>: replace links that leave the mirror with a page
+warning that you need to be online.</small></li>
+<li><small><b>Hide passwords</b>: keep credentials out of the rewritten
+links.</small></li>
+<li><small><b>Hide query strings</b>: drop the <tt>?a=b</tt> part from local
+filenames. Tidier, but two pages that differed only by query string then
+collide.</small></li>
+<li><small><b>Do not purge old files</b>: on an update, keep local files that have
+disappeared from the site.</small></li>
+<li><small><b>Inline assets as data: URIs (self-contained pages)</b>: embed images
+and stylesheets inside the HTML, so a page is one file you can send
+anywhere.</small></li>
+</ul>
+
+<h4><a name="opt_browserid"></a>Browser ID</h4>
+<center><img src="img/android_browserid.png" width="320" alt="Browser ID tab" border="0"></center>
+<ul>
+<li><small><b>Browser identity</b>: the <tt>User-Agent</tt> sent with every request.
+Some sites serve different pages, or refuse to answer, depending on
+it.</small></li>
+<li><small><b>HTML footer</b>: a comment added to each saved page. The three
+<tt>%s</tt> stand for the host, the file, and the date of the mirror, in that
+order.</small></li>
+<li><small><b>Languages</b>: the <tt>Accept-Language</tt> header, for sites that
+serve translations.</small></li>
+<li><small><b>Additional HTTP Headers</b>: one extra header line, written as
+<tt>Name: value</tt>.</small></li>
+<li><small><b>Default referer URL</b>: the <tt>Referer</tt> sent with requests, for
+sites that check where you came from.</small></li>
+</ul>
+
+<h4><a name="opt_spider"></a>Spider</h4>
+<center><img src="img/android_spider.png" width="320" alt="Spider tab" border="0"></center>
+<ul>
+<li><small><b>Accept cookies</b> and <b>Cookies file</b>: keep the session cookies a
+site hands out, without which some pages never appear. The file is in the usual
+<tt>cookies.txt</tt> format, so one exported from a browser can be reused
+here.</small></li>
+<li><small><b>Check document type</b>: when to ask the server what a URL actually
+returns, so that a script producing a GIF is saved with the right extension.
+<b>Never</b> is fast and produces a mirror that may not
+open.</small></li>
+<li><small><b>Parse java files</b>: look inside scripts for addresses.</small></li>
+<li><small><b>Spider</b>: whether to obey the site's <tt>robots.txt</tt>. Following
+it is the default and the polite choice.</small></li>
+<li><small><b>Seed the crawl from the site's sitemap</b>: read the site's sitemap
+for start addresses, which reaches pages nothing links to.</small></li>
+<li><small><b>Update hack (limit re-transfers)</b>: on an update, treat a file whose
+size has not changed as unchanged. Saves a lot of transfer, and now and then misses
+a real edit.</small></li>
+<li><small><b>URL hacks (join similar URLs)</b>: treat addresses that differ only
+cosmetically as one page, so it is not fetched twice. The three <b>Keep</b> boxes on
+the <a href="#opt_links">Links</a> tab switch off individual parts.</small></li>
+<li><small><b>Tolerant requests (for servers)</b>: accept a wrong length and other
+old-server quirks. Can leave files truncated, so it is off by
+default.</small></li>
+<li><small><b>Force old HTTP/1.0 requests (no 1.1)</b>: a last resort for servers
+that mishandle modern requests.</small></li>
+</ul>
+
+<h4><a name="opt_proxy"></a>Proxy address</h4>
+<center><img src="img/android_proxy.png" width="320" alt="Proxy address tab" border="0"></center>
+<ul>
+<li><small><b>Proxy protocol</b>: plain <b>HTTP</b>, <b>SOCKS5</b>, or <b>HTTP
+(CONNECT tunnel)</b> for a proxy that must tunnel the connection.</small></li>
+<li><small><b>Proxy address</b> and <b>Proxy port</b>: where the proxy
+listens.</small></li>
+<li><small><b>Use proxy for ftp transfers</b>: send <tt>ftp://</tt> addresses
+through the proxy too, which usually works better than the engine's own FTP client
+and gets through a firewall.</small></li>
+</ul>
+<p><small>There is no username and password here. A proxy that demands
+authentication cannot be used from the app.</small></p>
+
+<h4><a name="opt_logindexcache"></a>Log, Index, Cache</h4>
+<center><img src="img/android_logindexcache.png" width="320" alt="Log, Index, Cache tab" border="0"></center>
+<ul>
+<li><small><b>Store ALL files in cache</b>: keep every file in the update cache, not
+just the pages. The cache then grows to roughly the size of the mirror, and in
+exchange you can rebuild the site in a different layout without downloading it
+again.</small></li>
+<li><small><b>Do not re-download locally erased files</b>: a file you deleted by
+hand stays deleted through the next update.</small></li>
+<li><small><b>Write WARC archive</b>: also write the crawl as a standard WARC
+archive, the format web archives use, alongside the browsable
+copy.</small></li>
+<li><small><b>Report what changed since the previous mirror</b>: write
+<tt>hts-changes.json</tt> listing what this run found new, changed, unchanged and
+gone.</small></li>
+<li><small><b>Log files</b>: record what happened, at <b>normal</b>, <b>extended</b>
+or <b>debug</b> detail. Leave this on, since it is the only account of what failed
+and why.</small></li>
+<li><small><b>Make an index</b>: build the <tt>index.html</tt> that lists your
+mirrored sites.</small></li>
+<li><small><b>Make a word database</b>: write an <tt>index.txt</tt> of every word
+found, for searching or language work.</small></li>
+<li><small><b>Build a mail archive</b>: despite the name, this writes the mirror as
+one MIME-encapsulated <tt>.mht</tt> file.</small></li>
+</ul>
+
+<h4><a name="opt_mime"></a>Type/MIME associations</h4>
+<center><img src="img/android_mime.png" width="320" alt="Type/MIME associations tab" border="0"></center>
+<p><small>Each row promises the engine that a file extension always carries one MIME
+type, so it need not ask the server. Telling it that <tt>asp</tt> is
+<tt>text/html</tt> spares a request per link and speeds up a large mirror
+noticeably. Several extensions can share a row, separated by commas
+(<tt>asp,php,php3</tt>).</small></p>
+<p><small>The same rows rename files that arrive mislabelled: if you know every
+<tt>dat</tt> on the site is really a ZIP, map it to
+<tt>application/x-zip</tt>.</small></p>
+
+<h4><a name="opt_experts"></a>Experts Only</h4>
+<center><img src="img/android_experts.png" width="320" alt="Experts Only tab" border="0"></center>
+<ul>
+<li><small><b>Use a cache for updates</b>: required to update the mirror or resume
+an interrupted one later. Leave it on.</small></li>
+<li><small><b>Primary Scan Rule</b>: what to keep. <b>Just scan</b> saves nothing
+and only walks the site; the others store pages, everything but pages, or
+both.</small></li>
+<li><small><b>Travel mode</b>: whether the crawl may climb out of the starting
+folder. The default goes down into subfolders only.</small></li>
+<li><small><b>Global travel mode</b>: how far it may stray between hosts, from the
+one address to anywhere on the web. Beyond the default, set the depth and size
+limits first.</small></li>
+<li><small><b>Rewrite links: internal / external</b>: the form the saved links take.
+The default gives relative links inside the mirror and absolute ones for the rest,
+which is what makes the copy browsable from a folder. <b>Original URL / Original
+URL</b> leaves every link exactly as it was.</small></li>
+<li><small><b>Strip query keys</b>: parameter names to ignore when deciding whether
+two addresses are the same page. Listing <tt>utm_source</tt> stops the same page
+arriving several times under different tracking links.</small></li>
+<li><small><b>Activate Debugging Mode</b>: extra detail in the log, for working out
+why a mirror went wrong.</small></li>
+</ul>
 
 <br><br><br><br>
 <p align="right">Back to <a href="index.html">Home</a></p>
