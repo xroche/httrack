@@ -19,7 +19,7 @@ MetaInfodir = $(datadir)/metainfo
 # Explicit filenames (e.g. ../history.txt, div/search.sh) resolve via VPATH and
 # need no prefix.
 HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt
-HelpHtml_DATA = $(srcdir)/*.html
+HelpHtml_DATA = $(srcdir)/*.html $(srcdir)/*.js $(srcdir)/*.css
 HelpHtmldiv_DATA = div/search.sh
 HelpHtmlimg_DATA  = $(srcdir)/img/*
 HelpHtmlimages_DATA = $(srcdir)/images/*
@@ -39,8 +39,7 @@ MetaInfo_DATA = $(srcdir)/server/div/*.metainfo.xml
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) \
 	$(WebPixmap_DATA) $(WebIcon16x16_DATA) $(WebIcon32x32_DATA) $(WebIcon48x48_DATA) \
-	$(VFolderEntry_DATA) $(MetaInfo_DATA) \
-	httrack.css
+	$(VFolderEntry_DATA) $(MetaInfo_DATA)
 
 install-data-hook:
 	if test ! -L $(DESTDIR)$(prefix)/share/httrack/html ; then \
