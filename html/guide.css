@@ -1,0 +1,368 @@
+/* Styles for guide.html, the GUI guide covering WinHTTrack, WebHTTrack and Android. */
+
+:root {
+	--field: #77b;
+	--panel: #ccd;
+	--accent: #99c;
+	--ink: #111;
+	--ink-soft: #444;
+	--rule: #aab;
+	--link: #00c;
+	--link-hover: #c00;
+	--code-bg: #e8e8f2;
+	--chip: #dde;
+	--shadow: rgba(0, 0, 0, .25);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--field: #171a2b;
+		--panel: #22263a;
+		--accent: #3b4066;
+		--ink: #e6e6ee;
+		--ink-soft: #a9adc4;
+		--rule: #3b4066;
+		--link: #9db4ff;
+		--link-hover: #ff9d9d;
+		--code-bg: #14172a;
+		--chip: #2e3350;
+		--shadow: rgba(0, 0, 0, .6);
+	}
+}
+
+* { box-sizing: border-box; }
+
+body {
+	margin: 0;
+	padding: 0 1rem 3rem;
+	background: var(--field);
+	color: var(--ink);
+	font: 1em/1.6 "Trebuchet MS", Verdana, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ---- page frame ---- */
+
+.masthead, .wrap {
+	max-width: 68rem;
+	margin: 0 auto;
+}
+
+.masthead {
+	padding: .6rem 0 0;
+}
+
+.masthead img { display: block; max-width: 100%; height: auto; }
+
+.masthead .tagline {
+	background: #000;
+	color: #fff;
+	font-weight: bold;
+	padding: .25rem .4rem;
+	margin-top: .4rem;
+}
+
+.wrap {
+	background: var(--panel);
+	border-bottom: 6px solid #000;
+	padding: 1.5rem;
+}
+
+@media (min-width: 62rem) {
+	.wrap {
+		display: grid;
+		grid-template-columns: 14rem minmax(0, 1fr);
+		gap: 2.5rem;
+		align-items: start;
+	}
+}
+
+footer {
+	max-width: 68rem;
+	margin: .5rem auto 0;
+	color: #eef;
+	font-size: .8em;
+}
+
+@media (prefers-color-scheme: dark) {
+	footer { color: var(--ink-soft); }
+}
+
+/* ---- typography ---- */
+
+/* Anchor targets must clear the sticky tab strip. */
+h2, h3, section.tab { scroll-margin-top: 5.5rem; }
+
+h1 { font-size: 1.9em; margin: 0 0 .3em; line-height: 1.2; }
+h2 { font-size: 1.45em; margin: 2.5em 0 .5em; padding-bottom: .2em; border-bottom: 2px solid var(--rule); }
+h3 { font-size: 1.15em; margin: 2em 0 .4em; }
+h2:first-child, h1 + h2 { margin-top: 1em; }
+
+p { margin: 0 0 1em; }
+
+a { color: var(--link); }
+a:hover { color: var(--link-hover); }
+
+code, kbd, .cli {
+	font-family: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+	font-size: .9em;
+}
+
+code { background: var(--code-bg); padding: .1em .35em; border-radius: 3px; }
+
+.lede { font-size: 1.08em; color: var(--ink-soft); }
+
+/* ---- table of contents ---- */
+
+.toc { font-size: .92em; }
+
+@media (min-width: 62rem) {
+	.toc { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+}
+
+.toc h2 {
+	font-size: .8em;
+	text-transform: uppercase;
+	letter-spacing: .08em;
+	margin: 0 0 .5em;
+	border: 0;
+	color: var(--ink-soft);
+}
+
+.toc ol { list-style: none; margin: 0 0 1.5em; padding: 0; }
+.toc li { margin: 0; }
+
+.toc a {
+	display: block;
+	padding: .2rem .5rem;
+	text-decoration: none;
+	border-left: 3px solid transparent;
+	color: var(--ink);
+}
+
+.toc a:hover { background: var(--accent); }
+.toc a[aria-current="true"] { border-left-color: var(--link); font-weight: bold; }
+
+/* ---- platform switcher ---- */
+
+.platforms {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .3rem;
+	margin: 0 0 1.5rem;
+	padding: .3rem;
+	background: var(--chip);
+	border-radius: .5rem;
+}
+
+.platforms button {
+	flex: 1 1 8rem;
+	padding: .5rem .7rem;
+	border: 0;
+	border-radius: .35rem;
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	font-size: .95em;
+	cursor: pointer;
+}
+
+.platforms button:hover { background: var(--accent); }
+
+.platforms button[aria-pressed="true"] {
+	background: var(--panel);
+	box-shadow: 0 1px 3px var(--shadow);
+	font-weight: bold;
+}
+
+.platforms button small { display: block; font-weight: normal; color: var(--ink-soft); font-size: .82em; }
+
+/* Hide only what the chosen platform excludes: an "unhide" rule would need to
+   outweigh the hiding one, and loses on specificity. Without scripting no
+   platform is set, so every variant stays visible. */
+html[data-platform="win"] [data-for]:not([data-for~="win"]),
+html[data-platform="web"] [data-for]:not([data-for~="web"]),
+html[data-platform="droid"] [data-for]:not([data-for~="droid"]) { display: none; }
+
+/* ---- platform badges ---- */
+
+.badge {
+	display: inline-block;
+	padding: .05em .5em;
+	border-radius: 1em;
+	background: var(--accent);
+	color: var(--ink);
+	font-size: .78em;
+	font-weight: bold;
+	vertical-align: .1em;
+	white-space: nowrap;
+}
+
+.note {
+	margin: 0 0 1em;
+	padding: .7rem 1rem;
+	border-left: 4px solid var(--accent);
+	background: var(--chip);
+	font-size: .95em;
+}
+
+.note > :last-child { margin-bottom: 0; }
+
+/* ---- screenshots ---- */
+
+figure {
+	margin: 0 0 1.5em;
+	text-align: center;
+}
+
+figure img {
+	max-width: 100%;
+	height: auto;
+	border: 1px solid var(--rule);
+	background: #fff;
+	box-shadow: 0 2px 8px var(--shadow);
+	cursor: zoom-in;
+}
+
+figure img[data-for~="droid"] { max-width: 18rem; }
+
+figcaption {
+	margin-top: .5em;
+	font-size: .88em;
+	color: var(--ink-soft);
+}
+
+/* Zoom overlay. Closed <dialog> is hidden by the UA, so nothing shows without JS. */
+dialog#zoom {
+	max-width: 96vw;
+	max-height: 96vh;
+	padding: 0;
+	border: 0;
+	background: transparent;
+}
+
+dialog#zoom img {
+	display: block;
+	max-width: 96vw;
+	max-height: 96vh;
+	width: auto;
+	height: auto;
+	cursor: zoom-out;
+}
+
+dialog#zoom::backdrop { background: rgba(0, 0, 0, .8); }
+
+/* ---- option tab strip ---- */
+
+.tabstrip {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	display: flex;
+	flex-wrap: wrap;
+	gap: .2rem;
+	margin: 0 0 1.5rem;
+	padding: .4rem;
+	background: var(--chip);
+	border-radius: .4rem;
+	box-shadow: 0 2px 6px var(--shadow);
+}
+
+.tabstrip a {
+	padding: .3rem .6rem;
+	border-radius: .25rem;
+	text-decoration: none;
+	color: var(--ink);
+	font-size: .9em;
+	white-space: nowrap;
+}
+
+.tabstrip a:hover { background: var(--accent); }
+.tabstrip a[aria-current="true"] { background: var(--panel); font-weight: bold; box-shadow: 0 1px 3px var(--shadow); }
+
+/* ---- option filter ---- */
+
+.filter {
+	display: flex;
+	gap: .5rem;
+	align-items: center;
+	margin: 0 0 1.5rem;
+}
+
+.filter input {
+	flex: 1 1 auto;
+	padding: .5rem .7rem;
+	border: 1px solid var(--rule);
+	border-radius: .3rem;
+	background: var(--panel);
+	color: var(--ink);
+	font: inherit;
+}
+
+.filter output { font-size: .88em; color: var(--ink-soft); white-space: nowrap; }
+
+/* ---- option entries ---- */
+
+.opt {
+	margin: 0 0 1.2em;
+	padding-bottom: 1.2em;
+	border-bottom: 1px solid var(--rule);
+}
+
+.opt:last-child { border-bottom: 0; }
+
+.opt-head {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	align-items: baseline;
+	justify-content: space-between;
+	margin-bottom: .3em;
+}
+
+.opt-name { font-weight: bold; }
+
+.opt .cli {
+	background: var(--code-bg);
+	padding: .1em .45em;
+	border-radius: 3px;
+	color: var(--ink-soft);
+	white-space: nowrap;
+}
+
+.opt p { margin: 0 0 .5em; font-size: .95em; }
+.opt p:last-child { margin-bottom: 0; }
+
+.opt[hidden] { display: none; }
+
+/* ---- misc ---- */
+
+table.mime {
+	border-collapse: collapse;
+	margin: 0 0 1em;
+	font-size: .92em;
+}
+
+table.mime td {
+	border: 1px solid var(--rule);
+	padding: .3em .6em;
+}
+
+.skip {
+	position: absolute;
+	left: -9999px;
+}
+
+.skip:focus {
+	left: 1rem;
+	top: 1rem;
+	background: var(--panel);
+	padding: .5rem;
+	z-index: 10;
+}
+
+@media print {
+	body { background: #fff; }
+	.toc, .tabstrip, .platforms, .filter { display: none; }
+	.wrap { display: block; border: 0; }
+	html[data-platform] [data-for] { display: revert !important; }
+}
