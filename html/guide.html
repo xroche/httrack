@@ -391,6 +391,13 @@ bottom are the ones that keep you welcome.</p>
 </div>
 
 <div class="opt">
+	<div class="opt-head"><span class="opt-name">Pause between files</span><span class="cli">-%G, --pause MIN[:MAX]</span></div>
+	<p>Waits a random number of seconds between downloads. <code>2:8</code> picks a fresh delay in
+	that range each time. The gentlest way to crawl a small server, and less blunt than capping the
+	rate.</p>
+</div>
+
+<div class="opt">
 	<div class="opt-head"><span class="opt-name">Max time overall</span><span class="cli">-EN, --max-time N</span></div>
 	<p>Seconds the whole mirror may take. 3600 is an hour.</p>
 </div>
@@ -660,6 +667,31 @@ bottom are the ones that keep you welcome.</p>
 	<p>Treats addresses that differ only cosmetically as the same page (<code>www.example.com</code>
 	and <code>example.com</code>, doubled slashes, reordered query keys), so the same page is not
 	downloaded twice.</p>
+	<p>Three checkboxes opt out of one part each when a site really does treat the difference as
+	meaningful: <b>Keep the www. prefix</b> (<code>--keep-www-prefix</code>), <b>Keep double
+	slashes</b> (<code>--keep-double-slashes</code>) and <b>Keep the original query-string order</b>
+	(<code>--keep-query-order</code>).</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Seed the crawl from the site's sitemap</span><span class="cli">-%m, --sitemap</span></div>
+	<p>Reads the site's sitemap, the <code>Sitemap:</code> lines in <code>robots.txt</code> and then
+	<code>/sitemap.xml</code>, and adds every address it lists as a starting point. It reaches pages
+	no link on the site points to. <b>Sitemap address</b> (<code>--sitemap-url</code>) names one
+	directly instead of probing.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Load cookies from file</span><span class="cli">-%K, --cookies-file</span></div>
+	<p>Preloads cookies from a Netscape <code>cookies.txt</code> before the crawl starts. How you
+	mirror something that needs you logged in, by exporting the session from your browser.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Strip query keys</span><span class="cli">-%g, --strip-query</span></div>
+	<p>Comma-separated query keys to drop when naming saved files, such as
+	<code>sid,utm_source</code>. Keeps one page from being saved several times under tracking
+	parameters that change nothing.</p>
 </div>
 </section>
 
@@ -671,6 +703,13 @@ bottom are the ones that keep you welcome.</p>
 	<img data-for="web" src="img/guide-web-opt-proxy.png" alt="WebHTTrack Proxy tab" width="1024" height="762">
 	<img data-for="droid" src="img/guide-droid-opt-proxy.png" alt="Android Proxy tab" width="600" height="1300">
 </figure>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Proxy type</span><span class="cli">-P scheme://…</span></div>
+	<p>The proxy protocol. <b>HTTP</b> is an ordinary proxy. <b>HTTP (CONNECT tunnel)</b> sends every
+	request through a CONNECT tunnel, which CONNECT-only proxies such as Tor's
+	<code>HTTPTunnelPort</code> require. <b>SOCKS5</b> defaults to port 1080.</p>
+</div>
 
 <div class="opt">
 	<div class="opt-head"><span class="opt-name">Proxy address and port</span><span class="cli">-P, --proxy</span></div>
@@ -730,6 +769,34 @@ bottom are the ones that keep you welcome.</p>
 <div class="opt">
 	<div class="opt-head"><span class="opt-name">Make a word database</span><span class="cli">-%I, --search-index</span></div>
 	<p>Builds a searchable word index of every mirrored page.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Write a WARC archive of the crawl</span><span class="cli">-%r, --warc</span></div>
+	<p>Saves every fetched response into an ISO-28500 WARC/1.1 archive alongside the mirror, headers
+	and all. The mirror is a browsable copy; the WARC is the archival record of what the server
+	actually sent, which is what replay tools and web archives want.</p>
+	<p><b>WARC archive name</b> (<code>--warc-file</code>) sets the base name, blank to auto-name it
+	under the output directory. <b>WARC segment size limit</b> (<code>--warc-max-size</code>) starts a
+	new segment past that many bytes; blank or 0 keeps one file.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Write a CDXJ index of the WARC archive</span><span class="cli">-%rc, --warc-cdx</span></div>
+	<p>Adds a sorted CDXJ index listing every record in the archive, which replay tools use to find a
+	capture without reading the whole file.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Package the crawl as a WACZ file</span><span class="cli">--wacz</span></div>
+	<p>Bundles the WARC, its CDXJ index and the mirrored pages into one WACZ file. It implies both of
+	the two above.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Report what changed since the previous mirror</span><span class="cli">-%d, --changes</span></div>
+	<p>Writes <code>hts-changes.json</code> listing what this crawl left new, changed, unchanged and
+	gone against the previous mirror. The quick way to see what an update actually did.</p>
 </div>
 </section>
 
