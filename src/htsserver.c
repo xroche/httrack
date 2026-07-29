@@ -101,21 +101,53 @@ extern void webhttrack_main(char *cmd);
 extern void webhttrack_lock(void);
 extern void webhttrack_release(void);
 
-static int is_image(const char *file) {
-  return strstr(file, ".gif") != NULL
-         || strstr(file, ".png") != NULL;
+/* Content types for the GUI tree and the mirror it serves. Not the engine's
+   get_httptype_sized(): it needs an httrackp the server has none of yet, and
+   would apply the user's --assume rules to the GUI's own pages. */
+static const struct {
+  const char *ext;
+  const char *type;
+} server_mime_types[] = {
+    {"html", "text/html"},
+    {"htm", "text/html"},
+    {"css", "text/css"},
+    {"js", "text/javascript"},
+    {"txt", "text/plain"},
+    {"xml", "application/xml"},
+    {"gif", "image/gif"},
+    {"png", "image/png"},
+    {"jpg", "image/jpeg"},
+    {"jpeg", "image/jpeg"},
+    {"webp", "image/webp"},
+    {"avif", "image/avif"},
+    {"svg", "image/svg+xml"},
+    /* x-icon, not the registered vnd.microsoft.icon: what browsers send. */
+    {"ico", "image/x-icon"},
+    {NULL, NULL},
+};
+
+/* Content type of file, NULL if its extension is unlisted. Matched on the last
+   segment's whole extension, never on a substring of the path. */
+static const char *server_content_type(const char *file) {
+  const char *const slash = strrchr(file, '/');
+  const char *const dot = strrchr(slash != NULL ? slash : file, '.');
+  int i;
+
+  if (dot == NULL) {
+    return NULL;
+  }
+  for (i = 0; server_mime_types[i].ext != NULL; i++) {
+    if (strfield2(dot + 1, server_mime_types[i].ext)) {
+      return server_mime_types[i].type;
+    }
+  }
+  return NULL;
 }
-static int is_text(const char *file) {
-  return ((strstr(file, ".txt") != NULL));
-}
+
 static int is_html(const char *file) {
-  return ((strstr(file, ".htm") != NULL));
-}
-static int is_css(const char *file) {
-  return ((strstr(file, ".css") != NULL));
-}
-static int is_js(const char *file) {
-  return ((strstr(file, ".js") != NULL));
+  const char *const type = server_content_type(file);
+
+  return type != NULL && strcmp(type, "text/html") == 0;
 }
 
 static void sig_brpipe(int code) {
@@ -989,21 +1021,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               "Server: httrack-small-server\r\n" "Content-type: text/html\r\n"
               "Cache-Control: no-cache, must-revalidate, private\r\n"
               "Pragma: no-cache\r\n";
-            char ok_img[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: image/gif\r\n";
-            char ok_js[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: text/javascript\r\n";
-            char ok_css[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: text/css\r\n";
-            char ok_text[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: text/plain\r\n";
-            char ok_unknown[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: application/octet-stream\r\n";
+            char ok_other[] = "HTTP/1.0 200 OK\r\n"
+                              "Connection: close\r\n"
+                              "Server: httrack small server\r\n"
+                              "Content-type: ";
 
             /* register current page */
             coucal_write(NewLangList, "thisfile", (intptr_t) strdup(file));
@@ -1459,16 +1480,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             } else {
               if (is_html(file)) {
                 StringMemcat(headers, ok, sizeof(ok) - 1);
-              } else if (is_text(file)) {
-                StringMemcat(headers, ok_text, sizeof(ok_text) - 1);
-              } else if (is_js(file)) {
-                StringMemcat(headers, ok_js, sizeof(ok_js) - 1);
-              } else if (is_css(file)) {
-                StringMemcat(headers, ok_css, sizeof(ok_css) - 1);
-              } else if (is_image(file)) {
-                StringMemcat(headers, ok_img, sizeof(ok_img) - 1);
               } else {
-                StringMemcat(headers, ok_unknown, sizeof(ok_unknown) - 1);
+                const char *const type = server_content_type(file);
+
+                StringMemcat(headers, ok_other, sizeof(ok_other) - 1);
+                StringCat(headers,
+                          type != NULL ? type : "application/octet-stream");
+                StringCat(headers, "\r\n");
               }
               while(!feof(fp)) {
                 int n = (int) fread(line, 1, sizeof(line) - 2, fp);
