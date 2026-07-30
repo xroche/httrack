@@ -6,6 +6,7 @@ ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
 		httrack-doc.html lang.def README.md tools/mkdeb.sh \
+		tools/macos-app.sh tools/Info.plist.in \
 		bootstrap build.sh
 
 # Build the signed Debian packages from a clean source export. Pass the signing
@@ -16,3 +17,10 @@ DEB_FLAGS =
 deb:
 	$(SHELL) $(top_srcdir)/tools/mkdeb.sh $(DEB_FLAGS)
 .PHONY: deb
+
+# Assemble the macOS application bundle from an installed prefix, e.g.
+#   make macos-app APP_FLAGS="--prefix /tmp/inst --out /tmp"
+APP_FLAGS =
+macos-app:
+	$(SHELL) $(top_srcdir)/tools/macos-app.sh --plist tools/Info.plist $(APP_FLAGS)
+.PHONY: macos-app

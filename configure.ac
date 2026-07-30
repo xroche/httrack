@@ -360,5 +360,6 @@ html/Makefile
 libtest/Makefile
 tests/Makefile
 fuzz/Makefile
+tools/Info.plist
 ])
 AC_OUTPUT

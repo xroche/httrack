@@ -247,6 +247,65 @@ jobs:
       - name: Smoke-test webhttrack
         run: bash tests/webhttrack-smoke.sh "$RUNNER_TEMP/inst"
 
+  # The macOS app bundle (#886): assemble it, then prove it still works after being
+  # moved, which is the only thing a .app has to survive that a prefix install does not.
+  macos-app:
+    name: macOS app bundle (arm64)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          brew install autoconf automake libtool autoconf-archive brotli zstd
+
+      # --disable-shared keeps libhttrack inside the binaries, so the bundle carries no
+      # absolute dylib path back to the staging prefix.
+      - name: Build and install into a temp prefix
+        run: |
+          set -euo pipefail
+          ssl="$(brew --prefix openssl@3)"
+          brewp="$(brew --prefix)"
+          ./bootstrap
+          ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
+            LDFLAGS="-L${ssl}/lib -L${brewp}/lib" \
+            --prefix="$RUNNER_TEMP/inst" --disable-shared
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
+
+      - name: Assemble HTTrack.app
+        run: |
+          set -euo pipefail
+          make macos-app APP_FLAGS="--prefix $RUNNER_TEMP/inst --out $RUNNER_TEMP"
+          plutil -lint "$RUNNER_TEMP/HTTrack.app/Contents/Info.plist"
+
+      - name: Run it through the bundle stub
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/HTTrack.app"
+          bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
+
+      - name: Run it again after moving it
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/moved"
+          mv "$RUNNER_TEMP/HTTrack.app" "$RUNNER_TEMP/moved/"
+          rm -rf "$RUNNER_TEMP/inst"
+          app="$RUNNER_TEMP/moved/HTTrack.app"
+          bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
+
+      # No Developer ID here, so Gatekeeper cannot be exercised; an ad-hoc signature
+      # still proves the bundle is well formed enough to sign.
+      - name: Check the bundle is signable
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/moved/HTTrack.app"
+          codesign -s - --force --deep "$app"
+          codesign --verify --strict --verbose=2 "$app"
+
   # Portability/hardening: 32-bit (i386) build on the x86-64 runner via multilib
   # -- no extra hardware. Exercises the 32-bit size_t/pointer ABI, where size
   # and bounds math can truncate or wrap in ways 64-bit never reveals (the axis
@@ -626,6 +685,7 @@ jobs:
         src/webhttrack
         tests/*.sh
         tests/*.test
+        tools/macos-app.sh
         tools/mkdeb.sh
     steps:
       - uses: actions/checkout@v7

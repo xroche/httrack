@@ -1,10 +1,11 @@
 #!/bin/bash
 # Smoke-test an installed webhttrack: launch it with a stub browser and assert
-# htsserver comes up and serves the web UI. Arg: the install prefix.
+# htsserver comes up and serves the web UI. Args: the install prefix, and optionally
+# the launcher to run instead of $prefix/bin/webhttrack (the macOS .app stub).
 set -euo pipefail
 
-prefix="${1:?usage: webhttrack-smoke.sh <install-prefix>}"
-wht="$prefix/bin/webhttrack"
+prefix="${1:?usage: webhttrack-smoke.sh <install-prefix> [launcher]}"
+wht="${2:-$prefix/bin/webhttrack}"
 test -x "$wht" || {
     echo "no webhttrack at $wht" >&2
     exit 1
@@ -124,7 +125,9 @@ else
 fi
 EOF
 chmod +x "$browserstub"
-export PATH="$stubdir:$prefix/bin:$PATH"
+# Deliberately NOT $prefix/bin: the launcher must find its payload from $0, and
+# the browser stub is picked up through webhttrack's SRCHPATH, not $PATH.
+export PATH="$stubdir:$PATH"
 
 echo "launching webhttrack"
 "$wht" </dev/null >"$work/webhttrack.log" 2>&1 &
