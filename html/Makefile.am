@@ -40,10 +40,3 @@ EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) \
 	$(WebPixmap_DATA) $(WebIcon16x16_DATA) $(WebIcon32x32_DATA) $(WebIcon48x48_DATA) \
 	$(VFolderEntry_DATA) $(MetaInfo_DATA)
-
-install-data-hook:
-	if test ! -L $(DESTDIR)$(prefix)/share/httrack/html ; then \
-		( cd $(DESTDIR)$(prefix)/share/httrack \
-			&& $(LN_S) $(htmldir) html \
-		) \
-	fi

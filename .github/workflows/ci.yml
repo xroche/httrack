@@ -217,6 +217,36 @@ jobs:
       - name: Smoke-test webhttrack
         run: bash tests/webhttrack-smoke.sh "$RUNNER_TEMP/inst"
 
+  # Same smoke on the platform that ships webhttrack as a package: the install layout
+  # it asserts (a relative data symlink, #885) is what Debian consumes, and the macOS
+  # job alone left that untested on Linux.
+  webhttrack-linux:
+    name: webhttrack smoke (Linux x86-64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool autoconf-archive \
+            libssl-dev zlib1g-dev libbrotli-dev libzstd-dev
+
+      - name: Build and install into a temp prefix
+        run: |
+          set -euo pipefail
+          ./bootstrap
+          ./configure --prefix="$RUNNER_TEMP/inst"
+          make -j"$(nproc)"
+          make install
+
+      - name: Smoke-test webhttrack
+        run: bash tests/webhttrack-smoke.sh "$RUNNER_TEMP/inst"
+
   # Portability/hardening: 32-bit (i386) build on the x86-64 runner via multilib
   # -- no extra hardware. Exercises the 32-bit size_t/pointer ABI, where size
   # and bounds math can truncate or wrap in ways 64-bit never reveals (the axis

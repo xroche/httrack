@@ -18,6 +18,62 @@ export HOME="$work/home"
 mkdir -p "$HOME/websites"
 marker="$work/marker"
 
+# No installed symlink may be absolute, or the tree only works at the prefix it was
+# built for (#885). BSD find has no -lname, so read each link back by hand.
+abs=""
+nlink=0
+while IFS= read -r l; do
+    nlink=$((nlink + 1))
+    case "$(readlink "$l")" in
+    /*) abs="$abs $l" ;;
+    esac
+done < <(find "$prefix" -type l)
+test -z "$abs" || {
+    echo "absolute symlink(s) in install tree:$abs" >&2
+    exit 1
+}
+# find's status is lost through the pipe, so an empty scan would pass vacuously.
+test "$nlink" -gt 0 || {
+    echo "scanned no symlinks at all under $prefix" >&2
+    exit 1
+}
+
+# Locate the data dir the way webhttrack does, by the file it keys on, rather than
+# assuming $prefix/share: --datadir moves it, and the link has to follow the data.
+langdef=$(find "$prefix" -name lang.def -type f | head -1)
+test -n "$langdef" || {
+    echo "no lang.def under $prefix" >&2
+    exit 1
+}
+htmllink="$(dirname "$langdef")/html"
+test -L "$htmllink" || {
+    echo "no data symlink beside $langdef" >&2
+    exit 1
+}
+
+# Relocation: resolve the link inside a copy at another path and require it to stay
+# inside that copy. An absolute link resolves back to $prefix and fails here.
+reloc="$work/reloc"
+cp -R "$prefix" "$reloc"
+relocreal=$(cd "$reloc" && pwd -P)
+htmlreal=$(cd "$reloc${htmllink#"$prefix"}" 2>/dev/null && pwd -P) || {
+    echo "relocated tree: the data link does not resolve" >&2
+    exit 1
+}
+case "$htmlreal" in
+"$relocreal"/*) ;;
+*)
+    echo "relocated tree: link escapes to $htmlreal" >&2
+    exit 1
+    ;;
+esac
+# Resolving is not enough: it must land on the served UI, not just any directory.
+test -d "$htmlreal/server" || {
+    echo "relocated tree: $htmlreal has no server/" >&2
+    exit 1
+}
+echo "install tree is relocatable"
+
 stubdir="$work/bin"
 mkdir -p "$stubdir"
 
