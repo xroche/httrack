@@ -62,7 +62,6 @@ NAV = [
 # Browser", which tells a browser tab or a search result nothing.
 TITLES = {
     "abuse.html": "Using HTTrack responsibly",
-    "addurl.html": "Adding a URL to a mirror",
     "cache.html": "HTTrack cache format",
     "changes.html": "HTTrack change report format",
     "cmdguide.html": "HTTrack command-line guide",
@@ -72,7 +71,6 @@ TITLES = {
     "fcguide.html": "HTTrack Users Guide, by Fred Cohen (3.10)",
     "filters.html": "HTTrack filter syntax",
     "library.html": "The libhttrack library",
-    "options.html": "HTTrack options",
     "plug.html": "HTTrack callbacks and plugins",
     "plug_330.html": "HTTrack callbacks, 3.30 and earlier",
     "scripting.html": "Scripting HTTrack",
@@ -84,7 +82,6 @@ TITLES = {
 DESCRIPTIONS = {
     "abuse.html": "How to mirror a site without hammering the server, and what a"
     " webmaster can do about crawlers that do.",
-    "addurl.html": "Adding a URL to an existing HTTrack mirror.",
     "cache.html": "The format of the HTTrack cache in hts-cache, and how to read it.",
     "changes.html": "The change report HTTrack writes after an update, field by field.",
     "cmdguide.html": "A task-oriented guide to the httrack command line: scope,"
@@ -98,7 +95,6 @@ DESCRIPTIONS = {
     "filters.html": "HTTrack filter syntax: wildcards, and the size and MIME-type"
     " forms of a scan rule.",
     "library.html": "Linking against the libhttrack library.",
-    "options.html": "Where to find the current HTTrack option reference.",
     "plug.html": "Plugging your own C functions into the HTTrack engine.",
     "plug_330.html": "The HTTrack callback API as it was in release 3.30 and earlier.",
     "scripting.html": "Driving the httrack command-line program from shell and" " batch scripts.",
