@@ -1,5 +1,7 @@
-/* Progressive enhancement for guide.html. Everything here is optional: with
-   scripting off the page still carries every platform's text and screenshots. */
+/* Progressive enhancement for guide.html: the platform switcher and the option
+   filter. Image zoom and sidebar highlighting are shared, in doc.js. Everything
+   here is optional: with scripting off the page still carries every platform's
+   text and screenshots. */
 
 (function () {
 	"use strict";
@@ -96,26 +98,6 @@
 			jumpToHash();
 		}
 
-		/* ---- click to zoom ---- */
-
-		var zoom = document.getElementById("zoom");
-		if (zoom && typeof zoom.showModal === "function") {
-			var zoomImage = zoom.querySelector("img");
-			document.addEventListener("click", function (event) {
-				var img = event.target.closest("figure img");
-				if (!img) {
-					return;
-				}
-				event.preventDefault();
-				zoomImage.src = img.src;
-				zoomImage.alt = img.alt;
-				zoom.showModal();
-			});
-			zoom.addEventListener("click", function () {
-				zoom.close();
-			});
-		}
-
 		/* ---- option filter ---- */
 
 		var filter = document.getElementById("optfilter");
@@ -134,49 +116,12 @@
 					shown += hit ? 1 : 0;
 				});
 				/* Fold away a tab whose options all filtered out. */
-				document.querySelectorAll("section.tab").forEach(function (section) {
+				[].slice.call(document.querySelectorAll("section.tab")).forEach(function (section) {
 					section.hidden = needle !== "" &&
 						!section.querySelector(".opt:not([hidden])");
 				});
 				count.textContent = needle ? shown + " of " + options.length : "";
 			});
 		}
-
-		/* ---- highlight the section being read ---- */
-
-		var marks = [].slice.call(document.querySelectorAll(".toc a, .tabstrip a"))
-			.filter(function (a) { return a.hash.length > 1; });
-		if (!marks.length || !window.IntersectionObserver) {
-			return;
-		}
-
-		var byId = {};
-		marks.forEach(function (a) {
-			var id = a.hash.slice(1);
-			(byId[id] = byId[id] || []).push(a);
-		});
-
-		var visible = {};
-		var observer = new IntersectionObserver(function (entries) {
-			entries.forEach(function (entry) {
-				visible[entry.target.id] = entry.isIntersecting;
-			});
-			var top = Object.keys(byId).filter(function (id) { return visible[id]; })[0];
-			marks.forEach(function (a) {
-				a.removeAttribute("aria-current");
-			});
-			if (top) {
-				byId[top].forEach(function (a) {
-					a.setAttribute("aria-current", "true");
-				});
-			}
-		}, { rootMargin: "-10% 0px -70% 0px" });
-
-		Object.keys(byId).forEach(function (id) {
-			var el = document.getElementById(id);
-			if (el) {
-				observer.observe(el);
-			}
-		});
 	});
 })();

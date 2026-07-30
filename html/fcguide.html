@@ -1,110 +1,81 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
-	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
-	<title>HTTrack Website Copier - Offline Browser</title>
-
-	<style type="text/css">
-	<!--
-
-body {
-	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
-	background: #77b;
-}
-body, td {
-	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
-	}
-
-#subTitle {
-	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
-	}
-
-#siteNavigation a, #siteNavigation .current {
-	font-weight: bold;  color: #448;
-	}
-#siteNavigation a:link    { text-decoration: none; }
-#siteNavigation a:visited { text-decoration: none; }
-
-#siteNavigation .current { background-color: #ccd; }
-
-#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
-#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
-
-
-a:link    { text-decoration: underline;  color: #00f; }
-a:visited { text-decoration: underline;  color: #000; }
-a:hover   { text-decoration: underline;  color: #c00; }
-a:active  { text-decoration: underline; }
-
-#pageContent {
-	clear: both;
-	border-bottom: 6px solid #000;
-	padding: 10px;  padding-top: 20px;
-	line-height: 1.65em;
-	background-image: url(images/bg_rings.gif);
-	background-repeat: no-repeat;
-	background-position: top right;
-	}
-
-#pageContent, #siteNavigation {
-	background-color: #ccd;
-	}
-
-
-.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
-.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
-
-hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
-
-h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
-h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
-h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
-h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
-
-.blak { background-color: #000; }
-.hide { display: none; }
-.tableWidth { min-width: 400px; }
-
-.tblRegular       { border-collapse: collapse; }
-.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
-.tblHeaderColor, .tblHeaderColor td { background: #99c; }
-.tblNoBorder td   { border: 0; }
-
-
-// -->
-</style>
-
+<!-- doc-chrome:head -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Fred Cohen's HTTrack Users Guide, written for release 3.10.">
+<link rel="stylesheet" href="doc.css">
+<script src="doc.js" defer></script>
+<!-- /doc-chrome:head -->
+<title>HTTrack Users Guide, by Fred Cohen (3.10)</title>
 </head>
+<body>
 
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
-	<tr>
-	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
-	</tr>
-</table>
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
-	<tr>
-	<td id="subTitle">Open Source offline browser</td>
-	</tr>
-</table>
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
-<tr class="blak">
-<td>
-	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
-	<tr>
-	<td colspan="6"> 
-		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
-		<tr> 
-		<td id="pageContent"> 
-<!-- ==================== End prologue ==================== -->
+<!-- doc-chrome:top -->
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+	<img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier">
+	<div class="tagline">Open Source offline browser</div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Documentation">
+	<h2>On this page</h2>
+	<ul>
+		<li><a href="#background-and-introduction">Background and Introduction</a></li>
+		<li><a href="#basics">Basics</a></li>
+		<li><a href="#syntax">Syntax</a></li>
+		<li><a href="#a-thorough-going-over">A Thorough Going Over</a></li>
+		<li><a href="#filters">Filters</a></li>
+		<li><a href="#user-authentication-protocols">User Authentication Protocols</a></li>
+		<li><a href="#httrackrc">.httrackrc</a></li>
+		<li><a href="#release-notes">Release Notes</a></li>
+		<li><a href="#some-more-examples">Some More Examples</a></li>
+		<li><a href="#general-questions">General questions</a></li>
+		<li><a href="#troubleshooting">Troubleshooting</a></li>
+		<li><a href="#questions-concerning-a-mirror">Questions concerning a mirror</a></li>
+	</ul>
+	<h2>Start here</h2>
+	<ul>
+		<li><a href="guide.html">Interface guide</a></li>
+		<li><a href="faq.html">FAQ and troubleshooting</a></li>
+		<li><a href="abuse.html">Using HTTrack responsibly</a></li>
+	</ul>
+	<h2>Command line</h2>
+	<ul>
+		<li><a href="cmdguide.html">Command-line guide</a></li>
+		<li><a href="httrack.man.html">Option reference</a></li>
+		<li><a href="filters.html">Filter syntax</a></li>
+	</ul>
+	<h2>Developers</h2>
+	<ul>
+		<li><a href="dev.html">Programming</a></li>
+		<li><a href="library.html">libhttrack API</a></li>
+		<li><a href="plug.html">Callbacks</a></li>
+		<li><a href="scripting.html">Scripting</a></li>
+		<li><a href="cache.html">Cache format</a></li>
+		<li><a href="changes.html">Change report format</a></li>
+	</ul>
+	<h2>More</h2>
+	<ul>
+		<li><a href="fcguide.html" aria-current="page" class="here">Users Guide (3.10)</a></li>
+		<li><a href="contact.html">Contact and credits</a></li>
+		<li><a href="index.html">All documentation</a></li>
+	</ul>
+</nav>
+
+<main id="main">
+<!-- /doc-chrome:top -->
 
 <center><h1> Httrack Users Guide (3.10)</h1>
 By Fred Cohen </center>
 
 <hr>
 
-<h2> Background and Introduction </h2>
+<h2 id="background-and-introduction"> Background and Introduction </h2>
 
 <p align=justify> I started using httrack in mid-2000 and found it to be
 an excellent tool for imaging web sites.  Various words are used to
@@ -125,7 +96,7 @@ assistance from the authors I volunteered to write a users manual for
 httrack - and here it is.  I hope it gets the job done.
 
 <hr>
-<h2> Basics </h2>
+<h2 id="basics"> Basics </h2>
 
 <p align=justify> Httrack is a program that gets information from the
 Internet, looks for pointers to other information, gets that
@@ -385,7 +356,7 @@ the rest of us, I will now go through this listing one item at a time
 with examples... I will be here a while...
 
 <hr>
-<h2> Syntax </h2>
+<h2 id="syntax"> Syntax </h2>
 
 <pre><b><i>httrack &lt;URLs&gt; [-option] [+&lt;FILTERs&gt;] [-&lt;FILTERs&gt;] </i></b></pre>
 
@@ -571,7 +542,7 @@ www.all.net/bob/deeper/).
 
 <hr>
 
-<h2> A Thorough Going Over </h2>
+<h2 id="a-thorough-going-over"> A Thorough Going Over </h2>
 
 <p align=justify> Now that you have an introduction, it's time for a
 more though coverage.  This is where I go through each of the options
@@ -1930,7 +1901,7 @@ as -%h).
 
 <hr>
 
-<h2> Filters </h2>
+<h2 id="filters"> Filters </h2>
 
 <p align=justify> Filters are normally placed at the end of the command
 line, but can be intermixed with other command line options if desired,
@@ -2079,7 +2050,7 @@ generated automatically using the interface)
 
 <hr>
 
-<h2> User Authentication Protocols </h2>
+<h2 id="user-authentication-protocols"> User Authentication Protocols </h2>
 
 <p align=justify> Smoe servers require user ID and password information
 in order to gain access.  In this example, the user ID smith with
@@ -2096,7 +2067,7 @@ capability is being provided through th URL capture features
 
 <hr>
 
-<h2> .httrackrc </h2>
+<h2 id="httrackrc"> .httrackrc </h2>
 
 <p align=justify> A file called '.httrackrc' can be placed in the
 current directory, or if not found there, in the home directory, to
@@ -2185,7 +2156,7 @@ added by the .httrackrc
 
 <hr>
 
-<h2> Release Notes </h2>
+<h2 id="release-notes"> Release Notes </h2>
 
 <p align=justify> Some things change between releases.  Here are some
 recent changes in httrack that may affect some of these options:
@@ -2223,7 +2194,7 @@ collision for large numbers of files.
 
 <hr>
 
-<h2> Some More Examples </h2>
+<h2 id="some-more-examples"> Some More Examples </h2>
 
 <p align=justify> Here are some examples of special purpose httrack
 command lines that might be useful for your situation.
@@ -2275,7 +2246,7 @@ httrack "http://www.somesite.com/~library/thing/thingmain.htm" -O /tmp/thing -R5
 
 <hr>
 
-<h2>General questions:</h2>
+<h2 id="general-questions">General questions:</h2>
 
 <p align=justify><b>Q:  The install is not working on NT without administrator rights! </b>
 
@@ -2327,7 +2298,7 @@ Un*x? </b>
 <p align=justify> A: No.  Unfortunately, we do not have enough time for
 that - if you want to help us, please write one!
 
-<hr><h2> Troubleshooting:</h2>
+<hr><h2 id="troubleshooting"> Troubleshooting:</h2>
 
 <p align=justify><b>Q: Only the first page is caught.  What's wrong?</b>
 </br> A: First, check the <b>hts-err.txt</b> error log file - this can
@@ -2509,7 +2480,7 @@ considered as "newer" than the local ones..  even if there are
 identical! Unfortunately, there is no possibility to avoid this problem,
 which is strongly linked with the server abilities. 
 
-<p align=justify> <hr><h2> Questions concerning a mirror: </h2>
+<p align=justify> <hr><h2 id="questions-concerning-a-mirror"> Questions concerning a mirror: </h2>
 
 <p align=justify> <p align=justify><b>Q: I want to mirror a Web site,
 but there are some files outside the domain, too.  How to retrieve them?
@@ -2693,25 +2664,14 @@ too many sessions, or your system may be unable to provide the necessary
 resources.  Try redusing this number - for example using the -c2 options
 for only 2 simultaneous sesions.
 
-<!-- ==================== Start epilogue ==================== -->
-		</td>
-		</tr>
-		</table>
-	</td>
-	</tr>
-	</table>
-</td>
-</tr>
-</table>
+<!-- doc-chrome:bottom -->
+</main>
+</div>
 
-<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
-	<tr>
-	<td id="footer"><small>&copy; 2007 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
-	</tr>
-</table>
+<dialog id="zoom" aria-label="Enlarged image"><img src="" alt=""></dialog>
+
+<footer>&copy; 1998-2026 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</footer>
+<!-- /doc-chrome:bottom -->
 
 </body>
-
 </html>
-
-

@@ -133,6 +133,13 @@ hr { height: 1px; border: 0; background: var(--rule); margin: 2em 0; }
 
 img { max-width: 100%; height: auto; }
 
+/* Legacy prose carries bare URLs long enough to push a phone sideways. */
+body { overflow-wrap: break-word; }
+
+/* The reference pages carry tables wider than any column: scroll the table, not
+   the page. The guide's own MIME table is narrow and reads better left alone. */
+main table:not(.mime) { display: block; overflow-x: auto; }
+
 /* ---- table of contents ---- */
 
 .toc { font-size: .92em; }
@@ -219,19 +226,25 @@ img { max-width: 100%; height: auto; }
 
 /* ---- content tables ---- */
 
-table.data {
+/* The reference pages use bare <table> for their content tables. The guide's MIME
+   table is styled beside the guide and opts out. */
+main table:not(.mime) {
 	border-collapse: collapse;
 	margin: 0 0 1em;
 	font-size: .92em;
 }
 
-table.data td, table.data th {
+main table:not(.mime) td, main table:not(.mime) th {
 	border: 1px solid var(--rule);
 	padding: .3em .6em;
 	text-align: left;
+	vertical-align: top;
 }
 
-table.data th { background: var(--accent); }
+main table:not(.mime) th, main table:not(.mime) tr.head td {
+	background: var(--accent);
+	font-weight: bold;
+}
 
 /* ---- screenshots ---- */
 

@@ -685,6 +685,21 @@ jobs:
               exit 1 ;;
           esac
 
+  docs:
+    name: documentation (chrome in sync, links resolve)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      # The pages carry their navigation as real markup, because they are read from
+      # disk as often as over http and file:// has no includes. Regenerating has to
+      # be a no-op, or a page has drifted from tools/doc-chrome.py.
+      - name: Shared chrome is in sync
+        run: python3 tools/doc-chrome.py --check
+
+      - name: Relative links and anchors resolve
+        run: python3 tools/doc-links.py html
+
   man-page-sync:
     name: man page / html in sync
     if: github.event_name == 'pull_request'

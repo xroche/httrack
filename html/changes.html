@@ -1,105 +1,70 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
-	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
-	<title>HTTrack Website Copier - Change report format specification</title>
-
-	<style type="text/css">
-	<!--
-
-body {
-	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
-	background: #77b;
-}
-body, td {
-	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
-	}
-
-#subTitle {
-	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
-	}
-
-#siteNavigation a, #siteNavigation .current {
-	font-weight: bold;  color: #448;
-	}
-#siteNavigation a:link    { text-decoration: none; }
-#siteNavigation a:visited { text-decoration: none; }
-
-#siteNavigation .current { background-color: #ccd; }
-
-#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
-#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
-
-
-a:link    { text-decoration: underline;  color: #00f; }
-a:visited { text-decoration: underline;  color: #000; }
-a:hover   { text-decoration: underline;  color: #c00; }
-a:active  { text-decoration: underline; }
-
-#pageContent {
-	clear: both;
-	border-bottom: 6px solid #000;
-	padding: 10px;  padding-top: 20px;
-	line-height: 1.65em;
-	background-image: url(images/bg_rings.gif);
-	background-repeat: no-repeat;
-	background-position: top right;
-	}
-
-#pageContent, #siteNavigation {
-	background-color: #ccd;
-	}
-
-
-.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
-.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
-
-hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
-
-h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
-h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
-h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
-h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
-
-.blak { background-color: #000; }
-.hide { display: none; }
-.tableWidth { min-width: 400px; }
-
-.tblRegular       { border-collapse: collapse; }
-.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
-.tblHeaderColor, .tblHeaderColor td { background: #99c; }
-.tblNoBorder td   { border: 0; }
-
-
-// -->
-</style>
-
+<!-- doc-chrome:head -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="The change report HTTrack writes after an update, field by field.">
+<link rel="stylesheet" href="doc.css">
+<script src="doc.js" defer></script>
+<!-- /doc-chrome:head -->
+<title>HTTrack change report format</title>
 </head>
+<body>
 
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
-	<tr>
-	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
-	</tr>
-</table>
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
-	<tr>
-	<td id="subTitle">Open Source offline browser</td>
-	</tr>
-</table>
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
-<tr class="blak">
-<td>
-	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
-	<tr>
-	<td colspan="6"> 
-		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
-		<tr> 
-		<td id="pageContent"> 
-<!-- ==================== End prologue ==================== -->
+<!-- doc-chrome:top -->
+<a class="skip" href="#main">Skip to content</a>
 
-<h2 align="center"><em>Change report format specification</em></h2>
+<header class="masthead">
+	<img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier">
+	<div class="tagline">Open Source offline browser</div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Documentation">
+	<h2>On this page</h2>
+	<ul>
+		<li><a href="#what-changed-means">What "changed" means</a></li>
+		<li><a href="#with-the-cache-off">With the cache off</a></li>
+		<li><a href="#fields">Fields</a></li>
+		<li><a href="#encoding">Encoding</a></li>
+		<li><a href="#example">Example</a></li>
+		<li><a href="#notes">Notes</a></li>
+	</ul>
+	<h2>Start here</h2>
+	<ul>
+		<li><a href="guide.html">Interface guide</a></li>
+		<li><a href="faq.html">FAQ and troubleshooting</a></li>
+		<li><a href="abuse.html">Using HTTrack responsibly</a></li>
+	</ul>
+	<h2>Command line</h2>
+	<ul>
+		<li><a href="cmdguide.html">Command-line guide</a></li>
+		<li><a href="httrack.man.html">Option reference</a></li>
+		<li><a href="filters.html">Filter syntax</a></li>
+	</ul>
+	<h2>Developers</h2>
+	<ul>
+		<li><a href="dev.html">Programming</a></li>
+		<li><a href="library.html">libhttrack API</a></li>
+		<li><a href="plug.html">Callbacks</a></li>
+		<li><a href="scripting.html">Scripting</a></li>
+		<li><a href="cache.html">Cache format</a></li>
+		<li><a href="changes.html" aria-current="page" class="here">Change report format</a></li>
+	</ul>
+	<h2>More</h2>
+	<ul>
+		<li><a href="fcguide.html">Users Guide (3.10)</a></li>
+		<li><a href="contact.html">Contact and credits</a></li>
+		<li><a href="index.html">All documentation</a></li>
+	</ul>
+</nav>
+
+<main id="main">
+<!-- /doc-chrome:top -->
+
+<h1>Change report format specification</h1>
 
 <br />
 
@@ -111,7 +76,7 @@ summary of the same counts.
 
 <br /><br />
 
-<h3>What "changed" means</h3>
+<h3 id="what-changed-means">What "changed" means</h3>
 
 A resource is changed when its bytes differ, not when the server merely re-sent
 it. HTTrack compares the payload it just received against the copy the previous
@@ -129,7 +94,7 @@ server that answers 200 rather than 304 reads as changed. Keeping the cache on
 
 <br /><br />
 
-<h3>With the cache off</h3>
+<h3 id="with-the-cache-off">With the cache off</h3>
 
 <tt>--cache=0</tt> costs the report more than the digest of a parsed page. The
 mirror's file index (<tt>hts-cache/new.lst</tt>) is what records which files a
@@ -142,7 +107,7 @@ compare against and fall back to the transfer signal.
 
 <br /><br />
 
-<h3>Fields</h3>
+<h3 id="fields">Fields</h3>
 
 <ul>
 <li><tt>schema</tt>: format version, currently <tt>1</tt>. It is bumped only
@@ -179,7 +144,7 @@ copy the previous run left.</li>
 
 <br />
 
-<h3>Encoding</h3>
+<h3 id="encoding">Encoding</h3>
 
 The file is JSON, UTF-8. URLs and local paths reach HTTrack as raw bytes and are
 not guaranteed to be valid UTF-8; any byte sequence that is not becomes
@@ -188,7 +153,7 @@ rather than on <tt>url</tt> when a mirror is known to carry legacy-charset URLs.
 
 <br /><br />
 
-<h3>Example</h3>
+<h3 id="example">Example</h3>
 
 <pre>
 {
@@ -216,7 +181,7 @@ rather than on <tt>url</tt> when a mirror is known to carry legacy-charset URLs.
 
 <br /><br />
 
-<h3>Notes</h3>
+<h3 id="notes">Notes</h3>
 
 <ul>
 <li>A file listed under <tt>gone</tt> is only deleted when <tt>--purge-old</tt> is
@@ -239,25 +204,14 @@ scope: both change what a mirror directory contains.</li>
 
 <br /><br />
 
-<!-- ==================== Start epilogue ==================== -->
-		</td>
-		</tr>
-		</table>
-	</td>
-	</tr>
-	</table>
-</td>
-</tr>
-</table>
+<!-- doc-chrome:bottom -->
+</main>
+</div>
 
-<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
-	<tr>
-	<td id="footer"><small>&copy; 1998-2026 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
-	</tr>
-</table>
+<dialog id="zoom" aria-label="Enlarged image"><img src="" alt=""></dialog>
+
+<footer>&copy; 1998-2026 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</footer>
+<!-- /doc-chrome:bottom -->
 
 </body>
-
 </html>
-
-
