@@ -1,159 +1,111 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
-	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
-	<title>HTTrack Website Copier - Offline Browser</title>
-
-	<style type="text/css">
-	<!--
-
-body {
-	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
-	background: #77b;
-}
-body, td {
-	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
-	}
-
-#subTitle {
-	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
-	}
-
-#siteNavigation a, #siteNavigation .current {
-	font-weight: bold;  color: #448;
-	}
-#siteNavigation a:link    { text-decoration: none; }
-#siteNavigation a:visited { text-decoration: none; }
-
-#siteNavigation .current { background-color: #ccd; }
-
-#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
-#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
-
-
-a:link    { text-decoration: underline;  color: #00f; }
-a:visited { text-decoration: underline;  color: #000; }
-a:hover   { text-decoration: underline;  color: #c00; }
-a:active  { text-decoration: underline; }
-
-#pageContent {
-	clear: both;
-	border-bottom: 6px solid #000;
-	padding: 10px;  padding-top: 20px;
-	line-height: 1.65em;
-	background-image: url(images/bg_rings.gif);
-	background-repeat: no-repeat;
-	background-position: top right;
-	}
-
-#pageContent, #siteNavigation {
-	background-color: #ccd;
-	}
-
-
-.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
-.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
-
-hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
-
-h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
-h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
-h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
-h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
-
-.blak { background-color: #000; }
-.hide { display: none; }
-.tableWidth { min-width: 400px; }
-
-.tblRegular       { border-collapse: collapse; }
-.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
-.tblHeaderColor, .tblHeaderColor td { background: #99c; }
-.tblNoBorder td   { border: 0; }
-
-
-// -->
-</style>
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Documentation for HTTrack Website Copier: the interface guide for Windows, Linux and Android, the command-line guide and option reference, filter syntax, the FAQ, and the developer documentation.">
+<meta name="keywords" content="httrack, WinHTTrack, WebHTTrack, HTTrack Android, documentation, offline browser, website mirroring, web mirror utility, FAQ, command line, options, filters">
+<title>HTTrack documentation</title>
+<link rel="stylesheet" href="doc.css">
 </head>
+<body>
 
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
-	<tr>
-	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
-	</tr>
-</table>
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
-	<tr>
-	<td id="subTitle">Open Source offline browser</td>
-	</tr>
-</table>
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
-<tr class="blak">
-<td>
-	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
-	<tr>
-	<td colspan="6"> 
-		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
-		<tr> 
-		<td id="pageContent"> 
-<!-- ==================== End prologue ==================== -->
+<a class="skip" href="#main">Skip to content</a>
 
-<h2 align="center"><em>Documentation</em></h2>
+<header class="masthead">
+	<img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier">
+	<div class="tagline">Open Source offline browser</div>
+</header>
 
-<ul>
-  <li><a href="overview.html">Overview</a></li>
-  <br>HTTrack overview and features<br><br>
-  <li><a href="faq.html">FAQ &amp; Troubleshooting</a></li>
-  <br>Frequently asked questions about HTTrack, and troubleshooting<br><br>
-  <li>How to Use</li>
-  <ul>
-    <li><a href="guide.html">The HTTrack interface, step by step</a></li>
-    <br>Walkthrough and option reference for the three graphical versions: WinHTTrack on Windows, WebHTTrack on Linux/Unix, and the Android app<br>
-    <br>
-    <li><a href="httrack.man.html">Command-line version</a></li>
-    <br>How to run HTTrack from the command line, and where to find every option<br>
-    <br>
-    <li><a href="cmdguide.html">Command-line Guide</a></li>
-    <br>A task-oriented guide to the command line: common tasks, recipes, and the defaults that surprise newcomers<br>
-    <br>
-    <li><a href="fcguide.html">HTTrack Users Guide By Fred Cohen</a></li>
-    <br>A tutorial that describes all command-line options, for Linux and Windows users<br>
-    <br>
-    <li><a href="dev.html">Developer/Programming</a></li>
-    <br>How to use HTTrack in batch files, and how to use the library<br>
-  </ul>
-  <br>
-  <li><a href="abuse.html">How not to Use</a></li>
-  <br>What you mustn't do : bandwidth abuse, and other bad behaviours<br>
-  <br>
-  <li><a href="../license.txt">License</a></li>
-  <br>The HTTrack license agreement<br><br>
-  <li><a href="../history.txt">Release Changes</a></li>
-  <br>New features and bug fixes are listed here<br><br>
-  <li><a href="contact.html">About this program</a></li>
-  <br>How to reach us for comments, bug report and anything else, information about this project<br>
+<div class="wrap solo">
+<main id="main">
+
+<h1>HTTrack documentation</h1>
+
+<p class="lede">HTTrack copies a website to your disk, rewriting its links so the local copy
+browses like the original. It can resume an interrupted download, update a mirror it made
+earlier, mirror over HTTPS and through a proxy, save the crawl as a WARC archive, and report
+what changed since last time. There is a Windows interface (WinHTTrack), one for Linux and
+Unix (WebHTTrack), an Android app, and a command-line program on every platform.</p>
+
+<ul class="hub">
+
+<li>
+	<h2>Start here</h2>
+	<dl>
+		<dt><a href="guide.html">The HTTrack interface, step by step</a></dt>
+		<dd>A walkthrough of a first mirror, then every option panel, for WinHTTrack,
+		WebHTTrack and the Android app.</dd>
+
+		<dt><a href="faq.html">FAQ and troubleshooting</a></dt>
+		<dd>Why a site did not copy the way you expected, and what to do about it.</dd>
+
+		<dt><a href="abuse.html">Using HTTrack responsibly</a></dt>
+		<dd>How not to flood a server, and what webmasters can do about crawlers that do.</dd>
+	</dl>
+</li>
+
+<li>
+	<h2>Command line</h2>
+	<dl>
+		<dt><a href="cmdguide.html">Command-line guide</a></dt>
+		<dd>Organised by task: scope, filters, limits, logins, proxies, updates, plus
+		recipes you can copy.</dd>
+
+		<dt><a href="httrack.man.html">Option reference</a></dt>
+		<dd>The manual page, generated from the program itself, so it lists every option
+		the version you have really accepts.</dd>
+
+		<dt><a href="filters.html">Filter syntax</a></dt>
+		<dd>The rules behind <code>+*.gif</code> and friends, including the size and
+		MIME-type forms.</dd>
+	</dl>
+</li>
+
+<li>
+	<h2>For developers</h2>
+	<dl>
+		<dt><a href="dev.html">Programming with HTTrack</a></dt>
+		<dd>Driving the engine from a script, the callbacks, and the libhttrack API.</dd>
+
+		<dt><a href="cache.html">Cache format</a></dt>
+		<dd>What HTTrack stores in <code>hts-cache</code>, and how to read it.</dd>
+
+		<dt><a href="changes.html">Change report format</a></dt>
+		<dd>The machine-readable report <code>--changes</code> writes after an update.</dd>
+	</dl>
+</li>
+
+<li>
+	<h2>Archive</h2>
+	<dl>
+		<dt><a href="fcguide.html">HTTrack Users Guide</a>, by Fred Cohen
+		<span class="dated">(written for 3.10)</span></dt>
+		<dd>A tutorial covering the command line at length. It was written for release 3.10,
+		so the option list and the defaults it quotes have moved on: check anything specific
+		against the <a href="httrack.man.html">option reference</a>. Kept because it is still
+		a good long read, and because plenty of forum answers link to it.</dd>
+	</dl>
+</li>
+
 </ul>
 
-<!-- ==================== Start epilogue ==================== -->
-		</td>
-		</tr>
-		</table>
-	</td>
-	</tr>
-	</table>
-</td>
-</tr>
-</table>
+<h2>About this program</h2>
 
-<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
-	<tr>
-	<td id="footer"><small>&copy; 1998-2026 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
-	</tr>
-</table>
+<p><a href="contact.html">Contact and credits</a> &middot;
+<a href="../history.txt">Release notes</a> &middot;
+<a href="../license.txt">Licence</a> &middot;
+<a href="../greetings.txt">Acknowledgements</a></p>
+
+<p>HTTrack is free software released under the GNU General Public License, version 3 or
+later. It comes with no warranty, and copying a website is your responsibility: read
+<a href="abuse.html">Using HTTrack responsibly</a> before pointing it at a server you do
+not own.</p>
+
+</main>
+</div>
+
+<footer>&copy; 1998-2026 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</footer>
 
 </body>
-
 </html>
-
-
