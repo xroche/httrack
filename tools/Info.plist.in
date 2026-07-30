@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>HTTrack</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.httrack.WebHTTrack</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>WebHTTrack</string>
+	<key>CFBundleDisplayName</key>
+	<string>WebHTTrack Website Copier</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@PACKAGE_VERSION@</string>
+	<key>CFBundleVersion</key>
+	<string>@PACKAGE_VERSION@</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+	<!-- The UI is a local server the app opens in the default browser; it has no
+	     window of its own, so it must not take focus as a foreground app. -->
+	<key>LSBackgroundOnly</key>
+	<false/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>GNU General Public License v3</string>
+</dict>
+</plist>
