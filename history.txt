@@ -16,16 +16,21 @@ This file lists all changes and fixes that have been made for HTTrack
 + Fixed: several backward scans from strlen(s) - 1 read before their buffer on an empty string (#730, #768, #770, #814, #821)
 + Fixed: a URL could be saved onto the engine's own temporary files, and the final path segment was never clamped (#774, #842, #852)
 + Fixed: a query-string character reference the page charset cannot represent was left unescaped, changing how the query parses (#854)
++ Fixed: a second --update pass overwrote the previous WARC and regenerated a page-less WACZ (#759)
 + Fixed: WARC output dropped URLs of 1005 bytes or more, archived nothing for a 304 revisit, and marked an engine-forced not-modified as one the server sent (#778, #785, #826, #838, #839)
 + Fixed: ProxyTrack overflowed its .arc header block, walked past the end of an .ndx buffer, trusted an unparsed offset, and crashed on a PROPFIND or on an entry with no usable Last-Modified (#793, #820, #825, #828)
-+ Fixed: webhttrack leaked the session id into crawled pages, overflowed its command line so a quoted value could inject flags, and let a posted project path repoint the served root (#706, #707, #710)
++ Fixed: webhttrack leaked the session id into crawled pages, overflowed its command line so a quoted value could inject flags, let a posted project path repoint the served root, and built its redirect Location in a 256-byte stack buffer (#700, #706, #707, #710)
 + Fixed: in the web GUI, options ticked on by default could not be un-ticked, "max site size" set a per-file cap instead of the HTML one, and the mirror link on the finished page could not be followed (#708, #709, #725)
 + Fixed: htsserver labelled every PNG as image/gif and offered JPEG as a download, and an unauthenticated GET of a directory spun the server forever (#724, #875)
++ Fixed: webhttrack hung at exit when no mirror had been launched (#753)
 + Fixed: oversized cache and header fields aborted the engine or overflowed a neighbouring field instead of being clipped (#701, #715, #717, #722, #732)
++ Fixed: a -%S rules file of 4 GB or more overran the heap (#702)
 + Fixed: the CLI display did not repaint when the terminal was resized (#97)
++ Fixed: a document with no declared charset double-encoded the title lifted for the local index (#848)
 + Fixed: a fragment on an inlined reference was dropped, losing an SVG sprite selector (#766)
 + Fixed: several time helpers handed out libc's shared gmtime/localtime static rather than a reentrant breakdown (#794, #806)
 + Changed: fatal-signal backtraces name engine frames instead of a bare module and offset (#705)
++ Changed: --without-zlib is rejected at configure time rather than failing at link (#735)
 + Changed: the offline documentation gains one GUI guide with screenshots, an Android option reference, and a restructured index
 + Changed: multiple internal hardening, test and CI improvements
 

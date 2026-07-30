@@ -1,8 +1,8 @@
 httrack (3.49.15-1) unstable; urgency=medium
 
   * New upstream release: single-file mirrors with inlined assets, sitemap
-    ingestion, a change report between crawls, and a long run of --update and
-    FTP data-loss fixes plus parser hardening; full list in history.txt.
+    ingestion, a change report between crawls, and numerous --update, FTP and
+    parser fixes; full list in history.txt.
   * httrack-doc grows by roughly 1 MB: the offline guide now ships screenshots
     of the WinHTTrack, WebHTTrack and Android interfaces.
 

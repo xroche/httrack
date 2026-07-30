@@ -29,10 +29,10 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:7:0: 3.49.15 appends to httrackp's tail (harmless) and to htsblk's, but lien_back
-# embeds htsblk by value, so lien_back.is_update and everything after it shift +8.
-# Soname deliberately stays .so.3, as in 3.49.14: HTTrackQt is the only consumer of the
-# installed headers and is tracked separately, so a libhttrack4 rename isn't worth it.
+# 3:7:0: htsblk gained a tail field and lien_back embeds it by value, so
+# lien_back.is_update and everything after it shift +8 (httrackp's own tail growth
+# moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed
+# headers, so a libhttrack4 rename isn't worth it.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
 VERSION_INFO="3:7:0"
 AM_MAINTAINER_MODE
