@@ -211,6 +211,13 @@ void hts_backtrace_init(void) {
 #endif
 }
 
+/* Why the report has no frames: a silent gap reads as a handler that died. */
+static void print_no_trace(int fd, const char *msg, size_t len) {
+  if (write(fd, msg, len) != len) { /* no ssize_t: this is built on MSVC too */
+    /* sorry GCC */
+  }
+}
+
 void hts_print_backtrace(int fd) {
 #ifdef USES_BACKTRACE
   void *stack[256];
@@ -227,12 +234,15 @@ void hts_print_backtrace(int fd) {
       symbolize_backtrace(stack, size, fd);
       entered = 0;
     }
+  } else {
+    /* An empty trace means the build carries no unwind tables. */
+    const char msg[] = "No stack trace available: unwinding failed\n";
+
+    print_no_trace(fd, msg, sizeof(msg) - 1);
   }
 #else
   const char msg[] = "No stack trace available on this OS :(\n";
 
-  if (write(fd, msg, sizeof(msg) - 1) != sizeof(msg) - 1) {
-    /* sorry GCC */
-  }
+  print_no_trace(fd, msg, sizeof(msg) - 1);
 #endif
 }
