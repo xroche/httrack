@@ -10,10 +10,11 @@ test -x "$wht" || {
     exit 1
 }
 
+browserstub="$prefix/bin/x-www-browser"
 work="$(mktemp -d)"
 # webhttrack backgrounds htsserver, which outlives it; reap any stray one (scoped
 # to this prefix) so a lingering server can never hold the CI step open.
-trap 'set +e; pkill -f "$prefix/bin/htsserver" 2>/dev/null || true; rm -rf "$work"' EXIT
+trap 'set +e; pkill -f "$prefix/bin/htsserver" 2>/dev/null || true; rm -rf "$work" "$browserstub"' EXIT
 export HOME="$work/home"
 mkdir -p "$HOME/websites"
 marker="$work/marker"
@@ -90,14 +91,15 @@ exec /usr/bin/uname "$@"
 EOF
 chmod +x "$stubdir/uname"
 
-# Stub browser: webhttrack tries its browser-name list in order and runs the
-# first it finds, so shadow the first entry, "x-www-browser". It fetches the
-# server URL and records PASS only for the working UI: the brand string, the
-# step-2 form action, and an option-page tooltip, which a truncated/degraded
-# template page would lack. htsserver only lives until webhttrack exits, so the
-# check has to happen here.
+# Stub browser, named after the first entry of webhttrack's browser list. It goes in
+# $prefix/bin because webhttrack searches its own SRCHPATH before $PATH, so a real
+# /usr/bin/x-www-browser (Edge, on the GitHub Linux runners) would beat a PATH shadow.
+# It fetches the server URL and records PASS only for the working UI: the brand
+# string, the step-2 form action, and an option-page tooltip, which a
+# truncated/degraded template page would lack. htsserver only lives until webhttrack
+# exits, so the check has to happen here.
 # -a: the UI is served ISO-8859-1, so grep must not treat it as binary.
-cat >"$stubdir/x-www-browser" <<EOF
+cat >"$browserstub" <<EOF
 #!/bin/bash
 echo "stub browser invoked with: \$1" >&2
 # Also fetch an option page and require a rendered title='' tooltip: proves the
@@ -121,7 +123,7 @@ else
     echo "FAIL: unexpected response from \$1" >"$marker"
 fi
 EOF
-chmod +x "$stubdir/x-www-browser"
+chmod +x "$browserstub"
 export PATH="$stubdir:$prefix/bin:$PATH"
 
 echo "launching webhttrack"
