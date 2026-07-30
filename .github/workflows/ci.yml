@@ -233,8 +233,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            autoconf automake libtool autoconf-archive \
-            libssl-dev zlib1g-dev libbrotli-dev libzstd-dev
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
       - name: Build and install into a temp prefix
         run: |
