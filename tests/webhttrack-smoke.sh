@@ -125,7 +125,9 @@ else
 fi
 EOF
 chmod +x "$browserstub"
-export PATH="$stubdir:$prefix/bin:$PATH"
+# Deliberately NOT $prefix/bin: the launcher must find its payload from $0, and
+# the browser stub is picked up through webhttrack's SRCHPATH, not $PATH.
+export PATH="$stubdir:$PATH"
 
 echo "launching webhttrack"
 "$wht" </dev/null >"$work/webhttrack.log" 2>&1 &
