@@ -214,3 +214,4 @@ TESTS += 139_local-query-charref.test
 TESTS += 140_crash-handler.test
 TESTS += 141_webhttrack-warc-options.test
 TESTS += 142_webhttrack-content-type.test
+TESTS += 143_engine-backtrace-empty.test
