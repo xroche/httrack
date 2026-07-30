@@ -22,5 +22,5 @@ deb:
 #   make macos-app APP_FLAGS="--prefix /tmp/inst --out /tmp"
 APP_FLAGS =
 macos-app:
-	$(BASH) $(top_srcdir)/tools/macos-app.sh --plist tools/Info.plist $(APP_FLAGS)
+	$(SHELL) $(top_srcdir)/tools/macos-app.sh --plist tools/Info.plist $(APP_FLAGS)
 .PHONY: macos-app

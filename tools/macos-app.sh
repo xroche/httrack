@@ -1,8 +1,9 @@
-#!/bin/bash
-# Assemble HTTrack.app from an installed prefix, then verify it. The payload lives in
+#!/bin/sh
+# Assemble HTTrack.app from an installed prefix, then verify it. POSIX sh on purpose:
+# $(BASH) resolves to /bin/sh on macOS, where bash-in-sh-mode presets $BASH (#895). The payload lives in
 # Contents/Resources because webhttrack resolves htsserver and its data relative to its
 # own path, so the bundle needs no absolute paths of its own.
-set -euo pipefail
+set -eu
 
 usage() {
     echo "usage: $0 --prefix DIR --plist FILE [--out DIR]" >&2
@@ -41,6 +42,8 @@ test -r "$plist" || {
 }
 
 prefix=$(cd "$prefix" && pwd -P)
+list=$(mktemp)
+trap 'rm -f "$list"' EXIT
 app="$out/HTTrack.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
@@ -62,13 +65,14 @@ fail() {
 
 appreal=$(cd "$app" && pwd -P)
 
+find "$app" -type l >"$list"
 nlink=0
 while IFS= read -r l; do
     nlink=$((nlink + 1))
     case "$(readlink "$l")" in
     /*) fail "absolute symlink $l" ;;
     esac
-done < <(find "$app" -type l)
+done <"$list"
 test "$nlink" -gt 0 || fail "scanned no symlinks at all, the check proved nothing"
 
 test -d "$app/Contents/Resources/share/httrack/html/server" ||
@@ -77,21 +81,23 @@ test -d "$app/Contents/Resources/share/httrack/html/server" ||
 # Only our own library must be absent: system and Homebrew dylibs resolve from the
 # user's own install.
 if command -v otool >/dev/null 2>&1; then
+    find "$app/Contents" -type f -perm -u+x >"$list"
     while IFS= read -r bin; do
         file "$bin" | grep -q Mach-O || continue
         if otool -L "$bin" | tail -n +2 | grep -q "$prefix"; then
             otool -L "$bin" >&2
             fail "$bin still links against the staging prefix (build with --disable-shared)"
         fi
-    done < <(find "$app/Contents" -type f -perm -u+x)
+    done <"$list"
 fi
 
 # otool sees load commands only, so scan the text payload separately. The binaries
 # themselves still carry $(datadir) compiled in (#894), so they are not in scope here.
+find "$app/Contents" -type f >"$list"
 while IFS= read -r f; do
     file "$f" | grep -q text || continue
     grep -q -- "$prefix" "$f" 2>/dev/null && fail "$f embeds the staging prefix"
-done < <(find "$app/Contents" -type f)
+done <"$list"
 
 # The plist version is a separate spot from the engine's, so drift is silent unless
 # something compares them (#884 is what that looks like when nobody does).
