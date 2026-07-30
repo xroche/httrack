@@ -39,10 +39,20 @@ grep -q '^Caught signal ' "$out" || {
     cat "$out" >&2
     exit 1
 }
-if grep -q 'No stack trace available' "$out"; then
-    echo "no usable backtrace() here; skipping" >&2
+if grep -q 'No stack trace available on this OS' "$out"; then
+    echo "no backtrace() on this platform; skipping" >&2
     exit 77
 fi
+# 32-bit ARM is the one target whose toolchain may still refuse to unwind;
+# anywhere else an empty trace is the regression this test exists to catch.
+case "$(uname -m)" in
+arm | armv*)
+    if grep -q 'No stack trace available' "$out"; then
+        echo "no unwind tables in this ARM build; skipping" >&2
+        exit 77
+    fi
+    ;;
+esac
 # Unconditional and first: symbolizing must never cost the raw trace.
 grep -q "$rawframe" "$out" || {
     echo "raw module+offset frames are gone:" >&2

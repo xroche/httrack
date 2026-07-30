@@ -100,8 +100,8 @@ AX_CHECK_COMPILE_FLAG([-fstack-protector-strong], [DEFAULT_CFLAGS="$DEFAULT_CFLA
 	[AX_CHECK_COMPILE_FLAG([-fstack-protector], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector"], [], [-Werror])], [-Werror])
 AX_CHECK_COMPILE_FLAG([-fstack-clash-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-clash-protection"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-fcf-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fcf-protection"], [], [-Werror])
-# backtrace() unwinds through these. Default on amd64/arm64, off on armhf, where
-# their absence left every crash report frameless.
+# backtrace() unwinds through these; armhf, unlike amd64/arm64, defaults them off
+# and printed frameless crash reports.
 AX_CHECK_COMPILE_FLAG([-fasynchronous-unwind-tables], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fasynchronous-unwind-tables"], [], [-Werror])
 # No --discard-all: it drops the local symbols naming every static function, so
 # a trace misattributes them to the nearest surviving global. Costs 0.6% size.

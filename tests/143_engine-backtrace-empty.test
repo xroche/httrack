@@ -1,7 +1,6 @@
 #!/bin/bash
-# A backtrace() that yields no frames must still leave a report saying so: on
-# armhf the handler printed nothing at all between "Caught signal" and the
-# closing line, which reads as a handler that died halfway.
+# An empty backtrace() must still leave a report; a silent one reads as a
+# handler that died halfway.
 
 set -euo pipefail
 
@@ -37,7 +36,7 @@ export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
 # Control: a build that never traces would pass the assertion below for the
 # wrong reason.
 rc=0
-plain=$(httrack -#c=abort 2>&1) || rc=$?
+plain=$(HTTRACK_NO_SYMBOLIZE=1 httrack -#c=abort 2>&1) || rc=$? # no addr2line to wedge on
 test "$rc" -eq 134 || {
     echo "the plain crash exited $rc, not 134" >&2
     exit 1
@@ -59,7 +58,7 @@ grep -q "^Caught signal 6$" <<<"$out" || {
     printf '%s\n' "$out" >&2
     exit 1
 }
-grep -q 'No stack trace available' <<<"$out" || {
+grep -q 'No stack trace available: unwinding failed' <<<"$out" || {
     echo "an empty backtrace left no diagnostic:" >&2
     printf '%s\n' "$out" >&2
     exit 1

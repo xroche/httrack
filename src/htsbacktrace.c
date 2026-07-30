@@ -235,8 +235,7 @@ void hts_print_backtrace(int fd) {
       entered = 0;
     }
   } else {
-    /* The unwinder gave up on the first frame, which is what a build without
-       unwind tables looks like (armhf: gcc emits no .ARM.exidx by default). */
+    /* An empty trace means the build carries no unwind tables. */
     const char msg[] = "No stack trace available: unwinding failed\n";
 
     print_no_trace(fd, msg, sizeof(msg) - 1);

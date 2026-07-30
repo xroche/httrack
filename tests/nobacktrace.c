@@ -1,6 +1,5 @@
-/* backtrace() finding nothing is what a build without unwind tables does
-   (armhf emits no .ARM.exidx by default), and the frameless crash report that
-   follows is what 143_engine-backtrace-empty.test pins. */
+/* Forces the empty backtrace() of an unwind-tableless build, for
+   143_engine-backtrace-empty.test. */
 
 #define _GNU_SOURCE
 
