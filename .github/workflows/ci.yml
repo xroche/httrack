@@ -279,8 +279,7 @@ jobs:
       - name: Assemble HTTrack.app
         run: |
           set -euo pipefail
-          bash tools/macos-app.sh --prefix "$RUNNER_TEMP/inst" \
-            --plist tools/Info.plist --out "$RUNNER_TEMP"
+          make macos-app APP_FLAGS="--prefix $RUNNER_TEMP/inst --out $RUNNER_TEMP"
           plutil -lint "$RUNNER_TEMP/HTTrack.app/Contents/Info.plist"
 
       - name: Run it through the bundle stub
@@ -289,8 +288,6 @@ jobs:
           app="$RUNNER_TEMP/HTTrack.app"
           bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
 
-      # The real test: move the bundle somewhere unrelated, delete the prefix it was
-      # built from, and require it to still serve the UI.
       - name: Run it again after moving it
         run: |
           set -euo pipefail

@@ -17,3 +17,10 @@ DEB_FLAGS =
 deb:
 	$(SHELL) $(top_srcdir)/tools/mkdeb.sh $(DEB_FLAGS)
 .PHONY: deb
+
+# Assemble the macOS application bundle from an installed prefix, e.g.
+#   make macos-app APP_FLAGS="--prefix /tmp/inst --out /tmp"
+APP_FLAGS =
+macos-app:
+	$(BASH) $(top_srcdir)/tools/macos-app.sh --plist tools/Info.plist $(APP_FLAGS)
+.PHONY: macos-app

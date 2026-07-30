@@ -57,8 +57,6 @@ fail() {
     exit 1
 }
 
-# A bundle is only a bundle if it works where the user drops it, so every check below
-# is about surviving a move.
 appreal=$(cd "$app" && pwd -P)
 
 while IFS= read -r l; do
@@ -70,9 +68,8 @@ done < <(find "$app" -type l)
 test -d "$app/Contents/Resources/share/httrack/html/server" ||
     fail "Contents/Resources/share/httrack/html/server missing"
 
-# Mach-O referencing the staging prefix would load the wrong copy, or nothing, once the
-# app moves. Our own library is the one that must not appear; the system and Homebrew
-# dylibs are resolved by the user's own install.
+# Only our own library must be absent: system and Homebrew dylibs resolve from the
+# user's own install.
 if command -v otool >/dev/null 2>&1; then
     while IFS= read -r bin; do
         file "$bin" | grep -q Mach-O || continue

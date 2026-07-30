@@ -22,8 +22,7 @@
 	<string>@PACKAGE_VERSION@</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>11.0</string>
-	<!-- The UI is a local server the app opens in the default browser; it has no
-	     window of its own, so it must not take focus as a foreground app. -->
+	<!-- Not background-only: the UI opens in the user's default browser. -->
 	<key>LSBackgroundOnly</key>
 	<false/>
 	<key>NSHighResolutionCapable</key>
