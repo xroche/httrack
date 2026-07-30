@@ -143,7 +143,7 @@ jobs:
   # so point configure at it; everything else is in the SDK or default paths.
   macos:
     name: build (macOS arm64, clang)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -176,6 +176,18 @@ jobs:
           sudo ifconfig lo0 alias 127.0.0.2 up
           sudo ifconfig lo0 alias 127.0.0.3 up
 
+      - name: PROBE runner and sample(1) capability
+        run: |
+          set +e
+          sw_vers; echo "ncpu=$(sysctl -n hw.ncpu) mem=$(sysctl -n hw.memsize)"
+          sleep 120 &
+          victim=$!
+          /usr/bin/sample "$victim" 2 -mayDie >/tmp/sample.out 2>/tmp/sample.err
+          echo "sample rc=$?"
+          echo "--- has Call graph: ---"; grep -c '^Call graph:' /tmp/sample.out
+          head -20 /tmp/sample.out; echo "--- stderr ---"; head -20 /tmp/sample.err
+          kill $victim 2>/dev/null
+
       - name: Test
         timeout-minutes: 20
         run: |
@@ -186,12 +198,23 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+      - name: PROBE dump every failing test's own log
+        if: failure()
+        run: |
+          set +e
+          for trs in tests/*.trs; do
+            grep -q '^:test-result: \(FAIL\|ERROR\)' "$trs" || continue
+            log="${trs%.trs}.log"
+            echo "########## $log ##########"
+            cat "$log"
+          done
+
   # Runtime smoke of the WebHTTrack launcher on macOS: it carries a Darwin-only
   # browser path (open -W) and nothing else exercises htsserver. Install into a
   # temp prefix, then check webhttrack brings up htsserver and serves the UI.
   webhttrack-macos:
     name: webhttrack smoke (macOS arm64)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
         with:
