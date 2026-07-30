@@ -24,7 +24,7 @@ python=$(find_python) || {
 
 # The GUI assets asserted below have to exist, or every check goes vacuous.
 for asset in server/ping.js server/style.css images/screenshot_01.jpg \
-    images/bg_rings.gif img/android_spider.png \
+    images/bg_rings.gif img/guide-droid-opt-spider.png \
     server/div/com.httrack.WebHTTrack.metainfo.xml; do
     test -f "${distdir}/html/${asset}" || fail "missing GUI asset ${asset}"
 done
@@ -132,7 +132,7 @@ check_html_headers("/server/index.html")
 check_type("/server/ping.js", "text/javascript")
 check_type("/server/style.css", "text/css")
 check_type("/images/bg_rings.gif", "image/gif")
-check_type("/img/android_spider.png", "image/png")
+check_type("/img/guide-droid-opt-spider.png", "image/png")
 check_type("/images/screenshot_01.jpg", "image/jpeg")
 # Dots in the stem: the type comes from the last one, not the first.
 check_type("/server/div/com.httrack.WebHTTrack.metainfo.xml", "application/xml")
@@ -142,7 +142,7 @@ check_type("/server/div/com.httrack.WebHTTrack.metainfo.xml", "application/xml")
 parts = urllib.parse.urlsplit(url)
 sock = socket.create_connection((parts.hostname, parts.port), timeout=20)
 try:
-    sock.sendall(b"GET /img/android_spider.png HTTP/1.0\r\n\r\n")
+    sock.sendall(b"GET /img/guide-droid-opt-spider.png HTTP/1.0\r\n\r\n")
     raw = b""
     while len(raw) < 65536 and b"\r\n\r\n" not in raw and b"\n\n" not in raw:
         chunk = sock.recv(4096)
