@@ -30,6 +30,10 @@ if [ ! -r "${NOBACKTRACE_LIB:-}" ]; then
     exit 1
 fi
 
+# An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
+# refuses by default. The shim allocates nothing, so the ordering is harmless.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
 # Control: a build that never traces would pass the assertion below for the
 # wrong reason.
 rc=0
