@@ -688,6 +688,7 @@ jobs:
         src/webhttrack
         tests/*.sh
         tests/*.test
+        tools/macos-app.sh
         tools/mkdeb.sh
     steps:
       - uses: actions/checkout@v7
