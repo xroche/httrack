@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# configure must hand the Makefiles a real bash (BASH_SHELL): "make deb" and the test
+# driver both run bash scripts through it. Not searched into BASH, which bash presets to
+# its own path, so on macOS -- where /bin/sh is a bash -- it reported /bin/sh (#895, #891).
+#
+# shellcheck disable=SC2016 # the probes are for the shell under test to expand
+
+set -euo pipefail
+
+sh=${BASH_SHELL:-}
+test -n "$sh" || {
+    echo "BASH_SHELL is empty; tests/Makefile.am must export the configured value" >&2
+    exit 1
+}
+test -x "$sh" || {
+    echo "BASH_SHELL=$sh is not an executable file" >&2
+    exit 1
+}
+
+version=$("$sh" -c 'echo "${BASH_VERSION:-}"')
+test -n "$version" || {
+    echo "BASH_SHELL=$sh sets no BASH_VERSION, so it is not a bash" >&2
+    exit 1
+}
+
+# sh-mode bash sets BASH_VERSION too, so the version alone proves nothing.
+opts=$("$sh" -c 'echo ":${SHELLOPTS:-}:"')
+case "$opts" in
+*:posix:*)
+    echo "BASH_SHELL=$sh is a bash in POSIX sh-mode" >&2
+    exit 1
+    ;;
+esac
+
+# The test helpers use process substitution, which macOS's bash-3.2-as-sh rejects.
+out=$("$sh" -c 'cat <(echo procsub)' 2>&1) || {
+    echo "BASH_SHELL=$sh cannot run a process substitution: $out" >&2
+    exit 1
+}
+test "$out" = procsub || {
+    echo "expected 'procsub' from BASH_SHELL=$sh, got: $out" >&2
+    exit 1
+}
+
+echo "configured bash is $sh ($version)"

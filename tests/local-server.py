@@ -20,6 +20,7 @@ import hashlib
 import os
 import re
 import socket
+import socketserver
 import struct
 import sys
 import time
@@ -2664,6 +2665,12 @@ def main():
     # raise it from Python's default 5 so a busy -c8 crawl can't lose fetches.
     class BacklogHTTPServer(ThreadingHTTPServer):
         request_queue_size = 128
+
+        # Skip the getfqdn() reverse lookup stock server_bind() does for the
+        # unread server_name: it stalls 35s on macOS (#870).
+        def server_bind(self):
+            socketserver.TCPServer.server_bind(self)
+            self.server_name, self.server_port = self.server_address[:2]
 
     httpd = BacklogHTTPServer((args.bind, 0), factory)
 
