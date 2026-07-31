@@ -2666,10 +2666,8 @@ def main():
     class BacklogHTTPServer(ThreadingHTTPServer):
         request_queue_size = 128
 
-        # HTTPServer.server_bind() reverse-resolves the bind address through
-        # getfqdn() only to fill server_name, which nothing here reads. On macOS
-        # that lookup stalls for ~30s under a parallel run, delaying the PORT
-        # line past every caller's discovery budget (#870).
+        # Skip the getfqdn() reverse lookup stock server_bind() does for the
+        # unread server_name: it stalls 35s on macOS (#870).
         def server_bind(self):
             socketserver.TCPServer.server_bind(self)
             self.server_name, self.server_port = self.server_address[:2]
