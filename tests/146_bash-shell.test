@@ -70,14 +70,14 @@ for f in "$abs_top_srcdir"/*; do
     ln -s "$f" "$tmp/src/"
 done
 
-(cd "$tmp/bld" && BASH_SHELL="$tmp/mybash" bash "$tmp/src/configure" >conf.log 2>&1) || {
-    echo "configure BASH_SHELL=$tmp/mybash failed:" >&2
-    tail -20 "$tmp/bld/conf.log" >&2
-    exit 1
-}
-got=$(sed -n 's/^BASH_SHELL = //p' "$tmp/bld/Makefile")
+# Read the trace, not the generated Makefile, and ignore the exit status: BASH_SHELL is
+# resolved long before the library checks, which need a build environment we cannot assume
+# (macOS CI hands its own configure the Homebrew paths for openssl).
+(cd "$tmp/bld" && BASH_SHELL="$tmp/mybash" bash "$tmp/src/configure" >conf.log 2>&1) || true
+got=$(sed -n 's/^checking for bash\.\.\. //p' "$tmp/bld/conf.log")
 test "$got" = "$tmp/mybash" || {
-    echo "configure discarded BASH_SHELL=$tmp/mybash, kept: $got" >&2
+    echo "configure discarded BASH_SHELL=$tmp/mybash, resolved: ${got:-<no result line>}" >&2
+    tail -20 "$tmp/bld/conf.log" >&2
     exit 1
 }
 
