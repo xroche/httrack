@@ -49,7 +49,7 @@
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1"/>
-  <!-- Newest first; tests/01_engine-version-macros.test pins the top entry to the tree version. -->
+  <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
     <release version="3.49.15" date="2026-07-30">
       <description>
@@ -58,6 +58,7 @@
           <li>Read a site's sitemap, so pages nothing links to are still found</li>
           <li>See what a new pass added, updated or removed</li>
           <li>Updating a mirror no longer destroys a good local copy when a download fails or is interrupted</li>
+          <li>In the web interface, options ticked by default can be un-ticked again, the size limit applies to the whole site, and the finished mirror opens from its link</li>
         </ul>
       </description>
     </release>
@@ -66,7 +67,7 @@
         <ul>
           <li>Save a mirror as a web archive, indexed and packaged for replay</li>
           <li>Choose what the page footer says</li>
-          <li>Windows handles very long paths and non-English project names correctly</li>
+          <li>A mirror saved to a folder with accented characters in its name lands in the right place</li>
         </ul>
       </description>
     </release>
@@ -75,7 +76,7 @@
         <ul>
           <li>Mirror through a SOCKS5 proxy</li>
           <li>Files of 2 GB and over are handled correctly on Windows and on 32-bit systems</li>
-          <li>The web interface offers the options added since 3.49-2, among them a cookies file and a pause between downloads</li>
+          <li>The web interface offers options that used to be command-line only, among them a cookies file and a pause between downloads</li>
         </ul>
       </description>
     </release>
@@ -88,7 +89,7 @@
       <description>
         <ul>
           <li>Audio and video sources are mirrored along with the page</li>
-          <li>Site rules written with wildcards are understood</li>
+          <li>A site's robots.txt is followed more closely, including its Allow rules and wildcards</li>
           <li>A time limit now stops a slow download instead of waiting for it to end</li>
         </ul>
       </description>
