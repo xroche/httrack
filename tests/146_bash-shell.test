@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# configure must hand the Makefiles a real bash (BASH_SHELL): "make deb" and the
-# test driver both run bash scripts through it. It used to search into BASH,
-# which bash presets to its own path, so on macOS -- where /bin/sh is a bash in
-# sh-mode -- configure reported /bin/sh and that shell rejects the process
-# substitution the bundle script uses (#895, #891).
+# configure must hand the Makefiles a real bash (BASH_SHELL): "make deb" and the test
+# driver both run bash scripts through it. Not searched into BASH, which bash presets to
+# its own path, so on macOS -- where /bin/sh is a bash -- it reported /bin/sh (#895, #891).
 #
 # shellcheck disable=SC2016 # the probes are for the shell under test to expand
 
@@ -35,7 +33,7 @@ case "$opts" in
     ;;
 esac
 
-# The construct that killed the macOS bundle job.
+# The test helpers use process substitution, which macOS's bash-3.2-as-sh rejects.
 out=$("$sh" -c 'cat <(echo procsub)' 2>&1) || {
     echo "BASH_SHELL=$sh cannot run a process substitution: $out" >&2
     exit 1

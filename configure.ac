@@ -53,9 +53,8 @@ LT_INIT
 AC_PROG_LN_S
 LT_INIT
 
-# A real bash, for "make deb" and the test harness. Searched into BASH_SHELL and
-# not BASH because bash presets $BASH to its own path and macOS /bin/sh is itself
-# a bash, so AC_PATH_PROGS would honour that value instead of searching (#895).
+# A real bash, for "make deb" and the test harness. Not searched into BASH: bash presets
+# that to its own path, and macOS /bin/sh is a bash, so the macro never searches (#895).
 AS_UNSET([BASH_SHELL])
 AC_PATH_PROGS([BASH_SHELL], [bash], [/bin/bash])
 
