@@ -3389,6 +3389,26 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
   datadir_expect(self, "", expect);
   datadir_expect("httrack", "", "");
 
+  /* A directory part too long for the layout suffix to be appended must clip,
+     not abort: appending to a non-empty buffer is the *_safe_ abort path. */
+  {
+    /* Long enough that dirname + "../share/httrack/" overflows the candidate
+       buffer, short enough that the dirname itself still fits. */
+    const size_t dirlen = HTS_URLMAXSIZE * 2 - 8;
+    char huge[HTS_URLMAXSIZE * 3];
+    char got[HTS_URLMAXSIZE * 2];
+    size_t n;
+
+    huge[0] = '/';
+    for (n = 1; n < dirlen - 1; n++) {
+      huge[n] = 'a';
+    }
+    huge[dirlen - 1] = '/';
+    memcpy(huge + dirlen, "httrack", sizeof("httrack"));
+    hts_resolve_datadir(got, sizeof(got), huge, gone);
+    assertf(strcmp(got, gone) == 0);
+  }
+
   printf("datadir self-test OK\n");
   return 0;
 }

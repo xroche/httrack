@@ -146,13 +146,15 @@ void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
 
     for (i = 0; i < sizeof(layout) / sizeof(layout[0]); i++) {
       char cand[HTS_URLMAXSIZE * 2];
+      /* snprintf, not the strlncatbuff idiom: appending to a non-empty buffer
+         aborts on overflow, and a long enough argv[0] reaches it. */
+      const int n = snprintf(cand, sizeof(cand), "%s%s", base, layout[i]);
 
-      cand[0] = '\0';
-      strlncatbuff(cand, base, sizeof(cand), sizeof(cand) - 1);
-      strlncatbuff(cand, layout[i], sizeof(cand), sizeof(cand) - 1);
+      if (n < 0 || (size_t) n >= sizeof(cand)) {
+        continue; /* truncated, so not the path we meant to probe */
+      }
       if (datadir_has_templates(cand)) {
-        dst[0] = '\0';
-        strlncatbuff(dst, cand, dstsize, dstsize - 1);
+        snprintf(dst, dstsize, "%s", cand);
         return;
       }
     }
@@ -162,8 +164,7 @@ void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
   fallback = (builtin != NULL && *builtin != '\0') ? builtin
              : (base != NULL)                      ? base
                                                    : "";
-  dst[0] = '\0';
-  strlncatbuff(dst, fallback, dstsize, dstsize - 1);
+  snprintf(dst, dstsize, "%s", fallback);
 }
 
 #define htsmain_free() do { \
