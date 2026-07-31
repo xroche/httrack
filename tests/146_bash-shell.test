@@ -61,8 +61,7 @@ trap 'set +e; rm -rf "$tmp"' EXIT
 mkdir "$tmp/src" "$tmp/bld"
 ln -s "$sh" "$tmp/mybash"
 
-# Symlink farm rather than the real srcdir: autoconf refuses an out-of-tree run when
-# srcdir holds a config.status, which is what an in-tree build leaves behind.
+# Symlink farm, not the real srcdir: an in-tree config.status makes autoconf refuse it.
 for f in "$abs_top_srcdir"/*; do
     case "${f##*/}" in
     config.status | config.log | config.h | stamp-h1 | Makefile) continue ;;
@@ -70,13 +69,20 @@ for f in "$abs_top_srcdir"/*; do
     ln -s "$f" "$tmp/src/"
 done
 
-# Read the trace, not the generated Makefile, and ignore the exit status: BASH_SHELL is
-# resolved long before the library checks, which need a build environment we cannot assume
-# (macOS CI hands its own configure the Homebrew paths for openssl).
-(cd "$tmp/bld" && BASH_SHELL="$tmp/mybash" bash "$tmp/src/configure" >conf.log 2>&1) || true
-got=$(sed -n 's/^checking for bash\.\.\. //p' "$tmp/bld/conf.log")
+# Prefer the Makefile: it proves the value that reaches $(BASH_SHELL), not just the macro's
+# decision. configure may die on a library check before writing one, so fall back to the
+# trace it printed earlier.
+(cd "$tmp/bld" && BASH_SHELL="$tmp/mybash" bash "$tmp/src/configure" --disable-https >conf.log 2>&1) || true
+if test -f "$tmp/bld/Makefile"; then
+    got=$(sed -n 's/^BASH_SHELL = //p' "$tmp/bld/Makefile")
+    from="Makefile"
+else
+    got=$(sed -n 's/^checking for bash\.\.\. //p' "$tmp/bld/conf.log")
+    got=${got#"(cached) "}
+    from="trace"
+fi
 test "$got" = "$tmp/mybash" || {
-    echo "configure discarded BASH_SHELL=$tmp/mybash, resolved: ${got:-<no result line>}" >&2
+    echo "configure discarded BASH_SHELL=$tmp/mybash, $from has: ${got:-<nothing>}" >&2
     tail -20 "$tmp/bld/conf.log" >&2
     exit 1
 }
