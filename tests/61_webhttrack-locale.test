@@ -7,8 +7,7 @@ set -euo pipefail
 
 testdir=$(cd "$(dirname "$0")" && pwd)
 distdir=$(cd "${testdir}/.." && pwd)
-# The .in, not the generated script: only SRCHDISTPATH is substituted, and this
-# keeps the test inside srcdir.
+# The .in, not the generated script: only SRCHDISTPATH differs, and this stays in srcdir.
 script="${distdir}/src/webhttrack.in"
 
 fail() {

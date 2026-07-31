@@ -52,6 +52,13 @@ Please visit our Website: http://www.httrack.com
 #include "htsmd5.h"
 
 #include <ctype.h>
+/* hts_self_path() */
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 #if USE_BEGINTHREAD
 #ifdef _WIN32
 #include <process.h>
@@ -80,36 +87,61 @@ static int datadir_has_templates(const char *dir) {
                         "templates/index-header.html"));
 }
 
-/* Directory part of argv0, trailing '/' kept, or NULL when argv0 carries no
-   path: a bare name came from a PATH lookup and locates nothing. */
-static const char *exedir_of(char *dst, size_t dstsize, const char *argv0) {
+const char *hts_self_path(char *dst, size_t dstsize) {
+#if defined(_WIN32)
+  const DWORD n = GetModuleFileNameA(NULL, dst, (DWORD) dstsize);
+
+  /* Pre-Win8 returns nSize on truncation without terminating: a full buffer
+     is a failure, not a path. */
+  return (n > 0 && (size_t) n < dstsize) ? dst : NULL;
+#elif defined(__APPLE__)
+  uint32_t n = (uint32_t) dstsize;
+
+  return _NSGetExecutablePath(dst, &n) == 0 ? dst : NULL;
+#else
+  /* Linux; anywhere else this is simply absent and argv[0] has to do. */
+  const ssize_t n = readlink("/proc/self/exe", dst, dstsize - 1);
+
+  if (n <= 0 || (size_t) n >= dstsize - 1)
+    return NULL;
+  dst[n] = '\0';
+  return dst;
+#endif
+}
+
+/* Directory part of path, trailing '/' kept, or NULL when it carries none: a
+   bare name came from a PATH lookup and locates nothing. */
+static const char *dirname_of(char *dst, size_t dstsize, const char *path) {
   char catbuff[CATBUFF_SIZE];
-  const char *path, *sep;
+  const char *slashed, *sep;
   size_t len;
 
-  if (argv0 == NULL)
+  if (path == NULL)
     return NULL;
-  path = fslash(catbuff, sizeof(catbuff), argv0);
-  if ((sep = strrchr(path, '/')) == NULL)
+  slashed = fslash(catbuff, sizeof(catbuff), path);
+  if ((sep = strrchr(slashed, '/')) == NULL)
     return NULL;
-  len = (size_t) (sep - path) + 1;
+  len = (size_t) (sep - slashed) + 1;
   if (len >= dstsize)
     return NULL;
-  memcpy(dst, path, len);
+  memcpy(dst, slashed, len);
   dst[len] = '\0';
   return dst;
 }
 
-void hts_resolve_datadir(char *dst, size_t dstsize, const char *argv0,
+void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
                          const char *builtin) {
   /* An installed tree that was moved, then a flat one with templates/ beside
      the binary. */
   static const char *const layout[] = {"../share/httrack/", ""};
   char exedir[HTS_URLMAXSIZE * 2];
-  const char *base;
+  const char *base = NULL;
+  const char *fallback;
 
-  if (!datadir_has_templates(builtin) &&
-      (base = exedir_of(exedir, sizeof(exedir), argv0)) != NULL) {
+  if (!datadir_has_templates(builtin)) {
+    base = dirname_of(exedir, sizeof(exedir), selfpath);
+  }
+  if (base != NULL) {
     size_t i;
 
     for (i = 0; i < sizeof(layout) / sizeof(layout[0]); i++) {
@@ -125,8 +157,13 @@ void hts_resolve_datadir(char *dst, size_t dstsize, const char *argv0,
       }
     }
   }
+  /* Windows has no compiled-in data directory, so there the executable's own
+     is all we have. */
+  fallback = (builtin != NULL && *builtin != '\0') ? builtin
+             : (base != NULL)                      ? base
+                                                   : "";
   dst[0] = '\0';
-  strlncatbuff(dst, builtin, dstsize, dstsize - 1);
+  strlncatbuff(dst, fallback, dstsize, dstsize - 1);
 }
 
 #define htsmain_free() do { \
@@ -235,9 +272,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   // Data directory holding the HTML templates
   {
     char datadir[HTS_URLMAXSIZE * 2];
+    char selfbuff[HTS_URLMAXSIZE * 2];
+    const char *self = hts_self_path(selfbuff, sizeof(selfbuff));
 
-    hts_resolve_datadir(datadir, sizeof(datadir), argc > 0 ? argv[0] : NULL,
-                        HTS_HTTRACKDIR);
+#ifdef HTS_HTTRACKDIR
+    const char *const builtin = HTS_HTTRACKDIR;
+#else
+    const char *const builtin = "";
+#endif
+
+    if (self == NULL && argc > 0) {
+      self = argv[0];
+    }
+    hts_resolve_datadir(datadir, sizeof(datadir), self, builtin);
     StringCopy(opt->path_bin, datadir);
   }
 

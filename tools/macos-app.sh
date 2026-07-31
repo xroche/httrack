@@ -52,6 +52,14 @@ cp -R "$prefix"/. "$app/Contents/Resources/"
 rm -rf "$app/Contents/Resources/include"
 find "$app/Contents/Resources" \( -name '*.la' -o -name '*.a' \) -delete
 
+# webhttrack carries the configure-time datadir as a --datadir fallback (#887);
+# in a bundle that is only a build-machine path, and the relative entries ahead
+# of it already find the payload.
+wht="$app/Contents/Resources/bin/webhttrack"
+sed -e "s| \"$prefix/[^\"]*\"||g" "$wht" >"$wht.tmp"
+mv -f "$wht.tmp" "$wht"
+chmod +x "$wht"
+
 cat >"$app/Contents/MacOS/HTTrack" <<'EOF'
 #!/bin/sh
 exec "$(dirname "$0")/../Resources/bin/webhttrack" "$@"

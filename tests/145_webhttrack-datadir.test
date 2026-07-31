@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# webhttrack probed a fixed list of prefixes, so a build with a non-default
-# --datadir installed a launcher that could not start (#887). The configured
-# datadir must be substituted in, after the relative entries so a moved tree
-# still wins and before the guesses so --datadir is actually used.
+# A build with a non-default --datadir installed a launcher that could not start
+# (#887): the configured datadir must be searched, and after the relative entries.
 
 set -euo pipefail
 
@@ -33,8 +31,7 @@ for i in "${!SRCHDISTPATH[@]}"; do
 done
 test "${pos}" -ge 0 || fail "configured datadir ${datadir} is not in SRCHDISTPATH"
 
-# The two $BINWD entries must still precede it, or a relocated tree would read
-# whatever the build machine's datadir holds.
+# The relative entries must still come first, or a moved tree reads the build machine's.
 if [ "${SRCHDISTPATH[0]}" != "${BINWD}/../share" ] || [ "${SRCHDISTPATH[1]}" != "${BINWD}/.." ]; then
     fail "the relative entries moved: ${SRCHDISTPATH[0]} ${SRCHDISTPATH[1]}"
 fi
