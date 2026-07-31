@@ -12,10 +12,10 @@ EXTRA_DIST = INSTALL.Linux \
 # Build the signed Debian packages from a clean source export. Pass the signing
 # key and other options through DEB_FLAGS, e.g.:
 #   make deb DEB_FLAGS="--key BB71C7E6CB1AD8FAF53FE42A60C3AA7180598EFB"
-# See tools/mkdeb.sh --help for all options.
+# See tools/mkdeb.sh --help for all options. Not $(SHELL): mkdeb.sh is bash, and dash chokes (#891).
 DEB_FLAGS =
 deb:
-	$(SHELL) $(top_srcdir)/tools/mkdeb.sh $(DEB_FLAGS)
+	$(BASH_SHELL) $(top_srcdir)/tools/mkdeb.sh $(DEB_FLAGS)
 .PHONY: deb
 
 # Assemble the macOS application bundle from an installed prefix, e.g.

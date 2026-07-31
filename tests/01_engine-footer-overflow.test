@@ -1,9 +1,5 @@
 #!/bin/bash
 #
-# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
-# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms despite the
-# #!/bin/bash above.
-
 # A -%F footer whose expansion overflows the on-page buffer must be dropped, not
 # crash the crawl. Before the fix the unchecked hts_footer_format return left the
 # buffer unterminated and the next strcatbuff aborted (SIGABRT).

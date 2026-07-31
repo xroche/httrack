@@ -1,8 +1,7 @@
 #!/bin/sh
-# Assemble HTTrack.app from an installed prefix, then verify it. POSIX sh on purpose:
-# $(BASH) resolves to /bin/sh on macOS, where bash-in-sh-mode presets $BASH (#895). The payload lives in
-# Contents/Resources because webhttrack resolves htsserver and its data relative to its
-# own path, so the bundle needs no absolute paths of its own.
+# Assemble HTTrack.app from an installed prefix, then verify it. POSIX sh on purpose: a
+# bashism then fails shellcheck, not CI. Payload in Contents/Resources, where webhttrack
+# resolves htsserver and its data relative to its own path.
 set -eu
 
 usage() {

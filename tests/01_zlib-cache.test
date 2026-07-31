@@ -1,9 +1,5 @@
 #!/bin/bash
 #
-# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
-# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
-# tool flags despite the #!/bin/bash above.
-
 # Cache create/read/update logic (driven by 'httrack -#test=cache <dir>').
 #
 # The in-process self-test stores several hand-crafted edge entries (normal
