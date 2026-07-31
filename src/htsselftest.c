@@ -54,6 +54,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdns_selftest.h"
 #include "htscharset.h"
 #include "htscmdline.h"
+#include "htscoremain.h"
 #include "htsencoding.h"
 #include "htsftp.h"
 #include "htsmd5.h"
@@ -3311,6 +3312,104 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
 
   UNLINK(path);
   printf("makeindex self-test OK\n");
+  return 0;
+}
+
+static void datadir_expect(const char *selfpath, const char *builtin,
+                           const char *expect) {
+  char got[HTS_URLMAXSIZE * 2];
+
+  hts_resolve_datadir(got, sizeof(got), selfpath, builtin);
+  if (strcmp(got, expect) != 0) {
+    fprintf(stderr,
+            "datadir: self=%s builtin=\"%s\" gave \"%s\", expected \"%s\"\n",
+            selfpath != NULL ? selfpath : "(null)", builtin, got, expect);
+  }
+  assertf(strcmp(got, expect) == 0);
+}
+
+// -#test=datadir <dir>: a relocated tree must find its own templates instead of
+// silently falling back to the built-in ones (#894). argv[0] is writable.
+static int st_datadir(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE];
+  char self[HTS_URLMAXSIZE];
+  char expect[HTS_URLMAXSIZE * 2];
+  char installed[HTS_URLMAXSIZE];
+  char gone[HTS_URLMAXSIZE];
+  /* Each holds a templates/index-header.html, the file path_bin is read for.
+     nest/ keeps the flat case away from the installed share/httrack above. */
+  static const char *const dirs[] = {"share/httrack", "bin", "nest/flat"};
+  size_t i;
+
+  (void) opt;
+  assertf(argc >= 1);
+
+  /* argv[0] is a fallback: what the engine actually resolves from is this. */
+  assertf(hts_self_path(path, sizeof(path)) != NULL);
+  assertf(fexist(path));
+  /* Too small for any real path, so the truncation guard must refuse. */
+  assertf(hts_self_path(path, 2) == NULL);
+
+  for (i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
+    FILE *fp;
+
+    snprintf(path, sizeof(path), "%s/%s/templates/", argv[0], dirs[i]);
+    assertf(structcheck(path) == 0);
+    snprintf(path, sizeof(path), "%s/%s/templates/index-header.html", argv[0],
+             dirs[i]);
+    fp = fopen(path, "wb");
+    assertf(fp != NULL);
+    fclose(fp);
+  }
+  snprintf(installed, sizeof(installed), "%s/share/httrack/", argv[0]);
+  snprintf(gone, sizeof(gone), "%s/gone/", argv[0]);
+
+  /* A moved install: bin/ carries templates too, so this pins the order. */
+  snprintf(self, sizeof(self), "%s/bin/httrack", argv[0]);
+  snprintf(expect, sizeof(expect), "%s/bin/../share/httrack/", argv[0]);
+  datadir_expect(self, gone, expect);
+
+  /* The compiled-in path still wins when it exists. */
+  datadir_expect(self, installed, installed);
+
+  /* Flat layout: templates/ sits beside the binary. */
+  snprintf(self, sizeof(self), "%s/nest/flat/httrack", argv[0]);
+  snprintf(expect, sizeof(expect), "%s/nest/flat/", argv[0]);
+  datadir_expect(self, gone, expect);
+
+  /* Nothing to derive from, or nothing found: the compiled-in path stands. */
+  datadir_expect("httrack", gone, gone);
+  datadir_expect(NULL, gone, gone);
+  snprintf(self, sizeof(self), "%s/nowhere/deep/httrack", argv[0]);
+  datadir_expect(self, gone, gone);
+
+  /* No compiled-in path, as on Windows: the executable's own directory. */
+  snprintf(self, sizeof(self), "%s/nowhere/deep/httrack", argv[0]);
+  snprintf(expect, sizeof(expect), "%s/nowhere/deep/", argv[0]);
+  datadir_expect(self, "", expect);
+  datadir_expect("httrack", "", "");
+
+  /* A directory part too long for the layout suffix to be appended must clip,
+     not abort: appending to a non-empty buffer is the *_safe_ abort path. */
+  {
+    /* Long enough that dirname + "../share/httrack/" overflows the candidate
+       buffer, short enough that the dirname itself still fits. */
+    const size_t dirlen = HTS_URLMAXSIZE * 2 - 8;
+    char huge[HTS_URLMAXSIZE * 3];
+    char got[HTS_URLMAXSIZE * 2];
+    size_t n;
+
+    huge[0] = '/';
+    for (n = 1; n < dirlen - 1; n++) {
+      huge[n] = 'a';
+    }
+    huge[dirlen - 1] = '/';
+    memcpy(huge + dirlen, "httrack", sizeof("httrack"));
+    hts_resolve_datadir(got, sizeof(got), huge, gone);
+    assertf(strcmp(got, gone) == 0);
+  }
+
+  printf("datadir self-test OK\n");
   return 0;
 }
 
@@ -7585,6 +7684,9 @@ static const struct selftest_entry {
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
+    {"datadir", "<dir>",
+     "data directory resolution: compiled-in path, then the executable's tree",
+     st_datadir},
     {"inplace-escape", "", "inplace_escape_* vs escape_* equivalence self-test",
      st_inplace_escape},
     {"escape-room", "", "HT_ADD_HTMLESCAPED* reservation-factor self-test",

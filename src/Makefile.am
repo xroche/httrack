@@ -60,6 +60,13 @@ proxytrack_SOURCES = proxy/main.c \
 whttrackrundir = $(bindir)
 whttrackrun_SCRIPTS = webhttrack
 
+# $(datadir) only expands at make time, so substitute here rather than through
+# AC_CONFIG_FILES (#887).
+webhttrack: webhttrack.in Makefile
+	$(AM_V_GEN)$(SED) -e 's|@datadir[@]|$(datadir)|g' $(srcdir)/webhttrack.in >$@.tmp \
+		&& chmod +x $@.tmp && mv -f $@.tmp $@
+CLEANFILES = webhttrack
+
 libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htscache_selftest.c htsdns_selftest.c htsselftest.c \
 	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
@@ -88,7 +95,7 @@ libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(BROTLI_LIBS) $(ZSTD_LIBS) 
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 
-EXTRA_DIST = httrack.h htsstats.h webhttrack \
+EXTRA_DIST = httrack.h htsstats.h webhttrack.in \
 		version.rc \
 		libhttrack.rc \
 		httrack.rc \

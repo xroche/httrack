@@ -682,7 +682,7 @@ jobs:
         man/makeman.sh
         src/htsbasiccharsets.sh
         src/htsentities.sh
-        src/webhttrack
+        src/webhttrack.in
         tests/*.sh
         tests/*.test
         tools/macos-app.sh

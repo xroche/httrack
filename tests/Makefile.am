@@ -27,6 +27,8 @@ TESTS_ENVIRONMENT += V6_SUPPORT=$(V6_SUPPORT)
 # Asserted by 146_bash-shell.test.
 TESTS_ENVIRONMENT += BASH_SHELL=$(BASH_SHELL)
 TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
+TESTS_ENVIRONMENT += abs_top_builddir=$(abs_top_builddir)
+TESTS_ENVIRONMENT += CONFIGURED_DATADIR=$(datadir)
 TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
 TESTS_ENVIRONMENT += THREADATTRFAIL_LA=$(abs_builddir)/libthreadattrfail.la

@@ -215,4 +215,6 @@ TESTS += 140_crash-handler.test
 TESTS += 141_webhttrack-warc-options.test
 TESTS += 142_webhttrack-content-type.test
 TESTS += 143_engine-backtrace-empty.test
+TESTS += 144_engine-datadir.test
+TESTS += 145_webhttrack-datadir.test
 TESTS += 146_bash-shell.test
