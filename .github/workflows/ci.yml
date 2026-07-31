@@ -176,75 +176,6 @@ jobs:
           sudo ifconfig lo0 alias 127.0.0.2 up
           sudo ifconfig lo0 alias 127.0.0.3 up
 
-      - name: PROBE where local-server.py's pre-PORT time goes
-        run: |
-          set +e
-          sw_vers; python3 -VV
-          cat > /tmp/probe870.py <<'PROBE_EOF'
-          # PROBE (#870): where does local-server.py's pre-PORT time go on macos-15?
-          import os
-          import socket
-          import sys
-          import time
-          from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
-
-
-          def timed(label, fn):
-              t = time.time()
-              try:
-                  r = fn()
-              except Exception as e:
-                  r = "EXC %s" % e
-              print("%-28s %6.2fs  %s" % (label, time.time() - t, r), flush=True)
-
-
-          tag = sys.argv[1] if len(sys.argv) > 1 else "solo"
-          print("=== %s pid=%d ===" % (tag, os.getpid()), flush=True)
-          timed("gethostname", socket.gethostname)
-          timed("gethostbyaddr(127.0.0.1)", lambda: socket.gethostbyaddr("127.0.0.1")[0])
-          timed("getfqdn(127.0.0.1)", lambda: socket.getfqdn("127.0.0.1"))
-          timed("getfqdn(<hostname>)", lambda: socket.getfqdn(socket.gethostname()))
-
-
-          def bind_stock():
-              s = ThreadingHTTPServer(("127.0.0.1", 0), SimpleHTTPRequestHandler)
-              p = s.server_port
-              s.server_close()
-              return p
-
-
-          class NoFqdnServer(ThreadingHTTPServer):
-              def server_bind(self):
-                  import socketserver
-
-                  socketserver.TCPServer.server_bind(self)
-                  self.server_name, self.server_port = self.server_address[:2]
-
-
-          def bind_nofqdn():
-              s = NoFqdnServer(("127.0.0.1", 0), SimpleHTTPRequestHandler)
-              p = s.server_port
-              s.server_close()
-              return p
-
-
-          timed("ThreadingHTTPServer bind", bind_stock)
-          timed("bind without getfqdn", bind_nofqdn)
-          PROBE_EOF
-          echo "===== solo ====="
-          python3 /tmp/probe870.py solo
-          echo "===== 6 concurrent ====="
-          for i in 1 2 3 4 5 6; do python3 /tmp/probe870.py "par$i" & done; wait
-          echo "===== real (patched) local-server.py, 6 concurrent, time to PORT ====="
-          for i in 1 2 3 4 5 6; do
-            ( t=$(python3 -c 'import time;print(time.time())')
-              python3 tests/local-server.py --root tests/server-root > "/tmp/srv$i.out" 2>&1 &
-              p=$!
-              for _ in $(seq 1 600); do grep -q '^PORT ' "/tmp/srv$i.out" && break; sleep 0.1; done
-              python3 -c "import sys,time;print('srv$i to PORT: %.2fs' % (time.time()-float(sys.argv[1])))" "$t"
-              kill $p 2>/dev/null ) &
-          done; wait
-
       - name: Test
         timeout-minutes: 20
         run: |
@@ -254,15 +185,6 @@ jobs:
       - name: Print the test log on failure
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
-
-      - name: PROBE dump every failing test's own log
-        if: failure()
-        run: |
-          set +e
-          for trs in tests/*.trs; do
-            grep -q '^:test-result: \(FAIL\|ERROR\)' "$trs" || continue
-            echo "########## ${trs%.trs}.log ##########"; cat "${trs%.trs}.log"
-          done
 
   # Runtime smoke of the WebHTTrack launcher on macOS: it carries a Darwin-only
   # browser path (open -W) and nothing else exercises htsserver. Install into a

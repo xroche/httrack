@@ -38,16 +38,7 @@ mkdir -p "$work/root" "$work/proj"
     >"$work/server.out" 2>"$work/server.err" &
 spid=$!
 
-port=
-for _ in $(seq 1 100); do
-    port=$(sed -n 's/^PORT \([0-9]*\)$/\1/p' "$work/server.out" 2>/dev/null || true)
-    test -n "$port" && break
-    sleep 0.1
-done
-test -n "$port" || {
-    echo "local-server.py did not announce a port" >&2
-    exit 1
-}
+port=$(discover_server_port "$work/server.out" "$spid") || exit 1
 
 # Save path is "127.0.0.1_<port>/" + the URL path; target 998 bytes total.
 prefix="127.0.0.1_${port}/"
