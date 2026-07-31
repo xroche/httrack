@@ -43,4 +43,32 @@ test "$out" = procsub || {
     exit 1
 }
 
+# Whatever configure picks, an absolute BASH_SHELL from the user must win over the search.
+configure="${abs_top_srcdir:-}/configure"
+test -r "$configure" || {
+    echo "no configure script at $configure; tests/Makefile.am must export abs_top_srcdir" >&2
+    exit 1
+}
+
+help=$(bash "$configure" --help)
+grep -q '^  *BASH_SHELL ' <<<"$help" || {
+    echo "configure --help does not advertise BASH_SHELL (AC_ARG_VAR missing)" >&2
+    exit 1
+}
+
+tmp=$(mktemp -d)
+trap 'set +e; rm -rf "$tmp"' EXIT
+ln -s "$sh" "$tmp/mybash"
+mkdir "$tmp/bld"
+(cd "$tmp/bld" && BASH_SHELL="$tmp/mybash" bash "$configure" >conf.log 2>&1) || {
+    echo "configure BASH_SHELL=$tmp/mybash failed:" >&2
+    tail -20 "$tmp/bld/conf.log" >&2
+    exit 1
+}
+got=$(sed -n 's/^BASH_SHELL = //p' "$tmp/bld/Makefile")
+test "$got" = "$tmp/mybash" || {
+    echo "configure discarded BASH_SHELL=$tmp/mybash, kept: $got" >&2
+    exit 1
+}
+
 echo "configured bash is $sh ($version)"

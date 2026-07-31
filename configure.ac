@@ -57,7 +57,8 @@ LT_INIT
 
 # A real bash, for "make deb" and the test harness. Not searched into BASH: bash presets
 # that to its own path, and macOS /bin/sh is a bash, so the macro never searches (#895).
-AS_UNSET([BASH_SHELL])
+# Nothing presets BASH_SHELL, so it is safe to let the user point it at their own.
+AC_ARG_VAR([BASH_SHELL], [path to a real (non-POSIX-mode) bash])
 AC_PATH_PROGS([BASH_SHELL], [bash], [/bin/bash])
 
 # Export LD_LIBRARY_PATH name or equivalent.
