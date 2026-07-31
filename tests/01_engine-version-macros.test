@@ -1,15 +1,18 @@
 #!/bin/bash
 #
-# version.rc repeats the version that htsglobal.h declares. Signing enforces that
-# every binary in a release reports the same one, so a drift fails the signing
-# request on release day rather than the build. Assert the two agree.
+# htsglobal.h declares the version; version.rc, configure.ac and the AppStream
+# metainfo repeat it. A release that misses one signs a mismatched binary or
+# leaves software centres advertising an old version, so fail on the drift here.
 
 set -euo pipefail
 
-src="${top_srcdir:-..}/src"
+top="${top_srcdir:-..}"
+src="$top/src"
 h="$src/htsglobal.h"
 rc="$src/version.rc"
-for f in "$h" "$rc"; do
+ac="$top/configure.ac"
+metainfo="$top/html/server/div/com.httrack.WebHTTrack.metainfo.xml"
+for f in "$h" "$rc" "$ac" "$metainfo"; do
     [ -f "$f" ] || {
         echo "cannot find $f"
         exit 1
@@ -31,23 +34,47 @@ rc_fileversion=$(sed -n 's/.*VALUE "FileVersion",[[:space:]]*"\([^"]*\)".*/\1/p'
 rc_productversion=$(sed -n 's/.*VALUE "ProductVersion",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
 rc_productname=$(sed -n 's/.*VALUE "ProductName",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
 
+# The same version again, in configure.ac and in the metainfo software centres read.
+ac_version=$(sed -n 's/^AC_INIT(\[[^]]*\],[[:space:]]*\[\([^]]*\)\].*/\1/p' "$ac")
+releases=$(sed -n 's/.*<release[^>]*version="\([^"]*\)".*/\1/p' "$metainfo")
+if [ -z "$ac_version" ]; then
+    echo "could not read the version from $ac"
+    exit 1
+fi
+if [ -z "$releases" ]; then
+    echo "could not read any release version from $metainfo"
+    exit 1
+fi
+
 # 3.49.12 -> 3,49,12,0
 expected_numeric="$(echo "$versionid" | tr '.' ','),0"
 
 fail=0
 check() { # what expected actual
     if [ "$2" != "$3" ]; then
-        echo "version.rc $1 is \"$3\", but htsglobal.h says it should be \"$2\""
+        echo "$1 is \"$3\", but htsglobal.h says it should be \"$2\""
         fail=1
     fi
 }
-check FILEVERSION "$expected_numeric" "$fileversion"
-check PRODUCTVERSION "$expected_numeric" "$productversion"
-check FileVersion "$versionid" "$rc_fileversion"
-check ProductVersion "$version" "$rc_productversion"
+check "version.rc FILEVERSION" "$expected_numeric" "$fileversion"
+check "version.rc PRODUCTVERSION" "$expected_numeric" "$productversion"
+check "version.rc FileVersion" "$versionid" "$rc_fileversion"
+check "version.rc ProductVersion" "$version" "$rc_productversion"
 
 # Signing pins the product name too.
-check ProductName "HTTrack Website Copier" "$rc_productname"
+check "version.rc ProductName" "HTTrack Website Copier" "$rc_productname"
+
+check "the configure.ac AC_INIT version" "$versionid" "$ac_version"
+check "the newest metainfo release" "$versionid" "$(echo "$releases" | head -n 1)"
+
+# The top entry is only the newest if the list is ordered, so hold it to that: an
+# entry appended at the bottom must fail rather than pass unnoticed.
+echo "$releases" | awk -F. '
+    !/^[0-9]+\.[0-9]+\.[0-9]+$/ { print "unparsable metainfo release version: " $0; exit 1 }
+    { n = $1 * 1000000 + $2 * 1000 + $3 }
+    NR > 1 && n >= prev { print "metainfo releases are not newest-first: " $0; exit 1 }
+    { prev = n }
+' || fail=1
 
 [ "$fail" -eq 0 ] || exit 1
 
@@ -61,4 +88,4 @@ case "$out" in
     ;;
 esac
 
-echo "version resource agrees with htsglobal.h: $version ($expected_numeric)"
+echo "version.rc, configure.ac and the metainfo agree with htsglobal.h: $version ($expected_numeric)"
