@@ -71,6 +71,64 @@ Please visit our Website: http://www.httrack.com
 /* Resolver */
 extern int IPV6_resolver;
 
+/* A data directory is one that carries the templates path_bin is read for. */
+static int datadir_has_templates(const char *dir) {
+  char catbuff[CATBUFF_SIZE];
+
+  return dir != NULL && *dir != '\0' &&
+         fexist(fconcat(catbuff, sizeof(catbuff), dir,
+                        "templates/index-header.html"));
+}
+
+/* Directory part of argv0, trailing '/' kept, or NULL when argv0 carries no
+   path: a bare name came from a PATH lookup and locates nothing. */
+static const char *exedir_of(char *dst, size_t dstsize, const char *argv0) {
+  char catbuff[CATBUFF_SIZE];
+  const char *path, *sep;
+  size_t len;
+
+  if (argv0 == NULL)
+    return NULL;
+  path = fslash(catbuff, sizeof(catbuff), argv0);
+  if ((sep = strrchr(path, '/')) == NULL)
+    return NULL;
+  len = (size_t) (sep - path) + 1;
+  if (len >= dstsize)
+    return NULL;
+  memcpy(dst, path, len);
+  dst[len] = '\0';
+  return dst;
+}
+
+void hts_resolve_datadir(char *dst, size_t dstsize, const char *argv0,
+                         const char *builtin) {
+  /* An installed tree that was moved, then a flat one with templates/ beside
+     the binary. */
+  static const char *const layout[] = {"../share/httrack/", ""};
+  char exedir[HTS_URLMAXSIZE * 2];
+  const char *base;
+
+  if (!datadir_has_templates(builtin) &&
+      (base = exedir_of(exedir, sizeof(exedir), argv0)) != NULL) {
+    size_t i;
+
+    for (i = 0; i < sizeof(layout) / sizeof(layout[0]); i++) {
+      char cand[HTS_URLMAXSIZE * 2];
+
+      cand[0] = '\0';
+      strlncatbuff(cand, base, sizeof(cand), sizeof(cand) - 1);
+      strlncatbuff(cand, layout[i], sizeof(cand), sizeof(cand) - 1);
+      if (datadir_has_templates(cand)) {
+        dst[0] = '\0';
+        strlncatbuff(dst, cand, dstsize, dstsize - 1);
+        return;
+      }
+    }
+  }
+  dst[0] = '\0';
+  strlncatbuff(dst, builtin, dstsize, dstsize - 1);
+}
+
 #define htsmain_free() do { \
   if (url != NULL) { \
     free(url); \
@@ -174,20 +232,14 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   }
 #endif
 
-  // Binary program path?
-#ifndef HTS_HTTRACKDIR
+  // Data directory holding the HTML templates
   {
-    char catbuff[CATBUFF_SIZE];
-    char *path = fslash(catbuff, sizeof(catbuff), argv[0]);
-    char *a;
+    char datadir[HTS_URLMAXSIZE * 2];
 
-    if ((a = strrchr(path, '/'))) {
-      StringCopyN(opt->path_bin, argv[0], a - path);
-    }
+    hts_resolve_datadir(datadir, sizeof(datadir), argc > 0 ? argv[0] : NULL,
+                        HTS_HTTRACKDIR);
+    StringCopy(opt->path_bin, datadir);
   }
-#else
-  StringCopy(opt->path_bin, HTS_HTTRACKDIR);
-#endif
 
   /* filter CR, LF, TAB.. */
   {

@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# webhttrack probed a fixed list of prefixes, so a build with a non-default
+# --datadir installed a launcher that could not start (#887). The configured
+# datadir must be substituted in, after the relative entries so a moved tree
+# still wins and before the guesses so --datadir is actually used.
+
+set -euo pipefail
+
+script="${abs_top_builddir:?not run under make check}/src/webhttrack"
+datadir="${CONFIGURED_DATADIR:?not run under make check}"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+test -r "${script}" || fail "no ${script}"
+
+line=$(grep '^SRCHDISTPATH=' "${script}") || fail "no SRCHDISTPATH in ${script}"
+case "${line}" in
+*'@datadir@'*) fail "@datadir@ was never substituted: ${line}" ;;
+esac
+
+# Read the list back as the shell does, so a quoting slip fails here.
+BINWD='@BINWD@'
+eval "${line}"
+test "${#SRCHDISTPATH[@]}" -gt 3 || fail "SRCHDISTPATH is too short: ${line}"
+
+pos=-1
+for i in "${!SRCHDISTPATH[@]}"; do
+    test "${SRCHDISTPATH[$i]}" = "${datadir}" && pos=$i && break
+done
+test "${pos}" -ge 0 || fail "configured datadir ${datadir} is not in SRCHDISTPATH"
+
+# The two $BINWD entries must still precede it, or a relocated tree would read
+# whatever the build machine's datadir holds.
+if [ "${SRCHDISTPATH[0]}" != "${BINWD}/../share" ] || [ "${SRCHDISTPATH[1]}" != "${BINWD}/.." ]; then
+    fail "the relative entries moved: ${SRCHDISTPATH[0]} ${SRCHDISTPATH[1]}"
+fi
+test "${pos}" -eq 2 || fail "configured datadir is at index ${pos}, expected 2"
+
+echo "webhttrack searches the configured datadir: ${datadir}"

@@ -48,6 +48,8 @@ m4_warn([obsolete],
 # script's behavior did not change.  They are probably safe to remove.
 AC_CHECK_INCLUDES_DEFAULT
 AC_PROG_EGREP
+# $(SED) substitutes $(datadir) into src/webhttrack
+AC_PROG_SED
 
 LT_INIT
 AC_PROG_LN_S

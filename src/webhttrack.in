@@ -23,7 +23,9 @@ for d in "${pathdirs[@]}"; do
     # drop empty PATH fields, matching the old echo|tr word-split
     test -n "$d" && SRCHPATH+=("$d")
 done
-SRCHDISTPATH=("$BINWD/../share" "$BINWD/.." /usr/share /usr/local /usr /local /usr/local/share "${HOME}/usr" "${HOME}/usr/share" /opt/local/share /sw "${HOME}/usr/local" "${HOME}/usr/share")
+# @datadir@ is substituted at build time. It sits after the relative entries so a
+# moved tree still wins, and before the guesses so --datadir works (#887).
+SRCHDISTPATH=("$BINWD/../share" "$BINWD/.." "@datadir@" /usr/share /usr/local /usr /local /usr/local/share "${HOME}/usr" "${HOME}/usr/share" /opt/local/share /sw "${HOME}/usr/local" "${HOME}/usr/share")
 
 ###
 # And now some famous cuisine
