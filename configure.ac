@@ -53,8 +53,11 @@ LT_INIT
 AC_PROG_LN_S
 LT_INIT
 
-# bash, used to run the test scripts (see tests/Makefile.am TEST_LOG_COMPILER)
-AC_PATH_PROGS([BASH], [bash], [/bin/bash])
+# A real bash, for "make deb" and the test harness. Searched into BASH_SHELL and
+# not BASH because bash presets $BASH to its own path and macOS /bin/sh is itself
+# a bash, so AC_PATH_PROGS would honour that value instead of searching (#895).
+AS_UNSET([BASH_SHELL])
+AC_PATH_PROGS([BASH_SHELL], [bash], [/bin/bash])
 
 # Export LD_LIBRARY_PATH name or equivalent.
 AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)

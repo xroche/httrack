@@ -1,9 +1,5 @@
 #!/bin/bash
 #
-# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
-# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
-# tool flags despite the #!/bin/bash above.
-
 # Golden cache-format regression test (driven by 'httrack -#test=cache-golden <dir>').
 #
 # 01_zlib-cache.test writes the cache with the same build it reads back (a

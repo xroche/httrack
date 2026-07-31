@@ -24,6 +24,8 @@ TESTS_ENVIRONMENT += HTTPS_SUPPORT=$(HTTPS_SUPPORT)
 TESTS_ENVIRONMENT += BROTLI_ENABLED=$(BROTLI_ENABLED)
 TESTS_ENVIRONMENT += ZSTD_ENABLED=$(ZSTD_ENABLED)
 TESTS_ENVIRONMENT += V6_SUPPORT=$(V6_SUPPORT)
+# Asserted by 146_bash-shell.test.
+TESTS_ENVIRONMENT += BASH_SHELL=$(BASH_SHELL)
 TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
 TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
@@ -58,5 +60,5 @@ TEST_EXTENSIONS = .test
 # named, with diagnostics, rather than hang the job until CI cancels it -- a
 # cancelled step keeps neither its log nor its artifacts, so today a hang tells
 # us nothing at all. HTTRACK_TEST_TIMEOUT overrides the budget; 0 disables it.
-TEST_LOG_COMPILER = $(BASH) $(srcdir)/test-timeout.sh
+TEST_LOG_COMPILER = $(BASH_SHELL) $(srcdir)/test-timeout.sh
 CLEANFILES = check-network_sh.cache
