@@ -103,6 +103,12 @@ propfind() { # port path
         "http://127.0.0.1:$1/webdav/example.com/$2"
 }
 
+# Whatever the process wrote once serving; the banner ends on the PID line. A
+# missing PID line yields nothing, which the 207 count below then fails on.
+request_log() { # log
+    sed -n '/^PID=/,$p' "$1" | tail -n +2 | tr -d '\r'
+}
+
 quietport=$(freeport)
 : >"$dir/quiet.log" # the drainer creates it asynchronously
 env -u HTS_LOG "$python" -c "$pty_exec" "$dir/quiet.log" \
@@ -129,12 +135,12 @@ for path in "" page.html; do
 done
 
 # The enumeration is what builds the table, so the served 207s are what make
-# the absence below mean anything. They are logged after it, so waiting on them
+# the check below mean anything. They are logged after it, so waiting on them
 # also fences the drainer's copy.
 waited=0
-until test "$(grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' "$dir/quiet.log" || true)" -ge 2; do
+until test "$(request_log "$dir/quiet.log" | grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' || true)" -ge 2; do
     test "$waited" -lt 50 || {
-        echo "FAIL: fewer than two PROPFINDs were answered 207, so the checks below prove nothing"
+        echo "FAIL: fewer than two PROPFINDs were answered 207, so the check below proves nothing"
         cat "$dir/quiet.log"
         exit 1
     }
@@ -142,14 +148,15 @@ until test "$(grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' "$dir/quiet.lo
     waited=$((waited + 1))
 done
 
-log=$(<"$dir/quiet.log")
-for marker in 'hashtable .*summary:' '^\[0x[0-9a-f]*\]'; do
-    if grep -qE "$marker" <<<"$log"; then
-        echo "FAIL: a PROPFIND wrote '$marker' to proxytrack's console"
-        printf '%s\n' "$log"
-        exit 1
-    fi
-done
+# The property is that serving adds nothing but the access log, so whitelist
+# what a line may be; naming strings that must be absent would pass any
+# reworded or differently shaped leak.
+extra=$(request_log "$dir/quiet.log" | grep -vE '^( \* log: (HTTP|ICP) .*)?$' || true)
+test -z "$extra" || {
+    echo "FAIL: serving a PROPFIND wrote this to proxytrack's console:"
+    printf '%s\n' "$extra"
+    exit 1
+}
 
 # HTS_LOG brings the summary back, so the silence above is a routed handler and
 # not a deleted message, and the grep that asserted it does match when fed one.
@@ -180,8 +187,9 @@ until grep -qE 'hashtable .*summary:' "$dir/loud.log"; do
     sleep 0.1
     waited=$((waited + 1))
 done
-# Routed, so it carries a severity and no longer leaks the table address.
-grep -qE '^ \* debug: hashtable .*summary:' "$dir/loud.log" || {
+# Pin the routed shape whole: a severity, then the message, and nothing in
+# between where the table address used to be.
+grep -qE '^ \* debug: hashtable "[^"]*" summary:' "$dir/loud.log" || {
     echo "FAIL: the summary under HTS_LOG did not come through proxytrack's log"
     cat "$dir/loud.log"
     exit 1

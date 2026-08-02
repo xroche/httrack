@@ -58,6 +58,7 @@ static void proxytrack_coucal_loghandler(coucal_opaque arg,
   } else if (level <= coucal_log_warning) {
     severity = WARNING;
   } else {
+    /* not the DEBUG macro: it is NULL outside a debug build, voiding HTS_LOG */
     severity = proxytrack_verbose ? "debug" : NULL;
   }
   proxytrack_vprint_log(severity, format, args);
