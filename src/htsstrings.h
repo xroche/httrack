@@ -36,6 +36,8 @@ Please visit our Website: http://www.httrack.com
 #define HTS_STRINGS_DEFSTATIC
 
 /* System definitions. */
+#include <stdarg.h>
+#include <stdio.h>
 #include <string.h>
 
 /* GCC extension */
@@ -163,6 +165,44 @@ struct String {
 HTS_STATIC char *StringBuffN_(String *blk, int size) {
   StringRoom(*blk, size);
   return StringBuffRW(*blk);
+}
+
+/** Ceiling on the pre-C99 doubling search below; BLK is emptied past it. **/
+#define STRING_SPRINTF_MAX ((size_t) 16 * 1024 * 1024)
+
+/** Replace BLK's contents with the formatted output, growing to fit, so no
+    fixed reserve has to bound an argument carrying remote input. An argument
+    may not point into BLK's own buffer, which is reallocated here. **/
+#define StringSprintf(BLK, ...) StringSprintf_(&(BLK), __VA_ARGS__)
+
+HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
+                                                    const char *fmt, ...) {
+  size_t capacity = StringCapacity(*blk) > 256 ? StringCapacity(*blk) : 256;
+
+  for (;;) {
+    va_list args;
+    int ret;
+
+    StringRoomTotal(*blk, capacity);
+    va_start(args, fmt);
+    ret = vsnprintf(StringBuffRW(*blk), capacity, fmt, args);
+    va_end(args);
+    if (ret >= 0 && (size_t) ret < capacity) {
+      StringBuffRW(*blk)[ret] = '\0';
+      StringLength(*blk) = (size_t) ret;
+      return;
+    }
+    if (ret >= 0) {
+      capacity = (size_t) ret + 1; /* C99 said what it needs */
+    } else if (capacity < STRING_SPRINTF_MAX) {
+      capacity *= 2; /* pre-C99 msvcrt only says "too small" */
+    } else {
+      /* a conversion error returns -1 too, and no capacity ever fixes that */
+      StringBuffRW(*blk)[0] = '\0';
+      StringLength(*blk) = 0;
+      return;
+    }
+  }
 }
 
 /** Zero the fields (NULL buffer, no allocation). Use on an uninitialized
