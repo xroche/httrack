@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# A String that cannot grow must stop the process loudly rather than carry on
+# with a NULL buffer and a capacity already bumped. assert() is compiled out of
+# the MSVC Release build, so the check cannot lean on it (#915).
+
+set -euo pipefail
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+# the self-test aborts on purpose, so don't let set -e trip on it
+err=$(httrack -#test=stringoom 2>&1) || true
+
+case "$err" in
+*"NOT aborted"*)
+    fail "the failed allocation was not caught: $err"
+    ;;
+*"String: out of memory"*) ;;
+*)
+    fail "expected the String out-of-memory abort, got: $err"
+    ;;
+esac
+
+exit 0

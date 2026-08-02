@@ -80,6 +80,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <unistd.h>
@@ -7677,8 +7678,8 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
 
   /* one call on a String whose capacity is pinned to the boundary, so len ==
      capacity is reached exactly once per boundary */
-  for (i = 0; i < sizeof(caps) / sizeof(caps[0]); i++) {
-    for (len = caps[i] - 3; len <= caps[i] + 3; len++) {
+  for (i = 0; !err && i < sizeof(caps) / sizeof(caps[0]); i++) {
+    for (len = caps[i] - 3; !err && len <= caps[i] + 3; len++) {
       String s = STRING_EMPTY;
 
       StringRoomTotal(s, caps[i]);
@@ -7692,8 +7693,6 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
         err = 1;
       }
       StringFree(s);
-      if (err)
-        break;
     }
   }
 
@@ -7713,12 +7712,84 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   }
   StringFree(reused);
 
+  /* The give-up path: an argument libc cannot convert fails at every capacity,
+     so the retry loop climbs to STRING_SPRINTF_MAX and then empties the
+     String. Probe libc first -- a platform that formats an unpaired surrogate
+     without faulting never reaches the path. */
+  {
+    static const wchar_t bad[] = {(wchar_t) 0xd800, 0};
+    char probe[32];
+
+    if (snprintf(probe, sizeof(probe), "%ls", bad) < 0) {
+      String s = STRING_EMPTY;
+
+      StringCopy(s, "leftover");
+      StringSprintf(s, "%ls", bad);
+      if (StringNotEmpty(s) || StringBuff(s) == NULL ||
+          StringBuff(s)[0] != '\0') {
+        printf("  FAIL: a failed conversion left %u bytes behind\n",
+               (unsigned) StringLength(s));
+        err = 1;
+      }
+      StringFree(s);
+    } else { /* stderr: test 150 pins stdout to the one-line verdict */
+      fprintf(stderr, "  (skipped: this libc formats an unconvertible wide "
+                      "string)\n");
+    }
+  }
+
+  /* StringSprintf empties the String when it gives up, and the WebDAV
+     enumeration pops the trailing '/' right after: on an empty String an
+     unguarded pop would wrap the unsigned length and write off the end. */
+  {
+    String never = STRING_EMPTY;
+    String cleared = STRING_EMPTY;
+
+    StringPopRight(never); /* never written to: buffer_ is still NULL */
+    if (StringLength(never) != 0 || StringBuff(never) != NULL) {
+      printf("  FAIL: pop on an unallocated String\n");
+      err = 1;
+    }
+    StringClear(cleared);
+    StringPopRight(cleared);
+    if (StringLength(cleared) != 0 || StringBuff(cleared)[0] != '\0') {
+      printf("  FAIL: pop on an emptied String\n");
+      err = 1;
+    }
+    /* control: the guard must not swallow a pop that has a byte to drop */
+    StringSprintf(cleared, "ab");
+    StringPopRight(cleared);
+    if (StringLength(cleared) != 1 || strcmp(StringBuff(cleared), "a") != 0) {
+      printf("  FAIL: pop on a non-empty String\n");
+      err = 1;
+    }
+    StringFree(never);
+    StringFree(cleared);
+  }
+
   freet(expected);
   freet(head);
   freet(tail);
 
   printf("strsprintf self-test: %s\n", err ? "FAIL" : "OK");
   return err;
+}
+
+/* A failed allocation has no error channel through the String API, so growth
+   must abort rather than hand back a NULL buffer with the capacity already
+   bumped: assert() is compiled out of the MSVC Release build. */
+static int st_stringoom(httrackp *opt, int argc, char **argv) {
+  String s = STRING_EMPTY;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* pinned so the first doubling asks for a size no allocator can serve */
+  StringCapacity(s) = ((size_t) -1) / 4;
+  StringRoomTotal(s, StringCapacity(s) + 1);
+  printf("stringoom self-test: NOT aborted\n");
+  return 1;
 }
 
 /* ------------------------------------------------------------ */
@@ -7777,6 +7848,8 @@ static const struct selftest_entry {
      "bounded string-op self-test", st_strsafe},
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},
+    {"stringoom", "", "String growth aborts when an allocation fails",
+     st_stringoom},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"lastchar", "",
      "last-char helpers never index before the buffer (#770, #781, #821)",
