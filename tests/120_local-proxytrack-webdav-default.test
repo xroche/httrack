@@ -118,4 +118,21 @@ grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
     exit 1
 }
 
+# Leftover debug traces dumped the client's PROPFIND body and the generated
+# response straight to stderr, unauthenticated (#911). The per-request log line
+# proves the requests reached the handler, so the absence below means something.
+log=$(cat "$dir/pt.log")
+if ! grep -qi ' \* log: HTTP .* propfind ' <<<"$log"; then
+    echo "FAIL: proxytrack never logged the PROPFIND, so the checks below prove nothing"
+    printf '%s\n' "$log"
+    exit 1
+fi
+for marker in 'DEBUG: DAV-DATA' '^RESPONSE:'; do
+    if grep -q "$marker" <<<"$log"; then
+        echo "FAIL: a PROPFIND wrote '$marker' to proxytrack's stderr"
+        printf '%s\n' "$log"
+        exit 1
+    fi
+done
+
 echo "OK: PROPFIND on an exact cache entry lists its default document and survives"
