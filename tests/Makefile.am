@@ -36,6 +36,7 @@ TESTS_ENVIRONMENT += THREADATTRFAIL_LA=$(abs_builddir)/libthreadattrfail.la
 TESTS_ENVIRONMENT += THREADATTRFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libthreadattrfail.so
 TESTS_ENVIRONMENT += NOBACKTRACE_LA=$(abs_builddir)/libnobacktrace.la
 TESTS_ENVIRONMENT += NOBACKTRACE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libnobacktrace.so
+TESTS_ENVIRONMENT += STRINGOOM_BIN=$(abs_builddir)/stringoom$(EXEEXT)
 
 # rename() interposer for 01_engine-renameover.test; -rpath is what makes
 # libtool build a shared module rather than a static-only convenience library.
@@ -52,6 +53,12 @@ libthreadattrfail_la_LIBADD = $(DL_LIBS)
 # backtrace() interposer for 143_engine-backtrace-empty.test
 libnobacktrace_la_SOURCES = nobacktrace.c
 libnobacktrace_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+
+# realloc stub for 152_engine-string-oom.test; links nothing, so it stays a
+# plain binary rather than a libtool wrapper script.
+check_PROGRAMS = stringoom
+stringoom_SOURCES = stringoom.c
+stringoom_CPPFLAGS = -I$(top_srcdir)/src
 
 TEST_EXTENSIONS = .test
 # Run each .test through bash instead of execve()ing it. This lets "make check"

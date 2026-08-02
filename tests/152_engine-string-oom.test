@@ -2,18 +2,44 @@
 #
 # A String that cannot grow must stop the process loudly rather than carry on
 # with a NULL buffer and a capacity already bumped. assert() is compiled out of
-# the MSVC Release build, so the check cannot lean on it (#915).
+# the MSVC Release build, so the check cannot lean on it (#915). The failure is
+# injected through a realloc stub: asking a real allocator for a size it should
+# refuse is a guess about the machine, not a test.
 
 set -euo pipefail
+
+ulimit -c 0 # a deliberate abort must not litter the box with cores
 
 fail() {
     echo "FAIL: $1" >&2
     exit 1
 }
 
-# the self-test aborts on purpose, so don't let set -e trip on it
-err=$(httrack -#test=stringoom 2>&1) || true
+# Unset means this is not an automake run (the Windows job runs the scripts
+# directly), so the helper does not exist. Set but missing is a build problem,
+# not a skip, or the assertions below would pass vacuously.
+if [ -z "${STRINGOOM_BIN:-}" ]; then
+    echo "STRINGOOM_BIN unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -r "$STRINGOOM_BIN" ] || fail "$STRINGOOM_BIN was not built"
 
+# Control first: with the stub allocating for real, growth must not reach the
+# failure path at all.
+out=$("$STRINGOOM_BIN" grow) || fail "grow case exited non-zero: $out"
+test "$out" = "grow: OK" || fail "expected 'grow: OK', got: $out"
+
+# A failed realloc must reach the handler with the size it asked for, and leave
+# the String untouched rather than half-grown.
+out=$("$STRINGOOM_BIN" hook) || fail "hook case exited non-zero: $out"
+test "$out" = "hook: OK" || fail "expected 'hook: OK', got: $out"
+
+# Same on a String that already owns a buffer: the live pointer must survive.
+out=$("$STRINGOOM_BIN" keep) || fail "keep case exited non-zero: $out"
+test "$out" = "keep: OK" || fail "expected 'keep: OK', got: $out"
+
+# The shipped handler prints and aborts, so don't let set -e trip on it.
+err=$("$STRINGOOM_BIN" abort 2>&1) || true
 case "$err" in
 *"NOT aborted"*)
     fail "the failed allocation was not caught: $err"

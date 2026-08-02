@@ -7775,23 +7775,6 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* A failed allocation has no error channel through the String API, so growth
-   must abort rather than hand back a NULL buffer with the capacity already
-   bumped: assert() is compiled out of the MSVC Release build. */
-static int st_stringoom(httrackp *opt, int argc, char **argv) {
-  String s = STRING_EMPTY;
-
-  (void) opt;
-  (void) argc;
-  (void) argv;
-
-  /* pinned so the first doubling asks for a size no allocator can serve */
-  StringCapacity(s) = ((size_t) -1) / 4;
-  StringRoomTotal(s, StringCapacity(s) + 1);
-  printf("stringoom self-test: NOT aborted\n");
-  return 1;
-}
-
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -7848,8 +7831,6 @@ static const struct selftest_entry {
      "bounded string-op self-test", st_strsafe},
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},
-    {"stringoom", "", "String growth aborts when an allocation fails",
-     st_stringoom},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"lastchar", "",
      "last-char helpers never index before the buffer (#770, #781, #821)",
