@@ -19,8 +19,13 @@ test -r "$configure" || {
 }
 
 tmp=$(mktemp -d)
-trap 'set +e; rm -rf "$tmp"' EXIT
-trap 'set +e; rm -rf "$tmp"; exit 1' HUP INT TERM
+cleanup() {
+    # O_RDWR never blocks, and it releases whatever is left stuck opening the FIFO for read.
+    exec 9<>"$tmp/fifo" && exec 9>&-
+    rm -rf "$tmp"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT TERM
 
 # Symlink farm, not the real srcdir: an in-tree config.status makes autoconf refuse it.
 mkdir "$tmp/src"
@@ -40,6 +45,9 @@ ln -s "$sh" "$tmp/sh" # bash invoked as "sh" enters POSIX mode
 # A "bash" the PATH search will find first, and that answers -c like any other shell.
 printf '#!/bin/sh\nexec /bin/sh "$@"\n' >"$tmp/fakebin/bash"
 chmod 755 "$tmp/fakebin/bash"
+# Executable to "test -x", but bash blocks in open() on one it failed to exec.
+mkfifo "$tmp/fifo"
+chmod 755 "$tmp/fifo"
 
 n=0
 status=0
@@ -52,8 +60,22 @@ run() { # run <label> <env argument>...
     rundir="$tmp/run$n"
     mkdir "$rundir"
     status=0
+    # Capped: configure executes the candidate, and a hang wedges "make check" with no output
+    # at all. Polled, not a backgrounded "sleep" watchdog, which outlives the run it guards.
     (cd "$rundir" && env "$@" bash "$tmp/src/configure" --disable-https) \
-        >"$rundir/log" 2>&1 || status=$?
+        >"$rundir/log" 2>&1 &
+    local pid=$! waited=0
+    while test "$waited" -lt 300 && kill -0 "$pid" 2>/dev/null; do
+        sleep 1
+        waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null
+        echo "configure did not return within ${waited}s for $label" >&2
+        tail -5 "$rundir/log" >&2
+        exit 1
+    fi
+    wait "$pid" || status=$?
     log=$(cat "$rundir/log")
     echo "run $n ($label): exit $status"
 }
@@ -102,8 +124,11 @@ accept() {
 }
 
 reject relative 'BASH_SHELL must be an absolute path' BASH_SHELL=relbash
-reject missing 'is not an executable file' "BASH_SHELL=$tmp/missing/bash"
-reject non-executable 'is not an executable file' "BASH_SHELL=$tmp/notexec/bash"
+notreg='is not an executable regular file'
+reject missing "$notreg" "BASH_SHELL=$tmp/missing/bash"
+reject non-executable "$notreg" "BASH_SHELL=$tmp/notexec/bash"
+# "test -x" passes a FIFO, and configure then hangs forever instead of rejecting it (#922).
+reject fifo "$notreg" "BASH_SHELL=$tmp/fifo"
 reject sh-mode 'is a bash in POSIX sh-mode' "BASH_SHELL=$tmp/sh"
 # The #908 case: dash on Linux, bash in sh-mode on macOS, unusable either way. The spoofed
 # BASH_VERSION is what an ordinary shell echoes straight back, so it cannot be the probe.
