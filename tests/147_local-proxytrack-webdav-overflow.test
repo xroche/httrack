@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# escapexml() expands '&' fivefold, so an unauthenticated PROPFIND path of
+# escaped ampersands used to overflow the fixed DAV item reserve (#836).
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
+python=$(find_python) || {
+    echo "python3 missing, skipping"
+    exit 77
+}
+command -v curl >/dev/null 2>&1 || {
+    echo "curl missing, skipping"
+    exit 77
+}
+# MSYS cannot reap a native listener, and the orphan wedges the suite (#595).
+if is_windows; then
+    echo "windows: cannot reap a backgrounded proxytrack, skipping"
+    exit 77
+fi
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' INT TERM HUP
+
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
+printf 'hello' >"$dir/body"
+alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf '2 0 test\n'
+    printf '\n\n'
+    printf 'http://example.com/page.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
+    cat "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+freeport() {
+    "$python" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
+}
+proxyport=$(freeport)
+icpport=$(freeport)
+
+proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" >"$dir/pt.log" 2>&1 &
+ptpid=$!
+waited=0
+until grep -qE "HTTP Proxy installed on|Unable to (initialize a temporary server|create the server)" "$dir/pt.log"; do
+    kill -0 "$ptpid" 2>/dev/null || {
+        echo "FAIL: proxytrack exited before listening"
+        cat "$dir/pt.log"
+        exit 1
+    }
+    test "$waited" -lt 50 || {
+        echo "FAIL: proxytrack never announced its listen port"
+        exit 1
+    }
+    sleep 0.1
+    waited=$((waited + 1))
+done
+grep -q "HTTP Proxy installed on" "$dir/pt.log" || {
+    echo "FAIL: proxytrack failed to bind"
+    cat "$dir/pt.log"
+    exit 1
+}
+
+propfind() {
+    curl -s -i --max-time 30 -X PROPFIND -H "Depth: 0" \
+        "http://127.0.0.1:$proxyport/webdav/x/$1"
+}
+
+# The request line is capped at 1024 bytes (line1Size), so amplification, not
+# raw length, is what reaches far past the old 1024-byte item reserve: 900
+# ampersands leave escapexml() as 4500 bytes, and the path lands in the
+# response twice. Well under the cap, roughly 9000 bytes written.
+amps=$("$python" -c "print('&' * 900)")
+resp=$(propfind "$amps") || {
+    echo "FAIL: proxytrack died on an escapexml-amplified PROPFIND"
+    cat "$dir/pt.log"
+    exit 1
+}
+grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
+    echo "FAIL: expected 207 Multi-Status for the amplified path"
+    head -c 512 <<<"$resp"
+    exit 1
+}
+# A clipped path answers 207 just as happily, so count what came back instead
+# of settling for a live listener. The run appears in the href and again in
+# the displayname.
+got=$(grep -o '&amp;' <<<"$resp" | wc -l)
+test "$got" -eq 1800 || {
+    echo "FAIL: 900 ampersands went in, $got came back escaped, wanted 1800"
+    exit 1
+}
+
+# A second capacity, and without any escaping, so the bound is shown to be on
+# the written length rather than on a '&' special case: 900 plain bytes twice
+# over still clears the old reserve.
+plain=$("$python" -c "print('a' * 900)")
+resp=$(propfind "$plain") || {
+    echo "FAIL: proxytrack died on a 900-byte plain PROPFIND path"
+    cat "$dir/pt.log"
+    exit 1
+}
+grep -q "<href>/webdav/x/$plain</href>" <<<"$resp" || {
+    echo "FAIL: a 900-byte path did not come back whole"
+    exit 1
+}
+
+# The overflow killed the whole listener, so a plain request afterwards is the
+# liveness proof.
+resp=$(propfind "") || {
+    echo "FAIL: proxytrack died before the follow-up listing"
+    cat "$dir/pt.log"
+    exit 1
+}
+grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
+    echo "FAIL: expected 207 Multi-Status on the follow-up listing"
+    printf '%s\n' "$resp"
+    exit 1
+}
+
+echo "OK: an escapexml-amplified PROPFIND path is served whole and does not overflow"
