@@ -221,4 +221,4 @@ TESTS += 146_bash-shell.test
 TESTS += 147_local-proxytrack-webdav-overflow.test
 TESTS += 148_engine-spoolname.test
 TESTS += 150_engine-strsprintf.test
-TESTS += 151_engine-string-oom.test
+TESTS += 152_engine-string-oom.test
