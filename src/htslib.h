@@ -252,6 +252,11 @@ void treatfirstline(htsblk * retour, const char *rcvd);
    blank-line-terminated block it reads: a header section or a chunk trailer
    section. Overrunning it fails the transfer. */
 #define HTS_LINE_BLOCK_SIZE 8192
+/* http_xfread1() read modes: a positive bufl reads at most that many raw bytes,
+   these three read CR-stripped lines into the HTS_LINE_BLOCK_SIZE buffer. */
+#define HTS_XFREAD_LINE_BLOCK 0 /* lines up to a blank one (header/trailer) */
+#define HTS_XFREAD_LINE (-1)    /* one line, stopping at the first LF */
+#define HTS_XFREAD_RESERVE (-2) /* only allocate the buffer, read nothing */
 LLint http_xfread1(htsblk * r, int bufl);
 /* Cached resolver: fill out[0..count-1] with up to max addresses for iadr (in
    resolver order), returning the count (0 = does not resolve, negative-cached).
