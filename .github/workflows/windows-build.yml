@@ -265,7 +265,7 @@ jobs:
           # cause a false mismatch either.
           # footer-overflow and purge-longpath skip on Windows (need a path past MAX_PATH);
           # crange pending #581;
-          # webdav-default and webdav-mime need a reapable background listener, which MSYS cannot give them;
+          # webdav-default, webdav-mime and webdav-overflow need a reapable background listener, which MSYS cannot give them;
           # badmtime needs a filesystem that stores an mtime past gmtime's range;
           # single-file ends on a GUI half needing htsserver, which this job does not build;
           # update-304-leak needs a LeakSanitizer build, which MSVC has no equivalent of;
@@ -276,6 +276,7 @@ jobs:
           114_local-update-304-leak.test
           120_local-proxytrack-webdav-default.test
           143_engine-backtrace-empty.test
+          147_local-proxytrack-webdav-overflow.test
           48_local-crange-memresume.test
           71_local-crange-repaircache.test
           79_local-proxytrack-webdav-mime.test
