@@ -76,10 +76,8 @@ propfind() {
         "http://127.0.0.1:$proxyport/webdav/x/$1"
 }
 
-# The request line is capped at 1024 bytes (line1Size), so amplification, not
-# raw length, is what reaches far past the old 1024-byte item reserve: 900
-# ampersands leave escapexml() as 4500 bytes, and the path lands in the
-# response twice. Well under the cap, roughly 9000 bytes written.
+# Amplification, not raw length, clears the old 1024-byte reserve: 900 '&'
+# become 4500 bytes, written twice, all under the 1024-byte request-line cap.
 amps=$("$python" -c "print('&' * 900)")
 resp=$(propfind "$amps") || {
     echo "FAIL: proxytrack died on an escapexml-amplified PROPFIND"
@@ -91,18 +89,15 @@ grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
     head -c 512 <<<"$resp"
     exit 1
 }
-# A clipped path answers 207 just as happily, so count what came back instead
-# of settling for a live listener. The run appears in the href and again in
-# the displayname.
-got=$(grep -o '&amp;' <<<"$resp" | wc -l)
+# Count what came back: a clipped path answers 207 too. The run appears in
+# the href and again in the displayname.
+got=$({ grep -o '&amp;' <<<"$resp" || true; } | wc -l)
 test "$got" -eq 1800 || {
     echo "FAIL: 900 ampersands went in, $got came back escaped, wanted 1800"
     exit 1
 }
 
-# A second capacity, and without any escaping, so the bound is shown to be on
-# the written length rather than on a '&' special case: 900 plain bytes twice
-# over still clears the old reserve.
+# Unescaped, so the bound is shown to be on the written length, not on '&'.
 plain=$("$python" -c "print('a' * 900)")
 resp=$(propfind "$plain") || {
     echo "FAIL: proxytrack died on a 900-byte plain PROPFIND path"
@@ -114,8 +109,7 @@ grep -q "<href>/webdav/x/$plain</href>" <<<"$resp" || {
     exit 1
 }
 
-# The overflow killed the whole listener, so a plain request afterwards is the
-# liveness proof.
+# The overflow killed the listener, so a later request is the liveness proof.
 resp=$(propfind "") || {
     echo "FAIL: proxytrack died before the follow-up listing"
     cat "$dir/pt.log"

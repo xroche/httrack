@@ -548,8 +548,8 @@ static void proxytrack_add_DAV_Item(String * item, String * buff,
         name = "Default Document for the Folder";
     }
 
-    /* The escaped path lands here twice and escapexml() expands '&' fivefold,
-       so no fixed reserve bounds an unauthenticated PROPFIND path (#836). */
+    /* The path lands here twice and escapexml() expands '&' fivefold, so no
+       fixed reserve bounds it (#836). */
     StringSprintf(
         *item,
         "<response xmlns=\"DAV:\">\r\n"

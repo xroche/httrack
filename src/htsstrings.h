@@ -167,9 +167,12 @@ HTS_STATIC char *StringBuffN_(String *blk, int size) {
   return StringBuffRW(*blk);
 }
 
-/** Replace BLK's contents with the formatted output, growing it to fit. Use
-    instead of sprintf() into a hand-sized StringRoom(): no fixed reserve
-    bounds a format argument that carries remote input. **/
+/** Ceiling on the pre-C99 doubling search below; BLK is emptied past it. **/
+#define STRING_SPRINTF_MAX ((size_t) 16 * 1024 * 1024)
+
+/** Replace BLK's contents with the formatted output, growing to fit, so no
+    fixed reserve has to bound an argument carrying remote input. An argument
+    may not point into BLK's own buffer, which is reallocated here. **/
 #define StringSprintf(BLK, ...) StringSprintf_(&(BLK), __VA_ARGS__)
 
 HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
@@ -189,8 +192,16 @@ HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
       StringLength(*blk) = (size_t) ret;
       return;
     }
-    /* C99 returns the length it wanted; pre-C99 msvcrt returns -1, so double */
-    capacity = ret > 0 ? (size_t) ret + 1 : capacity * 2;
+    if (ret >= 0) {
+      capacity = (size_t) ret + 1; /* C99 said what it needs */
+    } else if (capacity < STRING_SPRINTF_MAX) {
+      capacity *= 2; /* pre-C99 msvcrt only says "too small" */
+    } else {
+      /* a conversion error returns -1 too, and no capacity ever fixes that */
+      StringBuffRW(*blk)[0] = '\0';
+      StringLength(*blk) = 0;
+      return;
+    }
   }
 }
 
