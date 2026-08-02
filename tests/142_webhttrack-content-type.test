@@ -24,7 +24,7 @@ python=$(find_python) || {
 
 # The GUI assets asserted below have to exist, or every check goes vacuous.
 for asset in server/ping.js server/style.css images/screenshot_01.jpg \
-    images/bg_rings.svg images/header_title_4.gif img/guide-droid-opt-spider.png \
+    images/bg_rings.svg img/fade.gif img/guide-droid-opt-spider.png \
     server/div/com.httrack.WebHTTrack.metainfo.xml; do
     test -f "${distdir}/html/${asset}" || fail "missing GUI asset ${asset}"
 done
@@ -132,7 +132,7 @@ check_html_headers("/server/index.html")
 check_type("/server/ping.js", "text/javascript")
 check_type("/server/style.css", "text/css")
 check_type("/images/bg_rings.svg", "image/svg+xml")
-check_type("/images/header_title_4.gif", "image/gif")
+check_type("/img/fade.gif", "image/gif")
 check_type("/img/guide-droid-opt-spider.png", "image/png")
 check_type("/images/screenshot_01.jpg", "image/jpeg")
 # Dots in the stem: the type comes from the last one, not the first.
