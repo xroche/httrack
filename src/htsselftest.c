@@ -7631,6 +7631,96 @@ static int st_rtrim(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* Format LEN bytes of EXPECTED into S as two arguments, and check what came
+   back. HEAD and TAIL are scratch buffers of at least LEN+1 bytes. */
+static int strsprintf_case(String *s, const char *expected, size_t len,
+                           char *head, char *tail) {
+  const size_t half = len / 2;
+
+  memcpy(head, expected, half);
+  head[half] = '\0';
+  memcpy(tail, expected + half, len - half);
+  tail[len - half] = '\0';
+  StringSprintf(*s, "%s%s", head, tail);
+  return StringLength(*s) == len &&
+         memcmp(StringBuff(*s), expected, len) == 0 &&
+         StringBuff(*s)[len] == '\0';
+}
+
+/* StringSprintf_ stores the terminator at buffer[ret], so its `ret < capacity`
+   guard is off by one byte at the exact fill: an output whose length equals the
+   capacity writes past the allocation (#836). The lengths that reach it are the
+   capacities themselves, floored at 256 and doubling from there. */
+static int st_strsprintf(httrackp *opt, int argc, char **argv) {
+  static const size_t caps[] = {256, 512, 1024, 2048};
+
+  enum { maxLen = 2100 };
+
+  char *expected = malloct(maxLen + 1);
+  char *head = malloct(maxLen + 1);
+  char *tail = malloct(maxLen + 1);
+  String reused = STRING_EMPTY;
+  size_t i, len;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  if (expected == NULL || head == NULL || tail == NULL) {
+    printf("strsprintf self-test: FAIL (out of memory)\n");
+    return 1;
+  }
+  for (i = 0; i < maxLen; i++)
+    expected[i] = (char) ('a' + (i % 26));
+  expected[maxLen] = '\0';
+
+  /* one call on a String whose capacity is pinned to the boundary, so len ==
+     capacity is reached exactly once per boundary */
+  for (i = 0; i < sizeof(caps) / sizeof(caps[0]); i++) {
+    for (len = caps[i] - 3; len <= caps[i] + 3; len++) {
+      String s = STRING_EMPTY;
+
+      StringRoomTotal(s, caps[i]);
+      if (StringCapacity(s) != caps[i]) {
+        printf("  FAIL: capacity %u pinned to %u\n", (unsigned) caps[i],
+               (unsigned) StringCapacity(s));
+        err = 1;
+      } else if (!strsprintf_case(&s, expected, len, head, tail)) {
+        printf("  FAIL: length %u at capacity %u\n", (unsigned) len,
+               (unsigned) caps[i]);
+        err = 1;
+      }
+      StringFree(s);
+      if (err)
+        break;
+    }
+  }
+
+  /* the same String reused: its capacity grows under it between calls, and a
+     shorter output must not leave the previous one behind */
+  for (len = 0; !err && len <= maxLen; len++) {
+    if (!strsprintf_case(&reused, expected, len, head, tail)) {
+      printf("  FAIL: growing length %u\n", (unsigned) len);
+      err = 1;
+    }
+  }
+  for (len = maxLen + 1; !err && len-- > 0;) {
+    if (!strsprintf_case(&reused, expected, len, head, tail)) {
+      printf("  FAIL: shrinking length %u\n", (unsigned) len);
+      err = 1;
+    }
+  }
+  StringFree(reused);
+
+  freet(expected);
+  freet(head);
+  freet(tail);
+
+  printf("strsprintf self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -7685,6 +7775,8 @@ static const struct selftest_entry {
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},
+    {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
+     st_strsprintf},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"lastchar", "",
      "last-char helpers never index before the buffer (#770, #781, #821)",

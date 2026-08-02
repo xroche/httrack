@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+# StringSprintf writes the terminator at buffer[ret], so a `ret <= capacity`
+# guard overflows by one byte whenever the output exactly fills the capacity
+# (#836). The proxytrack crawl tests never land on a capacity boundary.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# Resolve httrack before any cd: PATH may carry a build-relative entry.
+bin=$(command -v httrack) || {
+    echo "FAIL: httrack not found on PATH" >&2
+    exit 1
+}
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+out=$("$bin" -#test=strsprintf) || fail "httrack -#test=strsprintf exited non-zero: $out"
+test "$out" = "strsprintf self-test: OK" || fail "expected 'strsprintf self-test: OK', got: $out"
+
+exit 0

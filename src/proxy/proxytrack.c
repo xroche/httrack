@@ -548,29 +548,37 @@ static void proxytrack_add_DAV_Item(String * item, String * buff,
         name = "Default Document for the Folder";
     }
 
-    StringRoom(*item, 1024);
-    sprintf(StringBuffRW(*item),
-            "<response xmlns=\"DAV:\">\r\n" "<href>/webdav%s%s</href>\r\n"
-            "<propstat>\r\n" "<prop>\r\n" "<displayname>%s</displayname>\r\n"
-            "<iscollection>%d</iscollection>\r\n"
-            "<haschildren>%d</haschildren>\r\n" "<isfolder>%d</isfolder>\r\n"
-            "<resourcetype>%s</resourcetype>\r\n"
-            "<creationdate>%d-%02d-%02dT%02d:%02d:%02dZ</creationdate>\r\n"
-            "<getlastmodified>%s</getlastmodified>\r\n"
-            "<supportedlock></supportedlock>\r\n" "<lockdiscovery/>\r\n"
-            "<getcontenttype>%s</getcontenttype>\r\n"
-            "<getcontentlength>%d</getcontentlength>\r\n"
-            "<isroot>%d</isroot>\r\n" "</prop>\r\n"
-            "<status>HTTP/1.1 200 OK</status>\r\n" "</propstat>\r\n"
-            "</response>\r\n",
-            /* */
-            (StringBuff(*buff)[0] == '/') ? "" : "/", StringBuff(*buff), name,
-            isDir ? 1 : 0, isDir ? 1 : 0, isDir ? 1 : 0,
-            isDir ? "<collection/>" : "", timetm->tm_year + 1900,
-            timetm->tm_mon + 1, timetm->tm_mday, timetm->tm_hour,
-            timetm->tm_min, timetm->tm_sec, tms,
-            isDir ? "httpd/unix-directory" : mime, (int) size, isRoot ? 1 : 0);
-    StringLength(*item) = (int) strlen(StringBuff(*item));
+    /* The path lands here twice and escapexml() expands '&' fivefold, so no
+       fixed reserve bounds it (#836). */
+    StringSprintf(
+        *item,
+        "<response xmlns=\"DAV:\">\r\n"
+        "<href>/webdav%s%s</href>\r\n"
+        "<propstat>\r\n"
+        "<prop>\r\n"
+        "<displayname>%s</displayname>\r\n"
+        "<iscollection>%d</iscollection>\r\n"
+        "<haschildren>%d</haschildren>\r\n"
+        "<isfolder>%d</isfolder>\r\n"
+        "<resourcetype>%s</resourcetype>\r\n"
+        "<creationdate>%d-%02d-%02dT%02d:%02d:%02dZ</creationdate>\r\n"
+        "<getlastmodified>%s</getlastmodified>\r\n"
+        "<supportedlock></supportedlock>\r\n"
+        "<lockdiscovery/>\r\n"
+        "<getcontenttype>%s</getcontenttype>\r\n"
+        "<getcontentlength>%d</getcontentlength>\r\n"
+        "<isroot>%d</isroot>\r\n"
+        "</prop>\r\n"
+        "<status>HTTP/1.1 200 OK</status>\r\n"
+        "</propstat>\r\n"
+        "</response>\r\n",
+        /* */
+        (StringBuff(*buff)[0] == '/') ? "" : "/", StringBuff(*buff), name,
+        isDir ? 1 : 0, isDir ? 1 : 0, isDir ? 1 : 0,
+        isDir ? "<collection/>" : "", timetm->tm_year + 1900,
+        timetm->tm_mon + 1, timetm->tm_mday, timetm->tm_hour, timetm->tm_min,
+        timetm->tm_sec, tms, isDir ? "httpd/unix-directory" : mime, (int) size,
+        isRoot ? 1 : 0);
   }
 }
 
@@ -721,11 +729,8 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
     }
 
     /* Form response */
-    StringRoom(response, 1024);
-    sprintf(StringBuffRW(response),
-            "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n"
-            "<multistatus xmlns=\"DAV:\">\r\n");
-    StringLength(response) = (int) strlen(StringBuff(response));
+    StringSprintf(response, "<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n"
+                            "<multistatus xmlns=\"DAV:\">\r\n");
     /* */
 
     /* Root */
@@ -739,7 +744,6 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
     if (depth > 0) {
       time_t timestampRep = (time_t) - 1;
       const char *prefix = StringBuff(url);
-      unsigned int prefixLen = (unsigned int) strlen(prefix);
       char **list = PT_Enumerate(indexes, prefix, 0);
 
       if (list != NULL) {
@@ -752,15 +756,10 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
             int thisIsDir = (hts_lastchar(thisUrl) == '/') ? 1 : 0;
 
             /* Item URL */
-            StringRoom(itemUrl,
-                       thisUrlLen + prefixLen + sizeof("/webdav/") + 1);
-            StringClear(itemUrl);
-            sprintf(StringBuffRW(itemUrl), "/%s/%s", prefix, thisUrl);
-            if (!thisIsDir)
-              StringLength(itemUrl) = (int) strlen(StringBuff(itemUrl));
-            else
-              StringLength(itemUrl) = (int) strlen(StringBuff(itemUrl)) - 1;
-            StringBuffRW(itemUrl)[StringLength(itemUrl)] = '\0';
+            StringSprintf(itemUrl, "/%s/%s", prefix, thisUrl);
+            if (thisIsDir) { /* drop the trailing '/' */
+              StringPopRight(itemUrl);
+            }
 
             if (thisIsDir == isDir) {
               size_t size = 0;
@@ -1037,12 +1036,13 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
         const char *options = "GET, HEAD, OPTIONS, POST, PROPFIND, TRACE" ", MKCOL, DELETE, PUT";       /* Not supported */
 
         msgCode = HTTP_OK;
-        StringRoom(headers, 8192);
-        sprintf(StringBuffRW(headers),
-                "HTTP/1.1 %d %s\r\n" "DAV: 1, 2\r\n" "MS-Author-Via: DAV\r\n"
-                "Cache-Control: private\r\n" "Allow: %s\r\n", msgCode,
-                GetHttpMessage(msgCode), options);
-        StringLength(headers) = (int) strlen(StringBuff(headers));
+        StringSprintf(headers,
+                      "HTTP/1.1 %d %s\r\n"
+                      "DAV: 1, 2\r\n"
+                      "MS-Author-Via: DAV\r\n"
+                      "Cache-Control: private\r\n"
+                      "Allow: %s\r\n",
+                      msgCode, GetHttpMessage(msgCode), options);
       } else if (strcasecmp(command, "propfind") == 0) {
         if (davDepth > 1) {
           msgCode = 403;
@@ -1141,11 +1141,9 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
                proxytrack_process_DAV_Request(indexes, StringBuff(url),
                                               davDepth)) != NULL) {
             msgCode = element->statuscode;
-            StringRoom(davHeaders, 1024);
-            sprintf(StringBuffRW(davHeaders),
-                    "DAV: 1, 2\r\n" "MS-Author-Via: DAV\r\n"
-                    "Cache-Control: private\r\n");
-            StringLength(davHeaders) = (int) strlen(StringBuff(davHeaders));
+            StringSprintf(davHeaders, "DAV: 1, 2\r\n"
+                                      "MS-Author-Via: DAV\r\n"
+                                      "Cache-Control: private\r\n");
           }
         }
 #endif
@@ -1164,45 +1162,46 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
           }
         }
         if (element != NULL) {
+          /* lifted out of the format: a directive inside a macro argument list
+             is undefined, and MSVC rejects it */
+#ifndef NO_WEBDAV
+          const char *const davPart = StringBuff(davHeaders);
+#else
+          const char *const davPart = "";
+#endif
+
           msgCode = element->statuscode;
-          StringRoom(headers, 8192);
-          sprintf(StringBuffRW(headers),
-                  "HTTP/1.1 %d %s\r\n"
-#ifndef NO_WEBDAV
-                  "%s"
-#endif
-                  "Content-Type: %s%s%s%s\r\n"
-                  "%s%s%s"
-                  "%s%s%s"
-                  "%s%s%s",
-                  /* */
-                  msgCode, element->msg,
-#ifndef NO_WEBDAV
-                  /* DAV */
-                  StringBuff(davHeaders),
-#endif
-                  /* Content-type: foo; [ charset=bar ] */
-                  hts_effective_mime(element->contenttype),
-                  ((element->charset[0]) ? "; charset=\"" : ""),
-                  element->charset, ((element->charset[0]) ? "\"" : ""),
-                  /* location */
-                  ((element->location != NULL && element->location[0])
-                       ? "Location: "
-                       : ""),
-                  ((element->location != NULL && element->location[0])
-                       ? element->location
-                       : ""),
-                  ((element->location != NULL && element->location[0]) ? "\r\n"
-                                                                       : ""),
-                  /* last-modified */
-                  ((element->lastmodified[0]) ? "Last-Modified: " : ""),
-                  ((element->lastmodified[0]) ? element->lastmodified : ""),
-                  ((element->lastmodified[0]) ? "\r\n" : ""),
-                  /* etag */
-                  ((element->etag[0]) ? "ETag: " : ""),
-                  ((element->etag[0]) ? element->etag : ""),
-                  ((element->etag[0]) ? "\r\n" : ""));
-          StringLength(headers) = (int) strlen(StringBuff(headers));
+          StringSprintf(
+              headers,
+              "HTTP/1.1 %d %s\r\n"
+              "%s"
+              "Content-Type: %s%s%s%s\r\n"
+              "%s%s%s"
+              "%s%s%s"
+              "%s%s%s",
+              /* */
+              msgCode, element->msg, davPart,
+              /* Content-type: foo; [ charset=bar ] */
+              hts_effective_mime(element->contenttype),
+              ((element->charset[0]) ? "; charset=\"" : ""), element->charset,
+              ((element->charset[0]) ? "\"" : ""),
+              /* location */
+              ((element->location != NULL && element->location[0])
+                   ? "Location: "
+                   : ""),
+              ((element->location != NULL && element->location[0])
+                   ? element->location
+                   : ""),
+              ((element->location != NULL && element->location[0]) ? "\r\n"
+                                                                   : ""),
+              /* last-modified */
+              ((element->lastmodified[0]) ? "Last-Modified: " : ""),
+              ((element->lastmodified[0]) ? element->lastmodified : ""),
+              ((element->lastmodified[0]) ? "\r\n" : ""),
+              /* etag */
+              ((element->etag[0]) ? "ETag: " : ""),
+              ((element->etag[0]) ? element->etag : ""),
+              ((element->etag[0]) ? "\r\n" : ""));
         } else {
           /* No query string, no ending / : check the the <url>/ page */
           if (StringLength(url) > 0
@@ -1212,29 +1211,32 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
             StringCat(urlRedirect, "/");
             if (PT_LookupIndex(indexes, StringBuff(urlRedirect))) {
               msgCode = 301;    /* Moved Permanently */
-              StringRoom(headers, 8192);
-              sprintf(StringBuffRW(headers),
-                      "HTTP/1.1 %d %s\r\n" "Content-Type: text/html\r\n"
-                      "Location: %s\r\n",
-                      /* */
-                      msgCode, GetHttpMessage(msgCode), StringBuff(urlRedirect)
-                );
-              StringLength(headers) = (int) strlen(StringBuff(headers));
+              StringSprintf(headers,
+                            "HTTP/1.1 %d %s\r\n"
+                            "Content-Type: text/html\r\n"
+                            "Location: %s\r\n",
+                            /* */
+                            msgCode, GetHttpMessage(msgCode),
+                            StringBuff(urlRedirect));
               /* */
-              StringRoom(output,
-                         1024 + sizeof(PROXYTRACK_COMMENT_HEADER) +
-                         sizeof(DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES));
-              sprintf(StringBuffRW(output),
-                      "<html>" PROXYTRACK_COMMENT_HEADER
-                      DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES "<head>"
-                      "<title>ProxyTrack - Page has moved</title>" "</head>\r\n"
-                      "<body>" "<h3>The correct location is:</h3><br />"
-                      "<b><a href=\"%s\">%s</a></b><br />" "<br />" "<br />\r\n"
-                      "<i>Generated by ProxyTrack " PROXYTRACK_VERSION
-                      ", (C) Xavier Roche and other contributors</i>" "\r\n"
-                      "</body>" "</header>", StringBuff(urlRedirect),
-                      StringBuff(urlRedirect));
-              StringLength(output) = (int) strlen(StringBuff(output));
+              StringSprintf(
+                  output,
+                  "<html"
+                  ">" PROXYTRACK_COMMENT_HEADER DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES
+                  "<head>"
+                  "<title>ProxyTrack - Page has moved</title>"
+                  "</head>\r\n"
+                  "<body>"
+                  "<h3>The correct location is:</h3><br />"
+                  "<b><a href=\"%s\">%s</a></b><br />"
+                  "<br />"
+                  "<br />\r\n"
+                  "<i>Generated by ProxyTrack " PROXYTRACK_VERSION
+                  ", (C) Xavier Roche and other contributors</i>"
+                  "\r\n"
+                  "</body>"
+                  "</header>",
+                  StringBuff(urlRedirect), StringBuff(urlRedirect));
             }
           }
           if (msgCode == 0) {
@@ -1255,25 +1257,29 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
       } else if (msgError == NULL) {
         msgError = GetHttpMessage(msgCode);
       }
-      StringRoom(headers, 256);
-      sprintf(StringBuffRW(headers),
-              "HTTP/1.1 %d %s\r\n" "Content-type: text/html\r\n", msgCode,
-              msgError);
-      StringLength(headers) = (int) strlen(StringBuff(headers));
-      StringRoom(output,
-                 1024 + sizeof(PROXYTRACK_COMMENT_HEADER) +
-                 sizeof(DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES));
-      sprintf(StringBuffRW(output),
-              "<html>" PROXYTRACK_COMMENT_HEADER
-              DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES "<head>"
-              "<title>ProxyTrack - HTTP Proxy Error %d</title>" "</head>\r\n"
-              "<body>"
-              "<h3>A proxy error has occurred while processing the request.</h3><br />"
-              "<b>Error HTTP %d: <i>%s</i></b><br />" "<br />" "<br />\r\n"
-              "<i>Generated by ProxyTrack " PROXYTRACK_VERSION
-              ", (C) Xavier Roche and other contributors</i>" "\r\n" "</body>"
-              "</html>", msgCode, msgCode, msgError);
-      StringLength(output) = (int) strlen(StringBuff(output));
+      StringSprintf(headers,
+                    "HTTP/1.1 %d %s\r\n"
+                    "Content-type: text/html\r\n",
+                    msgCode, msgError);
+      StringSprintf(
+          output,
+          "<html"
+          ">" PROXYTRACK_COMMENT_HEADER DISABLE_IE_FRIENDLY_HTTP_ERROR_MESSAGES
+          "<head>"
+          "<title>ProxyTrack - HTTP Proxy Error %d</title>"
+          "</head>\r\n"
+          "<body>"
+          "<h3>A proxy error has occurred while processing the "
+          "request.</h3><br />"
+          "<b>Error HTTP %d: <i>%s</i></b><br />"
+          "<br />"
+          "<br />\r\n"
+          "<i>Generated by ProxyTrack " PROXYTRACK_VERSION
+          ", (C) Xavier Roche and other contributors</i>"
+          "\r\n"
+          "</body>"
+          "</html>",
+          msgCode, msgCode, msgError);
     }
     {
       char tmp[20 + 1];         /* 2^64 = 18446744073709551616 */

@@ -248,6 +248,10 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 void treatfirstline(htsblk * retour, const char *rcvd);
 
 // sous-fonctions
+/* Buffer http_xfread1() fills in its line modes, and so the ceiling on any
+   blank-line-terminated block it reads: a header section or a chunk trailer
+   section. Overrunning it fails the transfer. */
+#define HTS_LINE_BLOCK_SIZE 8192
 LLint http_xfread1(htsblk * r, int bufl);
 /* Cached resolver: fill out[0..count-1] with up to max addresses for iadr (in
    resolver order), returning the count (0 = does not resolve, negative-cached).
