@@ -221,4 +221,5 @@ TESTS += 146_bash-shell.test
 TESTS += 147_local-proxytrack-webdav-overflow.test
 TESTS += 149_local-chunked-trailer.test
 TESTS += 148_engine-spoolname.test
+TESTS += 151_bash-shell-validate.test
 TESTS += 150_engine-strsprintf.test
