@@ -1954,7 +1954,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
 
   } else if (bufl == -2) {      // force reserve
     if (r->adr == NULL) {
-      r->adr = (char *) malloct(8192);
+      r->adr = (char *) malloct(HTS_LINE_BLOCK_SIZE);
       r->size = 0;
       return 0;
     }
@@ -1969,11 +1969,11 @@ LLint http_xfread1(htsblk * r, int bufl) {
       nl = READ_INTERNAL_ERROR;
       count--;
       if (r->adr == NULL) {
-        r->adr = (char *) malloct(8192);
+        r->adr = (char *) malloct(HTS_LINE_BLOCK_SIZE);
         r->size = 0;
       }
       if (r->adr != NULL) {
-        if (r->size < 8190) {
+        if (r->size < HTS_LINE_BLOCK_SIZE - 2) {
           // lecture
           nl = hts_read(r, r->adr + r->size, 1);
           if (nl > 0) {

@@ -218,4 +218,5 @@ TESTS += 143_engine-backtrace-empty.test
 TESTS += 144_engine-datadir.test
 TESTS += 145_webhttrack-datadir.test
 TESTS += 146_bash-shell.test
+TESTS += 149_local-chunked-trailer.test
 TESTS += 148_engine-spoolname.test
