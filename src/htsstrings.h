@@ -141,8 +141,14 @@ struct String {
 HTS_STATIC void StringOom_(size_t size) {
   fprintf(stderr, "String: out of memory allocating %lu bytes\n",
           (unsigned long) size);
+  fflush(stderr); /* abort() flushes nothing; Windows buffers a piped stderr */
   abort();
 }
+
+/** What to do when an allocation of SIZE bytes fails; overridable. **/
+#ifndef STRING_OOM
+#define STRING_OOM(SIZE) StringOom_(SIZE)
+#endif
 
 /** Grow so capacity_ >= CAPACITY (total bytes, including the NUL). May realloc
     (invalidating prior buffer pointers); aborts on OOM. Never shrinks. **/
@@ -154,7 +160,7 @@ HTS_STATIC void StringOom_(size_t size) {
       char *const buff_ = STRING_REALLOC((BLK).buffer_, newcap_);              \
                                                                                \
       if (buff_ == NULL) {                                                     \
-        StringOom_(newcap_);                                                   \
+        STRING_OOM(newcap_);                                                   \
       }                                                                        \
       (BLK).buffer_ = buff_;                                                   \
       (BLK).capacity_ = newcap_;                                               \
