@@ -3498,9 +3498,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             else if (back[i].status == STATUS_CHUNK_WAIT || back[i].status == STATUS_CHUNK_CR) {        // recevoir longueur chunk en hexa caractère par caractère
               // backuper pour lire dans le buffer chunk
               htsblk r;
-              /* Trailers span several lines and end on a blank one, so read
-                 them as a block; the reader's 8KB line buffer then bounds the
-                 whole section, which carries no length of its own. */
+              /* Block mode bounds the trailer section, which declares no length
+                 of its own, by HTS_LINE_BLOCK_SIZE. */
               const int chunk_read_mode =
                   back_in_chunk_trailers(&back[i]) ? 0 : -1;
 
@@ -3653,8 +3652,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             if (back[i].status == STATUS_CHUNK_WAIT || back[i].status == STATUS_CHUNK_CR) {     // réception taille chunk en hexa (  après les en têtes, peut ne pas
               const hts_boolean in_trailers = back_in_chunk_trailers(&back[i]);
 
-              /* A chunk-size or chunk-CRLF line closes on its first LF; the
-                 trailer section only on the blank line that ends it. */
+              /* A chunk-size or chunk-CRLF line closes on its first LF, the
+                 trailer section on the blank line ending it. Two LFs mean a
+                 blank line only because the reader drops every CR. */
               if (back[i].chunk_size > 0 &&
                   back[i].chunk_adr[back[i].chunk_size - 1] == 10 &&
                   (!in_trailers || back[i].chunk_size == 1 ||
@@ -3662,7 +3662,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                 int chunk_size = -1;
                 char chunk_data[64];
 
-                if (back[i].chunk_size < 32 || in_trailers) { // not too big
+                if (in_trailers) {
+                  chunk_size =
+                      0; /* fields discarded, the blank line ends the body */
+                } else if (back[i].chunk_size < 32) { // not too big
                   char *chstrip = back[i].chunk_adr;
 
                   back[i].chunk_adr[back[i].chunk_size - 1] = '\0';     // octet nul 
@@ -3738,9 +3741,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                     back[i].chunk_adr, back[i].url_adr,
                                     back[i].url_fil);
                     }
-                  } else { /* back[i].status==STATUS_CHUNK_CR : just receiving
-                              ending CRLF after data, or the trailer section */
-                    if (chunk_data[0] == '\0' || in_trailers) {
+                  } else {      /* back[i].status==STATUS_CHUNK_CR : just receiving ending CRLF after data */
+                    if (chunk_data[0] == '\0') {
                       if (back[i].chunk_blocksize > 0)
                         chunk_size = (int) back[i].chunk_blocksize;     /* recent data chunk size */
                       else if (back[i].chunk_blocksize == -1)

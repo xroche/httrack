@@ -1721,6 +1721,7 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="none.html">none</a>\n'
             '\t<a href="huge.html">huge</a>\n'
             '\t<a href="bogus.html">bogus</a>\n'
+            '\t<a href="eof.html">eof</a>\n'
             '\t<a href="file.bin">file</a>\n'
         )
 
@@ -1729,8 +1730,7 @@ class Handler(SimpleHTTPRequestHandler):
             b"<html><body><p>CHUNKTRAIL-ONE</p></body></html>", [b"X-Foo: bar"]
         )
 
-    # Longer than the 256 bytes the line reader takes per call, so the section
-    # spans several reads before its blank line arrives.
+    # Spans several reads: longer than the reader's 256 bytes per call.
     def route_chunktrail_many(self):
         self.send_chunked_trailed(
             b"<html><body><p>CHUNKTRAIL-MANY</p></body></html>",
@@ -1743,16 +1743,15 @@ class Handler(SimpleHTTPRequestHandler):
             b"<html><body><p>CHUNKTRAIL-NONE</p></body></html>", []
         )
 
-    # Past the reader's 8KB line buffer: discarding trailers must stay bounded,
-    # so the transfer is dropped rather than followed forever.
+    # Past HTS_LINE_BLOCK_SIZE: the discard stays bounded, so the transfer drops.
     def route_chunktrail_huge(self):
         self.send_chunked_trailed(
             b"<html><body><p>CHUNKTRAIL-HUGE</p></body></html>",
             [b"X-Bloat-%04d: %s" % (n, b"w" * 100) for n in range(160)],
         )
 
-    # Junk where a data chunk's own CRLF belongs is still a framing error: only
-    # the terminating chunk opens the trailer section.
+    # Only the terminating chunk opens the section, so junk in a data chunk's
+    # own CRLF stays a framing error.
     def route_chunktrail_bogus(self):
         self.protocol_version = "HTTP/1.1"
         self.send_response(200)
@@ -1766,6 +1765,26 @@ class Handler(SimpleHTTPRequestHandler):
             body = b"<html><body><p>CHUNKTRAIL-BOGUS</p></body></html>"
             self.wfile.write(b"%X\r\n" % len(body) + body + b"X-Foo: bar\r\n")
             self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    # Body complete, then EOF before the blank line closing the section. The
+    # terminating chunk already arrived, so the payload stands.
+    def route_chunktrail_eof(self):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            body = b"<html><body><p>CHUNKTRAIL-EOF</p></body></html>"
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+            self.wfile.write(b"0\r\nX-Checksum: deadbeef\r\n")
             self.wfile.flush()
         except OSError:
             pass
@@ -2431,6 +2450,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/chunktrail/none.html": route_chunktrail_none,
         "/chunktrail/huge.html": route_chunktrail_huge,
         "/chunktrail/bogus.html": route_chunktrail_bogus,
+        "/chunktrail/eof.html": route_chunktrail_eof,
         "/chunktrail/file.bin": route_chunktrail_file,
         "/errpage/index.html": route_errpage_index,
         "/errpage/good.html": route_errpage_good,
