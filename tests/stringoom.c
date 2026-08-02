@@ -21,9 +21,9 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Drives StringRoomTotal's allocation-failure path through a realloc stub:
-   asking a real allocator for a size it should refuse is a guess about the
-   machine, not a test (#915). One case per run, named by argv[1]. */
+/* Drives the String allocation-failure path through a realloc stub: asking a
+   real allocator for a size it should refuse is a guess about the machine, not
+   a test (#915). One case per run, named by argv[1]. */
 
 #include <setjmp.h>
 #include <stdio.h>
@@ -34,9 +34,11 @@ static int alloc_fails = 0;
 static int oom_jumps = 0;
 static int oom_calls = 0;
 static size_t oom_size = 0;
+static size_t last_request = 0;
 static jmp_buf oom_jump;
 
 static char *test_realloc(char *buff, size_t size) {
+  last_request = size;
   if (alloc_fails) {
     return NULL;
   }
@@ -67,17 +69,57 @@ static void test_oom(size_t size) {
 /* File scope, so longjmp cannot leave them indeterminate. */
 static String room = STRING_EMPTY;
 static const char *kept = NULL;
+static size_t kept_capacity = 0;
+
+/* The handler must run once, and be told the size that was actually asked of
+   the allocator: an under-allocation reports a size the String does not have.
+   Compared against the stub's own record rather than a literal, so the initial
+   capacity stays a policy the test does not pin. */
+static int failure_reported(const char *name) {
+  if (oom_calls != 1) {
+    printf("%s: FAIL (handler ran %d times)\n", name, oom_calls);
+    return 0;
+  }
+  if (oom_size != last_request) {
+    printf("%s: FAIL (reported %u bytes, allocator was asked for %u)\n", name,
+           (unsigned) oom_size, (unsigned) last_request);
+    return 0;
+  }
+  return 1;
+}
 
 /* Control: with the stub allocating for real, nothing must reach the handler.
    Without this, a stub stuck in failing mode would "prove" every case. */
 static int grow_case(void) {
+  size_t cap, i;
+
   StringRoomTotal(room, 100);
   if (oom_calls != 0) {
     printf("grow: FAIL (handler ran %d times)\n", oom_calls);
     return 1;
   }
-  if (StringBuff(room) == NULL || StringCapacity(room) < 100) {
-    printf("grow: FAIL (capacity %u)\n", (unsigned) StringCapacity(room));
+  cap = StringCapacity(room);
+  if (StringBuff(room) == NULL || cap < 100) {
+    printf("grow: FAIL (capacity %u)\n", (unsigned) cap);
+    return 1;
+  }
+  /* A capacity never written to is a number, not a buffer: fill it to the
+     last byte, so an allocation short of the announced capacity is a heap
+     overflow the sanitizer legs catch. */
+  for (i = 0; i + 1 < cap; i++) {
+    StringBuffRW(room)[i] = (char) ('a' + (i % 26));
+  }
+  StringBuffRW(room)[cap - 1] = '\0';
+  for (i = 0; i + 1 < cap; i++) {
+    if (StringBuff(room)[i] != (char) ('a' + (i % 26))) {
+      printf("grow: FAIL (byte %u of %u read back as 0x%02x)\n", (unsigned) i,
+             (unsigned) cap, (unsigned char) StringBuff(room)[i]);
+      return 1;
+    }
+  }
+  if (strlen(StringBuff(room)) != cap - 1) {
+    printf("grow: FAIL (%u bytes readable, capacity %u)\n",
+           (unsigned) strlen(StringBuff(room)), (unsigned) cap);
     return 1;
   }
   StringFree(room);
@@ -92,16 +134,14 @@ static int hook_case(void) {
     printf("hook: FAIL (grew through a failing allocator)\n");
     return 1;
   }
+  if (!failure_reported("hook")) {
+    return 1;
+  }
   if (StringBuff(room) != NULL || StringCapacity(room) != 0 ||
       StringLength(room) != 0) {
     printf("hook: FAIL (capacity %u, buffer %s)\n",
            (unsigned) StringCapacity(room),
            StringBuff(room) == NULL ? "null" : "set");
-    return 1;
-  }
-  if (oom_size != 16) { /* the first doubling, and the size we report */
-    printf("hook: FAIL (reported %u bytes, expected 16)\n",
-           (unsigned) oom_size);
     return 1;
   }
   printf("hook: OK\n");
@@ -113,22 +153,56 @@ static int hook_case(void) {
 static int keep_case(void) {
   StringCopy(room, "abc");
   kept = StringBuff(room);
+  kept_capacity = StringCapacity(room);
   alloc_fails = oom_jumps = 1;
   if (setjmp(oom_jump) == 0) {
     StringRoomTotal(room, 1000);
     printf("keep: FAIL (grew through a failing allocator)\n");
     return 1;
   }
-  if (StringBuff(room) != kept || StringCapacity(room) != 16 ||
+  if (!failure_reported("keep")) {
+    return 1;
+  }
+  if (StringBuff(room) != kept || StringCapacity(room) != kept_capacity ||
       StringLength(room) != 3 || strcmp(StringBuff(room), "abc") != 0) {
-    printf("keep: FAIL (buffer %s, capacity %u)\n",
+    printf("keep: FAIL (buffer %s, capacity %u was %u)\n",
            StringBuff(room) == kept ? "kept" : "moved",
-           (unsigned) StringCapacity(room));
+           (unsigned) StringCapacity(room), (unsigned) kept_capacity);
     return 1;
   }
   alloc_fails = 0;
   StringFree(room);
   printf("keep: OK\n");
+  return 0;
+}
+
+/* The header's own growers expand STRING_OOM as well, so drive each of them
+   into the same failure rather than only the macro they call. */
+static int sprintf_case(void) {
+  alloc_fails = oom_jumps = 1;
+  if (setjmp(oom_jump) == 0) {
+    StringSprintf(room, "%s", "x");
+    printf("sprintf: FAIL (formatted through a failing allocator)\n");
+    return 1;
+  }
+  if (!failure_reported("sprintf") || StringBuff(room) != NULL) {
+    return 1;
+  }
+  printf("sprintf: OK\n");
+  return 0;
+}
+
+static int buffn_case(void) {
+  alloc_fails = oom_jumps = 1;
+  if (setjmp(oom_jump) == 0) {
+    (void) StringBuffN(room, 10);
+    printf("buffn: FAIL (reserved through a failing allocator)\n");
+    return 1;
+  }
+  if (!failure_reported("buffn") || StringBuff(room) != NULL) {
+    return 1;
+  }
+  printf("buffn: OK\n");
   return 0;
 }
 
@@ -149,9 +223,13 @@ int main(int argc, char **argv) {
     return hook_case();
   } else if (strcmp(mode, "keep") == 0) {
     return keep_case();
+  } else if (strcmp(mode, "sprintf") == 0) {
+    return sprintf_case();
+  } else if (strcmp(mode, "buffn") == 0) {
+    return buffn_case();
   } else if (strcmp(mode, "abort") == 0) {
     return abort_case();
   }
-  fprintf(stderr, "usage: %s grow|hook|keep|abort\n", argv[0]);
+  fprintf(stderr, "usage: %s grow|hook|keep|sprintf|buffn|abort\n", argv[0]);
   return 2;
 }

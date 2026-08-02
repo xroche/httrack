@@ -25,18 +25,12 @@ fi
 [ -r "$STRINGOOM_BIN" ] || fail "$STRINGOOM_BIN was not built"
 
 # Control first: with the stub allocating for real, growth must not reach the
-# failure path at all.
-out=$("$STRINGOOM_BIN" grow) || fail "grow case exited non-zero: $out"
-test "$out" = "grow: OK" || fail "expected 'grow: OK', got: $out"
-
-# A failed realloc must reach the handler with the size it asked for, and leave
-# the String untouched rather than half-grown.
-out=$("$STRINGOOM_BIN" hook) || fail "hook case exited non-zero: $out"
-test "$out" = "hook: OK" || fail "expected 'hook: OK', got: $out"
-
-# Same on a String that already owns a buffer: the live pointer must survive.
-out=$("$STRINGOOM_BIN" keep) || fail "keep case exited non-zero: $out"
-test "$out" = "keep: OK" || fail "expected 'keep: OK', got: $out"
+# failure path at all, and the capacity it announces must be writable to the
+# last byte. Then the three failure shapes, and the growers inside the header.
+for mode in grow hook keep sprintf buffn; do
+    out=$("$STRINGOOM_BIN" "$mode") || fail "$mode case exited non-zero: $out"
+    test "$out" = "$mode: OK" || fail "expected '$mode: OK', got: $out"
+done
 
 # The shipped handler prints and aborts, so don't let set -e trip on it.
 err=$("$STRINGOOM_BIN" abort 2>&1) || true
