@@ -50,7 +50,31 @@ freeport() {
 proxyport=$(freeport)
 icpport=$(freeport)
 
-proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" >"$dir/pt.log" 2>&1 &
+: >"$dir/pt.log" # the drainer below creates it asynchronously
+# stdout to a file is fully buffered and SIGTERM never flushes it, so a leak on
+# stdout would be lost; a pty line-buffers it. The exec keeps $! on proxytrack.
+"$python" -c '
+import os, pty, sys
+master, slave = pty.openpty()
+if os.fork() == 0:
+    os.close(slave)
+    with open(sys.argv[1], "wb", 0) as log:
+        while True:
+            try:
+                data = os.read(master, 65536)
+            except OSError:
+                break
+            if not data:
+                break
+            log.write(data)
+    os._exit(0)
+os.close(master)
+os.dup2(slave, 1)
+os.dup2(slave, 2)
+if slave > 2:
+    os.close(slave)
+os.execvp(sys.argv[2], sys.argv[2:])
+' "$dir/pt.log" proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" &
 ptpid=$!
 waited=0
 until grep -qE "HTTP Proxy installed on|Unable to (initialize a temporary server|create the server)" "$dir/pt.log"; do
@@ -73,8 +97,10 @@ grep -q "HTTP Proxy installed on" "$dir/pt.log" || {
 }
 
 propfind() {
-    curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
-        "http://127.0.0.1:$proxyport/webdav/example.com/$1"
+    local path=$1
+    shift
+    curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" "$@" \
+        "http://127.0.0.1:$proxyport/webdav/example.com/$path"
 }
 
 resp=$(propfind page.html) || {
@@ -117,5 +143,45 @@ grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
     printf '%s\n' "$resp"
     exit 1
 }
+
+# Leftover traces echoed the client's body and the generated response (#911).
+# The padding spills the canary past any stdio buffer, newline or not.
+sentinel=PT911-DAV-BODY-CANARY
+pad=$(printf '%8192s' '')
+resp=$(propfind "" -H 'Expect:' --data-binary "$sentinel${pad// /x}") || {
+    echo "FAIL: proxytrack died serving a PROPFIND carrying a body"
+    cat "$dir/pt.log"
+    exit 1
+}
+grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
+    echo "FAIL: expected 207 Multi-Status on the canary listing"
+    printf '%s\n' "$resp"
+    exit 1
+}
+
+# The 207 is what makes the absence below mean something: a depth-rejected
+# PROPFIND is logged 403 without ever reaching the traces. It is logged after
+# them, so waiting on it also fences the drainer's copy.
+waited=0
+until test "$(grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' "$dir/pt.log" || true)" -ge 3; do
+    test "$waited" -lt 50 || {
+        echo "FAIL: fewer than three PROPFINDs were answered 207, so the checks below prove nothing"
+        cat "$dir/pt.log"
+        exit 1
+    }
+    sleep 0.1
+    waited=$((waited + 1))
+done
+
+# Neither what the client sent nor the generated body is echoed anywhere; the
+# two literals name the exact regression on top.
+log=$(<"$dir/pt.log")
+for marker in "$sentinel" 'Default Document for the Folder' 'DEBUG: DAV-DATA' '^RESPONSE:'; do
+    if grep -q "$marker" <<<"$log"; then
+        echo "FAIL: a PROPFIND echoed '$marker' into proxytrack's output"
+        printf '%s\n' "$log"
+        exit 1
+    fi
+done
 
 echo "OK: PROPFIND on an exact cache entry lists its default document and survives"

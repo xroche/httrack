@@ -829,8 +829,6 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
     strcpybuff(elt->msg, "Multi-Status");
     StringFree(response);
 
-    fprintf(stderr, "RESPONSE:\n%s\n", elt->adr);
-
     return elt;
   }
   return NULL;
@@ -1051,7 +1049,6 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
           msgCode = 403;
           msgError = "DAV Depth Limit Forbidden";
         } else {
-          fprintf(stderr, "DEBUG: DAV-DATA=<%s>\n", StringBuff(davRequest));
           listRequest = 2;      /* propfind */
         }
       } else if (strcasecmp(command, "mkcol") == 0
