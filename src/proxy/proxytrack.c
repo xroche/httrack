@@ -757,6 +757,9 @@ static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
 
             /* Item URL */
             StringSprintf(itemUrl, "/%s/%s", prefix, thisUrl);
+            if (!StringNotEmpty(itemUrl)) { /* formatting gave up: unnameable */
+              continue;
+            }
             if (thisIsDir) { /* drop the trailing '/' */
               StringPopRight(itemUrl);
             }

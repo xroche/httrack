@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# A String that cannot grow must stop the process loudly rather than carry on
+# with a NULL buffer and a capacity already bumped. assert() is compiled out of
+# the MSVC Release build, so the check cannot lean on it (#915). The failure is
+# injected through a realloc stub: asking a real allocator for a size it should
+# refuse is a guess about the machine, not a test.
+
+set -euo pipefail
+
+ulimit -c 0 # a deliberate abort must not litter the box with cores
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+# Unset means this is not an automake run (the Windows job runs the scripts
+# directly), so the helper does not exist. Set but missing is a build problem,
+# not a skip, or the assertions below would pass vacuously.
+if [ -z "${STRINGOOM_BIN:-}" ]; then
+    echo "STRINGOOM_BIN unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -r "$STRINGOOM_BIN" ] || fail "$STRINGOOM_BIN was not built"
+
+# Control first: with the stub allocating for real, growth must not reach the
+# failure path at all, and the capacity it announces must be writable to the
+# last byte. Then the three failure shapes, and the growers inside the header.
+for mode in grow hook keep sprintf buffn; do
+    out=$("$STRINGOOM_BIN" "$mode") || fail "$mode case exited non-zero: $out"
+    test "$out" = "$mode: OK" || fail "expected '$mode: OK', got: $out"
+done
+
+# The shipped handler prints and aborts, so don't let set -e trip on it.
+err=$("$STRINGOOM_BIN" abort 2>&1) || true
+case "$err" in
+*"NOT aborted"*)
+    fail "the failed allocation was not caught: $err"
+    ;;
+*"String: out of memory"*) ;;
+*)
+    fail "expected the String out-of-memory abort, got: $err"
+    ;;
+esac
+
+exit 0
