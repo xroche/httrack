@@ -253,7 +253,7 @@ void treatfirstline(htsblk * retour, const char *rcvd);
    section. Overrunning it fails the transfer. */
 #define HTS_LINE_BLOCK_SIZE 8192
 /* http_xfread1() read modes: a positive bufl reads at most that many raw bytes,
-   these two read CR-stripped lines into the HTS_LINE_BLOCK_SIZE buffer. */
+   anything else reads CR-stripped lines into the HTS_LINE_BLOCK_SIZE buffer. */
 #define HTS_XFREAD_LINE_BLOCK 0 /* lines up to a blank one (header/trailer) */
 #define HTS_XFREAD_LINE (-1)    /* one line, stopping at the first LF */
 LLint http_xfread1(htsblk * r, int bufl);
