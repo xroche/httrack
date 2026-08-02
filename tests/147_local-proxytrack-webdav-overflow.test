@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # escapexml() expands '&' fivefold, so an unauthenticated PROPFIND path of
-# escaped ampersands used to overflow the fixed DAV item reserve (#836).
+# escaped ampersands used to overflow the fixed DAV item reserve (#836). The
+# Depth: 1 listing at the end covers the enumeration branch's own item URLs.
 
 set -euo pipefail
 
@@ -40,6 +41,11 @@ alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
     printf '2 0 test\n'
     printf '\n\n'
     printf 'http://example.com/page.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
+    cat "$dir/hdr" "$dir/body"
+    # a record begins on the newline following the previous one's data
+    printf '\n'
+    # gives the Depth: 1 listing below a child directory as well as a child file
+    printf 'http://example.com/sub/deep.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
     cat "$dir/hdr" "$dir/body"
 } >"$dir/in.arc"
 
@@ -106,6 +112,38 @@ resp=$(propfind "$plain") || {
 }
 grep -q "<href>/webdav/x/$plain</href>" <<<"$resp" || {
     echo "FAIL: a 900-byte path did not come back whole"
+    exit 1
+}
+
+# Depth: 1 is the only route into the enumeration branch, which builds each
+# item URL from the prefix and the child name. A child directory is enumerated
+# with a trailing '/' that has to come back off, or its name is lost and the
+# entry lists as the folder's default document.
+resp=$(curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
+    "http://127.0.0.1:$proxyport/webdav/example.com/") || {
+    echo "FAIL: proxytrack died on a Depth: 1 listing"
+    cat "$dir/pt.log"
+    exit 1
+}
+grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
+    echo "FAIL: expected 207 Multi-Status for the Depth: 1 listing"
+    printf '%s\n' "$resp"
+    exit 1
+}
+for want in '<href>/webdav/example\.com</href>' \
+    '<href>/webdav/example\.com/page\.html</href>' \
+    '<href>/webdav/example\.com/sub</href>' \
+    '<displayname>sub</displayname>'; do
+    grep -q "$want" <<<"$resp" || {
+        echo "FAIL: the Depth: 1 listing is missing $want"
+        printf '%s\n' "$resp"
+        exit 1
+    }
+done
+responses=$(grep -c '<response ' <<<"$resp" || true)
+test "$responses" -eq 3 || {
+    echo "FAIL: expected the root, the file and the directory, got $responses responses"
+    printf '%s\n' "$resp"
     exit 1
 }
 
