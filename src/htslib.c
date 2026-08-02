@@ -1948,13 +1948,6 @@ LLint http_xfread1(htsblk * r, int bufl) {
 
     }                           // stockage disque ou mémoire
 
-  } else if (bufl == HTS_XFREAD_RESERVE) {
-    if (r->adr == NULL) {
-      r->adr = (char *) malloct(HTS_LINE_BLOCK_SIZE);
-      r->size = 0;
-      return 0;
-    }
-    return -1;
   } else { // line modes: byte by byte, CR dropped
     int count = 256;
     int tot_nl = 0;
