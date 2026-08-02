@@ -67,6 +67,7 @@ if os.fork() == 0:
             if not data:
                 break
             log.write(data)
+    open(sys.argv[1] + ".done", "wb").close()
     os._exit(0)
 os.close(master)
 os.dup2(slave, 1)
@@ -109,6 +110,20 @@ request_log() { # log
     sed -n '/^PID=/,$p' "$1" | tail -n +2 | tr -d '\r'
 }
 
+# The drainer is proxytrack's child, not this shell's, so it cannot be waited
+# on; it marks the log once the pty has closed and the copy is complete.
+wait_drained() { # log
+    local waited=0
+    until test -e "$1.done"; do
+        test "$waited" -lt 100 || {
+            echo "FAIL: the pty drainer never finished copying the output"
+            exit 1
+        }
+        sleep 0.1
+        waited=$((waited + 1))
+    done
+}
+
 quietport=$(freeport)
 : >"$dir/quiet.log" # the drainer creates it asynchronously
 env -u HTS_LOG "$python" -c "$pty_exec" "$dir/quiet.log" \
@@ -116,27 +131,33 @@ env -u HTS_LOG "$python" -c "$pty_exec" "$dir/quiet.log" \
 quietpid=$!
 wait_listen "$dir/quiet.log" "$quietpid"
 
-for path in "" page.html; do
-    resp=$(propfind "$quietport" "$path") || {
-        echo "FAIL: PROPFIND '/$path' did not answer"
-        cat "$dir/quiet.log"
-        exit 1
-    }
-    grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
-        echo "FAIL: expected 207 Multi-Status for '/$path'"
-        printf '%s\n' "$resp"
-        exit 1
-    }
-    grep -q '<displayname>' <<<"$resp" || {
-        echo "FAIL: the listing of '/$path' enumerated nothing, so no table was built"
-        printf '%s\n' "$resp"
-        exit 1
-    }
-done
+# Both on one connection: the access log is written before send(), and only
+# proxytrack's keep-alive loop orders anything written after it, since the
+# second request is not read until the first one's teardown has run.
+resp=$(curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
+    "http://127.0.0.1:$quietport/webdav/example.com/" \
+    "http://127.0.0.1:$quietport/webdav/example.com/page.html") || {
+    echo "FAIL: the PROPFINDs did not answer"
+    cat "$dir/quiet.log"
+    exit 1
+}
+served=$(grep -c '^HTTP/1\.[01] 207 ' <<<"$resp" || true)
+test "$served" -eq 2 || {
+    echo "FAIL: expected two 207 Multi-Status replies, got $served"
+    printf '%s\n' "$resp"
+    exit 1
+}
+# The collection and its entry, then that entry and its default document. An
+# empty listing builds no table and would make the check below vacuous.
+listed=$(grep -c '<response ' <<<"$resp" || true)
+test "$listed" -eq 4 || {
+    echo "FAIL: the two listings enumerated $listed entries, wanted 4"
+    printf '%s\n' "$resp"
+    exit 1
+}
 
 # The enumeration is what builds the table, so the served 207s are what make
-# the check below mean anything. They are logged after it, so waiting on them
-# also fences the drainer's copy.
+# the check below mean anything.
 waited=0
 until test "$(request_log "$dir/quiet.log" | grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' || true)" -ge 2; do
     test "$waited" -lt 50 || {
@@ -147,6 +168,14 @@ until test "$(request_log "$dir/quiet.log" | grep -ci ' \* log: HTTP [^ ]* 207 [
     sleep 0.1
     waited=$((waited + 1))
 done
+
+# Only the access log is written before send(), so read the capture once
+# proxytrack is gone and the drainer has copied all of it: whatever a teardown
+# or keep-alive path writes has no ordering against the fence above, and no
+# sleep is short enough to be sound or long enough to be reliable.
+stop_server "$quietpid"
+quietpid=
+wait_drained "$dir/quiet.log"
 
 # The property is that serving adds nothing but the access log, so whitelist
 # what a line may be; naming strings that must be absent would pass any
