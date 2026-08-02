@@ -62,8 +62,10 @@ AC_PATH_PROGS([BASH_SHELL], [bash], [/bin/bash])
 AC_MSG_CHECKING([whether $BASH_SHELL is a bash outside POSIX mode])
 hts_bash_why=
 hts_bash_env=no
-if test ! -x "$BASH_SHELL"; then
-  hts_bash_why="not an executable file"
+# AS_EXECUTABLE_P, not "test -x": the PATH search above already demands a regular file, and
+# bash blocks forever reading a FIFO it failed to exec, so -x alone hangs configure (#922).
+if ! AS_EXECUTABLE_P(["$BASH_SHELL"]); then
+  hts_bash_why="not an executable regular file"
 elif test -z "$("$BASH_SHELL" -c 'echo "${BASH_VERSINFO[[0]]}"' 2>/dev/null)"; then
   # Not BASH_VERSION: that is an ordinary variable, so any shell echoes back a spoofed one.
   hts_bash_why="not a bash: it reports no BASH_VERSINFO"
