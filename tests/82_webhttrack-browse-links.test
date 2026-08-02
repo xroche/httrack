@@ -87,11 +87,30 @@ def get(path):
     return urllib.request.urlopen(url + path, timeout=20).read()
 
 
+def status(path):
+    try:
+        return urllib.request.urlopen(url + path, timeout=20).getcode()
+    except urllib.error.HTTPError as e:
+        return e.code
+
+
 # No crawl has run, so no commandRunning/commandEnd override swaps the page out.
 finished = get("/server/finished.html").decode("latin-1")
 # Control: an empty or unrendered page would pass "no file:" on its own.
 check("HTTrack Website Copier" in finished, "finished.html rendered")
 check("file://" not in finished, "finished.html has no file: link")
+
+# Every image a GUI page names must be served. The masthead is referenced from 23
+# of them, so one renamed asset breaks the lot and nothing else here would notice.
+page = get("/server/step2.html").decode("latin-1")
+srcs = [s for s in re.findall(r'<img[^>]+src="([^"]+)"', page)
+        if not s.startswith(("http:", "https:", "data:"))]
+check(len(srcs) > 0, "step2.html names local images (got %d)" % len(srcs))
+for src in sorted(set(srcs)):
+    got = status(urllib.parse.urljoin("/server/", src))
+    check(got == 200, "image %s is served (got %d)" % (src, got))
+# Control: the loop above proves nothing unless a missing asset really 404s.
+check(status("/server/images/absent.svg") == 404, "a missing image 404s")
 
 # Control: /website/ 404s until a project is set, so the fetches below are real.
 try:

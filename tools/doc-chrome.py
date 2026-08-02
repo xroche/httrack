@@ -186,7 +186,7 @@ def chrome(page, content):
         '<a class="skip" href="#main">Skip to content</a>',
         "",
         '<header class="masthead">',
-        '\t<img src="images/header_title_4.gif" width="400" height="34"'
+        '\t<img src="images/wordmark.svg" width="400" height="36"'
         ' alt="HTTrack Website Copier">',
         '\t<div class="tagline">Open Source offline browser</div>',
         "</header>",
