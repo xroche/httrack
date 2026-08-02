@@ -1,0 +1,190 @@
+#!/bin/bash
+#
+# coucal logs a per-table statistics summary when a table is deleted, and with
+# no handler installed it writes it itself, prefixed with the table address.
+# proxytrack builds and drops one table per WebDAV enumeration, so every
+# unauthenticated PROPFIND dumped a line to the operator's console (#918).
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
+python=$(find_python) || {
+    echo "python3 missing, skipping"
+    exit 77
+}
+command -v curl >/dev/null 2>&1 || {
+    echo "curl missing, skipping"
+    exit 77
+}
+# MSYS cannot reap a native listener, and the orphan wedges the suite (#595).
+if is_windows; then
+    echo "windows: cannot reap a backgrounded proxytrack, skipping"
+    exit 77
+fi
+
+dir=$(mktemp -d)
+quietpid=
+loudpid=
+cleanup() {
+    stop_server "$quietpid"
+    stop_server "$loudpid"
+    rm -rf "$dir"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' INT TERM HUP
+
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
+printf 'hello' >"$dir/body"
+alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf '2 0 test\n'
+    printf '\n\n'
+    printf 'http://example.com/page.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
+    cat "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+freeport() {
+    "$python" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
+}
+
+# stdout to a file is fully buffered and SIGTERM never flushes it, so a leak on
+# stdout would be lost; a pty line-buffers it. The exec keeps $! on proxytrack.
+pty_exec='
+import os, pty, sys
+master, slave = pty.openpty()
+if os.fork() == 0:
+    os.close(slave)
+    with open(sys.argv[1], "wb", 0) as log:
+        while True:
+            try:
+                data = os.read(master, 65536)
+            except OSError:
+                break
+            if not data:
+                break
+            log.write(data)
+    os._exit(0)
+os.close(master)
+os.dup2(slave, 1)
+os.dup2(slave, 2)
+if slave > 2:
+    os.close(slave)
+os.execvp(sys.argv[2], sys.argv[2:])
+'
+
+wait_listen() { # log pid
+    local waited=0
+    until grep -qE "HTTP Proxy installed on|Unable to (initialize a temporary server|create the server)" "$1"; do
+        kill -0 "$2" 2>/dev/null || {
+            echo "FAIL: proxytrack exited before listening"
+            cat "$1"
+            exit 1
+        }
+        test "$waited" -lt 50 || {
+            echo "FAIL: proxytrack never announced its listen port"
+            exit 1
+        }
+        sleep 0.1
+        waited=$((waited + 1))
+    done
+    grep -q "HTTP Proxy installed on" "$1" || {
+        echo "FAIL: proxytrack failed to bind"
+        cat "$1"
+        exit 1
+    }
+}
+
+propfind() { # port path
+    curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
+        "http://127.0.0.1:$1/webdav/example.com/$2"
+}
+
+quietport=$(freeport)
+: >"$dir/quiet.log" # the drainer creates it asynchronously
+env -u HTS_LOG "$python" -c "$pty_exec" "$dir/quiet.log" \
+    proxytrack "127.0.0.1:$quietport" "127.0.0.1:$(freeport)" "$dir/in.arc" &
+quietpid=$!
+wait_listen "$dir/quiet.log" "$quietpid"
+
+for path in "" page.html; do
+    resp=$(propfind "$quietport" "$path") || {
+        echo "FAIL: PROPFIND '/$path' did not answer"
+        cat "$dir/quiet.log"
+        exit 1
+    }
+    grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
+        echo "FAIL: expected 207 Multi-Status for '/$path'"
+        printf '%s\n' "$resp"
+        exit 1
+    }
+    grep -q '<displayname>' <<<"$resp" || {
+        echo "FAIL: the listing of '/$path' enumerated nothing, so no table was built"
+        printf '%s\n' "$resp"
+        exit 1
+    }
+done
+
+# The enumeration is what builds the table, so the served 207s are what make
+# the absence below mean anything. They are logged after it, so waiting on them
+# also fences the drainer's copy.
+waited=0
+until test "$(grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' "$dir/quiet.log" || true)" -ge 2; do
+    test "$waited" -lt 50 || {
+        echo "FAIL: fewer than two PROPFINDs were answered 207, so the checks below prove nothing"
+        cat "$dir/quiet.log"
+        exit 1
+    }
+    sleep 0.1
+    waited=$((waited + 1))
+done
+
+log=$(<"$dir/quiet.log")
+for marker in 'hashtable .*summary:' '^\[0x[0-9a-f]*\]'; do
+    if grep -qE "$marker" <<<"$log"; then
+        echo "FAIL: a PROPFIND wrote '$marker' to proxytrack's console"
+        printf '%s\n' "$log"
+        exit 1
+    fi
+done
+
+# HTS_LOG brings the summary back, so the silence above is a routed handler and
+# not a deleted message, and the grep that asserted it does match when fed one.
+loudport=$(freeport)
+: >"$dir/loud.log"
+HTS_LOG=1 "$python" -c "$pty_exec" "$dir/loud.log" \
+    proxytrack "127.0.0.1:$loudport" "127.0.0.1:$(freeport)" "$dir/in.arc" &
+loudpid=$!
+wait_listen "$dir/loud.log" "$loudpid"
+
+resp=$(propfind "$loudport" "") || {
+    echo "FAIL: PROPFIND under HTS_LOG did not answer"
+    cat "$dir/loud.log"
+    exit 1
+}
+grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
+    echo "FAIL: expected 207 Multi-Status under HTS_LOG"
+    printf '%s\n' "$resp"
+    exit 1
+}
+waited=0
+until grep -qE 'hashtable .*summary:' "$dir/loud.log"; do
+    test "$waited" -lt 50 || {
+        echo "FAIL: HTS_LOG=1 did not restore the hashtable summary"
+        cat "$dir/loud.log"
+        exit 1
+    }
+    sleep 0.1
+    waited=$((waited + 1))
+done
+# Routed, so it carries a severity and no longer leaks the table address.
+grep -qE '^ \* debug: hashtable .*summary:' "$dir/loud.log" || {
+    echo "FAIL: the summary under HTS_LOG did not come through proxytrack's log"
+    cat "$dir/loud.log"
+    exit 1
+}
+
+echo "OK: PROPFIND leaves no hashtable statistics on the console, HTS_LOG restores them"

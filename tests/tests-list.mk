@@ -224,3 +224,4 @@ TESTS += 148_engine-spoolname.test
 TESTS += 151_bash-shell-validate.test
 TESTS += 150_engine-strsprintf.test
 TESTS += 152_engine-string-oom.test
+TESTS += 153_local-proxytrack-quiet.test

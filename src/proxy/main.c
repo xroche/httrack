@@ -37,8 +37,31 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htsnet.h"
 #include "htslib.h"
+#include "coucal.h"
 #include "store.h"
 #include "proxytrack.h"
+
+/* HTS_LOG, the engine's own debug switch. */
+static hts_boolean proxytrack_verbose = HTS_FALSE;
+
+/* Without a handler coucal writes to stderr itself, prefixing the table
+   address; the per-enumeration statistics summary then lands on the operator's
+   console once per WebDAV request (#918). */
+static void proxytrack_coucal_loghandler(coucal_opaque arg,
+                                         coucal_loglevel level,
+                                         const char *format, va_list args) {
+  const char *severity;
+
+  (void) arg;
+  if (level <= coucal_log_critical) {
+    severity = CRITICAL;
+  } else if (level <= coucal_log_warning) {
+    severity = WARNING;
+  } else {
+    severity = proxytrack_verbose ? "debug" : NULL;
+  }
+  proxytrack_vprint_log(severity, format, args);
+}
 
 #ifndef _WIN32
 #include <signal.h>
@@ -89,6 +112,17 @@ int main(int argc, char *argv[]) {
     }
   }
 #endif
+
+  /* Before the first table is built. */
+  {
+    const char *const dbg_env = getenv("HTS_LOG");
+    int level = 0;
+
+    if (dbg_env != NULL && sscanf(dbg_env, "%d", &level) == 1 && level > 0) {
+      proxytrack_verbose = HTS_TRUE;
+    }
+  }
+  coucal_set_global_assert_handler(proxytrack_coucal_loghandler, NULL);
 
   /* Args */
   printf("ProxyTrack %s, build proxies upon HTTrack Website Copier Archives\n",
