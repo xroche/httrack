@@ -31,69 +31,101 @@ for f in "$abs_top_srcdir"/*; do
     ln -s "$f" "$tmp/src/"
 done
 
-mkdir "$tmp/notexec" "$tmp/with space"
+mkdir "$tmp/notexec" "$tmp/with space" "$tmp/fakebin"
 : >"$tmp/notexec/bash"
 chmod 644 "$tmp/notexec/bash"
 ln -s "$sh" "$tmp/mybash"
 ln -s "$sh" "$tmp/with space/bash"
 ln -s "$sh" "$tmp/sh" # bash invoked as "sh" enters POSIX mode
+# A "bash" the PATH search will find first, and that answers -c like any other shell.
+printf '#!/bin/sh\nexec /bin/sh "$@"\n' >"$tmp/fakebin/bash"
+chmod 755 "$tmp/fakebin/bash"
 
 n=0
 status=0
 log=
 rundir=
-run() { # run <BASH_SHELL value>
+run() { # run <label> <env argument>...
+    local label=$1
+    shift
     n=$((n + 1))
     rundir="$tmp/run$n"
     mkdir "$rundir"
     status=0
-    (cd "$rundir" && BASH_SHELL="$1" bash "$tmp/src/configure" --disable-https) \
+    (cd "$rundir" && env "$@" bash "$tmp/src/configure" --disable-https) \
         >"$rundir/log" 2>&1 || status=$?
     log=$(cat "$rundir/log")
+    echo "run $n ($label): exit $status"
 }
 
-reject() { # reject <BASH_SHELL value> <expected message>
-    run "$1"
+reject() { # reject <label> <expected message> <env argument>...
+    local label=$1 want=$2
+    shift 2
+    run "$label" "$@"
     test "$status" -ne 0 || {
-        echo "configure accepted BASH_SHELL=$1" >&2
+        echo "configure accepted $label" >&2
         exit 1
     }
-    grep -q "$2" <<<"$log" || {
-        echo "BASH_SHELL=$1 rejected without '$2':" >&2
+    grep -q "$want" <<<"$log" || {
+        echo "$label rejected without '$want':" >&2
         tail -5 <<<"$log" >&2
         exit 1
     }
 }
 
-accept() { # accept <BASH_SHELL value> <expected $(BASH_SHELL) in the Makefile, or "" for any>
-    run "$1"
+# accept <label> <expected $(BASH_SHELL), "" for any> <expected message, "" for none> <env argument>...
+accept() {
+    local label=$1 path=$2 want=$3
+    shift 3
+    run "$label" "$@"
     test "$status" -eq 0 || {
-        echo "configure rejected BASH_SHELL=$1 (exit $status):" >&2
+        echo "configure rejected $label (exit $status):" >&2
         tail -10 <<<"$log" >&2
         exit 1
     }
     got=$(sed -n 's/^BASH_SHELL = //p' "$rundir/Makefile")
     test -n "$got" || {
-        echo "BASH_SHELL=$1 configured, but the Makefile carries no BASH_SHELL" >&2
+        echo "$label configured, but the Makefile carries no BASH_SHELL" >&2
         exit 1
     }
-    if test -n "$2" && test "$got" != "$2"; then
-        echo "BASH_SHELL=$1 reached the Makefile as $got" >&2
+    if test -n "$path" && test "$got" != "$path"; then
+        echo "$label reached the Makefile as $got" >&2
         exit 1
+    fi
+    if test -n "$want"; then
+        grep -q "$want" <<<"$log" || {
+            echo "$label configured without '$want':" >&2
+            tail -5 <<<"$log" >&2
+            exit 1
+        }
     fi
 }
 
-reject relbash 'BASH_SHELL must be an absolute path'
-reject "$tmp/missing/bash" 'is not an executable file'
-reject "$tmp/notexec/bash" 'is not an executable file'
-reject "$tmp/sh" 'is a bash in POSIX sh-mode'
-# The #908 case: dash on Linux, bash in sh-mode on macOS, unusable either way.
-reject /bin/sh 'BASH_SHELL=/bin/sh is '
+reject relative 'BASH_SHELL must be an absolute path' BASH_SHELL=relbash
+reject missing 'is not an executable file' "BASH_SHELL=$tmp/missing/bash"
+reject non-executable 'is not an executable file' "BASH_SHELL=$tmp/notexec/bash"
+reject sh-mode 'is a bash in POSIX sh-mode' "BASH_SHELL=$tmp/sh"
+# The #908 case: dash on Linux, bash in sh-mode on macOS, unusable either way. The spoofed
+# BASH_VERSION is what an ordinary shell echoes straight back, so it cannot be the probe.
+reject /bin/sh 'BASH_SHELL=/bin/sh is ' BASH_SHELL=/bin/sh BASH_VERSION=9.9
 
-# $(BASH_SHELL) is unquoted in the Makefiles, so a space would only break later.
-reject "$tmp/with space/bash" 'BASH_SHELL must not contain whitespace'
+# make splits the value on whitespace, cuts it at a '#' and expands a '$', and no Makefile
+# quotes $(BASH_SHELL).
+meta='must not contain shell or make metacharacters'
+reject space "$meta" "BASH_SHELL=$tmp/with space/bash"
+reject semicolon "$meta" 'BASH_SHELL=/opt/a;b/bash'
+# shellcheck disable=SC2016 # the '$' has to reach configure unexpanded
+reject dollar "$meta" 'BASH_SHELL=/opt/a$b/bash'
+reject hash "$meta" 'BASH_SHELL=/opt/a#b/bash'
 
-accept "$tmp/mybash" "$tmp/mybash"
-accept "" "" # empty is unset: the search still decides
+# An environment in POSIX mode leaves no path that could pass, so the message must blame it
+# and not the shell.
+reject posix-env 'POSIXLY_CORRECT or SHELLOPTS' "BASH_SHELL=$sh" POSIXLY_CORRECT=1
+
+accept override "$tmp/mybash" '' "BASH_SHELL=$tmp/mybash"
+accept empty '' '' BASH_SHELL=
+# No override: an unusable bash is a warning, so a box that has none still builds.
+accept searched "$tmp/fakebin/bash" 'no usable bash found' -u BASH_SHELL "PATH=$tmp/fakebin:$PATH"
+accept searched-posix-env '' 'POSIXLY_CORRECT or SHELLOPTS' -u BASH_SHELL POSIXLY_CORRECT=1
 
 echo "configure validated $n BASH_SHELL values"
