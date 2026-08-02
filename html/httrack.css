@@ -37,7 +37,7 @@ a:active  { text-decoration: underline; }
 	border-bottom: 6px solid #000;
 	padding: 10px;  padding-top: 20px;
 	line-height: 1.65em;
-	background-image: url(images/bg_rings.gif);
+	background-image: url(images/bg_rings.svg);
 	background-repeat: no-repeat;
 	background-position: top right;
 	}
