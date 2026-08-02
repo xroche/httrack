@@ -3493,15 +3493,16 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
           // réception de données depuis socket ou fichier
           if (back[i].status) {
-            if (back[i].status == STATUS_WAIT_HEADERS)  // recevoir par bloc de lignes
-              retour_fread = http_xfread1(&(back[i].r), 0);
+            if (back[i].status == STATUS_WAIT_HEADERS)
+              retour_fread = http_xfread1(&(back[i].r), HTS_XFREAD_LINE_BLOCK);
             else if (back[i].status == STATUS_CHUNK_WAIT || back[i].status == STATUS_CHUNK_CR) {        // recevoir longueur chunk en hexa caractère par caractère
               // backuper pour lire dans le buffer chunk
               htsblk r;
               /* Block mode bounds the trailer section, which declares no length
                  of its own, by HTS_LINE_BLOCK_SIZE. */
-              const int chunk_read_mode =
-                  back_in_chunk_trailers(&back[i]) ? 0 : -1;
+              const int chunk_read_mode = back_in_chunk_trailers(&back[i])
+                                              ? HTS_XFREAD_LINE_BLOCK
+                                              : HTS_XFREAD_LINE;
 
               memcpy(&r, &(back[i].r), sizeof(htsblk));
               back[i].r.is_write = 0;   // mémoire
@@ -3511,7 +3512,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].r.out = NULL;
               back[i].r.is_file = 0;
               //
-              // ligne par ligne
+              // one line, or the whole trailer block
               retour_fread = http_xfread1(&(back[i].r), chunk_read_mode);
               // modifier et restaurer
               back[i].chunk_adr = back[i].r.adr;        // adresse

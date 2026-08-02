@@ -1834,12 +1834,8 @@ int check_writeinput_t(T_SOC soc, int timeout) {
     return 0;
 }
 
-// idem, sauf qu'ici on peut choisir la taille max de données à recevoir
-// SI bufl==0 alors le buffer est censé être de 8kos, et on recoit par bloc de lignes
-// en éliminant les cr (ex: header), arrêt si double-lf
-// SI bufl==-1 alors le buffer est censé être de 8kos, et on recoit ligne par ligne
-// en éliminant les cr (ex: header), arrêt si double-lf
-// Note: les +1 dans les malloc sont dûs à l'octet nul rajouté en fin de fichier
+// Read one block: bufl is a byte count, or one of the HTS_XFREAD_* line modes.
+// Note: the +1 in the mallocs is the trailing NUL appended to the data.
 LLint http_xfread1(htsblk * r, int bufl) {
   int nl = -1;
 
@@ -1952,14 +1948,14 @@ LLint http_xfread1(htsblk * r, int bufl) {
 
     }                           // stockage disque ou mémoire
 
-  } else if (bufl == -2) {      // force reserve
+  } else if (bufl == HTS_XFREAD_RESERVE) {
     if (r->adr == NULL) {
       r->adr = (char *) malloct(HTS_LINE_BLOCK_SIZE);
       r->size = 0;
       return 0;
     }
     return -1;
-  } else {                      // réception d'un en-tête octet par octet
+  } else { // line modes: byte by byte, CR dropped
     int count = 256;
     int tot_nl = 0;
     int lf_detected = 0;
@@ -1977,10 +1973,8 @@ LLint http_xfread1(htsblk * r, int bufl) {
           // lecture
           nl = hts_read(r, r->adr + r->size, 1);
           if (nl > 0) {
-            // exit if:
-            // lf detected AND already detected before
-            // or
-            // lf detected AND first character read
+            // exit on a blank line (LF seen twice, or LF as the first byte),
+            // or on the first LF in HTS_XFREAD_LINE mode
             if (*(r->adr + r->size) == 10) {
               if (lf_detected || (at_beginning) || (bufl < 0))
                 count = -1;
@@ -2045,7 +2039,7 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
 
     // tant qu'on a des données, et qu'on ne recoit pas deux LF, et que le timeout n'arrie pas
     do {
-      if (http_xfread1(&retour, 0) < 0)
+      if (http_xfread1(&retour, HTS_XFREAD_LINE_BLOCK) < 0)
         e = 1;
       else {
         if (retour.adr != NULL) {
