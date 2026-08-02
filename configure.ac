@@ -38,6 +38,46 @@ VERSION_INFO="3:7:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 
+# A real bash, for "make deb" and the test harness. Not searched into BASH: bash presets
+# that to its own path, and macOS /bin/sh is a bash, so the macro never searches (#895).
+# BASH_SHELL isn't preset the way BASH is, so AC_ARG_VAR needs no guard. Kept ahead of the
+# compiler probes so a bad override dies before them.
+AC_ARG_VAR([BASH_SHELL], [path to a real (non-POSIX-mode) bash])
+# AC_PATH_PROGS drops a relative override and searches instead, which loses the user's intent;
+# a whitespace one survives to $(BASH_SHELL) in the Makefiles, where nothing quotes it.
+case $BASH_SHELL in
+*[[[:space:]]]*) AC_MSG_ERROR([BASH_SHELL must not contain whitespace, got: $BASH_SHELL]) ;;
+'' | [[\\/]]* | ?:[[\\/]]*) ;;
+*) AC_MSG_ERROR([BASH_SHELL must be an absolute path, got: $BASH_SHELL]) ;;
+esac
+hts_bash_override=$BASH_SHELL
+AC_PATH_PROGS([BASH_SHELL], [bash], [/bin/bash])
+
+# An absolute override is taken verbatim, so BASH_SHELL=/bin/sh would put #895 back and only
+# surface at "make check" or "make deb" (#908). What we found ourselves is only a warning:
+# a box with no bash still builds, it just cannot run those two.
+AC_MSG_CHECKING([whether $BASH_SHELL is a bash outside POSIX mode])
+hts_bash_why=
+if test ! -x "$BASH_SHELL"; then
+  hts_bash_why="not an executable file"
+elif test -z "$("$BASH_SHELL" -c 'echo "$BASH_VERSION"' 2>/dev/null)"; then
+  hts_bash_why="not a bash: it reports no BASH_VERSION"
+else
+  # sh-mode bash reports a BASH_VERSION too, so only SHELLOPTS tells the two apart.
+  case $("$BASH_SHELL" -c 'echo ":$SHELLOPTS:"' 2>/dev/null) in
+  *:posix:*) hts_bash_why="a bash in POSIX sh-mode" ;;
+  esac
+fi
+if test -z "$hts_bash_why"; then
+  AC_MSG_RESULT([yes])
+else
+  AC_MSG_RESULT([no])
+  if test -n "$hts_bash_override"; then
+    AC_MSG_ERROR([BASH_SHELL=$BASH_SHELL is $hts_bash_why])
+  fi
+  AC_MSG_WARN([no usable bash found: $BASH_SHELL is $hts_bash_why. "make check" and "make deb" need one; pass BASH_SHELL=/path/to/bash])
+fi
+
 AC_PROG_CC
 AM_PROG_CC_C_O
 m4_warn([obsolete],
@@ -54,12 +94,6 @@ AC_PROG_SED
 LT_INIT
 AC_PROG_LN_S
 LT_INIT
-
-# A real bash, for "make deb" and the test harness. Not searched into BASH: bash presets
-# that to its own path, and macOS /bin/sh is a bash, so the macro never searches (#895).
-# BASH_SHELL isn't preset the way BASH is, so AC_ARG_VAR needs no guard.
-AC_ARG_VAR([BASH_SHELL], [path to a real (non-POSIX-mode) bash])
-AC_PATH_PROGS([BASH_SHELL], [bash], [/bin/bash])
 
 # Export LD_LIBRARY_PATH name or equivalent.
 AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)

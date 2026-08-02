@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# An absolute BASH_SHELL is taken verbatim by AC_PATH_PROGS and a relative one is dropped
+# for the search result, so configure has to check what it ends up with: BASH_SHELL=/bin/sh
+# otherwise puts #895 back and only shows up at "make check" or "make deb" (#908).
+
+set -euo pipefail
+
+sh=${BASH_SHELL:-}
+test -n "$sh" || {
+    echo "BASH_SHELL is empty; tests/Makefile.am must export the configured value" >&2
+    exit 1
+}
+
+configure="${abs_top_srcdir:-}/configure"
+test -r "$configure" || {
+    echo "no configure script at $configure; tests/Makefile.am must export abs_top_srcdir" >&2
+    exit 1
+}
+
+tmp=$(mktemp -d)
+trap 'set +e; rm -rf "$tmp"' EXIT
+trap 'set +e; rm -rf "$tmp"; exit 1' HUP INT TERM
+
+# Symlink farm, not the real srcdir: an in-tree config.status makes autoconf refuse it.
+mkdir "$tmp/src"
+for f in "$abs_top_srcdir"/*; do
+    case "${f##*/}" in
+    config.status | config.log | config.h | stamp-h1 | Makefile) continue ;;
+    esac
+    ln -s "$f" "$tmp/src/"
+done
+
+mkdir "$tmp/notexec" "$tmp/with space"
+: >"$tmp/notexec/bash"
+chmod 644 "$tmp/notexec/bash"
+ln -s "$sh" "$tmp/mybash"
+ln -s "$sh" "$tmp/with space/bash"
+ln -s "$sh" "$tmp/sh" # bash invoked as "sh" enters POSIX mode
+
+n=0
+status=0
+log=
+rundir=
+run() { # run <BASH_SHELL value>
+    n=$((n + 1))
+    rundir="$tmp/run$n"
+    mkdir "$rundir"
+    status=0
+    (cd "$rundir" && BASH_SHELL="$1" bash "$tmp/src/configure" --disable-https) \
+        >"$rundir/log" 2>&1 || status=$?
+    log=$(cat "$rundir/log")
+}
+
+reject() { # reject <BASH_SHELL value> <expected message>
+    run "$1"
+    test "$status" -ne 0 || {
+        echo "configure accepted BASH_SHELL=$1" >&2
+        exit 1
+    }
+    grep -q "$2" <<<"$log" || {
+        echo "BASH_SHELL=$1 rejected without '$2':" >&2
+        tail -5 <<<"$log" >&2
+        exit 1
+    }
+}
+
+accept() { # accept <BASH_SHELL value> <expected $(BASH_SHELL) in the Makefile, or "" for any>
+    run "$1"
+    test "$status" -eq 0 || {
+        echo "configure rejected BASH_SHELL=$1 (exit $status):" >&2
+        tail -10 <<<"$log" >&2
+        exit 1
+    }
+    got=$(sed -n 's/^BASH_SHELL = //p' "$rundir/Makefile")
+    test -n "$got" || {
+        echo "BASH_SHELL=$1 configured, but the Makefile carries no BASH_SHELL" >&2
+        exit 1
+    }
+    if test -n "$2" && test "$got" != "$2"; then
+        echo "BASH_SHELL=$1 reached the Makefile as $got" >&2
+        exit 1
+    fi
+}
+
+reject relbash 'BASH_SHELL must be an absolute path'
+reject "$tmp/missing/bash" 'is not an executable file'
+reject "$tmp/notexec/bash" 'is not an executable file'
+reject "$tmp/sh" 'is a bash in POSIX sh-mode'
+# The #908 case: dash on Linux, bash in sh-mode on macOS, unusable either way.
+reject /bin/sh 'BASH_SHELL=/bin/sh is '
+
+# $(BASH_SHELL) is unquoted in the Makefiles, so a space would only break later.
+reject "$tmp/with space/bash" 'BASH_SHELL must not contain whitespace'
+
+accept "$tmp/mybash" "$tmp/mybash"
+accept "" "" # empty is unset: the search still decides
+
+echo "configure validated $n BASH_SHELL values"

@@ -219,3 +219,4 @@ TESTS += 144_engine-datadir.test
 TESTS += 145_webhttrack-datadir.test
 TESTS += 146_bash-shell.test
 TESTS += 148_engine-spoolname.test
+TESTS += 151_bash-shell-validate.test
