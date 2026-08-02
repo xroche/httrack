@@ -73,10 +73,10 @@ else
   *:posix:*)
     hts_bash_why="a bash in POSIX sh-mode"
     # POSIXLY_CORRECT and an exported SHELLOPTS do that to every bash on the box, so no path
-    # can pass and blaming this one would send the user hunting for another. An env that
-    # cannot be cleared (no "env -u") reports nothing and keeps the plain diagnosis.
+    # can pass and blaming this one would send the user hunting for another. Reading them
+    # here would not do: configure puts its own shell in posix mode, which sets both.
     case $(env -u POSIXLY_CORRECT -u SHELLOPTS "$BASH_SHELL" -c 'echo ":$SHELLOPTS:"' 2>/dev/null) in
-    '' | *:posix:*) ;;
+    '' | *:posix:*) ;; # no "env -u", or posix whatever the environment: blame the path
     *) hts_bash_env=yes ;;
     esac
     ;;

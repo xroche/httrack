@@ -122,6 +122,16 @@ reject hash "$meta" 'BASH_SHELL=/opt/a#b/bash'
 # and not the shell.
 reject posix-env 'POSIXLY_CORRECT or SHELLOPTS' "BASH_SHELL=$sh" POSIXLY_CORRECT=1
 
+# Both at once: clearing the variable would still leave a bash invoked as sh, so the second
+# probe has to decide which one to blame instead of reading the environment.
+reject sh-mode-in-posix-env "BASH_SHELL=$tmp/sh is a bash in POSIX sh-mode" \
+    "BASH_SHELL=$tmp/sh" POSIXLY_CORRECT=1
+if grep -q 'POSIXLY_CORRECT or SHELLOPTS' <<<"$log"; then
+    echo "a bash invoked as sh was blamed on the environment:" >&2
+    tail -5 <<<"$log" >&2
+    exit 1
+fi
+
 accept override "$tmp/mybash" '' "BASH_SHELL=$tmp/mybash"
 accept empty '' '' BASH_SHELL=
 # No override: an unusable bash is a warning, so a box that has none still builds.
