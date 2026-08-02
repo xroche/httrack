@@ -1162,23 +1162,25 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
           }
         }
         if (element != NULL) {
+          /* lifted out of the format: a directive inside a macro argument list
+             is undefined, and MSVC rejects it */
+#ifndef NO_WEBDAV
+          const char *const davPart = StringBuff(davHeaders);
+#else
+          const char *const davPart = "";
+#endif
+
           msgCode = element->statuscode;
           StringSprintf(
               headers,
               "HTTP/1.1 %d %s\r\n"
-#ifndef NO_WEBDAV
               "%s"
-#endif
               "Content-Type: %s%s%s%s\r\n"
               "%s%s%s"
               "%s%s%s"
               "%s%s%s",
               /* */
-              msgCode, element->msg,
-#ifndef NO_WEBDAV
-              /* DAV */
-              StringBuff(davHeaders),
-#endif
+              msgCode, element->msg, davPart,
               /* Content-type: foo; [ charset=bar ] */
               hts_effective_mime(element->contenttype),
               ((element->charset[0]) ? "; charset=\"" : ""), element->charset,
