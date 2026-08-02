@@ -62,7 +62,30 @@ Please visit our Website: http://www.httrack.com
 
 #define VT_CLREOL       "\33[K"
 
+/* Subdirectory holding a mirrored file's temporaries, beside it. url_savename()
+   maps '~' to '_', so no URL can ever be mirrored inside it (#774, #842). */
+#define HTS_TMPDIR "~hts-tmp"
+
 /* Slot operations */
+static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
+                                const char *ext);
+
+hts_boolean back_spoolname(httrackp *opt, const char *save, char *dest,
+                           size_t size) {
+  /* -p0 keeps no save name to derive from, so it counts instead. No separator:
+     path_html_utf8 brings its own, and is "" with no -O, where an added one
+     would make this absolute and spool into the filesystem root. */
+  if (opt->getmode == 0) {
+    if (!slprintfbuff(dest, size, "%s" HTS_TMPDIR "/tmpfile%d.tmp",
+                      StringBuff(opt->path_html_utf8),
+                      opt->state.tmpnameid++)) {
+      dest[0] = '\0';
+      return HTS_FALSE;
+    }
+    return HTS_TRUE;
+  }
+  return back_tmpname(dest, size, save, "tmp");
+}
 static int slot_can_be_cached_on_disk(const lien_back * back);
 static int slot_can_be_cleaned(const lien_back * back);
 static int slot_can_be_finalized(httrackp * opt, const lien_back * back);
@@ -217,6 +240,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
 
         if (filename != NULL) {
           (void) UNLINK(filename);
+          back_tmpdir_drop(filename);
         }
 #else
         /* clear entry content (but not yet the entry) */
@@ -311,6 +335,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
                       adr, fil, sav);
       }
       (void) UNLINK(fileback);
+      back_tmpdir_drop(fileback);
 #else
       itemback = (lien_back *) ptr;
 #endif
@@ -483,22 +508,11 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
-        /* +16: room for the ".tmp" the url_sav form appends to a full-length
-           save name, so one buffer holds both shapes */
-        char BIGSTK tmpname[HTS_URLMAXSIZE * 2 + 16];
+        /* +32: room for the directory and extension back_spoolname() inserts */
+        char BIGSTK tmpname[HTS_URLMAXSIZE * 2 + 32];
         char *filename;
-        hts_boolean named;
-
-        /* the -p0 name is not derived from url_sav, so it needs a buffer of
-           its own size rather than the save name's */
-        if (opt->getmode != 0) {
-          named =
-              slprintfbuff(tmpname, sizeof(tmpname), "%s.tmp", back[i].url_sav);
-        } else {
-          named = slprintfbuff(tmpname, sizeof(tmpname), "%stmpfile%d.tmp",
-                               StringBuff(opt->path_html_utf8),
-                               opt->state.tmpnameid++);
-        }
+        const hts_boolean named =
+            back_spoolname(opt, back[i].url_sav, tmpname, sizeof(tmpname));
         filename = named ? strdupt(tmpname) : NULL;
 
         if (filename != NULL) {
@@ -656,10 +670,6 @@ int back_nsoc_overall(const struct_back * sback) {
   return n;
 }
 
-/* Subdirectory holding a mirrored file's temporaries, beside it. url_savename()
-   maps '~' to '_', so no URL can ever be mirrored inside it (#774, #842). */
-#define HTS_TMPDIR "~hts-tmp"
-
 /* Build save's temporary as <dir>/<HTS_TMPDIR>/<name>.<ext>. Appending the
    extension to save instead put it in the mirror namespace, so a site serving
    <path>.bak had its copy taken as the backup and then unlinked (#774).
@@ -717,7 +727,7 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
     /* same directory as the named case, so back_tmpdir_drop() only removes one
        the engine made (#842) */
     /* truncation here would collide distinct tmpnameid's onto one name */
-    if (!sprintfbuff(back->tmpfile_buffer, "%s/" HTS_TMPDIR "/tmp%d.%s",
+    if (!sprintfbuff(back->tmpfile_buffer, "%s" HTS_TMPDIR "/tmp%d.%s",
                      StringBuff(opt->path_html_utf8), opt->state.tmpnameid++,
                      ext)) {
       hts_log_print(opt, LOG_WARNING, "temporary filename too long in %s",

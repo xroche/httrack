@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# A frozen backlog slot must spool outside the mirror namespace, or a site
+# serving <path>.tmp has its own copy truncated and then unlinked (#859).
+
+set -euo pipefail
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/spoolname.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+httrack -#test=spoolname "${work}"
