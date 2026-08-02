@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# A chunked response may close with a trailer section after its terminating
+# zero-length chunk (RFC 9112 7.1.2); the fields are discarded, not treated as a
+# framing error that drops the resource (#855). The section carries no length of
+# its own, so it is bounded by the 8KB header line buffer: huge.html overruns it
+# and is refused. bogus.html puts the same field where a data chunk's own CRLF
+# belongs, which stays a framing error.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --log-not-found 'Invalid chunk.*chunktrail/(one|many|none|file)' \
+    --log-not-found 'illegal chunk CRLF.*chunktrail/(one|many|none|file|huge)' \
+    --file-matches 'chunktrail/one.html' 'CHUNKTRAIL-ONE' \
+    --file-matches 'chunktrail/many.html' 'CHUNKTRAIL-MANY' \
+    --file-matches 'chunktrail/none.html' 'CHUNKTRAIL-NONE' \
+    --file-matches 'chunktrail/file.bin' 'CHUNKTRAIL-BIN' \
+    --file-min-bytes 'chunktrail/file.bin' 16384 \
+    --cache-found '/chunktrail/one.html' \
+    --cache-found '/chunktrail/many.html' \
+    --cache-found '/chunktrail/file.bin' \
+    --log-found 'Interrupted transfer.*chunktrail/huge\.html' \
+    --not-found 'chunktrail/huge.html' \
+    --cache-not-found '/chunktrail/huge.html' \
+    --log-found 'illegal chunk CRLF.*chunktrail/bogus\.html' \
+    --not-found 'chunktrail/bogus.html' \
+    --cache-not-found '/chunktrail/bogus.html' \
+    httrack 'BASEURL/chunktrail/index.html'

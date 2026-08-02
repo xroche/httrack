@@ -1692,6 +1692,93 @@ class Handler(SimpleHTTPRequestHandler):
             pass
         self.close_connection = True
 
+    # #855: a trailer section after the terminating zero-length chunk.
+    def send_chunked_trailed(self, body, trailers, ctype="text/html; charset=utf-8"):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            half = len(body) // 2
+            for piece in (body[:half], body[half:]):
+                self.wfile.write(b"%X\r\n" % len(piece) + piece + b"\r\n")
+            self.wfile.write(
+                b"0\r\n" + b"".join(t + b"\r\n" for t in trailers) + b"\r\n"
+            )
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    def route_chunktrail_index(self):
+        self.send_html(
+            '\t<a href="one.html">one</a>\n'
+            '\t<a href="many.html">many</a>\n'
+            '\t<a href="none.html">none</a>\n'
+            '\t<a href="huge.html">huge</a>\n'
+            '\t<a href="bogus.html">bogus</a>\n'
+            '\t<a href="file.bin">file</a>\n'
+        )
+
+    def route_chunktrail_one(self):
+        self.send_chunked_trailed(
+            b"<html><body><p>CHUNKTRAIL-ONE</p></body></html>", [b"X-Foo: bar"]
+        )
+
+    # Longer than the 256 bytes the line reader takes per call, so the section
+    # spans several reads before its blank line arrives.
+    def route_chunktrail_many(self):
+        self.send_chunked_trailed(
+            b"<html><body><p>CHUNKTRAIL-MANY</p></body></html>",
+            [b"X-Field-%02d: %s" % (n, b"v" * 40) for n in range(20)],
+        )
+
+    # Control: same body, no trailer section.
+    def route_chunktrail_none(self):
+        self.send_chunked_trailed(
+            b"<html><body><p>CHUNKTRAIL-NONE</p></body></html>", []
+        )
+
+    # Past the reader's 8KB line buffer: discarding trailers must stay bounded,
+    # so the transfer is dropped rather than followed forever.
+    def route_chunktrail_huge(self):
+        self.send_chunked_trailed(
+            b"<html><body><p>CHUNKTRAIL-HUGE</p></body></html>",
+            [b"X-Bloat-%04d: %s" % (n, b"w" * 100) for n in range(160)],
+        )
+
+    # Junk where a data chunk's own CRLF belongs is still a framing error: only
+    # the terminating chunk opens the trailer section.
+    def route_chunktrail_bogus(self):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            body = b"<html><body><p>CHUNKTRAIL-BOGUS</p></body></html>"
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"X-Foo: bar\r\n")
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    # The direct-to-disk path, where the body never sits in memory.
+    def route_chunktrail_file(self):
+        self.send_chunked_trailed(
+            b"CHUNKTRAIL-BIN\n" + b"\x41\x42\x43\xfd" * 4096,
+            [b"X-Checksum: 0badc0de", b"X-Done: 1"],
+            "application/octet-stream",
+        )
+
     # Aborts the chunked body with an RST, so the read fails rather than seeing a
     # clean EOF and the transfer is already in error before the framing check.
     def route_chunktrunc_reset(self):
@@ -2338,6 +2425,13 @@ class Handler(SimpleHTTPRequestHandler):
         "/chunktrunc/stay.html": route_chunktrunc_stay,
         "/chunktrunc/hostile.html": route_chunktrunc_hostile,
         "/chunktrunc/reset.bin": route_chunktrunc_reset,
+        "/chunktrail/index.html": route_chunktrail_index,
+        "/chunktrail/one.html": route_chunktrail_one,
+        "/chunktrail/many.html": route_chunktrail_many,
+        "/chunktrail/none.html": route_chunktrail_none,
+        "/chunktrail/huge.html": route_chunktrail_huge,
+        "/chunktrail/bogus.html": route_chunktrail_bogus,
+        "/chunktrail/file.bin": route_chunktrail_file,
         "/errpage/index.html": route_errpage_index,
         "/errpage/good.html": route_errpage_good,
         "/errpage/missing.html": route_errpage_missing,

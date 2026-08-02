@@ -819,6 +819,14 @@ static hts_boolean back_chunked_unterminated(const lien_back *const back) {
   return back->is_chunk && back->chunk_blocksize != -1 ? HTS_TRUE : HTS_FALSE;
 }
 
+/* Past the terminating chunk, the line still owed is the optional trailer
+   section (RFC 9112 7.1.2), read and discarded like a header block. */
+static hts_boolean back_in_chunk_trailers(const lien_back *const back) {
+  return back->status == STATUS_CHUNK_CR && back->chunk_blocksize == -1
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
 // objet (lien) téléchargé ou transféré depuis le cache
 //
 // fermer les paramètres de transfert,
@@ -3480,6 +3488,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             else if (back[i].status == STATUS_CHUNK_WAIT || back[i].status == STATUS_CHUNK_CR) {        // recevoir longueur chunk en hexa caractère par caractère
               // backuper pour lire dans le buffer chunk
               htsblk r;
+              /* Trailers span several lines and end on a blank one, so read
+                 them as a block; the reader's 8KB line buffer then bounds the
+                 whole section, which carries no length of its own. */
+              const int chunk_read_mode =
+                  back_in_chunk_trailers(&back[i]) ? 0 : -1;
 
               memcpy(&r, &(back[i].r), sizeof(htsblk));
               back[i].r.is_write = 0;   // mémoire
@@ -3490,7 +3503,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].r.is_file = 0;
               //
               // ligne par ligne
-              retour_fread = http_xfread1(&(back[i].r), -1);
+              retour_fread = http_xfread1(&(back[i].r), chunk_read_mode);
               // modifier et restaurer
               back[i].chunk_adr = back[i].r.adr;        // adresse
               back[i].chunk_size = back[i].r.size;      // taille taille chunk
@@ -3628,12 +3641,18 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             // Traitement des en têtes chunks ou en têtes
             if (back[i].status == STATUS_CHUNK_WAIT || back[i].status == STATUS_CHUNK_CR) {     // réception taille chunk en hexa (  après les en têtes, peut ne pas
-              if (back[i].chunk_size > 0
-                  && back[i].chunk_adr[back[i].chunk_size - 1] == 10) {
+              const hts_boolean in_trailers = back_in_chunk_trailers(&back[i]);
+
+              /* A chunk-size or chunk-CRLF line closes on its first LF; the
+                 trailer section only on the blank line that ends it. */
+              if (back[i].chunk_size > 0 &&
+                  back[i].chunk_adr[back[i].chunk_size - 1] == 10 &&
+                  (!in_trailers || back[i].chunk_size == 1 ||
+                   back[i].chunk_adr[back[i].chunk_size - 2] == 10)) {
                 int chunk_size = -1;
                 char chunk_data[64];
 
-                if (back[i].chunk_size < 32) {  // pas trop gros
+                if (back[i].chunk_size < 32 || in_trailers) { // not too big
                   char *chstrip = back[i].chunk_adr;
 
                   back[i].chunk_adr[back[i].chunk_size - 1] = '\0';     // octet nul 
@@ -3709,8 +3728,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                     back[i].chunk_adr, back[i].url_adr,
                                     back[i].url_fil);
                     }
-                  } else {      /* back[i].status==STATUS_CHUNK_CR : just receiving ending CRLF after data */
-                    if (chunk_data[0] == '\0') {
+                  } else { /* back[i].status==STATUS_CHUNK_CR : just receiving
+                              ending CRLF after data, or the trailer section */
+                    if (chunk_data[0] == '\0' || in_trailers) {
                       if (back[i].chunk_blocksize > 0)
                         chunk_size = (int) back[i].chunk_blocksize;     /* recent data chunk size */
                       else if (back[i].chunk_blocksize == -1)
@@ -3817,12 +3837,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           }
                         }
                       }
-
-                      /* Oops, trailers! */
-                      if (back[i].r.keep_alive_trailers) {
-                        /* fixme (not yet supported) */
-                      }
-
                     }
 
                   }
@@ -3836,7 +3850,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   // NO! xxback[i].chunk_blocksize = 0;
                 }
 
-              }                 // taille buffer chunk > 1 && LF
+              } // chunk buffer holds a complete line
               //
             } else if (back[i].status == STATUS_WAIT_HEADERS) { // en têtes (avant le chunk si il est présent)
               //
