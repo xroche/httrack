@@ -6609,7 +6609,7 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
     StringCopy(opt->path_html_utf8, base);
     opt->getmode = 0;
     opt->state.tmpnameid = 7;
-    snprintf(want, sizeof(want), "%s//~hts-tmp/tmpfile7.tmp", argv[0]);
+    snprintf(want, sizeof(want), "%s/~hts-tmp/tmpfile7.tmp", argv[0]);
     if (!back_spoolname(opt, "", got, sizeof(got))) {
       fprintf(stderr, "spoolname: naming failed under -p0\n");
       err++;
@@ -6621,6 +6621,20 @@ static int st_spoolname(httrackp *opt, int argc, char **argv) {
       fprintf(stderr, "spoolname: -p0 did not consume a tmpnameid\n");
       err++;
     }
+  }
+
+  /* with no -O, path_html_utf8 is empty and the spool must stay relative to
+     the working directory; a separator of our own would put it in / */
+  StringCopy(opt->path_html_utf8, "");
+  opt->getmode = 0;
+  opt->state.tmpnameid = 0;
+  if (!back_spoolname(opt, "", got, sizeof(got))) {
+    fprintf(stderr, "spoolname: naming failed with no output directory\n");
+    err++;
+  } else if (strcmp(got, "~hts-tmp/tmpfile0.tmp") != 0) {
+    fprintf(stderr, "spoolname: no -O gave %s, want ~hts-tmp/tmpfile0.tmp\n",
+            got);
+    err++;
   }
 
   /* too long must empty dest, not hand back a truncated name landing

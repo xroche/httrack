@@ -72,9 +72,11 @@ static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
 
 hts_boolean back_spoolname(httrackp *opt, const char *save, char *dest,
                            size_t size) {
-  /* -p0 keeps no save name to derive from, so it counts instead */
+  /* -p0 keeps no save name to derive from, so it counts instead. No separator:
+     path_html_utf8 brings its own, and is "" with no -O, where an added one
+     would make this absolute and spool into the filesystem root. */
   if (opt->getmode == 0) {
-    if (!slprintfbuff(dest, size, "%s/" HTS_TMPDIR "/tmpfile%d.tmp",
+    if (!slprintfbuff(dest, size, "%s" HTS_TMPDIR "/tmpfile%d.tmp",
                       StringBuff(opt->path_html_utf8),
                       opt->state.tmpnameid++)) {
       dest[0] = '\0';
@@ -725,7 +727,7 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
     /* same directory as the named case, so back_tmpdir_drop() only removes one
        the engine made (#842) */
     /* truncation here would collide distinct tmpnameid's onto one name */
-    if (!sprintfbuff(back->tmpfile_buffer, "%s/" HTS_TMPDIR "/tmp%d.%s",
+    if (!sprintfbuff(back->tmpfile_buffer, "%s" HTS_TMPDIR "/tmp%d.%s",
                      StringBuff(opt->path_html_utf8), opt->state.tmpnameid++,
                      ext)) {
       hts_log_print(opt, LOG_WARNING, "temporary filename too long in %s",
