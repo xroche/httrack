@@ -279,6 +279,7 @@ jobs:
           143_engine-backtrace-empty.test
           147_local-proxytrack-webdav-overflow.test
           152_engine-string-oom.test
+          153_local-proxytrack-quiet.test
           48_local-crange-memresume.test
           71_local-crange-repaircache.test
           79_local-proxytrack-webdav-mime.test
