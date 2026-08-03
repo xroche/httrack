@@ -9,6 +9,11 @@ usage() {
     exit 2
 }
 
+fail() {
+    echo "bundle check: $*" >&2
+    exit 1
+}
+
 prefix=""
 plist=""
 icon=""
@@ -52,7 +57,9 @@ test -r "$icon" || {
 
 prefix=$(cd "$prefix" && pwd -P)
 list=$(mktemp)
-trap 'rm -f "$list"' EXIT
+mach=$(mktemp)
+deplist=$(mktemp)
+trap 'rm -f "$list" "$mach" "$deplist"' EXIT
 app="$out/HTTrack.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
@@ -76,10 +83,95 @@ exec "$(dirname "$0")/../Resources/bin/webhttrack" "$@"
 EOF
 chmod +x "$app/Contents/MacOS/HTTrack"
 
-fail() {
-    echo "bundle check: $*" >&2
-    exit 1
+fw="$app/Contents/Frameworks"
+
+# Everything outside macOS itself must travel with the bundle; OpenSSL comes from Homebrew here.
+sysdep() {
+    case "$1" in
+    /usr/lib/* | /System/Library/*) return 0 ;;
+    esac
+    return 1
 }
+
+# Mach-O files only, prefiltered so `file` is not run over the whole html payload.
+machos() {
+    find "$app/Contents" -type f \
+        \( -perm -u+x -o -name '*.dylib' -o -name '*.so' \) >"$list"
+    : >"$mach"
+    while IFS= read -r f; do
+        file "$f" | grep -q Mach-O && printf '%s\n' "$f" >>"$mach"
+    done <"$list"
+}
+
+# A dylib's first entry is its own LC_ID_DYLIB, skipped like any satisfied dependency.
+deps() {
+    otool -L "$1" | tail -n +2 | awk '{print $1}'
+}
+
+# One ../ per component below Contents, so the rpath is depth-correct wherever the loader sits.
+uprefix() {
+    printf '%s' "${1#"$app/Contents"}" |
+        awk -F/ '{for (i = 1; i <= NF; i++) if ($i != "") printf "../"}'
+}
+
+# Each pass rescans, so a dylib pulled in by the last pass gets its own deps on the next.
+copy_dylibs() {
+    mkdir -p "$fw"
+    while :; do
+        machos
+        : >"$deplist"
+        while IFS= read -r bin; do
+            deps "$bin" >>"$deplist"
+        done <"$mach"
+        sort -u "$deplist" -o "$deplist"
+        : >"$list"
+        while IFS= read -r dep; do
+            case "$dep" in @*) continue ;; esac
+            sysdep "$dep" && continue
+            test -r "$fw/$(basename "$dep")" && continue
+            printf '%s\n' "$dep" >>"$list"
+        done <"$deplist"
+        test -s "$list" || break
+        while IFS= read -r dep; do
+            test -r "$dep" || fail "$dep is loaded by the bundle but is not readable here"
+            cp "$dep" "$fw/"
+            chmod u+w "$fw/$(basename "$dep")"
+        done <"$list"
+    done
+    rmdir "$fw" 2>/dev/null || true
+}
+
+relink() {
+    test -d "$fw" || return 0
+    machos
+    while IFS= read -r bin; do
+        case "$bin" in
+        "$fw"/*) install_name_tool -id "@rpath/$(basename "$bin")" "$bin" ;;
+        esac
+        deps "$bin" >"$deplist"
+        while IFS= read -r dep; do
+            case "$dep" in @*) continue ;; esac
+            sysdep "$dep" && continue
+            install_name_tool -change "$dep" "@rpath/$(basename "$dep")" "$bin"
+        done <"$deplist"
+        rp="@loader_path/$(uprefix "${bin%/*}")Frameworks"
+        otool -l "$bin" | awk '/LC_RPATH/ {r = 1} r && $1 == "path" {print $2; r = 0}' >"$deplist"
+        grep -qxF "$rp" "$deplist" || install_name_tool -add_rpath "$rp" "$bin"
+        # install_name_tool invalidates the signature, and arm64 kills an unsigned Mach-O.
+        codesign -f -s - "$bin"
+    done <"$mach"
+}
+
+if [ "$(uname -s)" = Darwin ]; then
+    for t in otool install_name_tool codesign file; do
+        command -v "$t" >/dev/null 2>&1 ||
+            fail "$t not found -- install the Xcode command line tools"
+    done
+fi
+if command -v otool >/dev/null 2>&1; then
+    copy_dylibs
+    relink
+fi
 
 appreal=$(cd "$app" && pwd -P)
 
@@ -96,17 +188,32 @@ test "$nlink" -gt 0 || fail "scanned no symlinks at all, the check proved nothin
 test -d "$app/Contents/Resources/share/httrack/html/server" ||
     fail "Contents/Resources/share/httrack/html/server missing"
 
-# Only our own library must be absent: system and Homebrew dylibs resolve from the
-# user's own install.
+# A downloaded bundle resolves against macOS and itself; neither the staging prefix nor Homebrew is on the user's machine (#901).
 if command -v otool >/dev/null 2>&1; then
-    find "$app/Contents" -type f -perm -u+x >"$list"
+    nmach=0
+    machos
     while IFS= read -r bin; do
-        file "$bin" | grep -q Mach-O || continue
-        if otool -L "$bin" | tail -n +2 | grep -q "$prefix"; then
+        nmach=$((nmach + 1))
+        deps "$bin" >"$deplist"
+        while IFS= read -r dep; do
+            case "$dep" in
+            @rpath/*)
+                test -r "$fw/${dep#@rpath/}" ||
+                    fail "$bin loads $dep, absent from Contents/Frameworks"
+                continue
+                ;;
+            esac
+            sysdep "$dep" && continue
             otool -L "$bin" >&2
-            fail "$bin still links against the staging prefix (build with --disable-shared)"
-        fi
-    done <"$list"
+            case "$dep" in
+            "$prefix"/*)
+                fail "$bin links against the staging prefix (build with --disable-shared)"
+                ;;
+            esac
+            fail "$bin loads $dep from outside the bundle"
+        done <"$deplist"
+    done <"$mach"
+    test "$nmach" -gt 0 || fail "scanned no Mach-O files at all, the check proved nothing"
 fi
 
 # otool sees load commands only, so scan the text payload separately. The binaries
