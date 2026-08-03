@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# Unit-tests ci_suite_heartbeat (testlib.sh), the Windows job's last line of
+# reporting: when the runner dies the step log and the artifacts go with it, so a
+# wedged suite is only ever named by the annotations this emits (#795). Timings
+# are scaled down; the reap and the kill are stubbed, both being host-wide.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_hb.XXXXXX")
+trap 'set +e; rm -rf "$tmp"' EXIT
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+progress="$tmp/progress"
+export HTTRACK_WATCHDOG_GRACE=1
+
+# The reap stub models what the real one does to a wedged test: it kills the
+# engine, the test ends, and the caller records one more line of progress.
+unstick=0
+reap_leftover_processes() {
+    echo "REAP"
+    test "$unstick" -eq 0 || printf '0 99_stuck.test\n' >>"$progress"
+}
+kill_tree() { echo "KILL $1"; }
+list_stray_processes() { echo "(stub)"; }
+
+printf 'RUN 99_stuck.test at 0s\n' >"$progress"
+ci_suite_heartbeat 3 1 "$progress" 6 4242 >"$tmp/out" 2>&1 &
+hb=$!
+# Nothing may be said during the quiet window, or a healthy run annotates itself
+# every time.
+sleep 1
+test ! -s "$tmp/out" || fail "annotated inside the quiet window: $(cat "$tmp/out")"
+wait "$hb"
+out=$(cat "$tmp/out")
+
+# Every annotation names the test in flight, on a schedule landing exactly on the
+# hard deadline: one that overshot would report past the step's own timeout.
+got=$(sed -n 's/^::warning title=suite still running::\([0-9]*\)s elapsed.*/\1/p' "$tmp/out" | tr '\n' ' ')
+test "$got" = "3 4 5 6 " || fail "annotation schedule was [$got], want [3 4 5 6 ]"
+grep -q 'in flight: RUN 99_stuck.test' <<<"$out" || fail "annotation does not name the test in flight"
+grep -q '^KILL 4242$' <<<"$out" || fail "a suite stuck through the reap was not killed"
+
+# ... and one the reap frees keeps its step: it still has a result to report.
+unstick=1
+printf 'RUN 99_stuck.test at 0s\n' >"$progress"
+out=$(ci_suite_heartbeat 3 1 "$progress" 6 4242)
+grep -q '^REAP$' <<<"$out" || fail "positive control: never reached the reap"
+if grep -q '^KILL' <<<"$out"; then
+    fail "killed a suite that resumed after the reap"
+fi
+
+echo "heartbeat OK"
