@@ -854,22 +854,34 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
 /* New HTTrack cache (new.zip) format                           */
 /* ------------------------------------------------------------ */
 
-#define ZIP_FIELD_STRING(headers, headersSize, field, value) do { \
-  if ( (value != NULL) && (value)[0] != '\0') { \
-    sprintf(headers + headersSize, "%s: %s\r\n", field, (value != NULL) ? (value) : ""); \
-    (headersSize) += (int) strlen(headers + headersSize); \
-  } \
-} while(0)
-#define ZIP_FIELD_INT(headers, headersSize, field, value) do { \
-  if ( (value != 0) ) { \
-    sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
-    (headersSize) += (int) strlen(headers + headersSize); \
-  } \
-} while(0)
-#define ZIP_FIELD_INT_FORCE(headers, headersSize, field, value) do { \
-  sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
-  (headersSize) += (int) strlen(headers + headersSize); \
-} while(0)
+/* Append "<field>: <value>\r\n" to the header block, counting into `dropped`
+   the fields that did not fit. The values come back off a cache, so the block
+   is bounded rather than trusted to the element caps; the field is dropped
+   whole because a clipped one reads back as a valid shorter value.
+   `headers` must be an array, for sizeof. */
+#define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
+  do {                                                                         \
+    if ((value) != NULL && (value)[0] != '\0' &&                               \
+        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
+                         "%s: %s\r\n", field, value)) {                        \
+      (dropped)++;                                                             \
+    }                                                                          \
+  } while (0)
+#define ZIP_FIELD_INT(headers, headersSize, dropped, field, value)             \
+  do {                                                                         \
+    if ((value) != 0 &&                                                        \
+        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
+                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
+      (dropped)++;                                                             \
+    }                                                                          \
+  } while (0)
+#define ZIP_FIELD_INT_FORCE(headers, headersSize, dropped, field, value)       \
+  do {                                                                         \
+    if (!slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
+                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
+      (dropped)++;                                                             \
+    }                                                                          \
+  } while (0)
 /* refvalue_size is mandatory: the cache line is bounded only by the line
    buffer, not by the destination. */
 #define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
@@ -1272,18 +1284,15 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
 static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element) {
   zipFile zFileOut = (zipFile) arg;
   char headers[8192];
-  int headersSize;
+  size_t headersSize = 0;
+  int headersDropped = 0;
   zip_fileinfo fi;
   int zErr;
   const char *url_adr = "";
   const char *url_fil = "";
 
-  headers[0] = '\0';
-  headersSize = 0;
-
   /* Fields */
   headers[0] = '\0';
-  headersSize = 0;
   /* */
   {
     const char *message;
@@ -1294,25 +1303,43 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
       message = "(See X-StatusMessage)";
     }
     /* 64 characters MAX for first line */
-    sprintf(headers + headersSize, "HTTP/1.%c %d %s\r\n", '1',
-            element->statuscode, message);
+    if (!slcatprintfbuff(headers, sizeof(headers), &headersSize,
+                         "HTTP/1.%c %d %s\r\n", '1', element->statuscode,
+                         message)) {
+      headersDropped++;
+    }
   }
-  headersSize += (int) strlen(headers + headersSize);
 
   /* Second line MUST ALWAYS be X-In-Cache */
-  ZIP_FIELD_INT_FORCE(headers, headersSize, "X-In-Cache", 1);
-  ZIP_FIELD_INT(headers, headersSize, "X-StatusCode", element->statuscode);
-  ZIP_FIELD_STRING(headers, headersSize, "X-StatusMessage", element->msg);
-  ZIP_FIELD_INT(headers, headersSize, "X-Size", element->size); // size
-  ZIP_FIELD_STRING(headers, headersSize, "Content-Type", element->contenttype); // contenttype
-  ZIP_FIELD_STRING(headers, headersSize, "X-Charset", element->charset);        // contenttype
-  ZIP_FIELD_STRING(headers, headersSize, "Last-Modified", element->lastmodified);       // last-modified
-  ZIP_FIELD_STRING(headers, headersSize, "Etag", element->etag);        // Etag
-  ZIP_FIELD_STRING(headers, headersSize, "Location", element->location);        // 'location' pour moved
-  ZIP_FIELD_STRING(headers, headersSize, "Content-Disposition", element->cdispo);       // Content-disposition
-  ZIP_FIELD_STRING(headers, headersSize, "X-Addr", url_adr);    // Original address
-  ZIP_FIELD_STRING(headers, headersSize, "X-Fil", url_fil);     // Original URI filename
-  ZIP_FIELD_STRING(headers, headersSize, "X-Save", ""); // Original save filename
+  ZIP_FIELD_INT_FORCE(headers, headersSize, headersDropped, "X-In-Cache", 1);
+  ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-StatusCode",
+                element->statuscode);
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-StatusMessage",
+                   element->msg);
+  ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-Size",
+                element->size); // size
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Content-Type",
+                   element->contenttype); // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Charset",
+                   element->charset); // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Last-Modified",
+                   element->lastmodified); // last-modified
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Etag",
+                   element->etag); // Etag
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Location",
+                   element->location); // 'location' pour moved
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Content-Disposition",
+                   element->cdispo); // Content-disposition
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Addr",
+                   url_adr); // Original address
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Fil",
+                   url_fil); // Original URI filename
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Save",
+                   ""); // Original save filename
+  if (headersDropped != 0) {
+    fprintf(stderr, "Headers of %s: %d field(s) dropped" LF, url,
+            headersDropped);
+  }
 
   /* Time */
   memset(&fi, 0, sizeof(fi));

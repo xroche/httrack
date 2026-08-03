@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# Cache header-block bounds (httrack -#test=cache-hdrbounds <dir>): an entry
+# whose fields all sit at their declared caps must not overrun the writer's
+# fixed header buffer, and must not cost the entries written after it.
+
+set -eu
+
+dir=$(mktemp -d)
+trap 'set +e; rm -rf "$dir"' EXIT
+
+# the maxed entry logs an expected "cached headers too large" warning; the
+# verdict is the last line
+out=$(httrack -#test=cache-hdrbounds "$dir" 2>/dev/null | tail -n1)
+
+test "$out" = "cache-hdrbounds: OK" || {
+    echo "expected 'cache-hdrbounds: OK', got: $out" >&2
+    exit 1
+}

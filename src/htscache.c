@@ -119,22 +119,34 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
   // ---fin stockage en cache---
 }
 
-#define ZIP_FIELD_STRING(headers, headersSize, field, value) do { \
-  if ( (value != NULL) && (value)[0] != '\0') { \
-    sprintf(headers + headersSize, "%s: %s\r\n", field, (value != NULL) ? (value) : ""); \
-    (headersSize) += (int) strlen(headers + headersSize); \
-  } \
-} while(0)
-#define ZIP_FIELD_INT(headers, headersSize, field, value) do { \
-  if ( (value != 0) ) { \
-    sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
-    (headersSize) += (int) strlen(headers + headersSize); \
-  } \
-} while(0)
-#define ZIP_FIELD_INT_FORCE(headers, headersSize, field, value) do { \
-  sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
-  (headersSize) += (int) strlen(headers + headersSize); \
-} while(0)
+/* Append "<field>: <value>\r\n" to the header block, counting into `dropped`
+   the fields that did not fit. The values are remote-controlled (ETag,
+   Location, the URL itself) and together outgrow the block, so it is bounded;
+   the field is dropped whole because a clipped one reads back as a valid
+   shorter value. `headers` must be an array, for sizeof. */
+#define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
+  do {                                                                         \
+    if ((value) != NULL && (value)[0] != '\0' &&                               \
+        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
+                         "%s: %s\r\n", field, value)) {                        \
+      (dropped)++;                                                             \
+    }                                                                          \
+  } while (0)
+#define ZIP_FIELD_INT(headers, headersSize, dropped, field, value)             \
+  do {                                                                         \
+    if ((value) != 0 &&                                                        \
+        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
+                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
+      (dropped)++;                                                             \
+    }                                                                          \
+  } while (0)
+#define ZIP_FIELD_INT_FORCE(headers, headersSize, dropped, field, value)       \
+  do {                                                                         \
+    if (!slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
+                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
+      (dropped)++;                                                             \
+    }                                                                          \
+  } while (0)
 
 struct cache_back_zip_entry {
   unsigned long int hdrPos;
@@ -210,7 +222,8 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   char catbuff[CATBUFF_SIZE];
   int dataincache = 0;          // put data in cache ?
   char BIGSTK headers[8192];
-  int headersSize = 0;
+  size_t headersSize = 0;
+  int headersDropped = 0;
 
   zip_fileinfo fi;
   const char *url_save_suffix = url_save;
@@ -275,10 +288,11 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
       message = "(See X-StatusMessage)";
     }
     /* 64 characters MAX for first line */
-    sprintf(headers + headersSize, "HTTP/1.%c %d %s\r\n", '1', r->statuscode,
-            message);
+    if (!slcatprintfbuff(headers, sizeof(headers), &headersSize,
+                         "HTTP/1.%c %d %s\r\n", '1', r->statuscode, message)) {
+      headersDropped++;
+    }
   }
-  headersSize += (int) strlen(headers + headersSize);
 
   if (path_prefix != NULL && path_prefix[0] != '\0' && url_save != NULL
       && url_save[0] != '\0') {
@@ -290,19 +304,39 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   }
 
   /* Second line MUST ALWAYS be X-In-Cache */
-  ZIP_FIELD_INT_FORCE(headers, headersSize, "X-In-Cache", dataincache);
-  ZIP_FIELD_INT(headers, headersSize, "X-StatusCode", r->statuscode);
-  ZIP_FIELD_STRING(headers, headersSize, "X-StatusMessage", r->msg);
-  ZIP_FIELD_INT(headers, headersSize, "X-Size", r->size);       // size
-  ZIP_FIELD_STRING(headers, headersSize, "Content-Type", r->contenttype);       // contenttype
-  ZIP_FIELD_STRING(headers, headersSize, "X-Charset", r->charset);      // contenttype
-  ZIP_FIELD_STRING(headers, headersSize, "Last-Modified", r->lastmodified);     // last-modified
-  ZIP_FIELD_STRING(headers, headersSize, "Etag", r->etag);      // Etag
-  ZIP_FIELD_STRING(headers, headersSize, "Location", r->location);      // 'location' pour moved
-  ZIP_FIELD_STRING(headers, headersSize, "Content-Disposition", r->cdispo);     // Content-disposition
-  ZIP_FIELD_STRING(headers, headersSize, "X-Addr", url_adr);    // Original address
-  ZIP_FIELD_STRING(headers, headersSize, "X-Fil", url_fil);     // Original URI filename
-  ZIP_FIELD_STRING(headers, headersSize, "X-Save", url_save_suffix);    // Original save filename
+  ZIP_FIELD_INT_FORCE(headers, headersSize, headersDropped, "X-In-Cache",
+                      dataincache);
+  ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-StatusCode",
+                r->statuscode);
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-StatusMessage",
+                   r->msg);
+  ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-Size",
+                r->size); // size
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Content-Type",
+                   r->contenttype); // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Charset",
+                   r->charset); // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Last-Modified",
+                   r->lastmodified); // last-modified
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Etag",
+                   r->etag); // Etag
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Location",
+                   r->location); // 'location' pour moved
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Content-Disposition",
+                   r->cdispo); // Content-disposition
+  /* X-Save first of the three: it is the only one the reader consumes, so it
+     must not be what a full block drops */
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Save",
+                   url_save_suffix); // Original save filename
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Addr",
+                   url_adr); // Original address
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Fil",
+                   url_fil); // Original URI filename
+  if (headersDropped != 0) {
+    hts_log_print(opt, LOG_WARNING,
+                  "cached headers too large, %d field(s) dropped: %s%s",
+                  headersDropped, url_adr, url_fil);
+  }
 
   /* Filename */
   if (!link_has_authority(url_adr)) {

@@ -64,6 +64,13 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir);
    Returns the number of failed checks (0 = pass). */
 int cache_legacy_refused_selftest(httrackp *opt, const char *dir);
 
+/* A cache entry whose every field sits at its declared cap: the header block
+   the writer builds outgrows its fixed buffer, so this pins that the writer
+   bounds it, drops whole fields rather than halves, and still round-trips
+   everything written before the block filled. Returns the failed-check count.
+ */
+int cache_header_bounds_selftest(httrackp *opt, const char *dir);
+
 /* Inject read-side corruption (zip byte surgery: bad size, header, deflate)
    under <dir> and assert every case degrades to STATUSCODE_INVALID without
    tainting a sibling entry. */
