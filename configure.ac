@@ -197,6 +197,11 @@ AC_SUBST([LDFLAGS_PIE])
 # Ties a crash trace from a stripped build back to its separate debug symbols.
 AX_CHECK_LINK_FLAG([-Wl,--build-id], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--build-id"])
 
+# tools/macos-app.sh rewrites load commands to @rpath, which needs header room ld64 does
+# not leave by default; the probe fails on GNU ld, so this self-gates on Darwin.
+AX_CHECK_LINK_FLAG([-Wl,-headerpad_max_install_names],
+	[DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-headerpad_max_install_names"])
+
 ### Check for -fvisibility=hidden support
 gl_VISIBILITY
 AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
