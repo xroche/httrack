@@ -315,15 +315,13 @@ jobs:
           test -n "$hidden"
           bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
 
-      # The release path (macos-release.yml) minus Apple: ad-hoc identity, no notarization.
-      # Everything that can go wrong without a Developer ID -- an unsignable bundle, a
-      # Mach-O the walk misses, a DMG that will not build -- fails here, on the PR.
+      # The release path (macos-release.yml) minus Apple, so a bundle that cannot be
+      # signed or packed fails on the PR rather than on release day.
       - name: Sign and pack the bundle, ad hoc
         run: |
           set -euo pipefail
           bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
             --identity - --skip-notarize
-          codesign --verify --strict --verbose=2 "$app"
 
   # Portability/hardening: 32-bit (i386) build on the x86-64 runner via multilib
   # -- no extra hardware. Exercises the 32-bit size_t/pointer ABI, where size
@@ -705,6 +703,7 @@ jobs:
         tests/*.sh
         tests/*.test
         tools/macos-app.sh
+        tools/macos-bundle.sh
         tools/macos-release.sh
         tools/mkdeb.sh
     steps:

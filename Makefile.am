@@ -6,7 +6,7 @@ ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
 		httrack-doc.html lang.def README.md tools/mkdeb.sh \
-		tools/macos-app.sh tools/macos-release.sh \
+		tools/macos-app.sh tools/macos-bundle.sh tools/macos-release.sh \
 		tools/Info.plist.in tools/HTTrack.icns \
 		bootstrap build.sh
 

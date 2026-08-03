@@ -1,8 +1,10 @@
 #!/bin/sh
-# Sign, notarize and pack the bundle macos-app.sh built into a distributable DMG (#901).
-# POSIX sh like its sibling. --identity - --skip-notarize runs everything but Apple, which
-# is how a pull request covers this without the Developer ID secrets.
+# Sign, notarize and pack macos-app.sh's bundle into a distributable DMG (#901). POSIX sh
+# like its sibling. --identity - --skip-notarize runs everything but the calls to Apple.
 set -eu
+
+# shellcheck source=tools/macos-bundle.sh
+. "$(dirname "$0")/macos-bundle.sh"
 
 usage() {
     echo "usage: $0 --app DIR --identity ID [--out DIR]" >&2
@@ -73,10 +75,9 @@ for t in codesign xcrun hdiutil ditto file spctl; do
         fail "$t not found -- this needs the Xcode command line tools"
 done
 
-list=$(mktemp)
 mach=$(mktemp)
 nlog=$(mktemp)
-trap 'rm -f "$list" "$mach" "$nlog"' EXIT
+trap 'rm -f "$mach" "$nlog"' EXIT
 
 # Ad-hoc signatures cannot carry a timestamp, and Apple has nothing to countersign.
 ts=""
@@ -87,13 +88,8 @@ sign() {
     codesign --force $ts -s "$identity" "$@"
 }
 
-# Each Mach-O by hand: --deep reaches them but does not apply the hardened runtime,
-# which notarization requires on every one.
-find "$app/Contents" -type f >"$list"
-: >"$mach"
-while IFS= read -r f; do
-    if file "$f" | grep -q Mach-O; then printf '%s\n' "$f" >>"$mach"; fi
-done <"$list"
+# Each Mach-O by hand: --deep reaches them but never applies the hardened runtime.
+machos_into "$app/Contents" "$mach"
 test -s "$mach" || fail "no Mach-O file in the bundle, the signing below would prove nothing"
 
 # Before --force, which would re-sign away the damage this is meant to catch.
@@ -131,14 +127,12 @@ if [ "$skip_notarize" -eq 0 ]; then
     xcrun stapler staple "$app"
 fi
 
-# The plist version is what macos-app.sh already checked against the engine's.
-version=$(awk '/<key>CFBundleShortVersionString<\/key>/ {
-        getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$app/Contents/Info.plist")
+version=$(plist_value "$app/Contents/Info.plist" CFBundleShortVersionString)
 test -n "$version" || fail "no CFBundleShortVersionString in $app/Contents/Info.plist"
 
 dmg="$out/HTTrack-$version.dmg"
 stage=$(mktemp -d)
-trap 'rm -f "$list" "$mach" "$nlog"; rm -rf "$stage"' EXIT
+trap 'rm -f "$mach" "$nlog"; rm -rf "$stage"' EXIT
 # ditto, not cp: it carries a bundle's metadata across intact.
 ditto "$app" "$stage/$(basename "$app")"
 ln -s /Applications "$stage/Applications"

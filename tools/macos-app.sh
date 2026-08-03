@@ -4,6 +4,9 @@
 # resolves htsserver and its data relative to its own path.
 set -eu
 
+# shellcheck source=tools/macos-bundle.sh
+. "$(dirname "$0")/macos-bundle.sh"
+
 usage() {
     echo "usage: $0 --prefix DIR --plist FILE --icon FILE [--out DIR]" >&2
     exit 2
@@ -97,11 +100,7 @@ sysdep() {
 
 # Every file, not a prefilter: this list drives the copy, the relink and the audit alike.
 machos() {
-    find "$app/Contents" -type f >"$list"
-    : >"$mach"
-    while IFS= read -r f; do
-        if file "$f" | grep -q Mach-O; then printf '%s\n' "$f" >>"$mach"; fi
-    done <"$list"
+    machos_into "$app/Contents" "$mach"
 }
 
 # Only the indented lines are dependencies; a universal binary heads each slice.
@@ -245,8 +244,7 @@ done <"$list"
 
 # CFBundleIconFile is a Resources basename with an optional extension, so resolve it
 # the way Finder does rather than assume the plist and the payload agree.
-iconname=$(awk '/<key>CFBundleIconFile<\/key>/ {
-        getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$app/Contents/Info.plist")
+iconname=$(plist_value "$app/Contents/Info.plist" CFBundleIconFile)
 test -n "$iconname" || fail "Info.plist declares no CFBundleIconFile"
 iconfile="$app/Contents/Resources/$iconname"
 test -r "$iconfile" || iconfile="$iconfile.icns"
@@ -261,15 +259,13 @@ test "$((0x$iconlen))" -eq "$iconsize" ||
 
 # The plist version is a separate spot from the engine's, so drift is silent unless
 # something compares them (#884 is what that looks like when nobody does).
-plistver=$(awk '/<key>CFBundleShortVersionString<\/key>/ {
-        getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$app/Contents/Info.plist")
+plistver=$(plist_value "$app/Contents/Info.plist" CFBundleShortVersionString)
 binver=$("$app/Contents/Resources/bin/httrack" --version 2>/dev/null |
     sed -n 's/.*[Vv]ersion \([0-9][0-9.]*[-.][0-9][0-9]*\).*/\1/p' | head -1 | tr '-' '.')
 test -n "$binver" || fail "could not read a version out of the installed httrack"
 test "$plistver" = "$binver" ||
     fail "CFBundleShortVersionString says $plistver, httrack says $binver"
-bundlever=$(awk '/<key>CFBundleVersion<\/key>/ {
-        getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$app/Contents/Info.plist")
+bundlever=$(plist_value "$app/Contents/Info.plist" CFBundleVersion)
 test "$bundlever" = "$binver" ||
     fail "CFBundleVersion says $bundlever, httrack says $binver"
 

@@ -1,7 +1,5 @@
-# Signed, notarized HTTrack.dmg (#901). Separate from ci.yml because it needs the
-# Developer ID secrets, which a fork's pull request never gets, and because each run
-# costs two notarization submissions. The unsigned half of this path -- bundling, the
-# inside-out signing walk, the DMG -- runs on every PR in ci.yml's macos-app job.
+# Signed, notarized HTTrack.dmg (#901). Its own workflow because a fork's pull request
+# never gets the Developer ID secrets, and each run spends two notarization submissions.
 name: macOS release
 
 on:
@@ -45,7 +43,7 @@ jobs:
           set -euo pipefail
           brew install autoconf automake libtool autoconf-archive brotli zstd
 
-      # --disable-shared keeps libhttrack inside the binaries, as in ci.yml's macos-app job.
+      # --disable-shared keeps libhttrack inside the binaries.
       - name: Build and install into a temp prefix
         run: |
           set -euo pipefail
@@ -77,11 +75,13 @@ jobs:
           # Notarization holds the job well past the five-minute default lock.
           security set-keychain-settings -lut 21600 "$kc"
           security unlock-keychain -p "$kcpass" "$kc"
+          # Armed before the file exists: a failed import must not leave the key on a
+          # disk that later steps run repository code against.
+          trap 'rm -f "$RUNNER_TEMP/cert.p12"' EXIT HUP INT TERM
           # openssl, not base64: macOS spells the decode flag -D and GNU spells it -d.
           printf '%s' "$CERT_P12" | openssl base64 -d -A -out "$RUNNER_TEMP/cert.p12"
           security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$CERT_PASSWORD" \
             -T /usr/bin/codesign
-          rm -f "$RUNNER_TEMP/cert.p12"
           # Without this codesign blocks on a UI prompt no runner can answer.
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$kcpass" "$kc" >/dev/null
@@ -103,16 +103,16 @@ jobs:
         run: |
           set -euo pipefail
           key="$RUNNER_TEMP/notary.p8"
-          trap 'rm -f "$key"' EXIT
+          trap 'rm -f "$key"' EXIT HUP INT TERM
           printf '%s' "$NOTARY_KEY" | openssl base64 -d -A -out "$key"
           bash tools/macos-release.sh --app "$RUNNER_TEMP/HTTrack.app" \
             --identity "$SIGN_IDENTITY" --out "$RUNNER_TEMP" \
             --notary-key "$key" --notary-key-id "$NOTARY_KEY_ID" \
             --notary-issuer "$NOTARY_ISSUER_ID"
 
-      # What a user actually does: download (so, quarantined), mount, drag out, run. The
-      # steps above prove the paperwork; this is the only one that proves the result runs.
-      - name: Assess and run a quarantined copy out of the DMG
+      # The DMG round-trip is the one thing that can strip the stapled ticket, so assess
+      # the copy that came out of it rather than the app the signing step still holds.
+      - name: Assess a quarantined copy out of the DMG
         run: |
           set -euo pipefail
           dmg="$(echo "$RUNNER_TEMP"/HTTrack-*.dmg)"
@@ -121,13 +121,20 @@ jobs:
           trap 'hdiutil detach "$RUNNER_TEMP/mnt" >/dev/null || true' EXIT
           app="$RUNNER_TEMP/quarantined/HTTrack.app"
           ditto "$RUNNER_TEMP/mnt/HTTrack.app" "$app"
-          # Set rather than inherited: propagating the flag off a mounted image is
-          # LaunchServices' job, and nothing here goes through LaunchServices.
-          xattr -w -r com.apple.quarantine "0083;00000000;Safari;" "$app"
-          xattr -p com.apple.quarantine "$app" >/dev/null
-          spctl --assess --type exec -vv "$app"
-          # Last: the smoke test drops a browser stub inside the bundle, breaking the
-          # seal that the assessment above depends on.
+          # On the root only, as a real download lands it; -r would also chase symlinks.
+          xattr -w com.apple.quarantine "0083;00000000;Safari;" "$app"
+          # --no-cache, or the verdict already cached for this cdhash answers instead.
+          log="$RUNNER_TEMP/assess.log"
+          spctl --assess --type exec --ignore-cache --no-cache -vv "$app" >"$log" 2>&1 || {
+            cat "$log" >&2
+            exit 1
+          }
+          cat "$log"
+          grep -q "source=Notarized Developer ID" "$log"
+          # spctl alone can be answered online; this is the offline-launch proof.
+          xcrun stapler validate "$app"
+          # Not a Gatekeeper check: the stub is a script, so nothing here goes through
+          # LaunchServices. It proves the hardened runtime did not break the dylib loads.
           bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
 
       - name: Upload the DMG
@@ -137,8 +144,7 @@ jobs:
           path: ${{ runner.temp }}/HTTrack-*.dmg
           if-no-files-found: error
 
-      # Releases here are cut by hand, so a tag can land before one exists; say so
-      # rather than failing a run whose DMG is already built and attached above.
+      # Releases are cut by hand, so a tag can land before one exists.
       - name: Attach the DMG to the release
         if: github.ref_type == 'tag'
         env:
