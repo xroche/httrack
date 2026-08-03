@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# Unit-tests ci_suite_heartbeat (testlib.sh), the Windows job's last line of
-# reporting: when the runner dies the step log and the artifacts go with it, so a
-# wedged suite is only ever named by the annotations this emits (#795). Timings
-# are scaled down; the reap and the kill are stubbed, both being host-wide.
+# Unit-tests ci_suite_heartbeat (testlib.sh): when the Windows runner dies it
+# takes the step log and the artifacts, so these annotations are all that names
+# the wedged test (#795). Timings are scaled down and every assertion is against
+# the wall clock, since a watchdog with the right labels and the wrong delays
+# would kill healthy runs.
 
 set -euo pipefail
 
@@ -19,42 +20,60 @@ fail() {
 }
 
 progress="$tmp/progress"
-export HTTRACK_WATCHDOG_GRACE=1
-
-# The reap stub models what the real one does to a wedged test: it kills the
-# engine, the test ends, and the caller records one more line of progress.
-unstick=0
-reap_leftover_processes() {
-    echo "REAP"
-    test "$unstick" -eq 0 || printf '0 99_stuck.test\n' >>"$progress"
-}
 kill_tree() { echo "KILL $1"; }
-list_stray_processes() { echo "(stub)"; }
+list_stray_processes() {
+    printf '%s\n' "$*" >"$tmp/strayargs"
+    echo "(stub)"
+}
 
-printf 'RUN 99_stuck.test at 0s\n' >"$progress"
-ci_suite_heartbeat 3 1 "$progress" 6 4242 >"$tmp/out" 2>&1 &
+# Two lines, and a '%' in the one that matters: the annotation must name the test
+# in flight, not the suite's first, and must escape what it quotes.
+printf 'RUN 98_earlier.test at 0s\nRUN 99_stuck%%mark.test at 10s\n' >"$progress"
+
+# Stamped as each line arrives. quiet=3 every=1 stuck=5, so nothing may be said
+# before 3s and the kill may not land before 5s of a static progress file.
+start=$SECONDS
+ci_suite_heartbeat 3 1 "$progress" 5 4242 |
+    while IFS= read -r line; do
+        test -z "$line" || printf '%s|%s\n' "$((SECONDS - start))" "$line"
+    done >"$tmp/out"
+
+first=$(sed -n '1s/|.*//p' "$tmp/out")
+test -n "$first" || fail "the watchdog said nothing at all"
+test "$first" -ge 3 || fail "annotated at ${first}s, inside the 3s quiet window"
+
+killed=$(sed -n 's/^\([0-9]*\)|KILL 4242$/\1/p' "$tmp/out")
+test -n "$killed" || fail "a suite static past the stuck window was not killed"
+test "$killed" -ge 5 || fail "killed at ${killed}s, before 5s without progress"
+
+# The kill has to be announced, or it lands as an unexplained dead step: exactly
+# the #795 silence this exists to end.
+sed -n "$(($(grep -c '' "$tmp/out") - 1))p" "$tmp/out" |
+    grep -q '::error title=suite watchdog::' || fail "the kill was not annotated"
+
+grep -q 'in flight: RUN 99_stuck%25mark.test' "$tmp/out" ||
+    fail "annotation does not name the escaped test in flight: $(cat "$tmp/out")"
+grep -q '98_earlier' "$tmp/out" && fail "annotation names the first test, not the one in flight"
+grep -qx '0 named' "$tmp/strayargs" || fail "process list not host-wide: $(cat "$tmp/strayargs")"
+
+# A suite that keeps reporting is never killed, however long it runs.
+printf 'RUN 99_slow.test at 0s\n' >"$progress"
+for i in 1 2 3 4 5 6 7 8 9; do
+    (
+        command sleep "$i"
+        printf '%s 99_slow.test\n' "$i" >>"$progress"
+    ) &
+done
+ci_suite_heartbeat 3 1 "$progress" 5 4242 >"$tmp/moving" 2>&1 &
 hb=$!
-# Nothing may be said during the quiet window, or a healthy run annotates itself
-# every time.
-sleep 1
-test ! -s "$tmp/out" || fail "annotated inside the quiet window: $(cat "$tmp/out")"
-wait "$hb"
-out=$(cat "$tmp/out")
+command sleep 9
+kill "$hb" 2>/dev/null || true
+wait 2>/dev/null || true
 
-# Every annotation names the test in flight, on a schedule landing exactly on the
-# hard deadline: one that overshot would report past the step's own timeout.
-got=$(sed -n 's/^::warning title=suite still running::\([0-9]*\)s elapsed.*/\1/p' "$tmp/out" | tr '\n' ' ')
-test "$got" = "3 4 5 6 " || fail "annotation schedule was [$got], want [3 4 5 6 ]"
-grep -q 'in flight: RUN 99_stuck.test' <<<"$out" || fail "annotation does not name the test in flight"
-grep -q '^KILL 4242$' <<<"$out" || fail "a suite stuck through the reap was not killed"
-
-# ... and one the reap frees keeps its step: it still has a result to report.
-unstick=1
-printf 'RUN 99_stuck.test at 0s\n' >"$progress"
-out=$(ci_suite_heartbeat 3 1 "$progress" 6 4242)
-grep -q '^REAP$' <<<"$out" || fail "positive control: never reached the reap"
-if grep -q '^KILL' <<<"$out"; then
-    fail "killed a suite that resumed after the reap"
+grep -q '::notice title=suite still running::' "$tmp/moving" ||
+    fail "positive control: the watchdog never reported on the moving suite"
+if grep -q '^KILL' "$tmp/moving"; then
+    fail "killed a suite that was still making progress"
 fi
 
 echo "heartbeat OK"

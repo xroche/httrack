@@ -194,46 +194,54 @@ reap_leftover_processes() {
     return 0
 }
 
-# Emit a GitHub annotation in one write, so a background writer cannot interleave
-# into the foreground's output and split the command across two log lines.
+# Emit one GitHub annotation at level $1. The runner keeps only the first 10 of
+# each level per step and silently drops the rest, so the level is a budget: pick
+# one the step does not spend elsewhere. One printf led by a newline, since a
+# command is read only at the head of a line and the foreground shares this
+# stdout. sed/awk, not ${v//p/r}: bash 3.2 (macOS) cannot parse $'..' inside one.
 ci_annotate() {
-    local title=$1 msg=$2
-    msg=${msg//'%'/%25}
-    msg=${msg//$'\r'/}
-    msg=${msg//$'\n'/%0A}
-    printf '::warning title=%s::%s\n' "$title" "$msg"
+    local level=$1 title=$2 msg
+    msg=$(printf '%s' "$3" | tr -d '\r' | sed 's/%/%25/g' |
+        awk 'NR > 1 { printf "%%0A" } { printf "%s", $0 }')
+    printf '\n::%s title=%s::%s\n' "$level" "$title" "$msg"
 }
 
-# Report, and finally break, a suite running long. The Windows job dies with its
-# runner (#795), taking the step log and the if:always() artifacts with it, so the
-# wedging test has never been named; annotations stream as the log is written and
-# survive. Silent for $1s, then names the test in flight from $3 every $2; at $4
-# it kills the engine, and $5 if that frees nothing. Pick $4 past any run that
-# could still pass, since it forfeits whatever the suite had left to do.
+# Report, and finally break, a wedged suite, through annotations: the Windows job
+# dies with its runner (#795), which takes the step log and the artifacts with it.
+# Quiet for $1s, then names the test in flight from $3 every $2s; kills $5 once $3
+# has been static for $4s. Staticness, never elapsed time: a healthy test in flight
+# and a wedged one look identical by the clock, but every outcome writes a line,
+# the per-test timeout included, so $4 past that timeout means it never fired.
 ci_suite_heartbeat() {
-    local quiet=$1 every=$2 progress=$3 hard=$4 main=$5 waited=$1
-    sleep "$quiet"
+    local quiet=$1 every=$2 progress=$3 stuck=$4 main=$5
+    local tick=$2 waited=0 static=0 said=0 last='' now=''
+    test "$tick" -le 30 || tick=30
     while :; do
-        ci_annotate "suite still running" "$(
-            printf '%ss elapsed, in flight: %s\n' "$waited" "$(tail -n 1 "$progress" 2>/dev/null)"
-            # Bounded: past the pipe's atomic size the write can interleave, and
-            # half a workflow command is not one.
+        sleep "$tick" >/dev/null 2>&1 # holds no stdout: the caller's trap orphans it
+        waited=$((waited + tick))
+        now=$(tail -n 1 "$progress" 2>/dev/null)
+        if test "$now" != "$last"; then
+            last=$now static=0
+        else
+            static=$((static + tick))
+        fi
+        test "$waited" -ge "$quiet" || continue
+        # Checked every tick, not on the annotation cadence, which would let a
+        # late wedge run past the step's own timeout before being caught.
+        if test "$static" -ge "$stuck"; then
+            ci_annotate error "suite watchdog" "killing the step: ${static}s without progress, in flight: $now"
+            kill_tree "$main"
+            return 0
+        fi
+        test $((waited - said)) -ge "$every" || continue
+        said=$waited
+        # notice, not warning: reap_leftover_processes spends the warning budget
+        # one leaking test at a time, and a leak is what precedes the wedge.
+        ci_annotate notice "suite still running" "$(
+            printf '%ss elapsed, %ss without progress, in flight: %s\n' "$waited" "$static" "$now"
             list_stray_processes 0 named | head -n 8
         )"
-        test "$waited" -lt "$hard" || break
-        sleep "$every"
-        waited=$((waited + every))
     done
-    local before after
-    before=$(tail -n 1 "$progress" 2>/dev/null)
-    reap_leftover_processes "watchdog at ${waited}s"
-    # A suite the reap frees reports far more than a killed step, so only kill one
-    # that stayed stuck. The grace is overridable so the unit test need not wait it out.
-    sleep "${HTTRACK_WATCHDOG_GRACE:-60}"
-    after=$(tail -n 1 "$progress" 2>/dev/null)
-    test "$before" = "$after" || return 0
-    ci_annotate "suite watchdog" "killing the step, last progress: $after"
-    kill_tree "$main"
 }
 
 # Pids of engine processes in process group $1. Scoped to the group because the

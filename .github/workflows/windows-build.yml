@@ -209,11 +209,10 @@ jobs:
           : >"$progress"
 
           # Neither survives a job that dies with its runner (#795), so a watchdog
-          # reports through annotations, which do, and ends the step at 37 min if
-          # the deadline above never got its turn. Quiet below 12 min, since a
-          # healthy run takes 8-9; killing at 37 forfeits nothing, as the deadline
-          # gate already fails every suite still alive at 36.
-          ci_suite_heartbeat 720 360 "$progress" 2160 $$ &
+          # reports through annotations, which do. Quiet below 12 min because a
+          # healthy run takes 8-9; 900s without a progress line means $per_test
+          # never fired, and still leaves 4 min before the step timeout.
+          ci_suite_heartbeat 720 360 "$progress" 900 $$ &
           heartbeat=$!
           trap 'kill "$heartbeat" 2>/dev/null || true' EXIT
 
