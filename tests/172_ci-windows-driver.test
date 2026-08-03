@@ -19,6 +19,7 @@ fail() {
 cd "$tmp"
 
 path_before=$PATH
+# shellcheck source=tests/ci-windows-suite.sh
 . "$driver"
 test "$(type -t ci_suite_heartbeat)" = function || fail "sourcing did not define the watchdog"
 test ! -e suite-progress.log || fail "sourcing drove a suite"
@@ -46,6 +47,7 @@ EOF
 bin=$tmp/bin
 mkdir -p "$bin"
 printf '#!/bin/sh\nexit 0\n' >"$bin/httrack"
+# shellcheck disable=SC2016 # $2 is the stub's own argument
 printf '#!/bin/sh\necho "$2"\n' >"$bin/cygpath"
 chmod +x "$bin/httrack" "$bin/cygpath"
 test -x "$bin/httrack" || {
