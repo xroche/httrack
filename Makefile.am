@@ -6,7 +6,9 @@ ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
 		httrack-doc.html lang.def README.md tools/mkdeb.sh \
-		tools/macos-app.sh tools/Info.plist.in tools/HTTrack.icns \
+		tools/macos-app.sh tools/macos-bundle.sh tools/macos-release.sh \
+		tools/httrack-launcher.c \
+		tools/Info.plist.in tools/HTTrack.icns \
 		bootstrap build.sh
 
 # Build the signed Debian packages from a clean source export. Pass the signing
@@ -25,3 +27,12 @@ macos-app:
 	$(SHELL) $(top_srcdir)/tools/macos-app.sh --plist tools/Info.plist \
 		--icon $(top_srcdir)/tools/HTTrack.icns $(APP_FLAGS)
 .PHONY: macos-app
+
+# Sign, notarize and pack that bundle into the DMG we publish, e.g.
+#   make macos-release RELEASE_FLAGS="--app /tmp/HTTrack.app --identity ABCD1234 \
+#       --notary-key AuthKey.p8 --notary-key-id KEYID --notary-issuer ISSUERID"
+# See tools/macos-release.sh for the rest; .github/workflows/macos-release.yml runs it.
+RELEASE_FLAGS =
+macos-release:
+	$(SHELL) $(top_srcdir)/tools/macos-release.sh $(RELEASE_FLAGS)
+.PHONY: macos-release

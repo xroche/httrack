@@ -4,6 +4,9 @@
 # resolves htsserver and its data relative to its own path.
 set -eu
 
+# shellcheck source=tools/macos-bundle.sh
+. "$(dirname "$0")/macos-bundle.sh"
+
 usage() {
     echo "usage: $0 --prefix DIR --plist FILE --icon FILE [--out DIR]" >&2
     exit 2
@@ -79,12 +82,6 @@ sed -e "s| \"$prefix/[^\"]*\"||g" "$wht" >"$wht.tmp"
 mv -f "$wht.tmp" "$wht"
 chmod +x "$wht"
 
-cat >"$app/Contents/MacOS/HTTrack" <<'EOF'
-#!/bin/sh
-exec "$(dirname "$0")/../Resources/bin/webhttrack" "$@"
-EOF
-chmod +x "$app/Contents/MacOS/HTTrack"
-
 fw="$app/Contents/Frameworks"
 
 # Everything outside macOS itself must travel with the bundle; OpenSSL comes from Homebrew here.
@@ -97,11 +94,7 @@ sysdep() {
 
 # Every file, not a prefilter: this list drives the copy, the relink and the audit alike.
 machos() {
-    find "$app/Contents" -type f >"$list"
-    : >"$mach"
-    while IFS= read -r f; do
-        if file "$f" | grep -q Mach-O; then printf '%s\n' "$f" >>"$mach"; fi
-    done <"$list"
+    machos_into "$app/Contents" "$mach"
 }
 
 # Only the indented lines are dependencies; a universal binary heads each slice.
@@ -168,6 +161,7 @@ copy_dylibs() {
 relink() {
     test -d "$fw" || return 0
     machos
+    mainexe=$(main_executable "$app")
     while IFS= read -r bin; do
         case "$bin" in
         "$fw"/*) rewrite -id "@rpath/$(basename "$bin")" "$bin" ;;
@@ -182,17 +176,29 @@ relink() {
         otool -l "$bin" | awk '/LC_RPATH/ {r = 1} r && $1 == "path" {print $2; r = 0}' >"$deplist"
         grep -qxF "$rp" "$deplist" || rewrite -add_rpath "$rp" "$bin"
         # install_name_tool invalidates the signature, and arm64 kills an unsigned Mach-O.
+        [ "$bin" = "$mainexe" ] && continue
         codesign -f -s - "$bin"
     done <"$mach"
 }
 
 # Unconditional: shipping an unchecked bundle is worse than refusing to build one.
-for t in otool install_name_tool codesign file; do
+for t in cc otool install_name_tool codesign file; do
     command -v "$t" >/dev/null 2>&1 ||
         fail "$t not found -- macOS bundling needs the Xcode command line tools"
 done
+# After the preflight, and before the walks below have to find it. headerpad,
+# because relink() adds an rpath to every Mach-O in the bundle.
+launcher="$(dirname "$0")/httrack-launcher.c"
+test -r "$launcher" || fail "no launcher source at $launcher"
+cc -O2 -Wall -Wextra -Werror -Wl,-headerpad_max_install_names \
+    -o "$(main_executable "$app")" "$launcher" ||
+    fail "could not build the bundle launcher from $launcher"
+
 copy_dylibs
 relink
+# Last, so the seal covers every file the two rewrote. Signing the bundle is also
+# what signs the main executable, which codesign will not take on its own.
+codesign -f -s - "$app"
 
 appreal=$(cd "$app" && pwd -P)
 
@@ -245,8 +251,7 @@ done <"$list"
 
 # CFBundleIconFile is a Resources basename with an optional extension, so resolve it
 # the way Finder does rather than assume the plist and the payload agree.
-iconname=$(awk '/<key>CFBundleIconFile<\/key>/ {
-        getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$app/Contents/Info.plist")
+iconname=$(plist_value "$app/Contents/Info.plist" CFBundleIconFile)
 test -n "$iconname" || fail "Info.plist declares no CFBundleIconFile"
 iconfile="$app/Contents/Resources/$iconname"
 test -r "$iconfile" || iconfile="$iconfile.icns"
@@ -261,15 +266,13 @@ test "$((0x$iconlen))" -eq "$iconsize" ||
 
 # The plist version is a separate spot from the engine's, so drift is silent unless
 # something compares them (#884 is what that looks like when nobody does).
-plistver=$(awk '/<key>CFBundleShortVersionString<\/key>/ {
-        getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$app/Contents/Info.plist")
+plistver=$(plist_value "$app/Contents/Info.plist" CFBundleShortVersionString)
 binver=$("$app/Contents/Resources/bin/httrack" --version 2>/dev/null |
     sed -n 's/.*[Vv]ersion \([0-9][0-9.]*[-.][0-9][0-9]*\).*/\1/p' | head -1 | tr '-' '.')
 test -n "$binver" || fail "could not read a version out of the installed httrack"
 test "$plistver" = "$binver" ||
     fail "CFBundleShortVersionString says $plistver, httrack says $binver"
-bundlever=$(awk '/<key>CFBundleVersion<\/key>/ {
-        getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$app/Contents/Info.plist")
+bundlever=$(plist_value "$app/Contents/Info.plist" CFBundleVersion)
 test "$bundlever" = "$binver" ||
     fail "CFBundleVersion says $bundlever, httrack says $binver"
 
