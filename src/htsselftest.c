@@ -2875,6 +2875,18 @@ static int st_cache_hdrbounds(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static int st_cache_urlbounds(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  if (argc < 1) {
+    fprintf(stderr, "cache-urlbounds: needs a directory\n");
+    return 1;
+  }
+  err = cache_url_bounds_selftest(opt, argv[0]);
+  printf("cache-urlbounds: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_cache_corrupt(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -7911,6 +7923,9 @@ static const struct selftest_entry {
     {"cache-hdrbounds", "<dir>",
      "cache header block must stay bounded at max-length fields",
      st_cache_hdrbounds},
+    {"cache-urlbounds", "<dir>",
+     "cache store and lookup at max-length URLs must not abort or alias",
+     st_cache_urlbounds},
     {"zip-repair-shift", "<dir>",
      "cache zip-repair header read must not overflow a signed shift",
      st_zip_repair_shift},

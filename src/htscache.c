@@ -212,11 +212,30 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
   }
 }
 
+/* Append the cache key adr+fil to dst (already holding an optional scheme
+   prefix). All-or-nothing: a key that does not fit leaves dst untouched and
+   returns HTS_FALSE, because a clipped one is another URL's valid key. */
+static hts_boolean cache_key_cat(char *dst, size_t dstSize, const char *adr,
+                                 const char *fil) {
+  const size_t used = strlen(dst);
+  const size_t adrLen = strlen(adr);
+  const size_t filLen = strlen(fil);
+
+  /* untrusted alone on the left, the rest provably non-negative */
+  if (used >= dstSize || adrLen >= dstSize - used ||
+      filLen >= dstSize - used - adrLen) {
+    return HTS_FALSE;
+  }
+  memcpy(dst + used, adr, adrLen);
+  memcpy(dst + used + adrLen, fil, filLen + 1);
+  return HTS_TRUE;
+}
+
 /* Ajout d'un fichier en cache */
 void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                const char *url_adr, const char *url_fil, const char *url_save,
                int all_in_cache, const char *path_prefix) {
-  char BIGSTK filename[HTS_URLMAXSIZE * 4];
+  char BIGSTK filename[CACHE_ENTRYNAME_SIZE];
   char catbuff[CATBUFF_SIZE];
   int dataincache = 0;          // put data in cache ?
   char BIGSTK headers[CACHE_HEADERS_SIZE];
@@ -342,8 +361,13 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   } else {
     strcpybuff(filename, "");
   }
-  strcatbuff(filename, url_adr);
-  strcatbuff(filename, url_fil);
+  /* the URL comes off the wire: drop the entry rather than abort the mirror */
+  if (!cache_key_cat(filename, sizeof(filename), url_adr, url_fil)) {
+    hts_log_print(opt, LOG_WARNING,
+                  "URL too long to be cached, entry not cached: %s%s", url_adr,
+                  url_fil);
+    return;
+  }
 
   /* Time */
   memset(&fi, 0, sizeof(fi));
@@ -506,7 +530,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                                const char *target_save, char *location,
                                char *return_save, int readonly) {
   char BIGSTK location_default[HTS_URLMAXSIZE * 2];
-  char BIGSTK buff[HTS_URLMAXSIZE * 2];
+  char BIGSTK buff[CACHE_KEY_SIZE];
   char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
   char BIGSTK previous_save_[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
@@ -525,9 +549,13 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
     r.location = location_default;
   }
   r.location[0] = '\0';
-  strcpybuff(buff, adr);
-  strcatbuff(buff, fil);
-  hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
+  /* a key too long to be in the table is a miss, not a fatal error */
+  buff[0] = '\0';
+  if (!cache_key_cat(buff, sizeof(buff), adr, fil)) {
+    hash_pos_return = 0;
+  } else {
+    hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
+  }
   /* avoid errors on data entries */
   if (adr[0] == '/' && adr[1] == '/' && adr[2] == '[') {
     hash_pos_return = 0;
@@ -1126,7 +1154,8 @@ void cache_init(cache_back * cache, httrackp * opt) {
         /* Ready directory entries */
         if ((zErr = unzGoToFirstFile((unzFile) cache->zipInput)) == Z_OK) {
           char comment[128];
-          char BIGSTK filename[HTS_URLMAXSIZE * 4];
+          char BIGSTK filename[CACHE_ENTRYNAME_SIZE];
+          unz_file_info zfi;
           int entries = 0;
 
           memset(comment, 0, sizeof(comment));  // for truncated reads
@@ -1135,13 +1164,17 @@ void cache_init(cache_back * cache, httrackp * opt) {
 
             filename[0] = '\0';
             comment[0] = '\0';
+            memset(&zfi, 0, sizeof(zfi));
             if (unzOpenCurrentFile((unzFile) cache->zipInput) == Z_OK) {
               if ((readSizeHeader =
-                   unzGetLocalExtrafield((unzFile) cache->zipInput, comment,
-                                         sizeof(comment) - 2)) > 0
-                  && unzGetCurrentFileInfo((unzFile) cache->zipInput, NULL,
-                                           filename, sizeof(filename) - 2, NULL,
-                                           0, NULL, 0) == Z_OK) {
+                       unzGetLocalExtrafield((unzFile) cache->zipInput, comment,
+                                             sizeof(comment) - 2)) > 0 &&
+                  unzGetCurrentFileInfo((unzFile) cache->zipInput, &zfi,
+                                        filename, sizeof(filename) - 2, NULL, 0,
+                                        NULL, 0) == Z_OK
+                  /* minizip leaves a name this long unterminated, and a clipped
+                     one would index as another URL's key */
+                  && zfi.size_filename < sizeof(filename) - 2) {
                 long int pos =
                   (long int) unzGetOffset((unzFile) cache->zipInput);
                 assertf(readSizeHeader < sizeof(comment));
