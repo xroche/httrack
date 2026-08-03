@@ -30,8 +30,7 @@ HelpHtmlimages_DATA = $(srcdir)/images/*
 HelpHtmlTxt_DATA = ../greetings.txt ../history.txt ../license.txt
 WebHtml_DATA = $(srcdir)/server/*.html $(srcdir)/server/*.js $(srcdir)/server/*.css
 WebHtmlimages_DATA = $(srcdir)/server/images/*
-# The whole icon set below is generated from the brand master by gen/export.py;
-# the .xpm is the legacy $(datadir)/pixmaps fallback for the hicolor theme.
+# Generated from the brand master by gen/export.py. Asserted by tests/160.
 WebPixmap_DATA = $(srcdir)/server/div/*.xpm
 WebIcon16x16_DATA = $(srcdir)/server/div/16x16/*.png
 WebIcon32x32_DATA = $(srcdir)/server/div/32x32/*.png
