@@ -55,14 +55,18 @@ test -n "$had_m" || test -n "$windows" || set +m
 # under MSYS fork costs tens of milliseconds, and a second is what the Windows
 # suite already paid before this wrapper existed.
 if test -n "$windows"; then
-    tick=1 per_sec=1
+    tick=1
 else
-    tick=0.1 per_sec=10
+    tick=0.1
 fi
 
-ticks=0
+# Wall clock, not a tick count: under starvation an iteration costs far more than
+# $tick, so a counted deadline never arrives. Strictly greater, because $SECONDS
+# is floored: a reading of $budget can be a fraction under it, and firing early
+# kills a healthy test.
+start=$SECONDS
 while kill -0 "$pid" 2>/dev/null; do
-    if test "$((ticks / per_sec))" -ge "$budget"; then
+    if test "$((SECONDS - start))" -gt "$budget"; then
         # The dump below can run for minutes. Say so where a suite watchdog is
         # watching, or the silence reads as a wedge and the step dies mid-stack.
         test -z "${HTTRACK_PROGRESS_LOG:-}" || echo "DUMP $name" >>"$HTTRACK_PROGRESS_LOG"
@@ -74,6 +78,5 @@ while kill -0 "$pid" 2>/dev/null; do
         exit 124
     fi
     sleep "$tick"
-    ticks=$((ticks + 1))
 done
 wait "$pid"
