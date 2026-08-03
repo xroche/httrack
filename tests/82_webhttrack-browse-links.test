@@ -100,8 +100,7 @@ finished = get("/server/finished.html").decode("latin-1")
 check("HTTrack Website Copier" in finished, "finished.html rendered")
 check("file://" not in finished, "finished.html has no file: link")
 
-# Every image a GUI page names must be served. The masthead is referenced from 23
-# of them, so one renamed asset breaks the lot and nothing else here would notice.
+# Every image a GUI page names must be served; the masthead is on 23 of them.
 page = get("/server/step2.html").decode("latin-1")
 srcs = [s for s in re.findall(r'<img[^>]+src="([^"]+)"', page)
         if not s.startswith(("http:", "https:", "data:"))]
