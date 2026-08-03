@@ -123,6 +123,11 @@ rewrite() {
         fail "install_name_tool failed; link with LDFLAGS=-Wl,-headerpad_max_install_names"
 }
 
+# Resolves the directory, which is what Homebrew's opt -> Cellar symlink is.
+resolved() {
+    (cd "$(dirname "$1")" && printf '%s/%s\n' "$(pwd -P)" "$(basename "$1")")
+}
+
 # Each pass rescans, so a dylib pulled in by the last pass gets its own deps on the next.
 copy_dylibs() {
     mkdir -p "$fw"
@@ -138,11 +143,14 @@ copy_dylibs() {
         while IFS= read -r dep; do
             case "$dep" in @*) continue ;; esac
             sysdep "$dep" && continue
+            test -r "$dep" || fail "$dep is loaded by the bundle but is not readable here"
             base=$(basename "$dep")
             known=$(awk -v b="$base" '$1 == b {print $2}' "$fwmap")
             if [ -n "$known" ]; then
-                # Frameworks is flat, so two libraries under one name would clobber.
-                test "$known" = "$dep" || fail "$dep and $known are both named $base"
+                # Frameworks is flat, so two distinct libraries under one name would
+                # clobber; one library reached by two paths is fine.
+                test "$(resolved "$known")" = "$(resolved "$dep")" ||
+                    fail "$dep and $known are both named $base"
                 continue
             fi
             printf '%s\t%s\n' "$base" "$dep" >>"$fwmap"
@@ -150,7 +158,6 @@ copy_dylibs() {
         done <"$deplist"
         test -s "$list" || break
         while IFS= read -r dep; do
-            test -r "$dep" || fail "$dep is loaded by the bundle but is not readable here"
             cp "$dep" "$fw/"
             chmod u+w "$fw/$(basename "$dep")"
         done <"$list"
