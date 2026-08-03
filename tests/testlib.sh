@@ -195,50 +195,52 @@ reap_leftover_processes() {
 }
 
 # Emit one GitHub annotation at level $1. The runner keeps only the first 10 of
-# each level per step and silently drops the rest, so the level is a budget: pick
-# one the step does not spend elsewhere. One printf led by a newline, since a
-# command is read only at the head of a line and the foreground shares this
-# stdout. sed/awk, not ${v//p/r}: bash 3.2 (macOS) cannot parse $'..' inside one.
+# each level per step and drops the rest silently, so the level is a budget: pick
+# one the step does not spend elsewhere. Led by a newline, since a command is only
+# read at a line head. sed/awk, not ${v//p/r}: bash 3.2 cannot parse $'..' inside one.
 ci_annotate() {
     local level=$1 title=$2 msg
     msg=$(printf '%s' "$3" | tr -d '\r' | sed 's/%/%25/g' |
-        awk 'NR > 1 { printf "%%0A" } { printf "%s", $0 }')
+        awk 'NR > 1 { printf "%%0A" } { printf "%s", $0 }' || true)
     printf '\n::%s title=%s::%s\n' "$level" "$title" "$msg"
 }
 
-# Report, and finally break, a wedged suite, through annotations: the Windows job
-# dies with its runner (#795), which takes the step log and the artifacts with it.
 # Quiet for $1s, then names the test in flight from $3 every $2s; kills $5 once $3
 # has been static for $4s. Staticness, never elapsed time: a healthy test in flight
 # and a wedged one look identical by the clock, but every outcome writes a line,
-# the per-test timeout included, so $4 past that timeout means it never fired.
+# the per-test timeout included, so $4 past that timeout means it never fired (#795).
+# Seconds since this shell started. Overridable, so the unit test can drive the
+# schedule the workflow really passes off a virtual clock instead of waiting it out.
+hb_now() { echo "$SECONDS"; }
+
 ci_suite_heartbeat() {
     local quiet=$1 every=$2 progress=$3 stuck=$4 main=$5
-    local tick=$2 waited=0 static=0 said=0 last='' now=''
+    local tick=$2 begin now line said moved last=''
+    # Measured, never accumulated: the starvation this watchdog exists to catch is
+    # exactly what makes a sleep overshoot, and drift only ever delays the kill.
     test "$tick" -le 30 || tick=30
+    begin=$(hb_now) said=$begin moved=$begin
     while :; do
         sleep "$tick" >/dev/null 2>&1 # holds no stdout: the caller's trap orphans it
-        waited=$((waited + tick))
-        now=$(tail -n 1 "$progress" 2>/dev/null)
-        if test "$now" != "$last"; then
-            last=$now static=0
-        else
-            static=$((static + tick))
-        fi
-        test "$waited" -ge "$quiet" || continue
-        # Checked every tick, not on the annotation cadence, which would let a
-        # late wedge run past the step's own timeout before being caught.
-        if test "$static" -ge "$stuck"; then
-            ci_annotate error "suite watchdog" "killing the step: ${static}s without progress, in flight: $now"
+        now=$(hb_now)
+        # Guarded: under the caller's errexit a bare substitution assignment would
+        # end the watchdog in silence, which reads as protection and is not.
+        line=$(tail -n 1 "$progress" 2>/dev/null || true)
+        test "$line" = "$last" || { last=$line moved=$now; }
+        test $((now - begin)) -ge "$quiet" || continue
+        # Every tick, not on the annotation cadence, which would let a late wedge
+        # outlive the step's own timeout before being caught.
+        if test $((now - moved)) -ge "$stuck"; then
+            ci_annotate error "suite watchdog" "killing the step: $((now - moved))s without progress, in flight: $last"
             kill_tree "$main"
             return 0
         fi
-        test $((waited - said)) -ge "$every" || continue
-        said=$waited
-        # notice, not warning: reap_leftover_processes spends the warning budget
-        # one leaking test at a time, and a leak is what precedes the wedge.
+        test $((now - said)) -ge "$every" || continue
+        said=$now
+        # notice, not warning: reap_leftover_processes spends the warning budget.
         ci_annotate notice "suite still running" "$(
-            printf '%ss elapsed, %ss without progress, in flight: %s\n' "$waited" "$static" "$now"
+            printf '%ss elapsed, %ss without progress, in flight: %s\n' \
+                "$((now - begin))" "$((now - moved))" "$last"
             list_stray_processes 0 named | head -n 8
         )"
     done

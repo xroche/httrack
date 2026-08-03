@@ -209,9 +209,10 @@ jobs:
           : >"$progress"
 
           # Neither survives a job that dies with its runner (#795), so a watchdog
-          # reports through annotations, which do. Quiet below 12 min because a
-          # healthy run takes 8-9; 900s without a progress line means $per_test
-          # never fired, and still leaves 4 min before the step timeout.
+          # reports through annotations, which do. Quiet past 12 min since a healthy
+          # run takes 8-9; a kill 900s after the last progress line clears the
+          # longest legitimate gap, one $per_test, and still lands inside the step's
+          # own timeout for anything the loop was able to start.
           ci_suite_heartbeat 720 360 "$progress" 900 $$ &
           heartbeat=$!
           trap 'kill "$heartbeat" 2>/dev/null || true' EXIT
@@ -253,6 +254,9 @@ jobs:
                 echo "FAIL $t (exit $rc)"
                 # These assert with `test "$(...)" == "..." || exit 1`, which
                 # says nothing at all on failure. Re-run traced, still bounded.
+                # Noted first, or a slow trace reads as a wedge to the watchdog,
+                # which would then kill the step in the middle of writing it.
+                echo "RERUN $t" >>"$progress"
                 run_with_timeout "$per_test" bash -x "$t" >>"$t.log" 2>&1 || true
                 tail -n 25 "$t.log" | sed 's/^/      /'
                 ;;

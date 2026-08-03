@@ -1,10 +1,9 @@
 #!/bin/bash
 #
-# Unit-tests ci_suite_heartbeat (testlib.sh): when the Windows runner dies it
-# takes the step log and the artifacts, so these annotations are all that names
-# the wedged test (#795). Timings are scaled down and every assertion is against
-# the wall clock, since a watchdog with the right labels and the wrong delays
-# would kill healthy runs.
+# Unit-tests ci_suite_heartbeat (testlib.sh) on a virtual clock, at the values the
+# Windows workflow really passes: scaled-down timings collapse the sleep
+# granularity, the annotation cadence and the staticness window onto one number,
+# and a watchdog that confuses those kills healthy runs (#795).
 
 set -euo pipefail
 
@@ -26,54 +25,60 @@ list_stray_processes() {
     echo "(stub)"
 }
 
-# Two lines, and a '%' in the one that matters: the annotation must name the test
-# in flight, not the suite's first, and must escape what it quotes.
-printf 'RUN 98_earlier.test at 0s\nRUN 99_stuck%%mark.test at 10s\n' >"$progress"
+# First on the real clock, so the virtual one below cannot be measuring itself:
+# hb_now must default to seconds, and a static log must actually be killed.
+printf 'RUN 99_stuck.test at 0s\n' >"$progress"
+began=$SECONDS
+ci_suite_heartbeat 1 1 "$progress" 2 4242 >"$tmp/real" 2>&1
+spent=$((SECONDS - began))
+test "$spent" -ge 2 || fail "killed after ${spent}s of a 2s window: hb_now is not seconds"
+test "$spent" -le 30 || fail "took ${spent}s to notice a static log"
+grep -q '^KILL 4242$' "$tmp/real" || fail "a static log was not killed on the real clock"
 
-# Stamped as each line arrives. quiet=3 every=1 stuck=5, so nothing may be said
-# before 3s and the kill may not land before 5s of a static progress file.
-start=$SECONDS
-ci_suite_heartbeat 3 1 "$progress" 5 4242 |
-    while IFS= read -r line; do
-        test -z "$line" || printf '%s|%s\n' "$((SECONDS - start))" "$line"
-    done >"$tmp/out"
+# Virtual clock. sleep advances it and reports progress up to 1200, so the suite
+# is still healthy well past the quiet window before it goes silent.
+vnow=0
+# Two % and a CR in every line, because the runner needs both encoded: left raw,
+# either one truncates the command it is carrying.
+sleep() {
+    vnow=$((vnow + $1))
+    test "$vnow" -gt 1200 || printf 'RUN %ss%%a%%b.test\r at %ss\n' "$vnow" "$vnow" >>"$progress"
+}
+hb_now() { echo "$vnow"; }
 
-first=$(sed -n '1s/|.*//p' "$tmp/out")
-test -n "$first" || fail "the watchdog said nothing at all"
-test "$first" -ge 3 || fail "annotated at ${first}s, inside the 3s quiet window"
+printf 'RUN 98_earlier.test at 0s\n' >"$progress"
+ci_suite_heartbeat 720 360 "$progress" 900 4242 >"$tmp/out" 2>&1
 
-killed=$(sed -n 's/^\([0-9]*\)|KILL 4242$/\1/p' "$tmp/out")
-test -n "$killed" || fail "a suite static past the stuck window was not killed"
-test "$killed" -ge 5 || fail "killed at ${killed}s, before 5s without progress"
+# The suite reported healthily until 1200, past the quiet window, so nothing may
+# have killed it before then; the kill lands one staticness window later. tick is
+# clamped to 30, so it fires within 30s of that, not a whole 360 late.
+killed=$(sed -n 's/^::error title=suite watchdog::killing the step: \([0-9]*\)s.*/\1/p' "$tmp/out")
+test -n "$killed" || fail "a suite that stopped reporting was never killed"
+test "$killed" -ge 900 || fail "killed after only ${killed}s without progress, want 900"
+test "$killed" -le 930 || fail "killed ${killed}s after progress stopped: tick is not clamped to 30"
 
-# The kill has to be announced, or it lands as an unexplained dead step: exactly
-# the #795 silence this exists to end.
-sed -n "$(($(grep -c '' "$tmp/out") - 1))p" "$tmp/out" |
-    grep -q '::error title=suite watchdog::' || fail "the kill was not annotated"
+# Quiet window and cadence, from the annotations' own elapsed field.
+said=()
+while IFS= read -r t; do
+    said+=("$t")
+done < <(sed -n 's/^::notice title=suite still running::\([0-9]*\)s elapsed.*/\1/p' "$tmp/out")
+test "${#said[@]}" -ge 2 || fail "only ${#said[@]} annotations before the kill"
+test "${said[0]}" -eq 720 || fail "first annotation at ${said[0]}s, want 720"
+prev=${said[0]}
+for t in "${said[@]:1}"; do
+    test $((t - prev)) -eq 360 || fail "annotations ${prev}s and ${t}s apart, want 360"
+    prev=$t
+done
 
-grep -q 'in flight: RUN 99_stuck%25mark.test' "$tmp/out" ||
-    fail "annotation does not name the escaped test in flight: $(cat "$tmp/out")"
+grep -q 'in flight: RUN 1200s%25a%25b.test at 1200s' "$tmp/out" ||
+    fail "annotation does not name the escaped test in flight: $(head -3 "$tmp/out")"
+grep -q "$(printf '\r')" "$tmp/out" && fail "a CR reached the annotation, truncating it"
 grep -q '98_earlier' "$tmp/out" && fail "annotation names the first test, not the one in flight"
+grep -q '%0A(stub)' "$tmp/out" || fail "annotation dropped the process list, or its newline encoding"
 grep -qx '0 named' "$tmp/strayargs" || fail "process list not host-wide: $(cat "$tmp/strayargs")"
 
-# A suite that keeps reporting is never killed, however long it runs.
-printf 'RUN 99_slow.test at 0s\n' >"$progress"
-for i in 1 2 3 4 5 6 7 8 9; do
-    (
-        command sleep "$i"
-        printf '%s 99_slow.test\n' "$i" >>"$progress"
-    ) &
-done
-ci_suite_heartbeat 3 1 "$progress" 5 4242 >"$tmp/moving" 2>&1 &
-hb=$!
-command sleep 9
-kill "$hb" 2>/dev/null || true
-wait 2>/dev/null || true
-
-grep -q '::notice title=suite still running::' "$tmp/moving" ||
-    fail "positive control: the watchdog never reported on the moving suite"
-if grep -q '^KILL' "$tmp/moving"; then
-    fail "killed a suite that was still making progress"
-fi
+# A command is only read at the head of a line, so every annotation opens one.
+awk '/^::(notice|error) title=/ { if (prev != "") bad = 1 } { prev = $0 } END { exit bad }' "$tmp/out" ||
+    fail "an annotation followed a non-empty line, where the runner cannot see it"
 
 echo "heartbeat OK"
