@@ -9,7 +9,6 @@
 set -euo pipefail
 
 testdir=$(cd "$(dirname "$0")" && pwd)
-# Sourcing the CI driver defines the watchdog without running a suite.
 # shellcheck source=tests/ci-windows-suite.sh
 . "${testdir}/ci-windows-suite.sh"
 

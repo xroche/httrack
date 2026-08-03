@@ -232,3 +232,4 @@ TESTS += 161_local-proxytrack-zip-headers.test
 TESTS += 162_zlib-cache-urlbounds.test
 TESTS += 164_local-proxytrack-arc-hostile.test
 TESTS += 171_watchdog-heartbeat.test
+TESTS += 172_ci-windows-driver.test

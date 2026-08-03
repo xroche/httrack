@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# Drives the offline test suite on the Windows runner: per-test budget, suite
-# deadline, engine reaping, expected-skip gate and the wedge watchdog (#795). $1
-# is the directory holding the built httrack.exe. Sourceable, so the watchdog it
-# carries can be unit-tested by 171_watchdog-heartbeat.test.
+# Drives the offline test suite on the Windows runner (per-test budget, suite
+# deadline, engine reaping, skip gate, wedge watchdog #795). $1 is the directory
+# holding the built httrack.exe. Sourcing defines the helpers and drives nothing.
 
 testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=tests/testlib.sh
@@ -63,10 +62,11 @@ ci_suite_heartbeat() {
     done
 }
 
-# Only a direct run drives a suite; a sourcing test wants the watchdog above.
-test "${BASH_SOURCE[0]}" = "$0" || return 0
+# Only a direct run drives a suite. Asked of the shell, not derived from $0,
+# which a caller can set to this very path (172_ci-windows-driver.test).
+(return 0 2>/dev/null) && return 0
 
-# What "shell: bash" gave the step this used to be inlined in.
+# Explicit now that this is a script; GitHub's "shell: bash" gave the step both.
 set -euo pipefail
 bin=${1:?usage: ci-windows-suite.sh <bindir>}
 export PATH="$bin:$PATH"
