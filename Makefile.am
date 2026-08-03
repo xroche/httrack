@@ -6,7 +6,7 @@ ACLOCAL_AMFLAGS = -I m4
 EXTRA_DIST = INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
 		httrack-doc.html lang.def README.md tools/mkdeb.sh \
-		tools/macos-app.sh tools/Info.plist.in \
+		tools/macos-app.sh tools/Info.plist.in tools/HTTrack.icns \
 		bootstrap build.sh
 
 # Build the signed Debian packages from a clean source export. Pass the signing
@@ -22,5 +22,6 @@ deb:
 #   make macos-app APP_FLAGS="--prefix /tmp/inst --out /tmp"
 APP_FLAGS =
 macos-app:
-	$(SHELL) $(top_srcdir)/tools/macos-app.sh --plist tools/Info.plist $(APP_FLAGS)
+	$(SHELL) $(top_srcdir)/tools/macos-app.sh --plist tools/Info.plist \
+		--icon $(top_srcdir)/tools/HTTrack.icns $(APP_FLAGS)
 .PHONY: macos-app

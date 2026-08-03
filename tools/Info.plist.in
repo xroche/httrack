@@ -6,6 +6,8 @@
 	<string>en</string>
 	<key>CFBundleExecutable</key>
 	<string>HTTrack</string>
+	<key>CFBundleIconFile</key>
+	<string>HTTrack</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.httrack.WebHTTrack</string>
 	<key>CFBundleInfoDictionaryVersion</key>
