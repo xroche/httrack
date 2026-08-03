@@ -515,6 +515,30 @@ static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
 }
 
 /**
+ * Append formatted text at dest[*used] (dest capacity size, NUL included),
+ * advancing *used past it. All-or-nothing: on overflow dest is left as it was
+ * and HTS_FALSE returned, so a record parsed back field by field never carries
+ * a half-written one.
+ */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(4, 5) hts_boolean
+    slcatprintfbuff(char *dest, size_t size, size_t *used, const char *fmt,
+                    ...) {
+  va_list args;
+  hts_boolean fit;
+
+  assertf(dest != NULL && used != NULL && *used < size);
+  va_start(args, fmt);
+  fit = vslprintfbuff(dest + *used, size - *used, fmt, args);
+  va_end(args);
+  if (fit) {
+    *used += strlen(dest + *used);
+  } else {
+    dest[*used] = '\0';
+  }
+  return fit;
+}
+
+/**
  * slprintfbuff() for diagnostics quoting remote or client text, which are
  * meant to be clipped: nothing to act on, hence not HTS_CHECK_RESULT. A (void)
  * cast on slprintfbuff() is no substitute, GCC warns through it.

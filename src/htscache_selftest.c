@@ -1641,3 +1641,194 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
 
   return failures;
 }
+
+/* Header block of the ZIP's first entry, from its local extra field. By
+   position, not name: unzLocateFile compares through a 256-byte buffer and
+   cannot find the multi-KB entry name this test writes. */
+static int read_first_entry_extra(const char *path, char *extra,
+                                  size_t extralen) {
+  unzFile z = unzOpen(path);
+  int elen = -1;
+
+  if (z == NULL)
+    return -1;
+  if (unzGoToFirstFile(z) == UNZ_OK && unzOpenCurrentFile(z) == UNZ_OK) {
+    elen = unzGetLocalExtrafield(z, extra, (unsigned) (extralen - 1));
+    if (elen >= 0) {
+      extra[elen] = '\0';
+    }
+    unzCloseCurrentFile(z);
+  }
+  unzClose(z);
+  return elen;
+}
+
+static void fill_str(char *s, size_t size, size_t len, char c) {
+  assertf(len < size);
+  memset(s, c, len);
+  s[len] = '\0';
+}
+
+/* A value read back must be a prefix of what was written, and no shorter than
+   `least`: the reader clips a line to its parse buffer, but never splices,
+   reorders, or drops more than that. */
+static int check_prefix(const char *what, const char *got, const char *want,
+                        size_t least) {
+  const size_t len = strlen(got);
+
+  if (len < least || strncmp(got, want, len) != 0) {
+    fprintf(stderr,
+            "cache-hdrbounds: %s reads back '%.32s...' (%d bytes), expected a "
+            "prefix of the %d written, at least %d long\n",
+            what, got, (int) len, (int) strlen(want), (int) least);
+    return 1;
+  }
+  return 0;
+}
+
+int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
+  int failures = 0;
+  cache_back cache;
+  /* every htsblk field at the cap its declaration allows */
+  static char msg[80], ctype[HTS_MIMETYPE_SIZE], charset[HTS_MIMETYPE_SIZE];
+  static char etag[256], cdispo[256], location[HTS_URLMAXSIZE * 2];
+  /* url_adr/url_fil/save are all lien_back-sized, so the three alone reach
+     6 KB, past the header block the writer builds them in */
+  static char big_adr[HTS_URLMAXSIZE * 2], big_fil[HTS_URLMAXSIZE * 2];
+  static char big_save[HTS_URLMAXSIZE * 2];
+  /* the control: same maxed fields, but a URL short enough for the read path's
+     lookup buffer, so nothing is dropped and the round-trip must be exact */
+  static char ok_fil[HTS_URLMAXSIZE];
+  const char *const ok_adr = "example.com";
+  const char *const ok_save = "example.com/big.html";
+  const char *const body = "<html><body>maxed</body></html>";
+
+  fill_str(msg, sizeof(msg), sizeof(msg) - 1, 'M');
+  fill_str(ctype, sizeof(ctype), sizeof(ctype) - 1, 'C');
+  fill_str(charset, sizeof(charset), sizeof(charset) - 1, 'H');
+  fill_str(etag, sizeof(etag), sizeof(etag) - 1, 'E');
+  fill_str(cdispo, sizeof(cdispo), sizeof(cdispo) - 1, 'D');
+  fill_str(location, sizeof(location), sizeof(location) - 1, 'L');
+  /* 2040+2047: the largest pair cache_add's own "http://"+adr+fil filename
+     buffer (HTS_URLMAXSIZE*4) accepts, so the header block is what gives */
+  fill_str(big_adr, sizeof(big_adr), 2040, 'a');
+  big_fil[0] = '/';
+  fill_str(big_fil + 1, sizeof(big_fil) - 1, 2046, 'f');
+  fill_str(big_save, sizeof(big_save), sizeof(big_save) - 1, 'S');
+  ok_fil[0] = '/';
+  fill_str(ok_fil + 1, sizeof(ok_fil) - 1, sizeof(ok_fil) - 2, 'k');
+
+  {
+    char base[HTS_URLMAXSIZE];
+
+    strcpybuff(base, dir);
+    if (base[0] != '\0' && hts_lastchar(base) != '/') {
+      strcatbuff(base, "/");
+    }
+    StringCopy(opt->path_log, base);
+    StringCopy(opt->path_html, base);
+    StringCopy(opt->path_html_utf8, base);
+  }
+  opt->cache = HTS_CACHE_PRIORITY;
+
+  selftest_open_for_write(&cache, opt);
+  store_entry(opt, &cache, big_adr, big_fil, big_save, 200, msg, ctype, charset,
+              "Mon, 01 Jan 2024 00:00:00 GMT", etag, location, cdispo, body,
+              strlen(body));
+  store_entry(opt, &cache, ok_adr, ok_fil, ok_save, 200, msg, ctype, charset,
+              "Mon, 01 Jan 2024 00:00:00 GMT", etag, location, cdispo, body,
+              strlen(body));
+  selftest_close(&cache);
+
+  /* The overflowing entry is never read back through cache_readex: adr+fil
+     outgrows the read path's own lookup buffer. Read its header block straight
+     out of the ZIP instead: a runtime that does not trap the overrun would
+     otherwise store the over-long block and still pass. */
+  {
+    char zippath[HTS_URLMAXSIZE];
+    static char extra[CACHE_HEADERS_SIZE * 4];
+    size_t elen;
+
+    slprintfbuff_clip(zippath, sizeof(zippath), "%shts-cache/new.zip",
+                      StringBuff(opt->path_log));
+    if (read_first_entry_extra(zippath, extra, sizeof(extra)) < 0) {
+      fprintf(stderr, "cache-hdrbounds: maxed entry missing from the ZIP\n");
+      failures++;
+    } else if (strstr(extra, cdispo) == NULL) {
+      /* an early-out writer would leave the control entry first, and every
+         check below would then pass on the wrong block */
+      fprintf(stderr,
+              "cache-hdrbounds: first ZIP entry is not the maxed one\n");
+      failures++;
+    } else {
+      elen = strlen(extra);
+      if (elen >= CACHE_HEADERS_SIZE) {
+        fprintf(stderr,
+                "cache-hdrbounds: header block is %d bytes, past the writer's "
+                "%d-byte buffer\n",
+                (int) elen, (int) CACHE_HEADERS_SIZE);
+        failures++;
+      }
+      if (elen < 2 || strcmp(extra + elen - 2, "\r\n") != 0) {
+        fprintf(stderr, "cache-hdrbounds: header block ends mid-line\n");
+        failures++;
+      }
+      /* X-Fil is written last, so its absence is how we know the block
+         filled. Still present means this entry no longer reaches the bound --
+         url_adr/url_fil cannot grow (cache_add's filename buffer caps them),
+         so the case would need rebuilding, not silently weakening. */
+      if (strstr(extra, "X-Fil: ") != NULL) {
+        fprintf(stderr,
+                "cache-hdrbounds: the maxed entry no longer fills the %d-byte "
+                "block (%d bytes); this case has stopped testing the bound\n",
+                (int) CACHE_HEADERS_SIZE, (int) elen);
+        failures++;
+      }
+      /* X-Save is the only one of the three a reader acts on, so a full block
+         must not be what drops it */
+      if (strstr(extra, "X-Save: ") == NULL) {
+        fprintf(stderr, "cache-hdrbounds: X-Save was dropped from a full "
+                        "block; it must be written before X-Addr/X-Fil\n");
+        failures++;
+      }
+    }
+  }
+
+  selftest_open_for_read(&cache, opt);
+  {
+    char *locbuf = malloct(HTS_URLMAXSIZE * 2);
+    htsblk r;
+
+    locbuf[0] = '\0';
+    r = cache_readex(opt, &cache, ok_adr, ok_fil, "", locbuf, NULL, 1);
+    if (r.statuscode != 200) {
+      fprintf(stderr,
+              "cache-hdrbounds: entry after the overflowing one reads "
+              "statuscode %d, expected 200\n",
+              r.statuscode);
+      failures++;
+    }
+    /* a header block that fits loses nothing */
+    if (strcmp(r.msg, msg) != 0 || strcmp(r.contenttype, ctype) != 0 ||
+        strcmp(r.charset, charset) != 0 || strcmp(r.etag, etag) != 0 ||
+        strcmp(r.cdispo, cdispo) != 0) {
+      fprintf(stderr, "cache-hdrbounds: a maxed field did not round-trip\n");
+      failures++;
+    }
+    /* the reader clips this to its line buffer (1014 of the 2047 bytes at the
+       current HTS_URLMAXSIZE); the floor only has to rule out a real loss */
+    failures += check_prefix("location", locbuf, location, 1000);
+    if (r.adr == NULL || r.size != (LLint) strlen(body) ||
+        memcmp(r.adr, body, strlen(body)) != 0) {
+      fprintf(stderr, "cache-hdrbounds: body did not round-trip\n");
+      failures++;
+    }
+    if (r.adr != NULL) {
+      freet(r.adr);
+    }
+    freet(locbuf);
+  }
+  selftest_close(&cache);
+
+  return failures;
+}
