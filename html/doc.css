@@ -57,7 +57,15 @@ body {
 	padding: .6rem 0 0;
 }
 
-.masthead img { display: block; max-width: 100%; height: auto; }
+/* The wordmark's box is its ink box, so the k's ascender adds a band above the
+   caps and the round letters' overshoot one below the baseline. Trim both back
+   optically, or the tagline stops sitting against the baseline. */
+.masthead img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin: -1.7px 0 -1.1px;
+}
 
 .masthead .tagline {
 	background: #000;
