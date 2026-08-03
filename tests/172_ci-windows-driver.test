@@ -40,6 +40,7 @@ grep -q usage <<<"$out" || fail "argless run said: $out"
 run=$tmp/run
 mkdir -p "$run"
 cp "$driver" "$testdir/testlib.sh" "$testdir/test-timeout.sh" "$run/"
+chmod u+w "$run"/*.sh # distcheck's srcdir is read-only, and cp carries that over
 cat >>"$run/testlib.sh" <<'EOF'
 reap_leftover_processes() { return 0; }
 EOF
