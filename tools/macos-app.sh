@@ -114,6 +114,12 @@ uprefix() {
         awk -F/ '{for (i = 1; i <= NF; i++) if ($i != "") printf "../"}'
 }
 
+# Rewriting needs header slack that only -headerpad_max_install_names leaves behind.
+rewrite() {
+    install_name_tool "$@" ||
+        fail "install_name_tool failed; link with LDFLAGS=-Wl,-headerpad_max_install_names"
+}
+
 # Each pass rescans, so a dylib pulled in by the last pass gets its own deps on the next.
 copy_dylibs() {
     mkdir -p "$fw"
@@ -146,17 +152,17 @@ relink() {
     machos
     while IFS= read -r bin; do
         case "$bin" in
-        "$fw"/*) install_name_tool -id "@rpath/$(basename "$bin")" "$bin" ;;
+        "$fw"/*) rewrite -id "@rpath/$(basename "$bin")" "$bin" ;;
         esac
         deps "$bin" >"$deplist"
         while IFS= read -r dep; do
             case "$dep" in @*) continue ;; esac
             sysdep "$dep" && continue
-            install_name_tool -change "$dep" "@rpath/$(basename "$dep")" "$bin"
+            rewrite -change "$dep" "@rpath/$(basename "$dep")" "$bin"
         done <"$deplist"
         rp="@loader_path/$(uprefix "${bin%/*}")Frameworks"
         otool -l "$bin" | awk '/LC_RPATH/ {r = 1} r && $1 == "path" {print $2; r = 0}' >"$deplist"
-        grep -qxF "$rp" "$deplist" || install_name_tool -add_rpath "$rp" "$bin"
+        grep -qxF "$rp" "$deplist" || rewrite -add_rpath "$rp" "$bin"
         # install_name_tool invalidates the signature, and arm64 kills an unsigned Mach-O.
         codesign -f -s - "$bin"
     done <"$mach"

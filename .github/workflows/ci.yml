@@ -270,8 +270,10 @@ jobs:
           ssl="$(brew --prefix openssl@3)"
           brewp="$(brew --prefix)"
           ./bootstrap
+          # -headerpad_max_install_names: the bundle rewrites load commands to @rpath,
+          # which needs more header room than the linker leaves by default.
           ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
-            LDFLAGS="-L${ssl}/lib -L${brewp}/lib" \
+            LDFLAGS="-L${ssl}/lib -L${brewp}/lib -Wl,-headerpad_max_install_names" \
             --prefix="$RUNNER_TEMP/inst" --disable-shared
           make -j"$(sysctl -n hw.ncpu)"
           make install
