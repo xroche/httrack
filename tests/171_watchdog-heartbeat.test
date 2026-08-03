@@ -3,7 +3,8 @@
 # Unit-tests ci_suite_heartbeat (testlib.sh) on a virtual clock, at the values the
 # Windows workflow really passes: scaled-down timings collapse the sleep
 # granularity, the annotation cadence and the staticness window onto one number,
-# and a watchdog that confuses those kills healthy runs (#795).
+# and a watchdog that confuses those kills healthy runs (#795). The kill is timed
+# by the stub, never by the annotation, which the code under test writes itself.
 
 set -euo pipefail
 
@@ -19,63 +20,81 @@ fail() {
 }
 
 progress="$tmp/progress"
-kill_tree() { echo "KILL $1"; }
+kill_tree() { echo "KILL $1 at $(hb_now)"; }
+# Twelve lines, against a bound of eight.
 list_stray_processes() {
     printf '%s\n' "$*" >"$tmp/strayargs"
-    echo "(stub)"
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo "(stub $i)"; done
 }
 
-# First on the real clock, so the virtual one below cannot be measuring itself:
-# hb_now must default to seconds, and a static log must actually be killed.
+# First on the real clock, so the virtual one cannot be measuring itself. The
+# bound is tight enough to catch hb_now returning some other unit.
 printf 'RUN 99_stuck.test at 0s\n' >"$progress"
 began=$SECONDS
 ci_suite_heartbeat 1 1 "$progress" 2 4242 >"$tmp/real" 2>&1
 spent=$((SECONDS - began))
-test "$spent" -ge 2 || fail "killed after ${spent}s of a 2s window: hb_now is not seconds"
-test "$spent" -le 30 || fail "took ${spent}s to notice a static log"
-grep -q '^KILL 4242$' "$tmp/real" || fail "a static log was not killed on the real clock"
+test "$spent" -ge 2 || fail "killed after ${spent}s of a 2s window: hb_now runs fast"
+test "$spent" -le 8 || fail "took ${spent}s to notice a 2s static window: hb_now is not seconds"
+grep -q '^KILL 4242 at ' "$tmp/real" || fail "a static log was not killed on the real clock"
 
-# Virtual clock. sleep advances it and reports progress up to 1200, so the suite
-# is still healthy well past the quiet window before it goes silent.
-vnow=0
-# Two % and a CR in every line, because the runner needs both encoded: left raw,
-# either one truncates the command it is carrying.
+# Virtual clock, started well away from zero so the quiet window is measured from
+# when the watchdog began rather than from whatever the clock happened to read.
+vnow=5000
 sleep() {
     vnow=$((vnow + $1))
-    test "$vnow" -gt 1200 || printf 'RUN %ss%%a%%b.test\r at %ss\n' "$vnow" "$vnow" >>"$progress"
+    if test "$vnow" -eq 5600; then
+        # The one exercise of the errexit guard: tail must not end the watchdog.
+        rm -f "$progress"
+    elif test "$vnow" -le 6230; then
+        # Two % and a CR in every line, because the runner needs both encoded:
+        # left raw, either one truncates the command it is carrying.
+        printf 'RUN %ss%%a%%b.test\r at %ss\n' "$vnow" "$vnow" >>"$progress"
+    fi
 }
 hb_now() { echo "$vnow"; }
 
 printf 'RUN 98_earlier.test at 0s\n' >"$progress"
 ci_suite_heartbeat 720 360 "$progress" 900 4242 >"$tmp/out" 2>&1
 
-# The suite reported healthily until 1200, past the quiet window, so nothing may
-# have killed it before then; the kill lands one staticness window later. tick is
-# clamped to 30, so it fires within 30s of that, not a whole 360 late.
-killed=$(sed -n 's/^::error title=suite watchdog::killing the step: \([0-9]*\)s.*/\1/p' "$tmp/out")
+# Timed by the stub, not by the annotation. Progress stops at 6230, so a kill is
+# due at 7130 and nowhere else: earlier means it fired on a suite still
+# reporting, later means the 30s tick clamp is gone or the check rides the 360s
+# annotation cadence.
+killed=$(sed -n 's/^KILL 4242 at \([0-9]*\)$/\1/p' "$tmp/out")
 test -n "$killed" || fail "a suite that stopped reporting was never killed"
-test "$killed" -ge 900 || fail "killed after only ${killed}s without progress, want 900"
-test "$killed" -le 930 || fail "killed ${killed}s after progress stopped: tick is not clamped to 30"
+test "$killed" -eq 7130 || fail "killed at ${killed}, want 7130 (progress stopped at 6230)"
 
-# Quiet window and cadence, from the annotations' own elapsed field.
+# The kill has to be announced before it happens, or it lands unexplained.
+sed -n '/^::error title=suite watchdog::/=;/^KILL 4242 at /=' "$tmp/out" |
+    { read -r announced && read -r fired && test "$announced" -lt "$fired"; } ||
+    fail "the kill was not announced ahead of itself"
+
+# Quiet window and cadence, from the annotations' own elapsed field: a lie there
+# is caught by the kill oracle above, so these only have to pin the schedule.
 said=()
 while IFS= read -r t; do
     said+=("$t")
 done < <(sed -n 's/^::notice title=suite still running::\([0-9]*\)s elapsed.*/\1/p' "$tmp/out")
 test "${#said[@]}" -ge 2 || fail "only ${#said[@]} annotations before the kill"
-test "${said[0]}" -eq 720 || fail "first annotation at ${said[0]}s, want 720"
+test "${said[0]}" -eq 720 || fail "first annotation at ${said[0]}s, want 720 after the watchdog began"
 prev=${said[0]}
 for t in "${said[@]:1}"; do
     test $((t - prev)) -eq 360 || fail "annotations ${prev}s and ${t}s apart, want 360"
     prev=$t
 done
 
-grep -q 'in flight: RUN 1200s%25a%25b.test at 1200s' "$tmp/out" ||
+grep -q 'in flight: RUN 6230s%25a%25b.test at 6230s' "$tmp/out" ||
     fail "annotation does not name the escaped test in flight: $(head -3 "$tmp/out")"
 grep -q "$(printf '\r')" "$tmp/out" && fail "a CR reached the annotation, truncating it"
 grep -q '98_earlier' "$tmp/out" && fail "annotation names the first test, not the one in flight"
-grep -q '%0A(stub)' "$tmp/out" || fail "annotation dropped the process list, or its newline encoding"
 grep -qx '0 named' "$tmp/strayargs" || fail "process list not host-wide: $(cat "$tmp/strayargs")"
+
+# Joined with %0A and bounded to eight, and no separator left dangling: the
+# runner reads to end of line, so a trailing one is a visible empty tail.
+stubs=$(sed -n '/^::notice title=suite still running::/{p;q;}' "$tmp/out" |
+    grep -o '%0A(stub ' | grep -c '' || true)
+test "$stubs" -eq 8 || fail "annotation carried $stubs process lines, want 8"
+grep -q '%0A$' "$tmp/out" && fail "annotation ends on a dangling %0A separator"
 
 # A command is only read at the head of a line, so every annotation opens one.
 awk '/^::(notice|error) title=/ { if (prev != "") bad = 1 } { prev = $0 } END { exit bad }' "$tmp/out" ||

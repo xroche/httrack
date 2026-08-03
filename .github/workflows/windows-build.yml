@@ -204,9 +204,11 @@ jobs:
           suite_deadline=1500
           started=$SECONDS
 
-          # Survives into the artifact even if the tail of the step log does not.
+          # Reaches the artifact whenever the step ends on its own terms, which the
+          # tail of its log may not. Absolute, since a .test may have chdir'd.
           progress=suite-progress.log
           : >"$progress"
+          export HTTRACK_PROGRESS_LOG="$PWD/$progress"
 
           # A dying runner takes both, and every annotation with them (measured, see
           # #795), so the watchdog's job is to end the step first: one that fails on
