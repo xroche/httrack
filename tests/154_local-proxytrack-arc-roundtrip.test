@@ -1,0 +1,86 @@
+#!/bin/bash
+# proxytrack must re-read the .arc it writes: the blank line closing the version
+# block is a separator, and counting it in the declared length cost every entry.
+
+set -euo pipefail
+export LC_ALL=C
+
+dir=$(mktemp -d)
+cleanup() { rm -rf "$dir"; }
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT TERM
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+BODY=BODYMARKER
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nLast-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\nContent-Length: %d\r\n\r\n' "${#BODY}" >"$dir/hdr"
+printf '%s' "$BODY" >"$dir/body"
+alen=$(($(wc -c <"$dir/hdr") + ${#BODY}))
+
+# $1 output, $2 the filedesc length: 9 stops at the "2 0" line, 10 swallows the
+# blank line closing the version block the way the writer used to. Same bytes.
+build_arc() {
+    {
+        printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc %d\n' "$2"
+        printf '2 0 test\n'
+        printf '\n\n'
+        printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
+        cat "$dir/hdr" "$dir/body"
+    } >"$1"
+}
+
+# Convert $1 into $2, echoing how many entries proxytrack reported reading.
+convert() {
+    proxytrack --convert "$2" "$1" 2>"$dir/log" >/dev/null ||
+        fail "proxytrack died converting $1"
+    sed -n 's/^processed: .*(\([0-9]*\) items added)$/\1/p' "$dir/log"
+}
+
+build_arc "$dir/spec.arc" 9
+test "$(convert "$dir/spec.arc" "$dir/a.arc")" = 1 ||
+    fail "the hand-built archive itself did not load"
+
+# The reported bug: a second hop over proxytrack's own output.
+test "$(convert "$dir/a.arc" "$dir/b.arc")" = 1 ||
+    fail "proxytrack read no entry back from the .arc it wrote"
+grep -aqF "$BODY" "$dir/b.arc" || fail "entry survived the round-trip without its body"
+
+# Archives written before the fix must still load.
+build_arc "$dir/legacy.arc" 10
+test "$(convert "$dir/legacy.arc" "$dir/c.arc")" = 1 ||
+    fail "an archive whose length counts the blank line no longer loads"
+
+# And the blank line must stay outside the declared length, or a proxytrack
+# predating the fix reads nothing from what we now write. Two newlines exactly:
+# a third would put the record out of its reach again.
+hdrlen=$(head -1 "$dir/a.arc" | wc -c)
+declared=$(head -1 "$dir/a.arc" | awk '{print $NF}')
+sep=$(tail -c +$((hdrlen + declared + 1)) "$dir/a.arc" | head -c 3 | od -An -c | tr -d ' ')
+test "$sep" = '\n\nh' || fail "version block ends on '$sep', expected two newlines"
+# The block itself must not end on one either: counting the blank line and then
+# writing a second one round-trips, but leaves the length a byte too long.
+inner=$(tail -c +$((hdrlen + declared - 1)) "$dir/a.arc" | head -c 2 | od -An -c | tr -d ' ')
+test "$inner" != '\n\n' || fail "declared length still counts the blank line"
+
+# An empty archive is not a corrupt one...
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf '2 0 test\n'
+    printf '\n'
+} >"$dir/empty.arc"
+convert "$dir/empty.arc" "$dir/d.arc" >/dev/null
+! grep -q 'Unexpected' "$dir/log" || fail "empty archive reported as corrupt"
+
+# ...but a length running past the end of the file still is.
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 99999\n'
+    printf '2 0 test\n'
+    printf '\n\n'
+} >"$dir/truncated.arc"
+convert "$dir/truncated.arc" "$dir/e.arc" >/dev/null || true
+grep -q 'Unexpected' "$dir/log" || fail "a length past the end of the file loaded as an empty archive"
+
+echo "OK: proxytrack re-reads the .arc it writes"
