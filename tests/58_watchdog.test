@@ -70,4 +70,22 @@ else
     test ! -e "$marker" || fail "watchdog left a grandchild running"
 fi
 
+# The deadline is wall clock, not a count of poll iterations. Under starvation an
+# iteration costs several times the second it asks for, so a counted deadline
+# stretches with it and the wedge outlives the CI step instead of being reported.
+(
+    starve_sleep "$tmp/starve" 4 || fail "could not install the slow sleep"
+    start=$SECONDS
+    rc=0
+    if is_windows; then
+        run_with_timeout 3 ping -n 60 127.0.0.1 || rc=$?
+    else
+        run_with_timeout 3 sleep 60 || rc=$?
+    fi
+    elapsed=$((SECONDS - start))
+    test "$rc" -eq 124 || fail "starved watchdog reported $rc, want 124"
+    test "$elapsed" -lt 9 ||
+        fail "deadline counted polls, not seconds: ${elapsed}s for a 3s budget"
+)
+
 echo "watchdog OK"

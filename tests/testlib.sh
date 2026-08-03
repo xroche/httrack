@@ -310,17 +310,35 @@ dump_hang_diagnostics() {
     printf -- '===== end of diagnostics: %s =====\n' "$label"
 }
 
+# Put a `sleep` costing $2 times what it asks first on PATH, in dir $1: the CPU
+# starvation that stretches a poll iteration, which is what a deadline counting
+# those iterations mistakes for elapsed time (#795). Callers subshell it, as it
+# edits PATH. Sub-second requests round up to one, so a 0.1s poll stretches too.
+starve_sleep() {
+    local dir=$1 factor=$2 real
+    real=$(command -v sleep) || return 1
+    mkdir -p "$dir" || return 1
+    cat >"$dir/sleep" <<EOF
+#!/bin/sh
+n=\${1%%.*}
+test "\$n" -gt 0 2>/dev/null || n=1
+exec "$real" "\$((n * $factor))"
+EOF
+    chmod +x "$dir/sleep" || return 1
+    PATH="$dir:$PATH"
+    export PATH
+}
+
 # Collect a killed job, giving up after REAP_GRACE seconds. kill_tree can fail to
 # reap a native Windows descendant -- the very case these watchdogs exist for --
 # and a bare `wait` then blocks the watchdog itself forever, so the timeout it was
 # about to report is never printed and the whole suite wedges silently.
 REAP_GRACE=${REAP_GRACE:-10}
 reap_bounded() {
-    local pid=$1 waited=0
+    local pid=$1 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
-        test "$waited" -lt "$REAP_GRACE" || return 1
+        test "$((SECONDS - start))" -lt "$REAP_GRACE" || return 1
         sleep 1
-        waited=$((waited + 1))
     done
     wait "$pid" 2>/dev/null || true
     return 0
@@ -338,15 +356,14 @@ run_with_timeout() {
     "$@" &
     local pid=$!
     test -n "$had_m" || is_windows || set +m
-    local waited=0
+    local start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
-        if test "$waited" -ge "$secs"; then
+        if test "$((SECONDS - start))" -ge "$secs"; then
             kill_tree "$pid"
             reap_bounded "$pid" || true
             return 124
         fi
         sleep 1
-        waited=$((waited + 1))
     done
     wait "$pid"
 }
@@ -354,15 +371,14 @@ run_with_timeout() {
 # Bound an already-backgrounded crawl (pid $1) at $2s, reaping it and returning 124
 # on overrun: a wedge past --max-time would else block wait() forever and hang the CI step.
 wait_bounded() {
-    local pid=$1 secs=$2 waited=0
+    local pid=$1 secs=$2 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
-        if test "$waited" -ge "$secs"; then
+        if test "$((SECONDS - start))" -ge "$secs"; then
             kill_tree "$pid"
             reap_bounded "$pid" || true
             return 124
         fi
         sleep 1
-        waited=$((waited + 1))
     done
     wait "$pid"
 }
