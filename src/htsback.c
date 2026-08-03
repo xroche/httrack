@@ -2071,11 +2071,13 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       int hash_pos_return = 0;
 
       if (cache->hashtable) {
-        char BIGSTK buff[HTS_URLMAXSIZE * 4];
+        char BIGSTK buff[CACHE_KEY_SIZE];
+        size_t used = 0;
 
-        strcpybuff(buff, adr);
-        strcatbuff(buff, fil);
-        hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
+        /* a key too long to be in the table is a miss, not a fatal error */
+        if (slcatprintfbuff(buff, sizeof(buff), &used, "%s%s", adr, fil)) {
+          hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
+        }
 
         // negative values when data is not in cache
         if (hash_pos_return < 0) {

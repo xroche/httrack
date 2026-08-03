@@ -1,25 +1,25 @@
 #!/bin/bash
 #
-# Cache URL bounds (httrack -#test=cache-urlbounds <dir>): a URL at the length
-# lien_back can hold must store and look up without aborting, two keys differing
-# only past a clip point must not alias, and a longer one must drop its entry
-# rather than take the mirror down.
+# Cache URL bounds (httrack -#test=cache-urlbounds <dir>): a max-length URL must
+# store and look up without aborting or aliasing a neighbouring key.
 
 set -eu
 
 dir=$(mktemp -d)
 trap 'set +e; rm -rf "$dir"' EXIT
 
-# the unstorable entry logs an expected "URL too long to be cached" warning
-httrack -#test=cache-urlbounds "$dir" >"$dir/out" 2>/dev/null ||
+# stderr carries the expected "URL too long to be cached" warnings alongside the
+# self-test's own diagnostics: keep it out of the verdict, but not the report
+httrack -#test=cache-urlbounds "$dir" >"$dir/out" 2>"$dir/err" ||
     {
         echo "httrack exited $? running the self-test:" >&2
-        cat "$dir/out" >&2
+        cat "$dir/out" "$dir/err" >&2
         exit 1
     }
 
 out=$(tail -n1 "$dir/out")
 test "$out" = "cache-urlbounds: OK" || {
     echo "expected 'cache-urlbounds: OK', got: $out" >&2
+    cat "$dir/err" >&2
     exit 1
 }
