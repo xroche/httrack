@@ -126,10 +126,9 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
    shorter value. `headers` must be an array, for sizeof. */
 #define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
   do {                                                                         \
-    if ((value) != NULL && (value)[0] != '\0' &&                               \
-        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
-                         "%s: %s\r\n", field, value)) {                        \
-      (dropped)++;                                                             \
+    if ((value) != NULL && (value)[0] != '\0') {                               \
+      sprintf(headers + headersSize, "%s: %s\r\n", field, value);              \
+      (headersSize) += strlen(headers + headersSize);                          \
     }                                                                          \
   } while (0)
 #define ZIP_FIELD_INT(headers, headersSize, dropped, field, value)             \
