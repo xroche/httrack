@@ -57,7 +57,7 @@ body {
 	padding: .6rem 0 0;
 }
 
-/* Trim the ink box's ascender and overshoot bands, so the tagline sits on the baseline. */
+/* Take back the whitespace the SVG carries around the letters, restoring the old bitmap's spacing. */
 .masthead img {
 	display: block;
 	max-width: 100%;
