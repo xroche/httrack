@@ -11,6 +11,10 @@ WebPixmapdir = $(datadir)/pixmaps
 WebIcon16x16dir = $(datadir)/icons/hicolor/16x16/apps
 WebIcon32x32dir = $(datadir)/icons/hicolor/32x32/apps
 WebIcon48x48dir = $(datadir)/icons/hicolor/48x48/apps
+WebIcon64x64dir = $(datadir)/icons/hicolor/64x64/apps
+WebIcon128x128dir = $(datadir)/icons/hicolor/128x128/apps
+WebIcon256x256dir = $(datadir)/icons/hicolor/256x256/apps
+WebIconScalabledir = $(datadir)/icons/hicolor/scalable/apps
 VFolderEntrydir = $(prefix)/share/applications
 MetaInfodir = $(datadir)/metainfo
 
@@ -26,17 +30,20 @@ HelpHtmlimages_DATA = $(srcdir)/images/*
 HelpHtmlTxt_DATA = ../greetings.txt ../history.txt ../license.txt
 WebHtml_DATA = $(srcdir)/server/*.html $(srcdir)/server/*.js $(srcdir)/server/*.css
 WebHtmlimages_DATA = $(srcdir)/server/images/*
-# note: converted & normalized by
-# ico2xpm favicon.ico -o httrack.xpm
-# mogrify -format xpm -map /usr/share/doc/menu/examples/cmap.xpm httrack.xpm
+# Generated from the brand master by gen/export.py. Asserted by tests/160.
 WebPixmap_DATA = $(srcdir)/server/div/*.xpm
 WebIcon16x16_DATA = $(srcdir)/server/div/16x16/*.png
 WebIcon32x32_DATA = $(srcdir)/server/div/32x32/*.png
 WebIcon48x48_DATA = $(srcdir)/server/div/48x48/*.png
+WebIcon64x64_DATA = $(srcdir)/server/div/64x64/*.png
+WebIcon128x128_DATA = $(srcdir)/server/div/128x128/*.png
+WebIcon256x256_DATA = $(srcdir)/server/div/256x256/*.png
+WebIconScalable_DATA = $(srcdir)/server/div/scalable/*.svg
 VFolderEntry_DATA = $(srcdir)/server/div/*.desktop
 MetaInfo_DATA = $(srcdir)/server/div/*.metainfo.xml
 
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
 	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) \
 	$(WebPixmap_DATA) $(WebIcon16x16_DATA) $(WebIcon32x32_DATA) $(WebIcon48x48_DATA) \
-	$(VFolderEntry_DATA) $(MetaInfo_DATA)
+	$(WebIcon64x64_DATA) $(WebIcon128x128_DATA) $(WebIcon256x256_DATA) \
+	$(WebIconScalable_DATA) $(VFolderEntry_DATA) $(MetaInfo_DATA)

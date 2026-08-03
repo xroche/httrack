@@ -1,0 +1,80 @@
+#!/bin/bash
+#
+# A size added to the tree but not wired into html/Makefile.am is silently
+# neither installed nor distributed, so assert on what install and dist emit.
+
+set -euo pipefail
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+builddir="${abs_top_builddir:?not run under make check}"
+div="${srcdir}/html/server/div"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/icontheme.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# IHDR width and height, and a signature check so a non-PNG cannot answer.
+png_size() {
+    local hex
+    hex=$(od -An -tx1 -N24 "$1" | tr -d ' \n')
+    test "${hex:0:16}" = "89504e470d0a1a0a" || fail "$1 is not a PNG"
+    test "${hex:24:8}" = "49484452" || fail "$1 does not start with IHDR"
+    printf '%dx%d' "0x${hex:32:8}" "0x${hex:40:8}"
+}
+
+# hicolor names its directories by pixel size, plus "scalable" for the vector.
+icon_dirs() {
+    find "$1" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sed 's|.*/||' |
+        grep -E '^([0-9]+x[0-9]+|scalable)$' | sort || true
+}
+
+sizes=$(icon_dirs "${div}")
+test -n "${sizes}" || fail "no icon directories under ${div}"
+
+make -C "${builddir}/html" install DESTDIR="${work}/inst" >"${work}/log" 2>&1 ||
+    fail "make install failed: $(tail -3 "${work}/log")"
+make -C "${builddir}/html" distdir distdir="${work}/dist" \
+    top_distdir="${work}/dist" >>"${work}/log" 2>&1 ||
+    fail "make distdir failed: $(tail -3 "${work}/log")"
+
+# Both directions: what shipped must be exactly what the tree carries, so a
+# stale Makefile.am entry pointing at a removed size fails as loudly as a new
+# size nobody wired up.
+installed=$(find "${work}/inst" -path '*/icons/hicolor/*/apps/httrack.*' |
+    sed 's|.*/hicolor/||;s|/apps/.*||' | sort)
+test "${installed}" = "${sizes}" ||
+    fail "installed $(echo "${installed}" | tr '\n' ' ')!= tree $(echo "${sizes}" | tr '\n' ' ')"
+disted=$(icon_dirs "${work}/dist/server/div")
+test "${disted}" = "${sizes}" ||
+    fail "dist $(echo "${disted}" | tr '\n' ' ')!= tree $(echo "${sizes}" | tr '\n' ' ')"
+
+hicolor=$(find "${work}/inst" -type d -name hicolor)
+for name in ${sizes}; do
+    if [ "${name}" = scalable ]; then
+        svg="${hicolor}/scalable/apps/httrack.svg"
+        grep -q '<svg' "${svg}" || fail "${svg} has no <svg> root"
+        grep -q 'viewBox' "${svg}" || fail "${svg} has no viewBox, so it will not scale"
+        continue
+    fi
+    got=$(png_size "${hicolor}/${name}/apps/httrack.png")
+    test "${got}" = "${name}" || fail "${name}/apps/httrack.png is ${got}"
+done
+
+# Icon= is a theme name, so it must resolve in every size we install.
+for desktop in "${div}"/*.desktop; do
+    icon=$(sed -n 's/^Icon=//p' "${desktop}")
+    test -n "${icon}" || fail "$(basename "${desktop}"): no Icon="
+    for name in ${sizes}; do
+        ls "${hicolor}/${name}/apps/${icon}".* >/dev/null 2>&1 ||
+            fail "$(basename "${desktop}"): Icon=${icon} unresolved in ${name}"
+    done
+done
+
+echo "icon theme: $(echo "${sizes}" | tr '\n' ' ')installed and distributed"
