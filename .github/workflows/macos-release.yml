@@ -1,0 +1,156 @@
+# Signed, notarized HTTrack.dmg (#901). Separate from ci.yml because it needs the
+# Developer ID secrets, which a fork's pull request never gets, and because each run
+# costs two notarization submissions. The unsigned half of this path -- bundling, the
+# inside-out signing walk, the DMG -- runs on every PR in ci.yml's macos-app job.
+name: macOS release
+
+on:
+  push:
+    tags: ["[0-9]*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dmg:
+    name: signed DMG (macOS arm64)
+    runs-on: macos-15
+    permissions:
+      contents: write   # attach the DMG to the release the tag belongs to
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # Notarization is minutes in; a missing secret should not surface there.
+      - name: Check the signing secrets are present
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          hint="see secrets/apple/README.md in httrack-works"
+          : "${MACOS_CERT_P12:?unset repository secret ($hint)}"
+          : "${MACOS_CERT_PASSWORD:?unset repository secret ($hint)}"
+          : "${MACOS_NOTARY_KEY:?unset repository secret ($hint)}"
+          : "${MACOS_NOTARY_KEY_ID:?unset repository secret ($hint)}"
+          : "${MACOS_NOTARY_ISSUER_ID:?unset repository secret ($hint)}"
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          brew install autoconf automake libtool autoconf-archive brotli zstd
+
+      # --disable-shared keeps libhttrack inside the binaries, as in ci.yml's macos-app job.
+      - name: Build and install into a temp prefix
+        run: |
+          set -euo pipefail
+          ssl="$(brew --prefix openssl@3)"
+          brewp="$(brew --prefix)"
+          ./bootstrap
+          ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
+            LDFLAGS="-L${ssl}/lib -L${brewp}/lib" \
+            --prefix="$RUNNER_TEMP/inst" --disable-shared
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
+
+      - name: Assemble HTTrack.app
+        run: |
+          set -euo pipefail
+          make macos-app APP_FLAGS="--prefix $RUNNER_TEMP/inst --out $RUNNER_TEMP"
+          plutil -lint "$RUNNER_TEMP/HTTrack.app/Contents/Info.plist"
+
+      - name: Import the Developer ID certificate
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          kc="$RUNNER_TEMP/signing.keychain-db"
+          kcpass="$(openssl rand -base64 24)"
+          echo "::add-mask::$kcpass"
+          security create-keychain -p "$kcpass" "$kc"
+          # Notarization holds the job well past the five-minute default lock.
+          security set-keychain-settings -lut 21600 "$kc"
+          security unlock-keychain -p "$kcpass" "$kc"
+          # openssl, not base64: macOS spells the decode flag -D and GNU spells it -d.
+          printf '%s' "$CERT_P12" | openssl base64 -d -A -out "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/cert.p12"
+          # Without this codesign blocks on a UI prompt no runner can answer.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$kcpass" "$kc" >/dev/null
+          security list-keychains -d user -s "$kc"
+          id="$(security find-identity -v -p codesigning "$kc" |
+                awk '/Developer ID Application/ {print $2; exit}')"
+          test -n "$id" || {
+            security find-identity -v -p codesigning "$kc" >&2
+            echo "the .p12 holds no Developer ID Application identity" >&2
+            exit 1
+          }
+          echo "SIGN_IDENTITY=$id" >>"$GITHUB_ENV"
+
+      - name: Sign, notarize and pack the DMG
+        env:
+          NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          key="$RUNNER_TEMP/notary.p8"
+          trap 'rm -f "$key"' EXIT
+          printf '%s' "$NOTARY_KEY" | openssl base64 -d -A -out "$key"
+          bash tools/macos-release.sh --app "$RUNNER_TEMP/HTTrack.app" \
+            --identity "$SIGN_IDENTITY" --out "$RUNNER_TEMP" \
+            --notary-key "$key" --notary-key-id "$NOTARY_KEY_ID" \
+            --notary-issuer "$NOTARY_ISSUER_ID"
+
+      # What a user actually does: download (so, quarantined), mount, drag out, run. The
+      # steps above prove the paperwork; this is the only one that proves the result runs.
+      - name: Assess and run a quarantined copy out of the DMG
+        run: |
+          set -euo pipefail
+          dmg="$(echo "$RUNNER_TEMP"/HTTrack-*.dmg)"
+          test -f "$dmg"
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/mnt" "$dmg"
+          trap 'hdiutil detach "$RUNNER_TEMP/mnt" >/dev/null || true' EXIT
+          app="$RUNNER_TEMP/quarantined/HTTrack.app"
+          ditto "$RUNNER_TEMP/mnt/HTTrack.app" "$app"
+          # Set rather than inherited: propagating the flag off a mounted image is
+          # LaunchServices' job, and nothing here goes through LaunchServices.
+          xattr -w -r com.apple.quarantine "0083;00000000;Safari;" "$app"
+          xattr -p com.apple.quarantine "$app" >/dev/null
+          spctl --assess --type exec -vv "$app"
+          # Last: the smoke test drops a browser stub inside the bundle, breaking the
+          # seal that the assessment above depends on.
+          bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
+
+      - name: Upload the DMG
+        uses: actions/upload-artifact@v7
+        with:
+          name: HTTrack-macos-arm64-dmg
+          path: ${{ runner.temp }}/HTTrack-*.dmg
+          if-no-files-found: error
+
+      # Releases here are cut by hand, so a tag can land before one exists; say so
+      # rather than failing a run whose DMG is already built and attached above.
+      - name: Attach the DMG to the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP"/HTTrack-*.dmg --clobber
+          else
+            echo "no release $GITHUB_REF_NAME yet -- the DMG is on this run's artifacts"
+          fi
+
+      - name: Delete the signing keychain
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true

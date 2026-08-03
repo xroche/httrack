@@ -315,18 +315,14 @@ jobs:
           test -n "$hidden"
           bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
 
-      # No Developer ID here, so Gatekeeper cannot be exercised; an ad-hoc signature
-      # still proves the bundle is well formed enough to sign.
-      - name: Check the bundle is signable
+      # The release path (macos-release.yml) minus Apple: ad-hoc identity, no notarization.
+      # Everything that can go wrong without a Developer ID -- an unsignable bundle, a
+      # Mach-O the walk misses, a DMG that will not build -- fails here, on the PR.
+      - name: Sign and pack the bundle, ad hoc
         run: |
           set -euo pipefail
-          app="$RUNNER_TEMP/moved/HTTrack.app"
-          # Before --force, which would re-sign away the damage this is meant to catch.
-          for f in "$app/Contents/Resources/bin/"* "$app/Contents/Frameworks/"*.dylib; do
-            file "$f" | grep -q Mach-O || continue
-            codesign --verify --strict "$f"
-          done
-          codesign -s - --force --deep "$app"
+          bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
+            --identity - --skip-notarize
           codesign --verify --strict --verbose=2 "$app"
 
   # Portability/hardening: 32-bit (i386) build on the x86-64 runner via multilib
@@ -709,6 +705,7 @@ jobs:
         tests/*.sh
         tests/*.test
         tools/macos-app.sh
+        tools/macos-release.sh
         tools/mkdeb.sh
     steps:
       - uses: actions/checkout@v7
