@@ -25,9 +25,8 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz proxytrack's .arc reader the way `proxytrack --convert` drives it: the
-   record loop seeks on lengths read straight from the file, and every entry it
-   yields then reaches a writer. Reading takes a path, so inputs are files. */
+/* Fuzz proxytrack's .arc reader the way `--convert` drives it: the record loop
+   seeks on lengths read from the file, and every entry reaches a writer. */
 #include "fuzz.h"
 
 #include <stdarg.h>
@@ -51,8 +50,7 @@ static void fuzz_arc_cleanup(void) {
   (void) rmdir(arc_dir);
 }
 
-/* proxytrack's main() installs one; without it coucal writes a statistics
-   block to stderr for every hashtable freed */
+/* proxytrack's main() installs one; without it coucal logs stats per free */
 static void fuzz_arc_coucal_log(coucal_opaque arg, coucal_loglevel level,
                                 const char *format, va_list args) {
   (void) arg;

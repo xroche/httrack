@@ -707,9 +707,8 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
     PT_Index index = *pindex;
     struct_coucal_enum en = coucal_enum_new(index->slots.common.hash);
     coucal_item *chain;
-    /* the array holds pointers, and the slot is counted only once it is
-       stored: a failed realloc used to leave index_size counting an entry the
-       array never had, and to drop the array it did have */
+    /* index_size counts a slot only once the array holds it, so a failed
+       realloc leaves neither a phantom entry nor a dropped array */
     PT_Index *const grown = realloc(
         indexes->index, sizeof(*indexes->index) * (indexes->index_size + 1));
     int index_id;
@@ -2353,8 +2352,7 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               if (fetchSize <= 0) {
                 fetchSize = dataLength - metaSize;
               }
-              /* the declared body may exceed the whole archive, and we are
-                 about to allocate it */
+              /* the declared body may exceed the archive we allocate it from */
               if (fetchSize < 0 || fetchSize > dataLength - metaSize ||
                   fetchSize > index->fileSize - fposCurrent) {
                 r->statuscode = STATUSCODE_INVALID;
