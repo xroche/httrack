@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# Drives ci-windows-suite.sh here: the source guard, the bindir contract and the
+# loop's accounting. All three are Windows-only in production, so nothing would
+# exercise them before merge (#948).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+driver="$testdir/ci-windows-suite.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ciwin.XXXXXX")
+trap 'set +e; rm -rf "$tmp"' EXIT
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+cd "$tmp"
+
+path_before=$PATH
+# shellcheck source=tests/ci-windows-suite.sh
+. "$driver"
+test "$(type -t ci_suite_heartbeat)" = function || fail "sourcing did not define the watchdog"
+test ! -e suite-progress.log || fail "sourcing drove a suite"
+test "$PATH" = "$path_before" || fail "sourcing exported the suite's PATH"
+
+# bash -c sets $0 to the operand, so this defeats a [ BASH_SOURCE = $0 ] guard.
+out=$(bash -c '. "$0"' "$driver" 2>&1) || fail "sourcing through bash -c: $out"
+test ! -e suite-progress.log || fail "sourcing with \$0 at the driver drove a suite"
+
+rc=0
+out=$(bash "$driver" 2>&1) || rc=$?
+test "$rc" -eq 1 || fail "argless run exited $rc, want 1"
+grep -q usage <<<"$out" || fail "argless run said: $out"
+
+# A copy, so $testdir resolves to a testlib we can neuter: the driver reaps
+# engines host-wide between tests, which under "make check -j" would kill a
+# sibling's.
+run=$tmp/run
+mkdir -p "$run"
+cp "$driver" "$testdir/testlib.sh" "$testdir/test-timeout.sh" "$run/"
+chmod u+w "$run"/*.sh # distcheck's srcdir is read-only, and cp carries that over
+cat >>"$run/testlib.sh" <<'EOF'
+reap_leftover_processes() { return 0; }
+EOF
+
+bin=$tmp/bin
+mkdir -p "$bin"
+printf '#!/bin/sh\nexit 0\n' >"$bin/httrack"
+# shellcheck disable=SC2016 # $2 is the stub's own argument
+printf '#!/bin/sh\necho "$2"\n' >"$bin/cygpath"
+chmod +x "$bin/httrack" "$bin/cygpath"
+test -x "$bin/httrack" || {
+    echo "SKIP: ${TMPDIR:-/tmp} is noexec, the stub bindir cannot be run"
+    exit 77
+}
+
+# One per glob the driver enumerates: an empty category is counted as a failing
+# test named after the unexpanded pattern, which would drown the accounting.
+for t in 00_runnable 10_engine-pass 13_zlib-pass 14_local-pass 15_watchdog-pass \
+    16_crawl_proxy_https 17_crawl-log-salvage; do
+    printf '#!/bin/sh\nexit 0\n' >"$run/$t.test"
+done
+printf '#!/bin/sh\nexit 77\n' >"$run/11_engine-skip.test"
+printf '#!/bin/sh\nexit 3\n' >"$run/12_engine-fail.test"
+
+cd "$run"
+rc=0
+out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" \
+    bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?
+# The skip set and the pass floor are pinned to the real suite, so a stub run
+# ends on the floor; what is under test is the tally that reaches it.
+test "$rc" -eq 1 || fail "stub suite exited $rc, want 1 from the pass floor"
+grep -q '^ran=9 pass=7 fail=1 skip=1$' <<<"$out" ||
+    fail "wrong tally: $(grep '^ran=' <<<"$out")"
+grep -q '::error::only 7 tests passed (1 skipped)' <<<"$out" ||
+    fail "the pass floor did not report the count"
+grep -q 'FAIL 12_engine-fail.test (exit 3)' <<<"$out" || fail "the failing test was not named"
+
+# The progress log is what the watchdog reads and what the artifact keeps.
+grep -q '^RUN 12_engine-fail.test at ' suite-progress.log || fail "no RUN line for the failing test"
+grep -q '^RERUN 12_engine-fail.test$' suite-progress.log || fail "the traced re-run was not noted"
+grep -q '^77 11_engine-skip.test$' suite-progress.log || fail "the skip's status was not recorded"
+test -s 12_engine-fail.test.log || fail "no per-test log for the failing test"
+
+echo "ci-windows driver OK"
