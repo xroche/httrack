@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Unit-tests ci_suite_heartbeat (testlib.sh) on a virtual clock, at the values the
+# Unit-tests ci_suite_heartbeat (ci-windows-suite.sh) on a virtual clock, at the values the
 # Windows workflow really passes, in both its regimes: scaled-down timings
 # collapse the sleep granularity, the annotation cadence and the staticness
 # window onto one number, and a watchdog confusing those kills healthy runs
@@ -9,8 +9,9 @@
 set -euo pipefail
 
 testdir=$(cd "$(dirname "$0")" && pwd)
-# shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+# Sourcing the CI driver defines the watchdog without running a suite.
+# shellcheck source=tests/ci-windows-suite.sh
+. "${testdir}/ci-windows-suite.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_hb.XXXXXX")
 trap 'set +e; rm -rf "$tmp"' EXIT

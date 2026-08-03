@@ -9,6 +9,7 @@ EXTRA_DIST = $(TESTS) renamefail.c threadattrfail.c nobacktrace.c crawl-test.sh 
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	pty-resize.py test-timeout.sh \
 	local-crawl.sh local-server.py ftp-server.py testlib.sh \
+	ci-windows-suite.sh \
 	server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \

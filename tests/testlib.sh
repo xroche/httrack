@@ -194,60 +194,6 @@ reap_leftover_processes() {
     return 0
 }
 
-# Emit one GitHub annotation at level $1. The runner keeps only the first 10 of
-# each level per step and drops the rest silently, so the level is a budget: pick
-# one the step does not spend elsewhere. Led by a newline, since a command is only
-# read at a line head. sed/awk, not ${v//p/r}: bash 3.2 cannot parse $'..' inside one.
-ci_annotate() {
-    local level=$1 title=$2 msg
-    msg=$(printf '%s' "$3" | tr -d '\r' | sed 's/%/%25/g' |
-        awk 'NR > 1 { printf "%%0A" } { printf "%s", $0 }' || true)
-    printf '\n::%s title=%s::%s\n' "$level" "$title" "$msg"
-}
-
-# End a wedged suite before its runner dies: a step that fails on its own terms
-# keeps its log, a lost runner keeps nothing, annotations included (#795). Quiet
-# for $1s, then names the test in flight from $3 every $2s; kills $5 once $3 has
-# been static for $4s. Staticness, never elapsed time: a healthy test in flight and
-# a wedged one look identical by the clock, but every outcome writes a line, the
-# per-test timeout included, so $4 past that timeout means it never fired.
-# Seconds since this shell started. Overridable, so the unit test can drive the
-# schedule the workflow really passes off a virtual clock instead of waiting it out.
-hb_now() { echo "$SECONDS"; }
-
-ci_suite_heartbeat() {
-    local quiet=$1 every=$2 progress=$3 stuck=$4 main=$5
-    local tick=$2 begin now line said moved last=''
-    # Measured, never accumulated: the starvation this watchdog exists to catch is
-    # exactly what makes a sleep overshoot, and drift only ever delays the kill.
-    test "$tick" -le 30 || tick=30
-    begin=$(hb_now) said=$begin moved=$begin
-    while :; do
-        sleep "$tick" >/dev/null 2>&1 # holds no stdout: the caller's trap orphans it
-        now=$(hb_now)
-        # Guarded: under the caller's errexit a bare substitution assignment would
-        # end the watchdog in silence, which reads as protection and is not.
-        line=$(tail -n 1 "$progress" 2>/dev/null || true)
-        test "$line" = "$last" || { last=$line moved=$now; }
-        test $((now - begin)) -ge "$quiet" || continue
-        # Every tick, not on the annotation cadence, which would let a late wedge
-        # outlive the step's own timeout before being caught.
-        if test $((now - moved)) -ge "$stuck"; then
-            ci_annotate error "suite watchdog" "killing the step: $((now - moved))s without progress, in flight: $last"
-            kill_tree "$main"
-            return 0
-        fi
-        test $((now - said)) -ge "$every" || continue
-        said=$now
-        # notice, not warning: reap_leftover_processes spends the warning budget.
-        ci_annotate notice "suite still running" "$(
-            printf '%ss elapsed, %ss without progress, in flight: %s\n' \
-                "$((now - begin))" "$((now - moved))" "$last"
-            list_stray_processes 0 named | head -n 8
-        )"
-    done
-}
-
 # Pids of engine processes in process group $1. Scoped to the group because the
 # caller signals them, and under "make check -j" a global match would abort a
 # healthy sibling test's engine. Matches the executable basename only, so a
