@@ -99,6 +99,10 @@ typedef enum {
    the involved files are absent. */
 void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode);
 
+/* Capacity of the per-entry header block cache_add builds; the self-test
+   asserts the writer stays inside it, so both must move together. */
+#define CACHE_HEADERS_SIZE 8192
+
 void cache_rstr(FILE *fp, char *s, size_t s_size);
 char *cache_rstr_addr(FILE * fp);
 int cache_brstr(char *adr, char *s, size_t s_size);

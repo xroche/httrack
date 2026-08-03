@@ -227,3 +227,4 @@ TESTS += 152_engine-string-oom.test
 TESTS += 153_local-proxytrack-quiet.test
 TESTS += 154_local-proxytrack-arc-roundtrip.test
 TESTS += 160_zlib-cache-hdrbounds.test
+TESTS += 161_local-proxytrack-zip-headers.test

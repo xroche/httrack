@@ -854,11 +854,9 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
 /* New HTTrack cache (new.zip) format                           */
 /* ------------------------------------------------------------ */
 
-/* Append "<field>: <value>\r\n" to the header block, counting into `dropped`
-   the fields that did not fit. The values come back off a cache, so the block
-   is bounded rather than trusted to the element caps; the field is dropped
-   whole because a clipped one reads back as a valid shorter value.
-   `headers` must be an array, for sizeof. */
+/* Values read back off a cache, so the block is bounded rather than trusted to
+   the element caps; a field that does not fit is dropped whole and counted,
+   since a clipped one reads back as valid. `headers` must be an array. */
 #define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
   do {                                                                         \
     if ((value) != NULL && (value)[0] != '\0' &&                               \

@@ -119,11 +119,9 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
   // ---fin stockage en cache---
 }
 
-/* Append "<field>: <value>\r\n" to the header block, counting into `dropped`
-   the fields that did not fit. The values are remote-controlled (ETag,
-   Location, the URL itself) and together outgrow the block, so it is bounded;
-   the field is dropped whole because a clipped one reads back as a valid
-   shorter value. `headers` must be an array, for sizeof. */
+/* Remote-controlled values (ETag, Location, the URL) can together outgrow the
+   block, and a clipped field reads back as a valid shorter one, so one that
+   does not fit is dropped whole and counted. `headers` must be an array. */
 #define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
   do {                                                                         \
     if ((value) != NULL && (value)[0] != '\0' &&                               \
@@ -221,7 +219,7 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   char BIGSTK filename[HTS_URLMAXSIZE * 4];
   char catbuff[CATBUFF_SIZE];
   int dataincache = 0;          // put data in cache ?
-  char BIGSTK headers[8192];
+  char BIGSTK headers[CACHE_HEADERS_SIZE];
   size_t headersSize = 0;
   int headersDropped = 0;
 
@@ -324,8 +322,8 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                    r->location); // 'location' pour moved
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Content-Disposition",
                    r->cdispo); // Content-disposition
-  /* X-Save first of the three: it is the only one the reader consumes, so it
-     must not be what a full block drops */
+  /* X-Save first of the three: the only one a reader acts on, so a full block
+     must not drop it (X-Addr/X-Fil are pass-through metadata) */
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Save",
                    url_save_suffix); // Original save filename
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Addr",
