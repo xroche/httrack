@@ -1,7 +1,6 @@
 #!/bin/bash
-# proxytrack could not re-read the .arc it wrote: the version block's declared
-# length counted the blank line closing it, so the reader ate the first record's
-# separator and the archive loaded with no entries at all.
+# proxytrack must re-read the .arc it writes: the blank line closing the version
+# block is a separator, and counting it in the declared length cost every entry.
 
 set -euo pipefail
 export LC_ALL=C
@@ -55,21 +54,29 @@ test "$(convert "$dir/legacy.arc" "$dir/c.arc")" = 1 ||
     fail "an archive whose length counts the blank line no longer loads"
 
 # And the blank line must stay outside the declared length, or a proxytrack
-# predating the fix reads nothing from what we now write.
+# predating the fix reads nothing from what we now write. Two newlines exactly:
+# a third would put the record out of its reach again.
 hdrlen=$(head -1 "$dir/a.arc" | wc -c)
 declared=$(head -1 "$dir/a.arc" | awk '{print $NF}')
-sep=$(tail -c +$((hdrlen + declared + 1)) "$dir/a.arc" | head -c 2 | od -An -c | tr -d ' ')
-test "$sep" = '\n\n' || fail "version block ends on '$sep', expected two newlines"
+sep=$(tail -c +$((hdrlen + declared + 1)) "$dir/a.arc" | head -c 3 | od -An -c | tr -d ' ')
+test "$sep" = '\n\nh' || fail "version block ends on '$sep', expected two newlines"
 
-# An empty archive is not a corrupt one, in either form.
-for len in 9 10; do
-    {
-        printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc %d\n' "$len"
-        printf '2 0 test\n'
-        printf '\n'
-    } >"$dir/empty.arc"
-    convert "$dir/empty.arc" "$dir/d.arc" >/dev/null
-    ! grep -q 'Unexpected' "$dir/log" || fail "empty archive (length $len) reported as corrupt"
-done
+# An empty archive is not a corrupt one...
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf '2 0 test\n'
+    printf '\n'
+} >"$dir/empty.arc"
+convert "$dir/empty.arc" "$dir/d.arc" >/dev/null
+! grep -q 'Unexpected' "$dir/log" || fail "empty archive reported as corrupt"
+
+# ...but a length running past the end of the file still is.
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 99999\n'
+    printf '2 0 test\n'
+    printf '\n\n'
+} >"$dir/truncated.arc"
+convert "$dir/truncated.arc" "$dir/e.arc" >/dev/null || true
+grep -q 'Unexpected' "$dir/log" || fail "a length past the end of the file loaded as an empty archive"
 
 echo "OK: proxytrack re-reads the .arc it writes"

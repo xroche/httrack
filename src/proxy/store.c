@@ -1986,16 +1986,15 @@ static int skipArcNl(FILE * file) {
 /* Stop on the newline opening the first record: archives whose version block
    length swallowed the closing blank line leave only that one. */
 static int skipArcVersionNl(FILE *file) {
-  long int last = -1;
-  long int pos;
+  long int pos = ftell(file);
 
-  while ((pos = ftell(file)) >= 0 && fgetc(file) == 0x0a) {
-    last = pos;
-  }
-  if (last < 0) {
+  if (pos < 0 || fgetc(file) != 0x0a) {
     return -1;
   }
-  return fseek(file, last, SEEK_SET);
+  if (fgetc(file) == 0x0a) { /* the blank line, when outside the length */
+    pos++;
+  }
+  return fseek(file, pos, SEEK_SET);
 }
 
 static int skipArcData(FILE * file, const char *line) {
@@ -2112,7 +2111,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
         index->timestamp = getArcTimestamp(index->line);
         /* Skip the version block, leaving the record loop its own separator */
         if (skipArcData(index->file, index->line) != 0 ||
-            (skipArcVersionNl(index->file) != 0 && !feof(index->file))) {
+            skipArcVersionNl(index->file) != 0) {
           fprintf(stderr, "Unexpected bad data offset size first entry" LF);
           fclose(index->file);
           index->file = NULL;
@@ -2513,7 +2512,7 @@ static int PT_SaveCache__Arc(PT_Indexes indexes, const char *filename) {
             tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, st.filename,
             (int) strlen(prefix), prefix);
     /* the blank line closing the version block is a separator, outside the
-       declared length: counting it left every entry unreadable on reload */
+       declared length */
     fputc('\n', fp);
     st.fp = fp;
     st.indexes = indexes;
