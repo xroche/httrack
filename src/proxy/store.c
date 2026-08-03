@@ -707,12 +707,17 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
     PT_Index index = *pindex;
     struct_coucal_enum en = coucal_enum_new(index->slots.common.hash);
     coucal_item *chain;
-    int index_id = indexes->index_size++;
+    /* the array holds pointers, and the slot is counted only once it is
+       stored: a failed realloc used to leave index_size counting an entry the
+       array never had, and to drop the array it did have */
+    PT_Index *const grown = realloc(
+        indexes->index, sizeof(*indexes->index) * (indexes->index_size + 1));
+    int index_id;
     int nMerged = 0;
 
-    if ((indexes->index =
-         realloc(indexes->index,
-                 sizeof(struct _PT_Index) * indexes->index_size)) != NULL) {
+    if (grown != NULL) {
+      indexes->index = grown;
+      index_id = indexes->index_size++;
       indexes->index[index_id] = index;
       *pindex = NULL;
       while((chain = coucal_enum_next(&en)) != NULL) {
