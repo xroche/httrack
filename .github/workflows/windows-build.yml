@@ -212,10 +212,10 @@ jobs:
 
           # A dying runner takes both, and every annotation with them (measured, see
           # #795), so the watchdog's job is to end the step first: one that fails on
-          # its own terms keeps its log. Quiet past 12 min since a healthy run takes
-          # 8-9, and a kill 900s after the last progress line clears the longest
-          # legitimate gap, one $per_test.
-          ci_suite_heartbeat 720 360 "$progress" 900 $$ &
+          # its own terms keeps its log. Quiet past 16 min, clear of the 13 a healthy
+          # run measures here, and a kill 900s after the last progress line clears
+          # the longest legitimate gap, one $per_test.
+          ci_suite_heartbeat 960 360 "$progress" 900 $$ &
           heartbeat=$!
           trap 'kill "$heartbeat" 2>/dev/null || true' EXIT
 

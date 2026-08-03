@@ -39,8 +39,8 @@ HTTRACK_PROGRESS_LOG="$tmp/progress" HTTRACK_TEST_TIMEOUT=5 \
     bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
 elapsed=$((SECONDS - start))
 
-# Announced before the dump, which runs for minutes: a suite watchdog reading
-# that log would otherwise take the silence for a wedge and kill the step.
+# Announced when the dump starts, which runs for minutes: a suite watchdog
+# reading that log would take the silence for a wedge and kill the step.
 grep -qx 'DUMP 90_wedged.test' "$tmp/progress" ||
     fail "the dump was not announced: $(cat "$tmp/progress" 2>&1)"
 
