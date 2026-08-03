@@ -78,8 +78,7 @@ sleep 1
     HTTRACK_TEST_TIMEOUT=1 bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
     elapsed=$((SECONDS - start))
     test "$rc" -eq 124 || fail "starved guard reported $rc, want 124"
-    # Generous: the diagnostics dump runs inside this window too. A counted
-    # budget needs 40s before it even starts dumping.
+    # Generous: the diagnostics dump runs inside this window too.
     test "$elapsed" -lt 25 ||
         fail "budget counted polls, not seconds: ${elapsed}s for a 1s budget"
 )

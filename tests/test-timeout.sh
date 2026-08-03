@@ -60,11 +60,13 @@ else
     tick=0.1
 fi
 
-# Wall clock, not a tick count: under the starvation this exists to catch, an
-# iteration costs far more than $tick and a counted deadline never arrives.
+# Wall clock, not a tick count: under starvation an iteration costs far more than
+# $tick, so a counted deadline never arrives. Strictly greater, because $SECONDS
+# is floored: a reading of $budget can be a fraction under it, and firing early
+# kills a healthy test.
 start=$SECONDS
 while kill -0 "$pid" 2>/dev/null; do
-    if test "$((SECONDS - start))" -ge "$budget"; then
+    if test "$((SECONDS - start))" -gt "$budget"; then
         # The dump below can run for minutes. Say so where a suite watchdog is
         # watching, or the silence reads as a wedge and the step dies mid-stack.
         test -z "${HTTRACK_PROGRESS_LOG:-}" || echo "DUMP $name" >>"$HTTRACK_PROGRESS_LOG"

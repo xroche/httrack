@@ -70,11 +70,16 @@ else
     test ! -e "$marker" || fail "watchdog left a grandchild running"
 fi
 
-# The deadline is wall clock, not a count of poll iterations. Under starvation an
-# iteration costs several times the second it asks for, so a counted deadline
-# stretches with it and the wedge outlives the CI step instead of being reported.
+# Wall clock, not iteration count: under starvation a poll costs more than it asks,
+# so a counted deadline never fires before the CI step it was meant to beat.
 (
     starve_sleep "$tmp/starve" 4 || fail "could not install the slow sleep"
+    # Control: starvation must not make the watchdog kill work that is inside its
+    # budget. The command outlives several polls, so a guard that fires on the
+    # first one cannot pass this by exiting before it is ever looked at.
+    rc=0 && run_with_timeout 30 sleep 2 || rc=$?
+    test "$rc" -eq 0 || fail "starved watchdog killed a healthy command ($rc)"
+
     start=$SECONDS
     rc=0
     if is_windows; then
@@ -84,7 +89,10 @@ fi
     fi
     elapsed=$((SECONDS - start))
     test "$rc" -eq 124 || fail "starved watchdog reported $rc, want 124"
-    test "$elapsed" -lt 9 ||
+    # Never under budget, or a guard that kills everything on sight would pass.
+    test "$elapsed" -ge 3 || fail "the watchdog fired early (${elapsed}s of 3s)"
+    # One poll plus one reap, both stretched fourfold, is 8s; counting polls is 16s.
+    test "$elapsed" -lt 12 ||
         fail "deadline counted polls, not seconds: ${elapsed}s for a 3s budget"
 )
 

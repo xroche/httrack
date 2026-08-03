@@ -310,10 +310,9 @@ dump_hang_diagnostics() {
     printf -- '===== end of diagnostics: %s =====\n' "$label"
 }
 
-# Put a `sleep` costing $2 times what it asks first on PATH, in dir $1: the CPU
-# starvation that stretches a poll iteration, which is what a deadline counting
-# those iterations mistakes for elapsed time (#795). Callers subshell it, as it
-# edits PATH. Sub-second requests round up to one, so a 0.1s poll stretches too.
+# Install a `sleep` in dir $1 costing $2 times what it asks, simulating the CPU
+# starvation that stretches a poll iteration. Callers must subshell it (it edits
+# PATH); sub-second requests round up to 1s, so a 0.1s poll stretches too.
 starve_sleep() {
     local dir=$1 factor=$2 real
     real=$(command -v sleep) || return 1
@@ -337,7 +336,7 @@ REAP_GRACE=${REAP_GRACE:-10}
 reap_bounded() {
     local pid=$1 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
-        test "$((SECONDS - start))" -lt "$REAP_GRACE" || return 1
+        test "$((SECONDS - start))" -le "$REAP_GRACE" || return 1
         sleep 1
     done
     wait "$pid" 2>/dev/null || true
@@ -347,6 +346,8 @@ reap_bounded() {
 # Run "$@" under a wall-clock deadline of $1 seconds; return its exit status, or
 # 124 if it overran and was killed. timeout(1) is unusable here: it's absent on
 # macOS and its signals can't reap httrack.exe on Windows. We poll and kill_tree.
+# All three deadlines below compare strictly: $SECONDS is floored, so a reading of
+# the budget can be a fraction under it, and firing early kills healthy work.
 run_with_timeout() {
     local secs=$1
     shift
@@ -358,7 +359,7 @@ run_with_timeout() {
     test -n "$had_m" || is_windows || set +m
     local start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
-        if test "$((SECONDS - start))" -ge "$secs"; then
+        if test "$((SECONDS - start))" -gt "$secs"; then
             kill_tree "$pid"
             reap_bounded "$pid" || true
             return 124
@@ -373,7 +374,7 @@ run_with_timeout() {
 wait_bounded() {
     local pid=$1 secs=$2 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
-        if test "$((SECONDS - start))" -ge "$secs"; then
+        if test "$((SECONDS - start))" -gt "$secs"; then
             kill_tree "$pid"
             reap_bounded "$pid" || true
             return 124
