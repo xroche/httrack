@@ -82,12 +82,6 @@ sed -e "s| \"$prefix/[^\"]*\"||g" "$wht" >"$wht.tmp"
 mv -f "$wht.tmp" "$wht"
 chmod +x "$wht"
 
-cat >"$app/Contents/MacOS/HTTrack" <<'EOF'
-#!/bin/sh
-exec "$(dirname "$0")/../Resources/bin/webhttrack" "$@"
-EOF
-chmod +x "$app/Contents/MacOS/HTTrack"
-
 fw="$app/Contents/Frameworks"
 
 # Everything outside macOS itself must travel with the bundle; OpenSSL comes from Homebrew here.
@@ -186,10 +180,18 @@ relink() {
 }
 
 # Unconditional: shipping an unchecked bundle is worse than refusing to build one.
-for t in otool install_name_tool codesign file; do
+for t in cc otool install_name_tool codesign file; do
     command -v "$t" >/dev/null 2>&1 ||
         fail "$t not found -- macOS bundling needs the Xcode command line tools"
 done
+# After the preflight, and before the walks below have to find it. headerpad,
+# because relink() adds an rpath to every Mach-O in the bundle.
+launcher="$(dirname "$0")/httrack-launcher.c"
+test -r "$launcher" || fail "no launcher source at $launcher"
+cc -O2 -Wall -Wextra -Werror -Wl,-headerpad_max_install_names \
+    -o "$app/Contents/MacOS/HTTrack" "$launcher" ||
+    fail "could not build the bundle launcher from $launcher"
+
 copy_dylibs
 relink
 
