@@ -28,6 +28,7 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -196,6 +197,7 @@ struct _PT_Index__Old {
 struct _PT_Index__Arc {
   PT_INDEX_COMMON_STRUCTURE;
   FILE *file;
+  long int fileSize; /* bound for the lengths read out of the file */
   PT_Mutex fileLock;
   int version;
   char lastmodified[1024];
@@ -246,6 +248,13 @@ PT_Indexes PT_New(void) {
 
 void PT_Delete(PT_Indexes index) {
   if (index != NULL) {
+    int i;
+
+    /* PT_IndexMerge took ownership of each index, file handle included */
+    for (i = 0; i < index->index_size; i++) {
+      PT_Index_Delete(&index->index[i]);
+    }
+    free(index->index);
     coucal_delete(&index->cil);
     free(index);
   }
@@ -353,6 +362,11 @@ static void PT_Index_Delete__Arc(PT_Index * pindex) {
 
     if (index->file != NULL) {
       fclose(index->file);
+      index->file = NULL;
+    }
+    if (index->hash != NULL) {
+      coucal_delete(&index->hash);
+      index->hash = NULL;
     }
     MutexFree(&index->fileLock);
   }
@@ -559,8 +573,8 @@ PT_Index PT_LoadCache(const char *filename) {
         proxytrack_print_log(DEBUG,
                              "reading httrack cache (format #%d) %s : error",
                              type, filename);
-        free(index);
-        index = NULL;
+        /* the loader may already hold a file handle and entries */
+        PT_Index_Delete(&index);
         return NULL;
       } else {
         proxytrack_print_log(DEBUG,
@@ -694,12 +708,16 @@ int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex) {
     PT_Index index = *pindex;
     struct_coucal_enum en = coucal_enum_new(index->slots.common.hash);
     coucal_item *chain;
-    int index_id = indexes->index_size++;
+    /* index_size counts a slot only once the array holds it, so a failed
+       realloc leaves neither a phantom entry nor a dropped array */
+    PT_Index *const grown = realloc(
+        indexes->index, sizeof(*indexes->index) * (indexes->index_size + 1));
+    int index_id;
     int nMerged = 0;
 
-    if ((indexes->index =
-         realloc(indexes->index,
-                 sizeof(struct _PT_Index) * indexes->index_size)) != NULL) {
+    if (grown != NULL) {
+      indexes->index = grown;
+      index_id = indexes->index_size++;
       indexes->index[index_id] = index;
       *pindex = NULL;
       while((chain = coucal_enum_next(&en)) != NULL) {
@@ -1279,8 +1297,15 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
   return r;
 }
 
+/* Bytes a writer may take from an element: a reader that could not fetch the
+   body still hands back the declared size (#931). */
+static size_t PT_Element_BodySize(const PT_Element element) {
+  return element->adr != NULL ? element->size : 0;
+}
+
 static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element) {
   zipFile zFileOut = (zipFile) arg;
+  const size_t body_size = PT_Element_BodySize(element);
   char headers[8192];
   size_t headersSize = 0;
   int headersDropped = 0;
@@ -1315,7 +1340,7 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-StatusMessage",
                    element->msg);
   ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-Size",
-                element->size); // size
+                (int) body_size); // size
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Content-Type",
                    element->contenttype); // contenttype
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Charset",
@@ -1367,10 +1392,9 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   }
 
   /* Write data in cache */
-  if (element->size > 0 && element->adr != NULL) {
-    if ((zErr =
-         zipWriteInFileInZip(zFileOut, element->adr,
-                             (int) element->size)) != Z_OK) {
+  if (body_size != 0) {
+    if ((zErr = zipWriteInFileInZip(zFileOut, element->adr, (int) body_size)) !=
+        Z_OK) {
       assertf(! "zip_zipWriteInFileInZip_failed");
     }
   }
@@ -1522,6 +1546,9 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 
     cache->filenameDat[0] = '\0';
     cache->filenameNdx[0] = '\0';
+    /* before the first early return: the readers lock it and the destructor
+       frees it, whether or not we get as far as opening a file */
+    MutexInit(&cache->fileLock);
 
     index_base_path(cache->path, sizeof(cache->path), filename);
 
@@ -2122,6 +2149,13 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
     if (index->file != NULL) {
       coucal hashtable = index->hash;
 
+      /* past LONG_MAX a 32-bit ftell cannot answer; keep serving the records
+         it can still reach, with the bound no longer constraining */
+      if (fseek(index->file, 0, SEEK_END) != 0 ||
+          (index->fileSize = ftell(index->file)) < 0) {
+        index->fileSize = LONG_MAX;
+      }
+      rewind(index->file);
       if (readArcURLRecord(index) == 0) {
         int entries = 0;
 
@@ -2320,7 +2354,10 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
 
               if (fetchSize <= 0) {
                 fetchSize = dataLength - metaSize;
-              } else if (fetchSize > dataLength - metaSize) {
+              }
+              /* the declared body may exceed the archive we allocate it from */
+              if (fetchSize < 0 || fetchSize > dataLength - metaSize ||
+                  fetchSize > index->fileSize - fposCurrent) {
                 r->statuscode = STATUSCODE_INVALID;
                 strcpybuff(r->msg, "Cache Read Error : Truncated Data");
               }
@@ -2425,12 +2462,18 @@ static hts_boolean arc_headers_cat(char *headers, size_t size,
 static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element) {
   PT_SaveCache__Arc_t *st = (PT_SaveCache__Arc_t *) arg;
   FILE *const fp = st->fp;
+  const size_t body_size = PT_Element_BodySize(element);
   struct tm *tm = convert_time_rfc822(&st->buff, element->lastmodified);
   struct tm unknown_date;
   /* the two strcatbuff calls closing the block rely on these 4 bytes */
   const size_t room = sizeof(st->headers) - 4;
   hts_boolean fit;
   int size_headers;
+
+  if (body_size != element->size) {
+    fprintf(stderr, "Entry %s stored without its %lu-byte body" LF, url,
+            (unsigned long) element->size);
+  }
 
   /* a cached entry with no parseable Last-Modified must not take the writer
      down; the epoch is the conventional "date unknown" */
@@ -2456,7 +2499,7 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
                      (element->charset[0] ? "; charset=\"" : ""),
                      (element->charset[0] ? element->charset : ""),
                      (element->charset[0] ? "\"" : ""),
-                     /**/ element->lastmodified, (int) element->size);
+                     /**/ element->lastmodified, (int) body_size);
   if (element->location != NULL && element->location[0] != '\0') {
     if (!arc_headers_cat(st->headers, room, "Location: ") ||
         !arc_headers_cat(st->headers, room, element->location) ||
@@ -2481,8 +2524,8 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
   /* doc == <nl><URL-record><nl><network_doc> */
 
   /* Format: URL IP date mime result checksum location offset filename length */
-  if (element->adr != NULL) {
-    domd5mem(element->adr, element->size, st->md5, 1);
+  if (body_size != 0) {
+    domd5mem(element->adr, body_size, st->md5, 1);
   } else {
     strcpybuff(st->md5, "-");
   }
@@ -2499,12 +2542,10 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
           tm->tm_min, tm->tm_sec, hts_effective_mime(element->contenttype),
           element->statuscode, st->md5,
           (element->location ? element->location : "-"), (long int) ftell(fp),
-          st->filename, (long int) (size_headers + element->size));
+          st->filename, (long int) (size_headers + body_size));
   /* network_doc */
-  if (fwrite(st->headers, 1, size_headers, fp) != size_headers
-      || (element->size > 0
-          && fwrite(element->adr, 1, element->size, fp) != element->size)
-    ) {
+  if (fwrite(st->headers, 1, size_headers, fp) != size_headers ||
+      (body_size != 0 && fwrite(element->adr, 1, body_size, fp) != body_size)) {
     return 1;                   /* Error */
   }
 

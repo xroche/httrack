@@ -1,0 +1,109 @@
+#!/bin/bash
+# .arc records carry their own lengths, and proxytrack reads archives it does
+# not own: a record whose body it could not read reached the writer as a size
+# with a NULL pointer (#931), and one declaring a body larger than the archive
+# was allocated in full before the read could fail.
+
+set -euo pipefail
+export LC_ALL=C
+
+dir=$(mktemp -d)
+cleanup() { rm -rf "$dir"; }
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT TERM
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+arc_header() {
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf '2 0 test\n'
+    printf '\n\n'
+}
+
+convert() {
+    proxytrack --convert "$2" "$1" 2>"$dir/log" >/dev/null ||
+        fail "proxytrack died converting $1"
+}
+
+# First line of $2 matching $1, with CRs stripped; empty when there is none.
+first_line() {
+    tr -d '\r' <"$2" | grep -a "$1" | head -1 || true
+}
+
+# The single record in $1 must declare exactly the bytes that follow it, or the
+# next reader inherits the same lie.
+check_record_length() {
+    local body_start declared total
+    read -r body_start declared < <(
+        awk '/^http:\/\//{print off + length($0) + 1, $NF; exit} {off += length($0) + 1}' "$1"
+    )
+    total=$(($(wc -c <"$1")))
+    test "$((total - body_start))" -eq "$declared" ||
+        fail "$1: record declares $declared bytes, $((total - body_start)) follow it"
+}
+
+# A record the reader cannot complete: the status line holds no number, so the
+# body is never fetched and the declared Content-Length is all that is left.
+printf 'HTTP/1.1 - Broken\r\nContent-Type: text/html\r\nContent-Length: 10\r\n\r\n' >"$dir/hdr"
+{
+    arc_header
+    printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html -1 - - 0 t.arc %d\n' \
+        "$(($(wc -c <"$dir/hdr") + 10))"
+    cat "$dir/hdr"
+} >"$dir/nobody.arc"
+
+convert "$dir/nobody.arc" "$dir/a.arc"
+grep -aq 'stored without its 10-byte body' "$dir/log" ||
+    fail "the writer took a size the reader never filled"
+
+check_record_length "$dir/a.arc"
+# and the headers must agree with it, or the second hop reads a body that is
+# not there
+convert "$dir/a.arc" "$dir/b.arc"
+check_record_length "$dir/b.arc"
+if grep -aq 'stored without' "$dir/log"; then
+    fail "the second hop still lost a body"
+fi
+
+# A length no archive this size can hold: refused, not allocated. The reader
+# used to malloc it and report whatever the short read left behind.
+{
+    arc_header
+    printf 'http://example.com/q.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc 2000000000\n'
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\nHI'
+} >"$dir/huge.arc"
+
+convert "$dir/huge.arc" "$dir/c.arc"
+status=$(first_line '^HTTP/1.0 ' "$dir/c.arc")
+test "$status" = 'HTTP/1.0 -1 Cache Read Error : Truncated Data' ||
+    fail "entry declaring 2 GB reported as '$status'"
+
+# The control the bound needs: a body running to the last byte of the file is
+# the case an off-by-one refuses, and every assertion above passes on a reader
+# that refuses everything.
+body=BODYMARKER
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' "${#body}" >"$dir/hdr2"
+{
+    arc_header
+    printf 'http://example.com/r.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' \
+        "$(($(wc -c <"$dir/hdr2") + ${#body}))"
+    cat "$dir/hdr2"
+    printf '%s' "$body"
+} >"$dir/good.arc"
+
+convert "$dir/good.arc" "$dir/d.arc"
+grep -aqF "$body" "$dir/d.arc" || fail "a body ending on the last byte was refused"
+check_record_length "$dir/d.arc"
+
+# The ZIP writer takes the same body size, in a header of its own.
+convert "$dir/nobody.arc" "$dir/e.zip"
+test -z "$(first_line '^X-Size:' "$dir/e.zip")" ||
+    fail "zip entry declares a size with no body stored"
+convert "$dir/good.arc" "$dir/f.zip"
+test "$(first_line '^X-Size:' "$dir/f.zip")" = "X-Size: ${#body}" ||
+    fail "zip entry lost the size of a body it stored"
+
+echo "OK: hostile .arc records neither crash nor over-allocate the converter"

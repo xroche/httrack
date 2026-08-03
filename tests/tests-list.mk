@@ -230,3 +230,4 @@ TESTS += 154_local-proxytrack-arc-roundtrip.test
 TESTS += 160_zlib-cache-hdrbounds.test
 TESTS += 161_local-proxytrack-zip-headers.test
 TESTS += 162_zlib-cache-urlbounds.test
+TESTS += 164_local-proxytrack-arc-hostile.test

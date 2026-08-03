@@ -2,7 +2,7 @@
 if FUZZERS
 noinst_PROGRAMS = fuzz-charset fuzz-meta fuzz-idna fuzz-entities \
 	fuzz-unescape fuzz-filters fuzz-url fuzz-header fuzz-cachendx \
-	fuzz-htsparse fuzz-singlefile fuzz-sitemap
+	fuzz-htsparse fuzz-singlefile fuzz-sitemap fuzz-arc
 endif
 
 AM_CPPFLAGS = \
@@ -30,6 +30,11 @@ fuzz_htsparse_SOURCES = fuzz-htsparse.c fuzz.h
 fuzz_singlefile_SOURCES = fuzz-singlefile.c fuzz.h
 fuzz_sitemap_SOURCES = fuzz-sitemap.c fuzz.h
 
+# proxytrack does not link libhttrack, so its store compiles into the harness;
+# coucal, minizip and md5 still come from the static libhttrack above.
+fuzz_arc_SOURCES = fuzz-arc.c fuzz.h $(top_srcdir)/src/proxy/store.c
+fuzz_arc_CPPFLAGS = $(AM_CPPFLAGS) -DZLIB_CONST
+
 # List corpus files explicitly: automake does not expand EXTRA_DIST globs.
 EXTRA_DIST = README.md run-fuzzers.sh \
 	corpus/charset/utf8.txt corpus/charset/latin1.txt corpus/charset/sjis.txt \
@@ -55,4 +60,6 @@ EXTRA_DIST = README.md run-fuzzers.sh \
 	corpus/singlefile/srcset.html corpus/singlefile/rawtext.html \
 	corpus/singlefile/malformed.html corpus/singlefile/many-attrs.html \
 	corpus/sitemap/urlset.xml corpus/sitemap/sitemapindex.xml \
-	corpus/sitemap/truncated.xml corpus/sitemap/urlset.xml.gz
+	corpus/sitemap/truncated.xml corpus/sitemap/urlset.xml.gz \
+	corpus/arc/roundtrip.arc corpus/arc/truncated.arc \
+	corpus/arc/regress-null-body.arc
