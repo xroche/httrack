@@ -1983,6 +1983,21 @@ static int skipArcNl(FILE * file) {
   return -1;
 }
 
+/* Stop on the newline opening the first record: archives whose version block
+   length swallowed the closing blank line leave only that one. */
+static int skipArcVersionNl(FILE *file) {
+  long int last = -1;
+  long int pos;
+
+  while ((pos = ftell(file)) >= 0 && fgetc(file) == 0x0a) {
+    last = pos;
+  }
+  if (last < 0) {
+    return -1;
+  }
+  return fseek(file, last, SEEK_SET);
+}
+
 static int skipArcData(FILE * file, const char *line) {
   int jump = getArcLength(line);
 
@@ -2095,9 +2110,9 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
         }
         /* Timestamp */
         index->timestamp = getArcTimestamp(index->line);
-        /* Skip first entry */
-        if (skipArcData(index->file, index->line) != 0
-            || skipArcNl(index->file) != 0) {
+        /* Skip the version block, leaving the record loop its own separator */
+        if (skipArcData(index->file, index->line) != 0 ||
+            (skipArcVersionNl(index->file) != 0 && !feof(index->file))) {
           fprintf(stderr, "Unexpected bad data offset size first entry" LF);
           fclose(index->file);
           index->file = NULL;
@@ -2486,16 +2501,20 @@ static int PT_SaveCache__Arc(PT_Indexes indexes, const char *filename) {
        2<sp><reserved><sp><origin-code><nl>
        URL<sp>IP-address<sp>Archive-date<sp>Content-type<sp>Result-code<sp>Checksum<sp>Location<sp> Offset<sp>Filename<sp>Archive-length<nl>
        <nl> */
-    const char *prefix =
-      "2 0 HTTrack Website Copier" "\n"
-      "URL IP-address Archive-Date Content-Type Result-code Checksum Location Offset Filename Archive-length"
-      "\n" "\n";
+    const char *prefix = "2 0 HTTrack Website Copier"
+                         "\n"
+                         "URL IP-address Archive-Date Content-Type Result-code "
+                         "Checksum Location Offset Filename Archive-length"
+                         "\n";
     sprintf(st.filename, "httrack_%d.arc", (int) t);
     fprintf(fp,
             "filedesc://%s 0.0.0.0 %04d%02d%02d%02d%02d%02d text/plain 200 - - 0 %s %d"
             "\n" "%s", st.filename, tm.tm_year + 1900, tm.tm_mon + 1,
             tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, st.filename,
             (int) strlen(prefix), prefix);
+    /* the blank line closing the version block is a separator, outside the
+       declared length: counting it left every entry unreadable on reload */
+    fputc('\n', fp);
     st.fp = fp;
     st.indexes = indexes;
     st.t = t;
