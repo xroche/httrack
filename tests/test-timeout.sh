@@ -63,6 +63,9 @@ fi
 ticks=0
 while kill -0 "$pid" 2>/dev/null; do
     if test "$((ticks / per_sec))" -ge "$budget"; then
+        # The dump below can run for minutes. Say so where a suite watchdog is
+        # watching, or the silence reads as a wedge and the step dies mid-stack.
+        test -z "${HTTRACK_PROGRESS_LOG:-}" || echo "DUMP $name" >>"$HTTRACK_PROGRESS_LOG"
         dump_hang_diagnostics "$pid" "$name" "$budget"
         kill_tree "$pid"
         reap_bounded "$pid" || echo "hang: the tree outlived the kill; see the process list above"

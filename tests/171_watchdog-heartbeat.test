@@ -1,0 +1,137 @@
+#!/bin/bash
+#
+# Unit-tests ci_suite_heartbeat (testlib.sh) on a virtual clock, at the values the
+# Windows workflow really passes, in both its regimes: scaled-down timings
+# collapse the sleep granularity, the annotation cadence and the staticness
+# window onto one number, and a watchdog confusing those kills healthy runs
+# (#795). The kill is timed by the stub, never by the annotation the code writes.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_hb.XXXXXX")
+trap 'set +e; rm -rf "$tmp"' EXIT
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+progress="$tmp/progress"
+kill_tree() { echo "KILL $1 at $(hb_now)"; }
+# Twelve lines, against a bound of eight.
+list_stray_processes() {
+    printf '%s\n' "$*" >"$tmp/strayargs"
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo "(stub $i)"; done
+}
+
+# First on the real clock, so the virtual one cannot be measuring itself. The
+# bound is tight enough to catch hb_now returning some other unit.
+printf 'RUN 99_stuck.test at 0s\n' >"$progress"
+began=$SECONDS
+ci_suite_heartbeat 1 1 "$progress" 2 4242 >"$tmp/real" 2>&1
+spent=$((SECONDS - began))
+test "$spent" -ge 2 || fail "killed after ${spent}s of a 2s window: hb_now runs fast"
+test "$spent" -le 8 || fail "took ${spent}s to notice a 2s static window: hb_now is not seconds"
+grep -q '^KILL 4242 at ' "$tmp/real" || fail "a static log was not killed on the real clock"
+
+# Virtual clock, started well away from zero so the quiet window is measured from
+# when the watchdog began rather than from whatever the clock happened to read.
+vnow=5000
+ticks=0
+sleep() {
+    local step=$1
+    ticks=$((ticks + 1))
+    # Every fourth sleep overshoots fourfold. Starvation is what makes a sleep
+    # run long, and it is the whole difference between a clock that is measured
+    # and one accumulated from what was asked for: a perfect sleep here would
+    # make the code's central invariant unobservable.
+    test $((ticks % 4)) -ne 0 || step=$((step * 4))
+    vnow=$((vnow + step))
+    if test "$vnow" -ge 5600 && test "$vnow" -lt 5700; then
+        # The one exercise of the errexit guard: tail must not end the watchdog.
+        rm -f "$progress"
+    elif test "$vnow" -le 6230; then
+        # Two % and a CR in every line, because the runner needs both encoded:
+        # left raw, either one truncates the command it is carrying.
+        printf 'RUN %ss%%a%%b.test\r at %ss\n' "$vnow" "$vnow" >>"$progress"
+        echo "$vnow" >"$tmp/lastwrite"
+    fi
+}
+hb_now() { echo "$vnow"; }
+
+printf 'RUN 98_earlier.test at 0s\n' >"$progress"
+ci_suite_heartbeat 720 360 "$progress" 900 4242 >"$tmp/out" 2>&1
+
+# Timed by the stub, not by the annotation. The kill is due one staticness window
+# after the last progress line and within a tick of it: earlier means it fired on
+# a suite still reporting, later means the 30s clamp is gone, or the check rides
+# the 360s annotation cadence, or the clock is being accumulated rather than read.
+killed=$(sed -n 's/^KILL 4242 at \([0-9]*\)$/\1/p' "$tmp/out")
+wrote=$(cat "$tmp/lastwrite")
+test -n "$killed" || fail "a suite that stopped reporting was never killed"
+test "$killed" -ge $((wrote + 900)) ||
+    fail "killed at $killed, only $((killed - wrote))s after the last progress line at $wrote"
+test "$killed" -le $((wrote + 900 + 120)) ||
+    fail "killed at $killed, $((killed - wrote))s after the last progress line at $wrote"
+
+# The kill has to be announced before it happens, or it lands unexplained.
+sed -n '/^::error title=suite watchdog::/=;/^KILL 4242 at /=' "$tmp/out" |
+    { read -r announced && read -r fired && test "$announced" -lt "$fired"; } ||
+    fail "the kill was not announced ahead of itself"
+
+# Quiet window and cadence, from the annotations' own elapsed field: a lie there
+# is caught by the kill oracle above, so these only have to pin the schedule.
+said=()
+while IFS= read -r t; do
+    said+=("$t")
+done < <(sed -n 's/^::notice title=suite still running::\([0-9]*\)s elapsed.*/\1/p' "$tmp/out")
+test "${#said[@]}" -ge 2 || fail "only ${#said[@]} annotations before the kill"
+if test "${said[0]}" -lt 720 || test "${said[0]}" -gt 840; then
+    fail "first annotation at ${said[0]}s, want 720 after the watchdog began, within a tick"
+fi
+prev=${said[0]}
+for t in "${said[@]:1}"; do
+    if test $((t - prev)) -lt 360 || test $((t - prev)) -gt 480; then
+        fail "annotations ${prev}s and ${t}s apart, want 360 within a tick"
+    fi
+    prev=$t
+done
+
+grep -q "in flight: RUN ${wrote}s%25a%25b.test at ${wrote}s" "$tmp/out" ||
+    fail "annotation does not name the escaped test in flight: $(head -3 "$tmp/out")"
+grep -q "$(printf '\r')" "$tmp/out" && fail "a CR reached the annotation, truncating it"
+grep -q '98_earlier' "$tmp/out" && fail "annotation names the first test, not the one in flight"
+grep -qx '0 named' "$tmp/strayargs" || fail "process list not host-wide: $(cat "$tmp/strayargs")"
+
+# Joined with %0A and bounded to eight, and no separator left dangling: the
+# runner reads to end of line, so a trailing one is a visible empty tail.
+first=$(sed -n '/^::notice title=suite still running::/{p;q;}' "$tmp/out")
+for i in 1 8; do
+    grep -q "%0A(stub $i)" <<<"$first" || fail "annotation lost process line $i"
+done
+# By identity, not by count: any eight lines satisfy a tally, including the wrong
+# eight, which is what a bound applied at the far end would leave.
+grep -q '(stub 9)' <<<"$first" && fail "annotation carried more than the eight lines it bounds"
+grep -q '%0A$' "$tmp/out" && fail "annotation ends on a dangling %0A separator"
+
+# A command is only read at the head of a line, so every annotation opens one.
+awk '/^::(notice|error) title=/ { if (prev != "") bad = 1 } { prev = $0 } END { exit bad }' "$tmp/out" ||
+    fail "an annotation followed a non-empty line, where the runner cannot see it"
+
+# The workflow's own quiet window is longer than its staticness one, and only
+# then does the gate ahead of the kill decide anything: a suite dead from the
+# start waits out the quiet window rather than the shorter staticness one. Above,
+# where quiet is the shorter of the two, that gate is unreachable.
+vnow=9000
+ticks=0
+printf 'RUN 97_dead.test at 0s\n' >"$progress"
+ci_suite_heartbeat 960 360 "$progress" 900 4242 >"$tmp/late" 2>&1
+killed=$(sed -n 's/^KILL 4242 at \([0-9]*\)$/\1/p' "$tmp/late")
+test -n "$killed" || fail "a suite static from the start was never killed"
+test "$killed" -ge 9960 || fail "killed at $killed, inside the 960s quiet window"
+test "$killed" -le 10080 || fail "killed at $killed, want 9960 within a tick"
+
+echo "heartbeat OK"

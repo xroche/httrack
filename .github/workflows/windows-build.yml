@@ -204,9 +204,20 @@ jobs:
           suite_deadline=1500
           started=$SECONDS
 
-          # Survives into the artifact even if the tail of the step log does not.
+          # Reaches the artifact whenever the step ends on its own terms, which the
+          # tail of its log may not. Absolute, since a .test may have chdir'd.
           progress=suite-progress.log
           : >"$progress"
+          export HTTRACK_PROGRESS_LOG="$PWD/$progress"
+
+          # A dying runner takes both, and every annotation with them (measured, see
+          # #795), so the watchdog's job is to end the step first: one that fails on
+          # its own terms keeps its log. Quiet past 16 min, clear of the 13 a healthy
+          # run measures here, and a kill 900s after the last progress line clears
+          # the longest legitimate gap, one $per_test.
+          ci_suite_heartbeat 960 360 "$progress" 900 $$ &
+          heartbeat=$!
+          trap 'kill "$heartbeat" 2>/dev/null || true' EXIT
 
           pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
           # Globbed, not enumerated: a new NNN_engine-*.test or NNN_local-*.test
@@ -245,6 +256,9 @@ jobs:
                 echo "FAIL $t (exit $rc)"
                 # These assert with `test "$(...)" == "..." || exit 1`, which
                 # says nothing at all on failure. Re-run traced, still bounded.
+                # Noted first, or a slow trace reads as a wedge to the watchdog,
+                # which would then kill the step in the middle of writing it.
+                echo "RERUN $t" >>"$progress"
                 run_with_timeout "$per_test" bash -x "$t" >>"$t.log" 2>&1 || true
                 tail -n 25 "$t.log" | sed 's/^/      /'
                 ;;
