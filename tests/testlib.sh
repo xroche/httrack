@@ -205,10 +205,12 @@ ci_annotate() {
     printf '\n::%s title=%s::%s\n' "$level" "$title" "$msg"
 }
 
-# Quiet for $1s, then names the test in flight from $3 every $2s; kills $5 once $3
-# has been static for $4s. Staticness, never elapsed time: a healthy test in flight
-# and a wedged one look identical by the clock, but every outcome writes a line,
-# the per-test timeout included, so $4 past that timeout means it never fired (#795).
+# End a wedged suite before its runner dies: a step that fails on its own terms
+# keeps its log, a lost runner keeps nothing, annotations included (#795). Quiet
+# for $1s, then names the test in flight from $3 every $2s; kills $5 once $3 has
+# been static for $4s. Staticness, never elapsed time: a healthy test in flight and
+# a wedged one look identical by the clock, but every outcome writes a line, the
+# per-test timeout included, so $4 past that timeout means it never fired.
 # Seconds since this shell started. Overridable, so the unit test can drive the
 # schedule the workflow really passes off a virtual clock instead of waiting it out.
 hb_now() { echo "$SECONDS"; }

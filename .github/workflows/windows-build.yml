@@ -208,11 +208,11 @@ jobs:
           progress=suite-progress.log
           : >"$progress"
 
-          # Neither survives a job that dies with its runner (#795), so a watchdog
-          # reports through annotations, which do. Quiet past 12 min since a healthy
-          # run takes 8-9; a kill 900s after the last progress line clears the
-          # longest legitimate gap, one $per_test, and still lands inside the step's
-          # own timeout for anything the loop was able to start.
+          # A dying runner takes both, and every annotation with them (measured, see
+          # #795), so the watchdog's job is to end the step first: one that fails on
+          # its own terms keeps its log. Quiet past 12 min since a healthy run takes
+          # 8-9, and a kill 900s after the last progress line clears the longest
+          # legitimate gap, one $per_test.
           ci_suite_heartbeat 720 360 "$progress" 900 $$ &
           heartbeat=$!
           trap 'kill "$heartbeat" 2>/dev/null || true' EXIT
