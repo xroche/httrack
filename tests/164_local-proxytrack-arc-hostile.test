@@ -28,6 +28,11 @@ convert() {
         fail "proxytrack died converting $1"
 }
 
+# First line of $2 matching $1, with CRs stripped; empty when there is none.
+first_line() {
+    tr -d '\r' <"$2" | grep -a "$1" | head -1 || true
+}
+
 # The single record in $1 must declare exactly the bytes that follow it, or the
 # next reader inherits the same lie.
 check_record_length() {
@@ -72,8 +77,33 @@ fi
 } >"$dir/huge.arc"
 
 convert "$dir/huge.arc" "$dir/c.arc"
-status=$(tr -d '\r' <"$dir/c.arc" | grep -a '^HTTP/1.0 ' | head -1)
+status=$(first_line '^HTTP/1.0 ' "$dir/c.arc")
 test "$status" = 'HTTP/1.0 -1 Cache Read Error : Truncated Data' ||
     fail "entry declaring 2 GB reported as '$status'"
+
+# The control the bound needs: a body running to the last byte of the file is
+# the case an off-by-one refuses, and every assertion above passes on a reader
+# that refuses everything.
+body=BODYMARKER
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' "${#body}" >"$dir/hdr2"
+{
+    arc_header
+    printf 'http://example.com/r.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' \
+        "$(($(wc -c <"$dir/hdr2") + ${#body}))"
+    cat "$dir/hdr2"
+    printf '%s' "$body"
+} >"$dir/good.arc"
+
+convert "$dir/good.arc" "$dir/d.arc"
+grep -aqF "$body" "$dir/d.arc" || fail "a body ending on the last byte was refused"
+check_record_length "$dir/d.arc"
+
+# The ZIP writer takes the same body size, in a header of its own.
+convert "$dir/nobody.arc" "$dir/e.zip"
+test -z "$(first_line '^X-Size:' "$dir/e.zip")" ||
+    fail "zip entry declares a size with no body stored"
+convert "$dir/good.arc" "$dir/f.zip"
+test "$(first_line '^X-Size:' "$dir/f.zip")" = "X-Size: ${#body}" ||
+    fail "zip entry lost the size of a body it stored"
 
 echo "OK: hostile .arc records neither crash nor over-allocate the converter"

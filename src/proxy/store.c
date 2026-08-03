@@ -28,6 +28,7 @@ Please visit our Website: http://www.httrack.com
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1545,6 +1546,9 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
 
     cache->filenameDat[0] = '\0';
     cache->filenameNdx[0] = '\0';
+    /* before the first early return: the readers lock it and the destructor
+       frees it, whether or not we get as far as opening a file */
+    MutexInit(&cache->fileLock);
 
     index_base_path(cache->path, sizeof(cache->path), filename);
 
@@ -2145,14 +2149,13 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
     if (index->file != NULL) {
       coucal hashtable = index->hash;
 
+      /* past LONG_MAX a 32-bit ftell cannot answer; keep serving the records
+         it can still reach, with the bound no longer constraining */
       if (fseek(index->file, 0, SEEK_END) != 0 ||
-          (index->fileSize = ftell(index->file)) < 0 ||
-          fseek(index->file, 0, SEEK_SET) != 0) {
-        fprintf(stderr, "Unable to size file" LF);
-        fclose(index->file);
-        index->file = NULL;
-        return 0;
+          (index->fileSize = ftell(index->file)) < 0) {
+        index->fileSize = LONG_MAX;
       }
+      rewind(index->file);
       if (readArcURLRecord(index) == 0) {
         int entries = 0;
 
