@@ -161,6 +161,7 @@ copy_dylibs() {
 relink() {
     test -d "$fw" || return 0
     machos
+    mainexe=$(main_executable "$app")
     while IFS= read -r bin; do
         case "$bin" in
         "$fw"/*) rewrite -id "@rpath/$(basename "$bin")" "$bin" ;;
@@ -175,6 +176,7 @@ relink() {
         otool -l "$bin" | awk '/LC_RPATH/ {r = 1} r && $1 == "path" {print $2; r = 0}' >"$deplist"
         grep -qxF "$rp" "$deplist" || rewrite -add_rpath "$rp" "$bin"
         # install_name_tool invalidates the signature, and arm64 kills an unsigned Mach-O.
+        [ "$bin" = "$mainexe" ] && continue
         codesign -f -s - "$bin"
     done <"$mach"
 }
@@ -189,11 +191,14 @@ done
 launcher="$(dirname "$0")/httrack-launcher.c"
 test -r "$launcher" || fail "no launcher source at $launcher"
 cc -O2 -Wall -Wextra -Werror -Wl,-headerpad_max_install_names \
-    -o "$app/Contents/MacOS/HTTrack" "$launcher" ||
+    -o "$(main_executable "$app")" "$launcher" ||
     fail "could not build the bundle launcher from $launcher"
 
 copy_dylibs
 relink
+# Last, so the seal covers every file the two rewrote. Signing the bundle is also
+# what signs the main executable, which codesign will not take on its own.
+codesign -f -s - "$app"
 
 appreal=$(cd "$app" && pwd -P)
 

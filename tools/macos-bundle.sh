@@ -22,3 +22,10 @@ plist_value() {
     awk -v k="$2" '$0 ~ "<key>" k "</key>" {
         getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$1"
 }
+
+# The bundle's main executable. codesign resolves it to the enclosing bundle, so it
+# is signed and verified with the bundle, never on its own.
+main_executable() {
+    printf '%s/Contents/MacOS/%s\n' "$1" \
+        "$(plist_value "$1/Contents/Info.plist" CFBundleExecutable)"
+}

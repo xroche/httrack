@@ -92,13 +92,22 @@ sign() {
 machos_into "$app/Contents" "$mach"
 test -s "$mach" || fail "no Mach-O file in the bundle, the signing below would prove nothing"
 
+mainexe=$(main_executable "$app")
+
 # Before --force, which would re-sign away the damage this is meant to catch.
 while IFS= read -r bin; do
-    codesign --verify --strict "$bin" || fail "$bin arrived with a broken signature"
+    if [ "$bin" != "$mainexe" ]; then
+        codesign --verify --strict "$bin" || fail "$bin arrived with a broken signature"
+    fi
 done <"$mach"
+codesign --verify --strict "$app" || fail "$app arrived with a broken signature"
 
+# Inside out, and never the main executable on its own: signing the bundle is what
+# signs it, and doing it early would seal resources the rest of this loop rewrites.
 while IFS= read -r bin; do
-    sign --options runtime "$bin"
+    if [ "$bin" != "$mainexe" ]; then
+        sign --options runtime "$bin"
+    fi
 done <"$mach"
 sign --options runtime "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
