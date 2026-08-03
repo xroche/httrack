@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# An icon size added to the tree but not to html/Makefile.am is neither
+# installed nor distributed, and nothing else notices.
+
+set -euo pipefail
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+div="${srcdir}/html/server/div"
+mk="${srcdir}/html/Makefile.am"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# IHDR width and height. Read as bytes: PNG is big-endian, od -tu4 is not.
+png_size() {
+    local hex
+    hex=$(od -An -tx1 -j16 -N8 "$1" | tr -d ' \n')
+    printf '%dx%d' "0x${hex:0:8}" "0x${hex:8:8}"
+}
+
+test -r "${mk}" || fail "no ${mk}"
+seen=0
+for dir in "${div}"/*/; do
+    name=$(basename "${dir}")
+    case "${name}" in
+    [0-9]*x[0-9]* | scalable) ;;
+    *) continue ;;
+    esac
+    seen=$((seen + 1))
+
+    var="WebIcon${name}"
+    test "${name}" = scalable && var="WebIconScalable"
+    grep -q "^${var}dir = .*hicolor/${name}/apps\$" "${mk}" ||
+        fail "${name}: no ${var}dir installing into hicolor/${name}/apps"
+    grep -q "^${var}_DATA = .*div/${name}/\*\." "${mk}" ||
+        fail "${name}: no ${var}_DATA listing div/${name}"
+    grep -q "\$(${var}_DATA)" "${mk}" ||
+        fail "${name}: \$(${var}_DATA) missing from EXTRA_DIST, dist would drop it"
+
+    if [ "${name}" = scalable ]; then
+        test -r "${dir}/httrack.svg" || fail "scalable: no httrack.svg"
+        grep -q 'viewBox' "${dir}/httrack.svg" || fail "scalable: httrack.svg has no viewBox"
+        continue
+    fi
+    test -r "${dir}/httrack.png" || fail "${name}: no httrack.png"
+    got=$(png_size "${dir}/httrack.png")
+    test "${got}" = "${name}" || fail "${name}/httrack.png is ${got}"
+done
+test "${seen}" -ge 4 || fail "only ${seen} icon directories found under ${div}"
+
+# Icon= is a theme name, so it must exist in every size we install.
+for desktop in "${div}"/*.desktop; do
+    icon=$(sed -n 's/^Icon=//p' "${desktop}")
+    test -n "${icon}" || fail "$(basename "${desktop}"): no Icon="
+    for dir in "${div}"/[0-9]*x[0-9]*/; do
+        test -r "${dir}/${icon}.png" ||
+            fail "$(basename "${desktop}"): Icon=${icon} unresolved in $(basename "${dir}")"
+    done
+done
+
+echo "icon theme: ${seen} directories, all installed and distributed"
