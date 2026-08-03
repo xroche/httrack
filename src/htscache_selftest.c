@@ -921,7 +921,7 @@ static const golden_entry golden_entries[] = {
 
 #define GOLDEN_COUNT (sizeof(golden_entries) / sizeof(golden_entries[0]))
 
-static void golden_setup(httrackp *opt, const char *dir) {
+static void selftest_setup_dir(httrackp *opt, const char *dir) {
   char base[HTS_URLMAXSIZE];
 
   strcpybuff(base, dir);
@@ -940,7 +940,7 @@ int cache_golden_selftest(httrackp *opt, const char *dir, int regen) {
   cache_back cache;
 
   selftest_tag = "cache-golden";
-  golden_setup(opt, dir);
+  selftest_setup_dir(opt, dir);
 
   /* regen rewrites the fixture from the table; the test never passes it, so the
      read pass verifies bytes a previous build froze */
@@ -1025,7 +1025,7 @@ int cache_reconcile_selftest(httrackp *opt, const char *dir) {
   /* around the interrupted-run thresholds (new < 32768, old > 65536) */
   static const LLint TINY = 1024, MID = 40000, SOLID = 131072;
 
-  golden_setup(opt, dir);
+  selftest_setup_dir(opt, dir);
 #ifdef _WIN32
   mkdir(reconcile_st_path(opt, "hts-cache"));
 #else
@@ -1174,7 +1174,7 @@ int cache_legacy_refused_selftest(httrackp *opt, const char *dir) {
   int variant;
 
   selftest_tag = "cache-legacy";
-  golden_setup(opt, dir);
+  selftest_setup_dir(opt, dir);
 #ifdef _WIN32
   mkdir(reconcile_st_path(opt, "hts-cache"));
 #else
@@ -1552,7 +1552,7 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
 
   selftest_tag = "cache-corrupt";
-  golden_setup(opt, dir);
+  selftest_setup_dir(opt, dir);
 
   failures +=
       corrupt_case_zip(opt, "X-Size: 44", "X-Size: 99", 1, 1,
@@ -1696,8 +1696,8 @@ int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
      6 KB, past the header block the writer builds them in */
   static char big_adr[HTS_URLMAXSIZE * 2], big_fil[HTS_URLMAXSIZE * 2];
   static char big_save[HTS_URLMAXSIZE * 2];
-  /* the control: same maxed fields, but a URL short enough for the read path's
-     lookup buffer, so nothing is dropped and the round-trip must be exact */
+  /* the control: same maxed fields, but a URL short enough to leave the header
+     block room, so nothing is dropped and the round-trip must be exact */
   static char ok_fil[HTS_URLMAXSIZE];
   const char *const ok_adr = "example.com";
   const char *const ok_save = "example.com/big.html";
@@ -1709,9 +1709,7 @@ int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
   fill_str(etag, sizeof(etag), sizeof(etag) - 1, 'E');
   fill_str(cdispo, sizeof(cdispo), sizeof(cdispo) - 1, 'D');
   fill_str(location, sizeof(location), sizeof(location) - 1, 'L');
-  /* 2040+2047: the largest pair cache_add's own "http://"+adr+fil filename
-     buffer (HTS_URLMAXSIZE*4) accepts, so the header block is what gives */
-  fill_str(big_adr, sizeof(big_adr), 2040, 'a');
+  fill_str(big_adr, sizeof(big_adr), sizeof(big_adr) - 1, 'a');
   big_fil[0] = '/';
   fill_str(big_fil + 1, sizeof(big_fil) - 1, 2046, 'f');
   fill_str(big_save, sizeof(big_save), sizeof(big_save) - 1, 'S');
@@ -1740,10 +1738,8 @@ int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
               strlen(body));
   selftest_close(&cache);
 
-  /* The overflowing entry is never read back through cache_readex: adr+fil
-     outgrows the read path's own lookup buffer. Read its header block straight
-     out of the ZIP instead: a runtime that does not trap the overrun would
-     otherwise store the over-long block and still pass. */
+  /* Read the header straight from the ZIP, not through cache_readex: a runtime
+     that does not trap the overrun would store the block and still pass. */
   {
     char zippath[HTS_URLMAXSIZE];
     static char extra[CACHE_HEADERS_SIZE * 4];
@@ -1773,10 +1769,9 @@ int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
         fprintf(stderr, "cache-hdrbounds: header block ends mid-line\n");
         failures++;
       }
-      /* X-Fil is written last, so its absence is how we know the block
-         filled. Still present means this entry no longer reaches the bound --
-         url_adr/url_fil cannot grow (cache_add's filename buffer caps them),
-         so the case would need rebuilding, not silently weakening. */
+      /* X-Fil is written last, so its absence proves the block filled; the URL
+         is already at its lien_back cap, so a surviving X-Fil means the case
+         needs rebuilding, not silently weakening. */
       if (strstr(extra, "X-Fil: ") != NULL) {
         fprintf(stderr,
                 "cache-hdrbounds: the maxed entry no longer fills the %d-byte "
@@ -1829,6 +1824,161 @@ int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
     freet(locbuf);
   }
   selftest_close(&cache);
+
+  return failures;
+}
+
+/* A URL the cache cannot hold must read as a miss, never abort. */
+static int expect_miss(httrackp *opt, cache_back *cache, const char *adr,
+                       const char *fil) {
+  htsblk r = cache_readex(opt, cache, adr, fil, "", NULL, NULL, 1);
+  int failures = 0;
+
+  if (r.statuscode != STATUSCODE_INVALID) {
+    fprintf(stderr,
+            "%s: an unstorable URL reads statuscode %d, expected a "
+            "miss\n",
+            selftest_tag, r.statuscode);
+    failures++;
+  }
+  if (r.adr != NULL) {
+    freet(r.adr);
+  }
+  return failures;
+}
+
+/* A cache ZIP whose first entry name is longer than the writer can emit,
+   followed by a sane one; minizip hands such a name back unterminated. */
+static int urlbounds_write_foreign_zip(const char *zippath, size_t namelen) {
+  static const char hdr[] = "HTTP/1.1 200 OK\r\nX-In-Cache: 1\r\n"
+                            "X-StatusCode: 200\r\nX-Size: 4\r\n"
+                            "X-StatusMessage: OK\r\n"
+                            "Content-Type: text/html\r\nX-Charset: utf-8\r\n";
+  static char longname[CACHE_ENTRYNAME_SIZE * 2];
+  const char *const body = "okay";
+  zip_fileinfo fi;
+  zipFile z = zipOpen(zippath, APPEND_STATUS_CREATE);
+  int err = 0;
+  int i;
+
+  if (z == NULL) {
+    return -1;
+  }
+  memset(&fi, 0, sizeof(fi));
+  fill_str(longname, sizeof(longname), namelen, 'z');
+  memcpy(longname, "http://", 7);
+  for (i = 0; i < 2; i++) {
+    const char *const name = i == 0 ? longname : "http://example.com/sane.html";
+
+    err |= zipOpenNewFileInZip(z, name, &fi, hdr, (uInt) strlen(hdr), NULL, 0,
+                               NULL, Z_DEFLATED, Z_DEFAULT_COMPRESSION);
+    err |= zipWriteInFileInZip(z, body, (int) strlen(body));
+    err |= zipCloseFileInZip(z);
+  }
+  err |= zipClose(z, NULL);
+  return err;
+}
+
+int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
+  int failures = 0;
+  cache_back cache;
+  /* the largest pair lien_back can hold, and a twin differing only in its last
+     byte: a key clipped anywhere on the path aliases the two together */
+  static char big_adr[HTS_URLMAXSIZE * 2], big_fil[HTS_URLMAXSIZE * 2];
+  static char twin_fil[HTS_URLMAXSIZE * 2];
+  /* past every buffer on the path: no lien_back holds these, but the cache API
+     takes plain pointers, and dropping the entry beats aborting the mirror.
+     One overshoots url_fil, the other url_adr, so a bound on one destination
+     only is not enough to pass */
+  static char huge_fil[CACHE_ENTRYNAME_SIZE * 2];
+  static char huge_adr[CACHE_ENTRYNAME_SIZE * 2];
+  /* the key a writer that clipped huge_fil would have stored it under */
+  static char decoy_fil[HTS_URLMAXSIZE * 2];
+  const char *const short_adr = "example.com";
+  const char *const short_fil = "/after.html";
+  const char *const big_body = "<html><body>maxed</body></html>";
+  const char *const twin_body = "<html><body>twin</body></html>";
+  const char *const short_body = "<html><body>after</body></html>";
+  const char *const decoy_body = "<html><body>decoy</body></html>";
+  const char *const lm = "Mon, 01 Jan 2024 00:00:00 GMT";
+
+  fill_str(big_adr, sizeof(big_adr), sizeof(big_adr) - 1, 'a');
+  big_fil[0] = '/';
+  fill_str(big_fil + 1, sizeof(big_fil) - 1, sizeof(big_fil) - 2, 'f');
+  memcpy(twin_fil, big_fil, sizeof(twin_fil));
+  twin_fil[sizeof(twin_fil) - 2] = 'g';
+  huge_fil[0] = '/';
+  fill_str(huge_fil + 1, sizeof(huge_fil) - 1, sizeof(huge_fil) - 2, 'h');
+  fill_str(huge_adr, sizeof(huge_adr), sizeof(huge_adr) - 1, 'A');
+  decoy_fil[0] = '/';
+  fill_str(decoy_fil + 1, sizeof(decoy_fil) - 1, sizeof(decoy_fil) - 2, 'h');
+
+  selftest_tag = "cache-urlbounds";
+  selftest_setup_dir(opt, dir);
+
+  selftest_open_for_write(&cache, opt);
+  store_entry(opt, &cache, big_adr, big_fil, "example.com/big.html", 200, "OK",
+              "text/html", "utf-8", lm, "", "", "", big_body, strlen(big_body));
+  store_entry(opt, &cache, big_adr, twin_fil, "example.com/twin.html", 200,
+              "OK", "text/html", "utf-8", lm, "", "", "", twin_body,
+              strlen(twin_body));
+  /* stored first, so a writer that clipped rather than dropped would overwrite
+     it under its own key */
+  store_entry(opt, &cache, big_adr, decoy_fil, "example.com/decoy.html", 200,
+              "OK", "text/html", "utf-8", lm, "", "", "", decoy_body,
+              strlen(decoy_body));
+  store_entry(opt, &cache, big_adr, huge_fil, "example.com/huge.html", 200,
+              "OK", "text/html", "utf-8", lm, "", "", "", "dropped", 7);
+  store_entry(opt, &cache, huge_adr, "/short.html", "example.com/wide.html",
+              200, "OK", "text/html", "utf-8", lm, "", "", "", "dropped", 7);
+  /* written after the dropped one: the drop must cost nothing but itself */
+  store_entry(opt, &cache, short_adr, short_fil, "example.com/after.html", 200,
+              "OK", "text/html", "utf-8", lm, "", "", "", short_body,
+              strlen(short_body));
+  selftest_close(&cache);
+
+  selftest_open_for_read(&cache, opt);
+  /* the twin differs from the maxed entry only in its last byte: a key clipped
+     anywhere on the path serves one for the other */
+  failures += check_entry(opt, &cache, big_adr, big_fil, 200, "OK", "text/html",
+                          "utf-8", lm, "", "", "", big_body, strlen(big_body));
+  failures +=
+      check_entry(opt, &cache, big_adr, twin_fil, 200, "OK", "text/html",
+                  "utf-8", lm, "", "", "", twin_body, strlen(twin_body));
+  failures +=
+      check_entry(opt, &cache, short_adr, short_fil, 200, "OK", "text/html",
+                  "utf-8", lm, "", "", "", short_body, strlen(short_body));
+  failures +=
+      check_entry(opt, &cache, big_adr, decoy_fil, 200, "OK", "text/html",
+                  "utf-8", lm, "", "", "", decoy_body, strlen(decoy_body));
+  failures += expect_miss(opt, &cache, big_adr, huge_fil);
+  failures += expect_miss(opt, &cache, huge_adr, "/short.html");
+  selftest_close(&cache);
+
+  /* An entry name past every buffer on the path must be skipped, not indexed
+     from an unterminated read -- which only the sanitizer legs see. */
+  {
+    char zippath[HTS_URLMAXSIZE];
+    /* no pair of lien_back fields reaches this key, so look it up as one */
+    static char foreign_fil[CACHE_KEY_SIZE];
+
+    slprintfbuff_clip(zippath, sizeof(zippath), "%shts-cache/new.zip",
+                      StringBuff(opt->path_log));
+    if (urlbounds_write_foreign_zip(zippath, CACHE_ENTRYNAME_SIZE - 2) != 0) {
+      fprintf(stderr, "cache-urlbounds: could not write the foreign cache\n");
+      failures++;
+    } else {
+      /* the name the loader saw, minus the "http://" the index load strips */
+      fill_str(foreign_fil, sizeof(foreign_fil), CACHE_ENTRYNAME_SIZE - 2 - 7,
+               'z');
+      selftest_open_for_read(&cache, opt);
+      failures +=
+          check_entry(opt, &cache, "example.com", "/sane.html", 200, "OK",
+                      "text/html", "utf-8", "", "", "", "", "okay", 4);
+      failures += expect_miss(opt, &cache, "", foreign_fil);
+      selftest_close(&cache);
+    }
+  }
 
   return failures;
 }

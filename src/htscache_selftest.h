@@ -71,6 +71,10 @@ int cache_legacy_refused_selftest(httrackp *opt, const char *dir);
  */
 int cache_header_bounds_selftest(httrackp *opt, const char *dir);
 
+/* URLs at (and past) the cache API's length cap: store and lookup must neither
+   abort nor alias two keys. Returns the failed-check count. */
+int cache_url_bounds_selftest(httrackp *opt, const char *dir);
+
 /* Inject read-side corruption (zip byte surgery: bad size, header, deflate)
    under <dir> and assert every case degrades to STATUSCODE_INVALID without
    tainting a sibling entry. */
