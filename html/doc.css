@@ -69,7 +69,9 @@ body {
 	background: #000;
 	color: #fff;
 	font-weight: bold;
-	padding: .25rem .4rem;
+	/* A one-line label has no use for the body's prose leading. */
+	line-height: 1;
+	padding: .3rem .4rem;
 	margin-top: .4rem;
 }
 
