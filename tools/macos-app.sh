@@ -59,7 +59,9 @@ prefix=$(cd "$prefix" && pwd -P)
 list=$(mktemp)
 mach=$(mktemp)
 deplist=$(mktemp)
-trap 'rm -f "$list" "$mach" "$deplist"' EXIT
+otmp=$(mktemp)
+fwmap=$(mktemp)
+trap 'rm -f "$list" "$mach" "$deplist" "$otmp" "$fwmap"' EXIT
 app="$out/HTTrack.app"
 rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
@@ -93,19 +95,20 @@ sysdep() {
     return 1
 }
 
-# Mach-O files only, prefiltered so `file` is not run over the whole html payload.
+# Every file, not a prefilter: this list drives the copy, the relink and the audit alike.
 machos() {
-    find "$app/Contents" -type f \
-        \( -perm -u+x -o -name '*.dylib' -o -name '*.so' \) >"$list"
+    find "$app/Contents" -type f >"$list"
     : >"$mach"
     while IFS= read -r f; do
-        file "$f" | grep -q Mach-O && printf '%s\n' "$f" >>"$mach"
+        if file "$f" | grep -q Mach-O; then printf '%s\n' "$f" >>"$mach"; fi
     done <"$list"
 }
 
+# Only the indented lines are dependencies; a universal binary heads each slice.
 # A dylib's first entry is its own LC_ID_DYLIB, skipped like any satisfied dependency.
 deps() {
-    otool -L "$1" | tail -n +2 | awk '{print $1}'
+    otool -L "$1" >"$otmp" || fail "otool -L failed on $1"
+    awk '/^[[:space:]]/ {print $1}' "$otmp"
 }
 
 # One ../ per component below Contents, so the rpath is depth-correct wherever the loader sits.
@@ -123,6 +126,7 @@ rewrite() {
 # Each pass rescans, so a dylib pulled in by the last pass gets its own deps on the next.
 copy_dylibs() {
     mkdir -p "$fw"
+    : >"$fwmap"
     while :; do
         machos
         : >"$deplist"
@@ -134,7 +138,14 @@ copy_dylibs() {
         while IFS= read -r dep; do
             case "$dep" in @*) continue ;; esac
             sysdep "$dep" && continue
-            test -r "$fw/$(basename "$dep")" && continue
+            base=$(basename "$dep")
+            known=$(awk -v b="$base" '$1 == b {print $2}' "$fwmap")
+            if [ -n "$known" ]; then
+                # Frameworks is flat, so two libraries under one name would clobber.
+                test "$known" = "$dep" || fail "$dep and $known are both named $base"
+                continue
+            fi
+            printf '%s\t%s\n' "$base" "$dep" >>"$fwmap"
             printf '%s\n' "$dep" >>"$list"
         done <"$deplist"
         test -s "$list" || break
@@ -168,16 +179,13 @@ relink() {
     done <"$mach"
 }
 
-if [ "$(uname -s)" = Darwin ]; then
-    for t in otool install_name_tool codesign file; do
-        command -v "$t" >/dev/null 2>&1 ||
-            fail "$t not found -- install the Xcode command line tools"
-    done
-fi
-if command -v otool >/dev/null 2>&1; then
-    copy_dylibs
-    relink
-fi
+# Unconditional: shipping an unchecked bundle is worse than refusing to build one.
+for t in otool install_name_tool codesign file; do
+    command -v "$t" >/dev/null 2>&1 ||
+        fail "$t not found -- macOS bundling needs the Xcode command line tools"
+done
+copy_dylibs
+relink
 
 appreal=$(cd "$app" && pwd -P)
 
@@ -195,32 +203,30 @@ test -d "$app/Contents/Resources/share/httrack/html/server" ||
     fail "Contents/Resources/share/httrack/html/server missing"
 
 # A downloaded bundle resolves against macOS and itself; neither the staging prefix nor Homebrew is on the user's machine (#901).
-if command -v otool >/dev/null 2>&1; then
-    nmach=0
-    machos
-    while IFS= read -r bin; do
-        nmach=$((nmach + 1))
-        deps "$bin" >"$deplist"
-        while IFS= read -r dep; do
-            case "$dep" in
-            @rpath/*)
-                test -r "$fw/${dep#@rpath/}" ||
-                    fail "$bin loads $dep, absent from Contents/Frameworks"
-                continue
-                ;;
-            esac
-            sysdep "$dep" && continue
-            otool -L "$bin" >&2
-            case "$dep" in
-            "$prefix"/*)
-                fail "$bin links against the staging prefix (build with --disable-shared)"
-                ;;
-            esac
-            fail "$bin loads $dep from outside the bundle"
-        done <"$deplist"
-    done <"$mach"
-    test "$nmach" -gt 0 || fail "scanned no Mach-O files at all, the check proved nothing"
-fi
+nmach=0
+machos
+while IFS= read -r bin; do
+    nmach=$((nmach + 1))
+    deps "$bin" >"$deplist"
+    while IFS= read -r dep; do
+        case "$dep" in
+        @rpath/*)
+            test -r "$fw/${dep#@rpath/}" ||
+                fail "$bin loads $dep, absent from Contents/Frameworks"
+            continue
+            ;;
+        esac
+        sysdep "$dep" && continue
+        otool -L "$bin" >&2
+        case "$dep" in
+        "$prefix"/*)
+            fail "$bin links against the staging prefix (build with --disable-shared)"
+            ;;
+        esac
+        fail "$bin loads $dep from outside the bundle"
+    done <"$deplist"
+done <"$mach"
+test "$nmach" -gt 0 || fail "scanned no Mach-O files at all, the check proved nothing"
 
 # otool sees load commands only, so scan the text payload separately. The binaries
 # themselves still carry $(datadir) compiled in (#894), so they are not in scope here.

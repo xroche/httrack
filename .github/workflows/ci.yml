@@ -270,10 +270,8 @@ jobs:
           ssl="$(brew --prefix openssl@3)"
           brewp="$(brew --prefix)"
           ./bootstrap
-          # -headerpad_max_install_names: the bundle rewrites load commands to @rpath,
-          # which needs more header room than the linker leaves by default.
           ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
-            LDFLAGS="-L${ssl}/lib -L${brewp}/lib -Wl,-headerpad_max_install_names" \
+            LDFLAGS="-L${ssl}/lib -L${brewp}/lib" \
             --prefix="$RUNNER_TEMP/inst" --disable-shared
           make -j"$(sysctl -n hw.ncpu)"
           make install
@@ -299,15 +297,22 @@ jobs:
           app="$RUNNER_TEMP/moved/HTTrack.app"
           bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
 
-      # The load-command check cannot fail if the loader quietly falls back to Homebrew, so hide it (#901).
-      - name: Run it with Homebrew's OpenSSL out of reach
+      # The load-command check cannot fail while the loader can still reach Homebrew (#901).
+      - name: Run it with Homebrew's libraries out of reach
         run: |
           set -euo pipefail
-          ssl="$(brew --prefix)/opt/openssl@3"
-          test -e "$ssl"
-          sudo mv "$ssl" "$ssl.hidden"
-          trap 'sudo mv "$ssl.hidden" "$ssl"' EXIT
           app="$RUNNER_TEMP/moved/HTTrack.app"
+          # Without this the hiding below proves nothing: an empty Frameworks passes it.
+          ls "$app/Contents/Frameworks"/libssl.*.dylib >/dev/null
+          # The kegs, not just the opt symlinks: a source build records the Cellar path.
+          hidden=""
+          for keg in openssl@3 brotli zstd; do
+            for d in "$(brew --prefix)/opt/$keg" "$(brew --prefix)/Cellar/$keg"; do
+              if [ -e "$d" ]; then sudo mv "$d" "$d.hidden"; hidden="$hidden $d"; fi
+            done
+          done
+          trap 'for d in $hidden; do sudo mv "$d.hidden" "$d"; done' EXIT
+          test -n "$hidden"
           bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
 
       # No Developer ID here, so Gatekeeper cannot be exercised; an ad-hoc signature
@@ -316,6 +321,11 @@ jobs:
         run: |
           set -euo pipefail
           app="$RUNNER_TEMP/moved/HTTrack.app"
+          # Before --force, which would re-sign away the damage this is meant to catch.
+          for f in "$app/Contents/Resources/bin/"* "$app/Contents/Frameworks/"*.dylib; do
+            file "$f" | grep -q Mach-O || continue
+            codesign --verify --strict "$f"
+          done
           codesign -s - --force --deep "$app"
           codesign --verify --strict --verbose=2 "$app"
 
