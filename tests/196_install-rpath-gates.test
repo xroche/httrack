@@ -1,0 +1,55 @@
+#!/bin/bash
+# The binary-relative rpath must stay off where it is unwanted (#906): a
+# distribution libdir the loader already searches, and an explicit opt-out.
+
+set -euo pipefail
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+test -r "${srcdir}/configure" || {
+    echo "no configure in ${srcdir}; skipping" >&2
+    exit 77
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/rpathgate.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# One cache for every run: the probe itself is the slow part and its answer does
+# not depend on the prefix.
+cache=${work}/config.cache
+n=0
+
+expect() {
+    local want=$1 desc=$2
+    shift 2
+    local dir got
+    n=$((n + 1))
+    dir=${work}/build${n}
+    mkdir -p "${dir}"
+    (cd "${dir}" && bash "${srcdir}/configure" --cache-file="${cache}" "$@") \
+        >"${dir}/configure.log" 2>&1 || {
+        tail -20 "${dir}/configure.log" >&2
+        fail "configure ${*} failed"
+    }
+    got=$(sed -n 's/^ORIGIN_RPATH = *//p' "${dir}/src/Makefile")
+    test "${got}" = "${want}" || {
+        grep -i 'binary-relative' "${dir}/configure.log" >&2 || true
+        fail "${desc}: ORIGIN_RPATH is '${got}', expected '${want}'"
+    }
+    echo "ok: ${desc} -> ${want}"
+}
+
+# The positive control first, or every "no" below could come from a probe that
+# simply never succeeds on this machine.
+expect yes "a private prefix gets the rpath" --prefix="${work}/inst"
+expect no "a system prefix does not" --prefix=/usr
+expect no "a multiarch libdir does not" --prefix=/usr --libdir=/usr/lib/x86_64-linux-gnu
+expect no "--disable-origin-rpath is honoured" --prefix="${work}/inst" --disable-origin-rpath
+expect no "a static build does not" --prefix="${work}/inst" --disable-shared
