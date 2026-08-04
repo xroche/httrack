@@ -3,10 +3,10 @@
    "keep" installs one first, "none" leaves none installed.
 
    ALTSTACK_TRACE names a file to log the per-thread lifecycle to, for
-   183_altstack-worker.test: "<pid> <tid> query|set on|off|own <sp>" for every
-   sigaltstack(), "<pid> <tid> munmap - <sp>" for every unmap of a stack seen
-   installed. Only the ordering across those two syscalls can show that a worker
-   gives its stack back, and gives it back disabled first.
+   183_altstack-worker.test, Linux only as that leg is: "<pid> <tid> query|set
+   on|off|own <sp>" for every sigaltstack(), "<pid> <tid> munmap - <sp>" for
+   every unmap of a stack seen installed. Only the ordering across those two
+   syscalls can show that a worker gives its stack back, disabled first.
 
    "own" is an install of a mapping this shim watched mmap() hand out, which is
    what tells httrack's stacks apart from a sanitizer runtime's: those come from
@@ -25,9 +25,6 @@
 #include <unistd.h>
 
 #define PROBE_STACK_SIZE (128 * 1024)
-
-/* -fvisibility=hidden across the tree would otherwise hide the interposers. */
-#define SHIM_EXPORT __attribute__((visibility("default")))
 
 static void *probe_sp = NULL;
 
@@ -79,6 +76,14 @@ static void __attribute__((destructor)) probe_report(void) {
   }
 }
 
+/* Linux-only, like the leg of 183 that reads the trace: gettid() and the
+   LD_PRELOAD interposition below have no portable spelling, and interposing
+   mmap() process-wide where nothing consumes the result buys nothing. */
+#ifdef __linux__
+
+/* -fvisibility=hidden across the tree would otherwise hide the interposers. */
+#define SHIM_EXPORT __attribute__((visibility("default")))
+
 /* One per worker, so several crawls worth of them fit. */
 #define TRACE_STACKS 256
 
@@ -89,7 +94,9 @@ static __thread void *trace_last_mmap = NULL;
 static int (*real_sigaltstack)(const stack_t *, stack_t *) = NULL;
 static int (*real_munmap)(void *, size_t) = NULL;
 static void *(*real_mmap)(void *, size_t, int, int, int, off_t) = NULL;
+#ifdef __GLIBC__
 static void *(*real_mmap64)(void *, size_t, int, int, int, off64_t) = NULL;
+#endif
 
 /* Runs ahead of probe_setup(), whose own sigaltstack() call would otherwise
    reach an unresolved interposer. */
@@ -99,7 +106,9 @@ static void __attribute__((constructor(101))) trace_setup(void) {
   *(void **) &real_sigaltstack = dlsym(RTLD_NEXT, "sigaltstack");
   *(void **) &real_munmap = dlsym(RTLD_NEXT, "munmap");
   *(void **) &real_mmap = dlsym(RTLD_NEXT, "mmap");
+#ifdef __GLIBC__
   *(void **) &real_mmap64 = dlsym(RTLD_NEXT, "mmap64");
+#endif
   if (path == NULL || real_sigaltstack == NULL || real_munmap == NULL ||
       real_mmap == NULL) {
     return;
@@ -180,12 +189,9 @@ static void *trace_mapped(void *sp) {
 
 SHIM_EXPORT void *mmap(void *addr, size_t len, int prot, int flags, int fd,
                        off_t off);
-SHIM_EXPORT void *mmap64(void *addr, size_t len, int prot, int flags, int fd,
-                         off64_t off);
 
 /* hts_backtrace_altstack() installs what it just mapped, with nothing in
-   between, so the thread's last mapping is the whole of the check. Both names:
-   _FILE_OFFSET_BITS=64 is what the engine's own mmap() call ends up as. */
+   between, so the thread's last mapping is the whole of the check. */
 SHIM_EXPORT void *mmap(void *addr, size_t len, int prot, int flags, int fd,
                        off_t off) {
   return trace_mapped(
@@ -194,12 +200,19 @@ SHIM_EXPORT void *mmap(void *addr, size_t len, int prot, int flags, int fd,
           : (void *) syscall(SYS_mmap, addr, len, prot, flags, fd, off));
 }
 
+/* glibc only, and the name that matters: _FILE_OFFSET_BITS=64 redirects the
+   engine's own mmap() call to mmap64(). musl has no such split. */
+#ifdef __GLIBC__
+SHIM_EXPORT void *mmap64(void *addr, size_t len, int prot, int flags, int fd,
+                         off64_t off);
+
 SHIM_EXPORT void *mmap64(void *addr, size_t len, int prot, int flags, int fd,
                          off64_t off) {
   return real_mmap64 != NULL
              ? trace_mapped(real_mmap64(addr, len, prot, flags, fd, off))
              : mmap(addr, len, prot, flags, fd, (off_t) off);
 }
+#endif
 
 SHIM_EXPORT int munmap(void *addr, size_t len);
 
@@ -213,3 +226,5 @@ SHIM_EXPORT int munmap(void *addr, size_t len) {
   return real_munmap != NULL ? real_munmap(addr, len)
                              : (int) syscall(SYS_munmap, addr, len);
 }
+
+#endif /* __linux__ */
