@@ -1,0 +1,140 @@
+#!/bin/bash
+# An install copied away from its configured prefix still has to find
+# libhttrack, which it does through a binary-relative rpath (#906).
+
+set -euo pipefail
+
+builddir="${abs_top_builddir:?not run under make check}"
+bindir="${CONFIGURED_BINDIR:?not run under make check}"
+libdir="${CONFIGURED_LIBDIR:?not run under make check}"
+libdir=${libdir%/}
+
+skip() {
+    echo "$*; skipping" >&2
+    exit 77
+}
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/relocate.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+# DESTDIR keeps the configured prefix, so the absolute rpath libtool baked in
+# still points outside the staged tree, and libtool has no reason to relink
+# while the rest of the suite runs against the same build directory.
+stage=${work}/stage
+env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${builddir}/src" install-exec \
+    DESTDIR="${stage}" >"${work}/install.log" 2>&1 || {
+    cat "${work}/install.log" >&2
+    fail "make install-exec DESTDIR=${stage}"
+}
+
+bin=${stage}${bindir}/httrack
+test -r "${bin}" || fail "no httrack in ${stage}${bindir}"
+
+# Chosen by platform, not by whatever is installed: an ELF reader handed a
+# Mach-O prints no rpath instead of failing, which reads as "no rpath at all".
+case "$(uname -s)" in
+Darwin) candidates="otool" ;;
+*) candidates="readelf objdump" ;;
+esac
+dump=
+for cmd in ${candidates}; do
+    if command -v "${cmd}" >/dev/null 2>&1; then
+        dump=${cmd}
+        break
+    fi
+done
+
+# One rpath entry per line, in the order the loader searches them.
+rpath_entries() {
+    local raw=
+    case "${dump}" in
+    readelf) raw=$(LC_ALL=C readelf -d "$1" 2>/dev/null |
+        awk -F'[][]' '/\(RUNPATH\)|\(RPATH\)/ { print $2 }') ;;
+    objdump) raw=$(LC_ALL=C objdump -p "$1" 2>/dev/null |
+        awk '$1 == "RUNPATH" || $1 == "RPATH" { print $2 }') ;;
+    otool) raw=$(LC_ALL=C otool -l "$1" 2>/dev/null |
+        awk '/LC_RPATH/ { f = 1 } f && $1 == "path" { print $2; f = 0 }') ;;
+    esac
+    tr ':' '\n' <<<"${raw}" | grep -v '^$' || true
+}
+
+is_token() {
+    # shellcheck disable=SC2016 # the literal token is what we look for
+    case "$1" in
+    '$ORIGIN/../lib' | '@loader_path/../lib') return 0 ;;
+    esac
+    return 1
+}
+
+if [ -z "${dump}" ]; then
+    echo "no readelf, objdump or otool: not checking the rpath itself" >&2
+else
+    token_pos=0
+    libdir_pos=0
+    pos=0
+    while read -r entry; do
+        pos=$((pos + 1))
+        if is_token "${entry}" && [ "${token_pos}" -eq 0 ]; then token_pos=${pos}; fi
+        if [ "${entry%/}" = "${libdir}" ] && [ "${libdir_pos}" -eq 0 ]; then libdir_pos=${pos}; fi
+    done < <(rpath_entries "${bin}")
+
+    # The gate decides, so assert both directions: a build that suppressed the
+    # rpath must carry no token at all.
+    if [ "${ORIGIN_RPATH:-no}" != yes ]; then
+        test "${token_pos}" -eq 0 ||
+            fail "configure suppressed the rpath but httrack still carries the token"
+        echo "binary-relative rpath suppressed as configured, nothing to relocate"
+        exit 0
+    fi
+
+    test "${token_pos}" -ne 0 || fail "no binary-relative rpath in ${bin}"
+    # The token must come last: $(bindir)/../lib is a different directory under a
+    # lib64 or split-bindir layout and must not shadow the configured libdir.
+    test "${libdir_pos}" -ne 0 ||
+        fail "the configured libdir ${libdir} is not in the rpath of ${bin}"
+    test "${libdir_pos}" -lt "${token_pos}" ||
+        fail "the token precedes the configured libdir ${libdir} in the rpath of ${bin}"
+
+    if [ -r "${stage}${bindir}/proxytrack" ]; then
+        while read -r entry; do
+            ! is_token "${entry}" || fail "proxytrack links no libhttrack but carries the token"
+        done < <(rpath_entries "${stage}${bindir}/proxytrack")
+    fi
+fi
+
+test "${ORIGIN_RPATH:-no}" = yes ||
+    skip "configure did not enable a binary-relative rpath in this build"
+
+# The token is spelled ../lib, so it only answers for a layout that puts the
+# library there.
+base=$(dirname "${stage}${bindir}")
+ls "${base}"/lib/libhttrack.* >/dev/null 2>&1 ||
+    skip "this layout does not put libhttrack in $(basename "${bindir}")/../lib"
+
+copy=${work}/copy
+cp -R "${stage}" "${copy}"
+mv "${stage}" "${stage}.gone"
+copybase=${copy}${base#"${stage}"}
+
+cd "${work}"
+out=$(env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH "${copy}${bindir}/httrack" --version 2>&1) ||
+    fail "the copied binary did not start: ${out}"
+grep -q 'HTTrack version' <<<"${out}" || fail "unexpected --version output: ${out}"
+
+# Starting is not enough: take the copy's own library away and the binary has to
+# stop working. If it still runs, another libhttrack answered and the run above
+# proved nothing.
+mv "${copybase}/lib" "${copybase}/lib.gone"
+if env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH \
+    "${copy}${bindir}/httrack" --version >/dev/null 2>&1; then
+    skip "a libhttrack outside the copy answers, so the relocation proves nothing"
+fi
+
+echo "relocated install runs off its own library: ${out}"

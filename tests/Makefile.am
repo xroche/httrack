@@ -31,6 +31,10 @@ TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
 TESTS_ENVIRONMENT += abs_top_srcdir=$(abs_top_srcdir)
 TESTS_ENVIRONMENT += abs_top_builddir=$(abs_top_builddir)
 TESTS_ENVIRONMENT += CONFIGURED_DATADIR=$(datadir)
+TESTS_ENVIRONMENT += CONFIGURED_LIBDIR=$(libdir)
+TESTS_ENVIRONMENT += CONFIGURED_BINDIR=$(bindir)
+TESTS_ENVIRONMENT += ORIGIN_RPATH=$(ORIGIN_RPATH)
+TESTS_ENVIRONMENT += MAKE="$(MAKE)"
 # 205_install-headers.test compiles the installed headers with the build's compiler.
 # CPPFLAGS carries the dependency include paths a consumer needs too: brew's
 # openssl@3 is keg-only, so htsbasenet.h finds <openssl/ssl.h> only through it.
