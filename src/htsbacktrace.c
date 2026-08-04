@@ -38,14 +38,21 @@ Please visit our Website: http://www.httrack.com
 #include "htsbacktrace.h"
 
 #include "htsglobal.h"
+#include "htssafe.h"
 
 #include <stdlib.h>
 #include <string.h>
 #ifdef _WIN32
 #include <io.h> /* write */
+#else
+#include <signal.h>
 #endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+#if defined(SA_ONSTACK) /* sigaltstack() comes with it */
+#define USES_SIGALTSTACK
+#define BT_ALTSTACK_MIN (64 * 1024) /* floor: the report needs ~10kB */
 #endif
 #if (defined(__linux) && defined(HAVE_EXECINFO_H))
 #include <dlfcn.h>
@@ -206,8 +213,39 @@ static void symbolize_backtrace(void *const *stack, int size, int fd) {
 
 void hts_backtrace_init(void) {
 #ifdef USES_BACKTRACE
+  void *frame[1];
+
   symbolize_crash =
       getenv("HTTRACK_NO_SYMBOLIZE") == NULL ? HTS_TRUE : HTS_FALSE;
+  /* Pay for the unwinder now: glibc's first backtrace() dlopen()s libgcc_s,
+     which allocates and takes the loader lock the crashing thread may hold. */
+  (void) backtrace(frame, 1);
+#endif
+}
+
+hts_boolean hts_backtrace_altstack(void) {
+#ifdef USES_SIGALTSTACK
+  /* Not a constant since glibc 2.34: SIGSTKSZ is a sysconf() call. */
+  const size_t size =
+      (size_t) SIGSTKSZ > BT_ALTSTACK_MIN ? (size_t) SIGSTKSZ : BT_ALTSTACK_MIN;
+  stack_t ss;
+
+  /* Leave a large enough one alone: a sanitizer runtime installs its own. */
+  if (sigaltstack(NULL, &ss) == 0 && (ss.ss_flags & SS_DISABLE) == 0 &&
+      ss.ss_size >= size)
+    return HTS_TRUE;
+  ss.ss_sp = malloct(size);
+  if (ss.ss_sp == NULL)
+    return HTS_FALSE;
+  ss.ss_size = size;
+  ss.ss_flags = 0;
+  if (sigaltstack(&ss, NULL) != 0) {
+    freet(ss.ss_sp);
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+#else
+  return HTS_FALSE;
 #endif
 }
 

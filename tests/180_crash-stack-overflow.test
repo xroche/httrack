@@ -1,0 +1,43 @@
+#!/bin/bash
+# A stack-overflow SIGSEGV has no room left for a signal frame on the faulting
+# stack: without SA_ONSTACK the kernel kills us at 139 with no report at all
+# (#866). Checks the handler still speaks, and still reaches its end.
+
+set -euo pipefail
+
+ulimit -c 0 # a deliberate crash must not litter the box with cores
+
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "backtrace() is gated on Linux here (htsbacktrace.c), skipping" >&2
+    exit 77
+fi
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+# Dies from a caught fault, announcing it and printing the whole report. The
+# handler ends in abort(), so the shell sees SIGABRT (134), not SIGSEGV (139).
+assert_report() {
+    local kind="$1" out rc=0
+
+    out=$(httrack "-#c=$kind" 2>&1) || rc=$?
+    test "$rc" -eq 134 || {
+        echo "-#c=$kind exited $rc, expected 134" >&2
+        exit 1
+    }
+    grep -q "Deliberate '$kind' crash requested" <<<"$out" || exit 1
+    grep -q "^Caught signal 11$" <<<"$out" || exit 1
+    # Symbol names are unreliable under -fvisibility=hidden and the frame format
+    # is libc-specific, so match an address only.
+    grep -qE '0x[0-9a-f]+|No stack trace available' <<<"$out" || exit 1
+    # The handler ran to its end rather than faulting midway on the alt stack.
+    grep -q "Please report the problem" <<<"$out" || exit 1
+}
+
+# Control: an ordinary SIGSEGV was already reported before the fix, so a build
+# or harness that can no longer see any crash fails here rather than passing
+# the real case vacuously.
+assert_report segv
+
+assert_report stack

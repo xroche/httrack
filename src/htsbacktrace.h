@@ -33,9 +33,17 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSBACKTRACE_DEFH
 #define HTSBACKTRACE_DEFH
 
-/* Sample HTTRACK_NO_SYMBOLIZE before any crash: getenv() is not signal-safe.
-   Call once, from the process that installs the fatal-signal handlers. */
+#include "htsglobal.h"
+
+/* Sample HTTRACK_NO_SYMBOLIZE and load the unwinder before any crash: neither
+   is signal-safe. Call once, from the process installing the fatal handlers. */
 void hts_backtrace_init(void);
+
+/* Give the calling thread a signal stack of its own, so a handler registered
+   with SA_ONSTACK still runs when the fault is stack exhaustion. Per-thread and
+   kept until the thread dies; HTS_FALSE where the platform has no sigaltstack()
+   or the allocation failed, the handler then runs on the faulting stack. */
+hts_boolean hts_backtrace_altstack(void);
 
 /* Write the calling thread's stack to fd, callable from a fatal signal handler:
    raw frames first, then whatever an external symbolizer can name. Allocates
