@@ -3438,6 +3438,15 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+// -#test=pathbin: report what startup resolved, which -#test=datadir cannot see
+// because it hands hts_resolve_datadir() the path instead (#904).
+static int st_pathbin(httrackp *opt, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+  printf("path_bin=%s\n", StringBuff(opt->path_bin));
+  return 0;
+}
+
 // hts_buildtopindex() writes a system-charset name into a charset=utf-8 doc: on
 // Windows the gifs land in a mangled twin dir (#217) and a listed name renders
 // as mojibake (#216). Both must come out utf-8. argv[0] is writable.
@@ -7945,6 +7954,8 @@ static const struct selftest_entry {
     {"datadir", "<dir>",
      "data directory resolution: compiled-in path, then the executable's tree",
      st_datadir},
+    {"pathbin", "", "print the data directory this run resolved at startup",
+     st_pathbin},
     {"inplace-escape", "", "inplace_escape_* vs escape_* equivalence self-test",
      st_inplace_escape},
     {"escape-room", "", "HT_ADD_HTMLESCAPED* reservation-factor self-test",

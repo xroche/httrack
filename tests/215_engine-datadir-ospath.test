@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# The data directory has to come from the OS-reported executable path, not from
+# argv[0], or a PATH-invoked binary has nothing but a bare name to derive from
+# (#904). -#test=datadir cannot see this: it hands the path in.
+
+set -euo pipefail
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+skip() {
+    echo "$*; skipping" >&2
+    exit 77
+}
+
+# Unset means this is not an automake run (the Windows job runs the scripts
+# directly), so there is no unwrapped binary to copy.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+datadir="${CONFIGURED_DATADIR:?not run under make check}"
+
+# A shared build hides the program behind a wrapper script and puts the binary
+# in .libs; --disable-shared needs no wrapper and leaves it in src/.
+src=${HTTRACK_BIN:-}
+[ -r "${src}" ] || src=${abs_top_builddir}/src/httrack
+[ -r "${src}" ] || fail "no httrack binary under ${abs_top_builddir}/src"
+[ "$(head -c 2 "${src}")" != '#!' ] || fail "${src} is the libtool wrapper, not the binary"
+
+# The compiled-in directory short-circuits the whole resolution when it exists,
+# and then no argv[0] can change the answer.
+builtin="${datadir%/}/httrack"
+if [ -r "${builtin}/templates/index-header.html" ]; then
+    skip "the compiled-in data directory ${builtin} answers before the executable's tree"
+fi
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/ospath.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+# Two installed-looking trees, each with the templates file path_bin is read
+# for; only their contents tell them apart.
+plant() {
+    mkdir -p "$1/bin" "$1/share/httrack/templates"
+    printf '%s\n' "$2" >"$1/share/httrack/templates/index-header.html"
+}
+plant "${work}/real" REAL
+plant "${work}/decoy" DECOY
+bin=${work}/real/bin/httrack
+cp "${src}" "${bin}"
+# A program at the decoy path too: an existence-checked argv[0] must still lose.
+cp "${src}" "${work}/decoy/bin/httrack"
+
+# libtool knows which variable this platform's loader reads.
+if [ -n "${SHLIBPATH_VAR:-}" ] && [ -n "${HTTRACK_LIBDIR:-}" ]; then
+    prev=$(printenv "${SHLIBPATH_VAR}" || true)
+    export "${SHLIBPATH_VAR}=${HTTRACK_LIBDIR}${prev:+:${prev}}"
+fi
+
+got=
+run_as() {
+    local out line
+    out=$(exec -a "$1" "${bin}" -#test=pathbin 2>&1) ||
+        fail "the copy did not run as argv[0]=$1: ${out}"
+    line=$(grep '^path_bin=' <<<"${out}") || fail "no path_bin line in: ${out}"
+    got=${line#path_bin=}
+}
+
+marker_of() {
+    local f="${1%/}/templates/index-header.html"
+    if [ -r "${f}" ]; then cat "${f}"; fi
+}
+
+# Control: a truthful argv[0] must land on the copy's own templates, or the
+# runs below compare nothing.
+run_as "${bin}"
+mark=$(marker_of "${got}")
+[ "${mark}" = REAL ] ||
+    fail "the copy did not read its own templates: ${got} (${mark:-no templates})"
+
+# An argv[0] naming a tree that has templates of its own: taking it would give
+# DECOY.
+run_as "${work}/decoy/bin/httrack"
+mark=$(marker_of "${got}")
+[ "${mark}" = REAL ] || fail "argv[0] chose the data directory: ${got} (${mark:-no templates})"
+
+# What a PATH lookup leaves in argv[0]: no directory at all, and a PATH whose
+# first hit is the decoy.
+PATH="${work}/decoy/bin:${PATH}"
+run_as httrack
+mark=$(marker_of "${got}")
+[ "${mark}" = REAL ] ||
+    fail "a bare argv[0] lost the data directory: ${got} (${mark:-no templates})"
+
+echo "data directory resolved from the executable path under a decoy and a bare argv[0]: ${got}"

@@ -49,6 +49,12 @@ TESTS_ENVIRONMENT += NOBACKTRACE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libnobacktr
 TESTS_ENVIRONMENT += ALTSTACKPROBE_LA=$(abs_builddir)/libaltstackprobe.la
 TESTS_ENVIRONMENT += ALTSTACKPROBE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libaltstackprobe.so
 TESTS_ENVIRONMENT += STRINGOOM_BIN=$(abs_builddir)/stringoom$(EXEEXT)
+# 215_engine-datadir-ospath.test runs the engine from a copy, so it needs the
+# real binary rather than the libtool wrapper script, plus the loader variable
+# libtool picked for this platform.
+TESTS_ENVIRONMENT += HTTRACK_BIN=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)/httrack$(EXEEXT)
+TESTS_ENVIRONMENT += HTTRACK_LIBDIR=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)
+TESTS_ENVIRONMENT += SHLIBPATH_VAR=$(SHLIBPATH_VAR)
 
 # rename() interposer for 01_engine-renameover.test; -rpath is what makes
 # libtool build a shared module rather than a static-only convenience library.
