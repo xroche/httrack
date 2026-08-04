@@ -48,6 +48,8 @@ ci_suite_heartbeat() {
         # outlive the step's own timeout before being caught.
         if test $((now - moved)) -ge "$stuck"; then
             ci_annotate error "suite watchdog" "killing the step: $((now - moved))s without progress, in flight: $last"
+            # Direct first: kill_tree may reap this watchdog before its own root (#953).
+            kill_pid "$main"
             kill_tree "$main"
             return 0
         fi
@@ -122,11 +124,29 @@ heartbeat=$!
 trap 'kill "$heartbeat" 2>/dev/null || true' EXIT
 
 pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
-# Globbed, not enumerated: a new NNN_engine-*.test or NNN_local-*.test
-# is picked up automatically instead of silently getting zero coverage.
-for t in 00_runnable.test *_engine-*.test *_zlib-*.test \
-    *_local-*.test *_watchdog*.test *_crawl_proxy_https.test \
-    *_crawl-log-salvage.test; do
+# label:pattern, globbed rather than enumerated so a new NNN_engine-*.test or
+# NNN_local-*.test is picked up instead of silently getting zero coverage. Every
+# entry carries a metacharacter, or nullglob cannot empty it and the gate below
+# has nothing to catch.
+categories=(runnable:'00_runnable*.test' engine:'*_engine-*.test' zlib:'*_zlib-*.test'
+    local:'*_local-*.test' watchdog:'*_watchdog*.test'
+    proxy-https:'*_crawl_proxy_https.test' log-salvage:'*_crawl-log-salvage.test')
+tests=()
+shopt -s nullglob
+for c in "${categories[@]}"; do
+    # shellcheck disable=SC2206 # expanding the pattern is the point
+    matched=(${c#*:})
+    # Named, and before anything runs: left unexpanded the pattern reaches
+    # test-timeout.sh literally and is counted as a test failing 127 (#952).
+    test -n "${matched[0]:-}" || {
+        echo "::error::test category ${c%%:*} matched no tests (${c#*:})"
+        exit 1
+    }
+    tests+=("${matched[@]}")
+done
+shopt -u nullglob
+
+for t in "${tests[@]}"; do
     elapsed=$((SECONDS - started))
     if [ "$elapsed" -ge "$suite_deadline" ]; then
         echo "::error::suite deadline: ${elapsed}s elapsed, stopping before $t"
