@@ -425,7 +425,7 @@ Comentariu ce va fi plasat în fiecare fiºier HTML
 Languages accepted by the browser
 Limbile acceptate de browser
 Additional HTTP headers to be sent in each requests
-Anteturi HTTP suplimentare de trimis la fiecare cerere
+Anteturi HTTP suplimentare de trimis în fiecare cerere
 HTTP referer to be sent for initial URLs
 Referer HTTP de trimis pentru URL-urile initiale
 Back to starting page
