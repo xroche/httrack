@@ -1,0 +1,40 @@
+#!/bin/bash
+# Issue #982: a VT or FF inside a quoted href used to survive the link scan and
+# then be deleted from the URL, so the crawler fetched a link the page never
+# wrote. Only the CR/LF/TAB the scan strips may stay; anything else below 32
+# must cost the link. Each hostile href has both a deletion target (vttail.html)
+# and a truncation target (vt) on the server, so a mirror holding either one
+# names which rewrite happened.
+set -eu
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_982.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+doc="${tmpdir}/doc"
+mkdir -p "$doc"
+for f in clean.html tabtail.html vttail.html fftail.html vt ff; do
+    printf '<html><body>%s</body></html>\n' "$f" >"${doc}/${f}"
+done
+printf '<html><body>\n<a href="clean.html">c</a>\n<a href="tab\011tail.html">t</a>\n<a href="vt\013tail.html">v</a>\n<a href="ff\014tail.html">f</a>\n</body></html>\n' \
+    >"${doc}/index.html"
+
+# clean.html and tabtail.html are the positive controls: the crawl still follows
+# an ordinary link, and TAB is still stripped rather than costing its link.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
+    --errors 0 --files 3 \
+    --found 'clean.html' \
+    --found 'tabtail.html' \
+    --not-found 'vttail.html' \
+    --not-found 'fftail.html' \
+    --not-found 'vt' \
+    --not-found 'ff' \
+    httrack 'BASEURL/index.html'

@@ -1943,10 +1943,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             if (ok != -1) {     // continuer
               // découper le lien
               do {
-                if ((unsigned char) *eadr < 32) {   // caractère de contrôle (ou \0)
-                  if (!is_space(*eadr))
-                    ok = 0;
-                }
+                if (*eadr == '\0') // end of the parsed buffer
+                  ok = 0;
                 if (eadr - html > HTS_URLMAXSIZE)    // ** trop long, >HTS_URLMAXSIZE caractères (on prévoit HTS_URLMAXSIZE autres pour path)
                   ok = -1;      // ne pas traiter ce lien
 
@@ -1997,6 +1995,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
                   }
                 }
+                /* A control byte still inside the URL here (CR/LF/TAB are
+                   stripped below) would be deleted from it, fetching a link
+                   the page never wrote (#982). */
+                if (ok == 1 && (unsigned char) *eadr < 32 &&
+                    !is_retorsep(*eadr))
+                  ok = -1;
                 eadr++;
               } while(ok == 1);
 
@@ -2109,10 +2113,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   //  skip leading ones
                   while(is_realspace(*a))
                     a++;
-                  // strip cr, lf, tab inside URL
+                  // strip cr, lf, tab inside URL; the link scan lets only these
+                  // three control bytes through, and drops the link otherwise
                   llen = 0;
                   while(*a) {
-                    if (*a != '\n' && *a != '\r' && *a != '\t') {
+                    if (!is_retorsep(*a)) {
                       lien[llen++] = *a;
                     }
                     a++;
@@ -2152,7 +2157,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   strcpybuff(lien, 
                     unescape_http_unharm(catbuff, sizeof(catbuff), lien, 1 | 2));     /* note: '%' is still escaped */
 
-                  // Force to encode non-printable chars (should never happend)
+                  // Drop the control bytes a %XX may have just decoded to; DEL
+                  // and the C1 range stay, being UTF-8 continuation bytes here
                   escape_remove_control(lien);
 
                   // charset conversion for the URI filename (not the query
