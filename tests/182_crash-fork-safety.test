@@ -1,0 +1,61 @@
+#!/bin/bash
+# The fatal handler spawns a symbolizer. Doing that with fork() first runs the
+# pthread_atfork prepare handlers, so a lock the crashing thread already holds
+# (glibc's malloc arena lock, when its own corruption detector aborts from
+# inside malloc) deadlocks the handler and loses the report (#968). -#c=atfork
+# reproduces that regime; a wedge is a failure here, not a slow test.
+
+set -euo pipefail
+
+ulimit -c 0 # a deliberate crash must not litter the box with cores
+
+fail() {
+    echo "$*" >&2
+    exit 1
+}
+
+# The spawn lives in USES_BACKTRACE (Linux + execinfo.h); elsewhere the handler
+# starts no child and there is nothing to deadlock.
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "the symbolizer spawn is Linux-only, skipping" >&2
+    exit 77
+fi
+command -v httrack >/dev/null || fail "could not find httrack"
+# SIGTERM does reach a wedged httrack, but its handler only sets a flag, so the
+# kill has to be uncatchable or the wedge outlives the timeout.
+command -v timeout >/dev/null || fail "no timeout(1): a hang would never end here"
+
+# 134 is SIGABRT, the handler's own last statement; 137 is the wedge.
+crash_report() {
+    local kind="$1" out rc=0
+
+    out=$(timeout -s KILL 60 httrack "-#c=$kind" 2>&1) || rc=$?
+    test "$rc" -ne 137 || fail "-#c=$kind wedged: the handler never came back"
+    test "$rc" -eq 134 || fail "-#c=$kind exited $rc, expected 134"
+    grep -q "Please report the problem" <<<"$out" ||
+        fail "-#c=$kind: report truncated, the handler died halfway"
+    printf '%s\n' "$out"
+}
+
+# Control: an ordinary fault walks the same spawn path with no lock held, so a
+# build that cannot report at all fails here rather than passing the real case.
+plain=$(crash_report segv)
+locked=$(crash_report atfork)
+
+# We write the module header right before spawning: no header, and the run
+# never reached the code under test.
+if command -v addr2line >/dev/null || command -v llvm-symbolizer >/dev/null; then
+    grep -qE '^/.+:$' <<<"$plain" || fail "-#c=segv: no symbolizer was spawned"
+    grep -qE '^/.+:$' <<<"$locked" ||
+        fail "-#c=atfork: no symbolizer was spawned, the deadlock went untested"
+else
+    echo "no addr2line and no llvm-symbolizer: spawn path not exercised" >&2
+fi
+
+# addr2line is searched first and its -a output is the one line format that
+# does not move with the locale. Proves the child actually ran, which a header
+# written before the spawn cannot.
+if command -v addr2line >/dev/null; then
+    grep -qE '^0x[0-9a-f]{16}: ' <<<"$locked" ||
+        fail "-#c=atfork: no symbolized frame, addr2line never ran"
+fi

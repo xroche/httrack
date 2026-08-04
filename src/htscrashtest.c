@@ -41,6 +41,10 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+#include <pthread.h>
+#define CRASH_HAS_ATFORK
+#endif
 
 #if defined(_MSC_VER)
 #define CRASH_NOINLINE __declspec(noinline)
@@ -95,14 +99,31 @@ static CRASH_NOINLINE char blow_the_stack(size_t depth) {
 /* Faults with no stack left for the handler, unless it runs on an altstack. */
 static CRASH_NOINLINE void crash_stack(void) { (void) blow_the_stack(0); }
 
+#ifdef CRASH_HAS_ATFORK
+static pthread_mutex_t crash_fork_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void crash_fork_prepare(void) { pthread_mutex_lock(&crash_fork_lock); }
+
+static void crash_fork_parent(void) { pthread_mutex_unlock(&crash_fork_lock); }
+#endif
+
+/* Stands in for glibc's malloc, whose own pthread_atfork prepare handler takes
+   every arena lock: a fork() from the fatal handler then blocks forever and the
+   report is lost (#968). Plain segv where there is no pthread_atfork. */
+static CRASH_NOINLINE void crash_atfork(void) {
+#ifdef CRASH_HAS_ATFORK
+  pthread_atfork(crash_fork_prepare, crash_fork_parent, NULL);
+  pthread_mutex_lock(&crash_fork_lock);
+#endif
+  crash_segv();
+}
+
 static const struct {
   const char *name;
   void (*fn)(void);
 } crash_kinds[] = {
-    {"segv", crash_segv},
-    {"abort", crash_abort},
-    {"trap", crash_trap},
-    {"stack", crash_stack},
+    {"segv", crash_segv},   {"abort", crash_abort},   {"trap", crash_trap},
+    {"stack", crash_stack}, {"atfork", crash_atfork},
 };
 
 #define CRASH_KINDS_COUNT (sizeof(crash_kinds) / sizeof(crash_kinds[0]))
