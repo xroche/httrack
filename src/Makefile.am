@@ -42,9 +42,11 @@ httrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE)
 proxytrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 htsserver_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 
-httrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
+# @RPATH_ORIGIN_LDFLAGS@ makes a copied tree find libhttrack next to it (#906);
+# proxytrack links no shared library of ours, so it needs none.
+httrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE) @RPATH_ORIGIN_LDFLAGS@
 proxytrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
-htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
+htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE) @RPATH_ORIGIN_LDFLAGS@
 
 lib_LTLIBRARIES = libhttrack.la
 

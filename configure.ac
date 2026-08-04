@@ -202,6 +202,94 @@ AX_CHECK_LINK_FLAG([-Wl,--build-id], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--bu
 AX_CHECK_LINK_FLAG([-Wl,-headerpad_max_install_names],
 	[DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-headerpad_max_install_names"])
 
+### Relocatable install (#906)
+# libtool records the configured libdir as an absolute rpath, so a copied tree
+# cannot find libhttrack. A binary-relative rpath fixes that where the loader
+# expands the token, which the BSDs disagree on: probe by running one.
+AC_ARG_ENABLE([origin-rpath],
+	AS_HELP_STRING([--disable-origin-rpath],
+		[link the binaries without a binary-relative rpath]),
+	[], [enable_origin_rpath=yes])
+
+# hts_origin_ref_make survives make's expansion and libtool's eval of the link line.
+AS_CASE([$host_os],
+	[darwin*], [hts_origin_ref='@loader_path'; hts_origin_ref_make='@loader_path'],
+	[hts_origin_ref='$ORIGIN'; hts_origin_ref_make='\$$ORIGIN'])
+
+hts_save_prefix=$prefix
+hts_save_exec_prefix=$exec_prefix
+test "x$prefix" = xNONE && prefix=$ac_default_prefix
+test "x$exec_prefix" = xNONE && exec_prefix=$prefix
+eval hts_libdir=\"$libdir\"
+eval hts_libdir=\"$hts_libdir\"
+prefix=$hts_save_prefix
+exec_prefix=$hts_save_exec_prefix
+
+hts_origin_sysdir=no
+for hts_origin_d in $sys_lib_dlsearch_path_spec /lib /usr/lib /lib64 /usr/lib64; do
+	test "x$hts_libdir" = "x$hts_origin_d" && hts_origin_sysdir=yes
+done
+
+ORIGIN_RPATH=no
+RPATH_ORIGIN_LDFLAGS=""
+if test "x$enable_origin_rpath" = xno; then
+	AC_MSG_NOTICE([binary-relative rpath disabled by request])
+elif test "x$enable_shared" = xno; then
+	AC_MSG_NOTICE([binary-relative rpath not needed: no shared libraries])
+elif test "x$hts_origin_sysdir" = xyes; then
+	# libtool emits no rpath there either, and a packaged one draws a lintian tag.
+	AC_MSG_NOTICE([binary-relative rpath not needed: $hts_libdir is on the loader path])
+else
+	AC_MSG_CHECKING([whether the loader honours a binary-relative rpath])
+	AC_CACHE_VAL([hts_cv_origin_rpath], [
+		hts_cv_origin_rpath=no
+		rm -rf conftest.origin
+		AS_MKDIR_P([conftest.origin/bin])
+		AS_MKDIR_P([conftest.origin/lib])
+		AS_MKDIR_P([conftest.origin/run])
+		cat >conftest.origin/lib.c <<_ACEOF
+int hts_origin_probe(void);
+int hts_origin_probe(void) { return 42; }
+_ACEOF
+		cat >conftest.origin/main.c <<_ACEOF
+int hts_origin_probe(void);
+int main(void) { return hts_origin_probe() == 42 ? 0 : 1; }
+_ACEOF
+		AS_CASE([$host_os],
+			[darwin*], [hts_origin_mklib="$CC $CFLAGS -dynamiclib -install_name @rpath/libhtsorigin.dylib -o conftest.origin/lib/libhtsorigin.dylib conftest.origin/lib.c"
+				hts_origin_link=conftest.origin/lib/libhtsorigin.dylib],
+			[hts_origin_mklib="$CC $CFLAGS -fPIC -shared -o conftest.origin/lib/libhtsorigin.so conftest.origin/lib.c"
+				hts_origin_link="-Lconftest.origin/lib -lhtsorigin"])
+		if $hts_origin_mklib >&AS_MESSAGE_LOG_FD 2>&1; then
+			# Solaris and the older BSDs expand the token only with -z origin.
+			for hts_origin_try in "" "-Wl,-z,origin"; do
+				$CC $CFLAGS $LDFLAGS -o conftest.origin/bin/probe conftest.origin/main.c \
+					$hts_origin_link $hts_origin_try "-Wl,-rpath,$hts_origin_ref/../lib" \
+					>&AS_MESSAGE_LOG_FD 2>&1 || continue
+				# From an unrelated cwd, so a loader taking the token literally fails.
+				if test "x$cross_compiling" = xyes ||
+					(unset LD_LIBRARY_PATH DYLD_LIBRARY_PATH
+					cd conftest.origin/run && ../bin/probe) >&AS_MESSAGE_LOG_FD 2>&1; then
+					hts_cv_origin_rpath=yes
+					test -n "$hts_origin_try" && hts_cv_origin_rpath=origin
+					break
+				fi
+			done
+		fi
+		rm -rf conftest.origin
+	])
+	AS_CASE([$hts_cv_origin_rpath],
+		[no], [AC_MSG_RESULT([no])],
+		[
+			test "x$hts_cv_origin_rpath" = xorigin && RPATH_ORIGIN_LDFLAGS="-Wl,-z,origin "
+			RPATH_ORIGIN_LDFLAGS="$RPATH_ORIGIN_LDFLAGS-Wl,-rpath,$hts_origin_ref_make/../lib"
+			ORIGIN_RPATH=yes
+			AC_MSG_RESULT([yes ($hts_origin_ref/../lib)])
+		])
+fi
+AC_SUBST([ORIGIN_RPATH])
+AC_SUBST([RPATH_ORIGIN_LDFLAGS])
+
 ### Check for -fvisibility=hidden support
 gl_VISIBILITY
 AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"

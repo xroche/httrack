@@ -1,0 +1,101 @@
+#!/bin/bash
+# An install copied away from its configured prefix still has to find
+# libhttrack, which it does through a binary-relative rpath (#906).
+
+set -euo pipefail
+
+builddir="${abs_top_builddir:?not run under make check}"
+
+skip() {
+    echo "$*; skipping" >&2
+    exit 77
+}
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+test "${ORIGIN_RPATH:-no}" = yes ||
+    skip "configure did not enable a binary-relative rpath in this build"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/relocate.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+stage=${work}/stage
+copy=${work}/copy
+
+# Overriding the paths rather than using DESTDIR: the absolute rpath libtool
+# baked in keeps pointing at the configured libdir, which is the whole point.
+env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${builddir}/src" install \
+    prefix="${stage}" exec_prefix="${stage}" \
+    bindir="${stage}/bin" libdir="${stage}/lib" >"${work}/install.log" 2>&1 || {
+    cat "${work}/install.log" >&2
+    fail "make install into ${stage}"
+}
+
+has_shared_libhttrack() {
+    local f
+    for f in "$1"/libhttrack.so* "$1"/libhttrack*.dylib; do
+        if test -e "${f}"; then return 0; fi
+    done
+    return 1
+}
+
+test -r "${stage}/bin/httrack" || fail "no httrack in ${stage}/bin"
+has_shared_libhttrack "${stage}/lib" ||
+    skip "static build: no shared libhttrack to relocate"
+
+# The absolute rpath is the configured libdir; a library sitting there, or
+# anywhere else the loader searches, would answer even without the fix and
+# leave the run below proving nothing.
+libdir=${CONFIGURED_LIBDIR:-}
+if [ -n "${libdir}" ] && has_shared_libhttrack "${libdir}"; then
+    skip "an installed libhttrack in ${libdir} would answer instead"
+fi
+if command -v ldconfig >/dev/null 2>&1; then
+    cached=$(LC_ALL=C ldconfig -p 2>/dev/null || true)
+    if grep -q 'libhttrack\.so' <<<"${cached}"; then
+        skip "a system-wide libhttrack would answer instead"
+    fi
+fi
+
+# Whichever dumper exists: the token has to reach the binary literally, not as
+# an empty string and not expanded to the build directory.
+dump=
+for cmd in "readelf -d" "objdump -p" "otool -l"; do
+    command -v "${cmd%% *}" >/dev/null 2>&1 && dump=${cmd} && break
+done
+if [ -n "${dump}" ]; then
+    rpath=$(LC_ALL=C ${dump} "${stage}/bin/httrack" 2>/dev/null) || fail "${dump} failed"
+    # shellcheck disable=SC2016 # the literal token is what we look for
+    case "${rpath}" in
+    *'$ORIGIN/../lib'* | *'@loader_path/../lib'*) ;;
+    *) fail "no binary-relative rpath in ${stage}/bin/httrack" ;;
+    esac
+else
+    echo "no readelf/objdump/otool: skipping the rpath token check" >&2
+fi
+
+cp -R "${stage}" "${copy}"
+mv "${stage}" "${stage}.gone"
+
+cd "${work}"
+out=$(env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH "${copy}/bin/httrack" --version 2>&1) ||
+    fail "the copied binary did not start: ${out}"
+grep -q 'HTTrack version' <<<"${out}" || fail "unexpected --version output: ${out}"
+
+# Started is not enough: assert it loaded the library out of the copy.
+if command -v ldd >/dev/null 2>&1; then
+    libs=$(env -u LD_LIBRARY_PATH LC_ALL=C ldd "${copy}/bin/httrack" 2>&1) ||
+        fail "ldd failed: ${libs}"
+    line=$(grep 'libhttrack' <<<"${libs}") || fail "no libhttrack in ldd output: ${libs}"
+    case "${line}" in
+    *"${copy}/"*) ;;
+    *) fail "libhttrack resolved outside the copy: ${line}" ;;
+    esac
+fi
+
+echo "relocated install runs: ${out}"

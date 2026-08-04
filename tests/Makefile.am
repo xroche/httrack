@@ -31,6 +31,9 @@ TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
 TESTS_ENVIRONMENT += abs_top_srcdir=$(abs_top_srcdir)
 TESTS_ENVIRONMENT += abs_top_builddir=$(abs_top_builddir)
 TESTS_ENVIRONMENT += CONFIGURED_DATADIR=$(datadir)
+TESTS_ENVIRONMENT += CONFIGURED_LIBDIR=$(libdir)
+TESTS_ENVIRONMENT += ORIGIN_RPATH=$(ORIGIN_RPATH)
+TESTS_ENVIRONMENT += MAKE="$(MAKE)"
 TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
 TESTS_ENVIRONMENT += THREADATTRFAIL_LA=$(abs_builddir)/libthreadattrfail.la
