@@ -64,6 +64,13 @@ struct htsmutex_s {
 /* Library internal definictions */
 HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg);
 
+/* Run 'enter' when a thread hts_newthread() spawned starts, and 'leave' with
+   what 'enter' returned when it ends: how a caller extends per-thread state
+   (an alternate signal stack for its fatal handler) to the workers. Set before
+   spawning; NULL for either clears it. */
+HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
+                                     void (*leave)(void *cookie));
+
 HTSEXT_API void htsthread_wait_n(int n_wait);
 
 /* Locking functions */

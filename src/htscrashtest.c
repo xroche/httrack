@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscrashtest.h"
 
 #include "htssafe.h"
+#include "htsthread.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -95,6 +96,20 @@ static CRASH_NOINLINE char blow_the_stack(size_t depth) {
 /* Faults with no stack left for the handler, unless it runs on an altstack. */
 static CRASH_NOINLINE void crash_stack(void) { (void) blow_the_stack(0); }
 
+static void crash_stack_thread(void *arg) {
+  (void) arg;
+  fprintf(stderr, "** Crash test worker thread started\n");
+  fflush(stderr);
+  crash_stack();
+}
+
+/* Same runaway recursion in an engine worker: the fatal handler needs an
+   alternate stack in every thread, not just the main one (#969). */
+static CRASH_NOINLINE void crash_threadstack(void) {
+  if (hts_newthread(crash_stack_thread, NULL) == 0)
+    htsthread_wait_n(0); /* the worker takes the process down from there */
+}
+
 static const struct {
   const char *name;
   void (*fn)(void);
@@ -103,6 +118,7 @@ static const struct {
     {"abort", crash_abort},
     {"trap", crash_trap},
     {"stack", crash_stack},
+    {"threadstack", crash_threadstack},
 };
 
 #define CRASH_KINDS_COUNT (sizeof(crash_kinds) / sizeof(crash_kinds[0]))

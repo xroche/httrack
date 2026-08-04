@@ -1,0 +1,69 @@
+#!/bin/bash
+# #866 gave the main thread an alternate signal stack, but the crawl recurses in
+# the engine's workers, and sigaltstack() state is per-thread: a worker that ran
+# out of stack was still killed outright, with no report (#969).
+
+set -euo pipefail
+
+ulimit -c 0 # a deliberate crash must not litter the box with cores
+
+fail() {
+    echo "$*" >&2
+    exit 1
+}
+
+case "$(uname -s)" in
+Linux) traced=1 ;;
+MINGW* | MSYS* | CYGWIN*)
+    echo "no sigaltstack on Windows, skipping" >&2
+    exit 77
+    ;;
+# sigaltstack() is POSIX, so the fix applies; only the trace text below is
+# gated on Linux + execinfo.h (USES_BACKTRACE in htsbacktrace.c).
+*) traced=0 ;;
+esac
+command -v httrack >/dev/null || fail "could not find httrack"
+
+# Dies from a caught fault, running the report to its end. The handler finishes
+# in abort(), so the shell sees SIGABRT (134); 139 is the kernel killing us.
+crash_report() {
+    local kind="$1" out rc=0
+
+    out=$(httrack "-#c=$kind" 2>&1) || rc=$?
+    test "$rc" -eq 134 ||
+        fail "-#c=$kind exited $rc, expected 134 (139 means the handler never ran)"
+    grep -q "Please report the problem" <<<"$out" ||
+        fail "-#c=$kind: report truncated, the handler died halfway"
+    printf '%s\n' "$out"
+}
+
+# Frames the raw trace printed. A runaway recursion fills backtrace()'s buffer;
+# an ordinary fault is a dozen deep. Measured: 256 against 11.
+frame_count() {
+    grep -cE '\[0x[0-9a-f]+\]$' <<<"$1" || true
+}
+
+# Control: an ordinary fault was already reported before the fix, so a build or
+# harness that can no longer see any crash fails here rather than passing the
+# real case vacuously.
+plain=$(crash_report segv)
+worker=$(crash_report threadstack)
+
+grep -q "Crash test worker thread started" <<<"$worker" ||
+    fail "-#c=threadstack: no worker was spawned, nothing was tested"
+
+if [ "$traced" -eq 0 ]; then
+    exit 0
+fi
+
+grep -q "^Caught signal 11$" <<<"$worker" || fail "-#c=threadstack: no 'Caught signal 11' line"
+
+# The main thread is parked in htsthread_wait_n() once the worker announced
+# itself, and only the worker recurses. A trace that deep is therefore the
+# worker's, which is what had no alternate stack.
+worker_frames=$(frame_count "$worker")
+plain_frames=$(frame_count "$plain")
+test "$worker_frames" -ge 100 ||
+    fail "-#c=threadstack: $worker_frames frames, expected a runaway recursion"
+test "$plain_frames" -lt 100 ||
+    fail "-#c=segv: $plain_frames frames, the threshold no longer discriminates"
