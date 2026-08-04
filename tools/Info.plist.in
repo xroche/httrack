@@ -22,6 +22,7 @@
 	<string>@PACKAGE_VERSION@</string>
 	<key>CFBundleVersion</key>
 	<string>@PACKAGE_VERSION@</string>
+	<!-- Rewritten by macos-app.sh from the load commands of the assembled payload. -->
 	<key>LSMinimumSystemVersion</key>
 	<string>11.0</string>
 	<!-- Not background-only: the UI opens in the user's default browser. -->
