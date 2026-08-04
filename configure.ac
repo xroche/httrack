@@ -29,7 +29,7 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:8:0: revision-only bump, no ABI change this release.
+# 3:8:0: revision-only bump, no ABI change.
 # 3:7:0: htsblk gained a tail field and lien_back embeds it by value, so
 # lien_back.is_update and everything after it shift +8 (httrackp's own tail growth
 # moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed

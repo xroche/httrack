@@ -54,11 +54,11 @@
     <release version="3.49.16" date="2026-08-04">
       <description>
         <ul>
-          <li>The application has its own icon in the menu and the task switcher, at any screen size</li>
-          <li>Option tooltips work again in languages whose text contains an apostrophe</li>
-          <li>Nine interface strings that stayed in English are now translated in 26 languages</li>
-          <li>Mac users can download and launch HTTrack as an ordinary application</li>
-          <li>A page served in chunks with trailing headers is no longer rejected as invalid</li>
+          <li>The application has its own icon in the desktop menu, at any screen size</li>
+          <li>Option tooltips no longer break in languages whose text contains quotes or other special characters</li>
+          <li>Croatian, Macedonian, Polish, Slovak, Slovenian and Swedish text no longer shows as mangled characters</li>
+          <li>Pages that failed with an "Invalid chunk" error now download correctly</li>
+          <li>A very long web address no longer aborts the whole mirror</li>
         </ul>
       </description>
     </release>
