@@ -2,7 +2,8 @@
 #
 # The installed headers must also compile in a strict-ISO translation unit,
 # where __STRICT_ANSI__ drops the unprefixed GNU keywords and hides the libc's
-# POSIX declarations (#972). 205 varies only the bytecode mode, so it sees neither.
+# POSIX declarations (#972), and as C++ (#1002). 205 varies only the bytecode
+# mode, so it sees neither.
 
 set -euo pipefail
 
@@ -40,6 +41,8 @@ if [ -n "${TEST_CPPFLAGS:-}" ]; then
     read -r -a extra_argv <<<"$TEST_CPPFLAGS"
     cpp_argv+=("${extra_argv[@]}")
 fi
+# Snapshot before the C-only flag below is appended; the C++ leg reuses this.
+base_cpp_argv=("${cpp_argv[@]}")
 
 # gcc before 14 only warns on an implicit declaration, which would let the
 # hidden-strnlen half of #972 pass as clean.
@@ -195,6 +198,47 @@ else
         "$tmp/strnlen" || fail "htssafe_strnlen_ disagrees with memchr under -std=$std"
     done
 fi
+
+# The installed headers must also compile as C++ (#1002). -fsyntax-only never
+# runs g++'s -Wunused-function pass, so this leg always does a real -c compile.
+cxx=""
+for cand in "${CXX:-}" g++ clang++ c++; do
+    [ -n "$cand" ] && command -v "$cand" >/dev/null 2>&1 && {
+        cxx="$cand"
+        break
+    }
+done
+if [ -z "$cxx" ]; then
+    echo "no C++ compiler found, skipping the C++ leg" >&2
+else
+    cxx_stds=()
+    for std in c++11 c++17; do
+        printf 'int main() { return 0; }\n' >"$tmp/tu.cpp"
+        "$cxx" "${base_cpp_argv[@]}" "-std=$std" -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>/dev/null &&
+            cxx_stds+=("$std")
+    done
+    [ "${#cxx_stds[@]}" -gt 0 ] || echo "$cxx accepts neither -std=c++11 nor -std=c++17, skipping the C++ leg" >&2
+    for h in "${headers[@]}"; do
+        b=$(basename "$h")
+        argv=("${base_cpp_argv[@]}" -Wall -Wextra -Werror)
+        case "$b" in
+        htsnet.h | htsopt.h) argv+=("${posix_argv[@]}") ;;
+        esac
+        printf '#include <httrack/%s>\nint main() { return 0; }\n' "$b" >"$tmp/tu.cpp"
+        for std in "${cxx_stds[@]}"; do
+            for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
+                if ! "$cxx" "${argv[@]}" "-std=$std" "$mode" -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>"$tmp/cc.log"; then
+                    echo "$b does not compile as C++ under -std=$std ($mode):" >&2
+                    head -5 "$tmp/cc.log" >&2
+                    bad=1
+                fi
+            done
+        done
+    done
+    [ "${#cxx_stds[@]}" -eq 0 ] ||
+        echo "compiled ${#headers[@]} headers x ${#cxx_stds[@]} C++ std x 2 bytecode modes with $cxx" >&2
+fi
+[ "$bad" -eq 0 ] || fail "installed headers do not compile as C++"
 
 # The loops above are only meaningful if this compiler rejects a missing include.
 printf '#include "no-such-header-972.h"\n' >"$tmp/tu.c"
