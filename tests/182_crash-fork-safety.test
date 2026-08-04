@@ -63,7 +63,8 @@ fi
 # addr2line runs first, and its -a address line is what proves the child ran.
 # Unanchored width: -a pads to the target pointer size, 8 nibbles on 32-bit.
 if command -v addr2line >/dev/null; then
-    grep -qE '^0x[0-9a-f]+: ' <<<"$locked" ||
+    # A name, not just the shape: an all-"??" regression still emits the offsets.
+    grep -qE '^0x[0-9a-f]+: [A-Za-z_]' <<<"$locked" ||
         fail "-#c=atfork: no symbolized frame, addr2line never ran"
     # The child's stdout is redirected onto the report fd, prebuilt at startup:
     # symbolized frames belong on stderr, never on the crawler's own stdout.
