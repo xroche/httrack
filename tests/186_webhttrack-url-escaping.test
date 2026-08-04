@@ -75,8 +75,8 @@ if not m:
     sys.exit("no session id in server/index.html")
 sid = m.group(1).decode()
 
-# /xssjob/ links one .bin whose path carries the metacharacters and then trickles
-# it for a minute, so the job sits in the transfer table while the panel renders.
+# /xssjob/ links one .bin whose directory and leaf both carry the metacharacters
+# and trickles it, so the job sits in the transfer table while the panel renders.
 fields = {
     "sid": sid, "path": work, "projname": "crawl", "winprofile": "x",
     "command_do": "start",
@@ -89,23 +89,26 @@ urllib.request.urlopen(urllib.request.Request(
 
 # The panel is the page any .html request is overridden to while a crawl runs.
 PAYLOAD = "img src=x onerror=alert(1)"
+# Either form: breaking on the escaped one alone would make the control circular.
+populated = re.compile(r"d0(&lt;|<)i")
 deadline = time.time() + 90
 while True:
     body = urllib.request.urlopen(base + "/server/refresh.html",
                                   timeout=20).read().decode("latin-1")
-    if PAYLOAD in body:
+    if populated.search(body):
         break
     if time.time() > deadline:
         sys.exit("the hostile job never reached the panel:\n%s" % body[-4000:])
     time.sleep(1)
 
-# Positive control: the row is there, and every metacharacter came back as an
-# entity. Asserting only the absence below would pass on an empty table.
-for want in ("&lt;" + PAYLOAD + "&gt;", "&#39;quote.bin"):
+# Positive control: assert the escaped form too, or an empty table passes below.
+# Name and file are pinned apart, since either column can regress on its own.
+for want in ("d0&lt;i&#39;&gt;", "p0&lt;" + PAYLOAD + "&gt;&#39;quote.bin"):
     if want not in body:
         sys.exit("panel does not escape the link path as %r:\n%s" % (want, body[-4000:]))
-if "<" + PAYLOAD in body:
-    sys.exit("panel emits the link path as raw markup")
+for raw in ("d0<i", "<" + PAYLOAD):
+    if raw in body:
+        sys.exit("panel emits %r as raw markup" % raw)
 
 # The save name reaches a single-quoted JS literal: url_savename() maps < and >
 # to _ but keeps the apostrophe, which closes the literal unless it is escaped.

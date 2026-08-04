@@ -2087,9 +2087,12 @@ class Handler(SimpleHTTPRequestHandler):
     # #973: quoted, so the link parser keeps the < and > (only an unquoted > ends
     # a link) and the whole run reaches the progress panel.
     XSS_NAME = "p0<img src=x onerror=alert(1)>'quote.bin"
+    # The panel splits the URL at the last slash, so only a directory reaches its
+    # name column. Short, because the engine elides that column past 40 chars.
+    XSS_DIR = "d0<i'>"
 
     def route_xssjob_index(self):
-        self.send_html('\t<a href="%s">job</a>\n' % self.XSS_NAME)
+        self.send_html('\t<a href="%s/%s">job</a>\n' % (self.XSS_DIR, self.XSS_NAME))
 
     # #483: trickled .bin pages so the -E stop lands in the type waiter's
     # unlock-to-patch window with body bytes pending.
