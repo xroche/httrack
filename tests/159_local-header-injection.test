@@ -45,7 +45,7 @@ crawl() {
         exit 1
     }
     test "$rc" -le 128 || {
-        echo "httrack died on signal $((rc - 128))" >&2
+        echo "crawl ended abnormally ($rc)" >&2
         exit 1
     }
 }
