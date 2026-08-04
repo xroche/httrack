@@ -1,0 +1,158 @@
+#!/bin/bash
+#
+# An installed header must not offer a name libhttrack.so keeps hidden: the
+# consumer compiles, then fails to link (#977). Linked for real, not grepped.
+# Blind to a wrong signature, which the linker cannot see either.
+
+set -euo pipefail
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+skip() {
+    echo "$1, skipping" >&2
+    exit 77
+}
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is no install rule to drive.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+
+lib=${HTTRACK_SHLIB:-}
+[ -f "${lib:-/nonexistent}" ] || skip "no shared libhttrack at '${lib:-unset}'"
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+make=${MAKE:-make}
+command -v "$make" >/dev/null 2>&1 || skip "no make ($make)"
+nm=${NM:-nm}
+command -v "$nm" >/dev/null 2>&1 || skip "no nm ($nm)"
+
+tmp=$(mktemp -d) || exit 1
+trap 'set +e; rm -rf "$tmp"' EXIT
+
+# ELF only: BSD nm has no -D.
+"$nm" -D --defined-only "$lib" >"$tmp/exported.raw" 2>/dev/null ||
+    skip "$nm cannot read the dynamic table of $lib"
+"$nm" --defined-only "$lib" >"$tmp/all.raw" 2>/dev/null ||
+    skip "$nm cannot read the symbol table of $lib"
+awk 'NF >= 3 { print $3 }' "$tmp/exported.raw" | sort -u >"$tmp/exported"
+awk 'NF >= 3 { print $3 }' "$tmp/all.raw" | sort -u >"$tmp/all"
+comm -23 "$tmp/all" "$tmp/exported" >"$tmp/hidden"
+n_exported=$(wc -l <"$tmp/exported")
+n_hidden=$(wc -l <"$tmp/hidden")
+[ "$n_exported" -ge 50 ] || fail "$lib exports only $n_exported symbols, that cannot be right"
+[ "$n_hidden" -ge 100 ] || skip "only $n_hidden local symbols in $lib, it looks stripped"
+
+cpp_argv=(-I"$tmp/include")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    cpp_argv+=("${extra_argv[@]}")
+fi
+
+# volatile, or the compiler folds "address of a known symbol is non-null" to 1
+# and drops the relocation the link is being asked about.
+probe_body() {
+    printf 'int main(void) { const void *volatile p = (const void *) &%s; return p != 0; }\n' "$1"
+}
+
+# A function declaration is a lie the linker ignores, and stays PIE-clean
+# whichever kind $1 is. Compiled apart, so a malformed probe is not a link error.
+links() {
+    {
+        printf 'extern void %s(void);\n' "$1"
+        probe_body "$1"
+    } >"$tmp/ctl.c"
+    "${cc_argv[@]}" -w -c -o "$tmp/ctl.o" "$tmp/ctl.c" 2>"$tmp/ctl.log" || {
+        head -5 "$tmp/ctl.log" >&2
+        fail "the control probe for $1 does not compile"
+    }
+    "${cc_argv[@]}" -w -o "$tmp/ctl" "$tmp/ctl.o" "$lib" 2>"$tmp/ctl.log"
+}
+
+# Without both controls every verdict below is vacuous. Compiler-generated
+# statics ("a.2") are not spellable in C, so skip past them.
+pos=$(grep -x hts_is_available "$tmp/exported" || head -1 "$tmp/exported")
+neg=$(awk '/^[A-Za-z_][A-Za-z0-9_]*$/ { print; exit }' "$tmp/hidden")
+links "$pos" || {
+    head -5 "$tmp/ctl.log" >&2
+    skip "cannot link the exported $pos against $lib"
+}
+! links "$neg" || fail "the hidden $neg links anyway, so the probe cannot see the defect"
+
+# Override the install dir rather than DESTDIR: same rule and file list, no
+# prefix guessing. Empty MAKEFLAGS, or the sub-make hunts a jobserver it lacks.
+env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+    DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
+    {
+        cat "$tmp/install.log" >&2
+        fail "install-DevIncludesDATA failed"
+    }
+
+# A synthetic leak the loop must report: every real candidate is a static defined
+# in the header, which links from the probe's own copy and so proves nothing.
+canary=zzz-canary.h
+printf 'extern void %s(void);\n' "$neg" >"$tmp/include/httrack/$canary"
+
+headers=("$tmp/include/httrack"/*.h)
+[ "${#headers[@]}" -ge 10 ] || fail "only ${#headers[@]} headers installed, the list cannot be right"
+
+# Identifiers of the preprocessed unit, narrowed by cpp's line markers to the
+# installed headers, so <openssl/ssl.h> and friends stay out of the candidates.
+cat >"$tmp/ids.awk" <<'EOF'
+/^# [0-9]+ "/ {
+    s = $0
+    sub(/^# [0-9]+ "/, "", s)
+    sub(/".*$/, "", s)
+    ours = (index(s, PREFIX) == 1)
+    next
+}
+ours {
+    while (match($0, /[A-Za-z_][A-Za-z0-9_]*/)) {
+        print substr($0, RSTART, RLENGTH)
+        $0 = substr($0, RSTART + RLENGTH)
+    }
+}
+EOF
+
+probed=0
+leaks=""
+for h in "${headers[@]}"; do
+    b=$(basename "$h")
+    # config.h first, as a consumer must: it is what turns HTS_USEOPENSSL on, and
+    # without it htsbasenet.h preprocesses its OpenSSL half away.
+    printf '#include <httrack/config.h>\n#include <httrack/%s>\n' "$b" >"$tmp/tu.c"
+    "${cc_argv[@]}" "${cpp_argv[@]}" -UHTS_INTERNAL_BYTECODE -E -o "$tmp/tu.i" "$tmp/tu.c" \
+        2>"$tmp/cc.log" || {
+        head -5 "$tmp/cc.log" >&2
+        fail "$b does not preprocess the way a consumer includes it"
+    }
+    awk -v PREFIX="$tmp/include/httrack/" -f "$tmp/ids.awk" "$tmp/tu.i" | sort -u >"$tmp/ids"
+    while read -r sym; do
+        [ -n "$sym" ] || continue
+        {
+            printf '#include <httrack/config.h>\n#include <httrack/%s>\n' "$b"
+            probe_body "$sym"
+        } >"$tmp/probe.c"
+        # Undeclared means the header never put it on the consumer's surface.
+        "${cc_argv[@]}" "${cpp_argv[@]}" -UHTS_INTERNAL_BYTECODE -w -c -o "$tmp/probe.o" \
+            "$tmp/probe.c" 2>/dev/null || continue
+        probed=$((probed + 1))
+        "${cc_argv[@]}" -w -o "$tmp/probe" "$tmp/probe.o" "$lib" 2>/dev/null ||
+            leaks="$leaks $b:$sym"
+    done < <(comm -12 "$tmp/hidden" "$tmp/ids")
+done
+
+echo "linked $probed reachable symbol(s) from ${#headers[@]} installed headers" \
+    "($n_hidden hidden, $n_exported exported)"
+[ "$probed" -ge 5 ] || fail "only $probed symbols reached the link probe, the candidate list is broken"
+[ "${leaks#* "$canary":"$neg"}" != "$leaks" ] ||
+    fail "the synthetic $canary:$neg leak went unreported, the candidate list is broken"
+leaks=${leaks/ "$canary":"$neg"/}
+[ -z "$leaks" ] || fail "installed headers declare symbols $lib does not export:$leaks"
+
+exit 0

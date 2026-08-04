@@ -242,6 +242,7 @@ TESTS += 185_webhttrack-js-escaping.test
 TESTS += 200_pixmaps-fallback.test
 TESTS += 210_appstream-metainfo.test
 TESTS += 186_webhttrack-url-escaping.test
+TESTS += 207_install-headers-symbols.test
 TESTS += 182_crash-fork-safety.test
 TESTS += 155_engine-escape-control.test
 TESTS += 206_install-headers-c99.test
