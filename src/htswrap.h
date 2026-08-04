@@ -44,7 +44,6 @@ Please visit our Website: http://www.httrack.com
 #ifdef HTS_INTERNAL_BYTECODE
 
 #include "htsglobal.h"
-#include "coucal.h"
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
