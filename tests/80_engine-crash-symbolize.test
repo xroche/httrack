@@ -70,6 +70,8 @@ command -v addr2line >/dev/null || {
 oracle="${tmpdir}/oracle"
 sed -n 's/^\([^(]*\)(+\(0x[0-9a-f]*\)).*$/\1 \2/p' "$out" |
     while read -r mod off; do
+        # The main program is reported as argv[0], a bare name off PATH (#889).
+        test -f "$mod" || mod=$(command -v "$mod" 2>/dev/null) || continue
         test -f "$mod" || continue
         addr2line -Cfip -e "$mod" "$off" 2>/dev/null || true
     done >"$oracle"
