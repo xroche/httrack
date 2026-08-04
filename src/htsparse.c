@@ -2152,8 +2152,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     unescape_http_unharm(catbuff, sizeof(catbuff), lien, 1 | 2));     /* note: '%' is still escaped */
 
                   // Percent-encode the control bytes as a browser does (#982);
-                  // a byte grows to three, and a link that no longer fits is
-                  // dropped rather than clipped to a URL nobody wrote.
+                  // a byte grows to three, so a link that outgrows the buffer
+                  // is dropped rather than clipped to a URL nobody wrote.
                   {
                     char BIGSTK tempo[sizeof(lien)];
 
