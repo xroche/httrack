@@ -39,10 +39,11 @@ Please visit our Website: http://www.httrack.com
    is signal-safe. Call once, from the process installing the fatal handlers. */
 void hts_backtrace_init(void);
 
-/* Give the calling thread a signal stack of its own, so a handler registered
-   with SA_ONSTACK still runs when the fault is stack exhaustion. Per-thread and
-   kept until the thread dies; HTS_FALSE where the platform has no sigaltstack()
-   or the allocation failed, the handler then runs on the faulting stack. */
+/* Ensure the calling thread has an alternate signal stack, so a handler
+   registered with SA_ONSTACK still runs when the fault is stack exhaustion. One
+   already installed is left alone, whoever owns it. Per-thread and kept until
+   the thread dies; HTS_FALSE if none could be provided, the handler then
+   running on the faulting stack as it used to. */
 hts_boolean hts_backtrace_altstack(void);
 
 /* Write the calling thread's stack to fd, callable from a fatal signal handler:

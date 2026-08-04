@@ -38,7 +38,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsbacktrace.h"
 
 #include "htsglobal.h"
-#include "htssafe.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -46,11 +45,15 @@ Please visit our Website: http://www.httrack.com
 #include <io.h> /* write */
 #else
 #include <signal.h>
+#include <sys/mman.h>
 #endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#if defined(SA_ONSTACK) /* sigaltstack() comes with it */
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+#if defined(SA_ONSTACK) && defined(MAP_ANONYMOUS)
 #define USES_SIGALTSTACK
 #define BT_ALTSTACK_MIN (64 * 1024) /* floor: the report needs ~10kB */
 #endif
@@ -229,18 +232,23 @@ hts_boolean hts_backtrace_altstack(void) {
   const size_t size =
       (size_t) SIGSTKSZ > BT_ALTSTACK_MIN ? (size_t) SIGSTKSZ : BT_ALTSTACK_MIN;
   stack_t ss;
+  void *sp;
 
-  /* Leave a large enough one alone: a sanitizer runtime installs its own. */
-  if (sigaltstack(NULL, &ss) == 0 && (ss.ss_flags & SS_DISABLE) == 0 &&
-      ss.ss_size >= size)
+  /* Never take one over, whatever its size: a sanitizer runtime installs its
+     own and sizes it for its own handlers (ASan: 32kB, ours needs ~10kB). */
+  if (sigaltstack(NULL, &ss) == 0 && (ss.ss_flags & SS_DISABLE) == 0)
     return HTS_TRUE;
-  ss.ss_sp = malloct(size);
-  if (ss.ss_sp == NULL)
+  /* Mapped, not allocated: a stack for the handler must not live in the heap
+     whose corruption we may be reporting. */
+  sp = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1,
+            0);
+  if (sp == MAP_FAILED)
     return HTS_FALSE;
+  ss.ss_sp = sp;
   ss.ss_size = size;
   ss.ss_flags = 0;
   if (sigaltstack(&ss, NULL) != 0) {
-    freet(ss.ss_sp);
+    munmap(sp, size);
     return HTS_FALSE;
   }
   return HTS_TRUE;

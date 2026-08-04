@@ -1,0 +1,61 @@
+#!/bin/bash
+# The alt stack a fatal handler runs on (#866) must never be taken over from
+# whoever installed it first: a sanitizer sizes its own for its own handlers,
+# and replacing the mapping moves them onto ours. Checks both directions, since
+# a build that stopped installing one at all would satisfy the first alone.
+
+set -euo pipefail
+
+ulimit -c 0 # a deliberate crash must not litter the box with cores
+
+fail() {
+    echo "$*" >&2
+    exit 1
+}
+
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "LD_PRELOAD interposition is Linux-only here, skipping" >&2
+    exit 77
+fi
+command -v httrack >/dev/null || fail "could not find httrack"
+# A --disable-shared build has nothing to preload; anything else missing is a
+# build problem, not a skip, or the legs below would pass vacuously.
+[ -r "${ALTSTACKPROBE_LA:-}" ] || fail "${ALTSTACKPROBE_LA:-\$ALTSTACKPROBE_LA} was not built"
+if grep -q "^dlname=''" "$ALTSTACKPROBE_LA"; then
+    echo "static-only build, skipping" >&2
+    exit 77
+fi
+[ -r "${ALTSTACKPROBE_LIB:-}" ] || fail "${ALTSTACKPROBE_LIB:-\$ALTSTACKPROBE_LIB} was not built"
+
+# An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
+# refuses by default. The shim allocates nothing, so the ordering is harmless.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
+# The probe reports at exit, so this leg must not crash. Every process under the
+# preload reports, the libtool wrapper included, so a marker is looked for
+# anywhere in the output rather than on a given line.
+probe_run() {
+    local mode="$1" out rc=0
+
+    out=$(ALTSTACK_MODE="$mode" LD_PRELOAD="$ALTSTACKPROBE_LIB" httrack --version 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "ALTSTACK_MODE=$mode: httrack --version exited $rc"
+    printf '%s\n' "$out"
+}
+
+# One is already installed: nothing may replace it.
+if grep -q "ALTSTACK-OWN" <<<"$(probe_run keep)"; then
+    fail "httrack replaced an alternate signal stack that was already installed"
+fi
+
+# None is installed: httrack must provide one, which also proves the marker
+# asserted absent above can fire at all.
+grep -q "ALTSTACK-OWN" <<<"$(probe_run none)" ||
+    fail "httrack installed no alternate signal stack of its own"
+
+# And the borrowed stack has to be usable: the point of deferring is that the
+# handler still runs to its end on it.
+rc=0
+out=$(ALTSTACK_MODE=keep LD_PRELOAD="$ALTSTACKPROBE_LIB" httrack -#c=stack 2>&1) || rc=$?
+test "$rc" -eq 134 || fail "-#c=stack on a borrowed alt stack exited $rc, expected 134"
+grep -q "Please report the problem" <<<"$out" ||
+    fail "-#c=stack on a borrowed alt stack: report truncated, the handler died halfway"
