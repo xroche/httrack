@@ -22,11 +22,44 @@ python=$(find_python) || {
     exit 77
 }
 
-printf '[no handler is left on the html: mode] ..\t'
-stray=$(grep -nE '[ 	]on[A-Za-z]+="[^"]*[$][{](html:)?LANG_' \
-    "${distdir}"/html/server/*.html || true)
-test -z "${stray}" || fail "event handlers still interpolate as HTML:
-${stray}"
+printf '[each template puts js: in handlers and html: in text] ..\t'
+"${python}" - "${distdir}" <<'PY' || fail "the templates mix the two escaping modes (see above)"
+import glob, os, re, sys
+
+# A handler value is JS, everything else is HTML text: the two never swap.
+handler = re.compile(r'\bon[A-Za-z]+="([^"]*)"')
+subst = re.compile(r"\$\{([^}]*)\}")
+
+files = sorted(glob.glob(os.path.join(sys.argv[1], "html", "server", "*.html")))
+if len(files) < 20:
+    sys.exit("only %d server templates found" % len(files))
+
+bad, in_handler, in_text = [], {}, 0
+for path in files:
+    name = os.path.basename(path)
+    text = open(path, encoding="latin-1").read()
+    spans = [m.span(1) for m in handler.finditer(text)]
+    for m in subst.finditer(text):
+        key = m.group(1)
+        if any(a <= m.start() and m.end() <= b for a, b in spans):
+            in_handler[name] = in_handler.get(name, 0) + 1
+            # ${LANG_x}, ${html:LANG_x} and ${html:html:LANG_x} all reach the JS
+            # parser as HTML text; only the last renders empty instead of broken.
+            if re.match(r"(html:)*LANG_", key):
+                bad.append("%s: handler interpolates ${%s}" % (name, key))
+        else:
+            if key.startswith("js:"):
+                bad.append("%s: HTML text interpolates ${%s}" % (name, key))
+            elif key.startswith("html:"):
+                in_text += 1
+if bad:
+    sys.exit("\n".join(bad))
+# Neither leg may go vacuous; step2.html is named because it is the one the
+# ${html:html:} spelling hid in.
+if sum(in_handler.values()) < 300 or in_text < 100 or in_handler.get("step2.html", 0) < 8:
+    sys.exit("scanned too little: %d handler (%d in step2.html), %d text"
+             % (sum(in_handler.values()), in_handler.get("step2.html", 0), in_text))
+PY
 echo OK
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_jsesc.XXXXXX") || fail "no tmpdir"
@@ -49,8 +82,8 @@ root="${work}/root"
 mkdir -p "${root}"
 cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
 chmod -R u+w "${root}"
-# CRLF line pairs, English key then translation; \\ is read back as one
-# backslash. Whatever is left undefined falls back to English.
+# CRLF line pairs, English key then translation; \\ \n \t are read back as one
+# backslash, a newline and a tab. Anything left undefined falls back to English.
 printf '%s\r\n' \
     LANGUAGE_NAME 'Francais-864' \
     LANGUAGE_FILE 'Francais' \
@@ -59,6 +92,7 @@ printf '%s\r\n' \
     'Click to get help!' "Cliquez pour avoir de l'aide!" \
     'Click to confirm' 'Guillemet " et </script> ici' \
     'Cancel changes' 'Antislash \\ et & ici' \
+    'Follow external links' 'Deux\nlignes\tici' \
     >"${root}/lang/Francais.txt"
 
 printf '[a French tooltip survives the two decoders] ..\t'
@@ -92,41 +126,54 @@ if not m:
     sys.exit("no session id in server/index.html")
 sid = m.group(1).decode()
 
-# lang=2 selects LANGUAGE_2 and renders the page in one shot.
-req = urllib.request.Request(url + "/server/option1.html",
-                             data=("sid=%s&lang=2" % sid).encode("latin-1"),
-                             method="POST")
-resp = urllib.request.urlopen(req, timeout=20)
-if resp.status != 200:
-    sys.exit("option1.html answered %d" % resp.status)
-page = resp.read().decode("latin-1")
-if 'lang="fr"' not in page:
-    sys.exit("the server did not switch to LANGUAGE_2:\n" + page[:2000])
+
+def render(page):
+    # lang=2 selects LANGUAGE_2 and renders in one shot.
+    req = urllib.request.Request(url + "/server/" + page,
+                                 data=("sid=%s&lang=2" % sid).encode("latin-1"),
+                                 method="POST")
+    resp = urllib.request.urlopen(req, timeout=20)
+    if resp.status != 200:
+        sys.exit("%s answered %d" % (page, resp.status))
+    body = resp.read().decode("latin-1")
+    if 'lang="fr"' not in body:
+        sys.exit("%s did not switch to LANGUAGE_2:\n%s" % (page, body[:2000]))
+    return body
 
 
 def handler(js):
     return "onMouseOver=\"info('%s'); return true\"" % js
 
 
-wants = [
-    # an apostrophe closes the JS literal
-    handler(r"Cliquez pour avoir de l\x27aide!"),
-    # a quote closes the attribute, < opens </script>, and a surviving & would
-    # let the attribute decode rebuild either one
-    handler(r"Guillemet \x22 et \x3c/script\x3e ici"),
-    # a lone backslash would eat the next character as an escape
-    handler(r"Antislash \\ et \x26 ici"),
-    # the title attribute is HTML text and stays on the html: mode
-    "title='Cliquez pour avoir de l&#39;aide!'",
-    "title='Guillemet \" et &lt;/script&gt; ici'",
-    r"title='Antislash \ et &amp; ici'",
+help_tip = handler(r"Cliquez pour avoir de l\x27aide!")
+pages = [
+    ("option1.html", [
+        # an apostrophe closes the JS literal
+        help_tip,
+        # a quote closes the attribute, < opens </script>, and a surviving &
+        # would let the attribute decode rebuild either one
+        handler(r"Guillemet \x22 et \x3c/script\x3e ici"),
+        # a lone backslash would eat the next character as an escape
+        handler(r"Antislash \\ et \x26 ici"),
+        # a raw newline or tab is not legal inside a JS literal
+        handler(r"Deux\nlignes\x09ici"),
+        # the title attribute is HTML text and stays on the html: mode
+        "title='Cliquez pour avoir de l&#39;aide!'",
+        "title='Guillemet \" et &lt;/script&gt; ici'",
+        r"title='Antislash \ et &amp; ici'",
+    ]),
+    # ${html:html:LANG_x} used to render empty here rather than double-escape
+    ("step2.html", [help_tip]),
 ]
-for want in wants:
-    if want not in page:
-        sys.exit("option1.html does not emit %r" % want)
 
-for h in re.findall(r'onMouseOver="([^"]*)"', page):
-    if "&#39;" in h:
-        sys.exit("handler still carries an HTML entity: %r" % h)
+for page, wants in pages:
+    body = render(page)
+    for want in wants:
+        if want not in body:
+            sys.exit("%s does not emit %r" % (page, want))
+    # no static handler carries one, so any & or < came out of a translation
+    for h in re.findall(r'onMouseOver="([^"]*)"', body):
+        if "&" in h or "<" in h:
+            sys.exit("%s leaves an HTML-special byte in %r" % (page, h))
 PY
 echo OK
