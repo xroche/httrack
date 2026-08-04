@@ -92,10 +92,11 @@ static int record_main_base(struct dl_phdr_info *info, size_t size,
 }
 
 static void find_main_object(void) {
-  const ssize_t len =
-      readlink("/proc/self/exe", main_path, sizeof(main_path) - 1);
+  const ssize_t len = readlink("/proc/self/exe", main_path, sizeof(main_path));
 
-  if (len > 0) {
+  /* A full buffer is a clipped path, which readlink() cannot report: its prefix
+     names another file, and the symbolizer would happily open that one. */
+  if (len > 0 && (size_t) len < sizeof(main_path)) {
     main_path[len] = '\0';
     if (dl_iterate_phdr(record_main_base, NULL) == 1)
       return;
