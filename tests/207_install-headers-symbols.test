@@ -1,9 +1,8 @@
 #!/bin/bash
 #
 # An installed header must not offer a name libhttrack.so keeps hidden: the
-# consumer compiles, then fails to link (#977). Asserted against the artifacts,
-# not the header text: the hidden set is the library's symbol table minus its
-# dynamic table, and every name a consumer can reach is linked for real.
+# consumer compiles, then fails to link (#977). Linked for real, not grepped.
+# Blind to a wrong signature, which the linker cannot see either.
 
 set -euo pipefail
 
@@ -61,10 +60,8 @@ probe_body() {
     printf 'int main(void) { const void *volatile p = (const void *) &%s; return p != 0; }\n' "$1"
 }
 
-# Declares $1 by hand, so the controls below lean on no header. A function type
-# is a lie the linker ignores, and unlike a data declaration it stays PIE-clean
-# whichever kind $1 turns out to be. Compiling apart keeps a malformed probe
-# from reading as a link failure.
+# A function declaration is a lie the linker ignores, and stays PIE-clean
+# whichever kind $1 is. Compiled apart, so a malformed probe is not a link error.
 links() {
     {
         printf 'extern void %s(void);\n' "$1"
@@ -77,9 +74,8 @@ links() {
     "${cc_argv[@]}" -w -o "$tmp/ctl" "$tmp/ctl.o" "$lib" 2>"$tmp/ctl.log"
 }
 
-# The probe must resolve an exported name and reject a hidden one, or every
-# verdict below is vacuous. Compiler-generated statics ("a.2") are not spellable
-# in C, so skip past them.
+# Without both controls every verdict below is vacuous. Compiler-generated
+# statics ("a.2") are not spellable in C, so skip past them.
 pos=$(grep -x hts_is_available "$tmp/exported" || head -1 "$tmp/exported")
 neg=$(awk '/^[A-Za-z_][A-Za-z0-9_]*$/ { print; exit }' "$tmp/hidden")
 links "$pos" || {
@@ -88,9 +84,8 @@ links "$pos" || {
 }
 ! links "$neg" || fail "the hidden $neg links anyway, so the probe cannot see the defect"
 
-# Override the install dir rather than use DESTDIR: same rule and file list, no
-# guessing at the prefix. Empty MAKEFLAGS, or the sub-make reaches for a
-# jobserver the test driver did not hand it.
+# Override the install dir rather than DESTDIR: same rule and file list, no
+# prefix guessing. Empty MAKEFLAGS, or the sub-make hunts a jobserver it lacks.
 env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
     DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
     {
