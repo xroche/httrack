@@ -2310,6 +2310,67 @@ static int st_sniff(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* escape_remove_control() compacts in place, so it has to terminate at the new
+   end or the caller reads the compacted head plus the original tail (#974). */
+static int st_escape_control(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *in;
+    const char *out;
+  } cases[] = {
+      /* VT and FF are the ones that reach here: is_space() passes them */
+      {"/a\013bc", "/abc"},
+      {"\014abc", "abc"},
+      /* nothing moves, but the end does */
+      {"abc\013", "abc"},
+      {"abc\001def", "abcdef"},
+      {"\001\002\003", ""},
+      /* untouched inputs: the terminator must stay where it was */
+      {"abc", "abc"},
+      {"", ""},
+      /* only bytes below 32 go: DEL and high bytes are not control here */
+      {"a\177\303\251", "a\177\303\251"},
+      /* both sides of the >= 32 cut, and a shrink of more than one byte */
+      {"a b", "a b"},
+      {"a\037b\036c", "abc"},
+  };
+
+  const size_t ncases = sizeof(cases) / sizeof(cases[0]);
+  char buf[1024];
+  size_t k, m;
+
+  (void) opt;
+  if (argc > 0) {
+    const size_t n = st_decode_body(argv[0], buf, sizeof(buf));
+
+    assertf(n < sizeof(buf));
+    escape_remove_control(buf);
+    printf("escape-control: len=%d out=hex:", (int) strlen(buf));
+    for (k = 0; buf[k] != '\0'; k++) {
+      printf("%02x", (unsigned char) buf[k]);
+    }
+    printf("\n");
+    return 0;
+  }
+
+  for (k = 0; k < ncases; k++) {
+    const size_t inlen = strlen(cases[k].in);
+    const size_t outlen = strlen(cases[k].out);
+
+    /* poison, so a stray write shows up as a byte a zeroed buffer would hide */
+    memset(buf, '#', sizeof(buf));
+    memcpy(buf, cases[k].in, inlen + 1);
+    escape_remove_control(buf);
+    assertf(strlen(buf) == outlen);
+    assertf(memcmp(buf, cases[k].out, outlen + 1) == 0);
+    /* the terminator belongs inside the original string, never past its NUL */
+    for (m = inlen + 1; m < sizeof(buf); m++) {
+      assertf(buf[m] == '#');
+    }
+  }
+  printf("escape-control self-test OK\n");
+  return 0;
+}
+
 /* fsize()/fsize_utf8()/fpsize() must report a size past 4GB: 32-bit wraps both
    ways there (MSVC's off_t and struct _stat st_size are long, 32-bit even on
    x64), and a size under 4GB would survive an *unsigned* 32-bit truncation. */
@@ -7909,6 +7970,9 @@ static const struct selftest_entry {
      "local save-name for a URL", st_savename},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
+    {"escape-control", "[hex:..|string]",
+     "escape_remove_control() terminates at the compacted end",
+     st_escape_control},
     {"fsize", "<dir>", "file size past the 2GB signed-32-bit wrap", st_fsize},
     {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
      st_growsize},
