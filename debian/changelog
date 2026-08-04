@@ -1,8 +1,10 @@
 httrack (3.49.16-1) unstable; urgency=medium
 
-  * New upstream release: two ProxyTrack buffer overflows fixed, chunked
-    trailer handling, relocatable installs, crash-report backtraces on armhf,
-    a hicolor icon theme and translation fixes; full list in history.txt.
+  * New upstream release: a stack overflow in the cache header writer, which a
+    server's response headers could trigger in httrack and libhttrack3 as well
+    as in proxytrack, and a ProxyTrack DAV buffer overflow; chunked trailer
+    handling, relocatable installs, crash-report backtraces on armhf, a hicolor
+    icon theme and translation fixes; full list in history.txt.
 
  -- Xavier Roche <xavier@debian.org>  Tue, 04 Aug 2026 18:32:40 +0200
 

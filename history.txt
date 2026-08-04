@@ -8,7 +8,7 @@ This file lists all changes and fixes that have been made for HTTrack
 + New: macOS ships a signed and notarized HTTrack.app with its own icon, bundling the OpenSSL it needs so a downloaded copy launches (#890, #900, #901, #950)
 + New: the desktop icons install into the hicolor theme, scalable SVG included, so Icon=httrack resolves in a launcher (#932, #933)
 + Fixed: an unauthenticated PROPFIND overflowed the ProxyTrack DAV item buffer (#836)
-+ Fixed: the cached-headers block was built with an unbounded sprintf (#841)
++ Fixed: response headers from the server overflowed the stack buffer holding the cache header block, in both httrack and ProxyTrack (#841)
 + Fixed: a chunked response carrying trailers was rejected as "Invalid chunk" (#855)
 + Fixed: an over-long URL aborted the whole mirror inside the cache instead of reading as a miss (#935, #936)
 + Fixed: ProxyTrack could not re-read the .arc it writes, and crashed on a record whose body it could not read (#834, #929, #931)
