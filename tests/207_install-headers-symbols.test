@@ -98,6 +98,11 @@ env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDAT
         fail "install-DevIncludesDATA failed"
     }
 
+# A synthetic leak the loop must report: every real candidate is a static defined
+# in the header, which links from the probe's own copy and so proves nothing.
+canary=zzz-canary.h
+printf 'extern void %s(void);\n' "$neg" >"$tmp/include/httrack/$canary"
+
 headers=("$tmp/include/httrack"/*.h)
 [ "${#headers[@]}" -ge 10 ] || fail "only ${#headers[@]} headers installed, the list cannot be right"
 
@@ -150,6 +155,9 @@ done
 echo "linked $probed reachable symbol(s) from ${#headers[@]} installed headers" \
     "($n_hidden hidden, $n_exported exported)"
 [ "$probed" -ge 5 ] || fail "only $probed symbols reached the link probe, the candidate list is broken"
+[ "${leaks#* "$canary":"$neg"}" != "$leaks" ] ||
+    fail "the synthetic $canary:$neg leak went unreported, the candidate list is broken"
+leaks=${leaks/ "$canary":"$neg"/}
 [ -z "$leaks" ] || fail "installed headers declare symbols $lib does not export:$leaks"
 
 exit 0
