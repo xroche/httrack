@@ -17,11 +17,18 @@ testdir=$(cd "$(dirname "$0")" && pwd)
     exit 77
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_982.XXXXXX") || exit 1
+serverpid=
 cleanup() {
+    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 trap 'set +e; cleanup' EXIT
 trap cleanup HUP INT QUIT PIPE TERM
+
+fail() {
+    echo "FAIL: $1"
+    exit 1
+}
 
 doc="${tmpdir}/doc"
 mkdir -p "$doc"
@@ -31,12 +38,22 @@ ff=$(printf 'd\014ef.html')
 soh=$(printf 's\001oh.html')
 # CR, LF and TAB are stripped, not encoded, so this href must reach strip.html.
 strip=$(printf 's\011tr\015ip\012.html')
+# A control byte at either end is stripped like a space, so these two must reach
+# the plain names: encoding one there would 404 a link that fetches fine.
+trail=$(printf 'page.html\001')
+lead=$(printf '\037lead.html')
 # "abc.html" and "s" are what the old deletion and truncation would have hit.
-for f in clean.html abc.html def.html s d strip.html "$vt" "$ff" "$soh"; do
+for f in clean.html abc.html def.html s d strip.html page.html lead.html \
+    "$vt" "$ff" "$soh"; do
     printf 'body of %s\n' "$f" >"${doc}/${f}"
 done
-printf '<html><body>\n<a href="clean.html">c</a>\n<a href="%s">v</a>\n<a href="%s">f</a>\n<a href="%s">s</a>\n<a href="%s">t</a>\n<a href="big.html">b</a>\n</body></html>\n' \
-    "$vt" "$ff" "$soh" "$strip" >"${doc}/index.html"
+# Stripping both ends empties this one, which resolves to "./" and mirrors the
+# directory as index-2.html. The leading strip has to stop on the terminator the
+# trailing strip just wrote, or it reads on into the last link's leftovers and
+# fetches those.
+allctrl=$(printf '\013\013\013')
+printf '<html><body>\n<a href="clean.html">c</a>\n<a href="%s">v</a>\n<a href="%s">f</a>\n<a href="%s">s</a>\n<a href="%s">t</a>\n<a href="%s">e</a>\n<a href="%s">l</a>\n<a href="%s">a</a>\n<a href="big.html">b</a>\n</body></html>\n' \
+    "$vt" "$ff" "$soh" "$strip" "$trail" "$lead" "$allctrl" >"${doc}/index.html"
 
 # 700 control bytes encode to 2100, past the 2*HTS_URLMAXSIZE link buffer, so
 # the growth no longer fits and the link has to go rather than be clipped.
@@ -49,9 +66,12 @@ printf '<html><body>\n<a href="clean.html">c</a>\n<a href="%s">v</a>\n<a href="%
 # clean.html is the positive control: an ordinary link still crawls untouched,
 # and the three encoded fetches are what a browser would have requested.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
-    --errors 0 --files 7 \
+    --errors 0 --files 10 \
     --found 'clean.html' \
     --found 'strip.html' \
+    --found 'page.html' \
+    --found 'lead.html' \
+    --found 'index-2.html' \
     --found 'a%0bbc.html' \
     --found 'd%0cef.html' \
     --found 's%01oh.html' \
@@ -61,3 +81,39 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
     --not-found 'd' \
     --log-found 'link rejected \(control bytes do not fit\)' \
     httrack 'BASEURL/index.html' --debug-log
+
+# The query is escaped separately and appended back, so its own growth has to
+# fit too. Absolute, because a clipped relative link dies on the URL-length gate
+# anyway while a clipped absolute one lands just under it and gets fetched. The
+# port is only known once the server is up, hence a second crawl of our own.
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+qdoc="${tmpdir}/qdoc"
+mkdir -p "$qdoc"
+printf 'placeholder\n' >"${qdoc}/index.html"
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+LOCAL_SERVER_VERBOSE=1 "$python" "$(nativepath "${testdir}/local-server.py")" \
+    --root "$(nativepath "$qdoc")" >"$serverlog" 2>&1 &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+
+# 300 control bytes of path escape to ~900, under the URL-length gate; 380 more
+# of query escape to ~1140, which together overrun the 2 KB link buffer.
+{
+    printf '<html><body><a href="http://127.0.0.1:%s/a' "$port"
+    awk 'BEGIN { while (i++ < 300) printf "%c", 11 }'
+    printf 'b.html?q='
+    awk 'BEGIN { while (i++ < 380) printf "%c", 11 }'
+    printf 'END">x</a></body></html>\n'
+} >"${qdoc}/index.html"
+
+out="${tmpdir}/qout"
+httrack "http://127.0.0.1:${port}/index.html" -O "$out" -q -r3 -%v0 ||
+    fail "the query crawl did not run"
+# A clipped link went out as a 2 KB request and 404ed, so assert the outcome
+# and not just the refusal: nothing oversized asked for, nothing errored.
+errors=$(grep -acE '^[0-9:]*[[:space:]]Error:' "${out}/hts-log.txt" || true)
+test "$errors" -eq 0 || fail "the oversized query was fetched ($errors errors)"
+longest=$(awk '{ if (length($0) > n) n = length($0) } END { print n + 0 }' \
+    "$serverlog")
+test "$longest" -lt 1024 || fail "a ${longest}-byte request line went out"

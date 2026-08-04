@@ -2099,13 +2099,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   char *a = lien;
                   size_t llen;
 
-                  // strip ending spaces
+                  // strip both ends of every C0 control or space, as a browser
+                  // does; encoding one there would 404 a link that fetched fine
                   llen = (*a != '\0') ? strlen(a) : 0;
-                  while(llen > 0 && is_realspace(lien[llen - 1])) {
+                  while (llen > 0 && (unsigned char) lien[llen - 1] <= ' ') {
                     a[--llen] = '\0';
                   }
-                  //  skip leading ones
-                  while(is_realspace(*a))
+                  // '\0' is <= ' ' too, and an all-control link ends up empty
+                  while (*a != '\0' && (unsigned char) *a <= ' ')
                     a++;
                   // strip cr, lf, tab inside URL, as a browser does; every
                   // other control byte percent-encodes below
@@ -2217,10 +2218,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       "could not URL-decode string '%s'", lien);
                   }
 
-                  // we need to encode query string non-ascii chars, 
+                  // we need to encode query string non-ascii chars,
                   // leaving the encoding as-is (unlike the file part)
                   // and copy back query
-                  append_escape_check_url(query, lien, sizeof(lien));
+                  {
+                    const size_t used = strlen(lien);
+
+                    // the append grows the query too, and clips silently on
+                    // overflow: drop, or we fetch a query nobody wrote (#982)
+                    if (append_escape_check_url(query, lien, sizeof(lien)) >=
+                        sizeof(lien) - used) {
+                      error = 1;
+                      hts_log_print(opt, LOG_DEBUG,
+                                    "link rejected (query does not fit) %s",
+                                    lien);
+                    }
+                  }
                 }
 
                 // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!
