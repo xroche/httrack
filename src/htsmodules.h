@@ -134,6 +134,8 @@ typedef int (*t_htsWrapperPlugInit)(char *args);
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+#include "htsglobal.h"
+
 /** Capabilities string ("-noV6", "-nossl", ...) followed by "+name" for each
     loaded module. Returned pointer aliases opt->state.HTbuff; do not free, and
     it is overwritten by the next call. */

@@ -301,6 +301,8 @@ struct t_hts_htmlcheck_callbacks {
 /* Library-internal helpers, compiled only inside the engine. */
 #ifdef HTS_INTERNAL_BYTECODE
 
+#include <stddef.h>
+
 /* Maps a callback slot's name to its byte offset in the callback table, so a
    slot can be installed by name. */
 #ifndef HTS_DEF_FWSTRUCT_t_hts_callback_ref
