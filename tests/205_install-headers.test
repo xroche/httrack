@@ -19,9 +19,12 @@ if [ -z "${abs_top_builddir:-}" ]; then
 fi
 [ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
 
-cc=${CC:-cc}
-command -v "$cc" >/dev/null 2>&1 || {
-    echo "no C compiler ($cc), skipping" >&2
+# CC carries flags on some legs ("gcc -m32" on linux-i386, "ccache gcc"), so
+# split it: looking the whole string up as one program skips the i386 job, the
+# only leg with a different data model.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || {
+    echo "no C compiler (${cc_argv[0]}), skipping" >&2
     exit 77
 }
 make=${MAKE:-make}
@@ -32,6 +35,15 @@ command -v "$make" >/dev/null 2>&1 || {
 
 tmp=$(mktemp -d) || exit 1
 trap 'set +e; rm -rf "$tmp"' EXIT
+
+# Positive control: without it, a compiler whose libc headers are missing (a box
+# with no gcc-multilib and CC="gcc -m32") blames every installed header instead.
+printf '#include <stdio.h>\n' >"$tmp/tu.c"
+if ! "${cc_argv[@]}" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+    head -5 "$tmp/cc.log" >&2
+    echo "${cc_argv[*]} cannot compile a bare <stdio.h>, skipping" >&2
+    exit 77
+fi
 
 # Override the install dir rather than use DESTDIR: same rule and file list, no
 # guessing at the prefix. Empty MAKEFLAGS, or the sub-make reaches for a
@@ -54,7 +66,7 @@ for h in "${headers[@]}"; do
     b=$(basename "$h")
     printf '#include <httrack/%s>\n' "$b" >"$tmp/tu.c"
     for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
-        if ! "$cc" -I"$tmp/include" "$mode" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+        if ! "${cc_argv[@]}" -I"$tmp/include" "$mode" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
             echo "$b does not compile standalone ($mode):" >&2
             head -5 "$tmp/cc.log" >&2
             bad=1
@@ -65,8 +77,8 @@ done
 
 # The loop above is only meaningful if this compiler rejects a missing include.
 printf '#include "no-such-header-943.h"\n' >"$tmp/tu.c"
-if "$cc" -I"$tmp/include" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
-    fail "$cc accepted a missing include, the checks above proved nothing"
+if "${cc_argv[@]}" -I"$tmp/include" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    fail "${cc_argv[*]} accepted a missing include, the checks above proved nothing"
 fi
 
 exit 0
