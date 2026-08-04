@@ -125,7 +125,30 @@ done
 echo "compiled ${#headers[@]} headers x ${#stds[@]} std x 2 bytecode modes = $count units" >&2
 [ "$bad" -eq 0 ] || fail "installed headers do not compile in strict-ISO mode"
 
-# The loop above is only meaningful if this compiler rejects a missing include.
+# A macro body is only compiled where it expands, so the include-only loop above
+# never reaches the __typeof__ in htsbuff_must_be_array_ or HTS_IS_CHAR_BUFFER.
+cat >"$tmp/tu.c" <<'EOF'
+#include <httrack/htssafe.h>
+void f(void);
+void f(void) {
+  char a[8];
+  htsbuff b = htsbuff_array(a);
+  htsbuff_catn(&b, "x", 1);
+  strcpybuff(a, "y");
+}
+EOF
+for std in "${stds[@]}"; do
+    for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
+        if ! "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" "$mode" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+            echo "htssafe.h macros do not expand under -std=$std ($mode):" >&2
+            head -5 "$tmp/cc.log" >&2
+            bad=1
+        fi
+    done
+done
+[ "$bad" -eq 0 ] || fail "htssafe.h macros do not compile in strict-ISO mode"
+
+# The loops above are only meaningful if this compiler rejects a missing include.
 printf '#include "no-such-header-972.h"\n' >"$tmp/tu.c"
 if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=${stds[0]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
     fail "${cc_argv[*]} accepted a missing include, the checks above proved nothing"
