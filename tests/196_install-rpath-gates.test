@@ -51,5 +51,6 @@ expect() {
 expect yes "a private prefix gets the rpath" --prefix="${work}/inst"
 expect no "a system prefix does not" --prefix=/usr
 expect no "a multiarch libdir does not" --prefix=/usr --libdir=/usr/lib/x86_64-linux-gnu
+expect no "a 32-bit multilib libdir does not" --prefix=/usr --libdir=/usr/lib32
 expect no "--disable-origin-rpath is honoured" --prefix="${work}/inst" --disable-origin-rpath
 expect no "a static build does not" --prefix="${work}/inst" --disable-shared

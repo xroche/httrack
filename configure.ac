@@ -225,12 +225,13 @@ eval hts_libdir=\"$hts_libdir\"
 prefix=$hts_save_prefix
 exec_prefix=$hts_save_exec_prefix
 
-# Pattern-matched, not read from libtool's sys_lib_dlsearch_path_spec: that one
-# is only augmented when /etc/ld.so.conf exists, so a sysroot or minimal
-# container would let a distribution libdir through.
+# Enumerated, not read from libtool's sys_lib_dlsearch_path_spec: that one is
+# only augmented when /etc/ld.so.conf exists, so a sysroot or minimal container
+# would let a distribution libdir through. Spelled out rather than globbed as
+# /lib*, which would swallow /libfoo and /usr/libexec.
 AS_CASE([$hts_libdir],
-	[/lib | /lib/* | /lib64 | /lib64/* | /usr/lib | /usr/lib/* | /usr/lib64 | /usr/lib64/*],
-		[hts_origin_sysdir=yes],
+	[/lib | /lib/* | /lib32 | /lib32/* | /lib64 | /lib64/* | /libx32 | /libx32/*], [hts_origin_sysdir=yes],
+	[/usr/lib | /usr/lib/* | /usr/lib32 | /usr/lib32/* | /usr/lib64 | /usr/lib64/* | /usr/libx32 | /usr/libx32/*], [hts_origin_sysdir=yes],
 	[hts_origin_sysdir=no])
 
 ORIGIN_RPATH=no
