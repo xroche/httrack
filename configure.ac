@@ -212,9 +212,10 @@ AC_ARG_ENABLE([origin-rpath],
 	[hts_origin_asked=yes], [enable_origin_rpath=yes; hts_origin_asked=no])
 
 # hts_origin_ref_make survives make's expansion and libtool's eval of the link line.
-AS_CASE([$host_os],
-	[darwin*], [hts_origin_ref='@loader_path'; hts_origin_ref_make='@loader_path'],
-	[hts_origin_ref='$ORIGIN'; hts_origin_ref_make='\$$ORIGIN'])
+hts_origin_ref='$ORIGIN'
+hts_origin_ref_make='\$$ORIGIN'
+
+AS_CASE([$host_os], [darwin*], [hts_origin_darwin=yes], [hts_origin_darwin=no])
 
 hts_save_prefix=$prefix
 hts_save_exec_prefix=$exec_prefix
@@ -238,6 +239,10 @@ ORIGIN_RPATH=no
 RPATH_ORIGIN_LDFLAGS=""
 if test "x$enable_origin_rpath" = xno; then
 	AC_MSG_NOTICE([binary-relative rpath disabled by request])
+elif test "x$hts_origin_darwin" = xyes; then
+	# dyld reads LC_RPATH only for an @rpath/ load path, and libtool stamps the
+	# dylib with an absolute -install_name, so the entry would never be consulted.
+	AC_MSG_NOTICE([binary-relative rpath not used: libtool records an absolute install_name on Darwin])
 elif test "x$enable_shared" = xno; then
 	AC_MSG_NOTICE([binary-relative rpath not needed: no shared libraries])
 elif test "x$hts_origin_sysdir" = xyes; then
@@ -264,11 +269,8 @@ _ACEOF
 int hts_origin_probe(void);
 int main(void) { return hts_origin_probe() == 42 ? 0 : 1; }
 _ACEOF
-		AS_CASE([$host_os],
-			[darwin*], [hts_origin_mklib="$CC $CFLAGS -dynamiclib -install_name @rpath/libhtsorigin.dylib -o conftest.origin/lib/libhtsorigin.dylib conftest.origin/lib.c"
-				hts_origin_link=conftest.origin/lib/libhtsorigin.dylib],
-			[hts_origin_mklib="$CC $CFLAGS -fPIC -shared -o conftest.origin/lib/libhtsorigin.so conftest.origin/lib.c"
-				hts_origin_link="-Lconftest.origin/lib -lhtsorigin"])
+		hts_origin_mklib="$CC $CFLAGS -fPIC -shared -o conftest.origin/lib/libhtsorigin.so conftest.origin/lib.c"
+		hts_origin_link="-Lconftest.origin/lib -lhtsorigin"
 		if $hts_origin_mklib >&AS_MESSAGE_LOG_FD 2>&1; then
 			for hts_origin_cand in $hts_origin_cands; do
 				# Solaris and the older BSDs expand the token only with -z origin.
@@ -279,7 +281,7 @@ _ACEOF
 					>&AS_MESSAGE_LOG_FD 2>&1 || continue
 				# From an unrelated cwd, so a loader taking the token literally fails.
 				if test "x$cross_compiling" = xyes ||
-					(unset LD_LIBRARY_PATH DYLD_LIBRARY_PATH
+					(unset LD_LIBRARY_PATH
 					cd conftest.origin/run && ../bin/probe) >&AS_MESSAGE_LOG_FD 2>&1; then
 					hts_cv_origin_rpath=$hts_origin_cand
 					break

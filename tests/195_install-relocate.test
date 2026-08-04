@@ -37,20 +37,29 @@ env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${builddir}/src" install-exec 
 bin=${stage}${bindir}/httrack
 test -r "${bin}" || fail "no httrack in ${stage}${bindir}"
 
+# Chosen by platform, not by whatever is installed: an ELF reader handed a
+# Mach-O prints no rpath instead of failing, which reads as "no rpath at all".
+case "$(uname -s)" in
+Darwin) candidates="otool" ;;
+*) candidates="readelf objdump" ;;
+esac
 dump=
-for cmd in "readelf -d" "objdump -p" "otool -l"; do
-    command -v "${cmd%% *}" >/dev/null 2>&1 && dump=${cmd} && break
+for cmd in ${candidates}; do
+    if command -v "${cmd}" >/dev/null 2>&1; then
+        dump=${cmd}
+        break
+    fi
 done
 
 # One rpath entry per line, in the order the loader searches them.
 rpath_entries() {
     local raw=
     case "${dump}" in
-    "readelf -d") raw=$(LC_ALL=C readelf -d "$1" 2>/dev/null |
+    readelf) raw=$(LC_ALL=C readelf -d "$1" 2>/dev/null |
         awk -F'[][]' '/\(RUNPATH\)|\(RPATH\)/ { print $2 }') ;;
-    "objdump -p") raw=$(LC_ALL=C objdump -p "$1" 2>/dev/null |
+    objdump) raw=$(LC_ALL=C objdump -p "$1" 2>/dev/null |
         awk '$1 == "RUNPATH" || $1 == "RPATH" { print $2 }') ;;
-    "otool -l") raw=$(LC_ALL=C otool -l "$1" 2>/dev/null |
+    otool) raw=$(LC_ALL=C otool -l "$1" 2>/dev/null |
         awk '/LC_RPATH/ { f = 1 } f && $1 == "path" { print $2; f = 0 }') ;;
     esac
     tr ':' '\n' <<<"${raw}" | grep -v '^$' || true

@@ -43,7 +43,10 @@ expect() {
     n=$((n + 1))
     dir=${work}/build${n}
     mkdir -p "${dir}"
-    (cd "${dir}" && bash "${shadow}/configure" --cache-file="${cache}" "$@") \
+    # The gate has nothing to do with TLS, and the parent's CPPFLAGS/LDFLAGS are
+    # not passed on: a keg-only openssl (brew) makes --enable-https a hard error.
+    (cd "${dir}" && bash "${shadow}/configure" --cache-file="${cache}" \
+        --enable-https=auto "$@") \
         >"${dir}/configure.log" 2>&1 || {
         tail -20 "${dir}/configure.log" >&2
         fail "configure ${*} failed"
@@ -55,6 +58,13 @@ expect() {
     }
     echo "ok: ${desc} -> ${want}"
 }
+
+# Darwin has no positive case: configure turns the rpath off there whatever the
+# prefix, so assert that one row rather than run "no" rows that cannot fail.
+if [ "$(uname -s)" = Darwin ]; then
+    expect no "Darwin opts out whatever the prefix" --prefix="${work}/inst"
+    exit 0
+fi
 
 # The positive control first, or every "no" below could come from a probe that
 # simply never succeeds on this machine.
