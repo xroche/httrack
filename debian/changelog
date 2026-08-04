@@ -1,3 +1,11 @@
+httrack (3.49.16-1) unstable; urgency=medium
+
+  * New upstream release: two ProxyTrack buffer overflows fixed, chunked
+    trailer handling, relocatable installs, crash-report backtraces on armhf,
+    a hicolor icon theme and translation fixes; full list in history.txt.
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 04 Aug 2026 18:32:40 +0200
+
 httrack (3.49.15-1) unstable; urgency=medium
 
   * New upstream release: single-file mirrors with inlined assets, sitemap
