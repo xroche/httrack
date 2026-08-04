@@ -106,6 +106,28 @@ dump_crawl_logs() {
     done
 }
 
+# The Windows PID behind an MSYS pid, empty when unknown.
+win_pid() {
+    if test -r "/proc/$1/winpid"; then
+        cat "/proc/$1/winpid" 2>/dev/null || true
+    fi
+}
+
+# Signal one process, never its descendants: a caller inside the target's own
+# tree cannot rely on kill_tree, whose taskkill is then a grandchild of it (#953).
+kill_pid() {
+    local pid=$1
+    if is_windows; then
+        local winpid
+        winpid=$(win_pid "$pid")
+        if test -n "$winpid"; then
+            taskkill /F /PID "$winpid" >/dev/null 2>&1 || true
+        fi
+        return 0
+    fi
+    kill -9 "$pid" 2>/dev/null || true
+}
+
 # Kill a backgrounded job and its whole descendant tree. POSIX: the caller must
 # have put the job in its own process group (run_with_timeout does) so we signal
 # the group; a bare kill would orphan the grandchildren. Windows: the tree is
@@ -115,8 +137,8 @@ dump_crawl_logs() {
 kill_tree() {
     local pid=$1
     if is_windows; then
-        local winpid=
-        test -r "/proc/$pid/winpid" && winpid=$(cat "/proc/$pid/winpid" 2>/dev/null)
+        local winpid
+        winpid=$(win_pid "$pid")
         if test -n "$winpid"; then
             taskkill /F /T /PID "$winpid" >/dev/null 2>&1 || true
         else

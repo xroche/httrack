@@ -275,5 +275,12 @@ test "$plistver" = "$binver" ||
 bundlever=$(plist_value "$app/Contents/Info.plist" CFBundleVersion)
 test "$bundlever" = "$binver" ||
     fail "CFBundleVersion says $bundlever, httrack says $binver"
+# A bottled dylib's floor can exceed what the plist declares, and Finder only reads the
+# plist. The mismatch fails the build rather than being reconciled behind our backs.
+minos=$(macho_floor "$mach") || fail "could not read a minimum macOS out of the payload"
+test -n "$minos" || fail "no Mach-O in the bundle declares a minimum macOS"
+plistmin=$(plist_value "$app/Contents/Info.plist" LSMinimumSystemVersion)
+test "$plistmin" = "$minos" ||
+    fail "Info.plist declares macOS $plistmin, the payload needs $minos"
 
-echo "built $appreal (version $plistver)"
+echo "built $appreal (version $plistver, macOS $minos and later)"

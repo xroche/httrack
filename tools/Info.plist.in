@@ -22,8 +22,9 @@
 	<string>@PACKAGE_VERSION@</string>
 	<key>CFBundleVersion</key>
 	<string>@PACKAGE_VERSION@</string>
+	<!-- macos-app.sh checks this against the built payload. -->
 	<key>LSMinimumSystemVersion</key>
-	<string>11.0</string>
+	<string>15.0</string>
 	<!-- Not background-only: the UI opens in the user's default browser. -->
 	<key>LSBackgroundOnly</key>
 	<false/>
