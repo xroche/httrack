@@ -83,7 +83,8 @@ mkdir -p "${root}"
 cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
 chmod -R u+w "${root}"
 # CRLF line pairs, English key then translation; \\ \n \t are read back as one
-# backslash, a newline and a tab. Anything left undefined falls back to English.
+# backslash, a newline and a tab, and \203 is a raw shift-jis lead byte.
+# Anything left undefined falls back to English.
 printf '%s\r\n' \
     LANGUAGE_NAME 'Francais-864' \
     LANGUAGE_FILE 'Francais' \
@@ -93,6 +94,7 @@ printf '%s\r\n' \
     'Click to confirm' 'Guillemet " et </script> ici' \
     'Cancel changes' 'Antislash \\ et & ici' \
     'Follow external links' 'Deux\nlignes\tici' \
+    'Test all links in pages' "$(printf 'Lead \203\\\\ fin')" \
     >"${root}/lang/Francais.txt"
 
 printf '[a French tooltip survives the two decoders] ..\t'
@@ -154,9 +156,13 @@ pages = [
         # would let the attribute decode rebuild either one
         handler(r"Guillemet \x22 et \x3c/script\x3e ici"),
         # a lone backslash would eat the next character as an escape
-        handler(r"Antislash \\ et \x26 ici"),
+        handler(r"Antislash \x5c et \x26 ici"),
         # a raw newline or tab is not legal inside a JS literal
-        handler(r"Deux\nlignes\x09ici"),
+        handler(r"Deux\x0alignes\x09ici"),
+        # shift-jis, BIG5 and GBK trail bytes cover 0x5c, so a \\ pair after an
+        # orphan lead byte decodes to one glyph plus a stray backslash that
+        # escapes the closing quote; \x5c leaves the decoder nothing to pair
+        handler("Lead \x83" + r"\x5c fin"),
         # the title attribute is HTML text and stays on the html: mode
         "title='Cliquez pour avoir de l&#39;aide!'",
         "title='Guillemet \" et &lt;/script&gt; ici'",
@@ -175,5 +181,8 @@ for page, wants in pages:
     for h in re.findall(r'onMouseOver="([^"]*)"', body):
         if "&" in h or "<" in h:
             sys.exit("%s leaves an HTML-special byte in %r" % (page, h))
+        # every escape is a \xNN group: a bare \ is one a DBCS decode can eat
+        if re.search(r"\\(?!x[0-9a-f]{2})", h):
+            sys.exit("%s emits a non-hex escape in %r" % (page, h))
 PY
 echo OK

@@ -445,8 +445,9 @@ static hts_boolean cat_html_escaped(String *dst, char c) {
 }
 
 /* Append value escaped for a single-quoted JS literal inside a double-quoted
-   HTML attribute: hex escapes leave the attribute decode nothing to expand
-   back into a quote or a </script>. */
+   HTML attribute. Every escape is a \xNN group, so the only bytes it adds are
+   '\', 'x' and hex digits: nothing the attribute decode can expand back into a
+   quote, and no lone '\' for a DBCS trail byte to swallow. */
 static void cat_js_escaped(String *dst, const char *value) {
   const char *a;
 
@@ -455,14 +456,6 @@ static void cat_js_escaped(String *dst, const char *value) {
 
     switch (*a) {
     case '\\':
-      StringCat(*dst, "\\\\");
-      continue;
-    case '\n':
-      StringCat(*dst, "\\n");
-      continue;
-    case '\r':
-      StringCat(*dst, "\\r");
-      continue;
     case '\'':
     case '\"':
     case '&':
