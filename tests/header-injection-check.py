@@ -2,14 +2,13 @@
 """Grade the request bytes header-injection-server.py captured.
 
 Usage: header-injection-check.py <logfile> direct|proxy [port]
-
-Every check is on the literal bytes: httrack's own logs cannot see a request
-line that got split in two on the wire.
 """
 
 import sys
 
 MARKER = b"foo:"
+POISON_HOST = b"evil%0d%0afoo:%20injected.example"
+FTP_POISON_HOST = b"ftpevil%0d%0afoo:%20x.example"
 
 
 def requests(path):
@@ -18,7 +17,8 @@ def requests(path):
 
 
 def lines(req):
-    return req.rstrip(b"\n").split(b"\r\n")
+    """Split the way a tolerant server would, so a bare LF also ends a line."""
+    return [line.rstrip(b"\r") for line in req.rstrip(b"\n").split(b"\n")]
 
 
 def fail(msg, req=None):
@@ -60,18 +60,34 @@ def check_direct(reqs, port):
 
 
 def check_proxy(reqs):
+    # the authority is lowercased upstream, hence "foo:" and not "Foo:"
     poison = find(reqs, b"/p.html")
     poison = [r for r in poison if b"evil" in lines(r)[0]]
     if not poison:
         fail("the poisoned host was never requested through the proxy")
-    # the authority is lowercased upstream, hence "foo:" and not "Foo:"
-    want_line = b"GET http://evil%0d%0afoo:%20injected.example/p.html HTTP/1.1"
-    want_host = b"Host: evil%0d%0afoo:%20injected.example"
+    want_line = b"GET http://" + POISON_HOST + b"/p.html "
+    want_host = b"Host: " + POISON_HOST
     for req in poison:
-        if lines(req)[0] != want_line:
+        if not lines(req)[0].startswith(want_line):
             fail("proxy request line not escaped, wanted %r" % want_line, req)
         if want_host not in lines(req):
             fail("Host not escaped, wanted %r" % want_host, req)
+
+    # the poisoned host must also reach a Referer, or that escape goes ungraded
+    deep = find(reqs, b"http://" + POISON_HOST + b"/deep2.html")
+    if len(deep) != 1:
+        fail("expected one poisoned-host deep2.html request, got %d" % len(deep))
+    want = b"Referer: http://" + POISON_HOST + b"/p.html"
+    if want not in lines(deep[0]):
+        fail("poisoned referer host not escaped, wanted %r" % want, deep[0])
+
+    # ftp through an http proxy is built by its own emission site
+    ftp = find(reqs, b"ftp://")
+    if len(ftp) != 1:
+        fail("expected one ftp-through-proxy request, got %d" % len(ftp))
+    want = b"GET ftp://" + FTP_POISON_HOST + b"/f.txt "
+    if not lines(ftp[0])[0].startswith(want):
+        fail("ftp request line not escaped, wanted %r" % want, ftp[0])
 
     # positive control: an ordinary absolute-URI request is unaffected
     plain = find(reqs, b"GET http://plain.example/p.html ")

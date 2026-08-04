@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# A link carrying &#13;&#10; keeps raw CR/LF once hts_unescapeEntities() has run
-# past the parser's control-byte escape, so any request field built from it can
-# start a header line of the site's choosing. Graded on the captured request
-# bytes: httrack's log cannot show a request line that split in two on the wire.
+# A link carrying &#13;&#10; keeps raw CR/LF past the parser's control-byte
+# escape, so a request field built from it can start a header line of the
+# site's choosing. Graded on the wire bytes: a log cannot show a split line.
 
 set -euo pipefail
 
@@ -27,6 +26,7 @@ cleanup() {
     rm -rf "$tmpdir"
 }
 trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 start_probe() {
     local tag="$1"
@@ -35,11 +35,26 @@ start_probe() {
     port=$(discover_server_port "$tmpdir/$tag.out" "$serverpid") || exit 1
 }
 
+# a crawl may end non-zero, but never on the deadline or on a signal: an
+# assertf abort would otherwise be graded on whatever it managed to send
+crawl() {
+    local rc=0
+    run_with_timeout 90 httrack "$@" >>"$tmpdir/log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || {
+        echo "crawl hit the deadline" >&2
+        exit 1
+    }
+    test "$rc" -le 128 || {
+        echo "httrack died on signal $((rc - 128))" >&2
+        exit 1
+    }
+}
+
 # 1. Referer: the poisoned page links onward, so its own URL is the referer of
 # the next request. No proxy involved; this is a plain crawl.
 start_probe direct
-run_with_timeout 90 httrack "http://127.0.0.1:$port/" -O "$tmpdir/m1" \
-    -c1 --robots=0 --retries=0 --quiet -%v0 >>"$tmpdir/log" 2>&1 || true
+crawl "http://127.0.0.1:$port/" -O "$tmpdir/m1" \
+    -c1 --robots=0 --retries=0 --quiet -%v0
 stop_server "$serverpid"
 serverpid=
 "$python" "$checker" "$tmpdir/direct.wire" direct "$port" || {
@@ -47,13 +62,12 @@ serverpid=
     exit 1
 }
 
-# 2. Host and the proxy absolute-URI request line. Only reachable through an
-# http proxy: without one the poisoned authority fails to resolve and no
-# request is ever built.
+# 2. Host, the proxy absolute-URI request line and its ftp:// variant. Only
+# reachable through an http proxy: without one the poisoned authority fails to
+# resolve and no request is ever built.
 start_probe proxy
-run_with_timeout 90 httrack "http://start.example/" '+*' -P "127.0.0.1:$port" \
-    -O "$tmpdir/m2" -c1 --robots=0 --retries=0 --quiet -%v0 \
-    >>"$tmpdir/log" 2>&1 || true
+crawl "http://start.example/" '+*' -P "127.0.0.1:$port" \
+    -O "$tmpdir/m2" -c1 --robots=0 --retries=0 --quiet -%v0
 stop_server "$serverpid"
 serverpid=
 "$python" "$checker" "$tmpdir/proxy.wire" proxy || {

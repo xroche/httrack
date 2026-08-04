@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """Raw-socket probe for 159_local-header-injection.
 
-Speaks HTTP off the socket rather than through http.server so the request is
-logged byte-for-byte: a split header line is what this test is about, and any
-parsing framework would have already normalised it away. Serves an origin-form
-site and, on the same port, an http-proxy absolute-URI one, so a single server
-covers both the Referer and the Host/request-line vectors.
+Speaks HTTP off the socket so a split header line stays visible; serves an
+origin-form site and an http-proxy absolute-URI one on the same port.
 
 Appends "=== REQUEST ===\\n<bytes>\\n" per request to the log named on argv, and
 prints "PORT <n>" once listening.
@@ -20,10 +17,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from proxytestlib import bind_ephemeral  # noqa: E402
 
-# &#13;&#10; survives the parser's control-byte escape (hts_unescapeEntities runs
-# after it), so these land as raw CR/LF in the engine's link buffers.
+# &#13;&#10; outlives the parser's control-byte escape, so these land as raw CR/LF
 POISON_PATH = "/x&#13;&#10;Foo:%20injected.html"
 POISON_HOST = "evil&#13;&#10;Foo:%20injected.example"
+FTP_POISON_HOST = "ftpevil&#13;&#10;Foo:%20x.example"
 
 
 def page(body):
@@ -39,9 +36,11 @@ def root_page(port):
 
 # the poisoned page must link onward, or its URL never becomes a Referer
 POISON_PAGE = page('<a href="/deep.html">deep</a>')
+# the ftp link takes the ftp-through-proxy emission site, which has no Host:
 PROXY_ROOT = page(
-    '<a href="http://%s/p.html">poison</a>'
-    '<a href="http://plain.example/p.html">plain</a>' % POISON_HOST
+    '<a href="ftp://' + FTP_POISON_HOST + '/f.txt">ftp</a>'
+    '<a href="http://' + POISON_HOST + '/p.html">poison</a>'
+    '<a href="http://plain.example/p.html">plain</a>'
 )
 
 
