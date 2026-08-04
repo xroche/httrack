@@ -21,6 +21,16 @@ fail() {
     exit 1
 }
 
+# automake refuses an out-of-tree configure when srcdir holds a config.status,
+# which an in-tree build (CI, dpkg-buildpackage) leaves there; a symlink farm
+# without that one file is the same tree to configure.
+shadow=${work}/srcdir
+mkdir -p "${shadow}"
+for entry in "${srcdir}"/*; do
+    test "${entry##*/}" = config.status || ln -s "${entry}" "${shadow}/"
+done
+test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
+
 # One cache for every run: the probe itself is the slow part and its answer does
 # not depend on the prefix.
 cache=${work}/config.cache
@@ -33,7 +43,7 @@ expect() {
     n=$((n + 1))
     dir=${work}/build${n}
     mkdir -p "${dir}"
-    (cd "${dir}" && bash "${srcdir}/configure" --cache-file="${cache}" "$@") \
+    (cd "${dir}" && bash "${shadow}/configure" --cache-file="${cache}" "$@") \
         >"${dir}/configure.log" 2>&1 || {
         tail -20 "${dir}/configure.log" >&2
         fail "configure ${*} failed"
