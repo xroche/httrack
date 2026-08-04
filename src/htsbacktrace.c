@@ -61,6 +61,7 @@ Please visit our Website: http://www.httrack.com
 #include <dlfcn.h>
 #include <errno.h>
 #include <execinfo.h>
+#include <link.h>
 #include <signal.h>
 #include <spawn.h>
 #include <time.h>
@@ -81,6 +82,32 @@ static hts_boolean symbolize_crash = HTS_TRUE;
 /* Built at init: assembling file actions allocates; the crash path cannot. */
 static posix_spawn_file_actions_t spawn_actions;
 static posix_spawn_file_actions_t *spawn_redirect = NULL;
+
+/* dladdr() names the main program after argv[0], which the symbolizer cannot
+   open when the binary came off PATH; /proc/self/exe always names the file. */
+static char main_path[BT_PATH_SIZE];
+static const void *main_base;
+
+static int record_main_base(struct dl_phdr_info *info, size_t size,
+                            void *data) {
+  (void) size;
+  (void) data;
+  main_base = (const void *) info->dlpi_addr;
+  return 1; /* dl_iterate_phdr starts at the main program */
+}
+
+static void find_main_object(void) {
+  const ssize_t len = readlink("/proc/self/exe", main_path, sizeof(main_path));
+
+  /* A full buffer is a clipped path, which readlink() cannot report: its prefix
+     names another file, and the symbolizer would happily open that one. */
+  if (len > 0 && (size_t) len < sizeof(main_path)) {
+    main_path[len] = '\0';
+    if (dl_iterate_phdr(record_main_base, NULL) == 1)
+      return;
+  }
+  main_path[0] = '\0'; /* unresolved: keep whatever dladdr() reported */
+}
 
 /* "0x"-prefixed hex: the handler must stay stdio-free. */
 static void print_hex(char *buffer, uintptr_t value) {
@@ -182,11 +209,14 @@ static void symbolize_backtrace(void *const *stack, int size, int fd) {
      once, so argc cannot exceed argv[]. */
   for (spawned = 0; spawned < BT_MAX_MODULES; spawned++) {
     int first, j, argc = 0;
+    const char *path;
 
     for (first = 0; first < size && grouped[first]; first++)
       ;
     if (first >= size)
       break;
+    path = main_path[0] != '\0' && base[first] == main_base ? main_path
+                                                            : name[first];
     argv[argc++] = prog;
     argv[argc++] = opts;
     argv[argc++] = dashe;
@@ -200,7 +230,7 @@ static void symbolize_backtrace(void *const *stack, int size, int fd) {
     argv[argc] = NULL;
     /* access(): skip pseudo-modules like linux-vdso, which have no file and
        would draw nothing but an addr2line complaint. */
-    if (copy_bounded(module, sizeof(module), name[first]) &&
+    if (copy_bounded(module, sizeof(module), path) &&
         access(module, R_OK) == 0) {
       const size_t len = strlen(module);
 
@@ -224,6 +254,7 @@ void hts_backtrace_init(void) {
       posix_spawn_file_actions_adddup2(&spawn_actions, BT_REPORT_FD,
                                        STDOUT_FILENO) == 0)
     spawn_redirect = &spawn_actions; /* both symbolizers write on stdout */
+  find_main_object();
   /* Pay for the unwinder now: glibc's first backtrace() dlopen()s libgcc_s,
      which allocates and takes the loader lock the crashing thread may hold. */
   (void) backtrace(frame, 1);
