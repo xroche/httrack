@@ -7,7 +7,7 @@ sl
 LANGUAGE_AUTHOR
 Jadran Rudec,iur.\r\njrudec@email.si \r\n
 LANGUAGE_CHARSET
-ISO-8859-1
+windows-1250
 LANGUAGE_WINDOWSID
 Slovenian
 OK

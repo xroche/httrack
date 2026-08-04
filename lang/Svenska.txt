@@ -7,7 +7,7 @@ sv
 LANGUAGE_AUTHOR
 Staffan Ström (staffan at fam-strom.org) \r\n
 LANGUAGE_CHARSET
-ISO-8859-2
+ISO-8859-1
 LANGUAGE_WINDOWSID
 Swedish
 OK
