@@ -715,8 +715,9 @@ jobs:
           sudo apt-get update
           # noble ships shfmt 3.8.0 (universe), matching the pinned local dev
           # version; use it rather than fetching a release binary from github.com.
-          sudo apt-get install -y --no-install-recommends shellcheck shfmt
+          sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream
           shfmt --version
+          appstreamcli --version
 
       - name: shellcheck
         run: shellcheck $SHELL_SCRIPTS
@@ -733,6 +734,14 @@ jobs:
             python3 -c "import sys,xml.dom.minidom; xml.dom.minidom.parse(sys.argv[1])" "$f"
             echo "ok $f"
           done
+
+      # A software centre quietly ignores a metainfo it cannot parse. Errors and
+      # warnings fail; --no-net so the gate is on the file, not httrack.com's uptime.
+      - name: AppStream metainfo validation
+        run: |
+          set -euo pipefail
+          appstreamcli validate --no-net --explain \
+            html/server/div/com.httrack.WebHTTrack.metainfo.xml
 
   # Check clang-format on CHANGED LINES ONLY. The engine predates clang-format
   # (it was shaped by an old Visual Studio formatter) and does not round-trip,
