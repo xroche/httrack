@@ -2329,11 +2329,14 @@ static int st_escape_control(httrackp *opt, int argc, char **argv) {
       {"", ""},
       /* only bytes below 32 go: DEL and high bytes are not control here */
       {"a\177\303\251", "a\177\303\251"},
+      /* both sides of the >= 32 cut, and a shrink of more than one byte */
+      {"a b", "a b"},
+      {"a\037b\036c", "abc"},
   };
 
   const size_t ncases = sizeof(cases) / sizeof(cases[0]);
   char buf[1024];
-  size_t k;
+  size_t k, m;
 
   (void) opt;
   if (argc > 0) {
@@ -2360,7 +2363,9 @@ static int st_escape_control(httrackp *opt, int argc, char **argv) {
     assertf(strlen(buf) == outlen);
     assertf(memcmp(buf, cases[k].out, outlen + 1) == 0);
     /* the terminator belongs inside the original string, never past its NUL */
-    assertf(buf[inlen + 1] == '#');
+    for (m = inlen + 1; m < sizeof(buf); m++) {
+      assertf(buf[m] == '#');
+    }
   }
   printf("escape-control self-test OK\n");
   return 0;

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# escape_remove_control() used to compact in place without terminating, so a
-# dropped byte left the original tail glued to the result (#974). Hex both ways:
-# raw control bytes do not survive a Windows argv.
+# escape_remove_control() left a dropped byte's tail glued to the result (#974).
+# Vectors are hex: raw control bytes do not survive a Windows argv.
 
 set -euo pipefail
 
@@ -21,6 +20,8 @@ cases=(
     "616263:3:616263" # untouched: the terminator must stay put
     ":0:"
     "617fc3a9:4:617fc3a9" # DEL and high bytes are not stripped
+    "612062:3:612062"     # space is the first byte kept
+    "611f621e63:3:616263" # top of the control range, and two bytes dropped
 )
 
 for c in "${cases[@]}"; do
@@ -34,8 +35,7 @@ for c in "${cases[@]}"; do
         fail "hex:$in: expected len=$len out=hex:$out, got: $got"
 done
 
-# The in-binary table also checks what the printed result cannot show: that
-# nothing is written past the input's own NUL.
+# The in-binary table also checks the bytes past the NUL, which printing cannot show.
 got=$(httrack "-#test=escape-control") || fail "self-test exited non-zero"
 grep -q "escape-control self-test OK" <<<"$got" ||
     fail "unexpected self-test output: $got"
