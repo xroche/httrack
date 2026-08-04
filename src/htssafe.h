@@ -110,7 +110,7 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 
 /* Note: char[] and const char[] are compatible */
 #define HTS_IS_CHAR_BUFFER(VAR)                                                \
-  (__builtin_types_compatible_p(typeof(VAR), char[]))
+  (__builtin_types_compatible_p(__typeof__(VAR), char[]))
 #else
 /* Note: a bit lame as char[8] won't be seen. */
 #define HTS_IS_CHAR_BUFFER(VAR) (sizeof(VAR) != sizeof(char *))
@@ -309,14 +309,25 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                "overflow while copying '" #B "' to '" #A "'", __FILE__,        \
                __LINE__)
 
-/** strnlen replacement (autotools). **/
-#if (!defined(_WIN32) && !defined(HAVE_STRNLEN))
-
-static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
+/* POSIX strnlen is hidden from a strict-ISO consumer (__STRICT_ANSI__) and
+   absent on a few targets, so the inline helpers below use this instead. */
+static HTS_INLINE HTS_UNUSED size_t htssafe_strnlen_(const char *s,
+                                                     size_t maxlen) {
+#if (defined(_WIN32) || (defined(HAVE_STRNLEN) && !defined(__STRICT_ANSI__)))
+  return strnlen(s, maxlen);
+#else
   size_t i;
   for (i = 0; i < maxlen && s[i] != '\0'; i++)
     ;
   return i;
+#endif
+}
+
+/** strnlen replacement (autotools), for the engine sources that call it. **/
+#if (!defined(_WIN32) && !defined(HAVE_STRNLEN))
+
+static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
+  return htssafe_strnlen_(s, maxlen);
 }
 #endif
 
@@ -329,7 +340,7 @@ static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source,
                                                  const char *file, int line) {
   size_t size;
   assertf_(source != NULL, file, line);
-  size = sizeof_source != (size_t) -1 ? strnlen(source, sizeof_source)
+  size = sizeof_source != (size_t) -1 ? htssafe_strnlen_(source, sizeof_source)
                                       : strlen(source);
   assertf_(size < sizeof_source, file, line);
   return size;
@@ -408,8 +419,8 @@ static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
 
 /* 0 for an array, a -1 array-size compile error for a pointer. */
 #define htsbuff_must_be_array_(A)                                              \
-  (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(typeof(A),               \
-                                                      typeof(&(A)[0]))]) -     \
+  (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(__typeof__(A),           \
+                                                      __typeof__(&(A)[0]))]) - \
    1)
 
 #define htsbuff_array(ARR)                                                     \
@@ -426,7 +437,7 @@ static HTS_INLINE HTS_UNUSED void htsbuff_catn(htsbuff *b, const char *s,
                                                size_t n) {
   /* the (size_t)-1 "no limit" sentinel would reach strnlen as a bound past
      PTRDIFF_MAX */
-  const size_t add = n != (size_t) -1 ? strnlen(s, n) : strlen(s);
+  const size_t add = n != (size_t) -1 ? htssafe_strnlen_(s, n) : strlen(s);
   /* Overflow-safe: keep the (potentially huge) 'add' alone on one side. The
      maintained invariant len < cap makes 'cap - len' >= 1 (no underflow), so
      'add < cap - len' cannot wrap the way 'len + add < cap' could. */
