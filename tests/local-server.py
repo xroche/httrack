@@ -2084,6 +2084,13 @@ class Handler(SimpleHTTPRequestHandler):
         except OSError:
             pass
 
+    # #973: quoted, so the link parser keeps the < and > (only an unquoted > ends
+    # a link) and the whole run reaches the progress panel.
+    XSS_NAME = "p0<img src=x onerror=alert(1)>'quote.bin"
+
+    def route_xssjob_index(self):
+        self.send_html('\t<a href="%s">job</a>\n' % self.XSS_NAME)
+
     # #483: trickled .bin pages so the -E stop lands in the type waiter's
     # unlock-to-patch window with body bytes pending.
     def route_dcancel_index(self):
@@ -2464,6 +2471,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/cdispo/evil.php": route_cdispo,
         "/delayed/index.html": route_delayed_index,
         "/trickle/index.html": route_trickle_index,
+        "/xssjob/": route_xssjob_index,
+        "/xssjob/index.html": route_xssjob_index,
         "/trickle/p0.bin": route_trickle_page,
         "/trickle/p1.bin": route_trickle_page,
         "/trickle/p2.bin": route_trickle_page,
@@ -2740,6 +2749,9 @@ class Handler(SimpleHTTPRequestHandler):
                 handler = type(self).route_sitemap_capset
             elif re.fullmatch(r"/sitemapdir/cap\d+\.html", path):
                 handler = type(self).route_sitemap_cappage
+            elif path.startswith("/xssjob/"):
+                # Whatever the engine made of the metacharacters, the job trickles.
+                handler = type(self).route_trickle_page
         if handler is not None:
             handler(self)
             return True

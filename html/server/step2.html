@@ -4,7 +4,7 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
 	<meta name="description" content="${LANG_METADESC}" />
 	<meta name="keywords" content="${LANG_METAKEYW}" />
-	<title>'${projname}' - HTTrack Website Copier</title>
+	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
 	<script type="text/javascript" src="ping.js" defer></script>
@@ -268,7 +268,7 @@ ${do:loadhash}
 			>
 		</td></tr></table>
 
-${do:if-not-empty:urls}
+${do:output-mode:html}${do:if-not-empty:urls}
 <br>
 <h2>${LANG_URLS}:</h2><br>
 <h3><pre>${urls}</pre></h3>
