@@ -909,7 +909,7 @@ static void sig_fatal(int code) {
   size += print_num(&buffer[size], code);
   buffer[size++] = '\n';
   (void) (write(FD_ERR, buffer, size) == size);
-  hts_print_backtrace(FD_ERR);
+  hts_print_backtrace();
   (void) (write(FD_ERR, msgreport, sizeof(msgreport) - 1)
     == sizeof(msgreport) - 1);
   abort();
