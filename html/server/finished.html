@@ -89,7 +89,8 @@ ${LANG_F20}
 httrack ${commandReturnCmdl}
 </font>
 ${LANG_F21}
-${do:end-if}
+${/* end-if clears the output mode rather than restoring it, so re-arm it */}
+${do:end-if}${do:output-mode:html}
 
 ${do:if-empty:commandReturn}
 ${LANG_F22}
