@@ -22,7 +22,7 @@
 	<string>@PACKAGE_VERSION@</string>
 	<key>CFBundleVersion</key>
 	<string>@PACKAGE_VERSION@</string>
-	<!-- macos-app.sh fails the build unless the payload's load commands agree. -->
+	<!-- macos-app.sh checks this against the built payload. -->
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
 	<!-- Not background-only: the UI opens in the user's default browser. -->
