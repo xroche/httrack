@@ -16,11 +16,16 @@ skip() {
 }
 
 # Unset means this is not an automake run (the Windows job runs the scripts
-# directly), so there is no unwrapped binary to copy. Set but missing is a build
-# problem, not a skip.
-[ -n "${HTTRACK_BIN:-}" ] || skip "HTTRACK_BIN unset, no automake environment"
-[ -r "${HTTRACK_BIN}" ] || fail "${HTTRACK_BIN} was not built"
+# directly), so there is no unwrapped binary to copy.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
 datadir="${CONFIGURED_DATADIR:?not run under make check}"
+
+# A shared build hides the program behind a wrapper script and puts the binary
+# in .libs; --disable-shared needs no wrapper and leaves it in src/.
+src=${HTTRACK_BIN:-}
+[ -r "${src}" ] || src=${abs_top_builddir}/src/httrack
+[ -r "${src}" ] || fail "no httrack binary under ${abs_top_builddir}/src"
+[ "$(head -c 2 "${src}")" != '#!' ] || fail "${src} is the libtool wrapper, not the binary"
 
 # The compiled-in directory short-circuits the whole resolution when it exists,
 # and then no argv[0] can change the answer.
@@ -44,7 +49,7 @@ plant() {
 plant "${work}/real" REAL
 plant "${work}/decoy" DECOY
 bin=${work}/real/bin/httrack
-cp "${HTTRACK_BIN}" "${bin}"
+cp "${src}" "${bin}"
 
 # libtool knows which variable this platform's loader reads.
 if [ -n "${SHLIBPATH_VAR:-}" ] && [ -n "${HTTRACK_LIBDIR:-}" ]; then
