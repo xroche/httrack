@@ -54,8 +54,9 @@ fi
 
 # addr2line is searched first and its -a output is the one line format that
 # does not move with the locale. Proves the child actually ran, which a header
-# written before the spawn cannot.
+# written before the spawn cannot. Unanchored width: -a pads to the target's
+# pointer size, 8 nibbles on a 32-bit build.
 if command -v addr2line >/dev/null; then
-    grep -qE '^0x[0-9a-f]{16}: ' <<<"$locked" ||
+    grep -qE '^0x[0-9a-f]+: ' <<<"$locked" ||
         fail "-#c=atfork: no symbolized frame, addr2line never ran"
 fi
