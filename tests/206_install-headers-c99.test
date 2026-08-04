@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# The installed headers must also compile in a strict-ISO translation unit
-# (-std=c99/c11), where __STRICT_ANSI__ drops the unprefixed GNU keywords and
-# hides the libc's POSIX declarations (#972). 205 varies only the bytecode mode,
-# so it sees neither.
+# The installed headers must also compile in a strict-ISO translation unit,
+# where __STRICT_ANSI__ drops the unprefixed GNU keywords and hides the libc's
+# POSIX declarations (#972). 205 varies only the bytecode mode, so it sees neither.
 
 set -euo pipefail
 
@@ -20,8 +19,7 @@ if [ -z "${abs_top_builddir:-}" ]; then
 fi
 [ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
 
-# CC carries flags on some legs ("gcc -m32" on linux-i386, "ccache gcc"), so
-# split it before looking the program up.
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it first.
 read -r -a cc_argv <<<"${CC:-cc}"
 command -v "${cc_argv[0]}" >/dev/null 2>&1 || {
     echo "no C compiler (${cc_argv[0]}), skipping" >&2
@@ -77,9 +75,8 @@ if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=${stds[0]}" -fsyntax-only "$tmp/tu.c" 
     echo "note: this libc declares strnlen in strict mode, only the keyword half is exercised" >&2
 fi
 
-# Override the install dir rather than use DESTDIR: same rule and file list, no
-# guessing at the prefix. Empty MAKEFLAGS, or the sub-make reaches for a
-# jobserver the test driver did not hand it.
+# Override the install dir rather than DESTDIR: same rule and file list, no
+# prefix guessing. Empty MAKEFLAGS, or the sub-make hunts a jobserver it lacks.
 env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
     DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
     {
@@ -98,8 +95,7 @@ posix_argv=(-D_POSIX_C_SOURCE=200112L)
 printf '#include <httrack/htsnet.h>\n' >"$tmp/tu.c"
 if ! "${cc_argv[@]}" "${cpp_argv[@]}" "${posix_argv[@]}" "-std=${stds[0]}" \
     -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
-    echo "note: htsnet.h needs POSIX.1-2008, strnlen goes uncovered there" >&2
-    posix_argv=(-D_POSIX_C_SOURCE=200809L)
+    fail "htsnet.h needs POSIX.1-2008, which un-hides strnlen and would leave that half of #972 uncovered"
 fi
 
 count=0
