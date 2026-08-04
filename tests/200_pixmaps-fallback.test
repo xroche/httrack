@@ -23,8 +23,9 @@ fail() {
 # Geometry from the first string literal, with a header check so a text file
 # renamed to .xpm cannot answer.
 xpm_size() {
-    local geom
-    head -1 "$1" | grep -q '^/\* XPM \*/$' || fail "$1 has no XPM header"
+    local geom hdr
+    hdr=$(head -1 "$1")
+    grep -q '^/\* XPM \*/$' <<<"${hdr}" || fail "$1 has no XPM header"
     grep -q '^static char \*' "$1" || fail "$1 has no pixmap declaration"
     geom=$(grep -m1 '^"' "$1" | tr -d '"')
     case "${geom}" in
@@ -53,6 +54,12 @@ for desktop in "${div}"/*.desktop; do
     test -s "${xpm}" || fail "${xpm} is empty"
     got=$(xpm_size "${xpm}")
     test "${got}" = "32x32" || fail "${xpm} is ${got}, want the legacy 32x32"
+    # Any 32x32 image would pass the checks above, so pin it to the icon itself:
+    # same colors and pixels as the sized copy, only the C symbol name differs.
+    sized="${pixmaps}/${icon}32x32.xpm"
+    test -f "${sized}" || fail "no ${icon}32x32.xpm to compare the fallback against"
+    diff <(sed '/^static char \*/d' "${xpm}") <(sed '/^static char \*/d' "${sized}") >/dev/null ||
+        fail "${xpm} is not the same image as ${sized}"
     test -f "${work}/dist/server/div/${icon}.xpm" ||
         fail "${icon}.xpm is installed but not distributed"
 done
