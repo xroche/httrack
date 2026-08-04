@@ -35,10 +35,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 
-/* Sample HTTRACK_NO_SYMBOLIZE, locate the symbolizer and load the unwinder
-   before any crash: none of it is signal-safe, and skipping the call leaves the
-   report with raw frames only. Call once, from the process installing the fatal
-   handlers. */
+/* Sample HTTRACK_NO_SYMBOLIZE, prepare the symbolizer spawn and load the
+   unwinder: none of it is signal-safe. Call once, from the process installing
+   the fatal handlers. */
 void hts_backtrace_init(void);
 
 /* Ensure the calling thread has an alternate signal stack, so a handler
@@ -49,7 +48,8 @@ void hts_backtrace_init(void);
 hts_boolean hts_backtrace_altstack(void);
 
 /* Write the calling thread's stack to fd, callable from a fatal signal handler:
-   raw frames first, then whatever an external symbolizer can name. Allocates
+   raw frames first, then whatever an external symbolizer can name. Symbolizing
+   needs the stderr hts_backtrace_init() prepared its redirect for. Allocates
    nothing; prints a one-line notice where the OS has no backtrace(). */
 void hts_print_backtrace(int fd);
 

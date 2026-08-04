@@ -1,9 +1,6 @@
 #!/bin/bash
-# The fatal handler spawns a symbolizer. Doing that with fork() first runs the
-# pthread_atfork prepare handlers, so a lock the crashing thread already holds
-# (glibc's malloc arena lock, when its own corruption detector aborts from
-# inside malloc) deadlocks the handler and loses the report (#968). -#c=atfork
-# reproduces that regime; a wedge is a failure here, not a slow test.
+# -#c=atfork faults holding a lock a pthread_atfork handler wants, the regime a
+# fork() from the fatal handler deadlocks in (#968). A wedge is a failure here.
 
 set -euo pipefail
 
@@ -14,8 +11,8 @@ fail() {
     exit 1
 }
 
-# The spawn lives in USES_BACKTRACE (Linux + execinfo.h); elsewhere the handler
-# starts no child and there is nothing to deadlock.
+# The spawn needs backtrace(), so Linux is necessary but not sufficient: the
+# runtime notice below is what actually rules a musl build out.
 if [ "$(uname -s)" != "Linux" ]; then
     echo "the symbolizer spawn is Linux-only, skipping" >&2
     exit 77
@@ -40,6 +37,10 @@ crash_report() {
 # Control: an ordinary fault walks the same spawn path with no lock held, so a
 # build that cannot report at all fails here rather than passing the real case.
 plain=$(crash_report segv)
+if grep -q 'No stack trace available on this OS' <<<"$plain"; then
+    echo "no backtrace() in this build; skipping" >&2
+    exit 77
+fi
 locked=$(crash_report atfork)
 
 # We write the module header right before spawning: no header, and the run

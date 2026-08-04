@@ -62,25 +62,25 @@ Please visit our Website: http://www.httrack.com
 #include <errno.h>
 #include <execinfo.h>
 #include <signal.h>
+#include <spawn.h>
 #include <time.h>
 #include <sys/wait.h>
 #define USES_BACKTRACE
 #endif
 
 #ifdef USES_BACKTRACE
-#define BT_MAX_FRAMES 64     /* frames we try to name */
-#define BT_MAX_MODULES 8     /* distinct modules, one child each */
-#define BT_HEX_SIZE 19       /* "0x" + 16 nibbles + NUL */
-#define BT_PATH_SIZE 1024    /* module path; longer is skipped */
-#define BT_WAIT_TICKS 300    /* 10ms ticks, shared: cap a slow child */
-#define BT_NO_SYMBOLIZER 127 /* child exit: execv() failed */
+#define BT_MAX_FRAMES 64  /* frames we try to name */
+#define BT_MAX_MODULES 8  /* distinct modules, one child each */
+#define BT_HEX_SIZE 19    /* "0x" + 16 nibbles + NUL */
+#define BT_PATH_SIZE 1024 /* module path; longer is skipped */
+#define BT_WAIT_TICKS 300 /* 10ms ticks, shared: cap a slow child */
+#define BT_REPORT_FD STDERR_FILENO
 
 static hts_boolean symbolize_crash = HTS_TRUE;
 
-/* Resolved before any crash: a PATH search allocates, and the child of a
-   vfork() must not. NULL opts means no symbolizer, skip the whole step. */
-static char symbolizer_path[BT_PATH_SIZE];
-static char *symbolizer_opts = NULL;
+/* Built at init: assembling file actions allocates; the crash path cannot. */
+static posix_spawn_file_actions_t spawn_actions;
+static posix_spawn_file_actions_t *spawn_redirect = NULL;
 
 /* "0x"-prefixed hex: the handler must stay stdio-free. */
 static void print_hex(char *buffer, uintptr_t value) {
@@ -114,69 +114,26 @@ static hts_boolean copy_bounded(char *dest, size_t size, const char *src) {
   return src[i] == '\0' ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Store the first 'prog' found on PATH in symbolizer_path. Startup only: not
-   signal-safe, and pointless there since the answer cannot change. */
-static hts_boolean find_on_path(const char *prog) {
-  const size_t proglen = strlen(prog);
-  const char *dir = getenv("PATH");
-
-  while (dir != NULL && *dir != '\0') {
-    const char *const sep = strchr(dir, ':');
-    const size_t len = sep != NULL ? (size_t) (sep - dir) : strlen(dir);
-
-    /* An empty element means the current directory: never look there. */
-    if (len != 0 && len <= sizeof(symbolizer_path) - 2 &&
-        proglen < sizeof(symbolizer_path) - len - 1) {
-      memcpy(symbolizer_path, dir, len);
-      symbolizer_path[len] = '/';
-      memcpy(&symbolizer_path[len + 1], prog, proglen + 1);
-      if (access(symbolizer_path, X_OK) == 0)
-        return HTS_TRUE;
-    }
-    dir = sep != NULL ? sep + 1 : NULL;
-  }
-  symbolizer_path[0] = '\0';
-  return HTS_FALSE;
-}
-
-static void resolve_symbolizer(void) {
-  static char addr2line_opts[] = "-Cfipa";
+/* Run the symbolizer on argv, output on the report fd, within *budget ticks.
+   HTS_FALSE only if none could be run at all; otherwise silent, the raw trace
+   stands. Not fork(): it runs the pthread_atfork handlers, and glibc's malloc
+   registers one taking every arena lock a signal inside malloc holds (#968). */
+static hts_boolean spawn_symbolizer(char **argv, int *budget) {
+  static char llvm_prog[] = "llvm-symbolizer";
   static char llvm_opts[] = "-p";
-
-  if (find_on_path("addr2line"))
-    symbolizer_opts = addr2line_opts;
-  /* An LLVM-only install ships neither addr2line nor its option spelling. */
-  else if (find_on_path("llvm-symbolizer"))
-    symbolizer_opts = llvm_opts;
-}
-
-/* Run the symbolizer on argv, output on fd, within *budget ticks. HTS_FALSE
-   only if it could not be run at all; otherwise silent, the raw trace stands.
-   vfork(), not fork(): fork() runs the pthread_atfork prepare handlers, and
-   glibc's malloc registers one taking every arena lock, so a signal raised
-   inside malloc deadlocks the handler and loses the report (#968). */
-static hts_boolean spawn_symbolizer(char **argv, int fd, int *budget) {
-  int status = 0;
   pid_t pid;
 
-  pid = vfork();
-  if (pid == -1)
-    return HTS_FALSE;
-  if (pid == 0) {
-    /* Syscalls only: the address space here is still the parent's. */
-    dup2(fd, 1); /* both symbolizers write on stdout */
-    execv(symbolizer_path, argv);
-    _exit(BT_NO_SYMBOLIZER);
+  if (posix_spawnp(&pid, argv[0], spawn_redirect, NULL, argv, environ) != 0) {
+    argv[0] = llvm_prog; /* an LLVM-only install ships no addr2line */
+    argv[1] = llvm_opts;
+    if (posix_spawnp(&pid, argv[0], spawn_redirect, NULL, argv, environ) != 0)
+      return HTS_FALSE;
   }
   for (; *budget > 0; (*budget)--) {
     const struct timespec tick = {0, 10 * 1000 * 1000};
-    const pid_t reaped = waitpid(pid, &status, WNOHANG);
+    const pid_t reaped = waitpid(pid, NULL, WNOHANG);
 
-    if (reaped == pid)
-      return WIFEXITED(status) && WEXITSTATUS(status) == BT_NO_SYMBOLIZER
-                 ? HTS_FALSE
-                 : HTS_TRUE;
-    if (reaped == -1 && errno != EINTR)
+    if (reaped == pid || (reaped == -1 && errno != EINTR))
       return HTS_TRUE;
     nanosleep(&tick, NULL);
   }
@@ -189,6 +146,8 @@ static hts_boolean spawn_symbolizer(char **argv, int fd, int *budget) {
    -fvisibility=hidden keeps them out of .dynsym, but DWARF has them. dladdr()
    is not formally async-signal-safe; accepted, this path is already fatal. */
 static void symbolize_backtrace(void *const *stack, int size, int fd) {
+  static char prog[] = "addr2line";
+  static char opts[] = "-Cfipa";
   static char dashe[] = "-e";
   char hex[BT_MAX_FRAMES][BT_HEX_SIZE];
   const void *base[BT_MAX_FRAMES];
@@ -199,7 +158,8 @@ static void symbolize_backtrace(void *const *stack, int size, int fd) {
   int budget = BT_WAIT_TICKS;
   int i, spawned;
 
-  if (symbolizer_opts == NULL) /* none on PATH at startup */
+  /* Raw frames go to any fd; only the child's redirect is pinned at init. */
+  if (spawn_redirect == NULL || fd != BT_REPORT_FD)
     return;
   if (size > BT_MAX_FRAMES)
     size = BT_MAX_FRAMES;
@@ -227,8 +187,8 @@ static void symbolize_backtrace(void *const *stack, int size, int fd) {
       ;
     if (first >= size)
       break;
-    argv[argc++] = symbolizer_path;
-    argv[argc++] = symbolizer_opts;
+    argv[argc++] = prog;
+    argv[argc++] = opts;
     argv[argc++] = dashe;
     argv[argc++] = module;
     for (j = first; j < size; j++) {
@@ -247,7 +207,7 @@ static void symbolize_backtrace(void *const *stack, int size, int fd) {
       /* addr2line -a prints offsets only: say which module they are in. */
       (void) (write(fd, module, len) == (ssize_t) len);
       (void) (write(fd, ":\n", 2) == 2);
-      if (!spawn_symbolizer(argv, fd, &budget))
+      if (!spawn_symbolizer(argv, &budget))
         break; /* no symbolizer: stop at one header */
     }
   }
@@ -260,8 +220,10 @@ void hts_backtrace_init(void) {
 
   symbolize_crash =
       getenv("HTTRACK_NO_SYMBOLIZE") == NULL ? HTS_TRUE : HTS_FALSE;
-  if (symbolize_crash)
-    resolve_symbolizer();
+  if (symbolize_crash && posix_spawn_file_actions_init(&spawn_actions) == 0 &&
+      posix_spawn_file_actions_adddup2(&spawn_actions, BT_REPORT_FD,
+                                       STDOUT_FILENO) == 0)
+    spawn_redirect = &spawn_actions; /* both symbolizers write on stdout */
   /* Pay for the unwinder now: glibc's first backtrace() dlopen()s libgcc_s,
      which allocates and takes the loader lock the crashing thread may hold. */
   (void) backtrace(frame, 1);
