@@ -31,6 +31,11 @@ TESTS_ENVIRONMENT += top_srcdir=$(top_srcdir)
 TESTS_ENVIRONMENT += abs_top_srcdir=$(abs_top_srcdir)
 TESTS_ENVIRONMENT += abs_top_builddir=$(abs_top_builddir)
 TESTS_ENVIRONMENT += CONFIGURED_DATADIR=$(datadir)
+# 205_install-headers.test compiles the installed headers with the build's compiler.
+# CPPFLAGS carries the dependency include paths a consumer needs too: brew's
+# openssl@3 is keg-only, so htsbasenet.h finds <openssl/ssl.h> only through it.
+TESTS_ENVIRONMENT += CC="$(CC)"
+TESTS_ENVIRONMENT += TEST_CPPFLAGS="$(CPPFLAGS)"
 TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
 TESTS_ENVIRONMENT += THREADATTRFAIL_LA=$(abs_builddir)/libthreadattrfail.la
