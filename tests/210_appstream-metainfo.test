@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# The metainfo installs to usr/share/metainfo; a software centre that cannot
+# parse it just drops WebHTTrack, with no error anyone sees.
+
+set -euo pipefail
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+metainfo="${srcdir}/html/server/div/com.httrack.WebHTTrack.metainfo.xml"
+
+command -v appstreamcli >/dev/null 2>&1 || {
+    echo "appstreamcli not installed; skipping" >&2
+    exit 77
+}
+test -f "${metainfo}" || {
+    echo "FAIL: ${metainfo} not found" >&2
+    exit 1
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/appstream.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+# --no-net: validate the file, not the reachability of the screenshot host.
+validate() { appstreamcli validate --no-net --explain "$1"; }
+
+validate "${metainfo}" || {
+    echo "FAIL: metainfo does not validate" >&2
+    exit 1
+}
+
+# Positive control: an appstreamcli that never fails would pass the above.
+grep -v '<id>com.httrack.WebHTTrack</id>' "${metainfo}" >"${work}/noid.xml"
+if validate "${work}/noid.xml" >"${work}/noid.log" 2>&1; then
+    echo "FAIL: metainfo without <id> validated; the check proves nothing" >&2
+    exit 1
+fi
+grep -q component-id-missing "${work}/noid.log" ||
+    echo "note: id-less copy failed for another reason: $(tail -3 "${work}/noid.log")" >&2
+
+echo "appstream metainfo: valid"
