@@ -186,6 +186,8 @@ scanning
 tekshirilmoqda
 Waiting for scheduled time..
 Tayinlangan vaqt boshlanishu kutilmoqda..
+Transferring data..
+MaТlumotlar uzatilmoqda..
 Connecting to provider
 Provayder bilan bogТlanilmoqda
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 BoshlangТich sahifani yaratmoq
 Create a word database of all html pages
 —оздать базу данных слов, содержащихс€ в html-страницах
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Nusxaning toТliq RFC822 pochta arxivini (MHT/EML) yaratmoq
 Create error logging and report files
 —оздать лог файлы с информацией о работе и ошибках
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 »дентификаци€ броузера (строка User-Agent)
 Comment to be placed in each HTML file
  омментарий, размещаемый в каждом HTML файле
+Languages accepted by the browser
+Brauzer qabul qiladigan tillar
+Additional HTTP headers to be sent in each requests
+Har bir soТrovda yuboriladigan qoТshimcha HTTP sarlavhalari
+HTTP referer to be sent for initial URLs
+BoshlangТich URL uchun yuboriladigan HTTP referer
 Back to starting page
 BoshlangТich sahifaga oТtish
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Indeks yaratmoq
 Make a word database
 SoТz bazasini yaratmoq
+Build a mail archive
+Pochta arxivini yaratmoq
 Log files
 Log fayllar
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identifikator
 HTML footer
 Quyi HTML kolontitul
+Languages
+Tillar
+Additional HTTP Headers
+QoТshimcha HTTP sarlavhalari
+Default referer URL
+Standart referer URL
 N# connections
 N# bogТlanish
 Abandon host if error

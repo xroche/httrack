@@ -186,6 +186,8 @@ scanning
 sökning
 Waiting for scheduled time..
 Vänta på planlagd tidpunkt...
+Transferring data..
+Överför data..
 Connecting to provider
 Ansluter till Internet
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Skapa en startsida
 Create a word database of all html pages
 Skapa en textbaserad databas över alla HTML-sidor
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Skapa ett komplett RFC822-postarkiv (MHT/EML) av kopian
 Create error logging and report files
 Skapa felloggning och rapport-filer
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Webbläsare identitet
 Comment to be placed in each HTML file
 Kommentarer för infogas i varje HTML fil
+Languages accepted by the browser
+Språk som webbläsaren accepterar
+Additional HTTP headers to be sent in each requests
+Extra HTTP-huvuden som skickas i varje begäran
+HTTP referer to be sent for initial URLs
+HTTP-referer som skickas för de första URL:erna
 Back to starting page
 Tillbaka till startsidan
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Gör ett index
 Make a word database
 Gör en textbaserad databas
+Build a mail archive
+Skapa ett postarkiv
 Log files
 Log filer
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identitet
 HTML footer
 HTML fot
+Languages
+Språk
+Additional HTTP Headers
+Extra HTTP-huvuden
+Default referer URL
+Förvald referer-URL
 N# connections
 Antal förbindelser
 Abandon host if error

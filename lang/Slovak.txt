@@ -186,6 +186,8 @@ scanning
 Skenovanie
 Waiting for scheduled time..
 Èakanie na plánovanı èas...
+Transferring data..
+Prenos údajov..
 Connecting to provider
 Pripájanie providera
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Vytvori úvodnú stránku
 Create a word database of all html pages
 Vytvori databázu všetkıch slov ako html stránky
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Vytvori» úplnı po¹tovı archív RFC822 (MHT/EML) zrkadla
 Create error logging and report files
 Vytvori protokoly chıb a hlásení
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Identifikácia prehliadaèa
 Comment to be placed in each HTML file
 Komentár, ktorı má by umiestnenı do kadého HTML súboru
+Languages accepted by the browser
+Jazyky akceptované prehliadaèom
+Additional HTTP headers to be sent in each requests
+Ïal¹ie hlavièky HTTP odosielané v ka¾dej po¾iadavke
+HTTP referer to be sent for initial URLs
+Hlavièka HTTP referer odosielaná pre poèiatoèné adresy URL
 Back to starting page
 Spä na úvodnú stránku
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Vytvori index
 Make a word database
 Vytvori slovnú databázu
+Build a mail archive
+Vytvori» po¹tovı archív
 Log files
 Log súbory
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identita
 HTML footer
 Päta HTML
+Languages
+Jazyky
+Additional HTTP Headers
+Ïal¹ie hlavièky HTTP
+Default referer URL
+Predvolená adresa referer
 N# connections
 Poèet spojení
 Abandon host if error

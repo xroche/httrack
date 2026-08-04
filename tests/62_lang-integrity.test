@@ -86,31 +86,22 @@ LC_ALL=C awk -v keys="$keys" '
 ' "$def" || fail=1
 
 # A msgid absent from a language file silently falls back to English (#862).
-# The waivers predate the check, are tracked in #863, and may only shrink.
+# What is left waived is the Android UI, whose strings never reached lang/*.txt.
 LC_ALL=C sort -u <"$keys" >"$tmp/english.sorted"
 LC_ALL=C sort -u >"$tmp/waived" <<'UNTRANSLATED'
-Additional HTTP Headers
-Additional HTTP headers to be sent in each requests
 Beware: you local browser might be unable to browse files with embedded filenames
-Build a complete RFC822 mail (MHT/EML) archive of the mirror
-Build a mail archive
 Click on this notification to restart the interrupted mirror
 Could not create internal cached resources
 Could not get the system external storage directory
 Could not write to:
-Default referer URL
 Go To HTTrack Forum
 Go To HTTrack Website
-HTTP referer to be sent for initial URLs
 HTTrack may not be able to download websites until this problem is fixed
 HTTrack: could not save profile for '%s'!
 HTTrack: mirror '%s' stopped!
-Languages
-Languages accepted by the browser
 No storage media (SDCARD)
 Read-only media (SDCARD)
 Recreated HTTrack internal cached resources
-Transferring data..
 View Documentation
 View License
 UNTRANSLATED

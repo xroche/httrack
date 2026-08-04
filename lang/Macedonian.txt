@@ -186,6 +186,8 @@ scanning
 скенира
 Waiting for scheduled time..
 √о чекам даденото време...
+Transferring data..
+ња’Ёёб Ё– яё‘–вёжЎ..
 Connecting to provider
 ѕоврзуваЬе со проваЉдерот
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
  реираЉте —тарт страница
 Create a word database of all html pages
  реираЉте word база на податоци на сите html страници
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Є„а–—ёвЎ ж’џёбЁ– яёив’ЁбЏ– –аеЎ“– RFC822 (MHT/EML) Ё– ЏёяЎш–в–
 Create error logging and report files
  реираЉте error logging и датотеки со извештаи
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 »дентификациЉа на пребарувачот
 Comment to be placed in each HTML file
  оментар коЉ треба да биде сместен во секоЉа HTML датотека
+Languages accepted by the browser
+®–„ЎжЎ яаЎд–в’ЁЎ ё‘ яа’џЎбвг“–зёв
+Additional HTTP headers to be sent in each requests
+іёяёџЁЎв’џЁЎ HTTP „–”џ–“ш– ивё б’ Ўбяа–ь––в “ё б’Џё’ —–а–ъ’
+HTTP referer to be sent for initial URLs
+HTTP referer ивё б’ Ўбяа–ь– „– яёз’вЁЎв’ URL –‘а’бЎ
 Back to starting page
 Ќазад до стартната страница
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Ќаправи индекс
 Make a word database
 Ќаправи word база на податоци
+Build a mail archive
+Є„а–—ёвЎ яёив’ЁбЏ– –аеЎ“–
 Log files
 Log датотеки
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 »дентификациЉа
 HTML footer
 HTML футер
+Languages
+®–„ЎжЎ
+Additional HTTP Headers
+іёяёџЁЎв’џЁЎ HTTP „–”џ–“ш–
+Default referer URL
+Ѕв–Ё‘–а‘Ё– referer URL –‘а’б–
 N# connections
 ЅроЉ на конекции
 Abandon host if error

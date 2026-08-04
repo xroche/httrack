@@ -186,6 +186,8 @@ scanning
 сканира
 Waiting for scheduled time..
 Очаква зададеното време за начало...
+Transferring data..
+Прехвърляне на данни..
 Connecting to provider
 Свързване към доставчика
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Създай стартова страница
 Create a word database of all html pages
 Създай база данни с думите от всички html страници
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Създай пълен пощенски архив RFC822 (MHT/EML) на огледалото
 Create error logging and report files
 Създай файлове за отчети и запис на грешките
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Идентификация на браузъра
 Comment to be placed in each HTML file
 Да бъде поставен коментар във всеки HTML файл
+Languages accepted by the browser
+Езици, приемани от браузъра
+Additional HTTP headers to be sent in each requests
+Допълнителни HTTP заглавки, изпращани при всяка заявка
+HTTP referer to be sent for initial URLs
+HTTP referer, изпращан за началните адреси
 Back to starting page
 Назад към стартовата страница
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Създай индекс
 Make a word database
 Създай база данни с думи
+Build a mail archive
+Създай пощенски архив
 Log files
 Log файлове
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Идентичност
 HTML footer
 HTML край (footer)
+Languages
+Езици
+Additional HTTP Headers
+Допълнителни HTTP заглавки
+Default referer URL
+Подразбиращ се referer адрес
 N# connections
 Брой връзки
 Abandon host if error
