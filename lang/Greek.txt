@@ -372,6 +372,8 @@ Create a Start Page
 Δημιουργία αρχικής σελίδας
 Create a word database of all html pages
 Δημιουργία λίστας λέξεων από όλες τις σελίδες html
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Δημιουργία πλήρους αρχείου αλληλογραφίας RFC822 (MHT/EML) του αντιγράφου
 Create error logging and report files
 Δημιουργία αρχείου καταγραφής λαθών και αναφοράς
 Generate DOS 8-3 filenames ONLY
@@ -420,6 +422,12 @@ Browser identity
 Ταυτότητα που θα δηλώνει ο εξερευνητής
 Comment to be placed in each HTML file
 Σχόλια που θα τοποθετηθούν σε κάθε αρχείο HTML
+Languages accepted by the browser
+Γλώσσες που δέχεται ο εξερευνητής
+Additional HTTP headers to be sent in each requests
+Πρόσθετες κεφαλίδες HTTP που θα στέλνονται σε κάθε αίτηση
+HTTP referer to be sent for initial URLs
+HTTP referer που θα στέλνεται για τις αρχικές διευθύνσεις URL
 Back to starting page
 Πίσω στην αρχική σελίδα
 Save current preferences as default values
@@ -480,6 +488,8 @@ Make an index
 Δημιουργία ευρετηρίου
 Make a word database
 Δημιουργία βάσης-δεδομένων λέξεων
+Build a mail archive
+Δημιουργία αρχείου αλληλογραφίας
 Log files
 Αρχείο γεγονότων
 DOS names (8+3)
@@ -508,6 +518,12 @@ Identity
 Ταυτότητα
 HTML footer
 Σημείωση HTML
+Languages
+Γλώσσες
+Additional HTTP Headers
+Πρόσθετες κεφαλίδες HTTP
+Default referer URL
+Προεπιλεγμένη διεύθυνση referer
 N# connections
 Αριθμός συνδέσεων
 Abandon host if error
