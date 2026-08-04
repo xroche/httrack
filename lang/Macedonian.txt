@@ -7,7 +7,7 @@ mk
 LANGUAGE_AUTHOR
 јлександар —авиЭ (aleks@macedonia.eu.org) \r \n
 LANGUAGE_CHARSET
-ISO-8859-5
+windows-1251
 LANGUAGE_WINDOWSID
 FYRO Macedonian
 OK
@@ -187,7 +187,7 @@ scanning
 Waiting for scheduled time..
 √о чекам даденото време...
 Transferring data..
-ња’Ёёб Ё– яё‘–вёжЎ..
+ѕренос на податоци..
 Connecting to provider
 ѕоврзуваЬе со проваЉдерот
 [%d seconds] to go before start of operation
@@ -373,7 +373,7 @@ Create a Start Page
 Create a word database of all html pages
  реираЉте word база на податоци на сите html страници
 Build a complete RFC822 mail (MHT/EML) archive of the mirror
-Є„а–—ёвЎ ж’џёбЁ– яёив’ЁбЏ– –аеЎ“– RFC822 (MHT/EML) Ё– ЏёяЎш–в–
+»зработи целосна поштенска архива RFC822 (MHT/EML) на копиЉата
 Create error logging and report files
  реираЉте error logging и датотеки со извештаи
 Generate DOS 8-3 filenames ONLY
@@ -423,11 +423,11 @@ Browser identity
 Comment to be placed in each HTML file
  оментар коЉ треба да биде сместен во секоЉа HTML датотека
 Languages accepted by the browser
-®–„ЎжЎ яаЎд–в’ЁЎ ё‘ яа’џЎбвг“–зёв
+£азици прифатени од прелистувачот
 Additional HTTP headers to be sent in each requests
-іёяёџЁЎв’џЁЎ HTTP „–”џ–“ш– ивё б’ Ўбяа–ь––в “ё б’Џё’ —–а–ъ’
+ƒополнителни HTTP заглавЉа што се испраЭаат во секое бараЬе
 HTTP referer to be sent for initial URLs
-HTTP referer ивё б’ Ўбяа–ь– „– яёз’вЁЎв’ URL –‘а’бЎ
+HTTP referer што се испраЭа за почетните URL адреси
 Back to starting page
 Ќазад до стартната страница
 Save current preferences as default values
@@ -489,7 +489,7 @@ Make an index
 Make a word database
 Ќаправи word база на податоци
 Build a mail archive
-Є„а–—ёвЎ яёив’ЁбЏ– –аеЎ“–
+»зработи поштенска архива
 Log files
 Log датотеки
 DOS names (8+3)
@@ -519,11 +519,11 @@ Identity
 HTML footer
 HTML футер
 Languages
-®–„ЎжЎ
+£азици
 Additional HTTP Headers
-іёяёџЁЎв’џЁЎ HTTP „–”џ–“ш–
+ƒополнителни HTTP заглавЉа
 Default referer URL
-Ѕв–Ё‘–а‘Ё– referer URL –‘а’б–
+—тандардна referer URL адреса
 N# connections
 ЅроЉ на конекции
 Abandon host if error
@@ -947,70 +947,70 @@ Server terminated
 A fatal error has occurred during this mirror
 Ќастана фатална грешка при овоЉ mirror
 Proxy type:
-¬Ўя Ё– яаёЏбЎ:
+“ип на прокси:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
-њаёвёЏёџ Ё– яаёЏбЎ. HTTP: бв–Ё‘–а‘’Ё яаёЏбЎ. HTTP (вгЁ’џ CONNECT): ”ё Ўбяа–ь– б’Џё’ —–а–ъ’ яа’Џг вгЁ’џ CONNECT, „– яаёЏбЎ ивё яё‘‘а÷г“––в б–№ё CONNECT Џ–Џё HTTPTunnelPort Ё– Tor. SOCKS5: бв–Ё‘–а‘Ё– яёав– 1080.
+ѕротокол на прокси. HTTP: стандарден прокси. HTTP (тунел CONNECT): го испраЭа секое бараЬе преку тунел CONNECT, за прокси што поддржуваат само CONNECT како HTTPTunnelPort на Tor. SOCKS5: стандардна порта 1080.
 Load cookies from file:
-≤зЎв–ш Џёџ–зЎъ– ё‘ ‘–вёв’Џ–:
+¬читаЉ колачиЬа од датотека:
 Preload cookies from a Netscape cookies.txt file before crawling.
-Њ‘Ё–яа’‘ “зЎв–ш Џёџ–зЎъ– ё‘ ‘–вёв’Џ– Netscape cookies.txt яа’‘ яа’„’№–ъ’вё.
+ќднапред вчитаЉ колачиЬа од датотека Netscape cookies.txt пред преземаЬето.
 Pause between files:
-њ–г„– №’уг ‘–вёв’ЏЎ:
+ѕауза меГу датотеки:
 Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
-Ѕџгз–шЁё ‘ёжЁ’ъ’ №’уг яа’„’№–ъ–в– Ё– ‘–вёв’ЏЎ, “ё б’ЏгЁ‘Ў. ЇёаЎбвЎ MIN:MAX „– бџгз–’Ё ёяб’” (Ё– яаЎ№’а 2:8).
+—лучаЉно доцнеЬе меГу преземаЬата на датотеки, во секунди.  ористи MIN:MAX за случаен опсег (на пример 2:8).
 Keep the www. prefix (do not merge www.host with host)
-Ј–‘а÷Ў ”ё яа’дЎЏбёв www. (Ё’ бяёшг“–ш www.host бё host)
+«адржи го префиксот www. (не споЉуваЉ www.host со host)
 Do not treat www.host and host as the same site.
-љ’ ва’вЎа–ш ”Ў www.host Ў host Џ–Џё Ўбв б–шв.
+Ќе третираЉ ги www.host и host како ист саЉт.
 Keep double slashes in URLs
-Ј–‘а÷Ў ”Ў ‘“ёшЁЎв’ ЏёбЎ жавЎ “ё URL
+«адржи ги двоЉните коси црти во URL
 Do not collapse duplicate slashes in URLs.
-љ’ ёвбва–Ёг“–ш ”Ў яё“вёа’ЁЎв’ ЏёбЎ жавЎ “ё URL.
+Ќе отстрануваЉ ги повторените коси црти во URL.
 Keep the original query-string order
-Ј–‘а÷Ў ”ё Ў„“ёаЁЎёв а’‘ёбџ’‘ Ё– я–а–№’ваЎв’ “ё —–а–ъ’вё
+«адржи го изворниот редослед на параметрите во бараЬето
 Do not reorder query-string parameters when deduplicating URLs.
-љ’ №’Ёг“–ш ”ё а’‘ёбџ’‘ёв Ё– я–а–№’ваЎв’ Ё– —–а–ъ’вё яаЎ ёвбва–Ёг“–ъ’ ‘гяџЎЏ–вЎ URL.
+Ќе менуваЉ го редоследот на параметрите на бараЬето при отстрануваЬе дупликати URL.
 Strip query keys:
-Њвбва–ЁЎ Џџгз’“Ў ё‘ —–а–ъ’вё:
+ќтстрани клучеви од бараЬето:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
-Їџгз’“Ў ё‘ —–а–ъ’вё, ё‘‘’џ’ЁЎ бё „–яЎаЏ–, ивё б’ ёвбва–Ёг“––в ё‘ Ў№’вё Ё– „–зг“–Ё–в– ‘–вёв’Џ– (Ё– яаЎ№’а sid,utm_source).
+ лучеви од бараЬето, одделени со запирка, што се отстрануваат од името на зачуваната датотека (на пример sid,utm_source).
 Write a WARC archive of the crawl
-Ј–яЎиЎ WARC –аеЎ“– Ё– яа’—–аг“–ъ’вё
+«апиши WARC архива на пребаруваЬето
 Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
-Ј–зг“–ш ”ё б’Џёш яа’„’№’Ё ё‘”ё“ёа Ў “ё ISO-28500 WARC/1.1 –аеЎ“–, яёЏа–ш ё”џ’‘–џёвё.
+«ачуваЉ го секоЉ преземен одговор и во ISO-28500 WARC/1.1 архива, покраЉ огледалото.
 WARC archive name:
-Є№’ Ё– WARC –аеЎ“–в–:
+»ме на WARC архивата:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
-Є„—ёаЁё ёбЁё“Ёё Ў№’ „– WARC –аеЎ“–в–; ёбв–“’в’ яа–„Ёё „– –“вё№–вбЏё Ў№’Ёг“–ъ’ “ё Ў„џ’„ЁЎёв ‘Ўа’ЏвёаЎг№.
+»зборно основно име за WARC архивата; оставете празно за автоматско именуваЬе во излезниот директориум.
 Report what changed since the previous mirror
-Є„“’бвЎ ивё ’ яаё№’Ё’вё ё‘ яа’веё‘Ёёвё ё”џ’‘–џё
+»звести што е променето од претходното огледало
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
-Ј–яЎиЎ Ў hts-changes.json бё бяЎбёЏ Ё– вё– ивё ’ Ёё“ё, яаё№’Ё’вё, Ё’яаё№’Ё’вё ЎџЎ Ўбз’„Ё–вё “ё ё‘Ёёб Ё– яа’веё‘Ёёвё ё”џ’‘–џё.
+«апиши и hts-changes.json со список на тоа што е ново, променето, непроменето или исчезнато во однос на претходното огледало.
 Inline assets as data: URIs (self-contained pages)
-≤”а–‘Ў ”Ў а’бгабЎв’ Џ–Џё data: URI (б–№ёбвёшЁЎ бва–ЁЎжЎ)
+¬гради ги ресурсите како data: URI (самостоЉни страници)
 Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
-њё „–“аиг“–ъ’ Ё– ё”џ’‘–џёвё, б’Џёш– „–зг“–Ё– бва–ЁЎж– б’ яа’яЎиг“– бё “”а–‘’ЁЎ бвЎџбЏЎ џЎбвё“Ў, бЏаЎявЎ, бџЎЏЎ Ў дёЁвё“Ў, „– ‘– №ё÷’ бва–ЁЎж–в– ‘– б’ ёв“ёаЎ Ў б–№ёбвёшЁё.
+ѕо завршуваЬе на огледалото, секоЉа зачувана страница се препишува со вградени стилски листови, скрипти, слики и фонтови, за да може страницата да се отвори и самостоЉно.
 Largest inlined asset (bytes):
-љ–ш”ёџ’№ “”а–‘’Ё а’бгаб (—–швЎ):
+ЌаЉголем вграден ресурс (баЉти):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
-ј’бгаб яё”ёџ’№ ё‘ ё“–– ”ёџ’№ЎЁ– „–‘а÷г“– ё—ЎзЁ– “абЏ–; ёбв–“’в’ яа–„Ёё „– бв–Ё‘–а‘ЁЎв’ 10485760 —–швЎ.
+–есурс поголем од оваа големина задржува обична врска; оставете празно за стандардните 10485760 баЉти.
 Seed the crawl from the site's sitemap
-Ј–яёзЁЎ ”ё яа’—–аг“–ъ’вё ё‘ Џ–ав–в– Ё– б–швёв
+«апочни го пребаруваЬето од картата на саЉтот
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
-њаёзЎв–ш ш– Џ–ав–в– Ё– б–швёв (а’‘ё“Ўв’ Sitemap: “ё robots.txt, яёвё– /sitemap.xml) Ў ‘ё‘–ш ш– б’Џёш– Ё–“’‘’Ё– URL –‘а’б– Џ–Џё яёз’вЁ–.
+ѕрочитаЉ Ља картата на саЉтот (редовите Sitemap: во robots.txt, потоа /sitemap.xml) и додаЉ Ља секоЉа наведена URL адреса како почетна.
 Sitemap address:
-∞‘а’б– Ё– Џ–ав–в– Ё– б–швёв:
+јдреса на картата на саЉтот:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
-∞‘а’б– Ё– Џ–ав– Ё– б–швёв ивё ва’—– ‘– б’ яаёзЎв– Ё–№’бвё ЎбяЎвг“–ъ’ Ё– б–швёв; ёбв–“’в’ яа–„Ёё „– ‘– б’ ЎбяЎв– robots.txt, я– /sitemap.xml.
+јдреса на карта на саЉтот што треба да се прочита наместо испитуваЬе на саЉтот; оставете празно за да се испита robots.txt, па /sitemap.xml.
 Write a CDXJ index of the WARC archive
-Ј–яЎиЎ CDXJ ЎЁ‘’Џб Ё– WARC –аеЎ“–в–
+«апиши CDXJ индекс на WARC архивата
 Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
-Ј–яЎиЎ Ў бёавЎа–Ё CDXJ ЎЁ‘’Џб бё бЎв’ „–яЎбЎ ё‘ WARC –аеЎ“–в–, „– –џ–вЏЎв’ „– а’яаё‘гЏжЎш–.
+«апиши и сортиран CDXJ индекс со сите записи од WARC архивата, за алатките за репродукциЉа.
 Package the crawl as a WACZ file
-Ѕя–Џг“–ш ”ё яа’—–аг“–ъ’вё Џ–Џё WACZ ‘–вёв’Џ–
+—пакуваЉ го пребаруваЬето како WACZ датотека
 Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
-Ѕё—’аЎ ”Ў WARC –аеЎ“–в–, Ё’ш„ЎЁЎёв CDXJ ЎЁ‘’Џб Ў ё”џ’‘–ЁЎв’ бва–ЁЎжЎ “ё ’‘Ё– WACZ ‘–вёв’Џ–; ”Ў “Џџгзг“– WARC –аеЎ“–в– Ў CDXJ ЎЁ‘’Џбёв.
+—обери ги WARC архивата, неЉзиниот CDXJ индекс и огледаните страници во една WACZ датотека; ги вклучува WARC архивата и CDXJ индексот.
 WARC segment size limit:
-љ–ш”ёџ’№– ”ёџ’№ЎЁ– Ё– WARC б’”№’Ёв:
+ЌаЉголема големина на WARC сегмент:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
-Ј–яёзЁЎ Ёё“ WARC б’”№’Ёв Џё”– в’Џё“ЁЎёв ь’ ”ё Ё–‘№ЎЁ’ ё“ёш —аёш —–швЎ; ёбв–“’в’ яа–„Ёё ЎџЎ 0 „– ’‘Ё– ‘–вёв’Џ–.
+«апочни нов WARC сегмент кога тековниот Эе го надмине овоЉ броЉ баЉти; оставете празно или 0 за една датотека.
