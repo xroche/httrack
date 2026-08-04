@@ -50,6 +50,8 @@ plant "${work}/real" REAL
 plant "${work}/decoy" DECOY
 bin=${work}/real/bin/httrack
 cp "${src}" "${bin}"
+# A program at the decoy path too: an existence-checked argv[0] must still lose.
+cp "${src}" "${work}/decoy/bin/httrack"
 
 # libtool knows which variable this platform's loader reads.
 if [ -n "${SHLIBPATH_VAR:-}" ] && [ -n "${HTTRACK_LIBDIR:-}" ]; then
@@ -84,7 +86,9 @@ run_as "${work}/decoy/bin/httrack"
 mark=$(marker_of "${got}")
 [ "${mark}" = REAL ] || fail "argv[0] chose the data directory: ${got} (${mark:-no templates})"
 
-# What a PATH lookup leaves in argv[0]: no directory at all.
+# What a PATH lookup leaves in argv[0]: no directory at all, and a PATH whose
+# first hit is the decoy.
+PATH="${work}/decoy/bin:${PATH}"
 run_as httrack
 mark=$(marker_of "${got}")
 [ "${mark}" = REAL ] ||
