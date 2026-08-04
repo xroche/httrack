@@ -148,6 +148,58 @@ for std in "${stds[@]}"; do
 done
 [ "$bad" -eq 0 ] || fail "htssafe.h macros do not compile in strict-ISO mode"
 
+# Strict-ISO mode is the only one that selects htssafe_strnlen_'s byte loop, and
+# -fsyntax-only never runs a byte of it: differential it against memchr.
+cat >"$tmp/strnlen.c" <<'EOF'
+#include <httrack/htssafe.h>
+#include <string.h>
+int main(void) {
+  static const char alpha[2] = {'\0', 'a'};
+  char buf[16];
+  size_t bits, len, n;
+  for (len = 0; len <= 8; len++) {
+    for (bits = 0; bits < ((size_t) 1 << len); bits++) {
+      size_t i;
+      /* poison, or an overshot bound lands on a NUL and reads as correct */
+      memset(buf, 'Z', sizeof(buf));
+      for (i = 0; i < len; i++)
+        buf[i] = alpha[(bits >> i) & 1];
+      for (n = 0; n <= len; n++) {
+        const void *p = memchr(buf, '\0', n);
+        const size_t want = p != NULL ? (size_t) ((const char *) p - buf) : n;
+        const size_t got = htssafe_strnlen_(buf, n);
+        if (got != want) {
+          fprintf(stderr, "htssafe_strnlen_(%u) = %u, want %u\n", (unsigned) n,
+                  (unsigned) got, (unsigned) want);
+          return 1;
+        }
+      }
+    }
+  }
+  return 0;
+}
+EOF
+# A noexec TMPDIR or a cross-compiler would red the run for the wrong reason.
+printf 'int main(void) { return 0; }\n' >"$tmp/tu.c"
+if ! ("${cc_argv[@]}" "${cpp_argv[@]}" -o "$tmp/tu" "$tmp/tu.c" 2>/dev/null && "$tmp/tu"); then
+    echo "cannot run a binary built in $tmp, skipping the htssafe_strnlen_ differential" >&2
+else
+    for std in "${stds[@]}"; do
+        # Vacuous if the gate handed us libc's strnlen. Match that branch, not
+        # the loop, or a mutated loop reads as a lost fallback instead.
+        pp=$("${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" -E "$tmp/strnlen.c") ||
+            fail "cannot preprocess the htssafe_strnlen_ probe under -std=$std"
+        if grep -q 'return strnlen' <<<"$pp"; then
+            fail "-std=$std left htssafe_strnlen_ on libc, the check below proves nothing"
+        fi
+        "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" -o "$tmp/strnlen" "$tmp/strnlen.c" 2>"$tmp/cc.log" || {
+            head -5 "$tmp/cc.log" >&2
+            fail "the htssafe_strnlen_ probe does not build under -std=$std"
+        }
+        "$tmp/strnlen" || fail "htssafe_strnlen_ disagrees with memchr under -std=$std"
+    done
+fi
+
 # The loops above are only meaningful if this compiler rejects a missing include.
 printf '#include "no-such-header-972.h"\n' >"$tmp/tu.c"
 if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=${stds[0]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
