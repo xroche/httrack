@@ -1,0 +1,132 @@
+#!/bin/bash
+#
+# A tooltip reaches the browser as a JS literal inside an HTML attribute, so a
+# translation holding ' " \ & or < must survive both decoders intact.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+printf '[no handler is left on the html: mode] ..\t'
+stray=$(grep -nE '[ 	]on[A-Za-z]+="[^"]*[$][{](html:)?LANG_' \
+    "${distdir}"/html/server/*.html || true)
+test -z "${stray}" || fail "event handlers still interpolate as HTML:
+${stray}"
+echo OK
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_jsesc.XXXXXX") || fail "no tmpdir"
+srvlog=$(mktemp)
+srv=
+srvpid=
+cleanup() {
+    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
+    test -z "${srvpid}" || kill -9 "${srvpid}" 2>/dev/null || true
+    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
+    wait "${srv}" 2>/dev/null || true # absorb bash's async "Killed" notice
+    rm -rf "${work}" "${srvlog}"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+# A private data root, so LANGUAGE_2 can carry the hostile strings. distcheck's
+# srcdir is read-only and cp keeps that mode.
+root="${work}/root"
+mkdir -p "${root}"
+cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
+chmod -R u+w "${root}"
+# CRLF line pairs, English key then translation; \\ is read back as one
+# backslash. Whatever is left undefined falls back to English.
+printf '%s\r\n' \
+    LANGUAGE_NAME 'Francais-864' \
+    LANGUAGE_FILE 'Francais' \
+    LANGUAGE_ISO 'fr' \
+    LANGUAGE_CHARSET 'iso-8859-1' \
+    'Click to get help!' "Cliquez pour avoir de l'aide!" \
+    'Click to confirm' 'Guillemet " et </script> ici' \
+    'Cancel changes' 'Antislash \\ et & ici' \
+    >"${root}/lang/Francais.txt"
+
+printf '[a French tooltip survives the two decoders] ..\t'
+sport=$("${python}" -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
+(
+    trap '' TERM TTOU
+    # An isolated HOME keeps a stray ~/.httrack.ini out of the served settings.
+    export HOME="${work}"
+    exec htsserver "${root}/" --port "${sport}" >"${srvlog}" 2>&1
+) &
+srv=$!
+for _ in $(seq 1 40); do
+    url=$(sed -n 's/^URL=//p' "${srvlog}") && test -n "${url}" && break
+    kill -0 "${srv}" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
+srvpid=$(sed -n 's/^PID=//p' "${srvlog}") # absent on Windows
+
+"${python}" - "${url}" <<'PY' || fail "tooltips are not JS-escaped (see above)"
+import re, sys, urllib.request
+
+url = sys.argv[1].rstrip("/")
+form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1).decode()
+
+# lang=2 selects LANGUAGE_2 and renders the page in one shot.
+req = urllib.request.Request(url + "/server/option1.html",
+                             data=("sid=%s&lang=2" % sid).encode("latin-1"),
+                             method="POST")
+resp = urllib.request.urlopen(req, timeout=20)
+if resp.status != 200:
+    sys.exit("option1.html answered %d" % resp.status)
+page = resp.read().decode("latin-1")
+if 'lang="fr"' not in page:
+    sys.exit("the server did not switch to LANGUAGE_2:\n" + page[:2000])
+
+
+def handler(js):
+    return "onMouseOver=\"info('%s'); return true\"" % js
+
+
+wants = [
+    # an apostrophe closes the JS literal
+    handler(r"Cliquez pour avoir de l\x27aide!"),
+    # a quote closes the attribute, < opens </script>, and a surviving & would
+    # let the attribute decode rebuild either one
+    handler(r"Guillemet \x22 et \x3c/script\x3e ici"),
+    # a lone backslash would eat the next character as an escape
+    handler(r"Antislash \\ et \x26 ici"),
+    # the title attribute is HTML text and stays on the html: mode
+    "title='Cliquez pour avoir de l&#39;aide!'",
+    "title='Guillemet \" et &lt;/script&gt; ici'",
+    r"title='Antislash \ et &amp; ici'",
+]
+for want in wants:
+    if want not in page:
+        sys.exit("option1.html does not emit %r" % want)
+
+for h in re.findall(r'onMouseOver="([^"]*)"', page):
+    if "&#39;" in h:
+        sys.exit("handler still carries an HTML entity: %r" % h)
+PY
+echo OK

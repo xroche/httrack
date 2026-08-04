@@ -444,6 +444,43 @@ static hts_boolean cat_html_escaped(String *dst, char c) {
   return HTS_TRUE;
 }
 
+/* Append value escaped for a single-quoted JS literal inside a double-quoted
+   HTML attribute: hex escapes leave the attribute decode nothing to expand
+   back into a quote or a </script>. */
+static void cat_js_escaped(String *dst, const char *value) {
+  const char *a;
+
+  for (a = value; *a != '\0'; a++) {
+    char tmp[8];
+
+    switch (*a) {
+    case '\\':
+      StringCat(*dst, "\\\\");
+      continue;
+    case '\n':
+      StringCat(*dst, "\\n");
+      continue;
+    case '\r':
+      StringCat(*dst, "\\r");
+      continue;
+    case '\'':
+    case '\"':
+    case '&':
+    case '<':
+    case '>':
+      break;
+    default:
+      if ((unsigned char) *a >= 32) {
+        StringMemcat(*dst, a, 1);
+        continue;
+      }
+      break;
+    }
+    snprintf(tmp, sizeof(tmp), "\\x%02x", (unsigned char) *a);
+    StringCat(*dst, tmp);
+  }
+}
+
 /* Append the value of a double-quoted command-line argument: escaped for HTML,
    which the browser undoes when it posts the command line back, and for the
    argv splitter, which does not. */
@@ -1097,6 +1134,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "html:"))) {
                       name += p;
                       format = 1;
+                    } else if ((p = strfield(name, "js:"))) {
+                      name += p;
+                      format = 6;
                     } else if ((p = strfield(name, "unquoted:"))) {
                       name += p;
                       unquoted = HTS_TRUE;
@@ -1394,6 +1434,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         if (*langstr) {
                           StringCat(output, "checked");
                         }
+                        break;
+                      case 6:
+                        cat_js_escaped(&output, langstr);
                         break;
                       default:
                         if (*langstr) {
