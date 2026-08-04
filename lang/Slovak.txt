@@ -7,7 +7,7 @@ sk
 LANGUAGE_AUTHOR
 Dr. Martin Sereday (sereday at stonline.sk)\r\n
 LANGUAGE_CHARSET
-ISO-8859-2
+windows-1250
 LANGUAGE_WINDOWSID
 Slovak
 OK
@@ -181,7 +181,7 @@ Analıza HTML súboru (testovanie linkov)
 Pause - Toggle [Mirror]/[Pause download] to resume operation
 Pauza - Pokraèova [Stránka - Kópia]/[Zastavi kopírovanie]
 Finishing pending transfers - Select [Cancel] to stop now!
-Ukonèenie prebiehajúcich prenosov - Zvoµ [Zru¹i»]!
+Ukonèenie prebiehajúcich prenosov - Zvo¾ [Zruši]!
 scanning
 Skenovanie
 Waiting for scheduled time..
@@ -269,7 +269,7 @@ Kliknutím pokraèova
 Click to define options
 Kliknú a definova nastavenia
 Click to add a URL
-Klikuntím vlo¾ URL
+Klikuntím vlo URL
 Load URL(s) from text file
 Naèíta URL z textového súboru
 WinHTTrack preferences (*.opt)|*.opt||
@@ -373,7 +373,7 @@ Vytvori úvodnú stránku
 Create a word database of all html pages
 Vytvori databázu všetkıch slov ako html stránky
 Build a complete RFC822 mail (MHT/EML) archive of the mirror
-Vytvori» úplnı po¹tovı archív RFC822 (MHT/EML) zrkadla
+Vytvori úplnı poštovı archív RFC822 (MHT/EML) zrkadla
 Create error logging and report files
 Vytvori protokoly chıb a hlásení
 Generate DOS 8-3 filenames ONLY
@@ -389,7 +389,7 @@ Vybra poradie anaklızy
 Select global parsing direction
 Vybra globálnu analızu
 Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
-Nastav URL prepísaním pravidiel pre vnútorné linky (u¾ skopírované) a vonkaj¹ie linky (e¹te neskopírované).
+Nastav URL prepísaním pravidiel pre vnútorné linky (u skopírované) a vonkajšie linky (ešte neskopírované).
 Max simultaneous connections
 Maximum súèasnıch spojení
 File timeout
@@ -425,7 +425,7 @@ Komentár, ktorı má by umiestnenı do kadého HTML súboru
 Languages accepted by the browser
 Jazyky akceptované prehliadaèom
 Additional HTTP headers to be sent in each requests
-Ïal¹ie hlavièky HTTP odosielané v ka¾dej po¾iadavke
+Ïalšie hlavièky HTTP odosielané v kadej poiadavke
 HTTP referer to be sent for initial URLs
 Hlavièka HTTP referer odosielaná pre poèiatoèné adresy URL
 Back to starting page
@@ -489,7 +489,7 @@ Vytvori index
 Make a word database
 Vytvori slovnú databázu
 Build a mail archive
-Vytvori» po¹tovı archív
+Vytvori poštovı archív
 Log files
 Log súbory
 DOS names (8+3)
@@ -509,7 +509,7 @@ Tieto pravidlá majú by upravované iba vınimoène
 Activate Debugging Mode (winhttrack.log)
 Aktivova mód vyh¾adávania chıb (winhttrack.log)
 Rewrite links: internal / external
-Prepí¹ linky: vnútorné / vonkaj¹ie
+Prepíš linky: vnútorné / vonkajšie
 Flow control
 Kontrola toku
 Limits
@@ -521,7 +521,7 @@ Päta HTML
 Languages
 Jazyky
 Additional HTTP Headers
-Ïal¹ie hlavièky HTTP
+Ïalšie hlavièky HTTP
 Default referer URL
 Predvolená adresa referer
 N# connections
@@ -539,9 +539,9 @@ Pre prenosy cez ftp poui proxy
 TimeOut(s)
 Interval(y) èakania
 Persistent connections (Keep-Alive)
-Trvalé spojenie (Udr¾a»-¾ivé)
+Trvalé spojenie (Udra-ivé)
 Reduce connection time and type lookup time using persistent connections
-Zní¾ dobu pripojenia a zadaj èas vyhµadávania pri trvalıch spojeniach
+Zní dobu pripojenia a zadaj èas vyh¾adávania pri trvalıch spojeniach
 Retries
 Opätovné pokusy
 Size limit
@@ -917,7 +917,7 @@ Ignorova pravidlá v robots.txt\nPrevza pravidlá -//- okrem filtrov\nPrevzia v
 normal\nextended\ndebug
 normálny\nrozšírenı\nladenie
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
-Skopíruj web stránku(y)\nSkopíruj web stránku(y) + otázky\nPreber jednotlivé súbory\nSkopíruj v¹etky umiestnenia na stánkach (viacnásobné zrkadlo)\nOtestuj linky na stránkach (testuj zálo¾ky)\n* Pokraèuj v preru¹enom kopírovaní\n* Aktualizuj existujúce kópie
+Skopíruj web stránku(y)\nSkopíruj web stránku(y) + otázky\nPreber jednotlivé súbory\nSkopíruj všetky umiestnenia na stánkach (viacnásobné zrkadlo)\nOtestuj linky na stránkach (testuj záloky)\n* Pokraèuj v prerušenom kopírovaní\n* Aktualizuj existujúce kópie
 Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
 Relatívna URI / Absolútna URL (prednastavené)\nABsolútna URL / Absolútna URL\nAbsolútna URL\nPôvodná URL / Pôvodná URL
 Open Source offline browser
@@ -949,68 +949,68 @@ A fatal error has occurred during this mirror
 Proxy type:
 Typ proxy:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
-Protokol proxy. HTTP: ¹tandardné proxy. HTTP (tunel CONNECT): odo¹le ka¾dú po¾iadavku cez tunel CONNECT, pre proxy podporujúce len CONNECT ako HTTPTunnelPort v Tore. SOCKS5: predvolenı port 1080.
+Protokol proxy. HTTP: štandardné proxy. HTTP (tunel CONNECT): odošle kadú poiadavku cez tunel CONNECT, pre proxy podporujúce len CONNECT ako HTTPTunnelPort v Tore. SOCKS5: predvolenı port 1080.
 Load cookies from file:
-Naèíta» cookies zo súboru:
+Naèíta cookies zo súboru:
 Preload cookies from a Netscape cookies.txt file before crawling.
-Naèíta» cookies zo súboru Netscape cookies.txt pred zaèatím s»ahovania.
+Naèíta cookies zo súboru Netscape cookies.txt pred zaèatím sahovania.
 Pause between files:
 Prestávka medzi súbormi:
 Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
-Náhodné oneskorenie medzi s»ahovaním súborov, v sekundách. Pre náhodnı rozsah pou¾ite MIN:MAX (napr. 2:8).
+Náhodné oneskorenie medzi sahovaním súborov, v sekundách. Pre náhodnı rozsah pouite MIN:MAX (napr. 2:8).
 Keep the www. prefix (do not merge www.host with host)
-Zachova» predponu www. (nezluèova» www.host s host)
+Zachova predponu www. (nezluèova www.host s host)
 Do not treat www.host and host as the same site.
-Nepova¾ova» www.host a host za tú istú lokalitu.
+Nepovaova www.host a host za tú istú lokalitu.
 Keep double slashes in URLs
-Zachova» dvojité lomky v URL
+Zachova dvojité lomky v URL
 Do not collapse duplicate slashes in URLs.
-Nezluèova» opakované lomky v URL.
+Nezluèova opakované lomky v URL.
 Keep the original query-string order
-Zachova» pôvodné poradie re»azca dotazu
+Zachova pôvodné poradie reazca dotazu
 Do not reorder query-string parameters when deduplicating URLs.
-Nemeni» poradie parametrov re»azca dotazu pri odstraòovaní duplicitnıch URL.
+Nemeni poradie parametrov reazca dotazu pri odstraòovaní duplicitnıch URL.
 Strip query keys:
-Odstráni» kµúèe dotazu:
+Odstráni k¾úèe dotazu:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
-Kµúèe dotazu oddelené èiarkami, ktoré sa vynechajú z pomenovania ukladanıch súborov (napr. sid,utm_source).
+K¾úèe dotazu oddelené èiarkami, ktoré sa vynechajú z pomenovania ukladanıch súborov (napr. sid,utm_source).
 Write a WARC archive of the crawl
-Zapísa» archív WARC z prehµadávania
+Zapísa archív WARC z preh¾adávania
 Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
-Ulo¾i» aj ka¾dú stiahnutú odpoveï do archívu WARC/1.1 ISO-28500 vedµa zrkadla.
+Uloi aj kadú stiahnutú odpoveï do archívu WARC/1.1 ISO-28500 ved¾a zrkadla.
 WARC archive name:
 Názov archívu WARC:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
-Voliteµnı základnı názov archívu WARC; ponechajte prázdne pre automatické pomenovanie vo vıstupnom adresári.
+Volite¾nı základnı názov archívu WARC; ponechajte prázdne pre automatické pomenovanie vo vıstupnom adresári.
 Report what changed since the previous mirror
-Oznámi», èo sa od predchádzajúceho zrkadlenia zmenilo
+Oznámi, èo sa od predchádzajúceho zrkadlenia zmenilo
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
-Zapísa» aj hts-changes.json so zoznamom toho, èo je oproti predchádzajúcemu zrkadleniu nové, zmenené, nezmenené alebo chıbajúce.
+Zapísa aj hts-changes.json so zoznamom toho, èo je oproti predchádzajúcemu zrkadleniu nové, zmenené, nezmenené alebo chıbajúce.
 Inline assets as data: URIs (self-contained pages)
-Vlo¾i» zdroje ako URI data: (samostatné stránky)
+Vloi zdroje ako URI data: (samostatné stránky)
 Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
-Po dokonèení zrkadlenia prepísa» ka¾dú ulo¾enú stránku s vlo¾enımi ¹tılmi, skriptmi, obrázkami a písmami, aby sa stránka dala otvori» aj samostatne.
+Po dokonèení zrkadlenia prepísa kadú uloenú stránku s vloenımi štılmi, skriptmi, obrázkami a písmami, aby sa stránka dala otvori aj samostatne.
 Largest inlined asset (bytes):
-Najväè¹í vlo¾enı zdroj (bajty):
+Najväèší vloenı zdroj (bajty):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
-Zdroj väè¹í ne¾ táto veµkos» si ponechá be¾nı odkaz; ponechajte prázdne pre predvolenıch 10485760 bajtov.
+Zdroj väèší ne táto ve¾kos si ponechá benı odkaz; ponechajte prázdne pre predvolenıch 10485760 bajtov.
 Seed the crawl from the site's sitemap
-Zaèa» prehliadanie z mapy stránok
+Zaèa prehliadanie z mapy stránok
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
-Naèíta» mapu stránok (riadky Sitemap: v súbore robots.txt, potom /sitemap.xml) a prida» ka¾dú uvedenú adresu URL ako poèiatoènú.
+Naèíta mapu stránok (riadky Sitemap: v súbore robots.txt, potom /sitemap.xml) a prida kadú uvedenú adresu URL ako poèiatoènú.
 Sitemap address:
 Adresa mapy stránok:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
-Adresa mapy stránok, ktorá sa má naèíta» namiesto zis»ovania na stránke; ponechajte prázdne na zistenie z robots.txt a potom /sitemap.xml.
+Adresa mapy stránok, ktorá sa má naèíta namiesto zisovania na stránke; ponechajte prázdne na zistenie z robots.txt a potom /sitemap.xml.
 Write a CDXJ index of the WARC archive
-Zapísa» index CDXJ archívu WARC
+Zapísa index CDXJ archívu WARC
 Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
-Zapísa» aj zoradenı index CDXJ so v¹etkımi záznamami archívu WARC, pre nástroje na prehrávanie.
+Zapísa aj zoradenı index CDXJ so všetkımi záznamami archívu WARC, pre nástroje na prehrávanie.
 Package the crawl as a WACZ file
-Zabali» prehµadávanie do súboru WACZ
+Zabali preh¾adávanie do súboru WACZ
 Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
-Zlúèi» archív WARC, jeho index CDXJ a zrkadlené stránky do jedného súboru WACZ; vy¾aduje archív WARC a index CDXJ.
+Zlúèi archív WARC, jeho index CDXJ a zrkadlené stránky do jedného súboru WACZ; vyaduje archív WARC a index CDXJ.
 WARC segment size limit:
-Najväè¹ia veµkos» segmentu WARC:
+Najväèšia ve¾kos segmentu WARC:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
-Zaèa» novı segment WARC, keï aktuálny prekroèí tento poèet bajtov; ponechajte prázdne alebo 0 pre jeden súbor.
+Zaèa novı segment WARC, keï aktuálny prekroèí tento poèet bajtov; ponechajte prázdne alebo 0 pre jeden súbor.
