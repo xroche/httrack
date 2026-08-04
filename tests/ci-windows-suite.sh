@@ -125,8 +125,10 @@ trap 'kill "$heartbeat" 2>/dev/null || true' EXIT
 
 pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
 # label:pattern, globbed rather than enumerated so a new NNN_engine-*.test or
-# NNN_local-*.test is picked up instead of silently getting zero coverage.
-categories=(runnable:00_runnable.test engine:'*_engine-*.test' zlib:'*_zlib-*.test'
+# NNN_local-*.test is picked up instead of silently getting zero coverage. Every
+# entry carries a metacharacter, or nullglob cannot empty it and the gate below
+# has nothing to catch.
+categories=(runnable:'00_runnable*.test' engine:'*_engine-*.test' zlib:'*_zlib-*.test'
     local:'*_local-*.test' watchdog:'*_watchdog*.test'
     proxy-https:'*_crawl_proxy_https.test' log-salvage:'*_crawl-log-salvage.test')
 tests=()

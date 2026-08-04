@@ -98,4 +98,16 @@ grep -q '::error::test category zlib matched no tests' <<<"$out" ||
 grep -q 'FAIL \*_zlib' <<<"$out" && fail "the glob was counted as a failing test: $out"
 grep -q '^ran=' <<<"$out" && fail "the suite ran a test with a category empty: $out"
 
+# The first category names a single test, and a name nullglob cannot empty would
+# never reach the gate at all.
+printf '#!/bin/sh\nexit 0\n' >"$run/13_zlib-pass.test"
+rm -f "$run/00_runnable.test"
+rc=0
+out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" \
+    bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?
+test "$rc" -eq 1 || fail "an empty single-test category exited $rc, want 1"
+grep -q '::error::test category runnable matched no tests' <<<"$out" ||
+    fail "the empty single-test category was not named: $out"
+grep -q 'FAIL 00_runnable' <<<"$out" && fail "the unexpanded name was run as a test: $out"
+
 echo "ci-windows driver OK"
