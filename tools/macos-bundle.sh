@@ -23,22 +23,13 @@ plist_value() {
         getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$1"
 }
 
-# Rewrite the string value of key $2 in the plist $1 to $3. A missing key is silent,
-# so callers check the result rather than trust it.
-plist_set() {
-    _mb_tmp=$(mktemp)
-    awk -v k="$2" -v v="$3" '
-        { if (_p) { sub(/>[^<]*</, ">" v "<"); _p = 0 } print }
-        $0 ~ "<key>" k "</key>" { _p = 1 }' "$1" >"$_mb_tmp"
-    cat "$_mb_tmp" >"$1"
-    rm -f "$_mb_tmp"
-}
-
-# The oldest macOS every Mach-O listed in the file $1 can load on.
+# The oldest macOS every Mach-O listed in the file $1 can load on, empty if none says.
+# Nonzero when otool fails, which would otherwise drop that binary and lower the floor.
 macho_floor() {
     _mb_floor=
     while IFS= read -r _mb_bin; do
-        for _mb_v in $(otool -l "$_mb_bin" | awk '
+        _mb_cmds=$(otool -l "$_mb_bin") || return 1
+        for _mb_v in $(printf '%s\n' "$_mb_cmds" | awk '
             $1 == "cmd" { c = $2 }
             (c == "LC_BUILD_VERSION" && $1 == "minos") ||
             (c == "LC_VERSION_MIN_MACOSX" && $1 == "version") { print $2 }'); do

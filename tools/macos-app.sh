@@ -196,15 +196,7 @@ cc -O2 -Wall -Wextra -Werror -Wl,-headerpad_max_install_names \
 
 copy_dylibs
 relink
-# Finder believes LSMinimumSystemVersion and dyld ignores it, so derive it from what
-# the payload can actually load: one bottled dylib built on a newer runner raises the
-# floor for the whole bundle.
-machos
-minos=$(macho_floor "$mach")
-test -n "$minos" || fail "no Mach-O in the bundle declares a minimum macOS"
-plist_set "$app/Contents/Info.plist" LSMinimumSystemVersion "$minos"
-
-# Last, so the seal covers every file the three rewrote. Signing the bundle is also
+# Last, so the seal covers every file the two rewrote. Signing the bundle is also
 # what signs the main executable, which codesign will not take on its own.
 codesign -f -s - "$app"
 
@@ -283,9 +275,14 @@ test "$plistver" = "$binver" ||
 bundlever=$(plist_value "$app/Contents/Info.plist" CFBundleVersion)
 test "$bundlever" = "$binver" ||
     fail "CFBundleVersion says $bundlever, httrack says $binver"
-# Catches a plist_set that matched no key, which is silent by design.
+# Finder refuses on LSMinimumSystemVersion and dyld refuses on the load commands, so a
+# bottled dylib built for a newer OS silently raises the real floor above the declared
+# one. Asserted rather than derived: the shipped minimum is a decision, not a side effect
+# of which runner image built it.
+minos=$(macho_floor "$mach") || fail "could not read a minimum macOS out of the payload"
+test -n "$minos" || fail "no Mach-O in the bundle declares a minimum macOS"
 plistmin=$(plist_value "$app/Contents/Info.plist" LSMinimumSystemVersion)
 test "$plistmin" = "$minos" ||
-    fail "LSMinimumSystemVersion says $plistmin, the payload needs $minos"
+    fail "Info.plist declares macOS $plistmin, the payload needs $minos"
 
 echo "built $appreal (version $plistver, macOS $minos and later)"
