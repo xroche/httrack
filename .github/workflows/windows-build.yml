@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs on the same branch or PR.
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   libhttrack:
     runs-on: windows-2022
