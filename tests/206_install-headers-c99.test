@@ -91,15 +91,24 @@ headers=("$tmp/include/httrack"/*.h)
 [ "${#headers[@]}" -ge 10 ] || fail "only ${#headers[@]} headers installed, the list cannot be right"
 [ -f "$tmp/include/httrack/htssafe.h" ] || fail "htssafe.h was not installed"
 
+# No libc hands getnameinfo() to a strict-ISO unit, so a consumer of the two
+# socket headers must ask for POSIX. Prefer 2001: 2008 also un-hides strnlen,
+# which would stop those two covering that half of #972.
+posix_argv=(-D_POSIX_C_SOURCE=200112L)
+printf '#include <httrack/htsnet.h>\n' >"$tmp/tu.c"
+if ! "${cc_argv[@]}" "${cpp_argv[@]}" "${posix_argv[@]}" "-std=${stds[0]}" \
+    -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    echo "note: htsnet.h needs POSIX.1-2008, strnlen goes uncovered there" >&2
+    posix_argv=(-D_POSIX_C_SOURCE=200809L)
+fi
+
 count=0
 bad=0
 for h in "${headers[@]}"; do
     b=$(basename "$h")
     argv=("${cpp_argv[@]}")
-    # No libc exposes getnameinfo() and friends to a strict-ISO unit, so a
-    # consumer of the two socket headers must ask for POSIX itself.
     case "$b" in
-    htsnet.h | htsopt.h) argv+=(-D_POSIX_C_SOURCE=200809L) ;;
+    htsnet.h | htsopt.h) argv+=("${posix_argv[@]}") ;;
     esac
     printf '#include <httrack/%s>\n' "$b" >"$tmp/tu.c"
     for std in "${stds[@]}"; do
