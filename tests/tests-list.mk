@@ -234,5 +234,6 @@ TESTS += 164_local-proxytrack-arc-hostile.test
 TESTS += 171_watchdog-heartbeat.test
 TESTS += 172_ci-windows-driver.test
 TESTS += 205_install-headers.test
+TESTS += 185_webhttrack-js-escaping.test
 TESTS += 200_pixmaps-fallback.test
 TESTS += 210_appstream-metainfo.test
