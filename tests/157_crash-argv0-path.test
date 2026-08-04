@@ -1,7 +1,6 @@
 #!/bin/bash
 # dladdr() names the main program after argv[0], so a binary found on PATH is
-# reported as a bare "httrack" the symbolizer cannot open (#889). The crash
-# report still has to name the executable's own frames.
+# reported as a bare "httrack" the symbolizer cannot open (#889).
 
 set -euo pipefail
 
@@ -65,16 +64,22 @@ fi
 grep -qE '^httrack\(\+0x[0-9a-f]+\)' "${out}" ||
     skip "the main program is not reported as a bare argv[0] here"
 
-header=$(grep -m1 -E '^/.*/httrack:$' "${out}" || true)
-test -n "${header}" || fail "the report has no symbolized block for the executable"
+headers=$(grep -E '^/.*/httrack:$' "${out}" || true)
+test -n "${headers}" || fail "the report has no symbolized block for the executable"
+# Every frame of a module is claimed in one pass, so a second block for the
+# executable means library frames were misattributed to it.
+test "$(wc -l <<<"${headers}")" -eq 1 || fail "several executable blocks: ${headers}"
+header=${headers}
 exe=${header%:}
 # Device+inode, so a symlinked TMPDIR does not read as a different binary.
 test "${exe}" -ef "${bin}" || fail "the report names ${exe}, not the running ${bin}"
 
 # Frames of httrack.c, which stays in the program whether or not the engine is
-# a shared library; the block ends at the next module header.
+# a shared library.
 block=$(awk -v h="${header}" '$0 == h { on = 1; next } /^\// { on = 0 } on' "${out}")
-grep -qE '\b(sig_fatal|main)\b' <<<"${block}" ||
+# " at " pins the symbol column: both addr2line -Cfipa and llvm-symbolizer -p
+# emit it, and a path component named "main" does not.
+grep -qE '(^|[^[:alnum:]_])(sig_fatal|main) at ' <<<"${block}" ||
     fail "the executable's block names no frame: ${block}"
 
 echo "the crash report named ${exe} and its own frames"
