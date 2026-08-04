@@ -3973,9 +3973,14 @@ HTSEXT_API size_t escape_uri_utf(const char *const src,
   return x_escape_http(src, dest, size, 30);
 }
 
-HTSEXT_API size_t escape_check_url(const char *const src, 
-                                   char *const dest, const size_t size) {
+HTSEXT_API size_t escape_check_url(const char *const src, char *const dest,
+                                   const size_t size) {
   return x_escape_http(src, dest, size, 0);
+}
+
+HTSEXT_API size_t escape_control_url(const char *const src, char *const dest,
+                                     const size_t size) {
+  return x_escape_http(src, dest, size, 4);
 }
 
 // same as escape_check_url, but returns char*
@@ -4109,6 +4114,8 @@ HTSEXT_API size_t x_escape_http(const char *const s, char *const dest,
     else if (mode == 3)         // échapper que ce qui est nécessaire
       test = CHAR_SPECIAL(c)
              || CHAR_XXAVOID(c);
+    else if (mode == 4) // C0 controls only, leaving high bytes (UTF-8)
+      test = CHAR_LOW(c);
     else if (mode == 30)      // échapper que ce qui est nécessaire
       test = (c != '/' && CHAR_RESERVED(c))
         || CHAR_DELIM(c)

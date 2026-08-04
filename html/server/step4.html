@@ -4,7 +4,7 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
 	<meta name="description" content="${LANG_METADESC}" />
 	<meta name="keywords" content="${LANG_METAKEYW}" />
-	<title>'${projname}' - HTTrack Website Copier</title>
+	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
 	<script type="text/javascript" src="ping.js" defer></script>
@@ -132,7 +132,8 @@ httrack \
 \
 ${do:if-not-empty:BuildString}
 	--structure "${arg:BuildString}"
-${do:end-if}
+${/* end-if clears the output mode rather than restoring it, so re-arm it */}
+${do:end-if}${do:output-mode:html}
 	${test:build:-N0:-N0:-N1:-N2:-N3:-N4:-N5:-N100:-N101:-N102:-N103:-N104:-N105:-N99:-N199:}
 \
 	${ztest:dos::--long-names=0:--long-names=2}
@@ -189,7 +190,7 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:http10:--http-10}
 	${test:cache2:--store-all-in-cache}
 	${test:sitemap:--sitemap}
-	${test:sitemapurl:--sitemap-url "}${html:sitemapurl}${test:sitemapurl:"}
+	${test:sitemapurl:--sitemap-url "}${arg:sitemapurl}${test:sitemapurl:"}
 	${test:warc:--warc}
 	${test:warcfile:--warc-file "}${arg:warcfile}${test:warcfile:"}
 	${test:warcmaxsize:--warc-max-size=}${unquoted:warcmaxsize}

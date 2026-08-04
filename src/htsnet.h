@@ -305,6 +305,8 @@ static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
 typedef socklen_t SOClen;
 
 #if HTS_INET6 != 0
+/* Engine-only: not exported, and the type is useless without the setter. */
+#ifdef HTS_INTERNAL_BYTECODE
 /** Resolver backend: getaddrinfo/freeaddrinfo as a swappable pair, so the
     self-test can script DNS answers (families, multiplicity, errors)
     in-process. The free function must match its getaddrinfo (a fake allocates
@@ -317,6 +319,10 @@ typedef socklen_t SOClen;
 #define HTS_RESOLVER_CALL
 #endif
 
+/* File scope, or the tag below is a fresh type scoped to its own prototype
+   wherever <netdb.h> has not already declared it. */
+struct addrinfo;
+
 typedef struct hts_resolver_backend {
   int(HTS_RESOLVER_CALL *getaddrinfo)(const char *node, const char *service,
                                       const struct addrinfo *hints,
@@ -327,6 +333,7 @@ typedef struct hts_resolver_backend {
 /** Install a resolver backend for the process; NULL restores the libc default.
     Test-only seam, not thread-safe; callers must serialize against resolves. */
 void hts_dns_set_resolver_backend(const hts_resolver_backend *backend);
+#endif
 #endif
 
 #ifdef __cplusplus
