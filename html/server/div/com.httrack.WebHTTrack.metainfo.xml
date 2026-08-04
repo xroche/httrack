@@ -51,6 +51,17 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.49.16" date="2026-08-04">
+      <description>
+        <ul>
+          <li>The application has its own icon in the menu and the task switcher, at any screen size</li>
+          <li>Option tooltips work again in languages whose text contains an apostrophe</li>
+          <li>Nine interface strings that stayed in English are now translated in 26 languages</li>
+          <li>Mac users can download and launch HTTrack as an ordinary application</li>
+          <li>A page served in chunks with trailing headers is no longer rejected as invalid</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.15" date="2026-07-30">
       <description>
         <ul>
