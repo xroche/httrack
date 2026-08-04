@@ -23,6 +23,23 @@ plist_value() {
         getline; gsub(/^[^>]*>|<[^<]*$/, ""); print; exit }' "$1"
 }
 
+# The oldest macOS every Mach-O listed in the file $1 can load on, empty if none says.
+# Nonzero when otool fails, which would otherwise drop that binary and lower the floor.
+macho_floor() {
+    _mb_floor=
+    while IFS= read -r _mb_bin; do
+        _mb_cmds=$(otool -l "$_mb_bin") || return 1
+        for _mb_v in $(printf '%s\n' "$_mb_cmds" | awk '
+            $1 == "cmd" { c = $2 }
+            (c == "LC_BUILD_VERSION" && $1 == "minos") ||
+            (c == "LC_VERSION_MIN_MACOSX" && $1 == "version") { print $2 }'); do
+            _mb_floor=$(printf '%s\n%s\n' "$_mb_floor" "$_mb_v" |
+                sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+        done
+    done <"$1"
+    printf '%s\n' "$_mb_floor"
+}
+
 # The bundle's main executable. codesign resolves it to the enclosing bundle, so it
 # is signed and verified with the bundle, never on its own.
 main_executable() {
