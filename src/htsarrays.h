@@ -47,7 +47,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Abort (with the failed byte count) when a growth allocation fails. The
    array macros never return an out-of-memory error; they assert and abort. */
-static void hts_record_assert_memory_failed(const size_t size) {
+static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
   fprintf(stderr, "memory allocation failed (%lu bytes)", (long int) size);
   assertf(!"memory allocation failed");
 }
