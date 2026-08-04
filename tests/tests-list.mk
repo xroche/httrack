@@ -247,3 +247,4 @@ TESTS += 155_engine-escape-control.test
 TESTS += 206_install-headers-c99.test
 TESTS += 215_engine-datadir-ospath.test
 TESTS += 157_crash-argv0-path.test
+TESTS += 158_local-link-control-bytes.test

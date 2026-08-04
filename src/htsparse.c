@@ -1943,10 +1943,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             if (ok != -1) {     // continuer
               // découper le lien
               do {
-                if ((unsigned char) *eadr < 32) {   // caractère de contrôle (ou \0)
-                  if (!is_space(*eadr))
-                    ok = 0;
-                }
+                if (*eadr == '\0') // end of the parsed buffer
+                  ok = 0;
                 if (eadr - html > HTS_URLMAXSIZE)    // ** trop long, >HTS_URLMAXSIZE caractères (on prévoit HTS_URLMAXSIZE autres pour path)
                   ok = -1;      // ne pas traiter ce lien
 
@@ -2101,18 +2099,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   char *a = lien;
                   size_t llen;
 
-                  // strip ending spaces
+                  // strip both ends of every C0 control or space, as a browser
+                  // does; encoding one there would 404 a link that fetched fine
                   llen = (*a != '\0') ? strlen(a) : 0;
-                  while(llen > 0 && is_realspace(lien[llen - 1])) {
+                  while (llen > 0 && (unsigned char) lien[llen - 1] <= ' ') {
                     a[--llen] = '\0';
                   }
-                  //  skip leading ones
-                  while(is_realspace(*a))
+                  // '\0' is <= ' ' too, and an all-control link ends up empty
+                  while (*a != '\0' && (unsigned char) *a <= ' ')
                     a++;
-                  // strip cr, lf, tab inside URL
+                  // strip cr, lf, tab inside URL, as a browser does; every
+                  // other control byte percent-encodes below
                   llen = 0;
                   while(*a) {
-                    if (*a != '\n' && *a != '\r' && *a != '\t') {
+                    if (!is_retorsep(*a)) {
                       lien[llen++] = *a;
                     }
                     a++;
@@ -2152,8 +2152,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   strcpybuff(lien, 
                     unescape_http_unharm(catbuff, sizeof(catbuff), lien, 1 | 2));     /* note: '%' is still escaped */
 
-                  // Force to encode non-printable chars (should never happend)
-                  escape_remove_control(lien);
+                  // Percent-encode the control bytes as a browser does (#982);
+                  // a byte grows to three, so a link that outgrows the buffer
+                  // is dropped rather than clipped to a URL nobody wrote.
+                  {
+                    char BIGSTK tempo[sizeof(lien)];
+
+                    if (escape_control_url(lien, tempo, sizeof(tempo)) <
+                        sizeof(tempo)) {
+                      strcpybuff(lien, tempo);
+                    } else {
+                      error = 1;
+                      hts_log_print(
+                          opt, LOG_DEBUG,
+                          "link rejected (control bytes do not fit) %s", lien);
+                    }
+                  }
 
                   // charset conversion for the URI filename (not the query
                   // string), unless the bytes already are valid UTF-8:
@@ -2204,10 +2218,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       "could not URL-decode string '%s'", lien);
                   }
 
-                  // we need to encode query string non-ascii chars, 
+                  // we need to encode query string non-ascii chars,
                   // leaving the encoding as-is (unlike the file part)
                   // and copy back query
-                  append_escape_check_url(query, lien, sizeof(lien));
+                  {
+                    const size_t used = strlen(lien);
+
+                    // the append grows the query too, and clips silently on
+                    // overflow: drop, or we fetch a query nobody wrote (#982)
+                    if (append_escape_check_url(query, lien, sizeof(lien)) >=
+                        sizeof(lien) - used) {
+                      error = 1;
+                      hts_log_print(opt, LOG_DEBUG,
+                                    "link rejected (query does not fit) %s",
+                                    lien);
+                    }
+                  }
                 }
 
                 // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!
