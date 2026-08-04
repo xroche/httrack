@@ -1,6 +1,5 @@
-# Weekly, networked re-check of the AppStream metainfo (#971). The per-PR lint
-# job runs --no-net so an httrack.com outage can't red an unrelated PR, but
-# that also means it never sees a broken screenshot URL; this job does.
+# The per-PR lint runs --no-net so an httrack.com outage can't red an unrelated
+# PR; that also blinds it to a broken screenshot URL, which this job catches.
 name: appstream metainfo (networked)
 
 on:
@@ -27,8 +26,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends appstream
           appstreamcli --version
 
-      # No --no-net: a warning (e.g. screenshot-image-not-found) exits non-zero
-      # and fails this job, same as an error would.
+      # appstreamcli exits 3 on a warning, so a dead screenshot fails the job.
       - name: AppStream metainfo validation (network)
         run: |
           set -euo pipefail
