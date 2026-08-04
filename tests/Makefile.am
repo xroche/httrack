@@ -40,6 +40,9 @@ TESTS_ENVIRONMENT += MAKE="$(MAKE)"
 # openssl@3 is keg-only, so htsbasenet.h finds <openssl/ssl.h> only through it.
 TESTS_ENVIRONMENT += CC="$(CC)"
 TESTS_ENVIRONMENT += TEST_CPPFLAGS="$(CPPFLAGS)"
+# 207_install-headers-symbols.test links a consumer probe against it; missing on
+# a static-only build, where that test skips.
+TESTS_ENVIRONMENT += HTTRACK_SHLIB=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)/libhttrack.so
 TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
 TESTS_ENVIRONMENT += THREADATTRFAIL_LA=$(abs_builddir)/libthreadattrfail.la
