@@ -81,7 +81,8 @@ charset_declared_matches_bytes() {
     # No legacy 8-bit charset puts text at U+0080..U+009F, so a C1 there means
     # the bytes are really the matching Windows codepage.
     n=$(LC_ALL=C grep -c "$c1" "$tmp/utf8" || true)
-    if [ "$n" -ne 0 ]; then
+    # An empty n means grep failed, not that it found nothing.
+    if [ "${n:-1}" -ne 0 ]; then
         echo "${f##*/}: $n lines decode to C1 controls under $cs; the bytes are a Windows codepage"
         return 1
     fi
@@ -91,8 +92,9 @@ if ! command -v iconv >/dev/null 2>&1; then
     echo "iconv not found; charset check skipped" >&2
 else
     # Positive controls, one per branch: a file cannot pass while mislabelled.
-    LC_ALL=C sed '10s/.*/UTF-8\r/' "$langdir/Francais.txt" >"$tmp/undecodable.txt"
-    LC_ALL=C sed '10s/.*/ISO-8859-2\r/' "$langdir/Croatian.txt" >"$tmp/c1.txt"
+    # No CR: BSD sed writes a literal r, and the extractor strips CR anyway.
+    LC_ALL=C sed '10s/.*/UTF-8/' "$langdir/Francais.txt" >"$tmp/undecodable.txt"
+    LC_ALL=C sed '10s/.*/ISO-8859-2/' "$langdir/Croatian.txt" >"$tmp/c1.txt"
     for probe in undecodable c1; do
         if charset_declared_matches_bytes "$tmp/$probe.txt" >/dev/null; then
             echo "the charset check passed a deliberately mislabelled file ($probe)"
