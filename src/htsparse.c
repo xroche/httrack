@@ -1995,12 +1995,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
                   }
                 }
-                /* A control byte still inside the URL here (CR/LF/TAB are
-                   stripped below) would be deleted from it, fetching a link
-                   the page never wrote (#982). */
-                if (ok == 1 && (unsigned char) *eadr < 32 &&
-                    !is_retorsep(*eadr))
-                  ok = -1;
                 eadr++;
               } while(ok == 1);
 
@@ -2113,8 +2107,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   //  skip leading ones
                   while(is_realspace(*a))
                     a++;
-                  // strip cr, lf, tab inside URL; the link scan lets only these
-                  // three control bytes through, and drops the link otherwise
+                  // strip cr, lf, tab inside URL, as a browser does; every
+                  // other control byte percent-encodes below
                   llen = 0;
                   while(*a) {
                     if (!is_retorsep(*a)) {
@@ -2157,9 +2151,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   strcpybuff(lien, 
                     unescape_http_unharm(catbuff, sizeof(catbuff), lien, 1 | 2));     /* note: '%' is still escaped */
 
-                  // Drop the control bytes a %XX may have just decoded to; DEL
-                  // and the C1 range stay, being UTF-8 continuation bytes here
-                  escape_remove_control(lien);
+                  // Percent-encode the control bytes as a browser does (#982);
+                  // a byte grows to three, and a link that no longer fits is
+                  // dropped rather than clipped to a URL nobody wrote.
+                  {
+                    char BIGSTK tempo[sizeof(lien)];
+
+                    if (escape_control_url(lien, tempo, sizeof(tempo)) <
+                        sizeof(tempo)) {
+                      strcpybuff(lien, tempo);
+                    } else {
+                      error = 1;
+                      hts_log_print(
+                          opt, LOG_DEBUG,
+                          "link rejected (control bytes do not fit) %s", lien);
+                    }
+                  }
 
                   // charset conversion for the URI filename (not the query
                   // string), unless the bytes already are valid UTF-8:

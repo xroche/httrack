@@ -215,9 +215,12 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # equivalent of;
 # string-oom drives a helper binary that only the automake build produces;
 # datadir-ospath copies the unwrapped binary the automake build leaves in .libs,
-# and needs the loader variable libtool picked, neither of which this job has.
+# and needs the loader variable libtool picked, neither of which this job has;
+# link-control-bytes names its fixtures with the raw control bytes the requests
+# decode back to, which NTFS refuses.
 expected_skips="01_engine-footer-overflow.test
 100_local-purge-longpath.test
+158_local-link-control-bytes.test
 114_local-update-304-leak.test
 120_local-proxytrack-webdav-default.test
 143_engine-backtrace-empty.test
