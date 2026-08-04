@@ -69,13 +69,18 @@ Please visit our Website: http://www.httrack.com
 #define USES_BACKTRACE
 #endif
 
+#ifdef _WIN32
+#define BT_REPORT_FD 2 /* MSVC ships no <unistd.h> */
+#else
+#define BT_REPORT_FD STDERR_FILENO
+#endif
+
 #ifdef USES_BACKTRACE
 #define BT_MAX_FRAMES 64  /* frames we try to name */
 #define BT_MAX_MODULES 8  /* distinct modules, one child each */
 #define BT_HEX_SIZE 19    /* "0x" + 16 nibbles + NUL */
 #define BT_PATH_SIZE 1024 /* module path; longer is skipped */
 #define BT_WAIT_TICKS 300 /* 10ms ticks, shared: cap a slow child */
-#define BT_REPORT_FD STDERR_FILENO
 
 static hts_boolean symbolize_crash = HTS_TRUE;
 
@@ -141,10 +146,11 @@ static hts_boolean copy_bounded(char *dest, size_t size, const char *src) {
   return src[i] == '\0' ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Run the symbolizer on argv, output on the report fd, within *budget ticks.
-   HTS_FALSE only if none could be run at all; otherwise silent, the raw trace
-   stands. Not fork(): it runs the pthread_atfork handlers, and glibc's malloc
-   registers one taking every arena lock a signal inside malloc holds (#968). */
+/* Run the symbolizer on argv within *budget ticks; HTS_FALSE only if none could
+   be run at all. Not fork(): it runs the pthread_atfork handlers, and glibc's
+   malloc registers one taking every arena lock a signal inside malloc holds
+   (#968). posix_spawn() clones with CLONE_VFORK instead, and counts as
+   async-signal-safe as of POSIX.1-2024. */
 static hts_boolean spawn_symbolizer(char **argv, int *budget) {
   static char llvm_prog[] = "llvm-symbolizer";
   static char llvm_opts[] = "-p";
@@ -172,7 +178,7 @@ static hts_boolean spawn_symbolizer(char **argv, int *budget) {
 /* Name the frames backtrace_symbols_fd() leaves as module+offset:
    -fvisibility=hidden keeps them out of .dynsym, but DWARF has them. dladdr()
    is not formally async-signal-safe; accepted, this path is already fatal. */
-static void symbolize_backtrace(void *const *stack, int size, int fd) {
+static void symbolize_backtrace(void *const *stack, int size) {
   static char prog[] = "addr2line";
   static char opts[] = "-Cfipa";
   static char dashe[] = "-e";
@@ -185,8 +191,7 @@ static void symbolize_backtrace(void *const *stack, int size, int fd) {
   int budget = BT_WAIT_TICKS;
   int i, spawned;
 
-  /* Raw frames go to any fd; only the child's redirect is pinned at init. */
-  if (spawn_redirect == NULL || fd != BT_REPORT_FD)
+  if (spawn_redirect == NULL) /* init could not prepare the child's redirect */
     return;
   if (size > BT_MAX_FRAMES)
     size = BT_MAX_FRAMES;
@@ -235,8 +240,8 @@ static void symbolize_backtrace(void *const *stack, int size, int fd) {
       const size_t len = strlen(module);
 
       /* addr2line -a prints offsets only: say which module they are in. */
-      (void) (write(fd, module, len) == (ssize_t) len);
-      (void) (write(fd, ":\n", 2) == 2);
+      (void) (write(BT_REPORT_FD, module, len) == (ssize_t) len);
+      (void) (write(BT_REPORT_FD, ":\n", 2) == 2);
       if (!spawn_symbolizer(argv, &budget))
         break; /* no symbolizer: stop at one header */
     }
@@ -299,31 +304,31 @@ static void print_no_trace(int fd, const char *msg, size_t len) {
   }
 }
 
-void hts_print_backtrace(int fd) {
+void hts_print_backtrace(void) {
 #ifdef USES_BACKTRACE
   void *stack[256];
   const int size = backtrace(stack, sizeof(stack) / sizeof(stack[0]));
 
   /* A fault inside the handler lands back here: symbolizing twice interleaves
-     two traces on fd and spends a second budget. */
+     two traces on the report fd and spends a second budget. */
   static volatile sig_atomic_t entered = 0;
 
   if (size != 0) {
-    backtrace_symbols_fd(stack, size, fd);
+    backtrace_symbols_fd(stack, size, BT_REPORT_FD);
     if (symbolize_crash && entered == 0) {
       entered = 1;
-      symbolize_backtrace(stack, size, fd);
+      symbolize_backtrace(stack, size);
       entered = 0;
     }
   } else {
     /* An empty trace means the build carries no unwind tables. */
     const char msg[] = "No stack trace available: unwinding failed\n";
 
-    print_no_trace(fd, msg, sizeof(msg) - 1);
+    print_no_trace(BT_REPORT_FD, msg, sizeof(msg) - 1);
   }
 #else
   const char msg[] = "No stack trace available on this OS :(\n";
 
-  print_no_trace(fd, msg, sizeof(msg) - 1);
+  print_no_trace(BT_REPORT_FD, msg, sizeof(msg) - 1);
 #endif
 }

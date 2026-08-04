@@ -107,8 +107,8 @@ static void crash_fork_prepare(void) { pthread_mutex_lock(&crash_fork_lock); }
 static void crash_fork_parent(void) { pthread_mutex_unlock(&crash_fork_lock); }
 #endif
 
-/* Faults holding a lock a pthread_atfork prepare handler wants, as glibc's
-   malloc does with its arena locks. Plain segv where there is no atfork. */
+/* Faults holding a lock a pthread_atfork prepare handler wants (#968). Plain
+   segv where there is no atfork. */
 static CRASH_NOINLINE void crash_atfork(void) {
 #ifdef CRASH_HAS_ATFORK
   pthread_atfork(crash_fork_prepare, crash_fork_parent, NULL);
