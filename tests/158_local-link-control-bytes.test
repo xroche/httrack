@@ -29,12 +29,14 @@ mkdir -p "$doc"
 vt=$(printf 'a\013bc.html')
 ff=$(printf 'd\014ef.html')
 soh=$(printf 's\001oh.html')
+# CR, LF and TAB are stripped, not encoded, so this href must reach strip.html.
+strip=$(printf 's\011tr\015ip\012.html')
 # "abc.html" and "s" are what the old deletion and truncation would have hit.
-for f in clean.html abc.html def.html s d "$vt" "$ff" "$soh"; do
+for f in clean.html abc.html def.html s d strip.html "$vt" "$ff" "$soh"; do
     printf 'body of %s\n' "$f" >"${doc}/${f}"
 done
-printf '<html><body>\n<a href="clean.html">c</a>\n<a href="%s">v</a>\n<a href="%s">f</a>\n<a href="%s">s</a>\n<a href="big.html">b</a>\n</body></html>\n' \
-    "$vt" "$ff" "$soh" >"${doc}/index.html"
+printf '<html><body>\n<a href="clean.html">c</a>\n<a href="%s">v</a>\n<a href="%s">f</a>\n<a href="%s">s</a>\n<a href="%s">t</a>\n<a href="big.html">b</a>\n</body></html>\n' \
+    "$vt" "$ff" "$soh" "$strip" >"${doc}/index.html"
 
 # 700 control bytes encode to 2100, past the 2*HTS_URLMAXSIZE link buffer, so
 # the growth no longer fits and the link has to go rather than be clipped.
@@ -47,8 +49,9 @@ printf '<html><body>\n<a href="clean.html">c</a>\n<a href="%s">v</a>\n<a href="%
 # clean.html is the positive control: an ordinary link still crawls untouched,
 # and the three encoded fetches are what a browser would have requested.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
-    --errors 0 --files 6 \
+    --errors 0 --files 7 \
     --found 'clean.html' \
+    --found 'strip.html' \
     --found 'a%0bbc.html' \
     --found 'd%0cef.html' \
     --found 's%01oh.html' \
