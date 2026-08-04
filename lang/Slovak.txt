@@ -163,7 +163,7 @@ Požiadavka
 connect
 Spojenie
 search
-H¾danie
+H¾adanie
 ready
 Pripravené
 error
