@@ -104,8 +104,11 @@ static void (*thread_leave)(void *cookie) = NULL;
 
 HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
                                      void (*leave)(void *cookie)) {
-  thread_enter = enter;
-  thread_leave = leave;
+  /* Never half a pair: 'leave' must not see a cookie no 'enter' produced. */
+  const int paired = enter != NULL && leave != NULL;
+
+  thread_enter = paired ? enter : NULL;
+  thread_leave = paired ? leave : NULL;
 }
 
 #ifdef _WIN32

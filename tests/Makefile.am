@@ -67,9 +67,10 @@ libthreadattrfail_la_LIBADD = $(DL_LIBS)
 libnobacktrace_la_SOURCES = nobacktrace.c
 libnobacktrace_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 
-# alt-stack observer for 181_altstack-honoured.test
+# alt-stack observer for 181_altstack-honoured.test and 183_altstack-worker.test
 libaltstackprobe_la_SOURCES = altstackprobe.c
 libaltstackprobe_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+libaltstackprobe_la_LIBADD = $(DL_LIBS)
 
 # realloc stub for 152_engine-string-oom.test; links nothing, so it stays a
 # plain binary rather than a libtool wrapper script.
