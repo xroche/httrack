@@ -242,3 +242,4 @@ TESTS += 185_webhttrack-js-escaping.test
 TESTS += 200_pixmaps-fallback.test
 TESTS += 210_appstream-metainfo.test
 TESTS += 206_install-headers-c99.test
+TESTS += 157_crash-argv0-path.test

@@ -1,0 +1,34 @@
+# The per-PR lint runs --no-net so an httrack.com outage can't red an unrelated
+# PR; that also blinds it to a broken screenshot URL, which this job catches.
+name: appstream metainfo (networked)
+
+on:
+  schedule:
+    - cron: "12 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: appstreamcli validate (network)
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install appstreamcli
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends appstream
+          appstreamcli --version
+
+      # appstreamcli exits 3 on a warning, so a dead screenshot fails the job.
+      - name: AppStream metainfo validation (network)
+        run: |
+          set -euo pipefail
+          appstreamcli validate --explain \
+            html/server/div/com.httrack.WebHTTrack.metainfo.xml

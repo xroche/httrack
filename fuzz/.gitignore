@@ -1,0 +1,14 @@
+# Anchored: a glob like /fuzz-* would also swallow the tracked fuzz-*.c sources.
+/fuzz-charset
+/fuzz-meta
+/fuzz-idna
+/fuzz-entities
+/fuzz-unescape
+/fuzz-filters
+/fuzz-url
+/fuzz-header
+/fuzz-cachendx
+/fuzz-htsparse
+/fuzz-singlefile
+/fuzz-sitemap
+/fuzz-arc
