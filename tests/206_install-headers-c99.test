@@ -1,0 +1,125 @@
+#!/bin/bash
+#
+# The installed headers must also compile in a strict-ISO translation unit
+# (-std=c99/c11), where __STRICT_ANSI__ drops the unprefixed GNU keywords and
+# hides the libc's POSIX declarations (#972). 205 varies only the bytecode mode,
+# so it sees neither.
+
+set -euo pipefail
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is no install rule to drive.
+if [ -z "${abs_top_builddir:-}" ]; then
+    echo "abs_top_builddir unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+
+# CC carries flags on some legs ("gcc -m32" on linux-i386, "ccache gcc"), so
+# split it before looking the program up.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || {
+    echo "no C compiler (${cc_argv[0]}), skipping" >&2
+    exit 77
+}
+make=${MAKE:-make}
+command -v "$make" >/dev/null 2>&1 || {
+    echo "no make ($make), skipping" >&2
+    exit 77
+}
+
+tmp=$(mktemp -d) || exit 1
+trap 'set +e; rm -rf "$tmp"' EXIT
+
+# Seeding the array with -I keeps it non-empty, which bash 3.2 needs under set -u.
+cpp_argv=(-I"$tmp/include")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    cpp_argv+=("${extra_argv[@]}")
+fi
+
+# gcc before 14 only warns on an implicit declaration, which would let the
+# hidden-strnlen half of #972 pass as clean.
+printf 'int main(void) { return 0; }\n' >"$tmp/tu.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" -Werror=implicit-function-declaration \
+    -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    cpp_argv+=(-Werror=implicit-function-declaration)
+fi
+
+stds=()
+for std in c99 c11; do
+    printf 'int main(void) { return 0; }\n' >"$tmp/tu.c"
+    if ! "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+        echo "${cc_argv[*]} rejects -std=$std, skipping that mode" >&2
+        continue
+    fi
+    # Only meaningful if the flag is in force: bare typeof must not compile.
+    printf 'int f(int x) { typeof(x) y = x; return y; }\n' >"$tmp/tu.c"
+    if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+        echo "-std=$std keeps the GNU keywords here, skipping that mode" >&2
+        continue
+    fi
+    stds+=("$std")
+done
+[ "${#stds[@]}" -gt 0 ] || {
+    echo "no strict-ISO mode available from ${cc_argv[*]}, skipping" >&2
+    exit 77
+}
+
+# Whether the strnlen half of #972 is observable on this libc.
+printf '#include <string.h>\nsize_t f(const char *s) { return strnlen(s, 8); }\n' >"$tmp/tu.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=${stds[0]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    echo "note: this libc declares strnlen in strict mode, only the keyword half is exercised" >&2
+fi
+
+# Override the install dir rather than use DESTDIR: same rule and file list, no
+# guessing at the prefix. Empty MAKEFLAGS, or the sub-make reaches for a
+# jobserver the test driver did not hand it.
+env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+    DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
+    {
+        cat "$tmp/install.log" >&2
+        fail "install-DevIncludesDATA failed"
+    }
+
+headers=("$tmp/include/httrack"/*.h)
+[ "${#headers[@]}" -ge 10 ] || fail "only ${#headers[@]} headers installed, the list cannot be right"
+[ -f "$tmp/include/httrack/htssafe.h" ] || fail "htssafe.h was not installed"
+
+count=0
+bad=0
+for h in "${headers[@]}"; do
+    b=$(basename "$h")
+    argv=("${cpp_argv[@]}")
+    # No libc exposes getnameinfo() and friends to a strict-ISO unit, so a
+    # consumer of the two socket headers must ask for POSIX itself.
+    case "$b" in
+    htsnet.h | htsopt.h) argv+=(-D_POSIX_C_SOURCE=200809L) ;;
+    esac
+    printf '#include <httrack/%s>\n' "$b" >"$tmp/tu.c"
+    for std in "${stds[@]}"; do
+        for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
+            count=$((count + 1))
+            if ! "${cc_argv[@]}" "${argv[@]}" "-std=$std" "$mode" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+                echo "$b does not compile under -std=$std ($mode):" >&2
+                head -5 "$tmp/cc.log" >&2
+                bad=1
+            fi
+        done
+    done
+done
+echo "compiled ${#headers[@]} headers x ${#stds[@]} std x 2 bytecode modes = $count units" >&2
+[ "$bad" -eq 0 ] || fail "installed headers do not compile in strict-ISO mode"
+
+# The loop above is only meaningful if this compiler rejects a missing include.
+printf '#include "no-such-header-972.h"\n' >"$tmp/tu.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=${stds[0]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    fail "${cc_argv[*]} accepted a missing include, the checks above proved nothing"
+fi
+
+exit 0
