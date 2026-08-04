@@ -926,6 +926,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
   int direct_url = 0;           // ne pas analyser l'url (exemple: ftp://)
   const char *search_tag = NULL;
 
+  /* adr and the referer come off the network and can carry raw CR/LF; sized
+     like the url_adr/url_fil they mirror, so escaping only shrinks them. */
+  char BIGSTK esc[HTS_URLMAXSIZE * 2];
+
   // Initialize buffer
   buffer_head_request[0] = '\0';
 
@@ -954,9 +958,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
             if (retour->req.proxy.active &&
                 !hts_proxy_is_socks(retour->req.proxy.name) &&
                 !hts_proxy_is_connect(retour->req.proxy.name)) {
-              print_buffer(&bstr,
-                      "%s http://%s%s %s\r\n", method, adr, url,
-                      protocol);
+              /* only adr is raw here: the other three are %s-scanned */
+              print_buffer(&bstr, "%s http://%s%s %s\r\n", method,
+                           escape_check_url_addr(adr, esc, sizeof(esc)), url,
+                           protocol);
             } else {
               print_buffer(&bstr,
                        "%s %s %s\r\n", method, url, protocol);
@@ -999,14 +1004,16 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         printf("Proxy Use: for %s%s proxy %d port %d\n", adr, fil,
                retour->req.proxy.name, retour->req.proxy.port);
 #endif
-        print_buffer(&bstr, "http://%s", jump_identification_const(adr));
+        print_buffer(&bstr, "http://%s",
+                     escape_check_url_addr(jump_identification_const(adr), esc,
+                                           sizeof(esc)));
       } else {                  // ftp:// en proxy http
 #if HDEBUG
         printf("Proxy Use for ftp: for %s%s proxy %d port %d\n", adr, fil,
                retour->req.proxy.name, retour->req.proxy.port);
 #endif
         direct_url = 1;         // ne pas analyser user/pass
-        print_buffer(&bstr, "%s", adr);
+        print_buffer(&bstr, "%s", escape_check_url_addr(adr, esc, sizeof(esc)));
       }
     }
     // NOM DU FICHIER
@@ -1071,8 +1078,13 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                ||(strncmp(adr, "https://", 8) == 0)     /* or referer AND addresses are https */
           )
         ) {                     // PAS file://
-        print_buffer(&bstr, "Referer: http://%s%s"H_CRLF,
-                     jump_identification_const(referer_adr), referer_fil);
+        /* one escape per piece, so neither can outgrow its own source buffer */
+        print_buffer(
+            &bstr, "Referer: http://%s",
+            escape_check_url_addr(jump_identification_const(referer_adr), esc,
+                                  sizeof(esc)));
+        print_buffer(&bstr, "%s" H_CRLF,
+                     escape_check_url_addr(referer_fil, esc, sizeof(esc)));
       }
     }
     // HTTP field: referer
@@ -1105,7 +1117,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
       // Mandatory per RFC2616
       if (!direct_url) {        // pas ftp:// par exemple
-        print_buffer(&bstr, "Host: %s"H_CRLF, real_adr);
+        print_buffer(&bstr, "Host: %s" H_CRLF,
+                     escape_check_url_addr(real_adr, esc, sizeof(esc)));
       }
 
       // HTTP field: from

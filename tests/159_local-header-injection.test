@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# A link carrying &#13;&#10; keeps raw CR/LF once hts_unescapeEntities() has run
+# past the parser's control-byte escape, so any request field built from it can
+# start a header line of the site's choosing. Graded on the captured request
+# bytes: httrack's log cannot show a request line that split in two on the wire.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
+python=$(find_python) || {
+    echo "python3 missing, skipping"
+    exit 77
+}
+
+server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
+checker=$(nativepath "$top_srcdir/tests/header-injection-check.py")
+tmpdir=$(mktemp -d)
+serverpid=
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+
+start_probe() {
+    local tag="$1"
+    "$python" "$server" "$tmpdir/$tag.wire" >"$tmpdir/$tag.out" 2>"$tmpdir/$tag.err" &
+    serverpid=$!
+    port=$(discover_server_port "$tmpdir/$tag.out" "$serverpid") || exit 1
+}
+
+# 1. Referer: the poisoned page links onward, so its own URL is the referer of
+# the next request. No proxy involved; this is a plain crawl.
+start_probe direct
+run_with_timeout 90 httrack "http://127.0.0.1:$port/" -O "$tmpdir/m1" \
+    -c1 --robots=0 --retries=0 --quiet -%v0 >>"$tmpdir/log" 2>&1 || true
+stop_server "$serverpid"
+serverpid=
+"$python" "$checker" "$tmpdir/direct.wire" direct "$port" || {
+    cat "$tmpdir/log" >&2
+    exit 1
+}
+
+# 2. Host and the proxy absolute-URI request line. Only reachable through an
+# http proxy: without one the poisoned authority fails to resolve and no
+# request is ever built.
+start_probe proxy
+run_with_timeout 90 httrack "http://start.example/" '+*' -P "127.0.0.1:$port" \
+    -O "$tmpdir/m2" -c1 --robots=0 --retries=0 --quiet -%v0 \
+    >>"$tmpdir/log" 2>&1 || true
+stop_server "$serverpid"
+serverpid=
+"$python" "$checker" "$tmpdir/proxy.wire" proxy || {
+    cat "$tmpdir/log" >&2
+    exit 1
+}
