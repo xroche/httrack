@@ -372,6 +372,8 @@ Create a Start Page
 Luo aloitussivu
 Create a word database of all html pages
 Luo sanatietokanta kaikista html-sivuista
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Luo peilistä täydellinen RFC822-postiarkisto (MHT/EML)
 Create error logging and report files
 Luo virheloki- ja raporttitiedostot
 Generate DOS 8-3 filenames ONLY
@@ -420,6 +422,12 @@ Browser identity
 Esittäydy selaimena
 Comment to be placed in each HTML file
 Jokaiseen HTML-tiedostoon pantava kommentti
+Languages accepted by the browser
+Selaimen hyväksymät kielet
+Additional HTTP headers to be sent in each requests
+Lisäotsakkeet, jotka lähetetään jokaisessa HTTP-pyynnössä
+HTTP referer to be sent for initial URLs
+Alkuperäisille URL-osoitteille lähetettävä HTTP-referer
 Back to starting page
 Palaa aloitussivulle
 Save current preferences as default values
@@ -480,6 +488,8 @@ Make an index
 Tee indeksi
 Make a word database
 Tee sanatietokanta
+Build a mail archive
+Tee postiarkisto
 Log files
 Lokitiedostot
 DOS names (8+3)
@@ -508,6 +518,12 @@ Identity
 Esittäydy
 HTML footer
 HTML-alatunniste
+Languages
+Kielet
+Additional HTTP Headers
+HTTP-lisäotsakkeet
+Default referer URL
+Oletusarvoinen referer-URL
 N# connections
 Yhteyksiä
 Abandon host if error

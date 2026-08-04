@@ -186,6 +186,8 @@ scanning
 scannen
 Waiting for scheduled time..
 Eingestellte Startzeit abwarten
+Transferring data..
+Daten werden übertragen..
 Connecting to provider
 Verbindung aufbauen
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Startseite erstellen
 Create a word database of all html pages
 Liste mit allen Wörtern in den HTML-Seiten anlegen
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Vollständiges RFC822-Mailarchiv (MHT/EML) der Site-Kopie erstellen
 Create error logging and report files
 Fehlerprotokoll und Ablaufbericht erstellen
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Browser-Kennung
 Comment to be placed in each HTML file
 Kommentar, einzufügen in jede HTML-Datei
+Languages accepted by the browser
+Vom Browser akzeptierte Sprachen
+Additional HTTP headers to be sent in each requests
+Zusätzliche HTTP-Header, die in jeder Anfrage gesendet werden
+HTTP referer to be sent for initial URLs
+HTTP-Referer, der für die Start-URLs gesendet wird
 Back to starting page
 Zurück zur Startseite
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Index erstellen
 Make a word database
 Wortliste anlegen
+Build a mail archive
+Mailarchiv erstellen
 Log files
 Protokolldateien
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identität
 HTML footer
 HTML-Fußzeile
+Languages
+Sprachen
+Additional HTTP Headers
+Zusätzliche HTTP-Header
+Default referer URL
+Standard-Referer-URL
 N# connections
 Anzahl Verbindungen
 Abandon host if error
