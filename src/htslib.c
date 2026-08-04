@@ -4050,6 +4050,8 @@ HTSEXT_API void escape_remove_control(char *const s) {
       j++;
     }
   }
+  // compaction left the original tail sitting past j
+  s[j] = '\0';
 }
 
 #undef ADD_CHAR

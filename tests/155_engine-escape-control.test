@@ -1,0 +1,41 @@
+#!/bin/bash
+#
+# escape_remove_control() left a dropped byte's tail glued to the result (#974).
+# Vectors are hex: raw control bytes do not survive a Windows argv.
+
+set -euo pipefail
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+# input : expected length : expected output
+cases=(
+    "2f610b6263:4:2f616263" # VT mid-path, the shape the parser can reach
+    "0c616263:3:616263"     # FF first: every byte moves
+    "6162630b:3:616263"     # VT last: nothing moves, but the end does
+    "61626301646566:6:616263646566"
+    "010203:0:"       # all control
+    "616263:3:616263" # untouched: the terminator must stay put
+    ":0:"
+    "617fc3a9:4:617fc3a9" # DEL and high bytes are not stripped
+    "612062:3:612062"     # space is the first byte kept
+    "611f621e63:3:616263" # top of the control range, and two bytes dropped
+)
+
+for c in "${cases[@]}"; do
+    in=${c%%:*}
+    rest=${c#*:}
+    len=${rest%%:*}
+    out=${rest#*:}
+    got=$(httrack "-#test=escape-control" "hex:$in") ||
+        fail "hex:$in exited non-zero"
+    test "$got" = "escape-control: len=$len out=hex:$out" ||
+        fail "hex:$in: expected len=$len out=hex:$out, got: $got"
+done
+
+# The in-binary table also checks the bytes past the NUL, which printing cannot show.
+got=$(httrack "-#test=escape-control") || fail "self-test exited non-zero"
+grep -q "escape-control self-test OK" <<<"$got" ||
+    fail "unexpected self-test output: $got"
