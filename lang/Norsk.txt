@@ -186,6 +186,8 @@ scanning
 søker
 Waiting for scheduled time..
 Venter på planlagt tidspunkt...
+Transferring data..
+Overfører data..
 Connecting to provider
 Kobler til leverandør
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Opprett en startside
 Create a word database of all html pages
 Opprett en ord-database over alle HTML-sider
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Lag et komplett RFC822-postarkiv (MHT/EML) av kopien
 Create error logging and report files
 Opprett feillogging og rapporter
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Nettleser-identitet
 Comment to be placed in each HTML file
 Sett inn kommentar i alle HTML-filer
+Languages accepted by the browser
+Språk nettleseren godtar
+Additional HTTP headers to be sent in each requests
+Ekstra HTTP-hoder som sendes med hver forespørsel
+HTTP referer to be sent for initial URLs
+HTTP-referer som sendes for de første URL-ene
 Back to starting page
 Tilbake til startside
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Opprett en forside
 Make a word database
 Opprett en ord-database
+Build a mail archive
+Lag et postarkiv
 Log files
 Loggfiler
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identitet
 HTML footer
 HTML-fotnote
+Languages
+Språk
+Additional HTTP Headers
+Ekstra HTTP-hoder
+Default referer URL
+Standard referer-URL
 N# connections
 Antall forbindelser
 Abandon host if error
