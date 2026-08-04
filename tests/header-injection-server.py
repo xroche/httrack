@@ -54,6 +54,9 @@ def body_for(request, port):
         return root_page(port)
     if b"/x" in line:
         return POISON_PAGE
+    # the proxied pages link onward too, so a poisoned *host* becomes a referer
+    if b"/p.html" in line:
+        return page('<a href="/deep2.html">deep</a>')
     return page("leaf")
 
 

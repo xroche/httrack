@@ -926,8 +926,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
   int direct_url = 0;           // ne pas analyser l'url (exemple: ftp://)
   const char *search_tag = NULL;
 
-  /* adr and the referer come off the network and can carry raw CR/LF; sized
-     like the url_adr/url_fil they mirror, so escaping only shrinks them. */
+  /* adr and the referer come off the network and can carry raw CR/LF; capped
+     at their own source buffers, so the worst case emitted does not grow. */
   char BIGSTK esc[HTS_URLMAXSIZE * 2];
 
   // Initialize buffer
