@@ -234,3 +234,4 @@ TESTS += 164_local-proxytrack-arc-hostile.test
 TESTS += 171_watchdog-heartbeat.test
 TESTS += 172_ci-windows-driver.test
 TESTS += 180_crash-stack-overflow.test
+TESTS += 210_appstream-metainfo.test
