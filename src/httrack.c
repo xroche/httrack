@@ -931,8 +931,27 @@ static void sig_leave(int code) {
   }
 }
 
+/* SA_ONSTACK, so a stack-overflow SIGSEGV still reaches sig_fatal: the faulting
+   stack has no room left for a signal frame, and the kernel then kills the
+   process with no diagnostic at all (#866). */
+static void install_fatal_handler(int code) {
+#ifdef SA_ONSTACK
+  struct sigaction sa;
+
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = sig_fatal;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_ONSTACK;
+  if (sigaction(code, &sa, NULL) == 0)
+    return;
+#endif
+  signal(code, sig_fatal);
+}
+
 static void signal_handlers(void) {
   hts_backtrace_init();
+  /* Main thread only: engine threads keep the old behaviour. */
+  (void) hts_backtrace_altstack();
 #ifdef _WIN32
   signal(SIGINT, sig_leave);    // ^C
   signal(SIGTERM, sig_finish);  // kill <process>
@@ -944,16 +963,16 @@ static void signal_handlers(void) {
   signal(SIGCHLD, sig_ignore);  // child change status
 #endif
 #ifdef SIGABRT
-  signal(SIGABRT, sig_fatal);    // abort
+  install_fatal_handler(SIGABRT); // abort
 #endif
 #ifdef SIGBUS
-  signal(SIGBUS, sig_fatal);    // bus error
+  install_fatal_handler(SIGBUS); // bus error
 #endif
 #ifdef SIGILL
-  signal(SIGILL, sig_fatal);    // illegal instruction
+  install_fatal_handler(SIGILL); // illegal instruction
 #endif
 #ifdef SIGSEGV
-  signal(SIGSEGV, sig_fatal);   // segmentation violation
+  install_fatal_handler(SIGSEGV); // segmentation violation
 #endif
 }
 
