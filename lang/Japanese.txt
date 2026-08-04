@@ -186,6 +186,8 @@ scanning
 スキャン中
 Waiting for scheduled time..
 設定された開始時間を待っています..
+Transferring data..
+データを転送しています..
 Connecting to provider
 プロバイダへ接続中
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 スタートページの作成
 Create a word database of all html pages
 全てのHTMLページに単語データベースを作成する
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+ミラーの完全な RFC822 メールアーカイブ (MHT/EML) を作成する
 Create error logging and report files
 エラーログとレポートファイルを作成する
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 ブラウザID
 Comment to be placed in each HTML file
 どのHTMLファイルにも挿入されるコメント
+Languages accepted by the browser
+ブラウザが受け入れる言語
+Additional HTTP headers to be sent in each requests
+各リクエストで送信する追加の HTTP ヘッダ
+HTTP referer to be sent for initial URLs
+最初の URL に送信する HTTP リファラ
 Back to starting page
 スタートページに戻る
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 インデックスの作成
 Make a word database
 単語データベースを作成する
+Build a mail archive
+メールアーカイブの作成
 Log files
 ログファイル
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 ID
 HTML footer
 HTMLフッタ
+Languages
+言語
+Additional HTTP Headers
+追加の HTTP ヘッダ
+Default referer URL
+既定のリファラ URL
 N# connections
 接続数
 Abandon host if error

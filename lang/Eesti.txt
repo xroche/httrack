@@ -186,6 +186,8 @@ scanning
 skaneerimine
 Waiting for scheduled time..
 Etteantud aja ootamine...
+Transferring data..
+Andmete edastamine..
 Connecting to provider
 Ühendusevõtmine
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Tee alguslehekülg
 Create a word database of all html pages
 Loo kõigi HTML-lehekülgede sõnade andmebaas
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Koopia täieliku RFC822 kirjaarhiivi (MHT/EML) koostamine
 Create error logging and report files
 Tee vealogi ja raporti failid
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Brauseri identiteet
 Comment to be placed in each HTML file
 Kommentaar, mis lisatakse igale HTML-failile
+Languages accepted by the browser
+Brauseri aktsepteeritavad keeled
+Additional HTTP headers to be sent in each requests
+Täiendavad HTTP-päised, mis saadetakse iga päringuga
+HTTP referer to be sent for initial URLs
+Algsete URL-ide jaoks saadetav HTTP referer
 Back to starting page
 Tagasi alguslehele
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Tee indeks
 Make a word database
 Tee sõnade andmebaas
+Build a mail archive
+Tee kirjaarhiiv
 Log files
 Logifailid
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identiteet
 HTML footer
 HTML-i jalus
+Languages
+Keeled
+Additional HTTP Headers
+Täiendavad HTTP-päised
+Default referer URL
+Vaikimisi referer-URL
 N# connections
 Ühenduste arv
 Abandon host if error
