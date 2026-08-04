@@ -319,6 +319,10 @@ typedef socklen_t SOClen;
 #define HTS_RESOLVER_CALL
 #endif
 
+/* File scope, or the tag below is a fresh type scoped to its own prototype
+   wherever <netdb.h> has not already declared it. */
+struct addrinfo;
+
 typedef struct hts_resolver_backend {
   int(HTS_RESOLVER_CALL *getaddrinfo)(const char *node, const char *service,
                                       const struct addrinfo *hints,
