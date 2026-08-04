@@ -18,8 +18,7 @@ if [ "$(uname -s)" != "Linux" ]; then
     exit 77
 fi
 command -v httrack >/dev/null || fail "could not find httrack"
-# SIGTERM does reach a wedged httrack, but its handler only sets a flag, so the
-# kill has to be uncatchable or the wedge outlives the timeout.
+# A wedged httrack still catches SIGTERM and only sets a flag, hence -s KILL.
 command -v timeout >/dev/null || fail "no timeout(1): a hang would never end here"
 
 # 134 is SIGABRT, the handler's own last statement; 137 is the wedge.
@@ -43,8 +42,7 @@ if grep -q 'No stack trace available on this OS' <<<"$plain"; then
 fi
 locked=$(crash_report atfork)
 
-# We write the module header right before spawning: no header, and the run
-# never reached the code under test.
+# The module header is written just before the spawn: no header, no code under test.
 if command -v addr2line >/dev/null || command -v llvm-symbolizer >/dev/null; then
     grep -qE '^/.+:$' <<<"$plain" || fail "-#c=segv: no symbolizer was spawned"
     grep -qE '^/.+:$' <<<"$locked" ||
@@ -53,11 +51,15 @@ else
     echo "no addr2line and no llvm-symbolizer: spawn path not exercised" >&2
 fi
 
-# addr2line is searched first and its -a output is the one line format that
-# does not move with the locale. Proves the child actually ran, which a header
-# written before the spawn cannot. Unanchored width: -a pads to the target's
-# pointer size, 8 nibbles on a 32-bit build.
+# addr2line runs first and its -a output is the one line format the locale does
+# not move, so it is what proves the child ran. Unanchored width: -a pads to the
+# target pointer size, 8 nibbles on a 32-bit build.
 if command -v addr2line >/dev/null; then
     grep -qE '^0x[0-9a-f]+: ' <<<"$locked" ||
         fail "-#c=atfork: no symbolized frame, addr2line never ran"
+    # The child's stdout is redirected onto the report fd, prebuilt at startup:
+    # symbolized frames belong on stderr, never on the crawler's own stdout.
+    leaked=$(timeout -s KILL 60 httrack '-#c=segv' 2>/dev/null |
+        grep -cE '^0x[0-9a-f]+: ' || true)
+    test "$leaked" -eq 0 || fail "$leaked symbolized frames leaked to stdout"
 fi
