@@ -1,8 +1,7 @@
 #!/bin/bash
-# An ET_EXEC is mapped where it was linked, so dl_iterate_phdr() reports a zero
-# bias where dladdr() reports 0x400000. The crash report must still name the
-# executable and resolve its frames to source lines (#995), and must not take
-# /proc/self/exe for the program when that is the loader (#996).
+# A non-PIE crash report must name the executable and resolve its frames to
+# source lines (#995). /proc/self/exe must be rejected when it is the loader,
+# and kept when argv[0] merely differs from the file's name (#996).
 
 set -euo pipefail
 
@@ -78,11 +77,26 @@ if [ -n "${interp}" ] && [ -x "${interp}" ]; then
     rc=0
     LC_ALL=C run_with_timeout 60 "${interp}" "${work}/probe-pie" >"${out}" 2>&1 || rc=$?
     test "${rc}" -ne 124 || fail "the loader-launched probe did not finish in time"
-    grep -qE "^${work}/probe-pie:\$" "${out}" ||
+    grep -qxF "${work}/probe-pie:" "${out}" ||
         fail "launched through ${interp}, the report heads no block with the program"
     grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
         fail "launched through ${interp}, the report resolves no source line"
 fi
+
+# Same probe under another name: dladdr() echoes argv[0], so anything matching
+# the two names drops the module here instead of keeping the real file.
+altdir=${work}/alt
+mkdir "${altdir}"
+ln -s "${work}/probe-pie" "${altdir}/probe-renamed"
+out=${work}/renamed.log
+rc=0
+LC_ALL=C PATH="${altdir}:${PATH}" \
+    run_with_timeout 60 probe-renamed >"${out}" 2>&1 || rc=$?
+test "${rc}" -ne 124 || fail "the symlinked probe did not finish in time"
+grep -qxF "${work}/probe-pie:" "${out}" ||
+    fail "launched as probe-renamed, the report heads no block with the program"
+grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
+    fail "launched as probe-renamed, the report resolves no source line"
 
 if ! build "${work}/probe-nopie" -no-pie -fno-pie; then
     head -5 "${work}/cc.log" >&2

@@ -65,6 +65,7 @@ Please visit our Website: http://www.httrack.com
 #include <signal.h>
 #include <spawn.h>
 #include <time.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #define USES_BACKTRACE
 #endif
@@ -93,8 +94,8 @@ static posix_spawn_file_actions_t *spawn_redirect = NULL;
    hts_self_path() (htscoremain.c) resolves the same path, out of reach here:
    it is library-side and hidden by -fvisibility=hidden (#997). */
 static char main_path[BT_PATH_SIZE];
-/* Where the main program is mapped, and the bias to take off an address to get
-   the one addr2line wants: 0 for an ET_EXEC, which is mapped where it links. */
+/* Main program's mapped range, and the bias to subtract for addr2line (0 on an
+   ET_EXEC). */
 static uintptr_t main_lo, main_hi, main_bias;
 
 static int record_main_range(struct dl_phdr_info *info, size_t size,
@@ -105,6 +106,7 @@ static int record_main_range(struct dl_phdr_info *info, size_t size,
   (void) data;
   main_bias = (uintptr_t) info->dlpi_addr;
   main_lo = (uintptr_t) -1; /* an empty range matches no frame */
+  main_hi = 0;
   for (i = 0; i < info->dlpi_phnum; i++) {
     const ElfW(Phdr) *const phdr = &info->dlpi_phdr[i];
     const uintptr_t start = main_bias + (uintptr_t) phdr->p_vaddr;
@@ -119,34 +121,43 @@ static int record_main_range(struct dl_phdr_info *info, size_t size,
   return 1; /* dl_iterate_phdr starts at the main program */
 }
 
-/* By range, not by load base: dladdr() reports the mapping start and
-   dl_iterate_phdr() the bias, which differ on an ET_EXEC (#995). */
+/* Address range, not load base: the two disagree on an ET_EXEC (#995). */
 static hts_boolean is_main_frame(const void *addr) {
   const uintptr_t value = (uintptr_t) addr;
 
   return value >= main_lo && value < main_hi ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Trailing component of path, the whole of it when it holds no '/'. */
-static const char *base_name(const char *path) {
-  const char *const slash = strrchr(path, '/');
+/* Non-zero once a named link-map entry is the file *data stats to: the main
+   program's entry is the unnamed one, so a hit means a shared object. */
+static int names_a_shared_object(struct dl_phdr_info *info, size_t size,
+                                 void *data) {
+  const struct stat *const self = (const struct stat *) data;
+  struct stat st;
 
-  return slash != NULL ? slash + 1 : path;
+  (void) size;
+  if (info->dlpi_name == NULL || info->dlpi_name[0] == '\0')
+    return 0;
+  if (stat(info->dlpi_name, &st) != 0)
+    return 0; /* vDSO and the like have no file */
+  return st.st_dev == self->st_dev && st.st_ino == self->st_ino;
 }
 
 static void find_main_object(void) {
   const ssize_t len = readlink("/proc/self/exe", main_path, sizeof(main_path));
-  Dl_info info;
+  struct stat self;
 
   dl_iterate_phdr(record_main_range, NULL);
   /* A full buffer is a clipped path, which readlink() cannot report: its prefix
      names another file, and the symbolizer would happily open that one. */
   if (len > 0 && (size_t) len < sizeof(main_path)) {
     main_path[len] = '\0';
-    /* Started through the loader, /proc/self/exe is ld.so while dladdr() still
-       names the program: take dladdr()'s word for it (#996). */
-    if (dladdr((const void *) main_lo, &info) != 0 && info.dli_fname != NULL &&
-        strcmp(base_name(main_path), base_name(info.dli_fname)) == 0)
+    /* Started through the loader, /proc/self/exe is ld.so, which the link map
+       carries under its own name (#996). Identity, not dladdr()'s name: that is
+       argv[0] verbatim, so a symlinked or renamed program would lose its
+       module. */
+    if (stat(main_path, &self) == 0 &&
+        dl_iterate_phdr(names_a_shared_object, &self) == 0)
       return;
   }
   main_path[0] = '\0'; /* unresolved: keep whatever dladdr() reported */
