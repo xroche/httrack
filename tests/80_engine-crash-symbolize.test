@@ -66,9 +66,11 @@ command -v addr2line >/dev/null || {
 }
 
 # Control: resolve the same frames ourselves, so a stripped build cannot turn
-# the assertion below into a vacuous pass.
+# the assertion below into a vacuous pass. Second form: glibc drops the "+0x"
+# when the load bias is zero, and the bracketed address is then the file one.
 oracle="${tmpdir}/oracle"
-sed -n 's/^\([^(]*\)(+\(0x[0-9a-f]*\)).*$/\1 \2/p' "$out" |
+sed -n -e 's/^\([^(]*\)(+\(0x[0-9a-f]*\)).*$/\1 \2/p' \
+    -e 's/^\([^(]*\)() \[\(0x[0-9a-f]*\)\].*$/\1 \2/p' "$out" |
     while read -r mod off; do
         # The main program is reported as argv[0], a bare name off PATH (#889).
         test -f "$mod" || mod=$(command -v "$mod" 2>/dev/null) || continue

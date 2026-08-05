@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscrashtest.h"
 
 #include "htssafe.h"
+#include "htsthread.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -99,6 +100,23 @@ static CRASH_NOINLINE char blow_the_stack(size_t depth) {
 /* Faults with no stack left for the handler, unless it runs on an altstack. */
 static CRASH_NOINLINE void crash_stack(void) { (void) blow_the_stack(0); }
 
+static void crash_stack_thread(void *arg) {
+  (void) arg;
+  fprintf(stderr, "** Crash test worker thread started\n");
+  fflush(stderr);
+  crash_stack();
+}
+
+/* Same runaway recursion in an engine worker: the fatal handler needs an
+   alternate stack in every thread, not just the main one (#969). */
+static CRASH_NOINLINE void crash_threadstack(void) {
+  /* Aborting on a spawn failure keeps the caller's exit status a crash, so the
+     test reads "no worker started" rather than "the handler never ran". */
+  if (hts_newthread(crash_stack_thread, NULL) != 0)
+    abortLog("crash test: cannot spawn a worker thread");
+  htsthread_wait_n(0); /* the worker takes the process down from there */
+}
+
 #ifdef CRASH_HAS_ATFORK
 static pthread_mutex_t crash_fork_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -121,23 +139,36 @@ static const struct {
   const char *name;
   void (*fn)(void);
 } crash_kinds[] = {
-    {"segv", crash_segv},   {"abort", crash_abort},   {"trap", crash_trap},
-    {"stack", crash_stack}, {"atfork", crash_atfork},
+    {"segv", crash_segv},
+    {"abort", crash_abort},
+    {"trap", crash_trap},
+    {"stack", crash_stack},
+    {"threadstack", crash_threadstack},
+    {"atfork", crash_atfork},
 };
 
 #define CRASH_KINDS_COUNT (sizeof(crash_kinds) / sizeof(crash_kinds[0]))
 
+/* Appends what fits and drops the rest, where strcatbuff() would abort. */
+static void kinds_append(char *dest, size_t size, const char *src) {
+  const size_t used = strlen(dest);
+
+  strlncatbuff(dest, src, size, size - used - 1);
+}
+
 const char *hts_crash_test_kinds(void) {
-  static char list[64];
+  /* Clipped rather than aborted: a table outgrowing this must not cost the
+     process, the string only feeds a usage line. */
+  static char list[256];
 
   if (list[0] == '\0') {
     size_t i;
 
     for (i = 0; i < CRASH_KINDS_COUNT; i++) {
       if (i != 0) {
-        strcatbuff(list, ", ");
+        kinds_append(list, sizeof(list), ", ");
       }
-      strcatbuff(list, crash_kinds[i].name);
+      kinds_append(list, sizeof(list), crash_kinds[i].name);
     }
   }
   return list;

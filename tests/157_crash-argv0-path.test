@@ -60,7 +60,8 @@ fi
 
 # Control: without a bare argv[0] in the raw trace there is nothing to repair,
 # and the assertions below would pass on a report that never needed the fix.
-grep -qE '^httrack\(\+0x[0-9a-f]+\)' "${out}" ||
+# glibc drops the "+0x" offset when the load bias is zero, as in a non-PIE build.
+grep -qE '^httrack\((\+0x[0-9a-f]+)?\)' "${out}" ||
     skip "the main program is not reported as a bare argv[0] here"
 
 headers=$(grep -E '^/.*/httrack:$' "${out}" || true)
