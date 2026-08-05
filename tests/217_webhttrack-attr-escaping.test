@@ -42,11 +42,11 @@ root="${work}/root"
 mkdir -p "${root}"
 cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
 chmod -R u+w "${root}"
-# The shipped translations are Latin-1, so an escaper that entity-encodes every
-# byte >= 0x80 must not read as clean here.
+# Latin-1, like every shipped translation: an escaper that entity-encodes bytes
+# >= 0x80 has to fail here rather than read as clean.
 eacute=$(printf '\351')
 # CRLF line pairs, English key then translation. "OK" lands in a value="
-# attribute, "Click to confirm" in a single-quoted title=, which escape apart.
+# attribute, "Click to confirm" in a single-quoted title=.
 printf '%s\r\n' \
     LANGUAGE_NAME 'Francais-989' \
     LANGUAGE_FILE 'Francais' \
@@ -57,14 +57,13 @@ printf '%s\r\n' \
     Cancel 'Annuler' \
     >"${root}/lang/Francais.txt"
 
-# Two projects whose names and categories hold a quote: ${liststr:} builds its
-# own <option value=""> in C, out of reach of the template sweep.
+# A project whose directory name and Category= line both hold a quote.
 projects="${work}/projects"
 mkdir -p "${projects}/p\"q/hts-cache"
 printf 'Category=c%%22d\r\n' >"${projects}/p\"q/hts-cache/winprofile.ini"
 
-# Loaded on the first request: a Windows path proves the render leaves the
-# backslash alone, so what the browser posts back rewrites the same file.
+# Loaded on the first request; a Windows path, so the render has to leave the
+# backslash alone for what the browser posts back to rewrite the same file.
 printf 'path=C:\\ab\r\nlang=\r\n' >"${work}/.httrack.ini"
 
 printf '[a hostile settings value is entity-escaped in its attribute] ..\t'
@@ -133,8 +132,7 @@ pages = [
         # negative control: an ordinary value is not rewritten, and the mode
         # does not decode \ab into one byte the way a bare ${key} does
         r'name="footer" value="Mozilla/5.0 C:\ab"',
-        # a translation lands in a value= attribute as well, Latin-1 bytes and
-        # all: an escaper entity-encoding everything >= 0x80 fails here
+        # a translation lands in a value= attribute as well, high bytes and all
         'value="%s"' % escaped("Va \"y\" <ok> d\xe9j\xe9"),
         # ... and in a single-quoted title=, which keeps the quote raw
         "title='Cliquez \"ici\" &lt;maintenant&gt; d\xe9j\xe9'",
@@ -196,8 +194,8 @@ if "\r\npath=C:\\ab\r\n" not in saved:
 if '--proxy "socks5://px.example:3128"' not in body:
     sys.exit("step4.html drops the template's \\3A escape:\n%s" % body[:4000])
 
-# ${liststr:} builds its own <option value="">, in C, from a project directory
-# name and from the Category= line of each project's winprofile.ini.
+# ${liststr:} builds its own <option value=""> in C, so no template edit reaches
+# it; the two static categories it prepends are not user data.
 body = render("step2.html", {"path": projects})
 options = re.findall(r"<option value=\"([^\"]*)\">", body)
 for want in ("p&#34;q", "c&#34;d"):
