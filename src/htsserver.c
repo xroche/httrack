@@ -444,15 +444,22 @@ static hts_boolean cat_html_escaped(String *dst, char c) {
   return HTS_TRUE;
 }
 
-/* Append value escaped for a double-quoted HTML attribute: the quote included,
-   which cat_html_escaped() leaves raw for the single-quoted tooltips. */
+/* Same, for a double-quoted attribute: the quote included, which
+   cat_html_escaped() leaves raw for the single-quoted tooltips. */
+static hts_boolean cat_attr_escaped_char(String *dst, char c) {
+  if (c == '\"') {
+    StringCat(*dst, "&#34;");
+    return HTS_TRUE;
+  }
+  return cat_html_escaped(dst, c);
+}
+
+/* Append value escaped for a double-quoted HTML attribute. */
 static void cat_attr_escaped(String *dst, const char *value) {
   const char *a;
 
   for (a = value; *a != '\0'; a++) {
-    if (*a == '\"') {
-      StringCat(*dst, "&#34;");
-    } else if (!cat_html_escaped(dst, *a)) {
+    if (!cat_attr_escaped_char(dst, *a)) {
       StringMemcat(*dst, a, 1);
     }
   }
@@ -1132,6 +1139,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     int format = 0;
                     int listDefault = 0;
                     hts_boolean unquoted = HTS_FALSE;
+                    /* value comes from the template, not from the settings */
+                    hts_boolean literal = HTS_FALSE;
 
                     name[0] = '\0';
                     strlncatbuff(name, str, sizeof(name_), n);
@@ -1164,6 +1173,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
                       name += p;
                       format = 0;
+                      literal = HTS_TRUE;
                       pos2 = strchr(name, ':');
                       langstr = "";
                       if (pos2 != NULL) {
@@ -1293,6 +1303,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       int ztest = (name[0] == 'z');
 
                       langstr = "";
+                      literal = HTS_TRUE;
                       name += p;
                       pos2 = strchr(name, ':');
                       if (pos2 != NULL) {
@@ -1403,8 +1414,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           const char *a = langstr;
 
                           while(*a) {
-                            if (a[0] == '\\' && isxdigit(a[1])
-                                && isxdigit(a[2])) {
+                            /* the ini writer has no inverse for it, so a lone
+                               backslash in a settings value must stay one */
+                            if (literal && a[0] == '\\' && isxdigit(a[1]) &&
+                                isxdigit(a[2])) {
                               int n;
                               char c;
 
@@ -1493,7 +1506,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                               StringClear(tmpbuff);
                               break;
                             default:
-                              if (!cat_html_escaped(&tmpbuff, *fstr)) {
+                              /* format -2 writes its value into the option's
+                                 value="" as well, so the quote must go too */
+                              if (!(format == -2
+                                        ? cat_attr_escaped_char(&tmpbuff, *fstr)
+                                        : cat_html_escaped(&tmpbuff, *fstr))) {
                                 StringMemcat(tmpbuff, fstr, 1);
                               }
                               break;

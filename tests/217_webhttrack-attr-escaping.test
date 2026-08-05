@@ -42,18 +42,30 @@ root="${work}/root"
 mkdir -p "${root}"
 cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
 chmod -R u+w "${root}"
-# CRLF line pairs, English key then translation; anything left undefined falls
-# back to English. "OK" reaches a value=" attribute, "Click to confirm" a
-# single-quoted title=, and the two positions escape differently.
+# The shipped translations are Latin-1, so an escaper that entity-encodes every
+# byte >= 0x80 must not read as clean here.
+eacute=$(printf '\351')
+# CRLF line pairs, English key then translation. "OK" lands in a value="
+# attribute, "Click to confirm" in a single-quoted title=, which escape apart.
 printf '%s\r\n' \
     LANGUAGE_NAME 'Francais-989' \
     LANGUAGE_FILE 'Francais' \
     LANGUAGE_ISO 'fr' \
     LANGUAGE_CHARSET 'iso-8859-1' \
-    OK 'Va "y" <ok>' \
-    'Click to confirm' 'Cliquez "ici" <maintenant>' \
+    OK "Va \"y\" <ok> d${eacute}j${eacute}" \
+    'Click to confirm' "Cliquez \"ici\" <maintenant> d${eacute}j${eacute}" \
     Cancel 'Annuler' \
     >"${root}/lang/Francais.txt"
+
+# Two projects whose names and categories hold a quote: ${liststr:} builds its
+# own <option value=""> in C, out of reach of the template sweep.
+projects="${work}/projects"
+mkdir -p "${projects}/p\"q/hts-cache"
+printf 'Category=c%%22d\r\n' >"${projects}/p\"q/hts-cache/winprofile.ini"
+
+# Loaded on the first request: a Windows path proves the render leaves the
+# backslash alone, so what the browser posts back rewrites the same file.
+printf 'path=C:\\ab\r\nlang=\r\n' >"${work}/.httrack.ini"
 
 printf '[a hostile settings value is entity-escaped in its attribute] ..\t'
 sport=$("${python}" -c 'import socket
@@ -63,7 +75,7 @@ print(s.getsockname()[1])
 s.close()')
 (
     trap '' TERM TTOU
-    # An isolated HOME keeps a stray ~/.httrack.ini out of the served settings.
+    # An isolated HOME, so the ~/.httrack.ini above is the only one served.
     export HOME="${work}"
     exec htsserver "${root}/" --port "${sport}" >"${srvlog}" 2>&1
 ) &
@@ -76,10 +88,11 @@ done
 test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
 srvpid=$(sed -n 's/^PID=//p' "${srvlog}") # absent on Windows
 
-"${python}" - "${url}" <<'PY' || fail "an attribute takes the value raw (see above)"
-import re, sys, urllib.parse, urllib.request
+"${python}" - "${url}" "${projects}" <<'PY' || fail "an attribute takes the value raw (see above)"
+import html, re, sys, urllib.parse, urllib.request
 
 url = sys.argv[1].rstrip("/")
+projects = sys.argv[2]
 form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
 m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
 if not m:
@@ -120,10 +133,11 @@ pages = [
         # negative control: an ordinary value is not rewritten, and the mode
         # does not decode \ab into one byte the way a bare ${key} does
         r'name="footer" value="Mozilla/5.0 C:\ab"',
-        # a translation lands in a value= attribute as well
-        'value="%s"' % escaped('Va "y" <ok>'),
+        # a translation lands in a value= attribute as well, Latin-1 bytes and
+        # all: an escaper entity-encoding everything >= 0x80 fails here
+        'value="%s"' % escaped("Va \"y\" <ok> d\xe9j\xe9"),
         # ... and in a single-quoted title=, which keeps the quote raw
-        "title='Cliquez \"ici\" &lt;maintenant&gt;'",
+        "title='Cliquez \"ici\" &lt;maintenant&gt; d\xe9j\xe9'",
     ]),
     # a second template, and two fields in it: a per-site sweep miss shows up
     # nowhere else
@@ -147,6 +161,50 @@ for page, fields, wants in pages:
     for value in re.findall(r'\b[A-Za-z][A-Za-z0-9:_-]*="([^"]*)"', body):
         if "<" in value or ">" in value:
             sys.exit("%s leaves markup in the attribute %r" % (page, value))
+
+
+def attr(body, page, pattern):
+    m = re.search(pattern, body, re.S)
+    if not m:
+        sys.exit("%s emits no %s:\n%s" % (page, pattern, body[:4000]))
+    return m.group(1)
+
+
+# The browser posts the attribute back decoded, so an escaper that is stable on
+# display can still lose the value on the next submit.
+shown = attr(render("option6.html", {"user": "u" + BREAK}), "option6.html",
+             r'name="user" value="([^"]*)"')
+if html.unescape(shown) != "u" + BREAK:
+    sys.exit("option6.html value decodes to %r" % html.unescape(shown))
+again = attr(render("option6.html", {"user": html.unescape(shown)}),
+             "option6.html", r'name="user" value="([^"]*)"')
+if again != shown:
+    sys.exit("resubmitting the value gives %r, not %r" % (again, shown))
+
+# ~/.httrack.ini holds a Windows path; the ini reader has no backslash escape,
+# so both the display and the textarea the browser posts back must keep it.
+body = render("step2.html", {})
+if attr(body, "step2.html", r'name="path" value="([^"]*)"') != r"C:\ab":
+    sys.exit("step2.html mangles the loaded path:\n%s" % body[:4000])
+body = render("step4.html", {"prox": "px.example", "portprox": "3128",
+                             "proxytype": "1"})
+saved = attr(body, "step4.html",
+             r'<textarea name="userprofile"[^>]*>(.*?)</textarea>')
+if "\r\npath=C:\\ab\r\n" not in saved:
+    sys.exit("step4.html would save %r" % saved)
+# ... while a \3A the template itself writes still decodes to the separator
+if '--proxy "socks5://px.example:3128"' not in body:
+    sys.exit("step4.html drops the template's \\3A escape:\n%s" % body[:4000])
+
+# ${liststr:} builds its own <option value="">, in C, from a project directory
+# name and from the Category= line of each project's winprofile.ini.
+body = render("step2.html", {"path": projects})
+options = re.findall(r"<option value=\"([^\"]*)\">", body)
+for want in ("p&#34;q", "c&#34;d"):
+    if want not in options:
+        sys.exit("step2.html lists %r, not %r" % (options, want))
+if '<option value="p"q">' in body or '<option value="c"d">' in body:
+    sys.exit("step2.html closes an option value early:\n%s" % body[:4000])
 
 # The one attribute left on the URL mode, where the quote takes %22 instead:
 # an entity would decode back to a quote in the file:// URL it builds.
