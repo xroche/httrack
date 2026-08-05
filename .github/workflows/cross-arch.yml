@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-24.04
     # sid, not stable: the point is to predict what the sid buildds will say.
     container: debian:sid
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -49,8 +50,14 @@ jobs:
         run: |
           set -euo pipefail
           # deb-src, so zlib below comes from the archive and not a pinned URL.
-          sed -i 's/^Types: deb$/Types: deb deb-src/' \
-            /etc/apt/sources.list.d/debian.sources
+          # Its own stanza: editing the image's would break on a reworded one.
+          cat > /etc/apt/sources.list.d/deb-src.sources <<'EOF'
+          Types: deb-src
+          URIs: http://deb.debian.org/debian
+          Suites: sid
+          Components: main
+          Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+          EOF
           apt-get update
           apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
@@ -84,7 +91,10 @@ jobs:
           eval "$(dpkg-buildflags --export=sh)"
           # A cross AC_TRY_RUN answers "cross", which would swap in the bundled
           # snprintf that no buildd ever builds. Every glibc passes these.
+          # --disable-https: no ports arch has a cross libssl, so the TLS paths
+          # are the one part of the tree this matrix does not compile.
           "$GITHUB_WORKSPACE/configure" --host="$TRIPLET" \
+            --build="$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)" --disable-https \
             ac_cv_have_working_snprintf=yes ac_cv_have_working_vsnprintf=yes \
             CPPFLAGS="${CPPFLAGS:-} -I$ZPREFIX/include" \
             LDFLAGS="${LDFLAGS:-} -L$ZPREFIX/lib"
@@ -94,5 +104,9 @@ jobs:
 
       - name: Build the test artifacts
         # Nothing runs here, but the shims are where three of the four 3.49.17
-        # failures were: they only build under `check`.
-        run: make -C /tmp/bld -j"$(nproc)" check TESTS=
+        # failures were: they only build under `check`. Asserted, because an
+        # empty TESTS= would otherwise pass having built nothing.
+        run: |
+          set -euo pipefail
+          make -C /tmp/bld -j"$(nproc)" check TESTS=
+          test -f /tmp/bld/tests/.libs/libaltstackprobe.so
