@@ -1,0 +1,98 @@
+#!/bin/bash
+# dyld follows an rpath only for a load path spelled @rpath/..., so a relocatable
+# install on Darwin takes libhttrack's own id too, not just the rpath entries 195
+# checks (#978). Read the load commands the install produced.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+: "${abs_top_builddir:?not run under make check}"
+bindir="${CONFIGURED_BINDIR:?not run under make check}"
+libdir="${CONFIGURED_LIBDIR:?not run under make check}"
+libdir=${libdir%/}
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+skip() {
+    echo "$*; skipping" >&2
+    exit 77
+}
+
+test "$(uname -s)" = Darwin || skip "no Mach-O install commands to read here"
+command -v otool >/dev/null 2>&1 || skip "no otool"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/rpathid.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+stage=${work}/stage
+stage_install_exec "${stage}" "${work}/install.log" ||
+    fail "make install-exec DESTDIR=${stage}"
+
+# The install name, empty when absent. The awk drains its input rather than
+# exiting on the match, or otool takes SIGPIPE and pipefail returns it.
+dylib_id() {
+    otool -l "$1" |
+        awk '/LC_ID_DYLIB/ { f = 1 } f && $1 == "name" { if (!p) { print $2; p = 1 } f = 0 }'
+}
+
+# The dependencies, one per line: only the indented lines of otool -L are those.
+dylib_deps() {
+    otool -L "$1" | awk '/^[[:space:]]/ { print $1 }'
+}
+
+ids=()
+for lib in "${stage}${libdir}"/libhttrack*.dylib; do
+    # The version links point at the file below them, and the glob itself is what
+    # is left when a --disable-shared build installed no library at all.
+    test -f "${lib}" || continue
+    test ! -L "${lib}" || continue
+    id=$(dylib_id "${lib}")
+    test -n "${id}" || fail "${lib} carries no LC_ID_DYLIB"
+    ids+=("${id}")
+done
+test "${#ids[@]}" -gt 0 || skip "this build installed no libhttrack dylib"
+
+if [ "${ORIGIN_RPATH:-no}" != yes ]; then
+    # Both directions: with the gate off the id has to stay absolute, or the
+    # binaries would record an @rpath nothing puts an entry in them for.
+    for id in "${ids[@]}"; do
+        case "${id}" in
+        @rpath/*) fail "configure suppressed the rpath but ${id} is relative anyway" ;;
+        esac
+    done
+    skip "configure did not enable a binary-relative rpath in this build"
+fi
+
+for id in "${ids[@]}"; do
+    test "${id}" = "@rpath/${id##*/}" ||
+        fail "installed libhttrack keeps the id ${id}, which no rpath answers"
+done
+
+# The id only pays off if the executables recorded it: an absolute dependency
+# here resolves before any rpath is consulted and hides the whole change.
+idlist=$(printf '%s\n' "${ids[@]}")
+found=0
+for exe in httrack htsserver; do
+    bin=${stage}${bindir}/${exe}
+    test -r "${bin}" || fail "no ${exe} in ${stage}${bindir}"
+    while read -r dep; do
+        case "${dep}" in
+        *libhttrack*) ;;
+        *) continue ;;
+        esac
+        found=$((found + 1))
+        grep -qxF "${dep}" <<<"${idlist}" ||
+            fail "${exe} loads ${dep}, which is not the id the installed library carries"
+    done < <(dylib_deps "${bin}")
+done
+test "${found}" -ge 2 ||
+    fail "the two executables hold ${found} libhttrack dependencies, so this proved nothing"
+
+echo "installed libhttrack is ${ids[*]}, loaded as such by httrack and htsserver"

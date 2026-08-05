@@ -1,10 +1,14 @@
 #!/bin/bash
 # An install copied away from its configured prefix still has to find
-# libhttrack, which it does through a binary-relative rpath (#906).
+# libhttrack, which it does through a binary-relative rpath (#906). On Darwin
+# that also takes an @rpath install_name, which 219 reads (#978).
 
 set -euo pipefail
 
-builddir="${abs_top_builddir:?not run under make check}"
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+: "${abs_top_builddir:?not run under make check}"
 bindir="${CONFIGURED_BINDIR:?not run under make check}"
 libdir="${CONFIGURED_LIBDIR:?not run under make check}"
 libdir=${libdir%/}
@@ -24,15 +28,9 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/relocate.XXXXXX") || {
 }
 trap 'set +e; rm -rf "${work}"' EXIT
 
-# DESTDIR keeps the configured prefix, so the absolute rpath libtool baked in
-# still points outside the staged tree, and libtool has no reason to relink
-# while the rest of the suite runs against the same build directory.
 stage=${work}/stage
-env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${builddir}/src" install-exec \
-    DESTDIR="${stage}" >"${work}/install.log" 2>&1 || {
-    cat "${work}/install.log" >&2
+stage_install_exec "${stage}" "${work}/install.log" ||
     fail "make install-exec DESTDIR=${stage}"
-}
 
 bin=${stage}${bindir}/httrack
 test -r "${bin}" || fail "no httrack in ${stage}${bindir}"
