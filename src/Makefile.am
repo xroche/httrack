@@ -15,6 +15,10 @@ DevIncludes_DATA = \
 	htsarrays.h \
 	htssafe.h
 
+# What hands a consumer the include path and the rpath the @rpath id needs (#978).
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libhttrack.pc
+
 AM_CPPFLAGS = \
 	@DEFAULT_CFLAGS@ \
 	@THREADS_CFLAGS@ \
@@ -42,8 +46,8 @@ httrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE)
 proxytrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 htsserver_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 
-# @RPATH_ORIGIN_LDFLAGS@ makes a copied tree find libhttrack next to it (#906);
-# proxytrack links no shared library of ours, so it needs none.
+# @RPATH_ORIGIN_LDFLAGS@ makes a copied tree find libhttrack next to it (#906),
+# pairing on Darwin with the dylib's @rpath id (#978); proxytrack needs none of it.
 httrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE) @RPATH_ORIGIN_LDFLAGS@
 proxytrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
 htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE) @RPATH_ORIGIN_LDFLAGS@

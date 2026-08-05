@@ -71,7 +71,8 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$plist" "$app/Contents/Info.plist"
 cp "$icon" "$app/Contents/Resources/$(basename "$icon")"
 cp -R "$prefix"/. "$app/Contents/Resources/"
-rm -rf "$app/Contents/Resources/include"
+# Development surface only, and the .pc would carry the staging prefix in with it.
+rm -rf "$app/Contents/Resources/include" "$app/Contents/Resources/lib/pkgconfig"
 find "$app/Contents/Resources" \( -name '*.la' -o -name '*.a' \) -delete
 
 # webhttrack carries the configure-time datadir as a --datadir fallback (#887);

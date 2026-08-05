@@ -8,7 +8,7 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
 
-builddir="${abs_top_builddir:?not run under make check}"
+: "${abs_top_builddir:?not run under make check}"
 bindir="${CONFIGURED_BINDIR:?not run under make check}"
 libdir="${CONFIGURED_LIBDIR:?not run under make check}"
 
@@ -37,11 +37,8 @@ trap 'rm -rf "${work}"' HUP INT QUIT PIPE TERM
 # The installed ELF, not the build tree's libtool wrapper: the wrapper re-execs
 # its binary by absolute path, which is the argv[0] this test must not have.
 stage=${work}/stage
-env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${builddir}/src" install-exec \
-    DESTDIR="${stage}" >"${work}/install.log" 2>&1 || {
-    cat "${work}/install.log" >&2
+stage_install_exec "${stage}" "${work}/install.log" ||
     fail "make install-exec DESTDIR=${stage}"
-}
 bin=${stage}${bindir}/httrack
 test -r "${bin}" || fail "no httrack in ${stage}${bindir}"
 

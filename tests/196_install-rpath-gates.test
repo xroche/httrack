@@ -1,6 +1,7 @@
 #!/bin/bash
 # The binary-relative rpath must stay off where it is unwanted (#906): a
-# distribution libdir the loader already searches, and an explicit opt-out.
+# distribution libdir the loader already searches, and an explicit opt-out. The
+# rpath libhttrack.pc hands a consumer answers to the same gates (#978).
 
 set -euo pipefail
 
@@ -39,12 +40,12 @@ test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
 # not depend on the prefix.
 cache=${work}/config.cache
 n=0
-cases=6 # expect calls below, what the budget is paced against; 1 on Darwin
+cases=6 # expect calls below, what the budget is paced against
 
 expect() {
     local want=$1 desc=$2
     shift 2
-    local dir got began=$SECONDS
+    local dir got line began=$SECONDS
     n=$((n + 1))
     dir=${work}/build${n}
     mkdir -p "${dir}"
@@ -61,24 +62,27 @@ expect() {
         grep -i 'binary-relative' "${dir}/configure.log" >&2 || true
         fail "${desc}: ORIGIN_RPATH is '${got}', expected '${want}'"
     }
+    # Same answer here: no case below turns on the $ORIGIN probe, which the .pc's
+    # absolute rpath does not need anyway.
+    line=$(sed -n 's/^Libs: //p' "${dir}/src/libhttrack.pc")
+    test -n "${line}" || fail "${desc}: libhttrack.pc carries no Libs line"
+    case "${line}" in
+    *-rpath*) got=yes ;;
+    *) got=no ;;
+    esac
+    test "${got}" = "${want}" ||
+        fail "${desc}: libhttrack.pc rpath is '${got}', expected '${want}': ${line}"
     echo "ok: ${desc} -> ${want}"
     skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 }
 
-# Darwin has no positive case: configure turns the rpath off there whatever the
-# prefix, so assert that one row rather than run "no" rows that cannot fail.
-if [ "$(uname -s)" = Darwin ]; then
-    cases=1
-    expect no "Darwin opts out whatever the prefix" --prefix="${work}/inst"
-else
-    # The positive control first, or every "no" below could come from a probe that
-    # simply never succeeds on this machine.
-    expect yes "a private prefix gets the rpath" --prefix="${work}/inst"
-    expect no "a system prefix does not" --prefix=/usr
-    expect no "a multiarch libdir does not" --prefix=/usr --libdir=/usr/lib/x86_64-linux-gnu
-    expect no "a 32-bit multilib libdir does not" --prefix=/usr --libdir=/usr/lib32
-    expect no "--disable-origin-rpath is honoured" --prefix="${work}/inst" --disable-origin-rpath
-    expect no "a static build does not" --prefix="${work}/inst" --disable-shared
-fi
+# The positive control first, or every "no" below could come from a probe that
+# simply never succeeds on this machine.
+expect yes "a private prefix gets the rpath" --prefix="${work}/inst"
+expect no "a system prefix does not" --prefix=/usr
+expect no "a multiarch libdir does not" --prefix=/usr --libdir=/usr/lib/x86_64-linux-gnu
+expect no "a 32-bit multilib libdir does not" --prefix=/usr --libdir=/usr/lib32
+expect no "--disable-origin-rpath is honoured" --prefix="${work}/inst" --disable-origin-rpath
+expect no "a static build does not" --prefix="${work}/inst" --disable-shared
 
 test "${n}" -eq "${cases}" || fail "ran ${n} cases, not the ${cases} the budget is paced against"

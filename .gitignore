@@ -26,6 +26,7 @@ Makefile.in
 /stamp-h1
 # src/webhttrack.in is the source; an in-tree build generates this one (#887).
 /src/webhttrack
+/src/libhttrack.pc
 Makefile
 .deps/
 .dirstamp

@@ -48,6 +48,22 @@ expect_ok() {
     esac
 }
 
+# Run src/ install target $1 into DESTDIR $2, logging to $3. The configured prefix
+# survives DESTDIR, so libtool will not relink the build the rest of the suite runs
+# against; MAKEFLAGS and MAKELEVEL cleared, no jobserver to hunt.
+stage_install_target() {
+    local target=$1 dest=$2 log=$3
+    env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir:?}/src" \
+        "${target}" DESTDIR="${dest}" >"${log}" 2>&1 && return 0
+    cat "${log}" >&2
+    return 1
+}
+
+# The binaries and the library alone, for a caller reading what was linked.
+stage_install_exec() {
+    stage_install_target install-exec "$1" "$2"
+}
+
 is_windows() {
     case "$(uname -s)" in
     MINGW* | MSYS* | CYGWIN*) return 0 ;;
