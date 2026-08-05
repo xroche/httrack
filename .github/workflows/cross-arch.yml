@@ -50,14 +50,10 @@ jobs:
         run: |
           set -euo pipefail
           # deb-src, so zlib below comes from the archive and not a pinned URL.
-          # Its own stanza: editing the image's would break on a reworded one.
-          cat > /etc/apt/sources.list.d/deb-src.sources <<'EOF'
-          Types: deb-src
-          URIs: http://deb.debian.org/debian
-          Suites: sid
-          Components: main
-          Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
-          EOF
+          # In place: a second stanza has to repeat Signed-By, and apt rejects
+          # the same source carrying two spellings of the keyring.
+          sed -i 's/^Types: deb$/Types: deb deb-src/' \
+            /etc/apt/sources.list.d/debian.sources
           apt-get update
           apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
