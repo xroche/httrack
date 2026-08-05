@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 
@@ -115,7 +115,7 @@ ${do:end-if}
 <br>
 
 
-<form action="${thisfile}" name="form">
+<form action="${attr:thisfile}" name="form">
 <table width="100%">
 <tr><td>${LANG_T2}</td><td>http://<input name="urladr"
 			title='${html:LANG_T10}' onMouseOver="info('${js:LANG_T10}'); return true" onMouseOut="info('&nbsp;'); return true"
@@ -130,7 +130,7 @@ ${do:end-if}
 <tr><td>${LANG_T6}:</td><td><input name="urlpass"
 			title='${html:LANG_T13}' onMouseOver="info('${js:LANG_T13}'); return true" onMouseOut="info('&nbsp;'); return true"
 ></td></tr>
-<tr><td>${LANG_T7}:</td><td><input type="button" value="${LANG_T8}" onClick="alert('not yet implemented!')"
+<tr><td>${LANG_T7}:</td><td><input type="button" value="${attr:LANG_T8}" onClick="alert('not yet implemented!')"
 			title='${html:LANG_T14}' onMouseOver="info('${js:LANG_T14}'); return true" onMouseOut="info('&nbsp;'); return true"
 ></td></tr>
 </table>

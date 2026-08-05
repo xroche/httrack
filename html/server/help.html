@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
@@ -66,7 +66,7 @@ ${LANG_O16}...
 
 <tr><td class="tabCtrl" align="left">
 <a style="background:black;color: white" 
-   href="http://www.httrack.com/update.php3?Product=HTTrack&Version=${HTTRACK_VERSIONID}&VersionStr=${HTTRACK_VERSION}&Platform=${HTS_PLATFORM}&LanguageId=${lang}" target="_new"
+   href="http://www.httrack.com/update.php3?Product=HTTrack&Version=${attr:HTTRACK_VERSIONID}&VersionStr=${attr:HTTRACK_VERSION}&Platform=${attr:HTS_PLATFORM}&LanguageId=${attr:lang}" target="_new"
 			title='${html:LANG_O17}' onMouseOver="info('${js:LANG_O17}'); return true" onMouseOut="info('&nbsp;'); return true"
    >
 ${LANG_O17}...
