@@ -65,9 +65,29 @@ for lib in "${staged_libdir}"/libhttrack.so* "${staged_libdir}"/libhttrack*.dyli
 done
 [ "${shared}" = yes ] || skip "this build installed no shared libhttrack"
 
-# The staged copy still names the configured directories. All three, not prefix
-# alone: an explicit --libdir lands in the .pc absolute and derives from nothing.
+# Without the @rpath id there is nothing an rpath can answer: the dylib keeps an
+# absolute install name, and only what is installed at the real libdir resolves.
+if [ "$(uname -s)" = Darwin ] && [ "${ORIGIN_RPATH:-no}" != yes ]; then
+    skip "configure did not enable a binary-relative rpath in this build"
+fi
+
 export PKG_CONFIG_PATH=${staged_libdir}/pkgconfig
+
+# --define-variable OVERRIDES the file's own assignment, so every relocated query
+# below would pass on a .pc naming the wrong directory. Read the raw values first.
+expect_variable() {
+    local var=$1 want=$2 got
+    got=$("${pkgconfig}" --variable="${var}" libhttrack) ||
+        fail "pkg-config --variable=${var} failed"
+    test "${got%/}" = "${want}" ||
+        fail "libhttrack.pc says ${var}=${got}, configure was given ${want}"
+}
+expect_variable prefix "${prefix}"
+expect_variable libdir "${libdir}"
+expect_variable includedir "${includedir}"
+
+# The staged copy still names the configured directories, so point every one of
+# them at the stage to build against what was just installed.
 pc_query() {
     "${pkgconfig}" \
         --define-variable=prefix="${stage}${prefix}" \
@@ -121,16 +141,16 @@ case " ${static_libs} " in
 *) fail "pkg-config --static --libs carries no -lz, Libs.private cannot be right: ${static_libs}" ;;
 esac
 
-# Both directions of the gate: an rpath into a distribution libdir is a lintian
-# tag, and its absence anywhere else leaves the @rpath id unresolvable.
-if [ "${SYSTEM_LIBDIR:-no}" = yes ]; then
-    case "${libs}" in
-    *-rpath*) fail "${libdir} is a system libdir but libhttrack.pc still emits an rpath: ${libs}" ;;
-    esac
-else
+# Both directions of the gate: an unwanted rpath is a lintian tag or a disregarded
+# --disable-origin-rpath, a missing one leaves the @rpath id unresolvable.
+if [ "${PKGCONFIG_RPATH:-no}" = yes ]; then
     case " ${libs} " in
     *" -Wl,-rpath,${staged_libdir} "*) ;;
     *) fail "libhttrack.pc emits no rpath into ${staged_libdir}: ${libs}" ;;
+    esac
+else
+    case "${libs}" in
+    *-rpath*) fail "configure gated the rpath off but libhttrack.pc emits one: ${libs}" ;;
     esac
 fi
 
@@ -156,11 +176,11 @@ EOF
     fail "a consumer does not build from pkg-config --cflags --libs libhttrack"
 }
 
-# With no rpath by design, a staged system libdir is not on the loader's path.
-if [ "${SYSTEM_LIBDIR:-no}" = yes ]; then
-    runenv=(env "LD_LIBRARY_PATH=${staged_libdir}" "DYLD_LIBRARY_PATH=${staged_libdir}")
-else
+# With no rpath by design, the stage is not on the loader's path.
+if [ "${PKGCONFIG_RPATH:-no}" = yes ]; then
     runenv=(env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH)
+else
+    runenv=(env "LD_LIBRARY_PATH=${staged_libdir}" "DYLD_LIBRARY_PATH=${staged_libdir}")
 fi
 
 # From an unrelated cwd, so nothing resolves through a relative path.
@@ -169,6 +189,31 @@ out=$("${runenv[@]}" "${work}/consumer" 2>&1) ||
     fail "the consumer did not run: ${out}"
 test "${out}" = "${version}" ||
     fail "libhttrack.pc says Version ${version}, the library it resolved says ${out}"
+
+# An archive link needs each library ahead of the ones it uses, an order nothing
+# above exercises: the -lz check passed on a line that left 76 symbols undefined.
+static_cflags=$(pc_query --static --cflags) || fail "pkg-config --static --cflags failed"
+read -r -a static_cflags_argv <<<"${static_cflags}"
+read -r -a static_libs_argv <<<"${static_libs}"
+if [ ! -f "${staged_libdir}/libhttrack.a" ]; then
+    echo "this build installed no libhttrack.a; skipping the archive link" >&2
+elif ! "${cc_argv[@]}" -static -o "${work}/staticprobe" -x c - \
+    <<<'int main(void) { return 0; }' >/dev/null 2>&1; then
+    echo "${cc_argv[0]} cannot link -static here; skipping the archive link" >&2
+elif ! "${cc_argv[@]}" "${static_cflags_argv[@]}" -static -o "${work}/consumer-static" \
+    "${work}/consumer.c" "${static_libs_argv[@]}" 2>"${work}/cc-static.log"; then
+    # A sanitized build's archive needs the runtime -static cannot supply.
+    if grep -q -e __asan -e __ubsan -e __tsan -e __msan "${work}/cc-static.log"; then
+        echo "the build is sanitized, its archive does not link -static; skipping" >&2
+    else
+        head -20 "${work}/cc-static.log" >&2
+        fail "a consumer does not link from pkg-config --static --cflags --libs libhttrack"
+    fi
+else
+    out=$("${work}/consumer-static" 2>&1) || fail "the static consumer did not run: ${out}"
+    test "${out}" = "${version}" ||
+        fail "libhttrack.pc says Version ${version}, the archive it linked says ${out}"
+fi
 
 # Take the library away and the consumer has to stop working. If it still runs,
 # another libhttrack answered and the run above proved nothing.

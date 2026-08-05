@@ -240,17 +240,6 @@ AS_CASE([$hts_libdir],
 	[/usr/lib | /usr/lib/* | /usr/lib32 | /usr/lib32/* | /usr/lib64 | /usr/lib64/* | /usr/libx32 | /usr/libx32/*], [hts_origin_sysdir=yes],
 	[hts_origin_sysdir=no])
 
-# The @rpath id is only safe for a consumer carrying its own LC_RPATH, so
-# libhttrack.pc hands one out. ${libdir} is pkg-config's own variable, expanded
-# when the file is queried; the value is empty, leading space and all, for a
-# system libdir.
-SYSTEM_LIBDIR=$hts_origin_sysdir
-PKGCONFIG_RPATH_LDFLAG=
-AS_IF([test "x$hts_origin_sysdir" = xno],
-	[PKGCONFIG_RPATH_LDFLAG=' -Wl,-rpath,${libdir}'])
-AC_SUBST([SYSTEM_LIBDIR])
-AC_SUBST([PKGCONFIG_RPATH_LDFLAG])
-
 # dyld follows LC_RPATH only for a load path spelled @rpath/..., so Darwin also
 # needs libhttrack's own id. That comes from libtool's archive_cmds template and
 # not from LDFLAGS, so rewrite it; an unrecognised template leaves the gate off.
@@ -346,6 +335,19 @@ fi
 AC_SUBST([ORIGIN_RPATH])
 AC_SUBST([RPATH_ORIGIN_LDFLAGS])
 
+# The @rpath id is only safe for a consumer carrying its own LC_RPATH, so
+# libhttrack.pc hands one out -- under the gates the executables' own rpath
+# respects, so that --disable-origin-rpath and an archive-only build stay
+# rpath-free too. ${libdir} is pkg-config's own variable, expanded on query.
+PKGCONFIG_RPATH=no
+PKGCONFIG_RPATH_LDFLAG=
+AS_IF([test "x$enable_origin_rpath" != xno && test "x$enable_shared" != xno &&
+	test "x$hts_origin_sysdir" = xno],
+	[PKGCONFIG_RPATH=yes
+	PKGCONFIG_RPATH_LDFLAG=' -Wl,-rpath,${libdir}'])
+AC_SUBST([PKGCONFIG_RPATH])
+AC_SUBST([PKGCONFIG_RPATH_LDFLAG])
+
 ### Check for -fvisibility=hidden support
 gl_VISIBILITY
 AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
@@ -432,7 +434,8 @@ AC_CHECK_LIB(crypto, EVP_get_digestbyname,
 LIBS="$LIBS $OPENSSL_LIBS"
 AC_CHECK_LIB(ssl, SSL_CTX_new,
 	[
-	OPENSSL_LIBS="$OPENSSL_LIBS -lssl"
+	# -lssl first: an archive link needs it ahead of the -lcrypto it uses.
+	OPENSSL_LIBS="-lssl $OPENSSL_LIBS"
 	AC_DEFINE(HTS_USEOPENSSL, 1, [Check for OpenSSL])
 	],
 	[
@@ -499,6 +502,34 @@ AC_CHECK_LIB(c, dlopen, [DL_LIBS=
 AC_DEFINE(DLLIB, 1,[Check for dlopen in c])], AC_MSG_WARN([*** not found * this is bad]))
 AC_SUBST(DL_LIBS)
 fi
+
+### What libhttrack.pc tells a consumer about its private dependencies
+# A static link needs each library ahead of the ones it uses, which only a
+# dependency's own .pc gets right (and which alone carries the -L an
+# out-of-the-way prefix needs), so name the module wherever one is installed.
+# Dependents first: pkg-config emits Requires.private after Libs.private.
+AC_ARG_VAR([PKG_CONFIG], [path to the pkg-config utility])
+AC_PATH_TOOL([PKG_CONFIG], [pkg-config], [false])
+PKGCONFIG_REQUIRES_PRIVATE=
+PKGCONFIG_LIBS_PRIVATE=
+hts_pc_dep() { # hts_pc_dep <module or empty> <link line>
+	test -n "$2" || return 0
+	if test -n "$1" && $PKG_CONFIG --exists "$1" 2>/dev/null; then
+		PKGCONFIG_REQUIRES_PRIVATE="${PKGCONFIG_REQUIRES_PRIVATE:+$PKGCONFIG_REQUIRES_PRIVATE }$1"
+	else
+		PKGCONFIG_LIBS_PRIVATE="${PKGCONFIG_LIBS_PRIVATE:+$PKGCONFIG_LIBS_PRIVATE }$2"
+	fi
+}
+# Whichever half of OpenSSL was actually found; https=auto can settle for libcrypto.
+AS_CASE([" $OPENSSL_LIBS "],
+	[*" -lssl "*], [hts_pc_openssl=openssl],
+	[*" -lcrypto "*], [hts_pc_openssl=libcrypto],
+	[hts_pc_openssl=])
+hts_pc_dep "$hts_pc_openssl" "$OPENSSL_LIBS"
+hts_pc_dep libbrotlidec "$BROTLI_LIBS"
+hts_pc_dep libzstd "$ZSTD_LIBS"
+AC_SUBST([PKGCONFIG_REQUIRES_PRIVATE])
+AC_SUBST([PKGCONFIG_LIBS_PRIVATE])
 
 ### Check for setuid
 AC_CHECK_LIB(c, setuid, [

@@ -7,9 +7,11 @@ Name: libhttrack
 Description: HTTrack Website Copier engine
 URL: @PACKAGE_URL@
 Version: @PACKAGE_VERSION@
-# Flat, as the installed headers and the libtest examples include each other;
-# LFS decides the layout of the struct stat httrack-library.h typedefs.
+# Flat, as the installed headers and the libtest examples include each other; same
+# flags libtest itself builds with. config.h, not these, carries the ABI gating.
 Cflags: -I${includedir}/httrack @V6_FLAG@ @LFS_FLAG@
-# Carries its own leading space, and is empty for a system libdir (#978).
+# Carries its own leading space, and is empty wherever configure gates the rpath off (#978).
 Libs: -L${libdir} -lhttrack@PKGCONFIG_RPATH_LDFLAG@
-Libs.private: @LIBS@ @THREADS_LIBS@ @BROTLI_LIBS@ @ZSTD_LIBS@ @OPENSSL_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @ICONV_LIBS@
+# Ordered for an archive link: a library ahead of the ones it uses.
+Requires.private: @PKGCONFIG_REQUIRES_PRIVATE@
+Libs.private: @PKGCONFIG_LIBS_PRIVATE@ @LIBS@ @THREADS_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @ICONV_LIBS@

@@ -72,8 +72,10 @@ Package: libhttrack-dev
 Architecture: any
 Multi-Arch: same
 Section: libdevel
-# libhttrack3: what the .so symlink and libhttrack.pc's -lhttrack resolve onto.
-Depends: ${misc:Depends}, ${shlibs:Depends}, libhttrack3 (= ${binary:Version}), zlib1g-dev
+# libhttrack3: what the .so symlink and libhttrack.pc's -lhttrack resolve onto. The
+# other -dev packages: libhttrack.pc names their modules in Requires.private, and
+# pkg-config fails outright when one of those .pc files is missing.
+Depends: ${misc:Depends}, ${shlibs:Depends}, libhttrack3 (= ${binary:Version}), zlib1g-dev, libssl-dev, libbrotli-dev, libzstd-dev
 Description: Httrack website copier includes and development files
  This package adds supplemental files for using the httrack website copier
  library

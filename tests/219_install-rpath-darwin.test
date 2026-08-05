@@ -8,11 +8,6 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
 
-: "${abs_top_builddir:?not run under make check}"
-bindir="${CONFIGURED_BINDIR:?not run under make check}"
-libdir="${CONFIGURED_LIBDIR:?not run under make check}"
-libdir=${libdir%/}
-
 fail() {
     echo "FAIL: $*" >&2
     exit 1
@@ -21,6 +16,13 @@ skip() {
     echo "$*; skipping" >&2
     exit 77
 }
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is no install rule to drive.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+bindir="${CONFIGURED_BINDIR:?not run under make check}"
+libdir="${CONFIGURED_LIBDIR:?not run under make check}"
+libdir=${libdir%/}
 
 test "$(uname -s)" = Darwin || skip "no Mach-O install commands to read here"
 command -v otool >/dev/null 2>&1 || skip "no otool"

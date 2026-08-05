@@ -35,11 +35,11 @@ TESTS_ENVIRONMENT += CONFIGURED_DATADIR=$(datadir)
 TESTS_ENVIRONMENT += CONFIGURED_LIBDIR=$(libdir)
 TESTS_ENVIRONMENT += CONFIGURED_BINDIR=$(bindir)
 TESTS_ENVIRONMENT += ORIGIN_RPATH=$(ORIGIN_RPATH)
-# 222_pkgconfig-consumer.test relocates the staged .pc onto these, and asserts
-# both sides of the gate that keeps an rpath out of a system libdir.
+# 222_pkgconfig-consumer.test asserts the staged .pc against these, and both
+# sides of the gate deciding whether it hands a consumer an rpath.
 TESTS_ENVIRONMENT += CONFIGURED_PREFIX=$(prefix)
 TESTS_ENVIRONMENT += CONFIGURED_INCLUDEDIR=$(includedir)
-TESTS_ENVIRONMENT += SYSTEM_LIBDIR=$(SYSTEM_LIBDIR)
+TESTS_ENVIRONMENT += PKGCONFIG_RPATH=$(PKGCONFIG_RPATH)
 TESTS_ENVIRONMENT += MAKE="$(MAKE)"
 # 205_install-headers.test compiles the installed headers with the build's compiler.
 # CPPFLAGS carries the dependency include paths a consumer needs too: brew's
