@@ -1,3 +1,20 @@
+httrack (3.49.17-1) unstable; urgency=medium
+
+  * New upstream release: security fixes in the FTP and HTTP request paths and
+    in both WebHTTrack interfaces, where a crawled page could reach the control
+    panel, plus crash-report and stack-diagnostic fixes; full list in
+    history.txt. Also fixes the 3.49.16-1 build failures on armhf, loong64 and
+    hppa, both in the crash-report test's unwinding assumptions and in the
+    per-test time budget.
+  * libhttrack-dev ships $(libdir)/pkgconfig/libhttrack.pc, and so now depends
+    on libhttrack3 and on the -dev packages whose modules that file names:
+    libssl-dev, libbrotli-dev and libzstd-dev.
+  * Build with --disable-online-unit-tests. Policy 4.9 forbids network access
+    during a build, and the previous "auto" probe found one on hurd-i386, whose
+    crawl tests then failed on DNS.
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 05 Aug 2026 12:28:23 +0200
+
 httrack (3.49.16-1) unstable; urgency=medium
 
   * New upstream release: a stack overflow in the cache header writer, which a

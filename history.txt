@@ -4,6 +4,25 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-17
++ New: a pkg-config file, libhttrack.pc, ships with the development headers (#978)
++ Fixed: a crawled page could read the WebHTTrack session id and drive the control panel; the id is now unguessable and cross-origin commands are refused (#877)
++ Fixed: an ftp:// link carrying encoded line breaks could append commands to the FTP control channel (#1010)
++ Fixed: a crawled link could inject header lines into the requests HTTrack sends (#1008)
++ Fixed: a control byte in a link made the crawler fetch a URL the page never wrote, and stripping one left the original tail glued to the result (#1005, #981)
++ Fixed: the WebHTTrack progress panel rendered crawled URLs into HTML and JavaScript unescaped (#988)
++ Fixed: the WebHTTrack settings pages interpolated values into attributes unescaped, lost a value containing a quote, and mangled a Windows path such as C:\ab (#989)
++ Fixed: a worker thread exhausting its stack died with no diagnostic (#969)
++ Fixed: a non-PIE build's crash report named no frame of the executable and resolved no source line (#995, #996, #997)
++ Fixed: the crash report could hang, its symbolizer being forked from the signal handler (#985)
++ Fixed: two installed headers declared symbols the library does not export (#990)
++ Fixed: an install moved away from its configured prefix could not find libhttrack on macOS (#978)
++ Changed: mirrored pages are served sandboxed, so a saved page can no longer script the WebHTTrack panel, and loses cookies, storage and cross-frame access (#877)
++ Changed: htsserver exits with a diagnostic rather than fall back to a guessable session id when no entropy source answers (#877)
++ Changed: an FTP file whose name contains a tab is no longer fetched (#1010)
++ Changed: on macOS, libhttrack records @rpath/libhttrack.3.dylib, so anything linked against it afterwards supplies its own rpath (#978)
++ Changed: multiple internal hardening, build, test and CI improvements
+
 3.49-16
 + New: macOS ships a signed and notarized HTTrack.app with its own icon, bundling the OpenSSL it needs so a downloaded copy launches (#890, #900, #901, #950)
 + New: the desktop icons install into the hicolor theme, scalable SVG included, so Icon=httrack resolves in a launcher (#932, #933)
