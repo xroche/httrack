@@ -89,26 +89,64 @@ static posix_spawn_file_actions_t spawn_actions;
 static posix_spawn_file_actions_t *spawn_redirect = NULL;
 
 /* dladdr() names the main program after argv[0], which the symbolizer cannot
-   open when the binary came off PATH; /proc/self/exe always names the file. */
+   open when the binary came off PATH; /proc/self/exe always names the file.
+   hts_self_path() (htscoremain.c) resolves the same path, out of reach here:
+   it is library-side and hidden by -fvisibility=hidden (#997). */
 static char main_path[BT_PATH_SIZE];
-static const void *main_base;
+/* Where the main program is mapped, and the bias to take off an address to get
+   the one addr2line wants: 0 for an ET_EXEC, which is mapped where it links. */
+static uintptr_t main_lo, main_hi, main_bias;
 
-static int record_main_base(struct dl_phdr_info *info, size_t size,
-                            void *data) {
+static int record_main_range(struct dl_phdr_info *info, size_t size,
+                             void *data) {
+  size_t i;
+
   (void) size;
   (void) data;
-  main_base = (const void *) info->dlpi_addr;
+  main_bias = (uintptr_t) info->dlpi_addr;
+  main_lo = (uintptr_t) -1; /* an empty range matches no frame */
+  for (i = 0; i < info->dlpi_phnum; i++) {
+    const ElfW(Phdr) *const phdr = &info->dlpi_phdr[i];
+    const uintptr_t start = main_bias + (uintptr_t) phdr->p_vaddr;
+
+    if (phdr->p_type != PT_LOAD)
+      continue;
+    if (start < main_lo)
+      main_lo = start;
+    if (start + phdr->p_memsz > main_hi)
+      main_hi = start + phdr->p_memsz;
+  }
   return 1; /* dl_iterate_phdr starts at the main program */
+}
+
+/* By range, not by load base: dladdr() reports the mapping start and
+   dl_iterate_phdr() the bias, which differ on an ET_EXEC (#995). */
+static hts_boolean is_main_frame(const void *addr) {
+  const uintptr_t value = (uintptr_t) addr;
+
+  return value >= main_lo && value < main_hi ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Trailing component of path, the whole of it when it holds no '/'. */
+static const char *base_name(const char *path) {
+  const char *const slash = strrchr(path, '/');
+
+  return slash != NULL ? slash + 1 : path;
 }
 
 static void find_main_object(void) {
   const ssize_t len = readlink("/proc/self/exe", main_path, sizeof(main_path));
+  Dl_info info;
 
+  dl_iterate_phdr(record_main_range, NULL);
   /* A full buffer is a clipped path, which readlink() cannot report: its prefix
      names another file, and the symbolizer would happily open that one. */
   if (len > 0 && (size_t) len < sizeof(main_path)) {
     main_path[len] = '\0';
-    if (dl_iterate_phdr(record_main_base, NULL) == 1)
+    /* Started through the loader, /proc/self/exe is ld.so while dladdr() still
+       names the program: take dladdr()'s word for it (#996). */
+    if (dladdr((const void *) main_lo, &info) != 0 && info.dli_fname != NULL &&
+        strcmp(base_name(main_path), base_name(info.dli_fname)) == 0)
       return;
   }
   main_path[0] = '\0'; /* unresolved: keep whatever dladdr() reported */
@@ -186,6 +224,7 @@ static void symbolize_backtrace(void *const *stack, int size) {
   const void *base[BT_MAX_FRAMES];
   const char *name[BT_MAX_FRAMES];
   hts_boolean grouped[BT_MAX_FRAMES];
+  hts_boolean is_main[BT_MAX_FRAMES];
   char module[BT_PATH_SIZE];
   char *argv[4 + BT_MAX_FRAMES + 1];
   int budget = BT_WAIT_TICKS;
@@ -205,8 +244,10 @@ static void symbolize_backtrace(void *const *stack, int size) {
       continue;
     base[i] = info.dli_fbase;
     name[i] = info.dli_fname;
-    print_hex(hex[i], (uintptr_t) ((const char *) stack[i] -
-                                   (const char *) info.dli_fbase));
+    is_main[i] = is_main_frame(stack[i]);
+    print_hex(hex[i],
+              (uintptr_t) stack[i] -
+                  (is_main[i] ? main_bias : (uintptr_t) info.dli_fbase));
     grouped[i] = HTS_FALSE;
   }
 
@@ -220,8 +261,7 @@ static void symbolize_backtrace(void *const *stack, int size) {
       ;
     if (first >= size)
       break;
-    path = main_path[0] != '\0' && base[first] == main_base ? main_path
-                                                            : name[first];
+    path = main_path[0] != '\0' && is_main[first] ? main_path : name[first];
     argv[argc++] = prog;
     argv[argc++] = opts;
     argv[argc++] = dashe;

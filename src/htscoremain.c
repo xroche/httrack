@@ -87,6 +87,8 @@ static int datadir_has_templates(const char *dir) {
                         "templates/index-header.html"));
 }
 
+/* htsbacktrace.c copies the Linux branch: it is program-side and cannot reach
+   this hidden symbol, so a fix here belongs there too (#997). */
 const char *hts_self_path(char *dst, size_t dstsize) {
 #if defined(_WIN32)
   const DWORD n = GetModuleFileNameA(NULL, dst, (DWORD) dstsize);
