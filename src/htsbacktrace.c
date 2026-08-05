@@ -266,7 +266,7 @@ void hts_backtrace_init(void) {
 #endif
 }
 
-hts_boolean hts_backtrace_altstack(void) {
+void *hts_backtrace_altstack(void) {
 #ifdef USES_SIGALTSTACK
   /* Not a constant since glibc 2.34: SIGSTKSZ is a sysconf() call. */
   const size_t size =
@@ -277,23 +277,43 @@ hts_boolean hts_backtrace_altstack(void) {
   /* Never take one over, whatever its size: a sanitizer runtime installs its
      own and sizes it for its own handlers (ASan: 32kB, ours needs ~10kB). */
   if (sigaltstack(NULL, &ss) == 0 && (ss.ss_flags & SS_DISABLE) == 0)
-    return HTS_TRUE;
+    return NULL;
   /* Mapped, not allocated: a stack for the handler must not live in the heap
      whose corruption we may be reporting. */
   sp = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1,
             0);
   if (sp == MAP_FAILED)
-    return HTS_FALSE;
+    return NULL;
   ss.ss_sp = sp;
   ss.ss_size = size;
   ss.ss_flags = 0;
   if (sigaltstack(&ss, NULL) != 0) {
     munmap(sp, size);
-    return HTS_FALSE;
+    return NULL;
   }
-  return HTS_TRUE;
+  return sp;
 #else
-  return HTS_FALSE;
+  return NULL;
+#endif
+}
+
+void hts_backtrace_altstack_release(void *stack) {
+#ifdef USES_SIGALTSTACK
+  stack_t ss;
+  size_t size;
+
+  if (stack == NULL)
+    return;
+  /* Whatever replaced ours since is not ours to unmap. */
+  if (sigaltstack(NULL, &ss) != 0 || ss.ss_sp != stack)
+    return;
+  size = ss.ss_size;
+  ss.ss_flags = SS_DISABLE;
+  /* Disable first: the kernel must never send a handler to an unmapped page. */
+  if (sigaltstack(&ss, NULL) == 0)
+    munmap(stack, size);
+#else
+  (void) stack;
 #endif
 }
 
