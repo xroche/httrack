@@ -14,6 +14,13 @@
 
 #define _GNU_SOURCE
 
+/* An interposer has to define the symbol names the process really calls, so the
+   largefile redirect must not rename them: on a 32-bit glibc it gives mmap()
+   below the asm name mmap64, colliding with the mmap64() beside it. _TIME_BITS
+   rides on _FILE_OFFSET_BITS and cannot outlive it. */
+#undef _FILE_OFFSET_BITS
+#undef _TIME_BITS
+
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -187,6 +194,20 @@ static void *trace_mapped(void *sp) {
   return sp;
 }
 
+/* Reached only if dlsym() failed, and then it is the process's only mmap(), so
+   it has to be the right call: 32-bit arches have no SYS_mmap, and i386's wants
+   a pointer to an argument block, so prefer SYS_mmap2 wherever it exists. Its
+   offset is in 4096-byte units whatever the page size. */
+static void *raw_mmap(void *addr, size_t len, int prot, int flags, int fd,
+                      off_t off) {
+#ifdef SYS_mmap2
+  return (void *) syscall(SYS_mmap2, addr, len, prot, flags, fd,
+                          (unsigned long) (off / 4096));
+#else
+  return (void *) syscall(SYS_mmap, addr, len, prot, flags, fd, off);
+#endif
+}
+
 SHIM_EXPORT void *mmap(void *addr, size_t len, int prot, int flags, int fd,
                        off_t off);
 
@@ -194,10 +215,9 @@ SHIM_EXPORT void *mmap(void *addr, size_t len, int prot, int flags, int fd,
    between, so the thread's last mapping is the whole of the check. */
 SHIM_EXPORT void *mmap(void *addr, size_t len, int prot, int flags, int fd,
                        off_t off) {
-  return trace_mapped(
-      real_mmap != NULL
-          ? real_mmap(addr, len, prot, flags, fd, off)
-          : (void *) syscall(SYS_mmap, addr, len, prot, flags, fd, off));
+  return trace_mapped(real_mmap != NULL
+                          ? real_mmap(addr, len, prot, flags, fd, off)
+                          : raw_mmap(addr, len, prot, flags, fd, off));
 }
 
 /* glibc only, and the name that matters: _FILE_OFFSET_BITS=64 redirects the

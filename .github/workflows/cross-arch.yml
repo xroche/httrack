@@ -1,0 +1,100 @@
+# Cross-compiles for the Debian architectures no GitHub runner exists for.
+# 3.49.17 failed on four of them at once and every failure was a compile or
+# assemble error that x86-64 and arm64 cannot produce, so the buildd was the
+# first thing to see the code.
+name: Cross-arch
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege: the workflow only needs to read the repo.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same branch or PR.
+concurrency:
+  group: cross-arch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cross:
+    name: cross (${{ matrix.arch }})
+    runs-on: ubuntu-24.04
+    # sid, not stable: the point is to predict what the sid buildds will say.
+    container: debian:sid
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # arch is the dpkg name that selects the hardening flags, triplet the
+          # toolchain prefix; the two differ often enough to spell both out.
+          # The first four are 3.49.17's failures.
+          - { arch: armhf, triplet: arm-linux-gnueabihf }
+          - { arch: powerpc, triplet: powerpc-linux-gnu }
+          - { arch: hppa, triplet: hppa-linux-gnu }
+          - { arch: loong64, triplet: loongarch64-linux-gnu }
+          - { arch: sh4, triplet: sh4-linux-gnu }
+          - { arch: m68k, triplet: m68k-linux-gnu }
+          - { arch: alpha, triplet: alpha-linux-gnu }
+          - { arch: sparc64, triplet: sparc64-linux-gnu }
+          - { arch: riscv64, triplet: riscv64-linux-gnu }
+          - { arch: s390x, triplet: s390x-linux-gnu }
+    env:
+      DEB_HOST_ARCH: ${{ matrix.arch }}
+      TRIPLET: ${{ matrix.triplet }}
+      ZPREFIX: /tmp/zlib-${{ matrix.arch }}
+    steps:
+      - name: Install the toolchain
+        run: |
+          set -euo pipefail
+          # deb-src, so zlib below comes from the archive and not a pinned URL.
+          sed -i 's/^Types: deb$/Types: deb deb-src/' \
+            /etc/apt/sources.list.d/debian.sources
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            dpkg-dev git ca-certificates "gcc-$TRIPLET"
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Cross-build zlib
+        run: |
+          set -euo pipefail
+          # The one mandatory dependency, and no ports architecture has a
+          # zlib1g-dev:<arch> to multiarch-install. -fPIC: libhttrack.so links it.
+          mkdir -p /tmp/zsrc && cd /tmp/zsrc
+          apt-get source zlib1g
+          cd zlib-*/
+          CHOST="$TRIPLET" CC="$TRIPLET-gcc" CFLAGS="-O2 -fPIC" \
+            ./configure --prefix="$ZPREFIX" --static
+          make -j"$(nproc)"
+          make install
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          mkdir -p /tmp/bld && cd /tmp/bld
+          # The buildd's own flags, per architecture: -D_FILE_OFFSET_BITS=64 is
+          # what renamed an LD_PRELOAD shim's mmap() to mmap64 on 32-bit, and
+          # -fstack-clash-protection is not offered everywhere.
+          eval "$(dpkg-buildflags --export=sh)"
+          # A cross AC_TRY_RUN answers "cross", which would swap in the bundled
+          # snprintf that no buildd ever builds. Every glibc passes these.
+          "$GITHUB_WORKSPACE/configure" --host="$TRIPLET" \
+            ac_cv_have_working_snprintf=yes ac_cv_have_working_vsnprintf=yes \
+            CPPFLAGS="${CPPFLAGS:-} -I$ZPREFIX/include" \
+            LDFLAGS="${LDFLAGS:-} -L$ZPREFIX/lib"
+
+      - name: Build
+        run: make -C /tmp/bld -j"$(nproc)"
+
+      - name: Build the test artifacts
+        # Nothing runs here, but the shims are where three of the four 3.49.17
+        # failures were: they only build under `check`.
+        run: make -C /tmp/bld -j"$(nproc)" check TESTS=
