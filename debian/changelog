@@ -1,3 +1,14 @@
+httrack (3.49.18-1) unstable; urgency=medium
+
+  * New upstream release, fixing the 3.49.17-1 build failures on armhf, powerpc,
+    hppa and loong64: the test suite's mmap interposer did not compile on the
+    first three, and the alternate-stack test insisted on a longer backtrace than
+    loong64's unwinder produces. Nothing in the engine changed. Upstream now
+    cross-builds the test shims for the ports architectures on every push, so the
+    next such break surfaces before the buildds do.
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 05 Aug 2026 23:00:24 +0200
+
 httrack (3.49.17-1) unstable; urgency=medium
 
   * New upstream release: security fixes in the FTP and HTTP request paths and

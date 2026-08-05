@@ -51,6 +51,13 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.49.18" date="2026-08-05">
+      <description>
+        <ul>
+          <li>The program itself is unchanged: this release only fixes building HTTrack from source on some Linux distributions and processors</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.17" date="2026-08-05">
       <description>
         <ul>
