@@ -51,6 +51,17 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.49.17" date="2026-08-05">
+      <description>
+        <ul>
+          <li>A mirrored page opened in your browser can no longer take control of the WebHTTrack interface</li>
+          <li>Web addresses shown while a mirror runs no longer break the progress page</li>
+          <li>Settings keep values containing quotes or ampersands, and Windows paths such as C:\ab</li>
+          <li>A malformed link on a crawled site can no longer alter the requests HTTrack sends</li>
+          <li>Crash reports name the function and source line where the problem occurred</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.16" date="2026-08-04">
       <description>
         <ul>

@@ -4,6 +4,27 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-17
++ New: a pkg-config file, libhttrack.pc, ships with the development headers (#1018)
++ Fixed: a crawled page could read the WebHTTrack session id and drive the control panel; the id is now unguessable and cross-origin commands are refused (#877)
++ Fixed: an ftp:// link carrying encoded line breaks could append commands to the FTP control channel, and an unquoted LIST argument let a path holding a space list something else (#1010)
++ Fixed: a crawled link could inject header lines into the requests HTTrack sends (#1008)
++ Fixed: a control byte in a link made the crawler fetch a URL the page never wrote, and stripping one left the original tail glued to the result (#982, #974)
++ Fixed: the WebHTTrack progress panel rendered crawled URLs into HTML and JavaScript unescaped (#973)
++ Fixed: the WebHTTrack command box rendered its settings unescaped, so a posted value could break out of the box it was shown in (#998)
++ Fixed: the WebHTTrack settings pages interpolated values into attributes unescaped, lost a value containing a quote, and mangled a Windows path such as C:\ab (#989)
++ Fixed: a worker thread exhausting its stack died with no diagnostic (#969)
++ Fixed: a crash report named no frame of the executable on a non-PIE build, and named the dynamic loader rather than the program when launched through it (#995, #996)
++ Fixed: the crash report could hang, its symbolizer being forked from the signal handler (#968)
++ Fixed: the installed headers declared symbols the library does not export, and scoped struct addrinfo inside a parameter list (#977, #987)
++ Fixed: an install moved away from its configured prefix could not find libhttrack on macOS (#978)
++ Fixed: 3.49.16 did not build on armhf, loong64, hppa or hurd-i386 (#1015)
++ Changed: mirrored pages are served sandboxed, so a saved page can no longer script the WebHTTrack panel, and loses cookies, storage and cross-frame access (#877)
++ Changed: htsserver exits with a diagnostic rather than fall back to a guessable session id when no entropy source answers (#877)
++ Changed: an FTP file whose name contains a tab is no longer fetched (#1010)
++ Changed: on macOS, libhttrack records @rpath/libhttrack.3.dylib, so anything linked against it afterwards supplies its own rpath (#978)
++ Changed: multiple internal hardening, build, test and CI improvements
+
 3.49-16
 + New: macOS ships a signed and notarized HTTrack.app with its own icon, bundling the OpenSSL it needs so a downloaded copy launches (#890, #900, #901, #950)
 + New: the desktop icons install into the hicolor theme, scalable SVG included, so Icon=httrack resolves in a launcher (#932, #933)
