@@ -102,6 +102,43 @@ HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/93_off.test" >"$out" 2>&1 || rc=$?
 test "$rc" -eq 3 || fail "disabled guard changed the exit status ($rc)"
 grep -q 'guard off' "$out" || fail "output lost with the guard disabled"
 
+# --- the test reads the same budget the guard enforces ----------------------
+# skip_if_out_of_budget paces against it, so a raw or absent value would pace
+# against a number the guard is not using.
+saw_budget() { # saw_budget <want> <label>
+    grep -qx "budget=$1" "$out" ||
+        fail "$2 reached the test as '$(cat "$out")', want budget=$1"
+}
+# shellcheck disable=SC2016 # the fixture has to read the variable, not us
+printf 'echo "budget=${HTTRACK_TEST_TIMEOUT-unset}"\n' >"$tmp/95_budget.test"
+(unset HTTRACK_TEST_TIMEOUT && bash "$driver" "$tmp/95_budget.test") >"$out" 2>&1
+saw_budget 600 "an unset budget"
+HTTRACK_TEST_TIMEOUT=garbage bash "$driver" "$tmp/95_budget.test" >"$out" 2>&1
+saw_budget 600 "a non-numeric budget"
+HTTRACK_TEST_TIMEOUT=45 bash "$driver" "$tmp/95_budget.test" >"$out" 2>&1
+saw_budget 45 "an explicit budget"
+# 0 execs the test directly, so the pacer has to see the guard is off too.
+HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/95_budget.test" >"$out" 2>&1
+saw_budget 0 "a disabled guard"
+
+# --- a test too slow to finish skips instead of being killed ----------------
+# hppa spends ~150s on one configure run, and 124 takes the build down where 77
+# does not.
+cat >"$tmp/94_pacer.test" <<EOF
+. "${testdir}/testlib.sh"
+skip_if_out_of_budget 0 9999 # nothing left to run
+skip_if_out_of_budget 5 0    # steps that cost nothing
+skip_if_out_of_budget 5 40   # the next step alone wants 60s
+echo "the pacer let it through"
+EOF
+rc=0
+HTTRACK_TEST_TIMEOUT=20 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 77 || fail "a 60s step under a 20s budget reported $rc, want 77"
+rc=0
+HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "a 60s step under a 600s budget reported $rc, want 0"
+grep -q 'the pacer let it through' "$out" || fail "the pacer skipped a test that fits"
+
 # --- a wedged crawl yields a symbolized engine stack ------------------------
 # The whole point of the dump: name the frame the engine is stuck in. Windows has
 # neither half (MSYS signals do not reach a native httrack.exe, and that build has

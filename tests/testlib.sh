@@ -366,6 +366,21 @@ EOF
     export PATH
 }
 
+# Skip when the next of $1 remaining steps, at 1.5x the $2 seconds the last one
+# took, no longer fits the budget meant to catch a wedge (hppa spends ~150s on one
+# configure run and would else FTBFS). One step ahead rather than all of them: 196
+# shares a config.cache, so its first step costs several times the rest and
+# projecting it over them would skip a run that fits.
+skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took>
+    local budget=${HTTRACK_TEST_TIMEOUT:-600} need=$(($2 + $2 / 2))
+
+    case "$budget" in '' | *[!0-9]*) budget=600 ;; esac
+    test "$1" -gt 0 && test "$budget" -gt 0 || return 0
+    test "$((SECONDS + need))" -ge "$budget" || return 0
+    echo "$1 steps left, the last took ${2}s and the budget is ${budget}s; skipping" >&2
+    exit 77
+}
+
 # Collect a killed job, giving up after REAP_GRACE seconds. kill_tree can fail to
 # reap a native Windows descendant -- the very case these watchdogs exist for --
 # and a bare `wait` then blocks the watchdog itself forever, so the timeout it was
