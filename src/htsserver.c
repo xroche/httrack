@@ -1524,6 +1524,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           type != NULL ? type : "application/octet-stream");
                 StringCat(headers, "\r\n");
               }
+              if (virtualpath) {
+                /* No allow-same-origin: an opaque origin keeps script in a
+                   crawled page from reading the session id out of /server/ */
+                StringCat(headers,
+                          "Content-Security-Policy: sandbox "
+                          "allow-scripts allow-forms allow-popups\r\n");
+              }
               while(!feof(fp)) {
                 int n = (int) fread(line, 1, sizeof(line) - 2, fp);
 
