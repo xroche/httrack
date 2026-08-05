@@ -149,22 +149,12 @@ void ftp_split_userpass(const char *src, const char *end, char *user,
   }
 }
 
-/* No control byte in a command: a decoded %0d%0a smuggles a second (#1010). */
-static hts_boolean ftp_line_is_safe(const char *line) {
-  const char *c;
-
-  for (c = line; *c != '\0'; c++) {
-    if ((unsigned char) *c < ' ')
-      return HTS_FALSE;
-  }
-  return HTS_TRUE;
-}
-
-/* Build "<verb> <path>", quoting a path the server could not parse bare. */
-static void ftp_command(char *line, size_t line_size, const char *verb,
-                        const char *path) {
-  if (strchr(path, ' ') != NULL || strchr(path, '\"') != NULL ||
-      strchr(path, '\'') != NULL)
+/* Build "<verb> <path>" (see htsftp.h). */
+void ftp_command(char *line, size_t line_size, const char *verb,
+                 const char *path) {
+  /* A leading '-' would reach a server that shells out to ls as a flag. */
+  if (path[0] == '-' || strchr(path, ' ') != NULL ||
+      strchr(path, '\"') != NULL || strchr(path, '\'') != NULL)
     snprintf(line, line_size, "%s \"%s\"", verb, path);
   else
     snprintf(line, line_size, "%s %s", verb, path);
@@ -229,7 +219,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 #endif
   char BIGSTK adr_ip[1024];
   char *adr, *real_adr;
-  const char *ftp_filename = "";
+  char BIGSTK ftp_path[CATBUFF_SIZE]; // the decoded URL path, screened once
   int timeout = 300;            // timeout
   int timeout_onfly = 8;        // attente réponse supplémentaire
   int transfer_list = 0;        // directory
@@ -242,7 +232,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   SOCaddr server_data;
 
   //
-  line_retr[0] = adr_ip[0] = '\0';
+  line_retr[0] = adr_ip[0] = ftp_path[0] = '\0';
 
   timeout = 300;
 
@@ -269,22 +259,16 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     a = back->url_fil;
     if (a != NULL && *a != '\0') {
-      ftp_filename = a;
       if (strnotempty(a)) {
-        char catbuff[CATBUFF_SIZE];
-        char *ua = unescape_http(catbuff, sizeof(catbuff), a);
-        int len_a = (int) strlen(ua);
+        const size_t len_a =
+            strlen(unescape_http(ftp_path, sizeof(ftp_path), a));
 
-        if (len_a > 0 && ua[len_a - 1] == '/') {        /* obviously a directory listing */
+        if (len_a > 0 &&
+            ftp_path[len_a - 1] == '/') { /* obviously a directory listing */
           transfer_list = 1;
-          snprintf(line_retr, sizeof(line_retr), "LIST -A %s", ua);
-        } else if ((strchr(ua, ' '))
-                   || (strchr(ua, '\"'))
-                   || (strchr(ua, '\''))
-          ) {
-          snprintf(line_retr, sizeof(line_retr), "RETR \"%s\"", ua);
-        } else {                /* Regular one */
-          snprintf(line_retr, sizeof(line_retr), "RETR %s", ua);
+          ftp_command(line_retr, sizeof(line_retr), "LIST -A", ftp_path);
+        } else {
+          ftp_command(line_retr, sizeof(line_retr), "RETR", ftp_path);
         }
       } else {
         transfer_list = 1;
@@ -296,9 +280,10 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     }
   }
 
-  // fail here, or send_line() drops the command and the reply read times out
-  if (!ftp_line_is_safe(user) || !ftp_line_is_safe(pass) ||
-      !ftp_line_is_safe(line_retr)) {
+  // fail here, or send_line() drops the command and the reply read times out.
+  // Every command below is a literal verb plus one of these three.
+  if (!hts_is_control_free(user) || !hts_is_control_free(pass) ||
+      !hts_is_control_free(ftp_path)) {
     strcpybuff(back->r.msg, "Invalid control character in FTP URL");
     back->r.statuscode = STATUSCODE_INVALID;
     _HALT_FTP return 0;
@@ -530,10 +515,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           // SIZE
           if (back->r.statuscode != -1) {
             if (!transfer_list) {
-              char catbuff[CATBUFF_SIZE];
-              char *ua = unescape_http(catbuff, sizeof(catbuff), ftp_filename);
-
-              ftp_command(line, sizeof(line), "SIZE", ua);
+              ftp_command(line, sizeof(line), "SIZE", ftp_path);
 
               // SIZE?
               strcpybuff(back->info, "size");
@@ -555,7 +537,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 }
 
                 // MDTM?
-                ftp_command(line, sizeof(line), "MDTM", ua);
+                ftp_command(line, sizeof(line), "MDTM", ftp_path);
                 strcpybuff(back->info, "mdtm");
                 send_line(soc_ctl, line);
                 get_ftp_line(soc_ctl, line, sizeof(line), timeout);
@@ -943,7 +925,7 @@ int send_line(T_SOC soc, const char *data) {
   char BIGSTK line[1024];
 
   // backstop: the driver fails earlier, but no injected byte reaches the wire
-  if (!ftp_line_is_safe(data))
+  if (!hts_is_control_free(data))
     return 0;
 
   if (_DEBUG_HEAD) {

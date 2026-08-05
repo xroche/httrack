@@ -102,15 +102,9 @@ int http_proxy_tunnel(httrackp *opt, htsblk *retour, const char *adr,
 
   // backstop: never let a stray CR/LF in the host smuggle a second line into
   // the CONNECT request (the host is already sanitized upstream)
-  {
-    const char *c;
-
-    for (c = authority; *c != '\0'; c++) {
-      if ((unsigned char) *c < ' ') {
-        strcpybuff(retour->msg, "proxy CONNECT: invalid host");
-        return 0;
-      }
-    }
+  if (!hts_is_control_free(authority)) {
+    strcpybuff(retour->msg, "proxy CONNECT: invalid host");
+    return 0;
   }
 
   snprintf(req, sizeof(req), "CONNECT %s HTTP/1.0" H_CRLF "Host: %s" H_CRLF,
@@ -480,17 +474,14 @@ static int socks5_handshake_stream(httrackp *opt, socks5_stream *st,
   size_t userlen = 0, passlen = 0;
   int want_auth = 0;
   int port = ssl ? 443 : 80;
-  size_t i;
 
   if (hostlen == 0 || hostlen > SOCKS5_MAXFIELD)
     return socks5_fail(msg, msgsize, "SOCKS5: invalid origin host");
   if (host[0] == '[') // ATYP=domain cannot carry an IPv6 literal
     return socks5_fail(msg, msgsize,
                        "SOCKS5: IPv6 literal origin is not supported");
-  for (i = 0; i < hostlen; i++) {
-    if ((unsigned char) host[i] < ' ')
-      return socks5_fail(msg, msgsize, "SOCKS5: invalid origin host");
-  }
+  if (!hts_is_control_free_sized(host, hostlen))
+    return socks5_fail(msg, msgsize, "SOCKS5: invalid origin host");
   // the old range check ran after sscanf("%d") had wrapped a huge value into a
   // plausible port (#614). An empty "host:" stays refused here, unlike the
   // direct path, as it was before #614.

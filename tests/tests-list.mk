@@ -251,3 +251,4 @@ TESTS += 157_crash-argv0-path.test
 TESTS += 159_local-header-injection.test
 TESTS += 158_local-link-control-bytes.test
 TESTS += 216_engine-ftp-ctrlchars.test
+TESTS += 221_local-ftp-ctrlchars.test
