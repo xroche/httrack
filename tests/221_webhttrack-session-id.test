@@ -35,21 +35,22 @@ cleanup() {
 trap 'set +e; cleanup' EXIT
 trap cleanup HUP INT QUIT PIPE TERM
 
-freeport() {
-    "${python}" -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()'
-}
+# Both bound at once, or the two picks could land on the same free port.
+read -r porta portb <<<"$("${python}" -c 'import socket
+s = [socket.socket() for _ in range(2)]
+for x in s:
+    x.bind(("127.0.0.1", 0))
+print(*[x.getsockname()[1] for x in s])
+for x in s:
+    x.close()')"
 
 # An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
-launch() { # $1 = tag
+launch() { # $1 = tag, $2 = port
     mkdir -p "${work}/$1"
     (
         trap '' TERM TTOU
         export HOME="${work}/$1"
-        exec htsserver "${distdir}/" --port "$(freeport)" >"${work}/$1.log" 2>&1
+        exec htsserver "${distdir}/" --port "$2" >"${work}/$1.log" 2>&1
     ) &
     pids="${pids} $!"
 }
@@ -79,8 +80,8 @@ for _ in $(seq 1 10); do
         sleep 0.02
     done
     t0=$(date +%s)
-    launch a
-    launch b
+    launch a "${porta}"
+    launch b "${portb}"
     urla=$(started a) || fail "htsserver a did not start: $(cat "${work}/a.log")"
     urlb=$(started b) || fail "htsserver b did not start: $(cat "${work}/b.log")"
     t1=$(date +%s)
