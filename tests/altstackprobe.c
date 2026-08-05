@@ -14,6 +14,11 @@
 
 #define _GNU_SOURCE
 
+/* The largefile redirect renames this file's mmap() to mmap64, colliding with
+   its own mmap64(). _TIME_BITS rides on _FILE_OFFSET_BITS, so it goes too. */
+#undef _FILE_OFFSET_BITS
+#undef _TIME_BITS
+
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -187,6 +192,19 @@ static void *trace_mapped(void *sp) {
   return sp;
 }
 
+/* The fallback when dlsym() failed, so it has to be right: 32-bit arches have
+   no SYS_mmap and i386's wants an argument block, so prefer SYS_mmap2, whose
+   offset is in 4096-byte units whatever the page size. */
+static void *raw_mmap(void *addr, size_t len, int prot, int flags, int fd,
+                      off_t off) {
+#ifdef SYS_mmap2
+  return (void *) syscall(SYS_mmap2, addr, len, prot, flags, fd,
+                          (unsigned long) (off / 4096));
+#else
+  return (void *) syscall(SYS_mmap, addr, len, prot, flags, fd, off);
+#endif
+}
+
 SHIM_EXPORT void *mmap(void *addr, size_t len, int prot, int flags, int fd,
                        off_t off);
 
@@ -194,10 +212,9 @@ SHIM_EXPORT void *mmap(void *addr, size_t len, int prot, int flags, int fd,
    between, so the thread's last mapping is the whole of the check. */
 SHIM_EXPORT void *mmap(void *addr, size_t len, int prot, int flags, int fd,
                        off_t off) {
-  return trace_mapped(
-      real_mmap != NULL
-          ? real_mmap(addr, len, prot, flags, fd, off)
-          : (void *) syscall(SYS_mmap, addr, len, prot, flags, fd, off));
+  return trace_mapped(real_mmap != NULL
+                          ? real_mmap(addr, len, prot, flags, fd, off)
+                          : raw_mmap(addr, len, prot, flags, fd, off));
 }
 
 /* glibc only, and the name that matters: _FILE_OFFSET_BITS=64 redirects the
