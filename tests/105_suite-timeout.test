@@ -164,6 +164,7 @@ if ! is_windows && test -r /proc/self/stat; then
     trap 'set +e; kill "$fake" "$outside" 2>/dev/null; rm -rf "$tmp"' EXIT
     # ppid and pgid of $1: the oracle the listing is checked against.
     procfields() { awk '{ sub(/.*\) /, ""); print $2, $3 }' "/proc/$1/stat"; }
+    procstate() { awk '{ sub(/.*\) /, ""); print $1 }' "/proc/$1/stat" 2>/dev/null || echo gone; }
     read -r fppid pgid _ <<<"$(procfields "$fake")"
     read -r _ opgid _ <<<"$(procfields "$outside")"
     test "$fppid" != "$pgid" || fail "the fake shares ppid and pgid ($pgid)"
@@ -189,7 +190,12 @@ if ! is_windows && test -r /proc/self/stat; then
         stacks=$(request_engine_backtraces "$pgid")
         ! grep -q 'no engine process left' <<<"$stacks" ||
             fail "no-ps stack request found no engine to signal: $stacks"
-        ! kill -0 "$fake" 2>/dev/null || fail "the SIGABRT never reached pid $fake"
+        # Gone, or a zombie: the fake is reparented, and a container's pid 1 does
+        # not always reap. kill -0 alone succeeds on a zombie and proves nothing.
+        case "$(procstate "$fake")" in
+        Z | gone) ;;
+        *) fail "the SIGABRT never reached pid $fake" ;;
+        esac
         # With neither source the dump must say so, not print an empty section.
         # shellcheck disable=SC2317 # reached through ps_snapshot
         proc_snapshot() { return 1; }
