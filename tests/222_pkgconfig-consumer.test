@@ -36,6 +36,10 @@ read -r -a cc_argv <<<"${CC:-cc}"
 command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
 command -v "${MAKE:-make}" >/dev/null 2>&1 || skip "no make (${MAKE:-make})"
 
+# The consumer is built from the .pc alone, which carries no sanitizer flags, so
+# on an ASan build its runtime comes in through libhttrack rather than first.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
 work=$(mktemp -d "${TMPDIR:-/tmp}/pkgconf.XXXXXX") || {
     echo "no tmpdir" >&2
     exit 1
