@@ -101,6 +101,50 @@ static void htsweb_sig_brpipe(int code) {
   /* ignore */
 }
 
+#ifdef _WIN32
+/* RtlGenRandom, resolved at runtime so no import library is needed. */
+typedef BOOLEAN(WINAPI *hts_rtlgenrandom_t)(PVOID buffer, ULONG length);
+#endif
+
+/* Fill buffer with system entropy; HTS_FALSE if no source answered. There is
+   deliberately no weak fallback: the caller mints a secret with it. */
+static hts_boolean hts_random_bytes(void *buffer, size_t size) {
+#ifdef _WIN32
+  hts_boolean ok = HTS_FALSE;
+  HMODULE dll = LoadLibraryA("advapi32.dll");
+
+  if (dll != NULL) {
+    hts_rtlgenrandom_t gen =
+        (hts_rtlgenrandom_t) GetProcAddress(dll, "SystemFunction036");
+
+    /* the ULONG cast must not truncate; callers ask for a few dozen bytes */
+    if (gen != NULL && size <= 0x10000 && gen(buffer, (ULONG) size)) {
+      ok = HTS_TRUE;
+    }
+    FreeLibrary(dll);
+  }
+  return ok;
+#else
+  unsigned char *dst = (unsigned char *) buffer;
+  size_t done = 0;
+  FILE *fp = fopen("/dev/urandom", "rb");
+
+  if (fp == NULL) {
+    return HTS_FALSE;
+  }
+  while (done < size) {
+    const size_t n = fread(dst + done, 1, size - done, fp);
+
+    if (n == 0) { /* short read is a hard failure, not partial credit */
+      break;
+    }
+    done += n;
+  }
+  fclose(fp);
+  return done == size ? HTS_TRUE : HTS_FALSE;
+#endif
+}
+
 /* Threads that never return; no wait may count on them draining. */
 static int nonjoinable_threads = 0;
 
@@ -247,14 +291,19 @@ int main(int argc, char *argv[]) {
     smallserver_setkey("HTTRACK_INCOMPATIBLE_VERSIONID", hts_version());
   }
 
-  /* protected session-id */
+  /* Session id: the only thing authenticating a command, so it is seeded from
+     the system CSPRNG. A clock-derived one is guessable from the "Mirrored
+     from" stamp every mirrored page carries (#877). */
   {
-    char buff[1024];
+    unsigned char seed[32];
     char digest[32 + 2];
 
-    srand((unsigned int) time(NULL));
-    snprintf(buff, sizeof(buff), "%d-%d", (int) time(NULL), (int) rand());
-    domd5mem(buff, strlen(buff), digest, 1);
+    if (!hts_random_bytes(seed, sizeof(seed))) {
+      fprintf(stderr,
+              "** CRITICAL: no system entropy source to build a session id\n");
+      return -1;
+    }
+    domd5mem((const char *) seed, sizeof(seed), digest, 1);
     smallserver_setkey("sid", digest);
     smallserver_setkey("_sid", digest);
   }

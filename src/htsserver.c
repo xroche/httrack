@@ -366,6 +366,25 @@ typedef struct {
    so anything near this is already invalid and is rejected unread. */
 #define SID_VALUE_MAX 64
 
+/** Does this Origin name the panel itself?
+    Only our own plain-http authority passes: a sandboxed page sends "null", a
+    foreign one its own host, and an empty Host cannot be matched at all. */
+static hts_boolean origin_is_self(const char *origin, const char *host) {
+  const int p = strfield(origin, "http://");
+  const char *const authority = origin + p;
+
+  return host[0] != '\0' && p != 0 && strfield2(authority, host) != 0;
+}
+
+/** Header value with leading blanks dropped, clipped to fit dst. */
+static void copy_header_value(char *dst, size_t size, const char *value) {
+  while (*value == ' ' || *value == '\t') {
+    value++;
+  }
+  dst[0] = '\0';
+  strlncatbuff(dst, value, size, size - 1);
+}
+
 /** Does the urlencoded request body present the expected session id?
     True only if at least one "sid" field is present and every occurrence
     matches, so it holds whichever one a later last-write-wins parse keeps.
@@ -599,9 +618,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     LLint length = 0;
     const char *error_redirect = NULL;
     hts_boolean denied = HTS_FALSE;
+    char origin[256];
+    char host[256];
 
     line[0] = '\0';
     buffer[0] = '\0';
+    origin[0] = '\0';
+    host[0] = '\0';
     StringClear(headers);
     StringClear(output);
     StringClear(tmpbuff);
@@ -663,6 +686,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             tmp[0] = '\0';
             strncatbuff(tmp, s, 2);
             /*l = LANG_SEARCH(path, tmp); */
+          } else if ((p = strfield(line, "Origin:")) != 0) {
+            copy_header_value(origin, sizeof(origin), line + p);
+          } else if ((p = strfield(line, "Host:")) != 0) {
+            copy_header_value(host, sizeof(host), line + p);
           }
         }
         if (meth == 2) {
@@ -708,6 +735,16 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               (NewLangList, "sid", (intptr_t) strdup((char *) adr))) {
           }
         }
+      }
+
+      /* CSP stops a mirrored page reading /server/, not posting to it blind:
+         a no-cors POST still runs the command. Origin is browser-set and script
+         cannot forge it. Absent is allowed, most non-browser clients send none.
+       */
+      if (meth == 2 && origin[0] != '\0' && !origin_is_self(origin, host)) {
+        buffer[0] = '\0';
+        meth = 0;
+        denied = HTS_TRUE;
       }
 
       /* Authenticate the body before parsing it: every field it carries is
@@ -1562,6 +1599,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           type != NULL ? type : "application/octet-stream");
                 StringCat(headers, "\r\n");
               }
+              if (virtualpath) {
+                /* No allow-same-origin: an opaque origin keeps script in a
+                   crawled page from reading the session id out of /server/ */
+                StringCat(headers, "Content-Security-Policy: sandbox "
+                                   "allow-scripts allow-forms allow-popups "
+                                   "allow-downloads\r\n");
+              }
               while(!feof(fp)) {
                 int n = (int) fread(line, 1, sizeof(line) - 2, fp);
 
@@ -1593,7 +1637,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         StringCat(headers, "HTTP/1.0 403 Forbidden\r\n"
                            "Server: httrack small server\r\n"
                            "Content-type: text/html\r\n");
-        StringCat(output, "Missing or invalid session id.\r\n");
+        StringCat(output,
+                  "Missing or invalid session id, or foreign origin.\r\n");
       } else {
 #ifdef _DEBUG
         char error_hdr[] =
@@ -1612,12 +1657,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         StringCat(headers, tmp);
       }
       StringCat(headers, "\r\n");
+      /* a refusal cleared meth, yet the Content-length above promises a body */
       if ((send(soc_c, StringBuff(headers), (int) StringLength(headers), 0) !=
-           StringLength(headers))
-          || ((meth == 1)
-              && (send(soc_c, StringBuff(output), (int) StringLength(output), 0)
-                  != StringLength(output)))
-        ) {
+           StringLength(headers)) ||
+          ((meth == 1 || denied) &&
+           (send(soc_c, StringBuff(output), (int) StringLength(output), 0) !=
+            StringLength(output)))) {
 #ifdef _DEBUG
 #endif
       }

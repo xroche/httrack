@@ -1,0 +1,122 @@
+#!/bin/bash
+#
+# The session id authenticates every panel command, so it must not be derivable
+# from the clock: two servers started in the same second must still differ.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_sid.XXXXXX") || fail "no tmpdir"
+pids=
+cleanup() {
+    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
+    for p in ${pids}; do
+        kill -9 "${p}" 2>/dev/null || true
+    done
+    wait 2>/dev/null || true # absorb bash's async "Killed" notice
+    rm -rf "${work}"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+# Both bound at once, or the two picks could land on the same free port.
+read -r porta portb <<<"$("${python}" -c 'import socket
+s = [socket.socket() for _ in range(2)]
+for x in s:
+    x.bind(("127.0.0.1", 0))
+print(*[x.getsockname()[1] for x in s])
+for x in s:
+    x.close()')"
+
+# An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
+launch() { # $1 = tag, $2 = port
+    mkdir -p "${work}/$1"
+    (
+        trap '' TERM TTOU
+        export HOME="${work}/$1"
+        exec htsserver "${distdir}/" --port "$2" >"${work}/$1.log" 2>&1
+    ) &
+    pids="${pids} $!"
+}
+
+started() { # $1 = tag; prints the URL once the server is up
+    for _ in $(seq 1 100); do
+        url=$(sed -n 's/^URL=//p' "${work}/$1.log" 2>/dev/null) &&
+            test -n "${url}" && {
+            echo "${url}"
+            return 0
+        }
+        sleep 0.05
+    done
+    return 1
+}
+
+# Both servers have to read the same second off the clock, or the id they used
+# to derive from it would differ for a reason that is not entropy. Launching
+# just after a tick leaves a whole second to get there; the bracket confirms it.
+urla=
+urlb=
+for _ in $(seq 1 10); do
+    pids=
+    rm -f "${work}"/*.log
+    prev=$(date +%s)
+    while test "$(date +%s)" = "${prev}"; do
+        sleep 0.02
+    done
+    t0=$(date +%s)
+    launch a "${porta}"
+    launch b "${portb}"
+    urla=$(started a) || fail "htsserver a did not start: $(cat "${work}/a.log")"
+    urlb=$(started b) || fail "htsserver b did not start: $(cat "${work}/b.log")"
+    t1=$(date +%s)
+    test "${t0}" != "${t1}" || break
+    cleanup
+    urla=
+done
+test -n "${urla}" || {
+    echo "the box never started two servers inside one second; skipping" >&2
+    exit 77
+}
+
+"${python}" - "${urla}" "${urlb}" <<'PY' || fail "session id checks failed"
+import re, sys, urllib.request
+
+ids = []
+for u in sys.argv[1:3]:
+    body = urllib.request.urlopen(u.rstrip("/") + "/server/index.html",
+                                  timeout=20).read()
+    m = re.search(rb'name="sid" value="([^"]*)"', body)
+    if m is None:
+        print("FAIL: no sid in the form rendered by " + u)
+        sys.exit(1)
+    ids.append(m.group(1).decode())
+
+rc = 0
+for sid in ids:
+    # The templates and the server's own SID_VALUE_MAX assume an md5 digest.
+    ok = re.fullmatch(r"[0-9a-f]{32}", sid) is not None
+    print(("ok: " if ok else "FAIL: ") + "%r is an md5 hex digest" % sid)
+    rc |= 0 if ok else 1
+ok = ids[0] != ids[1]
+print(("ok: " if ok else "FAIL: ") + "same-second ids differ (%r)" % ids)
+sys.exit(rc | (0 if ok else 1))
+PY
+
+cleanup
+echo "PASS"
