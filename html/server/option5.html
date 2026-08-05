@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
@@ -93,8 +93,8 @@ ${do:end-if}
 <table>
 <tr><td>
 
-<form method="POST" action="${thisfile}" name="form">
-<input type="hidden" name="sid" value="${sid}">
+<form method="POST" action="${attr:thisfile}" name="form">
+<input type="hidden" name="sid" value="${attr:sid}">
 <input type="hidden" name="redirect" value="">
 <input type="hidden" name="closeme" value="">
 
@@ -103,7 +103,7 @@ ${do:end-if}
 <tr><td>
 ${LANG_G32}
 </td><td>
-<input name="depth" value="${depth}" size="4"
+<input name="depth" value="${attr:depth}" size="4"
 			title='${html:LANG_I1g}' onMouseOver="info('${js:LANG_I1g}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -111,7 +111,7 @@ ${LANG_G32}
 <tr><td>
 ${LANG_G32b}
 </td><td>
-<input name="depth2" value="${depth2}" size="4"
+<input name="depth2" value="${attr:depth2}" size="4"
 			title='${html:LANG_I1g2}' onMouseOver="info('${js:LANG_I1g2}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -119,7 +119,7 @@ ${LANG_G32b}
 <tr><td>
 ${LANG_I50}
 </td><td>
-<input name="maxhtml" value="${maxhtml}" size="4"
+<input name="maxhtml" value="${attr:maxhtml}" size="4"
 			title='${html:LANG_I18}' onMouseOver="info('${js:LANG_I18}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -127,7 +127,7 @@ ${LANG_I50}
 <tr><td>
 ${LANG_I50b}
 </td><td>
-<input name="othermax" value="${othermax}" size="4"
+<input name="othermax" value="${attr:othermax}" size="4"
 			title='${html:LANG_I19}' onMouseOver="info('${js:LANG_I19}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -135,7 +135,7 @@ ${LANG_I50b}
 <tr><td>
 ${LANG_I51}
 </td><td>
-<input name="sizemax" value="${sizemax}" size="4"
+<input name="sizemax" value="${attr:sizemax}" size="4"
 			title='${html:LANG_I20}' onMouseOver="info('${js:LANG_I20}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -143,7 +143,7 @@ ${LANG_I51}
 <tr><td>
 ${LANG_I65}
 </td><td>
-<input name="pausebytes" value="${pausebytes}" size="4"
+<input name="pausebytes" value="${attr:pausebytes}" size="4"
 			title='${html:LANG_I20b}' onMouseOver="info('${js:LANG_I20b}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -151,7 +151,7 @@ ${LANG_I65}
 <tr><td>
 ${LANG_PAUSEFILES}
 </td><td>
-<input name="pausefiles" value="${pausefiles}" size="8"
+<input name="pausefiles" value="${attr:pausefiles}" size="8"
 			title='${html:LANG_PAUSEFILESTIP}' onMouseOver="info('${js:LANG_PAUSEFILESTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -159,7 +159,7 @@ ${LANG_PAUSEFILES}
 <tr><td>
 ${LANG_I52}
 </td><td>
-<input name="maxtime" value="${maxtime}" size="4"
+<input name="maxtime" value="${attr:maxtime}" size="4"
 			title='${html:LANG_I21}' onMouseOver="info('${js:LANG_I21}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -167,7 +167,7 @@ ${LANG_I52}
 <tr><td>
 ${LANG_I54}
 </td><td>
-<input name="maxrate" value="${maxrate}" size="4"
+<input name="maxrate" value="${attr:maxrate}" size="4"
 			title='${html:LANG_I22}' onMouseOver="info('${js:LANG_I22}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -175,7 +175,7 @@ ${LANG_I54}
 <tr><td>
 ${LANG_I64}
 </td><td>
-<input name="maxconn" value="${maxconn}" size="4"
+<input name="maxconn" value="${attr:maxconn}" size="4"
 			title='${html:LANG_I22b}' onMouseOver="info('${js:LANG_I22b}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -183,7 +183,7 @@ ${LANG_I64}
 <tr><td>
 ${LANG_I64b}
 </td><td>
-<input name="maxlinks" value="${maxlinks}" size="4"
+<input name="maxlinks" value="${attr:maxlinks}" size="4"
 			title='${html:LANG_I22c}' onMouseOver="info('${js:LANG_I22c}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -191,12 +191,12 @@ ${LANG_I64b}
 <tr><td>
 	<table width="100%">
 	<tr><td align="left">
-	<input type="submit" value="${LANG_OK}"
+	<input type="submit" value="${attr:LANG_OK}"
 				onClick="form.closeme.value=1; form.submit(); return false;"
 				title='${html:LANG_TIPOK}' onMouseOver="info('${js:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>
 	</td><td align="right">
-	<input type="button" value="${LANG_CANCEL}"
+	<input type="button" value="${attr:LANG_CANCEL}"
 				onClick="window.close();"
 				title='${html:LANG_TIPCANCEL}' onMouseOver="info('${js:LANG_TIPCANCEL}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>

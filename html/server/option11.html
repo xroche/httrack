@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
@@ -93,8 +93,8 @@ ${do:end-if}
 <table>
 <tr><td>
 
-<form method="POST" action="${thisfile}" name="form">
-<input type="hidden" name="sid" value="${sid}">
+<form method="POST" action="${attr:thisfile}" name="form">
+<input type="hidden" name="sid" value="${attr:sid}">
 <input type="hidden" name="redirect" value="">
 <input type="hidden" name="closeme" value="">
 
@@ -111,97 +111,97 @@ ${LANG_W3}
 </td></tr>
 
 <td align="left">
-<input name="ext1" value="${ext1}"
+<input name="ext1" value="${attr:ext1}"
 			title='${html:LANG_W4}' onMouseOver="info('${js:LANG_W4}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td><td align="left">
 &#x21d4;
 </td><td align="left">
-<input name="mime1" value="${mime1}"
+<input name="mime1" value="${attr:mime1}"
 			title='${html:LANG_W5}' onMouseOver="info('${js:LANG_W5}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
 <!-- -->
 <td align="left">
-<input name="ext2" value="${ext2}"
+<input name="ext2" value="${attr:ext2}"
 			title='${html:LANG_W4}' onMouseOver="info('${js:LANG_W4}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td><td align="left">
 &#x21d4;
 </td><td align="left">
-<input name="mime2" value="${mime2}"
+<input name="mime2" value="${attr:mime2}"
 			title='${html:LANG_W5}' onMouseOver="info('${js:LANG_W5}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
 <!-- -->
 <td align="left">
-<input name="ext3" value="${ext3}"
+<input name="ext3" value="${attr:ext3}"
 			title='${html:LANG_W4}' onMouseOver="info('${js:LANG_W4}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td><td align="left">
 &#x21d4;
 </td><td align="left">
-<input name="mime3" value="${mime3}"
+<input name="mime3" value="${attr:mime3}"
 			title='${html:LANG_W5}' onMouseOver="info('${js:LANG_W5}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
 <!-- -->
 <td align="left">
-<input name="ext4" value="${ext4}"
+<input name="ext4" value="${attr:ext4}"
 			title='${html:LANG_W4}' onMouseOver="info('${js:LANG_W4}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td><td align="left">
 &#x21d4;
 </td><td align="left">
-<input name="mime4" value="${mime4}"
+<input name="mime4" value="${attr:mime4}"
 			title='${html:LANG_W5}' onMouseOver="info('${js:LANG_W5}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
 <!-- -->
 <td align="left">
-<input name="ext5" value="${ext5}"
+<input name="ext5" value="${attr:ext5}"
 			title='${html:LANG_W4}' onMouseOver="info('${js:LANG_W4}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td><td align="left">
 &#x21d4;
 </td><td align="left">
-<input name="mime5" value="${mime5}"
+<input name="mime5" value="${attr:mime5}"
 			title='${html:LANG_W5}' onMouseOver="info('${js:LANG_W5}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
 <!-- -->
 <td align="left">
-<input name="ext6" value="${ext6}"
+<input name="ext6" value="${attr:ext6}"
 			title='${html:LANG_W4}' onMouseOver="info('${js:LANG_W4}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td><td align="left">
 &#x21d4;
 </td><td align="left">
-<input name="mime6" value="${mime6}"
+<input name="mime6" value="${attr:mime6}"
 			title='${html:LANG_W5}' onMouseOver="info('${js:LANG_W5}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
 <!-- -->
 <td align="left">
-<input name="ext7" value="${ext7}"
+<input name="ext7" value="${attr:ext7}"
 			title='${html:LANG_W4}' onMouseOver="info('${js:LANG_W4}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td><td align="left">
 &#x21d4;
 </td><td align="left">
-<input name="mime7" value="${mime7}"
+<input name="mime7" value="${attr:mime7}"
 			title='${html:LANG_W5}' onMouseOver="info('${js:LANG_W5}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
 <!-- -->
 <td align="left">
-<input name="ext8" value="${ext8}"
+<input name="ext8" value="${attr:ext8}"
 			title='${html:LANG_W4}' onMouseOver="info('${js:LANG_W4}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td><td align="left">
 &#x21d4;
 </td><td align="left">
-<input name="mime8" value="${mime8}"
+<input name="mime8" value="${attr:mime8}"
 			title='${html:LANG_W5}' onMouseOver="info('${js:LANG_W5}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -215,12 +215,12 @@ ${LANG_W3}
 <tr><td>
 	<table width="100%">
 	<tr><td align="left">
-	<input type="submit" value="${LANG_OK}"
+	<input type="submit" value="${attr:LANG_OK}"
 				onClick="form.closeme.value=1; form.submit(); return false;"
 				title='${html:LANG_TIPOK}' onMouseOver="info('${js:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>
 	</td><td align="right">
-	<input type="button" value="${LANG_CANCEL}"
+	<input type="button" value="${attr:LANG_CANCEL}"
 				onClick="window.close();"
 				title='${html:LANG_TIPCANCEL}' onMouseOver="info('${js:LANG_TIPCANCEL}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>

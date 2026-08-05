@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<META http-equiv="refresh" content="30; URL=finished.html">
 	<title>'${html:projname}' - HTTrack Website Copier</title>
 
@@ -147,25 +147,25 @@ ${LANG_H20} ${html:info.currentjob}
 <br>
 
 <form method="POST" action="step4.html" name="form">
-<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="sid" value="${attr:sid}">
 <input type="hidden" name="command" value="">
 
 <table border="0" width="100%">
 
-<tr><td>${html:info.state[0]}</td><td>${html:info.name[0]}</td><td>${html:info.file[0]}</td><td>${html:info.size[0]}/${html:info.sizetot[0]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[0]}'; form.submit()" title='${html:LANG_H6}' onMouseOver="info('${js:LANG_H6}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[1]}</td><td>${html:info.name[1]}</td><td>${html:info.file[1]}</td><td>${html:info.size[1]}/${html:info.sizetot[1]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[1]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[2]}</td><td>${html:info.name[2]}</td><td>${html:info.file[2]}</td><td>${html:info.size[2]}/${html:info.sizetot[2]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[2]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[3]}</td><td>${html:info.name[3]}</td><td>${html:info.file[3]}</td><td>${html:info.size[3]}/${html:info.sizetot[3]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[3]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[4]}</td><td>${html:info.name[4]}</td><td>${html:info.file[4]}</td><td>${html:info.size[4]}/${html:info.sizetot[4]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[4]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[5]}</td><td>${html:info.name[5]}</td><td>${html:info.file[5]}</td><td>${html:info.size[5]}/${html:info.sizetot[5]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[5]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[6]}</td><td>${html:info.name[6]}</td><td>${html:info.file[6]}</td><td>${html:info.size[6]}/${html:info.sizetot[6]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[6]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[7]}</td><td>${html:info.name[7]}</td><td>${html:info.file[7]}</td><td>${html:info.size[7]}/${html:info.sizetot[7]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[7]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[8]}</td><td>${html:info.name[8]}</td><td>${html:info.file[8]}</td><td>${html:info.size[8]}/${html:info.sizetot[8]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[8]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[9]}</td><td>${html:info.name[9]}</td><td>${html:info.file[9]}</td><td>${html:info.size[9]}/${html:info.sizetot[9]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[9]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[10]}</td><td>${html:info.name[10]}</td><td>${html:info.file[10]}</td><td>${html:info.size[10]}/${html:info.sizetot[10]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[10]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[11]}</td><td>${html:info.name[11]}</td><td>${html:info.file[11]}</td><td>${html:info.size[11]}/${html:info.sizetot[11]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[11]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[12]}</td><td>${html:info.name[12]}</td><td>${html:info.file[12]}</td><td>${html:info.size[12]}/${html:info.sizetot[12]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[12]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
-<tr><td>${html:info.state[13]}</td><td>${html:info.name[13]}</td><td>${html:info.file[13]}</td><td>${html:info.size[13]}/${html:info.sizetot[13]}</td><td><input type="submit" value="${LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[13]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[0]}</td><td>${html:info.name[0]}</td><td>${html:info.file[0]}</td><td>${html:info.size[0]}/${html:info.sizetot[0]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[0]}'; form.submit()" title='${html:LANG_H6}' onMouseOver="info('${js:LANG_H6}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[1]}</td><td>${html:info.name[1]}</td><td>${html:info.file[1]}</td><td>${html:info.size[1]}/${html:info.sizetot[1]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[1]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[2]}</td><td>${html:info.name[2]}</td><td>${html:info.file[2]}</td><td>${html:info.size[2]}/${html:info.sizetot[2]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[2]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[3]}</td><td>${html:info.name[3]}</td><td>${html:info.file[3]}</td><td>${html:info.size[3]}/${html:info.sizetot[3]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[3]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[4]}</td><td>${html:info.name[4]}</td><td>${html:info.file[4]}</td><td>${html:info.size[4]}/${html:info.sizetot[4]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[4]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[5]}</td><td>${html:info.name[5]}</td><td>${html:info.file[5]}</td><td>${html:info.size[5]}/${html:info.sizetot[5]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[5]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[6]}</td><td>${html:info.name[6]}</td><td>${html:info.file[6]}</td><td>${html:info.size[6]}/${html:info.sizetot[6]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[6]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[7]}</td><td>${html:info.name[7]}</td><td>${html:info.file[7]}</td><td>${html:info.size[7]}/${html:info.sizetot[7]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[7]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[8]}</td><td>${html:info.name[8]}</td><td>${html:info.file[8]}</td><td>${html:info.size[8]}/${html:info.sizetot[8]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[8]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[9]}</td><td>${html:info.name[9]}</td><td>${html:info.file[9]}</td><td>${html:info.size[9]}/${html:info.sizetot[9]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[9]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[10]}</td><td>${html:info.name[10]}</td><td>${html:info.file[10]}</td><td>${html:info.size[10]}/${html:info.sizetot[10]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[10]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[11]}</td><td>${html:info.name[11]}</td><td>${html:info.file[11]}</td><td>${html:info.size[11]}/${html:info.sizetot[11]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[11]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[12]}</td><td>${html:info.name[12]}</td><td>${html:info.file[12]}</td><td>${html:info.size[12]}/${html:info.sizetot[12]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[12]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
+<tr><td>${html:info.state[13]}</td><td>${html:info.name[13]}</td><td>${html:info.file[13]}</td><td>${html:info.size[13]}/${html:info.sizetot[13]}</td><td><input type="submit" value="${attr:LANG_H15}" onClick="form.command.value='cancel-file=${js:info.url_sav[13]}'; form.submit()" title='${html:LANG_H7}' onMouseOver="info('${js:LANG_H7}'); return true" onMouseOut="info('&nbsp;'); return true"></td></tr>
 
 </table>
 
@@ -179,7 +179,7 @@ ${LANG_H20} ${html:info.currentjob}
 		<table width="100%" border="0"><tr><td align="left">
 		&nbsp;
 		</td><td align="right">
-			<input type="submit" value=" ${LANG_V4} " 
+			<input type="submit" value=" ${attr:LANG_V4} " 
 				title='${html:LANG_D3}' onMouseOver="disable_timer(); info('${js:LANG_D3}'); return true" 
 				onMouseOut="info('&nbsp;'); enable_timer(); return true"
 				onClick="if (do_confirm('${js:LANG_G1}')) { form.command.value='cancel'; form.submit(); } return false"
