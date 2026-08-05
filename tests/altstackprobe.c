@@ -192,10 +192,10 @@ static void *trace_mapped(void *sp) {
   return sp;
 }
 
-/* Reached only if dlsym() failed, and then it is the process's only mmap(), so
-   it has to be the right call: 32-bit arches have no SYS_mmap, and i386's wants
-   a pointer to an argument block, so prefer SYS_mmap2 wherever it exists. Its
-   offset is in 4096-byte units whatever the page size. */
+/* The fallback when dlsym() failed, so it has to be the right call: 32-bit
+   arches have no SYS_mmap and i386's wants a pointer to an argument block, so
+   prefer SYS_mmap2, whose offset is in 4096-byte units whatever the page size.
+ */
 static void *raw_mmap(void *addr, size_t len, int prot, int flags, int fd,
                       off_t off) {
 #ifdef SYS_mmap2
