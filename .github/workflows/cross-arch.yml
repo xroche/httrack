@@ -79,8 +79,9 @@ jobs:
           CHOST="$TRIPLET" CC="$TRIPLET-gcc" CFLAGS="-O2 -fPIC" \
             ./configure --prefix="$ZPREFIX" --static
           # configure detects s390x's vector CRC, whose sources live in the
-          # contrib/ the .dfsg repack drops. Nothing here needs a fast CRC.
-          sed -i 's/-DHAVE_S390X_VX//g' Makefile
+          # contrib/ the .dfsg repack drops: drop the define and the object it
+          # would build. Nothing here needs a fast CRC.
+          sed -i -E 's/(-DHAVE_S390X_VX|crc32_vx\.l?o)//g' Makefile
           make -j"$(nproc)"
           make install
 
