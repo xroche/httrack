@@ -521,6 +521,11 @@ HTSEXT_API size_t escape_uri_utf(const char *const src, char *const dest,
 HTSEXT_API size_t escape_check_url(const char *const src, char *const dest,
                                    const size_t size);
 
+/** Percent-escape the C0 control bytes of @p src (0x00-0x1f) and copy every
+    other byte verbatim, so bytes >= 0x7f keep the UTF-8 they carry. */
+HTSEXT_API size_t escape_control_url(const char *const src, char *const dest,
+                                     const size_t size);
+
 /** Append-variant of escape_spc_url(): escapes @p src after the existing
     NUL-terminated content of @p dest. Returns the bytes appended (excluding the
     NUL). */
@@ -572,7 +577,8 @@ HTSEXT_API size_t make_content_id(const char *const adr, const char *const fil,
 
 /** Low-level percent-escaper backing the escape_* family. @p mode selects the
     character class to escape: 0 check_url, 1 in_url, 2 spc_url, 3 uri,
-    30 uri_utf. @p max_size is the dest capacity including the NUL. */
+    4 control_url, 30 uri_utf. @p max_size is the dest capacity including the
+    NUL. */
 HTSEXT_API size_t x_escape_http(const char *const s, char *const dest,
                                 const size_t max_size, const int mode);
 
