@@ -24,6 +24,9 @@ budget=${HTTRACK_TEST_TIMEOUT:-600}
 case "$budget" in
 '' | *[!0-9]*) budget=600 ;;
 esac
+# Exported, so a test that runs a long series of expensive steps can pace itself
+# against the same number instead of being killed halfway (skip_if_out_of_budget).
+export HTTRACK_TEST_TIMEOUT="$budget"
 test "$budget" -gt 0 || exec "$BASH" "$@"
 
 # The test script is the last argument; automake passes no others today.

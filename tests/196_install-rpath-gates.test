@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
 srcdir="${abs_top_srcdir:?not run under make check}"
 test -r "${srcdir}/configure" || {
     echo "no configure in ${srcdir}; skipping" >&2
@@ -35,11 +39,12 @@ test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
 # not depend on the prefix.
 cache=${work}/config.cache
 n=0
+cases=6 # expect calls below, what the budget is paced against; 1 on Darwin
 
 expect() {
     local want=$1 desc=$2
     shift 2
-    local dir got
+    local dir got began=$SECONDS
     n=$((n + 1))
     dir=${work}/build${n}
     mkdir -p "${dir}"
@@ -57,11 +62,13 @@ expect() {
         fail "${desc}: ORIGIN_RPATH is '${got}', expected '${want}'"
     }
     echo "ok: ${desc} -> ${want}"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 }
 
 # Darwin has no positive case: configure turns the rpath off there whatever the
 # prefix, so assert that one row rather than run "no" rows that cannot fail.
 if [ "$(uname -s)" = Darwin ]; then
+    cases=1
     expect no "Darwin opts out whatever the prefix" --prefix="${work}/inst"
     exit 0
 fi
@@ -74,3 +81,5 @@ expect no "a multiarch libdir does not" --prefix=/usr --libdir=/usr/lib/x86_64-l
 expect no "a 32-bit multilib libdir does not" --prefix=/usr --libdir=/usr/lib32
 expect no "--disable-origin-rpath is honoured" --prefix="${work}/inst" --disable-origin-rpath
 expect no "a static build does not" --prefix="${work}/inst" --disable-shared
+
+test "${n}" -eq "${cases}" || fail "ran ${n} cases, not the ${cases} the budget is paced against"

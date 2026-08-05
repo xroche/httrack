@@ -350,6 +350,21 @@ EOF
     export PATH
 }
 
+# SKIP out when $1 more steps at the cost of the one that just ran ($2 seconds)
+# would overrun test-timeout.sh's budget: that budget is there to catch a wedge,
+# and a port slow enough to blow it on honest work (hppa spends ~150s on a single
+# configure run) would else FTBFS. Charge the step's own duration, not the elapsed
+# mean, or setup and a cold config.cache are billed to every remaining step.
+skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took>
+    local budget=${HTTRACK_TEST_TIMEOUT:-600} need=$((($1 + 1) * $2))
+
+    case "$budget" in '' | *[!0-9]*) budget=600 ;; esac
+    test "$1" -gt 0 && test "$budget" -gt 0 || return 0
+    test "$((SECONDS + need))" -ge "$budget" || return 0
+    echo "$1 steps left need ~${need}s and the budget is ${budget}s; skipping" >&2
+    exit 77
+}
+
 # Collect a killed job, giving up after REAP_GRACE seconds. kill_tree can fail to
 # reap a native Windows descendant -- the very case these watchdogs exist for --
 # and a bare `wait` then blocks the watchdog itself forever, so the timeout it was
