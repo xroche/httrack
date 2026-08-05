@@ -149,6 +149,17 @@ void ftp_split_userpass(const char *src, const char *end, char *user,
   }
 }
 
+/* No control byte in a command: a decoded %0d%0a smuggles a second (#1010). */
+static hts_boolean ftp_line_is_safe(const char *line) {
+  const char *c;
+
+  for (c = line; *c != '\0'; c++) {
+    if ((unsigned char) *c < ' ')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 /* Build "<verb> <path>", quoting a path the server could not parse bare. */
 static void ftp_command(char *line, size_t line_size, const char *verb,
                         const char *path) {
@@ -283,6 +294,14 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
       strcpybuff(back->r.msg, "Unexpected PORT error");
       back->r.statuscode = STATUSCODE_INVALID;
     }
+  }
+
+  // fail here, or send_line() drops the command and the reply read times out
+  if (!ftp_line_is_safe(user) || !ftp_line_is_safe(pass) ||
+      !ftp_line_is_safe(line_retr)) {
+    strcpybuff(back->r.msg, "Invalid control character in FTP URL");
+    back->r.statuscode = STATUSCODE_INVALID;
+    _HALT_FTP return 0;
   }
 
 #if FTP_DEBUG
@@ -922,6 +941,10 @@ FILE *dd = NULL;
 // 0 = ERROR
 int send_line(T_SOC soc, const char *data) {
   char BIGSTK line[1024];
+
+  // backstop: the driver fails earlier, but no injected byte reaches the wire
+  if (!ftp_line_is_safe(data))
+    return 0;
 
   if (_DEBUG_HEAD) {
     if (ioinfo) {

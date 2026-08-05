@@ -4525,6 +4525,50 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* send_line() must keep a control byte off the control channel: a %0d%0a
+   decoded out of the URL used to add a command line of its own (#1010). */
+static int st_ftpctrl(httrackp *opt, int argc, char **argv) {
+  static const char *const hostile[] = {
+      "RETR \"/f.txt\r\nDELE secret.txt\"", // the issue's URL, once decoded
+      "RETR \"/f.txt\rDELE secret.txt\"",   // a lone CR still ends the line
+      "RETR \"/f.txt\nDELE secret.txt\"",   // and so does a lone LF
+      "USER bob\001"                        // any control byte, not just CRLF
+  };
+  /* Ordinary paths must still go out untouched, high bytes included: a check
+     over plain char reads those as negative and would reject them. */
+  static const char *const legit[] = {"RETR \"/a b.txt\"", "RETR /plain.txt",
+                                      "RETR /caf\xe9.txt"};
+  static const char expect[] =
+      "RETR \"/a b.txt\"\r\nRETR /plain.txt\r\nRETR /caf\xe9.txt\r\n";
+  T_SOC sv[2];
+  char wire[512];
+  size_t got = 0;
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(st_socketpair(sv) == 0);
+  for (i = 0; i < sizeof(hostile) / sizeof(hostile[0]); i++)
+    assertf(send_line(sv[0], hostile[i]) == 0);
+  for (i = 0; i < sizeof(legit) / sizeof(legit[0]); i++)
+    assertf(send_line(sv[0], legit[i]) != 0);
+  deletesoc(sv[0]); // EOF, so the read below sees the whole wire
+  for (;;) {
+    const int n = (int) recv(sv[1], wire + got, (int) (sizeof(wire) - got), 0);
+
+    if (n <= 0)
+      break;
+    got += (size_t) n;
+  }
+  deletesoc(sv[1]);
+  assertf(got == sizeof(expect) - 1);
+  assertf(memcmp(wire, expect, got) == 0);
+  printf("ftp-ctrlchars self-test OK (%d bytes sent, %d rejected)\n", (int) got,
+         (int) (sizeof(hostile) / sizeof(hostile[0])));
+  return 0;
+}
+
 /* Slurp a whole file into a malloc'd buffer; sets *len. NULL on error. */
 static unsigned char *warc_slurp(const char *path, size_t *len) {
   FILE *f = FOPEN(path, "rb");
@@ -8037,6 +8081,8 @@ static const struct selftest_entry {
     {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
      st_ftpline},
     {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
+    {"ftp-ctrlchars", "", "send_line rejects a control byte in an FTP command",
+     st_ftpctrl},
     {"warc", "<dir>", "WARC/1.1 writer: framing, digests, revisit dedup",
      st_warc},
     {"warc-trunc", "<dir>", "WARC-Truncated on a cap-truncated body",
