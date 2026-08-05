@@ -240,6 +240,16 @@ AS_CASE([$hts_libdir],
 	[/usr/lib | /usr/lib/* | /usr/lib32 | /usr/lib32/* | /usr/lib64 | /usr/lib64/* | /usr/libx32 | /usr/libx32/*], [hts_origin_sysdir=yes],
 	[hts_origin_sysdir=no])
 
+# The @rpath id is only safe for a consumer that carries its own LC_RPATH, so
+# libhttrack.pc hands one out; ${libdir} is pkg-config's variable, expanded when
+# a consumer queries the file. Empty, leading space and all, for a system libdir.
+SYSTEM_LIBDIR=$hts_origin_sysdir
+PKGCONFIG_RPATH_LDFLAG=
+AS_IF([test "x$hts_origin_sysdir" = xno],
+	[PKGCONFIG_RPATH_LDFLAG=' -Wl,-rpath,${libdir}'])
+AC_SUBST([SYSTEM_LIBDIR])
+AC_SUBST([PKGCONFIG_RPATH_LDFLAG])
+
 # dyld follows LC_RPATH only for a load path spelled @rpath/..., so Darwin also
 # needs libhttrack's own id. That comes from libtool's archive_cmds template and
 # not from LDFLAGS, so rewrite it; an unrecognised template leaves the gate off.
@@ -556,6 +566,7 @@ AM_CONDITIONAL([FUZZERS], [test x"$fuzzers" = x"yes"])
 AC_CONFIG_FILES([
 Makefile
 src/Makefile
+src/libhttrack.pc
 man/Makefile
 m4/Makefile
 templates/Makefile

@@ -1,0 +1,176 @@
+#!/bin/bash
+# libhttrack.pc is what makes the @rpath install_name usable by a consumer: it
+# hands out the include path and, outside a system libdir, the rpath (#978).
+# Compiled, linked and run, since a compile alone passes on the broken case.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+skip() {
+    echo "$*; skipping" >&2
+    exit 77
+}
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is no install rule to drive.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+[ -f "${abs_top_builddir}/src/Makefile" ] || fail "${abs_top_builddir}/src is not configured"
+
+prefix=${CONFIGURED_PREFIX:?not run under make check}
+libdir=${CONFIGURED_LIBDIR:?not run under make check}
+includedir=${CONFIGURED_INCLUDEDIR:?not run under make check}
+prefix=${prefix%/}
+libdir=${libdir%/}
+includedir=${includedir%/}
+
+pkgconfig=${PKG_CONFIG:-pkg-config}
+command -v "${pkgconfig}" >/dev/null 2>&1 || skip "no ${pkgconfig}"
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+command -v "${MAKE:-make}" >/dev/null 2>&1 || skip "no make (${MAKE:-make})"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/pkgconf.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+stage=${work}/stage
+stage_install_target install "${stage}" "${work}/install.log" ||
+    fail "make install DESTDIR=${stage}"
+
+staged_libdir=${stage}${libdir}
+test -r "${staged_libdir}/pkgconfig/libhttrack.pc" ||
+    fail "no libhttrack.pc in ${staged_libdir}/pkgconfig"
+
+# Only a shared build has anything for an rpath to resolve; --disable-shared
+# leaves -lhttrack pointing at an archive.
+shared=no
+for lib in "${staged_libdir}"/libhttrack.so* "${staged_libdir}"/libhttrack*.dylib; do
+    if [ -f "${lib}" ]; then
+        shared=yes
+        break
+    fi
+done
+[ "${shared}" = yes ] || skip "this build installed no shared libhttrack"
+
+# The staged copy still names the configured directories. All three, not prefix
+# alone: an explicit --libdir lands in the .pc absolute and derives from nothing.
+export PKG_CONFIG_PATH=${staged_libdir}/pkgconfig
+pc_query() {
+    "${pkgconfig}" \
+        --define-variable=prefix="${stage}${prefix}" \
+        --define-variable=libdir="${staged_libdir}" \
+        --define-variable=includedir="${stage}${includedir}" \
+        "$@" libhttrack
+}
+
+cflags=$(pc_query --cflags) || fail "pkg-config --cflags failed"
+libs=$(pc_query --libs) || fail "pkg-config --libs failed"
+static_libs=$(pc_query --static --libs) || fail "pkg-config --static --libs failed"
+version=$(pc_query --modversion) || fail "pkg-config --modversion failed"
+
+read -r -a cflags_argv <<<"${cflags}"
+read -r -a libs_argv <<<"${libs}"
+
+first_flag() {
+    local prefix_flag=$1 flag
+    shift
+    for flag in "$@"; do
+        case "${flag}" in
+        "${prefix_flag}"*)
+            printf '%s\n' "${flag#"${prefix_flag}"}"
+            return 0
+            ;;
+        esac
+    done
+    return 1
+}
+
+incdir=$(first_flag -I "${cflags_argv[@]}") ||
+    fail "libhttrack.pc gives no include path: ${cflags}"
+linkdir=$(first_flag -L "${libs_argv[@]}") ||
+    fail "libhttrack.pc gives no library path: ${libs}"
+
+# Anything outside the stage is a real install answering instead, which would
+# make every check below say nothing about the file just generated.
+for dir in "${incdir}" "${linkdir}"; do
+    case "${dir}" in
+    "${stage}"/*) ;;
+    *) fail "libhttrack.pc did not relocate ${dir} into ${stage}" ;;
+    esac
+done
+test -r "${incdir}/httrack-library.h" ||
+    fail "the include path ${incdir} from libhttrack.pc holds no httrack-library.h"
+
+# zlib is a hard requirement reached only through Libs.private, so a static link
+# without it does not resolve.
+case " ${static_libs} " in
+*" -lz "*) ;;
+*) fail "pkg-config --static --libs carries no -lz, Libs.private cannot be right: ${static_libs}" ;;
+esac
+
+# Both directions of the gate: an rpath into a distribution libdir is a lintian
+# tag, and its absence anywhere else leaves the @rpath id unresolvable.
+if [ "${SYSTEM_LIBDIR:-no}" = yes ]; then
+    case "${libs}" in
+    *-rpath*) fail "${libdir} is a system libdir but libhttrack.pc still emits an rpath: ${libs}" ;;
+    esac
+else
+    case " ${libs} " in
+    *" -Wl,-rpath,${staged_libdir} "*) ;;
+    *) fail "libhttrack.pc emits no rpath into ${staged_libdir}: ${libs}" ;;
+    esac
+fi
+
+# Flat, as the installed headers include each other and the libtest examples do:
+# an include path one level too high would still resolve <httrack/...>.
+cat >"${work}/consumer.c" <<'EOF'
+#include <stdio.h>
+#include <httrack-library.h>
+
+int main(void) {
+  const char *const version = hts_version();
+  if (version == NULL) {
+    return 1;
+  }
+  printf("%s\n", version);
+  return 0;
+}
+EOF
+
+"${cc_argv[@]}" "${cflags_argv[@]}" -o "${work}/consumer" "${work}/consumer.c" \
+    "${libs_argv[@]}" 2>"${work}/cc.log" || {
+    head -20 "${work}/cc.log" >&2
+    fail "a consumer does not build from pkg-config --cflags --libs libhttrack"
+}
+
+# With no rpath by design, a staged system libdir is not on the loader's path.
+if [ "${SYSTEM_LIBDIR:-no}" = yes ]; then
+    runenv=(env "LD_LIBRARY_PATH=${staged_libdir}" "DYLD_LIBRARY_PATH=${staged_libdir}")
+else
+    runenv=(env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH)
+fi
+
+# From an unrelated cwd, so nothing resolves through a relative path.
+cd "${work}"
+out=$("${runenv[@]}" "${work}/consumer" 2>&1) ||
+    fail "the consumer did not run: ${out}"
+test "${out}" = "${version}" ||
+    fail "libhttrack.pc says Version ${version}, the library it resolved says ${out}"
+
+# Take the library away and the consumer has to stop working. If it still runs,
+# another libhttrack answered and the run above proved nothing.
+mv "${staged_libdir}" "${staged_libdir}.gone"
+if "${runenv[@]}" "${work}/consumer" >/dev/null 2>&1; then
+    skip "a libhttrack outside the stage answers, so the run proves nothing"
+fi
+
+echo "a pkg-config consumer built and ran against the staged libhttrack ${version}"

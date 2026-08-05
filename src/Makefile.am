@@ -15,6 +15,10 @@ DevIncludes_DATA = \
 	htsarrays.h \
 	htssafe.h
 
+# What hands a consumer the include path and the rpath the @rpath id needs (#978).
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libhttrack.pc
+
 AM_CPPFLAGS = \
 	@DEFAULT_CFLAGS@ \
 	@THREADS_CFLAGS@ \
