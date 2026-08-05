@@ -65,7 +65,7 @@ grep -q 'slow but healthy' "$out" || fail "healthy test output lost"
 
 # The killed tree must really be gone, or the next test inherits its ports.
 sleep 1
-! grep -q "$tmp/90_wedged.test" <<<"$(ps -A -o args 2>/dev/null)" ||
+! grep -q "$tmp/90_wedged.test" <<<"$(ps_snapshot)" ||
     fail "the wedged test survived the guard"
 
 # --- the budget is wall clock, not a count of poll iterations ----------------
@@ -138,6 +138,72 @@ rc=0
 HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "a 60s step under a 600s budget reported $rc, want 0"
 grep -q 'the pacer let it through' "$out" || fail "the pacer skipped a test that fits"
+
+# --- the process lists survive a host with no ps ----------------------------
+# Fedora's build root ships no procps, and the guard then named nothing (#1021).
+if ! is_windows && test -r /proc/self/stat; then
+    mkdir -p "$tmp/nops"
+    printf '#!/bin/sh\nexit 127\n' >"$tmp/nops/ps"
+    chmod +x "$tmp/nops/ps"
+    # Both lists match on the basename alone, so any long-lived binary will do.
+    ln -sf "$(command -v sleep)" "$tmp/httrack"
+    # Started from a subshell so ppid and pgid differ: swapping those two columns
+    # is invisible whenever the test shell happens to lead its own group.
+    (
+        "$tmp/httrack" 60 &
+        echo $! >"$tmp/fake.pid"
+    )
+    # Its own group, to prove the filter keeps an outsider out.
+    (
+        set -m
+        "$tmp/httrack" 60 &
+        echo $! >"$tmp/outside.pid"
+    )
+    fake=$(cat "$tmp/fake.pid")
+    outside=$(cat "$tmp/outside.pid")
+    trap 'set +e; kill "$fake" "$outside" 2>/dev/null; rm -rf "$tmp"' EXIT
+    # ppid and pgid of $1: the oracle the listing is checked against.
+    procfields() { awk '{ sub(/.*\) /, ""); print $2, $3 }' "/proc/$1/stat"; }
+    procstate() { awk '{ sub(/.*\) /, ""); print $1 }' "/proc/$1/stat" 2>/dev/null || echo gone; }
+    read -r fppid pgid _ <<<"$(procfields "$fake")"
+    read -r _ opgid _ <<<"$(procfields "$outside")"
+    test "$fppid" != "$pgid" || fail "the fake shares ppid and pgid ($pgid)"
+    test "$opgid" != "$pgid" || fail "the outsider landed in the group under test"
+    (
+        PATH="$tmp/nops:$PATH"
+        ! ps -A >/dev/null 2>&1 || fail "the ps shim did not take"
+        snap=$(list_stray_processes "$pgid" group)
+        # Line 1 is the header every consumer drops; a row there would be lost.
+        case "$(head -n1 <<<"$snap")" in
+        [0-9]*) fail "the no-ps listing has no header: $snap" ;;
+        esac
+        ! grep -qE "^$outside " <<<"$snap" ||
+            fail "no-ps group list reported pid $outside, in another group"
+        read -r _ rppid rpgid _ <<<"$(grep -E "^$fake " <<<"$snap")"
+        test "$rppid $rpgid" = "$fppid $pgid" ||
+            fail "no-ps row for $fake reads ppid/pgid '$rppid $rpgid', want '$fppid $pgid'"
+        engines=$(list_engine_pids "$pgid")
+        grep -qx "$fake" <<<"$engines" || fail "no-ps engine list lost pid $fake"
+        ! grep -qx "$outside" <<<"$engines" ||
+            fail "no-ps engine list reached outside the group (pid $outside)"
+        # The chain, not just its input: this is what reported nothing on Fedora.
+        stacks=$(request_engine_backtraces "$pgid")
+        ! grep -q 'no engine process left' <<<"$stacks" ||
+            fail "no-ps stack request found no engine to signal: $stacks"
+        # Gone, or a zombie: the fake is reparented, and a container's pid 1 does
+        # not always reap. kill -0 alone succeeds on a zombie and proves nothing.
+        case "$(procstate "$fake")" in
+        Z | gone) ;;
+        *) fail "the SIGABRT never reached pid $fake" ;;
+        esac
+        # With neither source the dump must say so, not print an empty section.
+        # shellcheck disable=SC2317 # reached through ps_snapshot
+        proc_snapshot() { return 1; }
+        grep -q 'no process list' <<<"$(list_stray_processes "$pgid" group)" ||
+            fail "a host with no ps and no /proc produced no notice"
+    )
+    kill "$fake" "$outside" 2>/dev/null || true
+fi
 
 # --- a wedged crawl yields a symbolized engine stack ------------------------
 # The whole point of the dump: name the frame the engine is stuck in. Windows has
