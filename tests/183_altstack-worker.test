@@ -66,12 +66,15 @@ plain_frames=$(frame_count "$plain")
 test "$plain_frames" -lt 100 ||
     fail "-#c=segv: $plain_frames frames, the threshold no longer discriminates"
 
-# armhf and loong64 cannot unwind out of the frame that faulted on the guard
-# page, leaving the handler's own three frames and nothing to count; 180 skips
-# on the same absolute floor, which a worker that merely stopped recursing
-# (11 frames, like the control) stays well clear of. Only this half goes blind
-# there: the release trace below still judges the same fix.
-if [ "$worker_frames" -lt 6 ]; then
+# Naming no frame at all is the unwinder failing outright, not a weak one, and
+# the floor below would take it for loong64. hts_print_backtrace() says which.
+if grep -q "No stack trace available" <<<"$worker"; then
+    fail "-#c=threadstack: the report carries no stack trace at all"
+fi
+
+# armhf and loong64 cannot unwind past the frame that faulted on the guard page
+# (180 skips on the same floor); the release trace below still judges the fix.
+if [ "$worker_frames" -ge 1 ] && [ "$worker_frames" -lt 6 ]; then
     echo "-#c=threadstack: $worker_frames frames, too few for this unwinder to" \
         "show the recursion" >&2
 elif [ "$worker_frames" -lt 100 ]; then

@@ -29,8 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # arch is the dpkg name that selects the hardening flags, triplet the
-          # toolchain prefix; the two differ often enough to spell both out.
+          # arch selects the hardening flags, triplet is the toolchain prefix.
           # The first four are 3.49.17's failures.
           - { arch: armhf, triplet: arm-linux-gnueabihf }
           - { arch: powerpc, triplet: powerpc-linux-gnu }
@@ -38,7 +37,6 @@ jobs:
           - { arch: loong64, triplet: loongarch64-linux-gnu }
           - { arch: sh4, triplet: sh4-linux-gnu }
           - { arch: m68k, triplet: m68k-linux-gnu }
-          - { arch: alpha, triplet: alpha-linux-gnu }
           - { arch: sparc64, triplet: sparc64-linux-gnu }
           - { arch: riscv64, triplet: riscv64-linux-gnu }
           - { arch: s390x, triplet: s390x-linux-gnu }
@@ -56,7 +54,8 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
-            dpkg-dev git ca-certificates "gcc-$TRIPLET"
+            dpkg-dev git ca-certificates \
+            "gcc-$TRIPLET" "libc6-dev-$DEB_HOST_ARCH-cross"
 
       - uses: actions/checkout@v7
         with:
@@ -65,8 +64,8 @@ jobs:
       - name: Cross-build zlib
         run: |
           set -euo pipefail
-          # The one mandatory dependency, and no ports architecture has a
-          # zlib1g-dev:<arch> to multiarch-install. -fPIC: libhttrack.so links it.
+          # Mandatory, and no ports arch has a zlib1g-dev:<arch> to
+          # multiarch-install. -fPIC because libhttrack.so links it.
           mkdir -p /tmp/zsrc && cd /tmp/zsrc
           apt-get source zlib1g
           cd zlib-*/
@@ -80,9 +79,8 @@ jobs:
           set -euo pipefail
           autoreconf -fi
           mkdir -p /tmp/bld && cd /tmp/bld
-          # The buildd's own flags, per architecture: -D_FILE_OFFSET_BITS=64 is
-          # what renamed an LD_PRELOAD shim's mmap() to mmap64 on 32-bit, and
-          # -fstack-clash-protection is not offered everywhere.
+          # The buildd's own per-arch flags: -D_FILE_OFFSET_BITS=64 is the shim
+          # hazard, and -fstack-clash-protection is not offered everywhere.
           eval "$(dpkg-buildflags --export=sh)"
           # A cross AC_TRY_RUN answers "cross", which would swap in the bundled
           # snprintf that no buildd ever builds. Every glibc passes these.

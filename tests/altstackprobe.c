@@ -14,10 +14,8 @@
 
 #define _GNU_SOURCE
 
-/* An interposer has to define the symbol names the process really calls, so the
-   largefile redirect must not rename them: on a 32-bit glibc it gives mmap()
-   below the asm name mmap64, colliding with the mmap64() beside it. _TIME_BITS
-   rides on _FILE_OFFSET_BITS and cannot outlive it. */
+/* The largefile redirect renames this file's mmap() to mmap64, colliding with
+   its own mmap64(). _TIME_BITS rides on _FILE_OFFSET_BITS, so it goes too. */
 #undef _FILE_OFFSET_BITS
 #undef _TIME_BITS
 
