@@ -56,7 +56,7 @@
         <ul>
           <li>A mirrored page opened in your browser can no longer take control of the WebHTTrack interface</li>
           <li>Web addresses shown while a mirror runs no longer break the progress page</li>
-          <li>Settings keep values containing quotes or ampersands, and Windows paths such as C:\folder</li>
+          <li>Settings keep values containing quotes or ampersands, and Windows paths such as C:\ab</li>
           <li>A malformed link on a crawled site can no longer alter the requests HTTrack sends</li>
           <li>Crash reports name the function and source line where the problem occurred</li>
         </ul>

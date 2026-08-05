@@ -29,7 +29,8 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:9:0: revision-only bump, no ABI change (#991 only added an exported symbol).
+# 3:9:0: revision-only bump. #991 and #1005 each added an export
+# (hts_set_thread_hooks, escape_control_url); nothing changed or went away.
 # 3:8:0: revision-only bump, no ABI change.
 # 3:7:0: htsblk gained a tail field and lien_back embeds it by value, so
 # lien_back.is_update and everything after it shift +8 (httrackp's own tail growth
