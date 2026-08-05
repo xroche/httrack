@@ -4,6 +4,11 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-18
++ Fixed: the 3.49.17 package build failed on four architectures: the test suite's mmap interposer did not compile on armhf, powerpc or hppa, and the alternate-stack test rejected loong64's shorter backtrace (#1023)
++ Fixed: the test suite failed on a host with no ps command, such as a Fedora build root; its hang diagnostics now read /proc directly (#1021)
++ Changed: multiple internal test and CI improvements, including a cross-compile matrix covering the Debian ports architectures
+
 3.49-17
 + New: a pkg-config file, libhttrack.pc, ships with the development headers (#1018)
 + Fixed: a crawled page could read the WebHTTrack session id and drive the control panel; the id is now unguessable and cross-origin commands are refused (#877)
