@@ -42,9 +42,8 @@ httrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE)
 proxytrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 htsserver_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 
-# @RPATH_ORIGIN_LDFLAGS@ makes a copied tree find libhttrack next to it (#906);
-# on Darwin it pairs with the @rpath install_name configure gives the dylib
-# (#978). proxytrack links no shared library of ours, so it needs none.
+# @RPATH_ORIGIN_LDFLAGS@ makes a copied tree find libhttrack next to it (#906),
+# pairing on Darwin with the dylib's @rpath id (#978); proxytrack needs none of it.
 httrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE) @RPATH_ORIGIN_LDFLAGS@
 proxytrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
 htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE) @RPATH_ORIGIN_LDFLAGS@

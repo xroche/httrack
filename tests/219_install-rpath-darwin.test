@@ -1,7 +1,7 @@
 #!/bin/bash
 # dyld follows an rpath only for a load path spelled @rpath/..., so a relocatable
-# install on Darwin takes libhttrack's own id too, not just the rpath entries 195
-# checks (#978). Read the load commands the install produced.
+# install on Darwin takes libhttrack's own id too (#978). Read the load commands
+# the install produced.
 
 set -euo pipefail
 
@@ -47,6 +47,11 @@ dylib_deps() {
     otool -L "$1" | awk '/^[[:space:]]/ { print $1 }'
 }
 
+# The LC_RPATH entries, one per line.
+dylib_rpaths() {
+    otool -l "$1" | awk '/LC_RPATH/ { f = 1 } f && $1 == "path" { print $2; f = 0 }'
+}
+
 ids=()
 for lib in "${stage}${libdir}"/libhttrack*.dylib; do
     # The version links point at the file below them, and the glob itself is what
@@ -57,6 +62,7 @@ for lib in "${stage}${libdir}"/libhttrack*.dylib; do
     test -n "${id}" || fail "${lib} carries no LC_ID_DYLIB"
     ids+=("${id}")
 done
+# Must stay ahead of every "${ids[@]}" below: bash 3.2 calls an empty array unbound.
 test "${#ids[@]}" -gt 0 || skip "this build installed no libhttrack dylib"
 
 if [ "${ORIGIN_RPATH:-no}" != yes ]; then
@@ -75,13 +81,17 @@ for id in "${ids[@]}"; do
         fail "installed libhttrack keeps the id ${id}, which no rpath answers"
 done
 
-# The id only pays off if the executables recorded it: an absolute dependency
-# here resolves before any rpath is consulted and hides the whole change.
+# The id only pays off if the executables recorded it and hold an entry answering
+# it: an absolute dependency resolves before any rpath, and an @rpath one without
+# the entry resolves to nothing at all.
 idlist=$(printf '%s\n' "${ids[@]}")
-found=0
 for exe in httrack htsserver; do
     bin=${stage}${bindir}/${exe}
     test -r "${bin}" || fail "no ${exe} in ${stage}${bindir}"
+    rpaths=$(dylib_rpaths "${bin}")
+    grep -qxF '@loader_path/../lib' <<<"${rpaths}" ||
+        fail "${exe} carries no @loader_path/../lib rpath, so a copied tree resolves nothing"
+    found=0
     while read -r dep; do
         case "${dep}" in
         *libhttrack*) ;;
@@ -91,8 +101,8 @@ for exe in httrack htsserver; do
         grep -qxF "${dep}" <<<"${idlist}" ||
             fail "${exe} loads ${dep}, which is not the id the installed library carries"
     done < <(dylib_deps "${bin}")
+    test "${found}" -ge 1 ||
+        fail "${exe} holds no libhttrack dependency, so this proved nothing"
 done
-test "${found}" -ge 2 ||
-    fail "the two executables hold ${found} libhttrack dependencies, so this proved nothing"
 
 echo "installed libhttrack is ${ids[*]}, loaded as such by httrack and htsserver"

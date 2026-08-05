@@ -60,8 +60,7 @@ expect() {
 }
 
 # The positive control first, or every "no" below could come from a probe that
-# simply never succeeds on this machine. On Darwin it is also what fails if the
-# @rpath install_name stops being stamped (#978).
+# simply never succeeds on this machine.
 expect yes "a private prefix gets the rpath" --prefix="${work}/inst"
 expect no "a system prefix does not" --prefix=/usr
 expect no "a multiarch libdir does not" --prefix=/usr --libdir=/usr/lib/x86_64-linux-gnu

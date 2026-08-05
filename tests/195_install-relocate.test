@@ -1,7 +1,7 @@
 #!/bin/bash
 # An install copied away from its configured prefix still has to find
 # libhttrack, which it does through a binary-relative rpath (#906). On Darwin
-# that also takes an @rpath install_name, which 219 reads (#978).
+# that also takes an @rpath install_name (#978).
 
 set -euo pipefail
 

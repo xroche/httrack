@@ -212,8 +212,8 @@ AC_ARG_ENABLE([origin-rpath],
 		[link the binaries without a binary-relative rpath]),
 	[hts_origin_asked=yes], [enable_origin_rpath=yes; hts_origin_asked=no])
 
-# The token each loader expands, hts_origin_ref_make in the spelling that
-# survives make's expansion and libtool's eval of the link line.
+# hts_origin_ref is the raw token the loader expands; hts_origin_ref_make is the
+# spelling that survives make's expansion and libtool's eval of the link line.
 AS_CASE([$host_os],
 	[darwin*], [hts_origin_darwin=yes
 		hts_origin_ref='@loader_path'
@@ -248,7 +248,12 @@ if test "x$hts_origin_darwin" = xyes; then
 	hts_origin_subst='s|-install_name $rpath/|-install_name @rpath/|'
 	hts_origin_archive=`printf '%s\n' "$archive_cmds" | $SED "$hts_origin_subst"`
 	hts_origin_expsym=`printf '%s\n' "$archive_expsym_cmds" | $SED "$hts_origin_subst"`
-	test "x$hts_origin_archive" = "x$archive_cmds" || hts_origin_id=yes
+	# Both templates or neither: should they ever diverge, the -export-symbols
+	# path would keep stamping the absolute id the rpath cannot answer.
+	if test "x$hts_origin_archive" != "x$archive_cmds" &&
+		test "x$hts_origin_expsym" != "x$archive_expsym_cmds"; then
+		hts_origin_id=yes
+	fi
 fi
 
 ORIGIN_RPATH=no

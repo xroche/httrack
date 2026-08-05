@@ -48,9 +48,8 @@ expect_ok() {
     esac
 }
 
-# Stage src/'s install-exec under DESTDIR $1, logging to $2 and dumping it on
-# failure. The configured prefix survives, so libtool has no reason to relink the
-# build the rest of the suite runs against; empty MAKEFLAGS, no jobserver to hunt.
+# The configured prefix survives DESTDIR, so libtool will not relink the build the
+# rest of the suite runs against; MAKEFLAGS and MAKELEVEL cleared, no jobserver to hunt.
 stage_install_exec() {
     local dest=$1 log=$2
     env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir:?}/src" \
