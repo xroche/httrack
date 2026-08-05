@@ -176,12 +176,17 @@ kill_tree() {
 ENGINE_EXE_RE='^(lt-)?(httrack|proxytrack|htsserver|webhttrack)([.]exe)?$'
 FIXTURE_SERVER_RE='^(local-server|proxy-https-server|proxy-connect-server|socks5-server|tls-stall-server)[.]py$'
 
-# Every process as "PID PPID PGID ELAPSED S COMMAND", header first. `ps` is not a
-# given: a Fedora build root has no procps, and its absence left the hang dump
-# printing an empty list rather than saying so (#1021).
+# Every process as "PID PPID PGID ELAPSED S COMMAND", header first. A Fedora
+# build root has no procps, and an empty list reads as "nothing running" (#1021).
 ps_snapshot() {
-    # POSIX keywords throughout, so the ps route holds on macOS too.
-    ps -A -o pid,ppid,pgid,etime,state,args 2>/dev/null && return 0
+    local snap
+    # POSIX keywords, so the ps route holds on macOS too; a ps that lists nothing
+    # (hidepid, a locked-down container) is no better than an absent one.
+    if snap=$(ps -A -o pid,ppid,pgid,etime,state,args 2>/dev/null |
+        awk 'NR > 1 { rows++ } { print } END { exit rows ? 0 : 1 }'); then
+        printf '%s\n' "$snap"
+        return 0
+    fi
     proc_snapshot && return 0
     # Every consumer drops line 1, so the notice rides in the header's place.
     printf 'no process list: this host has neither ps nor a readable /proc\n'
@@ -192,14 +197,17 @@ ps_snapshot() {
 proc_snapshot() {
     local d stat rest arg args comm hz uptime
     local -a f
-    local nl # spelled out of line: bash 3.2 fails to parse $'\n' inside ${v//p/r}
-    nl=$'\n'
+    local ws # spelled out of line: bash 3.2 fails to parse $'..' inside ${v//p/r}
+    ws=$' \t\n\v\f\r'
     test -r /proc/self/stat || return 1
     hz=$(getconf CLK_TCK 2>/dev/null) || hz=
+    # A zero or non-numeric tick would abort the shell in the division below.
+    case "$hz" in '' | 0 | *[!0-9]*) hz=100 ;; esac
     read -r uptime _ </proc/uptime 2>/dev/null || return 1
     printf 'PID PPID PGID ELAPSED S COMMAND\n'
     for d in /proc/[0-9]*; do
-        read -r stat <"$d/stat" 2>/dev/null || continue
+        # Braced: a failed open reports to the caller's stderr, not the redirect.
+        { read -r stat <"$d/stat"; } 2>/dev/null || continue
         # comm may hold spaces and parens; every field past it is numeric.
         rest=${stat##*') '}
         comm=${stat#*(}
@@ -207,12 +215,13 @@ proc_snapshot() {
         read -ra f <<<"$rest" || continue
         test "${#f[@]}" -ge 20 || continue # short read: the process is going away
         args=
-        # An argv holding a newline would split one process over two lines.
+        # Whitespace inside an argv would split the row or shift the columns the
+        # consumers match on, which ps avoids by mapping those bytes away.
         { while IFS= read -r -d '' arg; do
-            args="${args:+$args }${arg//"$nl"/ }"
+            args="${args:+$args }${arg//["$ws"]/ }"
         done <"$d/cmdline"; } 2>/dev/null || true
         printf '%s %s %s %s %s %s\n' "${d#/proc/}" "${f[1]}" "${f[2]}" \
-            "$(((${uptime%%.*} * ${hz:-100} - f[19]) / ${hz:-100}))" \
+            "$(((${uptime%%.*} * hz - f[19]) / hz))" \
             "${f[0]}" "${args:-[$comm]}"
     done
 }
