@@ -253,6 +253,7 @@ TESTS += 159_local-header-injection.test
 TESTS += 158_local-link-control-bytes.test
 TESTS += 220_webhttrack-mirror-isolation.test
 TESTS += 223_webhttrack-session-id.test
+TESTS += 217_webhttrack-attr-escaping.test
 TESTS += 216_engine-ftp-ctrlchars.test
 TESTS += 221_local-ftp-ctrlchars.test
 TESTS += 218_crash-nopie-frames.test

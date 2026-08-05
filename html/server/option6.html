@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
@@ -93,8 +93,8 @@ ${do:end-if}
 <table>
 <tr><td>
 
-<form method="POST" action="${thisfile}" name="form">
-<input type="hidden" name="sid" value="${sid}">
+<form method="POST" action="${attr:thisfile}" name="form">
+<input type="hidden" name="sid" value="${attr:sid}">
 <input type="hidden" name="redirect" value="">
 <input type="hidden" name="closeme" value="">
 
@@ -103,7 +103,7 @@ ${do:end-if}
 <tr><td>
 ${LANG_I43}
 </td><td>
-<input name="user" value="${user}" size="60"
+<input name="user" value="${attr:user}" size="60"
 			title='${html:LANG_I23}' onMouseOver="info('${js:LANG_I23}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -111,7 +111,7 @@ ${LANG_I43}
 <tr><td>
 ${LANG_I43b}
 </td><td>
-<input name="footer" value="${footer}" size="60"
+<input name="footer" value="${attr:footer}" size="60"
 			title='${html:LANG_I23b}' onMouseOver="info('${js:LANG_I23b}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -121,12 +121,12 @@ ${LANG_I43b}
 <tr><td>
 	<table width="100%">
 	<tr><td align="left">
-	<input type="submit" value="${LANG_OK}"
+	<input type="submit" value="${attr:LANG_OK}"
 				onClick="form.closeme.value=1; form.submit(); return false;"
 				title='${html:LANG_TIPOK}' onMouseOver="info('${js:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>
 	</td><td align="right">
-	<input type="button" value="${LANG_CANCEL}"
+	<input type="button" value="${attr:LANG_CANCEL}"
 				onClick="window.close();"
 				title='${html:LANG_TIPCANCEL}' onMouseOver="info('${js:LANG_TIPCANCEL}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>
