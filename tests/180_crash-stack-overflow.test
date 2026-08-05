@@ -54,6 +54,11 @@ deepest_repeat() {
     sort <<<"$addrs" | uniq -c | sort -rn | awk 'NR==1 { print $1 + 0 }'
 }
 
+# Raw frames in the report: backtrace_symbols_fd() closes every one with [0xADDR].
+frame_count() {
+    grep -c '\[0x' <<<"$1" || true
+}
+
 # Control: an ordinary SIGSEGV was already reported before the fix, so a build
 # or harness that can no longer see any crash fails here rather than passing the
 # real case vacuously.
@@ -67,10 +72,24 @@ fi
 grep -q "^Caught signal 11$" <<<"$segv" || fail "-#c=segv: no 'Caught signal 11' line"
 grep -q "^Caught signal 11$" <<<"$stack" || fail "-#c=stack: no 'Caught signal 11' line"
 
-# Measured on x86-64: ~250 repeats for the recursion, 1 for the control.
+# Measured on x86-64: recursion 256 frames/~250 repeats, control 11/1.
 stack_deep=$(deepest_repeat "$stack")
 segv_deep=$(deepest_repeat "$segv")
+stack_frames=$(frame_count "$stack")
+
+# armhf and loong64 cannot unwind out of the frame that faulted on the guard page,
+# leaving the handler's own three frames and nothing to count. An absolute floor,
+# not a compare against the control: the two call chains differ by a frame that
+# only -O2 tail-calls away, and a crash_stack that merely stopped recursing still
+# unwinds 11. Killing that mutant is what the count below is for.
+if [ "$stack_frames" -lt 6 ]; then
+    echo "-#c=stack: $stack_frames frames, too few for this unwinder to" \
+        "show the recursion:" >&2
+    head -5 <<<"$stack" >&2
+    exit 0
+fi
 test "$stack_deep" -ge 20 ||
-    fail "-#c=stack: deepest frame repeats $stack_deep times, expected a recursion"
+    fail "-#c=stack: deepest frame repeats $stack_deep times over $stack_frames frames," \
+        "expected a recursion"
 test "$segv_deep" -lt 20 ||
     fail "-#c=segv: deepest frame repeats $segv_deep times, the threshold no longer discriminates"

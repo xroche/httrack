@@ -3749,6 +3749,20 @@ const char *jump_protocol_const(const char *source) {
 
 DECLARE_NON_CONST_VERSION(jump_protocol)
 
+hts_boolean hts_is_control_free_sized(const char *str, size_t len) {
+  size_t i;
+
+  for (i = 0; i < len; i++) {
+    if ((unsigned char) str[i] < ' ')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+hts_boolean hts_is_control_free(const char *str) {
+  return hts_is_control_free_sized(str, strlen(str));
+}
+
 hts_boolean hts_proxy_is_socks(const char *name) {
   if (name == NULL)
     return HTS_FALSE;

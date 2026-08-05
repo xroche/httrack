@@ -194,7 +194,11 @@ tmpdir=
 crawlpid=
 nopurge=
 verbose=
-trap cleanup EXIT HUP INT QUIT ILL TRAP ABRT BUS FPE SEGV PIPE ALRM TERM STKFLT XCPU XFSZ
+# One at a time: an unknown name (STKFLT is Linux-only) makes the whole trap
+# command complain, on every run, on GNU/Hurd and the BSDs.
+for sig in EXIT HUP INT QUIT ILL TRAP ABRT BUS FPE SEGV PIPE ALRM TERM STKFLT XCPU XFSZ; do
+    trap cleanup "$sig" 2>/dev/null || true
+done
 
 # working directory
 tmpdir="${tmptopdir}/httrack_ut.$$"

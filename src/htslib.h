@@ -237,6 +237,14 @@ int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
 int check_writeinput_t(T_SOC soc, int timeout);
 
+/* TRUE if str[0..len) holds no byte below ' '. A control byte in a value the
+   client puts on a protocol line (an FTP command, a CONNECT authority, a
+   SOCKS5 host) smuggles a line or a field of its own. */
+hts_boolean hts_is_control_free_sized(const char *str, size_t len);
+
+/* Same over a NUL-terminated string. */
+hts_boolean hts_is_control_free(const char *str);
+
 /* TRUE if this -P proxy name (which keeps its scheme) is a SOCKS5 proxy. */
 hts_boolean hts_proxy_is_socks(const char *name);
 
