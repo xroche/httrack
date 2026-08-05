@@ -2008,6 +2008,21 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     }
   }
 
+  /* a control byte in the host would be a field of its own in the ATYP=domain
+     request; the port that follows it must not hide it (#1010) */
+  {
+    static const char *const hostile[] = {"ori\rgin.test", "ori\rgin.test:80"};
+    size_t k;
+
+    for (k = 0; k < sizeof(hostile) / sizeof(hostile[0]); k++) {
+      len = socks5_reply(script, 0x01, v4, sizeof(v4));
+      io.reply = script;
+      io.reply_len = len;
+      assertf(socks5_handshake_scripted(opt, hostile[k], proxy, &io) == 0);
+      assertf(io.sent_len == 0);
+    }
+  }
+
   /* credentials: split on the first colon of the escaped userinfo, so %3a stays
      inside the username and a colon in the password is not a delimiter */
   {
@@ -4522,6 +4537,72 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
     assertf(ubuf[8] == 'Z' && pbuf[8] == 'Z');
   }
   printf("ftp-userpass self-test OK\n");
+  return 0;
+}
+
+/* send_line() must drop a command line carrying a control byte (#1010). */
+static int st_ftpctrl(httrackp *opt, int argc, char **argv) {
+  /* Verb and URL path as run_launch_ftp() hands them over, then the line the
+     wire must carry; NULL for a command that must never leave. */
+  static const struct {
+    const char *verb;
+    const char *path;
+    const char *sent;
+  } cases[] = {
+      {"RETR", "/f.txt%0d%0aDELE%20secret.txt", NULL},
+      {"RETR", "/f.txt%0dDELE%20secret.txt", NULL},
+      {"RETR", "/f.txt%0aDELE%20secret.txt", NULL},
+      {"LIST -A", "/d%0d%0aDELE%20secret.txt/", NULL},
+      {"RETR", "/plain.txt", "RETR /plain.txt"},
+      {"RETR", "/a%20b.txt", "RETR \"/a b.txt\""},
+      {"RETR", "%2Fa%25b.txt", "RETR /a%b.txt"},
+      /* High bytes must still go out: a plain-char check reads them negative
+         and rejects them. */
+      {"RETR", "/caf%e9.txt", "RETR /caf\xe9.txt"},
+      /* Bare, these two would hand a server that shells out to ls a flag. */
+      {"LIST -A", "/x%20-la/", "LIST -A \"/x -la/\""},
+      {"LIST -A", "-la", "LIST -A \"-la\""},
+  };
+
+  char BIGSTK catbuff[CATBUFF_SIZE];
+  char cmd[512];
+  char expect[512];
+  char wire[512];
+  T_SOC sv[2];
+  size_t got = 0, dropped = 1, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  expect[0] = '\0';
+  assertf(st_socketpair(sv) == 0);
+  assertf(send_line(sv[0], "USER bob\001") == 0); // any field, not just a path
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    ftp_command(cmd, sizeof(cmd), cases[i].verb,
+                unescape_http(catbuff, sizeof(catbuff), cases[i].path));
+    if (cases[i].sent == NULL) {
+      assertf(strstr(cmd, "DELE") != NULL); // the payload did reach the builder
+      assertf(send_line(sv[0], cmd) == 0);
+      dropped++;
+    } else {
+      assertf(send_line(sv[0], cmd) != 0);
+      strcatbuff(expect, cases[i].sent);
+      strcatbuff(expect, "\r\n");
+    }
+  }
+  deletesoc(sv[0]); // EOF, so the read below sees the whole wire
+  for (;;) {
+    const int n = (int) recv(sv[1], wire + got, (int) (sizeof(wire) - got), 0);
+
+    if (n <= 0)
+      break;
+    got += (size_t) n;
+  }
+  deletesoc(sv[1]);
+  assertf(got == strlen(expect));
+  assertf(memcmp(wire, expect, got) == 0);
+  printf("ftp-ctrlchars self-test OK (%d bytes sent, %d rejected)\n", (int) got,
+         (int) dropped);
   return 0;
 }
 
@@ -8037,6 +8118,8 @@ static const struct selftest_entry {
     {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
      st_ftpline},
     {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
+    {"ftp-ctrlchars", "", "send_line rejects a control byte in an FTP command",
+     st_ftpctrl},
     {"warc", "<dir>", "WARC/1.1 writer: framing, digests, revisit dedup",
      st_warc},
     {"warc-trunc", "<dir>", "WARC-Truncated on a cap-truncated body",
