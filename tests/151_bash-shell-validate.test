@@ -6,6 +6,10 @@
 
 set -euo pipefail
 
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
 sh=${BASH_SHELL:-}
 test -n "$sh" || {
     echo "BASH_SHELL is empty; tests/Makefile.am must export the configured value" >&2
@@ -50,11 +54,12 @@ mkfifo "$tmp/fifo"
 chmod 755 "$tmp/fifo"
 
 n=0
+cases=16 # reject/accept calls below; pinned again once they have all run
 status=0
 log=
 rundir=
 run() { # run <label> <env argument>...
-    local label=$1
+    local label=$1 began=$SECONDS
     shift
     n=$((n + 1))
     rundir="$tmp/run$n"
@@ -78,6 +83,7 @@ run() { # run <label> <env argument>...
     wait "$pid" || status=$?
     log=$(cat "$rundir/log")
     echo "run $n ($label): exit $status"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 }
 
 reject() { # reject <label> <expected message> <env argument>...
@@ -163,4 +169,8 @@ accept empty '' '' BASH_SHELL=
 accept searched "$tmp/fakebin/bash" 'no usable bash found' -u BASH_SHELL "PATH=$tmp/fakebin:$PATH"
 accept searched-posix-env '' 'POSIXLY_CORRECT or SHELLOPTS' -u BASH_SHELL POSIXLY_CORRECT=1
 
+test "$n" -eq "$cases" || {
+    echo "ran $n cases, not the $cases the budget is paced against" >&2
+    exit 1
+}
 echo "configure validated $n BASH_SHELL values"

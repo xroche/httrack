@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# A %0d%0a in an FTP URL decoded into a command line of its own (#1010). The
+# run has to end on an error: send_line() alone drops the command and leaves
+# the engine on a 300s read. A bare listing argument had the same shape, a
+# space in it giving the server a second token.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+server=$(nativepath "${testdir}/ftp-server.py")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+root="${tmpdir}/root"
+out="${tmpdir}/crawl"
+cmds="${tmpdir}/cmds"
+mkdir -p "${root}/d -la" "$out"
+printf 'body\n' >"${root}/f.txt"
+printf 'secret\n' >"${root}/x.txt"
+printf 'listed\n' >"${root}/d -la/inside.txt"
+
+serverlog="${tmpdir}/server.out"
+"$python" "$server" --root "$(nativepath "$root")" \
+    --log "$(nativepath "$cmds")" >"$serverlog" 2>&1 &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+ok() { echo "OK: $*"; }
+# 60s is the wedge detector: a dropped command leaves the engine on a 300s read.
+crawl() {
+    run_with_timeout 60 httrack "$1" -O "$out" --quiet --disable-security-limits \
+        --robots=0 --timeout=20 --max-time=45 --retries=1 -c1
+}
+
+# --- the injected command line ----------------------------------------------
+: >"$cmds"
+start=$SECONDS
+crawl "ftp://127.0.0.1:${port}/f%0d%0aDELE%20x.txt" >"${tmpdir}/log1" 2>&1 ||
+    fail "the run did not finish in $((SECONDS - start))s"
+grep -aq 'Invalid control character in FTP URL' "${out}/hts-log.txt" ||
+    fail "no refusal in the log: $(grep -a 'Error' "${out}/hts-log.txt" || true)"
+ok "the injected URL is refused in $((SECONDS - start))s"
+
+sent=$(cat "$cmds")
+test -z "$sent" || fail "the engine still talked to the server: ${sent}"
+ok "nothing reached the control channel"
+
+# --- a space in a listing argument ------------------------------------------
+: >"$cmds"
+crawl "ftp://127.0.0.1:${port}/d%20-la/" >"${tmpdir}/log2" 2>&1 ||
+    fail "the listing crawl never finished"
+listcmd=$(grep -a '^LIST ' "$cmds" || true)
+test "$listcmd" = 'LIST -A "/d -la/"' ||
+    fail "the listing path is not one quoted token: [${listcmd}]"
+grep -aq inside.txt "${out}/127.0.0.1_${port}/d -la/index.txt" ||
+    fail "the quoted listing brought nothing back; mirror holds $(find "$out" \
+        -type f -not -path '*hts-cache*')"
+ok "the listing path goes out as a single token, and still lists"

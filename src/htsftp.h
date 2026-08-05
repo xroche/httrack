@@ -75,6 +75,11 @@ int get_ftp_line(T_SOC soc, char *line, size_t line_size, int timeout);
    Both sizes must be nonzero. */
 void ftp_split_userpass(const char *src, const char *end, char *user,
                         size_t user_size, char *pass, size_t pass_size);
+/* Build "<verb> <path>" into line[line_size], truncating to fit. The path is
+   quoted whenever a bare one would give the server a second token; it must
+   already have been screened for control bytes. */
+void ftp_command(char *line, size_t line_size, const char *verb,
+                 const char *path);
 T_SOC get_datasocket(char *to_send, size_t to_send_size);
 int stop_ftp(lien_back * back);
 char *linejmp(char *line);
