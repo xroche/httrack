@@ -70,8 +70,12 @@ jobs:
           # Mandatory, and no ports arch has a zlib1g-dev:<arch> to
           # multiarch-install. -fPIC because libhttrack.so links it.
           mkdir -p /tmp/zsrc && cd /tmp/zsrc
-          apt-get source zlib1g
-          cd zlib-*/
+          # Unpatched: Debian's arch-specific patches expect its own rules to
+          # build them (s390x's vector CRC pulls a header they add), and we only
+          # need something to link -lz against.
+          apt-get source --download-only zlib1g
+          dpkg-source --skip-patches -x ./*.dsc src
+          cd src
           CHOST="$TRIPLET" CC="$TRIPLET-gcc" CFLAGS="-O2 -fPIC" \
             ./configure --prefix="$ZPREFIX" --static
           make -j"$(nproc)"
