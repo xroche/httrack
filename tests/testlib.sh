@@ -176,6 +176,47 @@ kill_tree() {
 ENGINE_EXE_RE='^(lt-)?(httrack|proxytrack|htsserver|webhttrack)([.]exe)?$'
 FIXTURE_SERVER_RE='^(local-server|proxy-https-server|proxy-connect-server|socks5-server|tls-stall-server)[.]py$'
 
+# Every process as "PID PPID PGID ELAPSED S COMMAND", header first. `ps` is not a
+# given: a Fedora build root has no procps, and its absence left the hang dump
+# printing an empty list rather than saying so (#1021).
+ps_snapshot() {
+    # POSIX keywords throughout, so the ps route holds on macOS too.
+    ps -A -o pid,ppid,pgid,etime,state,args 2>/dev/null && return 0
+    proc_snapshot && return 0
+    # Every consumer drops line 1, so the notice rides in the header's place.
+    printf 'no process list: this host has neither ps nor a readable /proc\n'
+    return 1
+}
+
+# The same six columns out of /proc, in bash alone; elapsed as plain seconds.
+proc_snapshot() {
+    local d stat rest arg args comm hz uptime
+    local -a f
+    local nl # spelled out of line: bash 3.2 fails to parse $'\n' inside ${v//p/r}
+    nl=$'\n'
+    test -r /proc/self/stat || return 1
+    hz=$(getconf CLK_TCK 2>/dev/null) || hz=
+    read -r uptime _ </proc/uptime 2>/dev/null || return 1
+    printf 'PID PPID PGID ELAPSED S COMMAND\n'
+    for d in /proc/[0-9]*; do
+        read -r stat <"$d/stat" 2>/dev/null || continue
+        # comm may hold spaces and parens; every field past it is numeric.
+        rest=${stat##*') '}
+        comm=${stat#*(}
+        comm=${comm%)*}
+        read -ra f <<<"$rest" || continue
+        test "${#f[@]}" -ge 20 || continue # short read: the process is going away
+        args=
+        # An argv holding a newline would split one process over two lines.
+        { while IFS= read -r -d '' arg; do
+            args="${args:+$args }${arg//"$nl"/ }"
+        done <"$d/cmdline"; } 2>/dev/null || true
+        printf '%s %s %s %s %s %s\n' "${d#/proc/}" "${f[1]}" "${f[2]}" \
+            "$(((${uptime%%.*} * ${hz:-100} - f[19]) / ${hz:-100}))" \
+            "${f[0]}" "${args:-[$comm]}"
+    done
+}
+
 # List processes a hung test may have left running, one per line. $1 is the test's
 # process group; $2 selects "group" (that group's members, whatever their name),
 # "others" (engine and fixture processes outside it, which under "make check -j"
@@ -190,10 +231,9 @@ list_stray_processes() {
         test "$mode" != others || return 0
         tasklist 2>/dev/null | grep -Ei 'httrack|proxytrack|htsserver|python' || true
     else
-        # `args` and `state` are POSIX ps keywords, so this holds on macOS too.
         # Fields 6 and 7 are the command and its first argument (the interpreter
         # and its script, for the Python fixtures).
-        ps -A -o pid,ppid,pgid,etime,state,args 2>/dev/null |
+        ps_snapshot |
             awk -v pg="$pgid" -v mode="$mode" -v eng="$ENGINE_EXE_RE" -v srv="$FIXTURE_SERVER_RE" '
                 NR == 1 { print; next }
                 { ingroup = (pg > 0 && $3 == pg)
@@ -239,9 +279,9 @@ reap_leftover_processes() {
 list_engine_pids() {
     local pgid=${1:-0}
     test "$pgid" -gt 0 2>/dev/null || return 0
-    ps -A -o pid,pgid,args 2>/dev/null |
+    ps_snapshot |
         awk -v pg="$pgid" -v eng="$ENGINE_EXE_RE" \
-            'NR > 1 && $2 == pg { c = $3; sub(/.*[\/\\]/, "", c); if (c ~ eng) print $1 }'
+            'NR > 1 && $3 == pg { c = $6; sub(/.*[\/\\]/, "", c); if (c ~ eng) print $1 }'
 }
 
 # Ask the wedged test's engine processes for a stack. What is obtainable differs
