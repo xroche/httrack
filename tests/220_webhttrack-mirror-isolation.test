@@ -121,9 +121,9 @@ def post(path, body, origin=None):
 
 def body_is_complete(got):
     """A Content-length the response never delivers leaves the client hanging."""
-    head, _, payload = got.partition(b"\r\n\r\n")
-    m = re.search(rb"\r\nContent-length: (\d+)\r\n", head)
-    return m is not None and len(payload) == int(m.group(1))
+    head, sep, payload = got.partition(b"\r\n\r\n")
+    m = re.search(rb"\r\nContent-length: (\d+)$", head)
+    return sep != b"" and m is not None and len(payload) == int(m.group(1))
 
 
 def fetch(path):

@@ -367,9 +367,8 @@ typedef struct {
 #define SID_VALUE_MAX 64
 
 /** Does this Origin name the panel itself?
-    Only our own plain-http authority passes; a sandboxed page sends "null" and
-    a foreign one its own host, so neither can post a command blind. An empty
-    Host cannot be matched against and is refused. */
+    Only our own plain-http authority passes: a sandboxed page sends "null", a
+    foreign one its own host, and an empty Host cannot be matched at all. */
 static hts_boolean origin_is_self(const char *origin, const char *host) {
   const int p = strfield(origin, "http://");
   const char *const authority = origin + p;
@@ -717,10 +716,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         }
       }
 
-      /* CSP only stops a mirrored page reading /server/; a no-cors fetch can
-         still post one blind, and the command would run. Origin is what the
-         browser adds and script cannot forge, so refuse any POST claiming a
-         foreign one. Absent is allowed: same-origin clients often send none. */
+      /* CSP stops a mirrored page reading /server/, not posting to it blind:
+         a no-cors POST still runs the command. Origin is browser-set and script
+         cannot forge it. Absent is allowed, most non-browser clients send none.
+       */
       if (meth == 2 && origin[0] != '\0' && !origin_is_self(origin, host)) {
         buffer[0] = '\0';
         meth = 0;
@@ -1622,10 +1621,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       StringCat(headers, "\r\n");
       /* a refusal cleared meth, yet the Content-length above promises a body */
       if ((send(soc_c, StringBuff(headers), (int) StringLength(headers), 0) !=
-           StringLength(headers))
-          || ((meth == 1 || denied) &&
-              (send(soc_c, StringBuff(output), (int) StringLength(output), 0) !=
-               StringLength(output)))) {
+           StringLength(headers)) ||
+          ((meth == 1 || denied) &&
+           (send(soc_c, StringBuff(output), (int) StringLength(output), 0) !=
+            StringLength(output)))) {
 #ifdef _DEBUG
 #endif
       }
