@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htscharset.h" // after htslib.h: winsock2.h must precede windows.h
 #include "htsbacktrace.h"
+#include "htsthread.h"
 
 /* Static definitions */
 static int fexist(const char *s);
@@ -950,8 +951,9 @@ static void install_fatal_handler(int code) {
 
 static void signal_handlers(void) {
   hts_backtrace_init();
-  /* Main thread only: engine threads keep the old behaviour. */
   (void) hts_backtrace_altstack();
+  /* The crawl recurses in the engine's workers, so they need one too (#969). */
+  hts_set_thread_hooks(hts_backtrace_altstack, hts_backtrace_altstack_release);
 #ifdef _WIN32
   signal(SIGINT, sig_leave);    // ^C
   signal(SIGTERM, sig_finish);  // kill <process>

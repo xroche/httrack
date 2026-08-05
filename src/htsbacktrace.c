@@ -65,6 +65,7 @@ Please visit our Website: http://www.httrack.com
 #include <signal.h>
 #include <spawn.h>
 #include <time.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #define USES_BACKTRACE
 #endif
@@ -89,26 +90,74 @@ static posix_spawn_file_actions_t spawn_actions;
 static posix_spawn_file_actions_t *spawn_redirect = NULL;
 
 /* dladdr() names the main program after argv[0], which the symbolizer cannot
-   open when the binary came off PATH; /proc/self/exe always names the file. */
+   open when the binary came off PATH; /proc/self/exe always names the file.
+   hts_self_path() (htscoremain.c) resolves the same path, out of reach here:
+   it is library-side and hidden by -fvisibility=hidden (#997). */
 static char main_path[BT_PATH_SIZE];
-static const void *main_base;
+/* Main program's mapped range, and the bias to subtract for addr2line (0 on an
+   ET_EXEC). */
+static uintptr_t main_lo, main_hi, main_bias;
 
-static int record_main_base(struct dl_phdr_info *info, size_t size,
-                            void *data) {
+static int record_main_range(struct dl_phdr_info *info, size_t size,
+                             void *data) {
+  size_t i;
+
   (void) size;
   (void) data;
-  main_base = (const void *) info->dlpi_addr;
+  main_bias = (uintptr_t) info->dlpi_addr;
+  main_lo = (uintptr_t) -1; /* an empty range matches no frame */
+  main_hi = 0;
+  for (i = 0; i < info->dlpi_phnum; i++) {
+    const ElfW(Phdr) *const phdr = &info->dlpi_phdr[i];
+    const uintptr_t start = main_bias + (uintptr_t) phdr->p_vaddr;
+
+    if (phdr->p_type != PT_LOAD)
+      continue;
+    if (start < main_lo)
+      main_lo = start;
+    if (start + phdr->p_memsz > main_hi)
+      main_hi = start + phdr->p_memsz;
+  }
   return 1; /* dl_iterate_phdr starts at the main program */
+}
+
+/* Address range, not load base: the two disagree on an ET_EXEC (#995). */
+static hts_boolean is_main_frame(const void *addr) {
+  const uintptr_t value = (uintptr_t) addr;
+
+  return value >= main_lo && value < main_hi ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Non-zero once a named link-map entry is the file *data stats to: the main
+   program's entry is the unnamed one, so a hit means a shared object. */
+static int names_a_shared_object(struct dl_phdr_info *info, size_t size,
+                                 void *data) {
+  const struct stat *const self = (const struct stat *) data;
+  struct stat st;
+
+  (void) size;
+  if (info->dlpi_name == NULL || info->dlpi_name[0] == '\0')
+    return 0;
+  if (stat(info->dlpi_name, &st) != 0)
+    return 0; /* vDSO and the like have no file */
+  return st.st_dev == self->st_dev && st.st_ino == self->st_ino;
 }
 
 static void find_main_object(void) {
   const ssize_t len = readlink("/proc/self/exe", main_path, sizeof(main_path));
+  struct stat self;
 
+  dl_iterate_phdr(record_main_range, NULL);
   /* A full buffer is a clipped path, which readlink() cannot report: its prefix
      names another file, and the symbolizer would happily open that one. */
   if (len > 0 && (size_t) len < sizeof(main_path)) {
     main_path[len] = '\0';
-    if (dl_iterate_phdr(record_main_base, NULL) == 1)
+    /* Started through the loader, /proc/self/exe is ld.so, which the link map
+       carries under its own name (#996). Identity, not dladdr()'s name: that is
+       argv[0] verbatim, so a symlinked or renamed program would lose its
+       module. */
+    if (stat(main_path, &self) == 0 &&
+        dl_iterate_phdr(names_a_shared_object, &self) == 0)
       return;
   }
   main_path[0] = '\0'; /* unresolved: keep whatever dladdr() reported */
@@ -186,6 +235,7 @@ static void symbolize_backtrace(void *const *stack, int size) {
   const void *base[BT_MAX_FRAMES];
   const char *name[BT_MAX_FRAMES];
   hts_boolean grouped[BT_MAX_FRAMES];
+  hts_boolean is_main[BT_MAX_FRAMES];
   char module[BT_PATH_SIZE];
   char *argv[4 + BT_MAX_FRAMES + 1];
   int budget = BT_WAIT_TICKS;
@@ -205,8 +255,10 @@ static void symbolize_backtrace(void *const *stack, int size) {
       continue;
     base[i] = info.dli_fbase;
     name[i] = info.dli_fname;
-    print_hex(hex[i], (uintptr_t) ((const char *) stack[i] -
-                                   (const char *) info.dli_fbase));
+    is_main[i] = is_main_frame(stack[i]);
+    print_hex(hex[i],
+              (uintptr_t) stack[i] -
+                  (is_main[i] ? main_bias : (uintptr_t) info.dli_fbase));
     grouped[i] = HTS_FALSE;
   }
 
@@ -220,8 +272,7 @@ static void symbolize_backtrace(void *const *stack, int size) {
       ;
     if (first >= size)
       break;
-    path = main_path[0] != '\0' && base[first] == main_base ? main_path
-                                                            : name[first];
+    path = main_path[0] != '\0' && is_main[first] ? main_path : name[first];
     argv[argc++] = prog;
     argv[argc++] = opts;
     argv[argc++] = dashe;
@@ -266,7 +317,7 @@ void hts_backtrace_init(void) {
 #endif
 }
 
-hts_boolean hts_backtrace_altstack(void) {
+void *hts_backtrace_altstack(void) {
 #ifdef USES_SIGALTSTACK
   /* Not a constant since glibc 2.34: SIGSTKSZ is a sysconf() call. */
   const size_t size =
@@ -277,23 +328,43 @@ hts_boolean hts_backtrace_altstack(void) {
   /* Never take one over, whatever its size: a sanitizer runtime installs its
      own and sizes it for its own handlers (ASan: 32kB, ours needs ~10kB). */
   if (sigaltstack(NULL, &ss) == 0 && (ss.ss_flags & SS_DISABLE) == 0)
-    return HTS_TRUE;
+    return NULL;
   /* Mapped, not allocated: a stack for the handler must not live in the heap
      whose corruption we may be reporting. */
   sp = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1,
             0);
   if (sp == MAP_FAILED)
-    return HTS_FALSE;
+    return NULL;
   ss.ss_sp = sp;
   ss.ss_size = size;
   ss.ss_flags = 0;
   if (sigaltstack(&ss, NULL) != 0) {
     munmap(sp, size);
-    return HTS_FALSE;
+    return NULL;
   }
-  return HTS_TRUE;
+  return sp;
 #else
-  return HTS_FALSE;
+  return NULL;
+#endif
+}
+
+void hts_backtrace_altstack_release(void *stack) {
+#ifdef USES_SIGALTSTACK
+  stack_t ss;
+  size_t size;
+
+  if (stack == NULL)
+    return;
+  /* Whatever replaced ours since is not ours to unmap. */
+  if (sigaltstack(NULL, &ss) != 0 || ss.ss_sp != stack)
+    return;
+  size = ss.ss_size;
+  ss.ss_flags = SS_DISABLE;
+  /* Disable first: the kernel must never send a handler to an unmapped page. */
+  if (sigaltstack(&ss, NULL) == 0)
+    munmap(stack, size);
+#else
+  (void) stack;
 #endif
 }
 

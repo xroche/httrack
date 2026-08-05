@@ -4,7 +4,7 @@ include $(srcdir)/tests-list.mk
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c threadattrfail.c nobacktrace.c altstackprobe.c crawl-test.sh run-all-tests.sh check-network.sh \
+EXTRA_DIST = $(TESTS) renamefail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c crawl-test.sh run-all-tests.sh check-network.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
@@ -41,6 +41,8 @@ TESTS_ENVIRONMENT += MAKE="$(MAKE)"
 # openssl@3 is keg-only, so htsbasenet.h finds <openssl/ssl.h> only through it.
 TESTS_ENVIRONMENT += CC="$(CC)"
 TESTS_ENVIRONMENT += TEST_CPPFLAGS="$(CPPFLAGS)"
+# 218_crash-nopie-frames.test links the crash printer, which calls dladdr().
+TESTS_ENVIRONMENT += DL_LIBS="$(DL_LIBS)"
 # 207_install-headers-symbols.test links a consumer probe against it; absent on a
 # static-only build and named .dylib on macOS, where that ELF-only test skips.
 TESTS_ENVIRONMENT += HTTRACK_SHLIB=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)/libhttrack.so
@@ -77,9 +79,10 @@ libthreadattrfail_la_LIBADD = $(DL_LIBS)
 libnobacktrace_la_SOURCES = nobacktrace.c
 libnobacktrace_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 
-# alt-stack observer for 181_altstack-honoured.test
+# alt-stack observer for 181_altstack-honoured.test and 183_altstack-worker.test
 libaltstackprobe_la_SOURCES = altstackprobe.c
 libaltstackprobe_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+libaltstackprobe_la_LIBADD = $(DL_LIBS)
 
 # realloc stub for 152_engine-string-oom.test; links nothing, so it stays a
 # plain binary rather than a libtool wrapper script.
