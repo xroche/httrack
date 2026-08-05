@@ -74,5 +74,6 @@ listcmd=$(grep -a '^LIST ' "$cmds" || true)
 test "$listcmd" = 'LIST -A "/d -la/"' ||
     fail "the listing path is not one quoted token: [${listcmd}]"
 grep -aq inside.txt "${out}/127.0.0.1_${port}/d -la/index.txt" ||
-    fail "the quoted listing brought nothing back"
+    fail "the quoted listing brought nothing back; mirror holds $(find "$out" \
+        -type f -not -path '*hts-cache*')"
 ok "the listing path goes out as a single token, and still lists"
