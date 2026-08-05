@@ -240,9 +240,10 @@ AS_CASE([$hts_libdir],
 	[/usr/lib | /usr/lib/* | /usr/lib32 | /usr/lib32/* | /usr/lib64 | /usr/lib64/* | /usr/libx32 | /usr/libx32/*], [hts_origin_sysdir=yes],
 	[hts_origin_sysdir=no])
 
-# The @rpath id is only safe for a consumer that carries its own LC_RPATH, so
-# libhttrack.pc hands one out; ${libdir} is pkg-config's variable, expanded when
-# a consumer queries the file. Empty, leading space and all, for a system libdir.
+# The @rpath id is only safe for a consumer carrying its own LC_RPATH, so
+# libhttrack.pc hands one out. ${libdir} is pkg-config's own variable, expanded
+# when the file is queried; the value is empty, leading space and all, for a
+# system libdir.
 SYSTEM_LIBDIR=$hts_origin_sysdir
 PKGCONFIG_RPATH_LDFLAG=
 AS_IF([test "x$hts_origin_sysdir" = xno],

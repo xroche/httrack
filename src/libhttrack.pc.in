@@ -7,10 +7,9 @@ Name: libhttrack
 Description: HTTrack Website Copier engine
 URL: @PACKAGE_URL@
 Version: @PACKAGE_VERSION@
-# Flat includes, as the installed headers include each other and the libtest
-# examples do; LFS decides the layout of the struct stat they typedef.
+# Flat, as the installed headers and the libtest examples include each other;
+# LFS decides the layout of the struct stat httrack-library.h typedefs.
 Cflags: -I${includedir}/httrack @V6_FLAG@ @LFS_FLAG@
-# The rpath is what lets a consumer find libhttrack outside a system libdir; it
-# comes with its own leading space, being empty for a system one (#978).
+# Carries its own leading space, and is empty for a system libdir (#978).
 Libs: -L${libdir} -lhttrack@PKGCONFIG_RPATH_LDFLAG@
 Libs.private: @LIBS@ @THREADS_LIBS@ @BROTLI_LIBS@ @ZSTD_LIBS@ @OPENSSL_LIBS@ @DL_LIBS@ @SOCKET_LIBS@ @ICONV_LIBS@

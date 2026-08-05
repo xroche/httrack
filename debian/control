@@ -72,8 +72,7 @@ Package: libhttrack-dev
 Architecture: any
 Multi-Arch: same
 Section: libdevel
-# libhttrack3: the .so symlink and libhttrack.pc's -lhttrack are useless without
-# the runtime SONAME they resolve onto.
+# libhttrack3: what the .so symlink and libhttrack.pc's -lhttrack resolve onto.
 Depends: ${misc:Depends}, ${shlibs:Depends}, libhttrack3 (= ${binary:Version}), zlib1g-dev
 Description: Httrack website copier includes and development files
  This package adds supplemental files for using the httrack website copier
