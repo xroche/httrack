@@ -34,9 +34,8 @@ configure-stamp:
 
 	dh_autoreconf
 	# note: dpkg-buildflags to be removed when compat=9
-	# No online tests: Policy 4.9 forbids network access during a build, and "auto"
-	# made it a lottery -- hurd-i386 FTBFS'd on a crawl whose DNS went away after
-	# the probe had said yes.
+	# Policy 4.9 forbids network access during a build, and "auto" made it a lottery:
+	# hurd-i386 FTBFS'd on a crawl whose DNS went away after the probe had said yes.
 	dh_auto_configure -- --disable-online-unit-tests $(shell dpkg-buildflags --export=configure)
 
 	touch configure-stamp

@@ -72,20 +72,19 @@ fi
 grep -q "^Caught signal 11$" <<<"$segv" || fail "-#c=segv: no 'Caught signal 11' line"
 grep -q "^Caught signal 11$" <<<"$stack" || fail "-#c=stack: no 'Caught signal 11' line"
 
-# Measured on x86-64: 256 frames and ~250 repeats for the recursion, 11 and 1
-# for the control.
+# Measured on x86-64: recursion 256 frames/~250 repeats, control 11/1.
 stack_deep=$(deepest_repeat "$stack")
 segv_deep=$(deepest_repeat "$segv")
 stack_frames=$(frame_count "$stack")
-segv_frames=$(frame_count "$segv")
 
-# armhf and loong64 cannot unwind out of the frame that faulted on the guard
-# page, and a report shallower than the control's holds no recursion to count.
-# Strictly shallower: a crash_stack that stopped recursing unwinds exactly as far
-# as the control, and that mutant is what the count below exists to kill.
-if [ "$stack_frames" -lt "$segv_frames" ]; then
-    echo "-#c=stack: $stack_frames frames against the control's $segv_frames;" \
-        "this unwinder cannot show the recursion:" >&2
+# armhf and loong64 cannot unwind out of the frame that faulted on the guard page,
+# leaving the handler's own three frames and nothing to count. An absolute floor,
+# not a compare against the control: the two call chains differ by a frame that
+# only -O2 tail-calls away, and a crash_stack that merely stopped recursing still
+# unwinds 11. Killing that mutant is what the count below is for.
+if [ "$stack_frames" -lt 6 ]; then
+    echo "-#c=stack: $stack_frames frames, too few for this unwinder to" \
+        "show the recursion:" >&2
     head -5 <<<"$stack" >&2
     exit 0
 fi
