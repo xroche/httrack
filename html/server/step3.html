@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
@@ -111,7 +111,7 @@ ${do:end-if}
 <br>
 
 <form method="POST" action="step4.html" name="form">
-<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="sid" value="${attr:sid}">
 <input type="hidden" name="redirect" value="">
 
 <table border="0" width="100%">
@@ -129,7 +129,7 @@ ${do:end-if}
 		<tr><td>
 		${LANG_G44}
 		</td><td>
-		<input type="button" value="${LANG_G43}" 
+		<input type="button" value="${attr:LANG_G43}" 
 		       onClick="doOpenWindow()"
 			title='${html:LANG_G24b}' onMouseOver="info('${js:LANG_G24b}'); return true" onMouseOut="info('&nbsp;'); return true"
 			   >
@@ -149,7 +149,7 @@ ${do:output-mode:}
 		<tr><td>
 		${LANG_URLLIST}:
 		</td><td>
-		<input name="filelist" value="${filelist}" size="40"
+		<input name="filelist" value="${attr:filelist}" size="40"
 			title='${html:LANG_G24c}' onMouseOver="info('${js:LANG_G24c}'); return true" onMouseOut="info('&nbsp;'); return true"
 		>
 		</td></tr></table>
@@ -160,7 +160,7 @@ ${do:output-mode:}
 		<tr><td>
 		${LANG_G41}
 		</td><td>
-		<input type="button" value="${LANG_G40}" onClick="window.open('option1.html', 'option1', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
+		<input type="button" value="${attr:LANG_G40}" onClick="window.open('option1.html', 'option1', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
 			title='${html:LANG_G24}' onMouseOver="info('${js:LANG_G24}'); return true" onMouseOut="info('&nbsp;'); return true"
 		>
 		</td></tr></table>
@@ -169,11 +169,11 @@ ${do:output-mode:}
 
 	<tr><td align="right">
 		<table width="100%" border="0"><tr><td align="left">
-			<input type="submit" value=" << ${LANG_PREVIOUS} " onClick="form.redirect.value='step2.html'; form.submit()"
+			<input type="submit" value=" << ${attr:LANG_PREVIOUS} " onClick="form.redirect.value='step2.html'; form.submit()"
 			title='${html:LANG_TIPPREV}' onMouseOver="info('${js:LANG_TIPPREV}'); return true" onMouseOut="info('&nbsp;'); return true"			
 			>
 		</td><td align="right">
-			<input name="nextBtn" type="submit" value=" ${LANG_NEXT} >> "
+			<input name="nextBtn" type="submit" value=" ${attr:LANG_NEXT} >> "
 			title='${html:LANG_TIPNEXT}' onMouseOver="info('${js:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
 			>
 		</td></tr></table>

@@ -444,6 +444,20 @@ static hts_boolean cat_html_escaped(String *dst, char c) {
   return HTS_TRUE;
 }
 
+/* Append value escaped for a double-quoted HTML attribute: the quote included,
+   which cat_html_escaped() leaves raw for the single-quoted tooltips. */
+static void cat_attr_escaped(String *dst, const char *value) {
+  const char *a;
+
+  for (a = value; *a != '\0'; a++) {
+    if (*a == '\"') {
+      StringCat(*dst, "&#34;");
+    } else if (!cat_html_escaped(dst, *a)) {
+      StringMemcat(*dst, a, 1);
+    }
+  }
+}
+
 /* Append value escaped for a single-quoted JS literal inside a double-quoted
    HTML attribute. Every escape is a \xNN group, so the only bytes it adds are
    '\', 'x' and hex digits: nothing the attribute decode can expand back into a
@@ -1127,6 +1141,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "html:"))) {
                       name += p;
                       format = 1;
+                    } else if ((p = strfield(name, "attr:"))) {
+                      name += p;
+                      format = 7;
                     } else if ((p = strfield(name, "js:"))) {
                       name += p;
                       format = 6;
@@ -1396,10 +1413,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                                 StringMemcat(output, &c, 1);
                               }
                               a += 2;
-                            } else if (unquoted && a[0] == '\"') {
-                              /* the browser posts an entity back as a raw
-                                 quote, which would open a quoted run in the
-                                 argv splitter; a URI cannot hold one anyway */
+                            } else if ((unquoted || outputmode == 3) &&
+                                       a[0] == '\"') {
+                              /* an entity decodes back to a quote, which opens
+                                 a quoted run in the argv splitter or ends the
+                                 attribute the URL sits in; no URI holds one */
                               StringCat(output, "%22");
                             } else if (outputmode &&
                                        cat_html_escaped(&output, a[0])) {
@@ -1430,6 +1448,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         break;
                       case 6:
                         cat_js_escaped(&output, langstr);
+                        break;
+                      case 7:
+                        cat_attr_escaped(&output, langstr);
                         break;
                       default:
                         if (*langstr) {

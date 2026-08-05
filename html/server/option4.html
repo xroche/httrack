@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
@@ -94,7 +94,7 @@ ${do:end-if}
 <tr><td>
 
 <form method="POST" action="refresh.html" name="form">
-<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="sid" value="${attr:sid}">
 <input type="hidden" name="redirect" value="">
 <input type="hidden" name="closeme" value="">
 
@@ -108,7 +108,7 @@ ${do:end-if}
 <tr><td>
 ${LANG_I44}
 </td><td>
-<input name="connexion" value="${connexion}" size="4"
+<input name="connexion" value="${attr:connexion}" size="4"
 			title='${html:LANG_I12}' onMouseOver="info('${js:LANG_I12}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr><tr><td></td><td>
@@ -120,7 +120,7 @@ ${LANG_I44}
 <tr><td>
 ${LANG_I47d}
 </td><td>
-<input name="timeout" value="${timeout}" size="4"
+<input name="timeout" value="${attr:timeout}" size="4"
 			title='${html:LANG_I13}' onMouseOver="info('${js:LANG_I13}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr><tr><td></td><td>
@@ -132,7 +132,7 @@ ${LANG_I47d}
 <tr><td>
 ${LANG_I48}
 </td><td>
-<input name="retry" value="${retry}" size="4"
+<input name="retry" value="${attr:retry}" size="4"
 			title='${html:LANG_I17}' onMouseOver="info('${js:LANG_I17}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr>
@@ -140,7 +140,7 @@ ${LANG_I48}
 <tr><td>
 ${LANG_I46}
 </td><td>
-<input name="rate" value="${rate}" size="4"
+<input name="rate" value="${attr:rate}" size="4"
 			title='${html:LANG_I15}' onMouseOver="info('${js:LANG_I15}'); return true" onMouseOut="info('&nbsp;'); return true"
 >
 </td></tr><tr><td></td><td>
@@ -154,12 +154,12 @@ ${LANG_I46}
 <tr><td>
 	<table width="100%">
 	<tr><td align="left">
-	<input type="submit" value="${LANG_OK}"
+	<input type="submit" value="${attr:LANG_OK}"
 				onClick="form.closeme.value=1; form.submit(); return false;"
 				title='${html:LANG_TIPOK}' onMouseOver="info('${js:LANG_TIPOK}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>
 	</td><td align="right">
-	<input type="button" value="${LANG_CANCEL}"
+	<input type="button" value="${attr:LANG_CANCEL}"
 				onClick="window.close();"
 				title='${html:LANG_TIPCANCEL}' onMouseOver="info('${js:LANG_TIPCANCEL}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>

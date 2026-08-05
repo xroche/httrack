@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<title>'${html:projname}' - HTTrack Website Copier</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
@@ -108,7 +108,7 @@ ${html:path}/${html:projname}
 </ul>
 
 <form method="POST" action="exit.html" name="form">
-<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="sid" value="${attr:sid}">
 <input type="hidden" name="command" value="quit">
 
 <table border="0" width="100%">
@@ -121,7 +121,7 @@ ${html:path}/${html:projname}
 		<table width="100%" border="0"><tr><td align="left">
 		&nbsp;
 		</td><td align="right">
-			<input type="submit" value=" ${LANG_QUIT} "
+			<input type="submit" value=" ${attr:LANG_QUIT} "
 				onClick="form.submit()">
 		</td></tr></table>
 

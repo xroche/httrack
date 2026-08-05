@@ -22,12 +22,15 @@ python=$(find_python) || {
     exit 77
 }
 
-printf '[each template puts js: in handlers and html: in text] ..\t'
-"${python}" - "${distdir}" <<'PY' || fail "the templates mix the two escaping modes (see above)"
+printf '[each template escapes for the position it interpolates into] ..\t'
+"${python}" - "${distdir}" <<'PY' || fail "the templates mix the escaping modes (see above)"
 import glob, os, re, sys
 
 # A handler value is JS, everything else is HTML text: the two never swap.
 handler = re.compile(r'\bon[A-Za-z]+="([^"]*)"')
+# Every other double-quoted attribute value, and the raw text of a script block.
+quoted = re.compile(r'\b[A-Za-z][A-Za-z0-9:_-]*="([^"]*)"')
+script = re.compile(r"<script\b[^>]*>(.*?)</script>", re.S | re.I)
 subst = re.compile(r"\$\{([^}]*)\}")
 # Directives expand to template-written markup, or (arg:) escape the value
 # themselves. unquoted: only rewrites ", so it needs the mode like a bare key.
@@ -41,11 +44,14 @@ if len(files) < 20:
     sys.exit("only %d server templates found" % len(files))
 
 bad, in_handler, in_text, in_body = [], {}, 0, 0
-unquoted, cmdline = 0, 0
+unquoted, cmdline, in_attr, in_script = 0, 0, {}, 0
 for path in files:
     name = os.path.basename(path)
     text = open(path, encoding="latin-1").read()
     spans = [m.span(1) for m in handler.finditer(text)]
+    attrs = [s for s in (m.span(1) for m in quoted.finditer(text))
+             if s not in spans]
+    scripts = [m.span(1) for m in script.finditer(text)]
     # Every value on the engine command line is a shell token: a quoted one takes
     # arg:, which escapes " and \, a bare one unquoted:. html: escapes neither.
     for ta in re.finditer(r'<textarea name="command".*?</textarea>', text, re.S):
@@ -53,21 +59,21 @@ for path in files:
         for c in subst.finditer(ta.group(0)):
             if c.group(1).startswith("html:"):
                 bad.append("%s: command line interpolates ${%s}" % (name, c.group(1)))
-    # An attribute value is a third position: only js: escapes the double quote
-    # that ends one, so those are left out rather than checked against html:.
+    # What is left inside a tag: an unquoted attribute, or a single-quoted one,
+    # which the tooltips write as html: and the runtime leg below checks.
     def in_tag(pos):
         return text.rfind("<", 0, pos) > text.rfind(">", 0, pos)
     # ${do:output-mode:X} escapes every bare value until the next end-if clears
     # it, which is how a <pre> or <textarea> keeps its newlines (src/htsserver.c).
-    mode = 0
+    mode = ""
     for m in subst.finditer(text):
         key = m.group(1)
         if key.startswith("do:output-mode:"):
-            mode = key[len("do:output-mode:"):] != ""
+            mode = key[len("do:output-mode:"):]
         elif key.startswith("do:end-if"):
             # end-if clears the mode rather than restoring it: the rest of an
             # output-mode region that holds one renders raw.
-            mode = 0
+            mode = ""
         if directive.match(key):
             continue
         # counted after the skip, so re-adding unquoted: to it trips the floor
@@ -79,7 +85,18 @@ for path in files:
             # ${LANG_x} and ${html:LANG_x} both reach the JS parser as HTML text.
             if not key.startswith("js:"):
                 bad.append("%s: handler interpolates ${%s}" % (name, key))
-        elif key.startswith("js:"):
+        elif any(a <= m.start() and m.end() <= b for a, b in scripts):
+            in_script += 1
+            # a script block is JS the moment the tags are stripped, handler or not
+            if not key.startswith("js:"):
+                bad.append("%s: script block interpolates ${%s}" % (name, key))
+        elif any(a <= m.start() and m.end() <= b for a, b in attrs):
+            in_attr[name] = in_attr.get(name, 0) + 1
+            # html: keeps the double quote that ends the attribute, so only attr:
+            # is safe here; html-urlescaped is, because it %22-encodes it.
+            if not key.startswith("attr:") and mode != "html-urlescaped":
+                bad.append("%s: attribute interpolates ${%s}" % (name, key))
+        elif key.startswith(("js:", "attr:")):
             bad.append("%s: HTML text interpolates ${%s}" % (name, key))
         elif key.startswith("html:"):
             in_text += 1
@@ -94,11 +111,15 @@ if bad:
 # No leg may go vacuous; step2.html is named because it is the one the
 # ${html:html:} spelling hid in.
 if (sum(in_handler.values()) < 300 or in_text < 100 or in_body < 350
-        or in_handler.get("step2.html", 0) < 8 or unquoted < 18 or cmdline != 1):
+        or in_handler.get("step2.html", 0) < 8 or unquoted < 18 or cmdline != 1
+        or sum(in_attr.values()) < 220 or in_attr.get("option5.html", 0) < 16
+        or in_script < 1):
     sys.exit("scanned too little: %d handler (%d in step2.html), %d text, %d body,"
-             " %d unquoted, %d command line"
+             " %d attribute (%d in option5.html), %d script, %d unquoted,"
+             " %d command line"
              % (sum(in_handler.values()), in_handler.get("step2.html", 0), in_text,
-                in_body, unquoted, cmdline))
+                in_body, sum(in_attr.values()), in_attr.get("option5.html", 0),
+                in_script, unquoted, cmdline))
 PY
 echo OK
 
