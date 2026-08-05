@@ -42,10 +42,14 @@ void hts_backtrace_init(void);
 
 /* Ensure the calling thread has an alternate signal stack, so a handler
    registered with SA_ONSTACK still runs when the fault is stack exhaustion. One
-   already installed is left alone, whoever owns it. Per-thread and kept until
-   the thread dies; HTS_FALSE if none could be provided, the handler then
+   already installed is left alone, whoever owns it. Returns the mapping to hand
+   back when the thread ends, NULL if nothing was installed, the handler then
    running on the faulting stack as it used to. */
-hts_boolean hts_backtrace_altstack(void);
+void *hts_backtrace_altstack(void);
+
+/* Unmap what hts_backtrace_altstack() returned, from that same thread: one
+   alternate stack per worker adds up over a crawl. */
+void hts_backtrace_altstack_release(void *stack);
 
 /* Write the calling thread's stack to stderr, callable from a fatal signal
    handler: raw frames first, then whatever an external symbolizer can name.
