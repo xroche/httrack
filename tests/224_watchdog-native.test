@@ -16,6 +16,12 @@ workflow="$top/.github/workflows/windows-build.yml"
 tmpbase=${TMPDIR:-/tmp}
 
 tmp=$(mktemp -d "$tmpbase/httrack_wdnat.XXXXXX")
+# TMPDIR is a Windows path on the runner, and its drive-letter colon would split
+# the PATH entry the stubs below are found through, silently running the real
+# PowerShell against the real watchdog instead.
+if command -v cygpath >/dev/null 2>&1; then
+    tmp=$(cygpath -u "$tmp")
+fi
 trap 'set +e; rm -rf "$tmp"' EXIT
 fail() {
     echo "FAIL: $*" >&2
@@ -108,6 +114,10 @@ if test -x "$bin/pwsh"; then
         cd "$tmp"
         PATH="$bin:$PATH"
         export PATH
+        # An unshadowed pwsh would run the real watchdog against the real token,
+        # and every assertion below would still read as a launch failure.
+        test "$(command -v pwsh)" = "$bin/pwsh" ||
+            fail "the stub does not shadow PowerShell: $(command -v pwsh)"
         # shellcheck source=tests/ci-windows-suite.sh
         . "$driver"
         ci_watchdog_pid=''
