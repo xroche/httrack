@@ -194,26 +194,58 @@ def suite_steps(wf):
     return [s for s in steps_of(wf) if "ci-windows-suite.sh" in str(s.get("run", ""))]
 
 
+def suite_jobs(wf):
+    return [
+        j
+        for j in (wf.get("jobs") or {}).values()
+        if any("ci-windows-suite.sh" in str(s.get("run", "")) for s in (j.get("steps") or []))
+    ]
+
+
+# A job-level block replaces the workflow's outright, so one naming only contents
+# silently drops statuses: write.
+def perms_of(wf, job):
+    p = job.get("permissions", wf.get("permissions"))
+    if p in ("read-all", "write-all"):
+        w = "read" if p == "read-all" else "write"
+        return {"contents": w, "statuses": w}
+    return p if isinstance(p, dict) else {}
+
+
+WANT_ENV = {
+    "WATCHDOG_TOKEN": "${{ secrets.GITHUB_TOKEN }}",
+    "WATCHDOG_REPO": "${{ github.repository }}",
+    # The merge commit, which no PR checks UI reads.
+    "WATCHDOG_SHA": "${{ github.sha }}",
+}
+
+
 def audit(wf):
     bad = []
-    perms = wf.get("permissions") or {}
-    if perms.get("statuses") != "write":
-        bad.append("the workflow token cannot post a commit status")
-    if perms.get("contents") != "read":
-        bad.append("contents: read was dropped from the workflow")
     if not checkouts(wf):
         bad.append("no actions/checkout step to audit")
     for s in checkouts(wf):
         if (s.get("with") or {}).get("persist-credentials") is not False:
             bad.append("a checkout persists the job token for the whole job")
-    found = suite_steps(wf)
-    if len(found) != 1:
-        bad.append("%d steps run the suite, cannot tell which one is watched" % len(found))
+    jobs, found = suite_jobs(wf), suite_steps(wf)
+    if len(jobs) != 1 or len(found) != 1:
+        bad.append("%d jobs and %d steps run the suite, cannot tell which is watched" % (len(jobs), len(found)))
         return bad
+    perms = perms_of(wf, jobs[0])
+    if perms.get("statuses") != "write":
+        bad.append("the suite job cannot post a commit status: statuses is %r" % perms.get("statuses"))
+    if perms.get("contents") != "read":
+        bad.append("contents: read was dropped from the suite job")
     env = found[0].get("env") or {}
-    for v in ("WATCHDOG_TOKEN", "WATCHDOG_REPO", "WATCHDOG_SHA", "WATCHDOG_CONTEXT"):
-        if not env.get(v):
-            bad.append("%s is not passed to the suite step" % v)
+    for v, want in WANT_ENV.items():
+        if env.get(v) != want:
+            bad.append("%s is %r, want %r" % (v, env.get(v), want))
+    # Both axes, or the matrix legs overwrite each other's status.
+    for axis in ("matrix.platform", "matrix.configuration"):
+        if axis not in str(env.get("WATCHDOG_CONTEXT") or ""):
+            bad.append("WATCHDOG_CONTEXT does not name %s" % axis)
+    if "github.run_id" not in str(env.get("WATCHDOG_URL") or ""):
+        bad.append("WATCHDOG_URL does not link the run being watched")
     cap = found[0].get("timeout-minutes")
     if not isinstance(cap, int):
         bad.append("the suite step has no timeout-minutes of its own")
@@ -225,11 +257,21 @@ def audit(wf):
 def mutate(wf, kind):
     if kind == "perm":
         wf["permissions"]["statuses"] = "read"
+    elif kind == "jobperm":
+        suite_jobs(wf)[0]["permissions"] = {"contents": "read"}
     elif kind == "creds":
         for s in checkouts(wf):
             (s.get("with") or {}).pop("persist-credentials", None)
     elif kind == "env":
         suite_steps(wf)[0]["env"].pop("WATCHDOG_TOKEN")
+    elif kind == "token":
+        suite_steps(wf)[0]["env"]["WATCHDOG_TOKEN"] = "${{ secrets.WATCHDOG_PAT }}"
+    elif kind == "sha":
+        suite_steps(wf)[0]["env"]["WATCHDOG_SHA"] = "${{ github.event.pull_request.head.sha }}"
+    elif kind == "context":
+        suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"] = "windows-suite"
+    elif kind == "url":
+        suite_steps(wf)[0]["env"]["WATCHDOG_URL"] = "${{ github.server_url }}"
     elif kind == "cap":
         suite_steps(wf)[0].pop("timeout-minutes")
     elif kind != "none":
@@ -251,8 +293,10 @@ PY
     # One control per key, or an audit that stopped looking at one would ride on
     # another still firing. "none" round-trips the file through the parser, which
     # rewrites quoting, order and flow style: no verdict may move.
-    for m in none:'' perm:'cannot post' creds:'persists the job token' \
-        env:'WATCHDOG_TOKEN is not passed' cap:'no timeout-minutes of its own'; do
+    for m in none:'' perm:'cannot post' jobperm:'cannot post' creds:'persists the job token' \
+        env:'WATCHDOG_TOKEN is' token:'WATCHDOG_TOKEN is' sha:'WATCHDOG_SHA is' \
+        context:'does not name matrix.platform' url:'does not link the run' \
+        cap:'no timeout-minutes of its own'; do
         "$py" "$tmp/wf.py" mutate "$workflow" "${m%%:*}" >"$tmp/wf.yml"
         said=$("$py" "$tmp/wf.py" audit "$tmp/wf.yml") ||
             fail "the workflow audit did not run on the ${m%%:*} control: $said"
@@ -278,6 +322,9 @@ PY
     maxsecs=$(sed -n 's/^[[:space:]]*\[int\]\$MaxSeconds = \([0-9]*\).*$/\1/p' "$wdscript")
     test -n "$maxsecs" || fail "cannot read the watchdog's own deadline"
     test "$maxsecs" -le "$cap" || fail "the watchdog runs ${maxsecs}s past the ${cap}s step timeout"
+    # Bounded below too: the reporter has to outlive the heartbeat's own kill.
+    test "$maxsecs" -ge $((deadline + stuck)) ||
+        fail "the watchdog stops at ${maxsecs}s, before the kill at $((deadline + stuck))s"
 fi
 
 psruns=()
@@ -358,8 +405,11 @@ sink_stop() {
     sinkpid=''
 }
 # Ours, so a leg that lost its -ApiBase reaches GitHub with a credential it
-# refuses rather than with whatever the step was handed.
-export WATCHDOG_TOKEN=dummy WATCHDOG_REPO=octo/nowhere WATCHDOG_SHA=0000000
+# refuses. Distinctive, since the legs grade the log on never carrying it.
+export WATCHDOG_TOKEN=n0tat0ken WATCHDOG_REPO=octo/nowhere WATCHDOG_SHA=0000000
+
+# The log rides into the job's artifact, which nothing secret-masks.
+token_free() { ! grep -q "$WATCHDOG_TOKEN" "$1"; }
 
 run_posting() {
     local secs=$1
@@ -486,9 +536,8 @@ backoff_leg() {
         echo "a rejecting API was called $calls times: the loop stopped trying"
         return 1
     }
-    # One diagnosis for both, since which one a runaway trips first is a matter
-    # of how fast the box is: the backoff has to thin the calls out and leave the
-    # log alone, the log being all a run whose token cannot post will leave.
+    # One diagnosis for both: which one trips first depends on box speed. The
+    # backoff must thin the calls, not the log; a token-less run leaves only the log.
     if test "$calls" -gt 5 || test "$lines" -lt $((2 * calls)); then
         echo "$calls calls and $lines log lines against an API rejecting every one: nothing backs off"
         return 1
@@ -546,6 +595,13 @@ for psrun in "${psruns[@]}"; do
         'dropped the leading fields'
     # shellcheck disable=SC2016
     mutate tail-always-ok 's/\$r = @{ Ok = \$false;/$r = @{ Ok = $true;/' 'reads as one that was read'
+    mutate counters-empty "s/return (\$f -join ' ')/return ''/" 'counters are not key=value'
+    # The production cadence: no leg below runs without a schedule of its own.
+    # shellcheck disable=SC2016
+    mutate default-cadence 's/\[int\]\$IntervalSeconds = 30/[int]$IntervalSeconds = 3000/' \
+        'default status cadence'
+    # shellcheck disable=SC2016
+    mutate default-poll 's/\[int\]\$PollSeconds = 5/[int]$PollSeconds = 50/' 'default poll'
 
     # Timed and counted by this shell, never read out of what the watchdog
     # writes: the cadence and the deadline are both mine to set.
@@ -602,9 +658,18 @@ for psrun in "${psruns[@]}"; do
     legs=(cadence throttle staticness backoff)
     test "$devfull" -eq 0 || legs+=(fullstdout)
     for leg in "${legs[@]}"; do
+        : >"$legout"
         said=$("${leg}_leg" "$(nativepath "$wdscript")") ||
             fail "the $psrun watchdog fails the $leg leg: $said"
+        token_free "$legout" || fail "the $leg leg logged the status token"
     done
+    # Control: a catch block widened to the whole exception is how it would get out.
+    leaky="$tmp/token-in-log.ps1"
+    # shellcheck disable=SC2016 # PowerShell variables, quoted for sed
+    sed '/status post failed/s/$_.Exception.Message/$script:Token/' "$wdscript" >"$leaky"
+    cmp -s "$wdscript" "$leaky" && fail "the leaky mutant changed nothing, so it proves nothing"
+    backoff_leg "$(nativepath "$leaky")" >/dev/null || true
+    token_free "$legout" && fail "the token audit cannot see a logged token"
 
     # Same shape as mutate() above, graded by a leg instead of the self-test, and
     # on the diagnosis rather than the exit status for the same reason.

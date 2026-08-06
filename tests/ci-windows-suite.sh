@@ -30,8 +30,8 @@ ci_annotate() {
 hb_now() { echo "$SECONDS"; }
 
 # Start the off-box telemetry over the progress log $1, setting ci_watchdog_pid;
-# 1 with no PowerShell. Forks nothing and kills nothing, so it still reports
-# where the heartbeat below cannot (#795).
+# return 1 with no PowerShell available. Forks nothing and kills nothing, so it
+# reports where the heartbeat below cannot (#795).
 ci_start_native_watchdog() {
     local progress=$1 ps1 c exe='' waited=0
     ps1="$testdir/ci-windows-watchdog.ps1"
@@ -83,6 +83,9 @@ ci_suite_heartbeat() {
         # outlive the step's own timeout before being caught.
         if test $((now - moved)) -ge "$stuck"; then
             ci_annotate error "suite watchdog" "killing the step: $((now - moved))s without progress, in flight: $last"
+            # Ahead of the kill, which runs no EXIT trap: an orphan would outlive the
+            # step and overwrite its last status with a frozen tail.
+            test -z "${watchdog:-}" || kill_pid "$watchdog"
             # Direct first: kill_tree may reap this watchdog before its own root (#953).
             kill_pid "$main"
             kill_tree "$main"
@@ -111,6 +114,11 @@ command -v httrack >/dev/null || {
     echo "::error::no httrack.exe in $bin"
     exit 1
 }
+
+# Out of the environment before the first child forks below: an inherited token
+# could post a commit status in the name of the run.
+ci_watchdog_token=${WATCHDOG_TOKEN:-}
+unset WATCHDOG_TOKEN
 
 # httrack.exe is native, so MSYS rewrites any argument shaped like a
 # POSIX path, and a URL path is shaped exactly like one: "/a/b.html"
@@ -159,10 +167,6 @@ stuck=900
 # 960s of quiet and 900s of static log, and every #795 death measured so far
 # lands inside the first 750s of the step.
 watchdog='' ci_watchdog_pid=''
-# Out of the environment: a token every test child inherits could post a commit
-# status in the name of the run.
-ci_watchdog_token=${WATCHDOG_TOKEN:-}
-unset WATCHDOG_TOKEN
 ci_start_native_watchdog "$PWD/$progress" && watchdog=$ci_watchdog_pid
 test -n "$watchdog" || echo "no off-box watchdog: no usable PowerShell"
 ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ &

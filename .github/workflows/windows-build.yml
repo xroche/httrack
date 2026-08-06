@@ -181,7 +181,7 @@ jobs:
           # Through the environment, never argv, which the process list exposes.
           WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WATCHDOG_REPO: ${{ github.repository }}
-          # A pull_request's merge commit, so these stay out of the PR's checks UI.
+          # github.sha here is the PR's merge commit, so statuses posted against it stay out of the PR's checks UI.
           WATCHDOG_SHA: ${{ github.sha }}
           WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
           WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

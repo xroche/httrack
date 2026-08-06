@@ -53,26 +53,50 @@ EOF
 bin=$tmp/bin
 mkdir -p "$bin"
 printf '#!/bin/sh\nexit 0\n' >"$bin/httrack"
-# shellcheck disable=SC2016 # $2 is the stub's own argument
-printf '#!/bin/sh\necho "$2"\n' >"$bin/cygpath"
+# The first child the driver forks: the token has to be gone before it runs.
+# shellcheck disable=SC2016 # $2 and the token are the stub's own expansions
+printf '#!/bin/sh\necho "TOKEN=${WATCHDOG_TOKEN:-}" >>%s\necho "$2"\n' "$tmp/cygpathtoken" \
+    >"$bin/cygpath"
 chmod +x "$bin/httrack" "$bin/cygpath"
 # The driver puts this bindir first on PATH, so this is the interpreter it finds.
 # Unconditional, because a real PowerShell here runs the real watchdog, and only
 # the scrub above stands between that and api.github.com.
 wdargv=$tmp/wdargv
+wdmark=$tmp/wdmark
 : >"$wdargv"
 cat >"$bin/pwsh" <<EOF
 #!/bin/sh
 { echo "TOKEN=\${WATCHDOG_TOKEN:-}"; printf '%s\n' "\$@"; } >>"$wdargv"
 echo "watchdog ready"
-exec sleep 60
+# Ticks rather than sleeps: a pid can be reused, a running reporter cannot.
+n=0
+while :; do
+    n=\$((n + 1))
+    echo "\$n" >"$wdmark.part"
+    mv "$wdmark.part" "$wdmark"
+    sleep 0.2
+done
 EOF
 chmod +x "$bin/pwsh"
-test "$(PATH="$bin:$PATH" command -v pwsh)" = "$bin/pwsh" ||
-    fail "the stub does not shadow PowerShell: $(PATH="$bin:$PATH" command -v pwsh)"
-test -x "$bin/httrack" || {
+# Ahead of any command -v, which asks access(X_OK) and so reads false here.
+test -x "$bin/pwsh" || {
     echo "SKIP: ${TMPDIR:-/tmp} is noexec, the stub bindir cannot be run"
     exit 77
+}
+test "$(PATH="$bin:$PATH" command -v pwsh)" = "$bin/pwsh" ||
+    fail "the stub does not shadow PowerShell: $(PATH="$bin:$PATH" command -v pwsh)"
+
+# The stub advances $wdmark every 0.2s, so a marker that moves says it still runs.
+# Sampled three times, or a loaded box starving the stub would read as a kill.
+still_ticking() {
+    local a b
+    a=$(cat "$wdmark" 2>/dev/null || true)
+    for _ in 1 2 3; do
+        sleep 1
+        b=$(cat "$wdmark" 2>/dev/null || true)
+        test -n "$b" && test "$a" != "$b" && return 0
+    done
+    return 1
 }
 
 # One per glob the driver enumerates: an empty category is counted as a failing
@@ -102,14 +126,19 @@ grep -q '::error::only 7 tests passed (1 skipped)' <<<"$out" ||
     fail "the pass floor did not report the count"
 grep -q 'FAIL 12_engine-fail.test (exit 3)' <<<"$out" || fail "the failing test was not named"
 
-# The reporter as the real driver launches it, rather than through a test
-# sourcing the helper: launched, and holding a token nothing else sees.
+# This launches the watchdog the way the real driver does, not through a test
+# sourcing the helper, proving it starts and holds a token nothing else sees.
 grep -q '^watchdog ready$' watchdog.log || fail "no watchdog was launched: $(cat watchdog.log)"
 test -r "$tmp/childtoken" || fail "the test that reads its environment did not run"
 grep -qx 'TOKEN=' "$tmp/childtoken" ||
     fail "a test inherited the status token: $(cat "$tmp/childtoken")"
 grep -qx 'TOKEN=s3cr3t' "$wdargv" ||
     fail "the watchdog was launched without its token: $(cat "$wdargv")"
+test -s "$tmp/cygpathtoken" || fail "the cygpath stub never ran"
+grep -q 'TOKEN=s3cr3t' "$tmp/cygpathtoken" &&
+    fail "the driver forked a child before scrubbing its token: $(cat "$tmp/cygpathtoken")"
+# An orphan runs out its own deadline, re-posting a frozen tail past the step (#795).
+! still_ticking || fail "the driver exited leaving its reporter running"
 # Positive control for the gate below: with every category matched it stays silent.
 grep -q 'matched no tests' <<<"$out" && fail "a full suite reported an empty category"
 
@@ -142,5 +171,35 @@ test "$rc" -eq 1 || fail "an empty single-test category exited $rc, want 1"
 grep -q '::error::test category runnable matched no tests' <<<"$out" ||
     fail "the empty single-test category was not named: $out"
 grep -q 'FAIL 00_runnable' <<<"$out" && fail "the unexpanded name was run as a test: $out"
+
+# The wedge branch has to end the reporter itself: its kill of the suite is a
+# TerminateProcess, which runs no EXIT trap. Forked the way the driver forks it,
+# since the branch reads $watchdog from the shell it was forked from.
+wedge_leg() (
+    PATH="$bin:$PATH"
+    export PATH
+    prog=$run/wedge-progress.log
+    printf 'RUN 99_wedged.test at 0s\n' >"$prog"
+    ci_watchdog_pid=''
+    ci_start_native_watchdog "$prog" || fail "the wedge leg launched no watchdog"
+    watchdog=$ci_watchdog_pid
+    still_ticking || fail "the wedge leg's reporter was not running to begin with"
+    # Its own process group, so the tree kill below cannot reach this shell.
+    set -m
+    sleep 300 &
+    victim=$!
+    set +m
+    ci_suite_heartbeat 0 1 "$prog" 0 "$victim" >"$tmp/wedge.out" 2>&1 &
+    wait "$!"
+    grep -q '::error title=suite watchdog::' "$tmp/wedge.out" ||
+        fail "the wedge branch was never reached: $(cat "$tmp/wedge.out")"
+    ! still_ticking || fail "the wedge kill orphaned the reporter"
+)
+# Held back: bash announces every job it reaps from a signal, which reads as a
+# failure in a log that passed.
+wedge_leg >"$tmp/wedge.log" 2>&1 || {
+    cat "$tmp/wedge.log" >&2
+    exit 1
+}
 
 echo "ci-windows driver OK"

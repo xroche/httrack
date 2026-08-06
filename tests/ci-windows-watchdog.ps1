@@ -1,7 +1,6 @@
-# Off-box telemetry for the Windows suite step (#795). It spawns nothing and
-# kills nothing, so nothing a wedge takes away can disarm it, and it reports as a
-# commit status, the only channel that outlives a dead runner. Every status
-# carries one state; what a reader wants is the description of the last to land.
+# Off-box telemetry for the Windows suite step (#795): it spawns and kills
+# nothing, so a wedge cannot disarm it, and reports as a commit status, the only
+# channel that outlives a dead runner. Every status carries the same state.
 param(
     [string]$ProgressLog = '',
     [int]$IntervalSeconds = 30,
@@ -179,6 +178,19 @@ function Invoke-WatchdogSelfTest {
         Assert-That ($tail.Ok) 'a readable log reads as unreadable'
         Assert-That ($tail.Line -eq 'RUN 42_probe.test at 7s') ('the tail is not the last line: {0}' -f $tail.Line)
     } finally { [System.IO.File]::Delete($f.FullName) }
+
+    # Space-separated key=value: the counters share the 140-char description with
+    # the fields a wedge is read for, and '?' from a failed probe is a value.
+    $c = Get-WatchdogCounters
+    Assert-That ($c -match '^[a-z]+=\S+( [a-z]+=\S+)*$') ('the counters are not key=value pairs: {0}' -f $c)
+    foreach ($k in 'p', 'h', 'd') {
+        Assert-That ($c -match ('(^| ){0}=' -f $k)) ('the counters dropped {0}=: {1}' -f $k, $c)
+    }
+    Assert-That ($c.Length -le 60) ('the counters take {0} of the 140 characters' -f $c.Length)
+
+    # Nothing else reads these: every other leg passes its own schedule.
+    Assert-That ($IntervalSeconds -eq 30) ('the default status cadence is {0}s' -f $IntervalSeconds)
+    Assert-That ($PollSeconds -eq 5) ('the default poll is {0}s' -f $PollSeconds)
 
     Assert-That (-not (Send-WatchdogStatus 'self-test')) 'the self-test can reach the API'
 
