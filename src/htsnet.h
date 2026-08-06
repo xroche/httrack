@@ -282,9 +282,8 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
 #endif
 
 /** Write the numeric (dotted/colon) host of ss into namebuf (capacity
-    namebuflen), scope id stripped. On failure namebuf becomes "". Out of line
-    so this header stays free of getnameinfo(), which no libc declares to a
-    strict-ISO translation unit (#1001). */
+    namebuflen), scope id stripped. On failure namebuf becomes "". Out of line:
+    getnameinfo() isn't declared to a strict-ISO translation unit (#1001). */
 HTSNET_API void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
                                   SOCaddr *const ss, const char *file,
                                   const int line);

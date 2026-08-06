@@ -43,7 +43,7 @@ htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 
 httrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE)
-# -DHTS_NO_LIBHTTRACK: proxytrack compiles htsnet.c in instead of linking the library.
+# -DHTS_NO_LIBHTTRACK: see htsnet.h's HTSNET_API guard.
 proxytrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5 -DHTS_NO_LIBHTTRACK
 htsserver_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 
