@@ -41,7 +41,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
+            appstream appstream-util
 
       - name: Configure
         run: |
@@ -715,7 +716,8 @@ jobs:
           sudo apt-get update
           # noble ships shfmt 3.8.0 (universe), matching the pinned local dev
           # version; use it rather than fetching a release binary from github.com.
-          sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream
+          sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
+            appstream-util
           shfmt --version
           appstreamcli --version
 
@@ -741,6 +743,8 @@ jobs:
         run: |
           set -euo pipefail
           appstreamcli validate --no-net --explain \
+            html/server/div/com.httrack.WebHTTrack.metainfo.xml
+          appstream-util validate-relax --nonet \
             html/server/div/com.httrack.WebHTTrack.metainfo.xml
 
   # Check clang-format on CHANGED LINES ONLY. The engine predates clang-format

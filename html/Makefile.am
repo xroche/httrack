@@ -15,7 +15,7 @@ WebIcon64x64dir = $(datadir)/icons/hicolor/64x64/apps
 WebIcon128x128dir = $(datadir)/icons/hicolor/128x128/apps
 WebIcon256x256dir = $(datadir)/icons/hicolor/256x256/apps
 WebIconScalabledir = $(datadir)/icons/hicolor/scalable/apps
-VFolderEntrydir = $(prefix)/share/applications
+VFolderEntrydir = $(datadir)/applications
 MetaInfodir = $(datadir)/metainfo
 
 # Wildcards are globbed against $(srcdir): a bare "*.html" is resolved against
