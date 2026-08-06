@@ -186,16 +186,37 @@ if ! is_windows && test -r /proc/self/stat; then
         grep -qx "$fake" <<<"$engines" || fail "no-ps engine list lost pid $fake"
         ! grep -qx "$outside" <<<"$engines" ||
             fail "no-ps engine list reached outside the group (pid $outside)"
+        # A platform with no stack mechanism must say so and leave the engine
+        # alone. Shimmed, because no CI leg is one: the Hurd branch below runs
+        # only on the buildds that failed for want of it.
+        # shellcheck disable=SC2016 # the shim reads them, not us
+        printf '#!/bin/sh\ncase "$1" in -s) echo GNU;; *) exec %s "$@";; esac\n' \
+            "$(command -v uname)" >"$tmp/nops/uname"
+        chmod +x "$tmp/nops/uname"
+        grep -q "no stack mechanism known for GNU" <<<"$(request_engine_backtraces "$pgid")" ||
+            fail "a platform with no stack mechanism reported nothing"
+        case "$(procstate "$fake")" in
+        Z | gone) fail "the no-mechanism branch signalled pid $fake" ;;
+        esac
+        rm -f "$tmp/nops/uname"
+
         # The chain, not just its input: this is what reported nothing on Fedora.
         stacks=$(request_engine_backtraces "$pgid")
         ! grep -q 'no engine process left' <<<"$stacks" ||
             fail "no-ps stack request found no engine to signal: $stacks"
-        # Gone, or a zombie: the fake is reparented, and a container's pid 1 does
-        # not always reap. kill -0 alone succeeds on a zombie and proves nothing.
-        case "$(procstate "$fake")" in
-        Z | gone) ;;
-        *) fail "the SIGABRT never reached pid $fake" ;;
-        esac
+        # Only Linux signals; elsewhere (Hurd's uname reports "GNU") the chain
+        # owes the reader its no-mechanism report instead of silence.
+        if test "$(uname -s)" = Linux; then
+            # Gone, or a zombie: the fake is reparented, and a container's pid 1
+            # does not always reap. kill -0 succeeds on a zombie, proving nothing.
+            case "$(procstate "$fake")" in
+            Z | gone) ;;
+            *) fail "the SIGABRT never reached pid $fake" ;;
+            esac
+        else
+            grep -q 'no stack mechanism known' <<<"$stacks" ||
+                fail "no stack mechanism was reported on $(uname -s): $stacks"
+        fi
         # With neither source the dump must say so, not print an empty section.
         # shellcheck disable=SC2317 # reached through ps_snapshot
         proc_snapshot() { return 1; }
@@ -203,6 +224,34 @@ if ! is_windows && test -r /proc/self/stat; then
             fail "a host with no ps and no /proc produced no notice"
     )
     kill "$fake" "$outside" 2>/dev/null || true
+fi
+
+# --- an emulated buildd hides the engine behind its binfmt interpreter -------
+# Synthetic rows: no runner here has qemu-user, and the column shift is the point.
+if ! is_windows; then
+    (
+        # shellcheck disable=SC2317 # reached through the two matchers below
+        ps_snapshot() {
+            cat <<'EOF'
+PID PPID PGID ELAPSED S COMMAND
+11 1 40 12 S /usr/libexec/qemu-binfmt/hppa-binfmt-P /bld/src/httrack -q http://h/
+12 1 40 12 S /usr/bin/qemu-hppa-static /usr/bin/python3 /t/local-server.py 8080
+13 1 40 12 S /bld/src/httrack -q http://h/
+14 1 40 12 S /usr/bin/strace /bld/src/httrack -q http://h/
+15 1 40 12 S /usr/bin/qemu-img convert /srv/local-server.py out.raw
+16 1 40 12 S /usr/bin/qemu-nbd /mnt/httrack
+17 1 40 12 S /opt/my-custom-binfmt /mnt/httrack
+EOF
+        }
+        # Rows 14 to 17 are the controls: shifting past anything but an emulator
+        # would take a wrapper, or a disk image, for the engine and kill it.
+        engines=$(list_engine_pids 40)
+        test "$engines" = $'11\n13' ||
+            fail "emulated engine list is '$engines', want pids 11 and 13"
+        named=$(list_stray_processes 0 named | awk 'NR > 1 { print $1 }')
+        test "$named" = $'11\n12\n13' ||
+            fail "emulated stray list is '$named', want pids 11, 12 and 13"
+    )
 fi
 
 # --- a wedged crawl yields a symbolized engine stack ------------------------
