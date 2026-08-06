@@ -59,6 +59,9 @@ struct FTPDownloadStruct {
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+/* Capacity of every FTP control-line buffer; send_line() adds the CRLF. */
+#define FTP_LINE_SIZE 1024
+
 #if USE_BEGINTHREAD
 void launch_ftp(FTPDownloadStruct * params);
 void back_launch_ftp(void *pP);
@@ -75,11 +78,17 @@ int get_ftp_line(T_SOC soc, char *line, size_t line_size, int timeout);
    Both sizes must be nonzero. */
 void ftp_split_userpass(const char *src, const char *end, char *user,
                         size_t user_size, char *pass, size_t pass_size);
-/* Build "<verb> <path>" into line[line_size], truncating to fit. The path is
-   quoted whenever a bare one would give the server a second token; it must
-   already have been screened for control bytes. */
-void ftp_command(char *line, size_t line_size, const char *verb,
-                 const char *path);
+/* Build "<verb> <path>" into line[line_size]. The path is quoted whenever a
+   bare one would give the server a second token; it must already have been
+   screened for control bytes. Returns HTS_FALSE and empties line when the
+   command does not fit, as a clipped one would name a different file. */
+hts_boolean ftp_command(char *line, size_t line_size, const char *verb,
+                        const char *path);
+/* ftp_command() into a control line of the one capacity every FTP buffer has;
+   anything narrower fails the build rather than refusing a path that fits. */
+#define ftp_command_line(line, verb, path)                                     \
+  (HTS_COMPILE_ASSERT(sizeof(line) == FTP_LINE_SIZE),                          \
+   ftp_command((line), sizeof(line), (verb), (path)))
 T_SOC get_datasocket(char *to_send, size_t to_send_size);
 int stop_ftp(lien_back * back);
 char *linejmp(char *line);
