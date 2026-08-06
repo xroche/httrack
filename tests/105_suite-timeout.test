@@ -151,28 +151,32 @@ if ! is_windows && test -r /proc/self/stat; then
     mkdir -p "$tmp/nops"
     printf '#!/bin/sh\nexit 127\n' >"$tmp/nops/ps"
     chmod +x "$tmp/nops/ps"
-    # Matched on the basename alone, so any long-lived binary would do -- except a
-    # renamed coreutils: uutils dispatches on argv[0] and refuses it (#1042).
+    # A shell copy, not a renamed sleep: uutils refuses an argv[0] it does not own
+    # (#1042). Either works, since both lists match on the basename alone.
     cp "${BASH:-$(command -v sh)}" "$tmp/httrack" || fail "no shell to copy"
-    # The fakes block in open() and fork nothing, so the SIGABRT orphans no child.
+    "$tmp/httrack" -c : || fail "cannot exec out of $tmp (noexec?)"
+    # Read-write, so the open does not block and the timeout can bound it: the
+    # fakes then fork nothing for the SIGABRT to orphan, and a test killed
+    # outright leaks no process named httrack onto the runner.
     mkfifo "$tmp/hold"
+    hold="read -t 60 _ <>'$tmp/hold'"
     # Started from a subshell so ppid and pgid differ: swapping those two columns
     # is invisible whenever the test shell happens to lead its own group.
     (
-        "$tmp/httrack" -c "read _ <'$tmp/hold'" &
+        "$tmp/httrack" -c "$hold" &
         echo $! >"$tmp/fake.pid"
     )
     # Its own group, to prove the filter keeps an outsider out.
     (
         set -m
-        "$tmp/httrack" -c "read _ <'$tmp/hold'" &
+        "$tmp/httrack" -c "$hold" &
         echo $! >"$tmp/outside.pid"
     )
     fake=$(cat "$tmp/fake.pid")
     outside=$(cat "$tmp/outside.pid")
     trap 'set +e; kill "$fake" "$outside" 2>/dev/null; rm -rf "$tmp"' EXIT
-    # /proc holds the pid from the fork on, so a fake that never exec'd surfaces
-    # only as an empty field far below -- which is how #1042 read.
+    # /proc holds the pid from the fork on, so a fake that never exec'd would fail
+    # some later assertion instead of this one.
     running() {
         local i=0 argv0
         while test "$i" -lt 20; do
