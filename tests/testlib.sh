@@ -184,7 +184,10 @@ AWK_PROC_NAMES='
 function basen(s) { sub(/.*[\/\\]/, "", s); return s }
 function qemushift(  n) {
     n = basen($6)
-    return n ~ /^qemu-[[:alnum:]_]+(-static)?$|-binfmt(-[[:upper:]]+)?$/ ? 1 : 0
+    # qemu-img and friends take an image, not a program, and this list is fed to
+    # kill: shifting past them would read a disk path as the process name.
+    if (n ~ /^qemu-(img|nbd|io|ga|edid|keymap)$/) return 0
+    return n ~ /^qemu-[[:alnum:]_]+(-static)?$|^[[:alnum:]_]+-binfmt(-[[:upper:]]+)?$/ ? 1 : 0
 }'
 
 # Every process as "PID PPID PGID ELAPSED S COMMAND", header first. A Fedora
