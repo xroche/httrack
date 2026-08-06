@@ -205,19 +205,19 @@ while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {
         }
         if ((Get-WatchdogAction $now $postedAt $IntervalSeconds) -eq 'post') {
             $postedAt = $now
+            $static = -1
+            if ($tail.Ok) { $static = $now - $movedAt }
+            $desc = Format-WatchdogStatus $now $static $tail.Line (Get-WatchdogCounters)
+            # Logged whatever the backoff decides: it throttles the API, not the
+            # artifact, which is all a run whose token cannot post will leave.
+            Write-WatchdogLog $desc
             if ($skip -gt 0) {
                 $skip--
+            } elseif (Send-WatchdogStatus 'pending' $desc) {
+                $backoff = 0
             } else {
-                $static = -1
-                if ($tail.Ok) { $static = $now - $movedAt }
-                $desc = Format-WatchdogStatus $now $static $tail.Line (Get-WatchdogCounters)
-                if (Send-WatchdogStatus 'pending' $desc) {
-                    $backoff = 0
-                } else {
-                    $backoff = Get-NextBackoff $backoff
-                    $skip = $backoff
-                }
-                Write-WatchdogLog $desc
+                $backoff = Get-NextBackoff $backoff
+                $skip = $backoff
             }
         }
     } catch {
