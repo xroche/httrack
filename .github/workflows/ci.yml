@@ -720,7 +720,6 @@ jobs:
             appstream-util
           shfmt --version
           appstreamcli --version
-          appstream-util --version
 
       - name: shellcheck
         run: shellcheck $SHELL_SCRIPTS
