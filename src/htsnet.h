@@ -273,25 +273,20 @@ static HTS_UNUSED socklen_t SOCaddr_copyaddr_(SOCaddr *const server,
                       __LINE__);                                               \
   } while (0)
 
-/** Write the numeric (dotted/colon) host of ss into namebuf (capacity
-    namebuflen), scope id stripped. On failure namebuf becomes "". */
-static HTS_UNUSED void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
-                                         SOCaddr *const ss, const char *file,
-                                         const int line) {
-  assertf_(namebuf != NULL, file, line);
-  assertf_(ss != NULL, file, line);
+/* proxytrack compiles htsnet.c in rather than linking the library, and MSVC
+   rejects a dllimport definition. */
+#ifdef HTS_NO_LIBHTTRACK
+#define HTSNET_API
+#else
+#define HTSNET_API HTSEXT_API
+#endif
 
-  if (getnameinfo(&ss->m_addr.sa, sizeof(ss->m_addr), namebuf, namebuflen, NULL,
-                  0, NI_NUMERICHOST) == 0) {
-    /* remove scope id(s) */
-    char *const pos = strchr(namebuf, '%');
-    if (pos != NULL) {
-      *pos = '\0';
-    }
-  } else {
-    namebuf[0] = '\0';
-  }
-}
+/** Write the numeric (dotted/colon) host of ss into namebuf (capacity
+    namebuflen), scope id stripped. On failure namebuf becomes "". Out of line:
+    getnameinfo() isn't declared to a strict-ISO translation unit (#1001). */
+HTSNET_API void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
+                                  SOCaddr *const ss, const char *file,
+                                  const int line);
 
 /** Numeric host of ss into namebuf (capacity namebuflen); "" on failure. */
 #define SOCaddr_inetntoa(namebuf, namebuflen, ss)                              \
