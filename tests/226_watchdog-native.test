@@ -9,7 +9,7 @@ set -euo pipefail
 # First, before anything here can start an interpreter: a token reaching one
 # posts forged statuses onto the commit under test.
 unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
-export WATCHDOG_CONTEXT='225_watchdog-native (never posted)'
+export WATCHDOG_CONTEXT='226_watchdog-native (never posted)'
 
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
@@ -343,7 +343,7 @@ cadence_leg() {
 }
 
 staticness_leg() {
-    local until moved lastq legpid
+    local stop moved lastq legpid
     sink_start 201
     printf 'RUN 36_local-bigcrawl.test at 0s\n' >"$tmp/progress.log"
     run_posting 90 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
@@ -351,8 +351,8 @@ staticness_leg() {
     legpid=$!
     # Six seconds of a log being written, then silence. Staticness has to follow
     # the log through both, and elapsed time follows neither.
-    until=$((SECONDS + 6))
-    while test "$SECONDS" -lt "$until"; do
+    stop=$((SECONDS + 6))
+    while test "$SECONDS" -lt "$stop"; do
         printf 'RUN 36_local-bigcrawl.test at %ss\n' "$SECONDS" >>"$tmp/progress.log"
         sleep 0.4
     done
@@ -375,7 +375,7 @@ staticness_leg() {
         ;;
     esac
     test "$lastq" -ge 3 || {
-        echo "staticness stalled at ${lastq}s over six of silence: $(posted_pairs | tr '\n' '/')"
+        echo "staticness stalled at ${lastq}s over six seconds of silence: $(posted_pairs | tr '\n' '/')"
         return 1
     }
 }
