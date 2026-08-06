@@ -8,14 +8,15 @@ EXTRA_DIST = $(TESTS) renamefail.c threadattrfail.c nobacktrace.c altstackprobe.
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
-	pty-resize.py test-timeout.sh \
+	pty-resize.py test-timeout.sh png-colors.py \
 	local-crawl.sh local-server.py ftp-server.py testlib.sh \
 	ci-windows-suite.sh \
 	server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \
 	server-root/fraglink/index.html server-root/fraglink/target.html \
-	fixtures/cache-golden/hts-cache/new.zip
+	fixtures/cache-golden/hts-cache/new.zip \
+	install-manifest.txt
 
 TESTS_ENVIRONMENT =
 TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH
@@ -34,6 +35,10 @@ TESTS_ENVIRONMENT += abs_top_builddir=$(abs_top_builddir)
 TESTS_ENVIRONMENT += CONFIGURED_DATADIR=$(datadir)
 TESTS_ENVIRONMENT += CONFIGURED_LIBDIR=$(libdir)
 TESTS_ENVIRONMENT += CONFIGURED_BINDIR=$(bindir)
+# 225_install-manifest.test folds these back out of the staged paths.
+TESTS_ENVIRONMENT += CONFIGURED_MANDIR=$(mandir)
+TESTS_ENVIRONMENT += CONFIGURED_DOCDIR=$(docdir)
+TESTS_ENVIRONMENT += CONFIGURED_HTMLDIR=$(htmldir)
 TESTS_ENVIRONMENT += ORIGIN_RPATH=$(ORIGIN_RPATH)
 # 222_pkgconfig-consumer.test asserts the staged .pc against these, and both
 # sides of the gate deciding whether it hands a consumer an rpath.

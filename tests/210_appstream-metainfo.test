@@ -6,14 +6,34 @@
 set -euo pipefail
 
 srcdir="${abs_top_srcdir:?not run under make check}"
-metainfo="${srcdir}/html/server/div/com.httrack.WebHTTrack.metainfo.xml"
 
-command -v appstreamcli >/dev/null 2>&1 || {
-    echo "appstreamcli not installed; skipping" >&2
+# --no-net/--nonet: validate the file, not the reachability of the screenshot
+# host. Fedora's build gates on appstream-util, stricter about icons and
+# metadata than appstreamcli.
+validate() {
+    case $1 in
+    appstreamcli) appstreamcli validate --no-net --explain "$2" ;;
+    appstream-util) appstream-util validate-relax --nonet "$2" ;;
+    *)
+        echo "FAIL: no validator named $1" >&2
+        exit 1
+        ;;
+    esac
+}
+
+tools=()
+for tool in appstreamcli appstream-util; do
+    command -v "${tool}" >/dev/null 2>&1 && tools+=("${tool}")
+done
+test ${#tools[@]} -gt 0 || {
+    echo "no appstream validator installed; skipping" >&2
     exit 77
 }
-test -f "${metainfo}" || {
-    echo "FAIL: ${metainfo} not found" >&2
+
+# html/Makefile.am installs these by glob; a second one must not ship unchecked.
+metainfos=("${srcdir}"/html/server/div/*.metainfo.xml)
+test -f "${metainfos[0]}" || {
+    echo "FAIL: no metainfo under ${srcdir}/html/server/div" >&2
     exit 1
 }
 
@@ -23,21 +43,18 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/appstream.XXXXXX") || {
 }
 trap 'set +e; rm -rf "${work}"' EXIT
 
-# --no-net: validate the file, not the reachability of the screenshot host.
-validate() { appstreamcli validate --no-net --explain "$1"; }
-
-validate "${metainfo}" || {
-    echo "FAIL: metainfo does not validate" >&2
-    exit 1
-}
-
-# Positive control: an appstreamcli that never fails would pass the above.
-grep -v '<id>com.httrack.WebHTTrack</id>' "${metainfo}" >"${work}/noid.xml"
-if validate "${work}/noid.xml" >"${work}/noid.log" 2>&1; then
-    echo "FAIL: metainfo without <id> validated; the check proves nothing" >&2
-    exit 1
-fi
-grep -q component-id-missing "${work}/noid.log" ||
-    echo "note: id-less copy failed for another reason: $(tail -3 "${work}/noid.log")" >&2
-
-echo "appstream metainfo: valid"
+for metainfo in "${metainfos[@]}"; do
+    # Positive control: a validator that never fails would pass the check below.
+    sed '/<id>/d' "${metainfo}" >"${work}/noid.xml"
+    for tool in "${tools[@]}"; do
+        validate "${tool}" "${metainfo}" || {
+            echo "FAIL: ${metainfo##*/} does not validate under ${tool}" >&2
+            exit 1
+        }
+        if validate "${tool}" "${work}/noid.xml" >"${work}/noid.log" 2>&1; then
+            echo "FAIL: ${tool} validated a metainfo with no <id>; it proves nothing" >&2
+            exit 1
+        fi
+    done
+    echo "appstream metainfo: ${metainfo##*/} valid (${tools[*]})"
+done

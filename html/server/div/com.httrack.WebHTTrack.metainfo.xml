@@ -26,7 +26,6 @@
     </ul>
   </description>
   <launchable type="desktop-id">WebHTTrack.desktop</launchable>
-  <icon type="stock">httrack</icon>
   <categories>
     <category>Network</category>
   </categories>

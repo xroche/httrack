@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# Distro packages (Fedora %files, debian/*.files) name every installed file, so a
+# file appearing or vanishing here breaks their build and not ours; it broke
+# Fedora's twice in three weeks.
+
+set -euo pipefail
+
+: "${abs_top_builddir:?not run under make check}"
+manifest="${abs_top_srcdir:?not run under make check}/tests/install-manifest.txt"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# macOS names the library .dylib, and Windows has no distro packaging to protect.
+test "$(uname -s)" = Linux || {
+    echo "install layout is pinned on Linux only; skipping" >&2
+    exit 77
+}
+test -r "${manifest}" || fail "no ${manifest}"
+
+# The docs are dropped below, so a docdir holding datadir would drop the pinned
+# data files with them and leave nothing to compare.
+docdir=${CONFIGURED_DOCDIR:?not run under make check}
+case "${CONFIGURED_DATADIR:?not run under make check}" in
+"${docdir%/}" | "${docdir%/}"/*)
+    echo "docdir contains datadir; skipping" >&2
+    exit 77
+    ;;
+esac
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/manifest.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+stage=${work}/stage
+env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir}" \
+    install DESTDIR="${stage}" >"${work}/install.log" 2>&1 || {
+    cat "${work}/install.log" >&2
+    fail "make install DESTDIR=${stage}"
+}
+
+# Fold the configured directories back to tokens so the pin survives any --prefix
+# or --libdir. Longest path first, so a nested directory beats the one it sits in
+# whatever the layout puts where.
+: >"${work}/dirs"
+for var in DOCDIR HTMLDIR MANDIR INCLUDEDIR LIBDIR BINDIR DATADIR; do
+    name=CONFIGURED_${var}
+    path=${!name:-}
+    test -n "${path}" || fail "${name} not set"
+    path=${path%/}
+    printf '%s\t%s\t%s\n' "${#path}" "${path}" "${var}" >>"${work}/dirs"
+done
+LC_ALL=C sort -rn "${work}/dirs" -o "${work}/dirs"
+
+paths=() tokens=()
+while IFS=$'\t' read -r _ path var; do
+    paths+=("${path}")
+    tokens+=("${var}")
+done <"${work}/dirs"
+
+# Matched literally: a directory holding a regex metacharacter would silently
+# fold nothing if this were a pattern.
+fold() {
+    local line=$1 i
+    for i in "${!paths[@]}"; do
+        case ${line} in
+        "${paths[i]}"/*)
+            printf '@%s@/%s\n' "${tokens[i]}" "${line#"${paths[i]}"/}"
+            return
+            ;;
+        esac
+    done
+    printf '%s\n' "${line}"
+}
+
+# Dropped: the docs, since where they sit under docdir is a --htmldir choice each
+# distro makes its own way and no package names them one by one; the .a/.la
+# libtool bookkeeping no distro ships; and the library revision, which moves
+# every release. The soname digit stays: a bump renames Debian's package.
+(cd "${stage}" && find . \( -type f -o -type l \) | sed 's|^\.||') |
+    while IFS= read -r line; do fold "${line}"; done |
+    sed -e '/^@DOCDIR@\//d' -e '/^@HTMLDIR@\//d' \
+        -e '/\.la$/d' -e '/\.a$/d' \
+        -e 's|\(\.so\.[0-9][0-9]*\)\.[0-9][0-9]*\.[0-9][0-9]*$|\1.@revision@|' |
+    LC_ALL=C sort >"${work}/actual"
+
+# An install that staged nothing matches nothing; say that, not a 300-line diff.
+grep -qx '@BINDIR@/httrack' "${work}/actual" || fail "nothing staged under ${stage}"
+
+LC_ALL=C sort "${manifest}" >"${work}/expected"
+diff -u "${work}/expected" "${work}/actual" ||
+    fail "the installed file set changed; update tests/install-manifest.txt and say so in the release notes -- Fedora's %files and debian/*.files name these files"
+
+echo "install manifest: $(wc -l <"${work}/actual") files"
