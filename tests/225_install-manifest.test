@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# Distro packages name the installed files (Fedora's %files, debian/*.files), so
+# a file appearing or vanishing here breaks their build and not ours -- Fedora's
+# twice in three weeks. Changing the set is fine; not noticing is not.
+
+set -euo pipefail
+
+: "${abs_top_builddir:?not run under make check}"
+manifest="${abs_top_srcdir:?not run under make check}/tests/install-manifest.txt"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# macOS names the library .dylib, and Windows has no distro packaging to protect.
+test "$(uname -s)" = Linux || {
+    echo "install layout is pinned on Linux only; skipping" >&2
+    exit 77
+}
+test -r "${manifest}" || fail "no ${manifest}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/manifest.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+stage=${work}/stage
+env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir}" \
+    install DESTDIR="${stage}" >"${work}/install.log" 2>&1 || {
+    cat "${work}/install.log" >&2
+    fail "make install DESTDIR=${stage}"
+}
+
+# Docs in docdir or under it is a --htmldir choice each distro makes its own way,
+# and no package names them individually.
+case "${CONFIGURED_HTMLDIR:?not run under make check}" in
+"${CONFIGURED_DOCDIR:?not run under make check}"*) ;;
+*)
+    echo "htmldir outside docdir; skipping" >&2
+    exit 77
+    ;;
+esac
+
+# Fold the configured directories back to tokens so the pin survives any
+# --prefix/--libdir; longest first, since docdir and mandir nest in datadir.
+for var in DOCDIR MANDIR INCLUDEDIR LIBDIR BINDIR DATADIR; do
+    name=CONFIGURED_${var}
+    path=${!name:-}
+    test -n "${path}" || fail "${name} not set"
+    echo "s|^${path%/}/|@${var}@/|"
+done >"${work}/norm.sed"
+
+# Dropped: docdir per above, the .a/.la libtool bookkeeping no distro ships, and
+# the library revision, which moves every release. The soname digit stays: a bump
+# renames Debian's binary package.
+(cd "${stage}" && find . \( -type f -o -type l \) | sed 's|^\.||') |
+    sed -f "${work}/norm.sed" \
+        -e '/^@DOCDIR@\//d' -e '/\.la$/d' -e '/\.a$/d' \
+        -e 's|\(\.so\.[0-9][0-9]*\)\.[0-9][0-9]*\.[0-9][0-9]*$|\1.@revision@|' |
+    LC_ALL=C sort >"${work}/actual"
+
+# An install that staged nothing matches nothing; say that, not a 300-line diff.
+grep -qx '@BINDIR@/httrack' "${work}/actual" || fail "nothing staged under ${stage}"
+
+LC_ALL=C sort "${manifest}" >"${work}/expected"
+diff -u "${work}/expected" "${work}/actual" ||
+    fail "the installed file set changed; update tests/install-manifest.txt and say so in the release notes -- Fedora's %files and debian/*.files name these files"
+
+echo "install manifest: $(wc -l <"${work}/actual") files"
