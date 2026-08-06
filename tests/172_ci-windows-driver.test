@@ -39,7 +39,8 @@ grep -q usage <<<"$out" || fail "argless run said: $out"
 # sibling's.
 run=$tmp/run
 mkdir -p "$run"
-cp "$driver" "$testdir/testlib.sh" "$testdir/test-timeout.sh" "$run/"
+cp "$driver" "$testdir/testlib.sh" "$testdir/test-timeout.sh" \
+    "$testdir/ci-windows-watchdog.ps1" "$run/"
 chmod u+w "$run"/*.sh # distcheck's srcdir is read-only, and cp carries that over
 cat >>"$run/testlib.sh" <<'EOF'
 reap_leftover_processes() { return 0; }
@@ -51,6 +52,23 @@ printf '#!/bin/sh\nexit 0\n' >"$bin/httrack"
 # shellcheck disable=SC2016 # $2 is the stub's own argument
 printf '#!/bin/sh\necho "$2"\n' >"$bin/cygpath"
 chmod +x "$bin/httrack" "$bin/cygpath"
+# The driver puts this bindir on PATH, so a stub here is the interpreter it finds
+# where there is no real one; a real PowerShell drives the real script instead.
+wdargv=$tmp/wdargv
+: >"$wdargv"
+if ! command -v pwsh >/dev/null 2>&1 && ! command -v powershell.exe >/dev/null 2>&1; then
+    cat >"$bin/pwsh" <<EOF
+#!/bin/sh
+{ echo "TOKEN=\${WATCHDOG_TOKEN:-}"; printf '%s\n' "\$@"; } >>"$wdargv"
+case " \$* " in
+*" -Post failure "*) echo "final status failure"; exit 0 ;;
+*" -Post "*) echo "final status other"; exit 0 ;;
+esac
+echo "watchdog ready"
+exec sleep 60
+EOF
+    chmod +x "$bin/pwsh"
+fi
 test -x "$bin/httrack" || {
     echo "SKIP: ${TMPDIR:-/tmp} is noexec, the stub bindir cannot be run"
     exit 77
@@ -58,16 +76,21 @@ test -x "$bin/httrack" || {
 
 # One per glob the driver enumerates: an empty category is counted as a failing
 # test named after the unexpanded pattern, which would drown the accounting.
-for t in 00_runnable 10_engine-pass 13_zlib-pass 14_local-pass 15_watchdog-pass \
+for t in 00_runnable 13_zlib-pass 14_local-pass 15_watchdog-pass \
     16_crawl_proxy_https 17_crawl-log-salvage; do
     printf '#!/bin/sh\nexit 0\n' >"$run/$t.test"
 done
+# One test reports back what it inherited: the token the step is handed can post
+# commit statuses, and a forged one has already reached a commit under test.
+# shellcheck disable=SC2016 # the stub expands it, not this shell
+printf '#!/bin/sh\necho "TOKEN=${WATCHDOG_TOKEN:-}" >%s\nexit 0\n' "$tmp/childtoken" \
+    >"$run/10_engine-pass.test"
 printf '#!/bin/sh\nexit 77\n' >"$run/11_engine-skip.test"
 printf '#!/bin/sh\nexit 3\n' >"$run/12_engine-fail.test"
 
 cd "$run"
 rc=0
-out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" \
+out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" WATCHDOG_TOKEN=s3cr3t \
     bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?
 # The skip set and the pass floor are pinned to the real suite, so a stub run
 # ends on the floor; what is under test is the tally that reaches it.
@@ -77,6 +100,18 @@ grep -q '^ran=9 pass=7 fail=1 skip=1$' <<<"$out" ||
 grep -q '::error::only 7 tests passed (1 skipped)' <<<"$out" ||
     fail "the pass floor did not report the count"
 grep -q 'FAIL 12_engine-fail.test (exit 3)' <<<"$out" || fail "the failing test was not named"
+
+# The reporter as the real driver launches it, rather than through a test
+# sourcing the helper: launched, ended, and holding a token nothing else sees.
+grep -q '^watchdog ready$' watchdog.log || fail "no watchdog was launched: $(cat watchdog.log)"
+grep -q 'final status failure' watchdog.log ||
+    fail "the driver's own verdict was never posted: $(cat watchdog.log)"
+test -r "$tmp/childtoken" || fail "the test that reads its environment did not run"
+grep -qx 'TOKEN=' "$tmp/childtoken" ||
+    fail "a test inherited the status token: $(cat "$tmp/childtoken")"
+if test -s "$wdargv"; then
+    grep -qx 'TOKEN=s3cr3t' "$wdargv" || fail "the watchdog was launched without its token"
+fi
 # Positive control for the gate below: with every category matched it stays silent.
 grep -q 'matched no tests' <<<"$out" && fail "a full suite reported an empty category"
 

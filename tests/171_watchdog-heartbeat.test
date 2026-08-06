@@ -138,7 +138,9 @@ test "$killed" -le 10080 || fail "killed at $killed, want 9960 within a tick"
 
 # taskkill is a grandchild of its own target, so a leaves-first /T would reap the
 # watchdog before the root (#953): kill_tree here never returns, and the stubs
-# record the order, which the code under test cannot write to.
+# record the order, which the code under test cannot write to. A taskkill runs no
+# trap, so this path posts the verdict itself, after silencing the reporter that
+# would otherwise overwrite it.
 rec="$tmp/killed"
 : >"$rec"
 vnow=9000
@@ -146,6 +148,8 @@ ticks=0
 printf 'RUN 96_wedged.test at 0s\n' >"$progress"
 rc=0
 (
+    watchdog=777
+    ci_post_final_status() { echo "POST $1" >>"$rec"; }
     kill_pid() { echo "DIRECT $1" >>"$rec"; }
     kill_tree() {
         echo "TREE $1" >>"$rec"
@@ -154,10 +158,10 @@ rc=0
     ci_suite_heartbeat 960 360 "$progress" 900 4242 >"$tmp/hedge" 2>&1
 ) || rc=$?
 test "$rc" -eq 9 || fail "the tree kill never fired: watchdog returned $rc"
-test "$(sed -n 1p "$rec")" = "DIRECT 4242" ||
-    fail "the target was not signalled directly ahead of the tree walk: $(tr '\n' '/' <"$rec")"
-test "$(sed -n 2p "$rec")" = "TREE 4242" ||
-    fail "the tree was not killed after the direct signal: $(tr '\n' '/' <"$rec")"
-test "$(sed -n '$=' "$rec")" -eq 2 || fail "extra kills: $(tr '\n' '/' <"$rec")"
+want='DIRECT 777
+POST 1
+DIRECT 4242
+TREE 4242'
+test "$(cat "$rec")" = "$want" || fail "the kill path did: $(tr '\n' '/' <"$rec")"
 
 echo "heartbeat OK"
