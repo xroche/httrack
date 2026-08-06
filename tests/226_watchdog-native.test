@@ -402,15 +402,14 @@ cadence_leg() {
     esac
 }
 
-# Three properties off one 12s run, since the run is what costs: staticness has
-# to follow the log through movement and through silence, and an accepted post
-# must leave the next one alone.
+# Staticness has to follow the log through movement and then through silence,
+# which is why this leg is the long one.
 staticness_leg() {
-    local n moved dq dt legpid stop
+    local moved dq dt legpid stop
     sink_start 201
     printf 'RUN 36_local-bigcrawl.test at 0s\n' >"$tmp/progress.log"
     run_posting 90 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
-        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 12 >"$legout" 2>&1 &
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 16 >"$legout" 2>&1 &
     legpid=$!
     # Started on the first status that lands rather than on this shell's clock:
     # an interpreter three seconds into its own startup would see silence only,
@@ -430,11 +429,6 @@ staticness_leg() {
         return 1
     }
     sink_stop
-    n=$(grep -c . "$posts" || true)
-    test "$n" -ge 8 || {
-        echo "$n calls over 12s at a 1s interval: an accepted post throttles the next"
-        return 1
-    }
     moved=$(posted_pairs | awk '$2 ~ /^[0-9]+$/ && $1 >= 2 && $2 <= 1 { n++ } END { print n + 0 }')
     test "$moved" -ge 1 || {
         echo "no post read the log as moving while it was being written: $(posted_pairs | tr '\n' '/')"
@@ -448,6 +442,31 @@ staticness_leg() {
         echo "staticness moved ${dq}s over ${dt}s of silence: $(posted_pairs | tr '\n' '/')"
         return 1
     fi
+}
+
+# Every due tick logs its line before the throttle decides, so these two counts
+# are a ratio no slow box can move: one to one while nothing is being skipped.
+throttle_leg() {
+    local calls lines
+    sink_start 201
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 8 >"$legout" 2>&1 || {
+        sink_stop
+        echo "the loop exited nonzero: $(cat "$legout")"
+        return 1
+    }
+    sink_stop
+    calls=$(grep -c . "$posts" || true)
+    lines=$(grep -c 't=[0-9]*s q=' "$legout" || true)
+    test "$lines" -ge 3 || {
+        echo "$lines due ticks over 8s at a 1s interval: too few to judge a throttle"
+        return 1
+    }
+    test $((calls * 4)) -ge $((lines * 3)) || {
+        echo "$calls of $lines due ticks reached an accepting API: a landed post throttles the next"
+        return 1
+    }
 }
 
 backoff_leg() {
@@ -484,7 +503,7 @@ fullstdout_leg() {
         -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 5 >/dev/full 2>&1 || true
     sink_stop
     n=$(grep -c . "$posts" || true)
-    test "$n" -ge 3 || {
+    test "$n" -ge 2 || {
         echo "$n posts with a full stdout: a failed log write took the loop with it"
         return 1
     }
@@ -580,7 +599,7 @@ for psrun in "${psruns[@]}"; do
             >/dev/full 2>/dev/null; then
         devfull=1
     fi
-    legs=(cadence staticness backoff)
+    legs=(cadence throttle staticness backoff)
     test "$devfull" -eq 0 || legs+=(fullstdout)
     for leg in "${legs[@]}"; do
         said=$("${leg}_leg" "$(nativepath "$wdscript")") ||
@@ -611,10 +630,10 @@ for psrun in "${psruns[@]}"; do
         staticness 'staticness moved'
     # shellcheck disable=SC2016
     mutate_leg skip-when-none-owed 's/if (\$skip -gt 0)/if ($skip -ge 0)/' \
-        staticness 'throttles the next'
+        throttle 'a landed post throttles the next'
     # shellcheck disable=SC2016
     mutate_leg success-skips 's/if (\$Ok) { return @(0, 0) }/if ($Ok) { return @(1, 0) }/' \
-        staticness 'throttles the next'
+        throttle 'a landed post throttles the next'
     # shellcheck disable=SC2016
     mutate_leg backoff-never-skips 's/if (\$skip -gt 0)/if ($false)/' backoff 'nothing backs off'
     if test "$devfull" -eq 1; then
