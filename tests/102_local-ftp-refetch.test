@@ -52,19 +52,7 @@ serverlog="${tmpdir}/server.out"
 "$python" "$server" --root "$(nativepath "$root")" \
     --mode-file "$(nativepath "$mode")" >"$serverlog" 2>&1 &
 serverpid=$!
-port=
-for _ in $(seq 1 300); do
-    line=$(grep -m1 '^PORT ' "$serverlog" 2>/dev/null) && port="${line#PORT }" && break
-    kill -0 "$serverpid" 2>/dev/null || {
-        echo "ftp server exited early: $(cat "$serverlog")" >&2
-        exit 1
-    }
-    sleep 0.1
-done
-test -n "$port" || {
-    echo "could not discover ftp server port: $(cat "$serverlog")" >&2
-    exit 1
-}
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 host="127.0.0.1_${port}"
 urls=()
 for name in keep empty stay; do
