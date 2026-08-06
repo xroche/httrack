@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# Issue #938: downscaling the vector master to 16 px antialiased every stem to
+# grey. The small raster is drawn on the pixel grid, so it must stay flat.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+div="${srcdir}/html/server/div"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+colors() {
+    "${python}" "${testdir}/png-colors.py" "${div}/$1/httrack.png" ||
+        fail "$1: cannot read the icon"
+}
+
+small=$(colors 16x16)
+n=$(wc -l <<<"${small}")
+test "${n}" -le 4 || fail "16x16 icon has ${n} colours, the stems are antialiased"
+
+# Both flats present: an all-field tile and an all-ink one are flat too.
+for flat in '#9999cc' '#040404'; do
+    grep -q " ${flat}\$" <<<"${small}" || fail "16x16 icon has no ${flat} pixel"
+done
+
+# The mark covers a quarter of the tile; a hairline or a near-solid block is
+# not the monogram, and both would satisfy every count above.
+ink=$(sed -n "s/ #040404\$//p" <<<"${small}")
+if test "${ink}" -lt 26 || test "${ink}" -gt 128; then
+    fail "16x16 icon inks ${ink} of 256 pixels"
+fi
+
+# Control: the sizes that are still downscaled are not flat, so a counter that
+# always answered one colour could not have passed the assertions above.
+big=$(wc -l <<<"$(colors 48x48)")
+test "${big}" -gt 16 || fail "48x48 icon has ${big} colours, the counter is blind"
+
+echo "16x16 icon: ${n} colours, ${ink}/256 ink; 48x48: ${big} colours"
