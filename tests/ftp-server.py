@@ -10,6 +10,8 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
   empty     open the data connection and send nothing
   norest    answer REST with 500, so the client re-fetches from scratch
   nomdtm    answer MDTM with 500, like a server predating RFC 3659
+
+--require-pass answers USER with 331, the only way the client's PASS is sent.
 """
 
 import argparse
@@ -25,12 +27,13 @@ def reply(conn, text):
 
 
 class Session(threading.Thread):
-    def __init__(self, conn, root, mode_file, log):
+    def __init__(self, conn, root, mode_file, log, require_pass=False):
         threading.Thread.__init__(self, daemon=True)
         self.conn = conn
         self.root = root
         self.mode_file = mode_file
         self.log = log
+        self.require_pass = require_pass
         self.pasv = None
         self.rest = 0
         self.path = "/"  # named by SIZE/RETR; REST carries no path
@@ -132,7 +135,9 @@ class Session(threading.Thread):
 
     def dispatch(self, verb, arg):
         conn = self.conn
-        if verb in ("USER", "PASS", "TYPE", "NOOP"):
+        if verb == "USER" and self.require_pass:
+            reply(conn, "331 password required")  # the client sends PASS only on a 3xx
+        elif verb in ("USER", "PASS", "TYPE", "NOOP"):
             reply(conn, "200 ok")
         elif verb == "SYST":
             reply(conn, "215 UNIX Type: L8")
@@ -209,6 +214,7 @@ def main():
     ap.add_argument("--root", required=True)
     ap.add_argument("--mode-file")
     ap.add_argument("--log")
+    ap.add_argument("--require-pass", action="store_true")
     args = ap.parse_args()
 
     logfp = open(args.log, "a", encoding="utf-8") if args.log else None
@@ -231,7 +237,7 @@ def main():
     root = os.path.abspath(args.root)
     while True:
         conn, _ = srv.accept()
-        Session(conn, root, args.mode_file, log).start()
+        Session(conn, root, args.mode_file, log, args.require_pass).start()
 
 
 if __name__ == "__main__":

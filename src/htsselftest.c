@@ -4540,19 +4540,22 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
     const size_t ucap = caps[c], pcap = caps[1 - c];
 
-    for (over = 0; over <= 1; over++) { /* overshoot the user, then the pass */
-      const size_t cap = over == 0 ? ucap : pcap;
+    /* overshoot the user, the pass, then a bare name bounded only by '@' */
+    for (over = 0; over <= 2; over++) {
+      const size_t cap = over == 1 ? pcap : ucap;
       size_t len;
 
       for (len = cap - 2; len <= cap + 1; len++) {
-        const size_t user_len = over == 0 ? len : 1;
-        const size_t pass_len = over == 0 ? 1 : len;
-        const size_t total = user_len + pass_len + 2; /* the ':' and the '@' */
+        const size_t user_len = over == 1 ? 1 : len;
+        const size_t pass_len = over == 0 ? 1 : (over == 1 ? len : 0);
+        const size_t total = user_len + pass_len + (over == 2 ? 1 : 2);
         const hts_boolean fits = len < cap ? HTS_TRUE : HTS_FALSE;
 
         memset(in, 'u', user_len);
-        in[user_len] = ':';
-        memset(in + user_len + 1, 'p', pass_len);
+        if (over != 2) {
+          in[user_len] = ':';
+          memset(in + user_len + 1, 'p', pass_len);
+        }
         in[total - 1] = '@';
         in[total] = '\0';
         memcpy(ubuf, poison, sizeof(ubuf)); /* a zero canary would hide a NUL */
@@ -4561,7 +4564,8 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
                 fits);
         if (fits) {
           assertf(strlen(ubuf) == user_len && strlen(pbuf) == pass_len);
-          assertf(ubuf[user_len - 1] == 'u' && pbuf[pass_len - 1] == 'p');
+          assertf(ubuf[user_len - 1] == 'u');
+          assertf(pass_len == 0 || pbuf[pass_len - 1] == 'p');
         } else {
           assertf(ubuf[0] == '\0' && pbuf[0] == '\0'); /* fail safe */
         }

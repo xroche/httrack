@@ -28,14 +28,15 @@ probe() {
     cat "${tmpdir}/mir/hts-log.txt"
 }
 
-for u in "$(rep 256):pw" "u:$(rep 256)"; do
+# The bare name has no ':' to bound it, only the '@', and is the worse branch.
+for u in "$(rep 256):pw" "u:$(rep 256)" "$(rep 256)"; do
     log=$(probe "${u}")
     grep -q "FTP user name or password too long" <<<"${log}" ||
         fail "over-long userinfo was not refused: ${log}"
 done
 
 # 255 still fits, and a plain login is the outsider a widened gate would refuse.
-for u in "$(rep 255):pw" "u:$(rep 255)" "bob:secret"; do
+for u in "$(rep 255):pw" "u:$(rep 255)" "$(rep 255)" "bob:secret"; do
     log=$(probe "${u}")
     grep -q "Unable to connect to the server" <<<"${log}" ||
         fail "userinfo that fits did not reach the connect: ${log}"
