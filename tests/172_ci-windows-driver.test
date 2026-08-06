@@ -6,6 +6,10 @@
 
 set -euo pipefail
 
+# Before the driver is sourced: with these set, anything it starts posts a commit
+# status on whatever the surrounding shell was last looking at.
+unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
+
 testdir=$(cd "$(dirname "$0")" && pwd)
 driver="$testdir/ci-windows-suite.sh"
 
@@ -52,23 +56,20 @@ printf '#!/bin/sh\nexit 0\n' >"$bin/httrack"
 # shellcheck disable=SC2016 # $2 is the stub's own argument
 printf '#!/bin/sh\necho "$2"\n' >"$bin/cygpath"
 chmod +x "$bin/httrack" "$bin/cygpath"
-# The driver puts this bindir on PATH, so a stub here is the interpreter it finds
-# where there is no real one; a real PowerShell drives the real script instead.
+# The driver puts this bindir first on PATH, so this is the interpreter it finds.
+# Unconditional, because a real PowerShell here runs the real watchdog, and only
+# the scrub above stands between that and api.github.com.
 wdargv=$tmp/wdargv
 : >"$wdargv"
-if ! command -v pwsh >/dev/null 2>&1 && ! command -v powershell.exe >/dev/null 2>&1; then
-    cat >"$bin/pwsh" <<EOF
+cat >"$bin/pwsh" <<EOF
 #!/bin/sh
 { echo "TOKEN=\${WATCHDOG_TOKEN:-}"; printf '%s\n' "\$@"; } >>"$wdargv"
-case " \$* " in
-*" -Post failure "*) echo "final status failure"; exit 0 ;;
-*" -Post "*) echo "final status other"; exit 0 ;;
-esac
 echo "watchdog ready"
 exec sleep 60
 EOF
-    chmod +x "$bin/pwsh"
-fi
+chmod +x "$bin/pwsh"
+test "$(PATH="$bin:$PATH" command -v pwsh)" = "$bin/pwsh" ||
+    fail "the stub does not shadow PowerShell: $(PATH="$bin:$PATH" command -v pwsh)"
 test -x "$bin/httrack" || {
     echo "SKIP: ${TMPDIR:-/tmp} is noexec, the stub bindir cannot be run"
     exit 77
@@ -102,16 +103,13 @@ grep -q '::error::only 7 tests passed (1 skipped)' <<<"$out" ||
 grep -q 'FAIL 12_engine-fail.test (exit 3)' <<<"$out" || fail "the failing test was not named"
 
 # The reporter as the real driver launches it, rather than through a test
-# sourcing the helper: launched, ended, and holding a token nothing else sees.
+# sourcing the helper: launched, and holding a token nothing else sees.
 grep -q '^watchdog ready$' watchdog.log || fail "no watchdog was launched: $(cat watchdog.log)"
-grep -q 'final status failure' watchdog.log ||
-    fail "the driver's own verdict was never posted: $(cat watchdog.log)"
 test -r "$tmp/childtoken" || fail "the test that reads its environment did not run"
 grep -qx 'TOKEN=' "$tmp/childtoken" ||
     fail "a test inherited the status token: $(cat "$tmp/childtoken")"
-if test -s "$wdargv"; then
-    grep -qx 'TOKEN=s3cr3t' "$wdargv" || fail "the watchdog was launched without its token"
-fi
+grep -qx 'TOKEN=s3cr3t' "$wdargv" ||
+    fail "the watchdog was launched without its token: $(cat "$wdargv")"
 # Positive control for the gate below: with every category matched it stays silent.
 grep -q 'matched no tests' <<<"$out" && fail "a full suite reported an empty category"
 

@@ -1,15 +1,13 @@
 # Off-box telemetry for the Windows suite step (#795). It spawns nothing and
 # kills nothing, so nothing a wedge takes away can disarm it, and it reports as a
-# commit status, the only channel that outlives a dead runner.
+# commit status, the only channel that outlives a dead runner. Every status
+# carries one state; what a reader wants is the description of the last to land.
 param(
     [string]$ProgressLog = '',
     [int]$IntervalSeconds = 30,
     [int]$PollSeconds = 5,
     # Cannot outlive the step, whatever the caller forgets to kill.
     [int]$MaxSeconds = 2700,
-    # One-shot mode: post this state and exit, so the driver reports its own end.
-    [string]$Post = '',
-    [string]$Message = '',
     # Seam for the suite's own test, which points it at a sink it can count.
     [string]$ApiBase = 'https://api.github.com',
     [switch]$NoPost,
@@ -35,6 +33,15 @@ function Get-NextBackoff {
     return [Math]::Min($Current * 2, 32)
 }
 
+# The (skip, backoff) pair after an attempted post, $Ok being whether it landed:
+# a rejection that later resolves has to leave nothing behind.
+function Get-NextThrottle {
+    param([bool]$Ok, [int]$Backoff)
+    if ($Ok) { return @(0, 0) }
+    $b = Get-NextBackoff $Backoff
+    return @($b, $b)
+}
+
 # GitHub truncates a description at 140 chars, so the counters take the cut, not
 # the fields a wedge is read for. $Static below zero is unknown.
 function Format-WatchdogStatus {
@@ -51,13 +58,10 @@ function Format-WatchdogStatus {
 # --- probes ------------------------------------------------------------------
 
 # One try/catch per counter: a probe that fails costs its own field, not the loop.
+# In-process only. A CIM query is richer, but its connect to a wedged WMI service
+# is unbounded, and would hang the one reporter still standing.
 function Get-WatchdogCounters {
     $f = New-Object System.Collections.ArrayList
-    try {
-        $os = Get-CimInstance -ClassName Win32_OperatingSystem -OperationTimeoutSec 5
-        [void]$f.Add('m={0}' -f [int]($os.FreePhysicalMemory / 1KB))
-        [void]$f.Add('v={0}' -f [int]($os.FreeVirtualMemory / 1KB))
-    } catch { [void]$f.Add('m=? v=?') }
     try {
         $ps = @(Get-Process)
         [void]$f.Add('p={0}' -f $ps.Count)
@@ -107,12 +111,14 @@ $script:TargetUrl = $env:WATCHDOG_URL
 $script:Context = $env:WATCHDOG_CONTEXT
 if (-not $script:Context) { $script:Context = 'windows-suite-watchdog' }
 
-# -NoPost is the test's hard stop: no request, whatever the environment holds.
+# One state always, so nothing downstream can read a verdict out of telemetry:
+# GitHub records the job's conclusion already. -NoPost is the test's hard stop,
+# whatever the environment holds.
 function Send-WatchdogStatus {
-    param([string]$State, [string]$Description)
+    param([string]$Description)
     if ($NoPost -or $SelfTest) { return $false }
     if (-not $script:Token -or -not $script:Repo -or -not $script:Sha) { return $false }
-    $body = @{ state = $State; context = $script:Context; description = $Description }
+    $body = @{ state = 'success'; context = $script:Context; description = $Description }
     if ($script:TargetUrl) { $body['target_url'] = $script:TargetUrl }
     try {
         Invoke-RestMethod -Method Post -TimeoutSec 20 `
@@ -143,8 +149,15 @@ function Invoke-WatchdogSelfTest {
     Assert-That ((Get-NextBackoff 1) -eq 2) 'the backoff does not grow'
     Assert-That ((Get-NextBackoff 32) -eq 32) 'the backoff is not capped'
 
+    $ok = Get-NextThrottle $true 8
+    Assert-That ($ok[0] -eq 0 -and $ok[1] -eq 0) 'a landed post leaves the run throttled'
+    $ko = Get-NextThrottle $false 0
+    Assert-That ($ko[0] -eq 1 -and $ko[1] -eq 1) 'a first rejection skips nothing'
+    $ko = Get-NextThrottle $false 4
+    Assert-That ($ko[0] -eq 8 -and $ko[1] -eq 8) 'a repeat rejection does not widen the gap'
+
     $long = '43_local-update-truncate-with-a-very-long-name-indeed.test'
-    $line = Format-WatchdogStatus 812 41 $long 'm=9012 v=14022 p=118 h=41230 d=13210'
+    $line = Format-WatchdogStatus 812 41 $long 'p=118 h=41230 d=13210'
     Assert-That ($line.Length -le 140) ('status description is {0} characters' -f $line.Length)
     Assert-That ($line -like 't=812s q=41s 43_local-update-truncate*') ('status leads with the wrong fields: {0}' -f $line)
     Assert-That ($line -like '*d=13210') 'the counters did not survive a long test name'
@@ -154,6 +167,8 @@ function Invoke-WatchdogSelfTest {
     Assert-That ($clip -match '^t=1s q=2s x{46} \| c$') ('the in-flight name was not clipped to 46: {0}' -f $clip)
     $wide = Format-WatchdogStatus 1 2 ('x' * 300) ('y' * 300)
     Assert-That ($wide.Length -le 140) ('an oversized status was not clipped: {0}' -f $wide.Length)
+    # Cut from the tail: the head carries the fields a wedge is read for.
+    Assert-That ($wide -like 't=1s q=2s x*') ('clipping dropped the leading fields: {0}' -f $wide)
 
     $gone = Get-ProgressTail -Path ('no-such-progress-log-{0}.tmp' -f $PID)
     Assert-That (-not $gone.Ok) 'an unreadable log reads as one that was read'
@@ -165,7 +180,7 @@ function Invoke-WatchdogSelfTest {
         Assert-That ($tail.Line -eq 'RUN 42_probe.test at 7s') ('the tail is not the last line: {0}' -f $tail.Line)
     } finally { [System.IO.File]::Delete($f.FullName) }
 
-    Assert-That (-not (Send-WatchdogStatus 'success' 'self-test')) 'the self-test can reach the API'
+    Assert-That (-not (Send-WatchdogStatus 'self-test')) 'the self-test can reach the API'
 
     if ($bad.Count -gt 0) {
         foreach ($b in $bad) { Write-Host ('self-test FAIL: {0}' -f $b) }
@@ -177,24 +192,10 @@ function Invoke-WatchdogSelfTest {
 
 if ($SelfTest) { Invoke-WatchdogSelfTest }
 
-# --- one-shot: the driver's own verdict ---------------------------------------
+# --- main loop ----------------------------------------------------------------
 
 # Windows PowerShell still defaults below TLS 1.2, which api.github.com refuses.
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
-
-if ($Post) {
-    # One transient 5xx here is the difference between a resolved status and a
-    # finished suite left reading `pending`.
-    for ($try = 1; $try -le 3; $try++) {
-        if (Send-WatchdogStatus $Post $Message) { break }
-        if ($NoPost -or -not $script:Token) { break }
-        Start-Sleep -Seconds (2 * $try)
-    }
-    Write-WatchdogLog ('final status {0}: {1}' -f $Post, $Message)
-    exit 0
-}
-
-# --- main loop ----------------------------------------------------------------
 
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $lastSig = ''
@@ -227,11 +228,10 @@ while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {
             Write-WatchdogLog $desc
             if ($skip -gt 0) {
                 $skip--
-            } elseif (Send-WatchdogStatus 'pending' $desc) {
-                $backoff = 0
             } else {
-                $backoff = Get-NextBackoff $backoff
-                $skip = $backoff
+                $next = Get-NextThrottle (Send-WatchdogStatus $desc) $backoff
+                $skip = $next[0]
+                $backoff = $next[1]
             }
         }
     } catch {

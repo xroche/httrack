@@ -40,8 +40,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive   # coucal lives in src/coucal
-          # Or the token, which can now post statuses, sits in .git/config for
-          # the whole job, where every test the suite runs can read it.
+          # Or the job token stays in .git/config, where every test the suite
+          # runs can read it.
           persist-credentials: false
 
       # Located through vswhere rather than microsoft/setup-msbuild: the repo
