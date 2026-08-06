@@ -84,6 +84,11 @@ void ftp_split_userpass(const char *src, const char *end, char *user,
    command does not fit, as a clipped one would name a different file. */
 hts_boolean ftp_command(char *line, size_t line_size, const char *verb,
                         const char *path);
+/* ftp_command() into a control line of the one capacity every FTP buffer has;
+   anything narrower fails the build rather than refusing a path that fits. */
+#define ftp_command_line(line, verb, path)                                     \
+  (HTS_COMPILE_ASSERT(sizeof(line) == FTP_LINE_SIZE),                          \
+   ftp_command((line), sizeof(line), (verb), (path)))
 T_SOC get_datasocket(char *to_send, size_t to_send_size);
 int stop_ftp(lien_back * back);
 char *linejmp(char *line);

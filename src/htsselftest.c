@@ -4540,12 +4540,12 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* A command that does not fit its control line must be reported, not clipped:
-   clipped, it would name a different file (#1019). Both quoting forms at two
-   capacities, since the quoted one is two bytes wider. */
+/* Both quoting forms at two capacities: the quoted form is two bytes wider
+   (#1019). */
 static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
   static const size_t caps[] = {32, FTP_LINE_SIZE};
-  char BIGSTK buf[FTP_LINE_SIZE + 2];
+  char BIGSTK buf[FTP_LINE_SIZE + 32];
+  char BIGSTK poison[FTP_LINE_SIZE + 32];
   char BIGSTK path[FTP_LINE_SIZE + 2];
   char BIGSTK wire[FTP_LINE_SIZE * 2];
   size_t c, got = 0;
@@ -4554,6 +4554,7 @@ static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
+  memset(poison, '#', sizeof(poison));
   for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
     const size_t cap = caps[c];
     int quoted;
@@ -4567,8 +4568,8 @@ static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
         memset(path, 'p', len);
         path[len] = '\0';
         if (quoted)
-          path[0] = ' ';               /* any of these forces the quoted form */
-        memset(buf, '#', sizeof(buf)); /* poison: a zero canary hides a NUL */
+          path[0] = ' '; /* any of these forces the quoted form */
+        memcpy(buf, poison, sizeof(buf)); /* a zero canary would hide a NUL */
         if (len > fit) {
           assertf(ftp_command(buf, cap, "RETR", path) == HTS_FALSE);
           assertf(buf[0] == '\0'); /* fail-safe for an ignored result */
@@ -4578,13 +4579,14 @@ static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
           assertf(strncmp(buf, "RETR ", 5) == 0);
           assertf(buf[verb + len - 1] == (quoted ? '\"' : 'p'));
         }
-        assertf(buf[cap] == '#'); /* nothing written past the bound */
+        /* the whole tail: one canary byte misses a write just past it */
+        assertf(memcmp(buf + cap, poison, sizeof(buf) - cap) == 0);
       }
     }
   }
 
-  /* send_line() carries the CRLF a maximal command needs, and drops rather
-     than truncates one that is longer. */
+  /* send_line() adds the CRLF and drops, rather than truncates, an over-length
+     line. */
   memset(path, 'q', FTP_LINE_SIZE);
   path[FTP_LINE_SIZE] = '\0';
   assertf(st_socketpair(sv) == 0);

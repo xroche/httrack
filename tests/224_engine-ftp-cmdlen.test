@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# An FTP command too long for the control line it is sent from must be refused,
-# not clipped into a request for another file, and must never abort (#1019).
+# A too-long FTP command must be refused, never truncated or aborted (#1019).
 
 set -euo pipefail
 
@@ -18,9 +17,26 @@ out=$(httrack -O "${tmpdir}/st" "-#test=ftp-cmdlen" run 2>&1) ||
     fail "self-test exited non-zero: ${out}"
 grep -q "ftp-cmdlen self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
 
-# The reachable half: a 300-byte host aborted in the copy into _adr[256].
-host=$(awk 'BEGIN { while (i++ < 300) printf "a" }')
-out=$(httrack "ftp://${host}/f.txt" -O "${tmpdir}/host" -q 2>&1) ||
-    fail "a long FTP host name crashed the engine: ${out}"
-grep -q "Host name too long" "${tmpdir}/host/hts-log.txt" ||
-    fail "the link was not rejected: $(cat "${tmpdir}/host/hts-log.txt")"
+# The reachable half: the copy into _adr[256] aborted on a long host.
+rep() { awk -v n="$1" 'BEGIN { while (i++ < n) printf "a" }'; }
+
+probe_host() {
+    rm -rf "${tmpdir}/host"
+    httrack "ftp://$1/f.txt" -O "${tmpdir}/host" -q >/dev/null 2>&1 ||
+        fail "a ${#1}-byte FTP host name crashed the engine"
+    cat "${tmpdir}/host/hts-log.txt"
+}
+
+for n in 256 257 300; do
+    log=$(probe_host "$(rep "${n}")")
+    grep -q "Host name too long" <<<"${log}" ||
+        fail "a ${n}-byte host was not rejected: ${log}"
+done
+
+# 255 still fits _adr[256]; 127.0.0.1:1 is the outsider a widened gate swallows.
+log=$(probe_host "$(rep 255)")
+grep -q "Unable to get server's address" <<<"${log}" ||
+    fail "a 255-byte host did not reach the resolver: ${log}"
+log=$(probe_host "127.0.0.1:1")
+grep -q "Unable to connect to the server" <<<"${log}" ||
+    fail "a normal host did not reach the connect: ${log}"

@@ -274,11 +274,10 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         if (len_a > 0 &&
             ftp_path[len_a - 1] == '/') { /* obviously a directory listing */
           transfer_list = 1;
-          fits = ftp_command(line_retr, sizeof(line_retr), "LIST -A", ftp_path);
+          fits = ftp_command_line(line_retr, "LIST -A", ftp_path);
         } else {
-          fits = ftp_command(line_retr, sizeof(line_retr), "RETR", ftp_path);
+          fits = ftp_command_line(line_retr, "RETR", ftp_path);
         }
-        /* Clipped, the command would fetch another file under this name. */
         if (!fits) {
           strcpybuff(back->r.msg, "FTP path too long");
           back->r.statuscode = STATUSCODE_INVALID;
@@ -379,6 +378,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     {
       char BIGSTK line[FTP_LINE_SIZE];
+
+      /* line_retr is copied here verbatim; a narrower line[] would clip it. */
+      HTS_COMPILE_ASSERT(sizeof(line) == sizeof(line_retr));
 
       // envoi du login
 
@@ -537,8 +539,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           // SIZE
           if (back->r.statuscode != -1) {
             // a clipped probe would size and date a different file
-            if (!transfer_list &&
-                ftp_command(line, sizeof(line), "SIZE", ftp_path)) {
+            if (!transfer_list && ftp_command_line(line, "SIZE", ftp_path)) {
               // SIZE?
               strcpybuff(back->info, "size");
               send_line(soc_ctl, line);
@@ -559,7 +560,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 }
 
                 // MDTM?
-                if (ftp_command(line, sizeof(line), "MDTM", ftp_path)) {
+                if (ftp_command_line(line, "MDTM", ftp_path)) {
                   strcpybuff(back->info, "mdtm");
                   send_line(soc_ctl, line);
                   get_ftp_line(soc_ctl, line, sizeof(line), timeout);
@@ -594,7 +595,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                     rest_understood = 1;
                   } // else never mind
                 }
-              }                 // sinon tant pis
+              } // sinon tant pis
             }
           }
 #if FTP_PASV
