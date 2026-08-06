@@ -190,12 +190,19 @@ if ! is_windows && test -r /proc/self/stat; then
         stacks=$(request_engine_backtraces "$pgid")
         ! grep -q 'no engine process left' <<<"$stacks" ||
             fail "no-ps stack request found no engine to signal: $stacks"
-        # Gone, or a zombie: the fake is reparented, and a container's pid 1 does
-        # not always reap. kill -0 alone succeeds on a zombie and proves nothing.
-        case "$(procstate "$fake")" in
-        Z | gone) ;;
-        *) fail "the SIGABRT never reached pid $fake" ;;
-        esac
+        # Only Linux signals; elsewhere (Hurd's uname reports "GNU") the chain has
+        # to say it knows no mechanism instead of silently doing nothing.
+        if test "$(uname -s)" = Linux; then
+            # Gone, or a zombie: the fake is reparented, and a container's pid 1
+            # does not always reap. kill -0 succeeds on a zombie, proving nothing.
+            case "$(procstate "$fake")" in
+            Z | gone) ;;
+            *) fail "the SIGABRT never reached pid $fake" ;;
+            esac
+        else
+            grep -q 'no stack mechanism known' <<<"$stacks" ||
+                fail "no stack mechanism was reported on $(uname -s): $stacks"
+        fi
         # With neither source the dump must say so, not print an empty section.
         # shellcheck disable=SC2317 # reached through ps_snapshot
         proc_snapshot() { return 1; }
@@ -203,6 +210,33 @@ if ! is_windows && test -r /proc/self/stat; then
             fail "a host with no ps and no /proc produced no notice"
     )
     kill "$fake" "$outside" 2>/dev/null || true
+fi
+
+# --- an emulated buildd hides the engine behind its binfmt interpreter -------
+# Under qemu-user the engine is the interpreter's first argument, and a matcher
+# reading the command column alone finds nothing to name or signal. Synthetic
+# rows: no runner has qemu-user, and the column shift is the whole point.
+if ! is_windows; then
+    (
+        # shellcheck disable=SC2317 # reached through the two matchers below
+        ps_snapshot() {
+            cat <<'EOF'
+PID PPID PGID ELAPSED S COMMAND
+11 1 40 12 S /usr/libexec/qemu-binfmt/hppa-binfmt-P /bld/src/httrack -q http://h/
+12 1 40 12 S /usr/bin/qemu-hppa-static /usr/bin/python3 /t/local-server.py 8080
+13 1 40 12 S /bld/src/httrack -q http://h/
+14 1 40 12 S /usr/bin/strace /bld/src/httrack -q http://h/
+EOF
+        }
+        # Row 14 is the control: matching the argument unconditionally would take
+        # any wrapper for the engine and signal that instead.
+        engines=$(list_engine_pids 40)
+        test "$engines" = $'11\n13' ||
+            fail "emulated engine list is '$engines', want pids 11 and 13"
+        named=$(list_stray_processes 0 named | awk 'NR > 1 { print $1 }')
+        test "$named" = $'11\n12\n13' ||
+            fail "emulated stray list is '$named', want pids 11, 12 and 13"
+    )
 fi
 
 # --- a wedged crawl yields a symbolized engine stack ------------------------
