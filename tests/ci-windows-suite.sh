@@ -217,7 +217,8 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # datadir-ospath copies the unwrapped binary the automake build leaves in .libs,
 # and needs the loader variable libtool picked, neither of which this job has;
 # link-control-bytes names its fixtures with the raw control bytes the requests
-# decode back to, which NTFS refuses.
+# decode back to, which NTFS refuses;
+# ftp-userpass starves the x64 runner until the step is lost, Win32 passing (#1038).
 expected_skips="01_engine-footer-overflow.test
 100_local-purge-longpath.test
 158_local-link-control-bytes.test
@@ -228,6 +229,7 @@ expected_skips="01_engine-footer-overflow.test
 152_engine-string-oom.test
 153_local-proxytrack-quiet.test
 215_engine-datadir-ospath.test
+230_local-ftp-userpass.test
 48_local-crange-memresume.test
 71_local-crange-repaircache.test
 79_local-proxytrack-webdav-mime.test

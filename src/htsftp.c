@@ -122,31 +122,30 @@ void launch_ftp(FTPDownloadStruct * params) {
   return 0; \
   }
 
-/* Bounded split of a hostile-URL "user[:pass]@" prefix (see htsftp.h). */
-void ftp_split_userpass(const char *src, const char *end, char *user,
-                        size_t user_size, char *pass, size_t pass_size) {
-  size_t n = 0;
+/* Split a hostile-URL "user[:pass]@" prefix (see htsftp.h). */
+hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
+                               size_t user_size, char *pass, size_t pass_size) {
+  size_t len = 0, user_len, pass_len;
+  const char *colon;
 
   assertf(user_size > 0 && pass_size > 0); /* the size-1 math underflows on 0 */
+  assertf(end > src);                      /* end is one past the '@' */
 
-  while (src[n] != '\0' && src[n] != ':') {
-    if (n < user_size - 1)
-      user[n] = src[n];
-    n++;
-  }
-  user[n < user_size ? n : user_size - 1] = '\0';
-  pass[0] = '\0';
-  if (src[n] == ':') { // password follows the colon
-    const size_t base = n + 1;
-    size_t k = 0;
-
-    while (&src[base + k + 1] < end && src[base + k] != '\0') {
-      if (k < pass_size - 1)
-        pass[k] = src[base + k];
-      k++;
-    }
-    pass[k < pass_size ? k : pass_size - 1] = '\0';
-  }
+  user[0] = pass[0] = '\0'; // fail safe for a caller that ignores the result
+  while (len < (size_t) (end - src) - 1 && src[len] != '\0')
+    len++;
+  colon = memchr(src, ':', len);
+  user_len = colon != NULL ? (size_t) (colon - src) : len;
+  pass_len = colon != NULL ? len - user_len - 1 : 0;
+  /* a clipped name is another account's, so refuse rather than log in as it */
+  if (user_len >= user_size || pass_len >= pass_size)
+    return HTS_FALSE;
+  memcpy(user, src, user_len);
+  user[user_len] = '\0';
+  if (pass_len != 0)
+    memcpy(pass, colon + 1, pass_len);
+  pass[pass_len] = '\0';
+  return HTS_TRUE;
 }
 
 /* Build "<verb> <path>" (see htsftp.h). */
@@ -258,7 +257,11 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   while(*real_adr == '/')
     real_adr++;                 // sauter /
   if ((adr = jump_identification(real_adr)) != real_adr) {      // user
-    ftp_split_userpass(real_adr, adr, user, sizeof(user), pass, sizeof(pass));
+    if (!ftp_split_userpass_buf(real_adr, adr, user, pass)) {
+      strcpybuff(back->r.msg, "FTP user name or password too long");
+      back->r.statuscode = STATUSCODE_INVALID;
+      _HALT_FTP return 0;
+    }
   }
   // Calculer RETR <nom>
   {
