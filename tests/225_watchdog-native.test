@@ -114,6 +114,10 @@ if test -x "$bin/pwsh"; then
         # shellcheck disable=SC2030 # local to this subshell is the point
         PATH="$bin:$PATH"
         export PATH
+        # An unshadowed pwsh would drive the real watchdog, and every assertion
+        # below would still read as a plain launch failure.
+        test "$(command -v pwsh)" = "$bin/pwsh" ||
+            fail "the stub does not shadow PowerShell: $(command -v pwsh)"
         # shellcheck source=tests/ci-windows-suite.sh
         . "$driver"
         ci_watchdog_pid='' ci_watchdog_exe=''
