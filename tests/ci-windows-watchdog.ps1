@@ -1,6 +1,6 @@
-# Off-box telemetry for the Windows suite step (#795). It spawns nothing, because
-# the wedge is a box where forks stopped working, and it reports as a commit
-# status, the only channel that outlives a dead runner. It never kills.
+# Off-box telemetry for the Windows suite step (#795). It spawns nothing and
+# kills nothing, so nothing a wedge takes away can disarm it, and it reports as a
+# commit status, the only channel that outlives a dead runner.
 param(
     [string]$ProgressLog = '',
     [int]$IntervalSeconds = 30,
