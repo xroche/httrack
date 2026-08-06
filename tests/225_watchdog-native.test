@@ -142,9 +142,11 @@ if test -x "$bin/pwsh"; then
     test -r "$posixtmp/argv" || fail "the watchdog was never launched"
     grep -qx -- '-SelfTest' "$posixtmp/argv" && fail "the production launch runs the self-test"
     grep -qx -- '-Post' "$posixtmp/argv" && fail "the production launch is the one-shot mode"
-    grep -qx -- "$wdscript" "$posixtmp/argv" ||
+    # Native form, because a non-MSYS interpreter cannot resolve a /d/a/... path.
+    grep -qx -- "$(nativepath "$wdscript")" "$posixtmp/argv" ||
         fail "the launch did not name the script: $(tr '\n' ' ' <"$posixtmp/argv")"
-    grep -qx -- "$posixtmp/progress.log" "$posixtmp/argv" || fail "the launch did not pass the progress log"
+    grep -qx -- "$(nativepath "$posixtmp/progress.log")" "$posixtmp/argv" ||
+        fail "the launch did not pass the progress log"
 
     # Both outcomes: a pending status that always dangles cannot mean anything.
     usestub argvstub
