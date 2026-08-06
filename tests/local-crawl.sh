@@ -253,8 +253,12 @@ serverpid=$!
 
 # Wait for the "PORT <n>" line (server prints it once bound). A cold Python
 # start under a parallel `make check -jN` can lag past a second on a loaded Windows runner.
-port=$(discover_server_port "$serverlog" "$serverpid") ||
+port=$(discover_server_port "$serverlog" "$serverpid") || {
+    # A server that died is a hard failure; only the deadline is the announce race
+    # 72 and 105 skip on, and they key on this exact wording.
+    test "$?" -ne 2 || die "server exited early"
     die "could not discover server port"
+}
 debug "server listening on ${scheme}://127.0.0.1:${port}"
 
 baseurl="${scheme}://127.0.0.1:${port}"

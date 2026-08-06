@@ -76,7 +76,8 @@ is_windows() {
 }
 
 # Open the timer fd poll_wait reads from: a fifo held open read-write, so there is
-# always a writer and a read blocks to its own timeout instead of seeing EOF.
+# always a writer and a read blocks to its own timeout instead of seeing EOF. fd 9
+# is the harness's from here on; no test may hold it open across a poll.
 POLL_STATE=
 poll_open() {
     local f
@@ -86,24 +87,33 @@ poll_open() {
     # about is no place to discover how its select() behaves. That tick is a whole
     # second anyway, so there is little to win.
     is_windows && return 0
-    f="${TMPDIR:-/tmp}/.httrack-poll.$$"
-    rm -f "$f" 2>/dev/null
+    # Unique: $$ is the same in every subshell, and the loser of a race on one name
+    # opens a path that is gone.
+    f=$(mktemp -u "${TMPDIR:-/tmp}/.httrack-poll.XXXXXX" 2>/dev/null) || return 0
     mkfifo "$f" 2>/dev/null || return 0
     # Braced: "exec 9<>x 2>/dev/null" alone would send this shell's stderr to
     # /dev/null for good, exec applying its redirections to the shell itself.
-    if { exec 9<>"$f"; } 2>/dev/null; then POLL_STATE=fifo; fi
+    # Still a fifo, or bash's <> created a regular file on a vanished path, which
+    # reads EOF at once and spins every deadline loop.
+    if { exec 9<>"$f"; } 2>/dev/null && test -p "$f"; then
+        POLL_STATE=fifo
+    else
+        exec 9<&-
+    fi
     rm -f "$f" 2>/dev/null
     return 0
 }
 
 # One poll tick of at most $1 seconds, forking nothing where bash can time out a
-# read on that fd. A `sleep` per tick was 22% of every process the suite created,
-# and costs milliseconds apiece under MSYS (#795). HTTRACK_POLL_SLEEP=1 forces the
-# forked tick back.
+# read on that fd (a `sleep` per tick was 22% of every process the suite created,
+# and costs milliseconds apiece under MSYS, #795). $1 is a ceiling: the fd tick
+# returns every 0.1s whatever it is asked, and callers re-check their own deadline.
+# HTTRACK_POLL_SLEEP=1 forces the forked tick back, re-read per tick so a test can
+# starve the poll mid-run.
 poll_wait() {
     local secs=$1 rc=0
     test -n "$POLL_STATE" || poll_open
-    if test "$POLL_STATE" = fifo; then
+    if test "$POLL_STATE" = fifo && test -z "${HTTRACK_POLL_SLEEP:-}"; then
         # bash 4.0 is where -t took a fraction; below it, hand a caller asking for
         # one the sleep it asked for rather than rounding its tick up to a second.
         if test "${BASH_VERSINFO[0]}" -ge 4; then
@@ -120,7 +130,9 @@ poll_wait() {
         # bash 4.0 is also where a timeout started reporting >128; 3.2 says 1, which is
         # what a closed fd says everywhere. Ask the fd itself rather than the status,
         # or macOS retires its timer on the first tick and forks for the whole run.
-        if { : >&9; } 2>/dev/null; then return 0; fi
+        # `true`, not `:`: a redirection error on a POSIX special builtin exits the
+        # shell, which POSIXLY_CORRECT in the environment is enough to turn on.
+        if { true >&9; } 2>/dev/null; then return 0; fi
         POLL_STATE=forked # not a timer any more, stop trusting it
         exec 9<&-
     fi
@@ -138,10 +150,12 @@ stop_server() {
     return 0
 }
 
-# Echo the port local-server.py announces on $1 (its log), $2 being its pid.
-# Waits 30s: a cold Python start under a parallel `make check -jN` lags well
-# past a second, and 5s was tight enough that macos-15 missed it on 15 tests.
-# Matches anywhere, since a warning merged via 2>&1 can precede the line.
+# Echo the port local-server.py announces on $1 (its log), $2 being its pid, or
+# return 2 if the server died and 1 on the deadline: only the deadline is a race a
+# caller may skip on. Matches anywhere, since a warning merged via 2>&1 can precede
+# the line. A full minute of wall clock: a cold Python start under a parallel
+# `make check -jN` lags well past a second, 5s had macos-15 missing it on 15 tests,
+# and the count-of-ticks loop this replaced self-extended under load instead.
 discover_server_port() {
     local log=$1 pid=$2 line start=$SECONDS
     while :; do
@@ -157,9 +171,9 @@ discover_server_port() {
         fi
         kill -0 "$pid" 2>/dev/null || {
             echo "server exited early: $(cat "$log" 2>/dev/null)" >&2
-            return 1
+            return 2
         }
-        test "$((SECONDS - start))" -lt 30 || break
+        test "$((SECONDS - start))" -lt 60 || break
         poll_wait 0.1
     done
     echo "could not discover server port: $(cat "$log" 2>/dev/null)" >&2
@@ -492,6 +506,9 @@ EOF
     chmod +x "$dir/sleep" || return 1
     PATH="$dir:$PATH"
     export PATH
+    # Proved, not assumed: MSYS hands out a drive-letter TMPDIR and a PATH entry
+    # carrying a colon is read as two, so an unreachable shim starves nothing.
+    test "$(command -v sleep)" = "$dir/sleep" || return 1
 }
 
 # Skip when the next of $1 remaining steps, at 1.5x the $2 seconds the last one

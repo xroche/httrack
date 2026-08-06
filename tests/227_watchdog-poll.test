@@ -35,7 +35,7 @@ count_sleeps() { # count_sleeps <dir> <log>: a sleep shim recording each call
     sleep 0
     test -s "$2" || fail "the sleep shim is not on PATH (entry '$1')"
 }
-ticks() { # ticks <label> <secs> <count>: polls, counting the sleeps they forked
+ticks() { # ticks <label> <secs> <count> <floor>: polls, counting the sleeps forked
     local began=$SECONDS
     local i=0
     : >"$tmp/sleeps"
@@ -43,8 +43,9 @@ ticks() { # ticks <label> <secs> <count>: polls, counting the sleeps they forked
         poll_wait "$2"
         i=$((i + 1))
     done
-    # A tick that returns at once turns every deadline loop into a busy spin.
-    test "$((SECONDS - began))" -ge 1 || fail "$1: $3 polls of ${2}s took under a second"
+    # Floored at the whole wait asked for, so a tick running at half speed fails
+    # too, not only one that returns at once and spins every deadline loop.
+    test "$((SECONDS - began))" -ge "$4" || fail "$1: $3 polls of ${2}s took under ${4}s"
 }
 sleeps() { wc -l <"$tmp/sleeps" | tr -d ' '; }
 # Probed, not assumed: a host that cannot make a fifo -- and Windows, which opts
@@ -59,7 +60,7 @@ fi
     count_sleeps "$shim" "$tmp/sleeps"
     poll_wait 0.1 # settles POLL_STATE before the count
     echo "poll tick: $POLL_STATE"
-    ticks "$POLL_STATE tick" 0.1 20
+    ticks "$POLL_STATE tick" 0.1 30 3
     test -z "$canfifo" || test "$POLL_STATE" = fifo ||
         fail "the tick fell back to sleep on a host with working fifos"
     if test "$POLL_STATE" = fifo; then
@@ -67,22 +68,24 @@ fi
             test "$(sleeps)" -eq 0 || fail "the fd tick forked $(sleeps) sleeps"
         else
             # No fractional read -t below bash 4, so the documented fallback is the sleep asked for.
-            test "$(sleeps)" -eq 20 || fail "bash ${BASH_VERSINFO[0]} forked $(sleeps) of 20 fractional ticks"
+            test "$(sleeps)" -eq 30 || fail "bash ${BASH_VERSINFO[0]} forked $(sleeps) of 30 fractional ticks"
         fi
         # The whole-second tick every watchdog runs on must take the fd on every bash:
-        # where a fraction cannot, it is the only win left. Sized for ~2s either way,
+        # where a fraction cannot, it is the only win left. Sized for ~3s either way,
         # bash 4 shortening its own wait to 0.1s.
-        if test "${BASH_VERSINFO[0]}" -ge 4; then n=20; else n=2; fi
-        ticks "fd 1s tick" 1 "$n"
+        if test "${BASH_VERSINFO[0]}" -ge 4; then n=30; else n=3; fi
+        ticks "fd 1s tick" 1 "$n" 3
         test "$(sleeps)" -eq 0 || fail "the 1s fd tick forked $(sleeps) sleeps"
     fi
     # Forced back to sleep(1), which is the only tick a shimmed sleep can reach.
+    # POLL_STATE is left as it settled: a run already on the fd must give it up
+    # when a test starves the poll mid-run, so the override is read per tick.
     export HTTRACK_POLL_SLEEP=1
-    POLL_STATE=
-    ticks "forced sleep tick" 0.1 20
-    test "$(sleeps)" -eq 20 || fail "HTTRACK_POLL_SLEEP did not fork a sleep per tick"
+    ticks "forced sleep tick" 0.1 30 3
+    test "$(sleeps)" -eq 30 || fail "HTTRACK_POLL_SLEEP did not fork a sleep per tick"
     # A timer fd that stops timing out must fall back, not spin. Whole seconds: a
     # fraction never reaches the fd below bash 4.
+    unset HTTRACK_POLL_SLEEP # the fd is what is under test here, not the override
     POLL_STATE=fifo
     exec 9<&-
     : >"$tmp/sleeps"
@@ -133,11 +136,16 @@ echo "Traceback: address already in use" >"$log"
 writer=$!
 wait "$writer" 2>/dev/null || true
 began=$SECONDS
-err=$(discover_server_port "$log" "$writer" 2>&1 >/dev/null) && fail "a dead server yielded a port"
+rc=0
+err=$(discover_server_port "$log" "$writer" 2>&1 >/dev/null) || rc=$?
+test "$rc" -ne 0 || fail "a dead server yielded a port"
 test "$((SECONDS - began))" -lt 20 || fail "a dead server was waited out ($((SECONDS - began))s)"
 case "$err" in
 *"exited early"*) ;;
 *) fail "a dead server reported '$err'" ;;
 esac
+# 2, not 1: only the deadline is the announce race 72 and 105 skip on, so one
+# status for both had local-crawl.sh skipping a crashed server instead of failing.
+test "$rc" -eq 2 || fail "a dead server exited $rc, want 2"
 
 echo "poll helpers OK"
