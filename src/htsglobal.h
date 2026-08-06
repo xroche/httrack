@@ -273,6 +273,9 @@ typedef int hts_tristate;
 /* True when A is a non-NULL, non-empty string. */
 #define strnotempty(A) (((A) != NULL && (A)[0] != '\0'))
 
+/* Compile-time check, usable as an expression. */
+#define HTS_COMPILE_ASSERT(cond) ((void) sizeof(char[(cond) ? 1 : -1]))
+
 /* 'inline' where the dialect supports it (C++), nothing in plain C. */
 #ifdef __cplusplus
 #define HTS_INLINE inline

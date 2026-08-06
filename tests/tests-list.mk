@@ -260,3 +260,4 @@ TESTS += 221_local-ftp-ctrlchars.test
 TESTS += 218_crash-nopie-frames.test
 TESTS += 222_pkgconfig-consumer.test
 TESTS += 228_icon-small-flat.test
+TESTS += 224_engine-ftp-cmdlen.test
