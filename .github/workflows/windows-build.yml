@@ -14,6 +14,9 @@ on:
 
 permissions:
   contents: read
+  # The suite watchdog reports as a commit status, the only channel that
+  # outlives the runner it is reporting on (#795).
+  statuses: write
 
 # Cancel superseded runs on the same branch or PR.
 concurrency:
@@ -37,6 +40,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive   # coucal lives in src/coucal
+          # Or the job token stays in .git/config, where every test the suite
+          # runs can read it.
+          persist-credentials: false
 
       # Located through vswhere rather than microsoft/setup-msbuild: the repo
       # only allows GitHub-owned actions.
@@ -171,6 +177,14 @@ jobs:
         shell: bash
         working-directory: tests
         timeout-minutes: 45
+        env:
+          # Through the environment, never argv, which the process list exposes.
+          WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WATCHDOG_REPO: ${{ github.repository }}
+          # github.sha here is the PR's merge commit, so statuses posted against it stay out of the PR's checks UI.
+          WATCHDOG_SHA: ${{ github.sha }}
+          WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
+          WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           bash ./ci-windows-suite.sh \
             "$(cygpath -u "$GITHUB_WORKSPACE")/src/${{ matrix.platform }}/${{ matrix.configuration }}"

@@ -8,6 +8,10 @@
 
 set -euo pipefail
 
+# Before the driver is sourced: with these set, anything it starts posts a commit
+# status on whatever the surrounding shell was last looking at.
+unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
+
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/ci-windows-suite.sh
 . "${testdir}/ci-windows-suite.sh"
@@ -138,7 +142,8 @@ test "$killed" -le 10080 || fail "killed at $killed, want 9960 within a tick"
 
 # taskkill is a grandchild of its own target, so a leaves-first /T would reap the
 # watchdog before the root (#953): kill_tree here never returns, and the stubs
-# record the order, which the code under test cannot write to.
+# record the order, which the code under test cannot write to. The reporter goes
+# first: the kill runs no EXIT trap, and the tree walk reaches this heartbeat.
 rec="$tmp/killed"
 : >"$rec"
 vnow=9000
@@ -146,6 +151,7 @@ ticks=0
 printf 'RUN 96_wedged.test at 0s\n' >"$progress"
 rc=0
 (
+    watchdog=777
     kill_pid() { echo "DIRECT $1" >>"$rec"; }
     kill_tree() {
         echo "TREE $1" >>"$rec"
@@ -154,10 +160,12 @@ rc=0
     ci_suite_heartbeat 960 360 "$progress" 900 4242 >"$tmp/hedge" 2>&1
 ) || rc=$?
 test "$rc" -eq 9 || fail "the tree kill never fired: watchdog returned $rc"
-test "$(sed -n 1p "$rec")" = "DIRECT 4242" ||
+test "$(sed -n 1p "$rec")" = "DIRECT 777" ||
+    fail "the reporter was not killed ahead of the suite: $(tr '\n' '/' <"$rec")"
+test "$(sed -n 2p "$rec")" = "DIRECT 4242" ||
     fail "the target was not signalled directly ahead of the tree walk: $(tr '\n' '/' <"$rec")"
-test "$(sed -n 2p "$rec")" = "TREE 4242" ||
+test "$(sed -n 3p "$rec")" = "TREE 4242" ||
     fail "the tree was not killed after the direct signal: $(tr '\n' '/' <"$rec")"
-test "$(sed -n '$=' "$rec")" -eq 2 || fail "extra kills: $(tr '\n' '/' <"$rec")"
+test "$(sed -n '$=' "$rec")" -eq 3 || fail "extra kills: $(tr '\n' '/' <"$rec")"
 
 echo "heartbeat OK"

@@ -261,6 +261,7 @@ TESTS += 218_crash-nopie-frames.test
 TESTS += 222_pkgconfig-consumer.test
 TESTS += 227_watchdog-poll.test
 TESTS += 228_icon-small-flat.test
+TESTS += 226_watchdog-native.test
 TESTS += 224_engine-ftp-cmdlen.test
 TESTS += 230_local-ftp-userpass.test
 TESTS += 225_install-manifest.test
