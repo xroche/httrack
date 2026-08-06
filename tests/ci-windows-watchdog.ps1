@@ -10,6 +10,8 @@ param(
     # One-shot mode: post this state and exit, so the driver reports its own end.
     [string]$Post = '',
     [string]$Message = '',
+    # Seam for the suite's own test, which points it at a sink it can count.
+    [string]$ApiBase = 'https://api.github.com',
     [switch]$NoPost,
     [switch]$SelfTest
 )
@@ -68,7 +70,7 @@ function Get-WatchdogCounters {
     return ($f -join ' ')
 }
 
-# Ok separates "nothing moved" from "could not read it", which would else report
+# Ok separates "nothing moved" from "could not read it", which would otherwise report
 # a wedge for an unreadable file. Share flags: the driver appends as we read.
 function Get-ProgressTail {
     param([string]$Path)
@@ -91,7 +93,9 @@ function Get-ProgressTail {
 
 function Write-WatchdogLog {
     param([string]$Message)
-    Write-Host ('[watchdog {0:HH:mm:ss}] {1}' -f (Get-Date), $Message)
+    # A full disk is a state the sick runner reaches, and a log line lost to it
+    # must not take the loop reporting off-box with it.
+    try { Write-Host ('[watchdog {0:HH:mm:ss}] {1}' -f (Get-Date), $Message) } catch { }
 }
 
 # --- reporting ---------------------------------------------------------------
@@ -112,7 +116,7 @@ function Send-WatchdogStatus {
     if ($script:TargetUrl) { $body['target_url'] = $script:TargetUrl }
     try {
         Invoke-RestMethod -Method Post -TimeoutSec 20 `
-            -Uri ('https://api.github.com/repos/{0}/statuses/{1}' -f $script:Repo, $script:Sha) `
+            -Uri ('{0}/repos/{1}/statuses/{2}' -f $ApiBase.TrimEnd('/'), $script:Repo, $script:Sha) `
             -UserAgent 'httrack-windows-suite-watchdog' `
             -Headers @{
             Authorization = ('Bearer {0}' -f $script:Token)
@@ -144,7 +148,10 @@ function Invoke-WatchdogSelfTest {
     Assert-That ($line.Length -le 140) ('status description is {0} characters' -f $line.Length)
     Assert-That ($line -like 't=812s q=41s 43_local-update-truncate*') ('status leads with the wrong fields: {0}' -f $line)
     Assert-That ($line -like '*d=13210') 'the counters did not survive a long test name'
-    Assert-That ((Format-WatchdogStatus 8 -1 'x' 'y') -like 't=8s q=?s *') 'an unknown staticness reads as a number'
+    # -match, not -like: '?' is a wildcard there, so q=0s would satisfy it too.
+    Assert-That ((Format-WatchdogStatus 8 -1 'x' 'y') -match '^t=8s q=\?s x \| y$') 'an unknown staticness reads as a number'
+    $clip = Format-WatchdogStatus 1 2 ('x' * 80) 'c'
+    Assert-That ($clip -match '^t=1s q=2s x{46} \| c$') ('the in-flight name was not clipped to 46: {0}' -f $clip)
     $wide = Format-WatchdogStatus 1 2 ('x' * 300) ('y' * 300)
     Assert-That ($wide.Length -le 140) ('an oversized status was not clipped: {0}' -f $wide.Length)
 
@@ -176,7 +183,13 @@ if ($SelfTest) { Invoke-WatchdogSelfTest }
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
 
 if ($Post) {
-    [void](Send-WatchdogStatus $Post $Message)
+    # One transient 5xx here is the difference between a resolved status and a
+    # finished suite left reading `pending`.
+    for ($try = 1; $try -le 3; $try++) {
+        if (Send-WatchdogStatus $Post $Message) { break }
+        if ($NoPost -or -not $script:Token) { break }
+        Start-Sleep -Seconds (2 * $try)
+    }
     Write-WatchdogLog ('final status {0}: {1}' -f $Post, $Message)
     exit 0
 }
@@ -191,7 +204,8 @@ $postedAt = -$IntervalSeconds
 $backoff = 0
 $skip = 0
 
-Write-Host 'watchdog ready'
+# Guarded like the rest; the launcher waits for this exact line.
+try { Write-Host 'watchdog ready' } catch { }
 Write-WatchdogLog ('watching {0} every {1}s' -f $ProgressLog, $IntervalSeconds)
 
 while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {

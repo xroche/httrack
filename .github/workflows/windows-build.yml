@@ -14,9 +14,8 @@ on:
 
 permissions:
   contents: read
-  # The suite watchdog posts its heartbeat as a commit status: on a wedge the
-  # runner dies with the log, the annotations and the artifacts, so an off-box
-  # channel is the only one that can name the test in flight (#795).
+  # The suite watchdog reports as a commit status, the only channel that
+  # outlives the runner it is reporting on (#795).
   statuses: write
 
 # Cancel superseded runs on the same branch or PR.
@@ -41,6 +40,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive   # coucal lives in src/coucal
+          # Or the token, which can now post statuses, sits in .git/config for
+          # the whole job, where every test the suite runs can read it.
+          persist-credentials: false
 
       # Located through vswhere rather than microsoft/setup-msbuild: the repo
       # only allows GitHub-owned actions.
@@ -175,13 +177,11 @@ jobs:
         shell: bash
         working-directory: tests
         timeout-minutes: 45
-        # github.sha is the merge commit on a pull_request, so these statuses stay
-        # out of the PR's checks UI while remaining readable through the API. The
-        # token goes through the environment, never argv, which the process list
-        # would expose.
         env:
+          # Through the environment, never argv, which the process list exposes.
           WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WATCHDOG_REPO: ${{ github.repository }}
+          # A pull_request's merge commit, so these stay out of the PR's checks UI.
           WATCHDOG_SHA: ${{ github.sha }}
           WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
           WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

@@ -47,7 +47,8 @@ ci_start_native_watchdog() {
     # Never the step's stdout: a background holder of that pipe keeps the step
     # open past the suite (#949), and tests/*.log reaches the artifact anyway.
     : >watchdog.log
-    "$ci_watchdog_exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+    WATCHDOG_TOKEN="${ci_watchdog_token:-}" \
+        "$ci_watchdog_exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass \
         -File "$(nativepath "$ps1")" \
         -ProgressLog "$(nativepath "$progress")" \
         >>watchdog.log 2>&1 &
@@ -59,20 +60,48 @@ ci_start_native_watchdog() {
         sleep 1
         waited=$((waited + 1))
     done
-    kill -9 "$ci_watchdog_pid" 2>/dev/null
+    kill_pid "$ci_watchdog_pid"
     ci_watchdog_pid=''
     return 1
 }
 
-# Post the suite's own verdict from exit status $1: the watchdog cannot see the
-# driver exit, and a pending status that never resolves says nothing.
+# Post the suite's own verdict from exit status $1, described by $2: the watchdog
+# cannot see the driver exit, and a pending status that never resolves says nothing.
 ci_post_final_status() {
-    local rc=$1 state=success
+    local rc=$1 msg=${2:-"suite step ended rc=$1"} state=success
+    test -n "${ci_watchdog_exe:-}" || return 0
     test "$rc" -eq 0 || state=failure
-    "$ci_watchdog_exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+    WATCHDOG_TOKEN="${ci_watchdog_token:-}" \
+        "$ci_watchdog_exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass \
         -File "$(nativepath "$testdir/ci-windows-watchdog.ps1")" \
-        -Post "$state" -Message "suite step ended rc=$rc" \
+        -Post "$state" -Message "$msg" \
         >>watchdog.log 2>&1 || true
+}
+
+# End both watchers and post the suite's verdict from exit status $1.
+ci_stop_watchers() {
+    local rc=$1 msg="suite step ended rc=$1"
+    test -z "${ci_signal:-}" || msg="suite step killed by SIG$ci_signal"
+    kill "${heartbeat:-}" 2>/dev/null
+    # Silenced before the verdict, or its next tick overwrites it.
+    test -z "${watchdog:-}" || kill_pid "$watchdog"
+    # Posted even for a launch given up on: it may have posted a pending first.
+    ci_post_final_status "$rc" "$msg"
+    return 0
+}
+
+ci_on_signal() {
+    ci_signal=$1
+    exit $((128 + $2))
+}
+
+# A shell killed by a signal reaches its EXIT trap with $? = 0, so a cancelled or
+# timed-out step would report success: the verdict has to come from the handler.
+ci_install_traps() {
+    trap 'ci_on_signal INT 2' INT
+    trap 'ci_on_signal TERM 15' TERM
+    trap 'ci_on_signal HUP 1' HUP
+    trap 'ci_rc=$?; set +e; ci_stop_watchers "$ci_rc" || true' EXIT
 }
 
 ci_suite_heartbeat() {
@@ -94,6 +123,10 @@ ci_suite_heartbeat() {
         # outlive the step's own timeout before being caught.
         if test $((now - moved)) -ge "$stuck"; then
             ci_annotate error "suite watchdog" "killing the step: $((now - moved))s without progress, in flight: $last"
+            # A taskkill runs no trap, so this is the only verdict the kill path
+            # can leave; the reporter goes first or its next tick overwrites it.
+            test -z "${watchdog:-}" || kill_pid "$watchdog"
+            ci_post_final_status 1 "killed after $((now - moved))s without progress, in flight: $last"
             # Direct first: kill_tree may reap this watchdog before its own root (#953).
             kill_pid "$main"
             kill_tree "$main"
@@ -166,21 +199,20 @@ export HTTRACK_PROGRESS_LOG="$PWD/$progress"
 # run measures here, and a kill 900s after the last progress line clears
 # the longest legitimate gap, one $per_test.
 stuck=900
-ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ &
-heartbeat=$!
-# Complementary, not redundant: reporting only, so it has no verdict to race.
-watchdog='' ci_watchdog_pid='' ci_watchdog_exe=''
+# Orthogonal to that heartbeat rather than a spare of it: the heartbeat needs
+# 960s of quiet and 900s of static log, and every #795 death measured so far
+# lands inside the first 750s of the step.
+watchdog='' ci_watchdog_pid='' ci_watchdog_exe='' ci_signal='' ci_rc=0
+# Held here, never exported: a token every test child inherits is how four forged
+# statuses once reached a commit under test.
+ci_watchdog_token=${WATCHDOG_TOKEN:-}
+unset WATCHDOG_TOKEN
 ci_start_native_watchdog "$PWD/$progress" && watchdog=$ci_watchdog_pid
 test -n "$watchdog" || echo "no off-box watchdog: no usable PowerShell"
-ci_stop_watchers() {
-    kill "$heartbeat" 2>/dev/null
-    test -n "$watchdog" || return 0
-    # Silenced before the verdict, or its next tick overwrites it.
-    kill -9 "$watchdog" 2>/dev/null
-    ci_post_final_status "$1"
-    return 0
-}
-trap 'ci_stop_watchers $? || true' EXIT
+# Started after it, so the kill path can silence and outlive the reporter.
+ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ &
+heartbeat=$!
+ci_install_traps
 
 pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
 # label:pattern, globbed rather than enumerated so a new NNN_engine-*.test or
