@@ -715,9 +715,11 @@ jobs:
           sudo apt-get update
           # noble ships shfmt 3.8.0 (universe), matching the pinned local dev
           # version; use it rather than fetching a release binary from github.com.
-          sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream
+          sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
+            appstream-util
           shfmt --version
           appstreamcli --version
+          appstream-util --version
 
       - name: shellcheck
         run: shellcheck $SHELL_SCRIPTS
@@ -737,10 +739,14 @@ jobs:
 
       # A software centre quietly ignores a metainfo it cannot parse. Errors and
       # warnings fail; --no-net so the gate is on the file, not httrack.com's uptime.
+      # Both validators: appstream-util is what Fedora's build runs, and it is
+      # stricter about icons and metadata than appstreamcli.
       - name: AppStream metainfo validation
         run: |
           set -euo pipefail
           appstreamcli validate --no-net --explain \
+            html/server/div/com.httrack.WebHTTrack.metainfo.xml
+          appstream-util validate-relax --nonet \
             html/server/div/com.httrack.WebHTTrack.metainfo.xml
 
   # Check clang-format on CHANGED LINES ONLY. The engine predates clang-format
