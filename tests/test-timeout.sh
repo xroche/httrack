@@ -54,9 +54,8 @@ test -n "$had_m" || test -n "$windows" || set +m
 
 # Poll, because bash cannot wait with a deadline and a watchdog subshell would
 # have to signal across process groups, which MSYS cannot do. The interval is the
-# latency this adds to every healthy test, so keep it small where fork is cheap;
-# under MSYS fork costs tens of milliseconds, and a second is what the Windows
-# suite already paid before this wrapper existed.
+# latency this adds to every healthy test; the ceiling only matters where poll_wait
+# has to fall back to a forked sleep, which under MSYS costs tens of milliseconds.
 if test -n "$windows"; then
     tick=1
 else
@@ -80,6 +79,6 @@ while kill -0 "$pid" 2>/dev/null; do
         dump_crawl_logs
         exit 124
     fi
-    sleep "$tick"
+    poll_wait "$tick"
 done
 wait "$pid"

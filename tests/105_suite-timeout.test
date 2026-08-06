@@ -23,8 +23,11 @@ fail() {
 }
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_sutmo.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmp"' EXIT
-trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
+# A colon-free root for the PATH shim below: MSYS hands out a drive-letter TMPDIR
+# and a PATH entry carrying a colon is read as two, which leaves it unreachable.
+shim=$(mktemp -d /tmp/httrack_sutmoshim.XXXXXX 2>/dev/null) || shim="$tmp/starve"
+trap 'set +e; rm -rf "$tmp" "$shim"' EXIT
+trap 'rm -rf "$tmp" "$shim"' HUP INT QUIT PIPE TERM
 out="$tmp/out"
 
 # --- a hanging test is killed, named, and reported 124 ----------------------
@@ -71,11 +74,14 @@ sleep 1
 # --- the budget is wall clock, not a count of poll iterations ----------------
 # Starve the poll and a counted budget stretches with it: 10 polls of a 0.1s tick
 # become 40s, so the guard fires long after the step it was meant to beat (#795).
+# HTTRACK_POLL_SLEEP forces the forked tick, the only one a shimmed sleep reaches;
+# the loop it stretches is the same one poll_wait's fd tick drives.
 (
-    starve_sleep "$tmp/starve" 4 || fail "could not install the slow sleep"
+    starve_sleep "$shim" 4 || fail "could not install the slow sleep"
     start=$SECONDS
     rc=0
-    HTTRACK_TEST_TIMEOUT=1 bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
+    HTTRACK_POLL_SLEEP=1 HTTRACK_TEST_TIMEOUT=1 \
+        bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
     elapsed=$((SECONDS - start))
     test "$rc" -eq 124 || fail "starved guard reported $rc, want 124"
     # Generous: the diagnostics dump runs inside this window too.
