@@ -21,9 +21,15 @@ driver="$testdir/ci-windows-suite.sh"
 workflow="$top/.github/workflows/windows-build.yml"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wdnat.XXXXXX")
-trap 'set +e; stop_server "${sinkpid:-}"; rm -rf "$tmp"' EXIT
+sinkpidfile="$tmp/sink.pid"
+: >"$sinkpidfile"
+toppid=$$
+trap 'set +e; stop_server "$(cat "$sinkpidfile" 2>/dev/null)"; rm -rf "$tmp"' EXIT
+trap 'exit 1' TERM
+# Signalled, since a bare exit only ends the subshell a leg runs in.
 fail() {
     echo "FAIL: $*" >&2
+    kill -TERM "$toppid" 2>/dev/null || true
     exit 1
 }
 
@@ -356,10 +362,11 @@ run_wd() {
 sink="$tmp/sink.py"
 cat >"$sink" <<'PY'
 import http.server
+import socketserver
 import sys
 
 codes = [int(c) for c in sys.argv[1].split(",")]
-rec, portfile = sys.argv[2], sys.argv[3]
+rec = sys.argv[2]
 seen = []
 
 
@@ -378,30 +385,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-srv = http.server.HTTPServer(("127.0.0.1", 0), Handler)
-with open(portfile, "w") as f:
-    f.write(str(srv.server_port))
+class Sink(http.server.HTTPServer):
+    # Skip stock server_bind()'s getfqdn(): it stalls 35s on macOS (#870).
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+srv = Sink(("127.0.0.1", 0), Handler)
+# LF, since discover_server_port parses this line: Windows would emit \r\n.
+sys.stdout.reconfigure(newline="\n")
+print("PORT %d" % srv.server_port, flush=True)
 srv.serve_forever()
 PY
 
 posts="$tmp/posts"
-portfile="$tmp/port"
+sinklog="$tmp/sink.log"
 legout="$tmp/leg.out"
 port='' sinkpid=''
 sink_start() {
     : >"$posts"
-    rm -f "$portfile"
-    "$py" "$sink" "$1" "$posts" "$portfile" &
+    : >"$sinklog"
+    # Its own log: a leg's command substitution would else wait on the pipe the
+    # sink inherited for as long as the sink lives.
+    "$py" "$sink" "$1" "$posts" >"$sinklog" 2>&1 &
     sinkpid=$!
-    for _ in $(seq 1 100); do
-        test -s "$portfile" && break
-        sleep 0.1
-    done
-    test -s "$portfile" || fail "the status sink never bound a port"
-    port=$(cat "$portfile")
+    # Where the teardown can find it: sink_start runs in a subshell of its own.
+    echo "$sinkpid" >"$sinkpidfile"
+    port=$(discover_server_port "$sinklog" "$sinkpid") ||
+        fail "the status sink never bound a port: $(cat "$sinklog")"
 }
 sink_stop() {
     stop_server "$sinkpid"
+    : >"$sinkpidfile"
     sinkpid=''
 }
 # Ours, so a leg that lost its -ApiBase reaches GitHub with a credential it
