@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# Distro packages name the installed files (Fedora's %files, debian/*.files), so
-# a file appearing or vanishing here breaks their build and not ours -- Fedora's
-# twice in three weeks. Changing the set is fine; not noticing is not.
+# Distro packages (Fedora %files, debian/*.files) name every installed file, so a
+# file appearing or vanishing here breaks their build and not ours; it broke
+# Fedora's twice in three weeks.
 
 set -euo pipefail
 
@@ -21,6 +21,15 @@ test "$(uname -s)" = Linux || {
 }
 test -r "${manifest}" || fail "no ${manifest}"
 
+# The docs are dropped below, so a docdir holding datadir would drop the pinned
+# data files with them and leave nothing to compare.
+case "${CONFIGURED_DATADIR:?not run under make check}" in
+"${CONFIGURED_DOCDIR:?not run under make check}" | "${CONFIGURED_DOCDIR}"/*)
+    echo "docdir contains datadir; skipping" >&2
+    exit 77
+    ;;
+esac
+
 work=$(mktemp -d "${TMPDIR:-/tmp}/manifest.XXXXXX") || {
     echo "no tmpdir" >&2
     exit 1
@@ -34,31 +43,48 @@ env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir}" \
     fail "make install DESTDIR=${stage}"
 }
 
-# Docs in docdir or under it is a --htmldir choice each distro makes its own way,
-# and no package names them individually.
-case "${CONFIGURED_HTMLDIR:?not run under make check}" in
-"${CONFIGURED_DOCDIR:?not run under make check}"*) ;;
-*)
-    echo "htmldir outside docdir; skipping" >&2
-    exit 77
-    ;;
-esac
-
-# Fold the configured directories back to tokens so the pin survives any
-# --prefix/--libdir; longest first, since docdir and mandir nest in datadir.
-for var in DOCDIR MANDIR INCLUDEDIR LIBDIR BINDIR DATADIR; do
+# Fold the configured directories back to tokens so the pin survives any --prefix
+# or --libdir. Longest path first, so a nested directory beats the one it sits in
+# whatever the layout puts where.
+: >"${work}/dirs"
+for var in DOCDIR HTMLDIR MANDIR INCLUDEDIR LIBDIR BINDIR DATADIR; do
     name=CONFIGURED_${var}
     path=${!name:-}
     test -n "${path}" || fail "${name} not set"
-    echo "s|^${path%/}/|@${var}@/|"
-done >"${work}/norm.sed"
+    path=${path%/}
+    printf '%s\t%s\t%s\n' "${#path}" "${path}" "${var}" >>"${work}/dirs"
+done
+LC_ALL=C sort -rn "${work}/dirs" -o "${work}/dirs"
 
-# Dropped: docdir per above, the .a/.la libtool bookkeeping no distro ships, and
-# the library revision, which moves every release. The soname digit stays: a bump
-# renames Debian's binary package.
+paths=() tokens=()
+while IFS=$'\t' read -r _ path var; do
+    paths+=("${path}")
+    tokens+=("${var}")
+done <"${work}/dirs"
+
+# Matched literally: a directory holding a regex metacharacter would silently
+# fold nothing if this were a pattern.
+fold() {
+    local line=$1 i
+    for i in "${!paths[@]}"; do
+        case ${line} in
+        "${paths[i]}"/*)
+            printf '@%s@/%s\n' "${tokens[i]}" "${line#"${paths[i]}"/}"
+            return
+            ;;
+        esac
+    done
+    printf '%s\n' "${line}"
+}
+
+# Dropped: the docs, since where they sit under docdir is a --htmldir choice each
+# distro makes its own way and no package names them one by one; the .a/.la
+# libtool bookkeeping no distro ships; and the library revision, which moves
+# every release. The soname digit stays: a bump renames Debian's package.
 (cd "${stage}" && find . \( -type f -o -type l \) | sed 's|^\.||') |
-    sed -f "${work}/norm.sed" \
-        -e '/^@DOCDIR@\//d' -e '/\.la$/d' -e '/\.a$/d' \
+    while IFS= read -r line; do fold "${line}"; done |
+    sed -e '/^@DOCDIR@\//d' -e '/^@HTMLDIR@\//d' \
+        -e '/\.la$/d' -e '/\.a$/d' \
         -e 's|\(\.so\.[0-9][0-9]*\)\.[0-9][0-9]*\.[0-9][0-9]*$|\1.@revision@|' |
     LC_ALL=C sort >"${work}/actual"
 

@@ -41,7 +41,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
+            appstream appstream-util
 
       - name: Configure
         run: |
@@ -739,8 +740,6 @@ jobs:
 
       # A software centre quietly ignores a metainfo it cannot parse. Errors and
       # warnings fail; --no-net so the gate is on the file, not httrack.com's uptime.
-      # Both validators: appstream-util is what Fedora's build runs, and it is
-      # stricter about icons and metadata than appstreamcli.
       - name: AppStream metainfo validation
         run: |
           set -euo pipefail
