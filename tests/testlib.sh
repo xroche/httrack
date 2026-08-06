@@ -72,13 +72,13 @@ is_windows() {
 }
 
 # On Windows MSYS can't signal a native python.exe, so kill_tree ends the whole
-# tree (a bare kill -9 leaves children). "|| true" throughout: callers run under
-# set -e and the reap makes wait return 143.
+# tree (a bare kill -9 leaves children). Bounded because this runs from an EXIT
+# trap, where a survivor would turn a passing test into a harness timeout.
 stop_server() {
     test -n "${1:-}" || return 0
     kill "$1" 2>/dev/null || true
     if is_windows; then kill_tree "$1"; fi
-    wait "$1" 2>/dev/null || true
+    reap_bounded "$1" || true
     return 0
 }
 

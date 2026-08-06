@@ -60,8 +60,8 @@ crawl "bob:secret" || fail "the plain-login crawl never finished"
 sent=$(cat "$cmds")
 grep -qxF "USER bob" <<<"$sent" || fail "no USER bob on the wire: ${sent}"
 grep -qxF "PASS secret" <<<"$sent" || fail "no PASS secret on the wire: ${sent}"
-mirrored=$(find "$out" -name f.txt -not -path '*hts-cache*' | head -n1)
-cmp -s "$mirrored" "${root}/f.txt" || fail "the login did not bring the body back"
+cmp -s "${out}/127.0.0.1_${port}/f.txt" "${root}/f.txt" ||
+    fail "the login did not bring the body back; mirror holds $(find "$out" -type f)"
 ok "bob:secret reaches the server verbatim, and mirrors"
 
 # --- the longest userinfo that fits, byte for byte ---------------------------
