@@ -91,29 +91,17 @@ headers=("$tmp/include/httrack"/*.h)
 [ "${#headers[@]}" -ge 10 ] || fail "only ${#headers[@]} headers installed, the list cannot be right"
 [ -f "$tmp/include/httrack/htssafe.h" ] || fail "htssafe.h was not installed"
 
-# No libc hands getnameinfo() to a strict-ISO unit, so a consumer of the two
-# socket headers must ask for POSIX. Prefer 2001: 2008 also un-hides strnlen,
-# which would stop those two covering that half of #972.
-posix_argv=(-D_POSIX_C_SOURCE=200112L)
-printf '#include <httrack/htsnet.h>\n' >"$tmp/tu.c"
-if ! "${cc_argv[@]}" "${cpp_argv[@]}" "${posix_argv[@]}" "-std=${stds[0]}" \
-    -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
-    fail "htsnet.h needs POSIX.1-2008, which un-hides strnlen and would leave that half of #972 uncovered"
-fi
-
+# No -D_POSIX_C_SOURCE anywhere below: every installed header, htsnet.h and
+# htsopt.h included, must compile against the strict-ISO libc alone (#1001).
 count=0
 bad=0
 for h in "${headers[@]}"; do
     b=$(basename "$h")
-    argv=("${cpp_argv[@]}")
-    case "$b" in
-    htsnet.h | htsopt.h) argv+=("${posix_argv[@]}") ;;
-    esac
     printf '#include <httrack/%s>\n' "$b" >"$tmp/tu.c"
     for std in "${stds[@]}"; do
         for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
             count=$((count + 1))
-            if ! "${cc_argv[@]}" "${argv[@]}" "-std=$std" "$mode" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+            if ! "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" "$mode" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
                 echo "$b does not compile under -std=$std ($mode):" >&2
                 head -5 "$tmp/cc.log" >&2
                 bad=1
@@ -221,9 +209,6 @@ else
     for h in "${headers[@]}"; do
         b=$(basename "$h")
         argv=("${base_cpp_argv[@]}" -Wall -Wextra -Werror)
-        case "$b" in
-        htsnet.h | htsopt.h) argv+=("${posix_argv[@]}") ;;
-        esac
         printf '#include <httrack/%s>\nint main() { return 0; }\n' "$b" >"$tmp/tu.cpp"
         for std in "${cxx_stds[@]}"; do
             for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
