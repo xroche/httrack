@@ -150,14 +150,21 @@ void ftp_split_userpass(const char *src, const char *end, char *user,
 }
 
 /* Build "<verb> <path>" (see htsftp.h). */
-void ftp_command(char *line, size_t line_size, const char *verb,
-                 const char *path) {
+hts_boolean ftp_command(char *line, size_t line_size, const char *verb,
+                        const char *path) {
+  int n;
+
   /* A leading '-' would reach a server that shells out to ls as a flag. */
   if (path[0] == '-' || strchr(path, ' ') != NULL ||
       strchr(path, '\"') != NULL || strchr(path, '\'') != NULL)
-    snprintf(line, line_size, "%s \"%s\"", verb, path);
+    n = snprintf(line, line_size, "%s \"%s\"", verb, path);
   else
-    snprintf(line, line_size, "%s %s", verb, path);
+    n = snprintf(line, line_size, "%s %s", verb, path);
+  if (n < 0 || (size_t) n >= line_size) {
+    line[0] = '\0'; // fail safe for a caller that ignores the result
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
 }
 
 /* MDTM reply "213 YYYYMMDDHHMMSS[.frac]" (RFC 3659, UTC) into tm_time. */
@@ -211,7 +218,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   httrackp *opt = pStruct->pOpt;
   char user[256] = "anonymous";
   char pass[256] = "user@";
-  char line_retr[2048];
+  char line_retr[FTP_LINE_SIZE];
   int port = 21;
 
 #if FTP_PASV
@@ -262,13 +269,20 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
       if (strnotempty(a)) {
         const size_t len_a =
             strlen(unescape_http(ftp_path, sizeof(ftp_path), a));
+        hts_boolean fits;
 
         if (len_a > 0 &&
             ftp_path[len_a - 1] == '/') { /* obviously a directory listing */
           transfer_list = 1;
-          ftp_command(line_retr, sizeof(line_retr), "LIST -A", ftp_path);
+          fits = ftp_command(line_retr, sizeof(line_retr), "LIST -A", ftp_path);
         } else {
-          ftp_command(line_retr, sizeof(line_retr), "RETR", ftp_path);
+          fits = ftp_command(line_retr, sizeof(line_retr), "RETR", ftp_path);
+        }
+        /* Clipped, the command would fetch another file under this name. */
+        if (!fits) {
+          strcpybuff(back->r.msg, "FTP path too long");
+          back->r.statuscode = STATUSCODE_INVALID;
+          _HALT_FTP return 0;
         }
       } else {
         transfer_list = 1;
@@ -298,6 +312,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     SOCaddr server;
     char *a;
     char _adr[256];
+    size_t adr_len;
     const char *error = "unknown error";
 
     _adr[0] = '\0';
@@ -315,9 +330,16 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         back->r.statuscode = STATUSCODE_INVALID; // permanent, unlike a DNS miss
         _HALT_FTP return 0;
       }
-      strncatbuff(_adr, adr, (int) (a - adr));
+      adr_len = (size_t) (a - adr);
     } else
-      strcpybuff(_adr, adr);
+      adr_len = strlen(adr);
+    // no resolvable name is this long, and clipping would query another host
+    if (adr_len >= sizeof(_adr)) {
+      htsblk_failf(&back->r, "Host name too long");
+      back->r.statuscode = STATUSCODE_INVALID;
+      _HALT_FTP return 0;
+    }
+    strncatbuff(_adr, adr, (int) adr_len);
 
     // récupérer adresse résolue
     strcpybuff(back->info, "host name");
@@ -356,7 +378,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     _CHECK_HALT_FTP;
 
     {
-      char BIGSTK line[1024];
+      char BIGSTK line[FTP_LINE_SIZE];
 
       // envoi du login
 
@@ -514,9 +536,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 #endif
           // SIZE
           if (back->r.statuscode != -1) {
-            if (!transfer_list) {
-              ftp_command(line, sizeof(line), "SIZE", ftp_path);
-
+            // a clipped probe would size and date a different file
+            if (!transfer_list &&
+                ftp_command(line, sizeof(line), "SIZE", ftp_path)) {
               // SIZE?
               strcpybuff(back->info, "size");
               send_line(soc_ctl, line);
@@ -537,22 +559,24 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 }
 
                 // MDTM?
-                ftp_command(line, sizeof(line), "MDTM", ftp_path);
-                strcpybuff(back->info, "mdtm");
-                send_line(soc_ctl, line);
-                get_ftp_line(soc_ctl, line, sizeof(line), timeout);
-                _CHECK_HALT_FTP;
-                if (ftp_parse_mdtm(line, &remote_tm)) {
-                  char date[256];
+                if (ftp_command(line, sizeof(line), "MDTM", ftp_path)) {
+                  strcpybuff(back->info, "mdtm");
+                  send_line(soc_ctl, line);
+                  get_ftp_line(soc_ctl, line, sizeof(line), timeout);
+                  _CHECK_HALT_FTP;
+                  if (ftp_parse_mdtm(line, &remote_tm)) {
+                    char date[256];
 
-                  time_rfc822(date, &remote_tm);
-                  /* Stamp the mirror as the HTTP path does, so a later pass
-                     compares server-clock times instead of crossing clocks. */
-                  back->r.lastmodified[0] = '\0';
-                  strlncatbuff(back->r.lastmodified, date,
-                               sizeof(back->r.lastmodified),
-                               sizeof(back->r.lastmodified) - 1);
-                  remote_mtime = timegm(&remote_tm);
+                    time_rfc822(date, &remote_tm);
+                    /* Stamp the mirror as the HTTP path does, so a later pass
+                       compares server-clock times instead of crossing clocks.
+                     */
+                    back->r.lastmodified[0] = '\0';
+                    strlncatbuff(back->r.lastmodified, date,
+                                 sizeof(back->r.lastmodified),
+                                 sizeof(back->r.lastmodified) - 1);
+                    remote_mtime = timegm(&remote_tm);
+                  }
                 }
 
                 /* Only over a copy back_add() judged partial: on --update every
@@ -570,7 +594,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                     rest_understood = 1;
                   } // else never mind
                 }
-              }                 // sinon tant pis 
+              }                 // sinon tant pis
             }
           }
 #if FTP_PASV
@@ -613,7 +637,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               SOCaddr_initport(server, port_pasv);
               if (connect(soc_dat, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
                 strcpybuff(back->info, "retr");
-                strcpybuff(line, line_retr);
+                // clip, never abort: this line is built from a crawled URL
+                line[0] = '\0';
+                strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
                 send_line(soc_ctl, line);
                 get_ftp_line(soc_ctl, line, sizeof(line), timeout);
                 _CHECK_HALT_FTP;
@@ -660,7 +686,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           _CHECK_HALT_FTP;
           if (line[0] == '2') { // ok
             strcpybuff(back->info, "retr");
-            strcpybuff(line, line_retr);
+            // clip, never abort: this line is built from a crawled URL
+            line[0] = '\0';
+            strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
             send_line(soc_ctl, line);
             get_ftp_line(soc_ctl, line, sizeof(line), timeout);
             _CHECK_HALT_FTP;
@@ -922,7 +950,8 @@ FILE *dd = NULL;
 // routines de réception/émission
 // 0 = ERROR
 int send_line(T_SOC soc, const char *data) {
-  char BIGSTK line[1024];
+  char BIGSTK line[FTP_LINE_SIZE + 2]; // room for the CRLF of a maximal command
+  int n;
 
   // backstop: the driver fails earlier, but no injected byte reaches the wire
   if (!hts_is_control_free(data))
@@ -942,7 +971,10 @@ int send_line(T_SOC soc, const char *data) {
   printf("---> %s", data);
   fflush(stdout);
 #endif
-  snprintf(line, sizeof(line), "%s\x0d\x0a", data);
+  // an unterminated command would blend into whatever the server reads next
+  n = snprintf(line, sizeof(line), "%s\x0d\x0a", data);
+  if (n < 0 || n >= (int) sizeof(line))
+    return 0;
   if (check_socket_connect(soc) != 1) {
 #if FTP_DEBUG
     printf("!SOC WRITE ERROR\n");

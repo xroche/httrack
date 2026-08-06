@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# An FTP command too long for the control line it is sent from must be refused,
+# not clipped into a request for another file, and must never abort (#1019).
+
+set -euo pipefail
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpcmdlen.XXXXXX") || exit 1
+trap 'set +e; rm -rf "${tmpdir}"' EXIT
+trap 'exit 1' HUP INT QUIT TERM
+
+out=$(httrack -O "${tmpdir}/st" "-#test=ftp-cmdlen" run 2>&1) ||
+    fail "self-test exited non-zero: ${out}"
+grep -q "ftp-cmdlen self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
+
+# The reachable half: a 300-byte host aborted in the copy into _adr[256].
+host=$(awk 'BEGIN { while (i++ < 300) printf "a" }')
+out=$(httrack "ftp://${host}/f.txt" -O "${tmpdir}/host" -q 2>&1) ||
+    fail "a long FTP host name crashed the engine: ${out}"
+grep -q "Host name too long" "${tmpdir}/host/hts-log.txt" ||
+    fail "the link was not rejected: $(cat "${tmpdir}/host/hts-log.txt")"

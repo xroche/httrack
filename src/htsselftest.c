@@ -4540,6 +4540,73 @@ static int st_ftpuser(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* A command that does not fit its control line must be reported, not clipped:
+   clipped, it would name a different file (#1019). Both quoting forms at two
+   capacities, since the quoted one is two bytes wider. */
+static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
+  static const size_t caps[] = {32, FTP_LINE_SIZE};
+  char BIGSTK buf[FTP_LINE_SIZE + 2];
+  char BIGSTK path[FTP_LINE_SIZE + 2];
+  char BIGSTK wire[FTP_LINE_SIZE * 2];
+  size_t c, got = 0;
+  T_SOC sv[2];
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
+    const size_t cap = caps[c];
+    int quoted;
+
+    for (quoted = 0; quoted <= 1; quoted++) {
+      const size_t verb = 5 + 2 * (size_t) quoted; /* "RETR " plus quotes */
+      const size_t fit = cap - 1 - verb; /* longest path still fitting */
+      size_t len;
+
+      for (len = fit - 1; len <= fit + 1; len++) {
+        memset(path, 'p', len);
+        path[len] = '\0';
+        if (quoted)
+          path[0] = ' ';               /* any of these forces the quoted form */
+        memset(buf, '#', sizeof(buf)); /* poison: a zero canary hides a NUL */
+        if (len > fit) {
+          assertf(ftp_command(buf, cap, "RETR", path) == HTS_FALSE);
+          assertf(buf[0] == '\0'); /* fail-safe for an ignored result */
+        } else {
+          assertf(ftp_command(buf, cap, "RETR", path) == HTS_TRUE);
+          assertf(strlen(buf) == verb + len);
+          assertf(strncmp(buf, "RETR ", 5) == 0);
+          assertf(buf[verb + len - 1] == (quoted ? '\"' : 'p'));
+        }
+        assertf(buf[cap] == '#'); /* nothing written past the bound */
+      }
+    }
+  }
+
+  /* send_line() carries the CRLF a maximal command needs, and drops rather
+     than truncates one that is longer. */
+  memset(path, 'q', FTP_LINE_SIZE);
+  path[FTP_LINE_SIZE] = '\0';
+  assertf(st_socketpair(sv) == 0);
+  assertf(send_line(sv[0], path) == 0); /* one byte too long: never sent */
+  path[FTP_LINE_SIZE - 1] = '\0';
+  assertf(send_line(sv[0], path) != 0);
+  deletesoc(sv[0]);
+  for (;;) {
+    const int n = (int) recv(sv[1], wire + got, (int) (sizeof(wire) - got), 0);
+
+    if (n <= 0)
+      break;
+    got += (size_t) n;
+  }
+  deletesoc(sv[1]);
+  assertf(got == FTP_LINE_SIZE + 1); /* the maximal command alone */
+  assertf(memcmp(wire, path, FTP_LINE_SIZE - 1) == 0);
+  assertf(memcmp(wire + FTP_LINE_SIZE - 1, "\r\n", 2) == 0);
+  printf("ftp-cmdlen self-test OK (%d bytes sent)\n", (int) got);
+  return 0;
+}
+
 /* send_line() must drop a command line carrying a control byte (#1010). */
 static int st_ftpctrl(httrackp *opt, int argc, char **argv) {
   /* Verb and URL path as run_launch_ftp() hands them over, then the line the
@@ -8120,6 +8187,8 @@ static const struct selftest_entry {
     {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
     {"ftp-ctrlchars", "", "send_line rejects a control byte in an FTP command",
      st_ftpctrl},
+    {"ftp-cmdlen", "",
+     "an FTP command too long for its control line is refused", st_ftpcmdlen},
     {"warc", "<dir>", "WARC/1.1 writer: framing, digests, revisit dedup",
      st_warc},
     {"warc-trunc", "<dir>", "WARC-Truncated on a cap-truncated body",
