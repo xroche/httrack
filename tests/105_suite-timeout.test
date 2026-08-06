@@ -151,23 +151,40 @@ if ! is_windows && test -r /proc/self/stat; then
     mkdir -p "$tmp/nops"
     printf '#!/bin/sh\nexit 127\n' >"$tmp/nops/ps"
     chmod +x "$tmp/nops/ps"
-    # Both lists match on the basename alone, so any long-lived binary will do.
-    ln -sf "$(command -v sleep)" "$tmp/httrack"
+    # Matched on the basename alone, so any long-lived binary would do -- except a
+    # renamed coreutils: uutils dispatches on argv[0] and refuses it (#1042).
+    cp "${BASH:-$(command -v sh)}" "$tmp/httrack" || fail "no shell to copy"
+    # The fakes block in open() and fork nothing, so the SIGABRT orphans no child.
+    mkfifo "$tmp/hold"
     # Started from a subshell so ppid and pgid differ: swapping those two columns
     # is invisible whenever the test shell happens to lead its own group.
     (
-        "$tmp/httrack" 60 &
+        "$tmp/httrack" -c "read _ <'$tmp/hold'" &
         echo $! >"$tmp/fake.pid"
     )
     # Its own group, to prove the filter keeps an outsider out.
     (
         set -m
-        "$tmp/httrack" 60 &
+        "$tmp/httrack" -c "read _ <'$tmp/hold'" &
         echo $! >"$tmp/outside.pid"
     )
     fake=$(cat "$tmp/fake.pid")
     outside=$(cat "$tmp/outside.pid")
     trap 'set +e; kill "$fake" "$outside" 2>/dev/null; rm -rf "$tmp"' EXIT
+    # /proc holds the pid from the fork on, so a fake that never exec'd surfaces
+    # only as an empty field far below -- which is how #1042 read.
+    running() {
+        local i=0 argv0
+        while test "$i" -lt 20; do
+            { read -r -d '' argv0 <"/proc/$1/cmdline"; } 2>/dev/null &&
+                test "${argv0##*/}" = httrack && return 0
+            sleep 0.1
+            i=$((i + 1))
+        done
+        return 1
+    }
+    running "$fake" || fail "the fake engine never started"
+    running "$outside" || fail "the outsider never started"
     # ppid and pgid of $1: the oracle the listing is checked against.
     procfields() { awk '{ sub(/.*\) /, ""); print $2, $3 }' "/proc/$1/stat"; }
     procstate() { awk '{ sub(/.*\) /, ""); print $1 }' "/proc/$1/stat" 2>/dev/null || echo gone; }
