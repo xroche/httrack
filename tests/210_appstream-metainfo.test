@@ -45,7 +45,7 @@ trap 'set +e; rm -rf "${work}"' EXIT
 
 for metainfo in "${metainfos[@]}"; do
     # Positive control: a validator that never fails would pass the check below.
-    grep -v '<id>' "${metainfo}" >"${work}/noid.xml"
+    sed '/<id>/d' "${metainfo}" >"${work}/noid.xml"
     for tool in "${tools[@]}"; do
         validate "${tool}" "${metainfo}" || {
             echo "FAIL: ${metainfo##*/} does not validate under ${tool}" >&2

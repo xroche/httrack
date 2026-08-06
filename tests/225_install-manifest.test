@@ -23,8 +23,9 @@ test -r "${manifest}" || fail "no ${manifest}"
 
 # The docs are dropped below, so a docdir holding datadir would drop the pinned
 # data files with them and leave nothing to compare.
+docdir=${CONFIGURED_DOCDIR:?not run under make check}
 case "${CONFIGURED_DATADIR:?not run under make check}" in
-"${CONFIGURED_DOCDIR:?not run under make check}" | "${CONFIGURED_DOCDIR}"/*)
+"${docdir%/}" | "${docdir%/}"/*)
     echo "docdir contains datadir; skipping" >&2
     exit 77
     ;;
