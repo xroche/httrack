@@ -64,11 +64,67 @@ stage_install_exec() {
     stage_install_target install-exec "$1" "$2"
 }
 
+IS_WINDOWS=
 is_windows() {
-    case "$(uname -s)" in
-    MINGW* | MSYS* | CYGWIN*) return 0 ;;
-    *) return 1 ;;
-    esac
+    if test -z "$IS_WINDOWS"; then
+        case "$(uname -s)" in
+        MINGW* | MSYS* | CYGWIN*) IS_WINDOWS=yes ;;
+        *) IS_WINDOWS=no ;;
+        esac
+    fi
+    test "$IS_WINDOWS" = yes
+}
+
+# Open the timer fd poll_wait reads from: a fifo held open read-write, so there is
+# always a writer and a read blocks to its own timeout instead of seeing EOF.
+POLL_STATE=
+poll_open() {
+    local f
+    POLL_STATE=forked
+    test -z "${HTTRACK_POLL_SLEEP:-}" || return 0
+    # Not under MSYS: its fifos are emulated, and the leg whose stability #795 is
+    # about is no place to discover how its select() behaves. That tick is a whole
+    # second anyway, so there is little to win.
+    is_windows && return 0
+    f="${TMPDIR:-/tmp}/.httrack-poll.$$"
+    rm -f "$f" 2>/dev/null
+    mkfifo "$f" 2>/dev/null || return 0
+    # Braced: "exec 9<>x 2>/dev/null" alone would send this shell's stderr to
+    # /dev/null for good, exec applying its redirections to the shell itself.
+    if { exec 9<>"$f"; } 2>/dev/null; then POLL_STATE=fifo; fi
+    rm -f "$f" 2>/dev/null
+    return 0
+}
+
+# One poll tick of at most $1 seconds, forking nothing where bash can time out a
+# read on that fd. A `sleep` per tick was 22% of every process the suite created,
+# and costs milliseconds apiece under MSYS (#795). HTTRACK_POLL_SLEEP=1 forces the
+# forked tick back.
+poll_wait() {
+    local secs=$1 rc=0
+    test -n "$POLL_STATE" || poll_open
+    if test "$POLL_STATE" = fifo; then
+        # bash 4.0 is where -t took a fraction; below it, hand a caller asking for
+        # one the sleep it asked for rather than rounding its tick up to a second.
+        if test "${BASH_VERSINFO[0]}" -ge 4; then
+            secs=0.1
+        else
+            case "$secs" in *.*)
+                sleep "$secs"
+                return 0
+                ;;
+            esac
+        fi
+        read -t "$secs" -r -u 9 _ || rc=$?
+        test "$rc" -le 128 || return 0 # >128 is the timeout we asked for
+        # bash 4.0 is also where a timeout started reporting >128; 3.2 says 1, which is
+        # what a closed fd says everywhere. Ask the fd itself rather than the status,
+        # or macOS retires its timer on the first tick and forks for the whole run.
+        if { : >&9; } 2>/dev/null; then return 0; fi
+        POLL_STATE=forked # not a timer any more, stop trusting it
+        exec 9<&-
+    fi
+    sleep "$1"
 }
 
 # On Windows MSYS can't signal a native python.exe, so kill_tree ends the whole
@@ -87,17 +143,24 @@ stop_server() {
 # past a second, and 5s was tight enough that macos-15 missed it on 15 tests.
 # Matches anywhere, since a warning merged via 2>&1 can precede the line.
 discover_server_port() {
-    local log=$1 pid=$2 line _i
-    for _i in $(seq 1 300); do
-        if line=$(grep -m1 '^PORT ' "$log" 2>/dev/null); then
-            printf '%s\n' "${line#PORT }"
-            return 0
+    local log=$1 pid=$2 line start=$SECONDS
+    while :; do
+        if test -r "$log"; then
+            # Read in the shell: a grep per tick is a process per tick (#795).
+            while read -r line; do
+                case "$line" in 'PORT '*)
+                    printf '%s\n' "${line#PORT }"
+                    return 0
+                    ;;
+                esac
+            done <"$log"
         fi
         kill -0 "$pid" 2>/dev/null || {
             echo "server exited early: $(cat "$log" 2>/dev/null)" >&2
             return 1
         }
-        sleep 0.1
+        test "$((SECONDS - start))" -lt 30 || break
+        poll_wait 0.1
     done
     echo "could not discover server port: $(cat "$log" 2>/dev/null)" >&2
     return 1
@@ -455,7 +518,7 @@ reap_bounded() {
     local pid=$1 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         test "$((SECONDS - start))" -le "$REAP_GRACE" || return 1
-        sleep 1
+        poll_wait 1
     done
     wait "$pid" 2>/dev/null || true
     return 0
@@ -482,7 +545,7 @@ run_with_timeout() {
             reap_bounded "$pid" || true
             return 124
         fi
-        sleep 1
+        poll_wait 1
     done
     wait "$pid"
 }
@@ -497,7 +560,7 @@ wait_bounded() {
             reap_bounded "$pid" || true
             return 124
         fi
-        sleep 1
+        poll_wait 1
     done
     wait "$pid"
 }

@@ -1,0 +1,135 @@
+#!/bin/bash
+#
+# testlib's polling helpers: the deadline tick every watchdog turns on, and the
+# wait for a fixture server's port line. Both used to fork a process per tick,
+# which is what the whole harness is built out of (#795).
+
+set -eu
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_poll.XXXXXX") || exit 1
+trap 'set +e; rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
+
+# --- the tick waits, and costs no process where the fd timer works -----------
+count_sleeps() { # count_sleeps <dir> <log>: a sleep shim recording each call
+    mkdir -p "$1"
+    printf '#!/bin/sh\necho tick >>"%s"\nexec %s "$@"\n' "$2" "$(command -v sleep)" >"$1/sleep"
+    chmod +x "$1/sleep"
+    PATH="$1:$PATH"
+    export PATH
+}
+ticks() { # ticks <label> <secs> <count>: polls, counting the sleeps they forked
+    local began=$SECONDS
+    local i=0
+    : >"$tmp/sleeps"
+    while test "$i" -lt "$3"; do
+        poll_wait "$2"
+        i=$((i + 1))
+    done
+    # A tick that returns at once turns every deadline loop into a busy spin.
+    test "$((SECONDS - began))" -ge 1 || fail "$1: $3 polls of ${2}s took under a second"
+}
+sleeps() { wc -l <"$tmp/sleeps" | tr -d ' '; }
+# Probed, not assumed: a host that cannot make a fifo -- and Windows, which opts
+# out -- is entitled to the forked tick, but one that can and took it anyway has
+# lost the whole point. The override counts as opting out too, or the escape hatch
+# for a host whose fd tick misbehaves would red the suite it exists to rescue.
+canfifo=
+if test -z "${HTTRACK_POLL_SLEEP:-}" && ! is_windows && mkfifo "$tmp/probe" 2>/dev/null; then
+    canfifo=1
+fi
+(
+    count_sleeps "$tmp/count" "$tmp/sleeps"
+    poll_wait 0.1 # settles POLL_STATE before the count
+    echo "poll tick: $POLL_STATE"
+    ticks "$POLL_STATE tick" 0.1 20
+    test -z "$canfifo" || test "$POLL_STATE" = fifo ||
+        fail "the tick fell back to sleep on a host with working fifos"
+    if test "$POLL_STATE" = fifo; then
+        if test "${BASH_VERSINFO[0]}" -ge 4; then
+            test "$(sleeps)" -eq 0 || fail "the fd tick forked $(sleeps) sleeps"
+        else
+            # No fractional read -t below bash 4, so the documented fallback is the sleep asked for.
+            test "$(sleeps)" -eq 20 || fail "bash ${BASH_VERSINFO[0]} forked $(sleeps) of 20 fractional ticks"
+        fi
+        # The whole-second tick every watchdog runs on must take the fd on every bash:
+        # where a fraction cannot, it is the only win left. Sized for ~2s either way,
+        # bash 4 shortening its own wait to 0.1s.
+        if test "${BASH_VERSINFO[0]}" -ge 4; then n=20; else n=2; fi
+        ticks "fd 1s tick" 1 "$n"
+        test "$(sleeps)" -eq 0 || fail "the 1s fd tick forked $(sleeps) sleeps"
+    fi
+    # Forced back to sleep(1), which is the only tick a shimmed sleep can reach.
+    export HTTRACK_POLL_SLEEP=1
+    POLL_STATE=
+    ticks "forced sleep tick" 0.1 20
+    test "$(sleeps)" -eq 20 || fail "HTTRACK_POLL_SLEEP did not fork a sleep per tick"
+    # A timer fd that stops timing out must fall back, not spin. Whole seconds: a
+    # fraction never reaches the fd below bash 4.
+    POLL_STATE=fifo
+    exec 9<&-
+    : >"$tmp/sleeps"
+    poll_wait 1 2>/dev/null
+    test -s "$tmp/sleeps" || fail "a dead timer fd did not fall back to sleep"
+    test "$POLL_STATE" = forked || fail "a dead timer fd was kept ($POLL_STATE)"
+)
+
+# --- the port wait outlasts a slow announcement ------------------------------
+# A cold Python start lags seconds on a loaded runner, so falling through early
+# would fail every crawl test on exactly the hosts the wait exists for.
+log="$tmp/late.log"
+: >"$log"
+(
+    sleep 2
+    echo "warning: something merged from stderr"
+    echo "PORT 40001"
+    sleep 30
+) >>"$log" 2>&1 &
+writer=$!
+began=$SECONDS
+port=$(discover_server_port "$log" "$writer") || fail "the late port line was missed"
+test "$port" = 40001 || fail "read port '$port', want 40001"
+test "$((SECONDS - began))" -ge 2 || fail "the port arrived before it was written"
+kill "$writer" 2>/dev/null || true
+wait "$writer" 2>/dev/null || true
+
+# --- a half-written line is not a port ---------------------------------------
+# The announcement is one write in practice, but reading it in two would hand the
+# crawl a truncated port number, which resolves to a different server or none.
+log="$tmp/split.log"
+printf 'PORT 40' >"$log"
+(
+    sleep 2
+    printf '002\n'
+    sleep 30
+) >>"$log" 2>&1 &
+writer=$!
+port=$(discover_server_port "$log" "$writer") || fail "the completed port line was missed"
+test "$port" = 40002 || fail "read port '$port' from a split line, want 40002"
+kill "$writer" 2>/dev/null || true
+wait "$writer" 2>/dev/null || true
+
+# --- a server that dies without announcing is reported, not waited out -------
+log="$tmp/dead.log"
+echo "Traceback: address already in use" >"$log"
+(exit 1) &
+writer=$!
+wait "$writer" 2>/dev/null || true
+began=$SECONDS
+err=$(discover_server_port "$log" "$writer" 2>&1 >/dev/null) && fail "a dead server yielded a port"
+test "$((SECONDS - began))" -lt 20 || fail "a dead server was waited out ($((SECONDS - began))s)"
+case "$err" in
+*"exited early"*) ;;
+*) fail "a dead server reported '$err'" ;;
+esac
+
+echo "poll helpers OK"

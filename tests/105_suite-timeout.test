@@ -71,11 +71,14 @@ sleep 1
 # --- the budget is wall clock, not a count of poll iterations ----------------
 # Starve the poll and a counted budget stretches with it: 10 polls of a 0.1s tick
 # become 40s, so the guard fires long after the step it was meant to beat (#795).
+# HTTRACK_POLL_SLEEP forces the forked tick, the only one a shimmed sleep reaches;
+# the loop it stretches is the same one poll_wait's fd tick drives.
 (
     starve_sleep "$tmp/starve" 4 || fail "could not install the slow sleep"
     start=$SECONDS
     rc=0
-    HTTRACK_TEST_TIMEOUT=1 bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
+    HTTRACK_POLL_SLEEP=1 HTTRACK_TEST_TIMEOUT=1 \
+        bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
     elapsed=$((SECONDS - start))
     test "$rc" -eq 124 || fail "starved guard reported $rc, want 124"
     # Generous: the diagnostics dump runs inside this window too.
