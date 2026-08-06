@@ -33,15 +33,13 @@ for flat in '#9999cc' '#040404'; do
     grep -q " ${flat}\$" <<<"${small}" || fail "16x16 icon has no ${flat} pixel"
 done
 
-# The mark covers a quarter of the tile; a hairline or a near-solid block is
-# not the monogram, and both would satisfy every count above.
+# A hairline and a near-solid block both satisfy every count above.
 ink=$(sed -n "s/ #040404\$//p" <<<"${small}")
 if test "${ink}" -lt 26 || test "${ink}" -gt 128; then
     fail "16x16 icon inks ${ink} of 256 pixels"
 fi
 
-# Control: the sizes that are still downscaled are not flat, so a counter that
-# always answered one colour could not have passed the assertions above.
+# Control: a counter blind to antialiasing would pass every assertion above.
 big=$(wc -l <<<"$(colors 48x48)")
 test "${big}" -gt 16 || fail "48x48 icon has ${big} colours, the counter is blind"
 
