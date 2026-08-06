@@ -1,0 +1,246 @@
+#!/bin/bash
+#
+# The off-box suite watchdog (#795): its pure decisions through -SelfTest, the
+# process APIs it must never name, and the driver wiring no .ps1 can check for
+# itself. It only reports, so there is no kill path here to exercise.
+
+set -euo pipefail
+
+# First, before anything can start an interpreter: the suite step exports a live
+# token, and an escaped watchdog once inherited it and posted four forged
+# "success" statuses onto the commit under test (run 31086317012).
+unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
+export WATCHDOG_CONTEXT='225_watchdog-native (never posted)'
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "$testdir/testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+wdscript="$testdir/ci-windows-watchdog.ps1"
+driver="$testdir/ci-windows-suite.sh"
+workflow="$top/.github/workflows/windows-build.yml"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wdnat.XXXXXX")
+trap 'set +e; rm -rf "$tmp"' EXIT
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+test -r "$wdscript" || fail "no $wdscript"
+test -z "${WATCHDOG_TOKEN:-}${WATCHDOG_SHA:-}" || fail "a credential survived the scrub"
+
+# The prose in the script names the very calls the audits forbid.
+uncommented() { sed 's/[[:space:]]*#.*$//' "$1"; }
+
+# Telemetry only, so every spawn and kill idiom is out, short forms included:
+# PowerShell does not need the System. prefix.
+forbidden_calls() {
+    uncommented "$1" | grep -nEi \
+        'Start-Process|Start-Job|Start-ThreadJob|Stop-Process|Invoke-Expression|[^a-z]iex[^a-z]|taskkill|cmd\.exe|wmic|schtasks|Invoke-Item|Diagnostics\.Process|\.Kill\(|(^|[^-a-zA-Z0-9_])&[[:space:]]'
+}
+if hits=$(forbidden_calls "$wdscript"); then
+    fail "the watchdog names a process API: $hits"
+fi
+# One control per idiom: a denylist is worth only the entries that actually fire.
+# shellcheck disable=SC2016 # PowerShell source, not this shell's expansions
+for probe in 'Start-Process notepad.exe' 'Stop-Process -Id 4 -Force' \
+    '[Diagnostics.Process]::Start("x")' '(Get-Process -Name httrack).Kill()' \
+    'Invoke-Expression $cmd' '& "C:\\x.exe" -y' 'Start-Job { 1 }' 'taskkill /F /IM x.exe'; do
+    {
+        cat "$wdscript"
+        echo "$probe"
+    } >"$tmp/probe.ps1"
+    if ! forbidden_calls "$tmp/probe.ps1" >/dev/null; then
+        fail "the process-API audit cannot see: $probe"
+    fi
+done
+
+# shellcheck disable=SC2016 # $env: is PowerShell's, not this shell's
+grep -q '\$env:WATCHDOG_TOKEN' "$wdscript" ||
+    fail "the watchdog does not read its token from the environment"
+if grep -q 'WATCHDOG_TOKEN' "$driver"; then
+    fail "the token reaches the watchdog through argv, where the process list exposes it"
+fi
+# A background holder of the step's stdout keeps the step open past the suite (#949).
+grep -q '>>watchdog.log 2>&1' "$driver" ||
+    fail "the watchdog's output is not redirected off the step's stdout"
+
+if test -r "$workflow"; then
+    # The heartbeat still owns the kill and must beat the step timeout, which
+    # takes the log, the annotations and the artifacts with it.
+    n=$(grep -c 'timeout-minutes:' "$workflow")
+    test "$n" -eq 1 || fail "$n timeout-minutes in the workflow, cannot tell which bounds the suite"
+    cap=$(($(awk '/timeout-minutes:/ { print $2; exit }' "$workflow") * 60))
+    stuck=$(sed -n 's/^stuck=\([0-9]*\)$/\1/p' "$driver")
+    deadline=$(sed -n 's/^suite_deadline=\([0-9]*\)$/\1/p' "$driver")
+    test -n "$stuck" || fail "cannot read the heartbeat's static window"
+    test -n "$deadline" || fail "cannot read the driver's suite deadline"
+    # A test may start one second under the deadline and never report again.
+    test $((deadline + stuck + 240)) -le "$cap" ||
+        fail "a kill at ${deadline}+${stuck}s leaves under 240s before the ${cap}s step timeout"
+
+    grep -q '^  statuses: write$' "$workflow" || fail "the workflow token cannot post a commit status"
+    grep -q '^  contents: read$' "$workflow" || fail "contents: read was dropped from the workflow"
+    for v in WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_CONTEXT; do
+        grep -q "$v:" "$workflow" || fail "$v is not passed to the suite step"
+    done
+elif test -d "$top/.github"; then
+    fail "$workflow is gone but $top/.github is not"
+else
+    echo "note: no .github under $top (dist tarball), the workflow audits did not run"
+fi
+
+# PATH holds MSYS-style entries only, and TMPDIR on Windows is a D:/... path
+# that would split it on the drive colon.
+posixtmp=$tmp
+if is_windows && command -v cygpath >/dev/null 2>&1; then
+    posixtmp=$(cygpath -u "$tmp")
+fi
+bin="$posixtmp/bin"
+mkdir -p "$bin"
+# Renamed into place, so the poll below cannot read a half-written file.
+printf '#!/bin/sh\nprintf "%%s\\n" "$@" >%s/argv.part\nmv %s/argv.part %s/argv\necho "watchdog ready"\n' \
+    "$posixtmp" "$posixtmp" "$posixtmp" >"$bin/argvstub"
+printf '#!/bin/sh\nexit 127\n' >"$bin/deadstub"
+chmod +x "$bin/argvstub" "$bin/deadstub"
+usestub() { cp "$bin/$1" "$bin/pwsh" && cp "$bin/$1" "$bin/powershell.exe"; }
+usestub argvstub
+
+if test -x "$bin/pwsh"; then
+    (
+        cd "$posixtmp"
+        # shellcheck disable=SC2030 # local to this subshell is the point
+        PATH="$bin:$PATH"
+        export PATH
+        # shellcheck source=tests/ci-windows-suite.sh
+        . "$driver"
+        ci_watchdog_pid='' ci_watchdog_exe=''
+        ci_start_native_watchdog "$posixtmp/progress.log" ||
+            fail "the launch reported no watchdog with a PowerShell on PATH"
+        test -n "$ci_watchdog_pid" || fail "the launch set no pid"
+        # wait only reaps a child, which is what the teardown has to signal.
+        wait "$ci_watchdog_pid" || fail "the watchdog is not a child of the driver"
+
+        # A pid comes from the fork, so a dead interpreter still yields one.
+        usestub deadstub
+        ci_watchdog_pid='dangling'
+        rc=0
+        ci_start_native_watchdog "$posixtmp/progress.log" || rc=$?
+        test "$rc" -ne 0 || fail "an interpreter exiting 127 was reported as launched"
+        test -z "$ci_watchdog_pid" || fail "a failed launch left pid $ci_watchdog_pid behind"
+    )
+    for _ in $(seq 1 100); do
+        test -r "$posixtmp/argv" && break
+        sleep 0.1
+    done
+    test -r "$posixtmp/argv" || fail "the watchdog was never launched"
+    grep -qx -- '-SelfTest' "$posixtmp/argv" && fail "the production launch runs the self-test"
+    grep -qx -- '-Post' "$posixtmp/argv" && fail "the production launch is the one-shot mode"
+    grep -qx -- "$wdscript" "$posixtmp/argv" ||
+        fail "the launch did not name the script: $(tr '\n' ' ' <"$posixtmp/argv")"
+    grep -qx -- "$posixtmp/progress.log" "$posixtmp/argv" || fail "the launch did not pass the progress log"
+
+    # Both outcomes: a pending status that always dangles cannot mean anything.
+    usestub argvstub
+    for probe in 0:success 3:failure; do
+        rm -f "$posixtmp/argv"
+        (
+            cd "$posixtmp"
+            # shellcheck source=tests/ci-windows-suite.sh
+            . "$driver"
+            # shellcheck disable=SC2034 # read by the driver's ci_post_final_status
+            ci_watchdog_exe="$bin/pwsh"
+            ci_post_final_status "${probe%%:*}"
+        )
+        test -r "$posixtmp/argv" || fail "no final status posted for rc ${probe%%:*}"
+        grep -qx -- "${probe#*:}" "$posixtmp/argv" ||
+            fail "rc ${probe%%:*} posted $(tr '\n' ' ' <"$posixtmp/argv"), want ${probe#*:}"
+    done
+else
+    echo "note: $tmp is noexec, the driver wiring was not driven"
+fi
+
+psruns=()
+for c in pwsh powershell.exe powershell; do
+    if command -v "$c" >/dev/null 2>&1; then
+        psruns+=("$c")
+    fi
+done
+if test "${#psruns[@]}" -eq 0; then
+    echo "SKIP: no PowerShell here, the watchdog's own self-test cannot run"
+    exit 77
+fi
+
+# Bounded: a mutant that loops forever would else be caught only by the step
+# timeout this work exists to beat. -NoPost layers over the scrub above.
+run_wd() {
+    local secs=$1
+    shift
+    # -NoPost last: everything after -File <script> belongs to the script.
+    run_with_timeout "$secs" "$psrun" "${psargs[@]}" "$@" -NoPost 2>&1
+}
+
+for psrun in "${psruns[@]}"; do
+    psargs=(-NoProfile -NonInteractive)
+    case $psrun in
+    powershell*) psargs+=(-ExecutionPolicy Bypass) ;;
+    esac
+
+    out=$(run_wd 120 -File "$(nativepath "$wdscript")" -SelfTest) ||
+        fail "the $psrun self-test failed: $out"
+    grep -q 'watchdog self-test OK' <<<"$out" || fail "the $psrun self-test said: $out"
+
+    # A mutant the script survives is a property nothing is checking.
+    mutate() {
+        local name=$1 expr=$2 m="$tmp/$1.ps1" rc=0 said
+        sed "$expr" "$wdscript" >"$m"
+        cmp -s "$wdscript" "$m" && fail "mutant $name changed nothing, so it proves nothing"
+        said=$(run_wd 120 -File "$(nativepath "$m")" -SelfTest) || rc=$?
+        test "$rc" -ne 0 || fail "mutant $name passed the $psrun self-test: $said"
+    }
+    # shellcheck disable=SC2016 # PowerShell variables, quoted for sed
+    mutate cadence-off-by-one 's/-ge \$Interval/-gt \$Interval/'
+    # shellcheck disable=SC2016
+    mutate backoff-uncapped 's/\[Math\]::Min(\$Current \* 2, 32)/$Current * 2/'
+    # shellcheck disable=SC2016
+    mutate status-unclipped '/if (\$s.Length -gt 140)/d'
+    # shellcheck disable=SC2016
+    mutate tail-always-ok 's/\$r = @{ Ok = \$false;/$r = @{ Ok = $true;/'
+
+    # Timed and counted by this shell, never read out of what the watchdog
+    # writes: the cadence and the deadline are both mine to set.
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
+        -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 5) ||
+        fail "the $psrun slow-cadence loop exited nonzero: $out"
+    slow=$(grep -c 't=[0-9]*s q=' <<<"$out" || true)
+    test "$slow" -eq 1 || fail "$slow status lines at a 100s cadence over 5s, want 1: $out"
+
+    began=$SECONDS
+    out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
+        -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 5) ||
+        fail "the $psrun loop exited nonzero: $out"
+    spent=$((SECONDS - began))
+    test "$spent" -ge 4 || fail "a 5s watchdog returned after ${spent}s: MaxSeconds is not seconds"
+    test "$spent" -le 40 || fail "a 5s watchdog ran ${spent}s: it does not stop on its own"
+    fast=$(grep -c 't=[0-9]*s q=' <<<"$out" || true)
+    # Against the slow leg, not a floor: a probe tick is not instant.
+    test "$fast" -gt "$slow" || fail "$fast status lines at 1s against $slow at 100s: $out"
+    grep -q '36_local-bigcrawl.test' <<<"$out" || fail "the status does not name the test in flight: $out"
+    grep -q '95_local-sitemap' <<<"$out" && fail "the status named a test that was never in flight"
+    # Trips if the scrub and -NoPost were both lost: only a real attempt logs this.
+    grep -q 'status post failed' <<<"$out" && fail "a test leg reached the status API"
+
+    # An unreadable log must not read as a wedged one.
+    out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
+        -ProgressLog "$(nativepath "$tmp/no-such.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 3) ||
+        fail "the $psrun loop exited nonzero on a missing log: $out"
+    grep -q 'q=?s' <<<"$out" || fail "a missing log reported a staticness: $out"
+done
+
+echo "native watchdog OK (${psruns[*]})"

@@ -29,45 +29,50 @@ ci_annotate() {
 # schedule the workflow really passes off a virtual clock instead of waiting it out.
 hb_now() { echo "$SECONDS"; }
 
-# Convert a path for PowerShell: it is native, and the suite sets
-# MSYS_NO_PATHCONV for the engine's sake.
-ci_win_path() {
-    if command -v cygpath >/dev/null 2>&1; then
-        cygpath -w "$1"
-    else
-        echo "$1"
-    fi
-}
-
-# Start the native watchdog: $1 progress log, $2 the pid it kills, $3 the static
-# window it kills after. Sets ci_watchdog_pid; returns 1 with no PowerShell. It
-# forks nothing, because a box that has stopped forking is what it is here to
-# catch, and it reports off-box, because nothing inside a dying step survives (#795).
+# Start the off-box telemetry over the progress log $1, setting ci_watchdog_pid
+# and ci_watchdog_exe; 1 with no PowerShell. Forks nothing and kills nothing, so
+# it still reports where the heartbeat below cannot (#795).
 ci_start_native_watchdog() {
-    local progress=$1 main=$2 stuck=$3 ps1 psexe='' winpid c
+    local progress=$1 ps1 c waited=0
     ps1="$testdir/ci-windows-watchdog.ps1"
     test -r "$ps1" || return 1
-    # pwsh first: the runner image carries it and the script is tested against
-    # it; powershell.exe is the floor any Windows box gives us.
+    ci_watchdog_exe=''
     for c in pwsh powershell.exe; do
         if command -v "$c" >/dev/null 2>&1; then
-            psexe=$c
+            ci_watchdog_exe=$c
             break
         fi
     done
-    test -n "$psexe" || return 1
-    # A native process is killed by its Windows pid, not the MSYS one.
-    winpid=$(cat "/proc/$main/winpid" 2>/dev/null || echo "$main")
+    test -n "$ci_watchdog_exe" || return 1
     # Never the step's stdout: a background holder of that pipe keeps the step
-    # open after the suite ends (#949). tests/*.log reaches the artifact anyway.
-    "$psexe" -NoProfile -NonInteractive -ExecutionPolicy Bypass \
-        -File "$(ci_win_path "$ps1")" \
-        -ProgressLog "$(ci_win_path "$progress")" \
-        -DriverPid "$winpid" -StuckSeconds "$stuck" \
-        >watchdog.log 2>&1 &
-    # A direct child, never one echoed out of a command substitution: the caller
-    # can then signal it, and its recorded parent stays a live pid.
+    # open past the suite (#949), and tests/*.log reaches the artifact anyway.
+    : >watchdog.log
+    "$ci_watchdog_exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+        -File "$(nativepath "$ps1")" \
+        -ProgressLog "$(nativepath "$progress")" \
+        >>watchdog.log 2>&1 &
     ci_watchdog_pid=$!
+    # $! comes from the fork, not the exec: wait for it to actually speak.
+    while test "$waited" -lt 30; do
+        grep -q '^watchdog ready$' watchdog.log && return 0
+        kill -0 "$ci_watchdog_pid" 2>/dev/null || break
+        sleep 1
+        waited=$((waited + 1))
+    done
+    kill -9 "$ci_watchdog_pid" 2>/dev/null
+    ci_watchdog_pid=''
+    return 1
+}
+
+# Post the suite's own verdict from exit status $1: the watchdog cannot see the
+# driver exit, and a pending status that never resolves says nothing.
+ci_post_final_status() {
+    local rc=$1 state=success
+    test "$rc" -eq 0 || state=failure
+    "$ci_watchdog_exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+        -File "$(nativepath "$testdir/ci-windows-watchdog.ps1")" \
+        -Post "$state" -Message "suite step ended rc=$rc" \
+        >>watchdog.log 2>&1 || true
 }
 
 ci_suite_heartbeat() {
@@ -157,27 +162,25 @@ export HTTRACK_PROGRESS_LOG="$PWD/$progress"
 
 # A dying runner takes both, and every annotation with them (measured, see
 # #795), so the watchdog's job is to end the step first: one that fails on
-# its own terms keeps its log. A kill 900s after the last progress line
-# clears the longest legitimate gap, one $per_test.
+# its own terms keeps its log. Quiet past 16 min, clear of the 13 a healthy
+# run measures here, and a kill 900s after the last progress line clears
+# the longest legitimate gap, one $per_test.
 stuck=900
-watchdog='' heartbeat='' ci_watchdog_pid=''
-ci_start_native_watchdog "$PWD/$progress" $$ "$stuck" && watchdog=$ci_watchdog_pid
-# Exactly one killer, or the loser of the race overwrites the winner's verdict.
-# The bash heartbeat costs a fork per tick, which is the first thing a wedging
-# box stops giving, and it has been silent in every recorded wedge, so it stands
-# in only where there is no PowerShell to run the native one. Quiet past 16 min,
-# clear of the 13 a healthy run measures here.
-if test -z "$watchdog"; then
-    ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ &
-    heartbeat=$!
-fi
+ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ &
+heartbeat=$!
+# Complementary, not redundant: reporting only, so it has no verdict to race.
+watchdog='' ci_watchdog_pid='' ci_watchdog_exe=''
+ci_start_native_watchdog "$PWD/$progress" && watchdog=$ci_watchdog_pid
+test -n "$watchdog" || echo "no off-box watchdog: no usable PowerShell"
 ci_stop_watchers() {
-    test -z "$heartbeat" || kill "$heartbeat" 2>/dev/null
-    # SIGKILL: PowerShell is native, and MSYS signals do not reach one.
-    test -z "$watchdog" || kill -9 "$watchdog" 2>/dev/null
+    kill "$heartbeat" 2>/dev/null
+    test -n "$watchdog" || return 0
+    # Silenced before the verdict, or its next tick overwrites it.
+    kill -9 "$watchdog" 2>/dev/null
+    ci_post_final_status "$1"
     return 0
 }
-trap 'set +e; ci_stop_watchers' EXIT
+trap 'ci_stop_watchers $? || true' EXIT
 
 pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
 # label:pattern, globbed rather than enumerated so a new NNN_engine-*.test or
