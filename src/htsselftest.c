@@ -4501,40 +4501,75 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* ftp_split_userpass: well-formed split, plus a hostile over-long userinfo
-   that pre-fix overran user[256]/pass[256]. */
+/* ftp_split_userpass: the split itself, and userinfo refused rather than
+   clipped into another account's name (#1032). */
 static int st_ftpuser(httrackp *opt, int argc, char **argv) {
-  char user[256], pass[256];
-  char in[1200];
+  static const size_t caps[] = {16, 256}; /* asymmetric: a shared bound shows */
+  char ubuf[256 + 32], pbuf[sizeof(ubuf)], poison[sizeof(ubuf)];
+  char in[2 * 256 + 8];
+  size_t c, over;
 
   (void) opt;
   (void) argc;
   (void) argv;
+  memset(poison, '#', sizeof(poison));
   {
     const char ok[] = "bob:secret@host/f"; // '@' at index 10
 
-    ftp_split_userpass(ok, ok + 11, user, sizeof(user), pass, sizeof(pass));
-    assertf(strcmp(user, "bob") == 0);
-    assertf(strcmp(pass, "secret") == 0);
+    assertf(ftp_split_userpass(ok, ok + 11, ubuf, sizeof(ubuf), pbuf,
+                               sizeof(pbuf)) == HTS_TRUE);
+    assertf(strcmp(ubuf, "bob") == 0);
+    assertf(strcmp(pbuf, "secret") == 0);
   }
-  memset(in, 'u', 400);
-  in[400] = ':';
-  memset(in + 401, 'p', 400);
-  in[801] = '@';
-  in[802] = '\0';
-  ftp_split_userpass(in, in + 802, user, sizeof(user), pass, sizeof(pass));
-  assertf(strlen(user) == sizeof(user) - 1);
-  assertf(strlen(pass) == sizeof(pass) - 1);
   {
-    /* tight sizes + guard byte catch an off-by-one the 256 case can't */
-    char ubuf[16], pbuf[16];
+    const char ok[] = "bob@host/f"; // no password: the '@' still ends the user
 
-    memset(ubuf, 'Z', sizeof(ubuf));
-    memset(pbuf, 'Z', sizeof(pbuf));
-    ftp_split_userpass(in, in + 802, ubuf, 8, pbuf, 8);
-    assertf(strcmp(ubuf, "uuuuuuu") == 0);
-    assertf(strcmp(pbuf, "ppppppp") == 0);
-    assertf(ubuf[8] == 'Z' && pbuf[8] == 'Z');
+    assertf(ftp_split_userpass(ok, ok + 4, ubuf, sizeof(ubuf), pbuf,
+                               sizeof(pbuf)) == HTS_TRUE);
+    assertf(strcmp(ubuf, "bob") == 0);
+    assertf(pbuf[0] == '\0');
+  }
+  {
+    const char ok[] = "u@relay:pw@gw/f"; // only the last '@' ends the userinfo
+
+    assertf(ftp_split_userpass(ok, ok + 11, ubuf, sizeof(ubuf), pbuf,
+                               sizeof(pbuf)) == HTS_TRUE);
+    assertf(strcmp(ubuf, "u@relay") == 0);
+    assertf(strcmp(pbuf, "pw") == 0);
+  }
+  for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
+    const size_t ucap = caps[c], pcap = caps[1 - c];
+
+    for (over = 0; over <= 1; over++) { /* overshoot the user, then the pass */
+      const size_t cap = over == 0 ? ucap : pcap;
+      size_t len;
+
+      for (len = cap - 2; len <= cap + 1; len++) {
+        const size_t user_len = over == 0 ? len : 1;
+        const size_t pass_len = over == 0 ? 1 : len;
+        const size_t total = user_len + pass_len + 2; /* the ':' and the '@' */
+        const hts_boolean fits = len < cap ? HTS_TRUE : HTS_FALSE;
+
+        memset(in, 'u', user_len);
+        in[user_len] = ':';
+        memset(in + user_len + 1, 'p', pass_len);
+        in[total - 1] = '@';
+        in[total] = '\0';
+        memcpy(ubuf, poison, sizeof(ubuf)); /* a zero canary would hide a NUL */
+        memcpy(pbuf, poison, sizeof(pbuf));
+        assertf(ftp_split_userpass(in, in + total, ubuf, ucap, pbuf, pcap) ==
+                fits);
+        if (fits) {
+          assertf(strlen(ubuf) == user_len && strlen(pbuf) == pass_len);
+          assertf(ubuf[user_len - 1] == 'u' && pbuf[pass_len - 1] == 'p');
+        } else {
+          assertf(ubuf[0] == '\0' && pbuf[0] == '\0'); /* fail safe */
+        }
+        /* the whole tail: one canary byte misses a write just past it */
+        assertf(memcmp(ubuf + ucap, poison, sizeof(ubuf) - ucap) == 0);
+        assertf(memcmp(pbuf + pcap, poison, sizeof(pbuf) - pcap) == 0);
+      }
+    }
   }
   printf("ftp-userpass self-test OK\n");
   return 0;
