@@ -214,11 +214,14 @@ if test -x "$bin/pwsh"; then
             cd "$posixtmp"
             # shellcheck source=tests/ci-windows-suite.sh
             . "$driver"
+            # macOS ships bash 3.2 as /bin/bash, which has no BASHPID: the shell
+            # a command substitution execs names this subshell as its parent.
+            me=${BASHPID:-$(exec sh -c 'echo $PPID')}
             sleep 30 &
             # shellcheck disable=SC2034 # all three are read by the driver's teardown
             watchdog=$! heartbeat='' ci_watchdog_exe="$bin/pwsh"
             ci_install_traps
-            kill -"$sig" "$BASHPID"
+            kill -"$sig" "$me"
             sleep 5
         ) >/dev/null 2>&1 || true
         test -r "$posixtmp/argv" || fail "a $sig-killed suite posted nothing"
@@ -491,9 +494,15 @@ for psrun in "${psruns[@]}"; do
         continue
     fi
 
+    # ENOSPC on stdout, which is a state the sick runner reaches. MSYS cannot
+    # hand its emulated /dev/full to a native interpreter, which then writes as
+    # if to NUL, so the leg would grade a mutant nothing can trip.
+    devfull=0
+    if ! is_windows && test -w /dev/full; then
+        devfull=1
+    fi
     legs=(cadence staticness backoff)
-    # ENOSPC on stdout, which is a state the sick runner reaches.
-    test -w /dev/full && legs+=(fullstdout)
+    test "$devfull" -eq 0 || legs+=(fullstdout)
     for leg in "${legs[@]}"; do
         said=$("${leg}_leg" "$(nativepath "$wdscript")") ||
             fail "the $psrun watchdog fails the $leg leg: $said"
@@ -520,7 +529,7 @@ for psrun in "${psruns[@]}"; do
     mutate_leg static-elapsed 's/\$static = \$now - \$movedAt/$static = $now/' staticness
     # shellcheck disable=SC2016
     mutate_leg backoff-never-skips 's/if (\$skip -gt 0)/if ($false)/' backoff
-    if test -w /dev/full; then
+    if test "$devfull" -eq 1; then
         mutate_leg log-write-fatal 's/try { \(Write-Host .*\) } catch { }/\1/' fullstdout
     fi
 done
