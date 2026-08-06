@@ -16,8 +16,11 @@ fail() {
 }
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_poll.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmp"' EXIT
-trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
+# A colon-free root for the PATH shim below: MSYS hands out a drive-letter TMPDIR
+# and a PATH entry carrying a colon is read as two, which left every count at zero.
+shim=$(mktemp -d /tmp/httrack_pollshim.XXXXXX 2>/dev/null) || shim="$tmp/count"
+trap 'set +e; rm -rf "$tmp" "$shim"' EXIT
+trap 'rm -rf "$tmp" "$shim"' HUP INT QUIT PIPE TERM
 
 # --- the tick waits, and costs no process where the fd timer works -----------
 count_sleeps() { # count_sleeps <dir> <log>: a sleep shim recording each call
@@ -26,6 +29,11 @@ count_sleeps() { # count_sleeps <dir> <log>: a sleep shim recording each call
     chmod +x "$1/sleep"
     PATH="$1:$PATH"
     export PATH
+    # Proved, not assumed: an unreachable shim counts zero sleeps, which reads as
+    # "nothing forked" and would pass the very assertions it silently disarmed.
+    : >"$2"
+    sleep 0
+    test -s "$2" || fail "the sleep shim is not on PATH (entry '$1')"
 }
 ticks() { # ticks <label> <secs> <count>: polls, counting the sleeps they forked
     local began=$SECONDS
@@ -48,7 +56,7 @@ if test -z "${HTTRACK_POLL_SLEEP:-}" && ! is_windows && mkfifo "$tmp/probe" 2>/d
     canfifo=1
 fi
 (
-    count_sleeps "$tmp/count" "$tmp/sleeps"
+    count_sleeps "$shim" "$tmp/sleeps"
     poll_wait 0.1 # settles POLL_STATE before the count
     echo "poll tick: $POLL_STATE"
     ticks "$POLL_STATE tick" 0.1 20
