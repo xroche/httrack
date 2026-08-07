@@ -112,7 +112,8 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 #define HTS_IS_CHAR_BUFFER(VAR)                                                \
   (__builtin_types_compatible_p(__typeof__(VAR), char[]))
 #else
-/* Note: a bit lame as char[8] won't be seen. */
+/* Lame: an array of exactly pointer size reads as a pointer and loses its
+   bound; keep buff() destinations off char[8] (Win64) and char[4] (Win32). */
 #define HTS_IS_CHAR_BUFFER(VAR) (sizeof(VAR) != sizeof(char *))
 #endif
 #define HTS_IS_NOT_CHAR_BUFFER(VAR) (!HTS_IS_CHAR_BUFFER(VAR))

@@ -212,8 +212,8 @@ Please visit our Website: http://www.httrack.com
 /* Maximum URL length, in bytes. Callers size URL/path string buffers to this;
    anything longer is rejected. */
 #define HTS_URLMAXSIZE 1024
-/* Maximum command-line argument length, in bytes (kept >= HTS_URLMAXSIZE*2 so
-   an addr+path pair always fits). */
+/* Maximum length of a single command-line argument, in bytes; longer is
+   rejected. A buffer holding a message built around one adds +256. */
 #define HTS_CDLMAXSIZE 1024
 /* MIME-type buffer contract (htsblk.contenttype/charset/contentencoding); holds
    the longest registered MIME type, the Office OOXML ones reaching 73 chars */

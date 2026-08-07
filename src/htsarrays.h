@@ -106,18 +106,26 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
 /**
  * Ensure at least 'ROOM' elements can be put in the remaining space.
  * After a call to this macro, TypedArrayRoom(A) is guaranteed to be at
- * least equal to 'ROOM'.
+ * least equal to 'ROOM'. Aborts if the total would not fit a size_t.
  **/
 #define TypedArrayEnsureRoom(A, ROOM)                                          \
   do {                                                                         \
     const size_t room_ = (ROOM);                                               \
-    while (TypedArrayRoom(A) < room_) {                                        \
-      TypedArrayCapa(A) = TypedArrayCapa(A) < 16 ? 16 : TypedArrayCapa(A) * 2; \
+    /* Largest element count whose byte size still fits a size_t. */           \
+    const size_t maxCapa_ = (size_t) -1 / TypedArrayWidth(A);                  \
+    const size_t minCapa_ = maxCapa_ < 16 ? maxCapa_ : 16;                     \
+    size_t capa_ = TypedArrayCapa(A);                                          \
+    assertf(room_ <= maxCapa_ - TypedArraySize(A));                            \
+    /* Saturating: a plain capa_*2 wraps to 0 and the loop never ends. */      \
+    while (capa_ - TypedArraySize(A) < room_) {                                \
+      capa_ = capa_ < minCapa_       ? minCapa_                                \
+              : capa_ > maxCapa_ / 2 ? maxCapa_                                \
+                                     : capa_ * 2;                              \
     }                                                                          \
-    TypedArrayPtr(A) =                                                         \
-        realloc(TypedArrayPtr(A), TypedArrayCapa(A) * TypedArrayWidth(A));     \
+    TypedArrayCapa(A) = capa_;                                                 \
+    TypedArrayPtr(A) = realloct(TypedArrayPtr(A), capa_ * TypedArrayWidth(A)); \
     if (TypedArrayPtr(A) == NULL) {                                            \
-      hts_record_assert_memory_failed(TypedArrayCapa(A) * TypedArrayWidth(A)); \
+      hts_record_assert_memory_failed(capa_ *TypedArrayWidth(A));              \
     }                                                                          \
   } while (0)
 
@@ -154,8 +162,7 @@ static HTS_UNUSED void hts_record_assert_memory_failed(const size_t size) {
   do {                                                                         \
     if (TypedArrayPtr(A) != NULL) {                                            \
       TypedArrayCapa(A) = TypedArraySize(A) = 0;                               \
-      free(TypedArrayPtr(A));                                                  \
-      TypedArrayPtr(A) = NULL;                                                 \
+      freet(TypedArrayPtr(A));                                                 \
     }                                                                          \
   } while (0)
 

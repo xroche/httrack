@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# htsarrays.h growth macros (driven by 'httrack -#test=arrays').
+
+# Success path: growth reaches the requested room and the payload survives
+# every reallocation.
+rc=0
+out=$(httrack -#test=arrays run) || rc=$?
+test "$rc" -eq 0 || exit 1
+test "$out" == "arrays: OK" || exit 1
+
+# A hang is the pre-fix symptom here, so bound the runs where the shell can
+# (macOS ships no timeout(1); there the suite watchdog is the backstop).
+run_bounded() {
+    if command -v timeout >/dev/null; then timeout 60 "$@"; else "$@"; fi
+}
+
+# Room whose byte size cannot fit a size_t: capa*width used to wrap, handing
+# back an allocation far smaller than the capacity claimed. Match the specific
+# bound that must reject it, so an unrelated abort cannot pass the test.
+err=$(run_bounded httrack -#test=arrays overflow-capa 2>&1) || true
+case "$err" in
+*"arrays: NOT aborted"*)
+    echo "capacity overflow was NOT caught" >&2
+    exit 1
+    ;;
+*"room_ <= maxCapa_"*) ;;
+*)
+    echo "expected the capacity bound to abort, got: $err" >&2
+    exit 1
+    ;;
+esac
+
+# Room of SIZE_MAX: doubling used to wrap the capacity to 0 and spin forever.
+# It must saturate instead, reach the allocator, and fail there.
+err=$(run_bounded httrack -#test=arrays overflow-loop 2>&1) || true
+case "$err" in
+*"arrays: NOT aborted"*)
+    echo "SIZE_MAX room was NOT caught" >&2
+    exit 1
+    ;;
+*"memory allocation failed"*) ;;
+*)
+    echo "expected the growth to terminate and fail to allocate, got: $err" >&2
+    exit 1
+    ;;
+esac
+
+exit 0

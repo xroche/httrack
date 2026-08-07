@@ -448,9 +448,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
           strcpybuff(tempo, argv[na] + 1);
           if (hts_lastchar(tempo) != '"') {
-            char BIGSTK s[HTS_CDLMAXSIZE];
+            /* +256 holds the prefix around a max-length argument. */
+            char BIGSTK s[HTS_CDLMAXSIZE + 256];
 
-            sprintf(s, "Missing quote in %s", argv[na]);
+            snprintf(s, sizeof(s), "Missing quote in %s", argv[na]);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
