@@ -178,9 +178,8 @@ static int sf_rel_is_stylesheet(const char *tag_name) {
     p = rech_tageq(tag_name + i, "rel");
     if (p == 0)
       continue;
-    /* Bounded to rel's own value, and matched as a token: an unbounded search
-       runs past this tag into the next one, so a rel="canonical" inherited a
-       later <link>'s "stylesheet" and inlined the page it named. */
+    /* rel's own value only, as a token: an unbounded search reads the next
+       tag's rel, and a stray "stylesheet" there inlines a page. */
     len = rech_endtoken(tag_name + i + p, &value);
     /* rech_endtoken stops an unquoted value at whitespace only, and runs to the
        document NUL when a quote is left open; neither may leave this tag. */
@@ -207,8 +206,8 @@ static int sf_rel_is_stylesheet(const char *tag_name) {
   return -1;
 }
 
-/* The deny table's own matcher rather than htswizard's: a NULL tag here means
-   "any tag", where there it terminates the table. */
+/* This table's own matcher, not htswizard's: here a NULL tag means "any tag",
+   there it ends the table. */
 static hts_boolean sf_denied(const char *tag_name, const char *attr) {
   size_t i;
 

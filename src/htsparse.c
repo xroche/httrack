@@ -415,10 +415,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           r->adr[i] = ' ';
         }
       }
-      /* --single-file: RFC 2046 makes the generator responsible for a
-         boundary that cannot collide with what it encapsulates. Same duty
-         here, and the same negligible odds: only chance can put this run's
-         secret in a fetched document, since no site can spell it. */
+      /* Only chance can put this run's secret in a fetched document. */
       if (opt->single_file) {
         sf_may_mark = singlefile_may_mark(opt, r->adr, (size_t) r->size);
       }
@@ -3118,10 +3115,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           /* --single-file: tag the reference for the
                              end-of-mirror pass. A fragment, so a mirror left
                              marked by an interrupted run still browses. */
-                          /* A NULL tag means "a CSS or JS body" to the
-                             classifier, so a tag we could not name must not
-                             reach it: <a href=x.png> would sail past every
-                             tag-bearing deny rule. */
+                          /* A NULL tag reads as "a CSS or JS body", so a tag
+                             we cannot name must not reach the classifier. */
                           const char sf_class =
                               (opt->single_file && sf_may_mark && !in_media &&
                                p_type == 0 && !p_searchMETAURL &&
@@ -3144,11 +3139,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             }
                           }
 
-                          /* Measured on what was appended, not on tempo: the
-                             escape above is free to change the length. The
-                             query is inside the marked span so that inlining
-                             drops it -- appended to base64 it would corrupt
-                             the payload -- while a fallback link keeps it. */
+                          /* Measured on the appended bytes, not tempo: the
+                             escape can change the length. The query sits inside
+                             the span so inlining drops it. */
                           if (sf_class != 0) {
                             char sf_mark[SINGLEFILE_MARK_MAX];
 
