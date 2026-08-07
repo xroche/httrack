@@ -67,6 +67,14 @@ fi
 # htsserver.c decodes the POST body with it, so bytes that are not what it says
 # render and convert wrong (#963).
 c1=$(printf '\302[\200-\237]')
+# A single-byte charset maps all 256 byte values, so the iconv decode above
+# can never fail on it and cannot see a value left as raw UTF-8; a whole line
+# that itself decodes as valid multi-byte UTF-8 is that leak.
+# Scoped to single-byte charsets: BIG5, gb2312 and shift-jis are multi-byte, so
+# the premise fails and their genuine text matches this shape constantly.
+# Under 8 bytes a line can be valid UTF-8 by chance (Ukrainian.txt:686 is a
+# 2-byte word that is), so short mixed-encoding lines go undetected.
+utf8_full_line='^(?=.*[\x80-\xFF])(?:[\x00-\x7F]|[\xC2-\xDF][\x80-\xBF]|\xE0[\xA0-\xBF][\x80-\xBF]|[\xE1-\xEC][\x80-\xBF]{2}|\xED[\x80-\x9F][\x80-\xBF]|[\xEE-\xEF][\x80-\xBF]{2}|\xF0[\x90-\xBF][\x80-\xBF]{2}|[\xF1-\xF3][\x80-\xBF]{3}|\xF4[\x80-\x8F][\x80-\xBF]{2})*$'
 charset_declared_matches_bytes() {
     f=$1
     cs=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "LANGUAGE_CHARSET" { p = 1; next } p { print; exit }' "$f")
@@ -86,6 +94,17 @@ charset_declared_matches_bytes() {
         echo "${f##*/}: $n lines decode to C1 controls under $cs; the bytes are a Windows codepage"
         return 1
     fi
+    case "$(printf '%s' "$cs" | LC_ALL=C tr '[:upper:]' '[:lower:]')" in
+    iso-8859-* | windows-125*)
+        while IFS=: read -r ln _; do
+            len=$(LC_ALL=C awk -v n="$ln" 'NR == n { print length($0); exit }' "$f")
+            if [ "${len:-0}" -ge 8 ]; then
+                echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
+                return 1
+            fi
+        done < <(LC_ALL=C command grep -n -P "$utf8_full_line" "$f")
+        ;;
+    esac
 }
 
 if ! command -v iconv >/dev/null 2>&1; then
@@ -95,7 +114,10 @@ else
     # No CR: BSD sed writes a literal r, and the extractor strips CR anyway.
     LC_ALL=C sed '10s/.*/UTF-8/' "$langdir/Francais.txt" >"$tmp/undecodable.txt"
     LC_ALL=C sed '10s/.*/ISO-8859-2/' "$langdir/Croatian.txt" >"$tmp/c1.txt"
-    for probe in undecodable c1; do
+    # A value line left as raw UTF-8 under a declared single-byte charset.
+    LC_ALL=C awk -v repl="$(printf 'Une fuite UTF-8 : caf\xc3\xa9, na\xc3\xafve, t\xc3\xa9l\xc3\xa9phone')" \
+        'NR == 20 { print repl; next } { print }' "$langdir/Francais.txt" >"$tmp/utf8mix.txt"
+    for probe in undecodable c1 utf8mix; do
         if charset_declared_matches_bytes "$tmp/$probe.txt" >/dev/null; then
             echo "the charset check passed a deliberately mislabelled file ($probe)"
             exit 1
