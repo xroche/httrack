@@ -1751,7 +1751,9 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
 
     room = ((size_t) -1) / sizeof(arrays_wide_t) + 1;
     TypedArrayEnsureRoom(w, room);
-    printf("arrays: NOT aborted\n"); /* must be unreachable */
+    /* Unreachable, and printing the pointer is what keeps it so: an allocation
+       reaching nobody is removable, and its "== NULL" folds away with it. */
+    printf("arrays: NOT aborted (%p)\n", TypedArrayPtr(w));
     return 1;
   } else if (argc >= 1 && strcmp(argv[0], "overflow-loop") == 0) {
     /* Doubling past SIZE_MAX used to wrap capa to 0 and spin forever. */
@@ -1759,7 +1761,7 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
 
     room = (size_t) -1;
     TypedArrayEnsureRoom(a, room);
-    printf("arrays: NOT aborted\n"); /* must be unreachable */
+    printf("arrays: NOT aborted (%p)\n", TypedArrayPtr(a)); /* unreachable */
     return 1;
   } else {
     const int err = array_growth_selftests();
