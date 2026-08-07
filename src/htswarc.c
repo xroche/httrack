@@ -851,13 +851,14 @@ static void warc_cdx_flush(warc_writer *w) {
   FILE *f;
   char catbuff[CATBUFF_SIZE];
   size_t i;
-  int werr;
+  int werr, cerr;
   if (!w->cdx_on || w->cdx_path == NULL)
     return;
-  /* a leftover index now lies about the archive that just replaced it */
   if (w->cdx_count == 0) {
-    /* a failed or abandoned run replaced nothing, so nothing is stale */
-    if (w->opened && !w->failed)
+    /* Stale only if this run touched the archive: protect_prev here means
+       warc_commit swapped it, and without it a failed run clobbered it in
+       place. */
+    if (w->protect_prev || w->failed)
       hts_log_print(w->opt, LOG_ERROR,
                     "WARC: no record was indexed, %s was not rewritten",
                     w->cdx_path);
@@ -875,13 +876,15 @@ static void warc_cdx_flush(warc_writer *w) {
     fputc('\n', f);
   }
   werr = ferror(f) != 0;
-  /* only fclose's own errno is fresh; the short write's may already be stale */
-  if (fclose(f) != 0)
-    hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
-                  "WARC: could not write the index %s", w->cdx_path);
-  else if (werr)
+  cerr = fclose(f) != 0;
+  /* a write that already failed says more than fclose echoing it, and only
+     fclose's errno is still fresh */
+  if (werr)
     hts_log_print(w->opt, LOG_ERROR, "WARC: the index %s is incomplete",
                   w->cdx_path);
+  else if (cerr)
+    hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
+                  "WARC: could not write the index %s", w->cdx_path);
 }
 
 /* ---- WACZ pages + packaging (--wacz) ---- */

@@ -2084,8 +2084,7 @@ int httpmirror(char *url1, httrackp * opt) {
     ) {
     hts_log_print(opt, LOG_NOTICE,
                   "No data seems to have been transferred during this session! : restoring previous one!");
-    /* this return skips the teardown below, so close the writer here or the
-       archive keeps its temporaries and its index is never written */
+    /* this return skips the teardown that would close the writer */
     warc_abort_opt(opt);
     XH_uninit;
     hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);

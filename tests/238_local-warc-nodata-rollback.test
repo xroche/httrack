@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# A session that saves nothing rolls the cache back through an early return that
-# skipped the WARC teardown: the archive kept its temporary and its index was
-# never written (#1041). --archive-min-files pins both files into existence, and
-# the keep check pins the rollback against replacing a good archive with the
-# empty run's.
+# A rolled-back session must leave the previous archive and its index whole, not
+# a leftover temporary and a stale .cdx (#1041). --archive-min-files pins both
+# files into existence, so the keep check cannot pass on an empty set.
 
 set -eu
 

@@ -268,3 +268,4 @@ TESTS += 225_install-manifest.test
 TESTS += 231_tests-list-bijection.test
 TESTS += 232_online-gate-outoftree.test
 TESTS += 238_local-warc-nodata-rollback.test
+TESTS += 01_zlib-warc-cdx-errors.test
