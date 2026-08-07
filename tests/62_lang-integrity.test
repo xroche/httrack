@@ -74,7 +74,10 @@ c1=$(printf '\302[\200-\237]')
 # the premise fails and their genuine text matches this shape constantly.
 # Under 8 bytes a line can be valid UTF-8 by chance (Ukrainian.txt:686 is a
 # 2-byte word that is), so short mixed-encoding lines go undetected.
-utf8_full_line='^(?=.*[\x80-\xFF])(?:[\x00-\x7F]|[\xC2-\xDF][\x80-\xBF]|\xE0[\xA0-\xBF][\x80-\xBF]|[\xE1-\xEC][\x80-\xBF]{2}|\xED[\x80-\x9F][\x80-\xBF]|[\xEE-\xEF][\x80-\xBF]{2}|\xF0[\x90-\xBF][\x80-\xBF]{2}|[\xF1-\xF3][\x80-\xBF]{3}|\xF4[\x80-\x8F][\x80-\xBF]{2})*$'
+# Raw bytes in an awk ERE, not grep -P: BSD grep has no -P. NUL is left out of
+# the ASCII range because an awk record cannot hold one, and no lang file has any.
+utf8_full_line=$(printf '^([\001-\177]|[\302-\337][\200-\277]|\340[\240-\277][\200-\277]|[\341-\354][\200-\277][\200-\277]|\355[\200-\237][\200-\277]|[\356-\357][\200-\277][\200-\277]|\360[\220-\277][\200-\277][\200-\277]|[\361-\363][\200-\277][\200-\277][\200-\277]|\364[\200-\217][\200-\277][\200-\277])*$')
+high_byte=$(printf '[\200-\377]')
 charset_declared_matches_bytes() {
     f=$1
     cs=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "LANGUAGE_CHARSET" { p = 1; next } p { print; exit }' "$f")
@@ -96,13 +99,12 @@ charset_declared_matches_bytes() {
     fi
     case "$(printf '%s' "$cs" | LC_ALL=C tr '[:upper:]' '[:lower:]')" in
     iso-8859-* | windows-125*)
-        while IFS=: read -r ln _; do
-            len=$(LC_ALL=C awk -v n="$ln" 'NR == n { print length($0); exit }' "$f")
-            if [ "${len:-0}" -ge 8 ]; then
-                echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
-                return 1
-            fi
-        done < <(LC_ALL=C command grep -n -P "$utf8_full_line" "$f")
+        ln=$(LC_ALL=C awk -v u="$utf8_full_line" -v h="$high_byte" \
+            'length($0) >= 8 && $0 ~ h && $0 ~ u { print NR; exit }' "$f")
+        if [ -n "$ln" ]; then
+            echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
+            return 1
+        fi
         ;;
     esac
 }
