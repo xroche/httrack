@@ -29,7 +29,11 @@ strays=$(grep -nv -e '^$' -e '^#' -e '^TESTS =$' -e '^TESTS += [^ ]*\.test$' "$l
 $strays"
 
 sed -n 's/^TESTS += //p' "$list" | sort >"$tmp/all"
-for f in "$testdir"/*.test; do printf '%s\n' "${f##*/}"; done | sort >"$tmp/present"
+# A directory or a dangling symlink named NN_x.test is not a test file, and
+# make check would choke on it; count it as absent.
+for f in "$testdir"/*.test; do
+    if [ -f "$f" ]; then printf '%s\n' "${f##*/}"; fi
+done | sort >"$tmp/present"
 
 # Dedupe before comparing, or a repeated entry also reads as an absent file.
 dup=$(uniq -d "$tmp/all")
