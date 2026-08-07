@@ -270,3 +270,5 @@ TESTS += 231_tests-list-bijection.test
 TESTS += 233_local-ftp-ctrl-timeout.test
 TESTS += 234_local-ftp-maxtime.test
 TESTS += 232_online-gate-outoftree.test
+TESTS += 238_local-warc-nodata-rollback.test
+TESTS += 01_zlib-warc-cdx-errors.test
