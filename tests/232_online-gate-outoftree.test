@@ -24,8 +24,8 @@ fail() {
 
 # Invocations of a helper .sh by a bare name, which reads like a lookup but is
 # resolved against the caller's cwd. An explicit "./" is left alone: it says cwd
-# outright, and ci-windows-suite.sh means it, running on a staged copy. Comments
-# are dropped, local-crawl.sh documents its own usage with a bare invocation.
+# outright, and the Windows CI driver means it, running on a staged copy.
+# Comments are dropped, local-crawl.sh documents its own usage with a bare call.
 scan_bare_paths() {
     command grep -HnE '(^|[[:space:];&|(])(bash|sh|source|\.)[[:space:]]+[A-Za-z0-9_][A-Za-z0-9_./-]*\.sh([[:space:]]|$)' "$@" |
         command grep -vE '^[^:]*:[0-9]+:[[:space:]]*#' || true
