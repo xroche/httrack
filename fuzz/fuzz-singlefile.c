@@ -86,8 +86,8 @@ static void sf_marked(String *out, const char *ref, char cls) {
   char mark[SINGLEFILE_MARK_MAX];
 
   StringCat(*out, ref);
-  StringCat(*out, singlefile_mark(sf_opt, mark, sizeof(mark), cls,
-                                  strlen(ref)));
+  StringCat(*out,
+            singlefile_mark(sf_opt, mark, sizeof(mark), cls, strlen(ref)));
 }
 
 /* \001<ref>\002 in an input becomes <ref> plus its mark, which is the only
