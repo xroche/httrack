@@ -4427,8 +4427,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             // Content-Length that would overflow the add or the
                             // (size_t) cast is dropped and refetched instead.
                             if (back[i].r.totalsize > INT32_MAX - alloc_mem) {
-                              /* Windows refuses to unlink a file we still hold
-                                 open, stranding the partial (#581) */
+                              /* Windows refuses to unlink a file still open */
                               fclose(fp);
                               fp = NULL;
                               url_savename_refname_remove(opt, back[i].url_adr,

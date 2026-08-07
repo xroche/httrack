@@ -1,11 +1,6 @@
 #!/bin/bash
 # A resume the server answers with an unusable Content-Range must drop the
-# partial and re-fetch the whole file. Three ways that recovery can be lost:
-# it was spent out of the retry budget, so --retries=0 deleted the file
-# (#1052); the latch that bounds it is missing, so an always-unusable server
-# loops; and the whole-file refetch is only forced when a Range source survives
-# the restart, which on Windows it does because unlink refuses an open file
-# (#581, fixed by #655 -- this is what holds that fix in place).
+# partial and re-fetch the whole file, once, without spending the retry budget.
 set -e
 set -u
 
@@ -51,8 +46,17 @@ which httrack >/dev/null || {
     exit 1
 }
 
-full=6008 # len(RESUME206_BODY) = len("RSM206DT") + 6000
-have=3000 # RESUME206_HAVE, what pass 1 leaves on disk
+# Read from the server's own definitions: two routes happening to share a body
+# length must not let one leg assert the other's. Bodies come back as a length.
+server_const() { # server_const <name>
+    "$python" -c 'import re, sys
+src = open(sys.argv[1]).read()
+v = eval(re.search(r"^\s*%s = (.+)$" % sys.argv[2], src, re.M).group(1))
+print(v if isinstance(v, int) else len(v))' "$server" "$1"
+}
+resume_full=$(server_const RESUME206_BODY)
+crange_full=$(server_const CRANGE206_BODY)
+have=$(server_const RESUME206_HAVE) # what pass 1 leaves on disk
 
 # Crawl until the temp-ref appears, then interrupt: that is the state a resume
 # needs (a partial plus the ref naming it).
@@ -120,8 +124,8 @@ grep -q 'Restarting whole file' <"$log" || {
     exit 1
 }
 got=$(blob_size "$out")
-test "$got" -eq "$full" || {
-    echo "FAIL: blob.bin is ${got} bytes, expected ${full}"
+test "$got" -eq "$resume_full" || {
+    echo "FAIL: blob.bin is ${got} bytes, expected ${resume_full}"
     exit 1
 }
 echo "OK (${got} bytes)"
@@ -153,12 +157,46 @@ test "$restarts" -eq 1 || {
 }
 echo "OK (1 free restart, then bounded)"
 
+# --- the latch rides a re-record, and the budget survives the restart --------
+# A redirect to a case-different alias re-records the link under a new heap
+# entry; a latch left behind there buys a free restart every hop, so this
+# server (206, redirect, 206, ...) never ends. --retries=1 also shows the free
+# restart left the budget for the genuine failure that follows.
+printf '[alias redirect cannot reset the latch] ..\t'
+out="${tmpdir}/alias"
+mkdir "$out"
+rc=0
+run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=30 -c1 --retries=1 \
+    "${base}/alias206/index.html" >"${out}.log1" 2>&1 || rc=$?
+test "$rc" -ne 124 || {
+    echo "FAIL: the crawl never terminated; the alias hop reset the latch"
+    exit 1
+}
+log="${out}/hts-log.txt"
+# Without the hop the alternation was never driven and the rest proves nothing.
+grep -q 'Warning moved treated' <"$log" || {
+    echo "FAIL: no alias hop; the re-record path was never reached"
+    exit 1
+}
+restarts=$(grep -c 'Restarting whole file' <"$log" || true)
+test "$restarts" -eq 1 || {
+    echo "FAIL: ${restarts} free restarts across the alias hops, expected 1"
+    exit 1
+}
+retries=$(grep -c 'Retry after error' <"$log" || true)
+test "$retries" -eq 1 || {
+    echo "FAIL: ${retries} retries, expected 1; the free restart spent the budget"
+    exit 1
+}
+echo "OK (1 free restart, budget intact)"
+
 # --- #581: the refetch must not depend on the removal succeeding -------------
 # Windows refuses to unlink a file it still holds open, so the partial outlives
-# the restart and the retry re-derives a Range from it. LD_PRELOAD is the only
-# way to reach that from POSIX.
-if [ "$(uname -s)" != "Linux" ]; then
-    echo "resume-recovery: unlink interposition is Linux-only here, skipping the last leg"
+# the restart. LD_PRELOAD is the only way to reach that from POSIX, and the
+# interposer needs /proc to tell an open handle from a closed one.
+if [ "$(uname -s)" != "Linux" ] || [ ! -d /proc/self/fd ]; then
+    echo "resume-recovery: unlink interposition needs Linux + /proc, skipping the last leg"
     exit 0
 fi
 # A --disable-shared build has nothing to preload; anything else missing is a
@@ -176,33 +214,39 @@ if [ ! -r "${UNLINKFAIL_LIB:-}" ]; then
     exit 1
 fi
 
-printf '[refused unlink still refetches whole] ..\t'
+printf '[partial is closed before it is unlinked] ..\t'
 out="${tmpdir}/nounlink"
 mkdir "$out"
 interrupt_pass1 "$out" crange206mem --retries=1
-refusals="${tmpdir}/refusals.txt"
-: >"$refusals"
+attempts="${tmpdir}/attempts.txt"
+: >"$attempts"
 # An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
 # refuses by default. The shim allocates nothing, so the ordering is harmless.
 export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
-export UNLINKFAIL_MATCH=blob.bin UNLINKFAIL_LOG="$refusals" LD_PRELOAD="$UNLINKFAIL_LIB"
+export UNLINKFAIL_MATCH=blob.bin UNLINKFAIL_LOG="$attempts" LD_PRELOAD="$UNLINKFAIL_LIB"
 rc=0
 run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
     --robots=0 --timeout=30 -c1 --retries=1 --continue \
     "${base}/crange206mem/index.html" >"${out}.log2" 2>&1 || rc=$?
 unset LD_PRELOAD
 test "$rc" -ne 124 || {
-    echo "FAIL: the crawl never terminated; the refetch re-derived a Range"
+    echo "FAIL: the crawl never terminated"
     exit 1
 }
 # The shim silently matching nothing would make this leg a copy of test 48.
-test -s "$refusals" || {
-    echo "FAIL: no unlink was refused; the interposer never fired"
+seen=$(wc -l <"$attempts")
+test "$seen" -ge 1 || {
+    echo "FAIL: the interposer saw no unlink of the partial; it never fired"
+    exit 1
+}
+held=$(grep -c '^open ' <"$attempts" || true)
+test "$held" -eq 0 || {
+    echo "FAIL: ${held} of ${seen} unlink(s) came while the handle was open"
     exit 1
 }
 got=$(blob_size "$out")
-test "$got" -eq "$full" || {
-    echo "FAIL: blob.bin is ${got} bytes, expected ${full} (refetch lost)"
+test "$got" -eq "$crange_full" || {
+    echo "FAIL: blob.bin is ${got} bytes, expected ${crange_full} (refetch lost)"
     exit 1
 }
-echo "OK (${got} bytes, $(wc -l <"$refusals") unlink(s) refused)"
+echo "OK (${got} bytes, ${seen} unlink(s), none on an open handle)"

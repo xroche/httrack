@@ -1613,6 +1613,29 @@ class Handler(SimpleHTTPRequestHandler):
             return self._resume206_stall()
         return self._resume206_unusable()  # unusable forever, Range or not
 
+    # An unusable 206 alternating with a redirect to a case-different alias of
+    # the same path: the hop re-records the link, and a latch lost there buys
+    # another free restart every time round (#1052).
+    _alias206_count = 0
+
+    def route_alias206_index(self):
+        self.send_html('\t<a href="Blob.bin">blob</a>')
+
+    def _alias206(self, other):
+        Handler._alias206_count += 1
+        if Handler._alias206_count % 2:
+            return self._resume206_unusable()
+        self.send_response(301, "Moved Permanently")
+        self.send_header("Location", "/alias206/" + other)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_alias206_upper(self):
+        self._alias206("blob.bin")
+
+    def route_alias206_lower(self):
+        self._alias206("Blob.bin")
+
     # error pages / 0-byte files (#17): -o0 ("no error pages") must keep 4xx/5xx
     # bodies off disk; a genuine 0-byte 200 is a valid file and stays.
     def route_errpage_index(self):
@@ -2512,6 +2535,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/resume206/blob.bin": route_resume206,
         "/resume206loop/index.html": route_resume206loop_index,
         "/resume206loop/blob.bin": route_resume206loop,
+        "/alias206/index.html": route_alias206_index,
+        "/alias206/Blob.bin": route_alias206_upper,
+        "/alias206/blob.bin": route_alias206_lower,
         "/size/index.html": route_size_index,
         "/size/oversize.bin": route_size_oversize,
         "/chunked/index.html": route_chunked_index,

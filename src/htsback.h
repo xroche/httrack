@@ -87,8 +87,8 @@ HTS_INLINE int back_exist(struct_back * sback, httrackp * opt, const char *adr,
                           const char *fil, const char *sav);
 int back_nsoc(const struct_back * sback);
 int back_nsoc_overall(const struct_back * sback);
-/* refetch_whole: force a whole-file GET, ignoring any partial/temp-ref resume
-   (set when a prior 206 was rejected as unusable, #581). */
+/* refetch_whole: force a whole-file GET, ignoring any partial/temp-ref resume;
+   also the caller's latch marking this link's one free restart spent (#581). */
 int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
              const char *adr, const char *fil, const char *save,
              const char *referer_adr, const char *referer_fil, int test,

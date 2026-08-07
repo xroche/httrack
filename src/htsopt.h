@@ -724,7 +724,8 @@ struct lien_url {
   int testmode; /**< test only: send just a HEAD */
   hts_boolean
       refetch_whole; /**< force a whole-file GET, ignoring any partial/temp-ref
-                   resume, so a rejected 206 can't loop (#581) */
+                   resume (#581); doubles as the latch spending this link's one
+                   free restart, so copy it wherever retry is copied (#1052) */
 };
 
 /* A file being fetched in the background. */
