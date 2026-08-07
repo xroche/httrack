@@ -8,6 +8,10 @@
 
 set -euo pipefail
 
+# 226 asks this of every test naming the Windows suite driver, as the sweep's
+# allowlist below does.
+unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
+
 testdir=$(cd "$(dirname "$0")" && pwd)
 
 work=$(mktemp -d)
@@ -22,17 +26,8 @@ fail() {
     exit 1
 }
 
-# Invocations of a helper .sh by a bare name, which reads like a lookup but is
-# resolved against the caller's cwd. An explicit "./" is left alone: it says cwd
-# outright, and the Windows CI driver means it, running on a staged copy.
-# Comments are dropped, local-crawl.sh documents its own usage with a bare call.
-scan_bare_paths() {
-    command grep -HnE '(^|[[:space:];&|(])(bash|sh|source|\.)[[:space:]]+[A-Za-z0-9_][A-Za-z0-9_./-]*\.sh([[:space:]]|$)' "$@" |
-        command grep -vE '^[^:]*:[0-9]+:[[:space:]]*#' || true
-}
-
-## the seven gated tests must skip for the reason the flag gave, not because the
-## gate script could not be opened
+## the gated tests must skip for the reason the flag gave, not because the gate
+## script could not be opened
 
 # Discovered rather than listed, so a new online test is covered too. Matches the
 # gate line itself, not the mentions of it in comments.
@@ -60,22 +55,118 @@ command grep -q 'online tests are disabled' <<<"$out" || fail "check-network.sh 
 out=$(cd "$work" && ONLINE_UNIT_TESTS=yes bash "$testdir/check-network.sh" 2>&1) && rc=0 || rc=$?
 test "$rc" -eq 0 || fail "check-network.sh exited $rc with the flag on, expected 0: $out"
 
-## no helper is invoked by a cwd-relative path anywhere in tests/
+## no helper anywhere in tests/ is invoked through the caller's cwd
+#
+# The gate above cannot see this class: with the flag off check-network.sh exits
+# before a test's own crawl-test.sh line is ever reached, so the sweep is the
+# only thing standing between #1016 and a rerun of it.
 
-# Control: the scanner must flag a planted call and spare the commented one, or
-# the sweep below is a clean result from a filter that cannot see the failure.
-planted="$work/planted.sh"
-# Assembled from a variable so this file does not trip its own sweep.
-bare='bash crawl-test.sh --errors 0 httrack http://example.com/'
-printf '%s\n' '#!/bin/bash' "$bare" "# $bare" >"$planted"
-hits=$(scan_bare_paths "$planted")
-command grep -q 'planted.sh:2:' <<<"$hits" || fail "scanner missed a planted bare path, got: $hits"
-if command grep -q 'planted.sh:3:' <<<"$hits"; then
-    fail "scanner flagged a commented example: $hits"
-fi
+# An invocation is safe when its operand resolves the same from any cwd: an
+# absolute path, or one built from a variable holding a directory. Quotes and a
+# leading "./" change nothing about what the shell opens, so neither is exempt.
+invoke='(^|[[:space:];&|(`])(bash|sh|source|\.)[[:space:]]+'
+quote='["'"'"']?'
+literal_re="$invoke$quote"'(\./)?[A-Za-z0-9_][A-Za-z0-9_./-]*\.sh'
+var_re="$invoke$quote"'\$\{?[A-Za-z_][A-Za-z0-9_]*\}?'"$quote"'([[:space:]]|$)'
+# Anchored at a command position, or the word inside these failure messages
+# would match and this file would pin itself.
+eval_re='(^|[;&|(`])[[:space:]]*eval[[:space:]]'
 
-hits=$(cd "$testdir" && scan_bare_paths -- *.test *.sh)
-test -z "$hits" || fail "helper scripts invoked by a cwd-relative path:
+# The only two call sites that mean the cwd: each cd's into a directory it has
+# just filled with copies, and the copy is the target. Named rather than matched
+# by shape, because a shape exemption cannot tell them from #1016 in disguise.
+allowed='172_ci-windows-driver.test ci-windows-suite.sh
+ci-windows-suite.sh test-timeout.sh'
+
+# Matching lines of the given files as file:line:text, comments dropped:
+# local-crawl.sh documents its own usage with a bare call.
+code_lines() {
+    local re=$1
+    shift
+    command grep -HnE "$re" -- "$@" | command grep -vE '^[^:]*:[0-9]+:[[:space:]]*#' || true
+}
+
+# Prints every invocation resolved against the caller's cwd, and every one whose
+# operand it cannot resolve. Silence means the files are clean.
+sweep() {
+    local hit file text script var val
+
+    while IFS= read -r hit; do
+        test -n "$hit" || continue
+        file=${hit%%:*}
+        text=${hit#*:}
+        text=${text#*:}
+        script=$(command grep -oE '[A-Za-z0-9_][A-Za-z0-9_./-]*\.sh' <<<"$text" | head -1)
+        command grep -qxF "${file##*/} $script" <<<"$allowed" || echo "cwd-relative: $hit"
+    done < <(code_lines "$literal_re" "$@")
+
+    # A variable operand is only as good as what it holds, so resolve it: an
+    # assignment that is not itself anchored, or that cannot be found in the
+    # file at all, is reported rather than assumed innocent.
+    while IFS= read -r hit; do
+        test -n "$hit" || continue
+        file=${hit%%:*}
+        text=${hit#*:}
+        text=${text#*:}
+        var=$(command grep -oE "$var_re" <<<"$text" | head -1 |
+            sed -E 's/.*\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?.*/\1/')
+        val=$(command grep -hE "^[[:space:]]*$var=" "$file" | head -1)
+        val=${val#*=}
+        val=${val#[\"\']}
+        case $val in
+        /* | \$*) ;;
+        *) echo "unresolved \$$var: $hit" ;;
+        esac
+    done < <(code_lines "$var_re" "$@")
+}
+
+# eval hides its operand from any static reading, so the set of them is pinned
+# instead: a new one fails here and gets a human's eye rather than passing unseen.
+scan_eval() {
+    code_lines "$eval_re" "$@" |
+        sed -E 's#^\./##; s/^([^:]*):[0-9]+:[[:space:]]*(.*[[:space:]])?eval[[:space:]]+/\1 /'
+}
+
+# Controls. Each evasion is a printf format here, so the forms under test reach
+# the fixtures without appearing in this file as invocations the sweep would see.
+name=crawl-test.sh
+driver=ci-windows-suite.sh
+ev=$work/evasions
+mkdir -p "$ev"
+printf '#!/bin/bash\nbash %s --errors 0\n' "$name" >"$ev/bare.sh"
+printf '#!/bin/bash\nbash ./%s --errors 0\n' "$name" >"$ev/dotslash.sh"
+printf '#!/bin/bash\nbash "%s" --errors 0\n' "$name" >"$ev/quoted.sh"
+# shellcheck disable=SC2016 # the fixture's text, not this shell's
+printf '#!/bin/bash\nS=%s\nbash $S --errors 0\n' "$name" >"$ev/indirect.sh"
+# shellcheck disable=SC2016 # the fixture's text, not this shell's
+printf '#!/bin/bash\nbash ./%s "$bin"\n' "$driver" >"$ev/impostor.sh"
+# shellcheck disable=SC2016 # the fixture's text, not this shell's
+printf '#!/bin/bash\nG="$testdir/%s"\nbash $G --errors 0\n' "$name" >"$ev/anchored.sh"
+printf '#!/bin/bash\n# bash %s --errors 0\n' "$name" >"$ev/commented.sh"
+
+for f in bare dotslash quoted indirect impostor; do
+    test -n "$(sweep "$ev/$f.sh")" || fail "the sweep let $f through: $(tail -n +2 "$ev/$f.sh")"
+done
+# The other half of the control: a rule that flags everything proves nothing.
+for f in anchored commented; do
+    out=$(sweep "$ev/$f.sh")
+    test -z "$out" || fail "the sweep flagged $f.sh, which is correct code: $out"
+done
+printf '#!/bin/bash\neval "bash %s"\n' "$name" >"$ev/eval.sh"
+test -n "$(scan_eval "$ev/eval.sh")" || fail "the eval scan missed a planted eval"
+
+hits=$(cd "$testdir" && sweep ./*.test ./*.sh)
+test -z "$hits" || fail "helper scripts reachable only from the right cwd:
 $hits"
 
-echo "OK: $count gated tests skip with the flag's reason from an out-of-tree cwd"
+# Pinned by operand, since none of these builds a command naming a helper today.
+# shellcheck disable=SC2016 # the pinned operands, quoted as they appear
+reviewed='145_webhttrack-datadir.test "${line}"
+231_tests-list-bijection.test "$mutate")
+61_webhttrack-locale.test "${block}"
+61_webhttrack-locale.test "${funcs}"'
+got=$(cd "$testdir" && scan_eval ./*.test ./*.sh | sort)
+test "$got" = "$(sort <<<"$reviewed")" || fail "the set of eval sites changed; each hides its operand from the sweep and needs reading:
+$got"
+
+echo "OK: $count gated tests skip with the flag's reason, and tests/ is free of cwd-relative helper calls"
