@@ -5650,6 +5650,15 @@ static int st_cdx_logged(const char *name, const char *want) {
   return bad;
 }
 
+/* Leave a previous run's file behind for this one to find. */
+static void st_cdx_leave(const char *path, const char *content) {
+  FILE *const fp = FOPEN(path, "wb");
+
+  assertf(fp != NULL);
+  fputs(content, fp);
+  fclose(fp);
+}
+
 /* Feed n index lines whose URLs are `pad` characters long. */
 static void st_cdx_fill(warc_writer *w, int n, size_t pad) {
   char url[1024], req[1100];
@@ -5680,7 +5689,6 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   hts_boolean saved_cdx;
   void *saved_state;
   warc_writer *w;
-  FILE *fp;
   int err = 0;
 
   if (argc < 1) {
@@ -5700,25 +5708,50 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   warc_close(w);
   err |= st_cdx_logged("first run", NULL);
 
-  /* A previous archive: this run swapped over it, so its index is stale. */
+  /* A previous archive and its index: this run swapped over the first, so the
+     second now describes an archive that is gone. */
   fconcat(path, sizeof(path), argv[0], "cdxerr-prev.warc.gz");
-  fp = FOPEN(path, "wb");
-  assertf(fp != NULL);
-  fputs("previous archive", fp);
-  fclose(fp);
+  fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-prev.cdx");
+  st_cdx_leave(path, "previous archive");
+  st_cdx_leave(cdx, "com,example)/ 20240101000000 {}\n");
   w = warc_open(opt, path);
   assertf(w != NULL);
   warc_close(w);
   err |= st_cdx_logged("swap over a previous archive", stale);
 
   /* Mirror case: written in place, then abandoned, so the archive is clobbered
-     and any index beside it describes what used to be there. */
+     and the index beside it describes what used to be there. */
   fconcat(path, sizeof(path), argv[0], "cdxerr-abort.warc.gz");
+  fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-abort.cdx");
+  st_cdx_leave(cdx, "com,example)/ 20240101000000 {}\n");
   w = warc_open(opt, path);
   assertf(w != NULL);
   opt->state.warc = w;
   warc_abort_opt(opt);
   err |= st_cdx_logged("abandoned in-place run", stale);
+
+  /* Same, with no index left behind: the message would name a file that never
+     existed, which is the false alarm the gate is there to avoid. */
+  fconcat(path, sizeof(path), argv[0], "cdxerr-abort-noidx.warc.gz");
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+  opt->state.warc = w;
+  warc_abort_opt(opt);
+  err |= st_cdx_logged("abandoned run with no index", NULL);
+
+  /* An archive that never opened replaced nothing, so the index beside it
+     still describes what is there: the failed open is the only error. */
+  fconcat(path, sizeof(path), argv[0], "cdxerr-noopen.warc.gz");
+  fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-noopen.cdx");
+  st_cdx_leave(cdx, "com,example)/ 20240101000000 {}\n");
+  if (MKDIR(path) != 0 && errno != EEXIST) {
+    fprintf(stderr, "warc-cdx-errors: mkdir %s failed: %s\n", path,
+            strerror(errno));
+    err = 1;
+  } else {
+    assertf(warc_open(opt, path) == NULL);
+    err |= st_cdx_logged("archive that never opened", NULL);
+  }
 
   /* The index path cannot be opened at all. */
   fconcat(path, sizeof(path), argv[0], "cdxerr-fopen.warc.gz");

@@ -855,10 +855,9 @@ static void warc_cdx_flush(warc_writer *w) {
   if (!w->cdx_on || w->cdx_path == NULL)
     return;
   if (w->cdx_count == 0) {
-    /* Stale only if this run touched the archive: protect_prev here means
-       warc_commit swapped it, and without it a failed run clobbered it in
-       place. */
-    if (w->protect_prev || w->failed)
+    /* Stale only if an index is still on disk and this run wrote an archive
+       over what it describes: opened covers the swap and the in-place run. */
+    if (w->opened && fsize_utf8(w->cdx_path) > 0)
       hts_log_print(w->opt, LOG_ERROR,
                     "WARC: no record was indexed, %s was not rewritten",
                     w->cdx_path);
