@@ -138,6 +138,66 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # The Ubuntu buildds run a development release every runner above is well behind.
+  # That gap is what shipped 3.49.18 broken on every Ubuntu architecture but
+  # riscv64, when 25.10 made uutils the default coreutils (#1042).
+  ubuntu-devel:
+    name: build (Ubuntu devel, uutils coreutils)
+    runs-on: ubuntu-24.04
+    container: ubuntu:devel
+    timeout-minutes: 40
+    steps:
+      # Before checkout: the container has no git, so submodules would be lost.
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
+            git ca-certificates python3 procps
+
+      - name: Assert the coreutils dispatch on argv[0]
+        # The property #1042 broke on, not the version banner, which uutils has
+        # already reworded once. Without it the job quietly becomes a slower copy
+        # of the one above.
+        run: |
+          set -euo pipefail
+          ln -s "$(command -v sleep)" /tmp/not-a-coreutil
+          if /tmp/not-a-coreutil 0; then
+            echo "::error::coreutils here take any argv[0]; this image no longer guards uutils" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+          # A renamed dev package would disable a codec or TLS here, and the tests
+          # that cover them would SKIP rather than fail.
+          grep -q "define HTS_USEBROTLI 1" config.h
+          grep -q "define HTS_USEZSTD 1" config.h
+          grep -q "define HTS_USEOPENSSL 1" config.h
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          make check -j"$jobs"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
   # Portability: build and test on macOS (Darwin/clang) on a native runner --
   # no VM. The tree has no __APPLE__ branches, so Darwin exercises the
   # generic-Unix path on a second libc and kernel. brew's openssl@3 is keg-only,

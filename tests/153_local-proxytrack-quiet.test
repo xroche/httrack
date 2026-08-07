@@ -126,8 +126,13 @@ wait_drained() { # log
 
 quietport=$(freeport)
 : >"$dir/quiet.log" # the drainer creates it asynchronously
-env -u HTS_LOG "$python" -c "$pty_exec" "$dir/quiet.log" \
-    proxytrack "127.0.0.1:$quietport" "127.0.0.1:$(freeport)" "$dir/in.arc" &
+# Subshell, not env(1): uutils' env forks rather than execs, so stop_server would
+# kill the wrapper and leave proxytrack holding the pty open (#1042).
+(
+    unset HTS_LOG
+    exec "$python" -c "$pty_exec" "$dir/quiet.log" \
+        proxytrack "127.0.0.1:$quietport" "127.0.0.1:$(freeport)" "$dir/in.arc"
+) &
 quietpid=$!
 wait_listen "$dir/quiet.log" "$quietpid"
 
