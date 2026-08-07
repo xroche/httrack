@@ -854,11 +854,13 @@ static void warc_cdx_flush(warc_writer *w) {
   int werr;
   if (!w->cdx_on || w->cdx_path == NULL)
     return;
-  /* the archive was just swapped in, so an index left behind now lies */
+  /* a leftover index now lies about the archive that just replaced it */
   if (w->cdx_count == 0) {
-    hts_log_print(w->opt, LOG_ERROR,
-                  "WARC: no record was indexed, %s was not rewritten",
-                  w->cdx_path);
+    /* a failed or abandoned run replaced nothing, so nothing is stale */
+    if (w->opened && !w->failed)
+      hts_log_print(w->opt, LOG_ERROR,
+                    "WARC: no record was indexed, %s was not rewritten",
+                    w->cdx_path);
     return;
   }
   qsort(w->cdx_lines, w->cdx_count, sizeof(char *), cdx_cmp);
@@ -873,9 +875,13 @@ static void warc_cdx_flush(warc_writer *w) {
     fputc('\n', f);
   }
   werr = ferror(f) != 0;
-  if (fclose(f) != 0 || werr)
+  /* only fclose's own errno is fresh; the short write's may already be stale */
+  if (fclose(f) != 0)
     hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
                   "WARC: could not write the index %s", w->cdx_path);
+  else if (werr)
+    hts_log_print(w->opt, LOG_ERROR, "WARC: the index %s is incomplete",
+                  w->cdx_path);
 }
 
 /* ---- WACZ pages + packaging (--wacz) ---- */
@@ -1682,6 +1688,16 @@ int warc_surt(const char *url, char *out, size_t outsz) {
 void warc_close_opt(httrackp *opt) {
   if (opt->state.warc != NULL && opt->state.warc != WARC_DISABLED) {
     warc_close((warc_writer *) opt->state.warc);
+  }
+  opt->state.warc = NULL;
+}
+
+void warc_abort_opt(httrackp *opt) {
+  if (opt->state.warc != NULL && opt->state.warc != WARC_DISABLED) {
+    warc_writer *const w = (warc_writer *) opt->state.warc;
+    /* the session is rolling back, so this run must replace nothing */
+    w->failed = HTS_TRUE;
+    warc_close(w);
   }
   opt->state.warc = NULL;
 }

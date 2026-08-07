@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# A session that saves nothing rolls the cache back through an early return that
+# skipped the WARC teardown: the archive kept its temporary and its index was
+# never written (#1041). --archive-min-files pins both files into existence, and
+# the keep check pins the rollback against replacing a good archive with the
+# empty run's.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 --archive-kept-on-rerun \
+    --archive-min-files 2 --rerun-args '-C0' \
+    httrack 'BASEURL/nosuch/page.html' --warc-file warc-out --warc-cdx

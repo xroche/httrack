@@ -41,9 +41,9 @@
 # --archive-kept-on-rerun: the second pass must leave the first pass's
 # .warc[.gz]/.cdx/.wacz byte-identical, having no bodies to replace them (#759).
 # --archive-replaced-on-rerun is its mirror: every one of them is poisoned
-# between the passes and no marker may survive. Comparing bytes instead is
-# flaky: a repeat crawl can reproduce a .cdx exactly, it holds no per-run
-# entropy (#1041). Both also require no *.tmp left behind, and take an optional
+# between the passes and no poison may survive. Comparing bytes instead is flaky,
+# a repeat crawl can reproduce a .cdx exactly since it holds no per-run entropy
+# (#1041). Both also require no *.tmp left behind, and take an optional
 # --archive-min-files N guarding against a scenario that silently stopped
 # producing the segments it means to check.
 # --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
@@ -352,7 +352,7 @@ if test -n "${archive_kept}${archive_replaced}"; then
 fi
 
 # Poison what the second pass must replace: it moves a fresh file over each one,
-# so no marker may survive (#726, #1041).
+# so no poison may survive (#726, #1041).
 declare -a poisoned_files=()
 if test -z "$archive_kept" && test -n "${rerun}${rerun_args}"; then
     if test -n "$archive_replaced"; then
@@ -369,7 +369,7 @@ if test -z "$archive_kept" && test -n "${rerun}${rerun_args}"; then
     done
 fi
 test -z "$archive_replaced" || test "${#poisoned_files[@]}" -gt 0 ||
-    die "--archive-replaced-on-rerun without a second pass asserts nothing"
+    die "--archive-replaced-on-rerun poisoned nothing, so it would assert nothing"
 
 # --- plant leftovers the second pass has to deal with ------------------------
 if test "${#plants[@]}" -gt 0; then
@@ -433,7 +433,7 @@ if test -n "$rerun_args"; then
     result "OK (second pass)"
 fi
 
-# --- optional: did the second pass keep, or replace, the whole archive? ------
+# --- optional: did the second pass keep the whole archive byte-identical? ----
 if test -n "$archive_kept" && test "${#archive_files[@]}" -gt 0; then
     i=0
     for f in "${archive_files[@]}"; do
@@ -444,6 +444,7 @@ if test -n "$archive_kept" && test "${#archive_files[@]}" -gt 0; then
         i=$((i + 1))
     done
 fi
+# ...and did it replace what was poisoned above?
 i=0
 while test "$i" -lt "${#poisoned_files[@]}"; do
     f="${poisoned_files[$i]}"

@@ -2084,6 +2084,9 @@ int httpmirror(char *url1, httrackp * opt) {
     ) {
     hts_log_print(opt, LOG_NOTICE,
                   "No data seems to have been transferred during this session! : restoring previous one!");
+    /* this return skips the teardown below, so close the writer here or the
+       archive keeps its temporaries and its index is never written */
+    warc_abort_opt(opt);
     XH_uninit;
     hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
     opt->state.exit_xh = 2;     /* interrupted (no connection detected) */
