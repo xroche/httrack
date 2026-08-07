@@ -3802,8 +3802,17 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         break;
       }
 
+      /* A refused resume restarts the same transfer rather than retrying a
+         failed one, so it must not spend the budget; refetch_whole, set only by
+         a previous restart, latches it to one so an always-unusable server
+         cannot loop (#1052). */
+      const hts_boolean restart_whole =
+          r->refetch_wholefile && !heap(ptr)->refetch_whole;
+
       if (strcmp(heap(ptr)->fil, "/primary") != 0) {   // no primary (internal page 0)
-        if ((heap(ptr)->retry <= 0) || (!can_retry)) { // retry épuisés (ou retry impossible)
+        if (!restart_whole &&
+            ((heap(ptr)->retry <= 0) ||
+             (!can_retry))) { // retry épuisés (ou retry impossible)
           if ((opt->retry > 0) && (can_retry)) {
             hts_log_print(opt, LOG_ERROR,
                           "\"%s\" (%d) after %d retries at link %s%s (from %s%s)",
@@ -3853,19 +3862,29 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             }
           }
 
-        } else {                // retry!!
-          hts_log_print(opt, LOG_NOTICE,
-                        "Retry after error %d (%s) at link %s%s (from %s%s)",
-                        r->statuscode, r->msg, urladr(), urlfil(),
-                        heap(heap(ptr)->precedent)->adr,
-                        heap(heap(ptr)->precedent)->fil);
+        } else { // retry, or a refused-resume restart
+          if (restart_whole) {
+            hts_log_print(opt, LOG_NOTICE,
+                          "Restarting whole file after error %d (%s) at link "
+                          "%s%s (from %s%s)",
+                          r->statuscode, r->msg, urladr(), urlfil(),
+                          heap(heap(ptr)->precedent)->adr,
+                          heap(heap(ptr)->precedent)->fil);
+          } else {
+            hts_log_print(opt, LOG_NOTICE,
+                          "Retry after error %d (%s) at link %s%s (from %s%s)",
+                          r->statuscode, r->msg, urladr(), urlfil(),
+                          heap(heap(ptr)->precedent)->adr,
+                          heap(heap(ptr)->precedent)->fil);
+          }
           // redemander fichier
           if (hts_record_link(opt, urladr(), urlfil(), savename(), "", "", codebase)) {
             heap_top()->testmode = heap(ptr)->testmode;   // mode test?
             heap_top()->link_import = 0;   // pas mode import
             heap_top()->depth = heap(ptr)->depth;
             heap_top()->pass2 = max(heap(ptr)->pass2, numero_passe);
-            heap_top()->retry = heap(ptr)->retry - 1;     // moins 1 retry!
+            heap_top()->retry =
+                restart_whole ? heap(ptr)->retry : heap(ptr)->retry - 1;
             heap_top()->premier = heap(ptr)->premier;
             heap_top()->precedent = heap(ptr)->precedent;
             // a rejected resume (unusable 206) must refetch whole, no Range

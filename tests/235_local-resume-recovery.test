@@ -1,0 +1,208 @@
+#!/bin/bash
+# A resume the server answers with an unusable Content-Range must drop the
+# partial and re-fetch the whole file. Three ways that recovery can be lost:
+# it was spent out of the retry budget, so --retries=0 deleted the file
+# (#1052); the latch that bounds it is missing, so an always-unusable server
+# loops; and the whole-file refetch is only forced when a Range source survives
+# the restart, which on Windows it does because unlink refuses an open file
+# (#581, fixed by #655 -- this is what holds that fix in place).
+set -e
+set -u
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+# Pass 1 has to be interrupted mid-download to leave the temp-ref the resume
+# needs, and MSYS cannot signal a native exe.
+if is_windows; then
+    echo "Windows: the pass-1 interrupt needs a signal MSYS cannot deliver, skipping"
+    exit 77
+fi
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_resume.XXXXXX") || exit 1
+serverpid=
+crawlpid=
+cleanup() {
+    set +e
+    test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+# stdin off the terminal: run_with_timeout toggles job control, and a background
+# job that touches the tty is stopped with SIGTTIN.
+"$python" "$server" --root "$root" >"$serverlog" 2>&1 </dev/null &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+
+full=6008 # len(RESUME206_BODY) = len("RSM206DT") + 6000
+have=3000 # RESUME206_HAVE, what pass 1 leaves on disk
+
+# Crawl until the temp-ref appears, then interrupt: that is the state a resume
+# needs (a partial plus the ref naming it).
+interrupt_pass1() { # interrupt_pass1 <out> <route> <extra httrack args...>
+    local out=$1 route=$2
+    shift 2
+    local refdir="${out}/hts-cache/ref"
+    httrack -O "$out" --quiet --disable-security-limits --robots=0 \
+        --timeout=30 -c1 "$@" "${base}/${route}/index.html" \
+        >"${out}.log1" 2>&1 &
+    crawlpid=$!
+    local _
+    for _ in $(seq 1 300); do
+        test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" && break
+        kill -0 "$crawlpid" 2>/dev/null || break
+        sleep 0.1
+    done
+    sleep 0.3
+    kill -TERM "$crawlpid" 2>/dev/null
+    wait "$crawlpid" 2>/dev/null || true
+    crawlpid=
+    test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
+        echo "FAIL: no temp-ref survived pass 1; cannot drive the resume"
+        exit 1
+    }
+}
+
+blob_size() { # blob_size <out>
+    local blob
+    blob=$(find "$1" -name blob.bin 2>/dev/null | head -1)
+    test -n "$blob" || {
+        echo 0
+        return
+    }
+    wc -c <"$blob"
+}
+
+# --- #1052: --retries=0 must still recover -----------------------------------
+# The restart is the same transfer asked for differently, so it must not be
+# charged to the retry budget. Before the fix this deleted the file.
+printf '[--retries=0 recovers the whole file] ..\t'
+out="${tmpdir}/retry0"
+mkdir "$out"
+interrupt_pass1 "$out" resume206 --retries=0
+test "$(blob_size "$out")" -eq "$have" || {
+    echo "FAIL: pass 1 left $(blob_size "$out") bytes, expected ${have}"
+    exit 1
+}
+rc=0
+run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=30 -c1 --retries=0 --continue \
+    "${base}/resume206/index.html" >"${out}.log2" 2>&1 || rc=$?
+test "$rc" -ne 124 || {
+    echo "FAIL: the crawl never terminated"
+    exit 1
+}
+log="${out}/hts-log.txt"
+# Without these the recovery could not have been exercised at all.
+grep -q 'Unusable partial-content range' <"$log" || {
+    echo "FAIL: the resume was never rejected; the test proved nothing"
+    exit 1
+}
+grep -q 'Restarting whole file' <"$log" || {
+    echo "FAIL: the restart did not run outside the retry budget"
+    exit 1
+}
+got=$(blob_size "$out")
+test "$got" -eq "$full" || {
+    echo "FAIL: blob.bin is ${got} bytes, expected ${full}"
+    exit 1
+}
+echo "OK (${got} bytes)"
+
+# --- the latch bounds an always-unusable server ------------------------------
+# This server answers every request unusably, with or without a Range, so an
+# ungated restart would requeue forever. Exactly one is free; the rest fall
+# back to the retry budget, which --retries=0 empties immediately.
+printf '[always-unusable server terminates] ..\t'
+out="${tmpdir}/loop"
+mkdir "$out"
+interrupt_pass1 "$out" resume206loop --retries=0
+rc=0
+run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=30 -c1 --retries=0 --continue \
+    "${base}/resume206loop/index.html" >"${out}.log2" 2>&1 || rc=$?
+test "$rc" -ne 124 || {
+    echo "FAIL: the crawl never terminated; the restart is unbounded"
+    exit 1
+}
+grep -q 'Unusable partial-content range' <"${out}/hts-log.txt" || {
+    echo "FAIL: the resume was never rejected; the latch was not exercised"
+    exit 1
+}
+restarts=$(grep -c 'Restarting whole file' <"${out}/hts-log.txt" || true)
+test "$restarts" -eq 1 || {
+    echo "FAIL: ${restarts} free restarts, expected exactly 1 (latch)"
+    exit 1
+}
+echo "OK (1 free restart, then bounded)"
+
+# --- #581: the refetch must not depend on the removal succeeding -------------
+# Windows refuses to unlink a file it still holds open, so the partial outlives
+# the restart and the retry re-derives a Range from it. LD_PRELOAD is the only
+# way to reach that from POSIX.
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "resume-recovery: unlink interposition is Linux-only here, skipping the last leg"
+    exit 0
+fi
+# A --disable-shared build has nothing to preload; anything else missing is a
+# build problem, not a skip, or this leg would pass vacuously.
+if [ ! -r "${UNLINKFAIL_LA:-}" ]; then
+    echo "resume-recovery: ${UNLINKFAIL_LA:-\$UNLINKFAIL_LA} was not built" >&2
+    exit 1
+fi
+if grep -q "^dlname=''" "$UNLINKFAIL_LA"; then
+    echo "resume-recovery: static-only build, skipping the interposed leg"
+    exit 0
+fi
+if [ ! -r "${UNLINKFAIL_LIB:-}" ]; then
+    echo "resume-recovery: ${UNLINKFAIL_LIB:-\$UNLINKFAIL_LIB} was not built" >&2
+    exit 1
+fi
+
+printf '[refused unlink still refetches whole] ..\t'
+out="${tmpdir}/nounlink"
+mkdir "$out"
+interrupt_pass1 "$out" crange206mem --retries=1
+refusals="${tmpdir}/refusals.txt"
+: >"$refusals"
+# An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
+# refuses by default. The shim allocates nothing, so the ordering is harmless.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+export UNLINKFAIL_MATCH=blob.bin UNLINKFAIL_LOG="$refusals" LD_PRELOAD="$UNLINKFAIL_LIB"
+rc=0
+run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=30 -c1 --retries=1 --continue \
+    "${base}/crange206mem/index.html" >"${out}.log2" 2>&1 || rc=$?
+unset LD_PRELOAD
+test "$rc" -ne 124 || {
+    echo "FAIL: the crawl never terminated; the refetch re-derived a Range"
+    exit 1
+}
+# The shim silently matching nothing would make this leg a copy of test 48.
+test -s "$refusals" || {
+    echo "FAIL: no unlink was refused; the interposer never fired"
+    exit 1
+}
+got=$(blob_size "$out")
+test "$got" -eq "$full" || {
+    echo "FAIL: blob.bin is ${got} bytes, expected ${full} (refetch lost)"
+    exit 1
+}
+echo "OK (${got} bytes, $(wc -l <"$refusals") unlink(s) refused)"
