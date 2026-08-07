@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbauth.h"
 #include "htsthread.h"
 #include "htsback.h"
+#include "htsftp.h"
 #include "htswrap.h"
 #include "htsmd5.h"
 #include "htsmodules.h"
@@ -6126,6 +6127,9 @@ HTSEXT_API size_t hts_sizeof_opt(void) {
 
 HTSEXT_API void hts_free_opt(httrackp * opt) {
   if (opt != NULL) {
+    /* An FTP worker reads opt for its whole run, and not every caller drains
+       its threads the way httrack.c does before getting here (#1051). */
+    ftp_stop_workers();
 
     /* Alocated callbacks */
 

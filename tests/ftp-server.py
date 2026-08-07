@@ -8,6 +8,8 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
 
   truncate  send a prefix of the body, then drop the data connection
   empty     open the data connection and send nothing
+  trickle   dribble the body out in small chunks, keeping it in flight for long
+  stall     send a prefix, then hold the data connection open sending nothing
   norest    answer REST with 500, so the client re-fetches from scratch
   nomdtm    answer MDTM with 500, like a server predating RFC 3659
 
@@ -20,6 +22,13 @@ import socket
 import sys
 import threading
 import time
+
+
+TRICKLE_CHUNK = 8192
+TRICKLE_PAUSE = 0.2
+# Enough to trip a --max-size cap before the silence starts.
+STALL_PREFIX = 200000
+STALL_SECONDS = 600
 
 
 def reply(conn, text):
@@ -91,6 +100,14 @@ class Session(threading.Thread):
                 pass
             elif "truncate" in modes:
                 data.sendall(body[: max(1, len(body) // 8)])
+            elif "trickle" in modes:
+                for off in range(0, len(body), TRICKLE_CHUNK):
+                    data.sendall(body[off : off + TRICKLE_CHUNK])
+                    time.sleep(TRICKLE_PAUSE)
+            elif "stall" in modes:
+                data.sendall(body[:STALL_PREFIX])
+                for _ in range(STALL_SECONDS):
+                    time.sleep(1)
             else:
                 data.sendall(body)
         except OSError:
