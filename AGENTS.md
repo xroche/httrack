@@ -40,6 +40,10 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   match that is not on the last line is exposed. Capture the reply, assert the
   status line it must carry (an empty, truncated or redirected one is
   marker-free too), then match with a here-string: `grep -q M <<<"$reply"`.
+  `head -c N` and `head -n N` end the same way, and there the reds are
+  platform-specific: GNU `tail | head -c 3` survives, the uutils coreutils leg
+  turns the same line into exit 141 with no output at all. Let the reader seek
+  instead: `od -An -c -j <skip> -N <len> file`.
 
 ## Hard invariants
 - **Generated autotools files are NOT in git.** `configure`, every
