@@ -67,6 +67,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsurlport.h"
 #include "htsweb.h"
 #include "htscharset.h"
+#include "htsrandom.h"
 
 #if USE_BEGINTHREAD==0
 #error fatal: no threads support
@@ -99,50 +100,6 @@ extern char *commandReturnCmdl;
 
 static void htsweb_sig_brpipe(int code) {
   /* ignore */
-}
-
-#ifdef _WIN32
-/* RtlGenRandom, resolved at runtime so no import library is needed. */
-typedef BOOLEAN(WINAPI *hts_rtlgenrandom_t)(PVOID buffer, ULONG length);
-#endif
-
-/* Fill buffer with system entropy; HTS_FALSE if no source answered. There is
-   deliberately no weak fallback: the caller mints a secret with it. */
-static hts_boolean hts_random_bytes(void *buffer, size_t size) {
-#ifdef _WIN32
-  hts_boolean ok = HTS_FALSE;
-  HMODULE dll = LoadLibraryA("advapi32.dll");
-
-  if (dll != NULL) {
-    hts_rtlgenrandom_t gen =
-        (hts_rtlgenrandom_t) GetProcAddress(dll, "SystemFunction036");
-
-    /* the ULONG cast must not truncate; callers ask for a few dozen bytes */
-    if (gen != NULL && size <= 0x10000 && gen(buffer, (ULONG) size)) {
-      ok = HTS_TRUE;
-    }
-    FreeLibrary(dll);
-  }
-  return ok;
-#else
-  unsigned char *dst = (unsigned char *) buffer;
-  size_t done = 0;
-  FILE *fp = fopen("/dev/urandom", "rb");
-
-  if (fp == NULL) {
-    return HTS_FALSE;
-  }
-  while (done < size) {
-    const size_t n = fread(dst + done, 1, size - done, fp);
-
-    if (n == 0) { /* short read is a hard failure, not partial credit */
-      break;
-    }
-    done += n;
-  }
-  fclose(fp);
-  return done == size ? HTS_TRUE : HTS_FALSE;
-#endif
 }
 
 /* Threads that never return; no wait may count on them draining. */

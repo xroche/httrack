@@ -6055,6 +6055,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->changes_state = NULL;
   opt->single_file = HTS_FALSE;
   opt->single_file_max_size = SINGLEFILE_DEFAULT_MAX_SIZE;
+  opt->singlefile_state = NULL;
   StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;
   opt->pause_max_ms = 0;
@@ -6209,6 +6210,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->warc_file);
     StringFree(opt->sitemap_url);
     hts_sitemap_free(opt); /* backstop: httpmirror's early-return paths */
+    singlefile_free(opt);
 
     hts_changes_free_opt(opt);
 

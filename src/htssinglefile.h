@@ -55,18 +55,66 @@ extern "C" {
    so a few hundred bytes of hostile CSS can otherwise ask for gigabytes. */
 #define SINGLEFILE_MAX_PAGE_SIZE (64 * 1024 * 1024)
 
-/* Rewrite every HTML page the mirror produced. No-op unless opt->single_file;
-   call once the tree is final, after the update purge. */
+/* The mark htsparse appends to a saved reference the pass may inline:
+
+     #!<16-hex secret>.<class>.<len>
+
+   A fragment, so a mirror left marked by an interrupted run still browses.
+   The secret is 64 CSPRNG bits drawn once per run and never written to disk,
+   which is what makes the mark unforgeable: a site cannot spell one, so no
+   sanitiser has to keep hostile bytes away from it. <len> is the byte length
+   of the reference text immediately preceding the mark, so the pass never has
+   to guess where that reference starts. <class> is the context htsparse saw,
+   checked against the resolved type so a mismatch fails loudly. */
+#define SINGLEFILE_MARK_INTRO "#!"
+#define SINGLEFILE_SECRET_HEX 16
+
+/* Bytes before the ".<class>.<len>" tail. */
+#define SINGLEFILE_INTRO_LEN                                                   \
+  (sizeof(SINGLEFILE_MARK_INTRO) - 1 + SINGLEFILE_SECRET_HEX)
+
+/* <class>: what the referencing context expects. */
+#define SINGLEFILE_CLASS_ANY '-'
+#define SINGLEFILE_CLASS_CSS 'c'
+#define SINGLEFILE_CLASS_JS 'j'
+
+/* Enough for the intro, the secret, both separators and a 20-digit length. */
+#define SINGLEFILE_MARK_MAX 64
+
+/* Release this run's secret. */
+void singlefile_free(httrackp *opt);
+
+/* "#!<secret>" for this run, or NULL if no CSPRNG was available (in which case
+   nothing may be marked). Draws the secret on first use. */
+const char *singlefile_intro(httrackp *opt);
+
+/* HTS_FALSE if [body,len) already contains this run's intro, in which case the
+   document must not be marked: RFC 2046 gives the generator the same duty for
+   a MIME boundary. Only a 2^-64 coincidence can trip it, since the intro is
+   not something fetched content can spell. */
+hts_boolean singlefile_may_mark(httrackp *opt, const char *body, size_t len);
+
+/* Write the mark for a reference of reflen bytes into buf; returns buf. */
+const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
+                            size_t reflen);
+
+/* The class a reference in this context may inline as, or 0 to leave it alone.
+   tag_name points just past the '<' of the enclosing start tag, or NULL when
+   there is none (inside a stylesheet or a script); attr at the attribute name.
+   Everything htsparse detects is inlinable unless it names a page. */
+char singlefile_ref_class(const char *tag_name, const char *attr);
+
+/* Rewrite every HTML page the mirror produced, then strip the marks left in
+   the assets. No-op unless opt->single_file; call once the tree is final,
+   after the update purge. */
 void singlefile_process_mirror(httrackp *opt);
 
-/* Rewrite one HTML document held in memory, appending the result to out.
-   root is the mirror directory that references may not escape; page_path is
-   the document's own path under it (both UTF-8, '/' or native separators).
-   page_budget caps the total inlined bytes, since nested @import fans out
+/* Expand the marks in the document held in memory, appending the result to
+   out. root is the mirror directory that references may not escape; page_path
+   is the document's own path under it (both UTF-8, '/' or native separators).
+   page_budget caps the total inlined bytes, since a nested @import fans out
    multiplicatively; the mirror pass passes SINGLEFILE_MAX_PAGE_SIZE.
-   Returns HTS_TRUE if at least one reference was replaced; out may still
-   differ from the input when that is HTS_FALSE, since a style or srcset value
-   is re-serialized in place. */
+   Returns HTS_TRUE if at least one reference was replaced. */
 hts_boolean singlefile_rewrite_html(httrackp *opt, const char *root,
                                     const char *page_path, const char *html,
                                     size_t html_len, LLint page_budget,
