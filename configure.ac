@@ -395,7 +395,10 @@ AC_CHECK_TYPE(sa_family_t, [], [AC_DEFINE([sa_family_t], [uint16_t], [sa_family_
 AX_CHECK_ALIGNED_ACCESS_REQUIRED
 
 # check for various headers
-AC_CHECK_HEADERS([execinfo.h sys/ioctl.h])
+AC_CHECK_HEADERS([execinfo.h sys/ioctl.h sys/random.h])
+
+## CSPRNG for the --single-file mark; /dev/urandom is the fallback
+AC_CHECK_FUNCS([getrandom])
 
 ### zlib (mandatory)
 CHECK_ZLIB()
@@ -550,7 +553,7 @@ AC_DEFINE(HAVE_STRNLEN, 1,[Check for strnlen])], AC_MSG_RESULT([not found]))
 ## Online unit tests
 AC_MSG_CHECKING(whether to enable online unit tests)
 AC_ARG_ENABLE([online-unit-tests],
-	[AS_HELP_STRING([--enable-online-unit-tests=@<:@yes/no/auto@:>@],[Enable online-unit-tests @<:@default=yes@:>@])],
+	[AS_HELP_STRING([--enable-online-unit-tests=@<:@yes/no/auto@:>@],[Enable online-unit-tests @<:@default=no@:>@])],
 	[
 	case "${enableval}" in
 	no|yes|auto)
@@ -591,6 +594,10 @@ if test x"$fuzzers" = x"yes"; then
 	# Instrument the whole build for coverage; harnesses link -fsanitize=fuzzer.
 	AX_CHECK_COMPILE_FLAG([-fsanitize=fuzzer-no-link],
 		[DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fsanitize=fuzzer-no-link"],
+		[AC_MSG_ERROR([--enable-fuzzers requires libFuzzer support (clang)])])
+	# Ordinary programs are instrumented too, so they need that runtime at link.
+	AX_CHECK_LINK_FLAG([-fsanitize=fuzzer-no-link],
+		[DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -fsanitize=fuzzer-no-link"],
 		[AC_MSG_ERROR([--enable-fuzzers requires libFuzzer support (clang)])])
 	# clang's static sanitizer runtimes clash with -Wl,--no-undefined on the .so.
 	if test x"$enable_shared" != x"no"; then

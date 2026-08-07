@@ -58,7 +58,9 @@ EXTRA_DIST = README.md run-fuzzers.sh \
 	corpus/singlefile/img-src.html corpus/singlefile/link-rel.html \
 	corpus/singlefile/style-block.html corpus/singlefile/style-attr.html \
 	corpus/singlefile/srcset.html corpus/singlefile/rawtext.html \
-	corpus/singlefile/malformed.html corpus/singlefile/many-attrs.html \
+	corpus/singlefile/malformed.html \
+	corpus/singlefile/mark-at-eof.html corpus/singlefile/mark-only.html \
+	corpus/singlefile/mark-degenerate.html corpus/singlefile/traversal.html \
 	corpus/sitemap/urlset.xml corpus/sitemap/sitemapindex.xml \
 	corpus/sitemap/truncated.xml corpus/sitemap/urlset.xml.gz \
 	corpus/arc/roundtrip.arc corpus/arc/truncated.arc \

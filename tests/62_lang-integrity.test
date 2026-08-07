@@ -67,6 +67,17 @@ fi
 # htsserver.c decodes the POST body with it, so bytes that are not what it says
 # render and convert wrong (#963).
 c1=$(printf '\302[\200-\237]')
+# A single-byte charset maps all 256 byte values, so the iconv decode above
+# can never fail on it and cannot see a value left as raw UTF-8; a whole line
+# that itself decodes as valid multi-byte UTF-8 is that leak.
+# Scoped to single-byte charsets: BIG5, gb2312 and shift-jis are multi-byte, so
+# the premise fails and their genuine text matches this shape constantly.
+# Under 8 bytes a line can be valid UTF-8 by chance (Ukrainian.txt:686 is a
+# 2-byte word that is), so short mixed-encoding lines go undetected.
+# Raw bytes in an awk ERE, not grep -P: BSD grep has no -P. NUL is left out of
+# the ASCII range because an awk record cannot hold one, and no lang file has any.
+utf8_full_line=$(printf '^([\001-\177]|[\302-\337][\200-\277]|\340[\240-\277][\200-\277]|[\341-\354][\200-\277][\200-\277]|\355[\200-\237][\200-\277]|[\356-\357][\200-\277][\200-\277]|\360[\220-\277][\200-\277][\200-\277]|[\361-\363][\200-\277][\200-\277][\200-\277]|\364[\200-\217][\200-\277][\200-\277])*$')
+high_byte=$(printf '[\200-\377]')
 charset_declared_matches_bytes() {
     f=$1
     cs=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "LANGUAGE_CHARSET" { p = 1; next } p { print; exit }' "$f")
@@ -86,6 +97,16 @@ charset_declared_matches_bytes() {
         echo "${f##*/}: $n lines decode to C1 controls under $cs; the bytes are a Windows codepage"
         return 1
     fi
+    case "$(printf '%s' "$cs" | LC_ALL=C tr '[:upper:]' '[:lower:]')" in
+    iso-8859-* | windows-125*)
+        ln=$(LC_ALL=C awk -v u="$utf8_full_line" -v h="$high_byte" \
+            'length($0) >= 8 && $0 ~ h && $0 ~ u { print NR; exit }' "$f")
+        if [ -n "$ln" ]; then
+            echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
+            return 1
+        fi
+        ;;
+    esac
 }
 
 if ! command -v iconv >/dev/null 2>&1; then
@@ -95,7 +116,10 @@ else
     # No CR: BSD sed writes a literal r, and the extractor strips CR anyway.
     LC_ALL=C sed '10s/.*/UTF-8/' "$langdir/Francais.txt" >"$tmp/undecodable.txt"
     LC_ALL=C sed '10s/.*/ISO-8859-2/' "$langdir/Croatian.txt" >"$tmp/c1.txt"
-    for probe in undecodable c1; do
+    # A value line left as raw UTF-8 under a declared single-byte charset.
+    LC_ALL=C awk -v repl="$(printf 'Une fuite UTF-8 : caf\xc3\xa9, na\xc3\xafve, t\xc3\xa9l\xc3\xa9phone')" \
+        'NR == 20 { print repl; next } { print }' "$langdir/Francais.txt" >"$tmp/utf8mix.txt"
+    for probe in undecodable c1 utf8mix; do
         if charset_declared_matches_bytes "$tmp/$probe.txt" >/dev/null; then
             echo "the charset check passed a deliberately mislabelled file ($probe)"
             exit 1

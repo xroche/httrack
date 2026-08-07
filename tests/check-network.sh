@@ -1,6 +1,8 @@
 #!/bin/bash
 #
 
+testdir=$(cd "$(dirname "$0")" && pwd)
+
 # ensure the httrack unit tests are available so that ut will not break
 # the build in case of network outage
 
@@ -32,7 +34,7 @@ else
         fi
 
     # fetch single file
-    elif bash crawl-test.sh --errors 0 --files 1 httrack --timeout=3 --max-time=3 "$url" 2>/dev/null >/dev/null; then
+    elif bash "$testdir/crawl-test.sh" --errors 0 --files 1 httrack --timeout=3 --max-time=3 "$url" 2>/dev/null >/dev/null; then
         echo "ok" >$cache
         exit 0
     else
