@@ -571,6 +571,34 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: bash fuzz/run-fuzzers.sh fuzz check
 
+  # The job above links ASan, whose runtime also defines the sancov hooks the
+  # instrumentation emits, so it cannot see a program left without one (#1030).
+  # This is the bare --enable-fuzzers build; linking is what is under test.
+  fuzz-no-sanitizer:
+    name: build (fuzzers, no sanitizer runtime, clang)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Configure (fuzzers, static)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CC=clang --enable-fuzzers --disable-shared
+
+      - name: Build
+        run: make -j"$(nproc)"
+
   # Optional-dependency build: compile and test with HTTPS/OpenSSL disabled --
   # the configuration users on minimal systems build, and one libssl is not even
   # installed here so configure cannot silently re-enable it. The matrix above

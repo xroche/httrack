@@ -592,6 +592,11 @@ if test x"$fuzzers" = x"yes"; then
 	AX_CHECK_COMPILE_FLAG([-fsanitize=fuzzer-no-link],
 		[DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fsanitize=fuzzer-no-link"],
 		[AC_MSG_ERROR([--enable-fuzzers requires libFuzzer support (clang)])])
+	# The ordinary programs are instrumented too, so they need the sancov runtime
+	# the harnesses get from -fsanitize=fuzzer.
+	AX_CHECK_LINK_FLAG([-fsanitize=fuzzer-no-link],
+		[DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -fsanitize=fuzzer-no-link"],
+		[AC_MSG_ERROR([--enable-fuzzers requires libFuzzer support (clang)])])
 	# clang's static sanitizer runtimes clash with -Wl,--no-undefined on the .so.
 	if test x"$enable_shared" != x"no"; then
 		AC_MSG_ERROR([--enable-fuzzers requires --disable-shared])
