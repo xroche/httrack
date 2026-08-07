@@ -38,11 +38,14 @@ cat >"${doc}/index.html" <<'EOF'
 <img src="pixel.svg" data-src="lazy.svg" alt="l">
 <script src="app.js"></script>
 <a href="other.html">other</a>
-<p>id=pixel.svg#!htsinline end</p>
+<p>id=pixel.svg#!0011223344556677.-.9 end</p>
 <link rel="stylesheet" href="style_noext">
 <script src="app_noext"></script>
 <img src="pixel.svg#icon">
 <a href="pixel.svg">raw</a>
+<a href=pixel.svg>unquoted</a>
+<iframe src=pixel.svg></iframe>
+<link href="style_norel.css">
 </body></html>
 EOF
 cat >"${doc}/other.html" <<'EOF'
@@ -57,6 +60,7 @@ div { background: url(pixel.svg); }
 EOF
 printf 'var app = 1;\n' >"${doc}/app.js"
 printf 'body { color: red; }\n' >"${doc}/style_noext"
+printf 'body { color: green; }\n' >"${doc}/style_norel.css"
 printf 'var noext = 1;\n' >"${doc}/app_noext"
 printf '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>\n' \
     >"${doc}/pixel.svg"
@@ -187,6 +191,31 @@ grep -q 'rel="canonical" href="other.html"' "$page" || {
 }
 echo OK
 
+printf '[an unnamed tag cannot skip the deny rules] ..\t'
+# An unquoted value ending at '>' loses the tag name, which used to read as
+# "a CSS body" and took these past every tag-bearing deny rule.
+grep -q '<a href=pixel.svg>' "$page" || {
+    echo "FAIL: an unquoted anchor was inlined"
+    exit 1
+}
+grep -q '<iframe src=pixel.svg>' "$page" || {
+    echo "FAIL: an unquoted iframe was inlined"
+    exit 1
+}
+echo OK
+
+printf '[a rel-less link keeps its link] ..\t'
+# Nothing loads it, so it is not an asset however inlinable the file looks.
+grep -q '<link href="style_norel.css">' "$page" || {
+    echo "FAIL: a <link> with no rel was inlined"
+    exit 1
+}
+test -f "${out}/127.0.0.1_${port}/style_norel.css" || {
+    echo "FAIL: style_norel.css is missing, so the probe proves nothing"
+    exit 1
+}
+echo OK
+
 printf '[over-cap asset stays a link] ..\t'
 grep -q 'src="big.svg"' "$page" || {
     echo "FAIL: the over-cap asset did not keep its link"
@@ -261,13 +290,12 @@ grep -q 'data:image/svg+xml;base64,' "$badpage" || {
 echo OK
 
 printf '[a page cannot forge a mark] ..\t'
-# The page ships what the old in-band marker looked like, against a real
-# mirrored asset. The mark now carries a per-run secret the site cannot spell,
-# so the text is not a mark and is not even rewritten: byte-identical to the
-# mirror taken without --single-file. pixel.svg is inlined elsewhere on the
-# page, so the encoder was demonstrably willing.
+# A mark of the right shape but the wrong secret, against a real mirrored
+# asset. Expanding needs the secret, so it is deleted rather than resolved: a
+# truncated secret comparison would put a data: URI here instead. pixel.svg is
+# inlined elsewhere on the page, so the encoder was demonstrably willing.
 forged=$(sed -n 's/.*<p>\(id=[^<]*\)<\/p>.*/\1/p' "$page")
-test "$forged" = 'id=pixel.svg#!htsinline end' || {
+test "$forged" = 'id=pixel.svg end' || {
     echo "FAIL: the page was altered: $forged"
     exit 1
 }
@@ -288,15 +316,15 @@ if grep -q 'content="text/html;charset=data:' "$page"; then
 fi
 echo OK
 
-printf '[assets keep no marks] ..\t'
-if grep -rlF '#!' "${out}/127.0.0.1_${port}" 2>/dev/null | grep -q .; then
-    marked=$(grep -rlF '#!' "${out}/127.0.0.1_${port}" | tr '\n' ' ')
-    # the fixture's own literal is expected in index.html only
-    test "$marked" = "${out}/127.0.0.1_${port}/index.html " || {
-        echo "FAIL: marks survived in $marked"
-        exit 1
-    }
-fi
+printf '[no file keeps a mark] ..\t'
+# Stripping matches the mark's shape, not this run's secret, so nothing in the
+# mirror may carry one -- pages included, and whatever an earlier run left.
+marked=$(grep -rlE '#![0-9a-f]{16}\.[-cj]\.[0-9]+' \
+    "${out}/127.0.0.1_${port}" 2>/dev/null | tr '\n' ' ')
+test -z "$marked" || {
+    echo "FAIL: marks survived in $marked"
+    exit 1
+}
 echo OK
 
 printf '[an unrecognised type still inlines from its context] ..\t'
@@ -311,7 +339,7 @@ if grep -q 'href="style_noext"' "$page"; then
     echo "FAIL: extensionless stylesheet was not inlined"
     exit 1
 fi
-if grep -q 'src="app_noext"'  "$page"; then
+if grep -q 'src="app_noext"' "$page"; then
     echo "FAIL: extensionless script was not inlined"
     exit 1
 fi

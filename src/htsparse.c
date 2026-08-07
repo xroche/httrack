@@ -1840,6 +1840,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             int quoteinscript = 0;
             int noquote = 0;
             const char *tag_attr_start = html;
+            /* Kept because the value scan below clears intag on an unquoted
+               value ending at '>', and --single-file must still know the tag.
+               inscript_locked marks a whole CSS or JS file, the one context
+               that legitimately has no tag. */
+            const char *const sf_tag = intag_start_valid ? intag_name : NULL;
+            const int sf_tagless_body = inscript_locked;
 
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
             if ((nofollow)
@@ -3112,12 +3118,15 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           /* --single-file: tag the reference for the
                              end-of-mirror pass. A fragment, so a mirror left
                              marked by an interrupted run still browses. */
+                          /* A NULL tag means "a CSS or JS body" to the
+                             classifier, so a tag we could not name must not
+                             reach it: <a href=x.png> would sail past every
+                             tag-bearing deny rule. */
                           const char sf_class =
                               (opt->single_file && sf_may_mark && !in_media &&
-                               p_type == 0 && !p_searchMETAURL)
-                                  ? singlefile_ref_class(
-                                        intag_start_valid ? intag_name : NULL,
-                                        tag_attr_start)
+                               p_type == 0 && !p_searchMETAURL &&
+                               (sf_tag != NULL || sf_tagless_body))
+                                  ? singlefile_ref_class(sf_tag, tag_attr_start)
                                   : 0;
                           const size_t sf_start = TypedArraySize(output_buffer);
 

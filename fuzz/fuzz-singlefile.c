@@ -60,6 +60,10 @@ static void sf_cleanup(void) {
   (void) remove(sf_root);
 }
 
+/* One httrackp for the whole run: the mark secret lives on it, so a fresh one
+   per input would make every mark in the corpus unrecognisable. */
+static httrackp *sf_opt = NULL;
+
 /* A missing asset would silently reduce the target to its parser half. */
 static void sf_write(const char *name, const char *data, size_t len) {
   char path[700];
@@ -76,6 +80,48 @@ static void sf_text(const char *name, const char *data) {
   sf_write(name, data, strlen(data));
 }
 
+/* Append ref plus a real mark for it. The secret is drawn per httrackp, so a
+   fixture cannot spell one; every mark the target sees is built here. */
+static void sf_marked(String *out, const char *ref, char cls) {
+  char mark[SINGLEFILE_MARK_MAX];
+
+  StringCat(*out, ref);
+  StringCat(*out, singlefile_mark(sf_opt, mark, sizeof(mark), cls,
+                                  strlen(ref)));
+}
+
+/* \001<ref>\002 in an input becomes <ref> plus its mark, which is the only
+   way a corpus file can reach the mark parser at all. */
+static void sf_expand_input(const char *in, size_t len, String *out) {
+  size_t i, start = 0;
+
+  StringClear(*out);
+  for (i = 0; i < len; i++) {
+    if (in[i] == '\001') {
+      start = StringLength(*out);
+    } else if (in[i] == '\002') {
+      char mark[SINGLEFILE_MARK_MAX];
+
+      StringCat(*out, singlefile_mark(sf_opt, mark, sizeof(mark),
+                                      SINGLEFILE_CLASS_ANY,
+                                      StringLength(*out) - start));
+    } else {
+      StringAddchar(*out, in[i]);
+    }
+  }
+}
+
+static void sf_css(const char *name, const char *pre, const char *ref,
+                   const char *post) {
+  String body = STRING_EMPTY;
+
+  StringCopy(body, pre);
+  sf_marked(&body, ref, SINGLEFILE_CLASS_ANY);
+  StringCat(body, post);
+  sf_write(name, StringBuff(body), StringLength(body));
+  StringFree(body);
+}
+
 static void sf_init(void) {
   static const char png[] = "\x89PNG\r\n\x1a\n";
   static const char big[4096] = "\x89PNG";
@@ -83,6 +129,9 @@ static void sf_init(void) {
   char path[700];
 
   hts_init();
+  sf_opt = hts_create_opt();
+  sf_opt->log = sf_opt->errlog = NULL;
+  sf_opt->single_file_max_size = FUZZ_SF_CAP;
   snprintf(sf_root, sizeof(sf_root), "%s/httrack-fuzz-sf-XXXXXX",
            tmp != NULL && tmp[0] != '\0' ? tmp : "/tmp");
   if (mkdtemp(sf_root) == NULL)
@@ -98,37 +147,47 @@ static void sf_init(void) {
   /* Marked, so an inlined stylesheet recurses into its own marks and its
      un-inlinable reference is rebased; unmarked assets leave the target as a
      bare scan that reaches nothing. */
-  sf_text("s.css", "@import url(sub/b.css" SINGLEFILE_MARK ");\n"
-                   "div{background:url(a.png" SINGLEFILE_MARK ")}\n"
-                   "p{background:url(big.png" SINGLEFILE_MARK ")}\n");
-  sf_text("sub/b.css", "p{background:url(../a.png" SINGLEFILE_MARK ")}\n");
+  {
+    String css = STRING_EMPTY;
+
+    StringCopy(css, "@import url(");
+    sf_marked(&css, "sub/b.css", SINGLEFILE_CLASS_CSS);
+    StringCat(css, ");\ndiv{background:url(");
+    sf_marked(&css, "a.png", SINGLEFILE_CLASS_ANY);
+    StringCat(css, ")}\np{background:url(");
+    sf_marked(&css, "big.png", SINGLEFILE_CLASS_ANY);
+    StringCat(css, ")}\n");
+    sf_write("s.css", StringBuff(css), StringLength(css));
+    StringFree(css);
+  }
+  sf_css("sub/b.css", "p{background:url(", "../a.png", ")}\n");
 }
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   static int inited = 0;
 
   String out = STRING_EMPTY;
-  httrackp *opt;
-  /* Exact-length, unterminated: the rewriter is span-based, so ASan bounds a
-     read past html_len instead of it landing on a terminator. */
-  char *html = malloct(size != 0 ? size : 1);
+  String in = STRING_EMPTY;
+  char *html;
+  size_t html_len;
 
   if (!inited) {
     sf_init();
     inited = 1;
   }
-  memcpy(html, data, size);
-
-  opt = hts_create_opt();
-  opt->log = opt->errlog = NULL;
-  opt->single_file_max_size = FUZZ_SF_CAP;
+  sf_expand_input((const char *) data, size, &in);
+  html_len = StringLength(in);
+  /* Exact-length, unterminated: the rewriter is span-based, so ASan bounds a
+     read past html_len instead of it landing on a terminator. */
+  html = malloct(html_len != 0 ? html_len : 1);
+  memcpy(html, StringBuff(in), html_len);
+  StringFree(in);
 
   StringClear(out);
-  (void) singlefile_rewrite_html(opt, sf_root, sf_page, html, size,
+  (void) singlefile_rewrite_html(sf_opt, sf_root, sf_page, html, html_len,
                                  SINGLEFILE_MAX_PAGE_SIZE, &out);
 
   StringFree(out);
   freet(html);
-  hts_free_opt(opt);
   return 0;
 }

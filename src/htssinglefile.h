@@ -69,6 +69,10 @@ extern "C" {
 #define SINGLEFILE_MARK_INTRO "#!"
 #define SINGLEFILE_SECRET_HEX 16
 
+/* Bytes before the ".<class>.<len>" tail. */
+#define SINGLEFILE_INTRO_LEN                                                   \
+  (sizeof(SINGLEFILE_MARK_INTRO) - 1 + SINGLEFILE_SECRET_HEX)
+
 /* <class>: what the referencing context expects. */
 #define SINGLEFILE_CLASS_ANY '-'
 #define SINGLEFILE_CLASS_CSS 'c'

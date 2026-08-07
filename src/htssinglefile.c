@@ -162,8 +162,9 @@ static const htspair_t sf_deny_rules[] = {
     {NULL, "codebase"}, {NULL, NULL},
 };
 
-/* HTS_TRUE if the start tag at tag_name carries a rel naming a stylesheet. */
-static hts_boolean sf_rel_is_stylesheet(const char *tag_name) {
+/* Does the start tag at tag_name carry a rel naming a stylesheet? 1 yes, 0 a
+   rel that names something else, -1 no rel at all. */
+static int sf_rel_is_stylesheet(const char *tag_name) {
   size_t i;
 
   for (i = 0; i < HTS_URLMAXSIZE && tag_name[i] != '\0' && tag_name[i] != '>';
@@ -181,6 +182,14 @@ static hts_boolean sf_rel_is_stylesheet(const char *tag_name) {
        runs past this tag into the next one, so a rel="canonical" inherited a
        later <link>'s "stylesheet" and inlined the page it named. */
     len = rech_endtoken(tag_name + i + p, &value);
+    /* rech_endtoken stops an unquoted value at whitespace only, and runs to the
+       document NUL when a quote is left open; neither may leave this tag. */
+    for (j = 0; j < len; j++) {
+      if (value[j] == '>') {
+        len = j;
+        break;
+      }
+    }
     for (j = 0; j < len;) {
       int start;
 
@@ -191,11 +200,11 @@ static hts_boolean sf_rel_is_stylesheet(const char *tag_name) {
         j++;
       if (j - start == want &&
           strncasecmp(value + start, "stylesheet", want) == 0)
-        return HTS_TRUE;
+        return 1;
     }
-    return HTS_FALSE;
+    return 0;
   }
-  return HTS_FALSE;
+  return -1;
 }
 
 /* The deny table's own matcher rather than htswizard's: a NULL tag here means
@@ -228,9 +237,14 @@ char singlefile_ref_class(const char *tag_name, const char *attr) {
   }
   if (hts_cmp_tag_token(tag_name, "script") && rech_tageq(attr, "src") != 0)
     return SINGLEFILE_CLASS_JS;
-  if (hts_cmp_tag_token(tag_name, "link") && rech_tageq(attr, "href") != 0)
-    return sf_rel_is_stylesheet(tag_name) ? SINGLEFILE_CLASS_CSS
-                                          : SINGLEFILE_CLASS_ANY;
+  if (hts_cmp_tag_token(tag_name, "link") && rech_tageq(attr, "href") != 0) {
+    const int rel = sf_rel_is_stylesheet(tag_name);
+
+    /* No rel names nothing the browser would load, so it stays a link. */
+    if (rel < 0)
+      return 0;
+    return rel > 0 ? SINGLEFILE_CLASS_CSS : SINGLEFILE_CLASS_ANY;
+  }
   return SINGLEFILE_CLASS_ANY;
 }
 
@@ -522,6 +536,8 @@ static void sf_warn_oversize(sf_ctx *ctx, const char *path, LLint size,
 
 static void sf_expand(sf_ctx *ctx, const char *base_dir, int depth,
                       const char *body, size_t len, String *out);
+static size_t sf_strip_marks(const char *intro, size_t introlen, char *body,
+                             size_t len);
 
 /* Replace the reference [ref,ref+reflen), resolved against base_dir, with its
    data: URI appended to out. rebase_dir re-expresses an un-inlinable asset
@@ -597,6 +613,14 @@ static hts_boolean sf_inline(sf_ctx *ctx, const char *base_dir, const char *ref,
       StringFree(nested);
       StringFree(nested_dir);
     } else {
+      /* Past the nesting cap the body is embedded as it stands, so a mark it
+         still carries would ride into the payload and publish the secret. */
+      if ((cls & (SF_C_CSS | SF_C_JS)) != 0) {
+        const char *const intro = singlefile_intro(ctx->opt);
+
+        if (intro != NULL)
+          file_len = sf_strip_marks(intro, strlen(intro), file, file_len);
+      }
       done = sf_append_base64(&payload, file, file_len);
     }
     if (done) {
@@ -644,15 +668,31 @@ static void sf_warn_unresolved(sf_ctx *ctx, const char *ref, size_t reflen) {
 }
 
 /* Parse the mark at [p,end): "<intro>.<class>.<len>". Returns its length, or 0
-   if it is not one. */
+   if it is not one. A NULL intro matches any well-formed secret, which is what
+   lets a later run clear marks an interrupted one left behind: expanding a mark
+   needs the secret, recognising one to delete it does not. */
 static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
                             size_t avail, char *cls, size_t *reflen) {
   size_t i = introlen;
   size_t n = 0;
   int digits = 0;
 
-  if (avail < introlen || memcmp(p, intro, introlen) != 0)
+  if (avail < introlen)
     return 0;
+  if (intro != NULL) {
+    if (memcmp(p, intro, introlen) != 0)
+      return 0;
+  } else {
+    size_t k;
+
+    if (memcmp(p, SINGLEFILE_MARK_INTRO, sizeof(SINGLEFILE_MARK_INTRO) - 1) !=
+        0)
+      return 0;
+    for (k = sizeof(SINGLEFILE_MARK_INTRO) - 1; k < introlen; k++) {
+      if (!isxdigit((unsigned char) p[k]))
+        return 0;
+    }
+  }
   if (i + 3 >= avail || p[i] != '.')
     return 0;
   *cls = p[++i];
@@ -662,7 +702,7 @@ static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
   if (++i >= avail || p[i++] != '.')
     return 0;
   while (i < avail && p[i] >= '0' && p[i] <= '9') {
-    if (n > SF_MAX_REF) /* a length this big cannot name a mirrored file */
+    if (n >= SF_MAX_REF) /* a length this big cannot name a mirrored file */
       return 0;
     n = n * 10 + (size_t) (p[i++] - '0');
     digits++;
@@ -671,6 +711,25 @@ static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
     return 0;
   *reflen = n;
   return i;
+}
+
+/* Drop every mark from [body,body+len) in place; returns the new length. */
+static size_t sf_strip_marks(const char *intro, size_t introlen, char *body,
+                             size_t len) {
+  size_t r, w = 0;
+
+  for (r = 0; r < len;) {
+    char cls;
+    size_t reflen;
+    const size_t marklen =
+        sf_parse_mark(intro, introlen, body + r, len - r, &cls, &reflen);
+
+    if (marklen != 0)
+      r += marklen;
+    else
+      body[w++] = body[r++];
+  }
+  return w;
 }
 
 /* Copy [body,body+len) to out, replacing each marked reference by its data:
@@ -813,28 +872,14 @@ hts_boolean singlefile_rewrite_file(httrackp *opt, const char *root,
 /* Delete every mark from the file, keeping the reference and anything that
    followed it. Returns HTS_TRUE if the file changed. */
 static hts_boolean sf_strip_marks_file(httrackp *opt, const char *path) {
-  const char *const intro = singlefile_intro(opt);
-  size_t introlen, len = 0, r, w = 0;
+  size_t len = 0, w;
   char *body;
   hts_boolean ok;
 
-  if (intro == NULL)
-    return HTS_FALSE;
-  introlen = strlen(intro);
   body = sf_readfile(path, &len);
   if (body == NULL)
     return HTS_FALSE;
-  for (r = 0; r < len;) {
-    char cls;
-    size_t reflen;
-    const size_t marklen =
-        sf_parse_mark(intro, introlen, body + r, len - r, &cls, &reflen);
-
-    if (marklen != 0)
-      r += marklen;
-    else
-      body[w++] = body[r++];
-  }
+  w = sf_strip_marks(NULL, SINGLEFILE_INTRO_LEN, body, len);
   if (w == len) {
     freet(body);
     return HTS_FALSE;
@@ -865,13 +910,15 @@ void singlefile_process_mirror(httrackp *opt) {
   }
   /* Only once every page has been through the pass: a stylesheet is expanded
      from the marks in the copy on disk, so stripping it earlier would cost the
-     pages that had not read it yet. */
+     pages that had not read it yet. Pages are swept too, for whatever the pass
+     could not expand: a page it declined, or one an interrupted earlier run
+     left behind, whose secret died with it. */
   for (i = 0; i < opt->lien_tot; i++) {
     const lien_url *const link = opt->liens[i];
 
     if (link == NULL || link->sav == NULL || link->sav[0] == '\0')
       continue;
-    if (ishtml(opt, link->sav) == 1 || !fexist_utf8(link->sav))
+    if (!fexist_utf8(link->sav))
       continue;
     (void) sf_strip_marks_file(opt, link->sav);
   }
