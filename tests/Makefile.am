@@ -1,4 +1,4 @@
-# One entry per line so an append conflicts on that line alone (#844).
+# One entry per line so parallel branches union-merge instead of colliding (#844).
 include $(srcdir)/tests-list.mk
 
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it

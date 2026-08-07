@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# tests-list.mk and tests/*.test must stay a bijection: a registration whose file
-# is gone makes "make check" exit 2 before any test runs, with no "# TOTAL:" line
-# at all, and an unregistered file is silently never run (#1037).
+# tests-list.mk and tests/*.test must stay a bijection (#1037): a stale
+# registration kills make check silently, an unregistered file just never runs.
 
 set -euo pipefail
+export LC_ALL=C
 
 testdir=$(cd "${1:-$(dirname "$0")}" && pwd)
 list="${testdir}/tests-list.mk"
@@ -22,8 +22,8 @@ bad() {
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/tests-list.XXXXXX")
 trap 'set +e; rm -rf "$tmp"' EXIT
 
-# The extraction below takes one file per "TESTS +=" line, so a continuation or a
-# second name on a line would slip past the comparison unseen.
+# The sed below assumes one file per "TESTS +=" line; a continuation or a second
+# name on a line would slip past unseen.
 strays=$(grep -nv -e '^$' -e '^#' -e '^TESTS =$' -e '^TESTS += [^ ]*\.test$' "$list" || true)
 [ -z "$strays" ] || bad "malformed tests-list.mk lines, want one 'TESTS += NN_name.test' each:
 $strays"

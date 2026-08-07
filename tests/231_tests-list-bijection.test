@@ -1,9 +1,40 @@
 #!/bin/bash
 #
-# Catches the unregistered half locally; a stale registration never gets this far
-# (make check dies first), so CI runs the same script out of band too.
+# Covers the unregistered-file case; a stale registration cannot reach this test,
+# because make check dies first.
 
 set -euo pipefail
 
 testdir=$(cd "$(dirname "$0")" && pwd)
-exec bash "${testdir}/check-tests-list.sh" "${testdir}"
+checker="${testdir}/check-tests-list.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/tests_list.XXXXXX") || fail "no tmpdir"
+trap 'set +e; rm -rf "$work"' EXIT
+
+bash "$checker" "$testdir" || fail "the tree's own registrations do not check out"
+
+# Positive controls: every branch of the checker is silent on a clean tree, so
+# one that had stopped comparing would pass the assertion above just as well.
+control() {
+    local name=$1 want=$2 mutate=$3 dir="${work}/$1" out=""
+    mkdir -p "$dir"
+    : >"${dir}/00_kept.test"
+    printf 'TESTS =\nTESTS += 00_kept.test\n' >"${dir}/tests-list.mk"
+    (cd "$dir" && eval "$mutate")
+    if out=$(bash "$checker" "$dir" 2>&1); then
+        fail "$name: the checker accepted a broken list"
+    fi
+    grep -q "$want" <<<"$out" || fail "$name: wrong diagnostic: $out"
+}
+
+control absent 'registered but absent' 'echo "TESTS += 99_gone.test" >>tests-list.mk'
+control unregistered 'present but unregistered' ': >99_ghost.test'
+control duplicate 'registered twice' 'echo "TESTS += 00_kept.test" >>tests-list.mk'
+control malformed 'malformed' 'echo "TESTS += 00_kept.test 99_x.test" >>tests-list.mk'
+
+echo "OK: bijection holds, and the checker still sees each way it can break"
