@@ -72,7 +72,8 @@ int back_launch_ftp(FTPDownloadStruct * params);
 
 int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);
-/* opt may be NULL; when given, every wait is also clipped to --max-time. */
+/* Read one FTP reply line. opt may be NULL; when given, every wait it makes is
+   also clipped to --max-time. */
 int get_ftp_line(T_SOC soc, char *line, size_t line_size, int timeout,
                  const httrackp *opt);
 /* Split a "user[:pass]@" prefix (end = jump_identification result) into
@@ -104,7 +105,7 @@ int stop_ftp(lien_back * back);
 char *linejmp(char *line);
 int check_socket(T_SOC soc);
 int check_socket_connect(T_SOC soc);
-/* opt may be NULL; see get_ftp_line(). */
+/* Wait until the socket is readable. opt may be NULL; see get_ftp_line(). */
 int wait_socket_receive(T_SOC soc, int timeout, const httrackp *opt);
 #endif
 

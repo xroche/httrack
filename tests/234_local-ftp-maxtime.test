@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# --max-time could not end an FTP transfer already in flight (#1039): the slot
-# belongs to the FTP thread, which back_wait has no way to abort, so the crawl
-# ran on until the read timed out. --timeout is set an order of magnitude above
-# the cap here, so nothing but the mirror deadline can end this run.
+# Exercises --max-time against an in-flight FTP transfer; --timeout is set far above
+# the cap so only the mirror deadline can end the run.
 
 set -euo pipefail
 
@@ -57,8 +55,7 @@ run_with_timeout 90 httrack "ftp://127.0.0.1:${port}/f.bin" -O "$out" --quiet \
 elapsed=$((SECONDS - start))
 
 log="${out}/hts-log.txt"
-# Without this the transfer is still in the login exchange and the wait under
-# test was never entered.
+# Confirms the transfer had started; otherwise the wait under test never runs.
 sent=$(cat "$cmds")
 grep -q '^RETR ' <<<"$sent" ||
     fail "the transfer never started, so nothing was in flight: ${sent}"

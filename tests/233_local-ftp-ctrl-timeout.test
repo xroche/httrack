@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# The FTP control channel read with a hardcoded 300s timeout and never looked at
-# --timeout (#1039), so a server that accepts the connection and then says
-# nothing pinned the crawl for five minutes. Two values are needed: a ceiling one
-# of them meets alone is met by a hardcoded constant just as well.
+# Exercises --timeout on the FTP control and data channels, with two bounds no single
+# hardcoded constant satisfies, plus --timeout=0 meaning unlimited rather than instant.
 
 set -euo pipefail
 
@@ -20,22 +18,39 @@ command -v httrack >/dev/null || {
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftptmo.XXXXXX")
-serverpid=
+mutepid=
+livepid=
 cleanup() {
-    stop_server "$serverpid"
+    stop_server "$mutepid"
+    stop_server "$livepid"
     rm -rf "$tmpdir"
 }
 trap 'set +e; cleanup' EXIT
 trap cleanup HUP INT QUIT PIPE TERM
 
 root="${tmpdir}/root"
+cmds="${tmpdir}/cmds"
 mkdir -p "$root"
 printf 'body\n' >"${root}/f.txt"
+# One holds the data connection open and says nothing; the other feeds it at
+# about 20 KB/s, slow enough that a zero-length wait cannot ride it out.
+awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 100; i++) print s }' \
+    >"${root}/stall.bin"
+awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 60; i++) print s }' \
+    >"${root}/trick.bin"
+printf '/stall.bin stall\n/trick.bin trickle\n' >"${tmpdir}/modes"
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" --mute >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+mutelog="${tmpdir}/mute.out"
+"$python" "$server" --root "$(nativepath "$root")" --mute >"$mutelog" 2>&1 &
+mutepid=$!
+muteport=$(discover_server_port "$mutelog" "$mutepid") || exit 1
+
+livelog="${tmpdir}/live.out"
+"$python" "$server" --root "$(nativepath "$root")" \
+    --mode-file "$(nativepath "${tmpdir}/modes")" \
+    --log "$(nativepath "$cmds")" >"$livelog" 2>&1 &
+livepid=$!
+liveport=$(discover_server_port "$livelog" "$livepid") || exit 1
 
 fail() {
     echo "FAIL: $*" >&2
@@ -43,35 +58,70 @@ fail() {
 }
 ok() { echo "OK: $*"; }
 
-# --max-time is kept far out of the way, so only --timeout can end these runs.
+# No --max-time anywhere below, so --timeout is the only thing that can end a run.
 crawl() {
-    local to=$1 cap=$2
-    local out="${tmpdir}/out${to}"
+    local tag=$1 to=$2 cap=$3 url=$4
+    local out="${tmpdir}/out${tag}" rc=0
 
     mkdir -p "$out"
-    run_with_timeout "$cap" httrack "ftp://127.0.0.1:${port}/f.txt" -O "$out" \
-        --quiet --disable-security-limits --robots=0 --timeout="$to" \
-        --max-time=600 -c1 >"${tmpdir}/log${to}" 2>&1
+    run_with_timeout "$cap" httrack "$url" -O "$out" --quiet \
+        --disable-security-limits --robots=0 --timeout="$to" -c1 \
+        >"${tmpdir}/log${tag}" 2>&1 || rc=$?
+    # Only the cap and a signal are the crawl's own failure. A nonzero exit against
+    # a deliberately broken server is not, and the assertions below judge the rest.
+    test "$rc" -ne 124 || fail "the ${tag} run was still going at ${cap}s"
+    test "$rc" -lt 128 || fail "the ${tag} run died on signal $((rc - 128))"
 }
 
+# Every case names the timeout it saw, since htsftp.c prints the value actually in
+# force: that kills a hardcoded constant more directly than a timing bound does.
+logged() {
+    grep -aq "$2" "${tmpdir}/out${1}/hts-log.txt" ||
+        fail "no '$2' in the log: $(grep -a Error "${tmpdir}/out${1}/hts-log.txt" || true)"
+}
+
+# --- control channel: a server that connects and never greets -----------------
 # The engine retries once, so a run costs about twice the value asked for.
 start=$SECONDS
-crawl 4 60 || fail "the --timeout=4 run did not finish in $((SECONDS - start))s"
+crawl 4 4 60 "ftp://127.0.0.1:${muteport}/f.txt"
 short=$((SECONDS - start))
-test "$short" -lt 18 ||
-    fail "--timeout=4 took ${short}s: the control-channel read ignores it"
-grep -aq 'read timeout (4)' "${tmpdir}/out4/hts-log.txt" ||
-    fail "the log does not name the timeout used: $(grep -a Error \
-        "${tmpdir}/out4/hts-log.txt" || true)"
-ok "a 4s timeout ends the control-channel read in ${short}s"
+logged 4 'read timeout (4)'
+test "$short" -lt 18 || fail "--timeout=4 took ${short}s: the greeting read ignores it"
+ok "a 4s timeout ends the greeting read in ${short}s"
 
 # The floor here sits above the ceiling above, so no one constant satisfies both.
 start=$SECONDS
-crawl 20 120 || fail "the --timeout=20 run did not finish in $((SECONDS - start))s"
+crawl 20 20 120 "ftp://127.0.0.1:${muteport}/f.txt"
 long=$((SECONDS - start))
+logged 20 'read timeout (20)'
 test "$long" -ge 20 ||
     fail "--timeout=20 gave up after ${long}s, short of the value asked for"
 test "$long" -lt 70 || fail "--timeout=20 took ${long}s"
-grep -aq 'read timeout (20)' "${tmpdir}/out20/hts-log.txt" ||
-    fail "the log does not name the timeout used"
 ok "a 20s timeout waits ${long}s: the wait tracks the value, not a constant"
+
+# --- data channel: logged in, mid-body, and the server goes quiet -------------
+# The control channel is answered here, so only the body-transfer wait can hang.
+: >"$cmds"
+start=$SECONDS
+crawl stall 5 60 "ftp://127.0.0.1:${liveport}/stall.bin"
+stalled=$((SECONDS - start))
+sent=$(cat "$cmds")
+grep -q '^RETR ' <<<"$sent" || fail "the body transfer never started: ${sent}"
+logged stall 'Time out (5)'
+test "$stalled" -lt 40 ||
+    fail "a stalled body transfer took ${stalled}s under --timeout=5"
+ok "a 5s timeout ends the body-transfer wait in ${stalled}s"
+
+# --- --timeout=0 is unlimited, not zero --------------------------------------
+: >"$cmds"
+start=$SECONDS
+crawl zero 0 90 "ftp://127.0.0.1:${liveport}/trick.bin"
+zeroed=$((SECONDS - start))
+got="${tmpdir}/outzero/127.0.0.1_${liveport}/trick.bin"
+test -f "$got" || fail "--timeout=0 fetched nothing; mirror holds $(find \
+    "${tmpdir}/outzero" -type f -not -path '*hts-cache*')"
+want=$(wc -c <"${root}/trick.bin")
+have=$(wc -c <"$got")
+test "$have" -eq "$want" ||
+    fail "--timeout=0 gave up mid-transfer: ${have} of ${want} bytes"
+ok "--timeout=0 rides out a ${zeroed}s trickle and keeps all ${want} bytes"

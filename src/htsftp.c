@@ -229,8 +229,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   char BIGSTK adr_ip[1024];
   char *adr, *real_adr;
   char BIGSTK ftp_path[CATBUFF_SIZE]; // the decoded URL path, screened once
-  /* Wait opt->timeout like an HTTP slot rather than a hardcoded 300 (#1039); 0
-     disables it there, so keep the wait unbounded instead of instant. */
+  /* opt->timeout == 0 means unlimited; use INT_MAX so 0 doesn't make the read
+     return instantly. */
   const int timeout = opt->timeout > 0 ? opt->timeout : INT_MAX;
   int timeout_onfly = 8;        // attente réponse supplémentaire
   int transfer_list = 0;        // directory
@@ -1129,8 +1129,8 @@ int check_socket_connect(T_SOC soc) {
   return 0;
 }
 
-/* Clip a wait to what is left of --max-time: this slot belongs to the FTP
-   thread, so back_wait() cannot abort it the way it aborts an HTTP one. */
+/* Clip a wait to what is left of --max-time: back_wait() can't abort this slot
+   the way it aborts an HTTP one. */
 static int ftp_wait_left(const httrackp *opt, int timeout) {
   if (opt != NULL && opt->maxtime > 0) {
     const TStamp left =
