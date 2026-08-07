@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A rolled-back session must leave the previous archive and its index whole, not
+# a leftover temporary and a stale .cdx (#1041). --archive-min-files pins both
+# files into existence, so the keep check cannot pass on an empty set.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 1 --archive-kept-on-rerun \
+    --archive-min-files 2 --rerun-args '-C0' \
+    httrack 'BASEURL/nosuch/page.html' --warc-file warc-out --warc-cdx

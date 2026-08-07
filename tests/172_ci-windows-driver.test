@@ -114,6 +114,19 @@ still_ticking() {
     return 1
 }
 
+# Not still_ticking negated: the marker's mv outlives the kill -9 of its parent,
+# and one differing sample would read that straggler as a live reporter (#1058).
+reporter_stopped() {
+    local a b _try
+    for _try in 1 2 3 4 5; do
+        a=$(cat "$wdmark" 2>/dev/null || true)
+        sleep 3
+        b=$(cat "$wdmark" 2>/dev/null || true)
+        test -n "$b" && test "$a" = "$b" && return 0
+    done
+    return 1
+}
+
 # One per glob the driver enumerates: an empty category is counted as a failing
 # test named after the unexpanded pattern, which would drown the accounting.
 for t in 00_runnable 13_zlib-pass 14_local-pass 15_watchdog-pass \
@@ -154,7 +167,7 @@ test -s "$tmp/cygpathtoken" || fail "the cygpath stub never ran"
 grep -q 'TOKEN=s3cr3t' "$tmp/cygpathtoken" &&
     fail "the driver forked a child before scrubbing its token: $(cat "$tmp/cygpathtoken")"
 # An orphan runs out its own deadline, re-posting a frozen tail past the step (#795).
-! still_ticking || fail "the driver exited leaving its reporter running"
+reporter_stopped || fail "the driver exited leaving its reporter running"
 # Positive control for the gate below: with every category matched it stays silent.
 grep -q 'matched no tests' <<<"$out" && fail "a full suite reported an empty category"
 
@@ -211,7 +224,7 @@ wedge_leg() (
     wait "$!"
     grep -q '::error title=suite watchdog::' "$tmp/wedge.out" ||
         fail "the wedge branch was never reached: $(cat "$tmp/wedge.out")"
-    ! still_ticking || fail "the wedge kill orphaned the reporter"
+    reporter_stopped || fail "the wedge kill orphaned the reporter"
 )
 # Held back: bash announces every job it reaps from a signal, which reads as a
 # failure in a log that passed.

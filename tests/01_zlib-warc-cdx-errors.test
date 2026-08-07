@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# An index that cannot be written, or that would be left empty next to a
+# rewritten archive, must say so; a first run with nothing to index must not.
+
+set -euo pipefail
+
+httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+
+scratch=$(mktemp -d)
+trap 'set +e; rm -rf "$scratch"' EXIT
+
+out=$("$httrack_bin" -O /dev/null -#test=warc-cdx-errors "$scratch/")
+echo "$out"
+case "$out" in
+*": OK") ;;
+*) exit 1 ;;
+esac
