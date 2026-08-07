@@ -4,10 +4,6 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
-3.49-19
-+ Fixed: an FTP crawl ignored --timeout and --max-time while waiting on the server, so one that accepted the connection and then went quiet held the slot for five minutes (#1039)
-+ Changed: an FTP transfer given no --timeout now gives up after 120 seconds instead of 300, the default the rest of the engine already used (#1039)
-
 3.49-18
 + Fixed: the 3.49.17 package build failed on four architectures: the test suite's mmap interposer did not compile on armhf, powerpc or hppa, and the alternate-stack test rejected loong64's shorter backtrace (#1023)
 + Fixed: the test suite failed on a host with no ps command, such as a Fedora build root; its hang diagnostics now read /proc directly (#1021)
