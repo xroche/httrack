@@ -265,3 +265,4 @@ TESTS += 226_watchdog-native.test
 TESTS += 224_engine-ftp-cmdlen.test
 TESTS += 230_local-ftp-userpass.test
 TESTS += 225_install-manifest.test
+TESTS += 231_tests-list-bijection.test

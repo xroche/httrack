@@ -787,6 +787,11 @@ jobs:
       - name: shfmt
         run: shfmt -d -i 4 $SHELL_SCRIPTS
 
+      # A registration whose file is gone stops "make check" before it reports
+      # anything, so catch it here rather than as a missing line in a build log.
+      - name: tests-list.mk registrations
+        run: bash tests/check-tests-list.sh
+
       # MSBuild rejects a malformed .vcxproj with a bare MSB4025 and no build, so
       # catch it here in seconds rather than on a Windows runner minutes in.
       - name: XML well-formedness (MSBuild project files)

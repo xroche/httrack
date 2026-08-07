@@ -20,7 +20,9 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   `-c16` bigcrawl the way Python's default backlog of 5 did.
   Or run `sh build.sh` to do bootstrap + configure + make in one shot.
 - A `tests/NN_*.test` runs only if listed in `tests/tests-list.mk`; an
-  unregistered file is silently skipped.
+  unregistered file is silently skipped. A registration whose file is gone makes
+  `make check` exit 2 with no `# TOTAL:` line. `tests/check-tests-list.sh` (CI
+  lint and `231_tests-list-bijection.test`) enforces the pairing both ways.
 - `make check` prepends the build's `src/` to `PATH`, but a hand-run `.test` does
   not — an installed `/usr/bin/httrack` then shadows your build. Run via `make
   check`, or `PATH="<bld>/src:$PATH"` for a manual run.
