@@ -550,7 +550,7 @@ AC_DEFINE(HAVE_STRNLEN, 1,[Check for strnlen])], AC_MSG_RESULT([not found]))
 ## Online unit tests
 AC_MSG_CHECKING(whether to enable online unit tests)
 AC_ARG_ENABLE([online-unit-tests],
-	[AS_HELP_STRING([--enable-online-unit-tests=@<:@yes/no/auto@:>@],[Enable online-unit-tests @<:@default=yes@:>@])],
+	[AS_HELP_STRING([--enable-online-unit-tests=@<:@yes/no/auto@:>@],[Enable online-unit-tests @<:@default=no@:>@])],
 	[
 	case "${enableval}" in
 	no|yes|auto)

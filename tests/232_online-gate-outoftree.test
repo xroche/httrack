@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# The online crawl gates must resolve their helper scripts against the script's
+# own directory: an out-of-tree build tree holds no copy, so a bare relative
+# path fails to open and the tests skip claiming the network is unavailable
+# (#1016). Everything here runs from an unrelated directory with the flag off,
+# so it never touches the network.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+
+work=$(mktemp -d)
+cleanup() {
+    rm -rf "$work"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT QUIT TERM
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# Invocations of a helper .sh by a bare name, which reads like a lookup but is
+# resolved against the caller's cwd. An explicit "./" is left alone: it says cwd
+# outright, and ci-windows-suite.sh means it, running on a staged copy. Comments
+# are dropped, local-crawl.sh documents its own usage with a bare invocation.
+scan_bare_paths() {
+    command grep -HnE '(^|[[:space:];&|(])(bash|sh|source|\.)[[:space:]]+[A-Za-z0-9_][A-Za-z0-9_./-]*\.sh([[:space:]]|$)' "$@" |
+        command grep -vE '^[^:]*:[0-9]+:[[:space:]]*#' || true
+}
+
+## the seven gated tests must skip for the reason the flag gave, not because the
+## gate script could not be opened
+
+# Discovered rather than listed, so a new online test is covered too. Matches the
+# gate line itself, not the mentions of it in comments.
+gated=$(cd "$testdir" && command grep -lE '^[[:space:]]*[^#[:space:]].*check-network\.sh.*exit 77' -- *.test | sort)
+count=$(printf '%s\n' "$gated" | command grep -c . || true)
+# Floor: the seven of #1016. A silently empty list would pass every check below.
+test "$count" -ge 7 || fail "found only $count tests gating on check-network.sh, expected at least 7"
+
+for t in $gated; do
+    out=$(cd "$work" && ONLINE_UNIT_TESTS=no bash "$testdir/$t" 2>&1) && rc=0 || rc=$?
+    test "$rc" -eq 77 || fail "$t exited $rc from an out-of-tree cwd, expected 77 (skip)"
+    # Only check-network.sh emits this, and only once it has actually run. The
+    # "skipping online unit tests" banner prints on the broken path too, so
+    # matching that instead would assert nothing.
+    command grep -q 'online tests are disabled' <<<"$out" ||
+        fail "$t skipped without the gate's reason, got: $out"
+done
+
+## the flag still decides, from an out-of-tree cwd
+
+out=$(cd "$work" && ONLINE_UNIT_TESTS=no bash "$testdir/check-network.sh" 2>&1) && rc=0 || rc=$?
+test "$rc" -eq 1 || fail "check-network.sh exited $rc with the flag off, expected 1"
+command grep -q 'online tests are disabled' <<<"$out" || fail "check-network.sh gave no reason: $out"
+
+out=$(cd "$work" && ONLINE_UNIT_TESTS=yes bash "$testdir/check-network.sh" 2>&1) && rc=0 || rc=$?
+test "$rc" -eq 0 || fail "check-network.sh exited $rc with the flag on, expected 0: $out"
+
+## no helper is invoked by a cwd-relative path anywhere in tests/
+
+# Control: the scanner must flag a planted call and spare the commented one, or
+# the sweep below is a clean result from a filter that cannot see the failure.
+planted="$work/planted.sh"
+# Assembled from a variable so this file does not trip its own sweep.
+bare='bash crawl-test.sh --errors 0 httrack http://example.com/'
+printf '%s\n' '#!/bin/bash' "$bare" "# $bare" >"$planted"
+hits=$(scan_bare_paths "$planted")
+command grep -q 'planted.sh:2:' <<<"$hits" || fail "scanner missed a planted bare path, got: $hits"
+if command grep -q 'planted.sh:3:' <<<"$hits"; then
+    fail "scanner flagged a commented example: $hits"
+fi
+
+hits=$(cd "$testdir" && scan_bare_paths -- *.test *.sh)
+test -z "$hits" || fail "helper scripts invoked by a cwd-relative path:
+$hits"
+
+echo "OK: $count gated tests skip with the flag's reason from an out-of-tree cwd"

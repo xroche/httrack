@@ -3,9 +3,11 @@
 
 set -euo pipefail
 
-bash check-network.sh || ! echo "skipping online unit tests" || exit 77
+testdir=$(cd "$(dirname "$0")" && pwd)
 
-bash crawl-test.sh --errors 0 --files 3 \
+bash "$testdir/check-network.sh" || ! echo "skipping online unit tests" || exit 77
+
+bash "$testdir/crawl-test.sh" --errors 0 --files 3 \
     --found ut.httrack.com/cookies/third.html \
     --found ut.httrack.com/cookies/second.html \
     --found ut.httrack.com/cookies/entrance.html \
