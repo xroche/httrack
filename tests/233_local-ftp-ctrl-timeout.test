@@ -32,8 +32,8 @@ root="${tmpdir}/root"
 cmds="${tmpdir}/cmds"
 mkdir -p "$root"
 printf 'body\n' >"${root}/f.txt"
-# One holds the data connection open and says nothing; the other feeds it at
-# about 20 KB/s, slow enough that a zero-length wait cannot ride it out.
+# One holds the data connection open and says nothing; the other feeds it in
+# chunks 0.2s apart, so a zero-length wait cannot ride the gaps out.
 awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 100; i++) print s }' \
     >"${root}/stall.bin"
 awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 60; i++) print s }' \

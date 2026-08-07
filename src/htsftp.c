@@ -63,11 +63,54 @@ Please visit our Website: http://www.httrack.com
 
 #if USE_BEGINTHREAD
 
+/* Live FTP workers. Each writes through its backlog slot and reads opt for its
+   whole run, so neither may be freed while the list is not empty (#1051).
+   Registration happens at spawn, not at thread entry: a worker that has not
+   been scheduled yet must already hold the list against a teardown. */
+static FTPDownloadStruct *ftp_workers = NULL;
+static htsmutex ftp_workers_mutex = HTSMUTEX_INIT;
+
+static void ftp_worker_register(FTPDownloadStruct *worker) {
+  hts_mutexlock(&ftp_workers_mutex);
+  worker->pNext = ftp_workers;
+  ftp_workers = worker;
+  hts_mutexrelease(&ftp_workers_mutex);
+}
+
+static void ftp_worker_unregister(FTPDownloadStruct *worker) {
+  FTPDownloadStruct **prev;
+
+  hts_mutexlock(&ftp_workers_mutex);
+  for (prev = &ftp_workers; *prev != NULL; prev = &(*prev)->pNext) {
+    if (*prev == worker) {
+      *prev = worker->pNext;
+      break;
+    }
+  }
+  hts_mutexrelease(&ftp_workers_mutex);
+}
+
+void ftp_stop_workers(void) {
+  int wait;
+
+  do {
+    FTPDownloadStruct *worker;
+
+    hts_mutexlock(&ftp_workers_mutex);
+    /* Idempotent, and re-raised each pass so a worker registered meanwhile is
+       not missed. A registered worker's slot is still live by construction:
+       back_delete_all() drains before back_free(). */
+    for (worker = ftp_workers; worker != NULL; worker = worker->pNext)
+      worker->pBack->stop_ftp = HTS_TRUE;
+    wait = ftp_workers != NULL;
+    hts_mutexrelease(&ftp_workers_mutex);
+    if (wait)
+      Sleep(100);
+  } while (wait);
+}
+
 void back_launch_ftp(void *pP) {
   FTPDownloadStruct *pStruct = (FTPDownloadStruct *) pP;
-
-  if (pStruct == NULL)
-    return;
 
   if (pStruct == NULL) {
 #if FTP_DEBUG
@@ -87,11 +130,15 @@ void back_launch_ftp(void *pP) {
   // prêt
   pStruct->pBack->status = STATUS_FTP_READY;
 
-  /* Delete structure */
-  free(pP);
-
   /* Uninitialize */
   hts_uninit();
+
+  /* The status store above was this worker's last read of the slot and of opt;
+     deregistering lets the engine free both. */
+  ftp_worker_unregister(pStruct);
+
+  /* Delete structure */
+  free(pP);
   return;
 }
 
@@ -101,7 +148,16 @@ void launch_ftp(FTPDownloadStruct * params) {
 #if FTP_DEBUG
   printf("[Launching main ftp thread]\n");
 #endif
-  hts_newthread(back_launch_ftp, (void *) params);
+  ftp_worker_register(params);
+  if (hts_newthread(back_launch_ftp, (void *) params) != 0) {
+    /* Nobody would ever reap a slot left in STATUS_FTP_TRANSFER, and
+       ftp_stop_workers() would never return. */
+    ftp_worker_unregister(params);
+    strcpybuff(params->pBack->r.msg, "Unable to launch FTP thread");
+    params->pBack->r.statuscode = STATUSCODE_INVALID;
+    params->pBack->status = STATUS_FTP_READY;
+    free(params);
+  }
 }
 
 #else
@@ -391,14 +447,14 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
       // envoi du login
 
       // --USER--
-      get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt); // en tête
+      get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt); // en tête
       _CHECK_HALT_FTP;
 
       if (line[0] == '2') {     // ok, connecté
         strcpybuff(back->info, "login: user");
         snprintf(line, sizeof(line), "USER %s", user);
         send_line(soc_ctl, line);
-        get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+        get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
         _CHECK_HALT_FTP;
         if ((line[0] == '3') || (line[0] == '2')) {
           // --PASS--
@@ -406,12 +462,12 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             strcpybuff(back->info, "login: pass");
             snprintf(line, sizeof(line), "PASS %s", pass);
             send_line(soc_ctl, line);
-            get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+            get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
             _CHECK_HALT_FTP;
           }
           if (line[0] == '2') { // ok
             send_line(soc_ctl, "TYPE I");
-            get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+            get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
             _CHECK_HALT_FTP;
             if (line[0] == '2') {
               // ok
@@ -444,7 +500,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           strcpybuff(back->info, "pasv");
           snprintf(line, sizeof(line), "PASV");
           send_line(soc_ctl, line);
-          get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+          get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
         } else {                /* ipv6 */
           line[0] = '\0';
         }
@@ -506,7 +562,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
           strcpybuff(back->info, "pasv");
           snprintf(line, sizeof(line), "EPSV");
           send_line(soc_ctl, line);
-          get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+          get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
           _CHECK_HALT_FTP;
           if (line[0] == '2') { /* got it */
             char *a;
@@ -549,7 +605,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
               // SIZE?
               strcpybuff(back->info, "size");
               send_line(soc_ctl, line);
-              get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+              get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
               _CHECK_HALT_FTP;
               if (line[0] == '2') {     // SIZE compris, ALORS tester REST (sinon pas tester: cf probleme des txt.gz decompresses a la volee)
                 char *szstr = strchr(line, ' ');
@@ -569,7 +625,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 if (ftp_command_line(line, "MDTM", ftp_path)) {
                   strcpybuff(back->info, "mdtm");
                   send_line(soc_ctl, line);
-                  get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+                  get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
                   _CHECK_HALT_FTP;
                   if (ftp_parse_mdtm(line, &remote_tm)) {
                     char date[256];
@@ -595,7 +651,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   snprintf(line, sizeof(line), "REST " LLintP,
                            (LLint) back->range_req_size);
                   send_line(soc_ctl, line);
-                  get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+                  get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
                   _CHECK_HALT_FTP;
                   if ((line[0] == '3') || (line[0] == '2')) {   // ok
                     rest_understood = 1;
@@ -648,7 +704,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 line[0] = '\0';
                 strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
                 send_line(soc_ctl, line);
-                get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+                get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
                 _CHECK_HALT_FTP;
                 if (line[0] == '1') {
                   // OK
@@ -689,7 +745,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         if ((soc_servdat = get_datasocket(line, sizeof(line))) != INVALID_SOCKET) {
           _CHECK_HALT_FTP;
           send_line(soc_ctl, line);     // envoi du RETR
-          get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+          get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
           _CHECK_HALT_FTP;
           if (line[0] == '2') { // ok
             strcpybuff(back->info, "retr");
@@ -697,7 +753,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             line[0] = '\0';
             strlncatbuff(line, line_retr, sizeof(line), sizeof(line) - 1);
             send_line(soc_ctl, line);
-            get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+            get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
             _CHECK_HALT_FTP;
             if (line[0] == '1') {
               //T_SOC soc_dat;
@@ -752,14 +808,17 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             while((len > 0) && (!stop_ftp(back))) {
               // attendre les données
               len = 1;          // pas d'erreur pour le moment
-              switch (wait_socket_receive(soc_dat, timeout, opt)) {
+              switch (wait_socket_receive(back, soc_dat, timeout, opt)) {
               case -1:
                 strcpybuff(back->r.msg, "FTP read error");
                 back->r.statuscode = STATUSCODE_INVALID;
                 len = 0;        // fin
                 break;
               case 0:
-                htsblk_failf(&back->r, "Time out (%d)", timeout);
+                /* stop_ftp() names the real reason when it is the stop that
+                   cut the wait short. */
+                if (!stop_ftp(back))
+                  htsblk_failf(&back->r, "Time out (%d)", timeout);
                 back->r.statuscode = STATUSCODE_INVALID;
                 len = 0;        // fin
                 break;
@@ -819,9 +878,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
           // 226 Transfer complete?
           if (back->r.statuscode != -1) {
-            if (wait_socket_receive(soc_ctl, timeout_onfly, opt) > 0) {
+            if (wait_socket_receive(back, soc_ctl, timeout_onfly, opt) > 0) {
               // récupérer 226 transfer complete
-              get_ftp_line(soc_ctl, line, sizeof(line), timeout, opt);
+              get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
               if (line[0] == '2') {     // OK
                 strcpybuff(back->r.msg, "OK");
                 back->r.statuscode = HTTP_OK;
@@ -844,7 +903,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     _CHECK_HALT_FTP;
     strcpybuff(back->info, "quit");
     send_line(soc_ctl, "QUIT"); // bye bye
-    get_ftp_line(soc_ctl, NULL, 0, timeout, opt);
+    get_ftp_line(back, soc_ctl, NULL, 0, timeout, opt);
 #ifdef _WIN32
     closesocket(soc_ctl);
 #else
@@ -1001,8 +1060,8 @@ int send_line(T_SOC soc, const char *data) {
 #endif
 }
 
-int get_ftp_line(T_SOC soc, char *ptrline, size_t line_size, int timeout,
-                 const httrackp *opt) {
+int get_ftp_line(lien_back *back, T_SOC soc, char *ptrline, size_t line_size,
+                 int timeout, const httrackp *opt) {
   char BIGSTK data[1024];
   int i, ok, multiline;
 
@@ -1018,7 +1077,7 @@ int get_ftp_line(T_SOC soc, char *ptrline, size_t line_size, int timeout,
     char b;
 
     // vérifier données
-    switch (wait_socket_receive(soc, timeout, opt)) {
+    switch (wait_socket_receive(back, soc, timeout, opt)) {
     case -1:                   // erreur de lecture
       if (ptrline)
         snprintf(ptrline, line_size, "500 *read error");
@@ -1143,7 +1202,8 @@ static int ftp_wait_left(const httrackp *opt, int timeout) {
 }
 
 // attendre des données
-int wait_socket_receive(T_SOC soc, int timeout, const httrackp *opt) {
+int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
+                        const httrackp *opt) {
   TStamp ltime = time_local();
   int r;
 
@@ -1153,8 +1213,10 @@ int wait_socket_receive(T_SOC soc, int timeout, const httrackp *opt) {
   printf("\x0dWaiting for data ");
   fflush(stdout);
 #endif
-  while((!(r = check_socket(soc)))
-        && (((int) ((TStamp) (time_local() - ltime))) < timeout)) {
+  /* A stop raised by the engine ends the wait on the next 100ms tick instead of
+     after the full timeout, so teardown does not sit on a silent server. */
+  while ((!(r = check_socket(soc))) && (back == NULL || !back->stop_ftp) &&
+         (((int) ((TStamp) (time_local() - ltime))) < timeout)) {
     Sleep(100);
 #if FTP_DEBUG
     printf(".");

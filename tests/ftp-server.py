@@ -29,8 +29,8 @@ import time
 # the run under test.
 QUIET_SECONDS = 900
 
-TRICKLE_CHUNK = 4096
-TRICKLE_DELAY = 0.2
+TRICKLE_CHUNK = 8192
+TRICKLE_PAUSE = 0.2
 
 
 def reply(conn, text):
@@ -104,12 +104,14 @@ class Session(threading.Thread):
             elif "truncate" in modes:
                 data.sendall(body[: max(1, len(body) // 8)])
             elif "stall" in modes:
+                # A fraction, never the whole body: a completed transfer would
+                # end the wait the tests are timing.
                 data.sendall(body[: max(1, len(body) // 8)])
                 time.sleep(QUIET_SECONDS)
             elif "trickle" in modes:
                 for off in range(0, len(body), TRICKLE_CHUNK):
                     data.sendall(body[off : off + TRICKLE_CHUNK])
-                    time.sleep(TRICKLE_DELAY)
+                    time.sleep(TRICKLE_PAUSE)
             else:
                 data.sendall(body)
         except OSError:
