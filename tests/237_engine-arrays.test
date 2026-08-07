@@ -18,9 +18,7 @@ run_bounded() {
     if command -v timeout >/dev/null; then timeout 60 "$@"; else "$@"; fi
 }
 
-# Room whose byte size cannot fit a size_t: capa*width used to wrap, handing
-# back an allocation far smaller than the capacity claimed. Match the specific
-# bound that must reject it, so an unrelated abort cannot pass the test.
+# Room whose byte size cannot fit a size_t: capa*width used to wrap short.
 err=$(run_bounded httrack -#test=arrays overflow-capa 2>&1) || true
 case "$err" in
 *"arrays: NOT aborted"*)
@@ -35,8 +33,7 @@ case "$err" in
 esac
 
 # Room of SIZE_MAX: doubling used to wrap the capacity to 0 and spin forever.
-# It must saturate instead, reach the allocator, and fail there. ASan kills the
-# process on an over-large request unless told to return NULL like libc does.
+# ASan kills the process on an over-large request unless told to return NULL.
 err=$(ASAN_OPTIONS="${ASAN_OPTIONS-}${ASAN_OPTIONS:+:}allocator_may_return_null=1" \
     run_bounded httrack -#test=arrays overflow-loop 2>&1) || true
 case "$err" in

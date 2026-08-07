@@ -673,8 +673,6 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                   strcpybuff(StatsBuffer[index].state, "search");
                   ok = 1;
                 } else if (back[i].status == STATUS_FTP_TRANSFER) {     // ohh le beau ftp
-                  /* Not char[4]: the pointer size on Win32, where the
-                     strncatbuff below would lose its bound. */
                   char proto[8] = "ftp";
 
                   if (back[i].url_adr[0]) {

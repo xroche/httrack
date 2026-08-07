@@ -476,8 +476,6 @@ static void basic_selftests(void) {
    The abort-on-overflow guarantee is checked separately by the "overflow"
    sub-mode (it aborts the process by design). */
 static int string_safety_selftests(void) {
-  /* Not char[8]: the pointer size on Win64, where every op below would
-     degrade to plain strcpy/strcat and check nothing. */
   char buf[16];
 
   /* strcpybuff into a sized array: exact copy */
