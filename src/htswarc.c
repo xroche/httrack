@@ -851,17 +851,31 @@ static void warc_cdx_flush(warc_writer *w) {
   FILE *f;
   char catbuff[CATBUFF_SIZE];
   size_t i;
-  if (!w->cdx_on || w->cdx_path == NULL || w->cdx_count == 0)
+  int werr;
+  if (!w->cdx_on || w->cdx_path == NULL)
     return;
+  /* the archive was just swapped in, so an index left behind now lies */
+  if (w->cdx_count == 0) {
+    hts_log_print(w->opt, LOG_ERROR,
+                  "WARC: no record was indexed, %s was not rewritten",
+                  w->cdx_path);
+    return;
+  }
   qsort(w->cdx_lines, w->cdx_count, sizeof(char *), cdx_cmp);
   f = FOPEN(fconv(catbuff, sizeof(catbuff), w->cdx_path), "wb");
-  if (f == NULL)
+  if (f == NULL) {
+    hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
+                  "WARC: could not write the index %s", w->cdx_path);
     return;
+  }
   for (i = 0; i < w->cdx_count; i++) {
     fputs(w->cdx_lines[i], f);
     fputc('\n', f);
   }
-  fclose(f);
+  werr = ferror(f) != 0;
+  if (fclose(f) != 0 || werr)
+    hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
+                  "WARC: could not write the index %s", w->cdx_path);
 }
 
 /* ---- WACZ pages + packaging (--wacz) ---- */

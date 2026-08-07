@@ -40,8 +40,10 @@
 # restore the previous hts-cache generation byte-identical.
 # --archive-kept-on-rerun: the second pass must leave the first pass's
 # .warc[.gz]/.cdx/.wacz byte-identical, having no bodies to replace them (#759).
-# --archive-replaced-on-rerun is its mirror: every one of them must have been
-# rewritten. Both also require no *.tmp left behind, and take an optional
+# --archive-replaced-on-rerun is its mirror: every one of them is poisoned
+# between the passes and no marker may survive. Comparing bytes instead is
+# flaky: a repeat crawl can reproduce a .cdx exactly, it holds no per-run
+# entropy (#1041). Both also require no *.tmp left behind, and take an optional
 # --archive-min-files N guarding against a scenario that silently stopped
 # producing the segments it means to check.
 # --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
@@ -73,8 +75,7 @@ archive_min_files=0
 tmpdir=
 serverpid=
 crawlpid=
-wacz_poisoned=
-wacz_poison="stale-wacz-that-a-second-pass-must-replace"
+archive_poison="stale-archive-that-a-second-pass-must-replace"
 plant_poison="stale-leftover-that-a-second-pass-must-clobber"
 
 function warning {
@@ -333,28 +334,42 @@ if test -n "$warc_validate"; then
 fi
 
 # Snapshot the archive files the second pass must keep (or must replace).
-declare -a kept_files=()
+declare -a archive_files=()
 if test -n "${archive_kept}${archive_replaced}"; then
     while read -r f; do
         test -n "$f" || continue
-        cp "$f" "${tmpdir}/kept-${#kept_files[@]}" || die "could not snapshot $f"
-        kept_files+=("$f")
+        if test -n "$archive_kept"; then
+            cp "$f" "${tmpdir}/kept-${#archive_files[@]}" || die "could not snapshot $f"
+        fi
+        archive_files+=("$f")
     done < <(find "$mirrorroot" -maxdepth 2 \
         \( -name '*.warc.gz' -o -name '*.warc' -o -name '*.cdx' -o -name '*.wacz' \) \
         2>/dev/null | sort)
-    test "${#kept_files[@]}" -gt 0 ||
+    test "${#archive_files[@]}" -gt 0 ||
         die "the first pass produced no archive to compare against"
-    test "${#kept_files[@]}" -ge "$archive_min_files" ||
-        die "only ${#kept_files[@]} archive file(s), wanted $archive_min_files: ${kept_files[*]}"
+    test "${#archive_files[@]}" -ge "$archive_min_files" ||
+        die "only ${#archive_files[@]} archive file(s), wanted $archive_min_files: ${archive_files[*]}"
 fi
 
-# Poison the first-pass .wacz when a second pass follows: repackaging moves the
-# new archive over it, so the marker must be gone afterwards (#726). Poisoning
-# beats comparing the two packages, which can come out byte-identical.
-if test -z "$archive_kept" && test -n "$wacz_validate" && test -n "${rerun}${rerun_args}"; then
-    wacz_poisoned=$(find "$mirrorroot" -maxdepth 2 -name '*.wacz' 2>/dev/null | sort | tail -n1)
-    test -z "$wacz_poisoned" || echo "$wacz_poison" >"$wacz_poisoned"
+# Poison what the second pass must replace: it moves a fresh file over each one,
+# so no marker may survive (#726, #1041).
+declare -a poisoned_files=()
+if test -z "$archive_kept" && test -n "${rerun}${rerun_args}"; then
+    if test -n "$archive_replaced"; then
+        poisoned_files=("${archive_files[@]}")
+    elif test -n "$wacz_validate"; then
+        wacz_first=$(find "$mirrorroot" -maxdepth 2 -name '*.wacz' 2>/dev/null | sort | tail -n1)
+        test -z "$wacz_first" || poisoned_files=("$wacz_first")
+    fi
+    i=0
+    while test "$i" -lt "${#poisoned_files[@]}"; do
+        echo "$archive_poison" >"${poisoned_files[$i]}" ||
+            die "could not poison ${poisoned_files[$i]}"
+        i=$((i + 1))
+    done
 fi
+test -z "$archive_replaced" || test "${#poisoned_files[@]}" -gt 0 ||
+    die "--archive-replaced-on-rerun without a second pass asserts nothing"
 
 # --- plant leftovers the second pass has to deal with ------------------------
 if test "${#plants[@]}" -gt 0; then
@@ -419,21 +434,26 @@ if test -n "$rerun_args"; then
 fi
 
 # --- optional: did the second pass keep, or replace, the whole archive? ------
-if test "${#kept_files[@]}" -gt 0; then
+if test -n "$archive_kept" && test "${#archive_files[@]}" -gt 0; then
     i=0
-    for f in "${kept_files[@]}"; do
-        if test -n "$archive_kept"; then
-            info "checking the second pass kept $(basename "$f")"
-            cmp -s "${tmpdir}/kept-${i}" "$f" ||
-                die "$(basename "$f") was rewritten: the previous archive was destroyed"
-        else
-            info "checking the second pass replaced $(basename "$f")"
-            cmp -s "${tmpdir}/kept-${i}" "$f" &&
-                die "$(basename "$f") still holds the first pass's bytes"
-        fi
+    for f in "${archive_files[@]}"; do
+        info "checking the second pass kept $(basename "$f")"
+        cmp -s "${tmpdir}/kept-${i}" "$f" ||
+            die "$(basename "$f") was rewritten: the previous archive was destroyed"
         result "OK"
         i=$((i + 1))
     done
+fi
+i=0
+while test "$i" -lt "${#poisoned_files[@]}"; do
+    f="${poisoned_files[$i]}"
+    info "checking the second pass replaced $(basename "$f")"
+    test -s "$f" || die "$(basename "$f") is gone, not replaced"
+    grep -qa "$archive_poison" "$f" && die "$(basename "$f") still holds the poison"
+    result "OK"
+    i=$((i + 1))
+done
+if test "${#archive_files[@]}" -gt 0; then
     # A leftover in-progress file is as bad: the next pass would silently eat it.
     info "checking no in-progress archive was left behind"
     leftover=$(find "$mirrorroot" -maxdepth 2 \( -name '*.warc.gz.tmp' -o -name '*.warc.tmp' \) 2>/dev/null | head -n1)
@@ -557,12 +577,6 @@ if test -n "$wacz_validate"; then
             exit 77
         fi
         die "no .wacz file produced under $mirrorroot"
-    fi
-    if test -n "$wacz_poisoned"; then
-        info "checking the second pass replaced the .wacz"
-        grep -q "$wacz_poison" "$wacz_poisoned" 2>/dev/null &&
-            die "stale .wacz kept: $wacz_poisoned"
-        result "OK"
     fi
     validator=$(nativepath "${testdir}/wacz-validate.py")
     info "validating WACZ package"
