@@ -55,6 +55,7 @@ typedef struct FTPDownloadStruct FTPDownloadStruct;
 struct FTPDownloadStruct {
   lien_back *pBack;
   httrackp *pOpt;
+  FTPDownloadStruct *pNext; /* live-worker list, owned by htsftp.c */
 };
 
 /* Library internal definictions */
@@ -65,6 +66,9 @@ struct FTPDownloadStruct {
 #if USE_BEGINTHREAD
 void launch_ftp(FTPDownloadStruct * params);
 void back_launch_ftp(void *pP);
+/* Cancel every live FTP worker and block until each stops touching its backlog
+   slot and opt. Call before freeing either. */
+void ftp_stop_workers(void);
 #else
 void launch_ftp(FTPDownloadStruct * params, char *path, char *exec);
 int back_launch_ftp(FTPDownloadStruct * params);
@@ -72,7 +76,10 @@ int back_launch_ftp(FTPDownloadStruct * params);
 
 int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);
-int get_ftp_line(T_SOC soc, char *line, size_t line_size, int timeout);
+/* Read one control-channel reply into line[line_size]. back may be NULL; when
+   given, a stop raised on it ends the wait early. Returns 0 on error. */
+int get_ftp_line(lien_back *back, T_SOC soc, char *line, size_t line_size,
+                 int timeout);
 /* Split a "user[:pass]@" prefix (end = jump_identification result) into
    NUL-terminated user/pass buffers. Returns HTS_FALSE and empties both when a
    field does not fit, as a clipped one would name another account.
@@ -102,7 +109,9 @@ int stop_ftp(lien_back * back);
 char *linejmp(char *line);
 int check_socket(T_SOC soc);
 int check_socket_connect(T_SOC soc);
-int wait_socket_receive(T_SOC soc, int timeout);
+/* Wait up to timeout seconds for soc to become readable. back may be NULL;
+   when given, a stop raised on it cuts the wait short. */
+int wait_socket_receive(lien_back *back, T_SOC soc, int timeout);
 #endif
 
 #endif
