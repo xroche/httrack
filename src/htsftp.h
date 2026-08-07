@@ -76,10 +76,10 @@ int back_launch_ftp(FTPDownloadStruct * params);
 
 int run_launch_ftp(FTPDownloadStruct * params);
 int send_line(T_SOC soc, const char *data);
-/* Read one control-channel reply into line[line_size]. back may be NULL; when
-   given, a stop raised on it ends the wait early. Returns 0 on error. */
+/* Read one control-channel reply into line[line_size]. Returns 0 on error.
+   Optional back ends the wait on a stop, opt clips it to --max-time. */
 int get_ftp_line(lien_back *back, T_SOC soc, char *line, size_t line_size,
-                 int timeout);
+                 int timeout, const httrackp *opt);
 /* Split a "user[:pass]@" prefix (end = jump_identification result) into
    NUL-terminated user/pass buffers. Returns HTS_FALSE and empties both when a
    field does not fit, as a clipped one would name another account.
@@ -109,9 +109,10 @@ int stop_ftp(lien_back * back);
 char *linejmp(char *line);
 int check_socket(T_SOC soc);
 int check_socket_connect(T_SOC soc);
-/* Wait up to timeout seconds for soc to become readable. back may be NULL;
-   when given, a stop raised on it cuts the wait short. */
-int wait_socket_receive(lien_back *back, T_SOC soc, int timeout);
+/* Wait up to timeout seconds for soc to become readable. Optional back ends the
+   wait on a stop, opt clips it to --max-time. */
+int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
+                        const httrackp *opt);
 #endif
 
 #endif

@@ -4494,7 +4494,7 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   assertf(send(sv[1], "\r\n", 2, 0) == 2); // end the line so we return
   deletesoc(sv[1]);
   line[0] = '\0';
-  get_ftp_line(NULL, sv[0], line, sizeof(line), 5);
+  get_ftp_line(NULL, sv[0], line, sizeof(line), 5, NULL);
   deletesoc(sv[0]);
   printf("ftp-line self-test OK (bounded %d-byte reply)\n",
          (int) sizeof(flood));
