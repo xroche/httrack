@@ -592,8 +592,7 @@ if test x"$fuzzers" = x"yes"; then
 	AX_CHECK_COMPILE_FLAG([-fsanitize=fuzzer-no-link],
 		[DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fsanitize=fuzzer-no-link"],
 		[AC_MSG_ERROR([--enable-fuzzers requires libFuzzer support (clang)])])
-	# The ordinary programs are instrumented too, so they need the sancov runtime
-	# the harnesses get from -fsanitize=fuzzer.
+	# Ordinary programs are instrumented too, so they need that runtime at link.
 	AX_CHECK_LINK_FLAG([-fsanitize=fuzzer-no-link],
 		[DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -fsanitize=fuzzer-no-link"],
 		[AC_MSG_ERROR([--enable-fuzzers requires libFuzzer support (clang)])])

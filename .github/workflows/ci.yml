@@ -571,9 +571,8 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: bash fuzz/run-fuzzers.sh fuzz check
 
-  # The job above links ASan, whose runtime also defines the sancov hooks the
-  # instrumentation emits, so it cannot see a program left without one (#1030).
-  # This is the bare --enable-fuzzers build; linking is what is under test.
+  # Catches #1030: the job above links ASan, whose runtime already defines the
+  # sancov hooks the instrumentation calls, hiding a program left without one.
   fuzz-no-sanitizer:
     name: build (fuzzers, no sanitizer runtime, clang)
     runs-on: ubuntu-24.04
