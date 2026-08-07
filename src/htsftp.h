@@ -66,10 +66,8 @@ struct FTPDownloadStruct {
 #if USE_BEGINTHREAD
 void launch_ftp(FTPDownloadStruct * params);
 void back_launch_ftp(void *pP);
-/* Cancel every live FTP worker and block until each has stopped reading its
-   backlog slot and opt. Must be called before either is freed (#1051); the
-   workers poll the flag inside their socket waits, so this costs a tick rather
-   than the rest of the transfer. */
+/* Cancel every live FTP worker and block until each stops touching its backlog
+   slot and opt. Call before freeing either. */
 void ftp_stop_workers(void);
 #else
 void launch_ftp(FTPDownloadStruct * params, char *path, char *exec);

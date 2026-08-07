@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# An FTP transfer runs in a detached thread that writes through its backlog
-# slot, and the engine freed that array without waiting for it (#1051): a
-# --max-size cap reached while a slow server was still sending segfaulted in
-# run_launch_ftp. The stalled pass pins the drain as bounded rather than merely
-# patient -- a silent server must not hold teardown for the FTP read timeout.
+# Regression test for #1051: the engine freed FTP transfer slots a worker thread
+# was still writing to.
 
 set -euo pipefail
 
@@ -62,12 +59,19 @@ assert_capped() {
 echo "* trickle" >"$modes"
 out="${tmpdir}/trickle"
 rc=0
+start=$SECONDS
 run_with_timeout 120 httrack "ftp://127.0.0.1:${port}/f.bin" -O "$out" --quiet \
     --disable-security-limits --robots=0 --timeout=200 -M"$CAP" -c1 || rc=$?
+elapsed=$((SECONDS - start))
 test "$rc" -ne 124 || fail "trickle crawl overran its 120s cap"
+# Faults reliably only while the backlog array stays mmap-sized: free() unmaps it.
 test "$rc" -lt 128 || fail "trickle crawl died on signal $((rc - 128)) (#1051)"
 assert_capped "$out" "trickle"
-ok "a --max-size cap on a trickling FTP transfer exits cleanly (rc=${rc})"
+# A drain that waits the transfer out instead of cancelling it also exits 0, and
+# the trickle runs ~100s against ~3s for a cancel, so budget the clock as well.
+test "$elapsed" -lt 30 ||
+    fail "trickle crawl took ${elapsed}s, teardown waited for the transfer"
+ok "a --max-size cap on a trickling FTP transfer exits cleanly in ${elapsed}s"
 
 # --- the bound: teardown cancels the thread instead of waiting out its read.
 # The FTP data read is a 300s wait, so anything near that means the stop flag

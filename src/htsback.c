@@ -226,7 +226,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
     int i;
 
     /* An FTP worker writes through its slot until it returns, so nothing here
-       may wipe or free one under it (#1051). */
+       may wipe or free one under it. */
     ftp_stop_workers();
     // delete live slots
     for(i = 0; i < sback->count; i++) {

@@ -62,8 +62,8 @@ Please visit our Website: http://www.httrack.com
 
 /* Live FTP workers. Each writes through its backlog slot and reads opt for its
    whole run, so neither may be freed while the list is not empty (#1051).
-   Registered at spawn rather than at thread entry, so a launch immediately
-   followed by the wait still covers it (#747). */
+   Registration happens at spawn, not at thread entry: a worker that has not
+   been scheduled yet must already hold the list against a teardown. */
 static FTPDownloadStruct *ftp_workers = NULL;
 static htsmutex ftp_workers_mutex = HTSMUTEX_INIT;
 
