@@ -1,0 +1,210 @@
+#!/bin/bash
+#
+# A mirrored page must not reach the control panel: it lands in an opaque
+# origin, and a POST claiming a foreign origin is refused before it runs.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+# The panel assets the negative side reads have to exist, or it goes vacuous.
+for asset in server/index.html server/ping.js; do
+    test -f "${distdir}/html/${asset}" || fail "missing GUI asset ${asset}"
+done
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_sandbox.XXXXXX") || fail "no tmpdir"
+srvlog=$(mktemp)
+srv=
+srvpid=
+cleanup() {
+    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
+    test -z "${srvpid}" || kill -9 "${srvpid}" 2>/dev/null || true
+    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
+    wait "${srv}" 2>/dev/null || true # absorb bash's async "Killed" notice
+    rm -rf "${work}" "${srvlog}"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+# Stand in for a finished mirror: the crawl itself is not under test.
+proj="${work}/websites/proj"
+mkdir -p "${proj}/site.example"
+printf '<html><body>MIRROR-HTML-OK<script>1</script></body></html>\n' >"${proj}/page.html"
+# A crawled page lives one level down, under its host; the root files above
+# cannot tell a per-file gate from one keyed on the /website/ prefix.
+printf '<html><body>MIRROR-SUB-OK</body></html>\n' >"${proj}/site.example/deep.html"
+# #875 made a mirrored .svg render inline, so it carries script too.
+printf '<svg xmlns="http://www.w3.org/2000/svg">MIRROR-SVG-OK</svg>\n' >"${proj}/probe.svg"
+# Untyped: sniffing can still hand it to the HTML parser.
+printf 'MIRROR-BLOB-OK\n' >"${proj}/data.bin"
+
+# An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
+sport=$("${python}" -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
+(
+    trap '' TERM TTOU
+    export HOME="${work}"
+    exec htsserver "${distdir}/" --port "${sport}" >"${srvlog}" 2>&1
+) &
+srv=$!
+for _ in $(seq 1 40); do
+    url=$(sed -n 's/^URL=//p' "${srvlog}") && test -n "${url}" && break
+    kill -0 "${srv}" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
+srvpid=$(sed -n 's/^PID=//p' "${srvlog}") # absent on Windows
+
+# htsserver resolves the posted paths itself, so hand it native ones.
+"${python}" - "${url}" "$(nativepath "${work}/websites")" <<'PY' || fail "mirror isolation checks failed"
+import re, socket, sys, urllib.parse, urllib.request
+
+url, base = sys.argv[1].rstrip("/"), sys.argv[2]
+expected = "sandbox allow-scripts allow-forms allow-popups allow-downloads"
+parts = urllib.parse.urlsplit(url)
+rc = 0
+
+
+def check(ok, what):
+    global rc
+    print(("ok: " if ok else "FAIL: ") + what)
+    if not ok:
+        rc = 1
+
+
+def raw(request, whole=False):
+    """Raw so the status line is read verbatim and no redirect is followed."""
+    sock = socket.create_connection((parts.hostname, parts.port), timeout=20)
+    try:
+        sock.sendall(request)
+        got = b""
+        while len(got) < 65536 and (whole or b"\r\n\r\n" not in got):
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            got += chunk
+    finally:
+        sock.close()
+    return got
+
+
+def get(path):
+    return raw(b"GET " + path.encode() + b" HTTP/1.0\r\n\r\n")
+
+
+def post(path, body, origin=None):
+    head = "POST %s HTTP/1.0\r\nHost: %s\r\n" % (path, parts.netloc)
+    head += "Content-type: application/x-www-form-urlencoded\r\n"
+    head += "Content-length: %d\r\n" % len(body)
+    if origin is not None:
+        head += "Origin: %s\r\n" % origin
+    return raw(head.encode("latin-1") + b"\r\n" + body.encode("latin-1"), True)
+
+
+def body_is_complete(got):
+    """A Content-length the response never delivers leaves the client hanging."""
+    head, sep, payload = got.partition(b"\r\n\r\n")
+    m = re.search(rb"\r\nContent-length: (\d+)$", head)
+    return sep != b"" and m is not None and len(payload) == int(m.group(1))
+
+
+def fetch(path):
+    r = urllib.request.urlopen(url + path, timeout=20)
+    return r.headers, r.read()
+
+
+def check_sandboxed(path, marker):
+    hdrs, body = fetch(path)
+    got = hdrs.get("Content-Security-Policy", "")
+    check(got == expected, "%s is sandboxed (got %r)" % (path, got))
+    # A truncated or empty body would satisfy the header check on its own.
+    check(marker in body, "%s served its content" % path)
+    # allow-same-origin is the omission that matters: with it /server/ is readable again.
+    check("allow-same-origin" not in got, "%s keeps an opaque origin" % path)
+
+
+def check_unsandboxed(path, marker, when):
+    hdrs, body = fetch(path)
+    check("Content-Security-Policy" not in hdrs,
+          "%s is not sandboxed %s" % (path, when))
+    check(marker in body, "%s served its content %s" % (path, when))
+
+
+# Before any project is set: index.html renders the sid a sandbox would hide.
+panel = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+sid = re.search(rb'name="sid" value="([0-9a-f]+)"', panel)
+if sid is None:
+    print("FAIL: no sid in the rendered form")
+    sys.exit(1)
+check_unsandboxed("/server/index.html", b'name="sid"', "before the save")
+check_unsandboxed("/server/ping.js", b"function", "before the save")
+
+# What step4.html posts. command_do=save records the served root and runs no
+# crawl, so the mirror answering afterwards is the side effect to watch.
+fields = [("sid", sid.group(1).decode()), ("path", base), ("projname", "proj"),
+          ("command", "httrack"), ("command_do", "save"), ("winprofile", "x")]
+body = "&".join("%s=%s" % (k, urllib.parse.quote(v, safe="")) for k, v in fields)
+
+# A sandboxed page sends "null", any other page its own origin. Neither may
+# take effect, and a 403 on its own would not prove the command did not run.
+for origin in ("null", "http://crawled.example"):
+    got = post("/server/step4.html", body, origin)
+    check(got.startswith(b"HTTP/1.0 403 "), "Origin: %s is refused (got %r)"
+          % (origin, got.split(b"\r\n")[0]))
+    check(body_is_complete(got), "the refusal delivers the body it announces")
+check(get("/website/page.html").startswith(b"HTTP/1.0 404 "),
+      "the refused save bound no mirror")
+
+# urllib sends no Origin, and neither do most non-browser clients.
+check(not post("/server/step4.html", body).startswith(b"HTTP/1.0 403 "),
+      "a POST without an Origin is accepted")
+check(get("/website/page.html").startswith(b"HTTP/1.0 200 "),
+      "the accepted save bound the mirror")
+# The panel's own forms carry a matching Origin, so refusing every one is wrong.
+check(not post("/server/step4.html", body, url).startswith(b"HTTP/1.0 403 "),
+      "a POST from the panel's own origin is accepted")
+
+check_sandboxed("/website/page.html", b"MIRROR-HTML-OK")
+check_sandboxed("/website/site.example/deep.html", b"MIRROR-SUB-OK")
+check_sandboxed("/website/probe.svg", b"MIRROR-SVG-OK")
+check_sandboxed("/website/data.bin", b"MIRROR-BLOB-OK")
+
+# Repeated now that a project is bound: a gate keyed on server state rather
+# than on the /website/ prefix only starts sandboxing the panel here.
+check_unsandboxed("/server/ping.js", b"function", "after the save")
+check_unsandboxed("/server/finished.html", b"/website/index.html", "after the save")
+
+# urllib joins folded headers and hides framing, so read the raw block once.
+head = get("/website/page.html").split(b"\r\n\r\n")[0]
+check(head.startswith(b"HTTP/1.0 200 OK\r\n"), "mirrored page is a 200")
+check(head.count(b"Content-Security-Policy:") == 1, "one policy header")
+check(b"\r\nContent-Security-Policy: " + expected.encode() + b"\r\n" in head,
+      "policy line ends CRLF")
+check(b"\n" not in head.replace(b"\r\n", b""), "no bare LF in the header block")
+
+sys.exit(rc)
+PY
+
+# A leaked htsserver wedges the parallel harness behind a green log.
+cleanup
+! kill -0 "${srv}" 2>/dev/null || fail "htsserver ${srv} survived"
+
+echo "PASS"

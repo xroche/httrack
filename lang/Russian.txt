@@ -186,6 +186,8 @@ scanning
 сканируем
 Waiting for scheduled time..
 Ожидаем заданное время начала..
+Transferring data..
+Передача данных..
 Connecting to provider
 Соединяемся с провайдером
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Создать начальную страницу
 Create a word database of all html pages
 Создать базу данных слов, содержащихся в html-страницах
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Создать полный почтовый архив RFC822 (MHT/EML) зеркала
 Create error logging and report files
 Создать лог файлы с информацией о работе и ошибках
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Идентификация броузера (строка User-Agent)
 Comment to be placed in each HTML file
 Комментарий, размещаемый в каждом HTML файле
+Languages accepted by the browser
+Языки, принимаемые броузером
+Additional HTTP headers to be sent in each requests
+Дополнительные HTTP заголовки, отправляемые в каждом запросе
+HTTP referer to be sent for initial URLs
+HTTP referer, отправляемый для начальных URL
 Back to starting page
 Назад на начальную страницу
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Создать индекс
 Make a word database
 Создать базу данных слов
+Build a mail archive
+Создать почтовый архив
 Log files
 Log файлы
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Идентификатор
 HTML footer
 Нижний HTML колонтитул
+Languages
+Языки
+Additional HTTP Headers
+Дополнительные HTTP заголовки
+Default referer URL
+Referer URL по умолчанию
 N# connections
 N# соединений
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Адрес карты сайта:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Адрес карты сайта, которую нужно прочитать вместо опроса сайта; оставьте пустым, чтобы проверить robots.txt, затем /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Записать CDXJ-индекс WARC-архива
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Также записывать отсортированный CDXJ-индекс со всеми записями WARC-архива для средств воспроизведения.
+Package the crawl as a WACZ file
+Упаковать обход в файл WACZ
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Объединить WARC-архив, его CDXJ-индекс и страницы зеркала в один файл WACZ; включает WARC-архив и CDXJ-индекс.
+WARC segment size limit:
+Максимальный размер сегмента WARC:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Начинать новый сегмент WARC, когда текущий превысит указанное число байт; оставьте пустым или 0 для одного файла.

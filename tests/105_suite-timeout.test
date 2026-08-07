@@ -1,0 +1,341 @@
+#!/bin/bash
+#
+# The harness timeout (tests/test-timeout.sh) must name the test it killed, say
+# what was still running, and exit 124 -- otherwise a wedge only ever shows up as
+# a cancelled CI step, which keeps no log and no artifact.
+
+set -eu
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+driver="${testdir}/test-timeout.sh"
+test -r "$driver" || {
+    echo "no test-timeout.sh next to $0" >&2
+    exit 1
+}
+
+fail() {
+    echo "FAIL: $*" >&2
+    test -z "${out:-}" || sed 's/^/  | /' <"$out" >&2
+    exit 1
+}
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_sutmo.XXXXXX") || exit 1
+# A colon-free root for the PATH shim below: MSYS hands out a drive-letter TMPDIR
+# and a PATH entry carrying a colon is read as two, which leaves it unreachable.
+shim=$(mktemp -d /tmp/httrack_sutmoshim.XXXXXX 2>/dev/null) || shim="$tmp/starve"
+trap 'set +e; rm -rf "$tmp" "$shim"' EXIT
+trap 'rm -rf "$tmp" "$shim"' HUP INT QUIT PIPE TERM
+out="$tmp/out"
+
+# --- a hanging test is killed, named, and reported 124 ----------------------
+cat >"$tmp/90_wedged.test" <<'EOF'
+echo "marker: the wedged test started"
+sleep 300
+EOF
+
+start=$SECONDS
+rc=0
+HTTRACK_PROGRESS_LOG="$tmp/progress" HTTRACK_TEST_TIMEOUT=5 \
+    bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
+elapsed=$((SECONDS - start))
+
+# Announced when the dump starts, which runs for minutes: a suite watchdog
+# reading that log would take the silence for a wedge and kill the step.
+grep -qx 'DUMP 90_wedged.test' "$tmp/progress" ||
+    fail "the dump was not announced: $(cat "$tmp/progress" 2>&1)"
+
+test "$rc" -eq 124 || fail "wedged test reported $rc, want 124"
+# Never before the budget, or a slow-but-healthy test would be killed too.
+test "$elapsed" -ge 5 || fail "the guard fired early (${elapsed}s of a 5s budget)"
+test "$elapsed" -lt 30 || fail "the guard fired late (${elapsed}s)"
+grep -q 'marker: the wedged test started' "$out" || fail "the test's own output was lost"
+# The header, not a bare name: the process list quotes the test's path too, so a
+# wrapper that named nothing would still match that.
+grep -q '^===== TIMEOUT: 90_wedged.test exceeded' "$out" ||
+    fail "the diagnostics do not name the test"
+grep -q "own process tree" "$out" || fail "no process list in the diagnostics"
+
+# The budget is read, not hard-coded: well under it, the same shape survives.
+printf 'sleep 3\necho "slow but healthy"\n' >"$tmp/92_slow.test"
+rc=0
+HTTRACK_TEST_TIMEOUT=45 bash "$driver" "$tmp/92_slow.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "a healthy 3s test under a 45s budget reported $rc"
+grep -q 'slow but healthy' "$out" || fail "healthy test output lost"
+! grep -q 'TIMEOUT' "$out" || fail "the guard fired on a healthy test"
+
+# The killed tree must really be gone, or the next test inherits its ports.
+sleep 1
+! grep -q "$tmp/90_wedged.test" <<<"$(ps_snapshot)" ||
+    fail "the wedged test survived the guard"
+
+# --- the budget is wall clock, not a count of poll iterations ----------------
+# Starve the poll and a counted budget stretches with it: 10 polls of a 0.1s tick
+# become 40s, so the guard fires long after the step it was meant to beat (#795).
+# HTTRACK_POLL_SLEEP forces the forked tick, the only one a shimmed sleep reaches;
+# the loop it stretches is the same one poll_wait's fd tick drives.
+(
+    starve_sleep "$shim" 4 || fail "could not install the slow sleep"
+    start=$SECONDS
+    rc=0
+    HTTRACK_POLL_SLEEP=1 HTTRACK_TEST_TIMEOUT=1 \
+        bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
+    elapsed=$((SECONDS - start))
+    test "$rc" -eq 124 || fail "starved guard reported $rc, want 124"
+    # Generous: the diagnostics dump runs inside this window too.
+    test "$elapsed" -lt 25 ||
+        fail "budget counted polls, not seconds: ${elapsed}s for a 1s budget"
+)
+
+# --- exit status and output of a healthy test pass straight through ----------
+# 77 is automake's SKIP and 99 its hard error, so both have to survive the wrapper.
+for want in 0 1 77 99; do
+    printf 'echo "ran with %s"\nexit %s\n' "$want" "$want" >"$tmp/91_plain.test"
+    rc=0
+    HTTRACK_TEST_TIMEOUT=60 bash "$driver" "$tmp/91_plain.test" >"$out" 2>&1 || rc=$?
+    test "$rc" -eq "$want" || fail "exit $want came back as $rc"
+    grep -q "ran with $want" "$out" || fail "output lost for exit $want"
+    ! grep -q 'TIMEOUT' "$out" || fail "the guard fired on a test that exited at once"
+done
+
+# A budget of 0 disables the guard: the test still runs, and is not killed. Its
+# own file, so the assertion cannot ride on whatever the loop above left behind.
+printf 'echo "guard off"\nexit 3\n' >"$tmp/93_off.test"
+rc=0
+HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/93_off.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 3 || fail "disabled guard changed the exit status ($rc)"
+grep -q 'guard off' "$out" || fail "output lost with the guard disabled"
+
+# --- the test reads the same budget the guard enforces ----------------------
+# skip_if_out_of_budget paces against it, so a raw or absent value would pace
+# against a number the guard is not using.
+saw_budget() { # saw_budget <want> <label>
+    grep -qx "budget=$1" "$out" ||
+        fail "$2 reached the test as '$(cat "$out")', want budget=$1"
+}
+# shellcheck disable=SC2016 # the fixture has to read the variable, not us
+printf 'echo "budget=${HTTRACK_TEST_TIMEOUT-unset}"\n' >"$tmp/95_budget.test"
+(unset HTTRACK_TEST_TIMEOUT && bash "$driver" "$tmp/95_budget.test") >"$out" 2>&1
+saw_budget 600 "an unset budget"
+HTTRACK_TEST_TIMEOUT=garbage bash "$driver" "$tmp/95_budget.test" >"$out" 2>&1
+saw_budget 600 "a non-numeric budget"
+HTTRACK_TEST_TIMEOUT=45 bash "$driver" "$tmp/95_budget.test" >"$out" 2>&1
+saw_budget 45 "an explicit budget"
+# 0 execs the test directly, so the pacer has to see the guard is off too.
+HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/95_budget.test" >"$out" 2>&1
+saw_budget 0 "a disabled guard"
+
+# --- a test too slow to finish skips instead of being killed ----------------
+# hppa spends ~150s on one configure run, and 124 takes the build down where 77
+# does not.
+cat >"$tmp/94_pacer.test" <<EOF
+. "${testdir}/testlib.sh"
+skip_if_out_of_budget 0 9999 # nothing left to run
+skip_if_out_of_budget 5 0    # steps that cost nothing
+skip_if_out_of_budget 5 40   # the next step alone wants 60s
+echo "the pacer let it through"
+EOF
+rc=0
+HTTRACK_TEST_TIMEOUT=20 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 77 || fail "a 60s step under a 20s budget reported $rc, want 77"
+rc=0
+HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "a 60s step under a 600s budget reported $rc, want 0"
+grep -q 'the pacer let it through' "$out" || fail "the pacer skipped a test that fits"
+
+# --- the process lists survive a host with no ps ----------------------------
+# Fedora's build root ships no procps, and the guard then named nothing (#1021).
+if ! is_windows && test -r /proc/self/stat; then
+    mkdir -p "$tmp/nops"
+    printf '#!/bin/sh\nexit 127\n' >"$tmp/nops/ps"
+    chmod +x "$tmp/nops/ps"
+    # A shell copy, not a renamed sleep: uutils refuses an argv[0] it does not own
+    # (#1042). Either works, since both lists match on the basename alone.
+    cp "${BASH:-$(command -v sh)}" "$tmp/httrack" || fail "no shell to copy"
+    "$tmp/httrack" -c : || fail "cannot exec out of $tmp (noexec?)"
+    # Read-write, so the open does not block and the timeout can bound it: the
+    # fakes then fork nothing for the SIGABRT to orphan, and a test killed
+    # outright leaks no process named httrack onto the runner.
+    mkfifo "$tmp/hold"
+    hold="read -t 60 _ <>'$tmp/hold'"
+    # Started from a subshell so ppid and pgid differ: swapping those two columns
+    # is invisible whenever the test shell happens to lead its own group.
+    (
+        "$tmp/httrack" -c "$hold" &
+        echo $! >"$tmp/fake.pid"
+    )
+    # Its own group, to prove the filter keeps an outsider out.
+    (
+        set -m
+        "$tmp/httrack" -c "$hold" &
+        echo $! >"$tmp/outside.pid"
+    )
+    fake=$(cat "$tmp/fake.pid")
+    outside=$(cat "$tmp/outside.pid")
+    trap 'set +e; kill "$fake" "$outside" 2>/dev/null; rm -rf "$tmp"' EXIT
+    # /proc holds the pid from the fork on, so a fake that never exec'd would fail
+    # some later assertion instead of this one.
+    running() {
+        local i=0 argv0
+        while test "$i" -lt 20; do
+            { read -r -d '' argv0 <"/proc/$1/cmdline"; } 2>/dev/null &&
+                test "${argv0##*/}" = httrack && return 0
+            sleep 0.1
+            i=$((i + 1))
+        done
+        return 1
+    }
+    running "$fake" || fail "the fake engine never started"
+    running "$outside" || fail "the outsider never started"
+    # ppid and pgid of $1: the oracle the listing is checked against.
+    procfields() { awk '{ sub(/.*\) /, ""); print $2, $3 }' "/proc/$1/stat"; }
+    procstate() { awk '{ sub(/.*\) /, ""); print $1 }' "/proc/$1/stat" 2>/dev/null || echo gone; }
+    read -r fppid pgid _ <<<"$(procfields "$fake")"
+    read -r _ opgid _ <<<"$(procfields "$outside")"
+    test "$fppid" != "$pgid" || fail "the fake shares ppid and pgid ($pgid)"
+    test "$opgid" != "$pgid" || fail "the outsider landed in the group under test"
+    (
+        PATH="$tmp/nops:$PATH"
+        ! ps -A >/dev/null 2>&1 || fail "the ps shim did not take"
+        snap=$(list_stray_processes "$pgid" group)
+        # Line 1 is the header every consumer drops; a row there would be lost.
+        case "$(head -n1 <<<"$snap")" in
+        [0-9]*) fail "the no-ps listing has no header: $snap" ;;
+        esac
+        ! grep -qE "^$outside " <<<"$snap" ||
+            fail "no-ps group list reported pid $outside, in another group"
+        read -r _ rppid rpgid _ <<<"$(grep -E "^$fake " <<<"$snap")"
+        test "$rppid $rpgid" = "$fppid $pgid" ||
+            fail "no-ps row for $fake reads ppid/pgid '$rppid $rpgid', want '$fppid $pgid'"
+        engines=$(list_engine_pids "$pgid")
+        grep -qx "$fake" <<<"$engines" || fail "no-ps engine list lost pid $fake"
+        ! grep -qx "$outside" <<<"$engines" ||
+            fail "no-ps engine list reached outside the group (pid $outside)"
+        # A platform with no stack mechanism must say so and leave the engine
+        # alone. Shimmed, because no CI leg is one: the Hurd branch below runs
+        # only on the buildds that failed for want of it.
+        # shellcheck disable=SC2016 # the shim reads them, not us
+        printf '#!/bin/sh\ncase "$1" in -s) echo GNU;; *) exec %s "$@";; esac\n' \
+            "$(command -v uname)" >"$tmp/nops/uname"
+        chmod +x "$tmp/nops/uname"
+        grep -q "no stack mechanism known for GNU" <<<"$(request_engine_backtraces "$pgid")" ||
+            fail "a platform with no stack mechanism reported nothing"
+        case "$(procstate "$fake")" in
+        Z | gone) fail "the no-mechanism branch signalled pid $fake" ;;
+        esac
+        rm -f "$tmp/nops/uname"
+
+        # The chain, not just its input: this is what reported nothing on Fedora.
+        stacks=$(request_engine_backtraces "$pgid")
+        ! grep -q 'no engine process left' <<<"$stacks" ||
+            fail "no-ps stack request found no engine to signal: $stacks"
+        # Only Linux signals; elsewhere (Hurd's uname reports "GNU") the chain
+        # owes the reader its no-mechanism report instead of silence.
+        if test "$(uname -s)" = Linux; then
+            # Gone, or a zombie: the fake is reparented, and a container's pid 1
+            # does not always reap. kill -0 succeeds on a zombie, proving nothing.
+            case "$(procstate "$fake")" in
+            Z | gone) ;;
+            *) fail "the SIGABRT never reached pid $fake" ;;
+            esac
+        else
+            grep -q 'no stack mechanism known' <<<"$stacks" ||
+                fail "no stack mechanism was reported on $(uname -s): $stacks"
+        fi
+        # With neither source the dump must say so, not print an empty section.
+        # shellcheck disable=SC2317 # reached through ps_snapshot
+        proc_snapshot() { return 1; }
+        grep -q 'no process list' <<<"$(list_stray_processes "$pgid" group)" ||
+            fail "a host with no ps and no /proc produced no notice"
+    )
+    kill "$fake" "$outside" 2>/dev/null || true
+fi
+
+# --- an emulated buildd hides the engine behind its binfmt interpreter -------
+# Synthetic rows: no runner here has qemu-user, and the column shift is the point.
+if ! is_windows; then
+    (
+        # shellcheck disable=SC2317 # reached through the two matchers below
+        ps_snapshot() {
+            cat <<'EOF'
+PID PPID PGID ELAPSED S COMMAND
+11 1 40 12 S /usr/libexec/qemu-binfmt/hppa-binfmt-P /bld/src/httrack -q http://h/
+12 1 40 12 S /usr/bin/qemu-hppa-static /usr/bin/python3 /t/local-server.py 8080
+13 1 40 12 S /bld/src/httrack -q http://h/
+14 1 40 12 S /usr/bin/strace /bld/src/httrack -q http://h/
+15 1 40 12 S /usr/bin/qemu-img convert /srv/local-server.py out.raw
+16 1 40 12 S /usr/bin/qemu-nbd /mnt/httrack
+17 1 40 12 S /opt/my-custom-binfmt /mnt/httrack
+EOF
+        }
+        # Rows 14 to 17 are the controls: shifting past anything but an emulator
+        # would take a wrapper, or a disk image, for the engine and kill it.
+        engines=$(list_engine_pids 40)
+        test "$engines" = $'11\n13' ||
+            fail "emulated engine list is '$engines', want pids 11 and 13"
+        named=$(list_stray_processes 0 named | awk 'NR > 1 { print $1 }')
+        test "$named" = $'11\n12\n13' ||
+            fail "emulated stray list is '$named', want pids 11, 12 and 13"
+    )
+fi
+
+# --- a wedged crawl yields a symbolized engine stack ------------------------
+# The whole point of the dump: name the frame the engine is stuck in. Windows has
+# neither half (MSYS signals do not reach a native httrack.exe, and that build has
+# no backtrace()), so only assert it where the machinery exists.
+if is_windows; then
+    echo "suite timeout OK (no stack capture on Windows)"
+    exit 0
+fi
+command -v httrack >/dev/null || {
+    echo "SKIP: no httrack on PATH for the stack half" >&2
+    exit 77
+}
+
+# /watchdog/stall never answers, so the crawl wedges for real. CRAWL_DEADLINE is
+# raised past our budget so the guard under test is what fires, not local-crawl's.
+cat >"$tmp/92_stalled.test" <<EOF
+CRAWL_DEADLINE=600 bash "${testdir}/local-crawl.sh" --errors 0 \\
+    httrack 'BASEURL/watchdog/stall'
+EOF
+
+rc=0
+HTTRACK_TEST_TIMEOUT=20 bash "$driver" "$tmp/92_stalled.test" >"$out" 2>&1 || rc=$?
+
+if grep -qE 'python3 not found|could not discover server port' "$out"; then
+    echo "SKIP: local crawl prerequisites missing" >&2
+    exit 77
+fi
+test "$rc" -eq 124 || fail "stalled crawl reported $rc, want 124"
+
+if grep -q 'No stack trace available on this OS' "$out"; then
+    echo "suite timeout OK (no backtrace() on this platform)"
+    exit 0
+fi
+
+# Each platform's mechanism has its own marker, and the marker is what proves the
+# whole chain connected up rather than the dump merely running.
+case "$(uname -s)" in
+Linux)
+    # sig_fatal writes to the engine's own stderr, so this reaching our log also
+    # proves the crawl-log salvage worked.
+    grep -q '^Caught signal ' "$out" || fail "no engine backtrace was salvaged"
+    ;;
+Darwin)
+    grep -q '^Call graph:' "$out" || fail "sample(1) produced no call graph"
+    ;;
+*)
+    grep -q 'no stack mechanism known' "$out" ||
+        fail "unknown platform reported neither a stack nor its absence"
+    echo "suite timeout OK (no stack mechanism on $(uname -s))"
+    exit 0
+    ;;
+esac
+# A stalled crawl is necessarily inside httpmirror, so these frames must appear.
+# Matching "httrack" alone would pass on the process list above.
+grep -qE '\b(back_wait|httpmirror|hts_main_internal)\b' "$out" ||
+    fail "the stack names no engine frame"
+
+echo "suite timeout OK (named the test, dumped a stack, exited 124)"

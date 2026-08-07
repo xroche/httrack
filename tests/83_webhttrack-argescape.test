@@ -27,7 +27,8 @@ cleanup() {
     test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
     rm -f "${log}"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 freeport() {
     python3 -c 'import socket
@@ -102,12 +103,11 @@ test -n "${srv}" || fail "htsserver did not report its pid"
 sid=$(scrape_sid "${port}")
 test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid from the page (got '${sid}')"
 
-# Fill the wizard fields the command line quotes, then read back the generated
-# command line: the user-agent carries a break-out attempt, the footer a
-# backslash (which must survive the escape round trip), the project name a plain
-# value.
+# Fill the wizard fields with what would break each position, then read back the
+# generated command line; the project name stays plain as a control.
 body=$(formencode "sid=${sid}" 'user=Moz" -V "touch /tmp/pwn' 'footer=a\b"c' \
-    "path=/tmp/p" "projname=plain proj" 'urls=http://x/a"b' 'url2=+*.png"')
+    "path=/tmp/p" "projname=plain proj" 'urls=http://x/a"b' 'url2=+*.png"</textarea>' \
+    'sitemapurl=http://x/s.xml"b')
 request "${port}" "${body}" >/dev/null
 cmdline=$(request "${port}" "" step4 |
     sed -n '/<textarea name="command"/,/<\/textarea>/p')
@@ -144,5 +144,16 @@ grep -qF -- '+*.png%22' <<<"${cmdline}" ||
     fail "the quote in the filter field was not neutralised: ${cmdline}"
 grep -qF -- 'http://x/a"b' <<<"${cmdline}" &&
     fail "the url field still emits a raw quote: ${cmdline}"
+
+# The whole textarea is HTML too: a field holding its closing tag must come back
+# as entities, or the value lands in the page as markup.
+grep -qF -- '+*.png%22&lt;/textarea&gt;' <<<"${cmdline}" ||
+    fail "the filter field was not HTML-escaped: ${cmdline}"
+grep -qF -- '+*.png%22</textarea>' <<<"${cmdline}" &&
+    fail "the filter field still closes the textarea: ${cmdline}"
+
+# The sitemap url is quoted like the user-agent, so it takes the same escape.
+grep -qF -- '--sitemap-url "http://x/s.xml\"b"' <<<"${cmdline}" ||
+    fail "the quote in the sitemap url was not escaped: ${cmdline}"
 
 echo "PASS"

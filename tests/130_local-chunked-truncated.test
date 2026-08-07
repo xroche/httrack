@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+# A chunked response cut before its terminating zero-length chunk must be refused
+# like a short Content-Length body (#840): never cached, and never allowed to
+# replace a good copy on an --update. As with a short Content-Length, a first
+# crawl still leaves the partial bytes of a direct-to-disk resource in the mirror
+# (always.bin below); only the in-memory HTML class never reaches the disk.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# First crawl: always.* are cut on every pass, the other three are the control.
+# reset.bin dies on an RST instead of a clean EOF, so the read error must keep
+# its own diagnostic rather than be relabelled by the framing check.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --log-found 'truncated chunked transfer.*chunktrunc/always\.html' \
+    --log-found 'Truncated chunked transfer.*after 2 retries.*chunktrunc/always\.html' \
+    --log-found 'Interrupted transfer.*chunktrunc/reset\.bin' \
+    --log-not-found 'runcated chunked transfer.*chunktrunc/(page|stay|file|reset|hostile)' \
+    --not-found 'chunktrunc/always.html' \
+    --found 'chunktrunc/always.bin' \
+    --cache-not-found '/chunktrunc/always.html' \
+    --cache-not-found '/chunktrunc/always.bin' \
+    --cache-not-found '/chunktrunc/reset.bin' \
+    --cache-found '/chunktrunc/page.html' \
+    --cache-found '/chunktrunc/file.bin' \
+    --cache-found '/chunktrunc/hostile.html' \
+    --file-matches 'chunktrunc/page.html' 'CHUNKTRUNC-PAGE-V1' \
+    --file-matches 'chunktrunc/file.bin' 'CHUNKTRUNC-BIN-V1' \
+    httrack 'BASEURL/chunktrunc/index.html'
+
+# --update: page.html and file.bin come back cut, hostile.html comes back with a
+# 0x80000000 chunk-size line (rejected outright, since as an int it is INT_MIN
+# and would otherwise reach realloc sign-extended), stay.html is the control.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --rerun-args '--update' \
+    --log-found 'truncated chunked transfer.*chunktrunc/page\.html' \
+    --log-found 'truncated chunked transfer.*chunktrunc/file\.bin' \
+    --log-found 'truncated chunked transfer.*chunktrunc/hostile\.html' \
+    --log-found 'Illegal chunk \(80000000\) for .*chunktrunc/hostile\.html' \
+    --log-not-found 'not enough memory \(-' \
+    --file-matches 'chunktrunc/page.html' 'CHUNKTRUNC-PAGE-V1' \
+    --file-not-matches 'chunktrunc/page.html' 'CHUNKTRUNC-PAGE-V2' \
+    --file-matches 'chunktrunc/file.bin' 'CHUNKTRUNC-BIN-V1' \
+    --file-not-matches 'chunktrunc/file.bin' 'CHUNKTRUNC-BIN-V2' \
+    --file-min-bytes 'chunktrunc/file.bin' 32768 \
+    --file-matches 'chunktrunc/hostile.html' 'CHUNKHOSTILE-V1' \
+    --cache-not-found '/chunktrunc/hostile.html' \
+    --file-matches 'chunktrunc/stay.html' 'CHUNKSTAY-V2' \
+    httrack 'BASEURL/chunktrunc/index.html'
+
+# -%B (tolerant) takes the truncated body, as it does a short Content-Length.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --log-not-found 'truncated chunked transfer \(terminating chunk missing' \
+    --found 'chunktrunc/always.html' \
+    --cache-found '/chunktrunc/always.html' \
+    --cache-found '/chunktrunc/always.bin' \
+    httrack 'BASEURL/chunktrunc/index.html' '-%B'

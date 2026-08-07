@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# ProxyTrack's new.zip writer (proxytrack --convert out.zip): the header block
+# it builds per entry rides uncompressed in the entry's local extra field, so
+# grep sees it in the raw file. Every field the element carries must be there,
+# and the result must load back.
+
+set -eu
+
+dir=$(mktemp -d)
+trap 'set +e; rm -rf "$dir"' EXIT
+
+fail() {
+    echo "$1" >&2
+    exit 1
+}
+
+# just under the PT_Element caps (etag[64], cdispo[256]) and the reader's
+# per-line parse buffer, so every value must survive whole
+etag=$(printf '%0.sE' $(seq 1 60))
+cdispo="attachment; filename=$(printf '%0.sD' $(seq 1 200))"
+loc="http://example.com/$(printf '%0.sL' $(seq 1 900))"
+
+BODY='<html>hi</html>'
+printf 'HTTP/1.0 301 Moved\r\nContent-type: text/html\r\nEtag: "%s"\r\nLocation: %s\r\nContent-Disposition: %s\r\nLast-modified: Fri, 18 Jul 2003 08:59:11 GMT\r\nContent-length: %d\r\n\r\n' \
+    "$etag" "$loc" "$cdispo" ${#BODY} >"$dir/hdr"
+printf '%s' "$BODY" >"$dir/body"
+alen=$(($(wc -c <"$dir/hdr") + ${#BODY}))
+
+{
+    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf '2 0 test\n'
+    printf '\n\n'
+    printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html 301 - - 0 t.arc %d\n' "$alen"
+    cat "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+proxytrack --convert "$dir/out.zip" "$dir/in.arc" >/dev/null 2>&1 ||
+    fail "proxytrack died converting to new.zip"
+test -s "$dir/out.zip" || fail "no new.zip was written"
+
+# a writer that bounded the block by dropping fields would still produce a
+# loadable zip, so name the wide ones explicitly
+for field in "X-In-Cache: 1" "X-StatusCode: 301" "Etag: \"$etag\"" \
+    "Location: $loc" "Content-Disposition: $cdispo"; do
+    grep -qaF -- "$field" "$dir/out.zip" ||
+        fail "header block lost '$(echo "$field" | cut -c1-24)...'"
+done
+
+proxytrack --convert "$dir/back.arc" "$dir/out.zip" >"$dir/log" 2>&1 ||
+    fail "proxytrack died reading its own new.zip"
+grep -q '(1 items added)' "$dir/log" ||
+    fail "the new.zip did not load back: $(cat "$dir/log")"
+grep -qF "$BODY" "$dir/back.arc" || fail "body did not survive the round trip"

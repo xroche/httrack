@@ -62,6 +62,15 @@ extern char *hts_convertStringFromUTF8(const char *s, size_t size,
                                        const char *charset);
 
 /**
+ * Same, but refusing to lose a code point the charset can not represent:
+ * NULL is returned then, where hts_convertStringFromUTF8() may hand back a
+ * substituted string (Windows substitutes, iconv fails).
+ * Return NULL upon error.
+ **/
+extern char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
+                                             const char *charset);
+
+/**
  * Convert an UTF-8 string to an IDNA (RFC 3492) string.
  **/
 extern char *hts_convertStringUTF8ToIDNA(const char *s, size_t size);

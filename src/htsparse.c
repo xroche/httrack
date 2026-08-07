@@ -280,6 +280,20 @@ static void url_drop_fragment(char *const url) {
     *frag = '\0';
 }
 
+/* Charset to decode the page with, or NULL when conversion is off. *declared
+   tells a charset the document named from the iso-8859-1 guess standing in. */
+static const char *page_charset(const htsmoduleStruct *str,
+                                hts_boolean *declared) {
+  const char *const charset = str->page_charset_;
+
+  if (charset == NULL) {
+    *declared = HTS_FALSE;
+    return NULL;
+  }
+  *declared = *charset != '\0' ? HTS_TRUE : HTS_FALSE;
+  return *declared ? charset : "iso-8859-1";
+}
+
 /* True if [s, s+len) is exactly an HTTP method token (XHR.open's first
    argument is a method, not a URL: #218). Case-insensitive. */
 static int is_http_method(const char *s, size_t len) {
@@ -694,14 +708,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         }
 
                         // Decode title with encoding
-                        if (str->page_charset_ != NULL &&
-                            *str->page_charset_ != '\0') {
-                          char *sUtf = hts_convertStringToUTF8(
-                              s, strlen(s), str->page_charset_);
-                          if (sUtf != NULL) {
-                            /* UTF-8 can expand past s[]; truncate to fit */
-                            snprintf(s, sizeof(s), "%s", sUtf);
-                            freet(sUtf);
+                        {
+                          hts_boolean declared;
+                          const char *const charset =
+                              page_charset(str, &declared);
+
+                          // Guessed charset: never re-encode valid UTF-8 (#833)
+                          if (charset != NULL && !hts_isCharsetUTF8(charset) &&
+                              (declared || !hts_isStringUTF8(s, strlen(s)))) {
+                            char *sUtf =
+                                hts_convertStringToUTF8(s, strlen(s), charset);
+
+                            if (sUtf != NULL) {
+                              /* UTF-8 can expand past s[]; truncate to fit */
+                              snprintf(s, sizeof(s), "%s", sUtf);
+                              freet(sUtf);
+                            }
                           }
                         }
 
@@ -1710,7 +1732,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 #endif
                                     )   // ok pas de problème
                                     url_ok = 1;
-                                  else if (tempo[strlen(tempo) - 1] == '/') {   // un slash: ok..
+                                  else if (hts_lastchar(tempo) ==
+                                           '/') {       // un slash: ok..
                                     if (inscript)       // sinon si pas javascript, méfiance (répertoire style base?)
                                       url_ok = 1;
                                   }
@@ -1929,10 +1952,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             if (ok != -1) {     // continuer
               // découper le lien
               do {
-                if ((unsigned char) *eadr < 32) {   // caractère de contrôle (ou \0)
-                  if (!is_space(*eadr))
-                    ok = 0;
-                }
+                if (*eadr == '\0') // end of the parsed buffer
+                  ok = 0;
                 if (eadr - html > HTS_URLMAXSIZE)    // ** trop long, >HTS_URLMAXSIZE caractères (on prévoit HTS_URLMAXSIZE autres pour path)
                   ok = -1;      // ne pas traiter ce lien
 
@@ -2014,9 +2035,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               if (eadr - html - 1 < HTS_URLMAXSIZE) {        // pas trop long?
                 strncpy(lien, html, eadr - html - 1);
                 lien[eadr - html - 1] = '\0';
-                // supprimer les espaces
-                while((lien[strlen(lien) - 1] == ' ') && (strnotempty(lien)))
-                  lien[strlen(lien) - 1] = '\0';
+                while (hts_striplastchar(lien, ' ')) {
+                }
 
               } else
                 lien[0] = '\0'; // erreur
@@ -2066,7 +2086,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   }
                   q = strchr(a, '?');   // ne pas traiter après '?'
                   if (!q)
-                    q = a + strlen(a) - 1;
+                    q = hts_lastcharptr(a);
                   while((p = strstr(a, "//")) && (!done)) {     // remplacer // par /
                     if (p > q) {    // après le ? (toto.cgi?param=1//2.3)
                       done = 1; // stopper
@@ -2088,18 +2108,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   char *a = lien;
                   size_t llen;
 
-                  // strip ending spaces
+                  // strip both ends of every C0 control or space, as a browser
+                  // does; encoding one there would 404 a link that fetched fine
                   llen = (*a != '\0') ? strlen(a) : 0;
-                  while(llen > 0 && is_realspace(lien[llen - 1])) {
+                  while (llen > 0 && (unsigned char) lien[llen - 1] <= ' ') {
                     a[--llen] = '\0';
                   }
-                  //  skip leading ones
-                  while(is_realspace(*a))
+                  // '\0' is <= ' ' too, and an all-control link ends up empty
+                  while (*a != '\0' && (unsigned char) *a <= ' ')
                     a++;
-                  // strip cr, lf, tab inside URL
+                  // strip cr, lf, tab inside URL, as a browser does; every
+                  // other control byte percent-encodes below
                   llen = 0;
                   while(*a) {
-                    if (*a != '\n' && *a != '\r' && *a != '\t') {
+                    if (!is_retorsep(*a)) {
                       lien[llen++] = *a;
                     }
                     a++;
@@ -2119,9 +2141,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 /* Unescape/escape %20 and other &nbsp; */
                 {
                   // NULL when UTF-8 conversion is off (-%T0)
-                  const char *const charset = str->page_charset_;
-                  const int hasCharset = charset != NULL 
-                    && *charset != '\0';
+                  hts_boolean declared;
+                  const char *const charset = page_charset(str, &declared);
+                  const int hasCharset = charset != NULL;
                   char BIGSTK query[HTS_URLMAXSIZE * 2];
 
                   // cut query string
@@ -2139,8 +2161,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   strcpybuff(lien, 
                     unescape_http_unharm(catbuff, sizeof(catbuff), lien, 1 | 2));     /* note: '%' is still escaped */
 
-                  // Force to encode non-printable chars (should never happend)
-                  escape_remove_control(lien);
+                  // Percent-encode the control bytes as a browser does (#982);
+                  // a byte grows to three, so a link that outgrows the buffer
+                  // is dropped rather than clipped to a URL nobody wrote.
+                  {
+                    char BIGSTK tempo[sizeof(lien)];
+
+                    if (escape_control_url(lien, tempo, sizeof(tempo)) <
+                        sizeof(tempo)) {
+                      strcpybuff(lien, tempo);
+                    } else {
+                      error = 1;
+                      hts_log_print(
+                          opt, LOG_DEBUG,
+                          "link rejected (control bytes do not fit) %s", lien);
+                    }
+                  }
 
                   // charset conversion for the URI filename (not the query
                   // string), unless the bytes already are valid UTF-8:
@@ -2163,13 +2199,20 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       "could not decode URI '%s' with charset '%s'", lien, charset);
                   }
 
-                  // decode query string entities with page charset
+                  // decode query entities with the page charset, out-of-place
+                  // because the escape grows it (#854)
                   if (hasCharset) {
-                    if (hts_unescapeEntitiesWithCharset(query, 
-                                                        query, strlen(query) + 1,
-                                                        charset) != 0) {
-                        hts_log_print(opt, LOG_WARNING,
-                          "could not decode query string '%s' with charset '%s'", query, charset);
+                    char BIGSTK decoded[sizeof(query)];
+
+                    if (hts_unescapeEntitiesWithCharsetSpecial(
+                            query, decoded, sizeof(decoded), charset,
+                            UNESCAPE_ENTITIES_URL_QUERY) == 0) {
+                      strcpybuff(query, decoded);
+                    } else {
+                      hts_log_print(opt, LOG_WARNING,
+                                    "could not decode query string '%s' with "
+                                    "charset '%s'",
+                                    query, charset);
                     }
                   }
 
@@ -2184,10 +2227,22 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                       "could not URL-decode string '%s'", lien);
                   }
 
-                  // we need to encode query string non-ascii chars, 
+                  // we need to encode query string non-ascii chars,
                   // leaving the encoding as-is (unlike the file part)
                   // and copy back query
-                  append_escape_check_url(query, lien, sizeof(lien));
+                  {
+                    const size_t used = strlen(lien);
+
+                    // the append grows the query too, and clips silently on
+                    // overflow: drop, or we fetch a query nobody wrote (#982)
+                    if (append_escape_check_url(query, lien, sizeof(lien)) >=
+                        sizeof(lien) - used) {
+                      error = 1;
+                      hts_log_print(opt, LOG_DEBUG,
+                                    "link rejected (query does not fit) %s",
+                                    lien);
+                    }
+                  }
                 }
 
                 // convertir les éventuels \ en des / pour éviter des problèmes de reconnaissance!
@@ -2216,8 +2271,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // supposition dangereuse?
                 // OUI!!
 #if HTS_TILDE_SLASH
-                if (lien[strlen(lien) - 1] != '/') {
-                  char *a = lien + strlen(lien) - 1;
+                if (hts_lastchar(lien) != '/') {
+                  char *a = hts_lastcharptr(lien);
 
                   // éviter aussi index~1.html
                   while(a > lien && (*a != '~') && (*a != '/')
@@ -2263,7 +2318,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                 // vérifier que l'on ne doit pas ajouter de .class
                 if (!error) {
                   if (add_class) {
-                    char *a = lien + strlen(lien) - 1;
+                    char *a = hts_lastcharptr(lien);
 
                     while((a > lien) && (*a != '/') && (*a != '.'))
                       a--;
@@ -2281,7 +2336,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     // Vérifier les codebase=applet (au lieu de applet/)
                     if (p_type == -2) { // codebase
                       if (strnotempty(lien)) {
-                        if (lien[strlen(lien) - 1] != '/') {     // pas répertoire
+                        if (hts_lastchar(lien) != '/') { // pas répertoire
                           strcatbuff(lien, "/");
                         }
                       }
@@ -2318,7 +2373,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         {
                           char *a;
 
-                          a = lien + strlen(lien) - 1;
+                          a = hts_lastcharptr(lien);
                           while((*a) && (*a != '/') && (a > lien))
                             a--;
                           if (*a == '/') {
@@ -2329,8 +2384,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     }
 
                     if (!error) {       // pas d'erreur?
-                      if (p_type == 2) {        // code ET PAS codebase      
-                        char *a = lien + strlen(lien) - 1;
+                      if (p_type == 2) { // code ET PAS codebase
+                        char *a = hts_lastcharptr(lien);
                         char *start_of_filename = jump_identification(lien);
 
                         if (start_of_filename != NULL
@@ -2697,9 +2752,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             int cat_data_len = 0;
 
                             // ajouter lien external
-                            switch ((link_has_authority(afs.af.adr)) ? 1
-                                    : ((afs.af.fil[strlen(afs.af.fil) - 1] ==
-                                        '/') ? 1 : (ishtml(opt, afs.af.fil)))) {
+                            switch ((link_has_authority(afs.af.adr))
+                                        ? 1
+                                        : ((hts_lastchar(afs.af.fil) == '/')
+                                               ? 1
+                                               : (ishtml(opt, afs.af.fil)))) {
                             case 1:
                             case -2:   // html ou répertoire
                               if (opt->getmode & HTS_GETMODE_HTML) {
@@ -2742,7 +2799,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 cat_data_len = HTS_DATA_UNKNOWN_HTML_LEN;
                               }
                               break;
-                            }   // html,gif
+                            } // html,gif
 
                             if (patch_it) {
                               char BIGSTK save[HTS_URLMAXSIZE * 2];
@@ -3068,16 +3125,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           // Note: escape all chars, even >127 (no UTF)
                           HT_ADD_HTMLESCAPED_FULL(tempo);
 
-                          /* Measured on what was appended, not on tempo: the
-                             escape above is free to change the length. */
-                          if (sf_class != 0) {
-                            char sf_mark[SINGLEFILE_MARK_MAX];
-
-                            HT_ADD(singlefile_mark(
-                                opt, sf_mark, sizeof(sf_mark), sf_class,
-                                TypedArraySize(output_buffer) - sf_start));
-                          }
-
                           // Add query-string, for informational purpose only
                           // Useless, because all parameters-pages are saved into different targets
                           if (opt->includequery) {
@@ -3086,6 +3133,19 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             if (a) {
                               HT_ADD_HTMLESCAPED(a);
                             }
+                          }
+
+                          /* Measured on what was appended, not on tempo: the
+                             escape above is free to change the length. The
+                             query is inside the marked span so that inlining
+                             drops it -- appended to base64 it would corrupt
+                             the payload -- while a fallback link keeps it. */
+                          if (sf_class != 0) {
+                            char sf_mark[SINGLEFILE_MARK_MAX];
+
+                            HT_ADD(singlefile_mark(
+                                opt, sf_mark, sizeof(sf_mark), sf_class,
+                                TypedArraySize(output_buffer) - sf_start));
                           }
                         }
                         lastsaved = eadr - 1;   // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)

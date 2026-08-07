@@ -1,0 +1,149 @@
+/* Styles specific to guide.html: the platform switcher, the option tab strip and
+   the option entries. The shared page chrome is in doc.css, loaded first. */
+
+/* Anchor targets must clear the sticky tab strip. */
+h2, h3, section.tab { scroll-margin-top: 5.5rem; }
+
+.cli {
+	font-family: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+	font-size: .9em;
+}
+
+/* ---- platform switcher ---- */
+
+.platforms {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .3rem;
+	margin: 0 0 1.5rem;
+	padding: .3rem;
+	background: var(--chip);
+	border-radius: .5rem;
+}
+
+.platforms button {
+	flex: 1 1 8rem;
+	padding: .5rem .7rem;
+	border: 0;
+	border-radius: .35rem;
+	background: transparent;
+	color: var(--ink);
+	font: inherit;
+	font-size: .95em;
+	cursor: pointer;
+}
+
+.platforms button:hover { background: var(--accent); }
+
+.platforms button[aria-pressed="true"] {
+	background: var(--panel);
+	box-shadow: 0 1px 3px var(--shadow);
+	font-weight: bold;
+}
+
+.platforms button small { display: block; font-weight: normal; color: var(--ink-soft); font-size: .82em; }
+
+/* Hide only what the chosen platform excludes: an "unhide" rule would need to
+   outweigh the hiding one, and loses on specificity. Without scripting no
+   platform is set, so every variant stays visible. */
+html[data-platform="win"] [data-for]:not([data-for~="win"]),
+html[data-platform="web"] [data-for]:not([data-for~="web"]),
+html[data-platform="droid"] [data-for]:not([data-for~="droid"]) { display: none; }
+
+/* ---- platform badges ---- */
+
+.badge {
+	display: inline-block;
+	padding: .05em .5em;
+	border-radius: 1em;
+	background: var(--accent);
+	color: var(--ink);
+	font-size: .78em;
+	font-weight: bold;
+	vertical-align: .1em;
+	white-space: nowrap;
+}
+
+/* ---- screenshots ---- */
+
+figure img[data-for~="droid"] { max-width: 18rem; }
+
+/* ---- option tab strip ---- */
+
+.tabstrip {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	display: flex;
+	flex-wrap: wrap;
+	gap: .2rem;
+	margin: 0 0 1.5rem;
+	padding: .4rem;
+	background: var(--chip);
+	border-radius: .4rem;
+	box-shadow: 0 2px 6px var(--shadow);
+}
+
+.tabstrip a {
+	padding: .3rem .6rem;
+	border-radius: .25rem;
+	text-decoration: none;
+	color: var(--ink);
+	font-size: .9em;
+	white-space: nowrap;
+}
+
+.tabstrip a:hover { background: var(--accent); }
+.tabstrip a[aria-current="true"] { background: var(--panel); font-weight: bold; box-shadow: 0 1px 3px var(--shadow); }
+
+/* ---- option entries ---- */
+
+.opt {
+	margin: 0 0 1.2em;
+	padding-bottom: 1.2em;
+	border-bottom: 1px solid var(--rule);
+}
+
+.opt:last-child { border-bottom: 0; }
+
+.opt-head {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	align-items: baseline;
+	justify-content: space-between;
+	margin-bottom: .3em;
+}
+
+.opt-name { font-weight: bold; }
+
+.opt .cli {
+	background: var(--code-bg);
+	padding: .1em .45em;
+	border-radius: 3px;
+	color: var(--ink-soft);
+	white-space: nowrap;
+}
+
+.opt p { margin: 0 0 .5em; font-size: .95em; }
+.opt p:last-child { margin-bottom: 0; }
+
+.opt[hidden] { display: none; }
+
+/* ---- misc ---- */
+
+table.mime {
+	border-collapse: collapse;
+	margin: 0 0 1em;
+	font-size: .92em;
+}
+
+table.mime td {
+	border: 1px solid var(--rule);
+	padding: .3em .6em;
+}
+
+@media print {
+	.tabstrip, .platforms { display: none; }
+	html[data-platform] [data-for] { display: revert !important; }
+}

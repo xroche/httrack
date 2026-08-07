@@ -43,9 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsencoding.h"
 #include "htssniff.h"
 #include "htscodec.h"
-#if HTS_USEZLIB
 #include "htszlib.h"
-#endif
 #include <ctype.h>
 #include <limits.h>
 
@@ -67,14 +65,76 @@ Please visit our Website: http://www.httrack.com
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
 /* Based on linux/fs/umsdos/mangle.c */
+/* Hand-grouped rows; clang-format reflows the table into a blob. */
+/* clang-format off */
 static const char *hts_tbdev[] = {
-  "/prn", "/con", "/aux", "/nul",
-  "/lpt1", "/lpt2", "/lpt3", "/lpt4",
-  "/com1", "/com2", "/com3", "/com4",
-  "/clock$",
-  "/emmxxxx0", "/xmsxxxx0", "/setverxx",
+  "prn", "con", "aux", "nul",
+  "lpt1", "lpt2", "lpt3", "lpt4",
+  "com1", "com2", "com3", "com4",
+  "clock$",
+  "emmxxxx0", "xmsxxxx0", "setverxx",
   ""
 };
+/* clang-format on */
+
+/* Directories the engine owns inside the mirror: a URL naming one lands on the
+   cache and destroys it (#774). Defence in depth; the temporaries themselves
+   live where no savename can spell them (HTS_TMPDIR in htsback.c). */
+static const char *hts_tbreserved[] = {"hts-cache", "hts-tmp", ""};
+
+/* True once the component holds only what cleanEndingSpaceOrDot() strips. */
+static hts_boolean strippedToComponentEnd(const char *s) {
+  while (*s == ' ' || *s == '.')
+    s++;
+  return *s == '\0' || *s == '/' ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Replace foo/<reserved>/bar by foo/<reserved>_/bar, matching a whole path
+   component only (case-insensitively: the filesystem may be too). */
+static void escapeReservedNames(char *save, size_t size,
+                                const char *const *names) {
+  int i;
+
+  for (i = 0; names[i][0] != '\0'; i++) {
+    const char *a = save;
+    const size_t len = strlen(names[i]);
+
+    while ((a = strstrcase(a, names[i]))) {
+      hts_boolean reserved = HTS_FALSE;
+
+      if (a == save) {
+        /* save has had its leading '/' stripped above, so the table's anchor
+           never reached the first component (#842). It usually holds the
+           hostname, so only a trailing run may end it here: '.' would rename
+           aux.example.com. */
+        reserved = strippedToComponentEnd(a + len);
+      } else if (a[-1] == '/') {
+        switch ((int) a[len]) {
+        case '\0':
+        case '/':
+        case '.':
+          reserved = HTS_TRUE;
+          break;
+        case ' ':
+          /* cleanEndingSpaceOrDot() runs after us and hands the name back */
+          reserved = strippedToComponentEnd(a + len);
+          break;
+        }
+      }
+      if (reserved) {
+        char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+
+        tempo[0] = '\0';
+        strncatbuff(tempo, save, (int) (a - save) + (int) len);
+        strcatbuff(tempo, "_");
+        strcatbuff(tempo, a + len);
+        /* clip rather than abort: the name comes from the wire */
+        (void) strclipbuff(save, size, tempo);
+      }
+      a += len;
+    }
+  }
+}
 
 /* Strip all // */
 static void cleanDoubleSlash(char *s) {
@@ -439,9 +499,7 @@ int url_savename(lien_adrfilsave *const afs,
 
       strcpybuff(fil_complete_patche, normfil);
       // Version avec ou sans /
-      if (fil_complete_patche[strlen(fil_complete_patche) - 1] == '/')
-        fil_complete_patche[strlen(fil_complete_patche) - 1] = '\0';
-      else
+      if (!hts_striplastchar(fil_complete_patche, '/'))
         strcatbuff(fil_complete_patche, "/");
       i = hash_read(hash, normadr, fil_complete_patche, HASH_STRUCT_ORIGINAL_ADR_PATH);       // recherche table 2 (former->adr+former->fil)
       if (i >= 0) {
@@ -517,7 +575,8 @@ int url_savename(lien_adrfilsave *const afs,
         && protocol != PROTOCOL_FTP
       ) {
       // tester type avec requète HEAD si on ne connait pas le type du fichier
-      if (!((opt->check_type == 1) && (fil[strlen(fil) - 1] == '/')))   // slash doit être html?
+      if (!((opt->check_type == 1) &&
+            (hts_lastchar(fil) == '/'))) // slash doit être html?
         if (opt->savename_delayed == HTS_SAVENAME_DELAYED_HARD ||
             ishtml(opt, fil) < 0) { // unsure whether it's html or a file
           // lire dans le cache
@@ -812,7 +871,7 @@ int url_savename(lien_adrfilsave *const afs,
   // - - - DEBUT NOMMAGE - - -
 
   // Donner nom par défaut?
-  if (fil[strlen(fil) - 1] == '/') {
+  if (hts_lastchar(fil) == '/') {
     if (!strfield(adr_complete, "ftp://")
       ) {
       strcatbuff(fil, DEFAULT_HTML);    // nommer page par défaut!!
@@ -826,7 +885,7 @@ int url_savename(lien_adrfilsave *const afs,
   // Change the extension? e.g. php3 saved as html, cgi as html or gif/xbm
   // depending on the resolved type.
   if (ext_chg && !opt->no_type_change) {
-    char *a = fil + strlen(fil) - 1;
+    char *a = hts_lastcharptr(fil);
 
     if ((opt->debug > 1) && (opt->log != NULL)) {
       if (ext_chg == 1)
@@ -861,7 +920,7 @@ int url_savename(lien_adrfilsave *const afs,
   }
   // Rechercher premier / et dernier .
   {
-    const char *a = fil + strlen(fil) - 1;
+    const char *a = hts_lastcharptr(fil);
 
     // passer structures
     start_pos = fil;
@@ -1206,29 +1265,29 @@ int url_savename(lien_adrfilsave *const afs,
     switch (opt->savename_type % 100) {
     case 4:
     case 5:{                   // séparer par types
-        const char *a = fil + strlen(fil) - 1;
+      const char *a = hts_lastcharptr(fil);
 
-        // passer structures
-        while((a > fil) && (*a != '/') && (*a != '\\'))
+      // passer structures
+      while ((a > fil) && (*a != '/') && (*a != '\\'))
+        a--;
+      if ((*a == '/') || (*a == '\\'))
+        a++;
+
+      // html?
+      if ((ext_chg != 0) ? (ishtml_ext(ext) == 1) : (ishtml(opt, fil) == 1)) {
+        if (opt->savename_type % 100 == 5)
+          strcatbuff(afs->save, "html/");
+      } else {
+        const char *a = hts_lastcharptr(fil);
+
+        while ((a > fil) && (*a != '/') && (*a != '.'))
           a--;
-        if ((*a == '/') || (*a == '\\'))
-          a++;
-
-        // html?
-        if ((ext_chg != 0) ? (ishtml_ext(ext) == 1) : (ishtml(opt, fil) == 1)) {
-          if (opt->savename_type % 100 == 5)
-            strcatbuff(afs->save, "html/");
-        } else {
-          const char *a = fil + strlen(fil) - 1;
-
-          while((a > fil) && (*a != '/') && (*a != '.'))
-            a--;
-          if (*a != '.')
-            strcatbuff(afs->save, "other");
-          else
-            strcatbuff(afs->save, a + 1);
-          strcatbuff(afs->save, "/");
-        }
+        if (*a != '.')
+          strcatbuff(afs->save, "other");
+        else
+          strcatbuff(afs->save, a + 1);
+        strcatbuff(afs->save, "/");
+      }
         /*strcatbuff(save,a); */
         /* add name */
         ADD_STANDARD_NAME(0);
@@ -1261,7 +1320,7 @@ int url_savename(lien_adrfilsave *const afs,
         }
         afs->save[i + j] = '\0';
         // ajouter extension
-        a = fil + strlen(fil) - 1;
+        a = hts_lastcharptr(fil);
         while((a > fil) && (*a != '/') && (*a != '.'))
           a--;
         if (*a == '.') {
@@ -1286,7 +1345,7 @@ int url_savename(lien_adrfilsave *const afs,
 
     hts_lowcase(afs->save);
 
-    if (afs->save[strlen(afs->save) - 1] == '/')
+    if (hts_lastchar(afs->save) == '/')
       strcatbuff(afs->save, DEFAULT_HTML);   // nommer page par défaut!!
   }
 
@@ -1306,7 +1365,7 @@ int url_savename(lien_adrfilsave *const afs,
   // cela évite les /chez/toto et les /chez/toto/index.html incompatibles
   if (opt->savename_type != -1 &&
       opt->savename_delayed != HTS_SAVENAME_DELAYED_HARD) {
-    char *a = afs->save + strlen(afs->save) - 1;
+    char *a = hts_lastcharptr(afs->save);
 
     while((a > afs->save) && (*a != '.') && (*a != '/'))
       a--;
@@ -1372,35 +1431,12 @@ int url_savename(lien_adrfilsave *const afs,
   // éliminer les // (comme ftp://)
   cleanDoubleSlash(afs->save);
 
+  /* Runs on every platform, and before path_html is prepended below, so the
+     user's own output directory is never renamed. */
+  escapeReservedNames(afs->save, sizeof(afs->save), hts_tbreserved);
+
 #if HTS_OVERRIDE_DOS_FOLDERS
-  /* Replace /foo/nul/bar by /foo/nul_/bar */
-  {
-    int i = 0;
-
-    while(hts_tbdev[i][0]) {
-      const char *a = afs->save;
-
-      while((a = strstrcase(a, hts_tbdev[i]))) {
-        switch ((int) a[strlen(hts_tbdev[i])]) {
-        case '\0':
-        case '/':
-        case '.':
-          {
-            char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-
-            tempo[0] = '\0';
-            strncatbuff(tempo, afs->save, (int) (a - afs->save) + strlen(hts_tbdev[i]));
-            strcatbuff(tempo, "_");
-            strcatbuff(tempo, a + strlen(hts_tbdev[i]));
-            strcpybuff(afs->save, tempo);
-          }
-          break;
-        }
-        a += strlen(hts_tbdev[i]);
-      }
-      i++;
-    }
-  }
+  escapeReservedNames(afs->save, sizeof(afs->save), hts_tbdev);
 
   /* Strip ending . or ' ' forbidden on windoz */
   cleanEndingSpaceOrDot(afs->save);
@@ -1423,8 +1459,10 @@ int url_savename(lien_adrfilsave *const afs,
   if (opt->savename_83 > 0) {
     char *a, *last;
 
-    for(last = afs->save + strlen(afs->save) - 1;
-        last != afs->save && *last != '/' && *last != '\\' && *last != '.'; last--) ;
+    for (last = hts_lastcharptr(afs->save);
+         last != afs->save && *last != '/' && *last != '\\' && *last != '.';
+         last--)
+      ;
     if (*last != '.') {
       last = NULL;
     }
@@ -1507,6 +1545,7 @@ int url_savename(lien_adrfilsave *const afs,
 #endif
 #define MIN_LAST_SEG_RESERVE 12
 #define MAX_LAST_SEG_RESERVE 24
+#define MAX_EXT_LEN 12 /* longest tail kept across a cut, sans the dot */
   if (hts_stringLengthUTF8(afs->save) +
       hts_stringLengthUTF8(StringBuff(opt->path_html_utf8)) >=
       HTS_MAX_PATH_LEN) {
@@ -1575,9 +1614,26 @@ int url_savename(lien_adrfilsave *const afs,
           markStart = (p > lastSeg && p < extDot && wsave[p - 1] == '.')
                           ? p - 1
                           : extDot;
+        } else {
+          // #852: reserve a plain extension too, or the cut costs the page
+          // the ".html" the mirror is browsed by.
+          size_t p = wsaveLen;
+
+          while (p > lastSeg && wsave[p - 1] != '.')
+            p--;
+          if (p > lastSeg + 1 && wsaveLen - p <= MAX_EXT_LEN) {
+            markStart = p - 1;
+          }
         }
-        // head, bounded so the marker still fits, then the marker itself
-        for (i = lastSeg; i < markStart && j + (wsaveLen - markStart) < maxLen;
+        // #852: clamp the name like any directory segment; it was bounded by
+        // the whole path alone, so one component could run to maxLen.
+        const size_t tailLen = wsaveLen - markStart;
+        const size_t headLen =
+            tailLen < MAX_SEG_LEN ? MAX_SEG_LEN - tailLen : 0;
+
+        // head, bounded so the reserved tail still fits, then the tail itself
+        for (i = lastSeg; i < markStart && i - lastSeg < headLen &&
+                          j < maxLen && tailLen < maxLen - j;
              i++)
           wsave[j++] = wsave[i];
         for (i = markStart; i < wsaveLen && j < maxLen; i++)
@@ -1630,6 +1686,7 @@ int url_savename(lien_adrfilsave *const afs,
 #undef MAX_UTF8_SEQ_CHARS
 #undef MIN_LAST_SEG_RESERVE
 #undef MAX_LAST_SEG_RESERVE
+#undef MAX_EXT_LEN
 #undef MAX_SEG_LEN
 #undef HTS_MAX_PATH_LEN
 #undef HTS_PATH_TAIL_RESERVE
@@ -1679,8 +1736,8 @@ int url_savename(lien_adrfilsave *const afs,
 #endif
         } else {                // utilisé par un AUTRE, changer de nom
           char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-          char *a = afs->save + strlen(afs->save) - 1;
-          char *b;
+          char *a = hts_lastcharptr(afs->save);
+          size_t stem;
           int n = 2;
           char collisionSeparator =
               ((opt->savename_83 != HTS_SAVENAME_83_ISO9660) ? '-' : '_');
@@ -1702,18 +1759,16 @@ int url_savename(lien_adrfilsave *const afs,
             strcatbuff(tempo, afs->save);
 
           // tester la présence d'un -xx (ex: index-2.html -> index-3.html)
-          b = tempo + strlen(tempo) - 1;
-          while(isdigit((unsigned char) *b))
-            b--;
-          if (*b == collisionSeparator) {
-            sscanf(b + 1, "%d", &n);
-            *b = '\0';          // couper
+          stem = hts_rtrimlen(tempo, "0123456789");
+          if (stem != 0 && tempo[stem - 1] == collisionSeparator) {
+            sscanf(tempo + stem, "%d", &n);
+            tempo[stem - 1] = '\0'; // couper
             n++;                // plus un
           }
           // en plus il faut gérer le 8-3 .. pas facile le client
           if (opt->savename_83) {
             int max;
-            char *a = tempo + strlen(tempo) - 1;
+            char *a = hts_lastcharptr(tempo);
 
             while((a > tempo) && (*a != '/'))
               a--;

@@ -63,6 +63,13 @@ static int get_hex_value(char c) {
   } while (0)
 
 int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t max, const char *charset) {
+  return hts_unescapeEntitiesWithCharsetSpecial(src, dest, max, charset, 0);
+}
+
+int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
+                                           const size_t max,
+                                           const char *charset,
+                                           const int flags) {
   size_t i, j, ampStart, ampStartDest;
   int uc;
   int hex;
@@ -120,9 +127,18 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
             char buffer[32];
             len = 0;
             if ( ( ulen = hts_writeUTF8(uc, buffer, sizeof(buffer)) ) != 0) {
+              const hts_boolean urlQuery =
+                  (flags & UNESCAPE_ENTITIES_URL_QUERY) != 0;
               char *s;
               buffer[ulen] = '\0';
-              s = hts_convertStringFromUTF8(buffer, strlen(buffer), charset);
+              /* Strict for a query only: a substituted '?' must not pass for
+                 the code point the document wrote. */
+              if (urlQuery) {
+                s = hts_convertStringFromUTF8Strict(buffer, strlen(buffer),
+                                                    charset);
+              } else {
+                s = hts_convertStringFromUTF8(buffer, strlen(buffer), charset);
+              }
               if (s != NULL) {
                 const size_t sLen = strlen(s);
                 if (sLen < maxOut) {
@@ -130,7 +146,18 @@ int hts_unescapeEntitiesWithCharset(const char *src, char *dest, const size_t ma
                   memcpy(&dest[ampStartDest], s, sLen);
                   len = sLen;
                 }
-                free(s);
+                freet(s);
+              } else if (urlQuery) {
+                /* URL Standard: an unrepresentable code point is written
+                   %26%23<decimal>%3B rather than left as source text. */
+                char esc[32];
+                const int escLen =
+                    snprintf(esc, sizeof(esc), "%%26%%23%d%%3B", uc);
+
+                if (escLen > 0 && (size_t) escLen < maxOut) {
+                  memcpy(&dest[ampStartDest], esc, (size_t) escLen);
+                  len = (size_t) escLen;
+                }
               }
             }
           }

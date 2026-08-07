@@ -1,9 +1,5 @@
 #!/bin/bash
 #
-# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
-# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
-# tool flags despite the #!/bin/bash above.
-
 # Golden cache-format regression test (driven by 'httrack -#test=cache-golden <dir>').
 #
 # 01_zlib-cache.test writes the cache with the same build it reads back (a
@@ -27,7 +23,7 @@ test -e "$fixture/hts-cache/new.zip" || {
 }
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # Read against a private copy so the source tree is never touched (a read
 # session does not write, but copying keeps the test hermetic). Create the dir

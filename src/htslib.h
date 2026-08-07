@@ -157,6 +157,30 @@ struct t_dnscache {
   char host_addr[HTS_MAXADDRNUM][HTS_MAXADDRLEN];
 };
 
+/* Break t down as UTC into the caller's buffer, HTS_FALSE if that failed.
+   gmtime()'s static is shared, and both the engine and ProxyTrack convert on
+   worker threads. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_gmtime(time_t t,
+                                                    struct tm *tmbuf) {
+#ifdef _WIN32
+  /* Microsoft's gmtime_s takes the destination first, unlike C11 Annex K. */
+  return gmtime_s(tmbuf, &t) == 0 ? HTS_TRUE : HTS_FALSE;
+#else
+  return gmtime_r(&t, tmbuf) != NULL ? HTS_TRUE : HTS_FALSE;
+#endif
+}
+
+/* Break t down as local time into the caller's buffer, HTS_FALSE if that
+   failed. localtime()'s static is shared, same rationale as hts_gmtime(). */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_localtime(time_t t,
+                                                       struct tm *tmbuf) {
+#ifdef _WIN32
+  return localtime_s(tmbuf, &t) == 0 ? HTS_TRUE : HTS_FALSE;
+#else
+  return localtime_r(&t, tmbuf) != NULL ? HTS_TRUE : HTS_FALSE;
+#endif
+}
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
@@ -213,6 +237,14 @@ int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
 int check_writeinput_t(T_SOC soc, int timeout);
 
+/* TRUE if str[0..len) holds no byte below ' '. A control byte in a value the
+   client puts on a protocol line (an FTP command, a CONNECT authority, a
+   SOCKS5 host) smuggles a line or a field of its own. */
+hts_boolean hts_is_control_free_sized(const char *str, size_t len);
+
+/* Same over a NUL-terminated string. */
+hts_boolean hts_is_control_free(const char *str);
+
 /* TRUE if this -P proxy name (which keeps its scheme) is a SOCKS5 proxy. */
 hts_boolean hts_proxy_is_socks(const char *name);
 
@@ -224,6 +256,14 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 void treatfirstline(htsblk * retour, const char *rcvd);
 
 // sous-fonctions
+/* Buffer http_xfread1() fills in its line modes, and so the ceiling on any
+   blank-line-terminated block it reads: a header section or a chunk trailer
+   section. Overrunning it fails the transfer. */
+#define HTS_LINE_BLOCK_SIZE 8192
+/* http_xfread1() read modes: a positive bufl reads at most that many raw bytes,
+   anything else reads CR-stripped lines into the HTS_LINE_BLOCK_SIZE buffer. */
+#define HTS_XFREAD_LINE_BLOCK 0 /* lines up to a blank one (header/trailer) */
+#define HTS_XFREAD_LINE (-1)    /* one line, stopping at the first LF */
 LLint http_xfread1(htsblk * r, int bufl);
 /* Cached resolver: fill out[0..count-1] with up to max addresses for iadr (in
    resolver order), returning the count (0 = does not resolve, negative-cached).
@@ -265,6 +305,8 @@ void hts_now_iso8601(char out[32]);
 struct tm *convert_time_rfc822(struct tm *buffer, const char *s);
 int set_filetime(const char *file, struct tm *tm_time);
 int set_filetime_rfc822(const char *file, const char *date);
+/* File mtime as a UTC time_t, or (time_t) -1 if it can not be read. */
+time_t get_filetime(const char *file);
 int get_filetime_rfc822(const char *file, char *date);
 HTS_INLINE void time_rfc822(char *s, struct tm *A);
 HTS_INLINE void time_rfc822_local(char *s, struct tm *A);

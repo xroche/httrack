@@ -186,6 +186,8 @@ scanning
 skaneerimine
 Waiting for scheduled time..
 Etteantud aja ootamine...
+Transferring data..
+Andmete edastamine..
 Connecting to provider
 Ühendusevõtmine
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Tee alguslehekülg
 Create a word database of all html pages
 Loo kõigi HTML-lehekülgede sõnade andmebaas
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Koopia täieliku RFC822 kirjaarhiivi (MHT/EML) koostamine
 Create error logging and report files
 Tee vealogi ja raporti failid
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Brauseri identiteet
 Comment to be placed in each HTML file
 Kommentaar, mis lisatakse igale HTML-failile
+Languages accepted by the browser
+Brauseri aktsepteeritavad keeled
+Additional HTTP headers to be sent in each requests
+Täiendavad HTTP-päised, mis saadetakse iga päringuga
+HTTP referer to be sent for initial URLs
+Algsete URL-ide jaoks saadetav HTTP referer
 Back to starting page
 Tagasi alguslehele
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Tee indeks
 Make a word database
 Tee sõnade andmebaas
+Build a mail archive
+Tee kirjaarhiiv
 Log files
 Logifailid
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identiteet
 HTML footer
 HTML-i jalus
+Languages
+Keeled
+Additional HTTP Headers
+Täiendavad HTTP-päised
+Default referer URL
+Vaikimisi referer-URL
 N# connections
 Ühenduste arv
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Saidikaardi aadress:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Saidikaardi aadress, mida lugeda saidi sondeerimise asemel; jäta tühjaks, et kontrollida robots.txt-i ja seejärel /sitemap.xml-i.
+Write a CDXJ index of the WARC archive
+Kirjuta WARC-arhiivi CDXJ-indeks
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Kirjuta ka sorditud CDXJ-indeks kõigi WARC-arhiivi kirjetega, taasesituse tööriistade jaoks.
+Package the crawl as a WACZ file
+Paki läbimine WACZ-failiks
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Koonda WARC-arhiiv, selle CDXJ-indeks ja peegeldatud lehed ühte WACZ-faili; eeldab WARC-arhiivi ja CDXJ-indeksit.
+WARC segment size limit:
+WARC-segmendi suurim maht:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Alusta uut WARC-segmenti, kui praegune ületab selle baitide arvu; jäta tühjaks või 0, et hoida üks fail.

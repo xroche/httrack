@@ -26,7 +26,6 @@
     </ul>
   </description>
   <launchable type="desktop-id">WebHTTrack.desktop</launchable>
-  <icon type="stock">httrack</icon>
   <categories>
     <category>Network</category>
   </categories>
@@ -49,7 +48,101 @@
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1"/>
+  <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
-    <release version="3.49.8" date="2026-06-07"/>
+    <release version="3.49.18" date="2026-08-05">
+      <description>
+        <ul>
+          <li>The program itself is unchanged: this release only fixes building HTTrack from source on some Linux distributions and processors</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.49.17" date="2026-08-05">
+      <description>
+        <ul>
+          <li>A mirrored page opened in your browser can no longer take control of the WebHTTrack interface</li>
+          <li>Web addresses shown while a mirror runs no longer break the progress page</li>
+          <li>Settings keep values containing quotes or ampersands, and Windows paths such as C:\ab</li>
+          <li>A malformed link on a crawled site can no longer alter the requests HTTrack sends</li>
+          <li>Crash reports name the function and source line where the problem occurred</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.49.16" date="2026-08-04">
+      <description>
+        <ul>
+          <li>The application has its own icon in the desktop menu, at any screen size</li>
+          <li>Option tooltips no longer break in languages whose text contains quotes or other special characters</li>
+          <li>Croatian, Macedonian, Polish, Slovak, Slovenian and Swedish text no longer shows as mangled characters</li>
+          <li>Pages that failed with an "Invalid chunk" error now download correctly</li>
+          <li>A very long web address no longer aborts the whole mirror</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.49.15" date="2026-07-30">
+      <description>
+        <ul>
+          <li>Save a page and everything it needs as one self-contained file</li>
+          <li>Read a site's sitemap, so pages nothing links to are still found</li>
+          <li>See what a new pass added, updated or removed</li>
+          <li>Updating a mirror no longer destroys a good local copy when a download fails or is interrupted</li>
+          <li>In the web interface, options ticked by default can be un-ticked again, the size limit applies to the whole site, and the finished mirror opens from its link</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.49.14" date="2026-07-24">
+      <description>
+        <ul>
+          <li>Save a mirror as a web archive, indexed and packaged for replay</li>
+          <li>Choose what the page footer says</li>
+          <li>A mirror saved to a folder with accented characters in its name lands in the right place</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.49.13" date="2026-07-18">
+      <description>
+        <ul>
+          <li>Mirror through a SOCKS5 proxy</li>
+          <li>Files of 2 GB and over are handled correctly on Windows and on 32-bit systems</li>
+          <li>The web interface offers options that used to be command-line only, among them a cookies file and a pause between downloads</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.49.12" date="2026-07-10">
+      <description>
+        <p>Links carrying accented characters are followed again, a page wrongly labelled as compressed is no longer lost, and a new option explains why a given address is kept or skipped.</p>
+      </description>
+    </release>
+    <release version="3.49.11" date="2026-07-05">
+      <description>
+        <ul>
+          <li>Audio and video sources are mirrored along with the page</li>
+          <li>A site's robots.txt is followed more closely, including its Allow rules and wildcards</li>
+          <li>A time limit now stops a slow download instead of waiting for it to end</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.49.10" date="2026-06-28">
+      <description>
+        <ul>
+          <li>Start from a cookies file, and space downloads out with a random pause</li>
+          <li>Ignore chosen query parameters when naming saved files</li>
+          <li>Resuming a partial download no longer duplicates bytes</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.49.9" date="2026-06-21">
+      <description>
+        <p>Saved files get the right type when the server and the address disagree about it.</p>
+      </description>
+    </release>
+    <release version="3.49.8" date="2026-06-20">
+      <description>
+        <ul>
+          <li>Secure downloads can go through a plain web proxy</li>
+          <li>Every size of a responsive image is fetched</li>
+        </ul>
+      </description>
+    </release>
   </releases>
 </component>

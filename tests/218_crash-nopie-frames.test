@@ -1,0 +1,142 @@
+#!/bin/bash
+# A non-PIE crash report must name the executable and resolve its frames to
+# source lines (#995). /proc/self/exe must be rejected when it is the loader,
+# and kept when argv[0] merely differs from the file's name (#996).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+srcdir=${abs_top_srcdir:?not run under make check}
+builddir=${abs_top_builddir:?not run under make check}
+
+out=
+skip() {
+    echo "$*; skipping" >&2
+    exit 77
+}
+fail() {
+    echo "FAIL: $*" >&2
+    test -z "${out}" || sed 's/^/  | /' <"${out}" >&2
+    exit 1
+}
+
+test "$(uname -s)" = "Linux" || skip "the ELF load bias is a Linux matter"
+if ! command -v addr2line >/dev/null && ! command -v llvm-symbolizer >/dev/null; then
+    skip "no symbolizer installed"
+fi
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null || skip "no C compiler (${cc_argv[0]})"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/httrack_nopie.XXXXXX") || exit 1
+trap 'set +e; rm -rf "${work}"' EXIT
+trap 'rm -rf "${work}"' HUP INT QUIT PIPE TERM
+
+# The crash printer is linked into a probe of our own: every target the build
+# tree offers is a PIE, which is the case that already worked.
+cflags=(-g -O0 -I"${builddir}" -I"${builddir}/src" -I"${srcdir}/src")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"${TEST_CPPFLAGS}"
+    cflags+=("${extra_argv[@]}")
+fi
+sources=("${srcdir}/tests/nopieprobe.c" "${srcdir}/src/htsbacktrace.c")
+build() { # $1 output binary, rest extra flags
+    local bin=$1
+    shift
+    # shellcheck disable=SC2086 # DL_LIBS is a flag list; splitting is the point
+    "${cc_argv[@]}" "${cflags[@]}" "$@" -o "${bin}" "${sources[@]}" ${DL_LIBS:-} \
+        >"${work}/cc.log" 2>&1
+}
+
+# Control, run by absolute path so neither the load base nor argv[0] is in play:
+# it says whether this box symbolizes anything at all.
+build "${work}/probe-pie" || {
+    head -20 "${work}/cc.log" >&2
+    fail "the crash printer does not build standalone"
+}
+out=${work}/pie.log
+LC_ALL=C "${work}/probe-pie" >"${out}" 2>&1 || fail "the control probe exited non-zero"
+if grep -q 'No stack trace available' "${out}"; then
+    skip "this build produced no backtrace"
+fi
+grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
+    skip "nothing is symbolized here, even from an absolute path"
+
+# Same probe under the loader: there /proc/self/exe is ld.so, and only dladdr()
+# still names the program.
+interp=
+if command -v readelf >/dev/null; then
+    interp=$(LC_ALL=C readelf -l "${work}/probe-pie" |
+        sed -n 's/.*Requesting program interpreter: \([^]]*\)].*/\1/p')
+fi
+if [ -n "${interp}" ] && [ -x "${interp}" ]; then
+    out=${work}/loader.log
+    rc=0
+    LC_ALL=C run_with_timeout 60 "${interp}" "${work}/probe-pie" >"${out}" 2>&1 || rc=$?
+    test "${rc}" -ne 124 || fail "the loader-launched probe did not finish in time"
+    grep -qxF "${work}/probe-pie:" "${out}" ||
+        fail "launched through ${interp}, the report heads no block with the program"
+    grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
+        fail "launched through ${interp}, the report resolves no source line"
+fi
+
+# Same probe under another name: dladdr() echoes argv[0], so anything matching
+# the two names drops the module here instead of keeping the real file.
+altdir=${work}/alt
+mkdir "${altdir}"
+ln -s "${work}/probe-pie" "${altdir}/probe-renamed"
+out=${work}/renamed.log
+rc=0
+LC_ALL=C PATH="${altdir}:${PATH}" \
+    run_with_timeout 60 probe-renamed >"${out}" 2>&1 || rc=$?
+test "${rc}" -ne 124 || fail "the symlinked probe did not finish in time"
+grep -qxF "${work}/probe-pie:" "${out}" ||
+    fail "launched as probe-renamed, the report heads no block with the program"
+grep -qE 'probe_frame at .*nopieprobe\.c:[0-9]+' "${out}" ||
+    fail "launched as probe-renamed, the report resolves no source line"
+
+if ! build "${work}/probe-nopie" -no-pie -fno-pie; then
+    head -5 "${work}/cc.log" >&2
+    skip "this toolchain takes no -no-pie"
+fi
+bindir=${work}/bin
+mkdir "${bindir}"
+mv "${work}/probe-nopie" "${bindir}/probe-nopie"
+if command -v readelf >/dev/null; then
+    LC_ALL=C readelf -h "${bindir}/probe-nopie" >"${work}/elf.txt"
+    grep -qE '^[[:space:]]*Type:[[:space:]]+EXEC' "${work}/elf.txt" ||
+        skip "the toolchain ignored -no-pie and linked a PIE anyway"
+fi
+
+# No probe-nopie here, so a report that kept argv[0] has nothing to open.
+cd "${work}"
+out=${work}/nopie.log
+rc=0
+# LC_ALL=C: addr2line translates its " at " separator, which the match below pins.
+LC_ALL=C PATH="${bindir}:${PATH}" \
+    run_with_timeout 60 probe-nopie >"${out}" 2>&1 || rc=$?
+test "${rc}" -ne 124 || fail "the probe did not finish within the deadline"
+if ! command -v readelf >/dev/null; then
+    # glibc drops the "+0x" offset when the load bias is zero.
+    grep -qE '^probe-nopie\(\) \[0x' "${out}" ||
+        skip "no zero-bias frame in the report; this is no ET_EXEC"
+fi
+
+headers=$(grep -E '^/.*/probe-nopie:$' "${out}" || true)
+test -n "${headers}" || fail "the report has no symbolized block for the executable"
+# Every frame of a module is claimed in one pass, so a second block for the
+# executable means library frames were misattributed to it.
+test "$(wc -l <<<"${headers}")" -eq 1 || fail "several executable blocks: ${headers}"
+exe=${headers%:}
+# Device+inode, so a symlinked TMPDIR does not read as a different binary.
+test "${exe}" -ef "${bindir}/probe-nopie" || fail "the report names ${exe}"
+block=$(awk -v h="${headers}" '$0 == h { on = 1; next } /^\// { on = 0 } on' "${out}")
+# " at " pins the symbol column: both addr2line -Cfipa and llvm-symbolizer -p
+# emit it. A wrong offset resolves to "?? ??:0" instead.
+grep -qE '(^|[^[:alnum:]_])probe_frame at .*nopieprobe\.c:[0-9]+' <<<"${block}" ||
+    fail "the executable's block resolves no source line: ${block}"
+
+echo "the non-PIE report named ${exe} and resolved its own frames"

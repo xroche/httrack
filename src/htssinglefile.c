@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htslib.h"
 #include "htssafe.h"
+#include "htsrandom.h"
 #include "htstools.h"
 #include "htswizard.h"
 
@@ -161,20 +162,38 @@ static const htspair_t sf_deny_rules[] = {
     {NULL, "codebase"}, {NULL, NULL},
 };
 
-/* HTS_TRUE if the start tag at tag_name carries rel="...stylesheet...". */
+/* HTS_TRUE if the start tag at tag_name carries a rel naming a stylesheet. */
 static hts_boolean sf_rel_is_stylesheet(const char *tag_name) {
   size_t i;
 
   for (i = 0; i < HTS_URLMAXSIZE && tag_name[i] != '\0' && tag_name[i] != '>';
        i++) {
-    int p;
+    const int want = (int) sizeof("stylesheet") - 1;
+    const char *value;
+    int p, j, len;
 
     if (i != 0 && !is_space(tag_name[i - 1]))
       continue;
     p = rech_tageq(tag_name + i, "rel");
-    if (p != 0)
-      return strstrcase(tag_name + i + p, "stylesheet") != NULL ? HTS_TRUE
-                                                                : HTS_FALSE;
+    if (p == 0)
+      continue;
+    /* Bounded to rel's own value, and matched as a token: an unbounded search
+       runs past this tag into the next one, so a rel="canonical" inherited a
+       later <link>'s "stylesheet" and inlined the page it named. */
+    len = rech_endtoken(tag_name + i + p, &value);
+    for (j = 0; j < len;) {
+      int start;
+
+      while (j < len && is_space(value[j]))
+        j++;
+      start = j;
+      while (j < len && !is_space(value[j]))
+        j++;
+      if (j - start == want &&
+          strncasecmp(value + start, "stylesheet", want) == 0)
+        return HTS_TRUE;
+    }
+    return HTS_FALSE;
   }
   return HTS_FALSE;
 }
@@ -224,6 +243,16 @@ static int sf_is_space(int c) {
 }
 
 static int sf_is_sep(int c) { return c == '/' || c == '\\'; }
+
+/* Drop the whitespace surrounding a reference. */
+static void sf_trim(const char **ref, size_t *reflen) {
+  while (*reflen > 0 && sf_is_space((unsigned char) **ref)) {
+    (*ref)++;
+    (*reflen)--;
+  }
+  while (*reflen > 0 && sf_is_space((unsigned char) (*ref)[*reflen - 1]))
+    (*reflen)--;
+}
 
 /* Copy path into out with '/' separators and no trailing one. */
 static void sf_normalize_path(const char *path, String *out) {
@@ -296,12 +325,7 @@ static hts_boolean sf_resolve(const sf_ctx *ctx, const char *base_dir,
   size_t i, n;
   int sp = 0, part;
 
-  while (reflen > 0 && sf_is_space((unsigned char) *ref)) {
-    ref++;
-    reflen--;
-  }
-  while (reflen > 0 && sf_is_space((unsigned char) ref[reflen - 1]))
-    reflen--;
+  sf_trim(&ref, &reflen);
   /* A mirrored name carries no query or fragment. */
   for (n = 0; n < reflen; n++) {
     if (ref[n] == '#' || ref[n] == '?')
@@ -441,17 +465,20 @@ static hts_boolean sf_append_base64(String *out, char *data, size_t len) {
   return HTS_TRUE;
 }
 
-/* Append a mirror-relative path, percent-escaping everything an unquoted CSS
-   url() or an HTML attribute could choke on. */
-static void sf_append_escaped_path(String *out, const char *p) {
+/* Append [p,p+len), escaping what an unquoted CSS url(), an HTML attribute or
+   an appended fragment could choke on. preencoded text already carries the
+   document's own '%' and '&' escapes, and encoding those again changes it. */
+static void sf_append_escaped(String *out, const char *p, size_t len,
+                              hts_boolean preencoded) {
   static const char hex[] = "0123456789ABCDEF";
   size_t i;
 
-  for (i = 0; p[i] != '\0'; i++) {
+  for (i = 0; i < len; i++) {
     const unsigned char c = (unsigned char) p[i];
 
     if (c <= 32 || c >= 127 || c == '"' || c == '\'' || c == '(' || c == ')' ||
-        c == '\\' || c == '<' || c == '>' || c == '&' || c == '%') {
+        c == '\\' || c == '<' || c == '>' || c == '#' ||
+        (!preencoded && (c == '%' || c == '&'))) {
       StringAddchar(*out, '%');
       StringAddchar(*out, hex[c >> 4]);
       StringAddchar(*out, hex[c & 15]);
@@ -595,7 +622,7 @@ fallback:
     StringClear(rel);
     sf_relative_from(rebase_dir, StringBuff(path), &rel);
     if (StringLength(rel) > 0) {
-      sf_append_escaped_path(out, StringBuff(rel));
+      sf_append_escaped(out, StringBuff(rel), StringLength(rel), HTS_FALSE);
       done = HTS_TRUE;
     }
     StringFree(rel);
@@ -755,7 +782,7 @@ static hts_boolean sf_replace_file(httrackp *opt, const char *path,
                  HTS_ACCESS_FILE);
 #endif
   if (ok)
-    ok = hts_rename_over(StringBuff(tmp), path);
+    ok = hts_rename_over(opt, StringBuff(tmp), path);
   if (!ok) {
     hts_log_print(opt, LOG_ERROR, "single-file: could not rewrite %s", path);
     (void) UNLINK(StringBuff(tmp));

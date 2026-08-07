@@ -1,0 +1,88 @@
+#!/bin/bash
+# The binary-relative rpath must stay off where it is unwanted (#906): a
+# distribution libdir the loader already searches, and an explicit opt-out. The
+# rpath libhttrack.pc hands a consumer answers to the same gates (#978).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+test -r "${srcdir}/configure" || {
+    echo "no configure in ${srcdir}; skipping" >&2
+    exit 77
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/rpathgate.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# automake refuses an out-of-tree configure when srcdir holds a config.status,
+# which an in-tree build (CI, dpkg-buildpackage) leaves there; a symlink farm
+# without that one file is the same tree to configure.
+shadow=${work}/srcdir
+mkdir -p "${shadow}"
+for entry in "${srcdir}"/*; do
+    test "${entry##*/}" = config.status || ln -s "${entry}" "${shadow}/"
+done
+test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
+
+# One cache for every run: the probe itself is the slow part and its answer does
+# not depend on the prefix.
+cache=${work}/config.cache
+n=0
+cases=6 # expect calls below, what the budget is paced against
+
+expect() {
+    local want=$1 desc=$2
+    shift 2
+    local dir got line began=$SECONDS
+    n=$((n + 1))
+    dir=${work}/build${n}
+    mkdir -p "${dir}"
+    # The gate has nothing to do with TLS, and the parent's CPPFLAGS/LDFLAGS are
+    # not passed on: a keg-only openssl (brew) makes --enable-https a hard error.
+    (cd "${dir}" && bash "${shadow}/configure" --cache-file="${cache}" \
+        --enable-https=auto "$@") \
+        >"${dir}/configure.log" 2>&1 || {
+        tail -20 "${dir}/configure.log" >&2
+        fail "configure ${*} failed"
+    }
+    got=$(sed -n 's/^ORIGIN_RPATH = *//p' "${dir}/src/Makefile")
+    test "${got}" = "${want}" || {
+        grep -i 'binary-relative' "${dir}/configure.log" >&2 || true
+        fail "${desc}: ORIGIN_RPATH is '${got}', expected '${want}'"
+    }
+    # Same answer here: no case below turns on the $ORIGIN probe, which the .pc's
+    # absolute rpath does not need anyway.
+    line=$(sed -n 's/^Libs: //p' "${dir}/src/libhttrack.pc")
+    test -n "${line}" || fail "${desc}: libhttrack.pc carries no Libs line"
+    case "${line}" in
+    *-rpath*) got=yes ;;
+    *) got=no ;;
+    esac
+    test "${got}" = "${want}" ||
+        fail "${desc}: libhttrack.pc rpath is '${got}', expected '${want}': ${line}"
+    echo "ok: ${desc} -> ${want}"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+}
+
+# The positive control first, or every "no" below could come from a probe that
+# simply never succeeds on this machine.
+expect yes "a private prefix gets the rpath" --prefix="${work}/inst"
+expect no "a system prefix does not" --prefix=/usr
+expect no "a multiarch libdir does not" --prefix=/usr --libdir=/usr/lib/x86_64-linux-gnu
+expect no "a 32-bit multilib libdir does not" --prefix=/usr --libdir=/usr/lib32
+expect no "--disable-origin-rpath is honoured" --prefix="${work}/inst" --disable-origin-rpath
+expect no "a static build does not" --prefix="${work}/inst" --disable-shared
+
+test "${n}" -eq "${cases}" || fail "ran ${n} cases, not the ${cases} the budget is paced against"

@@ -67,6 +67,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsurlport.h"
 #include "htsweb.h"
 #include "htscharset.h"
+#include "htsrandom.h"
 
 #if USE_BEGINTHREAD==0
 #error fatal: no threads support
@@ -101,8 +102,8 @@ static void htsweb_sig_brpipe(int code) {
   /* ignore */
 }
 
-/* Number of background threads */
-static int background_threads = 0;
+/* Threads that never return; no wait may count on them draining. */
+static int nonjoinable_threads = 0;
 
 /* Server/client ping handling */
 static htsmutex pingMutex = HTSMUTEX_INIT;
@@ -224,9 +225,7 @@ int main(int argc, char *argv[]) {
 #ifdef HTS_USESWF
   smallserver_setkey("USESWF", "1");
 #endif
-#ifdef HTS_USEZLIB
   smallserver_setkey("USEZLIB", "1");
-#endif
 #ifdef _WIN32
   smallserver_setkey("WIN32", "1");
 #endif
@@ -249,14 +248,19 @@ int main(int argc, char *argv[]) {
     smallserver_setkey("HTTRACK_INCOMPATIBLE_VERSIONID", hts_version());
   }
 
-  /* protected session-id */
+  /* Session id: the only thing authenticating a command, so it is seeded from
+     the system CSPRNG. A clock-derived one is guessable from the "Mirrored
+     from" stamp every mirrored page carries (#877). */
   {
-    char buff[1024];
+    unsigned char seed[32];
     char digest[32 + 2];
 
-    srand((unsigned int) time(NULL));
-    snprintf(buff, sizeof(buff), "%d-%d", (int) time(NULL), (int) rand());
-    domd5mem(buff, strlen(buff), digest, 1);
+    if (!hts_random_bytes(seed, sizeof(seed))) {
+      fprintf(stderr,
+              "** CRITICAL: no system entropy source to build a session id\n");
+      return -1;
+    }
+    domd5mem((const char *) seed, sizeof(seed), digest, 1);
     smallserver_setkey("sid", digest);
     smallserver_setkey("_sid", digest);
   }
@@ -299,15 +303,19 @@ int main(int argc, char *argv[]) {
 
   /* pinger */
   if (parentPid > 0) {
-    hts_newthread(client_ping, (void *) (uintptr_t) parentPid);
-    background_threads++; /* Do not wait for this thread! */
+    if (hts_newthread(client_ping, (void *) (uintptr_t) parentPid) == 0) {
+#ifndef _WIN32
+      nonjoinable_threads++; /* client_ping() only ever leaves through exit() */
+#endif
+    }
     smallserver_setpinghandler(pingHandler, NULL);
   }
 
   /* launch */
   ret = help_server(argv[1], defaultPort, bindAddr);
 
-  htsthread_wait_n(background_threads - 1);
+  /* Drain everything a mirror may still have in flight, the pinger aside. */
+  htsthread_wait_n(nonjoinable_threads);
   hts_uninit();
 
 #ifdef _WIN32
@@ -382,7 +390,6 @@ void webhttrack_main(char *cmd) {
   commandRunning = 1;
   DEBUG(fprintf(stderr, "commandRunning=1\n"));
   hts_newthread(back_launch_cmd, (void *) strdup(cmd));
-  background_threads++; /* Do not wait for this thread! */
 }
 
 void webhttrack_lock(void) {
@@ -423,8 +430,8 @@ static int webhttrack_runmain(httrackp * opt, int argc, char **argv) {
   /* Rock'in! */
   ret = hts_main2(argc, argv, opt);
 
-  /* Wait for pending threads to finish */
-  htsthread_wait_n(background_threads);
+  /* Wait for pending threads to finish; the pinger and this thread stay. */
+  htsthread_wait_n(nonjoinable_threads + 1);
 
   return ret;
 }

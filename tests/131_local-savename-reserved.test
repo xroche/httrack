@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# url_savename must not name a URL into a directory the engine owns (#842).
+# Asserted on the tail only, so the -O root's rendering stays out of it.
+
+set -euo pipefail
+
+# resolve httrack before cd: make check puts a RELATIVE ../src on PATH
+httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+
+scratch=$(mktemp -d)
+trap 'set +e; rm -rf "$scratch"' EXIT
+cd "$scratch"
+
+tail_is() {
+    local fil="$1" want="$2"
+    shift 2
+    local out
+    out="$("$httrack_bin" -O "$scratch/out" -#test=savename "$fil" \
+        application/octet-stream "$@" | sed -n 's/^savename: //p')"
+    case "${out//\\//}" in
+    */"$want") ;;
+    *)
+        echo "FAIL: '$fil' $* -> '$out' (want tail '$want')"
+        exit 1
+        ;;
+    esac
+}
+
+# A trailing space: cleanEndingSpaceOrDot() strips it again after the check.
+tail_is '/d/hts-tmp%20/a.bin.bak' 'd/hts-tmp_/a.bin.bak'
+tail_is '/d/hts-cache%20/new.zip' 'd/hts-cache_/new.zip'
+tail_is '/d/hts-cache%20%20./new.zip' 'd/hts-cache_/new.zip'
+
+# The first component, which the table's leading '/' never reached.
+tail_is '/hts-cache/new.zip' 'hts-cache_/new.zip' type=100
+tail_is '/hts-tmp/a.bin' 'hts-tmp_/a.bin' type=100
+# Wider than the engine directories: the DOS devices share the table.
+tail_is '/nul/x.bin' 'nul_/x.bin' type=100
+
+# A single-label hostname sits in that same first component.
+tail_is '/a.bin.bak' 'hts-tmp_/a.bin.bak' adr=hts-tmp
+tail_is '/x.bin' 'nul_/x.bin' adr=nul
+
+# '~' never survives the forbidden-character pass, which is what puts the
+# temporaries out of reach whatever the escape above does.
+tail_is '/~hts-tmp/a.bin' '_hts-tmp/a.bin'
+tail_is '/~hts-tmp/a.bin' '_hts-tmp/a.bin' type=100
+
+# Controls: a whole component only, and a space that does not end one.
+tail_is '/hts-tmpfoo/a.bin' 'hts-tmpfoo/a.bin'
+tail_is '/xhts-cache/a.bin' 'xhts-cache/a.bin'
+tail_is '/con%20ference/a.bin' 'con ference/a.bin'
+tail_is '/d/a.bin' 'www.example.com/d/a.bin'
+
+# A hostname label is not a reserved name, and renaming one would move an
+# existing mirror out from under --update.
+tail_is '/d/a.bin' 'aux.example.com/d/a.bin' adr=aux.example.com
+tail_is '/d/a.bin' 'nul.example.com/d/a.bin' adr=nul.example.com
+tail_is '/d/a.bin' 'hts-cache.example.com/d/a.bin' adr=hts-cache.example.com
+# But a trailing run still resolves back to the bare name.
+tail_is '/a.bin' 'hts-tmp_/a.bin' adr='hts-tmp.'

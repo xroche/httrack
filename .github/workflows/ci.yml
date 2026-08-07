@@ -41,7 +41,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
+            appstream appstream-util
 
       - name: Configure
         run: |
@@ -79,7 +80,10 @@ jobs:
       - name: Build
         run: make -j"$(nproc)"
 
+      # A backstop only: tests/test-timeout.sh bounds each test, and a healthy run
+      # is a minute here, two on macOS. Without it a stall ran to the job's 6h default.
       - name: Test
+        timeout-minutes: 20
         run: |
           jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           make check -j"$jobs"
@@ -119,6 +123,7 @@ jobs:
         run: make -j"$(nproc)"
 
       - name: Test without python3
+        timeout-minutes: 20
         run: |
           set -euo pipefail
           # Hide every python3* so `command -v python3` fails like it does in the
@@ -133,13 +138,73 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # The Ubuntu buildds run a development release every runner above is well behind.
+  # That gap is what shipped 3.49.18 broken on every Ubuntu architecture but
+  # riscv64, when 25.10 made uutils the default coreutils (#1042).
+  ubuntu-devel:
+    name: build (Ubuntu devel, uutils coreutils)
+    runs-on: ubuntu-24.04
+    container: ubuntu:devel
+    timeout-minutes: 40
+    steps:
+      # Before checkout: the container has no git, so submodules would be lost.
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
+            git ca-certificates python3 procps
+
+      - name: Assert the coreutils dispatch on argv[0]
+        # The property #1042 broke on, not the version banner, which uutils has
+        # already reworded once. Without it the job quietly becomes a slower copy
+        # of the one above.
+        run: |
+          set -euo pipefail
+          ln -s "$(command -v sleep)" /tmp/not-a-coreutil
+          if /tmp/not-a-coreutil 0; then
+            echo "::error::coreutils here take any argv[0]; this image no longer guards uutils" >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+          # A renamed dev package would disable a codec or TLS here, and the tests
+          # that cover them would SKIP rather than fail.
+          grep -q "define HTS_USEBROTLI 1" config.h
+          grep -q "define HTS_USEZSTD 1" config.h
+          grep -q "define HTS_USEOPENSSL 1" config.h
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          make check -j"$jobs"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
   # Portability: build and test on macOS (Darwin/clang) on a native runner --
   # no VM. The tree has no __APPLE__ branches, so Darwin exercises the
   # generic-Unix path on a second libc and kernel. brew's openssl@3 is keg-only,
   # so point configure at it; everything else is in the SDK or default paths.
   macos:
     name: build (macOS arm64, clang)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -173,6 +238,7 @@ jobs:
           sudo ifconfig lo0 alias 127.0.0.3 up
 
       - name: Test
+        timeout-minutes: 20
         run: |
           jobs=$(( $(sysctl -n hw.ncpu) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           make check -j"$jobs"
@@ -186,7 +252,7 @@ jobs:
   # temp prefix, then check webhttrack brings up htsserver and serves the UI.
   webhttrack-macos:
     name: webhttrack smoke (macOS arm64)
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -211,6 +277,112 @@ jobs:
 
       - name: Smoke-test webhttrack
         run: bash tests/webhttrack-smoke.sh "$RUNNER_TEMP/inst"
+
+  # Same smoke on the platform that ships webhttrack as a package: the install layout
+  # it asserts (a relative data symlink, #885) is what Debian consumes, and the macOS
+  # job alone left that untested on Linux.
+  webhttrack-linux:
+    name: webhttrack smoke (Linux x86-64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Build and install into a temp prefix
+        run: |
+          set -euo pipefail
+          ./bootstrap
+          ./configure --prefix="$RUNNER_TEMP/inst"
+          make -j"$(nproc)"
+          make install
+
+      - name: Smoke-test webhttrack
+        run: bash tests/webhttrack-smoke.sh "$RUNNER_TEMP/inst"
+
+  # The macOS app bundle (#886): assemble it, then prove it still works after being
+  # moved, which is the only thing a .app has to survive that a prefix install does not.
+  macos-app:
+    name: macOS app bundle (arm64)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          brew install autoconf automake libtool autoconf-archive brotli zstd
+
+      # --disable-shared keeps libhttrack inside the binaries, so the bundle carries no
+      # absolute dylib path back to the staging prefix.
+      - name: Build and install into a temp prefix
+        run: |
+          set -euo pipefail
+          ssl="$(brew --prefix openssl@3)"
+          brewp="$(brew --prefix)"
+          ./bootstrap
+          ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
+            LDFLAGS="-L${ssl}/lib -L${brewp}/lib" \
+            --prefix="$RUNNER_TEMP/inst" --disable-shared
+          make -j"$(sysctl -n hw.ncpu)"
+          make install
+
+      - name: Assemble HTTrack.app
+        run: |
+          set -euo pipefail
+          make macos-app APP_FLAGS="--prefix $RUNNER_TEMP/inst --out $RUNNER_TEMP"
+          plutil -lint "$RUNNER_TEMP/HTTrack.app/Contents/Info.plist"
+
+      - name: Run it through the bundle stub
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/HTTrack.app"
+          bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
+
+      - name: Run it again after moving it
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/moved"
+          mv "$RUNNER_TEMP/HTTrack.app" "$RUNNER_TEMP/moved/"
+          rm -rf "$RUNNER_TEMP/inst"
+          app="$RUNNER_TEMP/moved/HTTrack.app"
+          bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
+
+      # The load-command check cannot fail while the loader can still reach Homebrew (#901).
+      - name: Run it with Homebrew's libraries out of reach
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/moved/HTTrack.app"
+          # Without this the hiding below proves nothing: an empty Frameworks passes it.
+          ls "$app/Contents/Frameworks"/libssl.*.dylib >/dev/null
+          # The kegs, not just the opt symlinks: a source build records the Cellar path.
+          hidden=""
+          for keg in openssl@3 brotli zstd; do
+            for d in "$(brew --prefix)/opt/$keg" "$(brew --prefix)/Cellar/$keg"; do
+              if [ -e "$d" ]; then sudo mv "$d" "$d.hidden"; hidden="$hidden $d"; fi
+            done
+          done
+          trap 'for d in $hidden; do sudo mv "$d.hidden" "$d"; done' EXIT
+          test -n "$hidden"
+          bash tests/webhttrack-smoke.sh "$app/Contents/Resources" "$app/Contents/MacOS/HTTrack"
+
+      # The release path (macos-release.yml) minus Apple, so a bundle that cannot be
+      # signed or packed fails on the PR rather than on release day.
+      - name: Sign and pack the bundle, ad hoc
+        run: |
+          set -euo pipefail
+          bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
+            --identity - --skip-notarize
 
   # Portability/hardening: 32-bit (i386) build on the x86-64 runner via multilib
   # -- no extra hardware. Exercises the 32-bit size_t/pointer ABI, where size
@@ -245,6 +417,7 @@ jobs:
         run: make -j"$(nproc)"
 
       - name: Test
+        timeout-minutes: 20
         run: |
           jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           make check -j"$jobs"
@@ -302,6 +475,7 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        timeout-minutes: 20
         run: |
           jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           make check -j"$jobs"
@@ -345,6 +519,7 @@ jobs:
       - name: Test (offline self-tests under MSan)
         env:
           MSAN_OPTIONS: abort_on_error=1:halt_on_error=1
+        timeout-minutes: 20
         run: |
           set -euo pipefail
           # 01_engine-* only; zlib-dependent self-tests are named 01_zlib-* and
@@ -426,6 +601,7 @@ jobs:
         run: make -j"$(nproc)"
 
       - name: Test
+        timeout-minutes: 20
         run: |
           jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           make check -j"$jobs"
@@ -433,6 +609,36 @@ jobs:
       - name: Print the test log on failure
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
+
+  # OpenSSL 4.0 removes the API 3.x deprecated. Building with that set hidden
+  # keeps the engine ready for it: a deprecated call fails here rather than the
+  # day a distro moves. Compile-only, since the headers are what is under test.
+  openssl-no-deprecated:
+    name: build (OpenSSL, no deprecated API)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Configure (deprecated OpenSSL API hidden)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CPPFLAGS=-DOPENSSL_NO_DEPRECATED
+          # A build with https off would pass this job vacuously.
+          grep -q "define HTS_USEOPENSSL 1" config.h
+
+      - name: Build
+        run: make -j"$(nproc)"
 
   # Validate the Debian packaging via the same script maintainers release with.
   # One amd64/gcc run is enough: packaging (control/rules/manifest/lintian/quilt
@@ -554,9 +760,12 @@ jobs:
         man/makeman.sh
         src/htsbasiccharsets.sh
         src/htsentities.sh
-        src/webhttrack
+        src/webhttrack.in
         tests/*.sh
         tests/*.test
+        tools/macos-app.sh
+        tools/macos-bundle.sh
+        tools/macos-release.sh
         tools/mkdeb.sh
     steps:
       - uses: actions/checkout@v7
@@ -567,14 +776,21 @@ jobs:
           sudo apt-get update
           # noble ships shfmt 3.8.0 (universe), matching the pinned local dev
           # version; use it rather than fetching a release binary from github.com.
-          sudo apt-get install -y --no-install-recommends shellcheck shfmt
+          sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
+            appstream-util
           shfmt --version
+          appstreamcli --version
 
       - name: shellcheck
         run: shellcheck $SHELL_SCRIPTS
 
       - name: shfmt
         run: shfmt -d -i 4 $SHELL_SCRIPTS
+
+      # A registration whose file is gone stops "make check" before it reports
+      # anything, so catch it here rather than as a missing line in a build log.
+      - name: tests-list.mk registrations
+        run: bash tests/check-tests-list.sh
 
       # MSBuild rejects a malformed .vcxproj with a bare MSB4025 and no build, so
       # catch it here in seconds rather than on a Windows runner minutes in.
@@ -585,6 +801,16 @@ jobs:
             python3 -c "import sys,xml.dom.minidom; xml.dom.minidom.parse(sys.argv[1])" "$f"
             echo "ok $f"
           done
+
+      # A software centre quietly ignores a metainfo it cannot parse. Errors and
+      # warnings fail; --no-net so the gate is on the file, not httrack.com's uptime.
+      - name: AppStream metainfo validation
+        run: |
+          set -euo pipefail
+          appstreamcli validate --no-net --explain \
+            html/server/div/com.httrack.WebHTTrack.metainfo.xml
+          appstream-util validate-relax --nonet \
+            html/server/div/com.httrack.WebHTTrack.metainfo.xml
 
   # Check clang-format on CHANGED LINES ONLY. The engine predates clang-format
   # (it was shaped by an old Visual Studio formatter) and does not round-trip,
@@ -618,7 +844,12 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin \
             "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
-          base="origin/${{ github.base_ref }}"
+          # Merge base, not the branch tip: master moves during a run, and a
+          # tip-relative diff blames its new C on this PR.
+          if ! base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"; then
+            echo "::error::no merge base with origin/${{ github.base_ref }}; cannot scope the check."
+            exit 1
+          fi
           set +e
           diff="$(git clang-format --binary clang-format-19 --style=file \
                     --diff --extensions c,h "$base")"
@@ -641,6 +872,21 @@ jobs:
               exit 1 ;;
           esac
 
+  docs:
+    name: documentation (chrome in sync, links resolve)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      # The pages carry their navigation as real markup, because they are read from
+      # disk as often as over http and file:// has no includes. Regenerating has to
+      # be a no-op, or a page has drifted from tools/doc-chrome.py.
+      - name: Shared chrome is in sync
+        run: python3 tools/doc-chrome.py --check
+
+      - name: Relative links and anchors resolve
+        run: python3 tools/doc-links.py html
+
   man-page-sync:
     name: man page / html in sync
     if: github.event_name == 'pull_request'
@@ -660,6 +906,8 @@ jobs:
           git fetch --no-tags origin \
             "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
           base="origin/${{ github.base_ref }}"
+          # Three dots: merge-base scoped, so commits landing on master mid-run
+          # are not counted as this PR's.
           changed="$(git diff --name-only "$base"...HEAD)"
           has() { printf '%s\n' "$changed" | grep -qx "$1"; }
           if has man/httrack.1 && ! has html/httrack.man.html; then

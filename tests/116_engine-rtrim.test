@@ -1,0 +1,107 @@
+#!/bin/bash
+#
+# Backward scans that start at s + strlen(s) - 1 and decrement with no lower
+# bound: the config-file right trim and the collision-rename digit scan both
+# walked off the front of a stack buffer. Neither ASan nor _FORTIFY_SOURCE sees
+# the self-test's overrun (it lands in the same frame), hence the poisoned byte.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+# Resolve httrack before any cd: PATH may carry a build-relative entry.
+bin=$(command -v httrack) || {
+    echo "FAIL: httrack not found on PATH" >&2
+    exit 1
+}
+case "$bin" in
+/*) ;;
+*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
+esac
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_rtrim.XXXXXX") || exit 1
+trap 'set +e; rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+# --- 1. the helper itself ---------------------------------------------------
+out=$("$bin" -#test=rtrim) || fail "httrack -#test=rtrim exited non-zero: $out"
+test "$out" = "rtrim self-test: OK" || fail "expected 'rtrim self-test: OK', got: $out"
+
+# --- 2. collision rename over an all-digit name -----------------------------
+# Two pages with the same all-digit name save to 2024.html, so the second goes
+# through the -<n> rename and the digit scan has nothing but digits to walk
+# over. Driven twice, because the two routes differ in who picks the URLs.
+site="$tmp/site"
+mkdir -p "$site/a" "$site/b"
+printf '%s\n' '<html><body><a href="a/2024.html">a</a> <a href="b/2024.html">b</a></body></html>' \
+    >"$site/index.html"
+echo '<html><body>A</body></html>' >"$site/a/2024.html"
+echo '<html><body>B</body></html>' >"$site/b/2024.html"
+
+# -g flattens the tree, and pins depth to 0: the operator supplies both URLs.
+out1="$tmp/out1"
+mkdir -p "$out1"
+(cd "$out1" && "$bin" -g "file://$site/a/2024.html" "file://$site/b/2024.html" \
+    --quiet -n >.log 2>&1) || fail "collision crawl exited non-zero: $(tail -3 "$out1/.log")"
+
+test -f "$out1/2024.html" || fail "2024.html not mirrored"
+test -f "$out1/2024-2.html" || fail "colliding name was not renamed to 2024-2.html"
+
+# -N "%n.%t" collides the same way with depth unrestricted, so one starting URL
+# is enough and the crawled page picks both colliding names itself.
+out3="$tmp/out3"
+mkdir -p "$out3"
+(cd "$out3" && "$bin" "file://$site/index.html" -N "%n.%t" --quiet -n >.log 2>&1) ||
+    fail "userdef-savename crawl exited non-zero: $(tail -3 "$out3/.log")"
+test -f "$out3/2024.html" || fail "2024.html not mirrored under -N '%n.%t'"
+test -f "$out3/2024-2.html" ||
+    fail "colliding name was not renamed under -N '%n.%t' (links followed, not argv)"
+
+# The rename must keep counting, not restart: a third collision is -3.
+mkdir -p "$site/c"
+echo '<html><body>C</body></html>' >"$site/c/2024.html"
+out2="$tmp/out2"
+mkdir -p "$out2"
+(cd "$out2" && "$bin" -g "file://$site/a/2024.html" "file://$site/b/2024.html" \
+    "file://$site/c/2024.html" --quiet -n >.log 2>&1) ||
+    fail "three-way collision crawl exited non-zero: $(tail -3 "$out2/.log")"
+test -f "$out2/2024-3.html" || fail "third colliding name was not renamed to 2024-3.html"
+
+# --- 3. a blank config line is skipped, not parsed ---------------------------
+# HTS_HTTRACKRC is ".httrackrc" on POSIX and "httrackrc" on Windows.
+rcdir="$tmp/rc"
+mkdir -p "$rcdir"
+echo '<html><body>hi</body></html>' >"$rcdir/index.html"
+printf '   \nzzz-not-an-option\n' >"$rcdir/.httrackrc"
+cp "$rcdir/.httrackrc" "$rcdir/httrackrc"
+
+rc=0
+log=$( (cd "$rcdir" && "$bin" "file://$rcdir/index.html" --quiet -n 2>&1)) || rc=$?
+test "$rc" -eq 0 || fail "rc-file crawl exited $rc: $log"
+log=${log//$'\r'/} # the empty-option check below must not miss a CRLF line
+
+# The line after the blank one must still be read, or this proves nothing.
+case "$log" in
+*"Unknown option: zzz-not-an-option"*) ;;
+*) fail "config file was not parsed past the blank line: $log" ;;
+esac
+# The blank line itself must not become an empty option.
+case "$log" in
+*"Unknown option: "$'\n'*) fail "blank config line was parsed as an empty option: $log" ;;
+esac
+
+# --- 4. the call sites stay bounded -----------------------------------------
+# Sections 2 and 3 only go red under a sanitizer: on a plain build the byte
+# below the buffer is usually not a digit, so a reverted scan stops anyway and
+# produces the same names. Pin the two sites at the source instead.
+command grep -q 'hts_rtrim(line, HTS_REALSPACES)' "$top_srcdir/src/htsalias.c" ||
+    fail "htsalias.c right trim no longer goes through hts_rtrim"
+command grep -q 'hts_rtrimlen(tempo, "0123456789")' "$top_srcdir/src/htsname.c" ||
+    fail "htsname.c collision-suffix scan no longer goes through hts_rtrimlen"
+
+exit 0

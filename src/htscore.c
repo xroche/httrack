@@ -773,7 +773,7 @@ int httpmirror(char *url1, httrackp * opt) {
         // sauter les + sans rien après..
         if (strnotempty(tempo)) {
           if ((plus == 0) && (type == 1)) {     // implicite: *www.edf.fr par exemple
-            if (tempo[strlen(tempo) - 1] != '*') {
+            if (hts_lastchar(tempo) != '*') {
               strcatbuff(tempo, "*");   // ajouter un *
             }
           }
@@ -1045,13 +1045,14 @@ int httpmirror(char *url1, httrackp * opt) {
     {
       TStamp tl = 0;
       time_t tt;
-      struct tm *A;
+      struct tm tmv;
 
       tt = time(NULL);
-      A = localtime(&tt);
-      tl += A->tm_sec;
-      tl += A->tm_min * 60;
-      tl += A->tm_hour * 60 * 60;
+      if (hts_localtime(tt, &tmv)) {
+        tl += tmv.tm_sec;
+        tl += tmv.tm_min * 60;
+        tl += tmv.tm_hour * 60 * 60;
+      }
       if (tl > opt->waittime)   // attendre minuit
         rollover = 1;
     }
@@ -1061,13 +1062,14 @@ int httpmirror(char *url1, httrackp * opt) {
     do {
       TStamp tl = 0;
       time_t tt;
-      struct tm *A;
+      struct tm tmv;
 
       tt = time(NULL);
-      A = localtime(&tt);
-      tl += A->tm_sec;
-      tl += A->tm_min * 60;
-      tl += A->tm_hour * 60 * 60;
+      if (hts_localtime(tt, &tmv)) {
+        tl += tmv.tm_sec;
+        tl += tmv.tm_min * 60;
+        tl += tmv.tm_hour * 60 * 60;
+      }
 
       if (rollover) {
         if (tl <= opt->waittime)
@@ -1728,16 +1730,12 @@ int httpmirror(char *url1, httrackp * opt) {
               if (charset != NULL)
                 free(charset);
             }
-            /* Could not detect charset: could it be UTF-8 ? */
-            /* No, we can not do that: browsers do not do it
-               (and it would break links). */
-            /* Could not detect charset */
+            /* Left empty when the document declared none: guessing UTF-8 here
+               would break links, and the parser picks its own fallback */
             if (page_charset[0] == '\0') {
               hts_log_print(opt, LOG_INFO,
                             "Warning: could not detect encoding for: %s%s",
                             urladr(), urlfil());
-              /* Fallback to ISO-8859-1 (~== identity) ; accents will look weird */
-              strcpy(page_charset, "iso-8859-1");
             }
           }
 
@@ -1770,7 +1768,9 @@ int httpmirror(char *url1, httrackp * opt) {
             /* */
             str.ptr_ = &ptr;
             /* */
-            str.page_charset_ = page_charset[0] != '\0' ? page_charset : NULL;
+            /* NULL when conversion is off, empty when the document declared no
+               charset; the parser tells the two apart */
+            str.page_charset_ = opt->convert_utf8 ? page_charset : NULL;
             /* */
             /* */
             stre.r_ = &r;
@@ -1818,60 +1818,6 @@ int httpmirror(char *url1, httrackp * opt) {
       else {                    // sauver fichier quelconque
         // -- -- --
         // sauver fichier
-
-        /* En cas d'erreur, vérifier que fichier d'erreur existe */
-        if (strnotempty(savename()) == 0) {       // chemin de sauvegarde existant
-          if (strcmp(urlfil(), "/robots.txt") == 0) {     // pas robots.txt
-            if (store_errpage) {        // c'est une page d'erreur
-              int create_html_warning = 0;
-              int create_gif_warning = 0;
-
-              switch (ishtml(opt, urlfil())) {    /* pas fichier html */
-              case 0:          /* non html */
-                {
-                  char buff[256];
-
-                  guess_httptype_sized(opt, buff, sizeof(buff), urlfil());
-                  if (strcmp(buff, "image/gif") == 0)
-                    create_gif_warning = 1;
-                }
-                break;
-              case 1:          /* html */
-                if (!r.adr) {
-                }
-                break;
-              default:         /* don't know.. */
-                break;
-              }
-              /* Créer message d'erreur ? */
-              if (create_html_warning) {
-                char *adr =
-                  (char *) malloct(strlen(HTS_DATA_ERROR_HTML) + 1100);
-                hts_log_print(opt, LOG_INFO, "Creating HTML warning file (%s)",
-                              r.msg);
-                if (adr) {
-                  if (r.adr) {
-                    freet(r.adr);
-                    r.adr = NULL;
-                  }
-                  sprintf(adr, HTS_DATA_ERROR_HTML, r.msg);
-                  r.adr = adr;
-                }
-              } else if (create_gif_warning) {
-                char *adr = (char *) malloct(HTS_DATA_UNKNOWN_GIF_LEN);
-
-                hts_log_print(opt, LOG_INFO, "Creating GIF dummy file (%s)",
-                              r.msg);
-                if (r.adr) {
-                  freet(r.adr);
-                  r.adr = NULL;
-                }
-                memcpy(adr, HTS_DATA_UNKNOWN_GIF, HTS_DATA_UNKNOWN_GIF_LEN);
-                r.adr = adr;
-              }
-            }
-          }
-        }
 
         if (strnotempty(savename()) == 0) {       // pas de chemin de sauvegarde
           if (strcmp(urlfil(), "/robots.txt") == 0) {     // robots.txt
@@ -1980,10 +1926,9 @@ int httpmirror(char *url1, httrackp * opt) {
           }
 
           // ATTENTION C'EST ICI QU'ON SAUVE LE FICHIER!!
-          // An empty body must not overwrite the file when the transfer failed
-          // (statuscode <= 0, e.g. an -M hard-stop): it would truncate a good
-          // copy to 0 (#77 follow-up).
-          if (r.adr != NULL || (r.size == 0 && r.statuscode > 0)) {
+          // A failed transfer has no body: r.adr holds debris from the aborted
+          // read, which would destroy the copy being re-fetched (#748).
+          if (r.statuscode > 0 && (r.adr != NULL || r.size == 0)) {
             file_notify(opt, urladr(), urlfil(), savename(), 1, 1, r.notmodified);
             if (filesave(opt, r.adr, (int) r.size, savename(), urladr(), urlfil()) !=
                 0) {
@@ -2191,7 +2136,9 @@ int httpmirror(char *url1, httrackp * opt) {
                   continue;
                 strcpybuff(file, StringBuff(opt->path_html));
                 strcatbuff(file, line + 1);
-                file[strlen(file) - 1] = '\0';
+                /* strip filenote()'s ']', absent when linput() truncated the
+                   line */
+                hts_striplastchar(file, ']');
                 hts_changes_previous(opt, file + StringLength(opt->path_html));
                 if (!strstr(adr, line)) { // not found in the new list?
                   if (fexist_utf8(file)) { // still on disk
@@ -2218,12 +2165,11 @@ int httpmirror(char *url1, httrackp * opt) {
                 fseek(old_lst, 0, SEEK_SET);
                 while(!feof(old_lst)) {
                   linput(old_lst, line, 1000);
-                  while(strnotempty(line) && (line[strlen(line) - 1] != '/')
-                        && (line[strlen(line) - 1] != '\\')) {
-                    line[strlen(line) - 1] = '\0';
+                  while (strnotempty(line) && (hts_lastchar(line) != '/') &&
+                         (hts_lastchar(line) != '\\')) {
+                    hts_choplastchar(line);
                   }
-                  if (strnotempty(line))
-                    line[strlen(line) - 1] = '\0';
+                  hts_choplastchar(line);
                   if (strnotempty(line))
                     if (!strstr(adr, line)) {   // non trouvé?
                       char BIGSTK file[HTS_URLMAXSIZE * 2];
@@ -2236,13 +2182,12 @@ int httpmirror(char *url1, httrackp * opt) {
                         if (opt->log) {
                           hts_log_print(opt, LOG_INFO, "Purging directory %s/",
                                         file);
-                          while(strnotempty(file)
-                                && (file[strlen(file) - 1] != '/')
-                                && (file[strlen(file) - 1] != '\\')) {
-                            file[strlen(file) - 1] = '\0';
+                          while (strnotempty(file) &&
+                                 (hts_lastchar(file) != '/') &&
+                                 (hts_lastchar(file) != '\\')) {
+                            hts_choplastchar(file);
                           }
-                          if (strnotempty(file))
-                            file[strlen(file) - 1] = '\0';
+                          hts_choplastchar(file);
                         }
                       }
                     }
@@ -2693,7 +2638,11 @@ HTSEXT_API int structcheck(const char *path) {
       if (!S_ISDIR(st.st_mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
-          sprintf(tmpbuf, "%s.txt", file);
+          /* bounded here, not by the path-length guard far above */
+          if (!sprintfbuff(tmpbuf, "%s.txt", file)) {
+            errno = ENAMETOOLONG;
+            return -1;
+          }
           if (rename(file, tmpbuf) != 0) {      /* Can't rename regular file */
             return -1;
           }
@@ -2801,7 +2750,11 @@ HTSEXT_API int structcheck_utf8(const char *path) {
       if (!S_ISDIR(st.st_mode)) {
 #if HTS_REMOVE_ANNOYING_INDEX
         if (S_ISREG(st.st_mode)) {      /* Regular file in place ; move it and create directory */
-          sprintf(tmpbuf, "%s.txt", file);
+          /* bounded here, not by the path-length guard far above */
+          if (!sprintfbuff(tmpbuf, "%s.txt", file)) {
+            errno = ENAMETOOLONG;
+            return -1;
+          }
           if (RENAME(file, tmpbuf) != 0) {      /* Can't rename regular file */
             return -1;
           }
@@ -3195,16 +3148,15 @@ int fspc(httrackp * opt, FILE * fp, const char *type) {
   if (fp != NULL) {
     char s[256];
     time_t tt;
-    struct tm *A;
+    struct tm tmv;
 
     tt = time(NULL);
-    A = localtime(&tt);
-    if (A == NULL) {
+    if (!hts_localtime(tt, &tmv)) {
       int localtime_returned_null = 0;
 
       assertf(localtime_returned_null);
     }
-    strftime(s, 250, "%H:%M:%S", A);
+    strftime(s, 250, "%H:%M:%S", &tmv);
     if (strnotempty(type))
       fprintf(fp, "%s\t%c%s: \t", s, hichar(*type), type + 1);
     else
@@ -3821,11 +3773,11 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
         strcpybuff(codebase, heap(ptr)->fil);
       else
         strcpybuff(codebase, heap(heap(ptr)->precedent)->fil);
-      a = codebase + strlen(codebase) - 1;
+      a = hts_lastcharptr(codebase);
       while((*a) && (*a != '/') && (a > codebase))
         a--;
       if (*a == '/')
-        *(a + 1) = '\0';        // couper
+        *(a + 1) = '\0';        // cut
     } else {                    // couper http:// éventuel
       if (strfield(codebase, "http://")) {
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];

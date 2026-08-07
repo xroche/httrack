@@ -1,0 +1,16 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_threadwait_st.XXXXXX") || exit 1
+trap 'set +e; rm -rf "$tmpdir"' EXIT
+trap 'rm -rf "$tmpdir"' HUP INT QUIT PIPE TERM
+
+# A thread is outstanding from the moment hts_newthread() returns, so a wait
+# that follows the spawn joins it, and wait_n(n) still leaves n behind (#747).
+expect_ok "threadwait self-test" httrack -O "${tmpdir}/o1" -#test=threadwait

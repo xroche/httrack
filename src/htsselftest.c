@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsmodules.h"
 #include "htsback.h"
 #include "htsdefines.h"
 #include "htslib.h"
@@ -53,6 +54,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdns_selftest.h"
 #include "htscharset.h"
 #include "htscmdline.h"
+#include "htscoremain.h"
 #include "htsencoding.h"
 #include "htsftp.h"
 #include "htsmd5.h"
@@ -63,9 +65,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htssinglefile.h"
-#if HTS_USEZLIB
 #include "htszlib.h"
-#endif
 #if HTS_USEZSTD
 #include <zstd.h>
 #endif
@@ -80,6 +80,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #ifndef _WIN32
 #include <sys/socket.h>
 #include <unistd.h>
@@ -2007,6 +2008,21 @@ static int st_socks5(httrackp *opt, int argc, char **argv) {
     }
   }
 
+  /* a control byte in the host would be a field of its own in the ATYP=domain
+     request; the port that follows it must not hide it (#1010) */
+  {
+    static const char *const hostile[] = {"ori\rgin.test", "ori\rgin.test:80"};
+    size_t k;
+
+    for (k = 0; k < sizeof(hostile) / sizeof(hostile[0]); k++) {
+      len = socks5_reply(script, 0x01, v4, sizeof(v4));
+      io.reply = script;
+      io.reply_len = len;
+      assertf(socks5_handshake_scripted(opt, hostile[k], proxy, &io) == 0);
+      assertf(io.sent_len == 0);
+    }
+  }
+
   /* credentials: split on the first colon of the escaped userinfo, so %3a stays
      inside the username and a colon in the password is not a delimiter */
   {
@@ -2306,6 +2322,67 @@ static int st_sniff(httrackp *opt, int argc, char **argv) {
   printf("sniff: known=%d consistent=%d\n",
          hts_sniff_mime_known(argv[0]) == HTS_TRUE,
          hts_sniff_mime_consistent(body, n, argv[0]) == HTS_TRUE);
+  return 0;
+}
+
+/* escape_remove_control() compacts in place, so it has to terminate at the new
+   end or the caller reads the compacted head plus the original tail (#974). */
+static int st_escape_control(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *in;
+    const char *out;
+  } cases[] = {
+      /* VT and FF are the ones that reach here: is_space() passes them */
+      {"/a\013bc", "/abc"},
+      {"\014abc", "abc"},
+      /* nothing moves, but the end does */
+      {"abc\013", "abc"},
+      {"abc\001def", "abcdef"},
+      {"\001\002\003", ""},
+      /* untouched inputs: the terminator must stay where it was */
+      {"abc", "abc"},
+      {"", ""},
+      /* only bytes below 32 go: DEL and high bytes are not control here */
+      {"a\177\303\251", "a\177\303\251"},
+      /* both sides of the >= 32 cut, and a shrink of more than one byte */
+      {"a b", "a b"},
+      {"a\037b\036c", "abc"},
+  };
+
+  const size_t ncases = sizeof(cases) / sizeof(cases[0]);
+  char buf[1024];
+  size_t k, m;
+
+  (void) opt;
+  if (argc > 0) {
+    const size_t n = st_decode_body(argv[0], buf, sizeof(buf));
+
+    assertf(n < sizeof(buf));
+    escape_remove_control(buf);
+    printf("escape-control: len=%d out=hex:", (int) strlen(buf));
+    for (k = 0; buf[k] != '\0'; k++) {
+      printf("%02x", (unsigned char) buf[k]);
+    }
+    printf("\n");
+    return 0;
+  }
+
+  for (k = 0; k < ncases; k++) {
+    const size_t inlen = strlen(cases[k].in);
+    const size_t outlen = strlen(cases[k].out);
+
+    /* poison, so a stray write shows up as a byte a zeroed buffer would hide */
+    memset(buf, '#', sizeof(buf));
+    memcpy(buf, cases[k].in, inlen + 1);
+    escape_remove_control(buf);
+    assertf(strlen(buf) == outlen);
+    assertf(memcmp(buf, cases[k].out, outlen + 1) == 0);
+    /* the terminator belongs inside the original string, never past its NUL */
+    for (m = inlen + 1; m < sizeof(buf); m++) {
+      assertf(buf[m] == '#');
+    }
+  }
+  printf("escape-control self-test OK\n");
   return 0;
 }
 
@@ -2623,6 +2700,136 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static char st_log_callback_seen[256];
+
+static void st_log_callback(httrackp *opt, int type, const char *format,
+                            va_list args) {
+  (void) opt;
+  (void) type;
+  (void) vsnprintf(st_log_callback_seen, sizeof(st_log_callback_seen), format,
+                   args);
+}
+
+/* The callback must not consume the va_list the log file's vfprintf() needs. */
+static int st_logcallback(httrackp *opt, int argc, char **argv) {
+  static const char want[] = "42 sentinel";
+  static const char want_filtered[] = "7 filtered";
+  char BIGSTK seen[sizeof(st_log_callback_seen)];
+  char BIGSTK line[256];
+  FILE *fp;
+  int rc = 1;
+
+  (void) argc;
+  (void) argv;
+
+  fp = tmpfile();
+  if (fp == NULL) {
+    fprintf(stderr, "logcallback: tmpfile() failed\n");
+    return 1;
+  }
+  opt->log = fp;
+  opt->debug = LOG_NOTICE;
+  st_log_callback_seen[0] = '\0';
+  hts_set_log_vprint_callback(st_log_callback);
+  hts_log_print(opt, LOG_NOTICE, "%d %s", 42, "sentinel");
+  hts_set_log_vprint_callback(NULL);
+  opt->log = NULL;
+  strcpybuff(seen, st_log_callback_seen);
+
+  rewind(fp);
+  if (fgets(line, (int) sizeof(line), fp) == NULL) {
+    fprintf(stderr, "logcallback: log file is empty, nothing was written\n");
+    fclose(fp);
+    return 1;
+  }
+  fclose(fp);
+
+  /* The callback runs above the level filter and without a log file at all;
+     the front-ends that install one usually have no opt->log open. */
+  st_log_callback_seen[0] = '\0';
+  hts_set_log_vprint_callback(st_log_callback);
+  hts_log_print(opt, LOG_DEBUG, "%d %s", 7, "filtered");
+  hts_set_log_vprint_callback(NULL);
+
+  /* Same arguments both ways; the file line carries a level prefix. */
+  if (strcmp(seen, want) != 0)
+    fprintf(stderr, "logcallback: callback got '%s' want '%s'\n", seen, want);
+  else if (strstr(line, want) == NULL)
+    fprintf(stderr, "logcallback: log file got '%s' want it to carry '%s'\n",
+            line, want);
+  else if (strcmp(st_log_callback_seen, want_filtered) != 0)
+    fprintf(stderr, "logcallback: unfiltered callback got '%s' want '%s'\n",
+            st_log_callback_seen, want_filtered);
+  else
+    rc = 0;
+
+  if (rc == 0)
+    printf("logcallback self-test OK\n");
+  return rc;
+}
+
+/* an empty fil started htsAddLink's codebase walk before the buffer (#730) */
+static int st_addlink(httrackp *opt, int argc, char **argv) {
+  htsmoduleStruct BIGSTK str;
+  cache_back cache;
+  struct_back *sback;
+  hash_struct hash;
+  int ptr = 0;
+  int i;
+
+  (void) argc;
+  (void) argv;
+
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = (void *) coucal_new(0);
+  sback = back_new(opt, opt->maxsoc * 32 + 1024);
+  /* same wiring as hts_mirror (htscore.c) */
+  hash_init(opt, &hash, opt->urlhack);
+  hash.liens = (const lien_url *const *const *) &opt->liens;
+  opt->hash = &hash;
+  hts_record_init(opt);
+
+  memset(&str, 0, sizeof(str));
+  str.opt = opt;
+  str.sback = sback;
+  str.cache = &cache;
+  str.hashptr = &hash;
+  str.ptr_ = &ptr;
+  str.addLink = htsAddLink;
+
+  /* [0] is the underflow; [1] and [2] are controls that the trim is unchanged.
+     A query-only link is the one that notices the trim at all: for the others
+     ident_url_relatif() re-derives the directory from the path it is given. */
+  for (i = 0; i < 3; i++) {
+    static const char *const fil[3] = {"", "/dir/page.html", "/dir/page.html"};
+    static const char *const lnk[3] = {"sub/page.html", "sub/page.html",
+                                       "?x=1"};
+    static const char *const want[3] = {
+        "untouched", "http://www.example.com/dir/sub/page.html",
+        "http://www.example.com/dir/?x=1"};
+    char BIGSTK loc[HTS_URLMAXSIZE * 2];
+    char BIGSTK link[HTS_URLMAXSIZE];
+
+    strcpybuff(loc, "untouched");
+    strcpybuff(link, lnk[i]);
+    str.localLink = loc;
+    str.localLinkSize = (int) sizeof(loc);
+    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", ""))
+      return 1;
+    ptr = heap_top_index();
+    str.url_host = heap(ptr)->adr;
+    str.url_file = heap(ptr)->fil;
+    assertf(htsAddLink(&str, link) == 0); /* refused by the wizard either way */
+    if (strcmp(loc, want[i]) != 0) {
+      fprintf(stderr, "addlink[%d]: got '%s' want '%s'\n", i, loc, want[i]);
+      return 1;
+    }
+  }
+
+  printf("addlink self-test OK\n");
+  return 0;
+}
+
 static int st_cache(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -2729,6 +2936,30 @@ static int st_cache_writefail(httrackp *opt, int argc, char **argv) {
   }
   err = cache_write_failure_selftest(opt, argv[0]);
   printf("cache-writefail: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_cache_hdrbounds(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  if (argc < 1) {
+    fprintf(stderr, "cache-hdrbounds: needs a directory\n");
+    return 1;
+  }
+  err = cache_header_bounds_selftest(opt, argv[0]);
+  printf("cache-hdrbounds: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_cache_urlbounds(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  if (argc < 1) {
+    fprintf(stderr, "cache-urlbounds: needs a directory\n");
+    return 1;
+  }
+  err = cache_url_bounds_selftest(opt, argv[0]);
+  printf("cache-urlbounds: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -3185,6 +3416,113 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static void datadir_expect(const char *selfpath, const char *builtin,
+                           const char *expect) {
+  char got[HTS_URLMAXSIZE * 2];
+
+  hts_resolve_datadir(got, sizeof(got), selfpath, builtin);
+  if (strcmp(got, expect) != 0) {
+    fprintf(stderr,
+            "datadir: self=%s builtin=\"%s\" gave \"%s\", expected \"%s\"\n",
+            selfpath != NULL ? selfpath : "(null)", builtin, got, expect);
+  }
+  assertf(strcmp(got, expect) == 0);
+}
+
+// -#test=datadir <dir>: a relocated tree must find its own templates instead of
+// silently falling back to the built-in ones (#894). argv[0] is writable.
+static int st_datadir(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE];
+  char self[HTS_URLMAXSIZE];
+  char expect[HTS_URLMAXSIZE * 2];
+  char installed[HTS_URLMAXSIZE];
+  char gone[HTS_URLMAXSIZE];
+  /* Each holds a templates/index-header.html, the file path_bin is read for.
+     nest/ keeps the flat case away from the installed share/httrack above. */
+  static const char *const dirs[] = {"share/httrack", "bin", "nest/flat"};
+  size_t i;
+
+  (void) opt;
+  assertf(argc >= 1);
+
+  /* argv[0] is a fallback: what the engine actually resolves from is this. */
+  assertf(hts_self_path(path, sizeof(path)) != NULL);
+  assertf(fexist(path));
+  /* Too small for any real path, so the truncation guard must refuse. */
+  assertf(hts_self_path(path, 2) == NULL);
+
+  for (i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
+    FILE *fp;
+
+    snprintf(path, sizeof(path), "%s/%s/templates/", argv[0], dirs[i]);
+    assertf(structcheck(path) == 0);
+    snprintf(path, sizeof(path), "%s/%s/templates/index-header.html", argv[0],
+             dirs[i]);
+    fp = fopen(path, "wb");
+    assertf(fp != NULL);
+    fclose(fp);
+  }
+  snprintf(installed, sizeof(installed), "%s/share/httrack/", argv[0]);
+  snprintf(gone, sizeof(gone), "%s/gone/", argv[0]);
+
+  /* A moved install: bin/ carries templates too, so this pins the order. */
+  snprintf(self, sizeof(self), "%s/bin/httrack", argv[0]);
+  snprintf(expect, sizeof(expect), "%s/bin/../share/httrack/", argv[0]);
+  datadir_expect(self, gone, expect);
+
+  /* The compiled-in path still wins when it exists. */
+  datadir_expect(self, installed, installed);
+
+  /* Flat layout: templates/ sits beside the binary. */
+  snprintf(self, sizeof(self), "%s/nest/flat/httrack", argv[0]);
+  snprintf(expect, sizeof(expect), "%s/nest/flat/", argv[0]);
+  datadir_expect(self, gone, expect);
+
+  /* Nothing to derive from, or nothing found: the compiled-in path stands. */
+  datadir_expect("httrack", gone, gone);
+  datadir_expect(NULL, gone, gone);
+  snprintf(self, sizeof(self), "%s/nowhere/deep/httrack", argv[0]);
+  datadir_expect(self, gone, gone);
+
+  /* No compiled-in path, as on Windows: the executable's own directory. */
+  snprintf(self, sizeof(self), "%s/nowhere/deep/httrack", argv[0]);
+  snprintf(expect, sizeof(expect), "%s/nowhere/deep/", argv[0]);
+  datadir_expect(self, "", expect);
+  datadir_expect("httrack", "", "");
+
+  /* A directory part too long for the layout suffix to be appended must clip,
+     not abort: appending to a non-empty buffer is the *_safe_ abort path. */
+  {
+    /* Long enough that dirname + "../share/httrack/" overflows the candidate
+       buffer, short enough that the dirname itself still fits. */
+    const size_t dirlen = HTS_URLMAXSIZE * 2 - 8;
+    char huge[HTS_URLMAXSIZE * 3];
+    char got[HTS_URLMAXSIZE * 2];
+    size_t n;
+
+    huge[0] = '/';
+    for (n = 1; n < dirlen - 1; n++) {
+      huge[n] = 'a';
+    }
+    huge[dirlen - 1] = '/';
+    memcpy(huge + dirlen, "httrack", sizeof("httrack"));
+    hts_resolve_datadir(got, sizeof(got), huge, gone);
+    assertf(strcmp(got, gone) == 0);
+  }
+
+  printf("datadir self-test OK\n");
+  return 0;
+}
+
+// -#test=pathbin: report what startup resolved, which -#test=datadir cannot see
+// because it hands hts_resolve_datadir() the path instead (#904).
+static int st_pathbin(httrackp *opt, int argc, char **argv) {
+  (void) argc;
+  (void) argv;
+  printf("path_bin=%s\n", StringBuff(opt->path_bin));
+  return 0;
+}
+
 // hts_buildtopindex() writes a system-charset name into a charset=utf-8 doc: on
 // Windows the gifs land in a mangled twin dir (#217) and a listed name renders
 // as mojibake (#216). Both must come out utf-8. argv[0] is writable.
@@ -3261,6 +3599,81 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   rmdir(path);
   rmdir(topdir);
   printf("topindex self-test OK\n");
+  return 0;
+}
+
+/* Build a path of exactly len chars under base; returns that length. */
+static size_t st_structcheck_longpath(char *dst, size_t dstsize,
+                                      const char *base, size_t len) {
+  size_t n = strlen(base);
+
+  assertf(len < dstsize && n + 2 <= len);
+  memmove(dst, base, n);
+  while (n < len) {
+    size_t seg = len - n - 1;
+
+    if (seg > 200) /* stay under the usual 255-byte component limit */
+      seg = len - n == 202 ? 199 : 200; /* never leave a bare separator */
+    dst[n++] = '/';
+    memset(dst + n, 'x', seg);
+    n += seg;
+  }
+  dst[n] = '\0';
+  return n;
+}
+
+/* The path guard, and the <name>.txt rename structcheck() performs when a
+   regular file sits where a directory has to go (#745). */
+static int st_structcheck(httrackp *opt, int argc, char **argv) {
+  char BIGSTK path[HTS_URLMAXSIZE * 2];
+  char BIGSTK target[HTS_URLMAXSIZE * 2];
+  FILE *fp;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=structcheck <writable directory>\n");
+    return 1;
+  }
+
+  /* over the guard: refused before a single directory is created */
+  st_structcheck_longpath(path, sizeof(path), argv[0], HTS_URLMAXSIZE + 1);
+  errno = 0;
+  assertf(structcheck(path) == -1);
+  assertf(errno == EINVAL);
+  errno = 0;
+  assertf(structcheck_utf8(path) == -1);
+  assertf(errno == EINVAL);
+  {
+    char *const sep = strchr(path + strlen(argv[0]) + 1, '/');
+
+    assertf(sep != NULL);
+    sep[1] = '\0'; /* the outermost component it would have created */
+    assertf(!dir_exists(path));
+  }
+
+  /* a regular file where a directory belongs is renamed to <name>.txt */
+  snprintf(path, sizeof(path), "%s/sc", argv[0]);
+  fp = fopen(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  snprintf(path, sizeof(path), "%s/sc/sub/", argv[0]);
+  assertf(structcheck(path) == 0);
+  assertf(dir_exists(path));
+  snprintf(target, sizeof(target), "%s/sc.txt", argv[0]);
+  assertf(fexist(target));
+
+  /* the utf-8 entry point carries the same rename */
+  snprintf(path, sizeof(path), "%s/u8", argv[0]);
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  snprintf(path, sizeof(path), "%s/u8/sub/", argv[0]);
+  assertf(structcheck_utf8(path) == 0);
+  assertf(dir_exists(path));
+  snprintf(target, sizeof(target), "%s/u8.txt", argv[0]);
+  assertf(fexist_utf8(target));
+
+  printf("structcheck self-test OK\n");
   return 0;
 }
 
@@ -3377,7 +3790,6 @@ static int st_status(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-#if HTS_USEZLIB
 /* Deflate src->path at windowBits (16+ gzip, + zlib, - raw); 0 on success. */
 static int ae_write_packed(const char *path, int windowBits,
                            const unsigned char *src, size_t len) {
@@ -3451,7 +3863,6 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   freet(buf);
   return ok ? 0 : 1;
 }
-#endif
 
 /* Write src[0..len) to path as-is; 0 on success. */
 static int ae_write_raw(const char *path, const unsigned char *src,
@@ -3501,7 +3912,6 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
   assertf(strstr(on, "br") == NULL && strstr(on, "zstd") == NULL);
   assertf((strstr(tls, ", br") != NULL) == (HTS_USEBROTLI != 0));
   assertf((strstr(tls, "zstd") != NULL) == (HTS_USEZSTD != 0));
-#if HTS_USEZLIB
   if (argc >= 1) {
     static const int windowBits[] = {16 + MAX_WBITS, MAX_WBITS, -MAX_WBITS};
     const unsigned char small[] =
@@ -3580,10 +3990,6 @@ static int st_acceptencoding(httrackp *opt, int argc, char **argv) {
     }
     freet(body);
   }
-#else
-  (void) argc;
-  (void) argv;
-#endif
   printf("acceptencoding self-test OK: %s\n", on);
   return 0;
 }
@@ -3928,7 +4334,6 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     freet(big);
   }
 
-#if HTS_USEZLIB
   /* A highly compressible document decodes without running away: the ratio
      budget cannot bind (deflate tops out near 1032:1), so this pins the
      decompression path itself rather than the 64 MiB ceiling. */
@@ -3979,13 +4384,11 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     freet(z);
     freet(x);
   }
-#endif
 
   /* An unterminated <loc> at end of buffer must not read past it. */
   assertf(sm_scan("<urlset><loc>http://h.test/a", 100, &idx, &c) == 0);
   assertf(sm_scan("<urlset><lo", 100, &idx, &c) == 0);
 
-#if HTS_USEZLIB
   /* A gzip-framed document is decompressed before scanning. */
   {
     const char *const xml =
@@ -4015,7 +4418,6 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     assertf(hts_sitemap_scan(z, 4, 100, &idx, sm_take, &c) == -1);
     freet(z);
   }
-#endif
 
   /* robots.txt: only Sitemap: records, comments stripped, case-insensitive,
      and group-independent (no User-agent line needed). */
@@ -4099,42 +4501,216 @@ static int st_ftpline(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* ftp_split_userpass: well-formed split, plus a hostile over-long userinfo
-   that pre-fix overran user[256]/pass[256]. */
+/* ftp_split_userpass: the split itself, and userinfo refused rather than
+   clipped into another account's name (#1032). */
 static int st_ftpuser(httrackp *opt, int argc, char **argv) {
-  char user[256], pass[256];
-  char in[1200];
+  static const size_t caps[] = {16, 256}; /* asymmetric: a shared bound shows */
+  char ubuf[256 + 32], pbuf[sizeof(ubuf)], poison[sizeof(ubuf)];
+  char in[2 * 256 + 8];
+  size_t c, over;
 
   (void) opt;
   (void) argc;
   (void) argv;
+  memset(poison, '#', sizeof(poison));
   {
     const char ok[] = "bob:secret@host/f"; // '@' at index 10
 
-    ftp_split_userpass(ok, ok + 11, user, sizeof(user), pass, sizeof(pass));
-    assertf(strcmp(user, "bob") == 0);
-    assertf(strcmp(pass, "secret") == 0);
+    assertf(ftp_split_userpass(ok, ok + 11, ubuf, sizeof(ubuf), pbuf,
+                               sizeof(pbuf)) == HTS_TRUE);
+    assertf(strcmp(ubuf, "bob") == 0);
+    assertf(strcmp(pbuf, "secret") == 0);
   }
-  memset(in, 'u', 400);
-  in[400] = ':';
-  memset(in + 401, 'p', 400);
-  in[801] = '@';
-  in[802] = '\0';
-  ftp_split_userpass(in, in + 802, user, sizeof(user), pass, sizeof(pass));
-  assertf(strlen(user) == sizeof(user) - 1);
-  assertf(strlen(pass) == sizeof(pass) - 1);
   {
-    /* tight sizes + guard byte catch an off-by-one the 256 case can't */
-    char ubuf[16], pbuf[16];
+    const char ok[] = "bob@host/f"; // no password: the '@' still ends the user
 
-    memset(ubuf, 'Z', sizeof(ubuf));
-    memset(pbuf, 'Z', sizeof(pbuf));
-    ftp_split_userpass(in, in + 802, ubuf, 8, pbuf, 8);
-    assertf(strcmp(ubuf, "uuuuuuu") == 0);
-    assertf(strcmp(pbuf, "ppppppp") == 0);
-    assertf(ubuf[8] == 'Z' && pbuf[8] == 'Z');
+    assertf(ftp_split_userpass(ok, ok + 4, ubuf, sizeof(ubuf), pbuf,
+                               sizeof(pbuf)) == HTS_TRUE);
+    assertf(strcmp(ubuf, "bob") == 0);
+    assertf(pbuf[0] == '\0');
+  }
+  {
+    const char ok[] = "u@relay:pw@gw/f"; // only the last '@' ends the userinfo
+
+    assertf(ftp_split_userpass(ok, ok + 11, ubuf, sizeof(ubuf), pbuf,
+                               sizeof(pbuf)) == HTS_TRUE);
+    assertf(strcmp(ubuf, "u@relay") == 0);
+    assertf(strcmp(pbuf, "pw") == 0);
+  }
+  for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
+    const size_t ucap = caps[c], pcap = caps[1 - c];
+
+    /* overshoot the user, the pass, then a bare name bounded only by '@' */
+    for (over = 0; over <= 2; over++) {
+      const size_t cap = over == 1 ? pcap : ucap;
+      size_t len;
+
+      for (len = cap - 2; len <= cap + 1; len++) {
+        const size_t user_len = over == 1 ? 1 : len;
+        const size_t pass_len = over == 0 ? 1 : (over == 1 ? len : 0);
+        const size_t total = user_len + pass_len + (over == 2 ? 1 : 2);
+        const hts_boolean fits = len < cap ? HTS_TRUE : HTS_FALSE;
+
+        memset(in, 'u', user_len);
+        if (over != 2) {
+          in[user_len] = ':';
+          memset(in + user_len + 1, 'p', pass_len);
+        }
+        in[total - 1] = '@';
+        in[total] = '\0';
+        memcpy(ubuf, poison, sizeof(ubuf)); /* a zero canary would hide a NUL */
+        memcpy(pbuf, poison, sizeof(pbuf));
+        assertf(ftp_split_userpass(in, in + total, ubuf, ucap, pbuf, pcap) ==
+                fits);
+        if (fits) {
+          assertf(strlen(ubuf) == user_len && strlen(pbuf) == pass_len);
+          assertf(ubuf[user_len - 1] == 'u');
+          assertf(pass_len == 0 || pbuf[pass_len - 1] == 'p');
+        } else {
+          assertf(ubuf[0] == '\0' && pbuf[0] == '\0'); /* fail safe */
+        }
+        /* the whole tail: one canary byte misses a write just past it */
+        assertf(memcmp(ubuf + ucap, poison, sizeof(ubuf) - ucap) == 0);
+        assertf(memcmp(pbuf + pcap, poison, sizeof(pbuf) - pcap) == 0);
+      }
+    }
   }
   printf("ftp-userpass self-test OK\n");
+  return 0;
+}
+
+/* Both quoting forms at two capacities: the quoted form is two bytes wider
+   (#1019). */
+static int st_ftpcmdlen(httrackp *opt, int argc, char **argv) {
+  static const size_t caps[] = {32, FTP_LINE_SIZE};
+  char BIGSTK buf[FTP_LINE_SIZE + 32];
+  char BIGSTK poison[FTP_LINE_SIZE + 32];
+  char BIGSTK path[FTP_LINE_SIZE + 2];
+  char BIGSTK wire[FTP_LINE_SIZE * 2];
+  size_t c, got = 0;
+  T_SOC sv[2];
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(poison, '#', sizeof(poison));
+  for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
+    const size_t cap = caps[c];
+    int quoted;
+
+    for (quoted = 0; quoted <= 1; quoted++) {
+      const size_t verb = 5 + 2 * (size_t) quoted; /* "RETR " plus quotes */
+      const size_t fit = cap - 1 - verb; /* longest path still fitting */
+      size_t len;
+
+      for (len = fit - 1; len <= fit + 1; len++) {
+        memset(path, 'p', len);
+        path[len] = '\0';
+        if (quoted)
+          path[0] = ' '; /* any of these forces the quoted form */
+        memcpy(buf, poison, sizeof(buf)); /* a zero canary would hide a NUL */
+        if (len > fit) {
+          assertf(ftp_command(buf, cap, "RETR", path) == HTS_FALSE);
+          assertf(buf[0] == '\0'); /* fail-safe for an ignored result */
+        } else {
+          assertf(ftp_command(buf, cap, "RETR", path) == HTS_TRUE);
+          assertf(strlen(buf) == verb + len);
+          assertf(strncmp(buf, "RETR ", 5) == 0);
+          assertf(buf[verb + len - 1] == (quoted ? '\"' : 'p'));
+        }
+        /* the whole tail: one canary byte misses a write just past it */
+        assertf(memcmp(buf + cap, poison, sizeof(buf) - cap) == 0);
+      }
+    }
+  }
+
+  /* send_line() adds the CRLF and drops, rather than truncates, an over-length
+     line. */
+  memset(path, 'q', FTP_LINE_SIZE);
+  path[FTP_LINE_SIZE] = '\0';
+  assertf(st_socketpair(sv) == 0);
+  assertf(send_line(sv[0], path) == 0); /* one byte too long: never sent */
+  path[FTP_LINE_SIZE - 1] = '\0';
+  assertf(send_line(sv[0], path) != 0);
+  deletesoc(sv[0]);
+  for (;;) {
+    const int n = (int) recv(sv[1], wire + got, (int) (sizeof(wire) - got), 0);
+
+    if (n <= 0)
+      break;
+    got += (size_t) n;
+  }
+  deletesoc(sv[1]);
+  assertf(got == FTP_LINE_SIZE + 1); /* the maximal command alone */
+  assertf(memcmp(wire, path, FTP_LINE_SIZE - 1) == 0);
+  assertf(memcmp(wire + FTP_LINE_SIZE - 1, "\r\n", 2) == 0);
+  printf("ftp-cmdlen self-test OK (%d bytes sent)\n", (int) got);
+  return 0;
+}
+
+/* send_line() must drop a command line carrying a control byte (#1010). */
+static int st_ftpctrl(httrackp *opt, int argc, char **argv) {
+  /* Verb and URL path as run_launch_ftp() hands them over, then the line the
+     wire must carry; NULL for a command that must never leave. */
+  static const struct {
+    const char *verb;
+    const char *path;
+    const char *sent;
+  } cases[] = {
+      {"RETR", "/f.txt%0d%0aDELE%20secret.txt", NULL},
+      {"RETR", "/f.txt%0dDELE%20secret.txt", NULL},
+      {"RETR", "/f.txt%0aDELE%20secret.txt", NULL},
+      {"LIST -A", "/d%0d%0aDELE%20secret.txt/", NULL},
+      {"RETR", "/plain.txt", "RETR /plain.txt"},
+      {"RETR", "/a%20b.txt", "RETR \"/a b.txt\""},
+      {"RETR", "%2Fa%25b.txt", "RETR /a%b.txt"},
+      /* High bytes must still go out: a plain-char check reads them negative
+         and rejects them. */
+      {"RETR", "/caf%e9.txt", "RETR /caf\xe9.txt"},
+      /* Bare, these two would hand a server that shells out to ls a flag. */
+      {"LIST -A", "/x%20-la/", "LIST -A \"/x -la/\""},
+      {"LIST -A", "-la", "LIST -A \"-la\""},
+  };
+
+  char BIGSTK catbuff[CATBUFF_SIZE];
+  char cmd[512];
+  char expect[512];
+  char wire[512];
+  T_SOC sv[2];
+  size_t got = 0, dropped = 1, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  expect[0] = '\0';
+  assertf(st_socketpair(sv) == 0);
+  assertf(send_line(sv[0], "USER bob\001") == 0); // any field, not just a path
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    ftp_command(cmd, sizeof(cmd), cases[i].verb,
+                unescape_http(catbuff, sizeof(catbuff), cases[i].path));
+    if (cases[i].sent == NULL) {
+      assertf(strstr(cmd, "DELE") != NULL); // the payload did reach the builder
+      assertf(send_line(sv[0], cmd) == 0);
+      dropped++;
+    } else {
+      assertf(send_line(sv[0], cmd) != 0);
+      strcatbuff(expect, cases[i].sent);
+      strcatbuff(expect, "\r\n");
+    }
+  }
+  deletesoc(sv[0]); // EOF, so the read below sees the whole wire
+  for (;;) {
+    const int n = (int) recv(sv[1], wire + got, (int) (sizeof(wire) - got), 0);
+
+    if (n <= 0)
+      break;
+    got += (size_t) n;
+  }
+  deletesoc(sv[1]);
+  assertf(got == strlen(expect));
+  assertf(memcmp(wire, expect, got) == 0);
+  printf("ftp-ctrlchars self-test OK (%d bytes sent, %d rejected)\n", (int) got,
+         (int) dropped);
   return 0;
 }
 
@@ -4249,14 +4825,14 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /a.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n"
       "Transfer-Encoding : chunked\r\nContent-Length: 999\r\n\r\n",
-      a_body, sizeof(a_body) - 1, NULL, 200, 0, 0);
+      a_body, sizeof(a_body) - 1, NULL, NULL, 200, 0, 0);
 
   /* 302 redirect: header-only, no body. */
   warc_write_transaction(
       w, "http://test.local/r", "127.0.0.1",
       "GET /r HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 302 Found\r\nLocation: http://test.local/a.html\r\n\r\n", NULL,
-      0, NULL, 302, 0, 0);
+      0, NULL, NULL, 302, 0, 0);
 
   /* 200 binary, chunked coding on the wire (already de-chunked here). */
   warc_write_transaction(
@@ -4264,7 +4840,7 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /b.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n"
       "Transfer-Encoding: chunked\r\n\r\n",
-      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0);
+      "\x00\x01\x02\x03\x04", 5, NULL, NULL, 200, 0, 0);
 
   /* 200 with a body shorter than the declared Content-Length (rewritten). */
   warc_write_transaction(
@@ -4272,20 +4848,20 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
       "GET /trunc HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
       "100\r\n\r\n",
-      "short", 5, NULL, 200, 0, 0);
+      "short", 5, NULL, NULL, 200, 0, 0);
 
   /* Same payload as a.html at a new URL: identical-payload-digest revisit
      (OpenSSL builds only; a plain build writes a second full response). */
   warc_write_transaction(w, "http://test.local/a2.html", "127.0.0.1",
                          "GET /a2.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         a_body, sizeof(a_body) - 1, NULL, 200, 0, 0);
+                         a_body, sizeof(a_body) - 1, NULL, NULL, 200, 0, 0);
 
   /* 304 revisit with an EMPTY response-header block: the block is just the
      2-byte separator, so declared Content-Length must be exactly 2 (F3). */
   warc_write_transaction(w, "http://test.local/nm", "127.0.0.1",
                          "GET /nm HTTP/1.1\r\nHost: test.local\r\n\r\n", "",
-                         NULL, 0, NULL, 304, 1, 0);
+                         NULL, 0, NULL, NULL, 304, 1, 0);
 
   warc_close(w);
 
@@ -4456,13 +5032,13 @@ static int st_warc_trunc(httrackp *opt, int argc, char **argv) {
       w, "http://test.local/big.bin", "127.0.0.1",
       "GET /big.bin HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n", body,
-      sizeof(body) - 1, NULL, 200, 0, WARC_TRUNC_LENGTH);
+      sizeof(body) - 1, NULL, NULL, 200, 0, WARC_TRUNC_LENGTH);
   warc_write_transaction(
       w, "http://test.local/big.gz", "127.0.0.1",
       "GET /big.gz HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
       "gzip\r\n\r\n",
-      (const char *) gz, sizeof(gz), NULL, 200, 0, WARC_TRUNC_TIME);
+      (const char *) gz, sizeof(gz), NULL, NULL, 200, 0, WARC_TRUNC_TIME);
   warc_close(w);
 
   data = warc_slurp(path, &data_len);
@@ -4616,7 +5192,7 @@ static int st_warc_rotate(httrackp *opt, int argc, char **argv) {
     warc_write_transaction(
         w, uri, "127.0.0.1", "GET / HTTP/1.1\r\nHost: test.local\r\n\r\n",
         "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\n\r\n",
-        (const char *) body, sizeof(body), NULL, 200, 0, 0);
+        (const char *) body, sizeof(body), NULL, NULL, 200, 0, 0);
   }
   warc_close(w);
   opt->warc_max_size = saved_max;
@@ -4698,7 +5274,7 @@ static int st_warc_verbatim(httrackp *opt, int argc, char **argv) {
       "GET /z.html HTTP/1.1\r\nHost: test.local\r\n\r\n",
       "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Encoding: "
       "gzip\r\nTransfer-Encoding: chunked\r\nContent-Length: 999\r\n\r\n",
-      (const char *) a_gz, sizeof(a_gz), NULL, 200, 0, 0);
+      (const char *) a_gz, sizeof(a_gz), NULL, NULL, 200, 0, 0);
   warc_close(w);
 
   data = warc_slurp(path, &data_len);
@@ -4819,6 +5395,101 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* A URL longer than the old 1024-byte header-format buffer must still reach the
+   archive: the record used to be abandoned whole, silently (#785). The sweep
+   straddles the boundary so both the stack-buffer and the grow path run. */
+static int st_warc_longurl(httrackp *opt, int argc, char **argv) {
+  /* "WARC-Target-URI: " + CRLF costs 19 bytes, so the old buffer failed at
+     1005; 9000 forces several reallocs within one record. */
+  static const size_t lengths[] = {100, 1003, 1004, 1005, 1006, 2000, 9000};
+  static const char resp_hdr[] =
+      "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n";
+  char path[HTS_URLMAXSIZE * 2];
+  char body[64];
+  warc_writer *w;
+  FILE *fp;
+  char *blob;
+  LLint fsz;
+  const char *at2;
+  size_t i, n, nrec = 0;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-longurl: need a writable directory\n");
+    return 1;
+  }
+  snprintf(path, sizeof(path), "%s/longurl.warc", argv[0]);
+
+  w = warc_open(opt, path);
+  if (w == NULL) {
+    fprintf(stderr, "warc-longurl: could not create %s\n", path);
+    return 1;
+  }
+  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    const size_t len = lengths[i];
+    char *uri = malloct(len + 1);
+
+    if (uri == NULL) {
+      warc_close(w);
+      return 1;
+    }
+    /* A distinct tail per URI so a truncated one cannot match another. */
+    snprintf(uri, len + 1, "http://example.com/%04d/", (int) len);
+    memset(uri + strlen(uri), 'a', len - strlen(uri));
+    uri[len] = '\0';
+    /* Distinct payloads: identical ones dedupe into revisit records. */
+    snprintf(body, sizeof(body), "<html><body>%04d</body></html>\n", (int) len);
+    if (warc_write_transaction(w, uri, NULL, NULL, resp_hdr, body, strlen(body),
+                               NULL, NULL, 200, 0, 0) != 0) {
+      fprintf(stderr, "warc-longurl: write failed at length %d\n", (int) len);
+      err = 1;
+    }
+    freet(uri);
+  }
+  warc_close(w);
+
+  fsz = fsize_utf8(path);
+  blob = (fsz > 0) ? malloct((size_t) fsz + 1) : NULL;
+  if (blob == NULL) {
+    fprintf(stderr, "warc-longurl: no archive written\n");
+    return 1;
+  }
+  fp = FOPEN(path, "rb");
+  n = (fp != NULL) ? fread(blob, 1, (size_t) fsz, fp) : 0;
+  if (fp != NULL)
+    fclose(fp);
+  blob[n] = '\0';
+
+  for (i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+    const size_t len = lengths[i];
+    char want[64];
+    const char *at;
+
+    snprintf(want, sizeof(want), "WARC-Target-URI: http://example.com/%04d/",
+             (int) len);
+    at = strstr(blob, want);
+    if (at == NULL) {
+      fprintf(stderr, "warc-longurl: length %d lost its record\n", (int) len);
+      err = 1;
+    } else if (strlen(at) < strlen("WARC-Target-URI: ") + len ||
+               at[strlen("WARC-Target-URI: ") + len] != '\r') {
+      fprintf(stderr, "warc-longurl: length %d truncated\n", (int) len);
+      err = 1;
+    }
+  }
+  for (at2 = blob; (at2 = strstr(at2, "WARC-Type: response")) != NULL; at2++)
+    nrec++;
+  if (nrec != sizeof(lengths) / sizeof(lengths[0])) {
+    fprintf(stderr, "warc-longurl: %d response records, want %d\n", (int) nrec,
+            (int) (sizeof(lengths) / sizeof(lengths[0])));
+    err = 1;
+  }
+
+  freet(blob);
+  printf("warc-longurl: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* End-to-end CDXJ: crawl a handful of records with --warc-cdx, then verify the
    .cdx is sorted, has exactly one line per response/revisit/resource (none for
    warcinfo/request), and each offset/length points at a gzip member that
@@ -4829,7 +5500,7 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   unsigned char *warc = NULL, *cdx = NULL;
   size_t warc_len = 0, cdx_len = 0;
   hts_boolean saved_cdx;
-  int err = 0, nlines = 0;
+  int err = 0, nlines = 0, nm_lines = 0;
   const char *lp, *cend;
   char prev[2048];
 
@@ -4846,20 +5517,27 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   warc_write_transaction(w, "http://www.example.com/one", "127.0.0.1",
                          "GET /one HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "one body\n", 9, NULL, 200, 0, 0);
+                         "one body\n", 9, NULL, NULL, 200, 0, 0);
   warc_write_resource(w, "ftp://files.example.com/data.bin", "127.0.0.1",
                       "application/octet-stream", "\x00\x01\x02\x03", 4, NULL,
                       0);
   warc_write_transaction(w, "http://alpha.example.com/two", "127.0.0.1",
                          "GET /two HTTP/1.1\r\nHost: alpha.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n",
-                         "two body\n", 9, NULL, 200, 0, 0);
+                         "two body\n", 9, NULL, NULL, 200, 0, 0);
   /* Same payload as /one at a new URL: identical-payload-digest revisit under
      OpenSSL, a full response otherwise; either way one index line. */
   warc_write_transaction(w, "http://zeta.example.com/dup", "127.0.0.1",
                          "GET /dup HTTP/1.1\r\nHost: zeta.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "one body\n", 9, NULL, 200, 0, 0);
+                         "one body\n", 9, NULL, NULL, 200, 0, 0);
+  /* A 304 declares no type, so the index line takes the caller's (#826). */
+  warc_write_transaction(w, "http://nm.example.com/kept", "127.0.0.1",
+                         "GET /kept HTTP/1.1\r\nHost: nm.example.com\r\n"
+                         "If-Modified-Since: Mon, 01 Jan 2024 00:00:00 GMT\r\n"
+                         "\r\n",
+                         "HTTP/1.1 304 Not Modified\r\n\r\n", NULL, 0, NULL,
+                         "text/html", 200, 1, 0);
   warc_close(w);
   opt->warc_cdx = saved_cdx;
 
@@ -4912,6 +5590,11 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
     }
     memcpy(url, us, urllen);
     url[urllen] = '\0';
+    if (strstr(url, "nm.example.com") != NULL) {
+      nm_lines++;
+      if (strstr(line, "\"mime\": \"text/html\"") == NULL)
+        err = 1;
+    }
     if (len == 0 || off > warc_len || len > warc_len - off) {
       err = 1;
       goto nextline;
@@ -4935,8 +5618,8 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   }
   freet(warc);
   freet(cdx);
-  if (nlines != 4)
-    err = 1; /* 3 responses/revisits + 1 resource; no warcinfo/request */
+  if (nlines != 5 || nm_lines != 1)
+    err = 1; /* 4 responses/revisits + 1 resource; no warcinfo/request */
   printf("warc-cdx: %d index lines: %s\n", nlines, err ? "FAIL" : "OK");
   return err;
 }
@@ -5003,13 +5686,13 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   warc_write_transaction(w, "http://www.example.com/", "127.0.0.1",
                          "GET / HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
                          "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
-                         "<html>home</html>\n", 18, NULL, 200, 0, 0);
+                         "<html>home</html>\n", 18, NULL, NULL, 200, 0, 0);
   warc_write_transaction(
       w, "http://www.example.com/data.bin", "127.0.0.1",
       "GET /data.bin HTTP/1.1\r\nHost: www.example.com\r\n\r\n",
       "HTTP/1.1 200 OK\r\n"
       "Content-Type: application/octet-stream\r\n\r\n",
-      "\x00\x01\x02\x03\x04", 5, NULL, 200, 0, 0);
+      "\x00\x01\x02\x03\x04", 5, NULL, NULL, 200, 0, 0);
   warc_close(w);
 
   /* Unzip every member in-process. */
@@ -5349,12 +6032,19 @@ static int sf_nesting(const char *hay, const char *mime) {
 static const char sf_png[] = "\x89PNG\r\n\x1a\n\x00\x01\x02\xff";
 #define SF_PNG_LEN 12
 
+static const char sf_svg[] = "<svg><g id=\"icon-a\"/></svg>";
+
 static const char sf_page[] =
     "<html><head>\n"
     "<link rel=\"stylesheet\" href=\"\001css/main.css\002\">\n"
     "<link rel=\"canonical\" href=\"\001other.html\002\">\n"
     "<title>t</title>\n"
-    "<style>body { background: url(\"\001img/a%20b.png\002\"); }</style>\n"
+    "<style>body { background: url(\"\001img/a%20b.png\002\"); }\n"
+    /* A fragment is document text the mark never covers, so it reaches the
+       data: URI exactly as written, in the quoting the author gave it. */
+    "b { background: url('\001img/sprite.svg\002#w x'); }\n"
+    "i { background: url('\001img/sprite.svg\002#lt<s>gt'); }\n"
+    "u { background: url(\"\001img/sprite.svg\002#z'(\\\xC3\xA9\"); }</style>\n"
     "</head><body>\n"
     "<img src=\"\001img/a%20b.png\002\" srcset=\"\001img/a%20b.png\002 "
     "1x, \001img/big.png\002 2x\">\n"
@@ -5388,6 +6078,16 @@ static const char sf_page[] =
     "<script src=\"\001js/app.js\002\"></script>\n"
     "<script>var s = \"</scripting>\"; var t = \"<img src='img/a%20b.png'>\";"
     "</script>\n"
+    /* A fragment selects inside the asset, so it has to survive onto the
+       data: URI; the query named the remote resource and must not. */
+    "<img src=\"\001img/sprite.svg\002#icon-a\">\n"
+    "<img srcset=\"\001img/sprite.svg\002#icon-b 2x\">\n"
+    "<svg><image xlink:href=\"\001img/sprite.svg\002#icon-c\"/></svg>\n"
+    "<div style=\"background:url(\001img/sprite.svg\002#icon-d)\"></div>\n"
+    "<div style=\"background:url('\001img/sprite.svg\002#i)e')\"></div>\n"
+    "<img src=\"\001img/sprite.svg?v=1\002#icon-f\">\n"
+    "<img src=\"\001img/sprite.svg\002#g&amp;h%2Di\">\n"
+    "<img src='\001img/sprite.svg\002#q\"z'>\n"
     "<img src=\"\001missing.png\002\" >\n"
     "<!--><img src=\"\001img/a%20b.png\002\">\n"
     "<div style=\"background:url(\001img/a%20b.png\002)\"></div>\n"
@@ -5407,6 +6107,10 @@ static void sf_fixture(httrackp *opt, const char *root) {
       "@font-face { font-family: f; src: url(\001../font/f.woff2\002); }\n"
       "body { background: url(\001../img/a%20b.png\002); }\n"
       "div { background: url(\001../img/big.png\002); }\n"
+      "div.s { background: url(\001../img/big-sprite.svg\002#icon-g); }\n"
+      /* A name whose escapes the rebase has to put back, unlike a fragment's;
+         the '#' has to come back encoded or it reads as one. */
+      "div.h { background: url(\001../img/b&amp;c%25d%23e.png\002); }\n"
       "/* url(../img/never.png) */\n";
   static const char nested[] =
       "div { background: url(\001../../img/a%20b.png\002); }\n";
@@ -5428,6 +6132,9 @@ static void sf_fixture(httrackp *opt, const char *root) {
   sf_put(root, "js/app.js", js, sizeof(js) - 1);
   sf_put(root, "img/a b.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/big.png", big, sizeof(big));
+  sf_put(root, "img/sprite.svg", sf_svg, sizeof(sf_svg) - 1);
+  sf_put(root, "img/big-sprite.svg", big, sizeof(big));
+  sf_put(root, "img/b&c%d#e.png", big, sizeof(big));
   sf_put(root, "img/in.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/po.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/sv.png", sf_png, SF_PNG_LEN);
@@ -5561,6 +6268,29 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   sf_check(strstr(out, "style='content:\"x\"; background:url(data:") != NULL,
            "style attribute re-quoted instead of substituted in place");
 
+  /* Fragments: the mark covers the reference only, so what followed it comes
+     back byte-identical -- including the escapes the document already carried
+     -- while the query rode inside the mark and went with it. */
+  sf_check(strstr(out, "img/sprite.svg") == NULL,
+           "a fragment-bearing reference was left a link");
+  sf_check(sf_count(out, "#icon-a\"") == 1, "img src fragment dropped");
+  sf_check(sf_count(out, "#icon-b 2x\"") == 1, "srcset fragment dropped");
+  sf_check(sf_count(out, "#icon-c\"") == 1, "xlink:href fragment dropped");
+  sf_check(sf_count(out, "#icon-d)") == 1, "style url() fragment dropped");
+  sf_check(sf_count(out, "#i)e')") == 1,
+           "a fragment closing the url() token was rewritten");
+  sf_check(sf_count(out, "#icon-f\"") == 1, "fragment after a query dropped");
+  sf_check(strstr(out, "?v=1") == NULL, "query carried onto the data: URI");
+  sf_check(sf_count(out, "#g&amp;h%2Di\"") == 1,
+           "an escape the document already carried was encoded again");
+  sf_check(sf_count(out, "#q\"z'") == 1, "a quote in a fragment was rewritten");
+  sf_check(sf_count(out, "#w x')") == 1,
+           "whitespace in a fragment was rewritten");
+  sf_check(sf_count(out, "#lt<s>gt')") == 1,
+           "'<'/'>' in a fragment were rewritten");
+  sf_check(sf_count(out, "#z'(\\\xC3\xA9\")") == 1,
+           "a quote, paren, backslash or high byte was rewritten");
+
   sf_check(strstr(out, "img/big.png 2x") != NULL, "over-cap asset inlined");
   sf_check(strstr(out, " 1x") != NULL, "srcset descriptor lost");
   sf_check(sf_count(out, "img/a%20b.png") ==
@@ -5587,6 +6317,10 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
        root, so it has to come back out as img/big.png or it dangles. */
     sf_check(strstr(css, "url(img/big.png)") != NULL,
              "over-cap url() not rebased onto the page's directory");
+    sf_check(strstr(css, "url(img/big-sprite.svg#icon-g)") != NULL,
+             "a rebased url() lost its fragment");
+    sf_check(strstr(css, "url(img/b%26c%25d%23e.png)") != NULL,
+             "a rebased name came back unescaped");
     nested = sf_decode(css, "text/css", NULL);
     sf_check(nested != NULL &&
                  strstr(nested, "url(data:image/png;base64,") != NULL,
@@ -5888,6 +6622,371 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+static void ro_put(const char *path, const char *data) {
+  FILE *const fp = FOPEN(path, "wb");
+
+  assertf(fp != NULL);
+  assertf(fwrite(data, 1, strlen(data), fp) == strlen(data));
+  fclose(fp);
+}
+
+/* HTS_TRUE if path holds exactly data. */
+static hts_boolean ro_is(const char *path, const char *data) {
+  char buf[64];
+  FILE *const fp = FOPEN(path, "rb");
+  size_t n;
+
+  if (fp == NULL)
+    return HTS_FALSE;
+  n = fread(buf, 1, sizeof(buf), fp);
+  fclose(fp);
+  return n == strlen(data) && memcmp(buf, data, n) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+// -#test=renameover <dir>: hts_rename_over() must replace an existing dst and
+// never lose one it did not replace (#779, #790). Which half is live depends on
+// what rename() does to an existing target, so probe that and name the regime.
+static int st_renameover(httrackp *opt, int argc, char **argv) {
+  if (argc < 1) {
+    fprintf(stderr, "renameover: needs a writable base dir\n");
+    return 1;
+  }
+  char src[HTS_URLMAXSIZE * 2], dst[HTS_URLMAXSIZE * 2];
+  int err = 0;
+
+  fconcat(src, sizeof(src), argv[0], "renameover-src.bin");
+  fconcat(dst, sizeof(dst), argv[0], "renameover-dst.bin");
+
+  (void) UNLINK(src);
+  (void) UNLINK(dst);
+  ro_put(src, "probe");
+  ro_put(dst, "probe");
+
+  const int probe = RENAME(src, dst) == 0 ? 0 : errno;
+  /* Only a target in the way is something the unlink can clear. */
+  const hts_boolean replaceable = probe == 0 || probe == EEXIST;
+
+  printf("renameover: regime %s\n",
+         probe == 0 ? "clobber" : (probe == EEXIST ? "fallback" : "refused"));
+
+  (void) UNLINK(src);
+  (void) UNLINK(dst);
+  ro_put(src, "new");
+  ro_put(dst, "old");
+  if (replaceable) {
+    /* An existing dst must still be replaced: the unlink is for this. */
+    if (!hts_rename_over(opt, src, dst)) {
+      fprintf(stderr, "renameover: replacing an existing dst failed: %s\n",
+              strerror(errno));
+      err++;
+    } else if (!ro_is(dst, "new") || fexist_utf8(src)) {
+      fprintf(stderr, "renameover: dst was not replaced by src\n");
+      err++;
+    }
+  } else {
+    /* A failure the unlink cannot fix must leave dst as it was. */
+    if (hts_rename_over(opt, src, dst)) {
+      fprintf(stderr, "renameover: an unfixable failure reported success\n");
+      err++;
+    }
+    if (!ro_is(dst, "old")) {
+      fprintf(stderr, "renameover: an unfixable failure destroyed dst\n");
+      err++;
+    }
+  }
+
+  /* A directory in the way is not something the caller asked to replace: it
+     must be refused, never parked aside and orphaned. */
+  (void) UNLINK(dst);
+  ro_put(src, "new");
+  if (MKDIR(dst) == 0) {
+    char parked[sizeof(dst) + 16];
+
+    snprintf(parked, sizeof(parked), "%s.hts-old0", dst);
+    if (hts_rename_over(opt, src, dst)) {
+      fprintf(stderr, "renameover: a directory at dst reported success\n");
+      err++;
+    }
+    if (!ro_is(src, "new")) {
+      fprintf(stderr, "renameover: a directory at dst consumed src\n");
+      err++;
+    }
+    /* RMDIR only succeeds on a directory that is there, so it doubles as the
+       probe: the parked name must not exist at all. */
+    if (RMDIR(parked) == 0 || fexist_utf8(parked)) {
+      fprintf(stderr, "renameover: a directory at dst was parked aside\n");
+      err++;
+    }
+    (void) RMDIR(dst);
+  }
+  (void) UNLINK(src);
+
+  /* A missing src must leave dst alone and report failure. */
+  (void) UNLINK(src);
+  ro_put(dst, "keep");
+  if (hts_rename_over(opt, src, dst)) {
+    fprintf(stderr, "renameover: a missing src reported success\n");
+    err++;
+  }
+  if (!ro_is(dst, "keep")) {
+    fprintf(stderr, "renameover: a missing src destroyed dst\n");
+    err++;
+  }
+
+  /* Same, with dst absent too: nothing to lose, still a failure. */
+  (void) UNLINK(dst);
+  if (hts_rename_over(opt, src, dst)) {
+    fprintf(stderr, "renameover: a missing src and dst reported success\n");
+    err++;
+  }
+
+  /* The aside fallback, driven directly: a clobbering rename() never reaches
+     it. Skipped in the refused regime, where no rename at all succeeds. */
+  if (replaceable) {
+    char aside[sizeof(dst) + 16], keep[sizeof(dst) + 16];
+
+    snprintf(aside, sizeof(aside), "%s.hts-old0", dst);
+    snprintf(keep, sizeof(keep), "%s.hts-old1", dst);
+    (void) UNLINK(aside);
+    (void) UNLINK(keep);
+    ro_put(src, "new");
+    ro_put(dst, "old");
+    if (!hts_rename_over_aside_selftest(opt, src, dst)) {
+      fprintf(stderr, "renameover: the aside fallback failed: %s\n",
+              strerror(errno));
+      err++;
+    } else if (!ro_is(dst, "new") || fexist_utf8(src) || fexist_utf8(aside)) {
+      fprintf(stderr, "renameover: the aside fallback did not replace dst\n");
+      err++;
+    }
+
+    /* #790: the retry fails (no src). The old content must survive, back at dst
+       or, when the move back fails too, under the parked name it is logged as.
+       Name the outcome so a leg cannot pass having tested the other one. */
+    (void) UNLINK(src);
+    ro_put(dst, "old");
+    if (hts_rename_over_aside_selftest(opt, src, dst)) {
+      fprintf(stderr, "renameover: a failed aside retry reported success\n");
+      err++;
+    }
+    if (ro_is(dst, "old") && !fexist_utf8(aside)) {
+      printf("renameover: restore back\n");
+    } else if (ro_is(aside, "old") && !fexist_utf8(dst)) {
+      printf("renameover: restore parked\n");
+      (void) UNLINK(aside);
+      ro_put(dst, "old");
+    } else {
+      fprintf(stderr, "renameover: a failed aside retry lost the old copy\n");
+      err++;
+    }
+
+    /* An unrelated file already sitting on the aside name must survive. */
+    ro_put(src, "new");
+    ro_put(aside, "mine");
+    if (!hts_rename_over_aside_selftest(opt, src, dst)) {
+      fprintf(stderr, "renameover: a taken aside name failed the move: %s\n",
+              strerror(errno));
+      err++;
+    } else if (!ro_is(dst, "new") || !ro_is(aside, "mine") ||
+               fexist_utf8(keep)) {
+      fprintf(stderr, "renameover: a taken aside name was not skipped\n");
+      err++;
+    }
+    (void) UNLINK(aside);
+    (void) UNLINK(keep);
+
+    /* A directory there reads as free to the probe, so the park must skip it
+       on the refusal rather than give up. */
+    ro_put(src, "new");
+    ro_put(dst, "old");
+    if (MKDIR(aside) == 0) {
+      if (!hts_rename_over_aside_selftest(opt, src, dst)) {
+        fprintf(stderr,
+                "renameover: a directory on the aside name blocked the "
+                "move: %s\n",
+                strerror(errno));
+        err++;
+      } else if (!ro_is(dst, "new") || fexist_utf8(keep)) {
+        fprintf(stderr, "renameover: a directory on the aside name was not "
+                        "skipped\n");
+        err++;
+      }
+      (void) RMDIR(aside);
+    }
+    (void) UNLINK(keep);
+  }
+
+  (void) UNLINK(src);
+  (void) UNLINK(dst);
+  printf("renameover: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+// -#test=refetchbackup <dir>: the #77 re-fetch backup must build its temporary
+// inside the ~hts-tmp directory, which no save name can spell (#774), and must
+// never leave the resource without a copy (#775).
+static int st_refetchbackup(httrackp *opt, int argc, char **argv) {
+  lien_back *back;
+  char want[HTS_URLMAXSIZE * 2 + 32];
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "refetchbackup: needs a writable base dir\n");
+    return 1;
+  }
+  back = calloct(1, sizeof(lien_back));
+  if (back == NULL) {
+    fprintf(stderr, "refetchbackup: out of memory\n");
+    return 1;
+  }
+  /* explicit separator: fconcat() joins without one, which would put the
+     temporary in the parent of the directory under test */
+  snprintf(back->url_sav, sizeof(back->url_sav), "%s/refetch.bin", argv[0]);
+  snprintf(want, sizeof(want), "%s/~hts-tmp/refetch.bin.bak", argv[0]);
+
+  /* #774: pin the name, so moving the temporary back into the mirror namespace
+     cannot pass unnoticed. */
+  ro_put(back->url_sav, "old");
+  back_refetch_backup(opt, back);
+  if (back->tmpfile == NULL || fexist_utf8(back->url_sav)) {
+    fprintf(stderr, "refetchbackup: the previous copy was not moved aside\n");
+    err++;
+  } else if (strcmp(back->tmpfile, want) != 0) {
+    fprintf(stderr, "refetchbackup: temporary is %s, want %s\n", back->tmpfile,
+            want);
+    err++;
+  }
+  ro_put(back->url_sav, "new"); /* what filecreate() + the transfer produce */
+  back_finalize_backup(opt, back, HTS_TRUE);
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: the committed copy is not the new one\n");
+    err++;
+  }
+
+  /* #758: only a killed run can leave something there, and it must be replaced
+     rather than disable the backup for good. */
+  if (structcheck(want) != 0) {
+    fprintf(stderr, "refetchbackup: cannot create %s\n", want);
+    freet(back);
+    return 1;
+  }
+  ro_put(want, "leftover");
+  back_refetch_backup(opt, back);
+  if (back->tmpfile == NULL || !ro_is(want, "new")) {
+    fprintf(stderr, "refetchbackup: a leftover temporary blocked the backup\n");
+    err++;
+  }
+
+  /* #775: filecreate() failed, so there is nothing to commit to. Saying so is
+     load-bearing: the caller must not cache this response against the old
+     body, or the next --update gets a 304 pinning it. */
+  (void) UNLINK(back->url_sav);
+  if (back_finalize_backup(opt, back, HTS_TRUE)) {
+    fprintf(stderr, "refetchbackup: a commit that restored reported success\n");
+    err++;
+  }
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: a commit with no new copy lost both\n");
+    err++;
+  }
+
+  /* An aborted transfer restores, as before. */
+  back_refetch_backup(opt, back);
+  ro_put(back->url_sav, "partial");
+  back_finalize_backup(opt, back, HTS_FALSE);
+  if (!ro_is(back->url_sav, "new")) {
+    fprintf(stderr, "refetchbackup: an aborted re-fetch kept the partial\n");
+    err++;
+  }
+
+  (void) UNLINK(back->url_sav);
+  freet(back);
+  printf("refetchbackup: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+// -#test=spoolname <dir>: a frozen backlog slot must spool inside ~hts-tmp, not
+// beside the mirrored file where a site serving <path>.tmp collides (#859).
+static int st_spoolname(httrackp *opt, int argc, char **argv) {
+  char BIGSTK got[HTS_URLMAXSIZE * 2 + 32];
+  char BIGSTK want[HTS_URLMAXSIZE * 2 + 32];
+  char BIGSTK save[HTS_URLMAXSIZE * 2];
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "spoolname: needs a writable base dir\n");
+    return 1;
+  }
+
+  /* named: the spool lands in the save name's own ~hts-tmp, which no URL can
+     spell since url_savename() maps '~' to '_' */
+  snprintf(save, sizeof(save), "%s/sub/page.html", argv[0]);
+  snprintf(want, sizeof(want), "%s/sub/~hts-tmp/page.html.tmp", argv[0]);
+  opt->getmode = 1;
+  if (!back_spoolname(opt, save, got, sizeof(got))) {
+    fprintf(stderr, "spoolname: naming failed for %s\n", save);
+    err++;
+  } else if (strcmp(got, want) != 0) {
+    fprintf(stderr, "spoolname: got %s, want %s\n", got, want);
+    err++;
+  }
+
+  /* pin the pre-#859 name as forbidden too: a site serving sub/page.html.tmp
+     was mirrored straight onto it */
+  snprintf(want, sizeof(want), "%s.tmp", save);
+  if (strcmp(got, want) == 0) {
+    fprintf(stderr, "spoolname: still spooling into the mirror namespace\n");
+    err++;
+  }
+
+  /* -p0 keeps no save name, so the spool counts inside path_html's ~hts-tmp */
+  {
+    char BIGSTK base[HTS_URLMAXSIZE * 2];
+
+    snprintf(base, sizeof(base), "%s/", argv[0]);
+    StringCopy(opt->path_html_utf8, base);
+    opt->getmode = 0;
+    opt->state.tmpnameid = 7;
+    snprintf(want, sizeof(want), "%s/~hts-tmp/tmpfile7.tmp", argv[0]);
+    if (!back_spoolname(opt, "", got, sizeof(got))) {
+      fprintf(stderr, "spoolname: naming failed under -p0\n");
+      err++;
+    } else if (strcmp(got, want) != 0) {
+      fprintf(stderr, "spoolname: -p0 got %s, want %s\n", got, want);
+      err++;
+    }
+    if (opt->state.tmpnameid != 8) {
+      fprintf(stderr, "spoolname: -p0 did not consume a tmpnameid\n");
+      err++;
+    }
+  }
+
+  /* with no -O, path_html_utf8 is empty and the spool must stay relative to
+     the working directory; a separator of our own would put it in / */
+  StringCopy(opt->path_html_utf8, "");
+  opt->getmode = 0;
+  opt->state.tmpnameid = 0;
+  if (!back_spoolname(opt, "", got, sizeof(got))) {
+    fprintf(stderr, "spoolname: naming failed with no output directory\n");
+    err++;
+  } else if (strcmp(got, "~hts-tmp/tmpfile0.tmp") != 0) {
+    fprintf(stderr, "spoolname: no -O gave %s, want ~hts-tmp/tmpfile0.tmp\n",
+            got);
+    err++;
+  }
+
+  /* too long must empty dest, not hand back a truncated name landing
+     somewhere real */
+  opt->getmode = 1;
+  if (back_spoolname(opt, save, got, 8) || got[0] != '\0') {
+    fprintf(stderr, "spoolname: an overlong name was not rejected\n");
+    err++;
+  }
+
+  printf("spoolname: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 // -#test=direnum <dir>: enumerate a long+non-ASCII directory via the
 // opendir/readdir wrappers; children must round-trip as UTF-8 (#133,#630).
 static int st_direnum(httrackp *opt, int argc, char **argv) {
@@ -6147,6 +7246,369 @@ static int st_changes(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* #747: a thread is outstanding from the moment hts_newthread() returns, not
+   from the moment it starts running, or a wait right after the spawn joins
+   nothing. One thread per round is what makes the old bug visible: the wait
+   had to find the counter at zero, and a batch of spawns gives the earlier
+   threads time to raise it. Unfixed, one round in two caught it, so the round
+   count is what turns that into a reliable failure. */
+#define THREADWAIT_N 8
+#define THREADWAIT_ROUNDS 16
+#define THREADWAIT_SLEEP_MS 50
+#define THREADWAIT_GATE_MS 10000
+
+static htsmutex threadwait_lock = HTSMUTEX_INIT;
+static int threadwait_done = 0;
+static hts_boolean threadwait_gated = HTS_FALSE;
+
+static int threadwait_count(void) {
+  int n;
+
+  hts_mutexlock(&threadwait_lock);
+  n = threadwait_done;
+  hts_mutexrelease(&threadwait_lock);
+  return n;
+}
+
+static void threadwait_thread(void *arg) {
+  (void) arg;
+  Sleep(THREADWAIT_SLEEP_MS);
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done++;
+  hts_mutexrelease(&threadwait_lock);
+}
+
+/* Stays outstanding until the gate clears, so wait_n() can be asked to leave a
+   known number of live threads behind. Bounded: a wait_n() that wrongly drains
+   them would otherwise never return, and hang the suite instead of failing. */
+static void threadwait_gated_thread(void *arg) {
+  int waited;
+
+  (void) arg;
+  for (waited = 0; waited < THREADWAIT_GATE_MS; waited += 10) {
+    hts_boolean gated;
+
+    hts_mutexlock(&threadwait_lock);
+    gated = threadwait_gated;
+    hts_mutexrelease(&threadwait_lock);
+    if (!gated)
+      break;
+    Sleep(10);
+  }
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done++;
+  hts_mutexrelease(&threadwait_lock);
+}
+
+static int st_backswap(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  return back_selftest_slot_swap();
+}
+
+static int st_threadwait(httrackp *opt, int argc, char **argv) {
+  int err = 0;
+  int i, round;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* htsthread_wait() joins a thread spawned just before it */
+  for (round = 0; round < THREADWAIT_ROUNDS && !err; round++) {
+    hts_mutexlock(&threadwait_lock);
+    threadwait_done = 0;
+    hts_mutexrelease(&threadwait_lock);
+    if (hts_newthread(threadwait_thread, NULL) != 0) {
+      fprintf(stderr, "threadwait: cannot spawn\n");
+      return 1;
+    }
+    htsthread_wait();
+    if (threadwait_count() != 1) {
+      fprintf(stderr, "threadwait: round %d returned before the thread ran\n",
+              round);
+      err = 1;
+    }
+  }
+
+  /* htsthread_wait_n(n) leaves n behind rather than draining everything */
+  hts_mutexlock(&threadwait_lock);
+  threadwait_done = 0;
+  threadwait_gated = HTS_TRUE;
+  hts_mutexrelease(&threadwait_lock);
+  for (i = 0; i < THREADWAIT_N; i++) {
+    if (hts_newthread(threadwait_gated_thread, NULL) != 0) {
+      fprintf(stderr, "threadwait: cannot spawn a gated thread\n");
+      return 1;
+    }
+  }
+  htsthread_wait_n(THREADWAIT_N);
+  if (threadwait_count() != 0) {
+    fprintf(stderr, "threadwait: wait_n(%d) joined %d gated threads\n",
+            THREADWAIT_N, threadwait_count());
+    err = 1;
+  }
+  hts_mutexlock(&threadwait_lock);
+  threadwait_gated = HTS_FALSE;
+  hts_mutexrelease(&threadwait_lock);
+  htsthread_wait();
+  if (threadwait_count() != THREADWAIT_N) {
+    fprintf(stderr, "threadwait: wait left %d/%d gated threads running\n",
+            THREADWAIT_N - threadwait_count(), THREADWAIT_N);
+    err = 1;
+  }
+
+  printf("threadwait self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* #794: hts_gmtime() must own its output. The table is an independent oracle;
+   the threaded phase is what corrupts if it ever goes back to gmtime()'s
+   shared static. */
+#define GMTIME_THREADS 8
+#define GMTIME_ROUNDS 50000
+
+static const struct {
+  time_t t;
+  int year, mon, mday, hour, min, sec, wday, yday;
+} gmtime_refs[] = {
+    {(time_t) 0, 70, 0, 1, 0, 0, 0, 4, 0},
+    {(time_t) 951782400, 100, 1, 29, 0, 0, 0, 2, 59}, /* a leap day */
+    {(time_t) 1000000000, 101, 8, 9, 1, 46, 40, 0, 251},
+    {(time_t) 2147483647, 138, 0, 19, 3, 14, 7, 2, 18}, /* 32-bit ceiling */
+};
+
+#define GMTIME_REFS ((int) (sizeof(gmtime_refs) / sizeof(gmtime_refs[0])))
+
+static hts_boolean gmtime_ref_matches(int i, const struct tm *tm) {
+  if (tm->tm_year != gmtime_refs[i].year || tm->tm_mon != gmtime_refs[i].mon ||
+      tm->tm_mday != gmtime_refs[i].mday ||
+      tm->tm_hour != gmtime_refs[i].hour || tm->tm_min != gmtime_refs[i].min ||
+      tm->tm_sec != gmtime_refs[i].sec || tm->tm_wday != gmtime_refs[i].wday ||
+      tm->tm_yday != gmtime_refs[i].yday)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
+static htsmutex gmtime_lock = HTSMUTEX_INIT;
+static int gmtime_bad = 0;
+
+static void gmtime_thread(void *arg) {
+  const int i = *(const int *) arg;
+  int bad = 0, round;
+
+  for (round = 0; round < GMTIME_ROUNDS; round++) {
+    struct tm tmv;
+
+    if (!hts_gmtime(gmtime_refs[i].t, &tmv) || !gmtime_ref_matches(i, &tmv))
+      bad++;
+  }
+  hts_mutexlock(&gmtime_lock);
+  gmtime_bad += bad;
+  hts_mutexrelease(&gmtime_lock);
+}
+
+static int st_gmtime(httrackp *opt, int argc, char **argv) {
+  static int idx[GMTIME_THREADS];
+  int err = 0, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < GMTIME_REFS; i++) {
+    struct tm tmv;
+
+    if (!hts_gmtime(gmtime_refs[i].t, &tmv)) {
+      fprintf(stderr, "gmtime: conversion #%d failed\n", i);
+      err = 1;
+    } else if (!gmtime_ref_matches(i, &tmv)) {
+      fprintf(stderr,
+              "gmtime: #%d gave %04d-%02d-%02d %02d:%02d:%02d (wday %d, "
+              "yday %d)\n",
+              i, tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday, tmv.tm_hour,
+              tmv.tm_min, tmv.tm_sec, tmv.tm_wday, tmv.tm_yday);
+      err = 1;
+    }
+  }
+
+  /* the return is the only failure signal the callers have, so a helper that
+     always claims success leaves them formatting an uninitialised struct tm.
+     Out of range for a 64-bit time_t: NULL from gmtime_r, EINVAL from
+     _gmtime64_s. */
+  if (sizeof(time_t) >= 8) {
+    const time_t beyond = (time_t) INT64_MAX;
+    struct tm tmv;
+
+    if (hts_gmtime(beyond, &tmv)) {
+      fprintf(stderr,
+              "gmtime: an out-of-range time_t was reported converted\n");
+      err = 1;
+    }
+  }
+
+  for (i = 0; i < GMTIME_THREADS; i++) {
+    idx[i] = i % GMTIME_REFS;
+    if (hts_newthread(gmtime_thread, &idx[i]) != 0) {
+      fprintf(stderr, "gmtime: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+  if (gmtime_bad != 0) {
+    fprintf(stderr, "gmtime: %d/%d concurrent conversions were corrupt\n",
+            gmtime_bad, GMTIME_THREADS * GMTIME_ROUNDS);
+    err = 1;
+  }
+
+  printf("gmtime self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* #806: hts_localtime() must own its output too, same rationale as
+   hts_gmtime() (#794). Reference table computed under TZ=XXX5 (fixed
+   UTC-5, no DST), which the driving .test script sets. */
+#define LOCALTIME_THREADS 8
+#define LOCALTIME_ROUNDS 50000
+
+static const struct {
+  time_t t;
+  int year, mon, mday, hour, min, sec, wday, yday;
+} localtime_refs[] = {
+    {(time_t) 0, 69, 11, 31, 19, 0, 0, 3, 364},
+    {(time_t) 951782400, 100, 1, 28, 19, 0, 0, 1,
+     58}, /* a leap day, GMT side */
+    {(time_t) 1000000000, 101, 8, 8, 20, 46, 40, 6, 250},
+    {(time_t) 2147483647, 138, 0, 18, 22, 14, 7, 1, 17},
+};
+
+#define LOCALTIME_REFS                                                         \
+  ((int) (sizeof(localtime_refs) / sizeof(localtime_refs[0])))
+
+static hts_boolean localtime_ref_matches(int i, const struct tm *tm) {
+  if (tm->tm_year != localtime_refs[i].year ||
+      tm->tm_mon != localtime_refs[i].mon ||
+      tm->tm_mday != localtime_refs[i].mday ||
+      tm->tm_hour != localtime_refs[i].hour ||
+      tm->tm_min != localtime_refs[i].min ||
+      tm->tm_sec != localtime_refs[i].sec ||
+      tm->tm_wday != localtime_refs[i].wday ||
+      tm->tm_yday != localtime_refs[i].yday)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
+static htsmutex localtime_lock = HTSMUTEX_INIT;
+static int localtime_bad = 0;
+
+static void localtime_thread(void *arg) {
+  const int i = *(const int *) arg;
+  int bad = 0, round;
+
+  for (round = 0; round < LOCALTIME_ROUNDS; round++) {
+    struct tm tmv;
+
+    if (!hts_localtime(localtime_refs[i].t, &tmv) ||
+        !localtime_ref_matches(i, &tmv))
+      bad++;
+  }
+  hts_mutexlock(&localtime_lock);
+  localtime_bad += bad;
+  hts_mutexrelease(&localtime_lock);
+}
+
+static int st_localtime(httrackp *opt, int argc, char **argv) {
+  static int idx[LOCALTIME_THREADS];
+  int err = 0, i;
+
+  (void) opt;
+
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=localtime <writable directory>\n");
+    return 1;
+  }
+
+  for (i = 0; i < LOCALTIME_REFS; i++) {
+    struct tm tmv;
+
+    if (!hts_localtime(localtime_refs[i].t, &tmv)) {
+      fprintf(stderr, "localtime: conversion #%d failed\n", i);
+      err = 1;
+    } else if (!localtime_ref_matches(i, &tmv)) {
+      fprintf(stderr,
+              "localtime: #%d gave %04d-%02d-%02d %02d:%02d:%02d (wday %d, "
+              "yday %d)\n",
+              i, tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday, tmv.tm_hour,
+              tmv.tm_min, tmv.tm_sec, tmv.tm_wday, tmv.tm_yday);
+      err = 1;
+    }
+  }
+
+  if (sizeof(time_t) >= 8) {
+    const time_t beyond = (time_t) INT64_MAX;
+    struct tm tmv;
+
+    if (hts_localtime(beyond, &tmv)) {
+      fprintf(stderr,
+              "localtime: an out-of-range time_t was reported converted\n");
+      err = 1;
+    }
+  }
+
+  for (i = 0; i < LOCALTIME_THREADS; i++) {
+    idx[i] = i % LOCALTIME_REFS;
+    if (hts_newthread(localtime_thread, &idx[i]) != 0) {
+      fprintf(stderr, "localtime: cannot spawn\n");
+      return 1;
+    }
+  }
+  htsthread_wait();
+  if (localtime_bad != 0) {
+    fprintf(stderr, "localtime: %d/%d concurrent conversions were corrupt\n",
+            localtime_bad, LOCALTIME_THREADS * LOCALTIME_ROUNDS);
+    err = 1;
+  }
+
+  /* get_filetime_rfc822() must report GMT, never the process's local zone,
+     and never a silent fallback to it on gmtime() failure (#806). */
+  {
+    char path[HTS_URLMAXSIZE];
+    char date[256];
+    struct tm parsed;
+
+    snprintf(path, sizeof(path), "%s/filetime.bin", argv[0]);
+    structcheck(path);
+    {
+      FILE *fp = FOPEN(path, "wb");
+
+      if (fp == NULL) {
+        fprintf(stderr, "localtime: cannot write %s\n", path);
+        return 1;
+      }
+      fputc('x', fp);
+      fclose(fp);
+    }
+    if (set_filetime_rfc822(path, "Tue, 29 Feb 2000 00:00:00 GMT") != 0) {
+      fprintf(stderr, "localtime: cannot set %s's mtime\n", path);
+      err = 1;
+    } else if (!get_filetime_rfc822(path, date)) {
+      fprintf(stderr, "localtime: get_filetime_rfc822 failed on %s\n", path);
+      err = 1;
+    } else if (convert_time_rfc822(&parsed, date) == NULL ||
+               parsed.tm_year != 100 || parsed.tm_mon != 1 ||
+               parsed.tm_mday != 29 || parsed.tm_hour != 0) {
+      fprintf(stderr,
+              "localtime: get_filetime_rfc822 reported \"%s\" (TZ=%s)\n", date,
+              getenv("TZ") ? getenv("TZ") : "");
+      err = 1;
+    }
+  }
+
+  printf("localtime self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #define CHANGES_RACE_FILES 8
 #define CHANGES_RACE_ROUNDS 400
 
@@ -6161,11 +7623,8 @@ static void changes_race_notify(httrackp *opt, int n) {
   hts_changes_notify(opt, "race.example", fil, save, HTS_TRUE, HTS_FALSE);
 }
 
-/* htsthread_wait() counts a thread only once it is running, so it can return
-   before any of them started; join on our own counter instead. */
 static htsmutex changes_race_lock = HTSMUTEX_INIT;
 static int changes_race_started = 0;
-static int changes_race_live = 0;
 
 static int changes_race_count(int *which) {
   int n;
@@ -6185,9 +7644,6 @@ static void changes_race_thread(void *arg) {
   hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < CHANGES_RACE_ROUNDS; i++)
     changes_race_notify(opt, i % CHANGES_RACE_FILES);
-  hts_mutexlock(&changes_race_lock);
-  changes_race_live--;
-  hts_mutexrelease(&changes_race_lock);
 }
 
 /* A transfer thread the crawl never joins (FTP) reaches hts_changes_notify()
@@ -6203,7 +7659,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   strcpybuff(base, argv[0]);
-  if (base[0] != '\0' && base[strlen(base) - 1] != '/')
+  if (base[0] != '\0' && hts_lastchar(base) != '/')
     strcatbuff(base, "/");
   StringCopy(opt->path_html, base);
   StringCopy(opt->path_html_utf8, base);
@@ -6242,7 +7698,6 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
      threads reaching a fresh one together race on the init itself. */
   hts_mutexlock(&changes_race_lock);
   changes_race_started = 0;
-  changes_race_live = 4;
   hts_mutexrelease(&changes_race_lock);
   for (i = 0; i < 4; i++) {
     if (hts_newthread(changes_race_thread, opt) != 0) {
@@ -6256,8 +7711,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < 64; i++)
     hts_changes_report(opt, &out);
   hts_changes_close_opt(opt);
-  while (changes_race_count(&changes_race_live) > 0)
-    Sleep(10);
+  htsthread_wait();
 
   /* Sealed: a straggler must be dropped, not start a report nobody writes. */
   changes_race_notify(opt, CHANGES_RACE_FILES + 1);
@@ -6273,6 +7727,388 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
   StringFree(out);
   hts_changes_free_opt(opt);
   printf("changes-race self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* The x[strlen(x) - 1] class (#770), its pointer spelling x + strlen(x) - 1
+   (#781) and its size_t index spelling (#821). The string starts mid-arena so
+   the byte it must not touch is a real neighbour; poisoned with '#', not 0, or
+   a stray NUL terminator would read as untouched. */
+static int st_lastchar(httrackp *opt, int argc, char **argv) {
+  enum { off = 8 };
+
+  char arena[16];
+  char *const s = &arena[off];
+  const int guard = off - 1; /* what the old idiom clobbers */
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+#define REPOISON(str)                                                          \
+  do {                                                                         \
+    memset(arena, '#', sizeof(arena));                                         \
+    strlcpybuff(s, (str), sizeof(arena) - off);                                \
+  } while (0)
+#define CHECK(cond)                                                            \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  /* the empty string: every helper must report "nothing" and touch nothing */
+  REPOISON("");
+  CHECK(hts_lastchar(s) == '\0');
+  CHECK(arena[guard] == '#');
+  REPOISON("");
+  CHECK(hts_striplastchar(s, '/') == HTS_FALSE);
+  CHECK(arena[guard] == '#');
+  CHECK(s[0] == '\0');
+  REPOISON("");
+  CHECK(hts_choplastchar(s) == HTS_FALSE);
+  CHECK(arena[guard] == '#');
+  CHECK(s[0] == '\0');
+
+  /* a '/' sitting where the underflow would land must not be mistaken for the
+     string's own last byte -- this is the #768 shape */
+  REPOISON("");
+  arena[guard] = '/';
+  CHECK(hts_lastchar(s) == '\0');
+  CHECK(hts_striplastchar(s, '/') == HTS_FALSE);
+  CHECK(arena[guard] == '/');
+
+  /* non-empty: ordinary behaviour */
+  REPOISON("ab/");
+  CHECK(hts_lastchar(s) == '/');
+  CHECK(hts_striplastchar(s, '/') == HTS_TRUE);
+  CHECK(strcmp(s, "ab") == 0);
+  CHECK(hts_striplastchar(s, '/') == HTS_FALSE);
+  CHECK(strcmp(s, "ab") == 0);
+  CHECK(hts_choplastchar(s) == HTS_TRUE);
+  CHECK(strcmp(s, "a") == 0);
+  CHECK(hts_choplastchar(s) == HTS_TRUE);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  /* one-character string: the boundary the guards get wrong */
+  REPOISON("/");
+  CHECK(hts_lastchar(s) == '/');
+  CHECK(hts_striplastchar(s, '/') == HTS_TRUE);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  /* the pointer spelling (#781): on an empty string the address must be the
+     terminating NUL, never the byte before it */
+  REPOISON("");
+  CHECK(hts_lastcharoffset(s) == 0);
+  CHECK(hts_lastcharptr(s) == s);
+  CHECK(*hts_lastcharptr(s) == '\0');
+  *hts_lastcharptr(s) = 'Z'; /* a write through it must stay inside s */
+  CHECK(arena[guard] == '#');
+  CHECK(s[0] == 'Z');
+
+  /* the neighbour must not be mistaken for the string's own last byte */
+  REPOISON("");
+  arena[guard] = '/';
+  CHECK(hts_lastcharptr(s) == s);
+  CHECK(*hts_lastcharptr(s) != '/');
+  CHECK(arena[guard] == '/');
+
+  /* the walk-back loops the sites use must stop at once on an empty string */
+  REPOISON("");
+  {
+    const char *p = hts_lastcharptr(s);
+    int steps = 0;
+
+    while (p > s && *p != '/')
+      p--, steps++;
+    CHECK(steps == 0);
+    CHECK(p == s);
+  }
+
+  REPOISON("ab/");
+  CHECK(hts_lastcharoffset(s) == 2);
+  CHECK(hts_lastcharptr(s) == s + 2);
+  CHECK(*hts_lastcharptr(s) == '/');
+  REPOISON("/");
+  CHECK(hts_lastcharptr(s) == s);
+  CHECK(*hts_lastcharptr(s) == '/');
+  CHECK(arena[guard] == '#');
+
+  /* the size_t index spelling (#821): (i > 0) cannot reject SIZE_MAX, so only
+     a safe seed stops the sites' walk-back */
+  REPOISON("");
+  {
+    const size_t vacuous = strlen(s) - 1;
+    size_t i = hts_lastcharoffset(s);
+    int steps = 0;
+
+    CHECK(vacuous > 0);
+    CHECK(i == 0);
+    /* step-capped so a bad seed fails the count instead of running off */
+    while ((i > 0) && (steps < 8) && (s[i] != '/'))
+      i--, steps++;
+    CHECK(steps == 0);
+    CHECK(s[i] != '/');
+    CHECK(arena[guard] == '#');
+  }
+
+  /* and the same loop must still find the real byte on a non-empty string */
+  REPOISON("a/b");
+  {
+    size_t i = hts_lastcharoffset(s);
+    int steps = 0;
+
+    while ((i > 0) && (steps < 8) && (s[i] != '/'))
+      i--, steps++;
+    CHECK(i == 1);
+    CHECK(arena[guard] == '#');
+  }
+
+  /* control: the canary must be able to fail, or the checks above prove
+     nothing. Clobber it exactly as the unguarded idiom would. */
+  REPOISON("");
+  s[-1] = '\0';
+  CHECK(arena[guard] != '#');
+  REPOISON("");
+  *(s + strlen(s) - 1) = 'X';
+  CHECK(arena[guard] != '#');
+
+#undef REPOISON
+#undef CHECK
+
+  printf("lastchar self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* hts_rtrim() and the sets it is called with. The string starts mid-arena, and
+   the byte below it is poisoned with '#' rather than 0, or the stray NUL the
+   old loop wrote there would read as untouched. */
+static int st_rtrim(httrackp *opt, int argc, char **argv) {
+  enum { off = 8 };
+
+  char arena[24];
+  char *const s = &arena[off];
+  const int guard = off - 1;
+  int err = 0;
+  int c;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+#define REPOISON(str)                                                          \
+  do {                                                                         \
+    memset(arena, '#', sizeof(arena));                                         \
+    strlcpybuff(s, (str), sizeof(arena) - off);                                \
+  } while (0)
+#define CHECK(cond)                                                            \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  /* nothing but spaces: the case that ran the old loop off the front */
+  REPOISON("   ");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  /* a space sitting below the string must not be eaten as if it were part of
+     it, which is exactly what the old loop did */
+  REPOISON("   ");
+  arena[guard] = ' ';
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == ' ');
+
+  REPOISON("");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(s[0] == '\0');
+  CHECK(arena[guard] == '#');
+
+  REPOISON("a b \t\r\n");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(strcmp(s, "a b") == 0);
+  CHECK(arena[guard] == '#');
+
+  REPOISON("ab");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(strcmp(s, "ab") == 0);
+
+  /* quotes count as space for is_space() but not for is_realspace() */
+  REPOISON("v\" ");
+  hts_rtrim(s, HTS_REALSPACES);
+  CHECK(strcmp(s, "v\"") == 0);
+  REPOISON("v\" ");
+  hts_rtrim(s, HTS_SPACES);
+  CHECK(strcmp(s, "v") == 0);
+
+  /* the sets must stay the macros they stand for */
+  for (c = 1; c < 256; c++) {
+    const char b = (char) c;
+
+    CHECK((strchr(HTS_SPACES, b) != NULL) == (is_space(b) != 0));
+    CHECK((strchr(HTS_REALSPACES, b) != NULL) == (is_realspace(b) != 0));
+  }
+
+  /* control: the canary must be able to fail */
+  REPOISON("   ");
+  s[-1] = '\0';
+  CHECK(arena[guard] != '#');
+
+#undef REPOISON
+#undef CHECK
+
+  printf("rtrim self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* Format LEN bytes of EXPECTED into S as two arguments, and check what came
+   back. HEAD and TAIL are scratch buffers of at least LEN+1 bytes. */
+static int strsprintf_case(String *s, const char *expected, size_t len,
+                           char *head, char *tail) {
+  const size_t half = len / 2;
+
+  memcpy(head, expected, half);
+  head[half] = '\0';
+  memcpy(tail, expected + half, len - half);
+  tail[len - half] = '\0';
+  StringSprintf(*s, "%s%s", head, tail);
+  return StringLength(*s) == len &&
+         memcmp(StringBuff(*s), expected, len) == 0 &&
+         StringBuff(*s)[len] == '\0';
+}
+
+/* StringSprintf_ stores the terminator at buffer[ret], so its `ret < capacity`
+   guard is off by one byte at the exact fill: an output whose length equals the
+   capacity writes past the allocation (#836). The lengths that reach it are the
+   capacities themselves, floored at 256 and doubling from there. */
+static int st_strsprintf(httrackp *opt, int argc, char **argv) {
+  static const size_t caps[] = {256, 512, 1024, 2048};
+
+  enum { maxLen = 2100 };
+
+  char *expected = malloct(maxLen + 1);
+  char *head = malloct(maxLen + 1);
+  char *tail = malloct(maxLen + 1);
+  String reused = STRING_EMPTY;
+  size_t i, len;
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  if (expected == NULL || head == NULL || tail == NULL) {
+    printf("strsprintf self-test: FAIL (out of memory)\n");
+    return 1;
+  }
+  for (i = 0; i < maxLen; i++)
+    expected[i] = (char) ('a' + (i % 26));
+  expected[maxLen] = '\0';
+
+  /* one call on a String whose capacity is pinned to the boundary, so len ==
+     capacity is reached exactly once per boundary */
+  for (i = 0; !err && i < sizeof(caps) / sizeof(caps[0]); i++) {
+    for (len = caps[i] - 3; !err && len <= caps[i] + 3; len++) {
+      String s = STRING_EMPTY;
+
+      StringRoomTotal(s, caps[i]);
+      if (StringCapacity(s) != caps[i]) {
+        printf("  FAIL: capacity %u pinned to %u\n", (unsigned) caps[i],
+               (unsigned) StringCapacity(s));
+        err = 1;
+      } else if (!strsprintf_case(&s, expected, len, head, tail)) {
+        printf("  FAIL: length %u at capacity %u\n", (unsigned) len,
+               (unsigned) caps[i]);
+        err = 1;
+      }
+      StringFree(s);
+    }
+  }
+
+  /* the same String reused: its capacity grows under it between calls, and a
+     shorter output must not leave the previous one behind */
+  for (len = 0; !err && len <= maxLen; len++) {
+    if (!strsprintf_case(&reused, expected, len, head, tail)) {
+      printf("  FAIL: growing length %u\n", (unsigned) len);
+      err = 1;
+    }
+  }
+  for (len = maxLen + 1; !err && len-- > 0;) {
+    if (!strsprintf_case(&reused, expected, len, head, tail)) {
+      printf("  FAIL: shrinking length %u\n", (unsigned) len);
+      err = 1;
+    }
+  }
+  StringFree(reused);
+
+  /* The give-up path: an argument libc cannot convert fails at every capacity,
+     so the retry loop climbs to STRING_SPRINTF_MAX and then empties the
+     String. Probe libc first -- a platform that formats an unpaired surrogate
+     without faulting never reaches the path. */
+  {
+    static const wchar_t bad[] = {(wchar_t) 0xd800, 0};
+    char probe[32];
+
+    if (snprintf(probe, sizeof(probe), "%ls", bad) < 0) {
+      String s = STRING_EMPTY;
+
+      StringCopy(s, "leftover");
+      StringSprintf(s, "%ls", bad);
+      if (StringNotEmpty(s) || StringBuff(s) == NULL ||
+          StringBuff(s)[0] != '\0') {
+        printf("  FAIL: a failed conversion left %u bytes behind\n",
+               (unsigned) StringLength(s));
+        err = 1;
+      }
+      StringFree(s);
+    } else { /* stderr: test 150 pins stdout to the one-line verdict */
+      fprintf(stderr, "  (skipped: this libc formats an unconvertible wide "
+                      "string)\n");
+    }
+  }
+
+  /* StringSprintf empties the String when it gives up, and the WebDAV
+     enumeration pops the trailing '/' right after: on an empty String an
+     unguarded pop would wrap the unsigned length and write off the end. */
+  {
+    String never = STRING_EMPTY;
+    String cleared = STRING_EMPTY;
+
+    StringPopRight(never); /* never written to: buffer_ is still NULL */
+    if (StringLength(never) != 0 || StringBuff(never) != NULL) {
+      printf("  FAIL: pop on an unallocated String\n");
+      err = 1;
+    }
+    StringClear(cleared);
+    StringPopRight(cleared);
+    if (StringLength(cleared) != 0 || StringBuff(cleared)[0] != '\0') {
+      printf("  FAIL: pop on an emptied String\n");
+      err = 1;
+    }
+    /* control: the guard must not swallow a pop that has a byte to drop */
+    StringSprintf(cleared, "ab");
+    StringPopRight(cleared);
+    if (StringLength(cleared) != 1 || strcmp(StringBuff(cleared), "a") != 0) {
+      printf("  FAIL: pop on a non-empty String\n");
+      err = 1;
+    }
+    StringFree(never);
+    StringFree(cleared);
+  }
+
+  freet(expected);
+  freet(head);
+  freet(tail);
+
+  printf("strsprintf self-test: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -6330,11 +8166,26 @@ static const struct selftest_entry {
     {"hashtable", "<count|file>", "coucal hashtable stress test", st_hashtable},
     {"strsafe", "[overflow|overflow-buff|overflow-src [str]]",
      "bounded string-op self-test", st_strsafe},
+    {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
+     st_strsprintf},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
+    {"lastchar", "",
+     "last-char helpers never index before the buffer (#770, #781, #821)",
+     st_lastchar},
+    {"rtrim", "", "hts_rtrim never walks below the buffer", st_rtrim},
     {"changes", "", "--changes bucket accounting and JSON escaping (#714)",
      st_changes},
     {"changes-race", "<dir>", "--changes under a late transfer thread (#714)",
      st_changes_race},
+    {"threadwait", "", "htsthread_wait() joins threads spawned just before it",
+     st_threadwait},
+    {"gmtime", "",
+     "hts_gmtime() fills the caller's buffer, not a static (#794)", st_gmtime},
+    {"localtime", "<dir>",
+     "hts_localtime() and get_filetime_rfc822()'s GMT labelling (#806)",
+     st_localtime},
+    {"backswap", "", "which backlog slots may be swapped to the ready table",
+     st_backswap},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},
@@ -6362,9 +8213,16 @@ static const struct selftest_entry {
      "local save-name for a URL", st_savename},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
+    {"escape-control", "[hex:..|string]",
+     "escape_remove_control() terminates at the compacted end",
+     st_escape_control},
     {"fsize", "<dir>", "file size past the 2GB signed-32-bit wrap", st_fsize},
     {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
      st_growsize},
+    {"addlink", "", "htsAddLink codebase walk over an empty current path",
+     st_addlink},
+    {"logcallback", "", "log callback must not consume the log file's va_list",
+     st_logcallback},
     {"cache", "<dir>", "cache read/write round-trip self-test", st_cache},
     {"cacheindex", "", "cache-index (.ndx) parse must stay in bounds",
      st_cacheindex},
@@ -6378,6 +8236,12 @@ static const struct selftest_entry {
      st_cache_legacy},
     {"cache-corrupt", "<dir>", "cache read-side corruption self-test",
      st_cache_corrupt},
+    {"cache-hdrbounds", "<dir>",
+     "cache header block must stay bounded at max-length fields",
+     st_cache_hdrbounds},
+    {"cache-urlbounds", "<dir>",
+     "cache store and lookup at max-length URLs must not abort or alias",
+     st_cache_urlbounds},
     {"zip-repair-shift", "<dir>",
      "cache zip-repair header read must not overflow a signed shift",
      st_zip_repair_shift},
@@ -6388,9 +8252,17 @@ static const struct selftest_entry {
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
+    {"structcheck", "<dir>",
+     "structcheck path guard and the <name>.txt rename it performs",
+     st_structcheck},
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
+    {"datadir", "<dir>",
+     "data directory resolution: compiled-in path, then the executable's tree",
+     st_datadir},
+    {"pathbin", "", "print the data directory this run resolved at startup",
+     st_pathbin},
     {"inplace-escape", "", "inplace_escape_* vs escape_* equivalence self-test",
      st_inplace_escape},
     {"escape-room", "", "HT_ADD_HTMLESCAPED* reservation-factor self-test",
@@ -6408,6 +8280,10 @@ static const struct selftest_entry {
     {"ftp-line", "", "get_ftp_line bounds a hostile FTP reply line",
      st_ftpline},
     {"ftp-userpass", "", "ftp_split_userpass bounds URL userinfo", st_ftpuser},
+    {"ftp-ctrlchars", "", "send_line rejects a control byte in an FTP command",
+     st_ftpctrl},
+    {"ftp-cmdlen", "",
+     "an FTP command too long for its control line is refused", st_ftpcmdlen},
     {"warc", "<dir>", "WARC/1.1 writer: framing, digests, revisit dedup",
      st_warc},
     {"warc-trunc", "<dir>", "WARC-Truncated on a cap-truncated body",
@@ -6420,6 +8296,9 @@ static const struct selftest_entry {
      st_warc_verbatim},
     {"warc-surt", "", "SURT canonicalization of the CDXJ sort key",
      st_warc_surt},
+    {"warc-longurl", "<dir>",
+     "a URL past the header-format buffer still reaches the archive",
+     st_warc_longurl},
     {"longpath", "<dir>",
      "round-trip a >MAX_PATH file through the _w* wrappers (\\\\?\\ on "
      "Windows)",
@@ -6427,6 +8306,15 @@ static const struct selftest_entry {
     {"mirrorio", "<dir>",
      "round-trip a long+non-ASCII path through the mirror I/O wrappers",
      st_mirrorio},
+    {"renameover", "<dir>",
+     "hts_rename_over(): replace dst, but never delete a dst it did not "
+     "replace",
+     st_renameover},
+    {"refetchbackup", "<dir>",
+     "the re-fetch backup always leaves a copy, and stays out of the mirror",
+     st_refetchbackup},
+    {"spoolname", "<dir>",
+     "a frozen backlog slot spools outside the mirror namespace", st_spoolname},
     {"direnum", "<dir>",
      "enumerate a long+non-ASCII directory through opendir/readdir",
      st_direnum},

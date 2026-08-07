@@ -43,8 +43,8 @@ Please visit our Website: http://www.httrack.com
    configure.ac, decoupled from these). VERSION is the display form, VERSIONID
    the dotted numeric form, AFF_VERSION the short form shown in footers,
    LIB_VERSION the data/cache format generation. */
-#define HTTRACK_VERSION "3.49-14"
-#define HTTRACK_VERSIONID "3.49.14"
+#define HTTRACK_VERSION "3.49-18"
+#define HTTRACK_VERSIONID "3.49.18"
 #define HTTRACK_AFF_VERSION "3.x"
 #define HTTRACK_LIB_VERSION "2.0"
 
@@ -272,6 +272,9 @@ typedef int hts_tristate;
 
 /* True when A is a non-NULL, non-empty string. */
 #define strnotempty(A) (((A) != NULL && (A)[0] != '\0'))
+
+/* Compile-time check, usable as an expression. */
+#define HTS_COMPILE_ASSERT(cond) ((void) sizeof(char[(cond) ? 1 : -1]))
 
 /* 'inline' where the dialect supports it (C++), nothing in plain C. */
 #ifdef __cplusplus

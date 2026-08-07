@@ -372,6 +372,8 @@ Create a Start Page
 Luo aloitussivu
 Create a word database of all html pages
 Luo sanatietokanta kaikista html-sivuista
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Luo peilistä täydellinen RFC822-postiarkisto (MHT/EML)
 Create error logging and report files
 Luo virheloki- ja raporttitiedostot
 Generate DOS 8-3 filenames ONLY
@@ -420,6 +422,12 @@ Browser identity
 Esittäydy selaimena
 Comment to be placed in each HTML file
 Jokaiseen HTML-tiedostoon pantava kommentti
+Languages accepted by the browser
+Selaimen hyväksymät kielet
+Additional HTTP headers to be sent in each requests
+Lisäotsakkeet, jotka lähetetään jokaisessa HTTP-pyynnössä
+HTTP referer to be sent for initial URLs
+Alkuperäisille URL-osoitteille lähetettävä HTTP-referer
 Back to starting page
 Palaa aloitussivulle
 Save current preferences as default values
@@ -480,6 +488,8 @@ Make an index
 Tee indeksi
 Make a word database
 Tee sanatietokanta
+Build a mail archive
+Tee postiarkisto
 Log files
 Lokitiedostot
 DOS names (8+3)
@@ -508,6 +518,12 @@ Identity
 Esittäydy
 HTML footer
 HTML-alatunniste
+Languages
+Kielet
+Additional HTTP Headers
+HTTP-lisäotsakkeet
+Default referer URL
+Oletusarvoinen referer-URL
 N# connections
 Yhteyksiä
 Abandon host if error
@@ -986,3 +1002,15 @@ Sitemap address:
 Sivukartan osoite:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Luettavan sivukartan osoite sivuston luotaamisen sijaan; jätä tyhjäksi, jolloin tarkistetaan robots.txt ja sitten /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Kirjoita WARC-arkiston CDXJ-hakemisto
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Kirjoita myös lajiteltu CDXJ-hakemisto, jossa on kaikki WARC-arkiston tietueet, toistotyökaluja varten.
+Package the crawl as a WACZ file
+Paketoi imurointi WACZ-tiedostoksi
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Kokoa WARC-arkisto, sen CDXJ-hakemisto ja peilatut sivut yhteen WACZ-tiedostoon; ottaa käyttöön myös WARC-arkiston ja CDXJ-hakemiston.
+WARC segment size limit:
+WARC-osan enimmäiskoko:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Aloita uusi WARC-osa, kun nykyinen ylittää tämän tavumäärän; jätä tyhjäksi tai 0, jolloin tiedosto pysyy yhtenä.

@@ -22,7 +22,8 @@ cleanup() {
     htssrv=
     rm -rf "$tmpdir"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 # --- the site ---------------------------------------------------------------
 doc="${tmpdir}/doc"
@@ -72,23 +73,7 @@ serverlog="${tmpdir}/server.log"
 : >"$serverlog"
 "$python" "$server" --root "$(nativepath "$doc")" >"$serverlog" 2>&1 &
 serverpid=$!
-port=
-for _ in $(seq 1 50); do
-    line=$(head -n1 "$serverlog" 2>/dev/null)
-    if test "${line%% *}" == "PORT"; then
-        port="${line#PORT }"
-        break
-    fi
-    kill -0 "$serverpid" 2>/dev/null || {
-        echo "server exited early: $(cat "$serverlog")"
-        exit 1
-    }
-    sleep 0.1
-done
-test -n "$port" || {
-    echo "could not discover server port"
-    exit 1
-}
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 base="http://127.0.0.1:${port}"
 
 which httrack >/dev/null || {
@@ -189,6 +174,15 @@ grep -q 'href="other.html"' "$page" || {
 }
 test -f "${out}/127.0.0.1_${port}/other.html" || {
     echo "FAIL: the linked page is missing from the mirror"
+    exit 1
+}
+echo OK
+
+printf '[a navigational rel keeps its link] ..\t'
+# The page carries a later rel="stylesheet"; reading rel past its own value let
+# this canonical link inherit it and inline the page it names.
+grep -q 'rel="canonical" href="other.html"' "$page" || {
+    echo "FAIL: rel=canonical was inlined"
     exit 1
 }
 echo OK

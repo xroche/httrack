@@ -84,9 +84,12 @@ extern "C" {
 /* OpenSSL structure */
 #include <openssl/bio.h>
 
+/* Engine-only: not exported, so the installed header must not offer it. */
+#ifdef HTS_INTERNAL_BYTECODE
 /** Process-wide OpenSSL client context, created lazily on first TLS use;
     shared by all connections. NULL until initialized. */
 extern SSL_CTX *openssl_ctx;
+#endif
 
 #endif
 #endif

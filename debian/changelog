@@ -1,3 +1,52 @@
+httrack (3.49.18-1) unstable; urgency=medium
+
+  * New upstream release, fixing the 3.49.17-1 build failures on armhf,
+    powerpc, hppa and loong64: the test suite's mmap interposer did not
+    compile on the first three, and the alternate-stack test insisted on a
+    longer backtrace than loong64's unwinder produces. Nothing in the engine
+    changed. Upstream now cross-builds the test shims for the ports
+    architectures on every push, so the next such break surfaces before the
+    buildds do.
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 05 Aug 2026 23:00:24 +0200
+
+httrack (3.49.17-1) unstable; urgency=medium
+
+  * New upstream release: security fixes in the FTP and HTTP request paths and
+    in both WebHTTrack interfaces, where a crawled page could reach the control
+    panel, plus crash-report and stack-diagnostic fixes; full list in
+    history.txt. Also fixes the 3.49.16-1 build failures on armhf, loong64 and
+    hppa, both in the crash-report test's unwinding assumptions and in the
+    per-test time budget.
+  * libhttrack-dev ships $(libdir)/pkgconfig/libhttrack.pc, and so now depends
+    on libhttrack3 and on the -dev packages whose modules that file names:
+    libssl-dev, libbrotli-dev and libzstd-dev.
+  * Build with --disable-online-unit-tests. Policy 4.9 forbids network access
+    during a build, and the previous "auto" probe found one on hurd-i386, whose
+    crawl tests then failed on DNS.
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 05 Aug 2026 12:28:23 +0200
+
+httrack (3.49.16-1) unstable; urgency=medium
+
+  * New upstream release: a stack overflow in the cache header writer, which a
+    server's response headers could trigger in httrack and libhttrack3 as well
+    as in proxytrack, and a ProxyTrack DAV buffer overflow; chunked trailer
+    handling, relocatable installs, crash-report backtraces on armhf, a hicolor
+    icon theme and translation fixes; full list in history.txt.
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 04 Aug 2026 18:32:40 +0200
+
+httrack (3.49.15-1) unstable; urgency=medium
+
+  * New upstream release: single-file mirrors with inlined assets, sitemap
+    ingestion, a change report between crawls, and numerous --update, FTP and
+    parser fixes; full list in history.txt.
+  * httrack-doc grows by roughly 1 MB: the offline guide now ships screenshots
+    of the WinHTTrack, WebHTTrack and Android interfaces.
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 30 Jul 2026 10:40:08 +0200
+
 httrack (3.49.14-1) unstable; urgency=medium
 
   * New upstream release: WARC/WACZ archive output, Windows long-path support,

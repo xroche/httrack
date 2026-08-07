@@ -62,19 +62,29 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
 
 /* Static definitions */
 
-HTS_UNUSED static void proxytrack_print_log(const char *severity, const char *format, ...) {
+/* Log one line; a NULL severity discards it. */
+HTS_UNUSED static void proxytrack_vprint_log(const char *severity,
+                                             const char *format, va_list args) {
   if (severity != NULL) {
     const int error = errno;
     FILE *const fp = stderr;
-    va_list args;
 
     fprintf(fp, " * %s: ", severity);
-    va_start(args, format);
     (void) vfprintf(fp, format, args);
-    va_end(args);
     fputs("\n", fp);
     fflush(fp);
     errno = error;
+  }
+}
+
+HTS_UNUSED static void proxytrack_print_log(const char *severity,
+                                            const char *format, ...) {
+  if (severity != NULL) {
+    va_list args;
+
+    va_start(args, format);
+    proxytrack_vprint_log(severity, format, args);
+    va_end(args);
   }
 }
 
@@ -360,21 +370,14 @@ HTS_UNUSED static struct tm *convert_time_rfc822(struct tm *result, const char *
 HTS_UNUSED static struct tm PT_GetTime(time_t t) {
   struct tm tmbuf;
 
-#ifdef _WIN32
-  struct tm *tm = gmtime(&t);
-#else
-  struct tm *tm = gmtime_r(&t, &tmbuf);
-#endif
-  if (tm != NULL)
-    return *tm;
-  else {
+  if (!hts_gmtime(t, &tmbuf)) {
     /* an all-zero tm has tm_mday == 0, which the ARC date field prints as a
        day of "00"; the epoch is the conventional "date unknown" */
     memset(&tmbuf, 0, sizeof(tmbuf));
     tmbuf.tm_year = 70;
     tmbuf.tm_mday = 1;
-    return tmbuf;
   }
+  return tmbuf;
 }
 HTS_UNUSED static int set_filetime(const char *file, struct tm *tm_time) {
   struct utimbuf tim;

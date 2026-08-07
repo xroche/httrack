@@ -1,0 +1,95 @@
+#!/bin/bash
+# A stack-overflow SIGSEGV has no room left for a signal frame on the faulting
+# stack: without SA_ONSTACK the kernel kills us at 139 with no report at all
+# (#866). Checks the handler still speaks, still reaches its end, and that the
+# fault under test really was a runaway recursion.
+
+set -euo pipefail
+
+ulimit -c 0 # a deliberate crash must not litter the box with cores
+
+fail() {
+    echo "$*" >&2
+    exit 1
+}
+
+case "$(uname -s)" in
+Linux) traced=1 ;;
+MINGW* | MSYS* | CYGWIN*)
+    echo "no sigaltstack on Windows, skipping" >&2
+    exit 77
+    ;;
+# sigaltstack() is POSIX, so the fix applies; only the trace text below is
+# gated on Linux + execinfo.h (USES_BACKTRACE in htsbacktrace.c).
+*) traced=0 ;;
+esac
+command -v httrack >/dev/null || fail "could not find httrack"
+
+# Dies from a caught fault, announcing it and running the report to its end.
+# The handler finishes in abort(), so the shell sees SIGABRT (134).
+crash_report() {
+    local kind="$1" out rc=0
+
+    out=$(httrack "-#c=$kind" 2>&1) || rc=$?
+    test "$rc" -eq 134 ||
+        fail "-#c=$kind exited $rc, expected 134 (139 means the handler never ran)"
+    grep -q "Deliberate '$kind' crash requested" <<<"$out" ||
+        fail "-#c=$kind: the deliberate-crash notice is missing"
+    grep -q "Please report the problem" <<<"$out" ||
+        fail "-#c=$kind: report truncated, the handler died halfway"
+    printf '%s\n' "$out"
+}
+
+# How often the most repeated address occurs: a runaway recursion prints the
+# same return address at every level, an ordinary fault repeats none. Tells the
+# two apart, and rejects a report carrying no frame at all.
+deepest_repeat() {
+    local addrs
+
+    addrs=$(grep -oE '0x[0-9a-f]+' <<<"$1" || true)
+    if [ -z "$addrs" ]; then
+        echo 0
+        return
+    fi
+    sort <<<"$addrs" | uniq -c | sort -rn | awk 'NR==1 { print $1 + 0 }'
+}
+
+# Raw frames in the report: backtrace_symbols_fd() closes every one with [0xADDR].
+frame_count() {
+    grep -c '\[0x' <<<"$1" || true
+}
+
+# Control: an ordinary SIGSEGV was already reported before the fix, so a build
+# or harness that can no longer see any crash fails here rather than passing the
+# real case vacuously.
+segv=$(crash_report segv)
+stack=$(crash_report stack)
+
+if [ "$traced" -eq 0 ]; then
+    exit 0
+fi
+
+grep -q "^Caught signal 11$" <<<"$segv" || fail "-#c=segv: no 'Caught signal 11' line"
+grep -q "^Caught signal 11$" <<<"$stack" || fail "-#c=stack: no 'Caught signal 11' line"
+
+# Measured on x86-64: recursion 256 frames/~250 repeats, control 11/1.
+stack_deep=$(deepest_repeat "$stack")
+segv_deep=$(deepest_repeat "$segv")
+stack_frames=$(frame_count "$stack")
+
+# armhf and loong64 cannot unwind out of the frame that faulted on the guard page,
+# leaving the handler's own three frames and nothing to count. An absolute floor,
+# not a compare against the control: the two call chains differ by a frame that
+# only -O2 tail-calls away, and a crash_stack that merely stopped recursing still
+# unwinds 11. Killing that mutant is what the count below is for.
+if [ "$stack_frames" -lt 6 ]; then
+    echo "-#c=stack: $stack_frames frames, too few for this unwinder to" \
+        "show the recursion:" >&2
+    head -5 <<<"$stack" >&2
+    exit 0
+fi
+test "$stack_deep" -ge 20 ||
+    fail "-#c=stack: deepest frame repeats $stack_deep times over $stack_frames frames," \
+        "expected a recursion"
+test "$segv_deep" -lt 20 ||
+    fail "-#c=segv: deepest frame repeats $segv_deep times, the threshold no longer discriminates"

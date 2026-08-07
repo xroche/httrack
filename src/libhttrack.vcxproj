@@ -114,6 +114,7 @@
     <ClCompile Include="htsconcat.c" />
     <ClCompile Include="htscore.c" />
     <ClCompile Include="htscoremain.c" />
+    <ClCompile Include="htscrashtest.c" />
     <ClCompile Include="htsdns_selftest.c" />
     <ClCompile Include="htsencoding.c" />
     <ClCompile Include="htsfilters.c" />
@@ -125,6 +126,7 @@
     <ClCompile Include="htscmdline.c" />
     <ClCompile Include="htsurlport.c" />
     <ClCompile Include="htsmd5.c" />
+    <ClCompile Include="htsnet.c" />
     <ClCompile Include="htsmodules.c" />
     <ClCompile Include="htsname.c" />
     <ClCompile Include="htsparse.c" />

@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A URL past the header-format buffer must still produce a record: the archive
+# used to lose it whole, with no error and an exit status of 0 (#785).
+
+set -e
+
+: "${top_srcdir:=..}"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_longurl.XXXXXX")
+trap 'set +e; rm -rf "$tmp"' EXIT
+
+httrack -O "$tmp/out" "-#test=warc-longurl" "$tmp"

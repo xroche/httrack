@@ -24,8 +24,12 @@ Makefile.in
 /config.log
 /config.status
 /stamp-h1
+# src/webhttrack.in is the source; an in-tree build generates this one (#887).
+/src/webhttrack
+/src/libhttrack.pc
 Makefile
 .deps/
+.dirstamp
 .libs/
 *.o
 *.lo
@@ -33,6 +37,15 @@ Makefile
 *.so
 *.so.*
 *.a
+
+# Built into the checkout by an in-tree "make" / "make check".
+/src/httrack
+/src/htsserver
+/src/proxytrack
+/tools/Info.plist
+/tests/stringoom
+/tests/*.log
+/tests/*.trs
 
 # make dist output; dist/ holds httrack-gh-release staging artifacts.
 /httrack-*.tar.gz

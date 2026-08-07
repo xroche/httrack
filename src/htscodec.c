@@ -72,7 +72,7 @@ hts_codec hts_codec_parse(const char *encoding) {
     return HTS_CODEC_IDENTITY;
   if (strfield2(encoding, "gzip") || strfield2(encoding, "x-gzip") ||
       strfield2(encoding, "deflate") || strfield2(encoding, "x-deflate"))
-    return HTS_USEZLIB ? HTS_CODEC_DEFLATE : HTS_CODEC_UNSUPPORTED;
+    return HTS_CODEC_DEFLATE;
   if (strfield2(encoding, "br"))
     return HTS_USEBROTLI ? HTS_CODEC_BROTLI : HTS_CODEC_UNSUPPORTED;
   if (strfield2(encoding, "zstd"))
@@ -98,16 +98,11 @@ hts_codec hts_codec_parse(const char *encoding) {
 const char *hts_acceptencoding(hts_boolean compressible, hts_boolean secure) {
   if (!compressible)
     return "identity";
-#if HTS_USEZLIB
   /* br and zstd over TLS only, as browsers do: a cleartext intermediary that
      rewrites a coding it can not read would corrupt the mirror. */
   if (secure)
     return "gzip, deflate" HTS_AE_BROTLI HTS_AE_ZSTD ", identity;q=0.9";
   return "gzip, deflate, identity;q=0.9";
-#else
-  (void) secure;
-  return "identity";
-#endif
 }
 
 hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext) {
@@ -300,11 +295,7 @@ int hts_codec_unpack(hts_codec codec, const char *filename,
     return -1;
   switch (codec) {
   case HTS_CODEC_DEFLATE:
-#if HTS_USEZLIB
     return hts_zunpack(filename, newfile);
-#else
-    return -1;
-#endif
   case HTS_CODEC_BROTLI:
   case HTS_CODEC_ZSTD:
     break;
@@ -348,10 +339,8 @@ size_t hts_codec_head(hts_codec codec, const void *in, size_t in_len, void *out,
   if (in == NULL || in_len == 0 || out == NULL || out_len == 0)
     return 0;
   switch (codec) {
-#if HTS_USEZLIB
   case HTS_CODEC_DEFLATE:
     return hts_zhead(in, in_len, out, out_len);
-#endif
 #if HTS_USEBROTLI
   case HTS_CODEC_BROTLI:
     return codec_head_brotli(in, in_len, out, out_len);

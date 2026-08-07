@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htslib.h"
 #include "htscharset.h" // after htslib.h: winsock2.h must precede windows.h
 #include "htsbacktrace.h"
+#include "htsthread.h"
 
 /* Static definitions */
 static int fexist(const char *s);
@@ -909,7 +910,7 @@ static void sig_fatal(int code) {
   size += print_num(&buffer[size], code);
   buffer[size++] = '\n';
   (void) (write(FD_ERR, buffer, size) == size);
-  hts_print_backtrace(FD_ERR);
+  hts_print_backtrace();
   (void) (write(FD_ERR, msgreport, sizeof(msgreport) - 1)
     == sizeof(msgreport) - 1);
   abort();
@@ -931,8 +932,28 @@ static void sig_leave(int code) {
   }
 }
 
+/* SA_ONSTACK, so a stack-overflow SIGSEGV still reaches sig_fatal: the faulting
+   stack has no room left for a signal frame, and the kernel then kills the
+   process with no diagnostic at all (#866). */
+static void install_fatal_handler(int code) {
+#ifdef SA_ONSTACK
+  struct sigaction sa;
+
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = sig_fatal;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_ONSTACK;
+  if (sigaction(code, &sa, NULL) == 0)
+    return;
+#endif
+  signal(code, sig_fatal);
+}
+
 static void signal_handlers(void) {
   hts_backtrace_init();
+  (void) hts_backtrace_altstack();
+  /* The crawl recurses in the engine's workers, so they need one too (#969). */
+  hts_set_thread_hooks(hts_backtrace_altstack, hts_backtrace_altstack_release);
 #ifdef _WIN32
   signal(SIGINT, sig_leave);    // ^C
   signal(SIGTERM, sig_finish);  // kill <process>
@@ -944,16 +965,16 @@ static void signal_handlers(void) {
   signal(SIGCHLD, sig_ignore);  // child change status
 #endif
 #ifdef SIGABRT
-  signal(SIGABRT, sig_fatal);    // abort
+  install_fatal_handler(SIGABRT); // abort
 #endif
 #ifdef SIGBUS
-  signal(SIGBUS, sig_fatal);    // bus error
+  install_fatal_handler(SIGBUS); // bus error
 #endif
 #ifdef SIGILL
-  signal(SIGILL, sig_fatal);    // illegal instruction
+  install_fatal_handler(SIGILL); // illegal instruction
 #endif
 #ifdef SIGSEGV
-  signal(SIGSEGV, sig_fatal);   // segmentation violation
+  install_fatal_handler(SIGSEGV); // segmentation violation
 #endif
 }
 

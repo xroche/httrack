@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# Issue #773: a test must fail only when an assertion fails. Under "set -e" a
+# failing command in an EXIT trap becomes the script's exit status, so a
+# teardown hiccup turned a test whose assertions all passed into a red CI leg.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+tmp=$(mktemp -d)
+trap 'set +e; rm -rf "$tmp"' EXIT
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+# run <trap-body> <script-body>: exit status and stderr of a subject script.
+run() {
+    {
+        echo "set -euo pipefail"
+        # printf, so the scanner below does not read this as a trap of our own
+        printf 'trap %s EXIT\n' "$1"
+        echo "$2"
+    } >"$tmp/subject"
+    rc=0
+    err=$(bash "$tmp/subject" 2>&1 >/dev/null) || rc=$?
+}
+
+# 1. the shape in the tree: teardown fails, every assertion passed -> pass
+run "'set +e; false'" "true"
+test "$rc" -eq 0 || fail "guarded teardown failure exited $rc, want 0"
+
+# 2. teeth for case 1: unguarded, the same teardown is what went red
+run "'false'" "true"
+test "$rc" -eq 1 || fail "unguarded teardown failure exited $rc, want 1"
+
+# 3. the guard must not swallow a real failure, nor a skip
+run "'set +e; false'" "exit 1"
+test "$rc" -eq 1 || fail "assertion failure exited $rc, want 1"
+run "'set +e; false'" "exit 77"
+test "$rc" -eq 77 || fail "skip exited $rc, want 77"
+
+# 4. not failing must not mean going quiet: teardown still reports why
+run "'set +e; rm /nonexistent-teardown-probe'" "true"
+test "$rc" -eq 0 || fail "guarded teardown failure exited $rc, want 0"
+case "$err" in
+*nonexistent-teardown-probe*) ;;
+*) fail "teardown error was silenced (stderr: '$err')" ;;
+esac
+echo "OK: teardown cannot decide the verdict, and still reports"
+
+# 5. no test may reintroduce the shape case 2 pins. Two spellings neutralise
+# errexit for teardown: "set +e" first, or "|| true" over the whole body.
+scanned=0
+for f in "$top_srcdir"/tests/*.test "$top_srcdir"/tests/*.sh; do
+    test -r "$f" || continue
+    scanned=$((scanned + 1))
+done
+# an unexpanded glob would report no offender having read nothing
+test "$scanned" -ge 50 || fail "scanned $scanned scripts in $top_srcdir/tests, want the whole suite"
+
+bad=$(awk '
+    FNR == 1 { errexit = 0 }
+    /^[[:space:]]*set[[:space:]]+(-[a-z]*e|-o[[:space:]]+errexit)/ { errexit = 1 }
+    !errexit { next }
+    !/^[[:space:]]*trap[[:space:]]+.*[[:space:]]EXIT([[:space:]]|;|$)/ { next }
+    {
+        guarded = /^[[:space:]]*trap[[:space:]]+.set \+e; / || /\|\|[[:space:]]+true.[[:space:]]+EXIT/
+        if (!guarded)
+            print FILENAME ":" FNR " unguarded"
+        # "set +e" on a trap shared with a signal leaves errexit off for the
+        # rest of the run, so a torn-down test could still report success
+        else if (/^[[:space:]]*trap[[:space:]]+.set \+e; / && /[[:space:]]EXIT[[:space:]]+[A-Z]/)
+            print FILENAME ":" FNR " set +e shared with a signal trap"
+    }
+' "$top_srcdir"/tests/*.test "$top_srcdir"/tests/*.sh)
+test -z "$bad" || fail "EXIT trap can decide the verdict:
+$bad"
+echo "OK: every EXIT trap under set -e runs teardown with errexit off"

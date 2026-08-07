@@ -1,0 +1,8 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# send_line() drops an FTP command carrying a control byte (#1010).
+out=$(httrack -O /dev/null -#test=ftp-ctrlchars run)
+grep -q "ftp-ctrlchars self-test OK" <<<"$out"

@@ -10,13 +10,14 @@ set -euo pipefail
 
 httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
 
-if ! "$httrack_bin" -#test 2>&1 | grep -q '^  warc-wacz'; then
+registry=$("$httrack_bin" -#test 2>&1 || true)
+if ! grep -q '^  warc-wacz' <<<"$registry"; then
     echo "warc-wacz self-test unavailable (build without OpenSSL); skipping"
     exit 77
 fi
 
 scratch=$(mktemp -d)
-trap 'rm -rf "$scratch"' EXIT
+trap 'set +e; rm -rf "$scratch"' EXIT
 
 out=$("$httrack_bin" -O /dev/null -#test=warc-wacz "$scratch/")
 echo "$out"

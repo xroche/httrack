@@ -1,0 +1,111 @@
+#!/bin/bash
+# Issue #854: a character reference the page charset can not represent must be
+# percent-escaped in a query string (%26%23<decimal>%3B), not left as source
+# text whose '&' and '#' split the query into extra parameters. A reference the
+# charset does represent must still go out as its encoded bytes.
+set -eu
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+httrack=$(command -v httrack) || ! echo "could not find httrack" >&2 || exit 1
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_854.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'cleanup || true' EXIT HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+reqlog="${tmpdir}/requests.txt"
+: >"$reqlog"
+CHARREF_LOG="$reqlog" "$python" "$server" --root "$root" >"$serverlog" 2>&1 &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+
+"$httrack" -O "${tmpdir}/crawl" --quiet --disable-security-limits --robots=0 \
+    --timeout=30 --retries=0 "http://127.0.0.1:${port}/charref/index.html" \
+    >"${tmpdir}/crawl.log" 2>&1 || true
+
+query_of() {
+    grep -F "/charref/$1.html?" "$reqlog" | cut -f1 |
+        sed "s|^/charref/$1.html?||" | sort -u
+}
+
+# check <label> <page> <want-parameter-count> <acceptable-query>...
+# The count is the origin's own parse of the wire bytes, independent of the
+# expected string. More than one query is acceptable where iconv and Windows
+# encode the same code point differently.
+check() {
+    local label="$1" page="$2" wantcount="$3" got count want ok=
+    shift 3
+    printf '[%s] ..\t' "$label"
+    got=$(query_of "$page") || got=
+    count=$(grep -F "/charref/${page}.html?" "$reqlog" | cut -f2 | sort -u) || count=
+    for want in "$@"; do
+        if test "$got" == "$want"; then
+            ok=1
+        fi
+    done
+    if test -z "$ok"; then
+        echo "FAIL: expected query '$1', got '${got}'"
+        exit 1
+    fi
+    if test "$count" != "$wantcount"; then
+        echo "FAIL: origin parsed '${count}' parameters, expected ${wantcount}"
+        exit 1
+    fi
+    echo "OK (${count} parameters)"
+}
+
+# iso-8859-1 fallback: € is unrepresentable (named and numeric alike), é is not.
+check "charset-less page" qnone 4 \
+    'a=%26%238364%3B&b=%26%238364%3B&c=%e9&d=x'
+# Control: utf-8 represents both, so they go out as their encoded bytes.
+check "declared utf-8 page" qutf8 4 \
+    'a=%e2%82%ac&b=%e2%82%ac&c=%c3%a9&d=x'
+# Multi-byte: あ and 〜 must survive as their encoded bytes, only € gets escaped.
+# The two cp932 tables disagree about 〜 (U+301C): iconv encodes it, Windows maps
+# 0x8160 to U+FF5E instead and reports the substitution, so both are correct.
+check "declared shift_jis page" qsjis 4 \
+    'a=%82%a0&c=%81`&b=%26%238364%3B&d=x' \
+    'a=%82%a0&c=%26%2312316%3B&b=%26%238364%3B&d=x'
+
+# iso-2022-jp encodes both references 7-bit clean, where a round-trip check saw
+# every one of them as unrepresentable. Asserted per field: iconv and Windows
+# differ on the trailing shift back to ASCII, so the bytes are not one string.
+printf '[declared iso-2022-jp page] ..\t'
+jis=$(query_of qjis) || jis=
+jiscount=$(grep -F "/charref/qjis.html?" "$reqlog" | cut -f2 | sort -u) || jiscount=
+for field in ${jis//&/ }; do
+    case "$field" in
+    a=%1b\$B* | c=%1b\$B*)
+        case "$field" in
+        *%26%23*)
+            echo "FAIL: '$field' escaped a reference iso-2022-jp represents"
+            exit 1
+            ;;
+        esac
+        ;;
+    # WideCharToMultiByte refuses lpUsedDefaultChar on a stateful codepage, so
+    # Windows substitutes € invisibly; harmless, '?' is no query delimiter.
+    b=%26%238364%3B | b=%3f | 'b=?' | d=x) ;;
+    *)
+        echo "FAIL: unexpected field '$field' in '$jis'"
+        exit 1
+        ;;
+    esac
+done
+if test "$jiscount" != 4; then
+    echo "FAIL: origin parsed '${jiscount}' parameters, expected 4"
+    exit 1
+fi
+echo "OK (${jiscount} parameters)"

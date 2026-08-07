@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
-# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms and GNU-only
-# tool flags despite the #!/bin/bash above.
+# Stick to POSIX tool flags: macOS ships BSD grep/sed, not the GNU ones.
 
 # Cache write-failure policy (-#test=cache-writefail <dir>). #174/#219: disk
 # full or a failure streak aborts cleanly; an isolated failure or an oversized
@@ -11,19 +9,19 @@
 set -eu
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 out=$(httrack -#test=cache-writefail "$dir")
 
 # Match the exact success line (error logs also go to stdout); a renamed/removed
 # test prints the registry to stderr, which exits non-zero but never prints this.
-printf '%s\n' "$out" | grep -qx "cache-writefail: OK" || {
+grep -qx "cache-writefail: OK" <<<"$out" || {
     echo "expected 'cache-writefail: OK', got: $out" >&2
     exit 1
 }
 
 # A skipped entry must be warned about with its URL.
-printf '%s\n' "$out" | grep -q "entry not cached: example.com/" || {
+grep -q "entry not cached: example.com/" <<<"$out" || {
     echo "expected a URL-bearing skip warning" >&2
     exit 1
 }

@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# #774: the site serves hts-tmp/, the reserved segment url_savename must escape
+# so a mirrored file cannot sit where the engine writes. Asserting the unescaped
+# path would pass with the bug live, which is how a first attempt missed it.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --rerun-args '--update' \
+    --file-matches 'bakname/a.bin' 'BAKNAME-MAIN-V2' \
+    --file-matches 'bakname/hts-tmp_/a.bin.bak' 'BAKNAME-SIBLING' \
+    --file-min-bytes 'bakname/hts-tmp_/a.bin.bak' 2048 \
+    --not-found 'bakname/hts-tmp/a.bin.bak' \
+    --log-not-found 'could not back up' \
+    --log-not-found 'could not restore' \
+    httrack 'BASEURL/bakname/index.html'

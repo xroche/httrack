@@ -5,7 +5,7 @@
 set -euo pipefail
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # $1 Last-Modified value (empty = omit the header), $2 expected archive date,
 # $3 label. The date is asserted exactly: a guard that fires unconditionally

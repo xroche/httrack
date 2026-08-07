@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# structcheck(): the path-length guard, and the <name>.txt rename that once
+# built its target with an unbounded sprintf (#745).
+
+set -euo pipefail
+
+dir=$(mktemp -d)
+trap 'set +e; rm -rf "$dir"' EXIT
+
+httrack -O /dev/null -#test=structcheck "$dir" |
+    grep -q "structcheck self-test OK"

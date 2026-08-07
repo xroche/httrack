@@ -30,7 +30,7 @@ cleanup() {
     stop_server "$ptpid"
     rm -rf "$dir"
 }
-trap cleanup EXIT
+trap 'set +e; cleanup' EXIT
 
 # Neither header is present, so file->contenttype and ->lastmodified stay "".
 printf 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"

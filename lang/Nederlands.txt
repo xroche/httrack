@@ -186,6 +186,8 @@ scanning
 scanning
 Waiting for scheduled time..
 Wacht op voorgegeven uur om te starten
+Transferring data..
+Gegevens overdragen..
 Connecting to provider
 Maak verbinding met de provider
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Startpagina aanmaken
 Create a word database of all html pages
 Kreëer een woorden-gegevensbank van alle HTML paginas
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Maak een volledig RFC822 mailarchief (MHT/EML) van de spiegeling
 Create error logging and report files
 Aanmaken van Protokolbestanden voor fouten en mededelingen.
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Browser identiteit
 Comment to be placed in each HTML file
 Voetnoot in elk HTML bestand
+Languages accepted by the browser
+Talen die de browser accepteert
+Additional HTTP headers to be sent in each requests
+Extra HTTP-headers die bij elk verzoek worden verstuurd
+HTTP referer to be sent for initial URLs
+HTTP-referer die voor de begin-URL's wordt verstuurd
 Back to starting page
 Terug naar de startpagina
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Maak een index
 Make a word database
 Kreëer een woorden-gegevensbank
+Build a mail archive
+Maak een mailarchief
 Log files
 Protocolbestanden
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identiteit
 HTML footer
 HTML voetnota
+Languages
+Talen
+Additional HTTP Headers
+Extra HTTP-headers
+Default referer URL
+Standaard referer-URL
 N# connections
 N# verbindingen
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Sitemap-adres:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Adres van een sitemap die gelezen moet worden in plaats van de site te onderzoeken; laat leeg om robots.txt en daarna /sitemap.xml te controleren.
+Write a CDXJ index of the WARC archive
+Een CDXJ-index van het WARC-archief schrijven
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Ook een gesorteerde CDXJ-index schrijven met elk record uit het WARC-archief, voor replaytools.
+Package the crawl as a WACZ file
+De crawl als WACZ-bestand verpakken
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Het WARC-archief, de CDXJ-index en de gespiegelde pagina's in één WACZ-bestand bundelen; impliceert het WARC-archief en de CDXJ-index.
+WARC segment size limit:
+Maximale grootte van een WARC-segment:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Een nieuw WARC-segment beginnen zodra het huidige dit aantal bytes overschrijdt; laat leeg of 0 voor één bestand.

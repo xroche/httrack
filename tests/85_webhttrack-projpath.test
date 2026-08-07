@@ -28,7 +28,8 @@ cleanup() {
     rm -f "${log}"
     rm -rf "${base}"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 freeport() {
     python3 -c 'import socket

@@ -1,102 +1,75 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-	<meta name="description" content="HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help" />
-	<meta name="keywords" content="httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software" />
-	<title>HTTrack Website Copier - Offline Browser</title>
-
-	<style type="text/css">
-	<!--
-
-body {
-	margin: 0;  padding: 0;  margin-bottom: 15px;  margin-top: 8px;
-	background: #77b;
-}
-body, td {
-	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
-	}
-
-#subTitle {
-	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
-	}
-
-#siteNavigation a, #siteNavigation .current {
-	font-weight: bold;  color: #448;
-	}
-#siteNavigation a:link    { text-decoration: none; }
-#siteNavigation a:visited { text-decoration: none; }
-
-#siteNavigation .current { background-color: #ccd; }
-
-#siteNavigation a:hover   { text-decoration: none;  background-color: #fff;  color: #000; }
-#siteNavigation a:active  { text-decoration: none;  background-color: #ccc; }
-
-a:link    { text-decoration: underline;  color: #00f; }
-a:visited { text-decoration: underline;  color: #000; }
-a:hover   { text-decoration: underline;  color: #c00; }
-a:active  { text-decoration: underline; }
-
-#pageContent {
-	clear: both;
-	border-bottom: 6px solid #000;
-	padding: 10px;  padding-top: 20px;
-	line-height: 1.65em;
-	background-image: url(images/bg_rings.gif);
-	background-repeat: no-repeat;
-	background-position: top right;
-	}
-
-#pageContent, #siteNavigation {
-	background-color: #ccd;
-	}
-
-.imgLeft  { float: left;   margin-right: 10px;  margin-bottom: 10px; }
-.imgRight { float: right;  margin-left: 10px;   margin-bottom: 10px; }
-
-hr { height: 1px;  color: #000;  background-color: #000;  margin-bottom: 15px; }
-
-h1 { margin: 0;  font-weight: bold;  font-size: 2em; }
-h2 { margin: 0;  font-weight: bold;  font-size: 1.6em; }
-h3 { margin: 0;  font-weight: bold;  font-size: 1.3em; }
-h4 { margin: 0;  font-weight: bold;  font-size: 1.18em; }
-
-.blak { background-color: #000; }
-.hide { display: none; }
-.tableWidth { min-width: 400px; }
-
-.tblRegular       { border-collapse: collapse; }
-.tblRegular td    { padding: 6px;  background-image: url(fade.gif);  border: 2px solid #99c; }
-.tblHeaderColor, .tblHeaderColor td { background: #99c; }
-.tblNoBorder td   { border: 0; }
-
-// -->
-</style>
-
+<!-- doc-chrome:head -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A task-oriented guide to the httrack command line: scope, filters, limits, logins, proxies, updates and recipes.">
+<link rel="stylesheet" href="doc.css">
+<script src="doc.js" defer></script>
+<!-- /doc-chrome:head -->
+<title>HTTrack command-line guide</title>
 </head>
+<body>
 
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
-	<tr>
-	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
-	</tr>
-</table>
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
-	<tr>
-	<td id="subTitle">Open Source offline browser</td>
-	</tr>
-</table>
-<table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
-<tr class="blak">
-<td>
-	<table width="100%" border="0" align="center" cellspacing="1" cellpadding="0">
-	<tr>
-	<td colspan="6"> 
-		<table width="100%" border="0" align="center" cellspacing="0" cellpadding="10">
-		<tr> 
-		<td id="pageContent"> 
-<!-- ==================== End prologue ==================== -->
+<!-- doc-chrome:top -->
+<a class="skip" href="#main">Skip to content</a>
 
-<h2 align="center"><em>Command-Line Guide</em></h2>
+<header class="masthead">
+	<img src="images/wordmark.svg" width="400" height="36" alt="HTTrack Website Copier">
+	<div class="tagline">Open Source offline browser</div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Documentation">
+	<h2>On this page</h2>
+	<ul>
+		<li><a href="#quickstart">1. Quick start</a></li>
+		<li><a href="#scope">2. Scope: how far the crawl reaches</a></li>
+		<li><a href="#filters">3. Filters and scan rules</a></li>
+		<li><a href="#limits">4. Limits and politeness</a></li>
+		<li><a href="#names">5. File names and types</a></li>
+		<li><a href="#links">6. Links and page building</a></li>
+		<li><a href="#identity">7. Identity, cookies and login</a></li>
+		<li><a href="#proxy">8. Proxy and network</a></li>
+		<li><a href="#update">9. Update and cache</a></li>
+		<li><a href="#experts">10. Experts and scripting</a></li>
+		<li><a href="#recipes">11. Recipes</a></li>
+	</ul>
+	<h2>Start here</h2>
+	<ul>
+		<li><a href="guide.html">Interface guide</a></li>
+		<li><a href="faq.html">FAQ and troubleshooting</a></li>
+		<li><a href="abuse.html">Using HTTrack responsibly</a></li>
+	</ul>
+	<h2>Command line</h2>
+	<ul>
+		<li><a href="cmdguide.html" aria-current="page" class="here">Command-line guide</a></li>
+		<li><a href="httrack.man.html">Option reference</a></li>
+		<li><a href="filters.html">Filter syntax</a></li>
+	</ul>
+	<h2>Developers</h2>
+	<ul>
+		<li><a href="dev.html">Programming</a></li>
+		<li><a href="library.html">libhttrack API</a></li>
+		<li><a href="plug.html">Callbacks</a></li>
+		<li><a href="scripting.html">Scripting</a></li>
+		<li><a href="cache.html">Cache format</a></li>
+		<li><a href="changes.html">Change report format</a></li>
+	</ul>
+	<h2>More</h2>
+	<ul>
+		<li><a href="fcguide.html">Users Guide (3.10)</a></li>
+		<li><a href="contact.html">Contact and credits</a></li>
+		<li><a href="index.html">All documentation</a></li>
+	</ul>
+</nav>
+
+<main id="main">
+<!-- /doc-chrome:top -->
+
+<h1>Command-Line Guide</h1>
 
 <p>This is a task-oriented guide to the <tt>httrack</tt> command line: how to do the
 things people actually ask for, and the handful of defaults that surprise
@@ -111,21 +84,6 @@ when a mirror does something you did not expect, the answer is almost always in
 the log. Every project writes <tt>hts-log.txt</tt> (and <tt>hts-err.txt</tt>) into
 its output directory, and those files name every URL that was refused, redirected,
 or filtered out. Read them first.</p>
-
-<h4>On this page</h4>
-<ul class="tblNoBorder">
-  <li><a href="#quickstart">1. Quick start</a></li>
-  <li><a href="#scope">2. Scope: how far the crawl reaches</a></li>
-  <li><a href="#filters">3. Filters and scan rules</a></li>
-  <li><a href="#limits">4. Limits and politeness</a></li>
-  <li><a href="#names">5. File names and types</a></li>
-  <li><a href="#links">6. Links and page building</a></li>
-  <li><a href="#identity">7. Identity, cookies and login</a></li>
-  <li><a href="#proxy">8. Proxy and network</a></li>
-  <li><a href="#update">9. Update and cache</a></li>
-  <li><a href="#experts">10. Experts and scripting</a></li>
-  <li><a href="#recipes">11. Recipes</a></li>
-</ul>
 
 <h3 id="quickstart">1. Quick start</h3>
 
@@ -156,7 +114,7 @@ you write. Get this right and most "it downloaded too much" or "it only grabbed
 the index" problems disappear.</p>
 
 <table class="tblRegular tableWidth" border="0">
-  <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
+  <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--depth (-r)</tt></td><td>Maximum link depth. <b>The start page is level 1</b>, so one level of links out is <tt>-r2</tt>, not <tt>-r1</tt>.</td></tr>
   <tr><td><tt>--stay-on-same-address (-a), --stay-on-same-domain (-d), --stay-on-same-tld (-l), --go-everywhere (-e)</tt></td><td>How far off the starting host the crawl may travel: same address (host), same principal domain, same top-level domain (for example .com), or everywhere. The default keeps you on the starting host.</td></tr>
   <tr><td><tt>--can-go-down (-D), --can-go-up (-U), --stay-on-same-dir (-S), --can-go-up-and-down (-B)</tt></td><td>Directory travel: down into subdirectories only, up to parent directories only, stay in the same directory, or both up and down.</td></tr>
@@ -242,7 +200,7 @@ options will not help there. That is an
 bracket forms match narrower sets. The full table, with size and mime rules, is on
 <a href="filters.html">the filters page</a>.</p>
 <table class="tblRegular tableWidth" border="0">
-  <tr class="tblHeaderColor"><td><b>Wildcard</b></td><td><b>Matches</b></td><td><b>Example</b></td></tr>
+  <tr class="head"><td><b>Wildcard</b></td><td><b>Matches</b></td><td><b>Example</b></td></tr>
   <tr><td><tt>*</tt></td><td>any run of characters</td><td><tt>+*.pdf</tt> &mdash; any URL ending <tt>.pdf</tt></td></tr>
   <tr><td><tt>*[file]</tt>, <tt>*[name]</tt></td><td>one path segment (any char but <tt>/</tt> and <tt>?</tt>)</td><td><tt>example.com/*[file]/</tt> &mdash; a directory-index page</td></tr>
   <tr><td><tt>*[path]</tt></td><td>a path, slashes allowed (any char but <tt>?</tt>)</td><td><tt>example.com/*[path].zip</tt></td></tr>
@@ -261,7 +219,7 @@ accident, and the <a href="abuse.html">abuse page</a> is worth a read. The limit
 below let you go faster when you own the target, and slower when you do not.</p>
 
 <table class="tblRegular tableWidth" border="0">
-  <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
+  <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--max-rate (-A)</tt></td><td>Maximum transfer rate in bytes/sec. <b>The default is about 100 KB/s even without this flag.</b> Raise it to go faster.</td></tr>
   <tr><td><tt>--sockets (-c)</tt></td><td>Number of parallel connections (default 4). <tt>--tiny</tt>, <tt>--wide</tt> and <tt>--ultrawide</tt> are presets.</td></tr>
   <tr><td><tt>--connection-per-second (-%c)</tt></td><td>New connections opened per second (default 5).</td></tr>
@@ -288,7 +246,7 @@ usually about a URL like <tt>/article?id=42</tt> or a <tt>.php</tt> page that is
 really HTML.</p>
 
 <table class="tblRegular tableWidth" border="0">
-  <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
+  <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--structure (-N)</tt></td><td>The local path and name layout. Presets are numeric, and you can also give a template such as <tt>--structure "%h%p/%n%q.%t"</tt>.</td></tr>
   <tr><td><tt>--long-names (-L)</tt></td><td>Long names, 8.3 names, or ISO9660 for CD masters.</td></tr>
   <tr><td><tt>--assume (-%A)</tt></td><td>Assume a MIME type for an extension, for example <tt>--assume php=text/html</tt>. This also skips the extra HEAD probe HTTrack would otherwise send to learn the type.</td></tr>
@@ -312,7 +270,7 @@ naming.</p>
 ones it kept so the local copy browses offline. These options tune both halves.</p>
 
 <table class="tblRegular tableWidth" border="0">
-  <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
+  <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--keep-links (-K)</tt></td><td>How links are rewritten in saved pages. The numbering is inverted from what you might guess: bare <tt>-K</tt> keeps <b>absolute</b> URLs, and <tt>-K0</tt> is the <b>relative</b> default. <tt>-K3</tt> keeps absolute URIs, <tt>-K4</tt> keeps the original links.</td></tr>
   <tr><td><tt>--replace-external (-x), --generate-errors (-o)</tt></td><td>Replace external links with an error page, and generate an error page for links that failed.</td></tr>
   <tr><td><tt>--preserve (-%p), --disable-passwords (-%x)</tt></td><td>Leave HTML untouched (no rewriting), and strip passwords out of saved links.</td></tr>
@@ -338,7 +296,7 @@ server), and obeys robots. Plenty of sites filter exactly that profile. These
 options control what HTTrack says about itself.</p>
 
 <table class="tblRegular tableWidth" border="0">
-  <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
+  <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--user-agent (-F)</tt></td><td>The <tt>User-Agent</tt>. Set a browser string to get past crawler blocks; <tt>--user-agent ""</tt> sends none.</td></tr>
   <tr><td><tt>--referer (-%R), --from (-%E), --language (-%l), --accept (-%a)</tt></td><td>Referer, From, Accept-Language and Accept headers.</td></tr>
   <tr><td><tt>--headers (-%X)</tt></td><td>Add raw header lines to every request.</td></tr>
@@ -369,7 +327,7 @@ across links at the same time.</p>
 <h3 id="proxy">8. Proxy and network</h3>
 
 <table class="tblRegular tableWidth" border="0">
-  <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
+  <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--proxy (-P)</tt></td><td>Route through a proxy. HTTP, SOCKS5 and CONNECT are supported: <tt>-P host:8080</tt>, <tt>-P socks5://host:1080</tt>, <tt>-P connect://host:443</tt>, with optional <tt>user:pass@</tt>.</td></tr>
   <tr><td><tt>--httpproxy-ftp (-%f)</tt></td><td>Send FTP requests through the HTTP proxy.</td></tr>
   <tr><td><tt>--protocol (-@i)</tt></td><td>Prefer IPv4 or IPv6.</td></tr>
@@ -392,7 +350,7 @@ updating possible. It is not a size-limited scratch area you can delete: throw i
 away and you lose the ability to continue or update the mirror.</p>
 
 <table class="tblRegular tableWidth" border="0">
-  <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
+  <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--continue</tt></td><td>Carry on an interrupted mirror, trusting the cache: it does not re-check pages already stored.</td></tr>
   <tr><td><tt>--update</tt></td><td>Re-run the mirror, revalidating each page with the server (If-Modified-Since / If-None-Match) and downloading only what changed.</td></tr>
   <tr><td><tt>--purge-old=0 (-X0)</tt></td><td>Do not purge. By default an update deletes local files that are no longer part of the mirror; <tt>--purge-old=0</tt> keeps them.</td></tr>
@@ -415,7 +373,7 @@ dynamic pages to look "changed" on every run. See the
 mirror behavior and expose the engine.</p>
 
 <table class="tblRegular tableWidth" border="0">
-  <tr class="tblHeaderColor"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
+  <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--get URL</tt></td><td>Fetch a single file and stop. Cache, index, depth, cookies and robots are all off for this mode.</td></tr>
   <tr><td><tt>--spider --testlinks --skeleton</tt></td><td>Scan without saving, test links at depth 1, or keep HTML only. Handy for checking a site before a real crawl.</td></tr>
   <tr><td><tt>--userdef-cmd (-V)</tt></td><td>Run a shell command on each downloaded file; <tt>$0</tt> is the file path. Good for on-the-fly processing.</td></tr>
@@ -540,24 +498,14 @@ all disabled.</small></p>
 <a href="cache.html">cache</a>; for the change report, see
 <a href="changes.html">changes</a>.</p>
 
-<!-- ==================== Start epilogue ==================== -->
-		</td>
-		</tr>
-		</table>
-	</td>
-	</tr>
-	</table>
-</td>
-</tr>
-</table>
+<!-- doc-chrome:bottom -->
+</main>
+</div>
 
-<table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
-	<tr>
-	<td id="footer"><small>&copy; 1998-2026 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>
-	</tr>
-</table>
+<dialog id="zoom" aria-label="Enlarged image"><img src="" alt=""></dialog>
+
+<footer>&copy; 1998-2026 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</footer>
+<!-- /doc-chrome:bottom -->
 
 </body>
-
 </html>
-

@@ -186,6 +186,8 @@ scanning
 Scansione
 Waiting for scheduled time..
 Attesa dell'orario specificato per iniziare
+Transferring data..
+Trasferimento dati..
 Connecting to provider
 Connesione al provider in corso
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Crea la pagina iniziale
 Create a word database of all html pages
 Crea un database delle parole di tutte le pagine HTML
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Crea un archivio di posta RFC822 (MHT/EML) completo del mirror
 Create error logging and report files
 Crea file di log per segnalare errori e informazioni
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Identità del browser
 Comment to be placed in each HTML file
 Piè di pagina per ogni file HTML
+Languages accepted by the browser
+Lingue accettate dal browser
+Additional HTTP headers to be sent in each requests
+Intestazioni HTTP aggiuntive da inviare in ogni richiesta
+HTTP referer to be sent for initial URLs
+Referer HTTP da inviare per gli URL iniziali
 Back to starting page
 Torna alla pagina iniziale
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Crea un indice
 Make a word database
 Crea un database delle parole
+Build a mail archive
+Crea un archivio di posta
 Log files
 File di log
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identità
 HTML footer
 Piè di pagina HTML
+Languages
+Lingue
+Additional HTTP Headers
+Intestazioni HTTP aggiuntive
+Default referer URL
+URL referer predefinito
 N# connections
 N° di connessioni
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Indirizzo della mappa del sito:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Indirizzo di una mappa del sito da leggere invece di sondare il sito; lasciare vuoto per sondare robots.txt e poi /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Scrivi un indice CDXJ dell'archivio WARC
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Scrivi anche un indice CDXJ ordinato con tutti i record dell'archivio WARC, per gli strumenti di riproduzione.
+Package the crawl as a WACZ file
+Impacchetta la scansione in un file WACZ
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Riunisci l'archivio WARC, il suo indice CDXJ e le pagine del mirror in un unico file WACZ; implica l'archivio WARC e l'indice CDXJ.
+WARC segment size limit:
+Dimensione massima del segmento WARC:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Inizia un nuovo segmento WARC quando quello corrente supera questo numero di byte; lascia vuoto o 0 per un solo file.

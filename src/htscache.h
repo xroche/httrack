@@ -67,7 +67,9 @@ htsblk cache_read(httrackp * opt, cache_back * cache, const char *adr,
 htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, const char *save, char *location);
 /* Like cache_read, but also yields entries whose transfer broke; return_save
-   (optional, HTS_URLMAXSIZE*2) receives the entry's recorded save name. */
+   (optional, HTS_URLMAXSIZE*2) receives the entry's recorded save name.
+   Header fields only: adr, headers and location come back NULL, so the caller
+   owns and frees nothing. */
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
                                    char *return_save);
@@ -77,6 +79,14 @@ htsblk cache_readex(httrackp * opt, cache_back * cache, const char *adr,
 htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, htsblk * r);
 void cache_init(cache_back * cache, httrackp * opt);
+
+/* Recover the damaged cache at name into hts-cache/repair.zip and move it over
+   name, storing what was recovered in *entries and *bytes. Returns NULL on
+   success, else a reason the caller reports: a recovery that is empty or does
+   not open never replaces the cache, and neither does one that cannot be moved
+   into place (#786, #824). Note: utf-8. */
+const char *cache_repair(httrackp *opt, const char *name,
+                         unsigned long *entries, unsigned long *bytes);
 
 /* Which hts-cache/ generation (new.* vs old.*) is authoritative. */
 typedef enum {
@@ -88,6 +98,16 @@ typedef enum {
 /* Reconcile the on-disk cache generations according to mode; a no-op when
    the involved files are absent. */
 void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode);
+
+/* Capacity of the per-entry header block cache_add builds; the self-test
+   asserts the writer stays inside it, so both must move together. */
+#define CACHE_HEADERS_SIZE 8192
+
+/* Cache key: url_adr followed by url_fil, each lien_back-sized. Write, index
+   load and lookup must each hold one whole -- a clipped key aliases another. */
+#define CACHE_KEY_SIZE (HTS_URLMAXSIZE * 4)
+/* The ZIP entry name is the key behind a "http://" the index load strips. */
+#define CACHE_ENTRYNAME_SIZE (CACHE_KEY_SIZE + 8)
 
 void cache_rstr(FILE *fp, char *s, size_t s_size);
 char *cache_rstr_addr(FILE * fp);

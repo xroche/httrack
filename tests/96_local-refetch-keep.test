@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+# A re-fetch cut mid-header must leave the mirrored file alone (#748) and keep
+# it out of the update purge (#746). err.bin is the control, an HTTP 500 on the
+# same resource already surviving both; stay.bin answers normally with a new
+# body, so a fix that stopped overwriting anything fails.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --rerun-args '--update' \
+    --log-found 'after 2 retries at link .*keep/page\.html' \
+    --log-found 'after 2 retries at link .*keep/data\.bin' \
+    --file-matches 'keep/page.html' 'KEEP-PAGE-V1' \
+    --file-not-matches 'keep/page.html' 'HTTP/1\.0 200' \
+    --file-matches 'keep/data.bin' 'KEEP-BIN-V1' \
+    --file-not-matches 'keep/data.bin' 'HTTP/1\.0 200' \
+    --file-min-bytes 'keep/data.bin' 2048 \
+    --file-matches 'keep/err.bin' 'KEEP-ERR-V1' \
+    --file-min-bytes 'keep/err.bin' 2048 \
+    --file-matches 'keep/stay.bin' 'KEEP-STAY-V2' \
+    --file-min-bytes 'keep/stay.bin' 2048 \
+    httrack 'BASEURL/keep/index.html' --retries=2

@@ -119,22 +119,32 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
   // ---fin stockage en cache---
 }
 
-#define ZIP_FIELD_STRING(headers, headersSize, field, value) do { \
-  if ( (value != NULL) && (value)[0] != '\0') { \
-    sprintf(headers + headersSize, "%s: %s\r\n", field, (value != NULL) ? (value) : ""); \
-    (headersSize) += (int) strlen(headers + headersSize); \
-  } \
-} while(0)
-#define ZIP_FIELD_INT(headers, headersSize, field, value) do { \
-  if ( (value != 0) ) { \
-    sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
-    (headersSize) += (int) strlen(headers + headersSize); \
-  } \
-} while(0)
-#define ZIP_FIELD_INT_FORCE(headers, headersSize, field, value) do { \
-  sprintf(headers + headersSize, "%s: "LLintP"\r\n", field, (LLint)(value)); \
-  (headersSize) += (int) strlen(headers + headersSize); \
-} while(0)
+/* Remote-controlled values (ETag, Location, the URL) can together outgrow the
+   block, and a clipped field reads back as a valid shorter one, so one that
+   does not fit is dropped whole and counted. `headers` must be an array. */
+#define ZIP_FIELD_STRING(headers, headersSize, dropped, field, value)          \
+  do {                                                                         \
+    if ((value) != NULL && (value)[0] != '\0' &&                               \
+        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
+                         "%s: %s\r\n", field, value)) {                        \
+      (dropped)++;                                                             \
+    }                                                                          \
+  } while (0)
+#define ZIP_FIELD_INT(headers, headersSize, dropped, field, value)             \
+  do {                                                                         \
+    if ((value) != 0 &&                                                        \
+        !slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
+                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
+      (dropped)++;                                                             \
+    }                                                                          \
+  } while (0)
+#define ZIP_FIELD_INT_FORCE(headers, headersSize, dropped, field, value)       \
+  do {                                                                         \
+    if (!slcatprintfbuff(headers, sizeof(headers), &(headersSize),             \
+                         "%s: " LLintP "\r\n", field, (LLint) (value))) {      \
+      (dropped)++;                                                             \
+    }                                                                          \
+  } while (0)
 
 struct cache_back_zip_entry {
   unsigned long int hdrPos;
@@ -206,11 +216,12 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
 void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                const char *url_adr, const char *url_fil, const char *url_save,
                int all_in_cache, const char *path_prefix) {
-  char BIGSTK filename[HTS_URLMAXSIZE * 4];
+  char BIGSTK filename[CACHE_ENTRYNAME_SIZE];
   char catbuff[CATBUFF_SIZE];
   int dataincache = 0;          // put data in cache ?
-  char BIGSTK headers[8192];
-  int headersSize = 0;
+  char BIGSTK headers[CACHE_HEADERS_SIZE];
+  size_t headersSize = 0;
+  int headersDropped = 0;
 
   zip_fileinfo fi;
   const char *url_save_suffix = url_save;
@@ -275,10 +286,11 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
       message = "(See X-StatusMessage)";
     }
     /* 64 characters MAX for first line */
-    sprintf(headers + headersSize, "HTTP/1.%c %d %s\r\n", '1', r->statuscode,
-            message);
+    if (!slcatprintfbuff(headers, sizeof(headers), &headersSize,
+                         "HTTP/1.%c %d %s\r\n", '1', r->statuscode, message)) {
+      headersDropped++;
+    }
   }
-  headersSize += (int) strlen(headers + headersSize);
 
   if (path_prefix != NULL && path_prefix[0] != '\0' && url_save != NULL
       && url_save[0] != '\0') {
@@ -290,28 +302,55 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   }
 
   /* Second line MUST ALWAYS be X-In-Cache */
-  ZIP_FIELD_INT_FORCE(headers, headersSize, "X-In-Cache", dataincache);
-  ZIP_FIELD_INT(headers, headersSize, "X-StatusCode", r->statuscode);
-  ZIP_FIELD_STRING(headers, headersSize, "X-StatusMessage", r->msg);
-  ZIP_FIELD_INT(headers, headersSize, "X-Size", r->size);       // size
-  ZIP_FIELD_STRING(headers, headersSize, "Content-Type", r->contenttype);       // contenttype
-  ZIP_FIELD_STRING(headers, headersSize, "X-Charset", r->charset);      // contenttype
-  ZIP_FIELD_STRING(headers, headersSize, "Last-Modified", r->lastmodified);     // last-modified
-  ZIP_FIELD_STRING(headers, headersSize, "Etag", r->etag);      // Etag
-  ZIP_FIELD_STRING(headers, headersSize, "Location", r->location);      // 'location' pour moved
-  ZIP_FIELD_STRING(headers, headersSize, "Content-Disposition", r->cdispo);     // Content-disposition
-  ZIP_FIELD_STRING(headers, headersSize, "X-Addr", url_adr);    // Original address
-  ZIP_FIELD_STRING(headers, headersSize, "X-Fil", url_fil);     // Original URI filename
-  ZIP_FIELD_STRING(headers, headersSize, "X-Save", url_save_suffix);    // Original save filename
+  ZIP_FIELD_INT_FORCE(headers, headersSize, headersDropped, "X-In-Cache",
+                      dataincache);
+  ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-StatusCode",
+                r->statuscode);
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-StatusMessage",
+                   r->msg);
+  ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-Size",
+                r->size); // size
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Content-Type",
+                   r->contenttype); // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Charset",
+                   r->charset); // contenttype
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Last-Modified",
+                   r->lastmodified); // last-modified
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Etag",
+                   r->etag); // Etag
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Location",
+                   r->location); // 'location' pour moved
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Content-Disposition",
+                   r->cdispo); // Content-disposition
+  /* X-Save first of the three: the only one a reader acts on, so a full block
+     must not drop it (X-Addr/X-Fil are pass-through metadata) */
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Save",
+                   url_save_suffix); // Original save filename
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Addr",
+                   url_adr); // Original address
+  ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Fil",
+                   url_fil); // Original URI filename
+  if (headersDropped != 0) {
+    hts_log_print(opt, LOG_WARNING,
+                  "cached headers too large, %d field(s) dropped: %s%s",
+                  headersDropped, url_adr, url_fil);
+  }
 
   /* Filename */
-  if (!link_has_authority(url_adr)) {
-    strcpybuff(filename, "http://");
-  } else {
-    strcpybuff(filename, "");
+  {
+    size_t used = 0;
+
+    /* the URL comes off the wire: drop the entry rather than abort the mirror,
+       and stop where the index load does so nothing written is unreadable */
+    if (!slcatprintfbuff(filename, sizeof(filename) - 2, &used, "%s%s%s",
+                         link_has_authority(url_adr) ? "" : "http://", url_adr,
+                         url_fil)) {
+      hts_log_print(opt, LOG_WARNING,
+                    "URL too long to be cached, entry not cached: %s%s",
+                    url_adr, url_fil);
+      return;
+    }
   }
-  strcatbuff(filename, url_adr);
-  strcatbuff(filename, url_fil);
 
   /* Time */
   memset(&fi, 0, sizeof(fi));
@@ -424,6 +463,11 @@ htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
 
     if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
       r = itemback->r;
+      /* header fields only, like cache_readex(): the entry torn down below
+         owns these (#826) */
+      r.adr = NULL;
+      r.headers = NULL;
+      r.location = NULL;
       if (return_save != NULL)
         strlcpybuff(return_save, itemback->url_sav, HTS_URLMAXSIZE * 2);
       /* cleanup */
@@ -469,7 +513,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                                const char *target_save, char *location,
                                char *return_save, int readonly) {
   char BIGSTK location_default[HTS_URLMAXSIZE * 2];
-  char BIGSTK buff[HTS_URLMAXSIZE * 2];
+  char BIGSTK buff[CACHE_KEY_SIZE];
   char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
   char BIGSTK previous_save_[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
@@ -488,9 +532,16 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
     r.location = location_default;
   }
   r.location[0] = '\0';
-  strcpybuff(buff, adr);
-  strcatbuff(buff, fil);
-  hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
+  {
+    size_t used = 0;
+
+    /* a key too long to be in the table is a miss, not a fatal error */
+    if (!slcatprintfbuff(buff, sizeof(buff), &used, "%s%s", adr, fil)) {
+      hash_pos_return = 0;
+    } else {
+      hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
+    }
+  }
   /* avoid errors on data entries */
   if (adr[0] == '/' && adr[1] == '/' && adr[2] == '[') {
     hash_pos_return = 0;
@@ -855,13 +906,6 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
   return r;
 }
 
-// lecture d'un fichier dans le cache
-// si save==null alors test unqiquement
-static int hts_rename(httrackp * opt, const char *a, const char *b) {
-  hts_log_print(opt, LOG_DEBUG, "Cache: rename %s -> %s (%p %p)", a, b, a, b);
-  return RENAME(a, b);
-}
-
 /* Open the cache ZIP via hts_fopen_utf8 so a non-ASCII path_log isn't mangled
    to ANSI (#630); 64-bit funcs keep multi-GB caches whole on Windows LLP64. */
 static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const void *filename,
@@ -964,6 +1008,35 @@ htsblk *cache_header(httrackp * opt, cache_back * cache, const char *adr,
     return NULL;
 }
 
+const char *cache_repair(httrackp *opt, const char *name,
+                         unsigned long *entries, unsigned long *bytes) {
+  char BIGSTK repairname[HTS_URLMAXSIZE * 2];
+  unzFile zip;
+
+  *entries = 0;
+  *bytes = 0;
+  if (!slprintfbuff(repairname, sizeof(repairname), "%s%s",
+                    StringBuff(opt->path_log), "hts-cache/repair.zip"))
+    return "the repair path is too long";
+  if (unzRepair(name, repairname,
+                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                        StringBuff(opt->path_log), "hts-cache/repair.tmp"),
+                entries, bytes) != Z_OK)
+    return "could not repair the cache";
+  /* unzRepair writes an end-of-central-directory record whatever it found, so
+     an input holding no local file header at all yields a valid empty archive
+     and a short write yields a truncated one. Only an archive that holds
+     something and opens may replace the cache (#824). */
+  if (*entries == 0)
+    return "the repaired cache holds no entry, keeping the damaged one";
+  if ((zip = hts_unzOpen_utf8(repairname)) == NULL)
+    return "the repaired cache does not open, keeping the damaged one";
+  unzClose(zip);
+  if (!hts_rename_over(opt, repairname, name))
+    return "could not put the repaired cache in place";
+  return NULL;
+}
+
 // Initialisation du cache: créer nouveau, renomer ancien, charger..
 void cache_init(cache_back * cache, httrackp * opt) {
   // ---
@@ -991,29 +1064,16 @@ void cache_init(cache_back * cache, httrackp * opt) {
               OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
               StringBuff(opt->path_log),
               "hts-cache/new.zip")))) { // a previous cache exists.. rename it
-        /* Remove OLD cache */
-        if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                StringBuff(opt->path_log),
-                                "hts-cache/old.zip"))) {
-          if (UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                             StringBuff(opt->path_log), "hts-cache/old.zip")) !=
-              0) {
-            hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                          "Cache: error while moving previous cache");
-          }
-        }
-
-        /* Rename */
-        if (hts_rename
-            (opt,
-             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                     "hts-cache/new.zip"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                                   StringBuff(opt->path_log),
-                                                   "hts-cache/old.zip")) != 0) {
+        if (!hts_rename_over(
+                opt,
+                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                        StringBuff(opt->path_log), "hts-cache/new.zip"),
+                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                        StringBuff(opt->path_log), "hts-cache/old.zip"))) {
           hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                         "Cache: error while moving previous cache");
         } else {
-          hts_log_print(opt, LOG_DEBUG, "Cache: successfully renamed");
+          hts_log_print(opt, LOG_DEBUG, "Cache: rotated new.zip to old.zip");
         }
       }
     } else {
@@ -1046,8 +1106,9 @@ void cache_init(cache_back * cache, httrackp * opt) {
       // Corrupted ZIP file ? Try to repair!
       if (cache->zipInput == NULL && !cache->ro) {
         char *name;
-        uLong repaired = 0;
-        uLong repairedBytes = 0;
+        const char *why;
+        unsigned long repaired = 0;
+        unsigned long repairedBytes = 0;
 
         if (!cache->ro) {
           name =
@@ -1060,25 +1121,16 @@ void cache_init(cache_back * cache, httrackp * opt) {
         }
         hts_log_print(opt, LOG_WARNING,
                       "Cache: damaged cache, trying to repair");
-        /* mztools has no UTF-8 hook, so repairing a corrupt cache under a
-           non-ASCII path_log fails cleanly (re-crawl), never forks a twin. */
-        if (unzRepair
-            (name,
-             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                     "hts-cache/repair.zip"), fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                                      StringBuff(opt->path_log),
-                                                      "hts-cache/repair.tmp"),
-             &repaired, &repairedBytes) == Z_OK) {
-          UNLINK(name);
-          RENAME(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                         StringBuff(opt->path_log), "hts-cache/repair.zip"),
-                 name);
-          cache->zipInput = hts_unzOpen_utf8(name);
+        why = cache_repair(opt, name, &repaired, &repairedBytes);
+        if (why != NULL) {
+          hts_log_print(opt, LOG_WARNING | LOG_ERRNO, "Cache: %s", why);
+        } else if ((cache->zipInput = hts_unzOpen_utf8(name)) != NULL) {
           hts_log_print(opt, LOG_WARNING,
                         "Cache: %d bytes successfully recovered in %d entries",
                         (int) repairedBytes, (int) repaired);
         } else {
-          hts_log_print(opt, LOG_WARNING, "Cache: could not repair the cache");
+          hts_log_print(opt, LOG_WARNING,
+                        "Cache: the repaired cache could not be reopened");
         }
       }
       // Opened ?
@@ -1088,7 +1140,8 @@ void cache_init(cache_back * cache, httrackp * opt) {
         /* Ready directory entries */
         if ((zErr = unzGoToFirstFile((unzFile) cache->zipInput)) == Z_OK) {
           char comment[128];
-          char BIGSTK filename[HTS_URLMAXSIZE * 4];
+          char BIGSTK filename[CACHE_ENTRYNAME_SIZE];
+          unz_file_info zfi;
           int entries = 0;
 
           memset(comment, 0, sizeof(comment));  // for truncated reads
@@ -1097,13 +1150,17 @@ void cache_init(cache_back * cache, httrackp * opt) {
 
             filename[0] = '\0';
             comment[0] = '\0';
+            memset(&zfi, 0, sizeof(zfi));
             if (unzOpenCurrentFile((unzFile) cache->zipInput) == Z_OK) {
               if ((readSizeHeader =
-                   unzGetLocalExtrafield((unzFile) cache->zipInput, comment,
-                                         sizeof(comment) - 2)) > 0
-                  && unzGetCurrentFileInfo((unzFile) cache->zipInput, NULL,
-                                           filename, sizeof(filename) - 2, NULL,
-                                           0, NULL, 0) == Z_OK) {
+                       unzGetLocalExtrafield((unzFile) cache->zipInput, comment,
+                                             sizeof(comment) - 2)) > 0 &&
+                  unzGetCurrentFileInfo((unzFile) cache->zipInput, &zfi,
+                                        filename, sizeof(filename) - 2, NULL, 0,
+                                        NULL, 0) == Z_OK
+                  /* minizip leaves a name this long unterminated, and a clipped
+                     one would index as another URL's key */
+                  && zfi.size_filename < sizeof(filename) - 2) {
                 long int pos =
                   (long int) unzGetOffset((unzFile) cache->zipInput);
                 assertf(readSizeHeader < sizeof(comment));

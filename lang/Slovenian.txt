@@ -7,7 +7,7 @@ sl
 LANGUAGE_AUTHOR
 Jadran Rudec,iur.\r\njrudec@email.si \r\n
 LANGUAGE_CHARSET
-ISO-8859-1
+windows-1250
 LANGUAGE_WINDOWSID
 Slovenian
 OK
@@ -186,6 +186,8 @@ scanning
 iskanje
 Waiting for scheduled time..
 Èakanje na èas razporejanja..
+Transferring data..
+Prenos podatkov..
 Connecting to provider
 Povezava z oskrbovalcem
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Naredi Zaèetno stran
 Create a word database of all html pages
 Naredi besedilno bazo podatkov vseh html strani
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Ustvari popoln postni arhiv RFC822 (MHT/EML) zrcaljene strani
 Create error logging and report files
 Naredi zgodovino napak (log) in datoteke s poroèili
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Istovetnost brskalnika
 Comment to be placed in each HTML file
 Opombe bodo vstavljene v HTML dattekah
+Languages accepted by the browser
+Jeziki, ki jih sprejema brskalnik
+Additional HTTP headers to be sent in each requests
+Dodatne glave HTTP, poslane v vsaki zahtevi
+HTTP referer to be sent for initial URLs
+Glava HTTP referer, poslana za zacetne naslove URL
 Back to starting page
 Pojdi na zaèetno stran
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Naredi indeks
 Make a word database
 Naredi podatkovno bazo besed
+Build a mail archive
+Ustvari postni arhiv
 Log files
 Log datoteke
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Istovetnost
 HTML footer
 Glava HTML dokumenta
+Languages
+Jeziki
+Additional HTTP Headers
+Dodatne glave HTTP
+Default referer URL
+Privzeti naslov referer
 N# connections
 Število prikljuèitev
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Naslov zemljevida spletnega mesta:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Naslov zemljevida spletnega mesta, ki naj se prebere namesto preverjanja mesta; pustite prazno za preverjanje robots.txt in nato /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Zapisi indeks CDXJ arhiva WARC
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Zapisi tudi urejen indeks CDXJ z vsemi zapisi arhiva WARC, za orodja za predvajanje.
+Package the crawl as a WACZ file
+Zapakiraj pregledovanje v datoteko WACZ
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Zdruzi arhiv WARC, njegov indeks CDXJ in zrcaljene strani v eno datoteko WACZ; vkljuci arhiv WARC in indeks CDXJ.
+WARC segment size limit:
+Najvecja velikost segmenta WARC:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Zacni nov segment WARC, ko trenutni preseze to stevilo bajtov; pustite prazno ali 0 za eno datoteko.

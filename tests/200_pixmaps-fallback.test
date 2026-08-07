@@ -1,0 +1,76 @@
+#!/bin/bash
+#
+# Desktops with no icon theme look up Icon= as a bare basename under
+# share/pixmaps, so assert on what install and dist emit, not on Makefile.am.
+
+set -euo pipefail
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+builddir="${abs_top_builddir:?not run under make check}"
+div="${srcdir}/html/server/div"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/pixmaps.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# Geometry from the first string literal, with a header check so a text file
+# renamed to .xpm cannot answer.
+xpm_size() {
+    local geom hdr
+    hdr=$(head -1 "$1")
+    grep -q '^/\* XPM \*/$' <<<"${hdr}" || fail "$1 has no XPM header"
+    grep -q '^static char \*' "$1" || fail "$1 has no pixmap declaration"
+    geom=$(grep -m1 '^"' "$1" | tr -d '"')
+    case "${geom}" in
+    [0-9]*' '[0-9]*' '[0-9]*' '[0-9]*) ;;
+    *) fail "$1: bad geometry line '${geom}'" ;;
+    esac
+    printf '%sx%s' "$(echo "${geom}" | cut -d' ' -f1)" "$(echo "${geom}" | cut -d' ' -f2)"
+}
+
+make -C "${builddir}/html" install DESTDIR="${work}/inst" >"${work}/log" 2>&1 ||
+    fail "make install failed: $(tail -3 "${work}/log")"
+make -C "${builddir}/html" distdir distdir="${work}/dist" \
+    top_distdir="${work}/dist" >>"${work}/log" 2>&1 ||
+    fail "make distdir failed: $(tail -3 "${work}/log")"
+
+pixmaps=$(find "${work}/inst" -type d -name pixmaps)
+test -n "${pixmaps}" || fail "no pixmaps directory installed"
+
+# Every Icon= must resolve as <basename>.xpm right here, theme or no theme.
+for desktop in "${div}"/*.desktop; do
+    icon=$(sed -n 's/^Icon=//p' "${desktop}")
+    test -n "${icon}" || fail "$(basename "${desktop}"): no Icon="
+    xpm="${pixmaps}/${icon}.xpm"
+    # -f rejects a dangling symlink, which installs and packages as garbage.
+    test -f "${xpm}" || fail "$(basename "${desktop}"): Icon=${icon} has no ${icon}.xpm"
+    test -s "${xpm}" || fail "${xpm} is empty"
+    got=$(xpm_size "${xpm}")
+    test "${got}" = "32x32" || fail "${xpm} is ${got}, want the legacy 32x32"
+    # Any 32x32 image would pass the checks above, so pin it to the icon itself:
+    # same colors and pixels as the sized copy, only the C symbol name differs.
+    sized="${pixmaps}/${icon}32x32.xpm"
+    test -f "${sized}" || fail "no ${icon}32x32.xpm to compare the fallback against"
+    diff <(sed '/^static char \*/d' "${xpm}") <(sed '/^static char \*/d' "${sized}") >/dev/null ||
+        fail "${xpm} is not the same image as ${sized}"
+    test -f "${work}/dist/server/div/${icon}.xpm" ||
+        fail "${icon}.xpm is installed but not distributed"
+done
+
+# The sized copies predate the fallback and stay: renaming one would strand the
+# other name in an upgraded package.
+for size in 16x16 32x32 48x48; do
+    xpm="${pixmaps}/httrack${size}.xpm"
+    test -f "${xpm}" || fail "httrack${size}.xpm no longer installed"
+    got=$(xpm_size "${xpm}")
+    test "${got}" = "${size}" || fail "${xpm} is ${got}"
+done
+
+echo "pixmaps: $(find "${pixmaps}" -type f | sed 's|.*/||' | sort | tr '\n' ' ')"

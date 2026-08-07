@@ -41,14 +41,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsstrings.h"
 #include "htscharset.h"
 #ifdef _WIN32
-/* before <stdlib.h>, which is what declares rand_s under it */
-#define _CRT_RAND_S
 #include "windows.h"
 #else
-#include <errno.h>
-#ifdef HAVE_SYS_RANDOM_H
-#include <sys/random.h>
-#endif
 #include <dirent.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -330,8 +324,7 @@ int lienrelatif(char *s, size_t ssize, const char *link, const char *curr_fil) {
   curr = _curr;
   strlcpybuff(curr, curr_fil, sizeof(_curr));
   if ((a = strchr(curr, '?')) == NULL) { // cut at the ? (query parameters)
-    // an empty path has no last character: curr-1 would read before the buffer
-    a = curr[0] != '\0' ? curr + strlen(curr) - 1 : curr;
+    a = hts_lastcharptr(curr);
   }
   while((*a != '/') && (a > curr))
     a--;                        // chercher dernier / du chemin courant
@@ -991,10 +984,7 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
       && toptemplate_bodycat) {
 
     strcpybuff(rpath, path);
-    if (rpath[0]) {
-      if (rpath[strlen(rpath) - 1] == '/')
-        rpath[strlen(rpath) - 1] = '\0';
-    }
+    hts_striplastchar(rpath, '/');
 
     fpo = fopen(fconcat(catbuff, sizeof(catbuff), rpath, "/index.html"), "wb");
     if (fpo) {
@@ -1207,11 +1197,8 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
   find_handle h;
   coucal hashCateg = NULL;
 
-  if (rpath[0]) {
-    if (rpath[strlen(rpath) - 1] == '/') {
-      rpath[strlen(rpath) - 1] = '\0';  /* note: patching stored (inhash) value */
-    }
-  }
+  /* note: patching stored (inhash) value */
+  hts_striplastchar(rpath, '/');
   h = hts_findfirst(rpath);
   if (h) {
     String iname = STRING_EMPTY;
@@ -1308,7 +1295,7 @@ HTSEXT_API find_handle hts_findfirst(char *path) {
 
           strcpybuff(rpath, path);
           if (rpath[0]) {
-            if (rpath[strlen(rpath) - 1] != '\\')
+            if (hts_lastchar(rpath) != '\\')
               strcatbuff(rpath, "\\");
           }
           strcatbuff(rpath, "*.*");
@@ -1320,7 +1307,7 @@ HTSEXT_API find_handle hts_findfirst(char *path) {
         strcpybuff(find->path, path);
         {
           if (find->path[0]) {
-            if (find->path[strlen(find->path) - 1] != '/')
+            if (hts_lastchar(find->path) != '/')
               strcatbuff(find->path, "/");
           }
         }
@@ -1450,58 +1437,75 @@ HTSEXT_API hts_boolean hts_findissystem(find_handle find) {
   return 0;
 }
 
-hts_boolean hts_random_bytes(void *buf, size_t len) {
-  unsigned char *const p = (unsigned char *) buf;
+/* Park cdst under a free sibling name; caside receives it. */
+static hts_boolean rename_park_aside(char *caside, size_t size,
+                                     const char *cdst) {
+  int i;
 
-#ifdef _WIN32
-  size_t i;
-
-  /* rand_s() is the CRT's wrapper over the system CSPRNG, and unlike
-     BCryptGenRandom it needs no extra import library. */
-  for (i = 0; i < len; i += sizeof(unsigned int)) {
-    const size_t left = len - i;
-    unsigned int v;
-
-    if (rand_s(&v) != 0)
+  for (i = 0; i < 16; i++) {
+    if (!slprintfbuff(caside, size, "%s.hts-old%d", cdst, i))
       return HTS_FALSE;
-    memcpy(p + i, &v, left < sizeof(v) ? left : sizeof(v));
+    /* Skip a name the mirror already holds: POSIX rename() would clobber it
+       (#774). A non-regular entry reads as free and the rename refuses it. */
+    if (fexist_utf8(caside))
+      continue;
+    if (RENAME(cdst, caside) == 0)
+      return HTS_TRUE;
   }
-  return HTS_TRUE;
-#else
-  size_t got = 0;
-  FILE *fp;
-
-#ifdef HAVE_GETRANDOM
-  while (got < len) {
-    const ssize_t n = getrandom(p + got, len - got, 0);
-
-    if (n < 0) {
-      if (errno == EINTR)
-        continue;
-      break; /* pre-3.17 kernel or a seccomp filter: try /dev/urandom */
-    }
-    got += (size_t) n;
-  }
-  if (got == len)
-    return HTS_TRUE;
-#endif
-  fp = fopen("/dev/urandom", "rb");
-  if (fp == NULL)
-    return HTS_FALSE;
-  got += fread(p + got, 1, len - got, fp);
-  fclose(fp);
-  return got == len ? HTS_TRUE : HTS_FALSE;
-#endif
+  return HTS_FALSE;
 }
 
-hts_boolean hts_rename_over(const char *src, const char *dst) {
+/* cdst is in the way of the move: park it, retry, and put it back if the retry
+   fails too. Unlinking it instead would leave nothing at all (#790). */
+static hts_boolean rename_over_aside(httrackp *opt, const char *csrc,
+                                     const char *cdst) {
+  char caside[CATBUFF_SIZE];
+  int err;
+
+  /* Only a regular file may be parked: a directory in the way is not what the
+     caller asked to replace, and parking it orphans it (UNLINK cannot drop). */
+  if (!fexist_utf8(cdst))
+    return HTS_FALSE;
+  if (!rename_park_aside(caside, sizeof(caside), cdst))
+    return HTS_FALSE;
+  if (RENAME(csrc, cdst) == 0) {
+    (void) UNLINK(caside);
+    return HTS_TRUE;
+  }
+  err = errno;
+  /* Retry once, then name the parked copy: nothing else on disk or in the log
+     points at it, and an --update purge would delete it unnoticed. */
+  if (RENAME(caside, cdst) != 0 && RENAME(caside, cdst) != 0)
+    hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                  "could not put %s back; its previous content is now %s", cdst,
+                  caside);
+  errno = err;
+  return HTS_FALSE;
+}
+
+hts_boolean hts_rename_over(httrackp *opt, const char *src, const char *dst) {
   char csrc[CATBUFF_SIZE], cdst[CATBUFF_SIZE];
 
   fconv(csrc, sizeof(csrc), src);
   fconv(cdst, sizeof(cdst), dst);
   if (RENAME(csrc, cdst) == 0)
     return HTS_TRUE;
-  /* RENAME does not clobber an existing target on Windows. */
-  (void) UNLINK(cdst);
-  return RENAME(csrc, cdst) == 0 ? HTS_TRUE : HTS_FALSE;
+  /* Only a dst in the way is something the fallback can clear, and the CRT maps
+     that to EEXIST; it keeps EACCES for a src another process holds, where the
+     retry would fail the same way. The src check covers a CRT that reports
+     neither. */
+  const int err = errno;
+
+  if (err != EEXIST || !fexist_utf8(src))
+    return HTS_FALSE;
+  return rename_over_aside(opt, csrc, cdst);
+}
+
+hts_boolean hts_rename_over_aside_selftest(httrackp *opt, const char *src,
+                                           const char *dst) {
+  char csrc[CATBUFF_SIZE], cdst[CATBUFF_SIZE];
+
+  fconv(csrc, sizeof(csrc), src);
+  fconv(cdst, sizeof(cdst), dst);
+  return rename_over_aside(opt, csrc, cdst);
 }

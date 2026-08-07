@@ -1,0 +1,70 @@
+#!/bin/bash
+# An empty backtrace() must still leave a report; a silent one reads as a
+# handler that died halfway.
+
+set -euo pipefail
+
+ulimit -c 0 # a deliberate crash must not litter the box with cores
+
+if [ "$(uname -s)" != "Linux" ]; then
+    echo "LD_PRELOAD interposition is Linux-only here, skipping" >&2
+    exit 77
+fi
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+# A --disable-shared build has nothing to preload; anything else missing is a
+# build problem, not a skip, or the leg below would pass vacuously.
+if [ ! -r "${NOBACKTRACE_LA:-}" ]; then
+    echo "${NOBACKTRACE_LA:-\$NOBACKTRACE_LA} was not built" >&2
+    exit 1
+fi
+if grep -q "^dlname=''" "$NOBACKTRACE_LA"; then
+    echo "static-only build, skipping" >&2
+    exit 77
+fi
+if [ ! -r "${NOBACKTRACE_LIB:-}" ]; then
+    echo "${NOBACKTRACE_LIB:-\$NOBACKTRACE_LIB} was not built" >&2
+    exit 1
+fi
+
+# An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
+# refuses by default. The shim allocates nothing, so the ordering is harmless.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
+# Control: a build that never traces would pass the assertion below for the
+# wrong reason.
+rc=0
+plain=$(HTTRACK_NO_SYMBOLIZE=1 httrack -#c=abort 2>&1) || rc=$? # no addr2line to wedge on
+test "$rc" -eq 134 || {
+    echo "the plain crash exited $rc, not 134" >&2
+    exit 1
+}
+if grep -q 'No stack trace available' <<<"$plain"; then
+    echo "no working backtrace() in this build; skipping" >&2
+    exit 77
+fi
+
+rc=0
+out=$(LD_PRELOAD="$NOBACKTRACE_LIB" httrack -#c=abort 2>&1) || rc=$?
+test "$rc" -eq 134 || {
+    echo "the interposed crash exited $rc, not 134" >&2
+    printf '%s\n' "$out" >&2
+    exit 1
+}
+grep -q "^Caught signal 6$" <<<"$out" || {
+    echo "no 'Caught signal' line:" >&2
+    printf '%s\n' "$out" >&2
+    exit 1
+}
+grep -q 'No stack trace available: unwinding failed' <<<"$out" || {
+    echo "an empty backtrace left no diagnostic:" >&2
+    printf '%s\n' "$out" >&2
+    exit 1
+}
+grep -q "Please report the problem" <<<"$out" || {
+    echo "the handler stopped before its closing line:" >&2
+    printf '%s\n' "$out" >&2
+    exit 1
+}

@@ -7,7 +7,7 @@
 set -eu
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # the smashed-header case logs expected "Corrupted cache entry" warnings on
 # stdout; the verdict is the last line

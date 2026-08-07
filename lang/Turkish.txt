@@ -186,6 +186,8 @@ scanning
 
 Waiting for scheduled time..
 Planlanan zaman bekleniyor..
+Transferring data..
+Veri aktarýlýyor..
 Connecting to provider
 Servis saðlayýcýya baðlanýyor
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Baþlangýç Sayfasý Yarat
 Create a word database of all html pages
 Tüm html sayfalarýndan bir kelime veritabaný yarat
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Yansýnýn tam bir RFC822 posta arþivini (MHT/EML) oluþtur
 Create error logging and report files
 Hata kaydý ve rapor dosyalarý yarat
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Browser Kimliði
 Comment to be placed in each HTML file
 Her HTML sayfasýnýn içerisine yerleþtirilecek açýklama
+Languages accepted by the browser
+Tarayýcýnýn kabul ettiði diller
+Additional HTTP headers to be sent in each requests
+Her istekte gönderilecek ek HTTP baþlýklarý
+HTTP referer to be sent for initial URLs
+Ýlk adresler için gönderilecek HTTP referer
 Back to starting page
 Baþlangýç sayfasýna dön
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Bir index yarat
 Make a word database
 Sözcük veritabaný hazýrla
+Build a mail archive
+Posta arþivi oluþtur
 Log files
 Kayýt dosyalarý
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Kimlik
 HTML footer
 HTML sayfa altlýðý
+Languages
+Diller
+Additional HTTP Headers
+Ek HTTP baþlýklarý
+Default referer URL
+Varsayýlan referer adresi
 N# connections
 N# baðlantý
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Site haritasý adresi:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Siteyi yoklamak yerine okunacak site haritasýnýn adresi; robots.txt ve ardýndan /sitemap.xml yoklamasý için boþ býrakýn.
+Write a CDXJ index of the WARC archive
+WARC arþivinin CDXJ dizinini yaz
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+WARC arþivindeki tüm kayýtlarý listeleyen sýralý bir CDXJ dizini de yaz; yeniden oynatma araçlarý için.
+Package the crawl as a WACZ file
+Taramayý WACZ dosyasý olarak paketle
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+WARC arþivini, CDXJ dizinini ve aynalanan sayfalarý tek bir WACZ dosyasýnda topla; WARC arþivini ve CDXJ dizinini gerektirir.
+WARC segment size limit:
+WARC parça boyutu sýnýrý:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Geçerli parça bu bayt sayýsýný aþtýðýnda yeni bir WARC parçasý baþlat; tek dosya için boþ býrakýn veya 0 girin.

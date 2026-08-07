@@ -48,9 +48,17 @@ Please visit our Website: http://www.httrack.com
 #include "htszlib.h"
 #include "htscharset.h"
 #include "htsselftest.h"
+#include "htscrashtest.h"
 #include "htsmd5.h"
 
 #include <ctype.h>
+/* hts_self_path() */
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 #if USE_BEGINTHREAD
 #ifdef _WIN32
 #include <process.h>
@@ -69,6 +77,97 @@ Please visit our Website: http://www.httrack.com
 
 /* Resolver */
 extern int IPV6_resolver;
+
+/* A data directory is one that carries the templates path_bin is read for. */
+static int datadir_has_templates(const char *dir) {
+  char catbuff[CATBUFF_SIZE];
+
+  return dir != NULL && *dir != '\0' &&
+         fexist(fconcat(catbuff, sizeof(catbuff), dir,
+                        "templates/index-header.html"));
+}
+
+/* htsbacktrace.c copies the Linux branch: it is program-side and cannot reach
+   this hidden symbol, so a fix here belongs there too (#997). */
+const char *hts_self_path(char *dst, size_t dstsize) {
+#if defined(_WIN32)
+  const DWORD n = GetModuleFileNameA(NULL, dst, (DWORD) dstsize);
+
+  /* Pre-Win8 returns nSize on truncation without terminating: a full buffer
+     is a failure, not a path. */
+  return (n > 0 && (size_t) n < dstsize) ? dst : NULL;
+#elif defined(__APPLE__)
+  uint32_t n = (uint32_t) dstsize;
+
+  return _NSGetExecutablePath(dst, &n) == 0 ? dst : NULL;
+#else
+  /* Linux; anywhere else this is simply absent and argv[0] has to do. */
+  const ssize_t n = readlink("/proc/self/exe", dst, dstsize - 1);
+
+  if (n <= 0 || (size_t) n >= dstsize - 1)
+    return NULL;
+  dst[n] = '\0';
+  return dst;
+#endif
+}
+
+/* Directory part of path, trailing '/' kept, or NULL when it carries none: a
+   bare name came from a PATH lookup and locates nothing. */
+static const char *dirname_of(char *dst, size_t dstsize, const char *path) {
+  char catbuff[CATBUFF_SIZE];
+  const char *slashed, *sep;
+  size_t len;
+
+  if (path == NULL)
+    return NULL;
+  slashed = fslash(catbuff, sizeof(catbuff), path);
+  if ((sep = strrchr(slashed, '/')) == NULL)
+    return NULL;
+  len = (size_t) (sep - slashed) + 1;
+  if (len >= dstsize)
+    return NULL;
+  memcpy(dst, slashed, len);
+  dst[len] = '\0';
+  return dst;
+}
+
+void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
+                         const char *builtin) {
+  /* An installed tree that was moved, then a flat one with templates/ beside
+     the binary. */
+  static const char *const layout[] = {"../share/httrack/", ""};
+  char exedir[HTS_URLMAXSIZE * 2];
+  const char *base = NULL;
+  const char *fallback;
+
+  if (!datadir_has_templates(builtin)) {
+    base = dirname_of(exedir, sizeof(exedir), selfpath);
+  }
+  if (base != NULL) {
+    size_t i;
+
+    for (i = 0; i < sizeof(layout) / sizeof(layout[0]); i++) {
+      char cand[HTS_URLMAXSIZE * 2];
+      /* snprintf, not the strlncatbuff idiom: appending to a non-empty buffer
+         aborts on overflow, and a long enough argv[0] reaches it. */
+      const int n = snprintf(cand, sizeof(cand), "%s%s", base, layout[i]);
+
+      if (n < 0 || (size_t) n >= sizeof(cand)) {
+        continue; /* truncated, so not the path we meant to probe */
+      }
+      if (datadir_has_templates(cand)) {
+        snprintf(dst, dstsize, "%s", cand);
+        return;
+      }
+    }
+  }
+  /* Windows has no compiled-in data directory, so there the executable's own
+     is all we have. */
+  fallback = (builtin != NULL && *builtin != '\0') ? builtin
+             : (base != NULL)                      ? base
+                                                   : "";
+  snprintf(dst, dstsize, "%s", fallback);
+}
 
 #define htsmain_free() do { \
   if (url != NULL) { \
@@ -92,19 +191,6 @@ extern int IPV6_resolver;
     } \
   } \
 } while(0)
-
-#ifdef HTS_CRASH_TEST
-static __attribute__ ((noinline)) void fourty_two(void) {
-  char *const ptr = (char*) (uintptr_t) 0x42;
-  (*ptr)++;
-}
-static __attribute__ ((noinline)) void do_really_crash(void) {
-  fourty_two();
-}
-static __attribute__ ((noinline)) void do_crash(void) {
-  do_really_crash();
-}
-#endif
 
 HTSEXT_API int hts_main(int argc, char **argv) {
   httrackp *opt = hts_create_opt();
@@ -186,20 +272,24 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   }
 #endif
 
-  // Binary program path?
-#ifndef HTS_HTTRACKDIR
+  // Data directory holding the HTML templates
   {
-    char catbuff[CATBUFF_SIZE];
-    char *path = fslash(catbuff, sizeof(catbuff), argv[0]);
-    char *a;
+    char datadir[HTS_URLMAXSIZE * 2];
+    char selfbuff[HTS_URLMAXSIZE * 2];
+    const char *self = hts_self_path(selfbuff, sizeof(selfbuff));
 
-    if ((a = strrchr(path, '/'))) {
-      StringCopyN(opt->path_bin, argv[0], a - path);
-    }
-  }
+#ifdef HTS_HTTRACKDIR
+    const char *const builtin = HTS_HTTRACKDIR;
 #else
-  StringCopy(opt->path_bin, HTS_HTTRACKDIR);
+    const char *const builtin = "";
 #endif
+
+    if (self == NULL && argc > 0) {
+      self = argv[0];
+    }
+    hts_resolve_datadir(datadir, sizeof(datadir), self, builtin);
+    StringCopy(opt->path_bin, datadir);
+  }
 
   /* filter CR, LF, TAB.. */
   {
@@ -357,7 +447,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           char BIGSTK tempo[HTS_CDLMAXSIZE];
 
           strcpybuff(tempo, argv[na] + 1);
-          if (tempo[0] == '\0' || tempo[strlen(tempo) - 1] != '"') {
+          if (hts_lastchar(tempo) != '"') {
             char BIGSTK s[HTS_CDLMAXSIZE];
 
             sprintf(s, "Missing quote in %s", argv[na]);
@@ -365,7 +455,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             htsmain_free();
             return -1;
           }
-          tempo[strlen(tempo) - 1] = '\0';
+          hts_choplastchar(tempo);
           /* tempo is argv[na] minus its surrounding quotes, so it fits in place
            */
           strlcpybuff(argv[na], tempo, strlen(argv[na]) + 1);
@@ -692,6 +782,29 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     }
   }
 
+  /* -#c[=KIND]: crash on purpose, to test crash handlers only (see
+     htscrashtest.h). Handled here so it needs no dummy URL either. */
+  {
+    int k;
+
+    for (k = 1; k < argc; k++) {
+      const char *const a = argv[k];
+
+      if (a[0] == '-' && a[1] == '#' && a[2] == 'c' &&
+          (a[3] == '\0' || a[3] == '=')) {
+        if (!hts_crash_test(a[3] == '=' ? a + 4 : NULL)) {
+          char s[256];
+
+          snprintf(s, sizeof(s), "Option #c expects one of: %s",
+                   hts_crash_test_kinds());
+          HTS_PANIC_PRINTF(s);
+        }
+        htsmain_free();
+        return -1;
+      }
+    }
+  }
+
   // Pas d'URL
 #if DEBUG_STEPS
   printf("Checking URLs\n");
@@ -863,7 +976,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         char BIGSTK tempo[HTS_CDLMAXSIZE + 256];
 
         strcpybuff(tempo, argv[na] + 1);
-        if (tempo[0] == '\0' || tempo[strlen(tempo) - 1] != '"') {
+        if (hts_lastchar(tempo) != '"') {
           char s[HTS_CDLMAXSIZE + 256];
 
           sprintf(s, "Missing quote in %s", argv[na]);
@@ -871,7 +984,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           htsmain_free();
           return -1;
         }
-        tempo[strlen(tempo) - 1] = '\0';
+        hts_choplastchar(tempo);
         /* tempo is argv[na] minus its surrounding quotes, so it fits in place
          */
         strlcpybuff(argv[na], tempo, strlen(argv[na]) + 1);
@@ -2180,8 +2293,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'R':
                 {
                   char *name;
-                  uLong repaired = 0;
-                  uLong repairedBytes = 0;
+                  const char *why;
+                  unsigned long repaired = 0;
+                  unsigned long repairedBytes = 0;
 
                   if (fexist_utf8(fconcat(
                           OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
@@ -2204,24 +2318,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     return 1;
                   }
                   fprintf(stderr, "Cache: trying to repair %s\n", name);
-                  if (unzRepair
-                      (name,
-                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                               "hts-cache/repair.zip"),
-                       fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                               "hts-cache/repair.tmp"), &repaired,
-                       &repairedBytes) == Z_OK) {
-                    UNLINK(name);
-                    RENAME(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                   StringBuff(opt->path_log),
-                                   "hts-cache/repair.zip"),
-                           name);
-                    fprintf(stderr,
-                            "Cache: %d bytes successfully recovered in %d entries\n",
-                            (int) repairedBytes, (int) repaired);
-                  } else {
-                    fprintf(stderr, "Cache: could not repair the cache\n");
+                  why = cache_repair(opt, name, &repaired, &repairedBytes);
+                  if (why != NULL) {
+                    fprintf(stderr, "Cache: %s\n", why);
+                    return 1;
                   }
+                  fprintf(
+                      stderr,
+                      "Cache: %d bytes successfully recovered in %d entries\n",
+                      (int) repairedBytes, (int) repaired);
                 }
                 return 0;
                 break;
@@ -2295,12 +2400,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 fprintf(stderr, "** AUTOCHECK OK\n");
                 return 0;
                 break;
-
-#ifdef HTS_CRASH_TEST
-              case 'c':  /* crash test */
-                do_crash();
-                break;
-#endif
 
               default:
                 printf("Internal option %c not recognized\n", *com);
@@ -2744,10 +2843,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       char *a;
 
       strcpybuff(rpath, StringBuff(opt->path_html));
-      if (rpath[0]) {
-        if (rpath[strlen(rpath) - 1] == '/')
-          rpath[strlen(rpath) - 1] = '\0';
-      }
+      hts_striplastchar(rpath, '/');
       a = strrchr(rpath, '/');
       if (a) {
         *a = '\0';

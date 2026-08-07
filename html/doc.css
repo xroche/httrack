@@ -1,0 +1,349 @@
+/* Shared chrome for the HTTrack documentation pages. Page-specific rules live
+   beside the page (guide.css). Read from disk as often as over http, so
+   everything here has to work from a file:// URL. */
+
+:root {
+	--field: #77b;
+	--panel: #ccd;
+	--accent: #99c;
+	--ink: #111;
+	--ink-soft: #444;
+	--rule: #aab;
+	--link: #00c;
+	--link-hover: #c00;
+	--code-bg: #e8e8f2;
+	--chip: #dde;
+	--shadow: rgba(0, 0, 0, .25);
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--field: #171a2b;
+		--panel: #22263a;
+		--accent: #3b4066;
+		--ink: #e6e6ee;
+		--ink-soft: #a9adc4;
+		--rule: #3b4066;
+		--link: #9db4ff;
+		--link-hover: #ff9d9d;
+		--code-bg: #14172a;
+		--chip: #2e3350;
+		--shadow: rgba(0, 0, 0, .6);
+	}
+}
+
+* { box-sizing: border-box; }
+
+/* The plain declaration before each var() is what IE11 gets: it drops the
+   custom-property line it cannot parse and keeps the literal above it. */
+body {
+	margin: 0;
+	padding: 0 1rem 3rem;
+	background: #77b;
+	background: var(--field);
+	color: #111;
+	color: var(--ink);
+	font: 1em/1.6 "Trebuchet MS", Verdana, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* ---- page frame ---- */
+
+.masthead, .wrap {
+	max-width: 68rem;
+	margin: 0 auto;
+}
+
+.masthead {
+	padding: .6rem 0 0;
+}
+
+/* Take back the whitespace the SVG carries around the letters, restoring the old bitmap's spacing. */
+.masthead img {
+	display: block;
+	max-width: 100%;
+	height: auto;
+	margin: -1.7px 0 -1.1px;
+}
+
+.masthead .tagline {
+	background: #000;
+	color: #fff;
+	font-weight: bold;
+	/* A one-line label has no use for the body's prose leading. */
+	line-height: 1;
+	padding: .3rem .4rem;
+	margin-top: .4rem;
+}
+
+.wrap {
+	background: #ccd;
+	background: var(--panel);
+	border-bottom: 6px solid #000;
+	padding: 1.5rem;
+	/* The rings the 2007 pages carried. Transparent, so it rides on --panel. */
+	background-image: url(images/bg_rings.svg);
+	background-repeat: no-repeat;
+	background-position: top right;
+}
+
+@media (prefers-color-scheme: dark) {
+	/* Rings dropped, not inverted: their lavender is a light-panel tone. */
+	.wrap { background-image: none; }
+
+	/* The wordmark is black on transparent, and all but vanishes on the dark field. */
+	.masthead img { filter: invert(1); }
+}
+
+@media (min-width: 62rem) {
+	.wrap {
+		display: grid;
+		grid-template-columns: 14rem minmax(0, 1fr);
+		gap: 2.5rem;
+		align-items: start;
+	}
+
+	/* The hub is its own navigation, so it spans the full width. */
+	.wrap.solo { display: block; }
+}
+
+footer {
+	max-width: 68rem;
+	margin: .5rem auto 0;
+	color: #eef;
+	font-size: .8em;
+}
+
+@media (prefers-color-scheme: dark) {
+	footer { color: var(--ink-soft); }
+}
+
+/* ---- typography ---- */
+
+h2, h3 { scroll-margin-top: 1rem; }
+
+h1 { font-size: 1.9em; margin: 0 0 .3em; line-height: 1.2; }
+h2 { font-size: 1.45em; margin: 2.5em 0 .5em; padding-bottom: .2em; border-bottom: 2px solid var(--rule); }
+h3 { font-size: 1.15em; margin: 2em 0 .4em; }
+h2:first-child, h1 + h2 { margin-top: 1em; }
+
+p { margin: 0 0 1em; }
+
+a { color: #00c; color: var(--link); }
+a:hover { color: #c00; color: var(--link-hover); }
+
+code, kbd, pre {
+	font-family: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+	font-size: .9em;
+}
+
+code, kbd { background: var(--code-bg); padding: .1em .35em; border-radius: 3px; }
+
+/* Legacy pages carry wide code samples: scroll them, never the page. */
+pre {
+	overflow-x: auto;
+	max-width: 100%;
+	padding: .7rem;
+	background: var(--code-bg);
+	border-left: 3px solid var(--accent);
+}
+
+.lede { font-size: 1.08em; color: var(--ink-soft); }
+
+hr { height: 1px; border: 0; background: var(--rule); margin: 2em 0; }
+
+img { max-width: 100%; height: auto; }
+
+/* Legacy prose carries bare URLs long enough to push a phone sideways. */
+body { overflow-wrap: break-word; }
+
+/* The reference pages carry tables wider than any column: scroll the table, not
+   the page. The guide's own MIME table is narrow and reads better left alone. */
+main table:not(.mime) { display: block; overflow-x: auto; }
+
+/* ---- table of contents ---- */
+
+.toc { font-size: .92em; }
+
+@media (min-width: 62rem) {
+	.toc { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+}
+
+.toc h2 {
+	font-size: .8em;
+	text-transform: uppercase;
+	letter-spacing: .08em;
+	margin: 0 0 .5em;
+	border: 0;
+	color: var(--ink-soft);
+}
+
+.toc ol, .toc ul { list-style: none; margin: 0 0 1.5em; padding: 0; }
+.toc li { margin: 0; }
+
+.toc a {
+	display: block;
+	padding: .2rem .5rem;
+	text-decoration: none;
+	border-left: 3px solid transparent;
+	color: var(--ink);
+}
+
+.toc a:hover { background: var(--accent); }
+.toc a[aria-current="true"] { border-left-color: var(--link); font-weight: bold; }
+.toc .here { font-weight: bold; }
+
+/* ---- callouts ---- */
+
+.note {
+	margin: 0 0 1em;
+	padding: .7rem 1rem;
+	border-left: 4px solid var(--accent);
+	background: var(--chip);
+	font-size: .95em;
+}
+
+.note > :last-child { margin-bottom: 0; }
+
+/* ---- the hub ---- */
+
+.hub {
+	display: grid;
+	gap: 1.5rem;
+	margin: 2rem 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+@media (min-width: 46rem) {
+	.hub { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.hub > li {
+	padding: 1.2rem;
+	background: var(--chip);
+	border-radius: .5rem;
+}
+
+.hub h2 {
+	margin: 0 0 .8em;
+	font-size: 1.1em;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	border: 0;
+	color: var(--ink-soft);
+}
+
+.hub dl { margin: 0; }
+.hub dt { margin: 0 0 .1em; font-weight: bold; }
+.hub dd { margin: 0 0 1em; font-size: .93em; color: var(--ink-soft); }
+.hub dd:last-child { margin-bottom: 0; }
+
+/* Option names in the glosses are short; without this a browser breaks
+   "--changes" after its hyphens. */
+.hub code { white-space: nowrap; }
+
+.dated { font-weight: normal; font-size: .85em; color: var(--ink-soft); }
+
+/* ---- content tables ---- */
+
+/* The reference pages use bare <table> for their content tables. The guide's MIME
+   table is styled beside the guide and opts out. */
+main table:not(.mime) {
+	border-collapse: collapse;
+	margin: 0 0 1em;
+	font-size: .92em;
+}
+
+main table:not(.mime) td, main table:not(.mime) th {
+	border: 1px solid var(--rule);
+	padding: .3em .6em;
+	text-align: left;
+	vertical-align: top;
+}
+
+main table:not(.mime) th, main table:not(.mime) tr.head td {
+	background: var(--accent);
+	font-weight: bold;
+}
+
+/* ---- screenshots ---- */
+
+figure {
+	margin: 0 0 1.5em;
+	text-align: center;
+}
+
+figure img {
+	border: 1px solid var(--rule);
+	background: #fff;
+	box-shadow: 0 2px 8px var(--shadow);
+	cursor: zoom-in;
+}
+
+figcaption {
+	margin-top: .5em;
+	font-size: .88em;
+	color: var(--ink-soft);
+}
+
+/* Zoom overlay. Closed <dialog> is hidden by the UA, so nothing shows without JS. */
+dialog#zoom {
+	max-width: 96vw;
+	max-height: 96vh;
+	padding: 0;
+	border: 0;
+	background: transparent;
+}
+
+dialog#zoom img {
+	display: block;
+	max-width: 96vw;
+	max-height: 96vh;
+	width: auto;
+	height: auto;
+	cursor: zoom-out;
+}
+
+dialog#zoom::backdrop { background: rgba(0, 0, 0, .8); }
+
+/* ---- filter box (guide options, and the FAQ) ---- */
+
+.filter {
+	display: flex;
+	gap: .5rem;
+	align-items: center;
+	margin: 0 0 1.5rem;
+}
+
+.filter input {
+	flex: 1 1 auto;
+	padding: .5rem .7rem;
+	border: 1px solid var(--rule);
+	border-radius: .3rem;
+	background: var(--panel);
+	color: var(--ink);
+	font: inherit;
+}
+
+.filter output { font-size: .88em; color: var(--ink-soft); white-space: nowrap; }
+
+/* ---- misc ---- */
+
+.skip {
+	position: absolute;
+	left: -9999px;
+}
+
+.skip:focus {
+	left: 1rem;
+	top: 1rem;
+	background: var(--panel);
+	padding: .5rem;
+	z-index: 10;
+}
+
+@media print {
+	body { background: #fff; }
+	.toc, .filter { display: none; }
+	.wrap { display: block; border: 0; }
+}

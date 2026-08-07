@@ -70,6 +70,29 @@ extern int hts_unescapeEntitiesWithCharset(const char *src,
                                            const char *charset);
 
 /**
+ * Flags for hts_unescapeEntitiesWithCharsetSpecial(). Values stay distinct from
+ * unescapeFlags above: both reach their function as a plain int.
+ **/
+typedef enum unescapeEntitiesFlags {
+  /** The destination is a URL query string: write a reference the charset can
+      not represent as %26%23<decimal>%3B (URL Standard), instead of source text
+      whose '&' and '#' would re-split the query. **/
+  UNESCAPE_ENTITIES_URL_QUERY = 2
+} unescapeEntitiesFlags;
+
+/**
+ * Unescape HTML entities into their charset equivalents, "flags" being a mask
+ * of UNESCAPE_ENTITIES_XXX constants.
+ * Note: source and destination MUST NOT be the same with a flag that may grow
+ * the string (UNESCAPE_ENTITIES_URL_QUERY).
+ * Returns 0 upon success, -1 upon overflow or error.
+ **/
+extern int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
+                                                  const size_t max,
+                                                  const char *charset,
+                                                  const int flags);
+
+/**
  * Unescape an URL-encoded string. The implicit charset is UTF-8.
  * In case of UTF-8 decoding error inside URL-encoded characters, 
  * the characters are left undecoded.

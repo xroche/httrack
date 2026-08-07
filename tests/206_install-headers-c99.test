@@ -1,0 +1,255 @@
+#!/bin/bash
+#
+# The installed headers must also compile in a strict-ISO translation unit,
+# where __STRICT_ANSI__ drops the unprefixed GNU keywords and hides the libc's
+# POSIX declarations (#972), and as C++ (#1002). 205 varies only the bytecode
+# mode, so it sees neither.
+
+set -euo pipefail
+
+fail() {
+    echo "FAIL: $1" >&2
+    exit 1
+}
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is no install rule to drive.
+if [ -z "${abs_top_builddir:-}" ]; then
+    echo "abs_top_builddir unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it first.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || {
+    echo "no C compiler (${cc_argv[0]}), skipping" >&2
+    exit 77
+}
+make=${MAKE:-make}
+command -v "$make" >/dev/null 2>&1 || {
+    echo "no make ($make), skipping" >&2
+    exit 77
+}
+
+tmp=$(mktemp -d) || exit 1
+trap 'set +e; rm -rf "$tmp"' EXIT
+
+# Seeding the array with -I keeps it non-empty, which bash 3.2 needs under set -u.
+cpp_argv=(-I"$tmp/include")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    cpp_argv+=("${extra_argv[@]}")
+fi
+# Snapshot before the C-only flag below is appended; the C++ leg reuses this.
+base_cpp_argv=("${cpp_argv[@]}")
+
+# gcc before 14 only warns on an implicit declaration, which would let the
+# hidden-strnlen half of #972 pass as clean.
+printf 'int main(void) { return 0; }\n' >"$tmp/tu.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" -Werror=implicit-function-declaration \
+    -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    cpp_argv+=(-Werror=implicit-function-declaration)
+fi
+
+stds=()
+for std in c99 c11; do
+    printf 'int main(void) { return 0; }\n' >"$tmp/tu.c"
+    if ! "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+        echo "${cc_argv[*]} rejects -std=$std, skipping that mode" >&2
+        continue
+    fi
+    # Only meaningful if the flag is in force: bare typeof must not compile.
+    printf 'int f(int x) { typeof(x) y = x; return y; }\n' >"$tmp/tu.c"
+    if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+        echo "-std=$std keeps the GNU keywords here, skipping that mode" >&2
+        continue
+    fi
+    stds+=("$std")
+done
+[ "${#stds[@]}" -gt 0 ] || {
+    echo "no strict-ISO mode available from ${cc_argv[*]}, skipping" >&2
+    exit 77
+}
+
+# Whether the strnlen half of #972 is observable on this libc.
+printf '#include <string.h>\nsize_t f(const char *s) { return strnlen(s, 8); }\n' >"$tmp/tu.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=${stds[0]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    echo "note: this libc declares strnlen in strict mode, only the keyword half is exercised" >&2
+fi
+
+# Override the install dir rather than DESTDIR: same rule and file list, no
+# prefix guessing. Empty MAKEFLAGS, or the sub-make hunts a jobserver it lacks.
+env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+    DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
+    {
+        cat "$tmp/install.log" >&2
+        fail "install-DevIncludesDATA failed"
+    }
+
+headers=("$tmp/include/httrack"/*.h)
+# Derived from DevIncludes_DATA so a new header needs no edit here. A header
+# dropped from that list moves both sides, hence the named checks below.
+declared=$(awk '/^DevIncludes_DATA[[:space:]]*=/ { inlist = 1 }
+    inlist {
+        last = ($0 !~ /\\$/)
+        sub(/^[^=]*=/, "")
+        gsub(/\\/, " ")
+        for (i = 1; i <= NF; i++)
+            if ($i ~ /\.h$/) n++
+        if (last) exit
+    }
+    END { print n + 0 }' "${abs_top_srcdir:?}/src/Makefile.am")
+[ "$declared" -ge 10 ] || fail "read only $declared headers out of DevIncludes_DATA, the parse is wrong"
+[ "${#headers[@]}" -eq "$declared" ] ||
+    fail "${#headers[@]} headers installed, DevIncludes_DATA declares $declared"
+for h in htssafe.h htsnet.h htsopt.h; do
+    [ -f "$tmp/include/httrack/$h" ] || fail "$h was not installed"
+done
+
+# No -D_POSIX_C_SOURCE anywhere below: every installed header, htsnet.h and
+# htsopt.h included, must compile against the strict-ISO libc alone (#1001).
+count=0
+bad=0
+for h in "${headers[@]}"; do
+    b=$(basename "$h")
+    printf '#include <httrack/%s>\n' "$b" >"$tmp/tu.c"
+    for std in "${stds[@]}"; do
+        for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
+            count=$((count + 1))
+            if ! "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" "$mode" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+                echo "$b does not compile under -std=$std ($mode):" >&2
+                head -5 "$tmp/cc.log" >&2
+                bad=1
+            fi
+        done
+    done
+done
+echo "compiled ${#headers[@]} headers x ${#stds[@]} std x 2 bytecode modes = $count units" >&2
+[ "$count" -eq $((${#headers[@]} * ${#stds[@]} * 2)) ] || fail "the compile loop skipped units"
+[ "$bad" -eq 0 ] || fail "installed headers do not compile in strict-ISO mode"
+
+# A macro body is only compiled where it expands, so the include-only loop above
+# never reaches the __typeof__ in htsbuff_must_be_array_ or HTS_IS_CHAR_BUFFER.
+cat >"$tmp/tu.c" <<'EOF'
+#include <httrack/htssafe.h>
+void f(void);
+void f(void) {
+  char a[8];
+  htsbuff b = htsbuff_array(a);
+  htsbuff_catn(&b, "x", 1);
+  strcpybuff(a, "y");
+}
+EOF
+for std in "${stds[@]}"; do
+    for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
+        if ! "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" "$mode" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+            echo "htssafe.h macros do not expand under -std=$std ($mode):" >&2
+            head -5 "$tmp/cc.log" >&2
+            bad=1
+        fi
+    done
+done
+[ "$bad" -eq 0 ] || fail "htssafe.h macros do not compile in strict-ISO mode"
+
+# Strict-ISO mode is the only one that selects htssafe_strnlen_'s byte loop, and
+# -fsyntax-only never runs a byte of it: differential it against memchr.
+cat >"$tmp/strnlen.c" <<'EOF'
+#include <httrack/htssafe.h>
+#include <string.h>
+int main(void) {
+  static const char alpha[2] = {'\0', 'a'};
+  char buf[16];
+  size_t bits, len, n;
+  for (len = 0; len <= 8; len++) {
+    for (bits = 0; bits < ((size_t) 1 << len); bits++) {
+      size_t i;
+      /* poison, or an overshot bound lands on a NUL and reads as correct */
+      memset(buf, 'Z', sizeof(buf));
+      for (i = 0; i < len; i++)
+        buf[i] = alpha[(bits >> i) & 1];
+      for (n = 0; n <= len; n++) {
+        const void *p = memchr(buf, '\0', n);
+        const size_t want = p != NULL ? (size_t) ((const char *) p - buf) : n;
+        const size_t got = htssafe_strnlen_(buf, n);
+        if (got != want) {
+          fprintf(stderr, "htssafe_strnlen_(%u) = %u, want %u\n", (unsigned) n,
+                  (unsigned) got, (unsigned) want);
+          return 1;
+        }
+      }
+    }
+  }
+  return 0;
+}
+EOF
+# Vacuous if the gate handed us libc's strnlen. Match that branch, not the
+# loop, or a mutated loop reads as a lost fallback instead. Needs no runnable
+# binary, so it stays outside the gate below.
+for std in "${stds[@]}"; do
+    pp=$("${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" -E "$tmp/strnlen.c") ||
+        fail "cannot preprocess the htssafe_strnlen_ probe under -std=$std"
+    if grep -q 'return strnlen' <<<"$pp"; then
+        fail "-std=$std left htssafe_strnlen_ on libc, the differential proves nothing"
+    fi
+done
+
+# A noexec TMPDIR or a cross-compiler would red the run for the wrong reason.
+printf 'int main(void) { return 0; }\n' >"$tmp/tu.c"
+if ! ("${cc_argv[@]}" "${cpp_argv[@]}" -o "$tmp/tu" "$tmp/tu.c" 2>/dev/null && "$tmp/tu"); then
+    echo "cannot run a binary built in $tmp, skipping the htssafe_strnlen_ differential" >&2
+else
+    for std in "${stds[@]}"; do
+        "${cc_argv[@]}" "${cpp_argv[@]}" "-std=$std" -o "$tmp/strnlen" "$tmp/strnlen.c" 2>"$tmp/cc.log" || {
+            head -5 "$tmp/cc.log" >&2
+            fail "the htssafe_strnlen_ probe does not build under -std=$std"
+        }
+        "$tmp/strnlen" || fail "htssafe_strnlen_ disagrees with memchr under -std=$std"
+    done
+fi
+
+# The installed headers must also compile as C++ (#1002). -fsyntax-only never
+# runs g++'s -Wunused-function pass, so this leg always does a real -c compile.
+cxx=""
+for cand in "${CXX:-}" g++ clang++ c++; do
+    [ -n "$cand" ] && command -v "$cand" >/dev/null 2>&1 && {
+        cxx="$cand"
+        break
+    }
+done
+if [ -z "$cxx" ]; then
+    echo "no C++ compiler found, skipping the C++ leg" >&2
+else
+    cxx_stds=()
+    for std in c++11 c++17; do
+        printf 'int main() { return 0; }\n' >"$tmp/tu.cpp"
+        "$cxx" "${base_cpp_argv[@]}" "-std=$std" -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>/dev/null &&
+            cxx_stds+=("$std")
+    done
+    [ "${#cxx_stds[@]}" -gt 0 ] || echo "$cxx accepts neither -std=c++11 nor -std=c++17, skipping the C++ leg" >&2
+    for h in "${headers[@]}"; do
+        b=$(basename "$h")
+        argv=("${base_cpp_argv[@]}" -Wall -Wextra -Werror)
+        printf '#include <httrack/%s>\nint main() { return 0; }\n' "$b" >"$tmp/tu.cpp"
+        for std in "${cxx_stds[@]}"; do
+            for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
+                if ! "$cxx" "${argv[@]}" "-std=$std" "$mode" -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>"$tmp/cc.log"; then
+                    echo "$b does not compile as C++ under -std=$std ($mode):" >&2
+                    head -5 "$tmp/cc.log" >&2
+                    bad=1
+                fi
+            done
+        done
+    done
+    [ "${#cxx_stds[@]}" -eq 0 ] ||
+        echo "compiled ${#headers[@]} headers x ${#cxx_stds[@]} C++ std x 2 bytecode modes with $cxx" >&2
+fi
+[ "$bad" -eq 0 ] || fail "installed headers do not compile as C++"
+
+# The loops above are only meaningful if this compiler rejects a missing include.
+printf '#include "no-such-header-972.h"\n' >"$tmp/tu.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=${stds[0]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    fail "${cc_argv[*]} accepted a missing include, the checks above proved nothing"
+fi
+
+exit 0

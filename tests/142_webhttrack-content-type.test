@@ -1,0 +1,205 @@
+#!/bin/bash
+#
+# htsserver must type each file it serves from its whole extension, and must
+# not expand ${...} in a mirrored page.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+# The GUI assets asserted below have to exist, or every check goes vacuous.
+for asset in server/ping.js server/style.css images/screenshot_01.jpg \
+    images/bg_rings.svg img/fade.gif img/guide-droid-opt-spider.png \
+    server/div/com.httrack.WebHTTrack.metainfo.xml; do
+    test -f "${distdir}/html/${asset}" || fail "missing GUI asset ${asset}"
+done
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_ctype.XXXXXX") || fail "no tmpdir"
+srvlog=$(mktemp)
+srv=
+srvpid=
+cleanup() {
+    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
+    test -z "${srvpid}" || kill -9 "${srvpid}" 2>/dev/null || true
+    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
+    wait "${srv}" 2>/dev/null || true # absorb bash's async "Killed" notice
+    rm -rf "${work}" "${srvlog}"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+# A mirror to serve through /website/, holding the awkward names: the crawl
+# itself is not under test.
+proj="${work}/websites/proj"
+mkdir -p "${proj}/photos.css"
+printf '<svg xmlns="http://www.w3.org/2000/svg"/>\n' >"${proj}/probe.svg"
+printf 'ICO\n' >"${proj}/probe.ico"
+printf 'PNG\n' >"${proj}/PROBE.PNG"
+printf 'WEBP\n' >"${proj}/probe.webp"
+printf 'JPEG\n' >"${proj}/probe.jpeg"
+printf 'plain\n' >"${proj}/notes.htm.txt"
+printf 'blob\n' >"${proj}/data.js.bin"
+printf 'blob\n' >"${proj}/photos.css/plain.bin"
+printf 'blob\n' >"${proj}/noextension"
+# An extension no table row may match on a prefix: .js/.jpg/.ico are rows.
+printf 'blob\n' >"${proj}/app.jsx"
+printf 'blob\n' >"${proj}/photo.jpgx"
+printf 'blob\n' >"${proj}/favicon.icon"
+# Dotted directory, dotless basename: the only shape that catches a lookup
+# scanning the whole path instead of the last segment.
+printf 'blob\n' >"${proj}/photos.css/plain"
+# Mirrored HTML: served raw, so ${...} must survive verbatim (an expanded one
+# would hand the crawled site the session id).
+# shellcheck disable=SC2016 # the literal ${...} is the point
+printf '<html>MIRROR-RAW ${_sid} ${LANG_WHATEVER}</html>\n' >"${proj}/page.html"
+printf '<html>MIRROR-HTM</html>\n' >"${proj}/Legacy.HtM"
+
+# An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
+sport=$("${python}" -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
+(
+    trap '' TERM TTOU
+    export HOME="${work}"
+    exec htsserver "${distdir}/" --port "${sport}" >"${srvlog}" 2>&1
+) &
+srv=$!
+for _ in $(seq 1 40); do
+    url=$(sed -n 's/^URL=//p' "${srvlog}") && test -n "${url}" && break
+    kill -0 "${srv}" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
+srvpid=$(sed -n 's/^PID=//p' "${srvlog}") # absent on Windows
+
+# htsserver resolves the posted paths itself, so hand it native ones.
+"${python}" - "${url}" "$(nativepath "${work}/websites")" <<'PY' || fail "content-type checks failed"
+import re, socket, sys, urllib.parse, urllib.request
+
+url, base = sys.argv[1].rstrip("/"), sys.argv[2]
+rc = 0
+
+
+def check(ok, what):
+    global rc
+    print(("ok: " if ok else "FAIL: ") + what)
+    if not ok:
+        rc = 1
+
+
+def fetch(path):
+    r = urllib.request.urlopen(url + path, timeout=20)
+    return r.headers, r.read()
+
+
+def check_type(path, expected):
+    hdrs, body = fetch(path)
+    got = hdrs.get("Content-type", "")
+    check(got == expected, "%s -> %s (got %r)" % (path, expected, got))
+    # A 200 with an empty body would satisfy any header assertion.
+    check(len(body) > 0, "%s has a body" % path)
+
+
+def check_html_headers(path):
+    """Only the HTML branch carries the no-cache pair; typing HTML off the
+    generic branch would drop it with every Content-type check still green."""
+    hdrs, body = fetch(path)
+    check(hdrs.get("Content-type", "") == "text/html", "%s is text/html" % path)
+    check("no-cache" in hdrs.get("Cache-Control", ""), "%s is no-cache" % path)
+    check(hdrs.get("Pragma", "") == "no-cache", "%s has Pragma no-cache" % path)
+    return body
+
+
+# The GUI's own tree.
+check_html_headers("/server/index.html")
+check_type("/server/ping.js", "text/javascript")
+check_type("/server/style.css", "text/css")
+check_type("/images/bg_rings.svg", "image/svg+xml")
+check_type("/img/fade.gif", "image/gif")
+check_type("/img/guide-droid-opt-spider.png", "image/png")
+check_type("/images/screenshot_01.jpg", "image/jpeg")
+# Dots in the stem: the type comes from the last one, not the first.
+check_type("/server/div/com.httrack.WebHTTrack.metainfo.xml", "application/xml")
+
+# urllib accepts a bare LF, so the framing needs the raw bytes. Bounded read:
+# htsserver does not close the connection after responding.
+parts = urllib.parse.urlsplit(url)
+sock = socket.create_connection((parts.hostname, parts.port), timeout=20)
+try:
+    sock.sendall(b"GET /img/guide-droid-opt-spider.png HTTP/1.0\r\n\r\n")
+    raw = b""
+    while len(raw) < 65536 and b"\r\n\r\n" not in raw and b"\n\n" not in raw:
+        chunk = sock.recv(4096)
+        if not chunk:
+            break
+        raw += chunk
+finally:
+    sock.close()
+head = raw.split(b"\r\n\r\n")[0] if b"\r\n\r\n" in raw else raw
+check(len(head) > 0, "raw header block is non-empty")
+check(raw.startswith(b"HTTP/1.0 200 OK\r\n"), "status line ends CRLF")
+check(b"\r\nContent-type: image/png\r\n" in raw, "type line ends CRLF")
+check(b"\n" not in head.replace(b"\r\n", b""), "no bare LF in the header block")
+
+# Point the server at the mirror the way step4.html does; a body without the
+# session id is refused outright. Only a profile save records the served root,
+# so post one; command_do=save runs no crawl.
+index = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+sid = re.search(rb'name="sid" value="([0-9a-f]+)"', index)
+if sid is None:
+    print("FAIL: no sid in the rendered form")
+    sys.exit(1)
+fields = [("sid", sid.group(1).decode()), ("path", base), ("projname", "proj"),
+          ("command", "httrack"), ("command_do", "save"), ("winprofile", "x")]
+body = "&".join("%s=%s" % (k, urllib.parse.quote(v, safe="")) for k, v in fields)
+urllib.request.urlopen(urllib.request.Request(
+    url + "/server/step4.html", data=body.encode("latin-1"), method="POST"),
+    timeout=20).read()
+
+check_type("/website/probe.svg", "image/svg+xml")
+check_type("/website/probe.ico", "image/x-icon")
+check_type("/website/PROBE.PNG", "image/png")
+check_type("/website/probe.webp", "image/webp")
+check_type("/website/probe.jpeg", "image/jpeg")
+# Extensions the path merely contains, never its own.
+check_type("/website/notes.htm.txt", "text/plain")
+check_type("/website/data.js.bin", "application/octet-stream")
+check_type("/website/photos.css/plain.bin", "application/octet-stream")
+check_type("/website/photos.css/plain", "application/octet-stream")
+check_type("/website/noextension", "application/octet-stream")
+# Table rows are whole extensions, not prefixes of one.
+check_type("/website/app.jsx", "application/octet-stream")
+check_type("/website/photo.jpgx", "application/octet-stream")
+check_type("/website/favicon.icon", "application/octet-stream")
+
+# A mirrored page takes the HTML branch too, but must be streamed verbatim.
+raw_page = check_html_headers("/website/page.html").decode("latin-1")
+check("MIRROR-RAW" in raw_page, "mirror page served")
+check("${_sid}" in raw_page, "mirror ${...} left unexpanded")
+check_type("/website/Legacy.HtM", "text/html")
+
+sys.exit(rc)
+PY
+
+# A leaked htsserver wedges the parallel harness behind a green log.
+cleanup
+! kill -0 "${srv}" 2>/dev/null || fail "htsserver ${srv} survived"
+
+echo "PASS"

@@ -186,6 +186,8 @@ scanning
 scanare in progres
 Waiting for scheduled time..
 Aºtept timpul programat pentru a continua...
+Transferring data..
+Transfer de date..
 Connecting to provider
 Mã conectez la furnizor
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Creazã o Paginã de Start
 Create a word database of all html pages
 Creeazã o bazã de date semanticã a tuturor paginilor html
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Construieste o arhiva de mail RFC822 (MHT/EML) completa a copiei
 Create error logging and report files
 Creeazã fiºiere jurnal pentru mesajele de eroare ºi fiºiere raport
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Identitatea browser-ului
 Comment to be placed in each HTML file
 Comentariu ce va fi plasat în fiecare fiºier HTML
+Languages accepted by the browser
+Limbile acceptate de browser
+Additional HTTP headers to be sent in each requests
+Anteturi HTTP suplimentare de trimis în fiecare cerere
+HTTP referer to be sent for initial URLs
+Referer HTTP de trimis pentru URL-urile initiale
 Back to starting page
 Înapoi la pagina de start
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Construieºte un index
 Make a word database
 Construieºte o bazã de date semanticã
+Build a mail archive
+Construieste o arhiva de mail
 Log files
 Fiºiere jurnal
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identitate
 HTML footer
 Subsol HTML
+Languages
+Limbi
+Additional HTTP Headers
+Anteturi HTTP suplimentare
+Default referer URL
+URL referer implicit
 N# connections
 Numãr de conexiuni
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Adresa hartii sitului:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Adresa unei harti a sitului care sa fie citita în loc de sondarea sitului; lasati gol pentru a sonda robots.txt, apoi /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Scrie un index CDXJ al arhivei WARC
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Scrie si un index CDXJ sortat cu toate inregistrarile arhivei WARC, pentru instrumentele de redare.
+Package the crawl as a WACZ file
+Impacheteaza parcurgerea intr-un fisier WACZ
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Reuneste arhiva WARC, indexul sau CDXJ si paginile oglindite intr-un singur fisier WACZ; implica arhiva WARC si indexul CDXJ.
+WARC segment size limit:
+Dimensiunea maxima a unui segment WARC:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Incepe un nou segment WARC cand cel curent depaseste acest numar de octeti; lasati gol sau 0 pentru un singur fisier.

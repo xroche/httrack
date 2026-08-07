@@ -376,8 +376,8 @@ void hts_finish_makeindex(httrackp *opt, int *makeindex_done,
                           const char *template_footer, const char *adr,
                           const char *fil);
 
-// Flush ht_buff[0..ht_len] to save on disk (skip if MD5 unchanged); *fp
-// closed+NULLed on write. Precondition: ht_len>0.
+// Flush ht_buff[0..ht_len] to save on disk; *fp closed+NULLed on write.
+// Precondition: ht_len>0.
 void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
                           FILE **fp, const char *ht_buff, size_t ht_len,
                           const char *adr, const char *fil, const char *save);

@@ -1,0 +1,85 @@
+#!/bin/bash
+# dladdr() names the main program after argv[0], so a binary found on PATH is
+# reported as a bare "httrack" the symbolizer cannot open (#889).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+: "${abs_top_builddir:?not run under make check}"
+bindir="${CONFIGURED_BINDIR:?not run under make check}"
+libdir="${CONFIGURED_LIBDIR:?not run under make check}"
+
+out=
+skip() {
+    echo "$*; skipping" >&2
+    exit 77
+}
+fail() {
+    echo "FAIL: $*" >&2
+    test -z "${out}" || sed 's/^/  | /' <"${out}" >&2
+    exit 1
+}
+
+if is_windows; then
+    skip "no backtrace() on Windows"
+fi
+if ! command -v addr2line >/dev/null && ! command -v llvm-symbolizer >/dev/null; then
+    skip "no symbolizer installed"
+fi
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argv0.XXXXXX") || exit 1
+trap 'set +e; rm -rf "${work}"' EXIT
+trap 'rm -rf "${work}"' HUP INT QUIT PIPE TERM
+
+# The installed ELF, not the build tree's libtool wrapper: the wrapper re-execs
+# its binary by absolute path, which is the argv[0] this test must not have.
+stage=${work}/stage
+stage_install_exec "${stage}" "${work}/install.log" ||
+    fail "make install-exec DESTDIR=${stage}"
+bin=${stage}${bindir}/httrack
+test -r "${bin}" || fail "no httrack in ${stage}${bindir}"
+
+# No "httrack" here, so a report that kept argv[0] has nothing to open.
+cd "${work}"
+out=${work}/trace
+rc=0
+# LC_ALL=C: addr2line translates its " at " separator, which the frame match below pins.
+PATH="${stage}${bindir}:${PATH}" \
+    LC_ALL=C \
+    LD_LIBRARY_PATH="${stage}${libdir%/}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
+    run_with_timeout 60 httrack -#test=strsafe overflow \
+    "this string is far too long for the buffer" >"${out}" 2>&1 || rc=$?
+test "${rc}" -ne 124 || fail "the crash handler did not finish within the deadline"
+grep -q '^Caught signal ' "${out}" || fail "the installed binary printed no backtrace"
+if grep -q 'No stack trace available' "${out}"; then
+    skip "this build produced no backtrace"
+fi
+
+# Control: without a bare argv[0] in the raw trace there is nothing to repair,
+# and the assertions below would pass on a report that never needed the fix.
+# glibc drops the "+0x" offset when the load bias is zero, as in a non-PIE build.
+grep -qE '^httrack\((\+0x[0-9a-f]+)?\)' "${out}" ||
+    skip "the main program is not reported as a bare argv[0] here"
+
+headers=$(grep -E '^/.*/httrack:$' "${out}" || true)
+test -n "${headers}" || fail "the report has no symbolized block for the executable"
+# Every frame of a module is claimed in one pass, so a second block for the
+# executable means library frames were misattributed to it.
+test "$(wc -l <<<"${headers}")" -eq 1 || fail "several executable blocks: ${headers}"
+header=${headers}
+exe=${header%:}
+# Device+inode, so a symlinked TMPDIR does not read as a different binary.
+test "${exe}" -ef "${bin}" || fail "the report names ${exe}, not the running ${bin}"
+
+# Frames of httrack.c, which stays in the program whether or not the engine is
+# a shared library.
+block=$(awk -v h="${header}" '$0 == h { on = 1; next } /^\// { on = 0 } on' "${out}")
+# " at " pins the symbol column: both addr2line -Cfipa and llvm-symbolizer -p
+# emit it, and a path component named "main" does not.
+grep -qE '(^|[^[:alnum:]_])(sig_fatal|main) at ' <<<"${block}" ||
+    fail "the executable's block names no frame: ${block}"
+
+echo "the crash report named ${exe} and its own frames"

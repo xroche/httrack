@@ -19,6 +19,9 @@ import gzip
 import hashlib
 import os
 import re
+import socket
+import socketserver
+import struct
 import sys
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -555,10 +558,22 @@ class Handler(SimpleHTTPRequestHandler):
     # ... and one that points the sitemap at the site root, to check a subtree
     # crawl is not widened by where the site chooses to put its sitemap.
     SCOPE_SITEMAP_UA = "scopesitemap"
+    # ... and one whose probe fails, with a body past the 1070 bytes that
+    # issue #769's over-read needed.
+    ERROR_ROBOTS_UA = "errorrobots"
 
     def route_robots(self):
         # The Sitemap: record is group-independent; only --sitemap acts on it.
         ua = self.headers.get("User-Agent") or ""
+        if self.ERROR_ROBOTS_UA in ua:
+            body = b"# " + b"x" * 4000 + b"\n"
+            self.send_response(404, "Not Found")
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
+            return
         host = self.headers.get("Host")
         body = "User-agent: *\nDisallow:\n"
         if self.DENY_DECLARED_UA in ua:
@@ -1000,6 +1015,62 @@ class Handler(SimpleHTTPRequestHandler):
         v = 1 if self.refetch_pass() == 1 else 2
         self.send_raw(b"<html><body><p>STAY-V%d</p></body></html>" % v, "text/html")
 
+    # --- re-fetch cut mid-header, so nothing is stored (#746, #748) ---------
+    KEEP_PAGE = b"<html><body><p>KEEP-PAGE-V1</p></body></html>"
+    KEEP_BIN = b"KEEP-BIN-V1\n" + b"\x51\x52\x53\x54" * 512
+    KEEP_ERR = b"KEEP-ERR-V1\n" + b"\x61\x62\x63\x64" * 512
+
+    def send_cut_headers(self):
+        """Hang up mid-header: the response never becomes parseable."""
+        self.close_connection = True
+        try:
+            self.wfile.write(b"HTTP/1.0 200 OK\r\nContent-Ty")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.connection.close()
+
+    def route_keep_index(self):
+        self.refetch_pass()
+        self.send_html(
+            '\t<a href="page.html">page</a>\n'
+            '\t<a href="data.bin">data</a>\n'
+            '\t<a href="err.bin">err</a>\n'
+            '\t<a href="stay.bin">stay</a>\n'
+        )
+
+    def route_keep_page(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.KEEP_PAGE, "text/html")
+        else:
+            self.send_cut_headers()
+
+    def route_keep_data(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.KEEP_BIN, "application/octet-stream")
+        else:
+            self.send_cut_headers()
+
+    # Control: an HTTP error on the same resource already keeps the copy, so
+    # the cut-header routes above must end up indistinguishable from it.
+    def route_keep_err(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.KEEP_ERR, "application/octet-stream")
+        else:
+            self.send_response(500)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    # Control: answers normally, with a new body on pass 2, so a fix that
+    # stopped overwriting mirrored files altogether would be caught.
+    def route_keep_stay(self):
+        v = 1 if self.refetch_pass() == 1 else 2
+        self.send_raw(
+            b"KEEP-STAY-V%d\n" % v + b"\x71\x72\x73\x74" * 512,
+            "application/octet-stream",
+        )
+
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
         self.send_raw(
@@ -1124,6 +1195,98 @@ class Handler(SimpleHTTPRequestHandler):
             if parts[3] == pdf:
                 self.send_raw(self.FAKE_PDF, "application/pdf")
                 return
+        self.send_response(404)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    # Character references in a query string (#854). CHARREF_LOG collects the
+    # request-target the origin saw, plus the parameter count it parses out of
+    # it. Per page: a reference the declared charset represents (é, あ) and one
+    # it does not (€).
+    CHARREF_QUERY = "?a=&euro;&b=&#8364;&c=&eacute;&d=x"
+    CHARREF_MB_QUERY = "?a=&#12354;&c=&#12316;&b=&euro;&d=x"
+    CHARREF_PAGES = {
+        "none": ("text/html", CHARREF_QUERY),
+        "utf8": ("text/html; charset=utf-8", CHARREF_QUERY),
+        "sjis": ("text/html; charset=shift_jis", CHARREF_MB_QUERY),
+        "jis": ("text/html; charset=iso-2022-jp", CHARREF_MB_QUERY),
+    }
+
+    def record_charref(self):
+        log = os.environ.get("CHARREF_LOG")
+        if log:
+            fields = [f for f in urlsplit(self.path).query.split("&") if f]
+            with open(log, "a") as fp:
+                fp.write("%s\t%d\n" % (self.path, len(fields)))
+
+    def route_charref(self):
+        name = urlsplit(self.path).path[len("/charref/") :]
+        variant = name[: -len(".html")] if name.endswith(".html") else ""
+        if variant == "index":
+            body = "".join(
+                '<a href="%s.html">%s</a>' % (v, v) for v in self.CHARREF_PAGES
+            )
+            self.send_raw(("<html><body>%s</body></html>" % body).encode(), "text/html")
+        elif variant in self.CHARREF_PAGES:
+            ctype, query = self.CHARREF_PAGES[variant]
+            body = '<a href="q%s.html%s">q</a>' % (variant, query)
+            self.send_raw(("<html><body>%s</body></html>" % body).encode(), ctype)
+        elif variant[1:] in self.CHARREF_PAGES:
+            self.send_raw(b"<html><body>q</body></html>", "text/html")
+        else:
+            self.send_response(404)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    # variant -> (Content-Type, title bytes, body bytes); the gb2312 and l1decl
+    # titles are valid UTF-8 as bytes, so only the declared charset decodes them
+    TITLEENC_PAGES = {
+        "u8": (
+            "text/html",
+            "Café-u8".encode(),
+            '<img src="s.svg#café"><a href="né.txt">leaf</a>'.encode(),
+        ),
+        # genuine latin-1: the guess must still be applied
+        "l1": (
+            "text/html",
+            "Café-l1".encode("latin-1"),
+            b'<a href="l1.txt">leaf</a>',
+        ),
+        "declared": ("text/html; charset=utf-8", "Café-declared".encode(), b"x"),
+        "gb2312": ("text/html; charset=gb2312", "图片".encode("gb2312") + b"-gb", b"x"),
+        "l1decl": (
+            "text/html; charset=iso-8859-1",
+            "Ã©".encode("latin-1") + b"-l1d",
+            b"x",
+        ),
+    }
+
+    def route_titleenc(self):
+        name = unquote(urlsplit(self.path).path)[len("/titleenc/") :]
+        variant = name[: -len(".html")] if name.endswith(".html") else None
+        if variant in self.TITLEENC_PAGES:
+            ctype, title, body = self.TITLEENC_PAGES[variant]
+            self.send_raw(
+                b"<html><head><title>"
+                + title
+                + b"</title></head><body>"
+                + body
+                + b"</body></html>",
+                ctype,
+            )
+            return
+        if name == "s.svg":
+            self.send_raw(
+                (
+                    '<svg xmlns="http://www.w3.org/2000/svg">'
+                    '<symbol id="café"><rect/></symbol></svg>'
+                ).encode(),
+                "image/svg+xml",
+            )
+            return
+        if name in ("né.txt", "l1.txt"):
+            self.send_raw(b"leaf\n", "text/plain")
+            return
         self.send_response(404)
         self.send_header("Content-Length", "0")
         self.end_headers()
@@ -1439,6 +1602,226 @@ class Handler(SimpleHTTPRequestHandler):
             self.wfile.write(b"%X\r\n" % len(piece) + piece + b"\r\n")
         self.wfile.write(b"0\r\n\r\n")
 
+    # #840: a chunked stream cut before its terminating zero-length chunk.
+    CHUNKTRUNC_V1 = b"<html><body><p>CHUNKTRUNC-PAGE-V1</p></body></html>"
+    CHUNKTRUNC_V2 = b"<html><body><p>CHUNKTRUNC-PAGE-V2</p></body></html>"
+
+    CHUNKTRUNC_BIN_V1 = b"CHUNKTRUNC-BIN-V1\n" + b"\x07\x08\x09\xfe" * 8192
+    CHUNKTRUNC_BIN_V2 = b"CHUNKTRUNC-BIN-V2\n" + b"\x17\x18\x19\xee" * 8192
+
+    def route_chunktrunc_index(self):
+        self.send_html(
+            '\t<a href="page.html">page</a>\n'
+            '\t<a href="always.html">always</a>\n'
+            '\t<a href="stay.html">stay</a>\n'
+            '\t<a href="file.bin">file</a>\n'
+            '\t<a href="always.bin">alwaysbin</a>\n'
+            '\t<a href="hostile.html">hostile</a>\n'
+            '\t<a href="reset.bin">reset</a>\n'
+        )
+
+    def send_chunked(self, body, terminate, ctype="text/html; charset=utf-8"):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+            if terminate:
+                self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    def route_chunktrunc_page(self):
+        if self.refetch_pass() == 1:
+            self.send_chunked(self.CHUNKTRUNC_V1, True)
+        else:
+            self.send_chunked(self.CHUNKTRUNC_V2, False)
+
+    # Same over the direct-to-disk path: the update pass delivers half the new
+    # body and never terminates it.
+    def route_chunktrunc_file(self):
+        octet = "application/octet-stream"
+        if self.refetch_pass() == 1:
+            self.send_chunked(self.CHUNKTRUNC_BIN_V1, True, octet)
+        else:
+            half = self.CHUNKTRUNC_BIN_V2[: len(self.CHUNKTRUNC_BIN_V2) // 2]
+            self.send_chunked(half, False, octet)
+
+    # Truncated on every pass, so a first crawl has nothing good to fall back on.
+    def route_chunktrunc_always(self):
+        self.send_chunked(b"<html><body><p>CHUNKTRUNC-ALWAYS</p></body></html>", False)
+
+    def route_chunktrunc_alwaysbin(self):
+        self.send_chunked(
+            b"CHUNKTRUNC-ALWAYSBIN\n" + b"\x27\x28\x29\xde" * 1000,
+            False,
+            "application/octet-stream",
+        )
+
+    # Control: terminated on both passes, so a normal --update still lands.
+    def route_chunktrunc_stay(self):
+        v = 1 if self.refetch_pass() == 1 else 2
+        self.send_chunked(b"<html><body><p>CHUNKSTAY-V%d</p></body></html>" % v, True)
+
+    # The update pass declares a chunk of 0x80000000, which sscanf("%x") lands in
+    # an int as INT_MIN: it must not read as the terminating chunk, and the sum
+    # it drives negative must not read as a complete body either.
+    def route_chunktrunc_hostile(self):
+        if self.refetch_pass() == 1:
+            self.send_chunked(b"<html><body><p>CHUNKHOSTILE-V1</p></body></html>", True)
+            return
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            self.wfile.write(b"80000000\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    # #855: a trailer section after the terminating zero-length chunk.
+    def send_chunked_trailed(self, body, trailers, ctype="text/html; charset=utf-8"):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            half = len(body) // 2
+            for piece in (body[:half], body[half:]):
+                self.wfile.write(b"%X\r\n" % len(piece) + piece + b"\r\n")
+            self.wfile.write(
+                b"0\r\n" + b"".join(t + b"\r\n" for t in trailers) + b"\r\n"
+            )
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    def route_chunktrail_index(self):
+        self.send_html(
+            '\t<a href="one.html">one</a>\n'
+            '\t<a href="many.html">many</a>\n'
+            '\t<a href="none.html">none</a>\n'
+            '\t<a href="huge.html">huge</a>\n'
+            '\t<a href="bogus.html">bogus</a>\n'
+            '\t<a href="eof.html">eof</a>\n'
+            '\t<a href="file.bin">file</a>\n'
+        )
+
+    def route_chunktrail_one(self):
+        self.send_chunked_trailed(
+            b"<html><body><p>CHUNKTRAIL-ONE</p></body></html>", [b"X-Foo: bar"]
+        )
+
+    # Spans several reads: longer than the reader's 256 bytes per call.
+    def route_chunktrail_many(self):
+        self.send_chunked_trailed(
+            b"<html><body><p>CHUNKTRAIL-MANY</p></body></html>",
+            [b"X-Field-%02d: %s" % (n, b"v" * 40) for n in range(20)],
+        )
+
+    # Control: same body, no trailer section.
+    def route_chunktrail_none(self):
+        self.send_chunked_trailed(
+            b"<html><body><p>CHUNKTRAIL-NONE</p></body></html>", []
+        )
+
+    # Past HTS_LINE_BLOCK_SIZE: the discard stays bounded, so the transfer drops.
+    def route_chunktrail_huge(self):
+        self.send_chunked_trailed(
+            b"<html><body><p>CHUNKTRAIL-HUGE</p></body></html>",
+            [b"X-Bloat-%04d: %s" % (n, b"w" * 100) for n in range(160)],
+        )
+
+    # Only the terminating chunk opens the section, so junk in a data chunk's
+    # own CRLF stays a framing error.
+    def route_chunktrail_bogus(self):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            body = b"<html><body><p>CHUNKTRAIL-BOGUS</p></body></html>"
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"X-Foo: bar\r\n")
+            self.wfile.write(b"0\r\n\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    # Body complete, then EOF before the blank line closing the section. The
+    # terminating chunk already arrived, so the payload stands.
+    def route_chunktrail_eof(self):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            body = b"<html><body><p>CHUNKTRAIL-EOF</p></body></html>"
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+            self.wfile.write(b"0\r\nX-Checksum: deadbeef\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    # The direct-to-disk path, where the body never sits in memory.
+    def route_chunktrail_file(self):
+        self.send_chunked_trailed(
+            b"CHUNKTRAIL-BIN\n" + b"\x41\x42\x43\xfd" * 4096,
+            [b"X-Checksum: 0badc0de", b"X-Done: 1"],
+            "application/octet-stream",
+        )
+
+    # Aborts the chunked body with an RST, so the read fails rather than seeing a
+    # clean EOF and the transfer is already in error before the framing check.
+    def route_chunktrunc_reset(self):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            body = b"CHUNKRESET\n" + b"\x31\x32\x33\xcd" * 4096
+            self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+            self.wfile.flush()
+            time.sleep(0.5)  # let the client consume the chunk first
+            self.connection.setsockopt(
+                socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0)
+            )
+            self.connection.close()
+        except OSError:
+            pass
+        self.close_connection = True
+
     # Content-Disposition naming: the attachment filename replaces the
     # URL-derived name; path components in it are stripped (RFC 2616).
     CDISPO_NAMES = {
@@ -1485,13 +1868,57 @@ class Handler(SimpleHTTPRequestHandler):
     def route_mini304_page(self):
         self.big_send(b"<html><body>tiny cacheable page</body></html>\n", "text/html")
 
+    # --- /bakname/: #774 — a mirrored file named like a re-fetch backup ----
+    # a.bin gets a new body every pass, so the update re-fetches it and takes a
+    # backup. The sibling carries a validator, so it only revalidates and must
+    # still be there afterwards. It is served under hts-tmp/, the directory the
+    # backup lives in, so the crawl asks for the exact path the engine writes.
+    BAKNAME_SIB = b"BAKNAME-SIBLING\n" + b"\x41\x42\x43\x44" * 512
+
+    def route_bakname_index(self):
+        self.send_html(
+            '\t<a href="a.bin">a</a>\n' '\t<a href="hts-tmp/a.bin.bak">bak</a>\n'
+        )
+
+    def route_bakname_main(self):
+        v = 1 if self.refetch_pass() == 1 else 2
+        self.send_raw(
+            b"BAKNAME-MAIN-V%d\n" % v + b"\x31\x32\x33\x34" * 512,
+            "application/octet-stream",
+        )
+
+    def route_bakname_sibling(self):
+        if self.headers.get("If-Modified-Since") or self.headers.get("If-None-Match"):
+            self.send_response(304)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Last-Modified", BIG_LASTMOD)
+        self.send_header("Content-Length", str(len(self.BAKNAME_SIB)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(self.BAKNAME_SIB)
+
+    # --- /tmpspace/: #842 — same collision, reached through the trailing-space
+    # bypass of the reserved-segment escape. "hts-tmp%20" was escaped by nothing
+    # and then had its space stripped, so the sibling landed on the backup's own
+    # name on shipped defaults.
+    def route_tmpspace_index(self):
+        self.send_html(
+            '\t<a href="a.bin">a</a>\n' '\t<a href="hts-tmp%20/a.bin.bak">bak</a>\n'
+        )
+
     # --- /errmask/: issue #176 — a page that 200'd on the first crawl but 403s
     # on the update fetch must keep its good copy, not be overwritten nor purged.
     ERRMASK_GOOD = b"KEEP" + b"." * 1020  # 1024 B distinctive non-HTML body
     ERRMASK_ERR = b"<html><body>error 403</body></html>\n"
 
     def route_errmask_index(self):
-        self.send_html('\t<a href="keep.dat">keep</a>\n')
+        self.send_html(
+            '\t<a href="keep.dat">keep</a>\n\t<a href="empty.dat">empty</a>\n'
+        )
 
     def route_errmask_keep(self):
         # First crawl (no validator) gets the 1024 B body + Last-Modified; the
@@ -1511,6 +1938,24 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         if self.command != "HEAD":
             self.wfile.write(self.ERRMASK_GOOD)
+
+    def route_errmask_empty(self):
+        # Same masking shape as keep.dat, but a genuinely zero-length body: an
+        # engine-forced revisit must still digest and archive it, not treat
+        # it as a missing-crypto case (#839).
+        if self.headers.get("If-Modified-Since") or self.headers.get("If-None-Match"):
+            self.send_response(403, "Forbidden")
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(self.ERRMASK_ERR)))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(self.ERRMASK_ERR)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Last-Modified", BIG_LASTMOD)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     # --- delayed-type degenerate paths (issues #5/#107) --------------------
     def route_delayed_index(self):
@@ -1638,6 +2083,16 @@ class Handler(SimpleHTTPRequestHandler):
                 time.sleep(1.0)
         except OSError:
             pass
+
+    # #973: quoted, so the link parser keeps the < and > (only an unquoted > ends
+    # a link) and the whole run reaches the progress panel.
+    XSS_NAME = "p0<img src=x onerror=alert(1)>'quote.bin"
+    # The panel splits the URL at the last slash, so only a directory reaches its
+    # name column. Short, because the engine elides that column past 40 chars.
+    XSS_DIR = "d0<i'>"
+
+    def route_xssjob_index(self):
+        self.send_html('\t<a href="%s/%s">job</a>\n' % (self.XSS_DIR, self.XSS_NAME))
 
     # #483: trickled .bin pages so the -E stop lands in the type waiter's
     # unlock-to-patch window with body bytes pending.
@@ -1950,6 +2405,11 @@ class Handler(SimpleHTTPRequestHandler):
         "/uptrunc/page.html": route_uptrunc_page,
         "/uptrunc/file.bin": route_uptrunc_file,
         "/uptrunc/stay.html": route_uptrunc_stay,
+        "/keep/index.html": route_keep_index,
+        "/keep/page.html": route_keep_page,
+        "/keep/data.bin": route_keep_data,
+        "/keep/err.bin": route_keep_err,
+        "/keep/stay.bin": route_keep_stay,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
         "/types/photo.png": route_types,
@@ -1986,6 +2446,22 @@ class Handler(SimpleHTTPRequestHandler):
         "/size/oversize.bin": route_size_oversize,
         "/chunked/index.html": route_chunked_index,
         "/chunked/page.html": route_chunked_page,
+        "/chunktrunc/index.html": route_chunktrunc_index,
+        "/chunktrunc/page.html": route_chunktrunc_page,
+        "/chunktrunc/always.html": route_chunktrunc_always,
+        "/chunktrunc/file.bin": route_chunktrunc_file,
+        "/chunktrunc/always.bin": route_chunktrunc_alwaysbin,
+        "/chunktrunc/stay.html": route_chunktrunc_stay,
+        "/chunktrunc/hostile.html": route_chunktrunc_hostile,
+        "/chunktrunc/reset.bin": route_chunktrunc_reset,
+        "/chunktrail/index.html": route_chunktrail_index,
+        "/chunktrail/one.html": route_chunktrail_one,
+        "/chunktrail/many.html": route_chunktrail_many,
+        "/chunktrail/none.html": route_chunktrail_none,
+        "/chunktrail/huge.html": route_chunktrail_huge,
+        "/chunktrail/bogus.html": route_chunktrail_bogus,
+        "/chunktrail/eof.html": route_chunktrail_eof,
+        "/chunktrail/file.bin": route_chunktrail_file,
         "/errpage/index.html": route_errpage_index,
         "/errpage/good.html": route_errpage_good,
         "/errpage/missing.html": route_errpage_missing,
@@ -1998,6 +2474,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/cdispo/evil.php": route_cdispo,
         "/delayed/index.html": route_delayed_index,
         "/trickle/index.html": route_trickle_index,
+        "/xssjob/": route_xssjob_index,
+        "/xssjob/index.html": route_xssjob_index,
         "/trickle/p0.bin": route_trickle_page,
         "/trickle/p1.bin": route_trickle_page,
         "/trickle/p2.bin": route_trickle_page,
@@ -2061,10 +2539,17 @@ class Handler(SimpleHTTPRequestHandler):
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
+        "/bakname/index.html": route_bakname_index,
+        "/bakname/a.bin": route_bakname_main,
+        "/bakname/hts-tmp/a.bin.bak": route_bakname_sibling,
+        "/tmpspace/index.html": route_tmpspace_index,
+        "/tmpspace/a.bin": route_bakname_main,
+        "/tmpspace/hts-tmp /a.bin.bak": route_bakname_sibling,
         "/mini304/index.html": route_mini304_index,
         "/mini304/page.html": route_mini304_page,
         "/errmask/index.html": route_errmask_index,
         "/errmask/keep.dat": route_errmask_keep,
+        "/errmask/empty.dat": route_errmask_empty,
         "/maxrecv/index.html": route_maxrecv_index,
         "/maxrecv/r0.bin": route_maxrecv_404,
         "/maxrecv/r1.bin": route_maxrecv_404,
@@ -2252,6 +2737,12 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/charset/"):
             self.route_charset()
             return True
+        if path.startswith("/charref/"):
+            self.route_charref()
+            return True
+        if path.startswith("/titleenc/"):
+            self.route_titleenc()
+            return True
         # Match percent-encoded paths (accented #157 route) by their decoded form.
         handler = self.ROUTES.get(path) or self.ROUTES.get(unquote(path))
         if handler is None:
@@ -2261,12 +2752,18 @@ class Handler(SimpleHTTPRequestHandler):
                 handler = type(self).route_sitemap_capset
             elif re.fullmatch(r"/sitemapdir/cap\d+\.html", path):
                 handler = type(self).route_sitemap_cappage
+            elif path.startswith("/xssjob/"):
+                # Whatever the engine made of the metacharacters, the job trickles.
+                handler = type(self).route_trickle_page
         if handler is not None:
             handler(self)
             return True
         return False
 
     def do_GET(self):
+        # Before reject_fragment(), so an unescaped '#' still shows up recorded.
+        if self.path.startswith("/charref/"):
+            self.record_charref()
         if self.reject_fragment():
             return
         if not self.dispatch():
@@ -2297,6 +2794,12 @@ def main():
     # raise it from Python's default 5 so a busy -c8 crawl can't lose fetches.
     class BacklogHTTPServer(ThreadingHTTPServer):
         request_queue_size = 128
+
+        # Skip the getfqdn() reverse lookup stock server_bind() does for the
+        # unread server_name: it stalls 35s on macOS (#870).
+        def server_bind(self):
+            socketserver.TCPServer.server_bind(self)
+            self.server_name, self.server_port = self.server_address[:2]
 
     httpd = BacklogHTTPServer((args.bind, 0), factory)
 

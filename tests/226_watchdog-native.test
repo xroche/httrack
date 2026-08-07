@@ -1,0 +1,726 @@
+#!/bin/bash
+#
+# The off-box suite watchdog (#795): its pure decisions through -SelfTest, what
+# reaches the status API, the process APIs it must never name, and the driver
+# wiring no .ps1 can check for itself.
+
+set -euo pipefail
+
+# Before the driver is sourced: with these set, anything it starts posts a commit
+# status on whatever the surrounding shell was last looking at.
+unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
+export WATCHDOG_CONTEXT='226_watchdog-native (never posted)'
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "$testdir/testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+wdscript="$testdir/ci-windows-watchdog.ps1"
+driver="$testdir/ci-windows-suite.sh"
+workflow="$top/.github/workflows/windows-build.yml"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wdnat.XXXXXX")
+sinkpidfile="$tmp/sink.pid"
+: >"$sinkpidfile"
+toppid=$$
+trap 'set +e; stop_server "$(cat "$sinkpidfile" 2>/dev/null)"; rm -rf "$tmp"' EXIT
+trap 'exit 1' TERM
+# Signalled, since a bare exit only ends the subshell a leg runs in.
+fail() {
+    echo "FAIL: $*" >&2
+    kill -TERM "$toppid" 2>/dev/null || true
+    exit 1
+}
+
+test -r "$wdscript" || fail "no $wdscript"
+test -z "${WATCHDOG_TOKEN:-}${WATCHDOG_SHA:-}" || fail "a credential survived the scrub"
+
+# The prose in the script names the very calls the audits forbid. A trailing
+# comment goes only on a quote-free line: cutting at any '#' would hide a call
+# sitting after an issue number inside a string.
+uncommented() { sed -e 's/^[[:space:]]*#.*$//' -e "/['\"]/! s/[[:space:]]#.*$//" "$1"; }
+
+# Telemetry only, so every spawn and kill idiom is out, aliases and short forms
+# included: PowerShell needs neither the System. prefix nor a space after '&'.
+forbidden_calls() {
+    uncommented "$1" | grep -nEi \
+        'Start-Process|Start-Job|Start-ThreadJob|(Start|Stop)-Service|Stop-Process|Invoke-Expression|Invoke-Item|Invoke-Command|Invoke-(Cim|Wmi)Method|Get-WmiObject|Register-Scheduled(Job|Task)|WScript\.Shell|taskkill|cmd\.exe|wmic|schtasks|Diagnostics\.Process|\.Kill\(|(^|[^-a-zA-Z0-9_])(iex|saps|spps|spjb|sajb|spsv|sasv|start|kill)([^-a-zA-Z0-9_]|$)|(^|[^-a-zA-Z0-9_])&[^-a-zA-Z0-9_=&]'
+}
+if hits=$(forbidden_calls "$wdscript"); then
+    fail "the watchdog names a process API: $hits"
+fi
+# One control per idiom: a denylist is worth only the entries that actually fire.
+# shellcheck disable=SC2016 # PowerShell source, not this shell's expansions
+for probe in 'Start-Process notepad.exe' 'Stop-Process -Id 4 -Force' \
+    '[Diagnostics.Process]::Start("x")' '(Get-Process -Name httrack).Kill()' \
+    'Invoke-Expression $cmd' '& "C:\\x.exe" -y' 'Start-Job { 1 }' 'taskkill /F /IM x.exe' \
+    'iex $cmd' '$cmd | iex' '&"C:\\x.exe"' '&$exe' 'saps notepad.exe' 'start notepad.exe' \
+    'spps -Name httrack' 'spjb { 1 }' 'sajb { 1 }' 'kill -Name httrack' \
+    'Start-Service w32time' 'Stop-Service w32time' 'spsv w32time' 'sasv w32time' \
+    'Get-WmiObject Win32_Process' \
+    'Invoke-CimMethod -ClassName Win32_Process -MethodName Create' \
+    'Invoke-WmiMethod -Class Win32_Process -Name Create' \
+    'Invoke-Command -ScriptBlock { 1 }' 'Register-ScheduledJob -Name x -ScriptBlock { 1 }' \
+    'Register-ScheduledTask -TaskName x -Action $a' \
+    '(New-Object -ComObject WScript.Shell).Run("x")' \
+    'Write-Host "#795"; Start-Process x'; do
+    {
+        cat "$wdscript"
+        echo "$probe"
+    } >"$tmp/probe.ps1"
+    if ! forbidden_calls "$tmp/probe.ps1" >/dev/null; then
+        fail "the process-API audit cannot see: $probe"
+    fi
+done
+
+# shellcheck disable=SC2016 # $env: is PowerShell's, not this shell's
+grep -q '\$env:WATCHDOG_TOKEN' "$wdscript" ||
+    fail "the watchdog does not read its token from the environment"
+if sed -n '/^param(/,/^)/p' "$wdscript" | grep -qi 'token'; then
+    fail "the watchdog takes its token as a parameter, where the process list exposes it"
+fi
+grep -q "ApiBase = 'https://api.github.com'" "$wdscript" ||
+    fail "the watchdog's default endpoint is not the GitHub API"
+# One state, so nothing downstream can read a verdict out of a status that only
+# carries telemetry. The job's own conclusion is the verdict.
+test "$(grep -c "state = 'success'" "$wdscript")" -eq 1 ||
+    fail "the watchdog posts something other than the one telemetry state"
+# The token stays in the driver's own shell: exported, every test it runs would
+# inherit a credential that can post statuses. 172 drives that end to end.
+grep -q '^unset WATCHDOG_TOKEN$' "$driver" ||
+    fail "the driver leaves its token in the environment its tests inherit"
+# A background holder of the step's stdout keeps the step open past the suite (#949).
+grep -q '>>watchdog.log 2>&1' "$driver" ||
+    fail "the watchdog's output is not redirected off the step's stdout"
+
+# Sourcing the driver is enough to start an interpreter that can post, so every
+# test that does it has to scrub first.
+scrubs() {
+    grep -q 'ci-windows-suite\.sh' "$1" || return 0
+    grep -qx 'unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL' "$1"
+}
+for t in "$testdir"/*.test; do
+    scrubs "$t" || fail "$(basename "$t") can reach the driver without scrubbing its credentials"
+done
+printf '#!/bin/sh\n. ./ci-windows-suite.sh\n' >"$tmp/unscrubbed.test"
+scrubs "$tmp/unscrubbed.test" && fail "the scrub audit passes a test that does not scrub"
+
+# PATH holds MSYS-style entries only, and TMPDIR on Windows is a D:/... path
+# that would split it on the drive colon.
+posixtmp=$tmp
+if is_windows && command -v cygpath >/dev/null 2>&1; then
+    posixtmp=$(cygpath -u "$tmp")
+fi
+bin="$posixtmp/bin"
+mkdir -p "$bin"
+# Renamed into place, so the poll below cannot read a half-written file.
+printf '#!/bin/sh\nprintf "%%s\\n" "$@" >%s/argv.part\nmv %s/argv.part %s/argv\necho "watchdog ready"\n' \
+    "$posixtmp" "$posixtmp" "$posixtmp" >"$bin/argvstub"
+printf '#!/bin/sh\nexit 127\n' >"$bin/deadstub"
+chmod +x "$bin/argvstub" "$bin/deadstub"
+usestub() { cp "$bin/$1" "$bin/pwsh" && cp "$bin/$1" "$bin/powershell.exe"; }
+usestub argvstub
+
+if test -x "$bin/pwsh"; then
+    (
+        cd "$posixtmp"
+        # shellcheck disable=SC2030 # local to this subshell is the point
+        PATH="$bin:$PATH"
+        export PATH
+        # An unshadowed pwsh would drive the real watchdog, and every assertion
+        # below would still read as a plain launch failure.
+        test "$(command -v pwsh)" = "$bin/pwsh" ||
+            fail "the stub does not shadow PowerShell: $(command -v pwsh)"
+        # shellcheck source=tests/ci-windows-suite.sh
+        . "$driver"
+        ci_watchdog_pid=''
+        ci_start_native_watchdog "$posixtmp/progress.log" ||
+            fail "the launch reported no watchdog with a PowerShell on PATH"
+        test -n "$ci_watchdog_pid" || fail "the launch set no pid"
+        # wait only reaps a child, which is what the teardown has to signal.
+        wait "$ci_watchdog_pid" || fail "the watchdog is not a child of the driver"
+
+        # A pid comes from the fork, so a dead interpreter still yields one.
+        usestub deadstub
+        ci_watchdog_pid='dangling'
+        rc=0
+        ci_start_native_watchdog "$posixtmp/progress.log" || rc=$?
+        test "$rc" -ne 0 || fail "an interpreter exiting 127 was reported as launched"
+        test -z "$ci_watchdog_pid" || fail "a failed launch left pid $ci_watchdog_pid behind"
+    )
+    for _ in $(seq 1 100); do
+        test -r "$posixtmp/argv" && break
+        sleep 0.1
+    done
+    test -r "$posixtmp/argv" || fail "the watchdog was never launched"
+    grep -qx -- '-SelfTest' "$posixtmp/argv" && fail "the production launch runs the self-test"
+    # Bypass is load-bearing: Windows PowerShell refuses an unsigned .ps1 without it.
+    for flag in -NoProfile -NonInteractive -ExecutionPolicy Bypass -File; do
+        grep -qx -- "$flag" "$posixtmp/argv" ||
+            fail "the launch dropped $flag: $(tr '\n' ' ' <"$posixtmp/argv")"
+    done
+    grep -qx -- '-ApiBase' "$posixtmp/argv" &&
+        fail "the production launch redirects the status API away from GitHub"
+    grep -qx -- '-NoPost' "$posixtmp/argv" &&
+        fail "the production launch cannot post at all"
+    # Native form, because a non-MSYS interpreter cannot resolve a /d/a/... path.
+    grep -qx -- "$(nativepath "$wdscript")" "$posixtmp/argv" ||
+        fail "the launch did not name the script: $(tr '\n' ' ' <"$posixtmp/argv")"
+    grep -qx -- "$(nativepath "$posixtmp/progress.log")" "$posixtmp/argv" ||
+        fail "the launch did not pass the progress log"
+else
+    echo "note: $tmp is noexec, the driver wiring was not driven"
+fi
+
+py=$(find_python || true)
+if ! test -r "$workflow"; then
+    test -d "$top/.github" && fail "$workflow is gone but $top/.github is not"
+    echo "note: no .github under $top (dist tarball), the workflow audits did not run"
+elif test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
+    echo "note: no python3 with PyYAML here, the workflow audits did not run"
+else
+    # Parsed, not grepped: every key below has to be read from the block that
+    # owns it, and an ordinary reformatting of the workflow must not move it.
+    cat >"$tmp/wf.py" <<'PY'
+import sys
+
+import yaml
+
+
+def steps_of(wf):
+    return [s for j in (wf.get("jobs") or {}).values() for s in (j.get("steps") or [])]
+
+
+def checkouts(wf):
+    return [s for s in steps_of(wf) if str(s.get("uses", "")).startswith("actions/checkout")]
+
+
+def suite_steps(wf):
+    return [s for s in steps_of(wf) if "ci-windows-suite.sh" in str(s.get("run", ""))]
+
+
+def suite_jobs(wf):
+    return [
+        j
+        for j in (wf.get("jobs") or {}).values()
+        if any("ci-windows-suite.sh" in str(s.get("run", "")) for s in (j.get("steps") or []))
+    ]
+
+
+# A job-level block replaces the workflow's outright, so one naming only contents
+# silently drops statuses: write.
+def perms_of(wf, job):
+    p = job.get("permissions", wf.get("permissions"))
+    if p in ("read-all", "write-all"):
+        w = "read" if p == "read-all" else "write"
+        return {"contents": w, "statuses": w}
+    return p if isinstance(p, dict) else {}
+
+
+WANT_ENV = {
+    "WATCHDOG_TOKEN": "${{ secrets.GITHUB_TOKEN }}",
+    "WATCHDOG_REPO": "${{ github.repository }}",
+    # The merge commit, which no PR checks UI reads.
+    "WATCHDOG_SHA": "${{ github.sha }}",
+}
+
+
+def audit(wf):
+    bad = []
+    if not checkouts(wf):
+        bad.append("no actions/checkout step to audit")
+    for s in checkouts(wf):
+        if (s.get("with") or {}).get("persist-credentials") is not False:
+            bad.append("a checkout persists the job token for the whole job")
+    jobs, found = suite_jobs(wf), suite_steps(wf)
+    if len(jobs) != 1 or len(found) != 1:
+        bad.append("%d jobs and %d steps run the suite, cannot tell which is watched" % (len(jobs), len(found)))
+        return bad
+    perms = perms_of(wf, jobs[0])
+    if perms.get("statuses") != "write":
+        bad.append("the suite job cannot post a commit status: statuses is %r" % perms.get("statuses"))
+    if perms.get("contents") != "read":
+        bad.append("contents: read was dropped from the suite job")
+    env = found[0].get("env") or {}
+    for v, want in WANT_ENV.items():
+        if env.get(v) != want:
+            bad.append("%s is %r, want %r" % (v, env.get(v), want))
+    # Both axes, or the matrix legs overwrite each other's status.
+    for axis in ("matrix.platform", "matrix.configuration"):
+        if axis not in str(env.get("WATCHDOG_CONTEXT") or ""):
+            bad.append("WATCHDOG_CONTEXT does not name %s" % axis)
+    if "github.run_id" not in str(env.get("WATCHDOG_URL") or ""):
+        bad.append("WATCHDOG_URL does not link the run being watched")
+    cap = found[0].get("timeout-minutes")
+    if not isinstance(cap, int):
+        bad.append("the suite step has no timeout-minutes of its own")
+    else:
+        print("timeout=%d" % cap)
+    return bad
+
+
+def mutate(wf, kind):
+    if kind == "perm":
+        wf["permissions"]["statuses"] = "read"
+    elif kind == "jobperm":
+        suite_jobs(wf)[0]["permissions"] = {"contents": "read"}
+    elif kind == "creds":
+        for s in checkouts(wf):
+            (s.get("with") or {}).pop("persist-credentials", None)
+    elif kind == "env":
+        suite_steps(wf)[0]["env"].pop("WATCHDOG_TOKEN")
+    elif kind == "token":
+        suite_steps(wf)[0]["env"]["WATCHDOG_TOKEN"] = "${{ secrets.WATCHDOG_PAT }}"
+    elif kind == "sha":
+        suite_steps(wf)[0]["env"]["WATCHDOG_SHA"] = "${{ github.event.pull_request.head.sha }}"
+    elif kind == "context":
+        suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"] = "windows-suite"
+    elif kind == "url":
+        suite_steps(wf)[0]["env"]["WATCHDOG_URL"] = "${{ github.server_url }}"
+    elif kind == "cap":
+        suite_steps(wf)[0].pop("timeout-minutes")
+    elif kind != "none":
+        raise SystemExit("unknown mutation " + kind)
+    return wf
+
+
+wf = yaml.safe_load(open(sys.argv[2]))
+if sys.argv[1] == "mutate":
+    yaml.safe_dump(mutate(wf, sys.argv[3]), sys.stdout)
+else:
+    for b in audit(wf):
+        print("BAD " + b)
+PY
+    said=$("$py" "$tmp/wf.py" audit "$workflow") || fail "the workflow audit did not run: $said"
+    grep -q '^BAD ' <<<"$said" && fail "$(grep '^BAD ' <<<"$said" | sed 's/^BAD //')"
+    cap=$(($(sed -n 's/^timeout=//p' <<<"$said") * 60))
+
+    # One control per key, or an audit that stopped looking at one would ride on
+    # another still firing. "none" round-trips the file through the parser, which
+    # rewrites quoting, order and flow style: no verdict may move.
+    for m in none:'' perm:'cannot post' jobperm:'cannot post' creds:'persists the job token' \
+        env:'WATCHDOG_TOKEN is' token:'WATCHDOG_TOKEN is' sha:'WATCHDOG_SHA is' \
+        context:'does not name matrix.platform' url:'does not link the run' \
+        cap:'no timeout-minutes of its own'; do
+        "$py" "$tmp/wf.py" mutate "$workflow" "${m%%:*}" >"$tmp/wf.yml"
+        said=$("$py" "$tmp/wf.py" audit "$tmp/wf.yml") ||
+            fail "the workflow audit did not run on the ${m%%:*} control: $said"
+        if test -z "${m#*:}"; then
+            grep -q '^BAD ' <<<"$said" && fail "a reformatted workflow fails the audit: $said"
+        else
+            grep -q "^BAD .*${m#*:}" <<<"$said" ||
+                fail "the ${m%%:*} control did not trip the audit: $said"
+        fi
+    done
+
+    # The heartbeat still owns the kill and must beat the step timeout.
+    stuck=$(sed -n 's/^stuck=\([0-9]*\)$/\1/p' "$driver")
+    deadline=$(sed -n 's/^suite_deadline=\([0-9]*\)$/\1/p' "$driver")
+    test -n "$stuck" || fail "cannot read the heartbeat's static window"
+    test -n "$deadline" || fail "cannot read the driver's suite deadline"
+    # A test may start one second under the deadline and never report again.
+    test $((deadline + stuck + 240)) -le "$cap" ||
+        fail "a kill at ${deadline}+${stuck}s leaves under 240s before the ${cap}s step timeout"
+
+    # The watchdog's own stop is its MaxSeconds, which must land inside the step.
+    # shellcheck disable=SC2016 # $MaxSeconds is PowerShell's
+    maxsecs=$(sed -n 's/^[[:space:]]*\[int\]\$MaxSeconds = \([0-9]*\).*$/\1/p' "$wdscript")
+    test -n "$maxsecs" || fail "cannot read the watchdog's own deadline"
+    test "$maxsecs" -le "$cap" || fail "the watchdog runs ${maxsecs}s past the ${cap}s step timeout"
+    # Bounded below too: the reporter has to outlive the heartbeat's own kill.
+    test "$maxsecs" -ge $((deadline + stuck)) ||
+        fail "the watchdog stops at ${maxsecs}s, before the kill at $((deadline + stuck))s"
+fi
+
+psruns=()
+for c in pwsh powershell.exe powershell; do
+    command -v "$c" >/dev/null 2>&1 || continue
+    # powershell and powershell.exe are one interpreter under two names.
+    seen=0
+    for p in ${psruns[@]+"${psruns[@]}"}; do
+        test "${p%.exe}" != "${c%.exe}" || seen=1
+    done
+    test "$seen" -eq 1 || psruns+=("$c")
+done
+if test "${#psruns[@]}" -eq 0; then
+    echo "SKIP: no PowerShell here, the watchdog's own self-test cannot run"
+    exit 77
+fi
+
+# Bounded: a mutant that loops forever would otherwise be caught only by the step
+# timeout this work exists to beat. -NoPost layers over the scrub above.
+run_wd() {
+    local secs=$1
+    shift
+    # -NoPost last: everything after -File <script> belongs to the script.
+    run_with_timeout "$secs" "$psrun" "${psargs[@]}" "$@" -NoPost 2>&1
+}
+
+# The legs below grade what reached the API. Printing and posting are decoupled,
+# so counting what the loop wrote can see neither the request rate nor the backoff.
+sink="$tmp/sink.py"
+cat >"$sink" <<'PY'
+import http.server
+import socketserver
+import sys
+
+codes = [int(c) for c in sys.argv[1].split(",")]
+rec = sys.argv[2]
+seen = []
+
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        with open(rec, "ab") as f:
+            f.write(self.rfile.read(n) + b"\n")
+        seen.append(1)
+        self.send_response(codes[(len(seen) - 1) % len(codes)])
+        self.send_header("Content-Length", "2")
+        self.end_headers()
+        self.wfile.write(b"{}")
+
+    def log_message(self, *args):
+        pass
+
+
+class Sink(http.server.HTTPServer):
+    # Skip stock server_bind()'s getfqdn(): it stalls 35s on macOS (#870).
+    def server_bind(self):
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
+srv = Sink(("127.0.0.1", 0), Handler)
+# LF, since discover_server_port parses this line: Windows would emit \r\n.
+sys.stdout.reconfigure(newline="\n")
+print("PORT %d" % srv.server_port, flush=True)
+srv.serve_forever()
+PY
+
+posts="$tmp/posts"
+sinklog="$tmp/sink.log"
+legout="$tmp/leg.out"
+port='' sinkpid=''
+sink_start() {
+    : >"$posts"
+    : >"$sinklog"
+    # Its own log: a leg's command substitution would else wait on the pipe the
+    # sink inherited for as long as the sink lives.
+    "$py" "$sink" "$1" "$posts" >"$sinklog" 2>&1 &
+    sinkpid=$!
+    # Where the teardown can find it: sink_start runs in a subshell of its own.
+    echo "$sinkpid" >"$sinkpidfile"
+    port=$(discover_server_port "$sinklog" "$sinkpid") ||
+        fail "the status sink never bound a port: $(cat "$sinklog")"
+}
+sink_stop() {
+    stop_server "$sinkpid"
+    : >"$sinkpidfile"
+    sinkpid=''
+}
+# Ours, so a leg that lost its -ApiBase reaches GitHub with a credential it
+# refuses. Distinctive, since the legs grade the log on never carrying it.
+export WATCHDOG_TOKEN=n0tat0ken WATCHDOG_REPO=octo/nowhere WATCHDOG_SHA=0000000
+
+# The log rides into the job's artifact, which nothing secret-masks.
+token_free() { ! grep -q "$WATCHDOG_TOKEN" "$1"; }
+
+run_posting() {
+    local secs=$1
+    shift
+    run_with_timeout "$secs" "$psrun" "${psargs[@]}" "$@" -ApiBase "http://127.0.0.1:$port"
+}
+# t and q of each posted status, in order and whatever key order the JSON took.
+posted_pairs() {
+    sed -n 's/.*t=\([0-9]*\)s q=\([0-9?]*\)s.*/\1 \2/p' "$posts"
+}
+
+# One property per leg, each returning its diagnosis so a mutant can be required
+# to trip that same check rather than merely to fail.
+cadence_leg() {
+    local n
+    sink_start 201
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 4 >"$legout" 2>&1 || {
+        sink_stop
+        echo "the loop exited nonzero: $(cat "$legout")"
+        return 1
+    }
+    sink_stop
+    n=$(grep -c . "$posts" || true)
+    test "$n" -eq 1 || {
+        echo "$n API calls at a 100s cadence over 4s, want 1"
+        return 1
+    }
+    grep -q '36_local-bigcrawl.test' "$posts" || {
+        echo "the posted status does not name the test in flight: $(cat "$posts")"
+        return 1
+    }
+    case $(posted_pairs) in
+    *[0-9]' '[0-9]*) ;;
+    *)
+        echo "a readable log posted no staticness: $(posted_pairs)"
+        return 1
+        ;;
+    esac
+}
+
+# Staticness has to follow the log through movement and then through silence,
+# which is why this leg is the long one.
+staticness_leg() {
+    local moved dq dt legpid stop
+    sink_start 201
+    printf 'RUN 36_local-bigcrawl.test at 0s\n' >"$tmp/progress.log"
+    run_posting 90 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 16 >"$legout" 2>&1 &
+    legpid=$!
+    # Started on the first status that lands rather than on this shell's clock:
+    # an interpreter three seconds into its own startup would see silence only,
+    # and the moving half would go untested.
+    for _ in $(seq 1 300); do
+        test -s "$posts" && break
+        sleep 0.1
+    done
+    stop=$((SECONDS + 3))
+    while test "$SECONDS" -lt "$stop"; do
+        printf 'RUN 36_local-bigcrawl.test at %ss\n' "$SECONDS" >>"$tmp/progress.log"
+        sleep 0.4
+    done
+    wait "$legpid" || {
+        sink_stop
+        echo "the loop exited nonzero: $(cat "$legout")"
+        return 1
+    }
+    sink_stop
+    moved=$(posted_pairs | awk '$2 ~ /^[0-9]+$/ && $1 >= 2 && $2 <= 1 { n++ } END { print n + 0 }')
+    test "$moved" -ge 1 || {
+        echo "no post read the log as moving while it was being written: $(posted_pairs | tr '\n' '/')"
+        return 1
+    }
+    # Once the log stops, staticness is elapsed time minus a constant, so it has
+    # to track it one for one. A bound on it would report every wedge as the cap.
+    dq=$(posted_pairs | awk '$1 >= 6 && $2 ~ /^[0-9]+$/ { if (f == "") f = $2; l = $2 } END { print l - f }')
+    dt=$(posted_pairs | awk '$1 >= 6 && $2 ~ /^[0-9]+$/ { if (f == "") f = $1; l = $1 } END { print l - f }')
+    if test "${dq:-0}" -ne "${dt:-0}" || test "${dq:-0}" -lt 4; then
+        echo "staticness moved ${dq}s over ${dt}s of silence: $(posted_pairs | tr '\n' '/')"
+        return 1
+    fi
+}
+
+# Every due tick logs its line before the throttle decides, so these two counts
+# are a ratio no slow box can move: one to one while nothing is being skipped.
+throttle_leg() {
+    local calls lines
+    sink_start 201
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 8 >"$legout" 2>&1 || {
+        sink_stop
+        echo "the loop exited nonzero: $(cat "$legout")"
+        return 1
+    }
+    sink_stop
+    calls=$(grep -c . "$posts" || true)
+    lines=$(grep -c 't=[0-9]*s q=' "$legout" || true)
+    test "$lines" -ge 3 || {
+        echo "$lines due ticks over 8s at a 1s interval: too few to judge a throttle"
+        return 1
+    }
+    test $((calls * 4)) -ge $((lines * 3)) || {
+        echo "$calls of $lines due ticks reached an accepting API: a landed post throttles the next"
+        return 1
+    }
+}
+
+backoff_leg() {
+    local calls lines
+    sink_start 403
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 8 >"$legout" 2>&1 || {
+        sink_stop
+        echo "the loop exited nonzero: $(cat "$legout")"
+        return 1
+    }
+    sink_stop
+    calls=$(grep -c . "$posts" || true)
+    lines=$(grep -c 't=[0-9]*s q=' "$legout" || true)
+    test "$calls" -ge 2 || {
+        echo "a rejecting API was called $calls times: the loop stopped trying"
+        return 1
+    }
+    # One diagnosis for both: which one trips first depends on box speed. The
+    # backoff must thin the calls, not the log; a token-less run leaves only the log.
+    if test "$calls" -gt 5 || test "$lines" -lt $((2 * calls)); then
+        echo "$calls calls and $lines log lines against an API rejecting every one: nothing backs off"
+        return 1
+    fi
+}
+
+fullstdout_leg() {
+    local n
+    sink_start 201
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 5 >/dev/full 2>&1 || true
+    sink_stop
+    n=$(grep -c . "$posts" || true)
+    test "$n" -ge 2 || {
+        echo "$n posts with a full stdout: a failed log write took the loop with it"
+        return 1
+    }
+}
+
+first=1
+for psrun in "${psruns[@]}"; do
+    psargs=(-NoProfile -NonInteractive)
+    case $psrun in
+    powershell*) psargs+=(-ExecutionPolicy Bypass) ;;
+    esac
+
+    out=$(run_wd 120 -File "$(nativepath "$wdscript")" -SelfTest) ||
+        fail "the $psrun self-test failed: $out"
+    grep -q 'watchdog self-test OK' <<<"$out" || fail "the $psrun self-test said: $out"
+
+    # A mutant the script survives is a property nothing is checking. Graded on
+    # the assertion named: one that merely fails to parse would read as caught.
+    mutate() {
+        local name=$1 expr=$2 want=$3 m="$tmp/$1.ps1" rc=0 said
+        sed "$expr" "$wdscript" >"$m"
+        cmp -s "$wdscript" "$m" && fail "mutant $name changed nothing, so it proves nothing"
+        said=$(run_wd 120 -File "$(nativepath "$m")" -SelfTest) || rc=$?
+        test "$rc" -ne 0 || fail "mutant $name passed the $psrun self-test: $said"
+        grep -q "self-test FAIL: .*$want" <<<"$said" ||
+            fail "mutant $name tripped no assertion of its own: $said"
+    }
+    # shellcheck disable=SC2016 # PowerShell variables, quoted for sed
+    mutate cadence-off-by-one 's/-ge \$Interval/-gt \$Interval/' 'due exactly on the interval'
+    # shellcheck disable=SC2016
+    mutate backoff-uncapped 's/\[Math\]::Min(\$Current \* 2, 32)/$Current * 2/' 'backoff is not capped'
+    # shellcheck disable=SC2016
+    mutate throttle-no-reset 's/if (\$Ok) { return @(0, 0) }/if ($Ok) { return @(0, $Backoff) }/' \
+        'landed post leaves'
+    # shellcheck disable=SC2016
+    mutate status-unclipped '/if (\$s.Length -gt 140)/d' 'was not clipped'
+    # An oversized status is cut from the tail: the head is what a wedge is read for.
+    # shellcheck disable=SC2016
+    mutate status-clipped-head 's/\$s = \$s.Substring(0, 140)/$s = $s.Substring($s.Length - 140)/' \
+        'dropped the leading fields'
+    # shellcheck disable=SC2016
+    mutate tail-always-ok 's/\$r = @{ Ok = \$false;/$r = @{ Ok = $true;/' 'reads as one that was read'
+    mutate counters-empty "s/return (\$f -join ' ')/return ''/" 'counters are not key=value'
+    # The production cadence: no leg below runs without a schedule of its own.
+    # shellcheck disable=SC2016
+    mutate default-cadence 's/\[int\]\$IntervalSeconds = 30/[int]$IntervalSeconds = 3000/' \
+        'default status cadence'
+    # shellcheck disable=SC2016
+    mutate default-poll 's/\[int\]\$PollSeconds = 5/[int]$PollSeconds = 50/' 'default poll'
+
+    # Timed and counted by this shell, never read out of what the watchdog
+    # writes: the cadence and the deadline are both mine to set.
+    printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
+    out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
+        -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 5) ||
+        fail "the $psrun slow-cadence loop exited nonzero: $out"
+    slow=$(grep -c 't=[0-9]*s q=' <<<"$out" || true)
+    test "$slow" -eq 1 || fail "$slow status lines at a 100s cadence over 5s, want 1: $out"
+
+    began=$SECONDS
+    out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
+        -ProgressLog "$(nativepath "$tmp/progress.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 5) ||
+        fail "the $psrun loop exited nonzero: $out"
+    spent=$((SECONDS - began))
+    test "$spent" -ge 4 || fail "a 5s watchdog returned after ${spent}s: MaxSeconds is not seconds"
+    test "$spent" -le 20 || fail "a 5s watchdog ran ${spent}s: it does not stop on its own"
+    fast=$(grep -c 't=[0-9]*s q=' <<<"$out" || true)
+    # Against the slow leg, not a floor: a probe tick is not instant.
+    test "$fast" -gt "$slow" || fail "$fast status lines at 1s against $slow at 100s: $out"
+    grep -q '36_local-bigcrawl.test' <<<"$out" || fail "the status does not name the test in flight: $out"
+    grep -q '95_local-sitemap' <<<"$out" && fail "the status named a test that was never in flight"
+    # Trips if the scrub and -NoPost were both lost: only a real attempt logs this.
+    grep -q 'status post failed' <<<"$out" && fail "a test leg reached the status API"
+
+    # An unreadable log must not read as a wedged one.
+    out=$(run_wd 60 -File "$(nativepath "$wdscript")" \
+        -ProgressLog "$(nativepath "$tmp/no-such.log")" \
+        -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 3) ||
+        fail "the $psrun loop exited nonzero on a missing log: $out"
+    grep -q 'q=?s' <<<"$out" || fail "a missing log reported a staticness: $out"
+
+    # The legs below read the sink, not the loop, and they exercise the script's
+    # decisions rather than the interpreter's: one flavour is enough.
+    test "$first" -eq 1 || continue
+    first=0
+    if test -z "$py"; then
+        echo "note: no python3 here, the posting legs did not run"
+        continue
+    fi
+
+    # ENOSPC on stdout, a state the sick runner reaches. Measured, since the leg
+    # rests on it: MSYS hands a native PowerShell a /dev/full it can write to.
+    devfull=0
+    # shellcheck disable=SC2016 # PowerShell source, not this shell's expansions
+    if test -w /dev/full &&
+        ! run_with_timeout 60 "$psrun" "${psargs[@]}" \
+            -Command '$ErrorActionPreference = "Stop"; Write-Host ("x" * 200000)' \
+            >/dev/full 2>/dev/null; then
+        devfull=1
+    fi
+    legs=(cadence throttle staticness backoff)
+    test "$devfull" -eq 0 || legs+=(fullstdout)
+    for leg in "${legs[@]}"; do
+        : >"$legout"
+        said=$("${leg}_leg" "$(nativepath "$wdscript")") ||
+            fail "the $psrun watchdog fails the $leg leg: $said"
+        token_free "$legout" || fail "the $leg leg logged the status token"
+    done
+    # Control: a catch block widened to the whole exception is how it would get out.
+    leaky="$tmp/token-in-log.ps1"
+    # shellcheck disable=SC2016 # PowerShell variables, quoted for sed
+    sed '/status post failed/s/$_.Exception.Message/$script:Token/' "$wdscript" >"$leaky"
+    cmp -s "$wdscript" "$leaky" && fail "the leaky mutant changed nothing, so it proves nothing"
+    backoff_leg "$(nativepath "$leaky")" >/dev/null || true
+    token_free "$legout" && fail "the token audit cannot see a logged token"
+
+    # Same shape as mutate() above, graded by a leg instead of the self-test, and
+    # on the diagnosis rather than the exit status for the same reason.
+    mutate_leg() {
+        local name=$1 expr=$2 leg=$3 want=$4 m="$tmp/$1.ps1" said
+        sed "$expr" "$wdscript" >"$m"
+        cmp -s "$wdscript" "$m" && fail "mutant $name changed nothing, so it proves nothing"
+        said=$("${leg}_leg" "$(nativepath "$m")") &&
+            fail "mutant $name passed the $leg leg"
+        grep -q "$want" <<<"$said" || fail "mutant $name tripped no check of its own: $said"
+    }
+    mutate_leg status-every-poll \
+        "s/if ((Get-WatchdogAction \$now \$postedAt \$IntervalSeconds) -eq 'post')/if (\$true)/" \
+        cadence 'API calls at a 100s cadence'
+    # shellcheck disable=SC2016 # PowerShell variables, quoted for sed
+    mutate_leg static-unknown 's/\$static = \$now - \$movedAt/$static = -1/' \
+        cadence 'posted no staticness'
+    # shellcheck disable=SC2016
+    mutate_leg static-elapsed 's/\$static = \$now - \$movedAt/$static = $now/' \
+        staticness 'read the log as moving'
+    # shellcheck disable=SC2016
+    mutate_leg static-capped 's/if (\$tail.Ok) { \$static = \$now - \$movedAt }/if ($tail.Ok) { $static = [Math]::Min($now - $movedAt, 5) }/' \
+        staticness 'staticness moved'
+    # shellcheck disable=SC2016
+    mutate_leg skip-when-none-owed 's/if (\$skip -gt 0)/if ($skip -ge 0)/' \
+        throttle 'a landed post throttles the next'
+    # shellcheck disable=SC2016
+    mutate_leg success-skips 's/if (\$Ok) { return @(0, 0) }/if ($Ok) { return @(1, 0) }/' \
+        throttle 'a landed post throttles the next'
+    # shellcheck disable=SC2016
+    mutate_leg backoff-never-skips 's/if (\$skip -gt 0)/if ($false)/' backoff 'nothing backs off'
+    if test "$devfull" -eq 1; then
+        mutate_leg log-write-fatal 's/try { \(Write-Host .*\) } catch { }/\1/' \
+            fullstdout 'took the loop with it'
+    fi
+done
+
+echo "native watchdog OK (${psruns[*]})"

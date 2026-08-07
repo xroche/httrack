@@ -186,6 +186,8 @@ scanning
 provìøování
 Waiting for scheduled time..
 Èekání na naplánovanı èas..
+Transferring data..
+Pøenos dat..
 Connecting to provider
 Pøipojování k poskytovateli
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Vytvoøit úvodní stránku
 Create a word database of all html pages
 Vytvoøit seznam slov ze všech HTML stránek
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Vytvoøit úplnı poštovní archiv RFC822 (MHT/EML) staeného webu
 Create error logging and report files
 Vytvoøit protokol s chybami a hlášeními
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Totonost prohlíeèe
 Comment to be placed in each HTML file
 Komentáø vloenı do kadého HTML souboru
+Languages accepted by the browser
+Jazyky pøijímané prohlíeèem
+Additional HTTP headers to be sent in each requests
+Další hlavièky HTTP odesílané v kadém poadavku
+HTTP referer to be sent for initial URLs
+Hlavièka HTTP referer odesílaná pro poèáteèní adresy URL
 Back to starting page
 Zpìt na úvodní stránku
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Vytvoøit rejstøík
 Make a word database
 Vytvoøit seznam slov
+Build a mail archive
+Vytvoøit poštovní archiv
 Log files
 Protokoly
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identifikace
 HTML footer
 Záhlaví HTML
+Languages
+Jazyky
+Additional HTTP Headers
+Další hlavièky HTTP
+Default referer URL
+Vıchozí adresa referer
 N# connections
 Poèet spojení
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Adresa mapy webu:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Adresa mapy webu, která se má naèíst místo zjišování na webu; ponechte prázdné pro zjištìní z robots.txt a poté /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Zapsat index CDXJ archivu WARC
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Zapsat také seøazenı index CDXJ se všemi záznamy archivu WARC, pro nástroje pro pøehrávání.
+Package the crawl as a WACZ file
+Zabalit procházení do souboru WACZ
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Slouèit archiv WARC, jeho index CDXJ a zrcadlené stránky do jednoho souboru WACZ; vyaduje archiv WARC a index CDXJ.
+WARC segment size limit:
+Nejvìtší velikost segmentu WARC:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Zaèít novı segment WARC, jakmile aktuální pøekroèí tento poèet bajtù; ponechte prázdné nebo 0 pro jeden soubor.

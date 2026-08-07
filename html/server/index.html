@@ -1,9 +1,9 @@
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${LANGUAGE_ISO}">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="${attr:LANGUAGE_ISO}">
 
 <head>
-	<meta http-equiv="Content-Type" content="text/html; charset=${LANGUAGE_CHARSET}" />
-	<meta name="description" content="${LANG_METADESC}" />
-	<meta name="keywords" content="${LANG_METAKEYW}" />
+	<meta http-equiv="Content-Type" content="text/html; charset=${attr:LANGUAGE_CHARSET}" />
+	<meta name="description" content="${attr:LANG_METADESC}" />
+	<meta name="keywords" content="${attr:LANG_METAKEYW}" />
 	<title>HTTrack Website Copier - Offline Browser</title>
 
 	<link rel="stylesheet" type="text/css" media="screen" href="style.css">
@@ -34,7 +34,7 @@ function info(str) {
 
 <table width="76%" border="0" align="center" cellspacing="0" cellpadding="0" class="tableWidth">
 	<tr>
-	<td><img src="images/header_title_4.gif" width="400" height="34" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
+	<td><img src="images/wordmark.svg" width="400" height="36" alt="HTTrack Website Copier" title="" border="0" id="title" /></td>
 	</tr>
 </table>
 <table width="76%" border="0" align="center" cellspacing="0" cellpadding="3" class="tableWidth">
@@ -43,7 +43,7 @@ function info(str) {
 	<td id="subTitle" align="right">
 		<a href="/server/file.html" target="_blank"
 			onClick="window.open('/server/file.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			title='${html:LANG_O1}' onMouseOver="info('${html:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_O1}' onMouseOver="info('${js:LANG_O1}'); return true" onMouseOut="info('&nbsp;'); return true"
 			style="color:#FFFFFF"
 		>
 		${LANG_O1}
@@ -55,7 +55,7 @@ ${do:if-file-exists:html/index.html}
 	<td id="subTitle" align="right">
 		<a href="/index.html" target="_blank"
 			onClick="window.open('/server/help.html', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false"
-			title='${html:LANG_TIPHELP}' onMouseOver="info('${html:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
+			title='${html:LANG_TIPHELP}' onMouseOver="info('${js:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
 			style="color:#FFFFFF"
 		>
 		${LANG_O5}
@@ -98,7 +98,7 @@ ${LANG_THANKYOU}!
 <br><br>
 
 <form method="POST" action="step2.html" name="form">
-<input type="hidden" name="sid" value="${sid}">
+<input type="hidden" name="sid" value="${attr:sid}">
 <input type="hidden" name="redirect" value="">
 
 <table border="0" width="100%">
@@ -112,8 +112,8 @@ ${LANG_THANKYOU}!
 
 
 	<tr><td align="right">
-		<input name="nextBtn" type="submit" value=" ${LANG_NEXT} >> "
-			title='${html:LANG_TIPNEXT}' onMouseOver="info('${html:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
+		<input name="nextBtn" type="submit" value=" ${attr:LANG_NEXT} >> "
+			title='${html:LANG_TIPNEXT}' onMouseOver="info('${js:LANG_TIPNEXT}'); return true" onMouseOut="info('&nbsp;'); return true"
 		>
 	</td></tr>
 </table>

@@ -1,6 +1,6 @@
 AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.49.14], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_INIT([httrack], [3.49.18], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -29,14 +29,84 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:6:0: 3.49.14 grows two installed structs from the inside (htsoptstate sits mid-
-# httrackp, htsblk mid-lien_back), so the fields after them shift: httrackp.cookies_file
-# +8, lien_back.http11 +48. Soname deliberately stays .so.3: the shifted fields are
-# 3.49-era additions no external consumer reaches, and a libhttrack3 rename isn't worth it.
+# 3:11:0: revision-only bump. #1001 moved SOCaddr_inetntoa_ out of htsnet.h, adding
+# an export where callers had an inline; nothing changed or went away.
+# 3:10:0: revision-only bump; only the version macro moved, the engine is untouched.
+# 3:9:0: revision-only bump. #991 and #1005 each added an export
+# (hts_set_thread_hooks, escape_control_url); nothing changed or went away.
+# 3:8:0: revision-only bump, no ABI change.
+# 3:7:0: htsblk gained a tail field and lien_back embeds it by value, so
+# lien_back.is_update and everything after it shift +8 (httrackp's own tail growth
+# moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed
+# headers, so a libhttrack4 rename isn't worth it.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
-VERSION_INFO="3:6:0"
+VERSION_INFO="3:11:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
+
+# A real bash, for "make deb" and the test harness. Not searched into BASH: bash presets
+# that to its own path, and macOS /bin/sh is a bash, so the macro never searches (#895).
+# BASH_SHELL isn't preset the way BASH is, so AC_ARG_VAR needs no guard. Kept ahead of the
+# compiler probes so a bad override dies before them.
+AC_ARG_VAR([BASH_SHELL], [path to a real (non-POSIX-mode) bash])
+# AC_PATH_PROGS drops a relative override and searches instead, which loses the user's intent.
+# Nothing quotes $(BASH_SHELL) in the Makefiles, and quoting could not save it anyway: make
+# splits on whitespace, expands '$' and treats '#' as a comment before any shell sees it.
+case $BASH_SHELL in
+*[[[:space:]]]* | *'#'* | *'$'* | *'`'* | *'\'* | *'"'* | *"'"* | *';'* | *'&'* | *'|'* | \
+*'<'* | *'>'* | *'('* | *')'* | *'*'* | *'?'* | *'@<:@'* | *'@:>@'* | *'{'* | *'}'*)
+  AC_MSG_ERROR([BASH_SHELL must not contain shell or make metacharacters, got: $BASH_SHELL]) ;;
+'' | [[\\/]]* | ?:[[\\/]]*) ;;
+*) AC_MSG_ERROR([BASH_SHELL must be an absolute path, got: $BASH_SHELL]) ;;
+esac
+hts_bash_override=$BASH_SHELL
+AC_PATH_PROGS([BASH_SHELL], [bash], [/bin/bash])
+
+# An absolute override is taken verbatim, so BASH_SHELL=/bin/sh would put #895 back and only
+# surface at "make check" or "make deb" (#908). What we found ourselves is only a warning:
+# a box with no bash still builds, it just cannot run those two.
+AC_MSG_CHECKING([whether $BASH_SHELL is a bash outside POSIX mode])
+hts_bash_why=
+hts_bash_env=no
+# AS_EXECUTABLE_P, not "test -x": the PATH search above already demands a regular file, and
+# bash blocks forever reading a FIFO it failed to exec, so -x alone hangs configure (#922).
+if ! AS_EXECUTABLE_P(["$BASH_SHELL"]); then
+  hts_bash_why="not an executable regular file"
+elif test -z "$("$BASH_SHELL" -c 'echo "${BASH_VERSINFO[[0]]}"' 2>/dev/null)"; then
+  # Not BASH_VERSION: that is an ordinary variable, so any shell echoes back a spoofed one.
+  hts_bash_why="not a bash: it reports no BASH_VERSINFO"
+else
+  # sh-mode bash reports a version too, so only SHELLOPTS tells the two apart.
+  case $("$BASH_SHELL" -c 'echo ":$SHELLOPTS:"' 2>/dev/null) in
+  *:posix:*)
+    hts_bash_why="a bash in POSIX sh-mode"
+    # POSIXLY_CORRECT and an exported SHELLOPTS do that to every bash on the box, so no path
+    # can pass and blaming this one would send the user hunting for another. Reading them
+    # here would not do: configure puts its own shell in posix mode, which sets both.
+    case $(env -u POSIXLY_CORRECT -u SHELLOPTS "$BASH_SHELL" -c 'echo ":$SHELLOPTS:"' 2>/dev/null) in
+    '' | *:posix:*) ;; # no "env -u", or posix whatever the environment: blame the path
+    *) hts_bash_env=yes ;;
+    esac
+    ;;
+  esac
+fi
+if test -z "$hts_bash_why"; then
+  AC_MSG_RESULT([yes])
+else
+  AC_MSG_RESULT([no])
+  hts_bash_msg="POSIXLY_CORRECT or SHELLOPTS forces every bash into POSIX sh-mode, $BASH_SHELL included. Clear them for configure and for make, which hands them to make check and make deb: env -u POSIXLY_CORRECT -u SHELLOPTS ..."
+  if test "$hts_bash_env" = yes; then
+    if test -n "$hts_bash_override"; then
+      AC_MSG_ERROR([$hts_bash_msg])
+    fi
+    AC_MSG_WARN([$hts_bash_msg])
+  else
+    if test -n "$hts_bash_override"; then
+      AC_MSG_ERROR([BASH_SHELL=$BASH_SHELL is $hts_bash_why])
+    fi
+    AC_MSG_WARN([no usable bash found: $BASH_SHELL is $hts_bash_why. "make check" and "make deb" need one; pass BASH_SHELL=/path/to/bash])
+  fi
+fi
 
 AC_PROG_CC
 AM_PROG_CC_C_O
@@ -48,13 +118,12 @@ m4_warn([obsolete],
 # script's behavior did not change.  They are probably safe to remove.
 AC_CHECK_INCLUDES_DEFAULT
 AC_PROG_EGREP
+# $(SED) substitutes $(datadir) into src/webhttrack
+AC_PROG_SED
 
 LT_INIT
 AC_PROG_LN_S
 LT_INIT
-
-# bash, used to run the test scripts (see tests/Makefile.am TEST_LOG_COMPILER)
-AC_PATH_PROGS([BASH], [bash], [/bin/bash])
 
 # Export LD_LIBRARY_PATH name or equivalent.
 AC_SUBST(SHLIBPATH_VAR,$shlibpath_var)
@@ -100,6 +169,9 @@ AX_CHECK_COMPILE_FLAG([-fstack-protector-strong], [DEFAULT_CFLAGS="$DEFAULT_CFLA
 	[AX_CHECK_COMPILE_FLAG([-fstack-protector], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-protector"], [], [-Werror])], [-Werror])
 AX_CHECK_COMPILE_FLAG([-fstack-clash-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fstack-clash-protection"], [], [-Werror])
 AX_CHECK_COMPILE_FLAG([-fcf-protection], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fcf-protection"], [], [-Werror])
+# backtrace() unwinds through these; armhf, unlike amd64/arm64, defaults them off
+# and printed frameless crash reports.
+AX_CHECK_COMPILE_FLAG([-fasynchronous-unwind-tables], [DEFAULT_CFLAGS="$DEFAULT_CFLAGS -fasynchronous-unwind-tables"], [], [-Werror])
 # No --discard-all: it drops the local symbols naming every static function, so
 # a trace misattributes them to the nearest surviving global. Costs 0.6% size.
 AX_CHECK_LINK_FLAG([-Wl,--no-undefined], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--no-undefined"])
@@ -130,6 +202,156 @@ AC_SUBST([LDFLAGS_PIE])
 
 # Ties a crash trace from a stripped build back to its separate debug symbols.
 AX_CHECK_LINK_FLAG([-Wl,--build-id], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,--build-id"])
+
+# tools/macos-app.sh rewrites load commands to @rpath, which needs header room ld64 does
+# not leave by default; the probe fails on GNU ld, so this self-gates on Darwin.
+AX_CHECK_LINK_FLAG([-Wl,-headerpad_max_install_names],
+	[DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,-headerpad_max_install_names"])
+
+### Relocatable install (#906, #978)
+# libtool records the configured libdir as an absolute rpath, so a copied tree
+# cannot find libhttrack. A binary-relative rpath fixes that where the loader
+# expands the token, which the BSDs disagree on: probe by running one.
+AC_ARG_ENABLE([origin-rpath],
+	AS_HELP_STRING([--disable-origin-rpath],
+		[link the binaries without a binary-relative rpath]),
+	[hts_origin_asked=yes], [enable_origin_rpath=yes; hts_origin_asked=no])
+
+# hts_origin_ref is the raw token the loader expands; hts_origin_ref_make is the
+# spelling that survives make's expansion and libtool's eval of the link line.
+AS_CASE([$host_os],
+	[darwin*], [hts_origin_darwin=yes
+		hts_origin_ref='@loader_path'
+		hts_origin_ref_make='@loader_path'],
+	[hts_origin_darwin=no
+		hts_origin_ref='$ORIGIN'
+		hts_origin_ref_make='\$$ORIGIN'])
+
+hts_save_prefix=$prefix
+hts_save_exec_prefix=$exec_prefix
+test "x$prefix" = xNONE && prefix=$ac_default_prefix
+test "x$exec_prefix" = xNONE && exec_prefix=$prefix
+eval hts_libdir=\"$libdir\"
+eval hts_libdir=\"$hts_libdir\"
+prefix=$hts_save_prefix
+exec_prefix=$hts_save_exec_prefix
+
+# Enumerated, not read from libtool's sys_lib_dlsearch_path_spec: that one is
+# only augmented when /etc/ld.so.conf exists, so a sysroot or minimal container
+# would let a distribution libdir through. Spelled out rather than globbed as
+# /lib*, which would swallow /libfoo and /usr/libexec.
+AS_CASE([$hts_libdir],
+	[/lib | /lib/* | /lib32 | /lib32/* | /lib64 | /lib64/* | /libx32 | /libx32/*], [hts_origin_sysdir=yes],
+	[/usr/lib | /usr/lib/* | /usr/lib32 | /usr/lib32/* | /usr/lib64 | /usr/lib64/* | /usr/libx32 | /usr/libx32/*], [hts_origin_sysdir=yes],
+	[hts_origin_sysdir=no])
+
+# dyld follows LC_RPATH only for a load path spelled @rpath/..., so Darwin also
+# needs libhttrack's own id. That comes from libtool's archive_cmds template and
+# not from LDFLAGS, so rewrite it; an unrecognised template leaves the gate off.
+hts_origin_id=no
+if test "x$hts_origin_darwin" = xyes; then
+	hts_origin_subst='s|-install_name $rpath/|-install_name @rpath/|'
+	hts_origin_archive=`printf '%s\n' "$archive_cmds" | $SED "$hts_origin_subst"`
+	hts_origin_expsym=`printf '%s\n' "$archive_expsym_cmds" | $SED "$hts_origin_subst"`
+	# Both templates or neither: should they ever diverge, the -export-symbols
+	# path would keep stamping the absolute id the rpath cannot answer.
+	if test "x$hts_origin_archive" != "x$archive_cmds" &&
+		test "x$hts_origin_expsym" != "x$archive_expsym_cmds"; then
+		hts_origin_id=yes
+	fi
+fi
+
+ORIGIN_RPATH=no
+RPATH_ORIGIN_LDFLAGS=""
+if test "x$enable_origin_rpath" = xno; then
+	AC_MSG_NOTICE([binary-relative rpath disabled by request])
+elif test "x$hts_origin_darwin" = xyes && test "x$hts_origin_id" = xno; then
+	AC_MSG_NOTICE([binary-relative rpath not used: unrecognised install_name in libtool archive_cmds])
+elif test "x$enable_shared" = xno; then
+	AC_MSG_NOTICE([binary-relative rpath not needed: no shared libraries])
+elif test "x$hts_origin_sysdir" = xyes; then
+	# A distribution libdir is already searched, and an rpath there is a lintian tag.
+	AC_MSG_NOTICE([binary-relative rpath not used: $hts_libdir is a system libdir])
+elif test "x$cross_compiling" = xyes && test "x$hts_origin_asked" = xno; then
+	AC_MSG_NOTICE([binary-relative rpath not probed: cross compiling, pass --enable-origin-rpath to force it])
+else
+	AC_MSG_CHECKING([whether the loader honours a binary-relative rpath])
+	AC_CACHE_VAL([hts_cv_origin_rpath], [
+		hts_cv_origin_rpath=no
+		# Cross compiling cannot run the probe, so take the stricter spelling first.
+		hts_origin_cands="none origin"
+		test "x$cross_compiling" = xyes && hts_origin_cands="origin none"
+		test "x$hts_origin_darwin" = xyes && hts_origin_cands=loader_path
+		rm -rf conftest.origin
+		AS_MKDIR_P([conftest.origin/bin])
+		AS_MKDIR_P([conftest.origin/lib])
+		AS_MKDIR_P([conftest.origin/run])
+		cat >conftest.origin/lib.c <<_ACEOF
+int hts_origin_probe(void);
+int hts_origin_probe(void) { return 42; }
+_ACEOF
+		cat >conftest.origin/main.c <<_ACEOF
+int hts_origin_probe(void);
+int main(void) { return hts_origin_probe() == 42 ? 0 : 1; }
+_ACEOF
+		if test "x$hts_origin_darwin" = xyes; then
+			# The same @rpath id, so a dead LC_RPATH cannot pass for a live one.
+			hts_origin_mklib="$CC $CFLAGS -dynamiclib -install_name @rpath/libhtsorigin.dylib -o conftest.origin/lib/libhtsorigin.dylib conftest.origin/lib.c"
+		else
+			hts_origin_mklib="$CC $CFLAGS -fPIC -shared -o conftest.origin/lib/libhtsorigin.so conftest.origin/lib.c"
+		fi
+		hts_origin_link="-Lconftest.origin/lib -lhtsorigin"
+		if $hts_origin_mklib >&AS_MESSAGE_LOG_FD 2>&1; then
+			for hts_origin_cand in $hts_origin_cands; do
+				# Solaris and the older BSDs expand the token only with -z origin.
+				hts_origin_try=
+				test "x$hts_origin_cand" = xorigin && hts_origin_try=-Wl,-z,origin
+				$CC $CFLAGS $LDFLAGS -o conftest.origin/bin/probe conftest.origin/main.c \
+					$hts_origin_link $hts_origin_try "-Wl,-rpath,$hts_origin_ref/../lib" \
+					>&AS_MESSAGE_LOG_FD 2>&1 || continue
+				# From an unrelated cwd, so a loader taking the token literally fails.
+				if test "x$cross_compiling" = xyes ||
+					(unset LD_LIBRARY_PATH DYLD_LIBRARY_PATH
+					cd conftest.origin/run && ../bin/probe) >&AS_MESSAGE_LOG_FD 2>&1; then
+					hts_cv_origin_rpath=$hts_origin_cand
+					break
+				fi
+			done
+		fi
+		rm -rf conftest.origin
+	])
+	AS_CASE([$hts_cv_origin_rpath],
+		[no], [AC_MSG_RESULT([no])],
+		[
+			# $(libdir) first, so the token only answers once the configured
+			# libdir is gone: $(bindir)/../lib is a different directory under a
+			# lib64 or split-bindir layout and must not shadow it.
+			RPATH_ORIGIN_LDFLAGS='-Wl,-rpath,$(libdir)'
+			test "x$hts_cv_origin_rpath" = xorigin && RPATH_ORIGIN_LDFLAGS="$RPATH_ORIGIN_LDFLAGS -Wl,-z,origin"
+			RPATH_ORIGIN_LDFLAGS="$RPATH_ORIGIN_LDFLAGS -Wl,-rpath,$hts_origin_ref_make/../lib"
+			if test "x$hts_origin_darwin" = xyes; then
+				archive_cmds=$hts_origin_archive
+				archive_expsym_cmds=$hts_origin_expsym
+			fi
+			ORIGIN_RPATH=yes
+			AC_MSG_RESULT([yes ($hts_origin_ref/../lib)])
+		])
+fi
+AC_SUBST([ORIGIN_RPATH])
+AC_SUBST([RPATH_ORIGIN_LDFLAGS])
+
+# The @rpath id is only safe for a consumer carrying its own LC_RPATH, so
+# libhttrack.pc hands one out -- under the gates the executables' own rpath
+# respects, so that --disable-origin-rpath and an archive-only build stay
+# rpath-free too. ${libdir} is pkg-config's own variable, expanded on query.
+PKGCONFIG_RPATH=no
+PKGCONFIG_RPATH_LDFLAG=
+AS_IF([test "x$enable_origin_rpath" != xno && test "x$enable_shared" != xno &&
+	test "x$hts_origin_sysdir" = xno],
+	[PKGCONFIG_RPATH=yes
+	PKGCONFIG_RPATH_LDFLAG=' -Wl,-rpath,${libdir}'])
+AC_SUBST([PKGCONFIG_RPATH])
+AC_SUBST([PKGCONFIG_RPATH_LDFLAG])
 
 ### Check for -fvisibility=hidden support
 gl_VISIBILITY
@@ -220,7 +442,8 @@ AC_CHECK_LIB(crypto, EVP_get_digestbyname,
 LIBS="$LIBS $OPENSSL_LIBS"
 AC_CHECK_LIB(ssl, SSL_CTX_new,
 	[
-	OPENSSL_LIBS="$OPENSSL_LIBS -lssl"
+	# -lssl first: an archive link needs it ahead of the -lcrypto it uses.
+	OPENSSL_LIBS="-lssl $OPENSSL_LIBS"
 	AC_DEFINE(HTS_USEOPENSSL, 1, [Check for OpenSSL])
 	],
 	[
@@ -287,6 +510,34 @@ AC_CHECK_LIB(c, dlopen, [DL_LIBS=
 AC_DEFINE(DLLIB, 1,[Check for dlopen in c])], AC_MSG_WARN([*** not found * this is bad]))
 AC_SUBST(DL_LIBS)
 fi
+
+### What libhttrack.pc tells a consumer about its private dependencies
+# A static link needs each library ahead of the ones it uses, which only a
+# dependency's own .pc gets right (and which alone carries the -L an
+# out-of-the-way prefix needs), so name the module wherever one is installed.
+# Dependents first: pkg-config emits Requires.private after Libs.private.
+AC_ARG_VAR([PKG_CONFIG], [path to the pkg-config utility])
+AC_PATH_TOOL([PKG_CONFIG], [pkg-config], [false])
+PKGCONFIG_REQUIRES_PRIVATE=
+PKGCONFIG_LIBS_PRIVATE=
+hts_pc_dep() { # hts_pc_dep <module or empty> <link line>
+	test -n "$2" || return 0
+	if test -n "$1" && $PKG_CONFIG --exists "$1" 2>/dev/null; then
+		PKGCONFIG_REQUIRES_PRIVATE="${PKGCONFIG_REQUIRES_PRIVATE:+$PKGCONFIG_REQUIRES_PRIVATE }$1"
+	else
+		PKGCONFIG_LIBS_PRIVATE="${PKGCONFIG_LIBS_PRIVATE:+$PKGCONFIG_LIBS_PRIVATE }$2"
+	fi
+}
+# Whichever half of OpenSSL was actually found; https=auto can settle for libcrypto.
+AS_CASE([" $OPENSSL_LIBS "],
+	[*" -lssl "*], [hts_pc_openssl=openssl],
+	[*" -lcrypto "*], [hts_pc_openssl=libcrypto],
+	[hts_pc_openssl=])
+hts_pc_dep "$hts_pc_openssl" "$OPENSSL_LIBS"
+hts_pc_dep libbrotlidec "$BROTLI_LIBS"
+hts_pc_dep libzstd "$ZSTD_LIBS"
+AC_SUBST([PKGCONFIG_REQUIRES_PRIVATE])
+AC_SUBST([PKGCONFIG_LIBS_PRIVATE])
 
 ### Check for setuid
 AC_CHECK_LIB(c, setuid, [
@@ -355,6 +606,7 @@ AM_CONDITIONAL([FUZZERS], [test x"$fuzzers" = x"yes"])
 AC_CONFIG_FILES([
 Makefile
 src/Makefile
+src/libhttrack.pc
 man/Makefile
 m4/Makefile
 templates/Makefile
@@ -363,5 +615,6 @@ html/Makefile
 libtest/Makefile
 tests/Makefile
 fuzz/Makefile
+tools/Info.plist
 ])
 AC_OUTPUT

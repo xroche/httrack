@@ -40,30 +40,13 @@ serverpid=
 cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
-    return 0
 }
-trap cleanup EXIT
+trap 'set +e; cleanup' EXIT
 
 # bind the live server to 127.0.0.1 only, so 127.0.0.2 refuses the connect
 "$python" "$server" --root "$root" --bind 127.0.0.1 >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
 serverpid=$!
-port=
-for _ in $(seq 1 50); do
-    line=$(head -n1 "$tmpdir/srv.out" 2>/dev/null || true)
-    if test "${line%% *}" == "PORT"; then
-        port="${line#PORT }"
-        break
-    fi
-    kill -0 "$serverpid" 2>/dev/null || {
-        echo "server exited early: $(cat "$tmpdir/srv.err")"
-        exit 1
-    }
-    sleep 0.1
-done
-test -n "$port" || {
-    echo "could not discover server port"
-    exit 1
-}
+port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
 
 out="$tmpdir/crawl"
 # macOS has only 127.0.0.1, so the dead 127.0.0.x connects block to the timeout

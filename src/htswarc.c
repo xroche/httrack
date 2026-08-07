@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 #include "htslib.h"
+#include "htsback.h"
 #include "htstools.h"
 #include "htssafe.h"
 #include "htszlib.h"
@@ -56,6 +57,9 @@ Please visit our Website: http://www.httrack.com
 
 /* opt->state.warc value meaning "open failed once, do not retry". */
 #define WARC_DISABLED ((void *) ~(uintptr_t) 0)
+
+/* Suffix of the in-progress archive when a previous one must survive it. */
+#define WARC_TMP_SUFFIX ".tmp"
 
 struct warc_writer {
   FILE *f;
@@ -86,6 +90,12 @@ struct warc_writer {
   char *base_path;      /* resolved archive path minus .warc[.gz] suffix */
   const char *base_ext; /* ".warc.gz" or ".warc" (static) */
   char *arc_path;    /* full single-file archive path (NULL under rotation) */
+  /* A re-run must not destroy an archive it cannot replace (#759). */
+  hts_boolean protect_prev;   /* previous archive present: build in a temp */
+  hts_boolean opened;         /* open completed; a failed one swaps nothing */
+  hts_boolean failed;         /* a record or segment was lost: swap nothing */
+  uint64_t unbacked_revisits; /* URLs this pass didn't capture here: an
+                                  unbacked revisit, or nothing written at all */
   char **page_lines; /* one JSON page line per 200 text/html response, owned */
   size_t page_count;
   size_t page_cap;
@@ -119,24 +129,32 @@ static void wbuf_free(wbuf *b) {
   b->len = b->cap = 0;
 }
 
-/* Append n bytes; returns 0 on success, -1 on OOM/overflow. */
-static int wbuf_add(wbuf *b, const void *p, size_t n) {
+/* Make room for n more bytes; returns 0 on success, -1 on OOM/overflow. */
+static int wbuf_reserve(wbuf *b, size_t n) {
+  size_t ncap;
+  char *nd;
   if (n > (size_t) -1 - b->len)
     return -1;
-  if (b->len + n > b->cap) {
-    size_t ncap = b->cap ? b->cap : 256;
-    char *nd;
-    while (ncap < b->len + n) {
-      if (ncap > (size_t) -1 / 2)
-        return -1;
-      ncap *= 2;
-    }
-    nd = realloct(b->data, ncap);
-    if (nd == NULL)
+  if (b->len + n <= b->cap)
+    return 0;
+  ncap = b->cap ? b->cap : 256;
+  while (ncap < b->len + n) {
+    if (ncap > (size_t) -1 / 2)
       return -1;
-    b->data = nd;
-    b->cap = ncap;
+    ncap *= 2;
   }
+  nd = realloct(b->data, ncap);
+  if (nd == NULL)
+    return -1;
+  b->data = nd;
+  b->cap = ncap;
+  return 0;
+}
+
+/* Append n bytes; returns 0 on success, -1 on OOM/overflow. */
+static int wbuf_add(wbuf *b, const void *p, size_t n) {
+  if (wbuf_reserve(b, n) != 0)
+    return -1;
   memcpy(b->data + b->len, p, n);
   b->len += n;
   return 0;
@@ -148,16 +166,32 @@ static int wbuf_puts(wbuf *b, const char *s) {
 
 static int wbuf_printf(wbuf *b, const char *fmt, ...) HTS_PRINTF_FUN(2, 3);
 
+/* A header line carrying a URL has no useful bound, and giving up here loses
+   the whole record, so anything past the stack buffer is formatted into the
+   wbuf itself rather than rejected (#785). */
 static int wbuf_printf(wbuf *b, const char *fmt, ...) {
   char tmp[1024];
+  size_t need;
   int n;
   va_list ap;
   va_start(ap, fmt);
   n = vsnprintf(tmp, sizeof(tmp), fmt, ap);
   va_end(ap);
-  if (n < 0 || (size_t) n >= sizeof(tmp))
+  if (n < 0)
     return -1;
-  return wbuf_add(b, tmp, (size_t) n);
+  if ((size_t) n < sizeof(tmp))
+    return wbuf_add(b, tmp, (size_t) n);
+  need = (size_t) n + 1; /* +1: vsnprintf always writes the NUL */
+  if (wbuf_reserve(b, need) != 0)
+    return -1;
+  va_start(ap, fmt);
+  n = vsnprintf(b->data + b->len, need, fmt, ap);
+  va_end(ap);
+  /* Never advance past what was reserved, whatever the second pass returns. */
+  if (n < 0 || (size_t) n >= need)
+    return -1;
+  b->len += (size_t) n; /* the NUL is scratch, overwritten by the next append */
+  return 0;
 }
 
 /* ---- gzip-per-record member writer (mirrors ae_write_packed) ---- */
@@ -1082,7 +1116,7 @@ static void warc_wacz_package(warc_writer *w) {
     hts_log_print(w->opt, LOG_WARNING,
                   "WACZ: packaging failed, kept existing %s untouched",
                   waczpath);
-  } else if (!hts_rename_over(tmppath, waczpath)) {
+  } else if (!hts_rename_over(w->opt, tmppath, waczpath)) {
     (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmppath));
     hts_log_print(w->opt, LOG_WARNING | LOG_ERRNO,
                   "WACZ: could not finalize %s", waczpath);
@@ -1129,13 +1163,17 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
      never split a record, and never rotate a warcinfo (it opens a segment). */
   if (w->max_size > 0 && w->seg_base != NULL && w->offset >= w->max_size &&
       strcmp(type, "warcinfo") != 0) {
-    if (warc_rotate(w) != 0)
+    if (warc_rotate(w) != 0) {
+      w->failed = HTS_TRUE;
       return -1;
+    }
   }
 
   /* F4: overflow-safe block length; http_hdr_len+sep is provably small. */
-  if (payload > (size_t) -1 - http_hdr_len - sep)
+  if (payload > (size_t) -1 - http_hdr_len - sep) {
+    w->failed = HTS_TRUE;
     return -1;
+  }
   block_len = http_hdr_len + sep + payload;
 
   memset(&hdr, 0, sizeof(hdr));
@@ -1241,10 +1279,22 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
   rc = 0;
 done:
   wbuf_free(&hdr);
+  if (rc != 0)
+    w->failed = HTS_TRUE; /* a truncated run must not replace a whole one */
   return rc;
 }
 
 /* ---- segment rotation (--warc-max-size) ---- */
+
+/* Path to open for the segment whose final path is `final`: that path itself,
+   or a sibling temp while a previous archive must survive until close. */
+static const char *warc_open_path(warc_writer *w, const char *final, char *buf,
+                                  size_t bufsz) {
+  if (!w->protect_prev)
+    return final;
+  snprintf(buf, bufsz, "%s" WARC_TMP_SUFFIX, final);
+  return buf;
+}
 
 /* Emit the warcinfo that heads a segment; sets w->info_id for its records. */
 static int warc_write_warcinfo_record(warc_writer *w) {
@@ -1257,17 +1307,23 @@ static int warc_write_warcinfo_record(warc_writer *w) {
 
 static int warc_rotate(warc_writer *w) {
   char namebuf[HTS_URLMAXSIZE * 2];
+  char openbuf[HTS_URLMAXSIZE * 2 + sizeof(WARC_TMP_SUFFIX)];
   char catbuff[CATBUFF_SIZE];
-  if (w->f != NULL) {
-    fclose(w->f);
-    w->f = NULL;
-  }
-  w->seg++;
-  snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, w->seg,
+  const unsigned next = w->seg + 1;
+  FILE *f;
+  snprintf(namebuf, sizeof(namebuf), "%s-%05u%s", w->seg_base, next,
            w->seg_ext);
-  w->f = FOPEN(fconv(catbuff, sizeof(catbuff), namebuf), "wb");
-  if (w->f == NULL)
+  /* Open before advancing: w->seg must only ever name a segment that exists,
+     or close-time packaging and swapping would work on a missing file. */
+  f = FOPEN(fconv(catbuff, sizeof(catbuff),
+                  warc_open_path(w, namebuf, openbuf, sizeof(openbuf))),
+            "wb");
+  if (f == NULL)
     return -1;
+  if (w->f != NULL)
+    fclose(w->f);
+  w->f = f;
+  w->seg = next;
   w->offset = 0;
   if (w->cdx_on) {
     freet(w->cur_seg);
@@ -1300,10 +1356,22 @@ void warc_free_request(htsblk *r) {
     freet(r->warc_resphdr);
     if (r->warc_rawpath != NULL) {
       (void) UNLINK(r->warc_rawpath); /* owns the verbatim spool file */
+      back_tmpdir_drop(r->warc_rawpath);
       freet(r->warc_rawpath);
       r->warc_rawpath = NULL;
     }
   }
+}
+
+void warc_move_request(htsblk *src, htsblk *dst) {
+  if (src == NULL || dst == NULL || src == dst)
+    return;
+  freet(dst->warc_reqhdr);
+  freet(dst->warc_resphdr);
+  dst->warc_reqhdr = src->warc_reqhdr;
+  dst->warc_resphdr = src->warc_resphdr;
+  src->warc_reqhdr = NULL;
+  src->warc_resphdr = NULL;
 }
 
 void warc_adopt_rawspool(htsblk *r, const char *tmpfile_path) {
@@ -1324,6 +1392,7 @@ void warc_adopt_rawspool(htsblk *r, const char *tmpfile_path) {
 warc_writer *warc_open(httrackp *opt, const char *path) {
   warc_writer *w;
   char namebuf[HTS_URLMAXSIZE * 2];
+  char openbuf[HTS_URLMAXSIZE * 2 + sizeof(WARC_TMP_SUFFIX)];
   char catbuff[CATBUFF_SIZE];
   wbuf info;
   const char *robots;
@@ -1337,16 +1406,8 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     char ts[32];
     time_t t = time(NULL);
     struct tm tmv;
-#if defined(_WIN32)
-    struct tm *g = gmtime(&t);
-    if (g != NULL)
-      tmv = *g;
-    else
+    if (!hts_gmtime(t, &tmv))
       memset(&tmv, 0, sizeof(tmv));
-#else
-    if (gmtime_r(&t, &tmv) == NULL)
-      memset(&tmv, 0, sizeof(tmv));
-#endif
     strftime(ts, sizeof(ts), "%Y%m%d%H%M%S", &tmv);
     snprintf(catbuff, sizeof(catbuff), "httrack-%s.warc.gz", ts);
     path =
@@ -1474,35 +1535,105 @@ warc_writer *warc_open(httrackp *opt, const char *path) {
     path = namebuf;
   }
 
-  w->f = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
+  if (w->max_size == 0 && (w->arc_path = strdupt(path)) == NULL) {
+    warc_close(w);
+    return NULL;
+  }
+  /* Set only once arc_path is recorded, so a half-built writer never swaps. */
+  w->protect_prev = fsize_utf8(path) > 0 ? HTS_TRUE : HTS_FALSE;
+  w->f = FOPEN(fconv(catbuff, sizeof(catbuff),
+                     warc_open_path(w, path, openbuf, sizeof(openbuf))),
+               "wb");
   if (w->f == NULL) {
     warc_close(w);
     return NULL;
   }
   if (w->cdx_on)
     w->cur_seg = path_basename_dup(path);
-  if (w->wacz_on && w->max_size == 0)
-    w->arc_path = strdupt(path); /* single-file: package this exact path */
 
   if (warc_write_warcinfo_record(w) != 0) {
     warc_close(w);
     return NULL;
   }
+  w->opened = HTS_TRUE;
   return w;
+}
+
+/* Final path of segment s (the run's only archive when rotation is off). */
+static const char *warc_seg_path(warc_writer *w, unsigned s, char *buf,
+                                 size_t bufsz) {
+  if (w->max_size == 0)
+    return w->arc_path;
+  snprintf(buf, bufsz, "%s-%05u%s", w->seg_base, s, w->seg_ext);
+  return buf;
+}
+
+/* Swap this run's archive into place, unless it only holds revisits naming
+   bodies the previous archive still has and this one does not (#759).
+   HTS_FALSE: the previous archive was kept, so leave its .cdx and .wacz too. */
+static hts_boolean warc_commit(warc_writer *w) {
+  char finalbuf[HTS_URLMAXSIZE * 2];
+  char tmpbuf[HTS_URLMAXSIZE * 2 + sizeof(WARC_TMP_SUFFIX)];
+  char catbuff[CATBUFF_SIZE];
+  const unsigned nseg = (w->max_size > 0) ? w->seg + 1 : 1;
+  hts_boolean swap;
+  unsigned s;
+
+  if (!w->protect_prev)
+    return HTS_TRUE; /* nothing was there to lose: written in place */
+
+  /* All or nothing: a swap stopping halfway would mix this run's segments with
+     the previous one's, so require every temp before renaming any. */
+  swap = w->opened && !w->failed && w->unbacked_revisits == 0;
+  for (s = 0; s < nseg && swap; s++) {
+    snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX,
+             warc_seg_path(w, s, finalbuf, sizeof(finalbuf)));
+    swap = fsize_utf8(tmpbuf) > 0;
+  }
+
+  if (swap) {
+    for (s = 0; s < nseg; s++) {
+      const char *final = warc_seg_path(w, s, finalbuf, sizeof(finalbuf));
+      snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX, final);
+      if (!hts_rename_over(w->opt, tmpbuf, final)) {
+        hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
+                      "WARC: could not replace %s", final);
+        return HTS_FALSE;
+      }
+    }
+    return HTS_TRUE;
+  }
+
+  for (s = 0; s < nseg; s++) {
+    snprintf(tmpbuf, sizeof(tmpbuf), "%s" WARC_TMP_SUFFIX,
+             warc_seg_path(w, s, finalbuf, sizeof(finalbuf)));
+    (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmpbuf));
+  }
+  if (w->unbacked_revisits > 0)
+    hts_log_print(
+        w->opt, LOG_ERROR,
+        "WARC: this pass revisited %llu URL(s) without re-downloading them, so "
+        "this archive doesn't hold their current content; kept the previous %s "
+        "(re-run with -C0, or --warc-file with a name of its own)",
+        (unsigned long long) w->unbacked_revisits,
+        warc_seg_path(w, 0, finalbuf, sizeof(finalbuf)));
+  return HTS_FALSE;
 }
 
 void warc_close(warc_writer *w) {
   size_t i;
   if (w == NULL)
     return;
-  warc_cdx_flush(w); /* sort + write <base>.cdx before tearing down */
   if (w->f != NULL)
     fclose(w->f);
   w->f = NULL;
+  if (warc_commit(w)) {
+    warc_cdx_flush(w); /* sort + write <base>.cdx beside the archive */
 #if HTS_USEOPENSSL
-  if (w->wacz_on) /* package once the segment(s) + .cdx are closed on disk */
-    warc_wacz_package(w);
+    if (w->wacz_on) /* package once the segment(s) + .cdx are closed on disk */
+      warc_wacz_package(w);
 #endif
+  }
   if (w->seen != NULL)
     coucal_delete(&w->seen);
   for (i = 0; i < w->cdx_count; i++)
@@ -1547,8 +1678,8 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
                            const char *ip, const char *req_hdr,
                            const char *resp_hdr, const char *body,
                            size_t body_len, const char *body_path,
-                           int statuscode, int is_update_unchanged,
-                           int truncated) {
+                           const char *content_type, int statuscode,
+                           int unchanged_kind, int truncated) {
   wbuf http;
   char resp_id[64];
   char pdig[33];
@@ -1571,18 +1702,43 @@ int warc_write_transaction(warc_writer *w, const char *target_uri,
    */
   snprintf(statusbuf, sizeof(statusbuf), "%d", statuscode);
   http_header_value(resp_hdr, "Content-Type", mimebuf, sizeof(mimebuf));
+  /* a 304 declares no type, so index the one only the caller knows */
+  if (mimebuf[0] == '\0' && content_type != NULL)
+    strlncatbuff(mimebuf, content_type, sizeof(mimebuf), sizeof(mimebuf) - 1);
 
   /* A payload exists (for digesting) unless this is a bodyless 304. */
   has_payload = (body_len > 0 && (body != NULL || body_path != NULL) &&
-                 !is_update_unchanged);
+                 unchanged_kind != WARC_UNCHANGED_SERVER_304);
 
   /* Payload digest drives identical-payload-digest dedup (OpenSSL only). */
   have_pdig =
       has_payload ? payload_digest_b32(body, body_len, body_path, pdig) : 0;
 
-  if (is_update_unchanged) {
+  if (unchanged_kind == WARC_UNCHANGED_SERVER_304) {
     is_revisit = 1;
     profile = "http://netpreserve.org/warc/1.1/revisit/server-not-modified";
+    /* Replay resolves a revisit by this field alone, and a 304 stands in for
+       the same URL. No WARC-Refers-To-Date to go with it: the cache keeps the
+       document's Last-Modified, never the previous capture time. */
+    refers_uri = target_uri;
+    /* Served from cache: the payload sits in the previous archive, not here. */
+    w->unbacked_revisits++;
+  } else if (unchanged_kind == WARC_UNCHANGED_ENGINE_FORCED) {
+    /* has_payload requires body_len>0, so a genuinely empty body looks
+       digest-less too; it still has a well-defined digest (sha1 of nothing),
+       so compute it here rather than treat it as a missing-crypto case. */
+    if (!have_pdig && body_len == 0 && (body != NULL || body_path != NULL))
+      have_pdig = payload_digest_b32(body, body_len, body_path, pdig);
+    /* Served from cache with no exchange either way: still unbacked. */
+    w->unbacked_revisits++;
+    /* No digest (no OpenSSL) means nothing to point a revisit at, and there
+       was no real exchange to record as a response; write nothing (#839). */
+    if (!have_pdig)
+      return 0;
+    is_revisit = 1;
+    profile =
+        "http://netpreserve.org/warc/1.1/revisit/identical-payload-digest";
+    refers_uri = target_uri;
   } else if (have_pdig && w->seen != NULL) {
     void *prev = NULL;
     if (coucal_read_pvoid(w->seen, pdig, &prev) && prev != NULL) {
@@ -1692,7 +1848,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   const char *body_path;
   const char *resp_hdr;
   char synth[512];
-  int is_unchanged;
+  int unchanged_kind;
   int is_ftp;
 
   if (opt->state.warc == WARC_DISABLED)
@@ -1753,7 +1909,12 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
     body_len = (size_t) back->r.warc_rawsize;
   }
 
-  is_unchanged = (back->r.notmodified && opt->is_update) ? 1 : 0;
+  if (!back->r.notmodified || !opt->is_update)
+    unchanged_kind = WARC_UNCHANGED_NONE;
+  else if (back->r.warc_forced_notmodified)
+    unchanged_kind = WARC_UNCHANGED_ENGINE_FORCED;
+  else
+    unchanged_kind = WARC_UNCHANGED_SERVER_304;
 
   /* Prefer the stashed raw headers; synthesize a minimal status line for the
      header-less (HTTP/0.9-style) responses that never carried a header block.
@@ -1768,6 +1929,7 @@ void warc_write_backtransaction(httrackp *opt, lien_back *back) {
   }
 
   warc_write_transaction(w, uri, ip, back->r.warc_reqhdr, resp_hdr, body,
-                         body_len, body_path, back->r.statuscode, is_unchanged,
+                         body_len, body_path, back->r.contenttype,
+                         back->r.statuscode, unchanged_kind,
                          back->r.warc_truncated);
 }

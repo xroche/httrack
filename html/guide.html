@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How to mirror a website with the HTTrack graphical interface: a step-by-step walkthrough and a full option reference for WinHTTrack on Windows, WebHTTrack on Linux and Unix, and HTTrack for Android.">
+<meta name="keywords" content="httrack, WinHTTrack, WebHTTrack, HTTrack Android, offline browser, website mirroring, web mirror utility, options, scan rules, filters">
+<title>The HTTrack interface, step by step</title>
+<link rel="stylesheet" href="doc.css">
+<link rel="stylesheet" href="guide.css">
+<script src="doc.js" defer></script>
+<script src="guide.js"></script>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="masthead">
+	<img src="images/wordmark.svg" width="400" height="36" alt="HTTrack Website Copier">
+	<div class="tagline">Open Source offline browser</div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc" aria-label="Contents">
+	<h2>Walkthrough</h2>
+	<ol>
+		<li><a href="#before">Before you start</a></li>
+		<li><a href="#step-start">1. Open HTTrack</a></li>
+		<li><a href="#step-project">2. Name the project</a></li>
+		<li><a href="#step-address">3. Enter the addresses</a></li>
+		<li><a href="#step-ready">4. Last checks</a></li>
+		<li><a href="#step-run">5. Watch it run</a></li>
+		<li><a href="#step-done">6. Read the result</a></li>
+	</ol>
+	<h2>Options</h2>
+	<ol>
+		<li><a href="#opt-scan-rules">Scan Rules</a></li>
+		<li><a href="#opt-limits">Limits</a></li>
+		<li><a href="#opt-flow-control">Flow Control</a></li>
+		<li><a href="#opt-links">Links</a></li>
+		<li><a href="#opt-build">Build</a></li>
+		<li><a href="#opt-browser-id">Browser ID</a></li>
+		<li><a href="#opt-spider">Spider</a></li>
+		<li><a href="#opt-proxy">Proxy</a></li>
+		<li><a href="#opt-log-index-cache">Log, Index, Cache</a></li>
+		<li><a href="#opt-mime-types">MIME Types</a></li>
+		<li><a href="#opt-experts-only">Experts Only</a></li>
+	</ol>
+	<h2>Elsewhere</h2>
+	<ol>
+		<li><a href="filters.html">Filter syntax</a></li>
+		<li><a href="cmdguide.html">Command-line guide</a></li>
+		<li><a href="faq.html">FAQ and troubleshooting</a></li>
+		<li><a href="index.html">All documentation</a></li>
+	</ol>
+</nav>
+
+<main id="main">
+
+<h1>The HTTrack interface, step by step</h1>
+
+<p class="lede">HTTrack copies a website to your disk so you can read it offline. The same
+engine ships behind three interfaces, and this page covers all three: pick yours below and
+the screenshots and notes follow along.</p>
+
+<div class="platforms" role="group" aria-label="Choose your version">
+	<button type="button" data-platform="win" aria-pressed="false">WinHTTrack <small>Windows</small></button>
+	<button type="button" data-platform="web" aria-pressed="false">WebHTTrack <small>Linux, macOS and Unix</small></button>
+	<button type="button" data-platform="droid" aria-pressed="false">HTTrack <small>Android</small></button>
+</div>
+
+<h2 id="before">Before you start</h2>
+
+<p>The three versions differ in their chrome, not in what they do. Every option below means
+the same thing in each of them, and all three write the same profile format. Where a version
+genuinely lacks something, it is marked <span class="badge">not on Android</span> or
+similar.</p>
+
+<p data-for="web">WebHTTrack runs as a small local web server and opens in your usual browser.
+Nothing is uploaded anywhere; the pages you see come from your own machine. Do leave the window
+open while a mirror runs: the interface pings the server every 30 seconds, and the server shuts
+itself down once those pings stop.</p>
+
+<p data-for="droid">The Android app needs Android 7.0 or later and is on
+<a href="https://play.google.com/store/apps/details?id=com.httrack.android">Google Play</a>.</p>
+
+<p>Each option also lists its command-line equivalent, so anything you set here can later be
+scripted. The <a href="cmdguide.html">command-line guide</a> covers that side.</p>
+
+<div class="note" data-for="droid">
+	<p><b>First launch.</b> Android asks for permission to store mirrors on your device. Without
+	it the app cannot save anything, so tap <b>Allow</b>.</p>
+	<figure>
+		<img data-for="droid" src="img/guide-droid-permission.png" alt="Android storage permission dialog" width="600" height="1300">
+	</figure>
+	<p>If an older release left mirrors behind, a second prompt offers to bring them in. Tap
+	<b>Import</b> to move them, or <b>Not now</b>.</p>
+	<figure>
+		<img data-for="droid" src="img/guide-droid-legacy-import.png" alt="Prompt offering to import mirrors from an older version" width="600" height="1300">
+	</figure>
+</div>
+
+<div class="note" data-for="win">
+	<p><b>First launch.</b> WinHTTrack opens on its About box, which carries a <b>Language
+	preference</b> dropdown at the foot. The choice is remembered, and
+	<b>Preferences &gt; Language preference...</b> changes it later.</p>
+	<figure>
+		<img data-for="win" src="img/guide-win-language.png" alt="WinHTTrack About box with the language preference dropdown" width="369" height="371">
+	</figure>
+</div>
+
+<h2 id="step-start">1. Open HTTrack</h2>
+
+<p>The welcome screen has nothing to fill in. <span data-for="win web">Click <b>Next</b></span><span
+data-for="droid">Tap <b>Next</b></span> to create a project, or open one you already made.</p>
+
+<figure>
+	<img data-for="win" src="img/guide-win-start.png" alt="WinHTTrack welcome pane" width="1040" height="744">
+	<img data-for="web" src="img/guide-web-start.png" alt="WebHTTrack welcome page" width="1024" height="388">
+	<img data-for="droid" src="img/guide-droid-start.png" alt="HTTrack for Android welcome screen" width="600" height="1300">
+	<figcaption>The welcome screen.</figcaption>
+</figure>
+
+<p class="note" data-for="web">The language dropdown starts blank on purpose: its first entry
+means "leave the interface as it is". Pick a language only if you want to change it.</p>
+
+<p class="note" data-for="web">On macOS, <code>brew install httrack</code> installs WebHTTrack
+alongside the command line tool. Open <b>HTTrack.app</b> if you have it, or run
+<code>webhttrack</code> in a terminal; either way the interface opens in your browser and
+behaves exactly as described here.</p>
+
+<h2 id="step-project">2. Name the project</h2>
+
+<p>A project is one mirror: its name becomes the folder your files land in, so give it something
+you will recognise in a year. The <b>category</b> is optional and only groups related projects
+together in the list.</p>
+
+<figure>
+	<img data-for="win" src="img/guide-win-project-name.png" alt="WinHTTrack project name, category and base path" width="1040" height="744">
+	<img data-for="web" src="img/guide-web-project-name.png" alt="WebHTTrack project name, category and base path" width="1024" height="346">
+	<img data-for="droid" src="img/guide-droid-project-name.png" alt="Android project name, category and base path" width="600" height="1300">
+	<figcaption>Project name, category, and where the files go.</figcaption>
+</figure>
+
+<p data-for="win web"><b>Base path</b> is the folder holding all your mirrors. Keeping every project
+under one folder is worth doing, if only so an update finds the previous copy. To reopen or update
+an existing project, pick its name from the list instead of typing a new one.</p>
+
+<p data-for="droid">The base path is fixed inside the app's storage and cannot be changed. To update
+an existing project, pick its name from the list instead of typing a new one.</p>
+
+<h2 id="step-address">3. Enter the addresses</h2>
+
+<p>Type the address you want to copy. Several addresses, one per line, are mirrored together and
+keep their links to each other.</p>
+
+<figure>
+	<img data-for="win" src="img/guide-win-project-setup.png" alt="WinHTTrack action and web addresses" width="1040" height="744">
+	<img data-for="web" src="img/guide-web-project-setup.png" alt="WebHTTrack action and web addresses" width="1024" height="496">
+	<img data-for="droid" src="img/guide-droid-project-setup.png" alt="Android web address and action" width="600" height="1300">
+	<figcaption>The addresses to copy, and what to do with them.</figcaption>
+</figure>
+
+<p><b>Action</b> decides what the engine does with them:</p>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Download web site(s)</span><span class="cli">-w, --mirror</span></div>
+	<p>The normal choice. Copies the sites with the current options.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Download web site(s) + questions</span><span class="cli">-W, --mirror-wizard</span></div>
+	<p>The same, but asks before following anything it is unsure about.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Get individual files</span><span class="cli">-g, --get-files</span></div>
+	<p>Downloads exactly the addresses you listed and follows nothing. Use it to grab a handful of
+	files rather than a site.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Download all sites in pages</span><span class="cli">-Y, --mirrorlinks</span></div>
+	<p>Mirrors every site linked from the pages you listed. Pointed at a bookmarks file, it copies
+	everything you bookmarked.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Test links in pages</span><span class="cli">--testlinks</span></div>
+	<p>Checks that the links resolve without saving anything. Useful against a bookmarks file.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Continue interrupted download</span><span class="cli">--continue</span></div>
+	<p>Picks a crashed or cancelled mirror back up where it stopped. Offered only when the project
+	already exists.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Update existing download</span><span class="cli">--update</span></div>
+	<p>Re-checks the whole site and fetches only what changed. Offered only when the project already
+	exists, and it needs the cache from the previous run, which is why
+	<a href="#opt-experts-only">Use a cache for updates</a> should stay on.</p>
+</div>
+
+<p data-for="win web">The <b>Add a URL</b> button takes one address at a time, and does two
+things the address box cannot. It attaches a login and password to that one address, for a
+page behind basic authentication. And it captures an address out of your browser, for a page
+you can only reach by submitting a form or following a script: HTTrack listens on a local
+port, you point your browser at it as a proxy and click the link or the submit button as
+usual, and the address the browser asks for is added to the project.</p>
+
+<figure data-for="web">
+	<img data-for="web" src="img/guide-web-add-url.png" alt="WebHTTrack add-a-URL dialog" width="1024" height="634">
+	<figcaption>Adding a single address, with an optional login.</figcaption>
+</figure>
+
+<p>Everything else lives behind <b>Set options</b>, described in
+<a href="#options">the option panel</a> below. The defaults are sane; a first mirror needs nothing
+from there except, quite often, a <a href="#opt-scan-rules">scan rule</a>.</p>
+
+<figure data-for="droid">
+	<img data-for="droid" src="img/guide-droid-options-menu.png" alt="Android options tab list" width="600" height="1300">
+	<figcaption>On Android the option tabs are a list.</figcaption>
+</figure>
+
+<h2 id="step-ready">4. Last checks</h2>
+
+<p data-for="win">One pane stands between you and the mirror. It can dial a connection first,
+hang up when the mirror ends, shut the machine down afterwards, or hold the whole thing for up to
+24 hours. Leave it alone if you are already online and want to start now, and click
+<b>Finish</b>.</p>
+
+<p data-for="web">One page stands between you and the mirror. <b>Start</b> begins it;
+the save-only choice writes the project settings and stops, which is handy when you are preparing
+a mirror to run later.</p>
+
+<p data-for="droid">Android has no such screen: <b>Start</b> on the address screen begins the
+mirror straight away.</p>
+
+<figure data-for="win web">
+	<img data-for="win" src="img/guide-win-ready.png" alt="WinHTTrack connection settings before starting" width="1040" height="744">
+	<img data-for="web" src="img/guide-web-ready.png" alt="WebHTTrack ready to start" width="1024" height="508">
+	<figcaption>The last screen before the mirror runs.</figcaption>
+</figure>
+
+<h2 id="step-run">5. Watch it run</h2>
+
+<p>The engine reports what it is doing: bytes written, links scanned, transfer rate, errors so
+far, and one line per transfer in flight. A mirror of any size takes a while. That is the
+server's pace as much as yours, and the <a href="#opt-limits">Limits</a> options exist to keep it
+polite.</p>
+
+<figure>
+	<img data-for="win" src="img/guide-win-progress.png" alt="WinHTTrack mirror in progress" width="1040" height="744">
+	<img data-for="web" src="img/guide-web-progress.png" alt="WebHTTrack mirror in progress" width="1024" height="742">
+	<img data-for="droid" src="img/guide-droid-progress.png" alt="Android mirror in progress" width="600" height="1300">
+	<figcaption>A crawl in flight.</figcaption>
+</figure>
+
+<p data-for="win web">You can stop at any point without losing what has been written, and a
+stopped mirror resumes later with <b>Continue interrupted download</b>. Individual transfers can
+be cancelled too, which is the quick way past one enormous file. Several options (the number of
+connections, the limits) can be changed while the mirror runs.</p>
+
+<p data-for="droid">Tap <b>Abort</b> to stop. Nothing already written is lost, and the mirror
+resumes later with <b>Continue interrupted download</b>.</p>
+
+<h2 id="step-done">6. Read the result</h2>
+
+<p>When the crawl ends, open the copy and read it as you would the real site. Links between
+mirrored pages are rewritten to point at each other, so it browses offline in any browser.</p>
+
+<figure>
+	<img data-for="win" src="img/guide-win-finished.png" alt="WinHTTrack mirror complete" width="1040" height="744">
+	<img data-for="web" src="img/guide-web-finished.png" alt="WebHTTrack mirror complete" width="1024" height="487">
+	<img data-for="droid" src="img/guide-droid-finished.png" alt="Android mirror complete" width="600" height="1300">
+	<figcaption>Done.</figcaption>
+</figure>
+
+<p>Read the log before you trust a mirror. It records every error, and a site that looks complete
+can still be missing images that a <a href="#opt-scan-rules">scan rule</a> would have caught. If
+something is missing, the <a href="faq.html">FAQ and troubleshooting</a> page starts with the
+usual causes.</p>
+
+<p data-for="win web">The files sit under the base path you chose, in a folder named after the
+project. Opening <code>index.html</code> there browses the mirror without HTTrack.</p>
+
+<p data-for="droid">Mirrors are written to
+<code>/storage/emulated/0/HTTrack/Websites</code>, in a folder named after the project. That is
+shared storage, so a file manager or a USB cable can reach it, and opening
+<code>index.html</code> there browses the mirror without the app.</p>
+
+<h2 id="options">The option panel</h2>
+
+<p>Eleven tabs, and you can ignore almost all of them. The defaults mirror a site correctly; the
+options are there for the sites that need persuading. Each entry below names the setting as the
+interface shows it, and the command-line option it corresponds to.</p>
+
+<nav class="tabstrip" aria-label="Option tabs">
+	<a href="#opt-scan-rules">Scan Rules</a>
+	<a href="#opt-limits">Limits</a>
+	<a href="#opt-flow-control">Flow Control</a>
+	<a href="#opt-links">Links</a>
+	<a href="#opt-build">Build</a>
+	<a href="#opt-browser-id">Browser ID</a>
+	<a href="#opt-spider">Spider</a>
+	<a href="#opt-proxy">Proxy</a>
+	<a href="#opt-log-index-cache">Log, Index, Cache</a>
+	<a href="#opt-mime-types">MIME Types</a>
+	<a href="#opt-experts-only">Experts Only</a>
+</nav>
+
+<div class="filter">
+	<label for="optfilter">Find an option</label>
+	<input type="search" id="optfilter" placeholder="cookies, depth, footer…" autocomplete="off">
+	<output id="optcount" for="optfilter"></output>
+</div>
+
+<section class="tab" id="opt-scan-rules">
+<h3>Scan Rules</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-scan-rules.png" alt="WinHTTrack Scan Rules tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-scan-rules.png" alt="WebHTTrack Scan Rules tab" width="1024" height="995">
+	<img data-for="droid" src="img/guide-droid-opt-scan-rules.png" alt="Android Scan Rules tab" width="600" height="1300">
+</figure>
+
+<p>The most useful tab in the panel, and the answer to most "why is this missing?" questions. A
+scan rule accepts or refuses addresses by pattern: a whole directory, a domain, a file type. When
+a mirror comes back without its images because they live on another host, this is where you let
+them in.</p>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Include link(s)</span><span class="cli">+pattern</span></div>
+	<p>Accept addresses matching the pattern, even ones the engine would otherwise leave alone.
+	<code>+*.example.com/*.jpg</code> takes the JPEGs from a neighbouring host;
+	<code>+*/images/landscapes/*</code> takes one directory wherever it appears.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Exclude link(s)</span><span class="cli">-pattern</span></div>
+	<p>Refuse addresses matching the pattern. <code>-*.zip</code> skips the archives,
+	<code>-*/forum/*</code> skips a section you do not want.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Rule list from a file</span><span class="cli">-%S, --urllist &lt;file&gt;</span></div>
+	<p>Reads rules from a text file, one per line, instead of the box.</p>
+</div>
+
+<p>Rules are read in order and the last match wins, so a broad exclusion followed by a narrow
+inclusion does what it looks like. The full pattern syntax, including size and MIME conditions,
+is on the <a href="filters.html">filter page</a>.</p>
+</section>
+
+<section class="tab" id="opt-limits">
+<h3>Limits</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-limits.png" alt="WinHTTrack Limits tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-limits.png" alt="WebHTTrack Limits tab" width="1024" height="1016">
+	<img data-for="droid" src="img/guide-droid-opt-limits.png" alt="Android Limits tab" width="600" height="1300">
+</figure>
+
+<p>Ceilings on how much the mirror may cost you, and cost the server. The two rate limits at the
+bottom are the ones that keep you welcome.</p>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Maximum mirroring depth</span><span class="cli">-rN, --depth N</span></div>
+	<p>How many clicks from your starting addresses the engine may travel. A depth of 3 means the
+	pages you listed, plus everything within two more clicks. Left empty it is effectively
+	unlimited, which is usually right: the engine already refuses to leave the site.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Maximum external depth</span><span class="cli">-%eN, --ext-depth N</span></div>
+	<p>How far to follow links off the site, past what the scan rules allow. It overrides the other
+	limits, so raise it with care. The default is zero.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Max size of any non-HTML file</span><span class="cli">-mN, --max-files N</span></div>
+	<p>Per-file ceiling in bytes: a larger image or archive is skipped.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Max size of any HTML file</span><span class="cli">-mN,N2, --max-files</span></div>
+	<p>The same for pages. One command-line option carries both ceilings, non-HTML first.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Site size limit</span><span class="cli">-MN, --max-size N</span></div>
+	<p>Total bytes the mirror may download before it stops.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Pause after downloading</span><span class="cli">-GN, --max-pause N</span></div>
+	<p>Pauses once that many bytes have arrived and waits for you to delete a lock file. The way to
+	mirror a site larger than your free space: back up and clear the files during the pause.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Pause between files</span><span class="cli">-%G, --pause MIN[:MAX]</span></div>
+	<p>Waits a random number of seconds between downloads. <code>2:8</code> picks a fresh delay in
+	that range each time. The gentlest way to crawl a small server, and less blunt than capping the
+	rate.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Max time overall</span><span class="cli">-EN, --max-time N</span></div>
+	<p>Seconds the whole mirror may take. 3600 is an hour.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Max transfer rate</span><span class="cli">-AN, --max-rate N</span></div>
+	<p>Bytes per second, across the whole mirror. Keeps HTTrack from taking the whole line.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Max connections / seconds</span><span class="cli">-%cN, --connection-per-second N</span></div>
+	<p>New connections per second, and the politest thing on this page. Fractions are allowed:
+	<code>0.1</code> is one connection every ten seconds. Setting it to zero removes the limit and
+	can flatten a small server; do not, unless the server is yours.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Maximum number of links</span><span class="cli">-#LN, --advanced-maxlinks N</span></div>
+	<p>How many addresses may be held in memory, downloaded or not. The engine stops dead on
+	reaching it, so do not set it low. The default of 100,000 suits most sites and costs memory to
+	raise.</p>
+</div>
+</section>
+
+<section class="tab" id="opt-flow-control">
+<h3>Flow Control</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-flow-control.png" alt="WinHTTrack Flow Control tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-flow-control.png" alt="WebHTTrack Flow Control tab" width="1024" height="910">
+	<img data-for="droid" src="img/guide-droid-opt-flow-control.png" alt="Android Flow Control tab" width="600" height="1300">
+</figure>
+
+<p>How hard to push, and when to give up on a server that is not answering.</p>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Number of connections</span><span class="cli">-cN, --sockets N</span></div>
+	<p>Transfers running at once. Four is the default and eight is comfortable on an ordinary site;
+	drop to one or two when the files are large, since parallel transfers of big files help nobody.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Timeout</span><span class="cli">-TN, --timeout N</span></div>
+	<p>Seconds to wait on a silent server before abandoning the link. It also bounds host name
+	resolution. Around 120 suits most connections.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Retries</span><span class="cli">-RN, --retries N</span></div>
+	<p>How many times to retry after a timeout or another non-fatal error. It will not rescue a
+	404: nothing retries a definite answer.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Min transfer rate</span><span class="cli">-JN, --min-rate N</span></div>
+	<p>Bytes per second below which a transfer is treated as stalled and dropped.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Abandon host on timeout or slow transfer</span><span class="cli">-HN, --host-control N</span></div>
+	<p>Whether one bad transfer condemns the whole host: never (0), on timeout (1), on a slow
+	transfer (2), or either (3). The checkboxes beside the timeout and rate fields set this. Anything
+	but <em>never</em> can drop a lot of links over one slow moment, so leave it off unless a host is
+	actively wasting your time.</p>
+</div>
+</section>
+
+<section class="tab" id="opt-links">
+<h3>Links</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-links.png" alt="WinHTTrack Links tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-links.png" alt="WebHTTrack Links tab" width="1024" height="781">
+	<img data-for="droid" src="img/guide-droid-opt-links.png" alt="Android Links tab" width="600" height="1300">
+</figure>
+
+<p>What counts as a link worth following.</p>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Attempt to detect all links</span><span class="cli">-%P, --extended-parsing</span></div>
+	<p>Looks for addresses everywhere, including unknown tags and JavaScript. On by default. It
+	earns its keep on script-heavy pages, at the price of the occasional request for something that
+	was never a link.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Get non-HTML files related to a link</span><span class="cli">-n, --near</span></div>
+	<p>Fetches the images and other files a page refers to even when they sit outside the mirror.
+	The usual fix for a page whose pictures live on another host.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Test validity of all links</span><span class="cli">-t, --test</span></div>
+	<p>Requests every link found, including ones the rules forbid, and logs the failures. A link
+	checker rather than a mirroring option.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Get HTML files first</span><span class="cli">-p7, --priority 7</span></div>
+	<p>Takes the pages before the images. The structure of the site is known sooner, which makes the
+	rest of the crawl better informed.</p>
+</div>
+</section>
+
+<section class="tab" id="opt-build">
+<h3>Build</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-build.png" alt="WinHTTrack Build tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-build.png" alt="WebHTTrack Build tab" width="1024" height="986">
+	<img data-for="droid" src="img/guide-droid-opt-build.png" alt="Android Build tab" width="600" height="1300">
+</figure>
+
+<p>How the copy is laid out on disk.</p>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Local structure type</span><span class="cli">-NN, --structure N</span></div>
+	<p>The default reproduces the site's own folders and names. The alternatives sort files by kind
+	instead: all the pages here, all the images there. A custom pattern such as
+	<code>-N "%h%p/%n%q.%t"</code> builds names from the host, path, name, query and type.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">DOS names (8+3)</span><span class="cli">-L0, --long-names 0</span></div>
+	<p>Cuts every name to eight characters and a three-letter extension.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">ISO9660 names (CDROM)</span><span class="cli">-L2, --long-names 2</span></div>
+	<p>Names that survive being burned to a CD or DVD.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">No error pages</span><span class="cli">-o0, --do-not-generate-errors</span></div>
+	<p>By default a page that returned 404 is saved as a note saying so. This drops those, leaving
+	nothing at all where the page was.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">No external pages</span><span class="cli">-x, --replace-external</span></div>
+	<p>Replaces links that leave the mirror with a page saying you need to be online. Keeps the
+	offline copy from silently reaching for the network.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Hide passwords</span><span class="cli">-%x, --disable-passwords</span></div>
+	<p>Strips credentials out of the links written into the saved pages, so the copy cannot leak
+	them.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Hide query strings</span><span class="cli">-%q0, --include-query-string 0</span></div>
+	<p>Local files rarely need the <code>?a=1&amp;b=2</code> part, though it can carry a hint about
+	what a page was. Some limited browsers choke on it.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Do not purge old files</span><span class="cli">-X0, --purge-old 0</span></div>
+	<p>After an update HTTrack deletes local files that are gone from the site or now excluded. This
+	keeps them.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Inline assets as data: URIs</span><span class="cli">-%Z, --single-file</span></div>
+	<p>Rewrites each saved page with its stylesheets, scripts, images and fonts embedded, so a single
+	file opens anywhere on its own. Links between mirrored pages stay relative; audio and video stay
+	links. <code>--single-file-max-size</code> caps each embedded asset, 10 MB by default.</p>
+</div>
+</section>
+
+<section class="tab" id="opt-browser-id">
+<h3>Browser ID</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-browser-id.png" alt="WinHTTrack Browser ID tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-browser-id.png" alt="WebHTTrack Browser ID tab" width="1024" height="706">
+	<img data-for="droid" src="img/guide-droid-opt-browser-id.png" alt="Android Browser ID tab" width="600" height="1300">
+</figure>
+
+<p>What HTTrack says about itself in its requests.</p>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Browser identity</span><span class="cli">-F, --user-agent</span></div>
+	<p>The <code>User-Agent</code> sent with every request. Some sites serve different pages, or
+	refuse to serve at all, depending on what they read here.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">HTML footer</span><span class="cli">-%F, --footer</span></div>
+	<p>A comment added to each saved page, recording where it came from. Named fields are
+	substituted: <code>{url}</code>, <code>{date}</code>, <code>{addr}</code>, <code>{path}</code>,
+	<code>{lastmodified}</code>, <code>{version}</code>, <code>{mime}</code>, <code>{charset}</code>,
+	<code>{status}</code> and <code>{size}</code>. For example
+	<code>&lt;!-- Mirrored from {url} on {date} --&gt;</code>. You can turn it off, but a page with no
+	record of its origin is worth less later.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Preferred language</span><span class="cli">-%l, --language</span></div>
+	<p>The <code>Accept-Language</code> header, as in <code>"fr, en, *"</code>. It decides which
+	translation a multilingual site hands over.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Default referer</span><span class="cli">-%R, --referer</span></div>
+	<p>The <code>Referer</code> sent with the first request. Occasionally needed by sites that refuse
+	traffic arriving from nowhere.</p>
+</div>
+</section>
+
+<section class="tab" id="opt-spider">
+<h3>Spider</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-spider.png" alt="WinHTTrack Spider tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-spider.png" alt="WebHTTrack Spider tab" width="1024" height="1557">
+	<img data-for="droid" src="img/guide-droid-opt-spider.png" alt="Android Spider tab" width="600" height="1300">
+</figure>
+
+<p>How the engine behaves towards the server it is talking to.</p>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Accept cookies</span><span class="cli">-bN, --cookies N</span></div>
+	<p>On by default. Sites that hand out a session before showing anything need it.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Check document type</span><span class="cli">-uN, --check-type N</span></div>
+	<p>When the address does not reveal the file type, say a <code>.cgi</code> that returns an image,
+	the engine asks the server so the file gets a sensible name locally. Turning this off entirely
+	produces a mirror full of files no browser will open.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Parse scripts</span><span class="cli">-jN, --parse-java N</span></div>
+	<p>Reads scripts looking for addresses. On by default.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Follow robots.txt</span><span class="cli">-sN, --robots N</span></div>
+	<p>Whether to respect the site's crawling rules: never (0), sometimes (1), always (2, the
+	default), or always including the strict rules (3). Ignoring them on a site you do not own is
+	how mirroring gets people blocked.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Update hacks</span><span class="cli">-%s, --updatehack</span></div>
+	<p>Works around servers that misreport what changed, treating a file of identical size as
+	unchanged even when the timestamp moved. Saves a great deal of traffic on dynamic sites, at a
+	small risk of keeping a stale page.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Tolerant requests</span><span class="cli">-%B, --tolerant</span></div>
+	<p>Accepts responses that break the rules. Off by default, because a server that lies about a
+	file's length usually leaves you with a truncated one.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Force HTTP/1.0 requests</span><span class="cli">-%h, --http-10</span></div>
+	<p>For servers and proxies too old to cope with anything newer. It costs you most of the update
+	machinery, so use it only when a site genuinely fails without it.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">URL hacks</span><span class="cli">-%u, --urlhack</span></div>
+	<p>Treats addresses that differ only cosmetically as the same page (<code>www.example.com</code>
+	and <code>example.com</code>, doubled slashes, reordered query keys), so the same page is not
+	downloaded twice.</p>
+	<p>Three checkboxes opt out of one part each when a site really does treat the difference as
+	meaningful: <b>Keep the www. prefix</b> (<code>--keep-www-prefix</code>), <b>Keep double
+	slashes</b> (<code>--keep-double-slashes</code>) and <b>Keep the original query-string order</b>
+	(<code>--keep-query-order</code>).</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Seed the crawl from the site's sitemap</span><span class="cli">-%m, --sitemap</span></div>
+	<p>Reads the site's sitemap, the <code>Sitemap:</code> lines in <code>robots.txt</code> and then
+	<code>/sitemap.xml</code>, and adds every address it lists as a starting point. It reaches pages
+	no link on the site points to. <b>Sitemap address</b> (<code>--sitemap-url</code>) names one
+	directly instead of probing.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Load cookies from file</span><span class="cli">-%K, --cookies-file</span></div>
+	<p>Preloads cookies from a Netscape <code>cookies.txt</code> before the crawl starts. How you
+	mirror something that needs you logged in, by exporting the session from your browser.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Strip query keys</span><span class="cli">-%g, --strip-query</span></div>
+	<p>Comma-separated query keys to drop when naming saved files, such as
+	<code>sid,utm_source</code>. Keeps one page from being saved several times under tracking
+	parameters that change nothing.</p>
+</div>
+</section>
+
+<section class="tab" id="opt-proxy">
+<h3>Proxy</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-proxy.png" alt="WinHTTrack Proxy tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-proxy.png" alt="WebHTTrack Proxy tab" width="1024" height="762">
+	<img data-for="droid" src="img/guide-droid-opt-proxy.png" alt="Android Proxy tab" width="600" height="1300">
+</figure>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Proxy type</span><span class="cli">-P scheme://…</span></div>
+	<p>The proxy protocol. <b>HTTP</b> is an ordinary proxy. <b>HTTP (CONNECT tunnel)</b> sends every
+	request through a CONNECT tunnel, which CONNECT-only proxies such as Tor's
+	<code>HTTPTunnelPort</code> require. <b>SOCKS5</b> defaults to port 1080.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Proxy address and port</span><span class="cli">-P, --proxy</span></div>
+	<p>The proxy to send requests through. On the command line one string carries the lot, including
+	a scheme and credentials where needed:
+	<code>--proxy socks5://user:pass@proxy.example.com:1080</code>.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Proxy login and password</span><span class="cli">-P user:pass@host:port</span></div>
+	<p>Filled in behind the <b>Configure</b> button, for a proxy that demands authentication.</p>
+	<p><span class="badge">not on Android</span> The Android app takes a host and a port only.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Use proxy for FTP transfers</span><span class="cli">-%f, --httpproxy-ftp</span></div>
+	<p>Sends <code>ftp://</code> transfers through the HTTP proxy as well. On by default, and worth
+	keeping: it gets FTP links through a firewall, and proxied FTP tends to be more reliable than the
+	engine's own client.</p>
+</div>
+</section>
+
+<section class="tab" id="opt-log-index-cache">
+<h3>Log, Index, Cache</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-log-index-cache.png" alt="WinHTTrack Log, Index, Cache tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-log-index-cache.png" alt="WebHTTrack Log, Index, Cache tab" width="1024" height="1278">
+	<img data-for="droid" src="img/guide-droid-opt-log-index-cache.png" alt="Android Log, Index, Cache tab" width="600" height="1300">
+</figure>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Store all files in cache</span><span class="cli">-k, --store-all-in-cache</span></div>
+	<p>Normally only pages are cached, since that is all an update needs. This caches everything,
+	which lets you rebuild the mirror in a different layout later without downloading it again, and
+	makes the cache as large as the mirror.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Do not re-download locally erased files</span><span class="cli">-%n, --do-not-recatch</span></div>
+	<p>A file you deleted stays deleted through the next update, instead of coming straight back.
+	Useful while pruning something large by hand.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Create log files</span><span class="cli">-f, --file-log</span></div>
+	<p>On, and worth leaving on: without a log you have no way to find out what failed. The
+	debug level beside it controls how much detail lands there.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Make an index</span><span class="cli">-I, --index</span></div>
+	<p>Writes an <code>index.html</code> at the top of the project, listing the mirrored sites. The
+	front door to the copy.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Make a word database</span><span class="cli">-%I, --search-index</span></div>
+	<p>Builds a searchable word index of every mirrored page.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Write a WARC archive of the crawl</span><span class="cli">-%r, --warc</span></div>
+	<p>Saves every fetched response into an ISO-28500 WARC/1.1 archive alongside the mirror, headers
+	and all. The mirror is a browsable copy; the WARC is the archival record of what the server
+	actually sent, which is what replay tools and web archives want.</p>
+	<p><b>WARC archive name</b> (<code>--warc-file</code>) sets the base name, blank to auto-name it
+	under the output directory. <b>WARC segment size limit</b> (<code>--warc-max-size</code>) starts a
+	new segment past that many bytes; blank or 0 keeps one file.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Write a CDXJ index of the WARC archive</span><span class="cli">-%rc, --warc-cdx</span></div>
+	<p>Adds a sorted CDXJ index listing every record in the archive, which replay tools use to find a
+	capture without reading the whole file.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Package the crawl as a WACZ file</span><span class="cli">--wacz</span></div>
+	<p>Bundles the WARC, its CDXJ index and the mirrored pages into one WACZ file. It implies both of
+	the two above.</p>
+</div>
+
+<div class="opt" data-for="win web">
+	<div class="opt-head"><span class="opt-name">Report what changed since the previous mirror</span><span class="cli">-%d, --changes</span></div>
+	<p>Writes <code>hts-changes.json</code> listing what this crawl left new, changed, unchanged and
+	gone against the previous mirror. The quick way to see what an update actually did.</p>
+</div>
+</section>
+
+<section class="tab" id="opt-mime-types">
+<h3>MIME Types</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-mime-types.png" alt="WinHTTrack MIME types tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-mime-types.png" alt="WebHTTrack MIME types tab" width="1024" height="1046">
+	<img data-for="droid" src="img/guide-droid-opt-mime-types.png" alt="Android MIME types tab" width="600" height="1300">
+</figure>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Type / MIME associations</span><span class="cli">-%A, --assume</span></div>
+	<p>Tells the engine what an extension always means, so it stops asking the server. On a site full
+	of <code>.asp</code> links this is a large speed-up: without it every unknown extension costs a
+	request before the engine knows what it has.</p>
+	<p>Enter a file type and the MIME type it maps to, <code>asp</code> to <code>text/html</code>,
+	and list several at once with commas: <code>asp,php,php3</code>. On the command line the same
+	thing reads <code>--assume asp,php,php3=text/html</code>, and
+	<code>--assume standard</code> covers the usual page extensions in one go.</p>
+	<p>It also renames on the way in. If you know the site's <code>.dat</code> files are really ZIPs,
+	map <code>dat</code> to <code>application/x-zip</code> and they land correctly named. Mapping an
+	unknown type to <code>application/octet-stream</code> simply stops the engine checking it.</p>
+	<table class="mime">
+		<tr><td><code>text/html</code></td><td>pages, which HTTrack parses for links</td></tr>
+		<tr><td><code>image/gif</code>, <code>image/jpeg</code>, <code>image/png</code></td><td>images</td></tr>
+		<tr><td><code>application/x-zip</code></td><td>ZIP archives</td></tr>
+		<tr><td><code>application/octet-stream</code></td><td>anything else, left alone</td></tr>
+	</table>
+	<p><span class="badge">Android</span> The table holds up to eight entries.</p>
+</div>
+</section>
+
+<section class="tab" id="opt-experts-only">
+<h3>Experts Only</h3>
+
+<figure>
+	<img data-for="win" src="img/guide-win-opt-experts-only.png" alt="WinHTTrack Experts Only tab" width="524" height="448">
+	<img data-for="web" src="img/guide-web-opt-experts-only.png" alt="WebHTTrack Experts Only tab" width="1024" height="1088">
+	<img data-for="droid" src="img/guide-droid-opt-experts-only.png" alt="Android Experts Only tab" width="600" height="1300">
+</figure>
+
+<p>The defaults here are right for almost every mirror. The travel modes are the exception: they
+are how you widen a crawl deliberately.</p>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Use a cache for updates</span><span class="cli">-CN, --cache N</span></div>
+	<p>Keep this on. The cache is what makes <b>Update existing download</b> and <b>Continue
+	interrupted download</b> possible at all; turning it off saves a little disk and costs you both.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Primary scan rule</span><span class="cli">-pN, --priority N</span></div>
+	<p>What gets saved: nothing (0, for checking links), pages only (1), everything but pages (2),
+	everything (3, the default), or pages first then the rest (7).</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Travel mode</span><span class="cli">-S -D -U -B</span></div>
+	<p>Which directories the crawl may enter relative to your starting address: this one only
+	(<code>-S</code>), it and below (<code>-D</code>, the default), it and above (<code>-U</code>), or
+	both directions (<code>-B</code>).</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Global travel mode</span><span class="cli">-a -d -l -e</span></div>
+	<p>How far the crawl may stray from the address you gave it: same address only (<code>-a</code>,
+	the default), same domain (<code>-d</code>), same top-level domain (<code>-l</code>), or anywhere
+	at all (<code>-e</code>). The last one will follow the web until a limit stops it.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Rewrite links</span><span class="cli">-KN, --keep-links N</span></div>
+	<p>What the links in the saved pages look like: relative, so the copy browses offline
+	(<code>K0</code>, the default), absolute, or the original online addresses (<code>K4</code>), which
+	gives you the pages as archived documents rather than a browsable mirror.</p>
+</div>
+
+<div class="opt">
+	<div class="opt-head"><span class="opt-name">Activate debug mode</span><span class="cli">-%H, --debug-headers</span></div>
+	<p>Writes the HTTP headers and other internals to the log. For diagnosing a site that behaves
+	strangely, not for normal use.</p>
+</div>
+</section>
+
+<h2 id="next">Where to go next</h2>
+
+<ul>
+	<li><a href="filters.html">Filter syntax</a>: the full pattern language behind Scan Rules.</li>
+	<li><a href="cmdguide.html">Command-line guide</a>: the same engine, scripted.</li>
+	<li><a href="httrack.man.html">Manual page</a>: every option, authoritative.</li>
+	<li><a href="faq.html">FAQ and troubleshooting</a>: when a mirror comes back wrong.</li>
+	<li><a href="abuse.html">How not to use HTTrack</a>: worth two minutes before pointing it at
+	someone else's server.</li>
+</ul>
+
+</main>
+</div>
+
+<dialog id="zoom" aria-label="Enlarged screenshot"><img src="" alt=""></dialog>
+
+<footer>&copy; 1998-2026 Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</footer>
+
+</body>
+</html>

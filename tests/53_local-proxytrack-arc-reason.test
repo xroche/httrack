@@ -5,7 +5,7 @@
 set -euo pipefail
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 printf 'HTTP/1.1 404 Not Found Here At All\r\nContent-Type: text/html\r\nLast-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
 printf 'hello' >"$dir/body"

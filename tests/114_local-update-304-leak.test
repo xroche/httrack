@@ -1,0 +1,92 @@
+#!/bin/bash
+#
+# Issue #782: a 304 during --update overwrote the whole response struct with the
+# cache entry, dropping the 8 KB header buffer it owned. Only a leak checker
+# sees it and the sanitized CI leg runs with detect_leaks off, so this one turns
+# it back on around a two-pass mini304 crawl; the fresh pass is the control.
+
+set -eu
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+probe=$(ASAN_OPTIONS=help=1 httrack -O /dev/null --version 2>&1 || true)
+case "$probe" in
+*AddressSanitizer*) ;;
+*)
+    echo "not a sanitized build, skipping" >&2
+    exit 77
+    ;;
+esac
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_304leak.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+
+out="${tmpdir}/crawl"
+mkdir "$out"
+url="http://127.0.0.1:${port}/mini304/index.html"
+
+# Last value wins in the sanitizer flag parser, so this overrides the job's
+# settings; the report file, not the exit status, is the verdict.
+asan_base="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=1:abort_on_error=0:exitcode=0"
+
+# run_pass <label> <extra httrack args...>
+run_pass() {
+    local label="$1"
+    shift
+    rm -f "${tmpdir}/asan".*
+    printf '[%s] ..\t' "$label"
+    ASAN_OPTIONS="${asan_base}:log_path=${tmpdir}/asan" \
+        httrack -O "$out" --quiet --disable-security-limits --robots=0 \
+        --timeout=30 --retries=1 -c1 "$@" "$url" >"${tmpdir}/log_${label}" 2>&1 || true
+    report=$(cat "${tmpdir}/asan".* 2>/dev/null || true)
+    test -z "$report" || {
+        echo "FAIL: sanitizer report on the ${label} pass"
+        echo "$report"
+        exit 1
+    }
+    echo "OK (clean)"
+}
+
+run_pass fresh
+run_pass update --update
+# only --warc-file stashes the two header blocks, so the archive limb of the fix
+# runs on this pass alone
+run_pass warc --update --warc-file leak
+
+# Teeth: the update passes must have gone through the 304 path, or a run that
+# re-downloaded everything would report clean having tested nothing.
+printf '[update used the cache] ..\t'
+if grep -aqE "no files updated" "${out}/hts-log.txt"; then
+    echo "OK"
+else
+    echo "FAIL: the update pass did not report unchanged files"
+    exit 1
+fi
+
+# ... and the WARC pass must have written an archive, or it stashed nothing.
+printf '[warc pass archived] ..\t'
+if [ -n "$(find "$out" -name 'leak*.warc*' -size +0c 2>/dev/null)" ]; then
+    echo "OK"
+else
+    echo "FAIL: the --warc-file pass produced no archive"
+    exit 1
+fi

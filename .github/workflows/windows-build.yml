@@ -14,6 +14,14 @@ on:
 
 permissions:
   contents: read
+  # The suite watchdog reports as a commit status, the only channel that
+  # outlives the runner it is reporting on (#795).
+  statuses: write
+
+# Cancel superseded runs on the same branch or PR.
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   libhttrack:
@@ -32,6 +40,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: recursive   # coucal lives in src/coucal
+          # Or the job token stays in .git/config, where every test the suite
+          # runs can read it.
+          persist-credentials: false
 
       # Located through vswhere rather than microsoft/setup-msbuild: the repo
       # only allows GitHub-owned actions.
@@ -166,73 +177,17 @@ jobs:
         shell: bash
         working-directory: tests
         timeout-minutes: 45
+        env:
+          # Through the environment, never argv, which the process list exposes.
+          WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WATCHDOG_REPO: ${{ github.repository }}
+          # github.sha here is the PR's merge commit, so statuses posted against it stay out of the PR's checks UI.
+          WATCHDOG_SHA: ${{ github.sha }}
+          WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
+          WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          set -u
-          bin="$(cygpath -u "$GITHUB_WORKSPACE")/src/${{ matrix.platform }}/${{ matrix.configuration }}"
-          export PATH="$bin:$PATH"
-          command -v httrack >/dev/null || { echo "::error::no httrack.exe in $bin"; exit 1; }
-
-          # httrack.exe is native, so MSYS rewrites any argument shaped like a
-          # POSIX path, and a URL path is shaped exactly like one: "/a/b.html"
-          # reached the engine as "C:/Program Files/Git/a/b.html". Switch that
-          # off, and hand the tests a TMPDIR that is already a Windows path.
-          export MSYS_NO_PATHCONV=1
-          export MSYS2_ARG_CONV_EXCL='*'
-          TMPDIR="$(cygpath -m "$RUNNER_TEMP")"
-          export TMPDIR
-
-          # Mirror what configure hands the suite. LC_ALL sets the codeset MSYS maps
-          # a UTF-8 mirror name onto UTF-16 with, which the intl crawls "test -f".
-          export HTTPS_SUPPORT=yes BROTLI_ENABLED=yes ZSTD_ENABLED=yes
-          export LC_ALL=C.UTF-8
-
-          # A wedged crawl must not eat the job's timeout budget. timeout(1)'s
-          # signals can't reap a native httrack.exe (MSYS signals don't reach it),
-          # so a hang orphaned processes that starved the runner; run_with_timeout
-          # TerminateProcess-es the whole tree. 600s clears the slowest multi-pass
-          # crawl (a few passes at --max-time=120 each).
-          . ./testlib.sh
-
-          pass=0 fail=0 skip=0 failed="" skipped=""
-          for t in 00_runnable.test 01_engine-*.test 01_zlib-*.test \
-                   *_local-*.test 13_crawl_proxy_https.test 58_watchdog.test \
-                   60_crawl-log-salvage.test; do
-            rc=0
-            run_with_timeout 600 bash "$t" >"$t.log" 2>&1 || rc=$?
-            case "$rc" in
-              0) pass=$((pass + 1)); echo "PASS $t" ;;
-              77) skip=$((skip + 1)) skipped="$skipped $t"; echo "SKIP $t" ;;
-              124)
-                fail=$((fail + 1)) failed="$failed $t"
-                echo "FAIL $t (timed out, tree killed)"
-                # Re-running a wedge traced would just hang again: salvage the
-                # killed crawl's own logs into the artifact instead.
-                dump_crawl_logs >>"$t.log"
-                tail -n 25 "$t.log" | sed 's/^/      /'
-                ;;
-              *)
-                fail=$((fail + 1)) failed="$failed $t"
-                echo "FAIL $t (exit $rc)"
-                # These assert with `test "$(...)" == "..." || exit 1`, which
-                # says nothing at all on failure. Re-run traced, still bounded.
-                run_with_timeout 600 bash -x "$t" >>"$t.log" 2>&1 || true
-                tail -n 25 "$t.log" | sed 's/^/      /'
-                ;;
-            esac
-          done
-          echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
-            tee -a "$GITHUB_STEP_SUMMARY"
-
-          # Every gate here exits 77, so an all-skipped suite would report green having
-          # tested nothing: pin the skips, and floor the passes in case the glob empties.
-          # footer-overflow skips on Windows (needs a path past MAX_PATH); crange pending #581;
-          # webdav-mime needs a reapable background listener, which MSYS cannot give it;
-          # badmtime needs a filesystem that stores an mtime past gmtime's range;
-          # single-file ends on a GUI half needing htsserver, which this job does not build.
-          expected_skips=" 01_engine-footer-overflow.test 48_local-crange-memresume.test 71_local-crange-repaircache.test 79_local-proxytrack-webdav-mime.test 88_local-proxytrack-badmtime.test 94_local-single-file.test"
-          [ "$pass" -ge 90 ] || { echo "::error::only $pass tests passed ($skip skipped)"; exit 1; }
-          [ "$skipped" = "$expected_skips" ] || { echo "::error::unexpected skips:$skipped"; exit 1; }
-          [ "$fail" -eq 0 ] || { echo "::error::failing:$failed"; exit 1; }
+          bash ./ci-windows-suite.sh \
+            "$(cygpath -u "$GITHUB_WORKSPACE")/src/${{ matrix.platform }}/${{ matrix.configuration }}"
 
       - name: Upload the test logs
         if: always()

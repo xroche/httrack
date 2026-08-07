@@ -1,0 +1,162 @@
+#!/bin/bash
+# A worker that ran out of stack was killed outright with no report: #866 gave
+# the alternate signal stack to the main thread, and sigaltstack() is per-thread
+# (#969). Second half of the file: the stacks have to be given back too.
+
+set -euo pipefail
+
+ulimit -c 0 # a deliberate crash must not litter the box with cores
+
+fail() {
+    echo "$*" >&2
+    exit 1
+}
+
+case "$(uname -s)" in
+Linux) traced=1 ;;
+MINGW* | MSYS* | CYGWIN*)
+    echo "no sigaltstack on Windows, skipping" >&2
+    exit 77
+    ;;
+# sigaltstack() is POSIX, so the fix applies; only the trace text below is
+# gated on Linux + execinfo.h (USES_BACKTRACE in htsbacktrace.c).
+*) traced=0 ;;
+esac
+command -v httrack >/dev/null || fail "could not find httrack"
+
+# Dies from a caught fault, running the report to its end. The handler finishes
+# in abort(), so the shell sees SIGABRT (134); 139 is the kernel killing us.
+crash_report() {
+    local kind="$1" out rc=0
+
+    out=$(httrack "-#c=$kind" 2>&1) || rc=$?
+    test "$rc" -eq 134 ||
+        fail "-#c=$kind exited $rc, expected 134 (139 means the handler never ran)"
+    grep -q "Please report the problem" <<<"$out" ||
+        fail "-#c=$kind: report truncated, the handler died halfway"
+    printf '%s\n' "$out"
+}
+
+# Frames the raw trace printed. A runaway recursion fills backtrace()'s buffer;
+# an ordinary fault is a dozen deep. Measured: 256 against 11.
+frame_count() {
+    grep -cE '\[0x[0-9a-f]+\]$' <<<"$1" || true
+}
+
+# Control: an ordinary fault was already reported before the fix, so a build or
+# harness that can no longer see any crash fails here rather than passing the
+# real case vacuously.
+plain=$(crash_report segv)
+worker=$(crash_report threadstack)
+
+grep -q "Crash test worker thread started" <<<"$worker" ||
+    fail "-#c=threadstack: no worker was spawned, nothing was tested"
+
+if [ "$traced" -eq 0 ]; then
+    exit 0
+fi
+
+grep -q "^Caught signal 11$" <<<"$worker" || fail "-#c=threadstack: no 'Caught signal 11' line"
+
+# The main thread is parked in htsthread_wait_n() once the worker announced
+# itself, and only the worker recurses. A trace that deep is therefore the
+# worker's, which is what had no alternate stack.
+worker_frames=$(frame_count "$worker")
+plain_frames=$(frame_count "$plain")
+test "$plain_frames" -lt 100 ||
+    fail "-#c=segv: $plain_frames frames, the threshold no longer discriminates"
+
+# Naming no frame at all is the unwinder failing outright, not a weak one, and
+# the floor below would take it for loong64. hts_print_backtrace() says which.
+if grep -q "No stack trace available" <<<"$worker"; then
+    fail "-#c=threadstack: the report carries no stack trace at all"
+fi
+
+# armhf and loong64 cannot unwind past the frame that faulted on the guard page
+# (180 skips on the same floor); the release trace below still judges the fix.
+if [ "$worker_frames" -ge 1 ] && [ "$worker_frames" -lt 6 ]; then
+    echo "-#c=threadstack: $worker_frames frames, too few for this unwinder to" \
+        "show the recursion" >&2
+elif [ "$worker_frames" -lt 100 ]; then
+    fail "-#c=threadstack: $worker_frames frames, expected a runaway recursion"
+fi
+
+# Everything above only proves the stack gets installed: the crashing worker
+# never returns, so the release hook never runs there. -#test=threadwait spawns
+# workers that do return, and the syscall trace says what each did with its
+# stack -- 64kB a worker, and an unmap the kernel is not told about first.
+[ -r "${ALTSTACKPROBE_LA:-}" ] || fail "${ALTSTACKPROBE_LA:-\$ALTSTACKPROBE_LA} was not built"
+if grep -q "^dlname=''" "$ALTSTACKPROBE_LA"; then
+    echo "static-only build, no release trace" >&2
+    exit 0
+fi
+[ -r "${ALTSTACKPROBE_LIB:-}" ] || fail "${ALTSTACKPROBE_LIB:-\$ALTSTACKPROBE_LIB} was not built"
+
+tmp=$(mktemp -d)
+trap 'set +e; rm -rf "$tmp"' EXIT
+trap 'exit 1' HUP INT TERM
+
+# See 181: the shim loads ahead of libasan and allocates nothing.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
+trace="$tmp/altstack.trace"
+rc=0
+out=$(ALTSTACK_TRACE="$trace" LD_PRELOAD="$ALTSTACKPROBE_LIB" \
+    httrack -#test=threadwait 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "-#test=threadwait exited $rc: $out"
+grep -q "threadwait self-test: OK" <<<"$out" ||
+    fail "-#test=threadwait did not report OK, no workers to judge: $out"
+[ -s "$trace" ] || fail "the probe traced no sigaltstack() call at all"
+
+# Pairs each thread's events: the unmap of one of our stacks has to come
+# straight after its SS_DISABLE, and no worker may end still holding one.
+read -r foreign workers released errors main_has <<<"$(awk '
+{
+    key = $1 ":" $2
+    is_main = ($1 == $2)
+    if (is_main && $4 != "off" && $4 != "-") { main_has = 1 }
+    if ($3 == "query") {
+        # Installed before anyone traced doing it: not ours either.
+        if (!(key in seen) && $4 == "on") { alien[key] = 1 }
+        prev[key] = "query " $4
+    } else if ($3 == "set" && $4 != "off") {
+        if ($4 == "own") { own[key] = $5; main_of[key] = is_main }
+        else { alien[key] = 1 }
+        prev[key] = "set-on " $5
+    } else if ($3 == "set") {
+        prev[key] = "set-off " $5
+    } else if ($3 == "munmap") {
+        if (prev[key] != "set-off " $5) {
+            print "thread " key ": unmapped " $5 " with the kernel still pointed at it" > "/dev/stderr"
+            errors++
+        }
+        if (is_main) {
+            print "thread " key ": the main thread gave up its alternate stack" > "/dev/stderr"
+            errors++
+        }
+        if (own[key] == $5) { freed[key] = 1 }
+        prev[key] = "munmap " $5
+    }
+    seen[key] = 1
+}
+END {
+    for (k in alien) { foreign++ }
+    for (k in own) {
+        if (!main_of[k]) { workers++; if (freed[k]) released++ }
+    }
+    print foreign+0, workers+0, released+0, errors+0, main_has+0
+}' "$trace")"
+
+# A sanitizer runtime installs its own in every thread, which we then leave
+# alone: nothing of ours to release, so nothing to judge. Cannot swallow a plain
+# build, where no alternate stack predates hts_backtrace_altstack().
+if [ "$foreign" -gt 0 ] && [ "$workers" -lt 8 ]; then
+    echo "$foreign thread(s) had an alternate stack already, no release trace" >&2
+    exit 0
+fi
+test "$errors" -eq 0 || fail "$errors alternate-stack lifecycle violation(s), listed above"
+test "$main_has" -eq 1 || fail "the main thread ran with no alternate stack at all"
+test "$workers" -ge 8 ||
+    fail "only $workers worker(s) got an alternate stack, too few to judge the release"
+test "$released" -eq "$workers" ||
+    fail "$((workers - released)) of $workers workers ended without giving their alternate stack back"

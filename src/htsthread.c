@@ -98,6 +98,19 @@ typedef struct hts_thread_s {
   void (*fun) (void *arg);
 } hts_thread_s;
 
+/* Set once before any thread is spawned, hence unlocked. */
+static void *(*thread_enter)(void) = NULL;
+static void (*thread_leave)(void *cookie) = NULL;
+
+HTSEXT_API void hts_set_thread_hooks(void *(*enter)(void),
+                                     void (*leave)(void *cookie)) {
+  /* Never half a pair: 'leave' must not see a cookie no 'enter' produced. */
+  const int paired = enter != NULL && leave != NULL;
+
+  thread_enter = paired ? enter : NULL;
+  thread_leave = paired ? leave : NULL;
+}
+
 #ifdef _WIN32
 static unsigned int __stdcall hts_entry_point(void *tharg)
 #else
@@ -107,11 +120,15 @@ static void *hts_entry_point(void *tharg)
   hts_thread_s *s_args = (hts_thread_s *) tharg;
   void *const arg = s_args->arg;
   void (*fun) (void *arg) = s_args->fun;
+  void *cookie;
 
   freet(tharg);
 
+  cookie = thread_enter != NULL ? thread_enter() : NULL;
   /* run */
   fun(arg);
+  if (thread_leave != NULL)
+    thread_leave(cookie);
 
   process_chain_add(-1);
 #ifdef _WIN32
@@ -148,20 +165,23 @@ HTSEXT_API int hts_newthread(void (*fun) (void *arg), void *arg) {
     const size_t stackSize = 1024 * 1024 * 8;
     pthread_attr_t attr;
     pthread_t handle = 0;
-    int retcode;
+    hts_boolean created;
 
-    if (pthread_attr_init(&attr) != 0
-        || pthread_attr_setstacksize(&attr, stackSize) != 0
-        || (retcode =
-            pthread_create(&handle, &attr, hts_entry_point, s_args)) != 0) {
+    /* init kept apart: destroying an uninitialised attr is undefined (#772) */
+    if (pthread_attr_init(&attr) == 0) {
+      created = pthread_attr_setstacksize(&attr, stackSize) == 0 &&
+                pthread_create(&handle, &attr, hts_entry_point, s_args) == 0;
+      pthread_attr_destroy(&attr); /* create() copied what it needed */
+    } else {
+      created = HTS_FALSE;
+    }
+    if (!created) {
       process_chain_add(-1);
       freet(s_args);
       return -1;
-    } else {
-      /* detach the thread from the main process so that is can be independent */
-      pthread_detach(handle);
-      pthread_attr_destroy(&attr);
     }
+    /* detach the thread from the main process so that it can be independent */
+    pthread_detach(handle);
   }
 #endif
   return 0;

@@ -17,6 +17,7 @@
 #       --errors N --errors-content N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
 #       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
+#       --cache-found URLTAIL ... --cache-not-found URLTAIL ... \
 #       --file-min-bytes PATH N --file-mode PATH OCTAL --max-mirror-bytes N \
 #       httrack BASEURL/some/path [httrack-args...]
 # --errors counts every "Error:" log line; --errors-content drops transient
@@ -25,6 +26,9 @@
 # --max/--min-mirror-bytes bound the mirrored content bytes (host root).
 # --file-matches/--file-not-matches grep (ERE) a mirrored file (PATH under the
 # host root), to assert rewritten link/content survived the crawl.
+# --cache-found/--cache-not-found assert whether hts-cache/new.zip holds an
+# entry whose URL ends with URLTAIL, e.g. /dir/page.html; being mirrored and
+# being cached are separate outcomes (#840).
 # --file-min-bytes asserts a mirrored file (PATH) is at least N bytes.
 # --file-mode asserts its octal permissions (e.g. 644); POSIX hosts only.
 # --rerun-args runs a second pass (same server and mirror dir) with the given
@@ -34,6 +38,15 @@
 # httrack via --cookies-file, to exercise preloaded cookies.
 # --rerun-dead re-runs with the server stopped: the no-data rollback must
 # restore the previous hts-cache generation byte-identical.
+# --archive-kept-on-rerun: the second pass must leave the first pass's
+# .warc[.gz]/.cdx/.wacz byte-identical, having no bodies to replace them (#759).
+# --archive-replaced-on-rerun is its mirror: every one of them must have been
+# rewritten. Both also require no *.tmp left behind, and take an optional
+# --archive-min-files N guarding against a scenario that silently stopped
+# producing the segments it means to check.
+# --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
+# directory at PATH under the host root between the passes, to hand the second
+# pass leftovers a killed run would have left (#758).
 
 set -u
 
@@ -54,11 +67,15 @@ outdir_intl=
 rerun=
 rerun_args=
 rerun_dead=
+archive_kept=
+archive_replaced=
+archive_min_files=0
 tmpdir=
 serverpid=
 crawlpid=
 wacz_poisoned=
 wacz_poison="stale-wacz-that-a-second-pass-must-replace"
+plant_poison="stale-leftover-that-a-second-pass-must-clobber"
 
 function warning {
     echo "** $*" >&2
@@ -87,6 +104,37 @@ function cleanup {
     fi
 }
 
+hostroot=
+function find_hostroot {
+    local cand
+    for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
+        if test -d "$cand"; then
+            hostroot="$cand"
+            return 0
+        fi
+    done
+    die "could not find host root under $out"
+}
+
+# Does the cache hold an entry whose URL ends with $1? An unreadable index is a
+# hard failure, else --cache-not-found would pass on a cache that never existed.
+# Suffix match over the whole key, so a URL with a query string needs the query
+# spelled out; a bare path would silently match nothing.
+function cache_has {
+    local rc
+    "$python" -c '
+import sys, zipfile
+try:
+    names = zipfile.ZipFile(sys.argv[1]).namelist()
+except Exception:
+    sys.exit(2)
+sys.exit(0 if any(n.endswith(sys.argv[2]) for n in names) else 1)
+' "${logroot}/hts-cache/new.zip" "$1"
+    rc=$?
+    test "$rc" -le 1 || die "cannot read cache index ${logroot}/hts-cache/new.zip"
+    return "$rc"
+}
+
 function assert_equals {
     info "$1"
     if test ! "$2" == "$3"; then
@@ -109,6 +157,7 @@ tmpdir=$(mktemp -d "${tmptopdir}/httrack_local.XXXXXX") || die "could not create
 # --- parse leading control flags --------------------------------------------
 declare -a audit=()
 declare -a cookies=()
+declare -a plants=()
 scheme=http
 pos=0
 args=("$@")
@@ -118,6 +167,13 @@ while test "$pos" -lt "$nargs"; do
     --debug) verbose=1 ;;
     --rerun) rerun=1 ;;           # run httrack a second time (update pass) before auditing
     --rerun-dead) rerun_dead=1 ;; # re-run with the server stopped (cache rollback)
+    # the second pass must leave the first pass's archive files untouched
+    --archive-kept-on-rerun) archive_kept=1 ;;
+    --archive-replaced-on-rerun) archive_replaced=1 ;; # ...or rewrite all of them
+    --archive-min-files)
+        pos=$((pos + 1))
+        archive_min_files="${args[$pos]}"
+        ;;
     # validate the produced .warc.gz (see the validation block near the end)
     --warc-validate) warc_validate=1 ;;
     # validate the produced .wacz package (stdlib, plus py-wacz/pywb if present)
@@ -141,6 +197,10 @@ while test "$pos" -lt "$nargs"; do
         pos=$((pos + 1))
         cookies+=("${args[$pos]}")
         ;;
+    --plant-file | --plant-dir)
+        plants+=("${args[$pos]}" "${args[$((pos + 1))]}")
+        pos=$((pos + 1))
+        ;;
     --rerun-args)
         pos=$((pos + 1))
         rerun_args="${args[$pos]}"
@@ -163,7 +223,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --found | --not-found | --directory | --log-found | --log-not-found | --max-mirror-bytes | --min-mirror-bytes)
+    --found | --not-found | --directory | --log-found | --log-not-found | --max-mirror-bytes | --min-mirror-bytes | --cache-found | --cache-not-found)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
@@ -193,14 +253,12 @@ serverpid=$!
 
 # Wait for the "PORT <n>" line (server prints it once bound). A cold Python
 # start under a parallel `make check -jN` can lag past a second on a loaded Windows runner.
-port=
-for _ in $(seq 1 300); do
-    # Match anywhere: a startup warning merged via 2>&1 could precede the PORT line.
-    line=$(grep -m1 '^PORT ' "$serverlog" 2>/dev/null) && port="${line#PORT }" && break
-    kill -0 "$serverpid" 2>/dev/null || die "server exited early: $(cat "$serverlog")"
-    sleep 0.1
-done
-test -n "$port" || die "could not discover server port: $(cat "$serverlog")"
+port=$(discover_server_port "$serverlog" "$serverpid") || {
+    # A server that died is a hard failure; only the deadline is the announce race
+    # 72 and 105 skip on, and they key on this exact wording.
+    test "$?" -ne 2 || die "server exited early"
+    die "could not discover server port"
+}
 debug "server listening on ${scheme}://127.0.0.1:${port}"
 
 baseurl="${scheme}://127.0.0.1:${port}"
@@ -274,12 +332,46 @@ if test -n "$warc_validate"; then
     test -z "$w1" || cp "$w1" "${tmpdir}/warc-pass1.gz"
 fi
 
+# Snapshot the archive files the second pass must keep (or must replace).
+declare -a kept_files=()
+if test -n "${archive_kept}${archive_replaced}"; then
+    while read -r f; do
+        test -n "$f" || continue
+        cp "$f" "${tmpdir}/kept-${#kept_files[@]}" || die "could not snapshot $f"
+        kept_files+=("$f")
+    done < <(find "$mirrorroot" -maxdepth 2 \
+        \( -name '*.warc.gz' -o -name '*.warc' -o -name '*.cdx' -o -name '*.wacz' \) \
+        2>/dev/null | sort)
+    test "${#kept_files[@]}" -gt 0 ||
+        die "the first pass produced no archive to compare against"
+    test "${#kept_files[@]}" -ge "$archive_min_files" ||
+        die "only ${#kept_files[@]} archive file(s), wanted $archive_min_files: ${kept_files[*]}"
+fi
+
 # Poison the first-pass .wacz when a second pass follows: repackaging moves the
 # new archive over it, so the marker must be gone afterwards (#726). Poisoning
 # beats comparing the two packages, which can come out byte-identical.
-if test -n "$wacz_validate" && test -n "${rerun}${rerun_args}"; then
+if test -z "$archive_kept" && test -n "$wacz_validate" && test -n "${rerun}${rerun_args}"; then
     wacz_poisoned=$(find "$mirrorroot" -maxdepth 2 -name '*.wacz' 2>/dev/null | sort | tail -n1)
     test -z "$wacz_poisoned" || echo "$wacz_poison" >"$wacz_poisoned"
+fi
+
+# --- plant leftovers the second pass has to deal with ------------------------
+if test "${#plants[@]}" -gt 0; then
+    find_hostroot
+    i=0
+    while test "$i" -lt "${#plants[@]}"; do
+        path="${hostroot}/${plants[$((i + 1))]}"
+        info "planting ${plants[$i]} ${plants[$((i + 1))]}"
+        if test "${plants[$i]}" = "--plant-dir"; then
+            mkdir -p "$path" || die "could not create $path"
+        else
+            mkdir -p "$(dirname "$path")" || die "could not create ${path%/*}"
+            echo "$plant_poison" >"$path" || die "could not write $path"
+        fi
+        result "OK"
+        i=$((i + 2))
+    done
 fi
 
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
@@ -326,6 +418,29 @@ if test -n "$rerun_args"; then
     result "OK (second pass)"
 fi
 
+# --- optional: did the second pass keep, or replace, the whole archive? ------
+if test "${#kept_files[@]}" -gt 0; then
+    i=0
+    for f in "${kept_files[@]}"; do
+        if test -n "$archive_kept"; then
+            info "checking the second pass kept $(basename "$f")"
+            cmp -s "${tmpdir}/kept-${i}" "$f" ||
+                die "$(basename "$f") was rewritten: the previous archive was destroyed"
+        else
+            info "checking the second pass replaced $(basename "$f")"
+            cmp -s "${tmpdir}/kept-${i}" "$f" &&
+                die "$(basename "$f") still holds the first pass's bytes"
+        fi
+        result "OK"
+        i=$((i + 1))
+    done
+    # A leftover in-progress file is as bad: the next pass would silently eat it.
+    info "checking no in-progress archive was left behind"
+    leftover=$(find "$mirrorroot" -maxdepth 2 \( -name '*.warc.gz.tmp' -o -name '*.warc.tmp' \) 2>/dev/null | head -n1)
+    test -z "$leftover" || die "left behind $leftover"
+    result "OK"
+fi
+
 # --- optional dead pass: server stopped, the cache must survive the rollback --
 if test -n "$rerun_dead"; then
     zip="${out}/hts-cache/new.zip"
@@ -363,19 +478,18 @@ if test -n "$rerun_dead"; then
 fi
 
 # --- discover the single host root (127.0.0.1_<port> or 127.0.0.1) -----------
-hostroot=
-for cand in "${mirrorroot}/127.0.0.1_${port}" "${mirrorroot}/127.0.0.1"; do
-    if test -d "$cand"; then
-        hostroot="$cand"
-        break
-    fi
-done
-test -n "$hostroot" || die "could not find host root under $out"
+find_hostroot
 debug "host root: $hostroot"
 
 # --- optional WARC validation (stdlib validator, no warcio) ------------------
 # WARC_VALIDATE_BODY="URLSUB=HEX" byte-checks a fresh-crawl response body;
-# WARC_VALIDATE_NORESP="URLSUB..." asserts those assets are revisits post-update.
+# WARC_VALIDATE_NORESP="URLSUB..." asserts those assets are revisits post-update;
+# WARC_VALIDATE_NORECORD="URLSUB..." asserts those assets have no record at all;
+# WARC_VALIDATE_IP="URLSUB=IP..." asserts the exact WARC-IP-Address on the record;
+# WARC_VALIDATE_PROFILE="URLSUB=SUBSTR..." asserts a revisit's WARC-Profile;
+# WARC_VALIDATE_NO_REVISIT=1 skips the "at least one revisit" requirement (a
+# no-OpenSSL leg where the only unchanged assets end up with no record at all);
+# WARC_VALIDATE_EXCHANGE=1 asserts each revisit carries its 304 request/response.
 if test -n "$warc_validate"; then
     validator=$(nativepath "${testdir}/warc-validate.py")
     warc=$(find "$mirrorroot" -maxdepth 2 \( -name '*.warc.gz' -o -name '*.warc' \) 2>/dev/null | sort | tail -n1)
@@ -393,18 +507,36 @@ if test -n "$warc_validate"; then
     # body and keeps Content-Encoding, instead of expecting a decoded body.
     test -n "${WARC_VALIDATE_VERBATIM:-}" && bodyargs+=(--verbatim)
     info "validating fresh WARC (response bodies)"
-    "$python" "$validator" "$(nativepath "$fresh")" "${bodyargs[@]}" >&2 ||
+    # macOS bash 3.2 calls an empty array unbound under set -u, and a caller
+    # asking only for the revisit checks leaves this one empty.
+    "$python" "$validator" "$(nativepath "$fresh")" \
+        ${bodyargs[@]+"${bodyargs[@]}"} >&2 ||
         die "fresh WARC validation failed"
     result "OK"
 
-    # Final file: after an update pass the unchanged assets must be revisits.
-    if test -n "$rerun"; then
-        declare -a revargs=(--expect-revisit)
+    # After an update pass the unchanged assets must be revisits, in an archive
+    # of the pass's own (WARC_VALIDATE_UPDATE): a revisit-only pass never
+    # replaces the archive holding the bodies it would strand (#759).
+    if test -n "${WARC_VALIDATE_UPDATE:-}"; then
+        upd=$(find "$mirrorroot" -maxdepth 2 -name "$WARC_VALIDATE_UPDATE" 2>/dev/null | head -n1)
+        test -n "$upd" || die "no $WARC_VALIDATE_UPDATE produced under $mirrorroot"
+        declare -a revargs=()
+        test -z "${WARC_VALIDATE_NO_REVISIT:-}" && revargs+=(--expect-revisit)
         for sub in ${WARC_VALIDATE_NORESP:-}; do
             revargs+=(--no-response-for "$sub")
         done
+        for sub in ${WARC_VALIDATE_NORECORD:-}; do
+            revargs+=(--no-record-for "$sub")
+        done
+        for spec in ${WARC_VALIDATE_IP:-}; do
+            revargs+=(--expect-ip "$spec")
+        done
+        for spec in ${WARC_VALIDATE_PROFILE:-}; do
+            revargs+=(--expect-revisit-profile "$spec")
+        done
+        test -n "${WARC_VALIDATE_EXCHANGE:-}" && revargs+=(--revisit-exchange)
         info "validating update WARC (revisits)"
-        "$python" "$validator" "$(nativepath "$warc")" "${revargs[@]}" >&2 ||
+        "$python" "$validator" "$(nativepath "$upd")" "${revargs[@]}" >&2 ||
             die "update WARC validation failed"
         result "OK"
     fi
@@ -439,9 +571,25 @@ if test -n "$wacz_validate"; then
 fi
 
 # No crawl, even a cancelled one, may leave engine temporaries: .delayed (#107,
-# #483), or the .z/.u content-coding temps (#557).
+# #483), the .z/.u content-coding temps (#557), or the ~hts-tmp directory those
+# and the re-fetch backup live in (#774). Only a test that planted something in
+# ~hts-tmp itself owns what is left there, so only that case skips the scan.
 info "checking for leftover engine temporaries"
-leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \) 2>/dev/null | head -5)
+scan_tmpdir=1
+i=0
+while test "$i" -lt "${#plants[@]}"; do
+    case "${plants[$((i + 1))]}" in
+    */~hts-tmp/*) scan_tmpdir=0 ;;
+    esac
+    i=$((i + 2))
+done
+if test "$scan_tmpdir" -eq 1; then
+    leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \
+        -o -name '~hts-tmp' \) 2>/dev/null | head -5)
+else
+    leftovers=$(find "$out" \( -name '*.delayed' -o -name '*.z' -o -name '*.u' \) \
+        2>/dev/null | head -5)
+fi
 if test -z "$leftovers"; then result "OK"; else
     result "leftover: $leftovers"
     exit 1
@@ -478,6 +626,22 @@ while test "$i" -lt "${#audit[@]}"; do
             result "cache not under logroot (mangled twin?)"
             exit 1
         fi
+        ;;
+    --cache-found)
+        i=$((i + 1))
+        info "checking cache holds ${audit[$i]}"
+        if cache_has "${audit[$i]}"; then result "OK"; else
+            result "not cached"
+            exit 1
+        fi
+        ;;
+    --cache-not-found)
+        i=$((i + 1))
+        info "checking cache lacks ${audit[$i]}"
+        if cache_has "${audit[$i]}"; then
+            result "cached"
+            exit 1
+        else result "OK"; fi
         ;;
     --found)
         i=$((i + 1))

@@ -1,9 +1,5 @@
 #!/bin/bash
 #
-# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
-# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms despite the
-# #!/bin/bash above.
-
 # A -%F footer whose expansion overflows the on-page buffer must be dropped, not
 # crash the crawl. Before the fix the unchecked hts_footer_format return left the
 # buffer unterminated and the next strcatbuff aborted (SIGABRT).
@@ -18,7 +14,7 @@ MINGW* | MSYS* | CYGWIN*) exit 77 ;;
 esac
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 # A few-hundred-char file path (kept well under the URL length limit) makes the
 # {path} field long.
@@ -50,7 +46,7 @@ httrack "file://$deep/index.html" -O "$mir" -%F "$footer" -q -s0 -%v0 \
 
 # The crawled page must exist (proves the URL wasn't rejected for length, so the
 # footer path ran). Look under file/, not $mir, to skip the makeindex top index.
-find "$mir/file" -name index.html | grep -q . || {
+test -n "$(find "$mir/file" -name index.html)" || {
     echo "page not mirrored; the oversized-footer path was not exercised" >&2
     exit 1
 }

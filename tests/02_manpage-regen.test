@@ -3,12 +3,7 @@
 # The committed man/httrack.1 must match what man/makeman.sh produces from the
 # current "httrack --help" output. This catches a --help change that was not
 # followed by "make -C man regen-man".
-#
-# Keep this POSIX-portable: the harness runs it via $(BASH), which is a plain
-# POSIX /bin/sh on some platforms (e.g. macOS), so avoid bashisms (such as
-# process substitution) despite the #!/bin/bash above.
 
-# pipefail is a bashism; keep to POSIX set flags ($(BASH) may be /bin/sh here).
 set -eu
 
 : "${top_srcdir:=..}"
@@ -29,7 +24,7 @@ command -v httrack >/dev/null 2>&1 || {
 tmp=$(mktemp) || exit 1
 committed_clean=$(mktemp) || exit 1
 generated_clean=$(mktemp) || exit 1
-trap 'rm -f "$tmp" "$committed_clean" "$generated_clean"' EXIT
+trap 'set +e; rm -f "$tmp" "$committed_clean" "$generated_clean"' EXIT
 
 README="$top_srcdir/README" bash "$gen" httrack >"$tmp" 2>/dev/null || {
     echo "makeman.sh failed" >&2

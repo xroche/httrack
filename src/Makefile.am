@@ -15,6 +15,10 @@ DevIncludes_DATA = \
 	htsarrays.h \
 	htssafe.h
 
+# What hands a consumer the include path and the rpath the @rpath id needs (#978).
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = libhttrack.pc
+
 AM_CPPFLAGS = \
 	@DEFAULT_CFLAGS@ \
 	@THREADS_CFLAGS@ \
@@ -39,34 +43,46 @@ htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 
 httrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE)
-proxytrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5
+# -DHTS_NO_LIBHTTRACK: see htsnet.h's HTSNET_API guard.
+proxytrack_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DNO_MALLOCT -DZLIB_CONST -DHTS_INTHASH_USES_MD5 -DHTS_NO_LIBHTTRACK
 htsserver_CFLAGS = $(AM_CFLAGS) $(CFLAGS_PIE) -DZLIB_CONST -DHTS_INTHASH_USES_MD5
 
-httrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
+# @RPATH_ORIGIN_LDFLAGS@ makes a copied tree find libhttrack next to it (#906),
+# pairing on Darwin with the dylib's @rpath id (#978); proxytrack needs none of it.
+httrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE) @RPATH_ORIGIN_LDFLAGS@
 proxytrack_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
-htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE)
+htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE) @RPATH_ORIGIN_LDFLAGS@
 
 lib_LTLIBRARIES = libhttrack.la
 
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h htsstats.h \
+	htsrandom.c htsrandom.h \
 	htscmdline.c htscmdline.h \
 	htsurlport.c htsurlport.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
-	htsurlport.c htsurlport.h \
+	htsurlport.c htsurlport.h htsnet.c \
 	coucal/coucal.c htsmd5.c md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c
 
 whttrackrundir = $(bindir)
 whttrackrun_SCRIPTS = webhttrack
 
+# $(datadir) only expands at make time, so substitute here rather than through
+# AC_CONFIG_FILES (#887).
+webhttrack: webhttrack.in Makefile
+	$(AM_V_GEN)$(SED) -e 's|@datadir[@]|$(datadir)|g' $(srcdir)/webhttrack.in >$@.tmp \
+		&& chmod +x $@.tmp && mv -f $@.tmp $@
+CLEANFILES = webhttrack
+
 libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htscache_selftest.c htsdns_selftest.c htsselftest.c \
 	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htscmdline.c htshelp.c htslib.c htsurlport.c htscoremain.c \
-	htsname.c htsrobots.c htstools.c htswizard.c \
+	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
-	htsmd5.c htscodec.c htswarc.c htschanges.c htssinglefile.c htssitemap.c htsproxy.c htszlib.c htswrap.c htsconcat.c \
+	htscrashtest.c \
+	htsmd5.c htsnet.c htscodec.c htswarc.c htschanges.c htssinglefile.c htssitemap.c htsproxy.c htszlib.c htswrap.c htsconcat.c \
 	htsmodules.c htscharset.c punycode.c htsencoding.c htssniff.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
@@ -77,7 +93,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htshelp.h htsindex.h htslib.h htsurlport.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h  \
-	htstools.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htssitemap.h htsproxy.h htszlib.h  \
+	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htssitemap.h htsproxy.h htszlib.h  \
 	htsstrings.h htsarrays.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
@@ -87,7 +103,7 @@ libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(BROTLI_LIBS) $(ZSTD_LIBS) 
 libhttrack_la_CFLAGS = $(AM_CFLAGS) -DLIBHTTRACK_EXPORTS -DZLIB_CONST
 libhttrack_la_LDFLAGS = $(AM_LDFLAGS) -version-info $(VERSION_INFO)
 
-EXTRA_DIST = httrack.h htsstats.h webhttrack \
+EXTRA_DIST = httrack.h htsstats.h webhttrack.in \
 		version.rc \
 		libhttrack.rc \
 		httrack.rc \

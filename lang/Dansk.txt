@@ -1032,3 +1032,15 @@ Sitemap address:
 Sitemap-adresse:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Adressen på et sitemap, der skal læses i stedet for at undersøge webstedet; lad feltet stå tomt for at undersøge robots.txt og derefter /sitemap.xml.
+Write a CDXJ index of the WARC archive
+Skriv et CDXJ-indeks over WARC-arkivet
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+Skriv også et sorteret CDXJ-indeks over hver post i WARC-arkivet, til afspilningsværktøjer.
+Package the crawl as a WACZ file
+Pak gennemsøgningen som en WACZ-fil
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+Saml WARC-arkivet, dets CDXJ-indeks og de spejlede sider i én WACZ-fil; medfører WARC-arkivet og CDXJ-indekset.
+WARC segment size limit:
+Største størrelse på WARC-segment:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Begynd et nyt WARC-segment, når det aktuelle overstiger dette antal byte; lad feltet stå tomt eller skriv 0 for én fil.

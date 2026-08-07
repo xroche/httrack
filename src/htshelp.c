@@ -83,9 +83,8 @@ void infomsg(const char *msg) {
               /* try the flag as-is, then strip a trailing N as the numeric-arg
                  placeholder (cN -> c); this order keeps -%N from becoming -% */
               p = optreal_find(cmd);
-              if (p < 0 && (int) strlen(cmd) > 2 &&
-                  cmd[strlen(cmd) - 1] == 'N') {
-                cmd[strlen(cmd) - 1] = '\0';
+              if (p < 0 && (int) strlen(cmd) > 2 && hts_lastchar(cmd) == 'N') {
+                hts_striplastchar(cmd, 'N');
                 p = optreal_find(cmd);
               }
               if (p >= 0) {
@@ -211,7 +210,7 @@ void help_wizard(httrackp * opt) {
     strcatbuff(str, "/websites/");
   }
   if (strnotempty(str))
-    if ((str[strlen(str) - 1] != '/') && (str[strlen(str) - 1] != '\\'))
+    if ((hts_lastchar(str) != '/') && (hts_lastchar(str) != '\\'))
       strcatbuff(str, "/");
   strcatbuff(stropt2, "-O \"");
   strcatbuff(stropt2, str);
@@ -559,8 +558,7 @@ void help(const char *app, int more) {
   infomsg
     (" %q *include query string for local files (useless, for information purpose only) (%q0 don't include)");
   infomsg(" %g  strip query keys for dedup ([host/pattern=]key1,key2,...)");
-  infomsg
-    ("  o *generate output html file in case of error (404..) (o0 don't generate)");
+  infomsg("  o *save the server's error pages (404..) (o0 discard them)");
   infomsg("  X *purge old files after update (X0 keep delete)");
   infomsg(" %p  preserve html files 'as is' (identical to '-K4 -%F \"\"')");
   infomsg(" %T  links conversion to UTF-8");

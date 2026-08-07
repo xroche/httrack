@@ -1,0 +1,176 @@
+#!/bin/bash
+#
+# An absolute BASH_SHELL is taken verbatim by AC_PATH_PROGS and a relative one is dropped
+# for the search result, so configure has to check what it ends up with: BASH_SHELL=/bin/sh
+# otherwise puts #895 back and only shows up at "make check" or "make deb" (#908).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+sh=${BASH_SHELL:-}
+test -n "$sh" || {
+    echo "BASH_SHELL is empty; tests/Makefile.am must export the configured value" >&2
+    exit 1
+}
+
+configure="${abs_top_srcdir:-}/configure"
+test -r "$configure" || {
+    echo "no configure script at $configure; tests/Makefile.am must export abs_top_srcdir" >&2
+    exit 1
+}
+
+tmp=$(mktemp -d)
+cleanup() {
+    # O_RDWR never blocks, and it releases whatever is left stuck opening the FIFO for read.
+    exec 9<>"$tmp/fifo" && exec 9>&-
+    rm -rf "$tmp"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT TERM
+
+# Symlink farm, not the real srcdir: an in-tree config.status makes autoconf refuse it.
+mkdir "$tmp/src"
+for f in "$abs_top_srcdir"/*; do
+    case "${f##*/}" in
+    config.status | config.log | config.h | stamp-h1 | Makefile) continue ;;
+    esac
+    ln -s "$f" "$tmp/src/"
+done
+
+mkdir "$tmp/notexec" "$tmp/with space" "$tmp/fakebin"
+: >"$tmp/notexec/bash"
+chmod 644 "$tmp/notexec/bash"
+ln -s "$sh" "$tmp/mybash"
+ln -s "$sh" "$tmp/with space/bash"
+ln -s "$sh" "$tmp/sh" # bash invoked as "sh" enters POSIX mode
+# A "bash" the PATH search will find first, and that answers -c like any other shell.
+printf '#!/bin/sh\nexec /bin/sh "$@"\n' >"$tmp/fakebin/bash"
+chmod 755 "$tmp/fakebin/bash"
+# Executable to "test -x", but bash blocks in open() on one it failed to exec.
+mkfifo "$tmp/fifo"
+chmod 755 "$tmp/fifo"
+
+n=0
+cases=16 # reject/accept calls below; pinned again once they have all run
+status=0
+log=
+rundir=
+run() { # run <label> <env argument>...
+    local label=$1 began=$SECONDS
+    shift
+    n=$((n + 1))
+    rundir="$tmp/run$n"
+    mkdir "$rundir"
+    status=0
+    # Capped: configure executes the candidate, and a hang wedges "make check" with no output
+    # at all. Polled, not a backgrounded "sleep" watchdog, which outlives the run it guards.
+    (cd "$rundir" && env "$@" bash "$tmp/src/configure" --disable-https) \
+        >"$rundir/log" 2>&1 &
+    local pid=$! waited=0
+    while test "$waited" -lt 300 && kill -0 "$pid" 2>/dev/null; do
+        sleep 1
+        waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        kill -9 "$pid" 2>/dev/null
+        echo "configure did not return within ${waited}s for $label" >&2
+        tail -5 "$rundir/log" >&2
+        exit 1
+    fi
+    wait "$pid" || status=$?
+    log=$(cat "$rundir/log")
+    echo "run $n ($label): exit $status"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+}
+
+reject() { # reject <label> <expected message> <env argument>...
+    local label=$1 want=$2
+    shift 2
+    run "$label" "$@"
+    test "$status" -ne 0 || {
+        echo "configure accepted $label" >&2
+        exit 1
+    }
+    grep -q "$want" <<<"$log" || {
+        echo "$label rejected without '$want':" >&2
+        tail -5 <<<"$log" >&2
+        exit 1
+    }
+}
+
+# accept <label> <expected $(BASH_SHELL), "" for any> <expected message, "" for none> <env argument>...
+accept() {
+    local label=$1 path=$2 want=$3
+    shift 3
+    run "$label" "$@"
+    test "$status" -eq 0 || {
+        echo "configure rejected $label (exit $status):" >&2
+        tail -10 <<<"$log" >&2
+        exit 1
+    }
+    got=$(sed -n 's/^BASH_SHELL = //p' "$rundir/Makefile")
+    test -n "$got" || {
+        echo "$label configured, but the Makefile carries no BASH_SHELL" >&2
+        exit 1
+    }
+    if test -n "$path" && test "$got" != "$path"; then
+        echo "$label reached the Makefile as $got" >&2
+        exit 1
+    fi
+    if test -n "$want"; then
+        grep -q "$want" <<<"$log" || {
+            echo "$label configured without '$want':" >&2
+            tail -5 <<<"$log" >&2
+            exit 1
+        }
+    fi
+}
+
+reject relative 'BASH_SHELL must be an absolute path' BASH_SHELL=relbash
+notreg='is not an executable regular file'
+reject missing "$notreg" "BASH_SHELL=$tmp/missing/bash"
+reject non-executable "$notreg" "BASH_SHELL=$tmp/notexec/bash"
+# "test -x" passes a FIFO, and configure then hangs forever instead of rejecting it (#922).
+reject fifo "$notreg" "BASH_SHELL=$tmp/fifo"
+reject sh-mode 'is a bash in POSIX sh-mode' "BASH_SHELL=$tmp/sh"
+# The #908 case: dash on Linux, bash in sh-mode on macOS, unusable either way. The spoofed
+# BASH_VERSION is what an ordinary shell echoes straight back, so it cannot be the probe.
+reject /bin/sh 'BASH_SHELL=/bin/sh is ' BASH_SHELL=/bin/sh BASH_VERSION=9.9
+
+# make splits the value on whitespace, cuts it at a '#' and expands a '$', and no Makefile
+# quotes $(BASH_SHELL).
+meta='must not contain shell or make metacharacters'
+reject space "$meta" "BASH_SHELL=$tmp/with space/bash"
+reject semicolon "$meta" 'BASH_SHELL=/opt/a;b/bash'
+# shellcheck disable=SC2016 # the '$' has to reach configure unexpanded
+reject dollar "$meta" 'BASH_SHELL=/opt/a$b/bash'
+reject hash "$meta" 'BASH_SHELL=/opt/a#b/bash'
+
+# An environment in POSIX mode leaves no path that could pass, so the message must blame it
+# and not the shell.
+reject posix-env 'POSIXLY_CORRECT or SHELLOPTS' "BASH_SHELL=$sh" POSIXLY_CORRECT=1
+
+# Both at once: clearing the variable would still leave a bash invoked as sh, so the second
+# probe has to decide which one to blame instead of reading the environment.
+reject sh-mode-in-posix-env "BASH_SHELL=$tmp/sh is a bash in POSIX sh-mode" \
+    "BASH_SHELL=$tmp/sh" POSIXLY_CORRECT=1
+if grep -q 'POSIXLY_CORRECT or SHELLOPTS' <<<"$log"; then
+    echo "a bash invoked as sh was blamed on the environment:" >&2
+    tail -5 <<<"$log" >&2
+    exit 1
+fi
+
+accept override "$tmp/mybash" '' "BASH_SHELL=$tmp/mybash"
+accept empty '' '' BASH_SHELL=
+# No override: an unusable bash is a warning, so a box that has none still builds.
+accept searched "$tmp/fakebin/bash" 'no usable bash found' -u BASH_SHELL "PATH=$tmp/fakebin:$PATH"
+accept searched-posix-env '' 'POSIXLY_CORRECT or SHELLOPTS' -u BASH_SHELL POSIXLY_CORRECT=1
+
+test "$n" -eq "$cases" || {
+    echo "ran $n cases, not the $cases the budget is paced against" >&2
+    exit 1
+}
+echo "configure validated $n BASH_SHELL values"

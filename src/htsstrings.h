@@ -36,6 +36,9 @@ Please visit our Website: http://www.httrack.com
 #define HTS_STRINGS_DEFSTATIC
 
 /* System definitions. */
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* GCC extension */
@@ -91,10 +94,6 @@ struct String {
 
 #define STRING_FREE(BUFF) free(BUFF)
 #endif
-#ifndef STRING_ASSERT
-#include <assert.h>
-#define STRING_ASSERT(EXP) assert(EXP)
-#endif
 
 /** Initializer for an empty String (NULL buffer). Use to declare or reset. **/
 #define STRING_EMPTY {(char *) NULL, 0, 0}
@@ -127,27 +126,44 @@ struct String {
 /** Byte POS positions from the end (read/write). POS==1 is the last byte. **/
 #define StringRightRW(BLK, POS) (StringBuffRW(BLK)[StringLength(BLK) - POS])
 
-/** Drop the last byte and re-terminate. Undefined if the String is empty
-    (no length check; would underflow). **/
+/** Drop the last byte and re-terminate. No-op on an empty String: the length
+    is unsigned, so an unguarded pop would wrap it and write off the end. **/
 #define StringPopRight(BLK)                                                    \
   do {                                                                         \
-    StringBuffRW(BLK)[--StringLength(BLK)] = '\0';                             \
+    if (StringLength(BLK) > 0) {                                               \
+      StringBuffRW(BLK)[--StringLength(BLK)] = '\0';                           \
+    }                                                                          \
   } while (0)
 
+/** Terminate on allocation failure. The String API returns void throughout, so
+    there is no channel to report it on, and continuing would hand the caller a
+    NULL buffer to write into. **/
+HTS_STATIC void StringOom_(size_t size) {
+  fprintf(stderr, "String: out of memory allocating %lu bytes\n",
+          (unsigned long) size);
+  fflush(stderr); /* abort() flushes nothing; Windows buffers a piped stderr */
+  abort();
+}
+
+/** What to do when an allocation of SIZE bytes fails; overridable. **/
+#ifndef STRING_OOM
+#define STRING_OOM(SIZE) StringOom_(SIZE)
+#endif
+
 /** Grow so capacity_ >= CAPACITY (total bytes, including the NUL). May realloc
-    (invalidating prior buffer pointers); aborts via STRING_ASSERT on OOM.
-    Never shrinks. **/
+    (invalidating prior buffer pointers); aborts on OOM. Never shrinks. **/
 #define StringRoomTotal(BLK, CAPACITY)                                         \
   do {                                                                         \
     const size_t capacity_ = (size_t) (CAPACITY);                              \
     while ((BLK).capacity_ < capacity_) {                                      \
-      if ((BLK).capacity_ < 16) {                                              \
-        (BLK).capacity_ = 16;                                                  \
-      } else {                                                                 \
-        (BLK).capacity_ *= 2;                                                  \
+      const size_t newcap_ = (BLK).capacity_ < 16 ? 16 : (BLK).capacity_ * 2;  \
+      char *const buff_ = STRING_REALLOC((BLK).buffer_, newcap_);              \
+                                                                               \
+      if (buff_ == NULL) {                                                     \
+        STRING_OOM(newcap_);                                                   \
       }                                                                        \
-      (BLK).buffer_ = STRING_REALLOC((BLK).buffer_, (BLK).capacity_);          \
-      STRING_ASSERT((BLK).buffer_ != NULL);                                    \
+      (BLK).buffer_ = buff_;                                                   \
+      (BLK).capacity_ = newcap_;                                               \
     }                                                                          \
   } while (0)
 
@@ -163,6 +179,46 @@ struct String {
 HTS_STATIC char *StringBuffN_(String *blk, int size) {
   StringRoom(*blk, size);
   return StringBuffRW(*blk);
+}
+
+/** Ceiling on the pre-C99 doubling search below; BLK is emptied past it. **/
+#define STRING_SPRINTF_MAX ((size_t) 16 * 1024 * 1024)
+
+/** Replace BLK's contents with the formatted output, growing to fit, so no
+    fixed reserve has to bound an argument carrying remote input. An argument
+    may not point into BLK's own buffer, which is reallocated here.
+    Leaves BLK empty if the output cannot be produced (a conversion error, or
+    past STRING_SPRINTF_MAX): callers must not assume a non-empty result. **/
+#define StringSprintf(BLK, ...) StringSprintf_(&(BLK), __VA_ARGS__)
+
+HTS_STATIC HTS_PRINTF_FUN(2, 3) void StringSprintf_(String *blk,
+                                                    const char *fmt, ...) {
+  size_t capacity = StringCapacity(*blk) > 256 ? StringCapacity(*blk) : 256;
+
+  for (;;) {
+    va_list args;
+    int ret;
+
+    StringRoomTotal(*blk, capacity);
+    va_start(args, fmt);
+    ret = vsnprintf(StringBuffRW(*blk), capacity, fmt, args);
+    va_end(args);
+    if (ret >= 0 && (size_t) ret < capacity) {
+      StringBuffRW(*blk)[ret] = '\0';
+      StringLength(*blk) = (size_t) ret;
+      return;
+    }
+    if (ret >= 0) {
+      capacity = (size_t) ret + 1; /* C99 said what it needs */
+    } else if (capacity < STRING_SPRINTF_MAX) {
+      capacity *= 2; /* pre-C99 msvcrt only says "too small" */
+    } else {
+      /* a conversion error returns -1 too, and no capacity ever fixes that */
+      StringBuffRW(*blk)[0] = '\0';
+      StringLength(*blk) = 0;
+      return;
+    }
+  }
 }
 
 /** Zero the fields (NULL buffer, no allocation). Use on an uninitialized

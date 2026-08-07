@@ -12,7 +12,10 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 . "${testdir}/testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wd.XXXXXX")
-trap 'rm -rf "$tmp"' EXIT
+# A colon-free root for the PATH shim below: MSYS hands out a drive-letter TMPDIR
+# and a PATH entry carrying a colon is read as two, which leaves it unreachable.
+shim=$(mktemp -d /tmp/httrack_wdshim.XXXXXX 2>/dev/null) || shim="$tmp/starve"
+trap 'set +e; rm -rf "$tmp" "$shim"' EXIT
 fail() {
     echo "FAIL: $*" >&2
     exit 1
@@ -69,5 +72,34 @@ else
     sleep 12
     test ! -e "$marker" || fail "watchdog left a grandchild running"
 fi
+
+# Wall clock, not iteration count: under starvation a poll costs more than it asks,
+# so a counted deadline never fires before the CI step it was meant to beat.
+(
+    # The forked tick is the only one a shimmed sleep can reach: against the fd
+    # tick nothing here would be starved but the payload, and the case goes inert.
+    export HTTRACK_POLL_SLEEP=1
+    starve_sleep "$shim" 4 || fail "could not install the slow sleep"
+    # Control: starvation must not make the watchdog kill work that is inside its
+    # budget. The command outlives several polls, so a guard that fires on the
+    # first one cannot pass this by exiting before it is ever looked at.
+    rc=0 && run_with_timeout 30 sleep 2 || rc=$?
+    test "$rc" -eq 0 || fail "starved watchdog killed a healthy command ($rc)"
+
+    start=$SECONDS
+    rc=0
+    if is_windows; then
+        run_with_timeout 3 ping -n 60 127.0.0.1 || rc=$?
+    else
+        run_with_timeout 3 sleep 60 || rc=$?
+    fi
+    elapsed=$((SECONDS - start))
+    test "$rc" -eq 124 || fail "starved watchdog reported $rc, want 124"
+    # Never under budget, or a guard that kills everything on sight would pass.
+    test "$elapsed" -ge 3 || fail "the watchdog fired early (${elapsed}s of 3s)"
+    # One poll plus one reap, both stretched fourfold, is 8s; counting polls is 16s.
+    test "$elapsed" -lt 12 ||
+        fail "deadline counted polls, not seconds: ${elapsed}s for a 3s budget"
+)
 
 echo "watchdog OK"

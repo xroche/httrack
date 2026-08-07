@@ -4,6 +4,82 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-18
++ Fixed: the 3.49.17 package build failed on four architectures: the test suite's mmap interposer did not compile on armhf, powerpc or hppa, and the alternate-stack test rejected loong64's shorter backtrace (#1023)
++ Fixed: the test suite failed on a host with no ps command, such as a Fedora build root; its hang diagnostics now read /proc directly (#1021)
++ Changed: multiple internal test and CI improvements, including a cross-compile matrix covering the Debian ports architectures
+
+3.49-17
++ New: a pkg-config file, libhttrack.pc, ships with the development headers (#1018)
++ Fixed: a crawled page could read the WebHTTrack session id and drive the control panel; the id is now unguessable and cross-origin commands are refused (#877)
++ Fixed: an ftp:// link carrying encoded line breaks could append commands to the FTP control channel, and an unquoted LIST argument let a path holding a space list something else (#1010)
++ Fixed: a crawled link could inject header lines into the requests HTTrack sends (#1008)
++ Fixed: a control byte in a link made the crawler fetch a URL the page never wrote, and stripping one left the original tail glued to the result (#982, #974)
++ Fixed: the WebHTTrack progress panel rendered crawled URLs into HTML and JavaScript unescaped (#973)
++ Fixed: the WebHTTrack command box rendered its settings unescaped, so a posted value could break out of the box it was shown in (#998)
++ Fixed: the WebHTTrack settings pages interpolated values into attributes unescaped, lost a value containing a quote, and mangled a Windows path such as C:\ab (#989)
++ Fixed: a worker thread exhausting its stack died with no diagnostic (#969)
++ Fixed: a crash report named no frame of the executable on a non-PIE build, and named the dynamic loader rather than the program when launched through it (#995, #996)
++ Fixed: the crash report could hang, its symbolizer being forked from the signal handler (#968)
++ Fixed: the installed headers declared symbols the library does not export, and scoped struct addrinfo inside a parameter list (#977, #987)
++ Fixed: an install moved away from its configured prefix could not find libhttrack on macOS (#978)
++ Fixed: 3.49.16 did not build on armhf, loong64, hppa or hurd-i386 (#1015)
++ Changed: mirrored pages are served sandboxed, so a saved page can no longer script the WebHTTrack panel, and loses cookies, storage and cross-frame access (#877)
++ Changed: htsserver exits with a diagnostic rather than fall back to a guessable session id when no entropy source answers (#877)
++ Changed: an FTP file whose name contains a tab is no longer fetched (#1010)
++ Changed: on macOS, libhttrack records @rpath/libhttrack.3.dylib, so anything linked against it afterwards supplies its own rpath (#978)
++ Changed: multiple internal hardening, build, test and CI improvements
+
+3.49-16
++ New: macOS ships a signed and notarized HTTrack.app with its own icon, bundling the OpenSSL it needs so a downloaded copy launches (#890, #900, #901, #950)
++ New: the desktop icons install into the hicolor theme, scalable SVG included, so Icon=httrack resolves in a launcher (#932, #933)
++ Fixed: an unauthenticated PROPFIND overflowed the ProxyTrack DAV item buffer (#836)
++ Fixed: response headers from the server overflowed the stack buffer holding the cache header block, in both httrack and ProxyTrack (#841)
++ Fixed: a chunked response carrying trailers was rejected as "Invalid chunk" (#855)
++ Fixed: an over-long URL aborted the whole mirror inside the cache instead of reading as a miss (#935, #936)
++ Fixed: ProxyTrack could not re-read the .arc it writes, and crashed on a record whose body it could not read (#834, #929, #931)
++ Fixed: ProxyTrack logged a hashtable stats line and every PROPFIND body to stderr (#911, #918)
++ Fixed: the frozen-slot spool was written inside the mirror namespace, so it landed in the mirrored tree (#859)
++ Fixed: a stack overflow killed httrack with no diagnostic, crash reports named no frame of the executable, and on armhf they had no frames at all (#866, #889, #892)
++ Fixed: an install moved away from its configured prefix could not find its data directory, its shared library, or the html symlink (#885, #887, #894, #906)
++ Fixed: tooltips in the web GUI broke on a translation containing an apostrophe; the escaping now also covers quotes, backslashes, markup and DBCS lead bytes (#864)
++ Fixed: nine strings of the Windows GUI's option dialogs were untranslated in 26 of the 30 language files, and six language files disagreed with their own declared charset (#863, #963)
++ Fixed: the AppStream metainfo still advertised WebHTTrack 3.49.8 (#884)
++ Fixed: the installed development headers did not compile standalone (#943)
++ Fixed: configure discarded a user-supplied BASH_SHELL, resolved bash to /bin/sh on macOS, and hung on one pointing at a FIFO (#891, #895, #908, #922)
++ Changed: the masthead wordmark and the rings background are SVG, so they stay sharp on a hi-DPI screen (#910, #916)
++ Changed: multiple internal hardening, build, test and CI improvements
+
+3.49-15
++ New: --single-file rewrites each saved page with its assets inlined as data: URIs (#713)
++ New: --changes reports what a crawl added, updated or removed against the previous mirror (#714)
++ New: --sitemap and --sitemap-url ingest sitemaps, so pages nothing links to are still found (#712)
++ New: webhttrack exposes --warc-cdx, --wacz and --warc-max-size (#862)
++ Fixed: --update and --purge-old destroyed a good local copy when the re-fetch got no response, was aborted mid-read, or when the backup meant to protect it failed (#746, #748, #758, #775)
++ Fixed: an FTP re-fetch truncated the mirrored file, resumed a complete mirror with REST and spliced the old body into the new one, and a successful transfer was blanked when its backlog slot was swapped out (#771, #797, #798, #823)
++ Fixed: a chunked response cut at a chunk boundary was stored and cached as complete (#840)
++ Fixed: cache repair deleted the old cache before a rename it never checked, and the unlink-then-rename fallback could lose the destination (#779, #786, #790, #824)
++ Fixed: several backward scans from strlen(s) - 1 read before their buffer on an empty string (#730, #768, #770, #814, #821)
++ Fixed: a URL could be saved onto the engine's own temporary files, and the final path segment was never clamped (#774, #842, #852)
++ Fixed: a query-string character reference the page charset cannot represent was left unescaped, changing how the query parses (#854)
++ Fixed: a second --update pass overwrote the previous WARC and regenerated a page-less WACZ (#759)
++ Fixed: WARC output dropped URLs of 1005 bytes or more, archived nothing for a 304 revisit, and marked an engine-forced not-modified as one the server sent (#778, #785, #826, #838, #839)
++ Fixed: ProxyTrack overflowed its .arc header block, walked past the end of an .ndx buffer, trusted an unparsed offset, and crashed on a PROPFIND or on an entry with no usable Last-Modified (#793, #820, #825, #828)
++ Fixed: webhttrack leaked the session id into crawled pages, overflowed its command line so a quoted value could inject flags, let a posted project path repoint the served root, and built its redirect Location in a 256-byte stack buffer (#700, #706, #707, #710)
++ Fixed: in the web GUI, options ticked on by default could not be un-ticked, "max site size" set a per-file cap instead of the HTML one, and the mirror link on the finished page could not be followed (#708, #709, #725)
++ Fixed: htsserver labelled every PNG as image/gif and offered JPEG as a download, and an unauthenticated GET of a directory spun the server forever (#724, #875)
++ Fixed: webhttrack hung at exit when no mirror had been launched (#753)
++ Fixed: oversized cache and header fields aborted the engine or overflowed a neighbouring field instead of being clipped (#701, #715, #717, #722, #732)
++ Fixed: a -%S rules file of 4 GB or more overran the heap (#702)
++ Fixed: the CLI display did not repaint when the terminal was resized (#97)
++ Fixed: a document with no declared charset double-encoded the title lifted for the local index (#848)
++ Fixed: a fragment on an inlined reference was dropped, losing an SVG sprite selector (#766)
++ Fixed: several time helpers handed out libc's shared gmtime/localtime static rather than a reentrant breakdown (#794, #806)
++ Changed: fatal-signal backtraces name engine frames instead of a bare module and offset (#705)
++ Changed: --without-zlib is rejected at configure time rather than failing at link (#735)
++ Changed: the offline documentation gains one GUI guide with screenshots, an Android option reference, and a restructured index
++ Changed: multiple internal hardening, test and CI improvements
+
 3.49-14
 + New: WARC/1.1 archive output (--warc), with a sorted CDXJ index (--warc-cdx) and WACZ packaging (--wacz), also available from webhttrack (#668)
 + New: -%F takes named footer fields such as {url}, {lastmodified}, {mime}, {charset} and {status} instead of a fixed layout (#667)
@@ -98,7 +174,7 @@ This file lists all changes and fixes that have been made for HTTrack
 + Fixed: report why a -%L URL list could not be loaded (#49)
 + Changed: multiple internal hardening, build and CI improvements
 
-.49-9
+3.49-9
 + Fixed: file-type detection from the Content-Type header: trust a declared type over a binary URL extension, honor --assume under the delayed type check, and keep a known extension against a bogus or empty Content-Type (#267, #29, #56)
 + Fixed: an uninitialized-buffer read when the Content-Type is empty (#411)
 + Fixed: restored C++ source-compatibility of the installed headers so reverse dependencies (httraqt) build again (#413)

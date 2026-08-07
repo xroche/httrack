@@ -186,6 +186,8 @@ scanning
 扫描
 Waiting for scheduled time..
 等待预定的时间..
+Transferring data..
+传送数据..
 Connecting to provider
 正在连接网络
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 创建一个起始页面
 Create a word database of all html pages
 根据网页使用语言创建词汇库文件
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+创建镜像的完整 RFC822 邮件归档 (MHT/EML)
 Create error logging and report files
 创建错误记录及汇报文件
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 浏览器身份
 Comment to be placed in each HTML file
 在每个HTML文件里添加的注释
+Languages accepted by the browser
+浏览器接受的语言
+Additional HTTP headers to be sent in each requests
+每次请求时额外发送的 HTTP 头
+HTTP referer to be sent for initial URLs
+起始网址所发送的 HTTP referer
 Back to starting page
 回到起始页面
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 创建一个 index.html 文件
 Make a word database
 创建词汇库
+Build a mail archive
+创建邮件归档
 Log files
 日志文件
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 身份
 HTML footer
 HTML页脚
+Languages
+语言
+Additional HTTP Headers
+额外的 HTTP 头
+Default referer URL
+默认的 referer 网址
 N# connections
 连接数
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Sitemap 地址：
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 要读取的 Sitemap 地址，用来代替自动探测；留空则先探测 robots.txt 再探测 /sitemap.xml。
+Write a CDXJ index of the WARC archive
+写入 WARC 归档的 CDXJ 索引
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+同时写入一个排序的 CDXJ 索引，列出 WARC 归档中的每条记录，供回放工具使用。
+Package the crawl as a WACZ file
+将本次抓取打包为 WACZ 文件
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+将 WARC 归档、CDXJ 索引和镜像页面打包成一个 WACZ 文件；这会同时启用 WARC 归档和 CDXJ 索引。
+WARC segment size limit:
+WARC 分段大小上限：
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+当前分段超过该字节数时开始新的 WARC 分段；留空或填 0 则保持单个文件。

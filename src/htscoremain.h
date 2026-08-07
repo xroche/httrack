@@ -47,6 +47,16 @@ Please visit our Website: http://www.httrack.com
 int cmdl_opt(char *s);
 int check_path(String * s, char *defaultname);
 
+/* Absolute path of the running executable, or NULL where the OS will not say
+   and argv[0] is the only clue left. Fills dst (dstsize bytes). */
+const char *hts_self_path(char *dst, size_t dstsize);
+
+/* Write the data directory holding the HTML templates into dst (dstsize bytes,
+   NUL-terminated, trailing '/' included): builtin when it is there, else a
+   layout under selfpath's directory. selfpath may be NULL, builtin empty. */
+void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
+                         const char *builtin);
+
 #endif
 
 #endif

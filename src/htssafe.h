@@ -110,7 +110,7 @@ static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
 
 /* Note: char[] and const char[] are compatible */
 #define HTS_IS_CHAR_BUFFER(VAR)                                                \
-  (__builtin_types_compatible_p(typeof(VAR), char[]))
+  (__builtin_types_compatible_p(__typeof__(VAR), char[]))
 #else
 /* Note: a bit lame as char[8] won't be seen. */
 #define HTS_IS_CHAR_BUFFER(VAR) (sizeof(VAR) != sizeof(char *))
@@ -309,14 +309,25 @@ static char *strncatbuff_ptr_(char *dest, const char *src, size_t n) {
                "overflow while copying '" #B "' to '" #A "'", __FILE__,        \
                __LINE__)
 
-/** strnlen replacement (autotools). **/
-#if (!defined(_WIN32) && !defined(HAVE_STRNLEN))
-
-static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
+/* POSIX strnlen is hidden from a strict-ISO consumer (__STRICT_ANSI__) and
+   absent on a few targets, so the inline helpers below use this instead. */
+static HTS_INLINE HTS_UNUSED size_t htssafe_strnlen_(const char *s,
+                                                     size_t maxlen) {
+#if (defined(_WIN32) || (defined(HAVE_STRNLEN) && !defined(__STRICT_ANSI__)))
+  return strnlen(s, maxlen);
+#else
   size_t i;
   for (i = 0; i < maxlen && s[i] != '\0'; i++)
     ;
   return i;
+#endif
+}
+
+/** strnlen replacement (autotools), for the engine sources that call it. **/
+#if (!defined(_WIN32) && !defined(HAVE_STRNLEN))
+
+static HTS_UNUSED size_t strnlen(const char *s, size_t maxlen) {
+  return htssafe_strnlen_(s, maxlen);
 }
 #endif
 
@@ -329,7 +340,7 @@ static HTS_INLINE HTS_UNUSED size_t strlen_safe_(const char *source,
                                                  const char *file, int line) {
   size_t size;
   assertf_(source != NULL, file, line);
-  size = sizeof_source != (size_t) -1 ? strnlen(source, sizeof_source)
+  size = sizeof_source != (size_t) -1 ? htssafe_strnlen_(source, sizeof_source)
                                       : strlen(source);
   assertf_(size < sizeof_source, file, line);
   return size;
@@ -408,8 +419,8 @@ static HTS_INLINE HTS_UNUSED htsbuff htsbuff_ptr_(char *buf, size_t cap) {
 
 /* 0 for an array, a -1 array-size compile error for a pointer. */
 #define htsbuff_must_be_array_(A)                                              \
-  (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(typeof(A),               \
-                                                      typeof(&(A)[0]))]) -     \
+  (sizeof(char[1 - 2 * !!__builtin_types_compatible_p(__typeof__(A),           \
+                                                      __typeof__(&(A)[0]))]) - \
    1)
 
 #define htsbuff_array(ARR)                                                     \
@@ -426,7 +437,7 @@ static HTS_INLINE HTS_UNUSED void htsbuff_catn(htsbuff *b, const char *s,
                                                size_t n) {
   /* the (size_t)-1 "no limit" sentinel would reach strnlen as a bound past
      PTRDIFF_MAX */
-  const size_t add = n != (size_t) -1 ? strnlen(s, n) : strlen(s);
+  const size_t add = n != (size_t) -1 ? htssafe_strnlen_(s, n) : strlen(s);
   /* Overflow-safe: keep the (potentially huge) 'add' alone on one side. The
      maintained invariant len < cap makes 'cap - len' >= 1 (no underflow), so
      'add < cap - len' cannot wrap the way 'len + add < cap' could. */
@@ -515,6 +526,30 @@ static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(3, 4) hts_boolean
 }
 
 /**
+ * Append formatted text at dest[*used] (dest capacity size, NUL included),
+ * advancing *used past it. All-or-nothing: on overflow dest is left as it was
+ * and HTS_FALSE returned, so a record parsed back field by field never carries
+ * a half-written one.
+ */
+static HTS_INLINE HTS_UNUSED HTS_CHECK_RESULT HTS_PRINTF_FUN(4, 5) hts_boolean
+    slcatprintfbuff(char *dest, size_t size, size_t *used, const char *fmt,
+                    ...) {
+  va_list args;
+  hts_boolean fit;
+
+  assertf(dest != NULL && used != NULL && *used < size);
+  va_start(args, fmt);
+  fit = vslprintfbuff(dest + *used, size - *used, fmt, args);
+  va_end(args);
+  if (fit) {
+    *used += strlen(dest + *used);
+  } else {
+    dest[*used] = '\0';
+  }
+  return fit;
+}
+
+/**
  * slprintfbuff() for diagnostics quoting remote or client text, which are
  * meant to be clipped: nothing to act on, hence not HTS_CHECK_RESULT. A (void)
  * cast on slprintfbuff() is no substitute, GCC warns through it.
@@ -538,6 +573,68 @@ static HTS_INLINE HTS_UNUSED HTS_PRINTF_FUN(3, 4) void slprintfbuff_clip(
 #else
 #define sprintfbuff(ARR, ...) slprintfbuff((ARR), sizeof(ARR), __VA_ARGS__)
 #endif
+
+/* Last character of s, or '\0' when s is empty. Replaces s[strlen(s) - 1],
+   which indexes one byte before the buffer on an empty string. */
+static HTS_INLINE HTS_UNUSED char hts_lastchar(const char *s) {
+  const size_t len = strlen(s);
+
+  return len != 0 ? s[len - 1] : '\0';
+}
+
+/* Drop a trailing c from s if present; HTS_TRUE if one was dropped. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_striplastchar(char *s, char c) {
+  const size_t len = strlen(s);
+
+  if (len != 0 && s[len - 1] == c) {
+    s[len - 1] = '\0';
+    return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* Drop the last character of s whatever it is; HTS_TRUE if s was not empty. */
+static HTS_INLINE HTS_UNUSED hts_boolean hts_choplastchar(char *s) {
+  const size_t len = strlen(s);
+
+  if (len != 0) {
+    s[len - 1] = '\0';
+    return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* htslib.h's is_space() and is_realspace() as hts_rtrim() sets; -#test=rtrim
+   keeps them in sync. */
+#define HTS_SPACES " \"\n\r\t\f\v'"
+#define HTS_REALSPACES " \n\r\t\f\v"
+
+/* Length of s once its trailing bytes from set are dropped; 0 if they all are.
+   Counts down from the end, so it stops at s rather than below the buffer. */
+static HTS_INLINE HTS_UNUSED size_t hts_rtrimlen(const char *s,
+                                                 const char *set) {
+  size_t len = strlen(s);
+
+  while (len != 0 && strchr(set, s[len - 1]) != NULL)
+    len--;
+  return len;
+}
+
+/* Drop the trailing bytes of s that occur in set. */
+static HTS_INLINE HTS_UNUSED void hts_rtrim(char *s, const char *set) {
+  s[hts_rtrimlen(s, set)] = '\0';
+}
+
+/* Offset of the last character of s, or 0 when s is empty. */
+static HTS_INLINE HTS_UNUSED size_t hts_lastcharoffset(const char *s) {
+  const size_t len = strlen(s);
+
+  return len != 0 ? len - 1 : 0;
+}
+
+/* Address of the last character of S, or of its terminating NUL when S is
+   empty. S is evaluated twice, so pass an lvalue. */
+#define hts_lastcharptr(S) ((S) + hts_lastcharoffset(S))
 
 /* Thin aliases over the libc allocator/memcpy (historical "t" suffix); no
    added bounds checking. freet() also NULLs the freed pointer and tolerates

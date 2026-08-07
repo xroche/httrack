@@ -14,7 +14,7 @@ python=$(find_python) || {
 }
 
 dir=$(mktemp -d)
-trap 'rm -rf "$dir"' EXIT
+trap 'set +e; rm -rf "$dir"' EXIT
 
 rc=0
 "$python" - "$dir/in.zip" <<'EOF' || rc=$?

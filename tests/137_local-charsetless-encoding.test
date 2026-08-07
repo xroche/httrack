@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+# #833: a document declaring no charset falls back to iso-8859-1, so anything
+# the engine lifts out of it that already is UTF-8 must be left alone.
+
+set -e
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_833.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+mkdir "${tmpdir}/docroot"
+"$python" "$server" --root "$(nativepath "${tmpdir}/docroot")" \
+    >"$serverlog" 2>&1 &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+
+# One crawl per variant: the generated top index carries the seed page's title.
+for variant in u8 l1 declared gb2312 l1decl; do
+    mkdir "${tmpdir}/${variant}"
+    httrack -O "${tmpdir}/${variant}" --quiet --disable-security-limits \
+        --robots=0 --timeout=30 --retries=0 \
+        "${base}/titleenc/${variant}.html" >"${tmpdir}/log-${variant}" 2>&1
+done
+
+# Byte-level assertions in python: portable, and the shell cannot mangle them.
+"$python" - "$tmpdir" "$port" <<'PY'
+import os
+import sys
+
+tmpdir, port = sys.argv[1], sys.argv[2]
+host = "127.0.0.1_%s" % port
+# What a second Latin-1 -> UTF-8 pass turns the two bytes of "é" into.
+DOUBLE = "é".encode().decode("latin-1").encode()
+failed = []
+
+
+def check(label, cond):
+    print("[%s] ..\t%s" % (label, "OK" if cond else "FAIL"))
+    if not cond:
+        failed.append(label)
+
+
+def rd(*parts):
+    with open(os.path.join(tmpdir, *parts), "rb") as f:
+        return f.read()
+
+
+index = rd("u8", "index.html")
+check("charset-less title kept its UTF-8 bytes", "Café-u8".encode() in index)
+check("charset-less title not double-encoded", DOUBLE not in index)
+
+page = rd("u8", host, "titleenc", "u8.html")
+check("fragment kept its UTF-8 bytes", "#café".encode() in page)
+check("fragment not double-encoded", DOUBLE not in page and b"%C3%83" not in page.upper())
+
+names = []
+for root, dirs, files in os.walk(os.path.join(tmpdir, "u8", host)):
+    names += dirs + files
+check("the accented leaf was mirrored", any("é" in n for n in names))
+check("no mirrored name was double-encoded", not any("Ã" in n for n in names))
+
+# Control: a real Latin-1 title still has to be converted, or the fix above is
+# just the conversion deleted.
+check("Latin-1 title converted", "Café-l1".encode() in rd("l1", "index.html"))
+check("declared UTF-8 title untouched",
+      "Café-declared".encode() in rd("declared", "index.html"))
+
+# Both titles below are valid UTF-8 already, and must still be decoded from the
+# charset the page declares.
+gb = rd("gb2312", "index.html")
+check("declared gb2312 title decoded", "图片-gb".encode() in gb)
+check("declared gb2312 title not left raw", "图片".encode("gb2312") + b"-gb" not in gb)
+l1d = rd("l1decl", "index.html")
+check("declared Latin-1 title decoded", "Ã©-l1d".encode() in l1d)
+check("declared Latin-1 title not left raw", "Ã©".encode("latin-1") + b"-l1d" not in l1d)
+
+if failed:
+    sys.exit("FAILED: %s" % ", ".join(failed))
+PY

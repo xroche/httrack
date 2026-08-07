@@ -926,6 +926,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
   int direct_url = 0;           // ne pas analyser l'url (exemple: ftp://)
   const char *search_tag = NULL;
 
+  /* adr and the referer come off the network and can carry raw CR/LF; capped
+     at their own source buffers, so the worst case emitted does not grow. */
+  char BIGSTK esc[HTS_URLMAXSIZE * 2];
+
   // Initialize buffer
   buffer_head_request[0] = '\0';
 
@@ -954,9 +958,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
             if (retour->req.proxy.active &&
                 !hts_proxy_is_socks(retour->req.proxy.name) &&
                 !hts_proxy_is_connect(retour->req.proxy.name)) {
-              print_buffer(&bstr,
-                      "%s http://%s%s %s\r\n", method, adr, url,
-                      protocol);
+              /* only adr is raw here: the other three are %s-scanned */
+              print_buffer(&bstr, "%s http://%s%s %s\r\n", method,
+                           escape_check_url_addr(adr, esc, sizeof(esc)), url,
+                           protocol);
             } else {
               print_buffer(&bstr,
                        "%s %s %s\r\n", method, url, protocol);
@@ -999,14 +1004,16 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         printf("Proxy Use: for %s%s proxy %d port %d\n", adr, fil,
                retour->req.proxy.name, retour->req.proxy.port);
 #endif
-        print_buffer(&bstr, "http://%s", jump_identification_const(adr));
+        print_buffer(&bstr, "http://%s",
+                     escape_check_url_addr(jump_identification_const(adr), esc,
+                                           sizeof(esc)));
       } else {                  // ftp:// en proxy http
 #if HDEBUG
         printf("Proxy Use for ftp: for %s%s proxy %d port %d\n", adr, fil,
                retour->req.proxy.name, retour->req.proxy.port);
 #endif
         direct_url = 1;         // ne pas analyser user/pass
-        print_buffer(&bstr, "%s", adr);
+        print_buffer(&bstr, "%s", escape_check_url_addr(adr, esc, sizeof(esc)));
       }
     }
     // NOM DU FICHIER
@@ -1071,8 +1078,13 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                ||(strncmp(adr, "https://", 8) == 0)     /* or referer AND addresses are https */
           )
         ) {                     // PAS file://
-        print_buffer(&bstr, "Referer: http://%s%s"H_CRLF,
-                     jump_identification_const(referer_adr), referer_fil);
+        /* one escape per piece, so neither can outgrow its own source buffer */
+        print_buffer(
+            &bstr, "Referer: http://%s",
+            escape_check_url_addr(jump_identification_const(referer_adr), esc,
+                                  sizeof(esc)));
+        print_buffer(&bstr, "%s" H_CRLF,
+                     escape_check_url_addr(referer_fil, esc, sizeof(esc)));
       }
     }
     // HTTP field: referer
@@ -1105,7 +1117,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
       // Mandatory per RFC2616
       if (!direct_url) {        // pas ftp:// par exemple
-        print_buffer(&bstr, "Host: %s"H_CRLF, real_adr);
+        print_buffer(&bstr, "Host: %s" H_CRLF,
+                     escape_check_url_addr(real_adr, esc, sizeof(esc)));
       }
 
       // HTTP field: from
@@ -1131,12 +1144,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
       // Compression accepted ?
       if (retour->req.http11) {
-        hts_boolean compressible = HTS_FALSE;
+        hts_boolean compressible =
+            (!retour->req.range_used && !retour->req.nocompression);
         hts_boolean secure = HTS_FALSE;
 
-#if HTS_USEZLIB
-        compressible = (!retour->req.range_used && !retour->req.nocompression);
-#endif
 #if HTS_USEOPENSSL
         secure = retour->ssl ? HTS_TRUE : HTS_FALSE;
 #endif
@@ -1324,7 +1335,7 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
       p++;                      // sauter espaces
     if ((int) strlen(rcvd + p) < 250) { // pas trop long?
       char tmp[256];
-      char *a = NULL, *b = NULL;
+      char *a = NULL;
 
       strcpybuff(tmp, rcvd + p);
       a = strstr(tmp, "filename=");
@@ -1337,15 +1348,9 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
 
           while((c = strchr(a, '/')))   /* skip all / (see RFC2616) */
             a = c + 1;
-          b = a + strlen(a) - 1;
-          while(is_space(*b))
-            b--;
-          b++;
-          if (b) {
-            *b = '\0';
-            if ((int) strlen(a) < 200) {        // pas trop long?
-              strcpybuff(retour->cdispo, a);
-            }
+          hts_rtrim(a, HTS_SPACES);
+          if ((int) strlen(a) < 200) { // pas trop long?
+            strcpybuff(retour->cdispo, a);
           }
         }
       }
@@ -1842,12 +1847,8 @@ int check_writeinput_t(T_SOC soc, int timeout) {
     return 0;
 }
 
-// idem, sauf qu'ici on peut choisir la taille max de données à recevoir
-// SI bufl==0 alors le buffer est censé être de 8kos, et on recoit par bloc de lignes
-// en éliminant les cr (ex: header), arrêt si double-lf
-// SI bufl==-1 alors le buffer est censé être de 8kos, et on recoit ligne par ligne
-// en éliminant les cr (ex: header), arrêt si double-lf
-// Note: les +1 dans les malloc sont dûs à l'octet nul rajouté en fin de fichier
+// Read one block: bufl is a byte count, or one of the HTS_XFREAD_* line modes.
+// Note: the +1 in the mallocs is the trailing NUL appended to the data.
 LLint http_xfread1(htsblk * r, int bufl) {
   int nl = -1;
 
@@ -1960,14 +1961,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
 
     }                           // stockage disque ou mémoire
 
-  } else if (bufl == -2) {      // force reserve
-    if (r->adr == NULL) {
-      r->adr = (char *) malloct(8192);
-      r->size = 0;
-      return 0;
-    }
-    return -1;
-  } else {                      // réception d'un en-tête octet par octet
+  } else { // line modes: byte by byte, CR dropped
     int count = 256;
     int tot_nl = 0;
     int lf_detected = 0;
@@ -1977,18 +1971,16 @@ LLint http_xfread1(htsblk * r, int bufl) {
       nl = READ_INTERNAL_ERROR;
       count--;
       if (r->adr == NULL) {
-        r->adr = (char *) malloct(8192);
+        r->adr = (char *) malloct(HTS_LINE_BLOCK_SIZE);
         r->size = 0;
       }
       if (r->adr != NULL) {
-        if (r->size < 8190) {
+        if (r->size < HTS_LINE_BLOCK_SIZE - 2) {
           // lecture
           nl = hts_read(r, r->adr + r->size, 1);
           if (nl > 0) {
-            // exit if:
-            // lf detected AND already detected before
-            // or
-            // lf detected AND first character read
+            // exit on a blank line (LF seen twice, or LF as the first byte),
+            // or on the first LF in HTS_XFREAD_LINE mode
             if (*(r->adr + r->size) == 10) {
               if (lf_detected || (at_beginning) || (bufl < 0))
                 count = -1;
@@ -2053,7 +2045,7 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
 
     // tant qu'on a des données, et qu'on ne recoit pas deux LF, et que le timeout n'arrie pas
     do {
-      if (http_xfread1(&retour, 0) < 0)
+      if (http_xfread1(&retour, HTS_XFREAD_LINE_BLOCK) < 0)
         e = 1;
       else {
         if (retour.adr != NULL) {
@@ -2692,41 +2684,36 @@ HTSEXT_API void qsec2str(char *st, TStamp t) {
 // heure actuelle, GMT, format rfc (taille buffer 256o)
 void time_gmt_rfc822(char *s) {
   time_t tt;
-  struct tm *A;
+  struct tm tmv;
 
   tt = time(NULL);
-  A = gmtime(&tt);
-  if (A == NULL)
-    A = localtime(&tt);
-  time_rfc822(s, A);
+  /* no local-time fallback: it would format local time and still label it GMT
+   * (#806) */
+  if (hts_gmtime(tt, &tmv))
+    time_rfc822(s, &tmv);
+  else
+    s[0] = '\0';
 }
 
 void hts_now_iso8601(char out[32]) {
   time_t t = time(NULL);
   struct tm tmv;
 
-#if defined(_WIN32)
-  struct tm *g = gmtime(&t);
-
-  if (g != NULL)
-    tmv = *g;
-  else
+  if (!hts_gmtime(t, &tmv))
     memset(&tmv, 0, sizeof(tmv));
-#else
-  if (gmtime_r(&t, &tmv) == NULL)
-    memset(&tmv, 0, sizeof(tmv));
-#endif
   strftime(out, 32, "%Y-%m-%dT%H:%M:%SZ", &tmv);
 }
 
 // heure actuelle, format rfc (taille buffer 256o)
 void time_local_rfc822(char *s) {
   time_t tt;
-  struct tm *A;
+  struct tm tmv;
 
   tt = time(NULL);
-  A = localtime(&tt);
-  time_rfc822_local(s, A);
+  if (hts_localtime(tt, &tmv))
+    time_rfc822_local(s, &tmv);
+  else
+    s[0] = '\0';
 }
 
 /* convertir une chaine en temps */
@@ -2860,19 +2847,27 @@ int set_filetime_rfc822(const char *file, const char *date) {
 }
 
 /* Note: utf-8 */
+time_t get_filetime(const char *file) {
+  STRUCT_STAT buf;
+
+  if (STAT(file, &buf) != 0)
+    return (time_t) -1;
+  return (time_t) buf.st_mtime;
+}
+
+/* Note: utf-8 */
 int get_filetime_rfc822(const char *file, char *date) {
   STRUCT_STAT buf;
 
   date[0] = '\0';
   if (STAT(file, &buf) == 0) {
-    struct tm *A;
+    struct tm tmv;
     time_t tt = buf.st_mtime;
 
-    A = gmtime(&tt);
-    if (A == NULL)
-      A = localtime(&tt);
-    if (A != NULL) {
-      time_rfc822(date, A);
+    /* no local-time fallback: it would format local time and still label it GMT
+     * (#806) */
+    if (hts_gmtime(tt, &tmv)) {
+      time_rfc822(date, &tmv);
       return 1;
     }
   }
@@ -3317,8 +3312,9 @@ int ishtml(httrackp * opt, const char *fil) {
   }
 
   /* Search for known ext */
-  for(a = fil_noquery + strlen(fil_noquery) - 1;
-      *a != '.' && *a != '/' && a > fil_noquery; a--) ;
+  for (a = hts_lastcharptr(fil_noquery);
+       *a != '.' && *a != '/' && a > fil_noquery; a--)
+    ;
   if (*a == '.') {              // a une extension
     char BIGSTK fil_noquery[HTS_URLMAXSIZE * 2];
     char *b;
@@ -3753,6 +3749,20 @@ const char *jump_protocol_const(const char *source) {
 
 DECLARE_NON_CONST_VERSION(jump_protocol)
 
+hts_boolean hts_is_control_free_sized(const char *str, size_t len) {
+  size_t i;
+
+  for (i = 0; i < len; i++) {
+    if ((unsigned char) str[i] < ' ')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+hts_boolean hts_is_control_free(const char *str) {
+  return hts_is_control_free_sized(str, strlen(str));
+}
+
 hts_boolean hts_proxy_is_socks(const char *name) {
   if (name == NULL)
     return HTS_FALSE;
@@ -3977,9 +3987,14 @@ HTSEXT_API size_t escape_uri_utf(const char *const src,
   return x_escape_http(src, dest, size, 30);
 }
 
-HTSEXT_API size_t escape_check_url(const char *const src, 
-                                   char *const dest, const size_t size) {
+HTSEXT_API size_t escape_check_url(const char *const src, char *const dest,
+                                   const size_t size) {
   return x_escape_http(src, dest, size, 0);
+}
+
+HTSEXT_API size_t escape_control_url(const char *const src, char *const dest,
+                                     const size_t size) {
+  return x_escape_http(src, dest, size, 4);
 }
 
 // same as escape_check_url, but returns char*
@@ -4067,6 +4082,8 @@ HTSEXT_API void escape_remove_control(char *const s) {
       j++;
     }
   }
+  // compaction left the original tail sitting past j
+  s[j] = '\0';
 }
 
 #undef ADD_CHAR
@@ -4111,6 +4128,8 @@ HTSEXT_API size_t x_escape_http(const char *const s, char *const dest,
     else if (mode == 3)         // échapper que ce qui est nécessaire
       test = CHAR_SPECIAL(c)
              || CHAR_XXAVOID(c);
+    else if (mode == 4) // C0 controls only, leaving high bytes (UTF-8)
+      test = CHAR_LOW(c);
     else if (mode == 30)      // échapper que ce qui est nécessaire
       test = (c != '/' && CHAR_RESERVED(c))
         || CHAR_DELIM(c)
@@ -4255,9 +4274,8 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
     return 1;
   } else {
     /* Check html -> text/html */
-    const char *a = fil + strlen(fil) - 1;
+    const char *a = hts_lastcharptr(fil);
 
-    /* a < fil when fil is empty: bound before dereferencing */
     while ((a > fil) && (*a != '.') && (*a != '/'))
       a--;
     if (a >= fil && *a == '.' && strlen(a) < 32) {
@@ -5080,7 +5098,7 @@ static int hts_dns_resolve_nocache_list(const char *const hostname,
   if (!strnotempty(hostname) || max <= 0) {
     return 0;
   }
-  if ((hostname[0] == '[') && (hostname[strlen(hostname) - 1] == ']')) {
+  if ((hostname[0] == '[') && (hts_lastchar(hostname) == ']')) {
     size_t size = strlen(hostname);
     char *copy = malloct(size + 1);
     int count;
@@ -5493,9 +5511,8 @@ void cut_path(char *fullpath, char *path, size_t path_size, char *pname,
               size_t pname_size) {
   path[0] = pname[0] = '\0';
   if (strnotempty(fullpath)) {
-    if ((fullpath[strlen(fullpath) - 1] == '/')
-        || (fullpath[strlen(fullpath) - 1] == '\\'))
-      fullpath[strlen(fullpath) - 1] = '\0';
+    if (!hts_striplastchar(fullpath, '/'))
+      hts_striplastchar(fullpath, '\\');
     if (strlen(fullpath) > 1) {
       char *a;
 
@@ -5793,7 +5810,8 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
   if (hts_log_print_callback != NULL) {
     va_list args_copy;
     va_copy(args_copy, args);
-    hts_log_print_callback(opt, type, format, args);
+    /* the copy, so the vfprintf() below still has an unread list */
+    hts_log_print_callback(opt, type, format, args_copy);
     va_end(args_copy);
   }
   if (opt != NULL && opt->log != NULL) {
@@ -6652,9 +6670,12 @@ int hts_rename_utf8(const char *oldpath, const char *newpath) {
   LPWSTR wnewpath = hts_pathToUCS2(newpath);
   if (woldpath != NULL && wnewpath != NULL) {
     const int result = _wrename(woldpath, wnewpath);
+    /* Save errno: callers key off it (#779) and free() may clobber it. */
+    const int err = errno;
 
     free(woldpath);
     free(wnewpath);
+    errno = err;
     return result;
   } else {
     if (woldpath != NULL)

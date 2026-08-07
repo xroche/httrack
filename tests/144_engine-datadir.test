@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+# A relocated install must read its own templates rather than silently falling
+# back to the compiled-in defaults (#894).
+
+set -euo pipefail
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/datadir.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+trap 'set +e; rm -rf "${work}"' EXIT
+
+httrack -#test=datadir "${work}"

@@ -101,21 +101,53 @@ extern void webhttrack_main(char *cmd);
 extern void webhttrack_lock(void);
 extern void webhttrack_release(void);
 
-static int is_image(const char *file) {
-  return strstr(file, ".gif") != NULL
-         || strstr(file, ".png") != NULL;
+/* Content types for the GUI tree and the mirror it serves. Not the engine's
+   get_httptype_sized(): it needs an httrackp the server has none of yet, and
+   would apply the user's --assume rules to the GUI's own pages. */
+static const struct {
+  const char *ext;
+  const char *type;
+} server_mime_types[] = {
+    {"html", "text/html"},
+    {"htm", "text/html"},
+    {"css", "text/css"},
+    {"js", "text/javascript"},
+    {"txt", "text/plain"},
+    {"xml", "application/xml"},
+    {"gif", "image/gif"},
+    {"png", "image/png"},
+    {"jpg", "image/jpeg"},
+    {"jpeg", "image/jpeg"},
+    {"webp", "image/webp"},
+    {"avif", "image/avif"},
+    {"svg", "image/svg+xml"},
+    /* x-icon, not the registered vnd.microsoft.icon: what browsers send. */
+    {"ico", "image/x-icon"},
+    {NULL, NULL},
+};
+
+/* Content type of file, NULL if its extension is unlisted. Matched on the last
+   segment's whole extension, never on a substring of the path. */
+static const char *server_content_type(const char *file) {
+  const char *const slash = strrchr(file, '/');
+  const char *const dot = strrchr(slash != NULL ? slash : file, '.');
+  int i;
+
+  if (dot == NULL) {
+    return NULL;
+  }
+  for (i = 0; server_mime_types[i].ext != NULL; i++) {
+    if (strfield2(dot + 1, server_mime_types[i].ext)) {
+      return server_mime_types[i].type;
+    }
+  }
+  return NULL;
 }
-static int is_text(const char *file) {
-  return ((strstr(file, ".txt") != NULL));
-}
+
 static int is_html(const char *file) {
-  return ((strstr(file, ".htm") != NULL));
-}
-static int is_css(const char *file) {
-  return ((strstr(file, ".css") != NULL));
-}
-static int is_js(const char *file) {
-  return ((strstr(file, ".js") != NULL));
+  const char *const type = server_content_type(file);
+
+  return type != NULL && strcmp(type, "text/html") == 0;
 }
 
 static void sig_brpipe(int code) {
@@ -334,6 +366,25 @@ typedef struct {
    so anything near this is already invalid and is rejected unread. */
 #define SID_VALUE_MAX 64
 
+/** Does this Origin name the panel itself?
+    Only our own plain-http authority passes: a sandboxed page sends "null", a
+    foreign one its own host, and an empty Host cannot be matched at all. */
+static hts_boolean origin_is_self(const char *origin, const char *host) {
+  const int p = strfield(origin, "http://");
+  const char *const authority = origin + p;
+
+  return host[0] != '\0' && p != 0 && strfield2(authority, host) != 0;
+}
+
+/** Header value with leading blanks dropped, clipped to fit dst. */
+static void copy_header_value(char *dst, size_t size, const char *value) {
+  while (*value == ' ' || *value == '\t') {
+    value++;
+  }
+  dst[0] = '\0';
+  strlncatbuff(dst, value, size, size - 1);
+}
+
 /** Does the urlencoded request body present the expected session id?
     True only if at least one "sid" field is present and every occurrence
     matches, so it holds whichever one a later last-write-wins parse keeps.
@@ -410,6 +461,57 @@ static hts_boolean cat_html_escaped(String *dst, char c) {
     return HTS_FALSE;
   }
   return HTS_TRUE;
+}
+
+/* Same, for a double-quoted attribute: the quote included, which
+   cat_html_escaped() leaves raw for the single-quoted tooltips. */
+static hts_boolean cat_attr_escaped_char(String *dst, char c) {
+  if (c == '\"') {
+    StringCat(*dst, "&#34;");
+    return HTS_TRUE;
+  }
+  return cat_html_escaped(dst, c);
+}
+
+/* Append value escaped for a double-quoted HTML attribute. */
+static void cat_attr_escaped(String *dst, const char *value) {
+  const char *a;
+
+  for (a = value; *a != '\0'; a++) {
+    if (!cat_attr_escaped_char(dst, *a)) {
+      StringMemcat(*dst, a, 1);
+    }
+  }
+}
+
+/* Append value escaped for a single-quoted JS literal inside a double-quoted
+   HTML attribute. Every escape is a \xNN group, so the only bytes it adds are
+   '\', 'x' and hex digits: nothing the attribute decode can expand back into a
+   quote, and no lone '\' for a DBCS trail byte to swallow. */
+static void cat_js_escaped(String *dst, const char *value) {
+  const char *a;
+
+  for (a = value; *a != '\0'; a++) {
+    char tmp[8];
+
+    switch (*a) {
+    case '\\':
+    case '\'':
+    case '\"':
+    case '&':
+    case '<':
+    case '>':
+      break;
+    default:
+      if ((unsigned char) *a >= 32) {
+        StringMemcat(*dst, a, 1);
+        continue;
+      }
+      break;
+    }
+    snprintf(tmp, sizeof(tmp), "\\x%02x", (unsigned char) *a);
+    StringCat(*dst, tmp);
+  }
 }
 
 /* Append the value of a double-quoted command-line argument: escaped for HTML,
@@ -516,9 +618,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     LLint length = 0;
     const char *error_redirect = NULL;
     hts_boolean denied = HTS_FALSE;
+    char origin[256];
+    char host[256];
 
     line[0] = '\0';
     buffer[0] = '\0';
+    origin[0] = '\0';
+    host[0] = '\0';
     StringClear(headers);
     StringClear(output);
     StringClear(tmpbuff);
@@ -580,6 +686,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             tmp[0] = '\0';
             strncatbuff(tmp, s, 2);
             /*l = LANG_SEARCH(path, tmp); */
+          } else if ((p = strfield(line, "Origin:")) != 0) {
+            copy_header_value(origin, sizeof(origin), line + p);
+          } else if ((p = strfield(line, "Host:")) != 0) {
+            copy_header_value(host, sizeof(host), line + p);
           }
         }
         if (meth == 2) {
@@ -625,6 +735,16 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               (NewLangList, "sid", (intptr_t) strdup((char *) adr))) {
           }
         }
+      }
+
+      /* CSP stops a mirrored page reading /server/, not posting to it blind:
+         a no-cors POST still runs the command. Origin is browser-set and script
+         cannot forge it. Absent is allowed, most non-browser clients send none.
+       */
+      if (meth == 2 && origin[0] != '\0' && !origin_is_self(origin, host)) {
+        buffer[0] = '\0';
+        meth = 0;
+        denied = HTS_TRUE;
       }
 
       /* Authenticate the body before parsing it: every field it carries is
@@ -989,21 +1109,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               "Server: httrack-small-server\r\n" "Content-type: text/html\r\n"
               "Cache-Control: no-cache, must-revalidate, private\r\n"
               "Pragma: no-cache\r\n";
-            char ok_img[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: image/gif\r\n";
-            char ok_js[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: text/javascript\r\n";
-            char ok_css[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: text/css\r\n";
-            char ok_text[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: text/plain\r\n";
-            char ok_unknown[] =
-              "HTTP/1.0 200 OK\r\n" "Connection: close\r\n"
-              "Server: httrack small server\r\n" "Content-type: application/octet-stream\r\n";
+            char ok_other[] = "HTTP/1.0 200 OK\r\n"
+                              "Connection: close\r\n"
+                              "Server: httrack small server\r\n"
+                              "Content-type: ";
 
             /* register current page */
             coucal_write(NewLangList, "thisfile", (intptr_t) strdup(file));
@@ -1050,9 +1159,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 if (!linput(fp, line, sizeof(line) - 2)) {
                   *str = '\0';
                 }
-                if (*str && str[strlen(str) - 1] == '\\') {
+                if (hts_lastchar(str) == '\\') {
                   nocr = 1;
-                  str[strlen(str) - 1] = '\0';
+                  hts_striplastchar(str, '\\');
                 }
                 while(*str) {
                   char *pos;
@@ -1067,6 +1176,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     int format = 0;
                     int listDefault = 0;
                     hts_boolean unquoted = HTS_FALSE;
+                    /* value comes from the template, not from the settings */
+                    hts_boolean literal = HTS_FALSE;
 
                     name[0] = '\0';
                     strlncatbuff(name, str, sizeof(name_), n);
@@ -1076,6 +1187,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "html:"))) {
                       name += p;
                       format = 1;
+                    } else if ((p = strfield(name, "attr:"))) {
+                      name += p;
+                      format = 7;
+                    } else if ((p = strfield(name, "js:"))) {
+                      name += p;
+                      format = 6;
                     } else if ((p = strfield(name, "unquoted:"))) {
                       name += p;
                       unquoted = HTS_TRUE;
@@ -1093,6 +1210,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
                       name += p;
                       format = 0;
+                      literal = HTS_TRUE;
                       pos2 = strchr(name, ':');
                       langstr = "";
                       if (pos2 != NULL) {
@@ -1169,11 +1287,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           char *rpath = (char *) adr;
 
                           //find_handle h;
-                          if (rpath[0]) {
-                            if (rpath[strlen(rpath) - 1] == '/') {
-                              rpath[strlen(rpath) - 1] = '\0';  /* note: patching stored (inhash) value */
-                            }
-                          }
+                          /* note: patching stored (inhash) value */
+                          hts_striplastchar(rpath, '/');
                           {
                             const char *profiles = hts_getcategories(rpath, 0);
                             const char *categ = hts_getcategories(rpath, 1);
@@ -1225,6 +1340,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       int ztest = (name[0] == 'z');
 
                       langstr = "";
+                      literal = HTS_TRUE;
                       name += p;
                       pos2 = strchr(name, ':');
                       if (pos2 != NULL) {
@@ -1335,8 +1451,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           const char *a = langstr;
 
                           while(*a) {
-                            if (a[0] == '\\' && isxdigit(a[1])
-                                && isxdigit(a[2])) {
+                            /* the ini writer has no inverse for it, so a lone
+                               backslash in a settings value must stay one */
+                            if (literal && a[0] == '\\' && isxdigit(a[1]) &&
+                                isxdigit(a[2])) {
                               int n;
                               char c;
 
@@ -1345,10 +1463,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                                 StringMemcat(output, &c, 1);
                               }
                               a += 2;
-                            } else if (unquoted && a[0] == '\"') {
-                              /* the browser posts an entity back as a raw
-                                 quote, which would open a quoted run in the
-                                 argv splitter; a URI cannot hold one anyway */
+                            } else if ((unquoted || outputmode == 3) &&
+                                       a[0] == '\"') {
+                              /* an entity decodes back to a quote, which opens
+                                 a quoted run in the argv splitter or ends the
+                                 attribute the URL sits in; no URI holds one */
                               StringCat(output, "%22");
                             } else if (outputmode &&
                                        cat_html_escaped(&output, a[0])) {
@@ -1376,6 +1495,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         if (*langstr) {
                           StringCat(output, "checked");
                         }
+                        break;
+                      case 6:
+                        cat_js_escaped(&output, langstr);
+                        break;
+                      case 7:
+                        cat_attr_escaped(&output, langstr);
                         break;
                       default:
                         if (*langstr) {
@@ -1418,7 +1543,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                               StringClear(tmpbuff);
                               break;
                             default:
-                              if (!cat_html_escaped(&tmpbuff, *fstr)) {
+                              /* format -2 writes its value into the option's
+                                 value="" as well, so the quote must go too */
+                              if (!(format == -2
+                                        ? cat_attr_escaped_char(&tmpbuff, *fstr)
+                                        : cat_html_escaped(&tmpbuff, *fstr))) {
                                 StringMemcat(tmpbuff, fstr, 1);
                               }
                               break;
@@ -1462,16 +1591,20 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             } else {
               if (is_html(file)) {
                 StringMemcat(headers, ok, sizeof(ok) - 1);
-              } else if (is_text(file)) {
-                StringMemcat(headers, ok_text, sizeof(ok_text) - 1);
-              } else if (is_js(file)) {
-                StringMemcat(headers, ok_js, sizeof(ok_js) - 1);
-              } else if (is_css(file)) {
-                StringMemcat(headers, ok_css, sizeof(ok_css) - 1);
-              } else if (is_image(file)) {
-                StringMemcat(headers, ok_img, sizeof(ok_img) - 1);
               } else {
-                StringMemcat(headers, ok_unknown, sizeof(ok_unknown) - 1);
+                const char *const type = server_content_type(file);
+
+                StringMemcat(headers, ok_other, sizeof(ok_other) - 1);
+                StringCat(headers,
+                          type != NULL ? type : "application/octet-stream");
+                StringCat(headers, "\r\n");
+              }
+              if (virtualpath) {
+                /* No allow-same-origin: an opaque origin keeps script in a
+                   crawled page from reading the session id out of /server/ */
+                StringCat(headers, "Content-Security-Policy: sandbox "
+                                   "allow-scripts allow-forms allow-popups "
+                                   "allow-downloads\r\n");
               }
               while(!feof(fp)) {
                 int n = (int) fread(line, 1, sizeof(line) - 2, fp);
@@ -1504,7 +1637,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         StringCat(headers, "HTTP/1.0 403 Forbidden\r\n"
                            "Server: httrack small server\r\n"
                            "Content-type: text/html\r\n");
-        StringCat(output, "Missing or invalid session id.\r\n");
+        StringCat(output,
+                  "Missing or invalid session id, or foreign origin.\r\n");
       } else {
 #ifdef _DEBUG
         char error_hdr[] =
@@ -1523,12 +1657,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         StringCat(headers, tmp);
       }
       StringCat(headers, "\r\n");
+      /* a refusal cleared meth, yet the Content-length above promises a body */
       if ((send(soc_c, StringBuff(headers), (int) StringLength(headers), 0) !=
-           StringLength(headers))
-          || ((meth == 1)
-              && (send(soc_c, StringBuff(output), (int) StringLength(output), 0)
-                  != StringLength(output)))
-        ) {
+           StringLength(headers)) ||
+          ((meth == 1 || denied) &&
+           (send(soc_c, StringBuff(output), (int) StringLength(output), 0) !=
+            StringLength(output)))) {
 #ifdef _DEBUG
 #endif
       }

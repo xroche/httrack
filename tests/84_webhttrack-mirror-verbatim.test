@@ -8,6 +8,8 @@ set -euo pipefail
 testdir=$(cd "$(dirname "$0")" && pwd)
 distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
 distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
 
 fail() {
     echo "FAIL: $*" >&2
@@ -34,7 +36,8 @@ cleanup() {
     wait "${csrv}" 2>/dev/null || true # absorb bash's async "Killed" notice
     rm -rf "${log}" "${work}"
 }
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
 
 freeport() {
     python3 -c 'import socket
@@ -147,12 +150,8 @@ grep -qi '^Content-type: text/html' "${hdr}" ||
 clog="${work}/content.log"
 python3 "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
 csrv=$!
-for _ in $(seq 1 40); do
-    cport=$(sed -n 's/^PORT //p' "${clog}") && test -n "${cport}" && break
-    kill -0 "${csrv}" 2>/dev/null || break
-    sleep 0.25
-done
-test -n "${cport:-}" || fail "content server did not come up: $(cat "${clog}")"
+cport=$(discover_server_port "${clog}" "${csrv}") ||
+    fail "content server did not come up"
 
 post "${port}" "sid=${sid}" "path=${work}" projname=crawl winprofile=x \
     command_do=start \

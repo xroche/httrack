@@ -186,6 +186,8 @@ scanning
 tekshirilmoqda
 Waiting for scheduled time..
 Tayinlangan vaqt boshlanishu kutilmoqda..
+Transferring data..
+Ma’lumotlar uzatilmoqda..
 Connecting to provider
 Provayder bilan bog’lanilmoqda
 [%d seconds] to go before start of operation
@@ -370,6 +372,8 @@ Create a Start Page
 Boshlang’ich sahifani yaratmoq
 Create a word database of all html pages
 Ñîçäàòü áàçó äàííûõ ñëîâ, ñîäåğæàùèõñÿ â html-ñòğàíèöàõ
+Build a complete RFC822 mail (MHT/EML) archive of the mirror
+Nusxaning to’liq RFC822 pochta arxivini (MHT/EML) yaratmoq
 Create error logging and report files
 Ñîçäàòü ëîã ôàéëû ñ èíôîğìàöèåé î ğàáîòå è îøèáêàõ
 Generate DOS 8-3 filenames ONLY
@@ -418,6 +422,12 @@ Browser identity
 Èäåíòèôèêàöèÿ áğîóçåğà (ñòğîêà User-Agent)
 Comment to be placed in each HTML file
 Êîììåíòàğèé, ğàçìåùàåìûé â êàæäîì HTML ôàéëå
+Languages accepted by the browser
+Brauzer qabul qiladigan tillar
+Additional HTTP headers to be sent in each requests
+Har bir so’rovda yuboriladigan qo’shimcha HTTP sarlavhalari
+HTTP referer to be sent for initial URLs
+Boshlang’ich URL uchun yuboriladigan HTTP referer
 Back to starting page
 Boshlang’ich sahifaga o’tish
 Save current preferences as default values
@@ -478,6 +488,8 @@ Make an index
 Indeks yaratmoq
 Make a word database
 So’z bazasini yaratmoq
+Build a mail archive
+Pochta arxivini yaratmoq
 Log files
 Log fayllar
 DOS names (8+3)
@@ -506,6 +518,12 @@ Identity
 Identifikator
 HTML footer
 Quyi HTML kolontitul
+Languages
+Tillar
+Additional HTTP Headers
+Qo’shimcha HTTP sarlavhalari
+Default referer URL
+Standart referer URL
 N# connections
 N# bog’lanish
 Abandon host if error
@@ -984,3 +1002,15 @@ Sitemap address:
 Sayt xaritasi manzili:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
 Saytni tekshirish o’rniga o’qiladigan sayt xaritasi manzili; robots.txt, so’ngra /sitemap.xml ni tekshirish uchun bo’sh qoldiring.
+Write a CDXJ index of the WARC archive
+WARC arxivining CDXJ indeksini yozish
+Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
+WARC arxividagi barcha yozuvlarni ro’yxatlovchi tartiblangan CDXJ indeksini ham yozish, qayta ijro vositalari uchun.
+Package the crawl as a WACZ file
+Qidiruvni WACZ fayliga paketlash
+Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
+WARC arxivi, uning CDXJ indeksi va ko’zgu sahifalarini bitta WACZ fayliga jamlash; WARC arxivi va CDXJ indeksini yoqadi.
+WARC segment size limit:
+WARC segmentining eng katta hajmi:
+Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
+Joriy segment shu baytlar sonidan oshganda yangi WARC segmentini boshlash; bitta fayl uchun bo’sh qoldiring yoki 0 kiriting.

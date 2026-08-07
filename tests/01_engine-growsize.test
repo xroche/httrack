@@ -10,7 +10,8 @@ echo "$out"
 test "$out" == "growsize self-test OK"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_growsize.XXXXXX")
-trap 'rm -rf "$tmp"' EXIT HUP INT QUIT PIPE TERM
+trap 'set +e; rm -rf "$tmp"' EXIT
+trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
 
 echo '<html><body>hi</body></html>' >"$tmp/index.html"
 printf -- '-*/zzmarker*\n' >"$tmp/rules.txt"
@@ -18,7 +19,7 @@ printf -- '-*/zzmarker*\n' >"$tmp/rules.txt"
 # the rules file lands in the URL/filter string, echoed back by the banner
 run=$(httrack -O "$tmp/out" --quiet -n "-%S" "$tmp/rules.txt" \
     "file://$tmp/index.html" 2>&1) || true
-printf '%s\n' "$run" | grep -q 'zzmarker' || {
+grep -q 'zzmarker' <<<"$run" || {
     echo "FAIL: -%S rules file was not loaded"
     printf '%s\n' "$run"
     exit 1

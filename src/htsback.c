@@ -62,7 +62,30 @@ Please visit our Website: http://www.httrack.com
 
 #define VT_CLREOL       "\33[K"
 
+/* Subdirectory holding a mirrored file's temporaries, beside it. url_savename()
+   maps '~' to '_', so no URL can ever be mirrored inside it (#774, #842). */
+#define HTS_TMPDIR "~hts-tmp"
+
 /* Slot operations */
+static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
+                                const char *ext);
+
+hts_boolean back_spoolname(httrackp *opt, const char *save, char *dest,
+                           size_t size) {
+  /* -p0 keeps no save name to derive from, so it counts instead. No separator:
+     path_html_utf8 brings its own, and is "" with no -O, where an added one
+     would make this absolute and spool into the filesystem root. */
+  if (opt->getmode == 0) {
+    if (!slprintfbuff(dest, size, "%s" HTS_TMPDIR "/tmpfile%d.tmp",
+                      StringBuff(opt->path_html_utf8),
+                      opt->state.tmpnameid++)) {
+      dest[0] = '\0';
+      return HTS_FALSE;
+    }
+    return HTS_TRUE;
+  }
+  return back_tmpname(dest, size, save, "tmp");
+}
 static int slot_can_be_cached_on_disk(const lien_back * back);
 static int slot_can_be_cleaned(const lien_back * back);
 static int slot_can_be_finalized(httrackp * opt, const lien_back * back);
@@ -217,6 +240,7 @@ void back_delete_all(httrackp * opt, cache_back * cache, struct_back * sback) {
 
         if (filename != NULL) {
           (void) UNLINK(filename);
+          back_tmpdir_drop(filename);
         }
 #else
         /* clear entry content (but not yet the entry) */
@@ -311,6 +335,7 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
                       adr, fil, sav);
       }
       (void) UNLINK(fileback);
+      back_tmpdir_drop(fileback);
 #else
       itemback = (lien_back *) ptr;
 #endif
@@ -340,10 +365,109 @@ static int back_index_ready(httrackp * opt, struct_back * sback, const char *adr
 }
 
 static int slot_can_be_cached_on_disk(const lien_back * back) {
+  /* A pending backup or spool means the slot is not finalized, and the swap
+     would unlink it through back_clear_entry() (#771). */
+  if (back->tmpfile != NULL && back->tmpfile[0] != '\0')
+    return 0;
   return (back->status == STATUS_READY && back->locked == 0
           && back->url_sav[0] != '\0'
           && strcmp(back->url_sav, BACK_ADD_TEST) != 0);
   /* Note: not checking !IS_DELAYED_EXT(back->url_sav) or it will quickly cause the slots to be filled! */
+}
+
+int back_selftest_slot_swap(void) {
+  lien_back back;
+  int err = 0;
+
+#define CHECK(want, why)                                                       \
+  do {                                                                         \
+    if (slot_can_be_cached_on_disk(&back) != (want)) {                         \
+      fprintf(stderr, "backswap: expected %d for %s\n", (want), (why));        \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  memset(&back, 0, sizeof(back));
+  back.status = STATUS_READY;
+  strcpybuff(back.url_sav, "/tmp/httrack-selftest.bin");
+  CHECK(1, "a plain ready slot");
+
+  back.tmpfile = back.tmpfile_buffer;
+  strcpybuff(back.tmpfile_buffer, "/tmp/httrack-selftest.bin.bak");
+  CHECK(0, "a slot still holding a re-fetch backup");
+
+  /* Callers clear a spent temporary by emptying the name, not the pointer. */
+  back.tmpfile_buffer[0] = '\0';
+  CHECK(1, "a slot whose temporary was already dropped");
+
+  back.tmpfile = NULL;
+  back.locked = 1;
+  CHECK(0, "a locked slot");
+  back.locked = 0;
+
+  back.status = STATUS_TRANSFER;
+  CHECK(0, "a slot still transferring");
+  back.status = STATUS_READY;
+
+  back.url_sav[0] = '\0';
+  CHECK(0, "a slot with no save name");
+
+  strcpybuff(back.url_sav, BACK_ADD_TEST);
+  CHECK(0, "the dummy test slot");
+#undef CHECK
+
+  /* The swap round-trip must not lose the size of a slot whose body is already
+     at url_sav, or the link writer blanks the file (#797). */
+  {
+    static const char body[] = "swapped body";
+    int c;
+
+    for (c = 0; c < 2; c++) {
+      const hts_boolean inmemory = c == 0 ? HTS_TRUE : HTS_FALSE;
+      FILE *const fp = tmpfile();
+      lien_back *copy = NULL;
+
+      memset(&back, 0, sizeof(back));
+      back.status = STATUS_READY;
+      strcpybuff(back.url_sav, "/tmp/httrack-selftest.bin");
+      back.r.size = (LLint) sizeof(body) - 1;
+      if (inmemory) {
+        back.r.adr = strdupt(body);
+      }
+      if (fp == NULL || back_serialize(fp, &back) != 0 ||
+          fseek(fp, 0, SEEK_SET) != 0 || back_unserialize(fp, &copy) != 0) {
+        fprintf(stderr, "backswap: round-trip failed for a %s slot\n",
+                inmemory ? "buffered" : "direct-to-disk");
+        err = 1;
+      } else {
+        if (copy->r.size != back.r.size) {
+          fprintf(stderr,
+                  "backswap: %s slot came back with size " LLintP
+                  ", expected " LLintP "\n",
+                  inmemory ? "buffered" : "direct-to-disk", copy->r.size,
+                  back.r.size);
+          err = 1;
+        }
+        if (inmemory && (copy->r.adr == NULL ||
+                         memcmp(copy->r.adr, body, sizeof(body) - 1) != 0)) {
+          fprintf(stderr, "backswap: buffered slot lost its body\n");
+          err = 1;
+        }
+        if (!inmemory && copy->r.adr != NULL) {
+          fprintf(stderr, "backswap: direct-to-disk slot gained a body\n");
+          err = 1;
+        }
+        back_clear_entry(copy);
+        freet(copy);
+      }
+      if (fp != NULL)
+        fclose(fp);
+      freet(back.r.adr);
+    }
+  }
+
+  printf("backswap self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
 }
 
 /* Put all backing entries that are ready in the storage hashtable to spare space and CPU */
@@ -384,18 +508,16 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
 #ifndef HTS_NO_BACK_ON_DISK
       /* temporarily serialize the entry on disk */
       {
-        int fsz = (int) strlen(back[i].url_sav);
-        char *filename = malloc(fsz + 8 + 1);
+        /* +32: room for the directory and extension back_spoolname() inserts */
+        char BIGSTK tmpname[HTS_URLMAXSIZE * 2 + 32];
+        char *filename;
+        const hts_boolean named =
+            back_spoolname(opt, back[i].url_sav, tmpname, sizeof(tmpname));
+        filename = named ? strdupt(tmpname) : NULL;
 
         if (filename != NULL) {
           FILE *fp;
 
-          if (opt->getmode != 0) {
-            sprintf(filename, "%s.tmp", back[i].url_sav);
-          } else {
-            sprintf(filename, "%stmpfile%d.tmp",
-                    StringBuff(opt->path_html_utf8), opt->state.tmpnameid++);
-          }
           /* Security check */
           if (fexist_utf8(filename)) {
             hts_log_print(opt, LOG_WARNING,
@@ -426,11 +548,12 @@ int back_cleanup_background(httrackp * opt, cache_back * cache,
                           "file does not exist");
           }
           if (filename != NULL)
-            free(filename);
+            freet(filename);
         } else {
           hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
-                        "engine: warning: serialize error for %s%s: memory full",
-                        back[i].url_adr, back[i].url_fil);
+                        "engine: warning: serialize error for %s%s: %s",
+                        back[i].url_adr, back[i].url_fil,
+                        named ? "memory full" : "temporary filename too long");
         }
       }
 #else
@@ -547,6 +670,38 @@ int back_nsoc_overall(const struct_back * sback) {
   return n;
 }
 
+/* Build save's temporary as <dir>/<HTS_TMPDIR>/<name>.<ext>. Appending the
+   extension to save instead put it in the mirror namespace, so a site serving
+   <path>.bak had its copy taken as the backup and then unlinked (#774).
+   HTS_FALSE (dest emptied) if it would not fit. Note: utf-8. */
+static hts_boolean back_tmpname(char *dest, size_t size, const char *save,
+                                const char *ext) {
+  const char *const slash = strrchr(save, '/');
+  const int dirlen = slash != NULL ? (int) (slash - save) + 1 : 0;
+
+  if (!slprintfbuff(dest, size, "%.*s" HTS_TMPDIR "/%s.%s", dirlen, save,
+                    slash != NULL ? slash + 1 : save, ext)) {
+    dest[0] = '\0';
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* Note: utf-8 */
+void back_tmpdir_drop(const char *tmp) {
+  char BIGSTK dir[HTS_URLMAXSIZE * 2];
+  const char *slash;
+
+  if (tmp == NULL || (slash = strrchr(tmp, '/')) == NULL)
+    return;
+  if (!strclipbuff(dir, sizeof(dir), tmp))
+    return;
+  dir[slash - tmp] = '\0';
+  slash = strrchr(dir, '/');
+  if (strcmp(slash != NULL ? slash + 1 : dir, HTS_TMPDIR) == 0)
+    (void) RMDIR(dir);
+}
+
 /* generate temporary file on lien_back */
 /* Note: utf-8 */
 static int create_back_tmpfile(httrackp *opt, lien_back *const back,
@@ -554,23 +709,25 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
   // do not use tempnam() but a regular filename
   back->tmpfile_buffer[0] = '\0';
   if (back->url_sav[0] != '\0') {
-    /* same capacity as url_sav, so truncation drops the extension and aliases
-       the temp name onto the live file that back_finalize_backup() UNLINKs */
-    if (!sprintfbuff(back->tmpfile_buffer, "%s.%s", back->url_sav, ext)) {
+    if (!back_tmpname(back->tmpfile_buffer, sizeof(back->tmpfile_buffer),
+                      back->url_sav, ext)) {
       hts_log_print(opt, LOG_WARNING, "temporary filename too long for %s",
                     back->url_sav);
-      back->tmpfile_buffer[0] = '\0';
       return -1;
     }
     back->tmpfile = back->tmpfile_buffer;
     if (structcheck(back->tmpfile) != 0) {
       hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
                     back->tmpfile);
+      back->tmpfile_buffer[0] = '\0';
+      back->tmpfile = NULL;
       return -1;
     }
   } else {
+    /* same directory as the named case, so back_tmpdir_drop() only removes one
+       the engine made (#842) */
     /* truncation here would collide distinct tmpnameid's onto one name */
-    if (!sprintfbuff(back->tmpfile_buffer, "%s/tmp%d.%s",
+    if (!sprintfbuff(back->tmpfile_buffer, "%s" HTS_TMPDIR "/tmp%d.%s",
                      StringBuff(opt->path_html_utf8), opt->state.tmpnameid++,
                      ext)) {
       hts_log_print(opt, LOG_WARNING, "temporary filename too long in %s",
@@ -579,22 +736,75 @@ static int create_back_tmpfile(httrackp *opt, lien_back *const back,
       return -1;
     }
     back->tmpfile = back->tmpfile_buffer;
+    if (structcheck(back->tmpfile) != 0) {
+      hts_log_print(opt, LOG_WARNING, "can not create directory to %s",
+                    back->tmpfile);
+      back->tmpfile_buffer[0] = '\0';
+      back->tmpfile = NULL;
+      return -1;
+    }
   }
   /* OK */
   hts_log_print(opt, LOG_TRACE, "produced temporary name %s", back->tmpfile);
   return 0;
 }
 
-/* Commit or restore a re-fetch backup (#77 follow-up): a re-fetch over an
-   existing file moved the good copy to back->tmpfile before truncating url_sav.
-   commit keeps the new file and drops the backup; else restore it so an aborted
-   transfer leaves the previous copy intact. Skips the zlib .z temp. */
-static void back_finalize_backup(httrackp *opt, lien_back *const back,
-                                 const hts_boolean commit) {
+/* Note: utf-8 */
+void back_refetch_backup(httrackp *opt, lien_back *const back) {
+  back->tmpfile = NULL;
+  if (fexist_utf8(back->url_sav)) {
+    hts_boolean saved = HTS_FALSE;
+
+    if (create_back_tmpfile(opt, back, "bak") == 0) {
+      /* clobber a .bak a killed run left behind, or the guard stays off for
+         good (#758) */
+      if (fexist_utf8(back->tmpfile))
+        hts_log_print(opt, LOG_WARNING, "replacing leftover backup %s",
+                      back->tmpfile);
+      saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
+      /* Another slot sharing the directory may have removed it between the
+         structcheck above and the rename: recreate it and try once more. */
+      if (!saved && structcheck(back->tmpfile) == 0)
+        saved = hts_rename_over(opt, back->url_sav, back->tmpfile);
+    }
+    if (!saved) {
+      hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                    "could not back up %s; an aborted re-fetch will lose it",
+                    back->url_sav);
+      back->tmpfile = NULL;
+    }
+  }
+}
+
+/* Did the fetch fail to produce a response, as opposed to the engine
+   deliberately passing the resource over? Only the latter may be purged. */
+static hts_boolean back_transfer_failed(const int statuscode) {
+  switch (statuscode) {
+  case STATUSCODE_TOO_BIG:
+  case STATUSCODE_EXCLUDED:
+  case STATUSCODE_TEST_OK:
+    return HTS_FALSE;
+  default:
+    return statuscode <= 0 ? HTS_TRUE : HTS_FALSE;
+  }
+}
+
+hts_boolean back_finalize_backup(httrackp *opt, lien_back *const back,
+                                 hts_boolean commit) {
+  const hts_boolean wanted = commit;
+
   if (back->tmpfile == NULL || back->r.compressed)
-    return;
+    return HTS_TRUE;
+  /* Nothing to commit to: filecreate() can fail after the backup was taken,
+     and dropping it then loses both copies (#775). */
+  if (commit && !fexist_utf8(back->url_sav)) {
+    hts_log_print(opt, LOG_WARNING, "%s was never created; restoring %s",
+                  back->url_sav, back->tmpfile);
+    commit = HTS_FALSE;
+  }
   if (commit) {
     (void) UNLINK(back->tmpfile); /* new copy is good; drop the backup */
+    back_tmpdir_drop(back->tmpfile);
   } else {
     if (back->r.out != NULL) {
       fclose(back->r.out);
@@ -602,12 +812,29 @@ static void back_finalize_backup(httrackp *opt, lien_back *const back,
     }
     /* On failure keep the backup: an orphaned temp beats losing the good copy.
      */
-    if (!hts_rename_over(back->tmpfile, back->url_sav))
+    if (!hts_rename_over(opt, back->tmpfile, back->url_sav))
       hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
                     "could not restore %s; previous copy kept as %s",
                     back->url_sav, back->tmpfile);
+    else
+      back_tmpdir_drop(back->tmpfile);
   }
   back->tmpfile = NULL;
+  return commit == wanted ? HTS_TRUE : HTS_FALSE;
+}
+
+/* A chunked body is framed by its terminating zero-length chunk (#840);
+   chunk_blocksize is reset per response and reaches -1 only once it is seen. */
+static hts_boolean back_chunked_unterminated(const lien_back *const back) {
+  return back->is_chunk && back->chunk_blocksize != -1 ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Past the terminating chunk, the line still owed is the optional trailer
+   section (RFC 9112 7.1.2), read and discarded like a header block. */
+static hts_boolean back_in_chunk_trailers(const lien_back *const back) {
+  return back->status == STATUS_CHUNK_CR && back->chunk_blocksize == -1
+             ? HTS_TRUE
+             : HTS_FALSE;
 }
 
 // objet (lien) téléchargé ou transféré depuis le cache
@@ -629,9 +856,22 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
     /* Don't store broken files. Note: check is done before compression.
        If the file is partial, the next run will attempt to continue it with compression too.
      */
-    if (back[p].r.totalsize >= 0 && back[p].r.statuscode > 0
-        && back[p].r.size != back[p].r.totalsize && !opt->tolerant) {
-      if (back[p].status == STATUS_READY) {
+    const hts_boolean cut_chunked = back_chunked_unterminated(&back[p]);
+    const hts_boolean short_body =
+        back[p].r.totalsize >= 0 && back[p].r.size != back[p].r.totalsize
+            ? HTS_TRUE
+            : HTS_FALSE;
+
+    if ((short_body || cut_chunked) && back[p].r.statuscode > 0 &&
+        !opt->tolerant) {
+      if (cut_chunked) {
+        hts_log_print(
+            opt, LOG_WARNING,
+            "truncated chunked transfer (terminating chunk missing, got " LLintP
+            " bytes): file not cached, will be retried on the next"
+            " update (use -%%B to cache anyway): %s%s",
+            back[p].r.size, back[p].url_adr, back[p].url_fil);
+      } else if (back[p].status == STATUS_READY) {
         hts_log_print(opt, LOG_WARNING,
                       "incomplete transfer (expected " LLintP
                       " bytes, got " LLintP
@@ -709,12 +949,21 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     hts_codec_parse(back[p].r.contentencoding);
                 /* Never decode over url_sav: a failed decode would destroy the
                    copy an --update re-fetch is supposed to refresh (#557). */
-                char BIGSTK unpacked[HTS_URLMAXSIZE * 2 + 4]; // room for ".u"
+                char BIGSTK unpacked[HTS_URLMAXSIZE * 2];
                 LLint size;
 
-                snprintf(unpacked, sizeof(unpacked), "%s.u", back[p].url_sav);
-                if ((size = hts_codec_unpack(codec, back[p].tmpfile,
-                                             unpacked)) >= 0) {
+                /* fits whenever the .z temp it decodes from did */
+                if (!back_tmpname(unpacked, sizeof(unpacked), back[p].url_sav,
+                                  "u")) {
+                  back[p].r.statuscode = STATUSCODE_INVALID;
+                  strcpybuff(back[p].r.msg, "Error when decompressing (the "
+                                            "temporary filename is too long)");
+                  /* as the decode-failure branch below: never let the coded
+                     bytes be committed as the page */
+                  if (!back[p].r.is_write)
+                    deleteaddr(&back[p].r);
+                } else if ((size = hts_codec_unpack(codec, back[p].tmpfile,
+                                                    unpacked)) >= 0) {
                   back[p].r.size = back[p].r.totalsize = size;
                   if (back[p].r.is_write) {
                     /* Sample the previous copy now: the rename below replaces
@@ -733,7 +982,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                                  "Read error when decompressing");
                     }
                     UNLINK(unpacked);
-                  } else if (hts_rename_over(unpacked, back[p].url_sav)) {
+                  } else if (hts_rename_over(opt, unpacked, back[p].url_sav)) {
                     /* The temp bypassed filecreate(), which is what chmods. */
 #ifndef _WIN32
                     chmod(back[p].url_sav, HTS_ACCESS_FILE);
@@ -786,6 +1035,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
               /* ensure that no remaining temporary file exists */
               if (back[p].tmpfile != NULL) {
                 unlink(back[p].tmpfile);
+                back_tmpdir_drop(back[p].tmpfile); /* the .u went with it */
                 back[p].tmpfile = NULL;
               }
             }
@@ -798,7 +1048,14 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
         }
         /* Body fully received: keep the freshly written url_sav, drop the
            backup of the previous copy. */
-        back_finalize_backup(opt, &back[p], HTS_TRUE);
+        if (!back_finalize_backup(opt, &back[p], HTS_TRUE)) {
+          /* The previous copy is back because the new one was never created;
+             caching this response's validators against it would pin the stale
+             body on every later --update. */
+          if (fexist_utf8(back[p].url_sav))
+            filenote(&opt->state.strc, back[p].url_sav, NULL);
+          return -1;
+        }
         /* Write mode to disk */
         if (back[p].r.is_write && back[p].r.adr != NULL) {
           freet(back[p].r.adr);
@@ -858,16 +1115,15 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
           char flags[32];
           char s[256];
           time_t tt;
-          struct tm *A;
+          struct tm tmv;
 
           tt = time(NULL);
-          A = localtime(&tt);
-          if (A == NULL) {
+          if (!hts_localtime(tt, &tmv)) {
             int localtime_returned_null = 0;
 
             assertf(localtime_returned_null);
           }
-          strftime(s, 250, "%H:%M:%S", A);
+          strftime(s, 250, "%H:%M:%S", &tmv);
 
           flags[0] = '\0';
           /* input flags */
@@ -1031,6 +1287,14 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
   /* Aborted, error, or not ready: url_sav (if written) is broken; restore the
      previous copy from the backup. */
   back_finalize_backup(opt, &back[p], HTS_FALSE);
+  /* Note the surviving copy, or the end-of-update purge drops what this run
+     never managed to replace (#746). */
+  if (!back[p].testmode && back_transfer_failed(back[p].r.statuscode) &&
+      back[p].url_sav[0] != '\0' && fexist_utf8(back[p].url_sav)) {
+    filenote(&opt->state.strc, back[p].url_sav, NULL);
+    file_notify(opt, back[p].url_adr, back[p].url_fil, back[p].url_sav, 0, 0,
+                back[p].r.notmodified);
+  }
   return -1;
 }
 
@@ -1078,6 +1342,14 @@ void back_connxfr(htsblk * src, htsblk * dst) {
   src->keep_alive_t = 0;
   dst->debugid = src->debugid;
   src->debugid = 0;
+  dst->address = src->address; // peer IP survives the cache-entry swap (#838)
+}
+
+/* Release the buffers a response owns. The connection members are left alone:
+   back_connxfr() moves those, and the file handles are closed elsewhere. */
+static void back_free_response(htsblk *r) {
+  deleteaddr(r);
+  warc_free_request(r);
 }
 
 void back_move(lien_back * src, lien_back * dst) {
@@ -1173,7 +1445,10 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
     (*dst)->r.ssl_con = NULL;
 #endif
     if (back_data_unserialize(fp, (void **) &(*dst)->r.adr, &size) == 0) {
-      (*dst)->r.size = size;
+      /* A bodyless slot already wrote its bytes to url_sav (FTP, direct to
+         disk); zeroing r.size makes the writer blank that file (#797). */
+      if ((*dst)->r.adr != NULL)
+        (*dst)->r.size = size;
       (*dst)->r.headers = NULL;
       if (back_string_unserialize(fp, &(*dst)->r.headers) == 0)
         return 0;               /* ok */
@@ -1612,10 +1887,7 @@ int back_clear_entry(lien_back * back) {
       back->r.soc = INVALID_SOCKET;
     }
 
-    if (back->r.adr != NULL) {  // reste un bloc à désallouer
-      freet(back->r.adr);
-      back->r.adr = NULL;
-    }
+    back_free_response(&back->r);
     if (back->chunk_adr != NULL) {      // reste un bloc à désallouer
       freet(back->chunk_adr);
       back->chunk_adr = NULL;
@@ -1626,14 +1898,9 @@ int back_clear_entry(lien_back * back) {
     // only for security
     if (back->tmpfile && back->tmpfile[0] != '\0') {
       (void) unlink(back->tmpfile);
+      back_tmpdir_drop(back->tmpfile);
       back->tmpfile = NULL;
     }
-    // headers
-    if (back->r.headers != NULL) {
-      freet(back->r.headers);
-      back->r.headers = NULL;
-    }
-    warc_free_request(&back->r);
     // Tout nettoyer
     memset(back, 0, sizeof(lien_back));
     back->r.soc = INVALID_SOCKET;
@@ -1804,11 +2071,13 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
       int hash_pos_return = 0;
 
       if (cache->hashtable) {
-        char BIGSTK buff[HTS_URLMAXSIZE * 4];
+        char BIGSTK buff[CACHE_KEY_SIZE];
+        size_t used = 0;
 
-        strcpybuff(buff, adr);
-        strcatbuff(buff, fil);
-        hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
+        /* a key too long to be in the table is a miss, not a fatal error */
+        if (slcatprintfbuff(buff, sizeof(buff), &used, "%s%s", adr, fil)) {
+          hash_pos_return = coucal_read(cache->hashtable, buff, &hash_pos);
+        }
 
         // negative values when data is not in cache
         if (hash_pos_return < 0) {
@@ -1931,6 +2200,8 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
                             back[p].url_adr, back[p].url_fil);
             }
             back[p].r.notmodified = 1;  // fichier non modifié
+            // no request was sent at all, so this is never a server 304 (#839)
+            back[p].r.warc_forced_notmodified = HTS_TRUE;
             back[p].status = STATUS_READY; // OK prêt
             back_set_finished(sback, p);
 
@@ -3143,20 +3414,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                           back[i].url_sav, 1, 1,
                                           back[i].r.notmodified);
                               back[i].r.compressed = 0;
-                              /* Re-fetch over an existing file (#77 follow-up):
-                                 move the good copy aside before truncating it
-                                 so an aborted transfer can restore it. url_sav
-                                 is still written normally (file list intact).
-                               */
-                              back[i].tmpfile = NULL;
-                              if (fexist_utf8(back[i].url_sav)) {
-                                if (create_back_tmpfile(opt, &back[i], "bak") !=
-                                        0 ||
-                                    RENAME(back[i].url_sav, back[i].tmpfile) !=
-                                        0) {
-                                  back[i].tmpfile = NULL;
-                                }
-                              }
+                              back_refetch_backup(opt, &back[i]);
                               if ((back[i].r.out =
                                    filecreate(&opt->state.strc,
                                               back[i].url_sav)) == NULL) {
@@ -3237,11 +3495,16 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
           // réception de données depuis socket ou fichier
           if (back[i].status) {
-            if (back[i].status == STATUS_WAIT_HEADERS)  // recevoir par bloc de lignes
-              retour_fread = http_xfread1(&(back[i].r), 0);
+            if (back[i].status == STATUS_WAIT_HEADERS)
+              retour_fread = http_xfread1(&(back[i].r), HTS_XFREAD_LINE_BLOCK);
             else if (back[i].status == STATUS_CHUNK_WAIT || back[i].status == STATUS_CHUNK_CR) {        // recevoir longueur chunk en hexa caractère par caractère
               // backuper pour lire dans le buffer chunk
               htsblk r;
+              /* Block mode bounds the trailer section, which declares no length
+                 of its own, by HTS_LINE_BLOCK_SIZE. */
+              const int chunk_read_mode = back_in_chunk_trailers(&back[i])
+                                              ? HTS_XFREAD_LINE_BLOCK
+                                              : HTS_XFREAD_LINE;
 
               memcpy(&r, &(back[i].r), sizeof(htsblk));
               back[i].r.is_write = 0;   // mémoire
@@ -3251,8 +3514,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back[i].r.out = NULL;
               back[i].r.is_file = 0;
               //
-              // ligne par ligne
-              retour_fread = http_xfread1(&(back[i].r), -1);
+              // one line, or the whole trailer block
+              retour_fread = http_xfread1(&(back[i].r), chunk_read_mode);
               // modifier et restaurer
               back[i].chunk_adr = back[i].r.adr;        // adresse
               back[i].chunk_size = back[i].r.size;      // taille taille chunk
@@ -3339,6 +3602,26 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               back_finalize(opt, cache, sback, i);
             }
 
+            /* Same treatment for an unterminated chunked stream: the byte count
+               agrees with the chunks that arrived, the framing does not. */
+            if (back[i].r.statuscode > 0 &&
+                back_chunked_unterminated(&back[i])) {
+              if (!opt->tolerant) {
+                deleteaddr(&back[i].r);
+                back[i].r.statuscode = STATUSCODE_CONNERROR; // recatch
+                htsblk_failf(&back[i].r,
+                             "Truncated chunked transfer (" LLintP
+                             " Bytes, terminating chunk missing)",
+                             (LLint) back[i].r.size);
+              } else {
+                hts_log_print(opt, LOG_WARNING,
+                              "Truncated chunked transfer (" LLintP
+                              " Bytes, terminating chunk missing) for %s%s",
+                              (LLint) back[i].r.size, back[i].url_adr,
+                              back[i].url_fil);
+              }
+            }
+
             if (back[i].r.totalsize >= 0) { // tester totalsize
               if (back[i].r.totalsize != back[i].r.size) {      // pas la même!
                 if (!opt->tolerant) {
@@ -3370,12 +3653,22 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             }
             // Traitement des en têtes chunks ou en têtes
             if (back[i].status == STATUS_CHUNK_WAIT || back[i].status == STATUS_CHUNK_CR) {     // réception taille chunk en hexa (  après les en têtes, peut ne pas
-              if (back[i].chunk_size > 0
-                  && back[i].chunk_adr[back[i].chunk_size - 1] == 10) {
+              const hts_boolean in_trailers = back_in_chunk_trailers(&back[i]);
+
+              /* A chunk-size or chunk-CRLF line closes on its first LF, the
+                 trailer section on the blank line ending it. Two LFs mean a
+                 blank line only because the reader drops every CR. */
+              if (back[i].chunk_size > 0 &&
+                  back[i].chunk_adr[back[i].chunk_size - 1] == 10 &&
+                  (!in_trailers || back[i].chunk_size == 1 ||
+                   back[i].chunk_adr[back[i].chunk_size - 2] == 10)) {
                 int chunk_size = -1;
                 char chunk_data[64];
 
-                if (back[i].chunk_size < 32) {  // pas trop gros
+                if (in_trailers) {
+                  chunk_size =
+                      0; /* fields discarded, the blank line ends the body */
+                } else if (back[i].chunk_size < 32) { // not too big
                   char *chstrip = back[i].chunk_adr;
 
                   back[i].chunk_adr[back[i].chunk_size - 1] = '\0';     // octet nul 
@@ -3398,10 +3691,22 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   if (back[i].r.totalsize < 0)
                     back[i].r.totalsize = 0;    // initialiser à 0 (-1 == unknown)
                   if (back[i].status == STATUS_CHUNK_WAIT) {    // "real" chunk
-                    if (sscanf(chunk_data, "%x", &chunk_size) == 1) {
+                    /* The chunk-size line is hostile input, so parse it wide
+                       and unsigned and drop anything an int cannot hold: sscanf
+                       "%x" lands 80000000 on INT_MIN, which sign-extends into a
+                       16EB realloc below and drives totalsize negative. */
+                    char *chunk_end = NULL;
+                    const unsigned long long chunk_value =
+                        strtoull(chunk_data, &chunk_end, 16);
+
+                    if (chunk_end != chunk_data && *chunk_end == '\0' &&
+                        chunk_value <= (unsigned long long) INT32_MAX) {
+                      chunk_size = (int) chunk_value;
                       if (chunk_size > 0)
                         back[i].chunk_blocksize = chunk_size;   /* the data block chunk size */
-                      else
+                      /* only a real 0 ends the stream; the bound above keeps a
+                         negative from ever claiming the sentinel (#840) */
+                      else if (chunk_size == 0)
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
                       if (back[i].r.adr != NULL || !back[i].r.is_write) {       // Not to disk
@@ -3547,12 +3852,6 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                           }
                         }
                       }
-
-                      /* Oops, trailers! */
-                      if (back[i].r.keep_alive_trailers) {
-                        /* fixme (not yet supported) */
-                      }
-
                     }
 
                   }
@@ -3566,7 +3865,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   // NO! xxback[i].chunk_blocksize = 0;
                 }
 
-              }                 // taille buffer chunk > 1 && LF
+              } // chunk buffer holds a complete line
               //
             } else if (back[i].status == STATUS_WAIT_HEADERS) { // en têtes (avant le chunk si il est présent)
               //
@@ -3951,11 +4250,20 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 
                       memset(&tmp, 0, sizeof(tmp));
                       back_connxfr(&back[i].r, &tmp);
+                      /* a real 304's headers belong to the revisit record, so
+                         they must survive the swap (#826); a forced one has
+                         none */
+                      if (server_sent_304)
+                        warc_move_request(&back[i].r, &tmp);
+                      /* the cache entry overwrites the whole struct, so drop
+                         what the 304 response still owns first (#782) */
+                      back_free_response(&back[i].r);
                       back[i].r =
                         cache_read(opt, cache, back[i].url_adr, back[i].url_fil,
                                    back[i].url_sav, back[i].location_buffer);
                       back[i].r.location = back[i].location_buffer;
                       back_connxfr(&tmp, &back[i].r);
+                      warc_move_request(&tmp, &back[i].r);
                     }
 
                     // hack:
@@ -3981,6 +4289,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       back[i].status = STATUS_READY;    // OK prêt
                       back_set_finished(sback, i);
                       back[i].r.notmodified = 1;        // NON modifié!
+                      // WARC must not claim a 304 the server never sent (#839)
+                      back[i].r.warc_forced_notmodified =
+                          server_sent_304 ? HTS_FALSE : HTS_TRUE;
                       hts_log_print(opt, LOG_DEBUG,
                                     "File loaded after test from cache: %s%s",
                                     back[i].url_adr, back[i].url_fil);
