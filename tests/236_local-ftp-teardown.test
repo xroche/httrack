@@ -33,6 +33,15 @@ fail() {
 ok() { echo "OK: $*"; }
 size_of() { wc -c <"$1" | tr -d '[:space:]'; }
 
+errlog="${tmpdir}/httrack.err"
+# A sanitized build reports the use-after-free and still exits 1, so the status
+# alone is blind to it. Leaks at exit are out of scope, hence no LeakSanitizer.
+assert_clean_run() {
+    cat "$errlog" >&2 # the redirect must not cost the harness log the crawl's stderr
+    ! grep -Eq 'AddressSanitizer:|MemorySanitizer:|runtime error:' "$errlog" ||
+        fail "$1: the crawl produced a sanitizer report (#1051)"
+}
+
 root="${tmpdir}/root"
 modes="${tmpdir}/modes"
 mkdir -p "$root"
@@ -61,8 +70,9 @@ out="${tmpdir}/trickle"
 rc=0
 start=$SECONDS
 run_with_timeout 120 httrack "ftp://127.0.0.1:${port}/f.bin" -O "$out" --quiet \
-    --disable-security-limits --robots=0 --timeout=200 -M"$CAP" -c1 || rc=$?
+    --disable-security-limits --robots=0 --timeout=200 -M"$CAP" -c1 2>"$errlog" || rc=$?
 elapsed=$((SECONDS - start))
+assert_clean_run "trickle"
 test "$rc" -ne 124 || fail "trickle crawl overran its 120s cap"
 # Faults reliably only while the backlog array stays mmap-sized: free() unmaps it.
 test "$rc" -lt 128 || fail "trickle crawl died on signal $((rc - 128)) (#1051)"
@@ -81,8 +91,9 @@ out="${tmpdir}/stall"
 rc=0
 start=$SECONDS
 run_with_timeout 120 httrack "ftp://127.0.0.1:${port}/f.bin" -O "$out" --quiet \
-    --disable-security-limits --robots=0 --timeout=200 -M"$CAP" -c1 || rc=$?
+    --disable-security-limits --robots=0 --timeout=200 -M"$CAP" -c1 2>"$errlog" || rc=$?
 elapsed=$((SECONDS - start))
+assert_clean_run "stall"
 test "$rc" -ne 124 || fail "stalled crawl overran its 120s cap, teardown is unbounded"
 test "$rc" -lt 128 || fail "stalled crawl died on signal $((rc - 128)) (#1051)"
 assert_capped "$out" "stall"
