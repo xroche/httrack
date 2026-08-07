@@ -5884,9 +5884,45 @@ static hts_boolean sf_try_put(const char *dir, const char *rel,
   return HTS_TRUE;
 }
 
+/* Expand a fixture: \001<ref>\002 becomes <ref> plus this run's mark for it.
+   The secret is random per run, so a fixture cannot spell a mark itself. */
+static void sf_expand_fixture(httrackp *opt, const char *in, size_t len,
+                              String *out) {
+  size_t i, start = 0;
+
+  StringClear(*out);
+  for (i = 0; i < len; i++) {
+    if (in[i] == '\001') {
+      start = StringLength(*out);
+    } else if (in[i] == '\002') {
+      char mark[SINGLEFILE_MARK_MAX];
+
+      StringCat(*out,
+                singlefile_mark(opt, mark, sizeof(mark), SINGLEFILE_CLASS_ANY,
+                                StringLength(*out) - start));
+    } else {
+      StringAddchar(*out, in[i]);
+    }
+  }
+}
+
 static void sf_put(const char *dir, const char *rel, const void *data,
                    size_t len) {
   assertf(sf_try_put(dir, rel, data, len));
+}
+
+/* sf_put() for a text fixture, expanding its \001<ref>\002 delimiters. Binary
+   fixtures must not go through here: sf_png carries those very bytes. */
+static size_t sf_put_marked(httrackp *opt, const char *dir, const char *rel,
+                            const void *data, size_t len) {
+  String body = STRING_EMPTY;
+  size_t written;
+
+  sf_expand_fixture(opt, (const char *) data, len, &body);
+  assertf(sf_try_put(dir, rel, StringBuff(body), StringLength(body)));
+  written = StringLength(body);
+  StringFree(body);
+  return written;
 }
 
 /* Number of times needle occurs in hay. */
@@ -6000,98 +6036,99 @@ static const char sf_svg[] = "<svg><g id=\"icon-a\"/></svg>";
 
 static const char sf_page[] =
     "<html><head>\n"
-    "<link rel=\"stylesheet\" href=\"css/main.css\">\n"
-    "<link rel=\"canonical\" href=\"other.html\">\n"
+    "<link rel=\"stylesheet\" href=\"\001css/main.css\002\">\n"
+    "<link rel=\"canonical\" href=\"\001other.html\002\">\n"
     "<title>t</title>\n"
-    "<style>body { background: url(\"img/a%20b.png\"); }\n"
-    /* Everything the escape set has to neutralise before a fragment reaches an
-       unquoted url() token: whitespace, '<'/'>', then a quote, a paren, a
-       backslash and a high byte together. */
-    "b { background: url('img/sprite.svg#w x'); }\n"
-    "i { background: url('img/sprite.svg#lt<s>gt'); }\n"
-    "u { background: url(\"img/sprite.svg#z'(\\\xC3\xA9\"); }</style>\n"
+    "<style>body { background: url(\"\001img/a%20b.png\002\"); }\n"
+    /* A fragment is document text the mark never covers, so it reaches the
+       data: URI exactly as written, in the quoting the author gave it. */
+    "b { background: url('\001img/sprite.svg\002#w x'); }\n"
+    "i { background: url('\001img/sprite.svg\002#lt<s>gt'); }\n"
+    "u { background: url(\"\001img/sprite.svg\002#z'(\\\xC3\xA9\"); }</style>\n"
     "</head><body>\n"
-    "<img src=\"img/a%20b.png\" srcset=\"img/a%20b.png 1x, img/big.png 2x\">\n"
-    "<link rel=\"icon\" href=\"icon.png\">\n"
-    "<link rel=\"preload\" as=\"font\" href=\"font/f.woff2\">\n"
+    "<img src=\"\001img/a%20b.png\002\" srcset=\"\001img/a%20b.png\002 "
+    "1x, \001img/big.png\002 2x\">\n"
+    "<link rel=\"icon\" href=\"\001icon.png\002\">\n"
+    "<link rel=\"preload\" as=\"font\" href=\"\001font/f.woff2\002\">\n"
     "<img src=\"data:image/gif;base64,QUJD\">\n"
     /* Each has a real file where its guard's removal would land it; without
        that they stay links either way, the target merely being absent. */
     "<img src=\"http://example.com/x.png\">\n"
     "<img src=\"//example.com/x.png\">\n"
-    "<input type=\"image\" src=\"img/in.png\">\n"
+    "<input type=\"image\" src=\"\001img/in.png\002\">\n"
     /* Lazy loading: src is the placeholder, the real image rides data-src. */
-    "<img src=\"img/ph.png\" data-src=\"img/lz.png\" "
-    "data-srcset=\"img/lz2.png 2x\" lowsrc=\"img/low.png\">\n"
-    "<object data=\"img/ob.png\"></object>\n"
-    "<embed src=\"img/em.png\">\n"
-    "<img data-src=\"other.html\">\n"
+    "<img src=\"\001img/ph.png\002\" data-src=\"\001img/lz.png\002\" "
+    "data-srcset=\"\001img/lz2.png\002 2x\" "
+    "lowsrc=\"\001img/low.png\002\">\n"
+    "<object data=\"\001img/ob.png\002\"></object>\n"
+    "<embed src=\"\001img/em.png\002\">\n"
+    "<img data-src=\"\001other.html\002\">\n"
     /* What a first pass emits: re-resolving it is what a second pass must not
        do, and the fallback type would inline whatever the walk found. */
     "<link rel=\"stylesheet\" href=\"data:text/css;base64,QUJD\">\n"
-    "<video poster=\"img/po.png\" controls>"
-    "<source src=\"v.mp4\" type=\"video/mp4\"></video>\n"
-    "<svg><image href=\"img/sv.png\"/></svg>\n"
-    "<table background=\"img/bg.png\"><tr><td>x</td></tr></table>\n"
+    "<video poster=\"\001img/po.png\002\" controls>"
+    "<source src=\"\001v.mp4\002\" type=\"video/mp4\"></video>\n"
+    "<svg><image href=\"\001img/sv.png\002\"/></svg>\n"
+    "<table background=\"\001img/bg.png\002\"><tr><td>x</td></tr></table>\n"
     /* The second is what bites: drop the clamp and its leading ".." lands it
        back on <root>/img/a b.png. The first can only 404 either way. */
-    "<img src=\"../escape.png\">\n"
-    "<img src=\"../img/a%20b.png\">\n"
+    "<img src=\"\001../escape.png\002\">\n"
+    "<img src=\"\001../img/a%20b.png\002\">\n"
     "<a href=\"img/a%20b.png\">link</a>\n"
-    "<script src=\"js/app.js\"></script>\n"
+    "<script src=\"\001js/app.js\002\"></script>\n"
     "<script>var s = \"</scripting>\"; var t = \"<img src='img/a%20b.png'>\";"
     "</script>\n"
     /* A fragment selects inside the asset, so it has to survive onto the
        data: URI; the query named the remote resource and must not. */
-    "<img src=\"img/sprite.svg#icon-a\">\n"
-    "<img srcset=\"img/sprite.svg#icon-b 2x\">\n"
-    "<svg><image xlink:href=\"img/sprite.svg#icon-c\"/></svg>\n"
-    "<div style=\"background:url(img/sprite.svg#icon-d)\"></div>\n"
-    "<div style=\"background:url('img/sprite.svg#i)e')\"></div>\n"
-    "<img src=\"img/sprite.svg?v=1#icon-f\">\n"
-    /* Already carries the document's own escapes: re-encoding either would
-       make the browser look for a different id. */
-    "<img src=\"img/sprite.svg#g&amp;h%2Di\">\n"
-    /* A '"' left raw here would end the attribute the rewriter re-quotes. */
-    "<img src='img/sprite.svg#q\"z'>\n"
-    "<img src=\"missing.png\" >\n"
-    "<!--><img src=\"img/a%20b.png\">\n"
-    "<div style=\"background:url(img/a%20b.png)\"></div>\n"
-    "<div style='content:\"x\"; background:url(img/a%20b.png)'></div>\n"
+    "<img src=\"\001img/sprite.svg\002#icon-a\">\n"
+    "<img srcset=\"\001img/sprite.svg\002#icon-b 2x\">\n"
+    "<svg><image xlink:href=\"\001img/sprite.svg\002#icon-c\"/></svg>\n"
+    "<div style=\"background:url(\001img/sprite.svg\002#icon-d)\"></div>\n"
+    "<div style=\"background:url('\001img/sprite.svg\002#i)e')\"></div>\n"
+    "<img src=\"\001img/sprite.svg?v=1\002#icon-f\">\n"
+    "<img src=\"\001img/sprite.svg\002#g&amp;h%2Di\">\n"
+    "<img src='\001img/sprite.svg\002#q\"z'>\n"
+    "<img src=\"\001missing.png\002\" >\n"
+    "<!--><img src=\"\001img/a%20b.png\002\">\n"
+    "<div style=\"background:url(\001img/a%20b.png\002)\"></div>\n"
+    "<div style='content:\"x\"; "
+    "background:url(\001img/a%20b.png\002)'></div>\n"
     "</body></html>\n";
 
 /* Lay a small mirror down under root. */
-static void sf_fixture(const char *root) {
+static void sf_fixture(httrackp *opt, const char *root) {
   /* The over-cap url() is what drives the rebase fallback: a reference an
      inlined stylesheet could not embed has to come out relative to the page,
      not to the stylesheet, or it dangles. */
   static const char css[] =
-      "@import \"sub/nested.css\";\n"
-      "@import url(\"sub/two.css\");\n"
+      "@import \"\001sub/nested.css\002\";\n"
+      "@import url(\"\001sub/two.css\002\");\n"
       "@import \"a\\\"url(../img/a b.png)b.css\";\n"
-      "@font-face { font-family: f; src: url(../font/f.woff2); }\n"
-      "body { background: url(../img/a b.png); }\n"
-      "div { background: url(../img/big.png); }\n"
-      "div.s { background: url(../img/big-sprite.svg#icon-g); }\n"
+      "@font-face { font-family: f; src: url(\001../font/f.woff2\002); }\n"
+      "body { background: url(\001../img/a%20b.png\002); }\n"
+      "div { background: url(\001../img/big.png\002); }\n"
+      "div.s { background: url(\001../img/big-sprite.svg\002#icon-g); }\n"
       /* A name whose escapes the rebase has to put back, unlike a fragment's;
          the '#' has to come back encoded or it reads as one. */
-      "div.h { background: url(../img/b&amp;c%25d%23e.png); }\n"
+      "div.h { background: url(\001../img/b&amp;c%25d%23e.png\002); }\n"
       "/* url(../img/never.png) */\n";
-  static const char nested[] = "div { background: url(../../img/a b.png); }\n";
-  static const char two[] = "p { background: url(../../img/a b.png); }\n";
-  static const char deep[] =
-      "<html><head><link rel=\"stylesheet\" href=\"../../css/main.css\">\n"
-      "</head><body>d</body></html>\n";
+  static const char nested[] =
+      "div { background: url(\001../../img/a%20b.png\002); }\n";
+  static const char two[] =
+      "p { background: url(\001../../img/a%20b.png\002); }\n";
+  static const char deep[] = "<html><head><link rel=\"stylesheet\" "
+                             "href=\"\001../../css/main.css\002\">\n"
+                             "</head><body>d</body></html>\n";
   static const char js[] = "var app = 1;\n";
   char big[4096];
 
   memset(big, 'B', sizeof(big));
-  sf_put(root, "page.html", sf_page, sizeof(sf_page) - 1);
-  sf_put(root, "deep/sub/page.html", deep, sizeof(deep) - 1);
+  sf_put_marked(opt, root, "page.html", sf_page, sizeof(sf_page) - 1);
+  sf_put_marked(opt, root, "deep/sub/page.html", deep, sizeof(deep) - 1);
   sf_put(root, "other.html", "<html>o</html>", 14);
-  sf_put(root, "css/main.css", css, sizeof(css) - 1);
-  sf_put(root, "css/sub/nested.css", nested, sizeof(nested) - 1);
-  sf_put(root, "css/sub/two.css", two, sizeof(two) - 1);
+  sf_put_marked(opt, root, "css/main.css", css, sizeof(css) - 1);
+  sf_put_marked(opt, root, "css/sub/nested.css", nested, sizeof(nested) - 1);
+  sf_put_marked(opt, root, "css/sub/two.css", two, sizeof(two) - 1);
   sf_put(root, "js/app.js", js, sizeof(js) - 1);
   sf_put(root, "img/a b.png", sf_png, SF_PNG_LEN);
   sf_put(root, "img/big.png", big, sizeof(big));
@@ -6132,7 +6169,7 @@ static void sf_fixture(const char *root) {
     }
     StringCat(wide,
               " title=\"> <img src=img/a%20b.png> \">end</p></body></html>");
-    sf_put(root, "wide.html", StringBuff(wide), StringLength(wide));
+    sf_put_marked(opt, root, "wide.html", StringBuff(wide), StringLength(wide));
     StringFree(wide);
   }
   sf_put(root, "v.mp4",
@@ -6158,7 +6195,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   sf_put(argv[0], "escape.png", sf_png,
          SF_PNG_LEN); /* just outside the mirror */
   fconcat(root, sizeof(root), argv[0], "mirror/");
-  sf_fixture(root);
+  sf_fixture(opt, root);
   fconcat(page, sizeof(page), root, "page.html");
 
   /* Cap between the small assets and big.png. */
@@ -6226,36 +6263,33 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   sf_check(strstr(out, "var t = \"<img src='img/a%20b.png'>\";") != NULL,
            "script body rewritten past a </scripting> lookalike");
 
-  /* Nothing an attribute value cannot hold: url() stays unquoted, and a quote
-     that was already in the CSS is escaped. */
-  sf_check(strstr(out, "url(\"data:") == NULL,
-           "a quoted url() would end a style attribute");
-  sf_check(strstr(out, "style=\"content:&quot;x&quot;; background:url(data:") !=
-               NULL,
-           "quote inside a rewritten style attribute not escaped");
+  /* Only the marked reference is touched: the value keeps its own quoting, so
+     nothing can be emitted that the attribute could not already hold. */
+  sf_check(strstr(out, "style='content:\"x\"; background:url(data:") != NULL,
+           "style attribute re-quoted instead of substituted in place");
 
-  /* Fragments: kept on the replacement, escaped where they would close the
-     url() token, and never joined by the query the mirrored name dropped. */
+  /* Fragments: the mark covers the reference only, so what followed it comes
+     back byte-identical -- including the escapes the document already carried
+     -- while the query rode inside the mark and went with it. */
   sf_check(strstr(out, "img/sprite.svg") == NULL,
            "a fragment-bearing reference was left a link");
   sf_check(sf_count(out, "#icon-a\"") == 1, "img src fragment dropped");
   sf_check(sf_count(out, "#icon-b 2x\"") == 1, "srcset fragment dropped");
   sf_check(sf_count(out, "#icon-c\"") == 1, "xlink:href fragment dropped");
   sf_check(sf_count(out, "#icon-d)") == 1, "style url() fragment dropped");
-  sf_check(sf_count(out, "#i%29e)") == 1,
-           "a fragment closing the url() token was not escaped");
+  sf_check(sf_count(out, "#i)e')") == 1,
+           "a fragment closing the url() token was rewritten");
   sf_check(sf_count(out, "#icon-f\"") == 1, "fragment after a query dropped");
   sf_check(strstr(out, "?v=1") == NULL, "query carried onto the data: URI");
   sf_check(sf_count(out, "#g&amp;h%2Di\"") == 1,
            "an escape the document already carried was encoded again");
-  sf_check(sf_count(out, "#q%22z\"") == 1,
-           "a quote in a fragment was not escaped");
-  sf_check(sf_count(out, "#w%20x)") == 1,
-           "whitespace in a fragment was not escaped");
-  sf_check(sf_count(out, "#lt%3Cs%3Egt)") == 1,
-           "'<'/'>' in a fragment were not escaped");
-  sf_check(sf_count(out, "#z%27%28%5C%C3%A9)") == 1,
-           "a quote, paren, backslash or high byte was left raw");
+  sf_check(sf_count(out, "#q\"z'") == 1, "a quote in a fragment was rewritten");
+  sf_check(sf_count(out, "#w x')") == 1,
+           "whitespace in a fragment was rewritten");
+  sf_check(sf_count(out, "#lt<s>gt')") == 1,
+           "'<'/'>' in a fragment were rewritten");
+  sf_check(sf_count(out, "#z'(\\\xC3\xA9\")") == 1,
+           "a quote, paren, backslash or high byte was rewritten");
 
   sf_check(strstr(out, "img/big.png 2x") != NULL, "over-cap asset inlined");
   sf_check(strstr(out, " 1x") != NULL, "srcset descriptor lost");
@@ -6275,7 +6309,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
              "url() inside a CSS comment was rewritten");
     sf_check(strstr(css, "url(data:font/woff2;base64,") != NULL,
              "@font-face src not inlined");
-    sf_check(strstr(css, "@import url(data:text/css;base64,") != NULL,
+    sf_check(strstr(css, "@import url(\"data:text/css;base64,") != NULL,
              "@import url() form not inlined");
     sf_check(strstr(css, "url(../img/a b.png)b.css") != NULL,
              "url() inside a string with an escaped quote was rewritten");
@@ -6343,7 +6377,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
 
   /* Same page, a cap above big.png: it now inlines. */
   fconcat(root, sizeof(root), argv[0], "mirror2/");
-  sf_fixture(root);
+  sf_fixture(opt, root);
   fconcat(page, sizeof(page), root, "page.html");
   opt->single_file_max_size = 1024 * 1024;
   sf_check(singlefile_rewrite_file(opt, root, page),
@@ -6357,21 +6391,37 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   /* Nothing inlines, so the rewriter must be byte transparent. Assert on its
      output: the file it declined to write could not have changed regardless. */
   fconcat(root, sizeof(root), argv[0], "mirror3/");
-  sf_fixture(root);
+  sf_fixture(opt, root);
   fconcat(page, sizeof(page), root, "page.html");
   opt->single_file_max_size = 1;
-  sf_check(!singlefile_rewrite_file(opt, root, page), "one-byte cap inlined");
+  /* The page is still rewritten: nothing inlines, but the marks must go. */
+  sf_check(singlefile_rewrite_file(opt, root, page),
+           "one-byte cap left the marks in place");
+  {
+    char *capped = readfile_utf8(page);
+
+    /* Only the two data: URIs the fixture itself ships. */
+    sf_check(capped != NULL && sf_count(capped, ";base64,") == 2,
+             "one-byte cap inlined");
+    freet(capped);
+  }
   {
     String verbatim = STRING_EMPTY;
 
     StringClear(verbatim);
-    (void) singlefile_rewrite_html(opt, root, page, sf_page,
-                                   sizeof(sf_page) - 1,
+    String marked = STRING_EMPTY;
+
+    sf_expand_fixture(opt, sf_page, sizeof(sf_page) - 1, &marked);
+    (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
+                                   StringLength(marked),
                                    SINGLEFILE_MAX_PAGE_SIZE, &verbatim);
-    sf_check(StringLength(verbatim) == sizeof(sf_page) - 1 &&
-                 memcmp(StringBuff(verbatim), sf_page, sizeof(sf_page) - 1) ==
-                     0,
-             "a page with nothing to inline was re-serialized differently");
+    /* Mark-transparent, not byte-transparent: a reference that cannot be
+       inlined loses its mark and keeps everything else. */
+    sf_check(StringLength(verbatim) < StringLength(marked),
+             "a page with nothing to inline kept its marks");
+    sf_check(strstr(StringBuff(verbatim), singlefile_intro(opt)) == NULL,
+             "an un-inlinable reference kept its mark");
+    StringFree(marked);
     StringFree(verbatim);
   }
   (void) outlen;
@@ -6380,26 +6430,29 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
      run is the control: it proves the fan-out is real, so the small one was
      cut short by the budget and not by the fixture. */
   {
-    static const char bomb_css[] = "@import \"b.css\";@import \"b.css\";"
-                                   "@import \"b.css\";@import \"b.css\";\n";
-    static const char bomb_html[] = "<html><head>"
-                                    "<link rel=\"stylesheet\" href=\"b.css\">"
-                                    "</head></html>\n";
-    const size_t css_len = sizeof(bomb_css) - 1;
-    String small = STRING_EMPTY, large = STRING_EMPTY;
+    static const char bomb_css[] =
+        "@import \"\001b.css\002\";@import \"\001b.css\002\";"
+        "@import \"\001b.css\002\";@import \"\001b.css\002\";\n";
+    static const char bomb_html[] =
+        "<html><head>"
+        "<link rel=\"stylesheet\" href=\"\001b.css\002\">"
+        "</head></html>\n";
+    size_t css_len;
+    String small = STRING_EMPTY, large = STRING_EMPTY, bomb = STRING_EMPTY;
 
     fconcat(root, sizeof(root), argv[0], "bomb/");
-    sf_put(root, "b.css", bomb_css, css_len);
+    css_len = sf_put_marked(opt, root, "b.css", bomb_css, sizeof(bomb_css) - 1);
     fconcat(page, sizeof(page), root, "page.html");
     opt->single_file_max_size = 1024 * 1024;
     StringClear(small);
     StringClear(large);
-    (void) singlefile_rewrite_html(opt, root, page, bomb_html,
-                                   sizeof(bomb_html) - 1, (LLint) css_len * 3,
+    sf_expand_fixture(opt, bomb_html, sizeof(bomb_html) - 1, &bomb);
+    (void) singlefile_rewrite_html(opt, root, page, StringBuff(bomb),
+                                   StringLength(bomb), (LLint) css_len * 3,
                                    &small);
-    (void) singlefile_rewrite_html(opt, root, page, bomb_html,
-                                   sizeof(bomb_html) - 1,
-                                   SINGLEFILE_MAX_PAGE_SIZE, &large);
+    (void) singlefile_rewrite_html(opt, root, page, StringBuff(bomb),
+                                   StringLength(bomb), SINGLEFILE_MAX_PAGE_SIZE,
+                                   &large);
     sf_check(StringLength(large) > 4096, "the @import bomb did not fan out");
     sf_check(StringLength(small) < StringLength(large) / 8,
              "the per-page budget did not cut the fan-out short");
@@ -6409,6 +6462,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
              "the per-page budget was not charged as each asset was taken");
     StringFree(small);
     StringFree(large);
+    StringFree(bomb);
   }
 
   if (!sf_colon_ok)

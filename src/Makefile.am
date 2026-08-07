@@ -56,6 +56,7 @@ htsserver_LDFLAGS = $(AM_LDFLAGS) $(LDFLAGS_PIE) @RPATH_ORIGIN_LDFLAGS@
 lib_LTLIBRARIES = libhttrack.la
 
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h htsstats.h \
+	htsrandom.c htsrandom.h \
 	htscmdline.c htscmdline.h \
 	htsurlport.c htsurlport.h
 proxytrack_SOURCES = proxy/main.c \
@@ -78,7 +79,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htscache_selftest.c htsdns_selftest.c htsselftest.c \
 	htscatchurl.c htsfilters.c htsftp.c htshash.c coucal/coucal.c \
 	htscmdline.c htshelp.c htslib.c htsurlport.c htscoremain.c \
-	htsname.c htsrobots.c htstools.c htswizard.c \
+	htsname.c htsrobots.c htstools.c htsrandom.c htswizard.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
 	htscrashtest.c \
 	htsmd5.c htsnet.c htscodec.c htswarc.c htschanges.c htssinglefile.c htssitemap.c htsproxy.c htszlib.c htswrap.c htsconcat.c \
@@ -92,7 +93,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htshelp.h htsindex.h htslib.h htsurlport.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htssniff.h \
 	htsopt.h htsrobots.h htsthread.h  \
-	htscrashtest.h htstools.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htssitemap.h htsproxy.h htszlib.h  \
+	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htssitemap.h htsproxy.h htszlib.h  \
 	htsstrings.h htsarrays.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \

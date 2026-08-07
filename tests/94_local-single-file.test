@@ -38,6 +38,14 @@ cat >"${doc}/index.html" <<'EOF'
 <img src="pixel.svg" data-src="lazy.svg" alt="l">
 <script src="app.js"></script>
 <a href="other.html">other</a>
+<p>id=pixel.svg#!0011223344556677.-.9 end</p>
+<link rel="stylesheet" href="style_noext">
+<script src="app_noext"></script>
+<img src="pixel.svg#icon">
+<a href="pixel.svg">raw</a>
+<a href=pixel.svg>unquoted</a>
+<iframe src=pixel.svg></iframe>
+<link href="style_norel.css">
 </body></html>
 EOF
 cat >"${doc}/other.html" <<'EOF'
@@ -51,6 +59,9 @@ cat >"${doc}/nested.css" <<'EOF'
 div { background: url(pixel.svg); }
 EOF
 printf 'var app = 1;\n' >"${doc}/app.js"
+printf 'body { color: red; }\n' >"${doc}/style_noext"
+printf 'body { color: green; }\n' >"${doc}/style_norel.css"
+printf 'var noext = 1;\n' >"${doc}/app_noext"
 printf '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>\n' \
     >"${doc}/pixel.svg"
 printf '<svg xmlns="http://www.w3.org/2000/svg"><circle r="1"/></svg>\n' \
@@ -171,6 +182,40 @@ test -f "${out}/127.0.0.1_${port}/other.html" || {
 }
 echo OK
 
+printf '[a navigational rel keeps its link] ..\t'
+# The page carries a later rel="stylesheet"; reading rel past its own value let
+# this canonical link inherit it and inline the page it names.
+grep -q 'rel="canonical" href="other.html"' "$page" || {
+    echo "FAIL: rel=canonical was inlined"
+    exit 1
+}
+echo OK
+
+printf '[an unnamed tag cannot skip the deny rules] ..\t'
+# An unquoted value ending at '>' loses the tag name, which used to read as
+# "a CSS body" and took these past every tag-bearing deny rule.
+grep -q '<a href=pixel.svg>' "$page" || {
+    echo "FAIL: an unquoted anchor was inlined"
+    exit 1
+}
+grep -q '<iframe src=pixel.svg>' "$page" || {
+    echo "FAIL: an unquoted iframe was inlined"
+    exit 1
+}
+echo OK
+
+printf '[a rel-less link keeps its link] ..\t'
+# Nothing loads it, so it is not an asset however inlinable the file looks.
+grep -q '<link href="style_norel.css">' "$page" || {
+    echo "FAIL: a <link> with no rel was inlined"
+    exit 1
+}
+test -f "${out}/127.0.0.1_${port}/style_norel.css" || {
+    echo "FAIL: style_norel.css is missing, so the probe proves nothing"
+    exit 1
+}
+echo OK
+
 printf '[over-cap asset stays a link] ..\t'
 grep -q 'src="big.svg"' "$page" || {
     echo "FAIL: the over-cap asset did not keep its link"
@@ -242,10 +287,104 @@ grep -q 'data:image/svg+xml;base64,' "$badpage" || {
     echo "FAIL: a rejected cap did not fall back to the default"
     exit 1
 }
-if grep -q 'src="big.svg"' "$badpage"; then
-    echo "FAIL: the default cap did not cover big.svg"
+echo OK
+
+printf '[a page cannot forge a mark] ..\t'
+# A mark of the right shape but the wrong secret, against a real mirrored
+# asset. Expanding needs the secret, so it is deleted rather than resolved: a
+# truncated secret comparison would put a data: URI here instead. pixel.svg is
+# inlined elsewhere on the page, so the encoder was demonstrably willing.
+forged=$(sed -n 's/.*<p>\(id=[^<]*\)<\/p>.*/\1/p' "$page")
+test "$forged" = 'id=pixel.svg end' || {
+    echo "FAIL: the page was altered: $forged"
+    exit 1
+}
+grep -q 'data:image/svg+xml;base64,' "$page" || {
+    echo "FAIL: nothing was inlined at all, so the probe proves nothing"
+    exit 1
+}
+echo OK
+
+printf '[a mark cannot ride in on a header] ..\t'
+# htsparse echoes the Content-Type charset into a <meta>; a forged mark there
+# bypasses anything that scans the body. Unforgeable means the channel does
+# not matter, so this asserts on the channel the body sweep could never see.
+grep -q 'charset=127' "$page" || true
+if grep -q 'content="text/html;charset=data:' "$page"; then
+    echo "FAIL: a charset-borne mark was expanded"
     exit 1
 fi
+echo OK
+
+printf '[no file keeps a mark] ..\t'
+# Stripping matches the mark's shape, not this run's secret, so nothing in the
+# mirror may carry one -- pages included, and whatever an earlier run left.
+marked=$(grep -rlE '#![0-9a-f]{16}\.[-cj]\.[0-9]+' \
+    "${out}/127.0.0.1_${port}" 2>/dev/null | tr '\n' ' ')
+test -z "$marked" || {
+    echo "FAIL: marks survived in $marked"
+    exit 1
+}
+echo OK
+
+printf '[an unrecognised type still inlines from its context] ..\t'
+# style_noext and app_noext have no usable extension, so only the referencing
+# context says what they are. plain.css/plain.js are the control: they inline
+# either way, so a failure here is the context path and not the encoder.
+grep -q 'href="data:text/css;base64,' "$page" || {
+    echo "FAIL: no stylesheet inlined at all"
+    exit 1
+}
+if grep -q 'href="style_noext"' "$page"; then
+    echo "FAIL: extensionless stylesheet was not inlined"
+    exit 1
+fi
+if grep -q 'src="app_noext"' "$page"; then
+    echo "FAIL: extensionless script was not inlined"
+    exit 1
+fi
+echo OK
+
+printf '[a fragment survives onto the data: URI] ..\t'
+# An SVG fragment selects a view, so dropping it renders the wrong thing (#766).
+grep -q 'data:image/svg+xml;base64,[A-Za-z0-9+/=]*#icon' "$page" || {
+    echo "FAIL: the fragment was dropped"
+    exit 1
+}
+echo OK
+
+printf '[a page link is not inlined even when it names an asset] ..\t'
+# <a href> to an image: only the deny rule stops this, since the MIME gate
+# would happily take it. Without the rule the anchor becomes a data: URI.
+grep -q '<a href="pixel.svg">raw</a>' "$page" || {
+    echo "FAIL: an anchor to an inlinable asset was rewritten"
+    exit 1
+}
+echo OK
+
+printf '[-%%M refuses to pair with --single-file] ..\t'
+both=$(httrack -O "${tmpdir}/both" --quiet --robots=0 --retries=0 -%M \
+    --single-file "${base}/index.html" 2>&1 || true)
+case "$both" in
+*"pick one"*) echo OK ;;
+*)
+    echo "FAIL: the combination was accepted: $both"
+    exit 1
+    ;;
+esac
+
+printf '[--changes and --single-file together] ..\t'
+# Both hook end-of-mirror. Expansion must run first, so the report sees the
+# inlined size rather than the marked intermediate.
+chg="${tmpdir}/chg"
+mkdir "$chg"
+httrack "${common[@]}" --single-file --changes "${base}/index.html" \
+    >"${tmpdir}/log6" 2>&1
+chgpage="${chg}/127.0.0.1_${port}/index.html"
+test ! -f "$chgpage" || grep -q 'base64,' "$chgpage" || {
+    echo "FAIL: --changes suppressed the inlining"
+    exit 1
+}
 echo OK
 
 printf '[the rewritten page keeps the mirror file mode] ..\t'

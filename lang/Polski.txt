@@ -539,9 +539,9 @@ U¿yj proxy dla transferu przez FTP
 TimeOut(s)
 Przekroczenie(a) czasu oczekiwania
 Persistent connections (Keep-Alive)
-Podtrzymywane poÅ‚Ä…czenia (Keep-Alive)
+Podtrzymywane po³¹czenia (Keep-Alive)
 Reduce connection time and type lookup time using persistent connections
-Zmniejsz czas poÅ‚Ä…czenia i czas sprawdzania typu dziÄ™ki uÅ¼yciu podtrzymywanych poÅ‚Ä…czeÅ„
+Zmniejsz czas po³¹czenia i czas sprawdzania typu dziêki u¿yciu podtrzymywanych po³¹czeñ
 Retries
 Ponowienia
 Size limit
