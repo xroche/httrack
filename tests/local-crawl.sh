@@ -41,9 +41,9 @@
 # --archive-kept-on-rerun: the second pass must leave the first pass's
 # .warc[.gz]/.cdx/.wacz byte-identical, having no bodies to replace them (#759).
 # --archive-replaced-on-rerun is its mirror: every one of them is poisoned
-# between the passes and no poison may survive. Comparing bytes instead is flaky,
-# a repeat crawl can reproduce a .cdx exactly since it holds no per-run entropy
-# (#1041). Both also require no *.tmp left behind, and take an optional
+# between the passes and no poison may survive, since a repeat crawl can
+# reproduce a .cdx exactly and byte comparison then reads it as stale (#1041).
+# Both also require no *.tmp left behind, and take an optional
 # --archive-min-files N guarding against a scenario that silently stopped
 # producing the segments it means to check.
 # --plant-file/--plant-dir drop a regular file (holding $plant_poison) or a
