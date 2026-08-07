@@ -1,0 +1,9 @@
+#!/bin/bash
+#
+# Catches the unregistered half locally; a stale registration never gets this far
+# (make check dies first), so CI runs the same script out of band too.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+exec bash "${testdir}/check-tests-list.sh" "${testdir}"

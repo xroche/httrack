@@ -1,6 +1,5 @@
-# One entry per line, never a backslash continuation: unioning a continued list
-# drops an entry silently (#844). A deletion merged alongside another branch's
-# append is restored by the union -- remove a test in a commit of its own.
+# One entry per line, never a backslash continuation: two branches appending a
+# test then conflict on that line alone, and check-tests-list.sh reads it (#844).
 TESTS =
 TESTS += 00_runnable.test
 TESTS += 01_engine-addlink.test
@@ -265,3 +264,4 @@ TESTS += 226_watchdog-native.test
 TESTS += 224_engine-ftp-cmdlen.test
 TESTS += 230_local-ftp-userpass.test
 TESTS += 225_install-manifest.test
+TESTS += 231_tests-list-bijection.test
