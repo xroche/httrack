@@ -1,0 +1,77 @@
+#!/bin/bash
+#
+# The FTP control channel read with a hardcoded 300s timeout and never looked at
+# --timeout (#1039), so a server that accepts the connection and then says
+# nothing pinned the crawl for five minutes. Two values are needed: a ceiling one
+# of them meets alone is met by a hardcoded constant just as well.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+server=$(nativepath "${testdir}/ftp-server.py")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftptmo.XXXXXX")
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+root="${tmpdir}/root"
+mkdir -p "$root"
+printf 'body\n' >"${root}/f.txt"
+
+serverlog="${tmpdir}/server.out"
+"$python" "$server" --root "$(nativepath "$root")" --mute >"$serverlog" 2>&1 &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+ok() { echo "OK: $*"; }
+
+# --max-time is kept far out of the way, so only --timeout can end these runs.
+crawl() {
+    local to=$1 cap=$2
+    local out="${tmpdir}/out${to}"
+
+    mkdir -p "$out"
+    run_with_timeout "$cap" httrack "ftp://127.0.0.1:${port}/f.txt" -O "$out" \
+        --quiet --disable-security-limits --robots=0 --timeout="$to" \
+        --max-time=600 -c1 >"${tmpdir}/log${to}" 2>&1
+}
+
+# The engine retries once, so a run costs about twice the value asked for.
+start=$SECONDS
+crawl 4 60 || fail "the --timeout=4 run did not finish in $((SECONDS - start))s"
+short=$((SECONDS - start))
+test "$short" -lt 18 ||
+    fail "--timeout=4 took ${short}s: the control-channel read ignores it"
+grep -aq 'read timeout (4)' "${tmpdir}/out4/hts-log.txt" ||
+    fail "the log does not name the timeout used: $(grep -a Error \
+        "${tmpdir}/out4/hts-log.txt" || true)"
+ok "a 4s timeout ends the control-channel read in ${short}s"
+
+# The floor here sits above the ceiling above, so no one constant satisfies both.
+start=$SECONDS
+crawl 20 120 || fail "the --timeout=20 run did not finish in $((SECONDS - start))s"
+long=$((SECONDS - start))
+test "$long" -ge 20 ||
+    fail "--timeout=20 gave up after ${long}s, short of the value asked for"
+test "$long" -lt 70 || fail "--timeout=20 took ${long}s"
+grep -aq 'read timeout (20)' "${tmpdir}/out20/hts-log.txt" ||
+    fail "the log does not name the timeout used"
+ok "a 20s timeout waits ${long}s: the wait tracks the value, not a constant"

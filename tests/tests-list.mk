@@ -266,3 +266,5 @@ TESTS += 224_engine-ftp-cmdlen.test
 TESTS += 230_local-ftp-userpass.test
 TESTS += 225_install-manifest.test
 TESTS += 231_tests-list-bijection.test
+TESTS += 233_local-ftp-ctrl-timeout.test
+TESTS += 234_local-ftp-maxtime.test

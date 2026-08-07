@@ -8,10 +8,13 @@ directory). Each line is "<path> <mode>...", path "*" matching everything:
 
   truncate  send a prefix of the body, then drop the data connection
   empty     open the data connection and send nothing
+  stall     send a prefix, then hold the data connection open and go quiet
+  trickle   send the body in small chunks, slowly enough to stay in flight
   norest    answer REST with 500, so the client re-fetches from scratch
   nomdtm    answer MDTM with 500, like a server predating RFC 3659
 
 --require-pass answers USER with 331, the only way the client's PASS is sent.
+--mute accepts the control connection and never speaks, not even the greeting.
 """
 
 import argparse
@@ -22,18 +25,27 @@ import threading
 import time
 
 
+# Longer than any bound a test asserts, so going quiet can never be what ends
+# the run under test.
+QUIET_SECONDS = 900
+
+TRICKLE_CHUNK = 4096
+TRICKLE_DELAY = 0.2
+
+
 def reply(conn, text):
     conn.sendall((text + "\r\n").encode("utf-8", "replace"))
 
 
 class Session(threading.Thread):
-    def __init__(self, conn, root, mode_file, log, require_pass=False):
+    def __init__(self, conn, root, mode_file, log, require_pass=False, mute=False):
         threading.Thread.__init__(self, daemon=True)
         self.conn = conn
         self.root = root
         self.mode_file = mode_file
         self.log = log
         self.require_pass = require_pass
+        self.mute = mute
         self.pasv = None
         self.rest = 0
         self.path = "/"  # named by SIZE/RETR; REST carries no path
@@ -91,12 +103,19 @@ class Session(threading.Thread):
                 pass
             elif "truncate" in modes:
                 data.sendall(body[: max(1, len(body) // 8)])
+            elif "stall" in modes:
+                data.sendall(body[: max(1, len(body) // 8)])
+                time.sleep(QUIET_SECONDS)
+            elif "trickle" in modes:
+                for off in range(0, len(body), TRICKLE_CHUNK):
+                    data.sendall(body[off : off + TRICKLE_CHUNK])
+                    time.sleep(TRICKLE_DELAY)
             else:
                 data.sendall(body)
         except OSError:
             pass
         data.close()
-        if modes & {"empty", "truncate"}:
+        if modes & {"empty", "truncate", "stall"}:
             reply(self.conn, "426 transfer aborted")
         else:
             reply(self.conn, "226 Transfer complete")
@@ -188,6 +207,9 @@ class Session(threading.Thread):
         conn = self.conn
         buf = b""
         try:
+            if self.mute:
+                time.sleep(QUIET_SECONDS)  # connected, but not even a greeting
+                return
             reply(conn, "220 httrack test ftp")
             while True:
                 while b"\r\n" not in buf:
@@ -215,6 +237,7 @@ def main():
     ap.add_argument("--mode-file")
     ap.add_argument("--log")
     ap.add_argument("--require-pass", action="store_true")
+    ap.add_argument("--mute", action="store_true")
     args = ap.parse_args()
 
     logfp = open(args.log, "a", encoding="utf-8") if args.log else None
@@ -237,7 +260,7 @@ def main():
     root = os.path.abspath(args.root)
     while True:
         conn, _ = srv.accept()
-        Session(conn, root, args.mode_file, log, args.require_pass).start()
+        Session(conn, root, args.mode_file, log, args.require_pass, args.mute).start()
 
 
 if __name__ == "__main__":
