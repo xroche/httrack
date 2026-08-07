@@ -267,3 +267,4 @@ TESTS += 230_local-ftp-userpass.test
 TESTS += 225_install-manifest.test
 TESTS += 231_tests-list-bijection.test
 TESTS += 235_local-resume-recovery.test
+TESTS += 232_online-gate-outoftree.test

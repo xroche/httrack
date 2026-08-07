@@ -59,6 +59,7 @@ Please visit our Website: http://www.httrack.com
 
 // parser
 #include "htsparse.h"
+#include "htssinglefile.h"
 #include "htsback.h"
 
 // arrays
@@ -398,6 +399,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
     FILE *fp = NULL;                  // fichier écrit localement 
     const char *html = r->adr;        // pointeur (on parcours)
     const char *lastsaved;            // adresse du dernier octet sauvé + 1
+    hts_boolean sf_may_mark = HTS_FALSE; // --single-file: mark this one?
 
     hts_log_print(opt, LOG_DEBUG, "scanning file %s%s (%s)..", urladr(), urlfil(),
                   savename());
@@ -412,6 +414,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         if (r->adr[i] == '\0') {
           r->adr[i] = ' ';
         }
+      }
+      /* Only chance can put this run's secret in a fetched document. */
+      if (opt->single_file) {
+        sf_may_mark = singlefile_may_mark(opt, r->adr, (size_t) r->size);
       }
     }
 
@@ -1831,6 +1837,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
             int quoteinscript = 0;
             int noquote = 0;
             const char *tag_attr_start = html;
+            /* Kept because the value scan below clears intag on an unquoted
+               value ending at '>', and --single-file must still know the tag.
+               inscript_locked marks a whole CSS or JS file, the one context
+               that legitimately has no tag. */
+            const char *const sf_tag = intag_start_valid ? intag_name : NULL;
+            const int sf_tagless_body = inscript_locked;
 
             // si nofollow ou un stop a été déclenché, réécrire tous les liens en externe
             if ((nofollow)
@@ -3100,6 +3112,19 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                         if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
 
+                          /* --single-file: tag the reference for the
+                             end-of-mirror pass. A fragment, so a mirror left
+                             marked by an interrupted run still browses. */
+                          /* A NULL tag reads as "a CSS or JS body", so a tag
+                             we cannot name must not reach the classifier. */
+                          const char sf_class =
+                              (opt->single_file && sf_may_mark && !in_media &&
+                               p_type == 0 && !p_searchMETAURL &&
+                               (sf_tag != NULL || sf_tagless_body))
+                                  ? singlefile_ref_class(sf_tag, tag_attr_start)
+                                  : 0;
+                          const size_t sf_start = TypedArraySize(output_buffer);
+
                           // écrire le lien modifié, relatif
                           // Note: escape all chars, even >127 (no UTF)
                           HT_ADD_HTMLESCAPED_FULL(tempo);
@@ -3112,6 +3137,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             if (a) {
                               HT_ADD_HTMLESCAPED(a);
                             }
+                          }
+
+                          /* Measured on the appended bytes, not tempo: the
+                             escape can change the length. The query sits inside
+                             the span so inlining drops it. */
+                          if (sf_class != 0) {
+                            char sf_mark[SINGLEFILE_MARK_MAX];
+
+                            HT_ADD(singlefile_mark(
+                                opt, sf_mark, sizeof(sf_mark), sf_class,
+                                TypedArraySize(output_buffer) - sf_start));
                           }
                         }
                         lastsaved = eadr - 1;   // dernier écrit+1 (enfin euh apres on fait un ++ alors hein)

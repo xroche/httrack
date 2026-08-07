@@ -49,6 +49,21 @@ chmod u+w "$run"/*.sh # distcheck's srcdir is read-only, and cp carries that ove
 cat >>"$run/testlib.sh" <<'EOF'
 reap_leftover_processes() { return 0; }
 EOF
+# Records who sourced this copy, so assert_staged can tell the staged driver from
+# the srcdir one. test-timeout.sh sources it too, hence the caller and not a bare
+# marker file.
+cat >>"$run/testlib.sh" <<EOF
+printf '%s\n' "\${BASH_SOURCE[1]##*/}" >>"$tmp/sourced-by"
+EOF
+: >"$tmp/sourced-by"
+
+# The suite under test has to be the staged copy: only it sources the testlib.sh
+# neutered above, and the srcdir one would reap sibling engines under "make check -j".
+assert_staged() {
+    grep -qx 'ci-windows-suite.sh' "$tmp/sourced-by" ||
+        fail "the srcdir driver ran, not the staged copy: $(sort -u "$tmp/sourced-by" | tr '\n' ' ')"
+    : >"$tmp/sourced-by"
+}
 
 bin=$tmp/bin
 mkdir -p "$bin"
@@ -117,6 +132,7 @@ cd "$run"
 rc=0
 out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" WATCHDOG_TOKEN=s3cr3t \
     bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?
+assert_staged
 # The skip set and the pass floor are pinned to the real suite, so a stub run
 # ends on the floor; what is under test is the tally that reaches it.
 test "$rc" -eq 1 || fail "stub suite exited $rc, want 1 from the pass floor"
@@ -154,6 +170,7 @@ rm -f "$run/13_zlib-pass.test"
 rc=0
 out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" \
     bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?
+assert_staged
 test "$rc" -eq 1 || fail "an empty category exited $rc, want 1"
 grep -q '::error::test category zlib matched no tests' <<<"$out" ||
     fail "the empty category was not named: $out"
@@ -167,6 +184,7 @@ rm -f "$run/00_runnable.test"
 rc=0
 out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" \
     bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?
+assert_staged
 test "$rc" -eq 1 || fail "an empty single-test category exited $rc, want 1"
 grep -q '::error::test category runnable matched no tests' <<<"$out" ||
     fail "the empty single-test category was not named: $out"

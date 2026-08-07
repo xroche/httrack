@@ -3,10 +3,12 @@
 
 set -euo pipefail
 
-bash check-network.sh || ! echo "skipping online unit tests" || exit 77
+testdir=$(cd "$(dirname "$0")" && pwd)
+
+bash "$testdir/check-network.sh" || ! echo "skipping online unit tests" || exit 77
 
 # unicode tests
-bash crawl-test.sh \
+bash "$testdir/crawl-test.sh" \
     --errors 1 --files 10 \
     --found ut.httrack.com/unicode-links/caf%a91bce.html \
     --found ut.httrack.com/unicode-links/café30f4.html \
@@ -21,7 +23,7 @@ bash crawl-test.sh \
     --found ut.httrack.com/unicode-links/utf8.html \
     httrack http://ut.httrack.com/unicode-links/utf8.html
 
-bash crawl-test.sh \
+bash "$testdir/crawl-test.sh" \
     --errors 2 --files 9 \
     --found ut.httrack.com/unicode-links/café3860.html \
     --found ut.httrack.com/unicode-links/café9fa8.html \
@@ -36,7 +38,7 @@ bash crawl-test.sh \
     --found ut.httrack.com/unicode-links/default.html \
     httrack http://ut.httrack.com/unicode-links/default.html
 
-bash crawl-test.sh \
+bash "$testdir/crawl-test.sh" \
     --errors 2 --files 9 \
     --found ut.httrack.com/unicode-links/caf%a9ae52.html \
     --found ut.httrack.com/unicode-links/caf%a9bf59.html \
@@ -51,7 +53,7 @@ bash crawl-test.sh \
     --found ut.httrack.com/unicode-links/iso88591.html \
     httrack http://ut.httrack.com/unicode-links/iso88591.html
 
-bash crawl-test.sh \
+bash "$testdir/crawl-test.sh" \
     --errors 4 --files 9 \
     --found ut.httrack.com/unicode-links/caf%a8%a6c72a.html \
     --found ut.httrack.com/unicode-links/caf%a9bf59.html \
