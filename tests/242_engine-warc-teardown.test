@@ -8,6 +8,7 @@ httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
 
 scratch=$(mktemp -d)
 trap 'set +e; rm -rf "$scratch"' EXIT
+trap 'rm -rf "$scratch"' HUP INT QUIT PIPE TERM
 
 out=$("$httrack_bin" -O /dev/null -#test=warc-teardown "$scratch/")
 echo "$out"

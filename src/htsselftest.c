@@ -4801,7 +4801,8 @@ static int st_ftpctrl(httrackp *opt, int argc, char **argv) {
 
 /* Slurp a whole file into a malloc'd buffer; sets *len. NULL on error. */
 static unsigned char *warc_slurp(const char *path, size_t *len) {
-  FILE *f = FOPEN(path, "rb");
+  char catbuff[CATBUFF_SIZE];
+  FILE *f = FOPEN(fconv(catbuff, sizeof(catbuff), path), "rb");
   unsigned char *buf;
   long sz;
   if (f == NULL)
@@ -5942,6 +5943,7 @@ static int st_warc_holds(const char *name, const char *path, const char *want,
     fprintf(stderr, "warc-teardown: %s: cannot read %s\n", name, path);
     return 1;
   }
+  /* shape, not validity: the first record's version line, nothing more */
   if (len < 8 || memcmp(blob, "WARC/1.1", 8) != 0) {
     fprintf(stderr, "warc-teardown: %s: %s does not open on a WARC record\n",
             name, path);
@@ -6005,7 +6007,8 @@ static int st_warc_teardown_case(httrackp *opt, const char *name,
     fprintf(stderr, "warc-teardown: %s: orphan temporary %s\n", name, tmp);
     err++;
   }
-  /* abort keeps run 1, close commits run 2, and neither takes the late emit */
+  /* abort keeps run 1, close commits run 2; the late body guards against an
+     append, no reopen can reach the archive without losing that run first */
   err += abort_run ? st_warc_holds(name, path, run1, run2, late)
                    : st_warc_holds(name, path, run2, run1, late);
   return err;
