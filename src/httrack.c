@@ -73,6 +73,9 @@ static int linput(FILE * fp, char *s, int max);
 #ifdef HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
+#ifdef _WIN32
+#include <io.h> /* _isatty */
+#endif
 #include <ctype.h>
 /* END specific definitions */
 
@@ -189,6 +192,15 @@ static void vt_home(void) {
 /* Last known terminal geometry; the defaults are the classic VT100 size. */
 static int term_cols = 80;
 static int term_rows = 24;
+
+/* The library's hts_stdout_isterminal() is hidden by -fvisibility=hidden. */
+static hts_boolean stdout_isterminal(void) {
+#ifdef _WIN32
+  return _isatty(_fileno(stdout)) ? HTS_TRUE : HTS_FALSE;
+#else
+  return isatty(fileno(stdout)) ? HTS_TRUE : HTS_FALSE;
+#endif
+}
 
 /* Returns HTS_TRUE if the terminal size changed since the last call. */
 static hts_boolean vt_size_refresh(void) {
@@ -327,7 +339,8 @@ static void __cdecl htsshow_uninit(t_hts_callbackarg * carg) {
 }
 static int __cdecl htsshow_start(t_hts_callbackarg * carg, httrackp * opt) {
   use_show = 0;
-  if (opt->verbosedisplay == HTS_VERBOSE_FULL) {
+  /* Cursor addressing needs a screen; the ENTER toggle re-enters here. */
+  if (opt->verbosedisplay == HTS_VERBOSE_FULL && stdout_isterminal()) {
     use_show = 1;
     (void) vt_size_refresh();
     vt_clear();

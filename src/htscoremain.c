@@ -261,7 +261,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #ifdef _WIN32
 #else
   /* Terminal is a tty, may ask questions and display funny information */
-  if (isatty(1)) {
+  if (hts_stdout_isterminal()) {
     opt->quiet = 0;
     opt->verbosedisplay = HTS_VERBOSE_SIMPLE;
   }
