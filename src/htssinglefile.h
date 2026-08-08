@@ -94,7 +94,8 @@ const char *singlefile_intro(httrackp *opt);
    not something fetched content can spell. */
 hts_boolean singlefile_may_mark(httrackp *opt, const char *body, size_t len);
 
-/* Write the mark for a reference of reflen bytes into buf; returns buf. */
+/* Write the mark for a reference of reflen bytes into buf; returns buf, left
+   empty for a reflen the pass could not read back. */
 const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
                             size_t reflen);
 

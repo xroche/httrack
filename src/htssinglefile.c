@@ -64,6 +64,12 @@ Please visit our Website: http://www.httrack.com
 #define SF_MAX_REF 4096
 #define SF_MAX_COMPONENTS 128
 
+/* Longest span htsparse can measure: HTS_URLMAXSIZE*2 of savename through
+   escape_for_html_print_full, plus as much query through
+   escape_for_html_print. */
+#define SF_MAX_SPAN                                                            \
+  (HTS_URLMAXSIZE * 2 * (HTS_HTMLESCAPE_FULL_MAXEXP + HTS_HTMLESCAPE_MAXEXP))
+
 /* Over-cap assets reported per pass; beyond that the log would carry one line
    per referencing page. */
 #define SF_MAX_WARN 32
@@ -125,18 +131,14 @@ const char *singlefile_intro(httrackp *opt) {
 
 hts_boolean singlefile_may_mark(httrackp *opt, const char *body, size_t len) {
   const char *const intro = singlefile_intro(opt);
-  size_t introlen, i;
 
   if (intro == NULL)
     return HTS_FALSE;
-  introlen = strlen(intro);
-  for (i = 0; i + introlen <= len; i++) {
-    if (memcmp(body + i, intro, introlen) == 0) {
-      hts_log_print(opt, LOG_ERROR,
-                    "single-file: document already carries this run's mark, "
-                    "leaving it alone");
-      return HTS_FALSE;
-    }
+  if (hts_memstr(body, len, intro, strlen(intro)) != NULL) {
+    hts_log_print(opt, LOG_ERROR,
+                  "single-file: document already carries this run's mark, "
+                  "leaving it alone");
+    return HTS_FALSE;
   }
   return HTS_TRUE;
 }
@@ -146,7 +148,9 @@ const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
   const char *const intro = singlefile_intro(opt);
 
   buf[0] = '\0';
-  if (intro != NULL)
+  /* Nothing sf_parse_mark would refuse: an unread mark stays in the page as
+     text and takes its reference with it. */
+  if (intro != NULL && reflen <= SF_MAX_SPAN)
     snprintf(buf, bufsize, "%s.%c.%d", intro, cls, (int) reflen);
   return buf;
 }
@@ -660,10 +664,11 @@ static void sf_warn_unresolved(sf_ctx *ctx, const char *ref, size_t reflen) {
   if (*ctx->warn_budget <= 0)
     return;
   (*ctx->warn_budget)--;
+  /* Clipped: a span runs far past anything that could name a file. */
   hts_log_print(ctx->opt, LOG_WARNING,
                 "single-file: marked reference \"%.*s\" resolves to no "
                 "mirrored file, left as a link",
-                (int) reflen, ref);
+                (int) (reflen > 256 ? 256 : reflen), ref);
 }
 
 /* Parse the mark at [p,end): "<intro>.<class>.<len>". Returns its length, or 0
@@ -701,12 +706,12 @@ static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
   if (++i >= avail || p[i++] != '.')
     return 0;
   while (i < avail && p[i] >= '0' && p[i] <= '9') {
-    if (n >= SF_MAX_REF) /* a length this big cannot name a mirrored file */
+    if (n > SF_MAX_SPAN) /* saturated: no digit run can overflow n */
       return 0;
     n = n * 10 + (size_t) (p[i++] - '0');
     digits++;
   }
-  if (digits == 0)
+  if (digits == 0 || n > SF_MAX_SPAN)
     return 0;
   *reflen = n;
   return i;
