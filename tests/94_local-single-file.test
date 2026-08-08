@@ -41,6 +41,7 @@ cat >"${doc}/index.html" <<'EOF'
 <a href=pixel.svg>unquoted</a>
 <iframe src=pixel.svg></iframe>
 <link href="style_norel.css">
+<a href="/sfmark.html">charset</a>
 </body></html>
 EOF
 cat >"${doc}/other.html" <<'EOF'
@@ -301,12 +302,23 @@ echo OK
 
 printf '[a mark cannot ride in on a header] ..\t'
 # htsparse echoes the Content-Type charset into a <meta>, a channel the body
-# sweep cannot see. A regression guard only: no fixture here serves a
-# mark-shaped charset, so it cannot fail today (#1069).
-if grep -q 'content="text/html;charset=data:' "$page"; then
+# sweep cannot see, so /sfmark.html serves a mark there. It names pixel.svg, so
+# an expansion would leave a data: URI.
+markpage="${out}/127.0.0.1_${port}/sfmark.html"
+test -f "$markpage" || {
+    echo "FAIL: the charset-mark page was not mirrored"
+    exit 1
+}
+if grep -q 'charset=data:' "$markpage"; then
     echo "FAIL: a charset-borne mark was expanded"
     exit 1
 fi
+# The mark is deleted and its reference kept: without this the check above
+# passes on a page that never carried a charset.
+grep -q 'content="text/html;charset=pixel.svg" />' "$markpage" || {
+    echo "FAIL: the charset never reached the page, so nothing was proven"
+    exit 1
+}
 echo OK
 
 printf '[no file keeps a mark] ..\t'
@@ -449,6 +461,19 @@ case "$st" in
     exit 1
     ;;
 esac
+
+printf '[the unresolved-reference warning is clipped] ..\t'
+# The self-test drives a 90 KB reference through it, so an unclipped build puts
+# all of it in the log. The first check is the floor: no warning proves nothing.
+grep -q 'resolves to no mirrored file' <<<"$st" || {
+    echo "FAIL: the self-test logged no unresolved reference"
+    exit 1
+}
+awk 'length($0) > 1024 { exit 1 }' <<<"$st" || {
+    echo "FAIL: a log line ran past the clip"
+    exit 1
+}
+echo OK
 
 # --- project reload restores the saved keys ---------------------------------
 distdir=$(cd "${top_srcdir}" && pwd)

@@ -6841,6 +6841,107 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   }
   (void) outlen;
 
+  /* A mark the pass cannot parse stays in the page as text, so whatever
+     singlefile_mark writes it has to read back. emit_max restates htsparse's
+     worst case for one reference independently of SINGLEFILE_MAX_SPAN, and the
+     spans straddle it. */
+  {
+    const size_t emit_max =
+        HTS_URLMAXSIZE * 2 *
+        (HTS_HTMLESCAPE_FULL_MAXEXP + HTS_HTMLESCAPE_MAXEXP);
+    const size_t spans[] = {4097, emit_max, emit_max + 1, emit_max * 4};
+    char mark[SINGLEFILE_MARK_MAX];
+    size_t k;
+
+    sf_check(singlefile_mark(opt, mark, sizeof(mark), SINGLEFILE_CLASS_ANY,
+                             emit_max)[0] != '\0',
+             "a span htsparse can emit was refused a mark");
+    for (k = 0; k < sizeof(spans) / sizeof(spans[0]); k++) {
+      String marked = STRING_EMPTY, got = STRING_EMPTY;
+      char *pad = (char *) malloct(spans[k]);
+      size_t marklen;
+
+      assertf(pad != NULL);
+      memset(pad, 'a', spans[k]);
+      StringClear(marked);
+      StringCat(marked, "<img src=\"");
+      StringMemcat(marked, pad, spans[k]);
+      marklen = strlen(singlefile_mark(opt, mark, sizeof(mark),
+                                       SINGLEFILE_CLASS_ANY, spans[k]));
+      StringCat(marked, mark);
+      StringCat(marked, "\">\n");
+      StringClear(got);
+      (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
+                                     StringLength(marked),
+                                     SINGLEFILE_MAX_PAGE_SIZE, &got);
+      sf_check(strstr(StringBuff(got), singlefile_intro(opt)) == NULL,
+               "a mark the emitter wrote stayed in the page as text");
+      sf_check(hts_memstr(StringBuff(got), StringLength(got), pad, spans[k]) !=
+                   NULL,
+               "the reference the mark measured was lost");
+      /* Nothing resolves here, so the mark is the only thing that may go: a
+         length check catches what a presence check cannot. */
+      sf_check(StringLength(got) == StringLength(marked) - marklen,
+               "the pass removed something other than the mark");
+      if (spans[k] == emit_max + 1) {
+        char tail[32];
+
+        /* Hand-built at cap+1, which singlefile_mark now refuses: without the
+           cap sf_parse_mark reads it and eats the padding behind it. */
+        snprintf(tail, sizeof(tail), ".%c.%d", SINGLEFILE_CLASS_ANY,
+                 (int) spans[k]);
+        StringClear(marked);
+        StringCat(marked, "<img src=\"");
+        StringMemcat(marked, pad, spans[k]);
+        StringCat(marked, singlefile_intro(opt));
+        StringCat(marked, tail);
+        StringCat(marked, "\">\n");
+        StringClear(got);
+        (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
+                                       StringLength(marked),
+                                       SINGLEFILE_MAX_PAGE_SIZE, &got);
+        sf_check(strstr(StringBuff(got), singlefile_intro(opt)) != NULL,
+                 "an over-cap length was read as a mark");
+        /* 2^64 + 10: unsaturated, the digits wrap to 10 and the mark eats ten
+           bytes of padding instead of being refused. */
+        StringClear(marked);
+        StringCat(marked, "<img src=\"");
+        StringMemcat(marked, pad, spans[k]);
+        StringCat(marked, singlefile_intro(opt));
+        StringCat(marked, ".-.18446744073709551626");
+        StringCat(marked, "\">\n");
+        StringClear(got);
+        (void) singlefile_rewrite_html(opt, root, page, StringBuff(marked),
+                                       StringLength(marked),
+                                       SINGLEFILE_MAX_PAGE_SIZE, &got);
+        sf_check(StringLength(got) == StringLength(marked),
+                 "a wrapping digit run was read as a mark");
+      }
+      freet(pad);
+      StringFree(marked);
+      StringFree(got);
+    }
+  }
+
+  /* singlefile_may_mark searches with hts_memstr, which finds nothing for an
+     empty needle; the intro is fixed-width, so that case cannot arise. */
+  {
+    String probe = STRING_EMPTY;
+
+    sf_check(strlen(singlefile_intro(opt)) == SINGLEFILE_INTRO_LEN,
+             "the intro is not the fixed-width string may_mark assumes");
+    sf_check(singlefile_may_mark(opt, "", 0), "an empty body was refused");
+    StringClear(probe);
+    StringMemcat(probe, "x\0", 2); /* bodies carry NULs; strstr would stop */
+    StringCat(probe, singlefile_intro(opt));
+    sf_check(!singlefile_may_mark(opt, StringBuff(probe), StringLength(probe)),
+             "an intro ending the body, past a NUL, was missed");
+    sf_check(
+        singlefile_may_mark(opt, StringBuff(probe), StringLength(probe) - 1),
+        "a truncated intro was read as one");
+    StringFree(probe);
+  }
+
   /* The per-page budget against a self-importing stylesheet. The large-budget
      run is the control: it proves the fan-out is real, so the small one was
      cut short by the budget and not by the fixture. */

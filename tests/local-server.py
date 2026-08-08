@@ -2431,7 +2431,18 @@ class Handler(SimpleHTTPRequestHandler):
             "application/octet-stream",
         )
 
+    # A --single-file mark in the charset, the one channel a body sweep cannot
+    # see (#1069). It names pixel.svg, a real asset, so an expansion would show.
+    SINGLEFILE_MARK_CHARSET = "pixel.svg#!0011223344556677.-.9"
+
+    def route_singlefile_mark(self):
+        self.send_raw(
+            b"<html><head></head><body><p>charset</p></body></html>",
+            "text/html; charset=" + self.SINGLEFILE_MARK_CHARSET,
+        )
+
     ROUTES = {
+        "/sfmark.html": route_singlefile_mark,
         "/cookies/entrance.php": route_entrance,
         "/cookies/second.php": route_second,
         "/cookies/third.php": route_third,
