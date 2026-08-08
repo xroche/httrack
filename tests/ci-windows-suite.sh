@@ -256,7 +256,7 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # same line; compared as a sorted set below, so glob discovery order can't
 # cause a false mismatch either.
 # footer-overflow and purge-longpath skip on Windows (need a path past MAX_PATH);
-# crange pending #581;
+# memresume pending #581;
 # webdav-default, webdav-mime and webdav-overflow need a reapable background listener, which MSYS cannot give them;
 # badmtime needs a filesystem that stores an mtime past gmtime's range;
 # single-file ends on a GUI half needing htsserver, which this job does not build;
@@ -268,7 +268,8 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # and needs the loader variable libtool picked, neither of which this job has;
 # link-control-bytes names its fixtures with the raw control bytes the requests
 # decode back to, which NTFS refuses;
-# ftp-userpass starves the x64 runner until the step is lost, Win32 passing (#1038).
+# ftp-userpass starves the x64 runner until the step is lost, Win32 passing (#1038);
+# repaircache and resume-recovery interrupt pass 1 with a signal MSYS cannot deliver to a native exe.
 expected_skips="01_engine-footer-overflow.test
 100_local-purge-longpath.test
 158_local-link-control-bytes.test
@@ -280,6 +281,7 @@ expected_skips="01_engine-footer-overflow.test
 153_local-proxytrack-quiet.test
 215_engine-datadir-ospath.test
 230_local-ftp-userpass.test
+235_local-resume-recovery.test
 48_local-crange-memresume.test
 71_local-crange-repaircache.test
 79_local-proxytrack-webdav-mime.test

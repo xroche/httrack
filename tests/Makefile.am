@@ -4,7 +4,7 @@ include $(srcdir)/tests-list.mk
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c crawl-test.sh run-all-tests.sh check-network.sh check-tests-list.sh \
+EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c crawl-test.sh run-all-tests.sh check-network.sh check-tests-list.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
@@ -58,6 +58,8 @@ TESTS_ENVIRONMENT += DL_LIBS="$(DL_LIBS)"
 TESTS_ENVIRONMENT += HTTRACK_SHLIB=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)/libhttrack.so
 TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
+TESTS_ENVIRONMENT += UNLINKFAIL_LA=$(abs_builddir)/libunlinkfail.la
+TESTS_ENVIRONMENT += UNLINKFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libunlinkfail.so
 TESTS_ENVIRONMENT += THREADATTRFAIL_LA=$(abs_builddir)/libthreadattrfail.la
 TESTS_ENVIRONMENT += THREADATTRFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libthreadattrfail.so
 TESTS_ENVIRONMENT += NOBACKTRACE_LA=$(abs_builddir)/libnobacktrace.la
@@ -74,11 +76,16 @@ TESTS_ENVIRONMENT += SHLIBPATH_VAR=$(SHLIBPATH_VAR)
 
 # rename() interposer for 01_engine-renameover.test; -rpath is what makes
 # libtool build a shared module rather than a static-only convenience library.
-check_LTLIBRARIES = librenamefail.la libthreadattrfail.la libnobacktrace.la \
-	libaltstackprobe.la
+check_LTLIBRARIES = librenamefail.la libunlinkfail.la libthreadattrfail.la \
+	libnobacktrace.la libaltstackprobe.la
 librenamefail_la_SOURCES = renamefail.c
 librenamefail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 librenamefail_la_LIBADD = $(DL_LIBS)
+
+# unlink() interposer for 235_local-resume-recovery.test
+libunlinkfail_la_SOURCES = unlinkfail.c
+libunlinkfail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+libunlinkfail_la_LIBADD = $(DL_LIBS)
 
 # pthread_create() interposer for 113_engine-threadattr-leak.test
 libthreadattrfail_la_SOURCES = threadattrfail.c

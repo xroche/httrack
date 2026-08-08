@@ -1547,6 +1547,95 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(self.CRANGE206_BODY)
 
+    # #581/#1052: an interrupted download leaves a partial plus a temp-ref, and
+    # the resume is answered with a Content-Range starting past what is on disk.
+    # The "loop" variant keeps answering unusably even without a Range, so only
+    # the one-shot latch can end the crawl.
+    RESUME206_BODY = b"RSM206DT" + bytes((i * 7 + 3) % 256 for i in range(6000))
+    RESUME206_HAVE = 3000
+    _resume206_started = set()
+
+    def _resume206_stall(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(self.RESUME206_BODY)))
+        self.send_header("Accept-Ranges", "bytes")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(self.RESUME206_BODY[: self.RESUME206_HAVE])
+            self.wfile.flush()
+            try:
+                while True:
+                    time.sleep(3600)
+            except OSError:
+                pass
+
+    def _resume206_unusable(self):
+        start = self.RESUME206_HAVE + 2000  # past what is on disk
+        body = self.RESUME206_BODY[start:]
+        self.send_response(206, "Partial Content")
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header(
+            "Content-Range",
+            "bytes %d-%d/%d"
+            % (start, len(self.RESUME206_BODY) - 1, len(self.RESUME206_BODY)),
+        )
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _resume206_whole(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(self.RESUME206_BODY)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(self.RESUME206_BODY)
+
+    def route_resume206_index(self):
+        self.send_html('\t<a href="blob.bin">blob</a>')
+
+    def route_resume206(self):
+        if "plain" not in Handler._resume206_started:
+            Handler._resume206_started.add("plain")
+            return self._resume206_stall()
+        if self.headers.get("Range") is not None:
+            return self._resume206_unusable()
+        return self._resume206_whole()
+
+    def route_resume206loop_index(self):
+        self.send_html('\t<a href="blob.bin">blob</a>')
+
+    def route_resume206loop(self):
+        if "loop" not in Handler._resume206_started:
+            Handler._resume206_started.add("loop")
+            return self._resume206_stall()
+        return self._resume206_unusable()  # unusable forever, Range or not
+
+    # An unusable 206 alternating with a redirect to a case-different alias of
+    # the same path: the hop re-records the link, and a latch lost there buys
+    # another free restart every time round (#1052).
+    _alias206_count = 0
+
+    def route_alias206_index(self):
+        self.send_html('\t<a href="Blob.bin">blob</a>')
+
+    def _alias206(self, other):
+        Handler._alias206_count += 1
+        if Handler._alias206_count % 2:
+            return self._resume206_unusable()
+        self.send_response(301, "Moved Permanently")
+        self.send_header("Location", "/alias206/" + other)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_alias206_upper(self):
+        self._alias206("blob.bin")
+
+    def route_alias206_lower(self):
+        self._alias206("Blob.bin")
+
     # error pages / 0-byte files (#17): -o0 ("no error pages") must keep 4xx/5xx
     # bodies off disk; a genuine 0-byte 200 is a valid file and stays.
     def route_errpage_index(self):
@@ -2442,6 +2531,13 @@ class Handler(SimpleHTTPRequestHandler):
         "/crange206/blob.bin": route_crange206,
         "/crange206mem/index.html": route_crange206mem_index,
         "/crange206mem/blob.bin": route_crange206mem,
+        "/resume206/index.html": route_resume206_index,
+        "/resume206/blob.bin": route_resume206,
+        "/resume206loop/index.html": route_resume206loop_index,
+        "/resume206loop/blob.bin": route_resume206loop,
+        "/alias206/index.html": route_alias206_index,
+        "/alias206/Blob.bin": route_alias206_upper,
+        "/alias206/blob.bin": route_alias206_lower,
         "/size/index.html": route_size_index,
         "/size/oversize.bin": route_size_oversize,
         "/chunked/index.html": route_chunked_index,

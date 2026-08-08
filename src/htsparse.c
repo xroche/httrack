@@ -3658,6 +3658,9 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                     heap_top()->pass2 =
                       max(heap(ptr)->pass2, numero_passe);
                     heap_top()->retry = heap(ptr)->retry;
+                    // same transfer under another name: carry the restart latch
+                    // too, else a 206/alias alternation restarts for free
+                    heap_top()->refetch_whole = heap(ptr)->refetch_whole;
                     heap_top()->premier = heap(ptr)->premier;
                     heap_top()->precedent = heap(ptr)->precedent;
                   } else {      // oups erreur, plus de mémoire!!
@@ -3764,6 +3767,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
           heap_top()->depth = heap(ptr)->depth;
           heap_top()->pass2 = max(heap(ptr)->pass2, numero_passe);
           heap_top()->retry = heap(ptr)->retry;
+          heap_top()->refetch_whole = heap(ptr)->refetch_whole;
           heap_top()->premier = heap(ptr)->premier;
           heap_top()->precedent = ptr;
           error = 1;
@@ -3838,8 +3842,15 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         break;
       }
 
+      /* Restarting a resume the server refused is not a retry of a failed
+         transfer: free, but latched to one per link so an always-unusable
+         server cannot loop (#1052). */
+      const hts_boolean restart_whole =
+          r->refetch_wholefile && !heap(ptr)->refetch_whole;
+
       if (strcmp(heap(ptr)->fil, "/primary") != 0) {   // no primary (internal page 0)
-        if ((heap(ptr)->retry <= 0) || (!can_retry)) { // retry épuisés (ou retry impossible)
+        // give up: no free restart left, and no budget (or nothing to retry)
+        if (!restart_whole && ((heap(ptr)->retry <= 0) || (!can_retry))) {
           if ((opt->retry > 0) && (can_retry)) {
             hts_log_print(opt, LOG_ERROR,
                           "\"%s\" (%d) after %d retries at link %s%s (from %s%s)",
@@ -3889,23 +3900,32 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             }
           }
 
-        } else {                // retry!!
-          hts_log_print(opt, LOG_NOTICE,
-                        "Retry after error %d (%s) at link %s%s (from %s%s)",
-                        r->statuscode, r->msg, urladr(), urlfil(),
-                        heap(heap(ptr)->precedent)->adr,
-                        heap(heap(ptr)->precedent)->fil);
-          // redemander fichier
+        } else { // retry, or a refused-resume restart
+          if (restart_whole) {
+            hts_log_print(opt, LOG_NOTICE,
+                          "Restarting whole file after error %d (%s) at link "
+                          "%s%s (from %s%s)",
+                          r->statuscode, r->msg, urladr(), urlfil(),
+                          heap(heap(ptr)->precedent)->adr,
+                          heap(heap(ptr)->precedent)->fil);
+          } else {
+            hts_log_print(opt, LOG_NOTICE,
+                          "Retry after error %d (%s) at link %s%s (from %s%s)",
+                          r->statuscode, r->msg, urladr(), urlfil(),
+                          heap(heap(ptr)->precedent)->adr,
+                          heap(heap(ptr)->precedent)->fil);
+          }
+          // re-request the file
           if (hts_record_link(opt, urladr(), urlfil(), savename(), "", "", codebase)) {
             heap_top()->testmode = heap(ptr)->testmode;   // mode test?
             heap_top()->link_import = 0;   // pas mode import
             heap_top()->depth = heap(ptr)->depth;
             heap_top()->pass2 = max(heap(ptr)->pass2, numero_passe);
-            heap_top()->retry = heap(ptr)->retry - 1;     // moins 1 retry!
+            heap_top()->retry =
+                restart_whole ? heap(ptr)->retry : heap(ptr)->retry - 1;
             heap_top()->premier = heap(ptr)->premier;
             heap_top()->precedent = heap(ptr)->precedent;
-            // a rejected resume (unusable 206) must refetch whole, no Range
-            // (#581)
+            // refetch whole with no Range, and latch out a second free restart
             heap_top()->refetch_whole = r->refetch_wholefile;
           } else {              // oups erreur, plus de mémoire!!
             return 0;

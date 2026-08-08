@@ -4430,6 +4430,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                             // Content-Length that would overflow the add or the
                             // (size_t) cast is dropped and refetched instead.
                             if (back[i].r.totalsize > INT32_MAX - alloc_mem) {
+                              /* Windows refuses to unlink a file still open */
+                              fclose(fp);
+                              fp = NULL;
                               url_savename_refname_remove(opt, back[i].url_adr,
                                                           back[i].url_fil);
                               UNLINK(back[i].url_sav);
@@ -4460,7 +4463,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               strcpybuff(back[i].r.msg,
                                          "No memory for partial file");
                             }
-                            fclose(fp);
+                            if (fp != NULL)
+                              fclose(fp);
                           } else {                              // open failed
                             back[i].status = STATUS_READY;      // terminé (voir plus loin)
                             back_set_finished(sback, i);
