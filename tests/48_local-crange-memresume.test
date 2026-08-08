@@ -15,11 +15,10 @@ root=$(nativepath "${testdir}/server-root")
 
 python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
 
-# The resume needs a graceful pass-1 interrupt (a clean cache), which MSYS can't
-# deliver to a native exe, and the restart-whole path fails on a repaired cache
-# (#581); TODO: drop once that lands.
+# The resume needs a graceful pass-1 interrupt to leave a temp-ref, and MSYS
+# cannot deliver a signal to a native exe.
 if is_windows; then
-    echo "Windows: interrupted-resume restart fails on a repaired cache (#581), skipping"
+    echo "Windows: the pass-1 interrupt needs a signal MSYS cannot deliver, skipping"
     exit 77
 fi
 
