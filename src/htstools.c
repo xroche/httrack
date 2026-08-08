@@ -42,6 +42,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #ifdef _WIN32
 #include "windows.h"
+#include <io.h> /* _isatty */
 #else
 #include <dirent.h>
 #ifdef HAVE_UNISTD_H
@@ -1508,4 +1509,12 @@ hts_boolean hts_rename_over_aside_selftest(httrackp *opt, const char *src,
   fconv(csrc, sizeof(csrc), src);
   fconv(cdst, sizeof(cdst), dst);
   return rename_over_aside(opt, csrc, cdst);
+}
+
+hts_boolean hts_stdout_isterminal(void) {
+#ifdef _WIN32
+  return _isatty(_fileno(stdout)) ? HTS_TRUE : HTS_FALSE;
+#else
+  return isatty(fileno(stdout)) ? HTS_TRUE : HTS_FALSE;
+#endif
 }
