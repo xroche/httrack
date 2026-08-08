@@ -80,11 +80,13 @@ void warc_move_request(htsblk *src, htsblk *dst);
 void warc_adopt_rawspool(htsblk *r, const char *tmpfile_path);
 
 /* Emit the request + response (or revisit) records for one finished
-   transaction. Lazily opens the writer into opt->state.warc; a no-op (logged
-   once) if the archive cannot be created. */
+   transaction. Lazily opens the writer into opt->state.warc; a no-op if the
+   archive cannot be created (logged once), and a silent one once the session
+   has closed or abandoned it. */
 void warc_write_backtransaction(httrackp *opt, lien_back *back);
 
-/* Close and free the writer held in opt->state.warc, if any. */
+/* Close and free the writer held in opt->state.warc, if any. Both this and
+   warc_abort_opt() are final: a later transaction reopens nothing. */
 void warc_close_opt(httrackp *opt);
 
 /* Same, but discards this run's archive: keeps the previous one and drops

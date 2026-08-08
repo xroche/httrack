@@ -257,7 +257,8 @@ struct htsoptstate {
   unsigned int debug_state;
   unsigned int tmpnameid; /**< counter for temporary file names */
   int is_ended;           /**< mirror has finished */
-  void *warc;             /**< open WARC writer (warc_writer*), or NULL */
+  void *warc; /**< WARC writer (warc_writer*), or NULL, or the WARC_DISABLED
+                   sentinel (htswarc.c) */
 };
 
 /* Library handles */
@@ -527,6 +528,7 @@ struct httrackp {
   // store library handles
   htslibhandles libHandles; /**< loaded external module handles */
   //
+  /* Live state, not options: copy_htsopt must leave it alone. */
   htsoptstate state; /**< embedded live engine state */
   String strip_query; /**< query keys to drop when deduping URLs (-strip-query);
                            appended at the tail to keep field offsets stable */

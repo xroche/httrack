@@ -1,0 +1,95 @@
+#!/bin/bash
+# The web GUI must emit the --single-file options (#713), driven through a live
+# htsserver.
+set -e
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+# The Windows job builds httrack.exe only and reaches this file through its
+# *_local-*.test glob, so report a skip there rather than a pass.
+if ! command -v htsserver >/dev/null; then
+    echo "SKIP (no htsserver in PATH)"
+    exit 77
+fi
+
+distdir=$(cd "${top_srcdir}" && pwd)
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_713gui.XXXXXX") || exit 1
+htssrv=
+cleanup() {
+    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
+    test -z "$htssrv" || kill -9 "$htssrv" 2>/dev/null || true
+    wait "$htssrv" 2>/dev/null || true # absorb bash's async "Killed" notice
+    htssrv=
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+printf '[webhttrack renders the options] ..\t'
+sport=$("$python" -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
+srvlog="${tmpdir}/htsserver.log"
+(
+    trap '' TERM TTOU
+    export HOME="${tmpdir}/home"
+    mkdir -p "$HOME"
+    exec htsserver "${distdir}/" --port "${sport}" >"${srvlog}" 2>&1
+) &
+htssrv=$!
+url=
+for _ in $(seq 1 40); do
+    url=$(sed -n 's/^URL=//p' "$srvlog" 2>/dev/null) && test -n "$url" && break
+    kill -0 "$htssrv" 2>/dev/null || break
+    sleep 0.25
+done
+test -n "${url:-}" || {
+    echo "FAIL: htsserver did not start: $(cat "$srvlog")"
+    exit 1
+}
+"$python" - "$url" <<'PY' || exit 1
+import re, sys, urllib.parse, urllib.request
+
+url = sys.argv[1]
+form = urllib.request.urlopen(url + "server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("FAIL: no session id in server/index.html")
+fields = [("sid", m.group(1).decode()), ("singlefile", "on"),
+          ("singlefilemax", "5000")]
+body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
+req = urllib.request.Request(url + "server/step4.html",
+                             data=body.encode("latin-1"), method="POST")
+page = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+
+
+def textarea(name):
+    # [ >] anchors the name: unanchored, "command" also matches "commandline".
+    m = re.search(r'<textarea name="%s"[ >].*?>(.*?)</textarea>' % name, page, re.S)
+    if m is None:
+        sys.exit("FAIL: no %s textarea in the rendered step4.html" % name)
+    return m.group(1)
+
+
+# Whole tokens: "--single-file" is a substring of "--single-file-max-size=5000",
+# so a plain `in` passes with the bare flag gone, and a one-sided anchor takes
+# both 50000 and a template fusion like --near--single-file-max-size=5000.
+cmd = textarea("command")
+if "--single-file" not in cmd.split():
+    sys.exit("FAIL: --single-file missing from the command line\n%s" % cmd)
+if "--single-file-max-size=5000" not in cmd.split():
+    sys.exit("FAIL: --single-file-max-size=5000 missing from the command "
+             "line\n%s" % cmd)
+ini = textarea("winprofile").replace("\r\n", "\n")
+for want in ("\nSingleFile=1\n", "\nSingleFileMaxSize=5000\n"):
+    if want not in ini:
+        sys.exit("FAIL: %r missing from winprofile.ini\n%s" % (want, ini))
+PY
+echo OK
