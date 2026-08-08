@@ -36,7 +36,7 @@ targets=$(
     {
         cat "${html}"/*.html | grep -o 'guide\.html#[^"'"'"' >]*' | sed 's/.*#//'
         grep -o 'href="#[^"]*"' "${guide}" | sed 's/^href="#//; s/"$//'
-    } | sed 's/^\(win\|web\|droid\)\///' | grep -v '^$' | sort -u
+    } | sed -e 's|^win/||' -e 's|^web/||' -e 's|^droid/||' | grep -v '^$' | sort -u
 )
 
 # Non-vacuity: the stubs and the in-page links must both have been seen.
