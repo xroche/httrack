@@ -286,7 +286,6 @@ expected_skips="01_engine-footer-overflow.test
 152_engine-string-oom.test
 153_local-proxytrack-quiet.test
 215_engine-datadir-ospath.test
-230_local-ftp-userpass.test
 243_local-ftp-deadhost-interrupt.test
 235_local-resume-recovery.test
 48_local-crange-memresume.test
