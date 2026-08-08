@@ -542,8 +542,9 @@ int httpmirror(char *url1, httrackp * opt) {
   t_cookie BIGSTK cookie;       // gestion des cookies
 
   int ptr;                      // pointeur actuel sur les liens
-  int retcode = 1; // what the single exit returns; a bailout sets -1
-  hts_boolean rollback = HTS_FALSE; // undo this session on the way out
+  int retcode = 1; // return code for the single exit; a bailout sets -1
+  hts_boolean rollback = HTS_FALSE;  // set to roll back the cache at cleanup
+  hts_boolean completed = HTS_FALSE; // set once the crawl loop reaches its end
 
   //
   int numero_passe = 0;         // deux passes pour html puis images
@@ -2291,17 +2292,24 @@ int httpmirror(char *url1, httrackp * opt) {
 
   // ending
   usercommand(opt, 0, NULL, NULL, NULL, NULL);
+  completed = HTS_TRUE;
 
 cleanup:
-  /* single exit: every bailout jumps here, so the archive, the change report
-     and the sitemap list are closed whichever way the mirror ends */
+  /* single exit: every bailout jumps here, so the closes below always run */
   warc_close_opt(opt); /* a no-op once warc_abort_opt() has run */
-  hts_changes_close_opt(opt);
+  /* An abort never ran hts_changes_indexed(), so its report would be false;
+     free it rather than overwrite the previous run's true one. */
+  if (completed)
+    hts_changes_close_opt(opt);
+  else
+    hts_changes_free_opt(opt);
   hts_sitemap_free(opt);
 
   // désallocation mémoire & buffers
+  freet(primary); /* NULL once the first link adopted it */
   XH_uninit;
-  if (rollback) /* after XH_uninit: it holds the cache files open */
+  /* reconcile renames the cache files XH_uninit just closed, so it runs last */
+  if (rollback)
     hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
 
   return retcode;
