@@ -1,6 +1,6 @@
 #!/bin/bash
-# The web GUI must emit the --single-file options (#713). Split from
-# 94_local-single-file.test so the engine half runs where htsserver is not built.
+# The web GUI must emit the --single-file options (#713), driven through a live
+# htsserver.
 set -e
 
 : "${top_srcdir:=..}"
@@ -71,16 +71,22 @@ page = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
 
 
 def textarea(name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
+    # [ >] anchors the name: unanchored, "command" also matches "commandline".
+    m = re.search(r'<textarea name="%s"[ >].*?>(.*?)</textarea>' % name, page, re.S)
     if m is None:
         sys.exit("FAIL: no %s textarea in the rendered step4.html" % name)
     return m.group(1)
 
 
+# Whole tokens: "--single-file" is a substring of "--single-file-max-size=5000",
+# so a plain `in` would pass with the bare flag gone, and an unterminated value
+# match would take 50000 for 5000.
 cmd = textarea("command")
-for want in ("--single-file", "--single-file-max-size=5000"):
-    if want not in cmd:
-        sys.exit("FAIL: %s missing from the command line\n%s" % (want, cmd))
+if "--single-file" not in cmd.split():
+    sys.exit("FAIL: --single-file missing from the command line\n%s" % cmd)
+if not re.search(r"--single-file-max-size=5000(?!\d)", cmd):
+    sys.exit("FAIL: --single-file-max-size=5000 missing from the command "
+             "line\n%s" % cmd)
 ini = textarea("winprofile").replace("\r\n", "\n")
 for want in ("\nSingleFile=1\n", "\nSingleFileMaxSize=5000\n"):
     if want not in ini:

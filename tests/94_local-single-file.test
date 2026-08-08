@@ -301,10 +301,9 @@ grep -q 'data:image/svg+xml;base64,' "$page" || {
 echo OK
 
 printf '[a mark cannot ride in on a header] ..\t'
-# htsparse echoes the Content-Type charset into a <meta>; a forged mark there
-# bypasses anything that scans the body. Unforgeable means the channel does
-# not matter, so this asserts on the channel the body sweep could never see.
-grep -q 'charset=127' "$page" || true
+# htsparse echoes the Content-Type charset into a <meta>, a channel the body
+# sweep cannot see. A regression guard only: no fixture here serves a
+# mark-shaped charset, so it cannot fail today (#1069).
 if grep -q 'content="text/html;charset=data:' "$page"; then
     echo "FAIL: a charset-borne mark was expanded"
     exit 1
@@ -314,6 +313,13 @@ echo OK
 printf '[no file keeps a mark] ..\t'
 # Stripping matches the mark's shape, not this run's secret, so nothing in the
 # mirror may carry one -- pages included, and whatever an earlier run left.
+# grep's status dies in the pipeline, so an unsearchable tree would read as
+# clean: floor the file count first.
+searched=$(find "${out}/127.0.0.1_${port}" -type f 2>/dev/null | wc -l)
+test "$searched" -ge 5 || {
+    echo "FAIL: only $searched mirrored files to sweep; nothing was proven"
+    exit 1
+}
 marked=$(grep -rlE '#![0-9a-f]{16}\.[-cj]\.[0-9]+' \
     "${out}/127.0.0.1_${port}" 2>/dev/null | tr '\n' ' ')
 test -z "$marked" || {
@@ -373,10 +379,17 @@ printf '[--changes and --single-file together] ..\t'
 # inlined size rather than the marked intermediate.
 chg="${tmpdir}/chg"
 mkdir "$chg"
-httrack "${common[@]}" --single-file --changes "${base}/index.html" \
+# Its own -O: "$common" points at the first mirror, which left $chgpage absent
+# and every check below vacuous.
+httrack -O "$chg" --quiet --disable-security-limits --robots=0 --timeout=30 \
+    --retries=0 --single-file --changes "${base}/index.html" \
     >"${tmpdir}/log6" 2>&1
 chgpage="${chg}/127.0.0.1_${port}/index.html"
-test ! -f "$chgpage" || grep -q 'base64,' "$chgpage" || {
+test -f "$chgpage" || {
+    echo "FAIL: --changes produced no mirrored page"
+    exit 1
+}
+grep -q 'base64,' "$chgpage" || {
     echo "FAIL: --changes suppressed the inlining"
     exit 1
 }
@@ -420,7 +433,7 @@ case "$st" in
     ;;
 esac
 
-# --- the web GUI must emit the same options ---------------------------------
+# --- project reload restores the saved keys ---------------------------------
 distdir=$(cd "${top_srcdir}" && pwd)
 printf '[project reload maps the keys back] ..\t'
 grep -q 'do:copy:SingleFile:singlefile' "${distdir}/html/server/step2.html" || {
