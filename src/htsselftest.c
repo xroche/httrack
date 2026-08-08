@@ -7722,6 +7722,122 @@ static int st_backswap(httrackp *opt, int argc, char **argv) {
   return back_selftest_slot_swap();
 }
 
+/* TEST-NET-1: routed nowhere, so a connect to it stays pending. */
+#define ST_BACKSTOP_DEADHOST "192.0.2.1"
+
+/* Open a connect that is still in flight, or INVALID_SOCKET where the network
+   answers for the blackhole instead of dropping. */
+static T_SOC st_backstop_pending(httrackp *opt, htsblk *r) {
+  T_SOC soc;
+
+  hts_init_htsblk(r);
+  soc = newhttp_addr(opt, ST_BACKSTOP_DEADHOST, r, 80, 0, 0, NULL);
+  if (soc == INVALID_SOCKET)
+    return INVALID_SOCKET;
+  r->soc = soc;
+  if (check_socket_connect(soc) != 0) {
+    strcpybuff(r->msg, "the network answers for this address");
+    deletehttp(r);
+    return INVALID_SOCKET;
+  }
+  return soc;
+}
+
+static void st_backstop_slot(lien_back *back, int status, const htsblk *r) {
+  back->r = *r;
+  back->r.location = back->location_buffer;
+  back->status = status;
+  back->timeout = -1; /* only the stop may end these slots */
+  back->rateout = -1;
+  /* poisoned, so the expected outcome cannot be the value the slot came with */
+  back->r.statuscode = STATUSCODE_TIMEOUT;
+  strcpybuff(back->r.msg, "untouched");
+  strcpybuff(back->url_adr, ST_BACKSTOP_DEADHOST);
+  strcpybuff(back->url_fil, "/stalled.html");
+}
+
+/* #1073: a user stop must drop the slots still waiting for a connection, and
+   only those. */
+static int st_backstop(httrackp *opt, int argc, char **argv) {
+  enum { SLOT_DNS = 0, SLOT_CONNECT, SLOT_SSL, SLOT_HEADERS, SLOT_XFER, SLOTS };
+
+  static const int status[SLOTS] = {STATUS_WAIT_DNS, STATUS_CONNECTING,
+                                    STATUS_SSL_WAIT_HANDSHAKE,
+                                    STATUS_WAIT_HEADERS, STATUS_TRANSFER};
+  htsblk r[SLOTS];
+  struct_back *sback;
+  cache_back cache;
+  lien_back *back;
+  int err = 0;
+  int i;
+
+  (void) argc;
+  (void) argv;
+
+  /* no quota may fire instead of the stop, and no slot may time out */
+  opt->maxtime = opt->maxsite = 0;
+  opt->timeout = 0;
+
+  /* The resolution wait owns no socket yet and the handshake wait no TLS
+     session: a stop must end them without reading either. */
+  for (i = 0; i < SLOTS; i++) {
+    if (i == SLOT_DNS) {
+      hts_init_htsblk(&r[i]);
+    } else if (st_backstop_pending(opt, &r[i]) == INVALID_SOCKET) {
+      printf("backstop: SKIP (no stalled connect to " ST_BACKSTOP_DEADHOST
+             ": %s)\n",
+             r[i].msg);
+      while (--i >= SLOT_CONNECT)
+        deletehttp(&r[i]);
+      return 77;
+    }
+  }
+
+  memset(&cache, 0, sizeof(cache));
+  cache.hashtable = coucal_new(0);
+  sback = back_new(opt, SLOTS);
+  back = sback->lnk;
+  for (i = 0; i < SLOTS; i++)
+    st_backstop_slot(&back[i], status[i], &r[i]);
+
+  hts_request_stop(opt, 0);
+  back_wait(sback, opt, &cache, 0);
+
+#define CHECK(cond)                                                            \
+  do {                                                                         \
+    if (!(cond)) {                                                             \
+      printf("  FAIL line %d: %s\n", __LINE__, #cond);                         \
+      err = 1;                                                                 \
+    }                                                                          \
+  } while (0)
+
+  /* every pre-connect slot is gone, socket closed, and reported as fatal so
+     the link is not queued again */
+  for (i = SLOT_DNS; i <= SLOT_SSL; i++) {
+    CHECK(back[i].status == STATUS_READY);
+    CHECK(back[i].r.soc == INVALID_SOCKET);
+    CHECK(back[i].r.statuscode == STATUSCODE_INVALID);
+    CHECK(strcmp(back[i].r.msg, "mirror stopped by user") == 0);
+  }
+  /* control: an established transfer is what the first stop lets finish, so a
+     sweep that took these too would be the wrong fix */
+  for (i = SLOT_HEADERS; i <= SLOT_XFER; i++) {
+    CHECK(back[i].status == status[i]);
+    CHECK(back[i].r.soc != INVALID_SOCKET);
+    CHECK(back[i].r.statuscode == STATUSCODE_TIMEOUT);
+    CHECK(strcmp(back[i].r.msg, "untouched") == 0);
+  }
+#undef CHECK
+
+  for (i = 0; i < SLOTS; i++)
+    deletehttp(&back[i].r);
+  back_free(&sback);
+  coucal_delete(&cache.hashtable);
+
+  printf("backstop self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_threadwait(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i, round;
@@ -8604,6 +8720,9 @@ static const struct selftest_entry {
      st_localtime},
     {"backswap", "", "which backlog slots may be swapped to the ready table",
      st_backswap},
+    {"backstop", "",
+     "a user stop drops the slots still waiting to connect (#1073)",
+     st_backstop},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},
