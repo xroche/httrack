@@ -3411,6 +3411,7 @@ int read_stdin(char *s, int max) {
 
 #ifdef _WIN32
 int check_stdin(void) {
+  /* The console queue, not stdin: no end of file to mistake for a keystroke. */
   return (_kbhit());
 }
 #else
@@ -3426,11 +3427,18 @@ int check_flot(T_SOC s) {
   return FD_ISSET(s, &fds);
 }
 int check_stdin(void) {
+  int c;
+
   fflush(stdout);
-  fflush(stdin);
-  if (check_flot(0))
-    return 1;
-  return 0;
+  if (!check_flot(0))
+    return 0;
+  /* Readable is not data: an stdin at EOF stays readable forever and reads as a
+     keypress (#1072). clearerr: a terminal can get input again after a ^D. */
+  clearerr(stdin);
+  if ((c = fgetc(stdin)) == EOF)
+    return 0;
+  ungetc(c, stdin);
+  return 1;
 }
 #endif
 #endif
