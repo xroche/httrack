@@ -2777,9 +2777,8 @@ static hts_boolean back_is_preconnect(const int status) {
          status == STATUS_SSL_WAIT_HANDSHAKE;
 }
 
-/* A stopped mirror has nothing to finish on a connection never established, and
-   left alone such a slot holds the drain for the whole --timeout (#1073). Slots
-   already receiving stay: finishing those is what the first ^C promises. */
+/* Drop the slots still waiting to connect: nothing to finish there, and left
+   alone they hold the drain for --timeout (#1073). Receiving slots stay. */
 static void back_stop_preconnect(httrackp *opt, struct_back *sback) {
   lien_back *const back = sback->lnk;
   int aborted = 0;

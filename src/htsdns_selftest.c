@@ -105,6 +105,10 @@ static mock_host mock_hosts[] = {
     /* a second one, so a cancelled resolve cannot cache an answer the next
        case then reads instead of asking for */
     {"slow2.test", 0, 1, {{AF_INET, {127, 0, 0, 10}}}, 0, MOCK_SLOW_MS},
+    /* two more for the cached entry point, checked with the mirror running and
+       then stopped: neither case may read the other's cached answer */
+    {"slow3.test", 0, 1, {{AF_INET, {127, 0, 0, 11}}}, 0, MOCK_SLOW_MS},
+    {"slow4.test", 0, 1, {{AF_INET, {127, 0, 0, 12}}}, 0, MOCK_SLOW_MS},
 };
 
 /* Serializes mock_host bookkeeping: a timed-out resolve is abandoned, so its
@@ -575,10 +579,31 @@ int dns_timeout_selftests(httrackp *opt) {
     CHECK(elapsed >= MOCK_SLOW_MS / 2);
   }
 
-  /* Three of the four resolves were abandoned mid-backend; wait for their
+  /* The cached entry point takes the mirror's own stop flag as its cancel, so
+     a ^C ends a resolve nothing else would bound (#1073). Unbounded here, to
+     tell the stop apart from a deadline. */
+  opt->timeout = 0;
+  {
+    /* control first: with the mirror running, the same call still waits */
+    start = mtime_local();
+    count = hts_dns_resolve_all(opt, "slow3.test", addrs, HTS_MAXADDRNUM, &err);
+    elapsed = mtime_local() - start;
+    CHECK(count == 1);
+    CHECK(elapsed >= MOCK_SLOW_MS / 2);
+
+    opt->state.stop = 1; /* the flag, not hts_request_stop's log line */
+    start = mtime_local();
+    count = hts_dns_resolve_all(opt, "slow4.test", addrs, HTS_MAXADDRNUM, &err);
+    elapsed = mtime_local() - start;
+    opt->state.stop = 0;
+    CHECK(count == 0);
+    CHECK(elapsed < MOCK_SLOW_MS / 2);
+  }
+
+  /* Four of the six resolves were abandoned mid-backend; wait for their
      workers to leave it before returning. The backend stays installed: an
      abandoned worker still reads it (to free its addrinfo). */
-  mock_wait_finished(4);
+  mock_wait_finished(6);
   return failures;
 }
 
