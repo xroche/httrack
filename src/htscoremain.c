@@ -261,7 +261,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #ifdef _WIN32
 #else
   /* Terminal is a tty, may ask questions and display funny information */
-  if (isatty(1)) {
+  if (hts_stdout_isterminal()) {
     opt->quiet = 0;
     opt->verbosedisplay = HTS_VERBOSE_SIMPLE;
   }
@@ -2784,6 +2784,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     }
 
     io_flush;
+
+    /* An explicit -%v2 outlives the tty probe above: the full display is cursor
+       addressing, which a redirected log records as garbage. */
+    if (opt->verbosedisplay == HTS_VERBOSE_FULL && !hts_stdout_isterminal())
+      opt->verbosedisplay = HTS_VERBOSE_SIMPLE;
 
     /* Enforce limits to avoid bandwidth abuse. The bypass_limits should only be used by administrators and experts. */
     if (!opt->bypass_limits) {

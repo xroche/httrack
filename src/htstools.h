@@ -149,6 +149,10 @@ hts_boolean hts_rename_over(httrackp *opt, const char *src, const char *dst);
 hts_boolean hts_rename_over_aside_selftest(httrackp *opt, const char *src,
                                            const char *dst);
 
+/* Whether stdout is a terminal: cursor tricks are noise a redirected log keeps
+   forever. Gate any VT sequence or CR-overwrite on it. */
+hts_boolean hts_stdout_isterminal(void);
+
 #endif
 
 #endif
