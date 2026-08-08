@@ -527,6 +527,7 @@ struct httrackp {
   // store library handles
   htslibhandles libHandles; /**< loaded external module handles */
   //
+  /* Live state, not options: copy_htsopt must leave it alone. */
   htsoptstate state; /**< embedded live engine state */
   String strip_query; /**< query keys to drop when deduping URLs (-strip-query);
                            appended at the tail to keep field offsets stable */
