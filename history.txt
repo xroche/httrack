@@ -4,6 +4,28 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-19
++ Fixed: an over-long user name in an ftp:// URL was truncated at the credential boundary, so the login went to a different account (#1032)
++ Fixed: an over-long FTP path or host name aborted the process instead of failing that one link (#1019)
++ Fixed: an FTP crawl ignored --timeout and --max-time, so a server that went quiet held a slot for five minutes (#1039)
++ Fixed: an FTP crawl of a dead host took two minutes to give up, and no signal could shorten it (#1059)
++ Fixed: the engine released the transfer slots while an FTP thread was still writing to one, crashing a mirror that hit its size or time limit (#1051)
++ Fixed: Ctrl-C did not shorten a connection or a name lookup already in flight, so ending a crawl against an unreachable host took minutes (#1073)
++ Fixed: a crawl that gave up mid-loop, on the link limit or an abort, lost its WARC archive and its change report, and a WARC written past teardown was stranded in a .tmp file (#1061, #1060)
++ Fixed: a crawl that rolled back for want of data still replaced the previous WARC archive, stranding its temporary and never writing its index; a stale or unwritable index is now reported rather than left silently in place (#1053)
++ Fixed: a resume the server answered with an unusable Content-Range deleted the partial file and never fetched it again; the restart no longer spends the retry budget, and is latched to one per link (#581, #1052)
++ Fixed: a long argument to -n or -O smashed the stack through an unbounded panic message, and the growable arrays could wrap their capacity to zero (#1040)
++ Fixed: --single-file could write a reference mark longer than it reads back, leaving it in the delivered page as visible text (#1054, #1069)
++ Fixed: on a terminal with no input left, a crawl toggled between the spinner and the full panel on every pass (#1072)
++ Fixed: -%v1 ended each line with a carriage return, so the lines overwrote each other and a redirected log was unreadable; -%v2 now paints its panel only on a terminal
++ Fixed: the installed socket headers did not compile under -std=c99 without _POSIX_C_SOURCE (#1001)
++ Fixed: the 16 px application icon rendered every stem as grey (#938)
++ Fixed: the desktop files installed outside the data directory, and the AppStream metainfo declared an icon name that is not a stock one
++ Fixed: the build failed on distributions whose coreutils are not GNU's (#1042)
++ Changed: --single-file drops its own HTML and CSS scanner and reuses the crawler's parser, so it follows the same references the mirror does (#749)
++ Changed: updated Turkish translation, and repaired two mangled Polish strings (#306)
++ Changed: multiple internal hardening, build, test and CI improvements
+
 3.49-18
 + Fixed: the 3.49.17 package build failed on four architectures: the test suite's mmap interposer did not compile on armhf, powerpc or hppa, and the alternate-stack test rejected loong64's shorter backtrace (#1023)
 + Fixed: the test suite failed on a host with no ps command, such as a Fedora build root; its hang diagnostics now read /proc directly (#1021)

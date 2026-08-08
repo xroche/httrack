@@ -1,3 +1,13 @@
+httrack (3.49.19-1) unstable; urgency=medium
+
+  * New upstream release: mostly FTP fixes, plus stack-overflow, mirror
+    interruption and --update data-loss fixes; full list in history.txt. Two
+    of them matter to the build: the test suite no longer assumes GNU
+    coreutils, and the AppStream metainfo no longer declares a non-stock icon
+    name that appstream-util rejects.
+
+ -- Xavier Roche <xavier@debian.org>  Sat, 08 Aug 2026 21:29:56 +0200
+
 httrack (3.49.18-1) unstable; urgency=medium
 
   * New upstream release, fixing the 3.49.17-1 build failures on armhf,

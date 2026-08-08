@@ -50,6 +50,20 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.49.19" date="2026-08-08">
+      <description>
+        <ul>
+          <li>Stopping a mirror now takes effect at once, instead of waiting for connections that were still being opened</li>
+          <li>A mirror that stops early keeps its web archive and its list of changes</li>
+          <li>A partly downloaded file the server refuses to resume is fetched again rather than lost</li>
+          <li>An FTP site that stops responding no longer blocks a download for five minutes</li>
+          <li>A very long web address or FTP path no longer crashes the mirror</li>
+          <li>Stopping a mirror while an FTP file is downloading no longer crashes</li>
+          <li>An FTP address carrying an over-long user name could sign in as a different account</li>
+          <li>Updated Turkish translation</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.18" date="2026-08-05">
       <description>
         <ul>
