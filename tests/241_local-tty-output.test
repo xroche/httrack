@@ -1,10 +1,7 @@
 #!/bin/bash
 #
-# -%v1 overwrote its own lines with CR and a clear-to-EOL, and an explicit -%v2
-# kept painting cursor-addressed panels whatever stdout was, so a redirected log
-# recorded a single unreadable line of escapes. Redirected output must now be
-# plain lines; the pty runs are the control that the terminal display and the
-# spinner both still work.
+# Requires -%v1/-%v2 to write plain lines when stdout is redirected, and to still
+# paint escapes when stdout is a real terminal (the pty controls at the end).
 
 set -eu
 
@@ -33,9 +30,9 @@ serverpid=$!
 port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 url="http://127.0.0.1:${port}/simple/basic.html"
 
-# A terminal nobody types at: stdin is the pty too, and never written to. An
-# stdin at EOF instead reads as a keypress and flips the display mode in a loop.
-# ONLCR off keeps the pty from manufacturing the CRs the spinner check counts.
+# Stdin is the pty too, and never written to: an stdin at EOF reads as a keypress
+# and flips the display mode in a loop. ONLCR off stops the pty manufacturing the
+# CRs the spinner check counts.
 cat >"${tmpdir}/ttyrun.py" <<'EOF'
 import os, subprocess, sys, termios
 
@@ -60,11 +57,12 @@ sys.exit(p.wait())
 EOF
 
 # crawl <label> <httrack args...>, stdout to a pipe; CRLF from the Windows CRT
-# is normalized away so only a CR the display wrote is left.
+# is normalized away so only a CR the display wrote is left. --quiet would gate
+# the spinner on its own, so the caller decides.
 crawl() {
     local label=$1
     shift
-    run_with_timeout 120 httrack -O "${tmpdir}/m_${label}" --quiet --robots=0 \
+    run_with_timeout 120 httrack -O "${tmpdir}/m_${label}" --robots=0 \
         --timeout=30 --retries=1 -c1 "$@" "$url" >"${tmpdir}/raw_${label}" 2>&1 || true
     sed $'s/\r$//' "${tmpdir}/raw_${label}" >"${tmpdir}/out_${label}"
 }
@@ -98,19 +96,29 @@ expect() {
 esc=$'\033'
 cr=$'\r'
 
-crawl v1 -%v1
+# Every crawl asserts it ran: `|| true` above would otherwise let a httrack that
+# died at startup pass every absence check below.
+ran() {
+    expect "$1 ran" "$(count "$2" '^Mirror launched')" ge 1 "$2"
+}
+
+crawl v1 --quiet -%v1
+ran "-%v1" v1
 expect "-%v1 into a pipe writes no escape" "$(count v1 "$esc")" eq 0 v1
 expect "-%v1 into a pipe writes no CR" "$(count v1 "$cr")" eq 0 v1
 # Teeth: the completion lines must actually be there, each ending its own line.
 expect "-%v1 keeps one line per file" "$(count v1 ' - OK$')" ge 2 v1
 
-crawl v2 -%v2
+crawl v2 --quiet -%v2
+ran "-%v2" v2
 expect "-%v2 into a pipe writes no escape" "$(count v2 "$esc")" eq 0 v2
 expect "-%v2 into a pipe writes no CR" "$(count v2 "$cr")" eq 0 v2
 
-# The spinner is the default display. POSIX already silences it off a tty by
-# forcing quiet, so this bites on Windows, which never probed the terminal.
+# The spinner is the default display. POSIX forces quiet off a tty and silences
+# it there anyway, so only Windows, which never probed the terminal, reaches the
+# gate this asserts.
 crawl v0 -%v0
+ran "-%v0" v0
 expect "the spinner writes no CR into a pipe" "$(count v0 "$cr")" eq 0 v0
 
 if is_windows; then
@@ -121,7 +129,7 @@ fi
 # Controls: suppressing the escapes off a terminal must not have suppressed the
 # display on one.
 crawl_tty ttyv2 -%v2
-expect "-%v2 still paints the panel on a terminal" "$(count ttyv2 "$esc")" ge 1 ttyv2
+expect "-%v2 still paints the panel on a terminal" "$(count ttyv2 "$esc")" ge 20 ttyv2
 
 crawl_tty ttyv0 -%v0
 expect "the spinner still turns on a terminal" "$(count ttyv0 "$cr")" ge 1 ttyv0
