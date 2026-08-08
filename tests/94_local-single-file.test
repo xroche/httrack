@@ -84,7 +84,8 @@ which httrack >/dev/null || {
 # The cap sits between pixel.svg and big.svg, so one inlines and one must not.
 out="${tmpdir}/crawl"
 mkdir "$out"
-common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0)
+opts=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0)
+common=(-O "$out" "${opts[@]}")
 httrack "${common[@]}" --single-file --single-file-max-size 4096 \
     "${base}/index.html" >"${tmpdir}/log1" 2>&1
 
@@ -264,8 +265,7 @@ printf '[-%%Z0 and a bad cap] ..\t'
 # it; a non-numeric cap is rejected and the built-in default used instead.
 off="${tmpdir}/off"
 mkdir "$off"
-httrack -O "$off" --quiet --disable-security-limits --robots=0 --timeout=30 \
-    --retries=0 -%Z0 "${base}/index.html" >"${tmpdir}/log3" 2>&1
+httrack -O "$off" "${opts[@]}" -%Z0 "${base}/index.html" >"${tmpdir}/log3" 2>&1
 offpage="${off}/127.0.0.1_${port}/index.html"
 if grep -q 'base64,' "$offpage"; then
     echo "FAIL: -%Z0 still inlined"
@@ -273,9 +273,8 @@ if grep -q 'base64,' "$offpage"; then
 fi
 bad="${tmpdir}/bad"
 mkdir "$bad"
-httrack -O "$bad" --quiet --disable-security-limits --robots=0 --timeout=30 \
-    --retries=0 --single-file-max-size notanumber "${base}/index.html" \
-    >"${tmpdir}/log4" 2>&1
+httrack -O "$bad" "${opts[@]}" --single-file-max-size notanumber \
+    "${base}/index.html" >"${tmpdir}/log4" 2>&1
 badpage="${bad}/127.0.0.1_${port}/index.html"
 # The default cap is 10 MB, so everything here inlines, big.svg included.
 grep -q 'data:image/svg+xml;base64,' "$badpage" || {
@@ -313,15 +312,16 @@ echo OK
 printf '[no file keeps a mark] ..\t'
 # Stripping matches the mark's shape, not this run's secret, so nothing in the
 # mirror may carry one -- pages included, and whatever an earlier run left.
-# grep's status dies in the pipeline, so an unsearchable tree would read as
-# clean: floor the file count first.
-searched=$(find "${out}/127.0.0.1_${port}" -type f 2>/dev/null | wc -l)
-test "$searched" -ge 5 || {
-    echo "FAIL: only $searched mirrored files to sweep; nothing was proven"
+# grep's own status, kept out of a pipeline that would launder it: 0 matched,
+# 1 clean, anything above that means the sweep never read the tree.
+st=0
+marked=$(grep -rlE '#![0-9a-f]{16}\.[-cj]\.[0-9]+' \
+    "${out}/127.0.0.1_${port}" 2>/dev/null) || st=$?
+test "$st" -le 1 || {
+    echo "FAIL: the mark sweep could not read the mirror (grep exit $st)"
     exit 1
 }
-marked=$(grep -rlE '#![0-9a-f]{16}\.[-cj]\.[0-9]+' \
-    "${out}/127.0.0.1_${port}" 2>/dev/null | tr '\n' ' ')
+marked=$(printf '%s' "$marked" | tr '\n' ' ')
 test -z "$marked" || {
     echo "FAIL: marks survived in $marked"
     exit 1
@@ -375,14 +375,13 @@ case "$both" in
 esac
 
 printf '[--changes and --single-file together] ..\t'
-# Both hook end-of-mirror. Expansion must run first, so the report sees the
-# inlined size rather than the marked intermediate.
+# Both hook end-of-mirror, and the report stats the file it names, so its size
+# for the page is the inlined one only if expansion ran first.
 chg="${tmpdir}/chg"
 mkdir "$chg"
 # Its own -O: "$common" points at the first mirror, which left $chgpage absent
 # and every check below vacuous.
-httrack -O "$chg" --quiet --disable-security-limits --robots=0 --timeout=30 \
-    --retries=0 --single-file --changes "${base}/index.html" \
+httrack -O "$chg" "${opts[@]}" --single-file --changes "${base}/index.html" \
     >"${tmpdir}/log6" 2>&1
 chgpage="${chg}/127.0.0.1_${port}/index.html"
 test -f "$chgpage" || {
@@ -391,6 +390,22 @@ test -f "$chgpage" || {
 }
 grep -q 'base64,' "$chgpage" || {
     echo "FAIL: --changes suppressed the inlining"
+    exit 1
+}
+reported=$("$python" - "${chg}/hts-changes.json" index.html <<'REPORT') || exit 1
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fp:
+    report = json.load(fp)
+for bucket in ("new", "changed", "unchanged"):
+    for entry in report.get(bucket, []):
+        if entry["file"].replace("\\", "/").endswith("/" + sys.argv[2]):
+            print(entry.get("size", -1))
+            sys.exit(0)
+sys.exit("FAIL: index.html is in no bucket of the change report")
+REPORT
+onpage=$(wc -c <"$chgpage")
+test "$reported" -eq "$onpage" || {
+    echo "FAIL: the report sizes the page at $reported, on disk it is $onpage"
     exit 1
 }
 echo OK
@@ -404,9 +419,8 @@ else
     mkdir "$umaskdir"
     (
         umask 077
-        httrack -O "$umaskdir" --quiet --disable-security-limits --robots=0 \
-            --timeout=30 --retries=0 --single-file "${base}/index.html" \
-            >"${tmpdir}/log5" 2>&1
+        httrack -O "$umaskdir" "${opts[@]}" --single-file \
+            "${base}/index.html" >"${tmpdir}/log5" 2>&1
     )
     umaskroot="${umaskdir}/127.0.0.1_${port}"
     mode() { "$python" -c 'import os,sys

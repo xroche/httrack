@@ -79,12 +79,12 @@ def textarea(name):
 
 
 # Whole tokens: "--single-file" is a substring of "--single-file-max-size=5000",
-# so a plain `in` would pass with the bare flag gone, and an unterminated value
-# match would take 50000 for 5000.
+# so a plain `in` passes with the bare flag gone, and a one-sided anchor takes
+# both 50000 and a template fusion like --near--single-file-max-size=5000.
 cmd = textarea("command")
 if "--single-file" not in cmd.split():
     sys.exit("FAIL: --single-file missing from the command line\n%s" % cmd)
-if not re.search(r"--single-file-max-size=5000(?!\d)", cmd):
+if "--single-file-max-size=5000" not in cmd.split():
     sys.exit("FAIL: --single-file-max-size=5000 missing from the command "
              "line\n%s" % cmd)
 ini = textarea("winprofile").replace("\r\n", "\n")
