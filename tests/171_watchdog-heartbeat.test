@@ -24,9 +24,15 @@ fail() {
 }
 
 progress="$tmp/progress"
-kill_tree() { echo "KILL $1 at $(hb_now)"; }
+kill_tree() {
+    hb_now
+    echo "KILL $1 at $hb_time"
+}
 # Stubbed too, or the legs below would send a real SIGKILL to pid 4242.
-kill_pid() { echo "DIRECT $1 at $(hb_now)"; }
+kill_pid() {
+    hb_now
+    echo "DIRECT $1 at $hb_time"
+}
 # Twelve lines, against a bound of eight.
 list_stray_processes() {
     printf '%s\n' "$*" >"$tmp/strayargs"
@@ -65,10 +71,21 @@ sleep() {
         printf 'RUN %ss%%a%%b.test\r at %ss\n' "$vnow" "$vnow" >>"$progress"
         echo "$vnow" >"$tmp/lastwrite"
     fi
+    # One tick reports what a sleep that cannot exec reports. Unguarded, errexit
+    # ends the watchdog here and every assertion below goes unanswered.
+    test "$ticks" -ne 3 || return 126
+    return 0
 }
-hb_now() { echo "$vnow"; }
+# A clock read through a command substitution runs one subshell deeper than the
+# watchdog itself, and that is a fork it must not need. Marker, not fail: an exit
+# here would only end that subshell. hb_depth is set at each call site below.
+hb_now() {
+    test "$BASH_SUBSHELL" -eq "$hb_depth" || : >"$tmp/forked"
+    hb_time=$vnow
+}
 
 printf 'RUN 98_earlier.test at 0s\n' >"$progress"
+hb_depth=$BASH_SUBSHELL
 ci_suite_heartbeat 720 360 "$progress" 900 4242 >"$tmp/out" 2>&1
 
 # Timed by the stub, not by the annotation. The kill is due one staticness window
@@ -134,6 +151,7 @@ awk '/^::(notice|error) title=/ { if (prev != "") bad = 1 } { prev = $0 } END { 
 vnow=9000
 ticks=0
 printf 'RUN 97_dead.test at 0s\n' >"$progress"
+hb_depth=$BASH_SUBSHELL
 ci_suite_heartbeat 960 360 "$progress" 900 4242 >"$tmp/late" 2>&1
 killed=$(sed -n 's/^KILL 4242 at \([0-9]*\)$/\1/p' "$tmp/late")
 test -n "$killed" || fail "a suite static from the start was never killed"
@@ -157,6 +175,7 @@ rc=0
         echo "TREE $1" >>"$rec"
         exit 9
     }
+    hb_depth=$BASH_SUBSHELL
     ci_suite_heartbeat 960 360 "$progress" 900 4242 >"$tmp/hedge" 2>&1
 ) || rc=$?
 test "$rc" -eq 9 || fail "the tree kill never fired: watchdog returned $rc"
@@ -167,5 +186,7 @@ test "$(sed -n 2p "$rec")" = "DIRECT 4242" ||
 test "$(sed -n 3p "$rec")" = "TREE 4242" ||
     fail "the tree was not killed after the direct signal: $(tr '\n' '/' <"$rec")"
 test "$(sed -n '$=' "$rec")" -eq 3 || fail "extra kills: $(tr '\n' '/' <"$rec")"
+
+test ! -e "$tmp/forked" || fail "the clock was read through a subshell, a fork a starved box cannot spare"
 
 echo "heartbeat OK"

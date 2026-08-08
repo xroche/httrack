@@ -25,9 +25,10 @@ ci_annotate() {
 # been static for $4s. Staticness, never elapsed time: a healthy test in flight and
 # a wedged one look identical by the clock, but every outcome writes a line, the
 # per-test timeout included, so $4 past that timeout means it never fired.
-# Seconds since this shell started. Overridable, so the unit test can drive the
-# schedule the workflow really passes off a virtual clock instead of waiting it out.
-hb_now() { echo "$SECONDS"; }
+# Assigns into hb_time rather than printing: reading the clock forks nothing, which
+# matters when the box has none to spare. Overridable for the unit test virtual clock.
+hb_time=0
+hb_now() { hb_time=$SECONDS; }
 
 # Start the off-box telemetry over the progress log $1, setting ci_watchdog_pid;
 # return 1 with no PowerShell available. Forks nothing and kills nothing, so it
@@ -70,10 +71,14 @@ ci_suite_heartbeat() {
     # Measured, never accumulated: the starvation this watchdog exists to catch is
     # exactly what makes a sleep overshoot, and drift only ever delays the kill.
     test "$tick" -le 30 || tick=30
-    begin=$(hb_now) said=$begin moved=$begin
+    hb_now
+    begin=$hb_time said=$begin moved=$begin
     while :; do
-        sleep "$tick" >/dev/null 2>&1 # holds no stdout: the caller's trap orphans it
-        now=$(hb_now)
+        # Guarded: a tick that cannot exec returns 127, and under the caller's errexit a
+        # bare failure would end the watchdog in silence (#1038).
+        sleep "$tick" >/dev/null 2>&1 || : # holds no stdout: the caller's trap orphans it
+        hb_now
+        now=$hb_time
         # Guarded: under the caller's errexit a bare substitution assignment would
         # end the watchdog in silence, which reads as protection and is not.
         line=$(tail -n 1 "$progress" 2>/dev/null || true)
