@@ -274,4 +274,5 @@ TESTS += 234_local-ftp-maxtime.test
 TESTS += 232_online-gate-outoftree.test
 TESTS += 238_local-warc-nodata-rollback.test
 TESTS += 01_zlib-warc-cdx-errors.test
+TESTS += 240_local-abort-teardown.test
 TESTS += 239_doc-guide-anchors.test
