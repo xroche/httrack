@@ -5257,8 +5257,10 @@ static int hts_dns_resolve_nocache_list_bounded(
 int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
                         const char **error) {
   assertf(opt != NULL);
-  return hts_dns_resolve_all_bounded(opt, iadr, out, max, opt->timeout, NULL,
-                                     error);
+  /* the mirror's stop flag cancels: a resolve behind a black hole otherwise
+     holds a stopped crawl for the whole --timeout (#1073) */
+  return hts_dns_resolve_all_bounded(opt, iadr, out, max, opt->timeout,
+                                     &opt->state.stop, error);
 }
 
 int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,

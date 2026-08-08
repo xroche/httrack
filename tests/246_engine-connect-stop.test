@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# A user stop must drop the slots still waiting to connect, instead of holding
+# the drain for the whole --timeout (#1073).
+
+set -euo pipefail
+
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+out=$(httrack -#test=backstop) || {
+    status=$?
+    echo "$out"
+    # 77: the network answers for TEST-NET-1, so no connect stalls here.
+    exit "$status"
+}
+echo "$out"
+case "$out" in
+*"backstop self-test: OK") ;;
+*) exit 1 ;;
+esac

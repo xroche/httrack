@@ -2771,6 +2771,37 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
   }
 }
 
+/* Slot waiting for a connection to come up: nothing requested on it yet. */
+static hts_boolean back_is_preconnect(const int status) {
+  return status == STATUS_WAIT_DNS || status == STATUS_CONNECTING ||
+         status == STATUS_SSL_WAIT_HANDSHAKE;
+}
+
+/* Drop the slots still waiting to connect: nothing to finish there, and left
+   alone they hold the drain for --timeout (#1073). Receiving slots stay. */
+static void back_stop_preconnect(httrackp *opt, struct_back *sback) {
+  lien_back *const back = sback->lnk;
+  int aborted = 0;
+  int i;
+
+  for (i = 0; i < sback->count; i++) {
+    if (!back_is_preconnect(back[i].status))
+      continue;
+    if (back[i].r.soc != INVALID_SOCKET)
+      deletehttp(&back[i].r);
+    back[i].r.soc = INVALID_SOCKET;
+    /* fatal, as back_add() reports it: a stop must not schedule a retry */
+    back[i].r.statuscode = STATUSCODE_INVALID;
+    strcpybuff(back[i].r.msg, "mirror stopped by user");
+    back_set_finished(sback, i);
+    aborted++;
+  }
+  if (aborted > 0)
+    hts_log_print(opt, LOG_WARNING,
+                  "Mirror stopped by user, %d pending connection(s) aborted",
+                  aborted);
+}
+
 // attente (gestion des buffers des sockets)
 void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                TStamp stat_timestart) {
@@ -2799,6 +2830,9 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   // Cleanup the stack to save space!
   back_clean(opt, cache, sback);
 #endif
+
+  if (opt->state.stop)
+    back_stop_preconnect(opt, sback);
 
   /* Time/size limit exceeded past grace: abort in-flight transfers so no wait
      loop starves (#481, #77). FTP slots stay, their thread owns the socket. */

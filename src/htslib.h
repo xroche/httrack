@@ -279,7 +279,8 @@ LLint http_xfread1(htsblk * r, int bufl);
    resolver order), returning the count (0 = does not resolve, negative-cached).
    Resolves once per host; later calls read the DNS cache. Must hold no lock
    (brackets opt->state.lock itself, never across the resolve). A miss resolves
-   on a worker thread bounded by opt->timeout; a timeout reports 0, uncached. */
+   on a worker thread bounded by opt->timeout and cut short by a mirror stop;
+   either reports 0, uncached. */
 int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
                         const char **error);
 /* Like hts_dns_resolve_all(), with the wait bounded by timeout seconds (<= 0:
