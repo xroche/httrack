@@ -1,70 +1,56 @@
 #!/bin/bash
 #
-# guide.html's section ids are link API: the redirect stubs left by the page
-# merge and the Android app's per-screen help both hardcode them, and an app
-# release outlives its engine pin.
+# httrack-android deep-links these ids as "guide.html#droid/<id>", and an
+# installed release outlives its engine pin. tools/doc-links.py resolves the
+# links the doc set itself carries; nothing else pins this set.
 
 set -euo pipefail
 
 srcdir="${abs_top_srcdir:?not run under make check}"
-html="${srcdir}/html"
-guide="${html}/guide.html"
+guide="${srcdir}/html/guide.html"
 
 test -r "${guide}" || {
     echo "FAIL: no ${guide}" >&2
     exit 1
 }
 
-ids=$(grep -o 'id="[^"]*"' "${guide}" | sed 's/^id="//; s/"$//' | sort)
-dups=$(uniq -d <<<"${ids}")
-test -z "${dups}" || {
-    echo "FAIL: duplicate id in guide.html: ${dups}" >&2
-    exit 1
+# The table of contents repeats every heading, so only <main> holds real anchors.
+main=$(awk '/<main[ >]/ { inmain = 1 } inmain { print } /<\/main>/ { inmain = 0 }' "${guide}")
+
+check() { # check <anchor>: present once, and reachable on Android
+    local hits tag platforms
+    hits=$(grep -o "id=\"$1\"" <<<"${main}" | wc -l || true)
+    test "${hits}" -eq 1 || {
+        echo "FAIL: ${hits} elements inside <main> carry id=\"$1\", want 1" >&2
+        return 1
+    }
+    tag=$(grep -m1 "id=\"$1\"" <<<"${main}")
+    platforms=$(grep -o 'data-for="[^"]*"' <<<"${tag}" | sed 's/^data-for="//; s/"$//' || true)
+    # guide.css hides one platform's elements from the others, so an anchor on a
+    # win-only element scrolls nowhere.
+    if test -n "${platforms}"; then
+        case " ${platforms} " in
+        *" droid "*) ;;
+        *)
+            echo "FAIL: id=\"$1\" sits on a data-for=\"${platforms}\" element, hidden from droid" >&2
+            return 1
+            ;;
+        esac
+    fi
 }
 
-has_id() { grep -qx "$1" <<<"${ids}"; }
-
-# Control: the matcher must be able to say no.
-if has_id no-such-section; then
-    echo "FAIL: has_id matches anything; the checks below prove nothing" >&2
+# Control: the check must be able to say no.
+if check no-such-section 2>/dev/null; then
+    echo "FAIL: check() passes an absent id; the assertions below prove nothing" >&2
     exit 1
 fi
 
-# Cross-page "guide.html#..." plus guide.html's own "#..." links, minus the
-# "#<platform>/" routing prefix guide.js strips before scrolling.
-targets=$(
-    {
-        cat "${html}"/*.html | grep -o 'guide\.html#[^"'"'"' >]*' | sed 's/.*#//'
-        grep -o 'href="#[^"]*"' "${guide}" | sed 's/^href="#//; s/"$//'
-    } | sed -e 's|^win/||' -e 's|^web/||' -e 's|^droid/||' | grep -v '^$' | sort -u
-)
-
-# Non-vacuity: the stubs and the in-page links must both have been seen.
-for seen in opt-links opt-scan-rules; do
-    grep -qx "${seen}" <<<"${targets}" || {
-        echo "FAIL: collected no reference to ${seen}; the scan found nothing" >&2
-        exit 1
-    }
-done
-
+# One target per Android screen; the pane-to-anchor map lives in httrack-android.
 fail=0
-for target in ${targets}; do
-    has_id "${target}" || {
-        echo "FAIL: something links to guide.html#${target}, which no id matches" >&2
-        fail=1
-    }
-done
-
-# Hardcoded by httrack-android for its contextual help; renaming one silently
-# drops installed builds at the top of the page.
 for anchor in droid-first-launch step-start step-project step-address options \
     step-run step-done droid-storage-location; do
-    has_id "${anchor}" || {
-        echo "FAIL: guide.html lost the Android help anchor ${anchor}" >&2
-        fail=1
-    }
+    check "${anchor}" || fail=1
 done
-
 test "${fail}" -eq 0 || exit 1
 
-echo "guide anchors: $(wc -l <<<"${targets}") link targets resolved, Android set intact"
+echo "guide anchors: the eight Android help targets are present and droid-visible"
