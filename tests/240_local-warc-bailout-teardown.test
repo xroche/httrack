@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# A crawl that gives up mid-loop (here the -#L link limit) must still run the
+# end-of-mirror teardown: commit the archive, rewrite the .cdx, drop no
+# temporary, and write the change report (#1061). Poisoning both archive files
+# is what makes this non-vacuous, since a repeat crawl reproduces them exactly.
+
+set -eu
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --archive-replaced-on-rerun \
+    --archive-min-files 2 --rerun-args '-#L4 -C0' \
+    --log-found 'Too many URLs' --log-found 'Change report' \
+    httrack 'BASEURL/warcgz/index.html' --warc-file warc-out --warc-cdx --changes

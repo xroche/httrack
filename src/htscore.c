@@ -542,6 +542,8 @@ int httpmirror(char *url1, httrackp * opt) {
   t_cookie BIGSTK cookie;       // gestion des cookies
 
   int ptr;                      // pointeur actuel sur les liens
+  int retcode = 1; // what the single exit returns; a bailout sets -1
+  hts_boolean rollback = HTS_FALSE; // undo this session on the way out
 
   //
   int numero_passe = 0;         // deux passes pour html puis images
@@ -939,6 +941,7 @@ int httpmirror(char *url1, httrackp * opt) {
                         fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                         StringBuff(opt->path_html_utf8), "index.html")),
                         "", "", NULL)) {
+      freet(primary);
       XH_extuninit;             // désallocation mémoire & buffers
       return 0;
     }
@@ -1114,6 +1117,7 @@ int httpmirror(char *url1, httrackp * opt) {
   /* Info for wrappers */
   hts_log_print(opt, LOG_INFO, "engine: start");
   if (!RUN_CALLBACK0(opt, start)) {
+    freet(primary);
     XH_extuninit;
     return 1;
   }
@@ -1278,9 +1282,8 @@ int httpmirror(char *url1, httrackp * opt) {
             /* Parse */
             switch (hts_mirror_wait_for_next_file(&str, &stre)) {
             case -1:
-              XH_uninit;
-              return -1;
-              break;
+              retcode = -1;
+              goto cleanup;
             case 2:
               // Jump to 'continue'
               // This is one of the very very rare cases where goto
@@ -1616,8 +1619,8 @@ int httpmirror(char *url1, httrackp * opt) {
           const int nlinks = opt->lien_tot;
 
           if (hts_mirror_check_moved(&str, &stre) != 0) {
-            XH_uninit;
-            return -1;
+            retcode = -1;
+            goto cleanup;
           }
           /* A redirect re-queues the target as a fresh link; without carrying
              the marking over, a moved sitemap is fetched and then ignored. */
@@ -1805,8 +1808,8 @@ int httpmirror(char *url1, httrackp * opt) {
 
             /* Parse */
             if (htsparse(&str, &stre) != 0) {
-              XH_uninit;
-              return -1;
+              retcode = -1;
+              goto cleanup;
             }
           }
         }
@@ -2084,12 +2087,11 @@ int httpmirror(char *url1, httrackp * opt) {
     ) {
     hts_log_print(opt, LOG_NOTICE,
                   "No data seems to have been transferred during this session! : restoring previous one!");
-    /* this return skips the teardown that would close the writer */
+    /* this run replaces nothing, so its archive must not be committed */
     warc_abort_opt(opt);
-    XH_uninit;
-    hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
     opt->state.exit_xh = 2;     /* interrupted (no connection detected) */
-    return 1;
+    rollback = HTS_TRUE;
+    goto cleanup;
   }
   // info text  
   if (cache.txt) {
@@ -2289,14 +2291,20 @@ int httpmirror(char *url1, httrackp * opt) {
 
   // ending
   usercommand(opt, 0, NULL, NULL, NULL, NULL);
-  warc_close_opt(opt);
+
+cleanup:
+  /* single exit: every bailout jumps here, so the archive, the change report
+     and the sitemap list are closed whichever way the mirror ends */
+  warc_close_opt(opt); /* a no-op once warc_abort_opt() has run */
   hts_changes_close_opt(opt);
   hts_sitemap_free(opt);
 
   // désallocation mémoire & buffers
   XH_uninit;
+  if (rollback) /* after XH_uninit: it holds the cache files open */
+    hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
 
-  return 1;                     // OK
+  return retcode;
 }
 
 // version 2 pour le reste
