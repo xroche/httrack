@@ -17,59 +17,78 @@ fail() {
     exit 1
 }
 
-mkdir -p "$tmp/bin"
-# A tick that cannot exec is what bash reports as 126/127; the counter reads the
-# status, so a stub returning one models it exactly.
-cat >"$tmp/bin/sleep" <<'EOF'
+# A tick that cannot exec is what bash reports as 126/127, so a stub returning one
+# models it exactly. The flaky stub fails every other call, which no counter that
+# resets on a good tick can ever accumulate into a verdict.
+mkdir -p "$tmp/dead" "$tmp/flaky"
+cat >"$tmp/dead/sleep" <<'EOF'
 #!/bin/sh
 exit 126
 EOF
-chmod +x "$tmp/bin/sleep"
+cat >"$tmp/flaky/sleep" <<'EOF'
+#!/bin/sh
+n=$(cat "$TICKFILE" 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" >"$TICKFILE"
+test $((n % 2)) -ne 0 || exit 126
+exit 0
+EOF
+chmod +x "$tmp/dead/sleep" "$tmp/flaky/sleep"
 
-# Builtins only: the broken PATH is inherited, and this must outlive ten ticks.
-cat >"$tmp/spin.sh" <<'EOF'
+# Builtins only, and self-limiting: the stubbed sleep is on the child's PATH too,
+# and a child that outlives the harness would leak when the kill is the thing broken.
+cat >"$tmp/child.sh" <<'EOF'
 #!/bin/bash
 trap 'exit 0' TERM INT
-while :; do :; done
-EOF
-# Long enough for the poll loop to tick many times over: a child that exits at once
-# would leave the control leg asserting about a loop that never ran.
-cat >"$tmp/quick.sh" <<'EOF'
-#!/bin/bash
-sleep 3
+echo "$$" >"$PIDFILE"
+end=$((SECONDS + 5))
+while test "$SECONDS" -lt "$end"; do :; done
 EOF
 
-# 60s, so a deadline that fires instead of the guard is visible as a stall and as
-# the DUMP line, rather than passing for the same 124.
+# 60s, so a deadline firing in place of the guard shows up as a stall and a DUMP
+# line rather than as the same 124.
 run_timeout() {
-    local extra_path=$1 script=$2 log=$3
-    env PATH="$extra_path$PATH" \
+    local bin=$1 log=$2
+    env PATH="$bin:$PATH" \
+        TICKFILE="$tmp/ticks" PIDFILE="$tmp/childpid" \
         HTTRACK_POLL_SLEEP=1 \
         HTTRACK_TEST_TIMEOUT=60 \
         HTTRACK_PROGRESS_LOG="$tmp/progress" \
-        "$BASH" "$testdir/test-timeout.sh" "$script" >"$log" 2>&1
+        "$BASH" "$testdir/test-timeout.sh" "$tmp/child.sh" >"$log" 2>&1
 }
 
 : >"$tmp/progress"
+: >"$tmp/childpid"
 began=$SECONDS
 rc=0
-run_timeout "$tmp/bin:" "$tmp/spin.sh" "$tmp/broken.log" || rc=$?
+run_timeout "$tmp/dead" "$tmp/broken.log" || rc=$?
 spent=$((SECONDS - began))
 
 test "$rc" -eq 124 || fail "a tick that never waits exited $rc, not 124: $(cat "$tmp/broken.log")"
-grep -q 'poll tick ran' "$tmp/broken.log" ||
-    fail "no verdict naming the tick: $(cat "$tmp/broken.log")"
-grep -q '^NOFORK spin.sh$' "$tmp/progress" ||
+# With the count, or a guard tripping on the first tick reads the same.
+grep -q 'poll tick ran 10 times' "$tmp/broken.log" ||
+    fail "no verdict naming the tenth tick: $(cat "$tmp/broken.log")"
+grep -q '^NOFORK child.sh$' "$tmp/progress" ||
     fail "the off-box watchdog got no marker: $(cat "$tmp/progress")"
-# The deadline path writes DUMP and takes the whole 60s. Both say the guard is gone
-# and the budget expiry is what ended the loop.
+# The deadline path writes DUMP and spends the whole 60s, so either says the guard
+# is gone and the budget is what ended the loop.
 grep -q '^DUMP ' "$tmp/progress" && fail "the loop ran to its 60s deadline, not the guard"
 test "$spent" -lt 30 || fail "took ${spent}s to give up on a tick that returns at once"
+childpid=$(cat "$tmp/childpid")
+test -n "$childpid" || fail "the child never started"
+kill -0 "$childpid" 2>/dev/null && fail "giving up left the wedged test running as $childpid"
 
-# Control: the same invocation with a working sleep must reach neither branch, or
-# the assertions above would hold for any run.
+# A tick that fails intermittently is a healthy box, and must never reach the
+# verdict: without the reset, any run long enough accumulates ten of them.
 : >"$tmp/progress"
-run_timeout "" "$tmp/quick.sh" "$tmp/ok.log" || fail "a healthy run failed: $(cat "$tmp/ok.log")"
+: >"$tmp/ticks"
+run_timeout "$tmp/flaky" "$tmp/flaky.log" || fail "an intermittent tick failed the run: $(cat "$tmp/flaky.log")"
+grep -q 'NOFORK' "$tmp/progress" && fail "ticks that fail every other call were read as a wedge"
+
+# Control: a working sleep must reach neither branch, or the assertions above would
+# hold for any run at all.
+: >"$tmp/progress"
+run_timeout "" "$tmp/ok.log" || fail "a healthy run failed: $(cat "$tmp/ok.log")"
 grep -q 'NOFORK' "$tmp/progress" && fail "a healthy poll tick was read as a broken one"
 
 echo "test-timeout poll guard OK"

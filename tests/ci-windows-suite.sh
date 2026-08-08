@@ -25,9 +25,8 @@ ci_annotate() {
 # been static for $4s. Staticness, never elapsed time: a healthy test in flight and
 # a wedged one look identical by the clock, but every outcome writes a line, the
 # per-test timeout included, so $4 past that timeout means it never fired.
-# Seconds since this shell started, into hb_time. Overridable, so the unit test can
-# drive the schedule the workflow really passes off a virtual clock. Assigns rather
-# than prints: a clock read through a fork is blind when the box runs out of them.
+# Assigns into hb_time rather than printing: reading the clock forks nothing, which
+# matters when the box has none to spare. Overridable for the unit test virtual clock.
 hb_time=0
 hb_now() { hb_time=$SECONDS; }
 
@@ -76,8 +75,7 @@ ci_suite_heartbeat() {
     begin=$hb_time said=$begin moved=$begin
     while :; do
         # Guarded: a tick that cannot exec returns 127, and under the caller's errexit a
-        # bare failure ends the watchdog in silence (#1038). A fork that cannot be made
-        # at all is beyond reach: bash exits 254 on its own.
+        # bare failure would end the watchdog in silence (#1038).
         sleep "$tick" >/dev/null 2>&1 || : # holds no stdout: the caller's trap orphans it
         hb_now
         now=$hb_time

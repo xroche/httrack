@@ -71,6 +71,10 @@ sleep() {
         printf 'RUN %ss%%a%%b.test\r at %ss\n' "$vnow" "$vnow" >>"$progress"
         echo "$vnow" >"$tmp/lastwrite"
     fi
+    # One tick reports what a sleep that cannot exec reports. Unguarded, errexit
+    # ends the watchdog here and every assertion below goes unanswered.
+    test "$ticks" -ne 3 || return 126
+    return 0
 }
 # A clock read through a command substitution runs one subshell deeper than the
 # watchdog itself, and that is a fork it must not need. Marker, not fail: an exit
