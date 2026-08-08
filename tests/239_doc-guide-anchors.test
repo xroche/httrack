@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# httrack-android deep-links these ids as "guide.html#droid/<id>", and an
+# installed release outlives its engine pin. tools/doc-links.py resolves the
+# links the doc set itself carries; nothing else pins this set.
+
+set -euo pipefail
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+guide="${srcdir}/html/guide.html"
+
+test -r "${guide}" || {
+    echo "FAIL: no ${guide}" >&2
+    exit 1
+}
+
+# The table of contents repeats every heading, so only <main> holds real anchors.
+main=$(awk '/<main[ >]/ { inmain = 1 } inmain { print } /<\/main>/ { inmain = 0 }' "${guide}")
+
+check() { # check <anchor>: present once, and reachable on Android
+    local hits tag platforms
+    hits=$(grep -o "id=\"$1\"" <<<"${main}" | wc -l || true)
+    test "${hits}" -eq 1 || {
+        echo "FAIL: ${hits} elements inside <main> carry id=\"$1\", want 1" >&2
+        return 1
+    }
+    tag=$(grep -m1 "id=\"$1\"" <<<"${main}")
+    platforms=$(grep -o 'data-for="[^"]*"' <<<"${tag}" | sed 's/^data-for="//; s/"$//' || true)
+    # guide.css hides one platform's elements from the others, so an anchor on a
+    # win-only element scrolls nowhere.
+    if test -n "${platforms}"; then
+        case " ${platforms} " in
+        *" droid "*) ;;
+        *)
+            echo "FAIL: id=\"$1\" sits on a data-for=\"${platforms}\" element, hidden from droid" >&2
+            return 1
+            ;;
+        esac
+    fi
+}
+
+# Control: the check must be able to say no.
+if check no-such-section 2>/dev/null; then
+    echo "FAIL: check() passes an absent id; the assertions below prove nothing" >&2
+    exit 1
+fi
+
+# One target per Android screen; the pane-to-anchor map lives in httrack-android.
+fail=0
+for anchor in droid-first-launch step-start step-project step-address options \
+    step-run step-done droid-storage-location; do
+    check "${anchor}" || fail=1
+done
+test "${fail}" -eq 0 || exit 1
+
+echo "guide anchors: the eight Android help targets are present and droid-visible"

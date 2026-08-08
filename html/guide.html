@@ -58,6 +58,9 @@
 
 <main id="main">
 
+<!-- Section ids are link API: the redirect stubs and the Android app's contextual help
+     hardcode them, and an app release outlives its engine pin. -->
+
 <h1>The HTTrack interface, step by step</h1>
 
 <p class="lede">HTTrack copies a website to your disk so you can read it offline. The same
@@ -88,7 +91,7 @@ itself down once those pings stop.</p>
 <p>Each option also lists its command-line equivalent, so anything you set here can later be
 scripted. The <a href="cmdguide.html">command-line guide</a> covers that side.</p>
 
-<div class="note" data-for="droid">
+<div class="note" data-for="droid" id="droid-first-launch">
 	<p><b>First launch.</b> Android asks for permission to store mirrors on your device. Without
 	it the app cannot save anything, so tap <b>Allow</b>.</p>
 	<figure>
@@ -287,7 +290,7 @@ usual causes.</p>
 <p data-for="win web">The files sit under the base path you chose, in a folder named after the
 project. Opening <code>index.html</code> there browses the mirror without HTTrack.</p>
 
-<p data-for="droid">Mirrors are written to
+<p data-for="droid" id="droid-storage-location">Mirrors are written to
 <code>/storage/emulated/0/HTTrack/Websites</code>, in a folder named after the project. That is
 shared storage, so a file manager or a USB cable can reach it, and opening
 <code>index.html</code> there browses the mirror without the app.</p>
