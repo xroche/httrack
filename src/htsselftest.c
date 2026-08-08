@@ -48,6 +48,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdefines.h"
 #include "htslib.h"
 #include "htsalias.h"
+#include "htsarrays.h"
 #include "htsparse.h"
 #include "htscache.h"
 #include "htscache_selftest.h"
@@ -475,7 +476,7 @@ static void basic_selftests(void) {
    The abort-on-overflow guarantee is checked separately by the "overflow"
    sub-mode (it aborts the process by design). */
 static int string_safety_selftests(void) {
-  char buf[8];
+  char buf[16];
 
   /* strcpybuff into a sized array: exact copy */
   strcpybuff(buf, "abc");
@@ -1680,6 +1681,90 @@ static int st_strsafe(httrackp *opt, int argc, char **argv) {
     const int err = string_safety_selftests();
 
     printf("strsafe: %s\n", err ? "FAIL" : "OK");
+    return err;
+  }
+}
+
+/* Wide enough that a capacity still fitting a size_t makes capa*width wrap. */
+typedef struct {
+  char pad[4096];
+} arrays_wide_t;
+
+/* Self-tests for the htsarrays.h growth macros.
+   Returns 0 if growth always reached the requested room, 1 otherwise.
+   The abort on an unsatisfiable request is checked by the "overflow-capa" and
+   "overflow-loop" sub-modes (they abort the process by design). */
+static int array_growth_selftests(void) {
+  TypedArray(char) a = EMPTY_TYPED_ARRAY;
+  TypedArray(arrays_wide_t) w = EMPTY_TYPED_ARRAY;
+  size_t i;
+  int err = 0;
+
+  TypedArrayEnsureRoom(a, 1);
+  if (TypedArrayRoom(a) < 1 || TypedArrayCapa(a) < 16)
+    err = 1;
+
+  /* A request past the current capacity must be met, not landed short of. */
+  TypedArrayAppend(a, "0123456789", 10);
+  TypedArrayEnsureRoom(a, 1000);
+  if (TypedArrayRoom(a) < 1000 || TypedArraySize(a) != 10)
+    err = 1;
+  if (memcmp(TypedArrayElts(a), "0123456789", 10) != 0)
+    err = 1;
+
+  /* Capacity must always keep capa*width representable. */
+  TypedArrayEnsureRoom(w, 3);
+  if (TypedArrayRoom(w) < 3 ||
+      TypedArrayCapa(w) > ((size_t) -1) / sizeof(arrays_wide_t))
+    err = 1;
+
+  /* Many small growths, checking the payload survives every reallocation. */
+  for (i = 0; i < 5000; i++) {
+    TypedArrayAdd(a, (char) ('a' + (i % 26)));
+  }
+  if (TypedArraySize(a) != 5010)
+    err = 1;
+  else {
+    for (i = 0; i < 5000; i++) {
+      if (TypedArrayNth(a, 10 + i) != (char) ('a' + (i % 26)))
+        err = 1;
+    }
+  }
+
+  TypedArrayFree(a);
+  TypedArrayFree(w);
+  return err;
+}
+
+static int st_arrays(httrackp *opt, int argc, char **argv) {
+  /* volatile keeps the sizes below opaque, so these stay runtime checks rather
+     than compile-time allocation warnings. */
+  volatile size_t room;
+
+  (void) opt;
+  if (argc >= 1 && strcmp(argv[0], "overflow-capa") == 0) {
+    /* Room whose byte size cannot fit a size_t: capa*width used to wrap and
+       hand back a short allocation. */
+    TypedArray(arrays_wide_t) w = EMPTY_TYPED_ARRAY;
+
+    room = ((size_t) -1) / sizeof(arrays_wide_t) + 1;
+    TypedArrayEnsureRoom(w, room);
+    /* Unreachable, and printing the pointer is what keeps it so: an allocation
+       reaching nobody is removable, and its "== NULL" folds away with it. */
+    printf("arrays: NOT aborted (%p)\n", TypedArrayPtr(w));
+    return 1;
+  } else if (argc >= 1 && strcmp(argv[0], "overflow-loop") == 0) {
+    /* Doubling past SIZE_MAX used to wrap capa to 0 and spin forever. */
+    TypedArray(char) a = EMPTY_TYPED_ARRAY;
+
+    room = (size_t) -1;
+    TypedArrayEnsureRoom(a, room);
+    printf("arrays: NOT aborted (%p)\n", TypedArrayPtr(a)); /* unreachable */
+    return 1;
+  } else {
+    const int err = array_growth_selftests();
+
+    printf("arrays: %s\n", err ? "FAIL" : "OK");
     return err;
   }
 }
@@ -8358,6 +8443,9 @@ static const struct selftest_entry {
      "bounded string-op self-test", st_strsafe},
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},
+    {"arrays", "[overflow-capa|overflow-loop]",
+     "htsarrays.h growth reaches the requested room, overflow aborts",
+     st_arrays},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"lastchar", "",
      "last-char helpers never index before the buffer (#770, #781, #821)",

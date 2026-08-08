@@ -673,7 +673,7 @@ int __cdecl htsshow_loop(t_hts_callbackarg * carg, httrackp * opt, lien_back * b
                   strcpybuff(StatsBuffer[index].state, "search");
                   ok = 1;
                 } else if (back[i].status == STATUS_FTP_TRANSFER) {     // ohh le beau ftp
-                  char proto[] = "ftp";
+                  char proto[8] = "ftp";
 
                   if (back[i].url_adr[0]) {
                     char *ep = strchr(back[i].url_adr, ':');
