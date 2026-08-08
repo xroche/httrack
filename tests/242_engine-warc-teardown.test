@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# Teardown finalizes the slots left in flight, and that late emit used to reopen
-# the archive the session had just closed or abandoned, orphaning a .tmp (#1060).
+# A late emit used to reopen the closed archive, orphaning a .tmp (#1060).
 
 set -euo pipefail
 

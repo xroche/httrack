@@ -5899,8 +5899,9 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
-/* One finished transaction through the engine hook, as back_finalize does. */
-static void st_warc_emit(httrackp *opt) {
+/* One finished transaction through the engine hook. No stashed headers, so the
+   hook synthesizes the status line the real caller supplies. */
+static void st_warc_emit(httrackp *opt, const char *body) {
   lien_back *back = calloct(1, sizeof(lien_back));
 
   assertf(back != NULL);
@@ -5909,20 +5910,67 @@ static void st_warc_emit(httrackp *opt) {
   back->r.statuscode = 200;
   strcpybuff(back->r.msg, "OK");
   strcpybuff(back->r.contenttype, "text/html");
-  back->r.adr = strdupt("body\n");
-  back->r.size = 5;
+  back->r.adr = strdupt(body);
+  back->r.size = (LLint) strlen(body);
   warc_write_backtransaction(opt, back);
   freet(back->r.adr);
   freet(back);
 }
 
-/* Two runs against one archive; the second ends per `abort_run`, then takes the
-   late emit teardown makes once the writer is gone. */
+/* memmem(): a NUL byte anywhere in the archive would cut strstr() short. */
+static hts_boolean st_blob_has(const unsigned char *blob, size_t len,
+                               const char *s) {
+  const size_t n = strlen(s);
+  size_t i;
+
+  for (i = 0; n <= len && i <= len - n; i++) {
+    if (memcmp(blob + i, s, n) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* The archive on disk must hold `want`'s run, and no trace of the others. */
+static int st_warc_holds(const char *name, const char *path, const char *want,
+                         const char *absent1, const char *absent2) {
+  const char *const absent[2] = {absent1, absent2};
+  size_t len = 0, i;
+  unsigned char *blob = warc_slurp(path, &len);
+  int err = 0;
+
+  if (blob == NULL) {
+    fprintf(stderr, "warc-teardown: %s: cannot read %s\n", name, path);
+    return 1;
+  }
+  if (len < 8 || memcmp(blob, "WARC/1.1", 8) != 0) {
+    fprintf(stderr, "warc-teardown: %s: %s does not open on a WARC record\n",
+            name, path);
+    err++;
+  }
+  if (!st_blob_has(blob, len, want)) {
+    fprintf(stderr, "warc-teardown: %s: %s lost the run holding \"%s\"\n", name,
+            path, want);
+    err++;
+  }
+  for (i = 0; i < 2; i++) {
+    if (st_blob_has(blob, len, absent[i])) {
+      fprintf(stderr, "warc-teardown: %s: %s took \"%s\"\n", name, path,
+              absent[i]);
+      err++;
+    }
+  }
+  freet(blob);
+  return err;
+}
+
+/* One archive, three writes: two runs, then the emit teardown makes. */
 static int st_warc_teardown_case(httrackp *opt, const char *name,
                                  const char *path, hts_boolean abort_run) {
+  static const char run1[] = "teardown-run-1-body";
+  static const char run2[] = "teardown-run-2-body-longer";
+  static const char late[] = "teardown-late-body";
   char tmp[HTS_URLMAXSIZE * 2 + 8];
   char catbuff[CATBUFF_SIZE];
-  LLint after, late;
   int err = 0;
 
   snprintf(tmp, sizeof(tmp), "%s.tmp", path);
@@ -5930,9 +5978,10 @@ static int st_warc_teardown_case(httrackp *opt, const char *name,
   (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmp));
   StringCopy(opt->warc_file, path);
 
-  /* nothing to protect yet, so the first run is written in place */
+  /* stands in for the per-mirror memset in hts_create_opt(): this test reuses
+     the dispatcher's opt where the engine always has a fresh one */
   opt->state.warc = NULL;
-  st_warc_emit(opt);
+  st_warc_emit(opt, run1);
   warc_close_opt(opt);
   if (fsize_utf8(path) <= 0) {
     fprintf(stderr, "warc-teardown: %s: the hook opened no archive\n", name);
@@ -5941,7 +5990,7 @@ static int st_warc_teardown_case(httrackp *opt, const char *name,
 
   /* a previous archive is now there, so this run goes through the temporary */
   opt->state.warc = NULL;
-  st_warc_emit(opt);
+  st_warc_emit(opt, run2);
   if (!fexist_utf8(tmp)) {
     fprintf(stderr, "warc-teardown: %s: no temporary beside %s\n", name, path);
     return 1;
@@ -5950,21 +5999,15 @@ static int st_warc_teardown_case(httrackp *opt, const char *name,
     warc_abort_opt(opt);
   else
     warc_close_opt(opt);
-  after = fsize_utf8(path);
 
-  st_warc_emit(opt);
-  late = fsize_utf8(path);
+  st_warc_emit(opt, late); /* what back_finalize emits during teardown */
   if (fexist_utf8(tmp)) {
     fprintf(stderr, "warc-teardown: %s: orphan temporary %s\n", name, tmp);
     err++;
   }
-  if (late != after) {
-    fprintf(stderr,
-            "warc-teardown: %s: archive is " LLintP " bytes after teardown, "
-            "was " LLintP "\n",
-            name, (LLint) late, (LLint) after);
-    err++;
-  }
+  /* abort keeps run 1, close commits run 2, and neither takes the late emit */
+  err += abort_run ? st_warc_holds(name, path, run1, run2, late)
+                   : st_warc_holds(name, path, run2, run1, late);
   return err;
 }
 
