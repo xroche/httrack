@@ -256,10 +256,10 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # same line; compared as a sorted set below, so glob discovery order can't
 # cause a false mismatch either.
 # footer-overflow and purge-longpath skip on Windows (need a path past MAX_PATH);
-# memresume pending #581;
-# webdav-default, webdav-mime and webdav-overflow need a reapable background listener, which MSYS cannot give them;
+# webdav-default, webdav-mime, webdav-overflow and proxytrack-quiet need a
+# reapable background listener, which MSYS cannot give them;
 # badmtime needs a filesystem that stores an mtime past gmtime's range;
-# single-file ends on a GUI half needing htsserver, which this job does not build;
+# single-file-gui drives htsserver, which this job does not build;
 # update-304-leak needs a LeakSanitizer build, which MSVC has no equivalent of;
 # crash-symbolize and backtrace-empty need backtrace(), which Windows has no
 # equivalent of;
@@ -269,7 +269,8 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # link-control-bytes names its fixtures with the raw control bytes the requests
 # decode back to, which NTFS refuses;
 # ftp-userpass starves the x64 runner until the step is lost, Win32 passing (#1038);
-# repaircache and resume-recovery interrupt pass 1 with a signal MSYS cannot deliver to a native exe;
+# memresume, repaircache and resume-recovery interrupt pass 1 with a signal
+# MSYS cannot deliver to a native exe;
 # ftp-deadhost-interrupt needs that same signal (its --timeout half runs, as 245).
 expected_skips="01_engine-footer-overflow.test
 100_local-purge-longpath.test
@@ -289,7 +290,7 @@ expected_skips="01_engine-footer-overflow.test
 79_local-proxytrack-webdav-mime.test
 80_engine-crash-symbolize.test
 88_local-proxytrack-badmtime.test
-94_local-single-file.test"
+241_local-single-file-gui.test"
 # First, or the deadline reads as an unexplained shortfall in the gates below.
 [ "$deadline" -eq 0 ] || {
     echo "::error::suite did not finish within ${suite_deadline}s"

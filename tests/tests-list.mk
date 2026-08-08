@@ -276,6 +276,7 @@ TESTS += 238_local-warc-nodata-rollback.test
 TESTS += 01_zlib-warc-cdx-errors.test
 TESTS += 240_local-abort-teardown.test
 TESTS += 239_doc-guide-anchors.test
+TESTS += 241_local-single-file-gui.test
 TESTS += 242_engine-warc-teardown.test
 TESTS += 243_local-ftp-deadhost-interrupt.test
 TESTS += 245_local-ftp-deadhost-timeout.test
