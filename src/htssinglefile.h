@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_SINGLEFILE_DEFH
 #define HTS_SINGLEFILE_DEFH
 
+#include "htscore.h" /* HTS_HTMLESCAPE_*_MAXEXP */
 #include "htsopt.h"
 #include "htsstrings.h"
 
@@ -80,6 +81,13 @@ extern "C" {
 
 /* Enough for the intro, the secret, both separators and a 20-digit length. */
 #define SINGLEFILE_MARK_MAX 64
+
+/* Longest <len> a mark may carry, which is what htsparse can append for one
+   reference: HTS_URLMAXSIZE*2 of savename through escape_for_html_print_full,
+   plus as much query through escape_for_html_print. The emit site asserts the
+   derivation against its own buffers. */
+#define SINGLEFILE_MAX_SPAN                                                    \
+  (HTS_URLMAXSIZE * 2 * (HTS_HTMLESCAPE_FULL_MAXEXP + HTS_HTMLESCAPE_MAXEXP))
 
 /* Release this run's secret. */
 void singlefile_free(httrackp *opt);

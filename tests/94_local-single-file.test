@@ -462,6 +462,19 @@ case "$st" in
     ;;
 esac
 
+printf '[the unresolved-reference warning is clipped] ..\t'
+# The self-test drives a 90 KB reference through it, so an unclipped build puts
+# all of it in the log. The first check is the floor: no warning proves nothing.
+grep -q 'resolves to no mirrored file' <<<"$st" || {
+    echo "FAIL: the self-test logged no unresolved reference"
+    exit 1
+}
+awk 'length($0) > 1024 { exit 1 }' <<<"$st" || {
+    echo "FAIL: a log line ran past the clip"
+    exit 1
+}
+echo OK
+
 # --- project reload restores the saved keys ---------------------------------
 distdir=$(cd "${top_srcdir}" && pwd)
 printf '[project reload maps the keys back] ..\t'

@@ -3145,6 +3145,17 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           if (sf_class != 0) {
                             char sf_mark[SINGLEFILE_MARK_MAX];
 
+                            /* SINGLEFILE_MAX_SPAN is derived from these two
+                               buffers, so a resize must move it: divide by zero
+                               here rather than silently stop marking. */
+                            enum {
+                              sf_span_fits =
+                                  1 /
+                                  (sizeof(tempo) * HTS_HTMLESCAPE_FULL_MAXEXP +
+                                       sizeof(lien) * HTS_HTMLESCAPE_MAXEXP <=
+                                   SINGLEFILE_MAX_SPAN)
+                            };
+
                             HT_ADD(singlefile_mark(
                                 opt, sf_mark, sizeof(sf_mark), sf_class,
                                 TypedArraySize(output_buffer) - sf_start));

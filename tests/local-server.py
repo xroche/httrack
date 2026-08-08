@@ -2431,10 +2431,8 @@ class Handler(SimpleHTTPRequestHandler):
             "application/octet-stream",
         )
 
-    # A --single-file mark in the response charset, which htsparse echoes into a
-    # <meta>: the one channel no body-side sweep can see (#1069). Wrong secret,
-    # so it must be deleted and not expanded; "pixel.svg" is a real mirrored
-    # asset, so an expansion would show.
+    # A --single-file mark in the charset, the one channel a body sweep cannot
+    # see (#1069). It names pixel.svg, a real asset, so an expansion would show.
     SINGLEFILE_MARK_CHARSET = "pixel.svg#!0011223344556677.-.9"
 
     def route_singlefile_mark(self):

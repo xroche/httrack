@@ -64,12 +64,6 @@ Please visit our Website: http://www.httrack.com
 #define SF_MAX_REF 4096
 #define SF_MAX_COMPONENTS 128
 
-/* Longest span htsparse can measure: HTS_URLMAXSIZE*2 of savename through
-   escape_for_html_print_full, plus as much query through
-   escape_for_html_print. */
-#define SF_MAX_SPAN                                                            \
-  (HTS_URLMAXSIZE * 2 * (HTS_HTMLESCAPE_FULL_MAXEXP + HTS_HTMLESCAPE_MAXEXP))
-
 /* Over-cap assets reported per pass; beyond that the log would carry one line
    per referencing page. */
 #define SF_MAX_WARN 32
@@ -150,7 +144,7 @@ const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
   buf[0] = '\0';
   /* Nothing sf_parse_mark would refuse: an unread mark stays in the page as
      text and takes its reference with it. */
-  if (intro != NULL && reflen <= SF_MAX_SPAN)
+  if (intro != NULL && reflen <= SINGLEFILE_MAX_SPAN)
     snprintf(buf, bufsize, "%s.%c.%d", intro, cls, (int) reflen);
   return buf;
 }
@@ -706,12 +700,12 @@ static size_t sf_parse_mark(const char *intro, size_t introlen, const char *p,
   if (++i >= avail || p[i++] != '.')
     return 0;
   while (i < avail && p[i] >= '0' && p[i] <= '9') {
-    if (n > SF_MAX_SPAN) /* saturated: no digit run can overflow n */
+    if (n > SINGLEFILE_MAX_SPAN) /* saturated: no digit run can overflow n */
       return 0;
     n = n * 10 + (size_t) (p[i++] - '0');
     digits++;
   }
-  if (digits == 0 || n > SF_MAX_SPAN)
+  if (digits == 0 || n > SINGLEFILE_MAX_SPAN)
     return 0;
   *reflen = n;
   return i;
