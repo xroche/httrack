@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# The language menu must mark the language actually in force, index 1 included:
+# the first option is opened before the list loop that carries the default.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_lang.XXXXXX") || fail "no tmpdir"
+pids=
+cleanup() {
+    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
+    for p in ${pids}; do
+        kill -9 "${p}" 2>/dev/null || true
+    done
+    wait 2>/dev/null || true # absorb bash's async "Killed" notice
+    rm -rf "${work}"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+# The indexes and their labels come from lang.indexes, not from observed output.
+check() { # $1 = lang index, $2 = expected label
+    local log port url
+    log="${work}/srv$1.log"
+    mkdir -p "${work}/h$1"
+    # An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
+    port=$("${python}" -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
+    (
+        trap '' TERM TTOU
+        export HOME="${work}/h$1"
+        exec htsserver "${distdir}/" --port "${port}" lang "$1" >"${log}" 2>&1
+    ) &
+    pids="${pids} $!"
+    url=
+    for _ in $(seq 1 40); do
+        url=$(sed -n 's/^URL=//p' "${log}") && test -n "${url}" && break
+        sleep 0.25
+    done
+    test -n "${url}" || fail "htsserver did not start: $(cat "${log}")"
+    "${python}" - "${url}" "$1" "$2" <<'PY' || fail "wrong selection for language $2"
+import re, sys, urllib.request
+
+url, want_id, want_label = sys.argv[1], sys.argv[2], sys.argv[3]
+page = urllib.request.urlopen(url, timeout=20).read().decode("utf-8", "replace")
+block = re.search(r'<select name="lang".*?</select>', page, re.S)
+if not block:
+    sys.exit("no language <select> in the page")
+opts = re.findall(r"<option value=(\d+)( selected)?>([^<]*)</option>", block.group(0))
+# A menu that failed to expand would satisfy every check below vacuously.
+if len(opts) < 20:
+    sys.exit("only %d options: the list did not expand" % len(opts))
+selected = [(i, label) for i, sel, label in opts if sel]
+if len(selected) != 1:
+    sys.exit("expected exactly one selected option, got %r" % (selected,))
+got_id, got_label = selected[0]
+if got_id != want_id or got_label != want_label:
+    sys.exit("selected %s/%r, wanted %s/%r" % (got_id, got_label, want_id, want_label))
+PY
+}
+
+# 1 is the boundary the loop cannot reach; 2 and 4 prove it tracks the input.
+check 1 English
+check 2 Francais
+check 4 Deutsch
+
+echo "PASS"
