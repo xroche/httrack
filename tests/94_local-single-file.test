@@ -392,7 +392,9 @@ grep -q 'base64,' "$chgpage" || {
     echo "FAIL: --changes suppressed the inlining"
     exit 1
 }
-reported=$("$python" - "${chg}/hts-changes.json" index.html <<'REPORT') || exit 1
+# Via a file, never a heredoc inside $(...): bash 3.2 (macOS) ends the
+# substitution at the ")" and runs the body as shell commands.
+cat >"${tmpdir}/report.py" <<'REPORT'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as fp:
     report = json.load(fp)
@@ -403,6 +405,7 @@ for bucket in ("new", "changed", "unchanged"):
             sys.exit(0)
 sys.exit("FAIL: index.html is in no bucket of the change report")
 REPORT
+reported=$("$python" "${tmpdir}/report.py" "${chg}/hts-changes.json" index.html) || exit 1
 onpage=$(wc -c <"$chgpage")
 test "$reported" -eq "$onpage" || {
     echo "FAIL: the report sizes the page at $reported, on disk it is $onpage"
