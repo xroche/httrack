@@ -1,10 +1,12 @@
-# One entry per line so parallel branches union-merge instead of colliding (#844).
-include $(srcdir)/tests-list.mk
+# configure globs tests/[0-9]*_*.test into this, so adding a test edits no shared
+# file. Not a make $(wildcard): automake word-splits TESTS at automake time and
+# emits a broken per-word rule for each.
+TESTS = @TESTS_LIST@
 
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c crawl-test.sh run-all-tests.sh check-network.sh check-tests-list.sh \
+EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \

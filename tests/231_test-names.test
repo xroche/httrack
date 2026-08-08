@@ -1,0 +1,82 @@
+#!/bin/bash
+#
+# The tree's own names, the build dir's TESTS against them, and one control per
+# way either check can go blind.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+checker="${testdir}/check-test-names.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/test_names.XXXXXX") || fail "no tmpdir"
+trap 'set +e; rm -rf "$work"' EXIT
+
+bash "$checker" "$testdir" || fail "the tree's own test names do not check out"
+
+## the build dir runs the TESTS configure froze into it, not what tests/ holds
+#
+# Nothing regenerates that list when a .test appears, so without this the new
+# test is simply never run and every other test still passes.
+mk="${abs_top_builddir:-}/tests/Makefile"
+if [ -z "${abs_top_builddir:-}" ]; then
+    echo "note: abs_top_builddir unset, skipping the stale-TESTS check (run via make check)" >&2
+elif [ ! -r "$mk" ]; then
+    fail "no Makefile at $mk"
+else
+    want=$(cd "$testdir" && printf '%s\n' [0-9]*_*.test | sort)
+    got=$(sed -n 's/^TESTS = //p' "$mk" | tr ' ' '\n' | sed '/^$/d' | sort)
+    test -n "$got" || fail "no TESTS assignment in $mk"
+    if [ "$want" != "$got" ]; then
+        fail "this build dir's TESTS predates tests/; re-run configure.
+never run: $(comm -23 <(printf '%s\n' "$want") <(printf '%s\n' "$got") | tr '\n' ' ')
+gone from tests/: $(comm -13 <(printf '%s\n' "$want") <(printf '%s\n' "$got") | tr '\n' ' ')"
+    fi
+fi
+
+## the checker still sees each way it can break
+#
+# It is silent on a clean tree, so one that had stopped looking would pass the
+# assertion above just as well.
+control() {
+    local name=$1 want=$2 mutate=$3 dir="${work}/$1" out=""
+    mkdir -p "$dir"
+    : >"${dir}/00_kept.test"
+    (cd "$dir" && eval "$mutate")
+    if out=$(bash "$checker" "$dir" 2>&1); then
+        fail "$name: the checker accepted a name make check would not run"
+    fi
+    grep -q "$want" <<<"$out" || fail "$name: wrong diagnostic: $out"
+}
+
+control misnamed 'outside the' ': >ghost.test'
+control noprefix 'outside the' ': >engine-thing.test'
+control uppercase 'outside the' ': >01_Engine.TEST'
+control whitespace 'whitespace in the name' ': >"01_a b.test"'
+control directory 'not a regular file' 'mkdir 99_dir.test'
+control dangling 'not a regular file' 'ln -s nowhere 99_dangling.test'
+control empty 'no test matched' 'rm 00_kept.test'
+
+# A git that answers with an error must report that the oracle did not run, not
+# read as "nothing tracked". Stubbed rather than dropped from PATH, which the
+# checker's other tools need.
+mkdir -p "$work/stub"
+printf '#!/bin/sh\nexit 1\n' >"$work/stub/git"
+chmod +x "$work/stub/git"
+out=$(PATH="$work/stub:$PATH" bash "$checker" "$testdir" 2>&1) ||
+    fail "the checker failed outright with git stubbed out: $out"
+grep -q 'skipping the tracked-set check' <<<"$out" ||
+    fail "a git that cannot answer read as a clean tracked set: $out"
+
+if command -v git >/dev/null 2>&1; then
+    control untracked 'untracked' 'git init -q . && git add 00_kept.test && : >99_ghost.test'
+    control gone 'tracked but absent' 'git init -q . && : >99_extra.test && git add . && rm 99_extra.test'
+else
+    echo "note: no git, skipping the tracked-set controls" >&2
+fi
+
+echo "OK: tests/, the build dir's TESTS and the checker's blind spots all line up"

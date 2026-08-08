@@ -19,10 +19,12 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   (`request_queue_size`) so macOS/BSD don't drop connections under a parallel
   `-c16` bigcrawl the way Python's default backlog of 5 did.
   Or run `sh build.sh` to do bootstrap + configure + make in one shot.
-- A `tests/NN_*.test` runs only if listed in `tests/tests-list.mk`; an
-  unregistered file is silently skipped. A registration whose file is gone makes
-  `make check` exit 2 with no `# TOTAL:` line. `tests/check-tests-list.sh` (CI
-  lint and `231_tests-list-bijection.test`) enforces the pairing both ways.
+- `configure` globs `TESTS` from `tests/[0-9]*_*.test`, so a new test needs no
+  registration, but an existing build dir keeps the list it was configured with:
+  `231_test-names.test` goes red until you reconfigure. It also compares the glob
+  against `git ls-files`, so a test you forgot to `git add` fails there instead of
+  quietly shrinking CI's suite. Name one outside the pattern and it never runs;
+  `tests/check-test-names.sh` (also a CI lint) rejects that.
 - `make check` prepends the build's `src/` to `PATH`, but a hand-run `.test` does
   not — an installed `/usr/bin/httrack` then shadows your build. Run via `make
   check`, or `PATH="<bld>/src:$PATH"` for a manual run.
