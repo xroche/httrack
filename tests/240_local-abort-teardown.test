@@ -1,0 +1,101 @@
+#!/bin/bash
+# An aborted mirror (-#L limit, then a dead server) must still commit its WARC
+# and rewrite the .cdx, and must leave the previous change report alone: it
+# never ran the index pass, so any report it wrote would be false (#1061).
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_abort.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+base="http://127.0.0.1:${port}"
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+
+out="${tmpdir}/crawl"
+mkdir "$out"
+report="${out}/hts-changes.json"
+poison="stale-archive-an-abort-must-still-replace"
+common=(--quiet --disable-security-limits --robots=0 --timeout=30 --changes
+    --purge-old=0 --warc-file warc-out --warc-cdx)
+
+expect() {
+    printf '[%s] ..\t' "$1"
+    shift
+    "$@" || {
+        echo "FAIL"
+        exit 1
+    }
+    echo "OK"
+}
+no_tmp() { test -z "$(find "$out" -maxdepth 1 -name '*.tmp' -print -quit)"; }
+unpoisoned() { ! grep -qa "$poison" "$1"; }
+
+# --- pass 1: a complete crawl, to have something an abort could destroy ------
+httrack "${common[@]}" -O "$out" "${base}/changes/index.html" \
+    >"${tmpdir}/log1" 2>&1
+test -s "$report" || {
+    echo "FAIL: pass 1 wrote no ${report}"
+    exit 1
+}
+cp "$report" "${tmpdir}/report1.json"
+for f in "${out}/warc-out.warc.gz" "${out}/warc-out.cdx"; do
+    test -s "$f" || {
+        echo "FAIL: pass 1 produced no $f"
+        exit 1
+    }
+    printf '%s\n' "$poison" >"$f"
+done
+
+# --- pass 2: -#L trips the link limit deep in the crawl loop -----------------
+# -C0 so the pass re-downloads: a revisit-only pass declines to swap on its own.
+httrack "${common[@]}" -O "$out" -C0 -\#L4 "${base}/changes/index.html" \
+    >"${tmpdir}/log2" 2>&1
+expect "the link limit aborted the crawl" \
+    grep -aq "Too many URLs" "${out}/hts-log.txt"
+expect "the abort still committed the archive" \
+    unpoisoned "${out}/warc-out.warc.gz"
+expect "the abort still rewrote the .cdx" unpoisoned "${out}/warc-out.cdx"
+expect "the abort left no in-progress archive" no_tmp
+expect "the abort kept the previous change report" \
+    cmp -s "${tmpdir}/report1.json" "$report"
+
+cp "${out}/warc-out.warc.gz" "${tmpdir}/warc2.gz"
+cp "${out}/warc-out.cdx" "${tmpdir}/cdx2"
+
+# --- pass 3: server gone, so the no-data rollback restores the last session --
+stop_server "$serverpid"
+serverpid=
+httrack "${common[@]}" -O "$out" --retries=1 --update "${base}/changes/index.html" \
+    >"${tmpdir}/log3" 2>&1
+expect "the dead pass rolled the session back" \
+    grep -aq "restoring previous one" "${out}/hts-log.txt"
+expect "the rollback kept the previous change report" \
+    cmp -s "${tmpdir}/report1.json" "$report"
+expect "the rollback kept the previous archive" \
+    cmp -s "${tmpdir}/warc2.gz" "${out}/warc-out.warc.gz"
+expect "the rollback kept the previous .cdx" \
+    cmp -s "${tmpdir}/cdx2" "${out}/warc-out.cdx"
+expect "the rollback left no in-progress archive" no_tmp

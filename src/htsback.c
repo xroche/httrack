@@ -60,8 +60,6 @@ Please visit our Website: http://www.httrack.com
 #define HTS_FTRUNCATE(fp, sz) ftruncate(fileno(fp), (sz))
 #endif
 
-#define VT_CLREOL       "\33[K"
-
 /* Subdirectory holding a mirrored file's temporaries, beside it. url_savename()
    maps '~' to '_', so no URL can ever be mirrored inside it (#774, #842). */
 #define HTS_TMPDIR "~hts-tmp"
@@ -4601,11 +4599,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
         if (opt->verbosedisplay == HTS_VERBOSE_SIMPLE) {
           if (back[i].status == STATUS_READY) {
             if (back[i].r.statuscode == HTTP_OK)
-              printf("* %s%s (" LLintP " bytes) - OK" VT_CLREOL "\r",
-                     back[i].url_adr, back[i].url_fil, (LLint) back[i].r.size);
+              printf("* %s%s (" LLintP " bytes) - OK\n", back[i].url_adr,
+                     back[i].url_fil, (LLint) back[i].r.size);
             else
-              printf("* %s%s (" LLintP " bytes) - %d" VT_CLREOL "\r",
-                     back[i].url_adr, back[i].url_fil, (LLint) back[i].r.size,
+              printf("* %s%s (" LLintP " bytes) - %d\n", back[i].url_adr,
+                     back[i].url_fil, (LLint) back[i].r.size,
                      back[i].r.statuscode);
             fflush(stdout);
           }
