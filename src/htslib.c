@@ -5208,7 +5208,7 @@ static void dns_resolve_thread(void *arg) {
    gets negative-cached. */
 static int hts_dns_resolve_nocache_list_bounded(
     const char *hostname, SOCaddr *const out, const int max, const int timeout,
-    const hts_boolean *cancel, const char **error) {
+    const volatile hts_boolean *cancel, const char **error) {
   dns_resolve_job *job;
   TStamp deadline;
   int count = -1;
@@ -5262,7 +5262,8 @@ int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
 }
 
 int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
-                                int max, int timeout, const hts_boolean *cancel,
+                                int max, int timeout,
+                                const volatile hts_boolean *cancel,
                                 const char **error) {
   char BIGSTK host[HTS_URLMAXSIZE * 2];
   SOCaddr resolved[HTS_MAXADDRNUM];

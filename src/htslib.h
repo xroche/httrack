@@ -285,7 +285,8 @@ int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
 /* Like hts_dns_resolve_all(), with the wait bounded by timeout seconds (<= 0:
    unbounded) and cut short as soon as *cancel, if given, is raised. */
 int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
-                                int max, int timeout, const hts_boolean *cancel,
+                                int max, int timeout,
+                                const volatile hts_boolean *cancel,
                                 const char **error);
 HTS_INLINE SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr,
                                      SOCaddr *const addr, const char **error);
