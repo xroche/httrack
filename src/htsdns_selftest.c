@@ -102,6 +102,9 @@ static mock_host mock_hosts[] = {
     {"nodns.test", EAI_NONAME, 0, {{0}}, 0},
     /* resolves, but only well after --timeout: the #606 wedge */
     {"slow.test", 0, 1, {{AF_INET, {127, 0, 0, 9}}}, 0, MOCK_SLOW_MS},
+    /* a second one, so a cancelled resolve cannot cache an answer the next
+       case then reads instead of asking for */
+    {"slow2.test", 0, 1, {{AF_INET, {127, 0, 0, 10}}}, 0, MOCK_SLOW_MS},
 };
 
 /* Serializes mock_host bookkeeping: a timed-out resolve is abandoned, so its
@@ -546,10 +549,36 @@ int dns_timeout_selftests(httrackp *opt) {
   CHECK(count == 0);
   CHECK(mock_read_calls("slow.test") == 2); /* re-resolved, not cached */
 
-  /* Both resolves were abandoned mid-backend; wait for their workers to leave
-     it before returning. The backend stays installed: an abandoned worker
-     still reads it (to free its addrinfo) after the last call returns. */
-  mock_wait_finished(2);
+  /* A raised cancel flag ends the wait where no deadline would, which is what
+     lets a stopped FTP worker leave a black-holed resolver (#1059). */
+  {
+    hts_boolean cancel = HTS_TRUE;
+
+    start = mtime_local();
+    count = hts_dns_resolve_all_bounded(opt, "slow.test", addrs, HTS_MAXADDRNUM,
+                                        0, &cancel, &err);
+    elapsed = mtime_local() - start;
+    CHECK(count == 0);
+    CHECK(elapsed < MOCK_SLOW_MS / 2);
+  }
+
+  /* And an unbounded resolve nobody cancels still waits for its answer: a
+     timeout of 0 must not be read back as a deadline of "now". */
+  {
+    hts_boolean cancel = HTS_FALSE;
+
+    start = mtime_local();
+    count = hts_dns_resolve_all_bounded(opt, "slow2.test", addrs,
+                                        HTS_MAXADDRNUM, 0, &cancel, &err);
+    elapsed = mtime_local() - start;
+    CHECK(count == 1);
+    CHECK(elapsed >= MOCK_SLOW_MS / 2);
+  }
+
+  /* Three of the four resolves were abandoned mid-backend; wait for their
+     workers to leave it before returning. The backend stays installed: an
+     abandoned worker still reads it (to free its addrinfo). */
+  mock_wait_finished(4);
   return failures;
 }
 

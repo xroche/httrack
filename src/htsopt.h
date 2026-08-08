@@ -222,7 +222,8 @@ typedef struct htsoptstate htsoptstate;
 struct htsoptstate {
   htsmutex lock; /**< guards this state block */
   /* */
-  int stop; /**< set to request the mirror to stop */
+  /** set to request the mirror to stop; volatile: polled without a lock */
+  volatile int stop;
   int exit_xh;
   int back_add_stats;
   /* */
@@ -771,7 +772,7 @@ struct lien_back {
   LLint chunk_blocksize; /**< data size declared by the chunk */
   LLint compressed_size; /**< compressed size (stats only) */
   char info[256]; /**< status text, e.g. for FTP */
-  int stop_ftp;   /**< stop flag for FTP */
+  volatile int stop_ftp; /**< stop flag for FTP, polled without a lock */
   int finalized;  /**< finalized (memory optimization) */
   int early_add;  /**< was added before the link heap saw it */
 #if DEBUG_CHECKINT
