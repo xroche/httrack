@@ -162,7 +162,7 @@ $hits"
 # Pinned by operand, since none of these builds a command naming a helper today.
 # shellcheck disable=SC2016 # the pinned operands, quoted as they appear
 reviewed='145_webhttrack-datadir.test "${line}"
-231_tests-list-bijection.test "$mutate")
+231_test-names.test "$mutate")
 61_webhttrack-locale.test "${block}"
 61_webhttrack-locale.test "${funcs}"'
 got=$(cd "$testdir" && scan_eval ./*.test ./*.sh | sort)

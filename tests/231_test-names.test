@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# The tree's own names, plus one control per way the checker can go blind.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+checker="${testdir}/check-test-names.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/test_names.XXXXXX") || fail "no tmpdir"
+trap 'set +e; rm -rf "$work"' EXIT
+
+bash "$checker" "$testdir" || fail "the tree's own test names do not check out"
+
+# Positive controls: the checker is silent on a clean tree, so one that had
+# stopped looking would pass the assertion above just as well.
+control() {
+    local name=$1 want=$2 mutate=$3 dir="${work}/$1" out=""
+    mkdir -p "$dir"
+    : >"${dir}/00_kept.test"
+    (cd "$dir" && eval "$mutate")
+    if out=$(bash "$checker" "$dir" 2>&1); then
+        fail "$name: the checker accepted a name make check would not run"
+    fi
+    grep -q "$want" <<<"$out" || fail "$name: wrong diagnostic: $out"
+}
+
+control misnamed 'outside the' ': >ghost.test'
+control noprefix 'outside the' ': >engine-thing.test'
+control directory 'not a regular file' 'mkdir 99_dir.test'
+control dangling 'not a regular file' 'ln -s nowhere 99_dangling.test'
+control empty 'no test matched' 'rm 00_kept.test'
+
+echo "OK: every .test in the tree is one make check runs, and the checker still sees each way it can break"

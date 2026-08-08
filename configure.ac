@@ -606,6 +606,20 @@ if test x"$fuzzers" = x"yes"; then
 fi
 AM_CONDITIONAL([FUZZERS], [test x"$fuzzers" = x"yes"])
 
+# tests/Makefile.am takes its TESTS from here instead of a checked-in list,
+# which made every pair of test-adding PRs conflict on the forge (#844).
+AC_MSG_CHECKING([for test scripts])
+TESTS_LIST=
+hts_ntests=0
+for hts_t in "$srcdir"/tests/[[0-9]]*_*.test; do
+	test -f "$hts_t" || continue
+	TESTS_LIST="$TESTS_LIST `echo "$hts_t" | sed 's|.*/||'`"
+	hts_ntests=`expr $hts_ntests + 1`
+done
+AC_SUBST([TESTS_LIST])
+AC_MSG_RESULT([$hts_ntests])
+test "$hts_ntests" -gt 0 || AC_MSG_ERROR([no test script matched tests/[[0-9]]*_*.test])
+
 # Final output
 AC_CONFIG_FILES([
 Makefile
