@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Run a command with a pty for stdout/stderr and capture what it paints.
 
-Usage: ttyrun.py <capture-file> [--stdin tty|eof] [--enter] -- <cmd> [args...]
+Usage: ttyrun.py <capture-file> [--stdin tty|eof] [--send enter|eot] -- <cmd> [args...]
 
---stdin tty (default) hands the child the pty, which never goes readable;
---stdin eof gives it /dev/null. --enter types one ENTER once the child paints.
+--stdin tty (default) hands the child the pty, --stdin eof gives it /dev/null.
+--send types one ENTER, or one ^D to put the terminal at end of file, as soon
+as the child paints.
 """
 import os
 import subprocess
@@ -15,7 +16,8 @@ capture = sys.argv[1]
 opts = sys.argv[2 : sys.argv.index("--")]
 argv = sys.argv[sys.argv.index("--") + 1 :]
 stdin_mode = opts[opts.index("--stdin") + 1] if "--stdin" in opts else "tty"
-send_enter = "--enter" in opts
+keys = {"enter": b"\n", "eot": b"\004"}
+send = keys[opts[opts.index("--send") + 1]] if "--send" in opts else None
 
 master, slave = os.openpty()
 attrs = termios.tcgetattr(slave)
@@ -38,8 +40,8 @@ with open(capture, "wb") as f:
         if not data:
             break
         f.write(data)
-        if send_enter:
-            os.write(master, b"\n")
-            send_enter = False
+        if send:
+            os.write(master, send)
+            send = None
 os.close(master)
 sys.exit(p.wait())

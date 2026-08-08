@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# #1072: on a terminal with stdin at end of file, select() keeps saying readable,
-# the crawl loop takes that for an ENTER and toggles the display on every pass.
-# -%v0 then paints the full panel it was told not to.
+# select() reports stdin readable even at end of file (#1072). The crawl loop
+# reads that as an ENTER and toggles the display every pass, so -%v0 paints
+# the full panel it was told to suppress.
 
 set -eu
 
@@ -79,8 +79,14 @@ expect "an stdin at EOF leaves -%v0 alone" "$(count eof "$esc")" eq 0 eof
 # Teeth: without this, a display that painted nothing at all would pass.
 expect "the spinner still turned" "$(count eof "$cr")" ge 1 eof
 
+# The ticket's own case: a terminal, not a redirection. A fix that just gave up
+# off a tty would pass the leg above and leave this one broken.
+crawl eot --stdin tty --send eot
+expect "^D ran the crawl too" "$(count eot '^Mirror launched')" ge 1 eot
+expect "a terminal at EOF leaves -%v0 alone" "$(count eot "$esc")" eq 0 eot
+
 # Control: a real ENTER must still toggle, or a check_stdin() that always reports
-# "nothing to read" would satisfy the case above.
-crawl enter --stdin tty --enter
+# "nothing to read" would satisfy both cases above.
+crawl enter --stdin tty --send enter
 expect "ENTER ran the crawl too" "$(count enter '^Mirror launched')" ge 1 enter
 expect "ENTER still switches to the panel" "$(count enter "$esc")" ge 20 enter
