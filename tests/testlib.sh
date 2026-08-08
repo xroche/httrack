@@ -199,24 +199,6 @@ dump_crawl_logs() {
     done
 }
 
-# Engine and fixture-server processes, matched on the executable basename only.
-# Matching the whole ps line instead would catch every unrelated command whose
-# arguments merely mention a path containing "httrack". One list feeds the matcher
-# and every Windows taskkill below: the two used to diverge, and a proxytrack
-# orphan survived the kill path that named only httrack.exe (#1067).
-ENGINE_EXES='httrack proxytrack htsserver webhttrack'
-ENGINE_EXE_RE="^(lt-)?(${ENGINE_EXES// /|})([.]exe)?\$"
-FIXTURE_SERVER_RE='^(local-server|proxy-https-server|proxy-connect-server|socks5-server|tls-stall-server)[.]py$'
-
-# taskkill every engine image on the host. Windows only, and by name, so the
-# caller must be sure no wanted process shares one.
-taskkill_engines() {
-    local e
-    for e in $ENGINE_EXES; do
-        taskkill /F /IM "$e.exe" >/dev/null 2>&1 || true
-    done
-}
-
 # The Windows PID behind an MSYS pid, empty when unknown.
 win_pid() {
     if test -r "/proc/$1/winpid"; then
@@ -263,6 +245,26 @@ kill_tree() {
     # so -"$pid" here would target whatever real group $pid's number collides
     # with -- possibly the harness's own -- and taskkill above already reaped it.
     kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+}
+
+# Engine and fixture-server processes, matched on the executable basename only.
+# Matching the whole ps line instead would catch every unrelated command whose
+# arguments merely mention a path containing "httrack". ENGINE_EXES feeds the
+# matcher and every Windows taskkill below, which used to drift apart (#1067).
+ENGINE_EXES='httrack proxytrack htsserver webhttrack'
+ENGINE_EXE_RE="^(lt-)?(${ENGINE_EXES// /|})([.]exe)?\$"
+# The same set against tasklist, whose first column is the image basename.
+# Anchored, or "notepad-httrack-notes.exe" reads as a leaked engine.
+ENGINE_IMAGE_RE="^(${ENGINE_EXES// /|})[.]exe"
+FIXTURE_SERVER_RE='^(local-server|proxy-https-server|proxy-connect-server|socks5-server|tls-stall-server)[.]py$'
+
+# taskkill every engine image on the host. Windows only, and by name, so the
+# caller must be sure no wanted process shares one.
+taskkill_engines() {
+    local e
+    for e in $ENGINE_EXES; do
+        taskkill /F /IM "$e.exe" >/dev/null 2>&1 || true
+    done
 }
 
 # awk prologue for the matchers below: under qemu-user the kernel reports the
@@ -341,7 +343,7 @@ list_stray_processes() {
         # slash switches: without MSYS_NO_PATHCONV a /fi would be rewritten to a
         # path. Plain output is Image Name + PID, which is all we need.
         test "$mode" != others || return 0
-        tasklist 2>/dev/null | grep -Ei "${ENGINE_EXES// /|}|python" || true
+        tasklist 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE|^python" || true
     else
         # Fields 6 and 7 are the command and its first argument (the interpreter
         # and its script, for the Python fixtures).
@@ -369,7 +371,7 @@ list_stray_processes() {
 reap_leftover_processes() {
     local label=${1:-} left
     if is_windows; then
-        left=$(tasklist 2>/dev/null | grep -Ei "${ENGINE_EXES// /|}" || true)
+        left=$(tasklist 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE" || true)
     else
         left=$(list_stray_processes 0 named | awk 'NR > 1')
     fi
@@ -465,7 +467,7 @@ dump_windows_stacks() {
         printf 'no stack: cdb.exe is not in the SDK Debuggers directories or on PATH\n'
         return 0
     fi
-    for p in $(tasklist 2>/dev/null | grep -Ei '^(httrack|proxytrack)[.]exe' | awk '{print $2}'); do
+    for p in $(tasklist 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE" | awk '{print $2}'); do
         found=1
         printf -- '--- cdb stack of pid %s ---\n' "$p"
         # Bounded, so a debugger that wedges cannot become the new hang. "qd"

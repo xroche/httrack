@@ -39,8 +39,10 @@ alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
     cat "$dir/hdr" "$dir/body"
 } >"$dir/in.arc"
 
+# $() strips a trailing LF, not the CR Windows python's print can put before it.
 freeport() {
-    "$python" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
+    "$python" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()' |
+        tr -d '\r'
 }
 proxyport=$(freeport)
 icpport=$(freeport)

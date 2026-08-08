@@ -19,9 +19,11 @@ command -v curl >/dev/null 2>&1 || {
     echo "curl missing, skipping"
     exit 77
 }
-# MSYS cannot reap a native listener, and the orphan wedges the suite (#595).
+# A leak on a fully buffered stdout shows only through the pty below, and Windows
+# builds neither Python's pty module nor os.fork; proxytrack also skips the PID=
+# line, which request_log() cuts the banner off at.
 if is_windows; then
-    echo "windows: cannot reap a backgrounded proxytrack, skipping"
+    echo "windows: python has no pty, so a buffered leak would be invisible, skipping"
     exit 77
 fi
 

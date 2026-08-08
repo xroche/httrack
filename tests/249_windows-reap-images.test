@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# The Windows reap paths kill by image name, and their list used to be written out
-# by hand beside ENGINE_EXE_RE: it named only httrack.exe, so a proxytrack orphan
-# outlived the suite and starved the runner (#1067). Windows-only in production,
-# so nothing would exercise it before merge.
+# The Windows kill paths name images by hand and had drifted from ENGINE_EXE_RE,
+# so a leaked proxytrack.exe outlived the reap and starved the runner (#1067).
+# Shimmed, since nothing exercises those branches off a Windows runner.
 
 set -euo pipefail
 
@@ -19,9 +18,8 @@ fail() {
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_reapimg.XXXXXX")
 trap 'set +e; rm -rf "$tmp"' EXIT
 
-# Stand in for the runner. win_pid is shimmed rather than left to /proc so the
-# branch under test is pinned on every host -- and so a real MSYS run of this test
-# cannot resolve $$ and taskkill its own shell.
+# Stand in for the runner. win_pid is shimmed, not left to /proc, so each branch
+# is pinned on every host and an MSYS run cannot taskkill this shell.
 IS_WINDOWS=yes
 taskkill() { printf '%s\n' "$*" >>"$tmp/killed"; }
 tasklist() { printf 'proxytrack.exe   4242 Console\n'; }
@@ -72,12 +70,31 @@ done
 # cannot tell it from a leaked fixture server.
 if grep -qxF '/F /IM python.exe' "$tmp/killed"; then fail "the reap killed an unrelated python.exe"; fi
 
-# Control for the two greps above: with nothing engine-shaped listed it must warn
-# about nothing and kill nothing.
-tasklist() { printf 'System Idle Process              0 Services\n'; }
+# Near misses, not an idle host, are what a widened image matcher lets through.
+tasklist() {
+    printf 'System Idle Process              0 Services\n'
+    printf 'notepad-httrack-notes.exe      77 Console\n'
+    printf 'httrackless.exe                78 Console\n'
+    printf 'trackpad.exe                   79 Console\n'
+}
 : >"$tmp/killed"
 out=$(reap_leftover_processes 99_probe.test)
-test -z "$out" || fail "an idle host was reported as leaking: $out"
-test ! -s "$tmp/killed" || fail "an idle host was reaped: $(cat "$tmp/killed")"
+test -z "$out" || fail "an unrelated process was reported as a leak: $out"
+test ! -s "$tmp/killed" || fail "an unrelated process was reaped: $(cat "$tmp/killed")"
+
+# The same list drives the wedge report, which names python too so a leaked
+# fixture server is still visible to a reader.
+tasklist() { printf 'htsserver.exe   99 Console\npython.exe   98 Console\ntrackpad.exe   78 Console\n'; }
+out=$(list_stray_processes 0 named)
+grep -q 'htsserver.exe' <<<"$out" || fail "the stray listing dropped an engine: $out"
+grep -q 'python.exe' <<<"$out" || fail "the stray listing dropped python: $out"
+if grep -q 'trackpad' <<<"$out"; then fail "the stray listing caught an unrelated process: $out"; fi
+
+# The bug was a second engine list drifting from the first, so fail on any name
+# still written by hand inside a taskkill or a process-matching grep.
+stray=$(grep -nE '(taskkill|tasklist|grep -Ei)[^#]*(httrack|proxytrack|htsserver|webhttrack)' \
+    "$top_srcdir/tests/testlib.sh" | grep -vE 'ENGINE_EXES|ENGINE_IMAGE_RE' || true)
+test -z "$stray" || fail "engine names hand-written outside ENGINE_EXES:
+$stray"
 
 echo "OK: the Windows reap paths cover every engine image the matcher knows"
