@@ -1,0 +1,92 @@
+#!/bin/bash
+#
+# select() reports stdin readable even at end of file (#1072). The crawl loop
+# reads that as an ENTER and toggles the display every pass, so -%v0 paints
+# the full panel it was told to suppress.
+
+set -eu
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+server=$(nativepath "${testdir}/local-server.py")
+root=$(nativepath "${testdir}/server-root")
+ttyrun=$(nativepath "${testdir}/ttyrun.py")
+
+if is_windows; then
+    echo "no pty on Windows; skipping" >&2
+    exit 77
+fi
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_stdineof.XXXXXX") || exit 1
+serverpid=
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+serverlog="${tmpdir}/server.log"
+: >"$serverlog"
+"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+
+which httrack >/dev/null || {
+    echo "could not find httrack"
+    exit 1
+}
+
+# Trickled pages: the crawl has to outlive several passes of the loop that polls
+# stdin, or a display that toggles has no time to show it.
+url="http://127.0.0.1:${port}/trickle/index.html"
+
+# crawl <label> <ttyrun opts...>
+crawl() {
+    local label=$1
+    shift
+    run_with_timeout 120 "$python" "$ttyrun" "${tmpdir}/out_${label}" "$@" -- \
+        httrack "$url" -O "${tmpdir}/m_${label}" --robots=0 -%v0 \
+        --timeout=30 --retries=1 -c2 --max-time 8 >/dev/null 2>&1 || true
+}
+
+# count <label> <ERE>
+count() {
+    LC_ALL=C grep -ac "$2" "${tmpdir}/out_$1" || true
+}
+
+# expect <description> <actual> <op> <bound> <label>
+expect() {
+    printf '[%s] ..\t' "$1"
+    if test "$2" -"$3" "$4"; then
+        echo "OK"
+    else
+        echo "FAIL: got $2"
+        LC_ALL=C head -c 400 "${tmpdir}/out_$5" | cat -v >&2
+        exit 1
+    fi
+}
+
+esc=$'\033'
+cr=$'\r'
+
+crawl eof --stdin eof
+expect "the crawl ran" "$(count eof '^Mirror launched')" ge 1 eof
+expect "an stdin at EOF leaves -%v0 alone" "$(count eof "$esc")" eq 0 eof
+# Teeth: without this, a display that painted nothing at all would pass.
+expect "the spinner still turned" "$(count eof "$cr")" ge 1 eof
+
+# The ticket's own case: a terminal, not a redirection. A fix that just gave up
+# off a tty would pass the leg above and leave this one broken.
+crawl eot --stdin tty --send eot
+expect "^D ran the crawl too" "$(count eot '^Mirror launched')" ge 1 eot
+expect "a terminal at EOF leaves -%v0 alone" "$(count eot "$esc")" eq 0 eot
+
+# Control: a real ENTER must still toggle, or a check_stdin() that always reports
+# "nothing to read" would satisfy both cases above.
+crawl enter --stdin tty --send enter
+expect "ENTER ran the crawl too" "$(count enter '^Mirror launched')" ge 1 enter
+expect "ENTER still switches to the panel" "$(count enter "$esc")" ge 20 enter

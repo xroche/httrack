@@ -30,31 +30,8 @@ serverpid=$!
 port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 url="http://127.0.0.1:${port}/simple/basic.html"
 
-# Stdin is the pty too, and never written to: an stdin at EOF reads as a keypress
-# and flips the display mode in a loop. ONLCR off stops the pty manufacturing the
-# CRs the spinner check counts.
-cat >"${tmpdir}/ttyrun.py" <<'EOF'
-import os, subprocess, sys, termios
-
-out, argv = sys.argv[1], sys.argv[2:]
-master, slave = os.openpty()
-attrs = termios.tcgetattr(slave)
-attrs[1] &= ~termios.ONLCR
-termios.tcsetattr(slave, termios.TCSANOW, attrs)
-p = subprocess.Popen(argv, stdin=slave, stdout=slave, stderr=slave)
-os.close(slave)
-with open(out, "wb") as f:
-    while True:
-        try:
-            data = os.read(master, 4096)
-        except OSError:  # the slave closed: EIO on Linux, empty read on BSD
-            break
-        if not data:
-            break
-        f.write(data)
-os.close(master)
-sys.exit(p.wait())
-EOF
+# Stdin is the pty too, and never written to, so it never reads as a keypress.
+ttyrun=$(nativepath "${testdir}/ttyrun.py")
 
 # crawl <label> <httrack args...>, stdout to a pipe; CRLF from the Windows CRT
 # is normalized away so only a CR the display wrote is left. --quiet would gate
@@ -71,7 +48,7 @@ crawl() {
 crawl_tty() {
     local label=$1
     shift
-    run_with_timeout 120 "$python" "${tmpdir}/ttyrun.py" "${tmpdir}/out_${label}" \
+    run_with_timeout 120 "$python" "$ttyrun" "${tmpdir}/out_${label}" -- \
         httrack -O "${tmpdir}/m_${label}" --robots=0 --timeout=30 --retries=1 \
         -c1 "$@" "$url" >/dev/null 2>&1 || true
 }
