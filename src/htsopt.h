@@ -256,7 +256,7 @@ struct htsoptstate {
   unsigned int debug_state;
   unsigned int tmpnameid; /**< counter for temporary file names */
   int is_ended;           /**< mirror has finished */
-  void *warc;             /**< open WARC writer (warc_writer*), or NULL */
+  void *warc;             /**< WARC writer, or NULL/an htswarc.c sentinel */
 };
 
 /* Library handles */

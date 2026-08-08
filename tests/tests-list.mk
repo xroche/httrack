@@ -275,3 +275,4 @@ TESTS += 232_online-gate-outoftree.test
 TESTS += 238_local-warc-nodata-rollback.test
 TESTS += 01_zlib-warc-cdx-errors.test
 TESTS += 239_doc-guide-anchors.test
+TESTS += 242_engine-warc-teardown.test

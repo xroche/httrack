@@ -84,7 +84,8 @@ void warc_adopt_rawspool(htsblk *r, const char *tmpfile_path);
    once) if the archive cannot be created. */
 void warc_write_backtransaction(httrackp *opt, lien_back *back);
 
-/* Close and free the writer held in opt->state.warc, if any. */
+/* Close and free the writer held in opt->state.warc, if any. Both this and
+   warc_abort_opt() are final: a later transaction reopens nothing. */
 void warc_close_opt(httrackp *opt);
 
 /* Same, but discards this run's archive: keeps the previous one and drops

@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+# Teardown finalizes the slots left in flight, and that late emit used to reopen
+# the archive the session had just closed or abandoned, orphaning a .tmp (#1060).
+
+set -euo pipefail
+
+httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+
+scratch=$(mktemp -d)
+trap 'set +e; rm -rf "$scratch"' EXIT
+
+out=$("$httrack_bin" -O /dev/null -#test=warc-teardown "$scratch/")
+echo "$out"
+case "$out" in
+*": OK") ;;
+*) exit 1 ;;
+esac
+
+# Same check from outside, so a temporary under any other name fails too.
+leftover=$(find "$scratch" -name '*.tmp' -print)
+if [ -n "$leftover" ]; then
+    echo "orphan temporaries: $leftover"
+    exit 1
+fi

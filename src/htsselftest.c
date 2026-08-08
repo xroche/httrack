@@ -5899,6 +5899,100 @@ static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* One finished transaction through the engine hook, as back_finalize does. */
+static void st_warc_emit(httrackp *opt) {
+  lien_back *back = calloct(1, sizeof(lien_back));
+
+  assertf(back != NULL);
+  strcpybuff(back->url_adr, "example.com");
+  strcpybuff(back->url_fil, "/teardown.html");
+  back->r.statuscode = 200;
+  strcpybuff(back->r.msg, "OK");
+  strcpybuff(back->r.contenttype, "text/html");
+  back->r.adr = strdupt("body\n");
+  back->r.size = 5;
+  warc_write_backtransaction(opt, back);
+  freet(back->r.adr);
+  freet(back);
+}
+
+/* Two runs against one archive; the second ends per `abort_run`, then takes the
+   late emit teardown makes once the writer is gone. */
+static int st_warc_teardown_case(httrackp *opt, const char *name,
+                                 const char *path, hts_boolean abort_run) {
+  char tmp[HTS_URLMAXSIZE * 2 + 8];
+  char catbuff[CATBUFF_SIZE];
+  LLint after, late;
+  int err = 0;
+
+  snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+  (void) UNLINK(fconv(catbuff, sizeof(catbuff), path));
+  (void) UNLINK(fconv(catbuff, sizeof(catbuff), tmp));
+  StringCopy(opt->warc_file, path);
+
+  /* nothing to protect yet, so the first run is written in place */
+  opt->state.warc = NULL;
+  st_warc_emit(opt);
+  warc_close_opt(opt);
+  if (fsize_utf8(path) <= 0) {
+    fprintf(stderr, "warc-teardown: %s: the hook opened no archive\n", name);
+    return 1;
+  }
+
+  /* a previous archive is now there, so this run goes through the temporary */
+  opt->state.warc = NULL;
+  st_warc_emit(opt);
+  if (!fexist_utf8(tmp)) {
+    fprintf(stderr, "warc-teardown: %s: no temporary beside %s\n", name, path);
+    return 1;
+  }
+  if (abort_run)
+    warc_abort_opt(opt);
+  else
+    warc_close_opt(opt);
+  after = fsize_utf8(path);
+
+  st_warc_emit(opt);
+  late = fsize_utf8(path);
+  if (fexist_utf8(tmp)) {
+    fprintf(stderr, "warc-teardown: %s: orphan temporary %s\n", name, tmp);
+    err++;
+  }
+  if (late != after) {
+    fprintf(stderr,
+            "warc-teardown: %s: archive is " LLintP " bytes after teardown, "
+            "was " LLintP "\n",
+            name, (LLint) late, (LLint) after);
+    err++;
+  }
+  return err;
+}
+
+// -#test=warc-teardown <dir>: teardown finalizes the slots left in flight, so
+// back_finalize emits after warc_close_opt/warc_abort_opt has run (#1060).
+static int st_warc_teardown(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE], saved_file[HTS_URLMAXSIZE];
+  void *saved_state;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-teardown: needs a writable directory\n");
+    return 1;
+  }
+  saved_state = opt->state.warc;
+  strlcpybuff(saved_file, StringBuff(opt->warc_file), sizeof(saved_file));
+
+  fconcat(path, sizeof(path), argv[0], "teardown-close.warc");
+  err += st_warc_teardown_case(opt, "close", path, HTS_FALSE);
+  fconcat(path, sizeof(path), argv[0], "teardown-abort.warc");
+  err += st_warc_teardown_case(opt, "abort", path, HTS_TRUE);
+
+  StringCopy(opt->warc_file, saved_file);
+  opt->state.warc = saved_state;
+  printf("warc-teardown: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #if HTS_USEOPENSSL
 /* Lowercase-hex SHA-256 of n bytes into out[65]; 1 on success. */
 static int wacz_test_sha256(const void *p, size_t n, char out[65]) {
@@ -8604,6 +8698,9 @@ static const struct selftest_entry {
     {"warc-cdx-errors", "<dir>",
      "--warc-cdx diagnostics when the index cannot be written or is empty",
      st_warc_cdx_errors},
+    {"warc-teardown", "<dir>",
+     "a closed or abandoned archive is not reopened by a late transaction",
+     st_warc_teardown},
 #if HTS_USEOPENSSL
     {"warc-wacz", "<dir>", "--wacz package: layout, STORE mode, sha256 digests",
      st_warc_wacz},

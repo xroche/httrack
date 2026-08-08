@@ -55,7 +55,8 @@ Please visit our Website: http://www.httrack.com
 #include <openssl/rand.h>
 #endif
 
-/* opt->state.warc value meaning "open failed once, do not retry". */
+/* opt->state.warc value meaning "no writer, and do not open one": the open
+   failed, or the session is done with the archive. */
 #define WARC_DISABLED ((void *) ~(uintptr_t) 0)
 
 /* Suffix of the in-progress archive when a previous one must survive it. */
@@ -1691,7 +1692,9 @@ void warc_close_opt(httrackp *opt) {
   if (opt->state.warc != NULL && opt->state.warc != WARC_DISABLED) {
     warc_close((warc_writer *) opt->state.warc);
   }
-  opt->state.warc = NULL;
+  /* final: teardown still finalizes slots, and a reopen there would orphan a
+     .tmp nobody closes (#1060) */
+  opt->state.warc = WARC_DISABLED;
 }
 
 void warc_abort_opt(httrackp *opt) {
@@ -1701,7 +1704,7 @@ void warc_abort_opt(httrackp *opt) {
     w->failed = HTS_TRUE;
     warc_close(w);
   }
-  opt->state.warc = NULL;
+  opt->state.warc = WARC_DISABLED;
 }
 
 /* ---- one transaction ---- */
