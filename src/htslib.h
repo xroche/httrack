@@ -214,6 +214,16 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend
 int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
                        char *dst, size_t dst_size);
 
+/* Switch soc between blocking and non-blocking mode; false on failure, with
+   errno (WSAGetLastError() on Windows) set. */
+hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking);
+/* Pending-connect result for a non-blocking socket reported ready by select():
+   0 = connected, >0 = the connect errno (refused, unreachable, ...), -1 if the
+   probe itself failed. A failed connect is reported ready as well (writable on
+   posix, exception set on winsock), so this is how success is told from failure
+   without blocking. */
+int connect_socket_error(T_SOC soc);
+
 T_SOC newhttp(httrackp * opt, const char *iadr, htsblk * retour, int port,
               int waitconnect);
 /* Like newhttp(), but connect to the addr_index-th resolved address of the host
@@ -272,6 +282,12 @@ LLint http_xfread1(htsblk * r, int bufl);
    on a worker thread bounded by opt->timeout; a timeout reports 0, uncached. */
 int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
                         const char **error);
+/* Like hts_dns_resolve_all(), with the wait bounded by timeout seconds (<= 0:
+   unbounded) and cut short as soon as *cancel, if given, is raised. */
+int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
+                                int max, int timeout,
+                                const volatile hts_boolean *cancel,
+                                const char **error);
 HTS_INLINE SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr,
                                      SOCaddr *const addr, const char **error);
 HTS_INLINE SOCaddr* hts_dns_resolve(httrackp * opt, const char *iadr,

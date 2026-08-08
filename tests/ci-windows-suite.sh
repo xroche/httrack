@@ -270,7 +270,8 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # decode back to, which NTFS refuses;
 # ftp-userpass starves the x64 runner until the step is lost, Win32 passing (#1038);
 # memresume, repaircache and resume-recovery interrupt pass 1 with a signal
-# MSYS cannot deliver to a native exe.
+# MSYS cannot deliver to a native exe;
+# ftp-deadhost-interrupt needs that same signal (its --timeout half runs, as 245).
 expected_skips="01_engine-footer-overflow.test
 100_local-purge-longpath.test
 158_local-link-control-bytes.test
@@ -282,6 +283,7 @@ expected_skips="01_engine-footer-overflow.test
 153_local-proxytrack-quiet.test
 215_engine-datadir-ospath.test
 230_local-ftp-userpass.test
+243_local-ftp-deadhost-interrupt.test
 235_local-resume-recovery.test
 48_local-crange-memresume.test
 71_local-crange-repaircache.test
