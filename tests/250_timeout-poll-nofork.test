@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# A poll tick that returns without waiting must end test-timeout.sh's wait loop,
+# not be re-forked every iteration on a box already out of processes (#1038).
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_nofork.XXXXXX")
+trap 'set +e; rm -rf "$tmp"' EXIT
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+mkdir -p "$tmp/bin"
+# A tick that cannot exec is what bash reports as 126/127; the counter reads the
+# status, so a stub returning one models it exactly.
+cat >"$tmp/bin/sleep" <<'EOF'
+#!/bin/sh
+exit 126
+EOF
+chmod +x "$tmp/bin/sleep"
+
+# Builtins only: the broken PATH is inherited, and this must outlive ten ticks.
+cat >"$tmp/spin.sh" <<'EOF'
+#!/bin/bash
+trap 'exit 0' TERM INT
+while :; do :; done
+EOF
+# Long enough for the poll loop to tick many times over: a child that exits at once
+# would leave the control leg asserting about a loop that never ran.
+cat >"$tmp/quick.sh" <<'EOF'
+#!/bin/bash
+sleep 3
+EOF
+
+# 60s, so a deadline that fires instead of the guard is visible as a stall and as
+# the DUMP line, rather than passing for the same 124.
+run_timeout() {
+    local extra_path=$1 script=$2 log=$3
+    env PATH="$extra_path$PATH" \
+        HTTRACK_POLL_SLEEP=1 \
+        HTTRACK_TEST_TIMEOUT=60 \
+        HTTRACK_PROGRESS_LOG="$tmp/progress" \
+        "$BASH" "$testdir/test-timeout.sh" "$script" >"$log" 2>&1
+}
+
+: >"$tmp/progress"
+began=$SECONDS
+rc=0
+run_timeout "$tmp/bin:" "$tmp/spin.sh" "$tmp/broken.log" || rc=$?
+spent=$((SECONDS - began))
+
+test "$rc" -eq 124 || fail "a tick that never waits exited $rc, not 124: $(cat "$tmp/broken.log")"
+grep -q 'poll tick ran' "$tmp/broken.log" ||
+    fail "no verdict naming the tick: $(cat "$tmp/broken.log")"
+grep -q '^NOFORK spin.sh$' "$tmp/progress" ||
+    fail "the off-box watchdog got no marker: $(cat "$tmp/progress")"
+# The deadline path writes DUMP and takes the whole 60s. Both say the guard is gone
+# and the budget expiry is what ended the loop.
+grep -q '^DUMP ' "$tmp/progress" && fail "the loop ran to its 60s deadline, not the guard"
+test "$spent" -lt 30 || fail "took ${spent}s to give up on a tick that returns at once"
+
+# Control: the same invocation with a working sleep must reach neither branch, or
+# the assertions above would hold for any run.
+: >"$tmp/progress"
+run_timeout "" "$tmp/quick.sh" "$tmp/ok.log" || fail "a healthy run failed: $(cat "$tmp/ok.log")"
+grep -q 'NOFORK' "$tmp/progress" && fail "a healthy poll tick was read as a broken one"
+
+echo "test-timeout poll guard OK"

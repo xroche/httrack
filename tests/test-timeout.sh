@@ -67,6 +67,11 @@ fi
 # is floored: a reading of $budget can be a fraction under it, and firing early
 # kills a healthy test.
 start=$SECONDS
+# A tick that returns without waiting bounds nothing, and re-forking it every
+# iteration is a fork storm on a box already short of processes (#1038). Counted,
+# not tripped on the first one, so a single lost tick is not a verdict.
+nowait=0
+nowait_limit=10
 while kill -0 "$pid" 2>/dev/null; do
     if test "$((SECONDS - start))" -gt "$budget"; then
         # The dump below can run for minutes. Say so where a suite watchdog is
@@ -79,6 +84,18 @@ while kill -0 "$pid" 2>/dev/null; do
         dump_crawl_logs
         exit 124
     fi
-    poll_wait "$tick"
+    if poll_wait "$tick"; then
+        nowait=0
+        continue
+    fi
+    nowait=$((nowait + 1))
+    test "$nowait" -ge "$nowait_limit" || continue
+    # Named where the off-box watchdog can still read it: a runner that dies here
+    # takes the step log and the artifacts with it, and its last commit status is
+    # all that is left (#795).
+    test -z "${HTTRACK_PROGRESS_LOG:-}" || echo "NOFORK $name" >>"$HTTRACK_PROGRESS_LOG"
+    echo "hang: the poll tick ran $nowait times without waiting; this box cannot start a process"
+    kill_tree "$pid"
+    exit 124
 done
 wait "$pid"
