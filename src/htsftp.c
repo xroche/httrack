@@ -302,7 +302,7 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
     /* state.stop counts here, unlike in the waits below: a mirror the user
        stopped has nothing to finish on a connection never established. */
     while (check_socket_connect(soc) == 0) {
-      if (back->stop_ftp || opt->state.stop ||
+      if (back->stop_ftp || (opt != NULL && opt->state.stop) ||
           (int) (time_local() - started) >= timeout)
         return HTS_FALSE;
       Sleep(100);
@@ -487,8 +487,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     SOCaddr_initport(server, port);
 
-    // connexion (bloquante, on est en thread)
     strcpybuff(back->info, "connect");
+    hts_log_print(opt, LOG_DEBUG, "FTP: connecting to %s:%d", _adr, port);
 
     if (!ftp_connect(back, soc_ctl, &server, timeout, opt)) {
       strcpybuff(back->r.msg, "Unable to connect to the server");

@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# --timeout must bound an FTP connect to a blackholed host, rather than the
+# kernel's own connect timeout: 127s on Linux, 75s on BSD, 21s on Windows (#1059).
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpdead.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+ok() { echo "OK: $*"; }
+
+timeout=2
+# Above --timeout plus its two retries (3 x 2s) and a truncated $SECONDS, below
+# the shortest kernel connect timeout an unfixed engine would wait out.
+bound=15
+# What the precondition below has to outlast for the bound to mean anything.
+probe=10
+blackhole=192.0.2.1
+
+# TEST-NET-1 is routed nowhere, so a connect hangs until something bounds it.
+# Where the network answers instead, there is no wait to cut short and an
+# unfixed engine passes every timing below.
+"$python" - "$blackhole" "$probe" <<'EOF' || exit 77
+import socket, sys, time
+
+host, limit = sys.argv[1], int(sys.argv[2])
+sock = socket.socket()
+sock.settimeout(limit)
+start = time.time()
+try:
+    sock.connect((host, 21))
+except socket.timeout:
+    sys.exit(0)
+except OSError as err:
+    print("%s answers in %.1fs (%s)" % (host, time.time() - start, err), file=sys.stderr)
+    sys.exit(1)
+print("%s accepted the connection" % host, file=sys.stderr)
+sys.exit(1)
+EOF
+ok "a connect to ${blackhole} is still unanswered after ${probe}s"
+
+out="${tmpdir}/crawl"
+mkdir -p "$out"
+start=$SECONDS
+# --max-time is set far above --timeout so only the connect bound can end this.
+run_with_timeout 90 httrack "ftp://${blackhole}/f.bin" -O "$out" --quiet \
+    --disable-security-limits --robots=0 --timeout="$timeout" --max-time=60 -c1 \
+    >"${tmpdir}/log" 2>&1 || fail "the crawl did not finish in $((SECONDS - start))s"
+elapsed=$((SECONDS - start))
+
+log="${out}/hts-log.txt"
+# Anchored on the FTP worker's own wording: the HTTP backend, which is already
+# non-blocking, emits the same text with a trailing ": <reason>".
+grep -aqE '"Unable to connect to the server" \([^)]*\) at link ftp://' "$log" ||
+    fail "the FTP connect is not what failed: $(grep -a Error "$log" || true)"
+if grep -aq 'More than' "$log"; then
+    fail "--max-time ended the run, so --timeout was never the bound"
+fi
+# The connect has to have been pending and then cut: an engine that fails it
+# outright (no socket, a rejected address) returns in about no time at all.
+test "$elapsed" -ge "$timeout" ||
+    fail "the connect failed in ${elapsed}s, before --timeout=${timeout} could bound it"
+test "$elapsed" -lt "$bound" ||
+    fail "--timeout=${timeout} left the connect going for ${elapsed}s"
+ok "--timeout bounds a connect to a dead host (${elapsed}s)"

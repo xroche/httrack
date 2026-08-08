@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# A crawl of a blackholed FTP host must end on --timeout, and on a Ctrl-C, rather
-# than on the kernel's own connect timeout: two minutes on Linux (#1059). Named
-# outside the Windows suite's globs, where MSYS cannot signal a native .exe.
+# A ^C must end a crawl parked in an FTP connect to a blackholed host, instead
+# of leaving it to the kernel's own two-minute connect timeout (#1059).
 
 set -euo pipefail
 
@@ -16,8 +15,10 @@ command -v httrack >/dev/null || {
     echo "could not find httrack" >&2
     exit 1
 }
+! is_windows || ! echo "MSYS cannot signal a native httrack.exe; skipping" >&2 ||
+    exit 77
 
-tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpdead.XXXXXX")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpint.XXXXXX")
 crawlpid=
 cleanup() {
     test -z "$crawlpid" || kill_tree "$crawlpid"
@@ -32,11 +33,16 @@ fail() {
 }
 ok() { echo "OK: $*"; }
 
+# Above a truncated $SECONDS and a loaded runner's scheduling, below the
+# shortest kernel connect timeout an unfixed engine would wait out.
+bound=15
+# What the precondition below has to outlast for the bound to mean anything.
+probe=10
+blackhole=192.0.2.1
+
 # TEST-NET-1 is routed nowhere, so a connect hangs until something bounds it.
 # Where the network answers instead, there is no wait to cut short and an
-# unfixed engine passes every timing below.
-blackhole=192.0.2.1
-probe=10
+# unfixed engine passes the timing below.
 "$python" - "$blackhole" "$probe" <<'EOF' || exit 77
 import socket, sys, time
 
@@ -58,49 +64,39 @@ ok "a connect to ${blackhole} is still unanswered after ${probe}s"
 
 out="${tmpdir}/crawl"
 mkdir -p "$out"
-start=$SECONDS
-# --max-time is set far above --timeout so only the connect bound can end this.
-run_with_timeout 90 httrack "ftp://${blackhole}/f.bin" -O "$out" --quiet \
-    --disable-security-limits --robots=0 --timeout=2 --max-time=60 -c1 \
-    >"${tmpdir}/log" 2>&1 || fail "the crawl did not finish in $((SECONDS - start))s"
-elapsed=$((SECONDS - start))
-
-log="${out}/hts-log.txt"
-grep -aq 'Unable to connect to the server' "$log" ||
-    fail "the connect is not what failed: $(grep -a Error "$log" || true)"
-if grep -aq 'More than' "$log"; then
-    fail "--max-time ended the run, so --timeout was never the bound"
-fi
-test "$elapsed" -lt "$probe" ||
-    fail "--timeout=2 left the connect going for ${elapsed}s"
-ok "--timeout bounds a connect to a dead host (${elapsed}s)"
-
-out="${tmpdir}/interrupt"
-mkdir -p "$out"
-# No bound at all this time: only the interrupt can end this run.
+# No bound of any kind, so only the interrupt can end this run.
 httrack "ftp://${blackhole}/f.bin" -O "$out" --quiet --disable-security-limits \
-    --robots=0 --timeout=0 --max-time=0 -c1 >"${tmpdir}/ilog" 2>&1 &
+    --debug-log --robots=0 --timeout=0 --max-time=0 -c1 >"${tmpdir}/log" 2>&1 &
 crawlpid=$!
+
+# Signal the worker once it is inside connect(), observed rather than slept for:
+# a ^C landing before it would prove nothing, and would red a correct tree.
 log="${out}/hts-log.txt"
-deadline=$((SECONDS + 30))
-while test ! -s "$log"; do
-    test "$SECONDS" -lt "$deadline" || fail "the crawl never started"
+deadline=$((SECONDS + 60))
+until test -s "$log" && grep -aq "FTP: connecting to ${blackhole}:" "$log"; do
+    test "$SECONDS" -lt "$deadline" || fail "the crawl never reached connect()"
     poll_wait 1
 done
-sleep 2 # and is inside connect() by now
+
+# Nothing bounds this run, so a crawl that ended by itself never reached the
+# wait under test: an engine failing the connect outright would pass below.
+sleep 5
+kill -0 "$crawlpid" 2>/dev/null ||
+    fail "the crawl ended on its own, so ^C is not what stopped it"
 
 start=$SECONDS
 kill -INT "$crawlpid"
-wait_bounded "$crawlpid" 45 ||
+wait_bounded "$crawlpid" 60 ||
     fail "^C left the crawl running for $((SECONDS - start))s"
 elapsed=$((SECONDS - start))
 crawlpid=
 
 grep -aq 'Exit requested by shell or user' "$log" ||
     fail "the crawl never saw the interrupt: $(grep -a Error "$log" || true)"
-# Without this the run could have been cut before the worker reached connect().
-grep -aq 'Unable to connect to the server' "$log" ||
-    fail "the interrupt did not land on a pending connect"
-test "$elapsed" -lt "$probe" ||
+# Anchored on the FTP worker's own wording: the HTTP backend, which is already
+# non-blocking, emits the same text with a trailing ": <reason>".
+grep -aqE '"Unable to connect to the server" \([^)]*\) at link ftp://' "$log" ||
+    fail "the interrupt did not land on a pending FTP connect"
+test "$elapsed" -lt "$bound" ||
     fail "^C took ${elapsed}s to end a crawl stuck in connect()"
 ok "^C ends a crawl stuck in connect() (${elapsed}s)"

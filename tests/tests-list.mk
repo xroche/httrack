@@ -275,4 +275,5 @@ TESTS += 232_online-gate-outoftree.test
 TESTS += 238_local-warc-nodata-rollback.test
 TESTS += 01_zlib-warc-cdx-errors.test
 TESTS += 239_doc-guide-anchors.test
-TESTS += 243_ftp-deadhost-timeout.test
+TESTS += 243_local-ftp-deadhost-interrupt.test
+TESTS += 244_local-ftp-deadhost-timeout.test
