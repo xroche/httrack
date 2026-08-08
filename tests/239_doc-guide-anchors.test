@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# guide.html's section ids are link API: the redirect stubs left by the page
+# merge and the Android app's per-screen help both hardcode them, and an app
+# release outlives its engine pin.
+
+set -euo pipefail
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+html="${srcdir}/html"
+guide="${html}/guide.html"
+
+test -r "${guide}" || {
+    echo "FAIL: no ${guide}" >&2
+    exit 1
+}
+
+ids=$(grep -o 'id="[^"]*"' "${guide}" | sed 's/^id="//; s/"$//' | sort)
+dups=$(uniq -d <<<"${ids}")
+test -z "${dups}" || {
+    echo "FAIL: duplicate id in guide.html: ${dups}" >&2
+    exit 1
+}
+
+has_id() { grep -qx "$1" <<<"${ids}"; }
+
+# Control: the matcher must be able to say no.
+if has_id no-such-section; then
+    echo "FAIL: has_id matches anything; the checks below prove nothing" >&2
+    exit 1
+fi
+
+# Cross-page "guide.html#..." plus guide.html's own "#..." links, minus the
+# "#<platform>/" routing prefix guide.js strips before scrolling.
+targets=$(
+    {
+        cat "${html}"/*.html | grep -o 'guide\.html#[^"'"'"' >]*' | sed 's/.*#//'
+        grep -o 'href="#[^"]*"' "${guide}" | sed 's/^href="#//; s/"$//'
+    } | sed 's/^\(win\|web\|droid\)\///' | grep -v '^$' | sort -u
+)
+
+# Non-vacuity: the stubs and the in-page links must both have been seen.
+for seen in opt-links opt-scan-rules; do
+    grep -qx "${seen}" <<<"${targets}" || {
+        echo "FAIL: collected no reference to ${seen}; the scan found nothing" >&2
+        exit 1
+    }
+done
+
+fail=0
+for target in ${targets}; do
+    has_id "${target}" || {
+        echo "FAIL: something links to guide.html#${target}, which no id matches" >&2
+        fail=1
+    }
+done
+
+# Hardcoded by httrack-android for its contextual help; renaming one silently
+# drops installed builds at the top of the page.
+for anchor in droid-first-launch step-start step-project step-address options \
+    step-run step-done droid-storage-location; do
+    has_id "${anchor}" || {
+        echo "FAIL: guide.html lost the Android help anchor ${anchor}" >&2
+        fail=1
+    }
+done
+
+test "${fail}" -eq 0 || exit 1
+
+echo "guide anchors: $(wc -l <<<"${targets}") link targets resolved, Android set intact"
