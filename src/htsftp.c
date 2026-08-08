@@ -270,6 +270,69 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
   return HTS_TRUE;
 }
 
+/* Clip a wait to what is left of --max-time: back_wait() can't abort this slot
+   the way it aborts an HTTP one. */
+static int ftp_wait_left(const httrackp *opt, int timeout) {
+  if (opt != NULL && opt->maxtime > 0) {
+    const TStamp left =
+        (TStamp) opt->maxtime - (time_local() - HTS_STAT.stat_timestart);
+
+    if (left < (TStamp) timeout)
+      timeout = left > 0 ? (int) left : 0;
+  }
+  return timeout;
+}
+
+/* Connect honoring the stop flag, --timeout and --max-time: a blocking
+   connect() to a black hole sits for the kernel's own two minutes (#1059). */
+static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
+                               int timeout, const httrackp *opt) {
+  const TStamp started = time_local();
+
+  timeout = ftp_wait_left(opt, timeout);
+  if (!socket_set_nonblocking(soc, HTS_TRUE))
+    return HTS_FALSE;
+  if (connect(soc, &SOCaddr_sockaddr(*server), SOCaddr_size(*server)) != 0) {
+#ifdef _WIN32
+    if (WSAGetLastError() != WSAEWOULDBLOCK)
+#else
+    if (errno != EINPROGRESS && errno != EINTR)
+#endif
+      return HTS_FALSE;
+    /* state.stop counts here, unlike in the waits below: a mirror the user
+       stopped has nothing to finish on a connection never established. */
+    while (check_socket_connect(soc) == 0) {
+      if (back->stop_ftp || opt->state.stop ||
+          (int) (time_local() - started) >= timeout)
+        return HTS_FALSE;
+      Sleep(100);
+    }
+    if (connect_socket_error(soc) != 0)
+      return HTS_FALSE;
+  }
+  /* the rest of the session reads and writes this socket blocking */
+  return socket_set_nonblocking(soc, HTS_FALSE);
+}
+
+/* Resolve, likewise: the shared resolver bounds itself by opt->timeout alone
+   and takes no stop flag. */
+static SOCaddr *ftp_dns_resolve(httrackp *opt, lien_back *back,
+                                const char *host, SOCaddr *addr, int timeout,
+                                const char **error) {
+  const int left = ftp_wait_left(opt, timeout);
+
+  SOCaddr_clear(*addr);
+  if (left <= 0) {
+    if (error != NULL)
+      *error = "mirror deadline reached";
+    return NULL;
+  }
+  if (hts_dns_resolve_all_bounded(opt, host, addr, 1, left, &back->stop_ftp,
+                                  error) > 0)
+    return SOCaddr_is_valid(*addr) ? addr : NULL;
+  return NULL;
+}
+
 // la véritable fonction une fois lancées les routines thread/fork
 int run_launch_ftp(FTPDownloadStruct * pStruct) {
   lien_back *back = pStruct->pBack;
@@ -404,7 +467,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
     // récupérer adresse résolue
     strcpybuff(back->info, "host name");
-    if (hts_dns_resolve2(opt, _adr, &server, &error) == NULL) {
+    if (ftp_dns_resolve(opt, back, _adr, &server, timeout, &error) == NULL) {
       htsblk_failf(&back->r, "Unable to get server's address: %s", error);
       back->r.statuscode = STATUSCODE_NON_FATAL;
       _HALT_FTP return 0;
@@ -427,15 +490,11 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     // connexion (bloquante, on est en thread)
     strcpybuff(back->info, "connect");
 
-    if (connect(soc_ctl, &SOCaddr_sockaddr(server), SOCaddr_size(server)) != 0) {
+    if (!ftp_connect(back, soc_ctl, &server, timeout, opt)) {
       strcpybuff(back->r.msg, "Unable to connect to the server");
       back->r.statuscode = STATUSCODE_INVALID;
       _HALT_FTP return 0;
-#ifdef _WIN32
     }
-#else
-    }
-#endif
     _CHECK_HALT_FTP;
 
     {
@@ -671,7 +730,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
         // Ok, se connecter
         if (port_pasv) {
           SOCaddr server;
-          int server_size = sizeof(server);
+          hts_boolean resolved;
           const char *error = "unknown error";
 
           // effacer structure
@@ -682,9 +741,11 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 
           // résoudre
           if (adr_ip[0]) {
-            hts_dns_resolve2(opt, adr_ip, &server, &error);
+            resolved = ftp_dns_resolve(opt, back, adr_ip, &server, timeout,
+                                       &error) != NULL;
           } else {
             SOCaddr_copy_SOCaddr(server, server_data);
+            resolved = HTS_TRUE;
           }
 
           // infos
@@ -692,13 +753,13 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
 #if FTP_DEBUG
           printf("Data: Connecting to %s:%d...\n", adr_ip, port_pasv);
 #endif
-          if (server_size > 0) {
+          if (resolved) {
             // socket
             soc_dat = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0);
             if (soc_dat != INVALID_SOCKET) {
               // structure: connexion au domaine internet, port 80 (ou autre)
               SOCaddr_initport(server, port_pasv);
-              if (connect(soc_dat, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
+              if (ftp_connect(back, soc_dat, &server, timeout, opt)) {
                 strcpybuff(back->info, "retr");
                 // clip, never abort: this line is built from a crawled URL
                 line[0] = '\0';
@@ -725,7 +786,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                 //
                 strcpybuff(back->r.msg, "Unable to connect");
                 back->r.statuscode = STATUSCODE_INVALID;
-              }                 // sinon on est prêts
+              } // sinon on est prêts
             } else {
               strcpybuff(back->r.msg, "Unable to create a socket");
               back->r.statuscode = STATUSCODE_INVALID;
@@ -734,7 +795,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             htsblk_failf(&back->r, "Unable to resolve IP %s: %s", adr_ip,
                          error);
             back->r.statuscode = STATUSCODE_INVALID;
-          }                     // sinon on est prêts
+          } // sinon on est prêts
         } else {
           htsblk_failf(&back->r, "PASV incorrect: %s", linejmp(line));
           back->r.statuscode = STATUSCODE_INVALID;
@@ -1186,19 +1247,6 @@ int check_socket_connect(T_SOC soc) {
     return 1;
   }
   return 0;
-}
-
-/* Clip a wait to what is left of --max-time: back_wait() can't abort this slot
-   the way it aborts an HTTP one. */
-static int ftp_wait_left(const httrackp *opt, int timeout) {
-  if (opt != NULL && opt->maxtime > 0) {
-    const TStamp left =
-        (TStamp) opt->maxtime - (time_local() - HTS_STAT.stat_timestart);
-
-    if (left < (TStamp) timeout)
-      timeout = left > 0 ? (int) left : 0;
-  }
-  return timeout;
 }
 
 // attendre des données

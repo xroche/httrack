@@ -1,0 +1,106 @@
+#!/bin/bash
+#
+# A crawl of a blackholed FTP host must end on --timeout, and on a Ctrl-C, rather
+# than on the kernel's own connect timeout: two minutes on Linux (#1059). Named
+# outside the Windows suite's globs, where MSYS cannot signal a native .exe.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+command -v httrack >/dev/null || {
+    echo "could not find httrack" >&2
+    exit 1
+}
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpdead.XXXXXX")
+crawlpid=
+cleanup() {
+    test -z "$crawlpid" || kill_tree "$crawlpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+ok() { echo "OK: $*"; }
+
+# TEST-NET-1 is routed nowhere, so a connect hangs until something bounds it.
+# Where the network answers instead, there is no wait to cut short and an
+# unfixed engine passes every timing below.
+blackhole=192.0.2.1
+probe=10
+"$python" - "$blackhole" "$probe" <<'EOF' || exit 77
+import socket, sys, time
+
+host, limit = sys.argv[1], int(sys.argv[2])
+sock = socket.socket()
+sock.settimeout(limit)
+start = time.time()
+try:
+    sock.connect((host, 21))
+except socket.timeout:
+    sys.exit(0)
+except OSError as err:
+    print("%s answers in %.1fs (%s)" % (host, time.time() - start, err), file=sys.stderr)
+    sys.exit(1)
+print("%s accepted the connection" % host, file=sys.stderr)
+sys.exit(1)
+EOF
+ok "a connect to ${blackhole} is still unanswered after ${probe}s"
+
+out="${tmpdir}/crawl"
+mkdir -p "$out"
+start=$SECONDS
+# --max-time is set far above --timeout so only the connect bound can end this.
+run_with_timeout 90 httrack "ftp://${blackhole}/f.bin" -O "$out" --quiet \
+    --disable-security-limits --robots=0 --timeout=2 --max-time=60 -c1 \
+    >"${tmpdir}/log" 2>&1 || fail "the crawl did not finish in $((SECONDS - start))s"
+elapsed=$((SECONDS - start))
+
+log="${out}/hts-log.txt"
+grep -aq 'Unable to connect to the server' "$log" ||
+    fail "the connect is not what failed: $(grep -a Error "$log" || true)"
+if grep -aq 'More than' "$log"; then
+    fail "--max-time ended the run, so --timeout was never the bound"
+fi
+test "$elapsed" -lt "$probe" ||
+    fail "--timeout=2 left the connect going for ${elapsed}s"
+ok "--timeout bounds a connect to a dead host (${elapsed}s)"
+
+out="${tmpdir}/interrupt"
+mkdir -p "$out"
+# No bound at all this time: only the interrupt can end this run.
+httrack "ftp://${blackhole}/f.bin" -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=0 --max-time=0 -c1 >"${tmpdir}/ilog" 2>&1 &
+crawlpid=$!
+log="${out}/hts-log.txt"
+deadline=$((SECONDS + 30))
+while test ! -s "$log"; do
+    test "$SECONDS" -lt "$deadline" || fail "the crawl never started"
+    poll_wait 1
+done
+sleep 2 # and is inside connect() by now
+
+start=$SECONDS
+kill -INT "$crawlpid"
+wait_bounded "$crawlpid" 45 ||
+    fail "^C left the crawl running for $((SECONDS - start))s"
+elapsed=$((SECONDS - start))
+crawlpid=
+
+grep -aq 'Exit requested by shell or user' "$log" ||
+    fail "the crawl never saw the interrupt: $(grep -a Error "$log" || true)"
+# Without this the run could have been cut before the worker reached connect().
+grep -aq 'Unable to connect to the server' "$log" ||
+    fail "the interrupt did not land on a pending connect"
+test "$elapsed" -lt "$probe" ||
+    fail "^C took ${elapsed}s to end a crawl stuck in connect()"
+ok "^C ends a crawl stuck in connect() (${elapsed}s)"

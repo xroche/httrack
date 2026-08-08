@@ -2122,6 +2122,30 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
   return retour;
 }
 
+hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking) {
+#ifdef _WIN32
+  unsigned long p = nonblocking ? 1 : 0;
+
+  return ioctlsocket(soc, FIONBIO, &p) == 0 ? HTS_TRUE : HTS_FALSE;
+#else
+  const int flags = fcntl(soc, F_GETFL, 0);
+  const int wanted = nonblocking ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK);
+
+  if (flags == -1 || fcntl(soc, F_SETFL, wanted) == -1)
+    return HTS_FALSE;
+  return HTS_TRUE;
+#endif
+}
+
+int connect_socket_error(T_SOC soc) {
+  int soerr = 0;
+  socklen_t len = (socklen_t) sizeof(soerr);
+
+  if (getsockopt(soc, SOL_SOCKET, SO_ERROR, (char *) &soerr, &len) != 0)
+    return -1;
+  return soerr;
+}
+
 // Crée un lien (http) vers une adresse internet iadr
 // retour: structure (adresse, taille, message si erreur (si !adr))
 // peut ouvrir avec des connect() non bloquants: waitconnect=0/1
@@ -2270,24 +2294,17 @@ T_SOC newhttp_addr(httrackp *opt, const char *_iadr, htsblk *retour, int port,
 
     // connexion non bloquante?
     if (!waitconnect) {
+      if (!socket_set_nonblocking(soc, HTS_TRUE)) {
 #ifdef _WIN32
-      unsigned long p = 1;      // non bloquant
-      if (ioctlsocket(soc, FIONBIO, &p)) {
         const int last_errno = WSAGetLastError();
+#else
+        const int last_errno = errno;
+#endif
         snprintf(retour->msg, sizeof(retour->msg),
                  "Non-blocking socket failed: %s", strerror(last_errno));
         deletesoc(soc);
         return INVALID_SOCKET;
       }
-#else
-      const int flags = fcntl(soc, F_GETFL, 0);
-      if (flags == -1 || fcntl(soc, F_SETFL, flags | O_NONBLOCK) == -1) {
-        snprintf(retour->msg, sizeof(retour->msg),
-                 "Non-blocking socket failed: %s", strerror(errno));
-        deletesoc(soc);
-        return INVALID_SOCKET;
-      }
-#endif
     }
     // Connexion au serveur lui même
 #if HDEBUG
@@ -5185,20 +5202,20 @@ static void dns_resolve_thread(void *arg) {
   dns_job_release(job);
 }
 
-/* Resolve hostname on a worker thread, giving up after timeout seconds.
-   Returns the address count, or -1 on timeout -- distinct from 0 ("does not
-   resolve"), which is a real answer and gets negative-cached. */
-static int hts_dns_resolve_nocache_list_bounded(const char *hostname,
-                                                SOCaddr *const out,
-                                                const int max,
-                                                const int timeout,
-                                                const char **error) {
+/* Resolve hostname on a worker thread, giving up after timeout seconds or as
+   soon as *cancel (optional) is raised. Returns the address count, or -1 on
+   timeout -- distinct from 0 ("does not resolve"), which is a real answer and
+   gets negative-cached. */
+static int hts_dns_resolve_nocache_list_bounded(
+    const char *hostname, SOCaddr *const out, const int max, const int timeout,
+    const hts_boolean *cancel, const char **error) {
   dns_resolve_job *job;
   TStamp deadline;
   int count = -1;
   int poll_ms = 1;
 
-  if (timeout <= 0) /* no bound asked for (--timeout 0) */
+  /* no bound asked for (--timeout 0), and nobody to cut it short either */
+  if (timeout <= 0 && cancel == NULL)
     return hts_dns_resolve_nocache_list(hostname, out, max, error);
 
   job = calloct(1, sizeof(*job));
@@ -5212,7 +5229,8 @@ static int hts_dns_resolve_nocache_list_bounded(const char *hostname,
     return hts_dns_resolve_nocache_list(hostname, out, max, error);
   }
 
-  deadline = mtime_local() + (TStamp) timeout * 1000;
+  /* timeout <= 0 got here only for a cancellable resolve: no deadline then */
+  deadline = timeout > 0 ? mtime_local() + (TStamp) timeout * 1000 : 0;
   for (;;) {
     hts_boolean done;
 
@@ -5225,7 +5243,8 @@ static int hts_dns_resolve_nocache_list_bounded(const char *hostname,
         *error = job->error;
     }
     hts_mutexrelease(&job->lock);
-    if (done || mtime_local() >= deadline)
+    if (done || (cancel != NULL && *cancel) ||
+        (deadline != 0 && mtime_local() >= deadline))
       break;
     Sleep(poll_ms);
     if (poll_ms < 50) /* short first polls keep a fast resolve fast */
@@ -5237,6 +5256,14 @@ static int hts_dns_resolve_nocache_list_bounded(const char *hostname,
 
 int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
                         const char **error) {
+  assertf(opt != NULL);
+  return hts_dns_resolve_all_bounded(opt, iadr, out, max, opt->timeout, NULL,
+                                     error);
+}
+
+int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
+                                int max, int timeout, const hts_boolean *cancel,
+                                const char **error) {
   char BIGSTK host[HTS_URLMAXSIZE * 2];
   SOCaddr resolved[HTS_MAXADDRNUM];
   coucal cache;
@@ -5275,7 +5302,7 @@ int hts_dns_resolve_all(httrackp *opt, const char *iadr, SOCaddr *out, int max,
   /* Resolve with no lock held: getaddrinfo can block for a long time, and
      state.lock also gates the stop request (#606). */
   count = hts_dns_resolve_nocache_list_bounded(host, resolved, HTS_MAXADDRNUM,
-                                               opt->timeout, error);
+                                               timeout, cancel, error);
 
 #if HTS_WIDE_DEBUG
   DEBUG_W("gethostbyname done\n");

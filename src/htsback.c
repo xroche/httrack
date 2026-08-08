@@ -174,20 +174,6 @@ int back_connect_fallback_due(int addr_index, int addr_count, int elapsed,
   return elapsed >= deadline;
 }
 
-/* Pending-connect result for a non-blocking socket reported ready by select():
-   0 = connected, >0 = the connect errno (refused, unreachable, ...), -1 if the
-   probe itself failed. A failed connect is reported ready as well (writable on
-   posix, exception set on winsock), so this is how success is told from failure
-   without blocking. */
-static int connect_socket_error(T_SOC soc) {
-  int soerr = 0;
-  socklen_t len = (socklen_t) sizeof(soerr);
-
-  if (getsockopt(soc, SOL_SOCKET, SO_ERROR, (char *) &soerr, &len) != 0)
-    return -1;
-  return soerr;
-}
-
 /* Retry a stuck/failed connecting slot against its next resolved address.
    Closes the current socket and starts a non-blocking connect to the next
    candidate, leaving the slot in STATUS_CONNECTING. Returns 1 if a new connect
