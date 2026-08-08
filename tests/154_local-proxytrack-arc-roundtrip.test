@@ -58,11 +58,13 @@ test "$(convert "$dir/legacy.arc" "$dir/c.arc")" = 1 ||
 # a third would put the record out of its reach again.
 hdrlen=$(head -1 "$dir/a.arc" | wc -c)
 declared=$(head -1 "$dir/a.arc" | awk '{print $NF}')
-sep=$(tail -c +$((hdrlen + declared + 1)) "$dir/a.arc" | head -c 3 | od -An -c | tr -d ' ')
+# od seeks for itself: piping the archive into `head -c` leaves the writer with
+# a closed pipe, and under pipefail that SIGPIPE is the test's exit status.
+sep=$(od -An -c -j $((hdrlen + declared)) -N 3 "$dir/a.arc" | tr -d ' ')
 test "$sep" = '\n\nh' || fail "version block ends on '$sep', expected two newlines"
 # The block itself must not end on one either: counting the blank line and then
 # writing a second one round-trips, but leaves the length a byte too long.
-inner=$(tail -c +$((hdrlen + declared - 1)) "$dir/a.arc" | head -c 2 | od -An -c | tr -d ' ')
+inner=$(od -An -c -j $((hdrlen + declared - 2)) -N 2 "$dir/a.arc" | tr -d ' ')
 test "$inner" != '\n\n' || fail "declared length still counts the blank line"
 
 # An empty archive is not a corrupt one...
