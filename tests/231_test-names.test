@@ -61,6 +61,17 @@ control directory 'not a regular file' 'mkdir 99_dir.test'
 control dangling 'not a regular file' 'ln -s nowhere 99_dangling.test'
 control empty 'no test matched' 'rm 00_kept.test'
 
+# A git that answers with an error must report that the oracle did not run, not
+# read as "nothing tracked". Stubbed rather than dropped from PATH, which the
+# checker's other tools need.
+mkdir -p "$work/stub"
+printf '#!/bin/sh\nexit 1\n' >"$work/stub/git"
+chmod +x "$work/stub/git"
+out=$(PATH="$work/stub:$PATH" bash "$checker" "$testdir" 2>&1) ||
+    fail "the checker failed outright with git stubbed out: $out"
+grep -q 'skipping the tracked-set check' <<<"$out" ||
+    fail "a git that cannot answer read as a clean tracked set: $out"
+
 if command -v git >/dev/null 2>&1; then
     control untracked 'untracked' 'git init -q . && git add 00_kept.test && : >99_ghost.test'
     control gone 'tracked but absent' 'git init -q . && : >99_extra.test && git add . && rm 99_extra.test'

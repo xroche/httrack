@@ -43,7 +43,13 @@ shopt -u nocaseglob nullglob
 # The glob carries no oracle of its own: a test its author forgot to "git add",
 # or one missing from a checkout, just makes the suite quietly smaller. Nothing
 # tracked here means a tarball, where there is no oracle to apply.
-tracked=$(git -C "$testdir" ls-files -- '[0-9]*_*.test' 2>/dev/null || true)
+# A git that cannot answer is not the same as an empty listing, so say which.
+if ! command -v git >/dev/null 2>&1 || ! git -C "$testdir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    tracked=""
+    echo "note: no git checkout here that git can read, skipping the tracked-set check" >&2
+else
+    tracked=$(git -C "$testdir" ls-files -- '[0-9]*_*.test')
+fi
 if [ -n "$tracked" ]; then
     untracked=$(comm -13 <(sort <<<"$tracked") <(printf '%s' "$present" | sort))
     [ -z "$untracked" ] || bad "untracked, so CI would run a smaller suite than you do: $untracked"
