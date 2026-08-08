@@ -1,13 +1,10 @@
 httrack (3.49.19-1) unstable; urgency=medium
 
-  * New upstream release: FTP fixes across the board, from an over-long user
-    name in a URL logging in as a different account to a crash when a mirror
-    hit its limit while an FTP transfer was in flight, plus stack-overflow
-    and interruption fixes and an --update data-loss fix; full list in
-    history.txt.
-  * Fixes two build failures reported by other distributions: two tests
-    assumed GNU coreutils, and the AppStream metainfo declared an icon name
-    that is not a stock one, which appstream-util rejects.
+  * New upstream release: mostly FTP fixes, plus stack-overflow, mirror
+    interruption and --update data-loss fixes; full list in history.txt. Two
+    of them matter to the build: the test suite no longer assumes GNU
+    coreutils, and the AppStream metainfo no longer declares a non-stock icon
+    name that appstream-util rejects.
 
  -- Xavier Roche <xavier@debian.org>  Sat, 08 Aug 2026 21:29:56 +0200
 
