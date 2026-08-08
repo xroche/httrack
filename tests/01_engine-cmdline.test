@@ -97,6 +97,10 @@ run_only "$tmp/q-bad" '"foo'
 refused "dangling-quote argument not refused cleanly"
 run_only "$tmp/q-lone" '"'
 refused "lone-quote argument not refused cleanly"
+# A dangling quote on an argument at the cap must not overflow the "Missing
+# quote in %s" panic buffer: the prefix plus a 1023-byte argument overran it.
+run_only "$tmp/q-long" "\"$(nchars 1022)"
+refused "near-cap dangling-quote argument overflowed the panic buffer"
 
 # --pause (#185): valid MIN[:MAX] accepted; malformed, reversed, over-range and
 # non-finite values refused cleanly. NaN defeats naive `<`/`>` checks (it

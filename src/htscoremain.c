@@ -448,9 +448,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 
           strcpybuff(tempo, argv[na] + 1);
           if (hts_lastchar(tempo) != '"') {
-            char BIGSTK s[HTS_CDLMAXSIZE];
+            /* +256 holds the prefix around a max-length argument. */
+            char BIGSTK s[HTS_CDLMAXSIZE + 256];
 
-            sprintf(s, "Missing quote in %s", argv[na]);
+            snprintf(s, sizeof(s), "Missing quote in %s", argv[na]);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
@@ -979,7 +980,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         if (hts_lastchar(tempo) != '"') {
           char s[HTS_CDLMAXSIZE + 256];
 
-          sprintf(s, "Missing quote in %s", argv[na]);
+          snprintf(s, sizeof(s), "Missing quote in %s", argv[na]);
           HTS_PANIC_PRINTF(s);
           htsmain_free();
           return -1;
@@ -2574,20 +2575,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       else
         opt->errlog = opt->log;
       if (opt->log == NULL) {
+        /* path_log is not argv-gated: ~ expansion admits 2047 bytes */
         char s[HTS_CDLMAXSIZE + 256];
 
-        sprintf(s, "Unable to create log file %s",
-                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                        "hts-log.txt"));
+        snprintf(s, sizeof(s), "Unable to create log file %s",
+                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                         StringBuff(opt->path_log), "hts-log.txt"));
         HTS_PANIC_PRINTF(s);
         htsmain_free();
         return -1;
       } else if (opt->errlog == NULL) {
         char s[HTS_CDLMAXSIZE + 256];
 
-        sprintf(s, "Unable to create log file %s",
-                fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), StringBuff(opt->path_log),
-                        "hts-err.txt"));
+        snprintf(s, sizeof(s), "Unable to create log file %s",
+                 fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                         StringBuff(opt->path_log), "hts-err.txt"));
         HTS_PANIC_PRINTF(s);
         htsmain_free();
         return -1;

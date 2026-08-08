@@ -851,17 +851,39 @@ static void warc_cdx_flush(warc_writer *w) {
   FILE *f;
   char catbuff[CATBUFF_SIZE];
   size_t i;
-  if (!w->cdx_on || w->cdx_path == NULL || w->cdx_count == 0)
+  int werr, cerr;
+  if (!w->cdx_on || w->cdx_path == NULL)
     return;
+  if (w->cdx_count == 0) {
+    /* Stale only if an index is still on disk and this run wrote an archive
+       over what it describes: opened covers the swap and the in-place run. */
+    if (w->opened && fsize_utf8(w->cdx_path) > 0)
+      hts_log_print(w->opt, LOG_ERROR,
+                    "WARC: no record was indexed, %s was not rewritten",
+                    w->cdx_path);
+    return;
+  }
   qsort(w->cdx_lines, w->cdx_count, sizeof(char *), cdx_cmp);
   f = FOPEN(fconv(catbuff, sizeof(catbuff), w->cdx_path), "wb");
-  if (f == NULL)
+  if (f == NULL) {
+    hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
+                  "WARC: could not write the index %s", w->cdx_path);
     return;
+  }
   for (i = 0; i < w->cdx_count; i++) {
     fputs(w->cdx_lines[i], f);
     fputc('\n', f);
   }
-  fclose(f);
+  werr = ferror(f) != 0;
+  cerr = fclose(f) != 0;
+  /* a write that already failed says more than fclose echoing it, and only
+     fclose's errno is still fresh */
+  if (werr)
+    hts_log_print(w->opt, LOG_ERROR, "WARC: the index %s is incomplete",
+                  w->cdx_path);
+  else if (cerr)
+    hts_log_print(w->opt, LOG_ERROR | LOG_ERRNO,
+                  "WARC: could not write the index %s", w->cdx_path);
 }
 
 /* ---- WACZ pages + packaging (--wacz) ---- */
@@ -1668,6 +1690,16 @@ int warc_surt(const char *url, char *out, size_t outsz) {
 void warc_close_opt(httrackp *opt) {
   if (opt->state.warc != NULL && opt->state.warc != WARC_DISABLED) {
     warc_close((warc_writer *) opt->state.warc);
+  }
+  opt->state.warc = NULL;
+}
+
+void warc_abort_opt(httrackp *opt) {
+  if (opt->state.warc != NULL && opt->state.warc != WARC_DISABLED) {
+    warc_writer *const w = (warc_writer *) opt->state.warc;
+    /* the session is rolling back, so this run must replace nothing */
+    w->failed = HTS_TRUE;
+    warc_close(w);
   }
   opt->state.warc = NULL;
 }

@@ -48,6 +48,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsdefines.h"
 #include "htslib.h"
 #include "htsalias.h"
+#include "htsarrays.h"
 #include "htsparse.h"
 #include "htscache.h"
 #include "htscache_selftest.h"
@@ -475,7 +476,7 @@ static void basic_selftests(void) {
    The abort-on-overflow guarantee is checked separately by the "overflow"
    sub-mode (it aborts the process by design). */
 static int string_safety_selftests(void) {
-  char buf[8];
+  char buf[16];
 
   /* strcpybuff into a sized array: exact copy */
   strcpybuff(buf, "abc");
@@ -1680,6 +1681,90 @@ static int st_strsafe(httrackp *opt, int argc, char **argv) {
     const int err = string_safety_selftests();
 
     printf("strsafe: %s\n", err ? "FAIL" : "OK");
+    return err;
+  }
+}
+
+/* Wide enough that a capacity still fitting a size_t makes capa*width wrap. */
+typedef struct {
+  char pad[4096];
+} arrays_wide_t;
+
+/* Self-tests for the htsarrays.h growth macros.
+   Returns 0 if growth always reached the requested room, 1 otherwise.
+   The abort on an unsatisfiable request is checked by the "overflow-capa" and
+   "overflow-loop" sub-modes (they abort the process by design). */
+static int array_growth_selftests(void) {
+  TypedArray(char) a = EMPTY_TYPED_ARRAY;
+  TypedArray(arrays_wide_t) w = EMPTY_TYPED_ARRAY;
+  size_t i;
+  int err = 0;
+
+  TypedArrayEnsureRoom(a, 1);
+  if (TypedArrayRoom(a) < 1 || TypedArrayCapa(a) < 16)
+    err = 1;
+
+  /* A request past the current capacity must be met, not landed short of. */
+  TypedArrayAppend(a, "0123456789", 10);
+  TypedArrayEnsureRoom(a, 1000);
+  if (TypedArrayRoom(a) < 1000 || TypedArraySize(a) != 10)
+    err = 1;
+  if (memcmp(TypedArrayElts(a), "0123456789", 10) != 0)
+    err = 1;
+
+  /* Capacity must always keep capa*width representable. */
+  TypedArrayEnsureRoom(w, 3);
+  if (TypedArrayRoom(w) < 3 ||
+      TypedArrayCapa(w) > ((size_t) -1) / sizeof(arrays_wide_t))
+    err = 1;
+
+  /* Many small growths, checking the payload survives every reallocation. */
+  for (i = 0; i < 5000; i++) {
+    TypedArrayAdd(a, (char) ('a' + (i % 26)));
+  }
+  if (TypedArraySize(a) != 5010)
+    err = 1;
+  else {
+    for (i = 0; i < 5000; i++) {
+      if (TypedArrayNth(a, 10 + i) != (char) ('a' + (i % 26)))
+        err = 1;
+    }
+  }
+
+  TypedArrayFree(a);
+  TypedArrayFree(w);
+  return err;
+}
+
+static int st_arrays(httrackp *opt, int argc, char **argv) {
+  /* volatile keeps the sizes below opaque, so these stay runtime checks rather
+     than compile-time allocation warnings. */
+  volatile size_t room;
+
+  (void) opt;
+  if (argc >= 1 && strcmp(argv[0], "overflow-capa") == 0) {
+    /* Room whose byte size cannot fit a size_t: capa*width used to wrap and
+       hand back a short allocation. */
+    TypedArray(arrays_wide_t) w = EMPTY_TYPED_ARRAY;
+
+    room = ((size_t) -1) / sizeof(arrays_wide_t) + 1;
+    TypedArrayEnsureRoom(w, room);
+    /* Unreachable, and printing the pointer is what keeps it so: an allocation
+       reaching nobody is removable, and its "== NULL" folds away with it. */
+    printf("arrays: NOT aborted (%p)\n", TypedArrayPtr(w));
+    return 1;
+  } else if (argc >= 1 && strcmp(argv[0], "overflow-loop") == 0) {
+    /* Doubling past SIZE_MAX used to wrap capa to 0 and spin forever. */
+    TypedArray(char) a = EMPTY_TYPED_ARRAY;
+
+    room = (size_t) -1;
+    TypedArrayEnsureRoom(a, room);
+    printf("arrays: NOT aborted (%p)\n", TypedArrayPtr(a)); /* unreachable */
+    return 1;
+  } else {
+    const int err = array_growth_selftests();
+
+    printf("arrays: %s\n", err ? "FAIL" : "OK");
     return err;
   }
 }
@@ -5624,6 +5709,196 @@ static int st_warc_cdx(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static char st_cdx_log[2048];
+
+/* Collect the "WARC:" diagnostics only, so an unrelated message cannot satisfy
+   (or break) a silence assertion. */
+static void st_cdx_log_cb(httrackp *opt, int type, const char *format,
+                          va_list args) {
+  char line[512];
+  (void) opt;
+  (void) type;
+  (void) vsnprintf(line, sizeof(line), format, args);
+  if (strncmp(line, "WARC:", 5) == 0)
+    strlncatbuff(st_cdx_log, line, sizeof(st_cdx_log),
+                 sizeof(st_cdx_log) - strlen(st_cdx_log) - 1);
+}
+
+/* 1 on mismatch; want == NULL asks for silence. Resets the capture. */
+static int st_cdx_logged(const char *name, const char *want) {
+  const int bad =
+      want != NULL ? strstr(st_cdx_log, want) == NULL : st_cdx_log[0] != '\0';
+  if (bad)
+    fprintf(stderr, "warc-cdx-errors: %s logged \"%s\", want \"%s\"\n", name,
+            st_cdx_log, want != NULL ? want : "(nothing)");
+  st_cdx_log[0] = '\0';
+  return bad;
+}
+
+/* Leave a previous run's file behind for this one to find. */
+static void st_cdx_leave(const char *path, const char *content) {
+  FILE *const fp = FOPEN(path, "wb");
+
+  assertf(fp != NULL);
+  fputs(content, fp);
+  fclose(fp);
+}
+
+/* Feed n index lines whose URLs are `pad` characters long. */
+static void st_cdx_fill(warc_writer *w, int n, size_t pad) {
+  char url[1024], req[1100];
+  int i;
+
+  for (i = 0; i < n; i++) {
+    size_t l =
+        (size_t) snprintf(url, sizeof(url), "http://e%d.example.com/", i);
+
+    while (l + 1 < sizeof(url) && l < pad)
+      url[l++] = 'p';
+    url[l] = '\0';
+    snprintf(req, sizeof(req),
+             "GET / HTTP/1.1\r\nHost: e%d.example.com\r\n\r\n", i);
+    warc_write_transaction(w, url, "127.0.0.1", req,
+                           "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n",
+                           "body\n", 5, NULL, NULL, 200, 0, 0);
+  }
+}
+
+/* Every way warc_cdx_flush can fail to leave a usable index beside the archive
+   it just replaced. The empty-index warning must stay silent for a first run,
+   which has no previous index to invalidate (#1041). */
+static int st_warc_cdx_errors(httrackp *opt, int argc, char **argv) {
+  char path[HTS_URLMAXSIZE], cdx[HTS_URLMAXSIZE];
+  static const char stale[] = "no record was indexed";
+  static const char unwritable[] = "could not write the index";
+  hts_boolean saved_cdx;
+  void *saved_state;
+  warc_writer *w;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "warc-cdx-errors: needs a writable directory\n");
+    return 1;
+  }
+  saved_state = opt->state.warc;
+  saved_cdx = opt->warc_cdx;
+  opt->warc_cdx = 1;
+  st_cdx_log[0] = '\0';
+  hts_set_log_vprint_callback(st_cdx_log_cb);
+
+  /* No previous archive and nothing indexed: nothing on disk went stale. */
+  fconcat(path, sizeof(path), argv[0], "cdxerr-first.warc.gz");
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+  warc_close(w);
+  err |= st_cdx_logged("first run", NULL);
+
+  /* A previous archive and its index: this run swapped over the first, so the
+     second now describes an archive that is gone. */
+  fconcat(path, sizeof(path), argv[0], "cdxerr-prev.warc.gz");
+  fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-prev.cdx");
+  st_cdx_leave(path, "previous archive");
+  st_cdx_leave(cdx, "com,example)/ 20240101000000 {}\n");
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+  warc_close(w);
+  err |= st_cdx_logged("swap over a previous archive", stale);
+
+  /* Mirror case: written in place, then abandoned, so the archive is clobbered
+     and the index beside it describes what used to be there. */
+  fconcat(path, sizeof(path), argv[0], "cdxerr-abort.warc.gz");
+  fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-abort.cdx");
+  st_cdx_leave(cdx, "com,example)/ 20240101000000 {}\n");
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+  opt->state.warc = w;
+  warc_abort_opt(opt);
+  err |= st_cdx_logged("abandoned in-place run", stale);
+
+  /* Same, with no index left behind: the message would name a file that never
+     existed, which is the false alarm the gate is there to avoid. */
+  fconcat(path, sizeof(path), argv[0], "cdxerr-abort-noidx.warc.gz");
+  w = warc_open(opt, path);
+  assertf(w != NULL);
+  opt->state.warc = w;
+  warc_abort_opt(opt);
+  err |= st_cdx_logged("abandoned run with no index", NULL);
+
+  /* An archive that never opened replaced nothing, so the index beside it
+     still describes what is there: the failed open is the only error. */
+  fconcat(path, sizeof(path), argv[0], "cdxerr-noopen.warc.gz");
+  fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-noopen.cdx");
+  st_cdx_leave(cdx, "com,example)/ 20240101000000 {}\n");
+  if (MKDIR(path) != 0 && errno != EEXIST) {
+    fprintf(stderr, "warc-cdx-errors: mkdir %s failed: %s\n", path,
+            strerror(errno));
+    err = 1;
+  } else {
+    assertf(warc_open(opt, path) == NULL);
+    err |= st_cdx_logged("archive that never opened", NULL);
+  }
+
+  /* The index path cannot be opened at all. */
+  fconcat(path, sizeof(path), argv[0], "cdxerr-fopen.warc.gz");
+  fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-fopen.cdx");
+  if (MKDIR(cdx) != 0 && errno != EEXIST) {
+    fprintf(stderr, "warc-cdx-errors: mkdir %s failed: %s\n", cdx,
+            strerror(errno));
+    err = 1;
+  } else {
+    w = warc_open(opt, path);
+    assertf(w != NULL);
+    st_cdx_fill(w, 1, 0);
+    warc_close(w);
+    err |= st_cdx_logged("unopenable index path", unwritable);
+  }
+
+#ifndef _WIN32
+  /* /dev/full fails every write with ENOSPC. An index below one stdio buffer
+     never reaches the device until fclose, and a larger one errors before it,
+     which is the difference the two messages carry. */
+  if (access("/dev/full", W_OK) == 0) {
+    fconcat(path, sizeof(path), argv[0], "cdxerr-short.warc.gz");
+    fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-short.cdx");
+    (void) UNLINK(cdx);
+    if (symlink("/dev/full", cdx) != 0) {
+      fprintf(stderr, "warc-cdx-errors: symlink %s failed: %s\n", cdx,
+              strerror(errno));
+      err = 1;
+    } else {
+      w = warc_open(opt, path);
+      assertf(w != NULL);
+      st_cdx_fill(w, 1, 0);
+      warc_close(w);
+      err |= st_cdx_logged("index lost at fclose", unwritable);
+
+      fconcat(path, sizeof(path), argv[0], "cdxerr-partial.warc.gz");
+      fconcat(cdx, sizeof(cdx), argv[0], "cdxerr-partial.cdx");
+      (void) UNLINK(cdx);
+      if (symlink("/dev/full", cdx) != 0) {
+        fprintf(stderr, "warc-cdx-errors: symlink %s failed: %s\n", cdx,
+                strerror(errno));
+        err = 1;
+      } else {
+        w = warc_open(opt, path);
+        assertf(w != NULL);
+        st_cdx_fill(w, 64, 512); /* well over any stdio buffer */
+        warc_close(w);
+        err |= st_cdx_logged("index truncated mid-write", "is incomplete");
+      }
+    }
+  } else {
+    printf("warc-cdx-errors: no /dev/full, skipping the write-failure cases\n");
+  }
+#endif
+
+  hts_set_log_vprint_callback(NULL);
+  opt->warc_cdx = saved_cdx;
+  opt->state.warc = saved_state;
+  printf("warc-cdx-errors: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 #if HTS_USEOPENSSL
 /* Lowercase-hex SHA-256 of n bytes into out[65]; 1 on success. */
 static int wacz_test_sha256(const void *p, size_t n, char out[65]) {
@@ -8168,6 +8443,9 @@ static const struct selftest_entry {
      "bounded string-op self-test", st_strsafe},
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},
+    {"arrays", "[overflow-capa|overflow-loop]",
+     "htsarrays.h growth reaches the requested room, overflow aborts",
+     st_arrays},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"lastchar", "",
      "last-char helpers never index before the buffer (#770, #781, #821)",
@@ -8323,6 +8601,9 @@ static const struct selftest_entry {
      st_cookieimport},
     {"warc-cdx", "<dir>", "--warc-cdx CDXJ index: sorted, offsets inflate",
      st_warc_cdx},
+    {"warc-cdx-errors", "<dir>",
+     "--warc-cdx diagnostics when the index cannot be written or is empty",
+     st_warc_cdx_errors},
 #if HTS_USEOPENSSL
     {"warc-wacz", "<dir>", "--wacz package: layout, STORE mode, sha256 digests",
      st_warc_wacz},
