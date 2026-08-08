@@ -17,12 +17,6 @@ command -v curl >/dev/null 2>&1 || {
     echo "curl missing, skipping"
     exit 77
 }
-# First test to run proxytrack as a live server, and MSYS cannot reap a native
-# listener: the orphan wedged the whole Windows suite for 48 minutes (#595).
-if is_windows; then
-    echo "windows: cannot reap a backgrounded proxytrack, skipping"
-    exit 77
-fi
 
 dir=$(mktemp -d)
 ptpid=
@@ -31,6 +25,7 @@ cleanup() {
     rm -rf "$dir"
 }
 trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' INT TERM HUP
 
 # Neither header is present, so file->contenttype and ->lastmodified stay "".
 printf 'HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"

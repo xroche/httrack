@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# The Windows reap paths kill by image name, and their list used to be written out
+# by hand beside ENGINE_EXE_RE: it named only httrack.exe, so a proxytrack orphan
+# outlived the suite and starved the runner (#1067). Windows-only in production,
+# so nothing would exercise it before merge.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_reapimg.XXXXXX")
+trap 'set +e; rm -rf "$tmp"' EXIT
+
+# Stand in for the runner. win_pid is shimmed rather than left to /proc so the
+# branch under test is pinned on every host -- and so a real MSYS run of this test
+# cannot resolve $$ and taskkill its own shell.
+IS_WINDOWS=yes
+taskkill() { printf '%s\n' "$*" >>"$tmp/killed"; }
+tasklist() { printf 'proxytrack.exe   4242 Console\n'; }
+win_pid() { :; }
+
+# The matcher is the reference set, so a widened or unanchored one would make
+# every assertion below pass for free.
+for e in $ENGINE_EXES; do
+    [[ $e =~ $ENGINE_EXE_RE ]] || fail "ENGINE_EXE_RE does not match $e"
+    [[ $e.exe =~ $ENGINE_EXE_RE ]] || fail "ENGINE_EXE_RE does not match $e.exe"
+done
+for e in xhttrack httrackx httrack.dll python.exe ''; do
+    if [[ $e =~ $ENGINE_EXE_RE ]]; then fail "ENGINE_EXE_RE matches '$e'"; fi
+done
+
+: >"$tmp/killed"
+kill_tree 4242
+# Spelled out, not built from $ENGINE_EXES: dropping a name from that list has to
+# fail here, and an expectation derived from it would shrink along with the bug.
+want='/F /IM htsserver.exe
+/F /IM httrack.exe
+/F /IM proxytrack.exe
+/F /IM python.exe
+/F /IM webhttrack.exe'
+got=$(sort "$tmp/killed")
+test "$got" = "$want" || fail "kill_tree without a winpid ran: $got"
+# The defect itself: whatever the matcher reports as an engine, the kill names.
+for e in $ENGINE_EXES; do
+    grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "kill_tree leaves $e.exe running"
+done
+
+# With a winpid it is one tree kill and nothing by name, or a parallel sibling's
+# engine would go down with the target.
+win_pid() { echo 4242; }
+: >"$tmp/killed"
+kill_tree 99
+test "$(cat "$tmp/killed")" = '/F /T /PID 4242' || fail "kill_tree with a winpid ran: $(cat "$tmp/killed")"
+win_pid() { :; }
+
+: >"$tmp/killed"
+out=$(reap_leftover_processes 99_probe.test)
+grep -q '99_probe.test left processes behind' <<<"$out" || fail "the leak was not attributed: $out"
+grep -q 'proxytrack.exe' <<<"$out" || fail "the leftover proxytrack was not named: $out"
+for e in $ENGINE_EXES; do
+    grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "reap_leftover_processes leaves $e.exe running"
+done
+# Deliberately spared: the runner may run a python.exe of its own, and tasklist
+# cannot tell it from a leaked fixture server.
+if grep -qxF '/F /IM python.exe' "$tmp/killed"; then fail "the reap killed an unrelated python.exe"; fi
+
+# Control for the two greps above: with nothing engine-shaped listed it must warn
+# about nothing and kill nothing.
+tasklist() { printf 'System Idle Process              0 Services\n'; }
+: >"$tmp/killed"
+out=$(reap_leftover_processes 99_probe.test)
+test -z "$out" || fail "an idle host was reported as leaking: $out"
+test ! -s "$tmp/killed" || fail "an idle host was reaped: $(cat "$tmp/killed")"
+
+echo "OK: the Windows reap paths cover every engine image the matcher knows"

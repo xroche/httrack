@@ -256,8 +256,8 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # same line; compared as a sorted set below, so glob discovery order can't
 # cause a false mismatch either.
 # footer-overflow and purge-longpath skip on Windows (need a path past MAX_PATH);
-# webdav-default, webdav-mime, webdav-overflow and proxytrack-quiet need a
-# reapable background listener, which MSYS cannot give them;
+# webdav-default, webdav-overflow and proxytrack-quiet need a reapable background
+# listener, which MSYS cannot give them;
 # badmtime needs a filesystem that stores an mtime past gmtime's range;
 # single-file-gui drives htsserver, which this job does not build;
 # update-304-leak needs a LeakSanitizer build, which MSVC has no equivalent of;
@@ -287,7 +287,6 @@ expected_skips="01_engine-footer-overflow.test
 235_local-resume-recovery.test
 48_local-crange-memresume.test
 71_local-crange-repaircache.test
-79_local-proxytrack-webdav-mime.test
 80_engine-crash-symbolize.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test"
