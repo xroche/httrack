@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+# The Windows kill paths name images by hand and had drifted from ENGINE_EXE_RE,
+# so a leaked proxytrack.exe outlived the reap and starved the runner (#1067).
+# Shimmed, since nothing exercises those branches off a Windows runner.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$top_srcdir/tests/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_reapimg.XXXXXX")
+trap 'set +e; rm -rf "$tmp"' EXIT
+
+# Stand in for the runner. win_pid is shimmed, not left to /proc, so each branch
+# is pinned on every host and an MSYS run cannot taskkill this shell.
+IS_WINDOWS=yes
+taskkill() { printf '%s\n' "$*" >>"$tmp/killed"; }
+tasklist() { printf 'proxytrack.exe   4242 Console\n'; }
+win_pid() { :; }
+
+# The matcher is the reference set, so a widened or unanchored one would make
+# every assertion below pass for free.
+for e in $ENGINE_EXES; do
+    [[ $e =~ $ENGINE_EXE_RE ]] || fail "ENGINE_EXE_RE does not match $e"
+    [[ $e.exe =~ $ENGINE_EXE_RE ]] || fail "ENGINE_EXE_RE does not match $e.exe"
+done
+for e in xhttrack httrackx httrack.dll python.exe ''; do
+    if [[ $e =~ $ENGINE_EXE_RE ]]; then fail "ENGINE_EXE_RE matches '$e'"; fi
+done
+
+: >"$tmp/killed"
+kill_tree 4242
+# Spelled out, not built from $ENGINE_EXES: dropping a name from that list has to
+# fail here, and an expectation derived from it would shrink along with the bug.
+want='/F /IM htsserver.exe
+/F /IM httrack.exe
+/F /IM proxytrack.exe
+/F /IM python.exe
+/F /IM webhttrack.exe'
+got=$(sort "$tmp/killed")
+test "$got" = "$want" || fail "kill_tree without a winpid ran: $got"
+# The defect itself: whatever the matcher reports as an engine, the kill names.
+for e in $ENGINE_EXES; do
+    grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "kill_tree leaves $e.exe running"
+done
+
+# With a winpid it is one tree kill and nothing by name, or a parallel sibling's
+# engine would go down with the target.
+win_pid() { echo 4242; }
+: >"$tmp/killed"
+kill_tree 99
+test "$(cat "$tmp/killed")" = '/F /T /PID 4242' || fail "kill_tree with a winpid ran: $(cat "$tmp/killed")"
+win_pid() { :; }
+
+: >"$tmp/killed"
+out=$(reap_leftover_processes 99_probe.test)
+grep -q '99_probe.test left processes behind' <<<"$out" || fail "the leak was not attributed: $out"
+grep -q 'proxytrack.exe' <<<"$out" || fail "the leftover proxytrack was not named: $out"
+for e in $ENGINE_EXES; do
+    grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "reap_leftover_processes leaves $e.exe running"
+done
+# Deliberately spared: the runner may run a python.exe of its own, and tasklist
+# cannot tell it from a leaked fixture server.
+if grep -qxF '/F /IM python.exe' "$tmp/killed"; then fail "the reap killed an unrelated python.exe"; fi
+
+# Near misses, not an idle host, are what a widened image matcher lets through.
+tasklist() {
+    printf 'System Idle Process              0 Services\n'
+    printf 'notepad-httrack-notes.exe      77 Console\n'
+    printf 'httrackless.exe                78 Console\n'
+    printf 'trackpad.exe                   79 Console\n'
+}
+: >"$tmp/killed"
+out=$(reap_leftover_processes 99_probe.test)
+test -z "$out" || fail "an unrelated process was reported as a leak: $out"
+test ! -s "$tmp/killed" || fail "an unrelated process was reaped: $(cat "$tmp/killed")"
+
+# The same list drives the wedge report, which names python too so a leaked
+# fixture server is still visible to a reader.
+tasklist() { printf 'htsserver.exe   99 Console\npython.exe   98 Console\ntrackpad.exe   78 Console\n'; }
+out=$(list_stray_processes 0 named)
+grep -q 'htsserver.exe' <<<"$out" || fail "the stray listing dropped an engine: $out"
+grep -q 'python.exe' <<<"$out" || fail "the stray listing dropped python: $out"
+if grep -q 'trackpad' <<<"$out"; then fail "the stray listing caught an unrelated process: $out"; fi
+
+# The bug was a second engine list drifting from the first, so fail on any name
+# still written by hand inside a taskkill or a process-matching grep.
+stray=$(grep -nE '(taskkill|tasklist|grep -Ei)[^#]*(httrack|proxytrack|htsserver|webhttrack)' \
+    "$top_srcdir/tests/testlib.sh" | grep -vE 'ENGINE_EXES|ENGINE_IMAGE_RE' || true)
+test -z "$stray" || fail "engine names hand-written outside ENGINE_EXES:
+$stray"
+
+echo "OK: the Windows reap paths cover every engine image the matcher knows"

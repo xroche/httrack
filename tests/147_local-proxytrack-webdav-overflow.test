@@ -18,11 +18,6 @@ command -v curl >/dev/null 2>&1 || {
     echo "curl missing, skipping"
     exit 77
 }
-# MSYS cannot reap a native listener, and the orphan wedges the suite (#595).
-if is_windows; then
-    echo "windows: cannot reap a backgrounded proxytrack, skipping"
-    exit 77
-fi
 
 dir=$(mktemp -d)
 ptpid=
@@ -49,8 +44,10 @@ alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
     cat "$dir/hdr" "$dir/body"
 } >"$dir/in.arc"
 
+# $() strips a trailing LF, not the CR Windows python's print can put before it.
 freeport() {
-    "$python" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
+    "$python" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()' |
+        tr -d '\r'
 }
 proxyport=$(freeport)
 icpport=$(freeport)
@@ -84,7 +81,7 @@ propfind() {
 
 # Amplification, not raw length, clears the old 1024-byte reserve: 900 '&'
 # become 4500 bytes, written twice, all under the 1024-byte request-line cap.
-amps=$("$python" -c "print('&' * 900)")
+amps=$("$python" -c "print('&' * 900)" | tr -d '\r')
 resp=$(propfind "$amps") || {
     echo "FAIL: proxytrack died on an escapexml-amplified PROPFIND"
     cat "$dir/pt.log"
@@ -104,7 +101,7 @@ test "$got" -eq 1800 || {
 }
 
 # Unescaped, so the bound is shown to be on the written length, not on '&'.
-plain=$("$python" -c "print('a' * 900)")
+plain=$("$python" -c "print('a' * 900)" | tr -d '\r')
 resp=$(propfind "$plain") || {
     echo "FAIL: proxytrack died on a 900-byte plain PROPFIND path"
     cat "$dir/pt.log"
