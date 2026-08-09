@@ -41,8 +41,6 @@ Please visit our Website: http://www.httrack.com
 #include <stdlib.h>
 #include <string.h>
 
-#include "htssafe.h"
-
 /* GCC extension */
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
@@ -92,9 +90,9 @@ struct String {
 
 /** Allocator **/
 #ifndef STRING_REALLOC
-#define STRING_REALLOC(BUFF, SIZE) ((char *) realloct(BUFF, SIZE))
+#define STRING_REALLOC(BUFF, SIZE) ((char *) realloc(BUFF, SIZE))
 
-#define STRING_FREE(BUFF) freet(BUFF)
+#define STRING_FREE(BUFF) free(BUFF)
 #endif
 
 /** Initializer for an empty String (NULL buffer). Use to declare or reset. **/
@@ -161,10 +159,10 @@ HTS_STATIC void StringOom_(size_t size) {
       const size_t maxcap_ = (size_t) -1;                                      \
       const size_t mincap_ = 16;                                               \
       const size_t cur_ = (BLK).capacity_;                                     \
-      /* Saturating: a plain cur_*2 wraps below cur_, which no further         \
-         doubling climbs back out of. */                                       \
+      /* Past the halfway point cur_*2 wraps below cur_, which no further      \
+         doubling climbs back out of; ask for the requested total instead. */  \
       const size_t newcap_ = cur_ < mincap_       ? mincap_                    \
-                             : cur_ > maxcap_ / 2 ? maxcap_                    \
+                             : cur_ > maxcap_ / 2 ? capacity_                  \
                                                   : cur_ * 2;                  \
       char *const buff_ = STRING_REALLOC((BLK).buffer_, newcap_);              \
                                                                                \
