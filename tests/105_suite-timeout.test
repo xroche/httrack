@@ -9,6 +9,8 @@ set -eu
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
+# shellcheck source=tests/proclib.sh
+. "${testdir}/proclib.sh"
 
 driver="${testdir}/test-timeout.sh"
 test -r "$driver" || {

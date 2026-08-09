@@ -43,10 +43,10 @@ grep -q usage <<<"$out" || fail "argless run said: $out"
 # sibling's.
 run=$tmp/run
 mkdir -p "$run"
-cp "$driver" "$testdir/testlib.sh" "$testdir/test-timeout.sh" \
+cp "$driver" "$testdir/testlib.sh" "$testdir/proclib.sh" "$testdir/test-timeout.sh" \
     "$testdir/ci-windows-watchdog.ps1" "$run/"
 chmod u+w "$run"/*.sh # distcheck's srcdir is read-only, and cp carries that over
-cat >>"$run/testlib.sh" <<'EOF'
+cat >>"$run/proclib.sh" <<'EOF'
 reap_leftover_processes() { return 0; }
 EOF
 # Records who sourced this copy, so assert_staged can tell the staged driver from

@@ -7,6 +7,8 @@
 testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "$testdir/testlib.sh"
+# shellcheck source=tests/proclib.sh
+. "$testdir/proclib.sh"
 
 # Emit one GitHub annotation at level $1. The runner keeps only the first 10 of
 # each level per step and drops the rest silently, so the level is a budget: pick

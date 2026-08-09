@@ -9,6 +9,8 @@ set -euo pipefail
 : "${top_srcdir:=..}"
 # shellcheck source=tests/testlib.sh
 . "$top_srcdir/tests/testlib.sh"
+# shellcheck source=tests/proclib.sh
+. "$top_srcdir/tests/proclib.sh"
 
 fail() {
     echo "FAIL: $*" >&2
@@ -91,9 +93,14 @@ grep -q 'python.exe' <<<"$out" || fail "the stray listing dropped python: $out"
 if grep -q 'trackpad' <<<"$out"; then fail "the stray listing caught an unrelated process: $out"; fi
 
 # The bug was a second engine list drifting from the first, so fail on any name
-# still written by hand inside a taskkill or a process-matching grep.
+# still written by hand inside a taskkill or a process-matching grep. Both files
+# must be readable, or the sweep below is a silent pass over nothing.
+for f in testlib.sh proclib.sh; do
+    test -r "$top_srcdir/tests/$f" || fail "no $f to sweep for hand-written engine names"
+done
 stray=$(grep -nE '(taskkill|tasklist|grep -Ei)[^#]*(httrack|proxytrack|htsserver|webhttrack)' \
-    "$top_srcdir/tests/testlib.sh" | grep -vE 'ENGINE_EXES|ENGINE_IMAGE_RE' || true)
+    "$top_srcdir/tests/testlib.sh" "$top_srcdir/tests/proclib.sh" |
+    grep -vE 'ENGINE_EXES|ENGINE_IMAGE_RE' || true)
 test -z "$stray" || fail "engine names hand-written outside ENGINE_EXES:
 $stray"
 

@@ -14,6 +14,8 @@ set -u
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
+# shellcheck source=tests/proclib.sh
+. "${testdir}/proclib.sh"
 
 # 600s is what the Windows leg already bounded each test at, and it clears the
 # 540s that local-crawl.sh's own watchdogs tolerate for a three-pass crawl
