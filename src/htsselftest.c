@@ -7896,9 +7896,8 @@ static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
     }
     st_backstop_slot(sback, i, status[i], &r[i]);
   }
-  /* Re-probe once settled: the check above runs on the heels of connect(), too
-     early to see a refusal, and back_wait() then rightly ends slots the caller
-     is about to assert it left alone (the powerpc buildds). */
+  /* The readback above is too early to see a refusal, and back_wait() then
+     ends slots the caller asserts are intact (the powerpc buildds). */
   Sleep(ST_BACKSTOP_SETTLE_MS);
   for (i = 0; i < slots; i++) {
     if (i != dnsslot && check_socket_connect(sback->lnk[i].r.soc) != 0) {
