@@ -206,6 +206,31 @@ static int buffn_case(void) {
   return 0;
 }
 
+/* Doubling past SIZE_MAX/2 must clamp, not wrap to a capacity below the one
+   already held, which no further doubling climbs back out of. Nothing reaches
+   that through the API, so the capacity is forced here. */
+static int saturate_case(void) {
+  StringCapacity(room) = ((size_t) -1) / 2 + 1;
+  alloc_fails = oom_jumps = 1;
+  if (setjmp(oom_jump) == 0) {
+    StringRoomTotal(room, (size_t) -1);
+    printf("saturate: FAIL (grew through a failing allocator)\n");
+    return 1;
+  }
+  if (!failure_reported("saturate")) {
+    return 1;
+  }
+  if (last_request != (size_t) -1) {
+    printf("saturate: FAIL (allocator asked for %lu bytes, want SIZE_MAX)\n",
+           (unsigned long) last_request);
+    return 1;
+  }
+  alloc_fails = 0;
+  StringFree(room);
+  printf("saturate: OK\n");
+  return 0;
+}
+
 /* Runs the shipped handler, which must print and abort. */
 static int abort_case(void) {
   alloc_fails = 1;
@@ -227,9 +252,12 @@ int main(int argc, char **argv) {
     return sprintf_case();
   } else if (strcmp(mode, "buffn") == 0) {
     return buffn_case();
+  } else if (strcmp(mode, "saturate") == 0) {
+    return saturate_case();
   } else if (strcmp(mode, "abort") == 0) {
     return abort_case();
   }
-  fprintf(stderr, "usage: %s grow|hook|keep|sprintf|buffn|abort\n", argv[0]);
+  fprintf(stderr, "usage: %s grow|hook|keep|sprintf|buffn|saturate|abort\n",
+          argv[0]);
   return 2;
 }
