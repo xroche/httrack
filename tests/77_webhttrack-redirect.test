@@ -6,114 +6,30 @@
 set -euo pipefail
 
 testdir=$(cd "$(dirname "$0")" && pwd)
-distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
-distdir=$(cd "${distdir}" && pwd)
-# run_with_timeout/kill_tree: timeout(1) is absent on macOS
-# shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+htsserver_require
 
-command -v htsserver >/dev/null || fail "no htsserver in PATH"
-command -v python3 >/dev/null || {
-    echo "python3 not found; skipping" >&2
-    exit 77
-}
-
-log=$(mktemp)
-# start() runs inside a command substitution, so its $! never reaches this
-# shell. Take the pid from the server's own announcement instead: a missed kill
-# leaves an orphan holding the CI job open long after the suite has passed.
-srvpid() { sed -n 's/^PID=//p' "${log}" 2>/dev/null | head -1; }
+bindlog=$(mktemp)
 cleanup() {
-    stop
-    rm -f "${log}"
+    htsserver_cleanup
+    rm -f "${bindlog}"
 }
 trap 'set +e; cleanup' EXIT
 trap cleanup HUP INT QUIT PIPE TERM
 
-freeport() {
-    python3 -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()'
-}
-
-# Start htsserver, echo the announced URL. Extra args are passed through.
-start() {
-    local port url
-    port=$(freeport)
-    : >"${log}"
-    (
-        trap '' TERM TTOU
-        exec htsserver "${distdir}/" --port "${port}" "$@" >"${log}" 2>&1
-    ) &
-    for _ in $(seq 1 40); do
-        url=$(sed -n 's/^URL=//p' "${log}" 2>/dev/null) && test -n "${url}" && break
-        sleep 0.25
-    done
-    test -n "${url:-}" || fail "htsserver did not come up: $(cat "${log}")"
-    echo "${url}"
-}
-
-stop() {
-    local pid
-    pid=$(srvpid)
-    test -z "${pid}" || kill -9 "${pid}" 2>/dev/null || true
-}
-
-# The session id gates the request body, so a POST has to carry one. The server
-# renders it into every form, which is where a browser picks it up too.
-scrape_sid() {
-    python3 -c 'import socket, sys
-s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
-s.settimeout(20)
-s.sendall(b"GET /server/index.html HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
-out = b""
-while True:
-    b = s.recv(65536)
-    if not b:
-        break
-    out += b
-s.close()
-sys.stdout.write(out.decode("latin-1"))' "$1" |
-        sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p' | head -1
-}
-
-# POST redirect=$1 to 127.0.0.1:$2 with session id $3, print the raw headers.
+# POST redirect=$1 with session id $2, printing the raw headers. Stopping at the
+# header block matters: an unbounded recv() hung the macOS runner for over an hour.
 post_redirect() {
-    python3 -c 'import socket, sys, urllib.parse
-body = ("sid=" + sys.argv[3] + "&redirect="
-        + urllib.parse.quote(sys.argv[1], safe=""))
-req = ("POST / HTTP/1.0\r\nHost: 127.0.0.1\r\n"
-       "Content-type: application/x-www-form-urlencoded\r\n"
-       "Content-length: %d\r\n\r\n%s" % (len(body), body))
-s = socket.create_connection(("127.0.0.1", int(sys.argv[2])), 10)
-s.settimeout(20)
-s.sendall(req.encode())
-out = b""
-# stop at the end of the header block: the server need not close the connection,
-# and an unbounded recv() hung the macOS runner for over an hour.
-while b"\r\n\r\n" not in out:
-    b = s.recv(65536)
-    if not b:
-        break
-    out += b
-s.close()
-sys.stdout.write(out.split(b"\r\n\r\n")[0].decode("latin-1"))' "$1" "$2" "$3"
+    htsserver_client --headers-only --field "sid=$2" --field "redirect=$1"
 }
-
-portof() { echo "${1##*:}" | tr -d /; }
 
 # "free"/"inuse"/"unusable": can $1 still be bound on 127.0.0.2? A wildcard
 # listener takes the port on every address, a loopback-only one does not, so
 # this discriminates where the announced URL cannot.
 probe_alias() {
-    python3 -c 'import socket, sys
+    "${HTS_PYTHON}" -c 'import socket, sys
 s = socket.socket()
 try:
     s.bind(("127.0.0.2", int(sys.argv[1])))
@@ -127,26 +43,24 @@ finally:
 
 # Non-repeating and not a round number: a truncation, a reorder or a dropped
 # interior byte all stay visible.
-long=$(python3 -c 'print("".join(chr(33 + i % 90) for i in range(4097)))')
-url=$(start)
-port=$(portof "${url}")
-sid=$(scrape_sid "${port}")
+long=$("${HTS_PYTHON}" -c 'print("".join(chr(33 + i % 90) for i in range(4097)))')
+htsserver_start
+sid=$(htsserver_sid)
 test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid (got '${sid}')"
-resp=$(post_redirect "${long}" "${port}" "${sid}") ||
+resp=$(post_redirect "${long}" "${sid}") ||
     fail "no response to an oversized redirect value"
-stop
+htsserver_stop
 loc=$(printf '%s' "${resp}" | sed -n 's/^Location: //p' | tr -d '\r')
 test "${loc}" = "${long}" ||
     fail "oversized redirect not echoed whole (got ${#loc} bytes, want ${#long})"
 
 # CR/LF must suppress the header outright. Sanitising it instead would keep the
 # grep for an injected header quiet while still emitting a mangled Location.
-url=$(start)
-port=$(portof "${url}")
-sid=$(scrape_sid "${port}")
+htsserver_start
+sid=$(htsserver_sid)
 resp=$(post_redirect '/foo
-X-Injected: pwned' "${port}" "${sid}") || fail "no response to a CRLF redirect value"
-stop
+X-Injected: pwned' "${sid}") || fail "no response to a CRLF redirect value"
+htsserver_stop
 # Here-string, not a pipe: grep -q SIGPIPEs the producer on the first match, and
 # pipefail then turns the hit into a silent pass.
 grep -qi 'X-Injected' <<<"${resp}" &&
@@ -157,32 +71,30 @@ test "$(grep -c '^HTTP/1\.' <<<"${resp}")" -eq 1 ||
     fail "CRLF redirect did not yield exactly one status line"
 
 # Loopback unless asked otherwise. Assert the socket, not the announcement.
-url=$(start)
-port=$(portof "${url}")
-alias_state=$(probe_alias "${port}")
-stop
+htsserver_start
+alias_state=$(probe_alias "${HTS_PORT}")
+htsserver_stop
 if test "${alias_state}" = unusable; then
     echo "no 127.0.0.2 alias; skipping the listen-address assertions" >&2
 else
     test "${alias_state}" = free ||
-        fail "default listen address is not loopback-only (127.0.0.2:${port} taken)"
-    case "${url}" in
+        fail "default listen address is not loopback-only (127.0.0.2:${HTS_PORT} taken)"
+    case "${HTS_URL}" in
     http://127.0.0.1:*) ;;
-    *) fail "default announcement is not loopback: ${url}" ;;
+    *) fail "default announcement is not loopback: ${HTS_URL}" ;;
     esac
 
-    url=$(start --bind 0.0.0.0)
-    port=$(portof "${url}")
-    alias_state=$(probe_alias "${port}")
-    stop
+    htsserver_start --bind 0.0.0.0
+    alias_state=$(probe_alias "${HTS_PORT}")
+    htsserver_stop
     test "${alias_state}" = inuse ||
-        fail "--bind 0.0.0.0 did not take the wildcard (127.0.0.2:${port} ${alias_state})"
+        fail "--bind 0.0.0.0 did not take the wildcard (127.0.0.2:${HTS_PORT} ${alias_state})"
 fi
 
 # An empty --bind must not quietly fall back to every interface. Bounded: if it
 # were accepted the server would listen instead of exiting.
-run_with_timeout 15 htsserver "${distdir}/" --bind "" >"${log}" 2>&1 || true
-grep -q -- "--bind needs an address" "${log}" ||
-    fail "empty --bind not refused: $(cat "${log}")"
+run_with_timeout 15 htsserver "${HTS_DISTDIR}/" --bind "" >"${bindlog}" 2>&1 || true
+grep -q -- "--bind needs an address" "${bindlog}" ||
+    fail "empty --bind not refused: $(cat "${bindlog}")"
 
 echo "PASS"

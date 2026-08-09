@@ -6,97 +6,23 @@
 set -euo pipefail
 
 testdir=$(cd "$(dirname "$0")" && pwd)
-distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
-distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-command -v htsserver >/dev/null || fail "no htsserver in PATH"
-command -v python3 >/dev/null || {
-    echo "python3 not found; skipping" >&2
-    exit 77
-}
+htsserver_require
 
 # ERROR_MESSAGE_MAX - 1 in htsserver.c.
 msgmax=1023
 
-srv=
-log=$(mktemp)
 # Physical path: macOS resolves TMPDIR through /var -> private/var, and the
 # paths built below sit within a few bytes of its 1024-byte PATH_MAX.
 base=$(cd "$(mktemp -d)" && pwd -P)
 cleanup() {
-    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
-    rm -f "${log}"
+    htsserver_cleanup
     rm -rf "${base}"
 }
 trap 'set +e; cleanup' EXIT
 trap cleanup HUP INT QUIT PIPE TERM
-
-freeport() {
-    python3 -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()'
-}
-
-# Echo the announced URL. Runs in a command substitution, so it is a
-# subshell and cannot export the pid: the caller reads it back with srvpid.
-start() {
-    local port url
-    port=$(freeport)
-    : >"${log}"
-    (
-        trap '' TERM TTOU XFSZ
-        # Caps regular-file writes, which is how the failing-write branch below
-        # is reached without /dev/full; the announce rides a pipe, exempt.
-        ulimit -f 8
-        exec htsserver "${distdir}/" --port "${port}" 2>&1
-    ) | cat >"${log}" &
-    for _ in $(seq 1 40); do
-        url=$(sed -n 's/^URL=//p' "${log}" 2>/dev/null) && test -n "${url}" && break
-        sleep 0.25
-    done
-    test -n "${url:-}" || fail "htsserver did not come up: $(cat "${log}")"
-    echo "${url}"
-}
-
-srvpid() { sed -n 's/^PID=//p' "${log}" | head -1; }
-
-alive() { kill -0 "$1" 2>/dev/null; }
-
-portof() { echo "${1##*:}" | tr -d /; }
-
-# Raw request to 127.0.0.1:$1: GET the path $2, or POST the body $3 to / when
-# $2 is empty. Prints the reply.
-request() {
-    python3 -c 'import socket, sys
-port, path, body = int(sys.argv[1]), sys.argv[2], sys.argv[3]
-if path:
-    req = "GET %s HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n" % path
-else:
-    req = ("POST / HTTP/1.0\r\nHost: 127.0.0.1\r\n"
-           "Content-type: application/x-www-form-urlencoded\r\n"
-           "Content-length: %d\r\n\r\n%s" % (len(body), body))
-s = socket.create_connection(("127.0.0.1", port), 10)
-s.settimeout(30)
-s.sendall(req.encode())
-out = b""
-while True:
-    b = s.recv(65536)
-    if not b:
-        break
-    out += b
-s.close()
-sys.stdout.write(out.decode("latin-1"))' "$1" "$2" "$3"
-}
-
-get() { request "$1" "$2" ""; }
-post() { request "$1" "" "$2"; }
 
 # Echo a path under the root $1 exactly $2 bytes long, in NAME_MAX-sized parts.
 padpath() {
@@ -115,7 +41,7 @@ check_clipped() {
     local prefix=$1 full=$((${#1} + ${#2})) page line shown
     test "${full}" -gt "${msgmax}" ||
         fail "a ${full}-byte message fits in ${msgmax}: it cannot show a clip"
-    page=$(get "${port}" /server/error.html | tr -d '\r')
+    page=$(htsserver_get /server/error.html | tr -d '\r')
     line=$(printf '%s\n' "${page}" | grep "^${prefix}") || {
         shown=$(printf '%s\n' "${page}" | grep '^Unable to ' | cut -c1-80 || true)
         fail "the error page reports '${shown:-nothing}', want: ${prefix}"
@@ -124,25 +50,23 @@ check_clipped() {
         fail "the message rendered ${#line} bytes, want ${full} clipped to ${msgmax}"
 }
 
-url=$(start)
-port=$(portof "${url}")
-srv=$(srvpid)
-test -n "${srv}" || fail "htsserver did not report its pid"
+# The write cap is how the failing-write branch below is reached without /dev/full.
+htsserver_start --write-limit 8
+test -n "${HTS_PID}" || fail "htsserver did not report its pid"
 
 # Every request body is gated by the session id (78_webhttrack-sid.test).
-sid=$(get "${port}" /server/index.html |
-    sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p' | head -1)
+sid=$(htsserver_sid)
 test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid (got '${sid}')"
 
 save() {
-    post "${port}" "sid=${sid}&command=httrack&command_do=save&winprofile=$2&path=$1&projname=$3"
+    htsserver_post "sid=${sid}&command=httrack&command_do=save&winprofile=$2&path=$1&projname=$3"
 }
 
 # A project path too long to be created at all.
 path=$(padpath "${base}/nodir" 1098)
 save "${path}" x p >/dev/null
-alive "${srv}" ||
-    fail "an over-long project path crashed the server: $(cat "${log}")"
+htsserver_alive ||
+    fail "an over-long project path crashed the server: $(cat "${HTS_LOG}")"
 check_clipped "Unable to create the directory structure in " "${path}/p"
 
 # A creatable project path whose hts-cache is not a directory, so the init file
@@ -151,7 +75,7 @@ path=$(padpath "${base}/isdir" 993)
 mkdir -p "${path}/p"
 ln -s /dev/null "${path}/p/hts-cache"
 save "${path}" x p >/dev/null
-alive "${srv}" || fail "an unwritable init file crashed the server: $(cat "${log}")"
+htsserver_alive || fail "an unwritable init file crashed the server: $(cat "${HTS_LOG}")"
 check_clipped "Unable to create the init file " "${path}/p"
 
 # The init file opens, then the write fails: the profile is past both stdio's
@@ -163,13 +87,13 @@ profile=${profile}${profile}${profile}${profile}
 profile=${profile}${profile}${profile}${profile}
 test "${#profile}" -eq 16384 || fail "built a ${#profile}-byte profile, want 16384"
 save "${path}" "${profile}" p >/dev/null
-alive "${srv}" || fail "a short init file write crashed the server: $(cat "${log}")"
+htsserver_alive || fail "a short init file write crashed the server: $(cat "${HTS_LOG}")"
 written=$(wc -c <"${path}/p/hts-cache/winprofile.ini" | tr -d ' ')
 test "${written}" -lt "${#profile}" ||
     fail "the file-size limit did not stop the write (${written} bytes landed)"
 check_clipped "Unable to write ${#profile} bytes in the the init file " "${path}/p"
 
-reply=$(get "${port}" /server/index.html || true)
+reply=$(htsserver_get /server/index.html || true)
 grep -q '200 OK' <<<"$reply" ||
     fail "the server stopped answering after the refused saves"
 

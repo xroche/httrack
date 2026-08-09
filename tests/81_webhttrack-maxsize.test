@@ -6,57 +6,23 @@
 set -euo pipefail
 
 testdir=$(cd "$(dirname "$0")" && pwd)
-distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
-distdir=$(cd "${distdir}" && pwd)
-# shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-command -v htsserver >/dev/null || fail "no htsserver in PATH"
-python=$(find_python) || {
-    echo "python3 not found; skipping" >&2
-    exit 77
-}
+htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_maxsize.XXXXXX") || fail "no tmpdir"
-srvlog=$(mktemp)
-srv=
 cleanup() {
-    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
-    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
-    wait "${srv}" 2>/dev/null || true # absorb bash's async "Killed" notice
-    srv=
-    rm -rf "${work}" "${srvlog}"
+    htsserver_cleanup
+    rm -rf "${work}"
 }
 trap 'set +e; cleanup' EXIT
 trap cleanup HUP INT QUIT PIPE TERM
 
-# webhttrack server on a pre-picked port; an isolated HOME keeps a stray
-# ~/.httrack.ini out of it.
-sport=$("${python}" -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()')
-(
-    trap '' TERM TTOU
-    export HOME="${work}"
-    exec htsserver "${distdir}/" --port "${sport}" >"${srvlog}" 2>&1
-) &
-srv=$!
-for _ in $(seq 1 40); do
-    url=$(sed -n 's/^URL=//p' "${srvlog}") && test -n "${url}" && break
-    kill -0 "${srv}" 2>/dev/null || break
-    sleep 0.25
-done
-test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
+htsserver_start --home "${work}"
 
 # Audit what step4.html renders back; without command_do nothing is launched.
-"${python}" - "${url}" <<'PY' || fail "wizard rendered the wrong options (see above)"
+"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "wizard rendered the wrong options (see above)"
 import re, sys, urllib.parse, urllib.request
 
 url = sys.argv[1]
@@ -131,7 +97,7 @@ cleanup
 # A bare -m<n> resets the html limit, so only the bare-then-comma order keeps
 # both caps live. basic.html is 487 bytes, well past the 10-byte html cap.
 crawl() {
-    bash "${distdir}/tests/local-crawl.sh" "$@"
+    bash "${HTS_DISTDIR}/tests/local-crawl.sh" "$@"
 }
 crawl --errors 1 --log-found 'File too big' \
     httrack 'BASEURL/simple/basic.html' '--max-files=,10'
