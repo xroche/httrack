@@ -58,9 +58,10 @@ fi
 
 # Which fault a spent thread stack raises varies by port (hppa does not say
 # SIGSEGV); SIGABRT would instead mean the engine ended itself.
+# By name, not by number: SIGBUS is 7 on x86 and 10 on hppa.
 caught=$(sed -n '/^Caught signal [0-9][0-9]*$/{s/.* //;p;q;}' <<<"$worker")
-case "$caught" in
-4 | 10 | 11) ;; # SIGILL, SIGBUS, SIGSEGV
+case "$(kill -l "${caught:-x}" 2>/dev/null || true)" in
+SEGV | BUS | ILL) ;;
 *)
     printf '%s\n' "$worker" >&2
     fail "-#c=threadstack: caught signal '${caught:-none}', expected a fault"
