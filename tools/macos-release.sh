@@ -70,7 +70,7 @@ if [ "$skip_notarize" -eq 0 ]; then
     fi
     test -r "$notary_key" || fail "no App Store Connect key at $notary_key"
 fi
-for t in codesign xcrun hdiutil ditto file spctl; do
+for t in codesign xcrun hdiutil ditto file spctl lipo; do
     command -v "$t" >/dev/null 2>&1 ||
         fail "$t not found -- this needs the Xcode command line tools"
 done
@@ -142,7 +142,8 @@ test -n "$version" || fail "no CFBundleShortVersionString in $app/Contents/Info.
 # The filename is what a user reads before downloading, so name the arch (#1083).
 # An arch counts only if every Mach-O carries it: one thin dylib and the app is not universal.
 arch=$(while IFS= read -r _bin; do lipo -archs "$_bin" | tr ' ' '\n'; done <"$mach" |
-    sort | uniq -c | awk -v n="$(wc -l <"$mach")" '$1 == n { print $2 }' | sort | paste -sd- -)
+    grep -v '^$' | sort | uniq -c |
+    awk -v n="$(wc -l <"$mach")" '$1 == n { print $2 }' | sort | paste -sd- -)
 test -n "$arch" || fail "the bundle's Mach-O files share no architecture"
 case "$arch" in
 *-*) arch=universal ;;
