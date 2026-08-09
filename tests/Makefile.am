@@ -12,6 +12,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c a
 	header-injection-server.py header-injection-check.py \
 	pty-resize.py ttyrun.py test-timeout.sh png-colors.py \
 	local-crawl.sh local-server.py ftp-server.py testlib.sh \
+	webhttracklib.sh httpclient.py \
 	ci-windows-suite.sh ci-windows-watchdog.ps1 \
 	server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \

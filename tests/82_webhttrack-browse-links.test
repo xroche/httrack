@@ -8,19 +8,10 @@ set -euo pipefail
 testdir=$(cd "$(dirname "$0")" && pwd)
 distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
 distdir=$(cd "${distdir}" && pwd)
-# shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-command -v htsserver >/dev/null || fail "no htsserver in PATH"
-python=$(find_python) || {
-    echo "python3 not found; skipping" >&2
-    exit 77
-}
+htsserver_require
 
 # Control: on a path that does not resolve, grep "passes" without reading anything.
 test -f "${distdir}/html/server/finished.html" || fail "no GUI pages under ${distdir}"
@@ -28,15 +19,9 @@ bad=$(grep -l 'file://' "${distdir}"/html/server/finished.html || true)
 test -z "${bad}" || fail "file: link left in: ${bad}"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_browse.XXXXXX") || fail "no tmpdir"
-srvlog=$(mktemp)
-srv=
-srvpid=
 cleanup() {
-    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
-    test -z "${srvpid}" || kill -9 "${srvpid}" 2>/dev/null || true
-    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
-    wait "${srv}" 2>/dev/null || true # absorb bash's async "Killed" notice
-    rm -rf "${work}" "${srvlog}"
+    htsserver_cleanup
+    rm -rf "${work}"
 }
 trap 'set +e; cleanup' EXIT
 trap cleanup HUP INT QUIT PIPE TERM
@@ -47,28 +32,10 @@ mkdir -p "${proj}"
 printf 'MIRROR-PROBE-OK\n' >"${proj}/probe.txt"
 printf '<html><body>MIRROR-INDEX-OK</body></html>\n' >"${proj}/index.html"
 
-# An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
-sport=$("${python}" -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()')
-(
-    trap '' TERM TTOU
-    export HOME="${work}"
-    exec htsserver "${distdir}/" --port "${sport}" >"${srvlog}" 2>&1
-) &
-srv=$!
-for _ in $(seq 1 40); do
-    url=$(sed -n 's/^URL=//p' "${srvlog}") && test -n "${url}" && break
-    kill -0 "${srv}" 2>/dev/null || break
-    sleep 0.25
-done
-test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
-srvpid=$(sed -n 's/^PID=//p' "${srvlog}") # absent on Windows
+htsserver_start --home "${work}"
 
 # htsserver resolves the posted paths itself, so hand it native ones.
-"${python}" - "${url}" "$(nativepath "${work}/websites")" <<'PY' || fail "browse-link checks failed"
+"${HTS_PYTHON}" - "${HTS_URL}" "$(nativepath "${work}/websites")" <<'PY' || fail "browse-link checks failed"
 import re, sys, urllib.error, urllib.parse, urllib.request
 
 url, base = sys.argv[1].rstrip("/"), sys.argv[2]
@@ -147,8 +114,7 @@ check("file://" not in body, "finished.html has no file: link")
 sys.exit(rc)
 PY
 
-# A leaked htsserver wedges the parallel harness behind a green log.
-cleanup
-! kill -0 "${srv}" 2>/dev/null || fail "htsserver ${srv} survived"
+htsserver_cleanup
+htsserver_assert_reaped
 
 echo "PASS"
