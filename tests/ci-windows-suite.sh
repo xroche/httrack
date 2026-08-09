@@ -273,7 +273,6 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # and needs the loader variable libtool picked, neither of which this job has;
 # link-control-bytes names its fixtures with the raw control bytes the requests
 # decode back to, which NTFS refuses;
-# ftp-userpass starves the x64 runner until the step is lost, Win32 passing (#1038);
 # memresume, repaircache and resume-recovery interrupt pass 1 with a signal
 # MSYS cannot deliver to a native exe;
 # ftp-deadhost-interrupt needs that same signal (its --timeout half runs, as 245);
@@ -288,7 +287,6 @@ expected_skips="01_engine-footer-overflow.test
 152_engine-string-oom.test
 153_local-proxytrack-quiet.test
 215_engine-datadir-ospath.test
-230_local-ftp-userpass.test
 243_local-ftp-deadhost-interrupt.test
 235_local-resume-recovery.test
 48_local-crange-memresume.test

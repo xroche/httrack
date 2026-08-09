@@ -11,12 +11,6 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
 
-# Starves the x64 CI runner until the whole suite step is lost; Win32 is fine (#1038).
-if is_windows; then
-    echo "windows: wedges the x64 runner (#1038), skipping"
-    exit 77
-fi
-
 python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
 command -v httrack >/dev/null || {
     echo "could not find httrack" >&2
