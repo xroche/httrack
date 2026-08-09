@@ -24,8 +24,8 @@ nativepath() {
     fi
 }
 
-# Self-signed cert for a local TLS origin, written to $1/both.pem. openssl's
-# output is reported, not discarded: a silent failure here left an empty log (#1094).
+# Self-signed cert for a local TLS origin, written to $1/both.pem, key first.
+# openssl's failure output is reported; discarding it left an empty log (#1094).
 make_tls_pem() {
     local dir=$1 out
     out=$(openssl req -x509 -newkey rsa:2048 -keyout "$dir/key.pem" \

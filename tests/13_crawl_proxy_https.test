@@ -33,7 +33,7 @@ cleanup() {
 }
 trap 'set +e; cleanup' EXIT
 
-# self-signed cert for the local TLS origin (httrack does not verify certs)
+# httrack does not verify certs, so a self-signed one is fine
 make_tls_pem "$tmpdir"
 
 # start_server <logdir> <mode>: launches a proxy+origin pair, sets $origin_port
