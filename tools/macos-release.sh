@@ -139,7 +139,16 @@ fi
 version=$(plist_value "$app/Contents/Info.plist" CFBundleShortVersionString)
 test -n "$version" || fail "no CFBundleShortVersionString in $app/Contents/Info.plist"
 
-dmg="$out/HTTrack-$version.dmg"
+# The filename is what a user reads before downloading, so name the arch (#1083).
+# An arch counts only if every Mach-O carries it: one thin dylib and the app is not universal.
+arch=$(while IFS= read -r _bin; do lipo -archs "$_bin" | tr ' ' '\n'; done <"$mach" |
+    sort | uniq -c | awk -v n="$(wc -l <"$mach")" '$1 == n { print $2 }' | sort | paste -sd- -)
+test -n "$arch" || fail "the bundle's Mach-O files share no architecture"
+case "$arch" in
+*-*) arch=universal ;;
+esac
+
+dmg="$out/HTTrack-$version-macos-$arch.dmg"
 stage=$(mktemp -d)
 trap 'rm -f "$mach" "$nlog"; rm -rf "$stage"' EXIT
 # ditto, not cp: it carries a bundle's metadata across intact.

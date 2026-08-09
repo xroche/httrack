@@ -151,15 +151,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          dmg="$(echo "$RUNNER_TEMP"/HTTrack-*.dmg)"
-          test -f "$dmg"
-          # Renamed here, not at build time, because httrack-com's staging script
-          # matches the artifact name exactly. The Release name is what a user reads (#1083).
-          named="$RUNNER_TEMP/release/$(basename "${dmg%.dmg}")-macos-arm64.dmg"
-          mkdir -p "$(dirname "$named")"
-          cp "$dmg" "$named"
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "$named" --clobber
+            gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP"/HTTrack-*.dmg --clobber
           else
             echo "no release $GITHUB_REF_NAME yet -- the DMG is on this run's artifacts"
           fi
