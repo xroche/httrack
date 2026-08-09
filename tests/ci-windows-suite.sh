@@ -276,8 +276,10 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # ftp-userpass starves the x64 runner until the step is lost, Win32 passing (#1038);
 # memresume, repaircache and resume-recovery interrupt pass 1 with a signal
 # MSYS cannot deliver to a native exe;
-# ftp-deadhost-interrupt needs that same signal (its --timeout half runs, as 245).
+# ftp-deadhost-interrupt needs that same signal (its --timeout half runs, as 245);
+# close-once interposes close() through LD_PRELOAD, which MSYS has no equivalent for.
 expected_skips="01_engine-footer-overflow.test
+253_local-ftp-close-once.test
 100_local-purge-longpath.test
 158_local-link-control-bytes.test
 114_local-update-304-leak.test

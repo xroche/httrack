@@ -6,7 +6,7 @@ TESTS = @TESTS_LIST@
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
+EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c closetrack.c ftpcancel.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
@@ -68,6 +68,9 @@ TESTS_ENVIRONMENT += NOBACKTRACE_LA=$(abs_builddir)/libnobacktrace.la
 TESTS_ENVIRONMENT += NOBACKTRACE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libnobacktrace.so
 TESTS_ENVIRONMENT += ALTSTACKPROBE_LA=$(abs_builddir)/libaltstackprobe.la
 TESTS_ENVIRONMENT += ALTSTACKPROBE_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libaltstackprobe.so
+TESTS_ENVIRONMENT += CLOSETRACK_LA=$(abs_builddir)/libclosetrack.la
+TESTS_ENVIRONMENT += CLOSETRACK_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libclosetrack.so
+TESTS_ENVIRONMENT += FTPCANCEL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/libftpcancel.so
 TESTS_ENVIRONMENT += STRINGOOM_BIN=$(abs_builddir)/stringoom$(EXEEXT)
 # 215_engine-datadir-ospath.test runs the engine from a copy, so it needs the
 # real binary rather than the libtool wrapper script, plus the loader variable
@@ -79,7 +82,7 @@ TESTS_ENVIRONMENT += SHLIBPATH_VAR=$(SHLIBPATH_VAR)
 # rename() interposer for 01_engine-renameover.test; -rpath is what makes
 # libtool build a shared module rather than a static-only convenience library.
 check_LTLIBRARIES = librenamefail.la libunlinkfail.la libthreadattrfail.la \
-	libnobacktrace.la libaltstackprobe.la
+	libnobacktrace.la libaltstackprobe.la libclosetrack.la libftpcancel.la
 librenamefail_la_SOURCES = renamefail.c
 librenamefail_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 librenamefail_la_LIBADD = $(DL_LIBS)
@@ -102,6 +105,16 @@ libnobacktrace_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 libaltstackprobe_la_SOURCES = altstackprobe.c
 libaltstackprobe_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
 libaltstackprobe_la_LIBADD = $(DL_LIBS)
+
+# close() observer for 253_local-ftp-close-once.test
+libclosetrack_la_SOURCES = closetrack.c
+libclosetrack_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+libclosetrack_la_LIBADD = $(DL_LIBS)
+
+# per-link cancel driver for 253_local-ftp-close-once.test
+libftpcancel_la_SOURCES = ftpcancel.c
+libftpcancel_la_LDFLAGS = -module -avoid-version -rpath $(abs_builddir)
+libftpcancel_la_LIBADD = $(DL_LIBS) -lpthread
 
 # realloc stub for 152_engine-string-oom.test; links nothing, so it stays a
 # plain binary rather than a libtool wrapper script.
