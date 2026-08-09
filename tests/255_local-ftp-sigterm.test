@@ -42,8 +42,15 @@ out="${tmpdir}/crawl"
 cmds="${tmpdir}/cmds"
 modes="${tmpdir}/modes"
 mkdir -p "$root"
-awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 100; i++) print s }' \
-    >"${root}/f.bin"
+# 800 KB, of which the stall mode sends an eighth: past the 32768 bytes below
+# which the engine calls the session dead and rolls the mirror back, so the
+# teardown assertions below describe a real mirror.
+awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 800; i++) print s }' \
+    >"${root}/big.bin"
+# Small enough to trickle out in a couple of seconds.
+head -c 102400 "${root}/big.bin" >"${root}/f.bin"
+# Three of them against two slots, for the all-slots-busy leg.
+for f in a b c; do cp "${root}/f.bin" "${root}/${f}.bin"; done
 
 serverlog="${tmpdir}/server.out"
 "$python" "$server" --root "$(nativepath "$root")" \
@@ -52,70 +59,117 @@ serverlog="${tmpdir}/server.out"
 serverpid=$!
 port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 
-# Backgrounded, with no bound of any kind on the phase that must be ended by
-# the signal alone: a --timeout or --max-time would end it on its own and the
-# assertion below would hold on the unfixed engine too.
+# $1 is a space-separated list of files to fetch; $name is the first of them.
+name=
 start_crawl() {
+    local urls=() f
+    for f in $1; do urls+=("ftp://127.0.0.1:${port}/${f}"); done
+    name=${1%% *}
+    shift
     : >"$cmds"
     rm -rf "${out:?}"
     mkdir -p "$out"
-    httrack "ftp://127.0.0.1:${port}/f.bin" -O "$out" --quiet \
-        --disable-security-limits --robots=0 -c2 "$@" \
+    httrack "${urls[@]}" -O "$out" --quiet \
+        --disable-security-limits --robots=0 "$@" \
         >"${tmpdir}/log" 2>&1 &
     crawlpid=$!
 }
 
 # Observed rather than slept for: the partial file appearing is what says the
 # data connection is up and the engine is parked on the slot.
+partial=
 await_transfer() {
-    local deadline=$((SECONDS + 60)) partial=
+    local deadline=$((SECONDS + 60))
+    partial=
     until test -n "$partial"; do
         test "$SECONDS" -lt "$deadline" || fail "the crawl never started a transfer"
-        grep -aq '^RETR ' "$cmds" 2>/dev/null && partial=$(find "$out" -name f.bin)
+        grep -aq '^RETR ' "$cmds" 2>/dev/null && partial=$(find "$out" -name "$name")
         poll_wait 1
     done
 }
 
+# wait_bounded folds its timeout and the crawl's own status into one return, so
+# a crash reads as a hang. Tell them apart, or the message names the wrong bug.
+await_exit() {
+    local rc=0
+    wait_bounded "$crawlpid" "$1" || rc=$?
+    crawlpid=
+    test "$rc" -ne 124 || fail "$2 was still running ${1}s later"
+    test "$rc" -eq 0 || fail "$2 exited $rc instead of unwinding cleanly"
+}
+
 # --- SIGTERM lands on a transfer nothing else can end ------------------------
-# A prefix, then silence for 15 minutes.
+# A prefix, then silence for 15 minutes. No --timeout or --max-time either:
+# any bound would end this crawl on its own and the unfixed engine would pass.
 printf '* stall\n' >"$modes"
-start_crawl --timeout=0 --max-time=0
+start_crawl big.bin --timeout=0 --max-time=0 -c2
 await_transfer
 started=$SECONDS
 kill -TERM "$crawlpid"
-wait_bounded "$crawlpid" 60 ||
-    fail "the terminated crawl was still waiting on the FTP slot 60s later"
-elapsed=$((SECONDS - started))
-crawlpid=
-ok "SIGTERM ended the crawl in ${elapsed}s"
+await_exit 60 "the terminated crawl"
+ok "SIGTERM ended the crawl in $((SECONDS - started))s"
 
-# The exit has to walk out through teardown, which is what stops the worker;
-# a bounded exit that skipped it would be some other path, not this fix.
+# Leaving the wait is only half of it: the exit has to walk out through the
+# normal end of the mirror. Bailing to the error path, or skipping the link as
+# though it were done, also ends the wait and loses the mirror instead.
 reply=$(cat "${tmpdir}/log")
 grep -q 'Exit requested to engine' <<<"$reply" ||
     fail "SIGTERM did not reach the engine: ${reply}"
 grep -q 'Thanks for using HTTrack' <<<"$reply" ||
     fail "the exit skipped teardown: ${reply}"
-ok "the exit unwound through teardown"
+test -s "${out}/hts-cache/new.zip" ||
+    fail "the cache was not committed: $(find "$out" -type f)"
+test -s "$partial" ||
+    fail "the received prefix was dropped: $(find "$out" -type f)"
+log=$(cat "${out}/hts-log.txt")
+# Only the outer loop's own exit_xh branch writes this. Returning the caller's
+# error code leaves the wait just as well, and jumps straight to cleanup with a
+# cache holding nothing.
+grep -q 'Exit requested by shell or user' <<<"$log" ||
+    fail "the mirror did not end through the engine's exit path: ${log}"
+# And the abandoned link has to be reported as abandoned. Returning the
+# already-done code leaves the wait too, and drops it without a word.
+grep -q "at link ftp://127.0.0.1:${port}/big.bin" <<<"$log" ||
+    fail "the abandoned link went unreported: ${log}"
+ok "the exit unwound through teardown, keeping the mirror"
+
+# --- SIGTERM with every slot busy --------------------------------------------
+# Three stalled links against two sockets: the mirror then parks a frame higher,
+# in the wait for a free socket, which the leg above never enters.
+start_crawl "a.bin b.bin c.bin" --timeout=0 --max-time=0 -c2
+deadline=$((SECONDS + 60))
+until test "$(grep -ac '^RETR ' "$cmds" 2>/dev/null || true)" -ge 2; do
+    test "$SECONDS" -lt "$deadline" || fail "the crawl never filled both sockets"
+    poll_wait 1
+done
+started=$SECONDS
+kill -TERM "$crawlpid"
+await_exit 60 "the terminated saturated crawl"
+reply=$(cat "${tmpdir}/log")
+grep -q 'Thanks for using HTTrack' <<<"$reply" ||
+    fail "the saturated exit skipped teardown: ${reply}"
+ok "SIGTERM ended a crawl with no free socket in $((SECONDS - started))s"
 
 # --- a single ^C still finishes the pending transfer -------------------------
 # The engine's policy is to let a receiving slot run to the end; the poll above
 # must not have turned that into an abort.
 printf '* trickle\n' >"$modes"
-start_crawl --timeout=30 --max-time=120
+start_crawl f.bin --timeout=30 --max-time=120 -c2
 await_transfer
 kill -INT "$crawlpid"
-wait_bounded "$crawlpid" 120 || fail "the interrupted crawl never ended"
-crawlpid=
+await_exit 120 "the interrupted crawl"
+# sig_leave's own line: without it the transfer completing says nothing, since
+# a signal that never arrived leaves a crawl that was going to finish anyway.
+grep -q 'Finishing pending transfers' "${tmpdir}/log" ||
+    fail "the ^C never reached sig_leave: $(cat "${tmpdir}/log")"
 cmp -s "${out}/127.0.0.1_${port}/f.bin" "${root}/f.bin" ||
     fail "^C cut the transfer short; mirror holds $(find "$out" -type f)"
 ok "a single ^C let the in-flight transfer complete"
 
 # --- an unsignalled crawl is unaffected --------------------------------------
 : >"$modes"
-start_crawl --timeout=30 --max-time=120
-wait_bounded "$crawlpid" 120 || fail "the plain crawl never ended"
-crawlpid=
+start_crawl f.bin --timeout=30 --max-time=120 -c2
+await_exit 120 "the plain crawl"
 cmp -s "${out}/127.0.0.1_${port}/f.bin" "${root}/f.bin" ||
     fail "the plain crawl did not mirror; it holds $(find "$out" -type f)"
 ok "an unsignalled crawl still mirrors normally"

@@ -4119,6 +4119,12 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         XH_uninit;
         return;
       }
+      /* Same omission as the wait for the current link: with every slot busy
+         the mirror parks here instead, and the exit never lands (#1096). */
+      if (*stre->exit_xh_) {
+        XH_uninit;
+        return;
+      }
       Sleep(100);               // pause
     }
     opt->state._hts_in_html_parsing = prev;
