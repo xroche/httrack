@@ -1702,8 +1702,7 @@ int httpmirror(char *url1, httrackp * opt) {
             opt, LOG_INFO,
             "Note: not scanning %s%s, an HTML page on a host foreign "
             "to %s; mirror it by adding it as a starting URL",
-            /* normalized both sides: a page-supplied link can carry credentials
-             */
+            /* normalized: a page-supplied link can carry credentials */
             jump_identification_const(urladr()), urlfil(),
             jump_identification_const(heap(heap(ptr)->precedent)->adr));
         heap(ptr)->depth = 0;
