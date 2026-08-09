@@ -4226,6 +4226,12 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
         XH_uninit;
         return 0;
       }
+      /* An exit asked of the engine must leave this wait too: only teardown
+         stops a live FTP worker, so waiting on its slot never ends (#1096). */
+      if (*stre->exit_xh_) {
+        XH_uninit;
+        return 0;
+      }
       // And fill the backing stack
       if (back[b].status > 0)
         back_fillmax(sback, opt, cache, ptr, numero_passe);
