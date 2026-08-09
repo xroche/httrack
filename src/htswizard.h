@@ -69,6 +69,10 @@ typedef struct htspair_t {
 /* HTS_TRUE if tag starts with the whole token cmp; NULL tag never matches. */
 hts_boolean hts_cmp_tag_token(const char *tag, const char *cmp);
 
+/* HTS_TRUE when link `ptr` was taken for an asset on a host foreign to its
+   referer: its URL does not look like hypertext, and the hosts differ. */
+hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr);
+
 int hts_acceptlink(httrackp * opt, int ptr,
                    const char *adr, const char *fil,
                    const char *tag, const char *attribute,

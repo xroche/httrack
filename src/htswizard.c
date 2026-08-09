@@ -930,6 +930,24 @@ int hts_acceptmime(httrackp * opt, int ptr,
 #undef _ROBOTS
 }
 
+hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr) {
+  int parent;
+
+  if (ptr <= 0)
+    return HTS_FALSE;
+  parent = heap(ptr)->precedent;
+  /* Seeds hang off the synthetic primary link 0: the user asked for those. */
+  if (parent <= 0 || parent >= opt->lien_tot)
+    return HTS_FALSE;
+  if (ishtml(opt, heap(ptr)->fil) != 0) /* hypertext, or no telling */
+    return HTS_FALSE;
+  /* adr carries the scheme and any user:pw@, so compare bare authorities. */
+  return strfield2(jump_identification_const(heap(ptr)->adr),
+                   jump_identification_const(heap(parent)->adr))
+             ? HTS_FALSE
+             : HTS_TRUE;
+}
+
 // tester taille
 int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint size) {
   int jok = 0;
@@ -954,7 +972,7 @@ int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint siz
         lfull[0] = '\0';
       strcatbuff(lfull, adr);
       if (*fil != '/')
-        strcatbuff(l, "/");
+        strcatbuff(lfull, "/");
       strcatbuff(lfull, fil);
 
       // filters, 0=sait pas 1=ok -1=interdit
