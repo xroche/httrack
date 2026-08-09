@@ -314,6 +314,36 @@ static hts_boolean ftp_connect(lien_back *back, T_SOC soc, SOCaddr *server,
   return socket_set_nonblocking(soc, HTS_FALSE);
 }
 
+#if !FTP_PASV
+/* The active-mode counterpart: an unbounded accept() waits for a data
+   connection the server may never make (#1074). */
+static T_SOC ftp_accept(lien_back *back, T_SOC soc, int timeout,
+                        const httrackp *opt) {
+  const TStamp started = time_local();
+  T_SOC soc_dat;
+
+  timeout = ftp_wait_left(opt, timeout);
+  if (!socket_set_nonblocking(soc, HTS_TRUE))
+    return INVALID_SOCKET;
+  /* state.stop counts as in ftp_connect: nothing is established yet */
+  while (check_socket(soc) == 0) {
+    if (back->stop_ftp || (opt != NULL && opt->state.stop) ||
+        (int) (time_local() - started) >= timeout)
+      return INVALID_SOCKET;
+    Sleep(100);
+  }
+  soc_dat = accept(soc, NULL, NULL);
+  /* BSD hands the listener's non-blocking flag down to the accepted socket,
+     which the transfer below reads blocking. */
+  if (soc_dat != INVALID_SOCKET &&
+      !socket_set_nonblocking(soc_dat, HTS_FALSE)) {
+    deletesoc(soc_dat);
+    return INVALID_SOCKET;
+  }
+  return soc_dat;
+}
+#endif
+
 /* Resolve, likewise: the shared resolver bounds itself by opt->timeout alone
    and takes no stop flag. */
 static SOCaddr *ftp_dns_resolve(httrackp *opt, lien_back *back,
@@ -817,8 +847,8 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             get_ftp_line(back, soc_ctl, line, sizeof(line), timeout, opt);
             _CHECK_HALT_FTP;
             if (line[0] == '1') {
-              //T_SOC soc_dat;
-              if ((soc_dat = accept(soc_servdat, NULL, NULL)) == INVALID_SOCKET) {
+              if ((soc_dat = ftp_accept(back, soc_servdat, timeout, opt)) ==
+                  INVALID_SOCKET) {
                 strcpybuff(back->r.msg, "Unable to accept connection");
                 back->r.statuscode = STATUSCODE_INVALID;
               }
