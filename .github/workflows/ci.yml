@@ -38,7 +38,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
@@ -80,6 +80,26 @@ jobs:
       - name: Build
         run: make -j"$(nproc)"
 
+      # FTP_PASV is 1 in every build, so #if !FTP_PASV never reaches a compiler
+      # and rots unnoticed (#1091). Rebuilt through make, to get the same flags
+      # the real object gets, then dropped so `make check` links a normal one.
+      - name: Compile the FTP active-mode branch
+        run: |
+          set -euo pipefail
+          objs="src/libhttrack_la-htsftp.lo src/libhttrack_la-htsftp.o src/.libs/libhttrack_la-htsftp.o"
+          rm -f $objs
+          log=$(make -C src libhttrack_la-htsftp.lo CPPFLAGS=-DFTP_PASV=0 2>&1) || { echo "$log"; exit 1; }
+          # Only the active branch calls accept(): without this the probe would
+          # pass just as well on a file that ignored -DFTP_PASV=0 entirely.
+          syms=$(nm --undefined-only src/.libs/libhttrack_la-htsftp.o)
+          grep -qw accept <<<"$syms" || { echo "::error::FTP_PASV=0 built no active-mode code"; exit 1; }
+          if grep -q 'warning:' <<<"$log"; then
+            echo "$log"
+            echo "::error::the FTP active-mode branch does not compile warning-free"
+            exit 1
+          fi
+          rm -f $objs
+
       # A backstop only: tests/test-timeout.sh bounds each test, and a healthy run
       # is a minute here, two on macOS. Without it a stall ran to the job's 6h default.
       - name: Test
@@ -108,7 +128,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -292,7 +312,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -401,7 +421,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo dpkg --add-architecture i386
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential gcc-multilib autoconf automake libtool \
             autoconf-archive zlib1g-dev:i386 libssl-dev:i386 \
@@ -444,7 +464,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -499,7 +519,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev
@@ -548,7 +568,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -584,7 +604,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -614,7 +634,7 @@ jobs:
       - name: Install build dependencies (no libssl)
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive zlib1g-dev
 
@@ -651,7 +671,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -730,7 +750,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -800,7 +820,7 @@ jobs:
       - name: Install linters
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           # noble ships shfmt 3.8.0 (universe), matching the pinned local dev
           # version; use it rather than fetching a release binary from github.com.
           sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
@@ -859,7 +879,7 @@ jobs:
             | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
           echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" \
             | sudo tee /etc/apt/sources.list.d/llvm-19.list >/dev/null
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends clang-format-19
           # The clang-format-19 package ships the git-clang-format driver;
           # expose it unsuffixed so "git clang-format" finds it.
