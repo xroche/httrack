@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# A cert fixture that fails must say why: discarding openssl's output left tests
-# 13 and 52 exiting 1 with an empty log (#1094).
+# The TLS fixture the crawl tests hand their python servers: the shipped cert
+# and key in one file, key first, the order load_cert_chain() documents.
 
 set -euo pipefail
 
@@ -9,11 +9,6 @@ set -euo pipefail
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
-
-command -v openssl >/dev/null 2>&1 || {
-    echo "openssl not found; skipping" >&2
-    exit 77
-}
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tlspem.XXXXXX")
 trap 'set +e; rm -rf "$tmpdir"' EXIT
@@ -24,53 +19,21 @@ fail() {
 }
 ok() { echo "OK: $*"; }
 
-# The working case first: a helper that never produces anything would otherwise
-# satisfy the failure case on its own.
-good="$tmpdir/good"
-mkdir -p "$good"
-make_tls_pem "$good"
+make_tls_pem "$tmpdir"
+
 # awk, not grep piped into head: the pipe would SIGPIPE the reader.
-keyline=$(awk '/BEGIN .*PRIVATE KEY/ { print NR; exit }' "$good/both.pem")
-certline=$(awk '/BEGIN CERTIFICATE/ { print NR; exit }' "$good/both.pem")
+keyline=$(awk '/BEGIN .*PRIVATE KEY/ { print NR; exit }' "$tmpdir/both.pem")
+certline=$(awk '/BEGIN CERTIFICATE/ { print NR; exit }' "$tmpdir/both.pem")
 test -n "$keyline" || fail "both.pem has no private key"
 test -n "$certline" || fail "both.pem has no certificate"
-# load_cert_chain() in the callers' servers reads this order.
 test "$keyline" -lt "$certline" || fail "both.pem holds the certificate before the key"
 ok "make_tls_pem writes a key and then a certificate"
 
-# Shim in an openssl that refuses, and require its reason to reach stderr.
-marker="openssl-stub-declined-to-issue"
-stub="$tmpdir/bin"
-broken="$tmpdir/broken"
-mkdir -p "$stub" "$broken"
-# The stub still writes the files it was asked for, so nothing but the helper's
-# own exit can make the status below non-zero.
-cat >"$stub/openssl" <<EOF
-#!/bin/sh
-while [ \$# -gt 0 ]; do
-    case \$1 in
-    -keyout | -out)
-        : >"\$2"
-        shift
-        ;;
-    esac
-    shift
-done
-echo "${marker}" >&2
-exit 3
-EOF
-chmod +x "$stub/openssl"
-
-rc=0
-err=$(
-    PATH="$stub:$PATH"
-    make_tls_pem "$broken" 2>&1 1>/dev/null
-) || rc=$?
-
-# Also proves the shim was reached: the real openssl here would exit 0.
-test "$rc" -eq 1 || fail "make_tls_pem exited ${rc}, want 1, with an openssl that exits 3"
-case "$err" in
-*"$marker"*) ;;
-*) fail "openssl's reason never reached stderr, got: '${err}'" ;;
-esac
-ok "a failing openssl is reported on stderr"
+# The shipped pair verbatim, not a fixture minted per run (#1099).
+awk -v start="$certline" 'NR >= start' "$tmpdir/both.pem" >"$tmpdir/cert.pem"
+cmp -s "$tmpdir/cert.pem" "${testdir}/server.crt" ||
+    fail "both.pem does not carry tests/server.crt"
+awk -v end="$certline" 'NR < end' "$tmpdir/both.pem" >"$tmpdir/key.pem"
+cmp -s "$tmpdir/key.pem" "${testdir}/server.key" ||
+    fail "both.pem does not carry tests/server.key"
+ok "make_tls_pem hands back the shipped cert and key"
