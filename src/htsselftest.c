@@ -7874,6 +7874,9 @@ static void st_backstop_slot(struct_back *sback, int p, int status,
   sback->connect_fallback[p].addr_count = 1;
 }
 
+/* A network that rejects TEST-NET-1 instead of dropping it answers in ms. */
+#define ST_BACKSTOP_SETTLE_MS 500
+
 /* Refill every slot: a fresh pending connect for each state that owns a socket,
    plus the poison the assertions read back. False if the blackhole answered. */
 static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
@@ -7892,6 +7895,18 @@ static hts_boolean st_backstop_arm(httrackp *opt, struct_back *sback,
       return HTS_FALSE;
     }
     st_backstop_slot(sback, i, status[i], &r[i]);
+  }
+  /* Re-probe once settled: the check above runs on the heels of connect(), too
+     early to see a refusal, and back_wait() then rightly ends slots the caller
+     is about to assert it left alone (the powerpc buildds). */
+  Sleep(ST_BACKSTOP_SETTLE_MS);
+  for (i = 0; i < slots; i++) {
+    if (i != dnsslot && check_socket_connect(sback->lnk[i].r.soc) != 0) {
+      printf("backstop: SKIP (the network answered for " ST_BACKSTOP_DEADHOST
+             " within %d ms)\n",
+             ST_BACKSTOP_SETTLE_MS);
+      return HTS_FALSE;
+    }
   }
   return HTS_TRUE;
 }
