@@ -1,9 +1,7 @@
 #!/bin/bash
-# Issue #121: a link whose URL looks like an asset (".../distorted.jpg") on a
-# foreign host is taken for a file, then the server answers text/html. Its own
-# links are same-host, so scanning it with the referring page's depth budget
-# mirrors that whole site. On the unfixed engine the foreign host yields 3 files
-# under -n and 7 under +*.jpg, against the 1 page it is entitled to.
+# Issue #121: a URL that looks like an asset (".../distorted.jpg") on a foreign
+# host, answered with text/html, must be stored and not scanned. The unfixed
+# engine mirrored 3 files of that host under -n and 7 under +*.jpg, against 1.
 set -eu
 
 : "${top_srcdir:=..}"
@@ -40,17 +38,27 @@ blog="${tmpdir}/b-server.log"
 bpid=$!
 bport=$(discover_server_port "$blog" "$bpid") || exit 1
 
-# The crawled site: the foreign link, plus a chain of its own the crawl must
-# still walk to the end.
+# The crawled site: the foreign link, a chain of its own, and the same shape of
+# asset-looking HTML page served by A itself.
 cat >"${tmpdir}/aroot/index.html" <<EOF
 <html><body>
 <a href="http://127.0.0.1:${bport}/foreign/s/xxx/distorted.jpg">foreign</a>
+<a href="/foreign/local/thing.jpg">same host</a>
 <a href="a1.html">local</a>
 </body></html>
 EOF
 printf '<html><body><a href="a2.html">deeper</a></body></html>\n' \
     >"${tmpdir}/aroot/a1.html"
 printf '<html><body>leaf</body></html>\n' >"${tmpdir}/aroot/a2.html"
+# Reached on its own, so the other runs stay free of these fetches.
+cat >"${tmpdir}/aroot/assets.html" <<EOF
+<html><head>
+<link rel="stylesheet" href="http://127.0.0.1:${bport}/asset/style.css">
+<script src="http://127.0.0.1:${bport}/asset/script.js"></script>
+</head><body>
+<img src="http://127.0.0.1:${bport}/asset/vector.svg">
+</body></html>
+EOF
 
 alog="${tmpdir}/a-server.log"
 : >"$alog"
@@ -61,11 +69,11 @@ aport=$(discover_server_port "$alog" "$apid") || exit 1
 
 which httrack >/dev/null || fail "could not find httrack"
 
-crawl() { # crawl <label> [httrack args...]
-    local label=$1
-    shift
-    httrack "http://127.0.0.1:${aport}/index.html" -O "${tmpdir}/out-${label}" \
-        --quiet --max-time=120 --timeout=30 --robots=0 "$@" \
+crawl() { # crawl <label> <start path> [httrack args...]
+    local label=$1 start=$2
+    shift 2
+    httrack "http://127.0.0.1:${aport}${start}" -O "${tmpdir}/out-${label}" \
+        --quiet --max-time=120 --timeout=30 --robots=0 --debug-log "$@" \
         >"${tmpdir}/crawl-${label}.log" 2>&1 || fail "crawl ${label} failed"
 }
 
@@ -84,6 +92,18 @@ expected
 $3"
 }
 
+# The engine must say why it stopped, or a pass could come from any refusal.
+check_noted() { # check_noted <label>
+    grep -aq 'not scanning .*an HTML page on a host foreign' \
+        "${tmpdir}/out-$1/hts-log.txt" ||
+        fail "$1: the crawl log does not record the skipped scan"
+}
+
+stored() { # stored <label> <port> <path>
+    test -s "${tmpdir}/out-$1/127.0.0.1_$2/$3" ||
+        fail "$1: $3 is missing or empty"
+}
+
 # One page, plus the .readme the store-without-scan path leaves beside it.
 kept="foreign/s/xxx/distorted.html
 foreign/s/xxx/distorted.html.readme"
@@ -95,31 +115,62 @@ foreign/s/xxx/c4.html
 foreign/s/xxx/c5.html
 foreign/s/xxx/distorted.html
 foreign/s/xxx/pic.html"
-# Negative control: same-host recursion is untouched and still reaches a2.
-local_pages="a1.html
+# Guards the fix against over-firing: A's own chain, and A's own asset-looking
+# HTML page, which is same-host and must still be scanned in full.
+untouched="a1.html
 a2.html
+foreign/local/c1.html
+foreign/local/c2.html
+foreign/local/c3.html
+foreign/local/c4.html
+foreign/local/c5.html
+foreign/local/pic.html
+foreign/local/thing.html
 index.html"
 
-# Near links (-n), then the scan rule WinHTTrack ships by default.
-crawl near -n
+# Near links (-n), then the scan rule that matches by extension.
+crawl near /index.html -n
 check near "$bport" "$kept"
-check near "$aport" "$local_pages"
-test -s "${tmpdir}/out-near/127.0.0.1_${bport}/foreign/s/xxx/distorted.html" ||
-    fail "the foreign page was not stored"
+check near "$aport" "$untouched"
+check_noted near
+stored near "$bport" foreign/s/xxx/distorted.html
 
-crawl jpg '+*.jpg'
+crawl jpg /index.html '+*.jpg'
 check jpg "$bport" "$kept"
-check jpg "$aport" "$local_pages"
+check jpg "$aport" "$untouched"
+check_noted jpg
+stored jpg "$bport" foreign/s/xxx/distorted.html
 
-crawl jpgnear -n '+*.jpg'
+crawl jpgnear /index.html -n '+*.jpg'
 check jpgnear "$bport" "$kept"
+check_noted jpgnear
+stored jpgnear "$bport" foreign/s/xxx/distorted.html
 
-# A rule naming the host asks for that site: it keeps its depth and is scanned.
-crawl hostrule "+127.0.0.1:${bport}/*"
-check hostrule "$bport" "$scanned"
-check hostrule "$aport" "$local_pages"
+# Naming the host in a rule does not buy the page a scan: only a seed does.
+crawl hostrule /index.html "+127.0.0.1:${bport}/*"
+check hostrule "$bport" "$kept"
+check hostrule "$aport" "$untouched"
 
-# Without either, the foreign link is out of scope to begin with.
-crawl none
+# A seeded host is its own referer, so nothing is foreign to it.
+httrack "http://127.0.0.1:${aport}/index.html" \
+    "http://127.0.0.1:${bport}/foreign/s/xxx/distorted.jpg" \
+    -O "${tmpdir}/out-seed" --quiet --max-time=120 --timeout=30 --robots=0 \
+    >"${tmpdir}/crawl-seed.log" 2>&1 || fail "crawl seed failed"
+check seed "$bport" "$scanned"
+
+# A foreign asset honestly typed is still parsed for what it references: the
+# clamp is for an HTML page, not for every content type httrack scans.
+crawl assets /assets.html '+*.css' '+*.js' '+*.svg' '+*.png'
+for f in asset/style.css asset/script.js asset/vector.svg \
+    asset/bg.png asset/inner.png; do
+    stored assets "$bport" "$f"
+done
+for f in asset/style.css asset/script.js asset/vector.svg; do
+    test ! -e "${tmpdir}/out-assets/127.0.0.1_${bport}/${f}.readme" ||
+        fail "assets: ${f} was stored without a scan"
+done
+
+# Without a rule or -n, the foreign link is out of scope to begin with.
+crawl none /index.html
 check none "$bport" ""
-check none "$aport" "$local_pages"
+check none "$aport" "$untouched"

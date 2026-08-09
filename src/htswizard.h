@@ -70,8 +70,7 @@ typedef struct htspair_t {
 hts_boolean hts_cmp_tag_token(const char *tag, const char *cmp);
 
 /* HTS_TRUE when link `ptr` was taken for an asset on a host foreign to its
-   referer: its URL does not look like hypertext and no filter rule names that
-   host. Such a page may be stored but must not be scanned (#121). */
+   referer: its URL does not look like hypertext, and the hosts differ. */
 hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr);
 
 int hts_acceptlink(httrackp * opt, int ptr,

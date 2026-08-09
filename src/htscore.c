@@ -1693,17 +1693,15 @@ int httpmirror(char *url1, httrackp * opt) {
       // traitement (parsing)
       // ------------------------------------------------------
 
-      /* A URL taken for an asset on a foreign host, answering hypertext: keep
-         the file, but spend no depth on it. Its links are same-host now, so the
-         parent's budget would mirror that whole site (#121). */
+      /* An asset URL on a foreign host that answers an HTML page gets no depth:
+         its links are same-host, and would mirror that whole site (#121). */
       if (!is_binary && heap(ptr)->depth > 0 &&
-          (is_hypertext_mime(opt, r.contenttype, urlfil()) ||
-           may_be_hypertext_mime(opt, r.contenttype, urlfil())) &&
+          is_html_mime_type(r.contenttype) &&
           hts_link_is_foreign_asset(opt, ptr)) {
         hts_log_print(opt, LOG_INFO,
-                      "Note: not scanning %s%s: %s from a host foreign to %s",
-                      urladr(), urlfil(), r.contenttype,
-                      heap(heap(ptr)->precedent)->adr);
+                      "Note: not scanning %s%s, an HTML page on a host foreign "
+                      "to %s; mirror it by adding it as a starting URL",
+                      urladr(), urlfil(), heap(heap(ptr)->precedent)->adr);
         heap(ptr)->depth = 0;
       }
 

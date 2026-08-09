@@ -930,50 +930,18 @@ int hts_acceptmime(httrackp * opt, int ptr,
 #undef _ROBOTS
 }
 
-/* Filter verdict for a link (1 accepted, -1 refused, 0 undecided), fed the two
-   URL forms the wizard tests. */
-static int hts_filters_verdict(httrackp *opt, const char *adr,
-                               const char *fil) {
-  char BIGSTK l[HTS_URLMAXSIZE * 2];
-  char BIGSTK lfull[HTS_URLMAXSIZE * 2];
-
-  strcpybuff(l, jump_identification_const(adr));
-  if (*fil != '/')
-    strcatbuff(l, "/");
-  strcatbuff(l, fil);
-  if (!link_has_authority(adr))
-    strcpybuff(lfull, "http://");
-  else
-    lfull[0] = '\0';
-  strcatbuff(lfull, adr);
-  if (*fil != '/')
-    strcatbuff(lfull, "/");
-  strcatbuff(lfull, fil);
-  return fa_strjoker_dual(/*url */ 0, *opt->filters.filters,
-                          *opt->filters.filptr, lfull, l, NULL, NULL, NULL);
-}
-
-/* Reserved TLD (RFC 2606): a filter matching this too is not host-specific. */
-#define HTS_FOREIGN_PROBE_HOST "unnamed.invalid"
-
 hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr) {
   int parent;
 
   if (ptr <= 0)
     return HTS_FALSE;
   parent = heap(ptr)->precedent;
-  if (parent < 0 || parent >= opt->lien_tot)
+  /* Seeds hang off the synthetic primary link 0: the user asked for those. */
+  if (parent <= 0 || parent >= opt->lien_tot)
     return HTS_FALSE;
   if (ishtml(opt, heap(ptr)->fil) != 0) /* hypertext, or no telling */
     return HTS_FALSE;
-  if (strfield2(heap(ptr)->adr, heap(parent)->adr))
-    return HTS_FALSE;
-  /* A rule that stops matching once the host changes names that host, so the
-     user asked for this site by name: leave its depth alone. */
-  return (hts_filters_verdict(opt, heap(ptr)->adr, heap(ptr)->fil) == 1 &&
-          hts_filters_verdict(opt, HTS_FOREIGN_PROBE_HOST, heap(ptr)->fil) != 1)
-             ? HTS_FALSE
-             : HTS_TRUE;
+  return strfield2(heap(ptr)->adr, heap(parent)->adr) ? HTS_FALSE : HTS_TRUE;
 }
 
 // tester taille
