@@ -270,6 +270,20 @@ static hts_boolean ftp_may_resume(httrackp *opt, const lien_back *back,
   return HTS_TRUE;
 }
 
+/* Idle time an in-flight transfer still gets after a stop: enough to ride out a
+   burst gap, far below the --timeout a silent server would else hold. Matches
+   the floor of the mirror deadline's own grace. */
+#define FTP_STOP_GRACE 5
+
+/* Clip a wait once a stop is pending: back_wait() can't abort this slot the way
+   it aborts an HTTP one, so an unclipped wait strands the crawl on ^C (#1096).
+   A function of the budget alone, so a caller may re-read it mid-wait. */
+static int ftp_stop_clip(const httrackp *opt, int timeout) {
+  if (opt != NULL && opt->state.stop && timeout > FTP_STOP_GRACE)
+    return FTP_STOP_GRACE;
+  return timeout;
+}
+
 /* Clip a wait to what is left of --max-time: back_wait() can't abort this slot
    the way it aborts an HTTP one. */
 static int ftp_wait_left(const httrackp *opt, int timeout) {
@@ -280,7 +294,7 @@ static int ftp_wait_left(const httrackp *opt, int timeout) {
     if (left < (TStamp) timeout)
       timeout = left > 0 ? (int) left : 0;
   }
-  return timeout;
+  return ftp_stop_clip(opt, timeout);
 }
 
 /* Connect honoring the stop flag, --timeout and --max-time: a blocking
@@ -1278,19 +1292,20 @@ int check_socket_connect(T_SOC soc) {
 // attendre des données
 int wait_socket_receive(lien_back *back, T_SOC soc, int timeout,
                         const httrackp *opt) {
-  TStamp ltime = time_local();
+  const TStamp ltime = time_local();
+  const int budget = ftp_wait_left(opt, timeout);
   int r;
-
-  timeout = ftp_wait_left(opt, timeout);
 
 #if FTP_DEBUG
   printf("\x0dWaiting for data ");
   fflush(stdout);
 #endif
   /* A stop raised by the engine ends the wait on the next 100ms tick instead of
-     after the full timeout, so teardown does not sit on a silent server. */
+     after the full timeout, so teardown does not sit on a silent server. Read
+     each pass, as a ^C lands long after the budget was fixed (#1096). */
   while ((!(r = check_socket(soc))) && (back == NULL || !back->stop_ftp) &&
-         (((int) ((TStamp) (time_local() - ltime))) < timeout)) {
+         (((int) ((TStamp) (time_local() - ltime))) <
+          ftp_stop_clip(opt, budget))) {
     Sleep(100);
 #if FTP_DEBUG
     printf(".");
