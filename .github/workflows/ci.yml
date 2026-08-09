@@ -81,23 +81,24 @@ jobs:
         run: make -j"$(nproc)"
 
       # FTP_PASV is 1 in every build, so #if !FTP_PASV never reaches a compiler
-      # and rots unnoticed (#1091). Rebuilt through make, to get the same flags
-      # the real object gets, then dropped so `make check` links a normal one.
+      # and rots unnoticed (#1091). Compiling is all this proves; nothing runs it.
       - name: Compile the FTP active-mode branch
         run: |
           set -euo pipefail
           objs="src/libhttrack_la-htsftp.lo src/libhttrack_la-htsftp.o src/.libs/libhttrack_la-htsftp.o"
-          rm -f $objs
-          log=$(make -C src libhttrack_la-htsftp.lo CPPFLAGS=-DFTP_PASV=0 2>&1) || { echo "$log"; exit 1; }
-          # Only the active branch calls accept(): without this the probe would
-          # pass just as well on a file that ignored -DFTP_PASV=0 entirely.
+          # accept() marks active-mode code: absent from the object Build made,
+          # present below. One-sided, it passes on a file that ignored the define.
           syms=$(nm --undefined-only src/.libs/libhttrack_la-htsftp.o)
-          grep -qw accept <<<"$syms" || { echo "::error::FTP_PASV=0 built no active-mode code"; exit 1; }
-          if grep -q 'warning:' <<<"$log"; then
-            echo "$log"
-            echo "::error::the FTP active-mode branch does not compile warning-free"
+          if grep -qw accept <<<"$syms"; then
+            echo "::error::accept() is reachable with FTP_PASV=1; the marker no longer discriminates"
             exit 1
           fi
+          rm -f $objs
+          # Through CC: overriding CPPFLAGS would drop configure's
+          # -D_FORTIFY_SOURCE and the object-size warnings that come with it.
+          make -C src libhttrack_la-htsftp.lo CC="$CC -DFTP_PASV=0 -Werror"
+          syms=$(nm --undefined-only src/.libs/libhttrack_la-htsftp.o)
+          grep -qw accept <<<"$syms" || { echo "::error::-DFTP_PASV=0 built no active-mode code"; exit 1; }
           rm -f $objs
 
       # A backstop only: tests/test-timeout.sh bounds each test, and a healthy run
