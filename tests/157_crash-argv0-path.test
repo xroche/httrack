@@ -4,19 +4,15 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 : "${abs_top_builddir:?not run under make check}"
 bindir="${CONFIGURED_BINDIR:?not run under make check}"
 libdir="${CONFIGURED_LIBDIR:?not run under make check}"
 
 out=
-skip() {
-    echo "$*; skipping" >&2
-    exit 77
-}
+
 fail() {
     echo "FAIL: $*" >&2
     test -z "${out}" || sed 's/^/  | /' <"${out}" >&2
@@ -31,8 +27,7 @@ if ! command -v addr2line >/dev/null && ! command -v llvm-symbolizer >/dev/null;
 fi
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argv0.XXXXXX") || exit 1
-trap 'set +e; rm -rf "${work}"' EXIT
-trap 'rm -rf "${work}"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "${work}"
 
 # The installed ELF, not the build tree's libtool wrapper: the wrapper re-execs
 # its binary by absolute path, which is the argv[0] this test must not have.

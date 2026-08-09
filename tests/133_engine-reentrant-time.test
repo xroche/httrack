@@ -3,10 +3,8 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
-: "${top_srcdir:=..}"
+. "$(dirname "$0")/testlib.sh"
 
 # A non-UTC zone, so a helper that reached for gmtime instead of localtime (or
 # vice-versa) gives a different answer: CI runners are UTC, where they agree.
@@ -16,8 +14,7 @@ LC_ALL=C
 export LC_ALL
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_localtime_st.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmpdir"' EXIT
-trap 'rm -rf "$tmpdir"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmpdir"
 
 # hts_localtime() reentrancy, and get_filetime_rfc822()'s GMT labelling (#806).
 expect_ok "localtime self-test" httrack -O "${tmpdir}/o1" \

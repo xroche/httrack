@@ -5,17 +5,15 @@
 # was allocated in full before the read could fail.
 
 set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 export LC_ALL=C
 
 dir=$(mktemp -d)
 cleanup() { rm -rf "$dir"; }
-trap 'set +e; cleanup' EXIT
-trap 'set +e; cleanup; exit 1' HUP INT TERM
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+cleanup_push cleanup
 
 arc_header() {
     printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'

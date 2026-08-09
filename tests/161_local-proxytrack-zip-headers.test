@@ -7,13 +7,11 @@
 
 set -eu
 
-dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
-fail() {
-    echo "$1" >&2
-    exit 1
-}
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
 
 # just under the PT_Element caps (etag[64], cdispo[256]) and the reader's
 # per-line parse buffer, so every value must survive whole

@@ -25,8 +25,7 @@ cleanup() {
     htsserver_cleanup
     rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 # A mirror to serve through /website/, holding the awkward names: the crawl
 # itself is not under test.

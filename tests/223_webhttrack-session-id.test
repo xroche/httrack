@@ -5,9 +5,8 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/webhttracklib.sh
-. "${testdir}/webhttracklib.sh"
+. "$(dirname "$0")/webhttracklib.sh"
 
 htsserver_require
 
@@ -16,8 +15,7 @@ cleanup() {
     htsserver_cleanup
     rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 launch() { # $1 = tag, $2 = port; leaves the URL in ${HTS_URL}
     htsserver_start --port "$2" --home "${work}/$1" --log "${work}/$1.log"
@@ -48,10 +46,7 @@ for _ in $(seq 1 10); do
     cleanup
     urla=
 done
-test -n "${urla}" || {
-    echo "the box never started two servers inside one second; skipping" >&2
-    exit 77
-}
+test -n "${urla}" || skip "the box never started two servers inside one second"
 
 "${HTS_PYTHON}" - "${urla}" "${urlb}" <<'PY' || fail "session id checks failed"
 import re, sys, urllib.request

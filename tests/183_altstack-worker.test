@@ -5,12 +5,10 @@
 
 set -euo pipefail
 
-ulimit -c 0 # a deliberate crash must not litter the box with cores
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
-fail() {
-    echo "$*" >&2
-    exit 1
-}
+ulimit -c 0 # a deliberate crash must not litter the box with cores
 
 case "$(uname -s)" in
 Linux) traced=1 ;;
@@ -103,7 +101,7 @@ fi
 [ -r "${ALTSTACKPROBE_LIB:-}" ] || fail "${ALTSTACKPROBE_LIB:-\$ALTSTACKPROBE_LIB} was not built"
 
 tmp=$(mktemp -d)
-trap 'set +e; rm -rf "$tmp"' EXIT
+cleanup_push rm -rf "$tmp"
 trap 'exit 1' HUP INT TERM
 
 # See 181: the shim loads ahead of libasan and allocates nothing.

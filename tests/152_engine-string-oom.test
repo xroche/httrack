@@ -8,12 +8,10 @@
 
 set -euo pipefail
 
-ulimit -c 0 # a deliberate abort must not litter the box with cores
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+ulimit -c 0 # a deliberate abort must not litter the box with cores
 
 # Unset means this is not an automake run (the Windows job runs the scripts
 # directly), so the helper does not exist. Set but missing is a build problem,

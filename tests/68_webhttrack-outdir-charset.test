@@ -10,9 +10,8 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/webhttracklib.sh
-. "${testdir}/webhttracklib.sh"
+. "$(dirname "$0")/webhttracklib.sh"
 
 htsserver_require
 
@@ -21,8 +20,7 @@ cleanup() {
     htsserver_cleanup
     rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 htsserver_start --home "${work}"
 

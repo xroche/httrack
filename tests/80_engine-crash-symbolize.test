@@ -3,22 +3,17 @@
 # backtrace_symbols_fd() leaves as module+offset (-fvisibility=hidden hides them).
 set -eu
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
-if is_windows; then
-    echo "no backtrace() on Windows; skipping" >&2
-    exit 77
-fi
+skip_on_windows "no backtrace() on Windows"
 command -v httrack >/dev/null || {
     echo "could not find httrack" >&2
     exit 1
 }
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_symbolize.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmpdir"' EXIT
-trap 'rm -rf "$tmpdir"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmpdir"
 out="${tmpdir}/trace"
 raw="${tmpdir}/trace-optout"
 overflow="this string is far too long for the buffer"
@@ -60,10 +55,7 @@ grep -q "$rawframe" "$out" || {
     exit 1
 }
 
-command -v addr2line >/dev/null || {
-    echo "addr2line not installed; skipping" >&2
-    exit 77
-}
+command -v addr2line >/dev/null || skip "addr2line not installed"
 
 # Control: resolve the same frames ourselves, so a stripped build cannot turn
 # the assertion below into a vacuous pass. Second form: glibc drops the "+0x"
@@ -77,10 +69,7 @@ sed -n -e 's/^\([^(]*\)(+\(0x[0-9a-f]*\)).*$/\1 \2/p' \
         test -f "$mod" || continue
         addr2line -Cfip -e "$mod" "$off" 2>/dev/null || true
     done >"$oracle"
-grep -qE 'st_strsafe|strcpy_safe_' "$oracle" || {
-    echo "addr2line names no hidden symbol in this build; skipping" >&2
-    exit 77
-}
+grep -qE 'st_strsafe|strcpy_safe_' "$oracle" || skip "addr2line names no hidden symbol in this build"
 
 # The payload. Dropping the raw frames first is what makes it specific: both
 # names are static, so .dynsym could never have carried them. Not anchored on

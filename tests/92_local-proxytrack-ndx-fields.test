@@ -5,17 +5,13 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
-python=$(find_python) || {
-    echo "python3 not found; skipping" >&2
-    exit 77
-}
+python=$(find_python) || skip "python3 not found"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 # each field fills binput's own bound, so together they run one past line[]
 "$python" - "$dir/foo.ndx" <<'EOF'

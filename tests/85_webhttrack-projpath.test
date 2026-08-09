@@ -5,9 +5,8 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/webhttracklib.sh
-. "${testdir}/webhttracklib.sh"
+. "$(dirname "$0")/webhttracklib.sh"
 
 htsserver_require
 
@@ -16,8 +15,7 @@ cleanup() {
     htsserver_cleanup
     rm -rf "${base}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 # GET $1 into ${reply}, requiring status $2. Captured, not piped: a dead request
 # reads as marker-absent, and so do a truncated body and a 302 to the file.

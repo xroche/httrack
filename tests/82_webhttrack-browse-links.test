@@ -23,8 +23,7 @@ cleanup() {
     htsserver_cleanup
     rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 # Stand in for a finished mirror: the crawl itself is not under test.
 proj="${work}/websites/proj"

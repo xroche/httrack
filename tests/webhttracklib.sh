@@ -12,26 +12,7 @@ HTS_SRV_PIDS=()
 HTS_REAPED_PIDS=()
 HTS_TMP_LOGS=()
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-# 77 is automake's "skipped", not a failure.
-skip() {
-    echo "$*; skipping" >&2
-    exit 77
-}
-
-# Literals, not $'..': Apple's bash 3.2 loses quote state on that inside a
-# parameter expansion, and 21 tests source this file.
-HTS_NL='
-'
 HTS_CR=$(printf '\r')
-
-# First line of $1. A "| head -1" would close the pipe early and, under pipefail,
-# SIGPIPE the producer into a spurious failure.
-firstline() { printf '%s\n' "${1%%"$HTS_NL"*}"; }
 
 # htsserver, plus a python3 the Debian buildd chroot may not have: that one skips.
 htsserver_require() {

@@ -6,16 +6,12 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Resolve httrack before any cd: PATH may carry a build-relative entry.
 bin=$(command -v httrack) || {
     echo "FAIL: httrack not found on PATH" >&2
-    exit 1
-}
-
-fail() {
-    echo "FAIL: $1" >&2
     exit 1
 }
 

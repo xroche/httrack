@@ -3,9 +3,8 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 # A non-UTC zone, so a helper that reached for localtime instead of gmtime gives
 # a different answer: CI runners are UTC, where the two agree.
@@ -13,8 +12,7 @@ TZ=XXX5
 export TZ
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_gmtime_st.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmpdir"' EXIT
-trap 'rm -rf "$tmpdir"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmpdir"
 
 # Concurrent conversions do not tread on each other the way gmtime()'s shared
 # static does (#794).

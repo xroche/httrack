@@ -3,17 +3,15 @@
 # block is a separator, and counting it in the declared length cost every entry.
 
 set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 export LC_ALL=C
 
 dir=$(mktemp -d)
 cleanup() { rm -rf "$dir"; }
-trap 'set +e; cleanup' EXIT
-trap 'set +e; cleanup; exit 1' HUP INT TERM
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+cleanup_push cleanup
 
 BODY=BODYMARKER
 printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nLast-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\nContent-Length: %d\r\n\r\n' "${#BODY}" >"$dir/hdr"

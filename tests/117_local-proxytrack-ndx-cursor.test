@@ -5,15 +5,12 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 dir=$(mktemp -d)
 cleanup() { rm -rf "$dir"; }
-trap 'set +e; cleanup' EXIT
-trap 'cleanup' HUP INT QUIT PIPE TERM
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+cleanup_push cleanup
 
 pad() { printf "%${1}s" '' | tr ' ' "$2"; }
 

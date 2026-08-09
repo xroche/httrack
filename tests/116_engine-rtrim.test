@@ -7,7 +7,8 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Resolve httrack before any cd: PATH may carry a build-relative entry.
 bin=$(command -v httrack) || {
@@ -20,13 +21,7 @@ case "$bin" in
 esac
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_rtrim.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmp"' EXIT
-trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+cleanup_push rm -rf "$tmp"
 
 # --- 1. the helper itself ---------------------------------------------------
 out=$("$bin" -#test=rtrim) || fail "httrack -#test=rtrim exited non-zero: $out"
