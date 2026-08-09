@@ -8,10 +8,8 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-
 # shellcheck source=tests/testlib.sh
-. "$top_srcdir/tests/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 python=$(find_python) || python=
 if test -z "$python"; then
@@ -29,7 +27,7 @@ cleanup() {
     done
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
+cleanup_push cleanup
 
 # start_server <logdir> <mode>: launches a proxy+origin pair, sets $origin_port
 # and $proxy_port from its announced ephemeral ports.

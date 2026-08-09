@@ -7,14 +7,12 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 tmpdir=$(mktemp -d) # honors the Windows-shaped TMPDIR the MSYS suite exports
 cleanup() { rm -rf "$tmpdir"; }
-trap 'set +e; cleanup' EXIT
-trap 'set +e; cleanup; exit 1' HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 # One local file header, no central directory: unzOpen fails, unzRepair
 # recovers the single entry. Same vector as -#test=zip-repair-shift.

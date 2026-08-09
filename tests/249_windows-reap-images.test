@@ -6,19 +6,13 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
 # shellcheck source=tests/testlib.sh
-. "$top_srcdir/tests/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 # shellcheck source=tests/proclib.sh
-. "$top_srcdir/tests/proclib.sh"
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+. "$(dirname "$0")/proclib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_reapimg.XXXXXX")
-trap 'set +e; rm -rf "$tmp"' EXIT
+cleanup_push rm -rf "$tmp"
 
 # Stand in for the runner. win_pid is shimmed, not left to /proc, so each branch
 # is pinned on every host and an MSYS run cannot taskkill this shell.

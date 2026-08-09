@@ -5,17 +5,11 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_nofork.XXXXXX")
-trap 'set +e; rm -rf "$tmp"' EXIT
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+cleanup_push rm -rf "$tmp"
 
 # A tick that cannot exec is what bash reports as 126/127, so a stub returning one
 # models it exactly. The flaky stub fails every other call, which no counter that

@@ -5,19 +5,13 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 srcdir="${abs_top_srcdir:?not run under make check}"
 div="${srcdir}/html/server/div"
 
-python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+python=$(find_python) || skip "python3 not found"
 
 colors() {
     "${python}" "${testdir}/png-colors.py" "${div}/$1/httrack.png" ||

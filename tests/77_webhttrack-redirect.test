@@ -5,9 +5,8 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/webhttracklib.sh
-. "${testdir}/webhttracklib.sh"
+. "$(dirname "$0")/webhttracklib.sh"
 
 htsserver_require
 
@@ -16,8 +15,7 @@ cleanup() {
     htsserver_cleanup
     rm -f "${bindlog}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 # POST redirect=$1 with session id $2, printing the raw headers. Stopping at the
 # header block matters: an unbounded recv() hung the macOS runner for over an hour.

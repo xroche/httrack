@@ -18,8 +18,7 @@ cleanup() {
     htsserver_cleanup
     rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 htsserver_start --home "${work}"
 

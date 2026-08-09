@@ -13,20 +13,11 @@ bindir="${CONFIGURED_BINDIR:?not run under make check}"
 libdir="${CONFIGURED_LIBDIR:?not run under make check}"
 libdir=${libdir%/}
 
-skip() {
-    echo "$*; skipping" >&2
-    exit 77
-}
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
 work=$(mktemp -d "${TMPDIR:-/tmp}/relocate.XXXXXX") || {
     echo "no tmpdir" >&2
     exit 1
 }
-trap 'set +e; rm -rf "${work}"' EXIT
+cleanup_push rm -rf "${work}"
 
 stage=${work}/stage
 stage_install_exec "${stage}" "${work}/install.log" ||

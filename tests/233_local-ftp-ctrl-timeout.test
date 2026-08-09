@@ -5,12 +5,10 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
-python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+python=$(find_python) || skip "python3 not found"
 command -v httrack >/dev/null || {
     echo "could not find httrack" >&2
     exit 1
@@ -25,8 +23,7 @@ cleanup() {
     stop_server "$livepid"
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 root="${tmpdir}/root"
 cmds="${tmpdir}/cmds"
@@ -52,10 +49,6 @@ livelog="${tmpdir}/live.out"
 livepid=$!
 liveport=$(discover_server_port "$livelog" "$livepid") || exit 1
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
 ok() { echo "OK: $*"; }
 
 # No --max-time anywhere below, so --timeout is the only thing that can end a run.

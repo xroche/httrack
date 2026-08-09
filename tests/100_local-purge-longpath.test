@@ -12,13 +12,11 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-
 # shellcheck source=tests/testlib.sh
-. "$top_srcdir/tests/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 # python3 is required; mirror check-network.sh's skip-with-77 convention.
-python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+python=$(find_python) || skip "python3 not found"
 
 # Resolve httrack now: the harness prepends a RELATIVE dir to PATH, so the cd
 # below would otherwise silently fall through to an installed copy.
@@ -48,10 +46,7 @@ need=$((998 - ${#prefix}))
 # 998-byte path, and httrack's own HTS_MAX_PATH_LEN clamps below it too. The
 # trigger is simply not reachable there.
 pathmax=$(getconf PATH_MAX / 2>/dev/null || echo 4096)
-test "$pathmax" -ge $((need + ${#work} + 128)) || {
-    echo "PATH_MAX $pathmax too small for a $need-byte path; skipping" >&2
-    exit 77
-}
+test "$pathmax" -ge $((need + ${#work} + 128)) || skip "PATH_MAX $pathmax too small for a $need-byte path"
 
 # Same on Win32, where MAX_PATH clamps the save path; getconf answers for the
 # MSYS emulation, not the Win32 API httrack calls, so it cannot see this.

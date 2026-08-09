@@ -6,17 +6,12 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 TMPDIR=$(mktemp -d "${TMPDIR:-/tmp}/httrack_salv.XXXXXX")
 export TMPDIR
-trap 'set +e; rm -rf "$TMPDIR"' EXIT
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+cleanup_push rm -rf "$TMPDIR"
 
 verdict="More than 120 seconds passed.. giving up"
 

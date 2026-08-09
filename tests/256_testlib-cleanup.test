@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+# cleanup_push replaces the trap pair every test used to write by hand, so its
+# ordering, its argument handling and the exit status it leaves behind are what
+# ~60 teardowns now rest on.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cleanup.XXXXXX")
+# Hand-written, not cleanup_push: this test must not lose its own teardown to
+# the bug it is looking for.
+trap 'set +e; rm -rf "$tmpdir"' EXIT
+
+ok() { echo "OK: $*"; }
+
+# Runs $1 as a test would, and reports its status: the subject has to be its own
+# process, since the traps under test are the shell's.
+subject() {
+    local rc=0
+    bash "$tmpdir/subject.sh" >"$tmpdir/out" 2>&1 || rc=$?
+    printf '%s\n' "$rc"
+}
+
+write_subject() {
+    {
+        printf 'set -euo pipefail\n. %s/testlib.sh\n' "$testdir"
+        printf 'note() { printf "%%s\\n" "$*" >>"%s/log"; }\n' "$tmpdir"
+        cat
+    } >"$tmpdir/subject.sh"
+    : >"$tmpdir/log"
+}
+
+## LIFO, verbatim arguments
+#
+# Two entries, since a FIFO drain passes any single-entry check. The argument
+# carries the spaces and quotes a bare re-expansion would resplit.
+write_subject <<'EOF'
+cleanup_push note 'pushed first'
+cleanup_push note "pushed  second 'quoted'"
+EOF
+rc=$(subject)
+test "$rc" -eq 0 || fail "the subject exited $rc: $(cat "$tmpdir/out")"
+want="pushed  second 'quoted'
+pushed first"
+test "$(cat "$tmpdir/log")" = "$want" || fail "wrong teardown order: $(cat "$tmpdir/log")"
+ok "cleanups run last-pushed-first with their arguments intact"
+
+## a failing teardown does not become the test's verdict (#773)
+write_subject <<'EOF'
+cleanup_push false
+cleanup_push note 'ran after the failure'
+EOF
+rc=$(subject)
+test "$rc" -eq 0 || fail "a failing cleanup left status $rc"
+test "$(cat "$tmpdir/log")" = 'ran after the failure' || fail "the stack stopped at the failure"
+ok "a failing cleanup neither aborts the drain nor reds the test"
+
+# And the real status still reaches automake.
+write_subject <<'EOF'
+cleanup_push note 'teardown ran'
+exit 3
+EOF
+rc=$(subject)
+test "$rc" -eq 3 || fail "exit 3 was reported as $rc"
+test -s "$tmpdir/log" || fail "the teardown was skipped on a non-zero exit"
+ok "the script's own exit status survives the teardown"
+
+## a signal drains once, not twice
+#
+# The EXIT trap fires after the signal handler, so a stack that is not emptied
+# runs every cleanup a second time -- a double rm is silent, a double kill is not.
+write_subject <<'EOF'
+cleanup_push note 'drained'
+kill -TERM $$
+sleep 30
+EOF
+rc=$(subject)
+test "$rc" -ne 0 || fail "a SIGTERM'd subject reported success"
+test "$(cat "$tmpdir/log")" = drained || fail "SIGTERM drained the stack $(wc -l <"$tmpdir/log") times"
+ok "a signal runs the teardown exactly once and ends the test"
+
+## nothing pushed, no trap
+#
+# Sourcing must leave EXIT alone: 150 tests install their own, and a library
+# that grabbed it at source time would silently drop theirs.
+write_subject <<'EOF'
+test -z "$(trap -p EXIT)" || note "sourcing installed: $(trap -p EXIT)"
+cleanup_push note 'pushed'
+test -n "$(trap -p EXIT)" || note 'cleanup_push installed no EXIT trap'
+EOF
+rc=$(subject)
+test "$rc" -eq 0 || fail "the subject exited $rc: $(cat "$tmpdir/out")"
+test "$(cat "$tmpdir/log")" = pushed || fail "unexpected EXIT trap state: $(cat "$tmpdir/log")"
+ok "the traps arrive with the first cleanup_push, not with the source line"

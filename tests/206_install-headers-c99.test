@@ -7,10 +7,8 @@
 
 set -euo pipefail
 
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Unset means no automake run (the Windows job runs the scripts directly), so
 # there is no install rule to drive.
@@ -22,18 +20,12 @@ fi
 
 # CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it first.
 read -r -a cc_argv <<<"${CC:-cc}"
-command -v "${cc_argv[0]}" >/dev/null 2>&1 || {
-    echo "no C compiler (${cc_argv[0]}), skipping" >&2
-    exit 77
-}
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
 make=${MAKE:-make}
-command -v "$make" >/dev/null 2>&1 || {
-    echo "no make ($make), skipping" >&2
-    exit 77
-}
+command -v "$make" >/dev/null 2>&1 || skip "no make ($make)"
 
 tmp=$(mktemp -d) || exit 1
-trap 'set +e; rm -rf "$tmp"' EXIT
+cleanup_push rm -rf "$tmp"
 
 # Seeding the array with -I keeps it non-empty, which bash 3.2 needs under set -u.
 cpp_argv=(-I"$tmp/include")
@@ -67,10 +59,7 @@ for std in c99 c11; do
     fi
     stds+=("$std")
 done
-[ "${#stds[@]}" -gt 0 ] || {
-    echo "no strict-ISO mode available from ${cc_argv[*]}, skipping" >&2
-    exit 77
-}
+[ "${#stds[@]}" -gt 0 ] || skip "no strict-ISO mode available from ${cc_argv[*]}"
 
 # Whether the strnlen half of #972 is observable on this libc.
 printf '#include <string.h>\nsize_t f(const char *s) { return strnlen(s, 8); }\n' >"$tmp/tu.c"

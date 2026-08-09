@@ -8,23 +8,18 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # 226 asks this of every test naming the Windows suite driver, as the sweep's
 # allowlist below does.
 unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
-
-testdir=$(cd "$(dirname "$0")" && pwd)
 
 work=$(mktemp -d)
 cleanup() {
     rm -rf "$work"
 }
-trap 'set +e; cleanup' EXIT
-trap 'set +e; cleanup; exit 1' HUP INT QUIT TERM
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+cleanup_push cleanup
 
 ## the gated tests must skip for the reason the flag gave, not because the gate
 ## script could not be opened

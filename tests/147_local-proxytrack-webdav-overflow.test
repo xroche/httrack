@@ -6,18 +6,11 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
 # shellcheck source=tests/testlib.sh
-. "$top_srcdir/tests/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
-python=$(find_python) || {
-    echo "python3 missing, skipping"
-    exit 77
-}
-command -v curl >/dev/null 2>&1 || {
-    echo "curl missing, skipping"
-    exit 77
-}
+python=$(find_python) || skip "python3 missing"
+command -v curl >/dev/null 2>&1 || skip "curl missing"
 
 dir=$(mktemp -d)
 ptpid=
@@ -25,8 +18,7 @@ cleanup() {
     stop_server "$ptpid"
     rm -rf "$dir"
 }
-trap 'set +e; cleanup' EXIT
-trap 'set +e; cleanup; exit 1' INT TERM HUP
+cleanup_push cleanup
 
 printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
 printf 'hello' >"$dir/body"

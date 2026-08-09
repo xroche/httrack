@@ -3,12 +3,10 @@
 
 set -euo pipefail
 
-ulimit -c 0 # a deliberate crash must not litter the box with cores
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
-fail() {
-    echo "$*" >&2
-    exit 1
-}
+ulimit -c 0 # a deliberate crash must not litter the box with cores
 
 # The spawn needs backtrace(), so Linux is necessary but not sufficient: the
 # runtime notice below is what actually rules a musl build out.

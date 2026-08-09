@@ -4,18 +4,12 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tlspem.XXXXXX")
-trap 'set +e; rm -rf "$tmpdir"' EXIT
+cleanup_push rm -rf "$tmpdir"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
 ok() { echo "OK: $*"; }
 
 make_tls_pem "$tmpdir"

@@ -6,10 +6,8 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-
 # shellcheck source=tests/testlib.sh
-. "$top_srcdir/tests/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 if test "${HTTPS_SUPPORT:-}" == "no"; then
     echo "no https support compiled, skipping"
@@ -34,7 +32,7 @@ cleanup() {
     done
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
+cleanup_push cleanup
 
 make_tls_pem "$tmpdir"
 

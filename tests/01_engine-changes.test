@@ -3,13 +3,11 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_changes_st.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmpdir"' EXIT
-trap 'rm -rf "$tmpdir"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmpdir"
 
 # --changes bucket accounting and JSON escaping (#714).
 expect_ok "changes self-test" httrack -O "${tmpdir}/o1" -#test=changes run

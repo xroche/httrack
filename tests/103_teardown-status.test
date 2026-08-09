@@ -6,15 +6,11 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 tmp=$(mktemp -d)
-trap 'set +e; rm -rf "$tmp"' EXIT
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+cleanup_push rm -rf "$tmp"
 
 # run <trap-body> <script-body>: exit status and stderr of a subject script.
 run() {

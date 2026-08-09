@@ -6,9 +6,8 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 sh=${BASH_SHELL:-}
 test -n "$sh" || {
@@ -28,8 +27,7 @@ cleanup() {
     exec 9<>"$tmp/fifo" && exec 9>&-
     rm -rf "$tmp"
 }
-trap 'set +e; cleanup' EXIT
-trap 'set +e; cleanup; exit 1' HUP INT TERM
+cleanup_push cleanup
 
 # Symlink farm, not the real srcdir: an in-tree config.status makes autoconf refuse it.
 mkdir "$tmp/src"

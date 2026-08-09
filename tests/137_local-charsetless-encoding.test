@@ -4,13 +4,11 @@
 # the engine lifts out of it that already is UTF-8 must be left alone.
 
 set -e
-: "${top_srcdir:=..}"
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 server=$(nativepath "${testdir}/local-server.py")
 
-python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+python=$(find_python) || skip "python3 not found"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_833.XXXXXX") || exit 1
 serverpid=
@@ -18,8 +16,7 @@ cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 serverlog="${tmpdir}/server.log"
 : >"$serverlog"
@@ -54,17 +51,14 @@ host = "127.0.0.1_%s" % port
 DOUBLE = "é".encode().decode("latin-1").encode()
 failed = []
 
-
 def check(label, cond):
     print("[%s] ..\t%s" % (label, "OK" if cond else "FAIL"))
     if not cond:
         failed.append(label)
 
-
 def rd(*parts):
     with open(os.path.join(tmpdir, *parts), "rb") as f:
         return f.read()
-
 
 index = rd("u8", "index.html")
 check("charset-less title kept its UTF-8 bytes", "Café-u8".encode() in index)

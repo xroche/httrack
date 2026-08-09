@@ -24,8 +24,7 @@ cleanup() {
     htsserver_cleanup
     rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 printf '[webhttrack emits the WARC options] ..\t'
 htsserver_start --home "${work}"

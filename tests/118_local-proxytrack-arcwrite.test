@@ -6,23 +6,16 @@
 set -euo pipefail
 export LC_ALL=C
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
 cleanup() { rm -rf "$dir"; }
-trap 'set +e; cleanup' EXIT
-trap 'set +e; cleanup; exit 1' HUP INT TERM
+cleanup_push cleanup
 
 # sizeof(PT_SaveCache__Arc_t.headers)
 HDRMAX=8192
 BODY=BODYMARKER
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
 
 pad() { printf "%${1}s" '' | tr ' ' "$2"; }
 

@@ -5,26 +5,17 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 srcdir="${abs_top_srcdir:?not run under make check}"
-test -r "${srcdir}/configure" || {
-    echo "no configure in ${srcdir}; skipping" >&2
-    exit 77
-}
+test -r "${srcdir}/configure" || skip "no configure in ${srcdir}"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/rpathgate.XXXXXX") || {
     echo "no tmpdir" >&2
     exit 1
 }
-trap 'set +e; rm -rf "${work}"' EXIT
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+cleanup_push rm -rf "${work}"
 
 # automake refuses an out-of-tree configure when srcdir holds a config.status,
 # which an in-tree build (CI, dpkg-buildpackage) leaves there; a symlink farm

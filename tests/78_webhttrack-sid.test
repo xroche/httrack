@@ -5,14 +5,12 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/webhttracklib.sh
-. "${testdir}/webhttracklib.sh"
+. "$(dirname "$0")/webhttracklib.sh"
 
 htsserver_require
 
-trap 'set +e; htsserver_cleanup' EXIT
-trap htsserver_cleanup HUP INT QUIT PIPE TERM
+cleanup_push htsserver_cleanup
 
 htsserver_start
 test -n "${HTS_PID}" || fail "htsserver did not report its pid"

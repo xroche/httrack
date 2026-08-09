@@ -5,18 +5,14 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 srcdir=${abs_top_srcdir:?not run under make check}
 builddir=${abs_top_builddir:?not run under make check}
 
 out=
-skip() {
-    echo "$*; skipping" >&2
-    exit 77
-}
+
 fail() {
     echo "FAIL: $*" >&2
     test -z "${out}" || sed 's/^/  | /' <"${out}" >&2
@@ -32,8 +28,7 @@ read -r -a cc_argv <<<"${CC:-cc}"
 command -v "${cc_argv[0]}" >/dev/null || skip "no C compiler (${cc_argv[0]})"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/httrack_nopie.XXXXXX") || exit 1
-trap 'set +e; rm -rf "${work}"' EXIT
-trap 'rm -rf "${work}"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "${work}"
 
 # The crash printer is linked into a probe of our own: every target the build
 # tree offers is a PIE, which is the case that already worked.

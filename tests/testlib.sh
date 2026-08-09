@@ -1,6 +1,61 @@
 #!/bin/bash
 #
-# Helpers shared by the crawl tests. Sourced, not run.
+# Helpers shared by the crawl tests. Sourced, not run: it resolves $testdir and
+# $top_srcdir, so a test opens with its own `set -euo pipefail` and the source
+# line and nothing else. Shell options stay the caller's -- the suite drivers
+# source this too, and errexit would end them on the first failing test.
+
+testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+: "${top_srcdir:=${testdir}/..}"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+# 77 is automake's "skipped", not a failure.
+skip() {
+    echo "$*; skipping" >&2
+    exit 77
+}
+
+# Guard form, so a bare `is_windows && skip ...` cannot end an errexit test that
+# is merely not on Windows.
+skip_on_windows() { ! is_windows || skip "$*"; }
+
+# A literal, not $'..': Apple's bash 3.2 loses quote state on that inside a
+# parameter expansion and the whole file dies of "unexpected EOF".
+TESTLIB_NL='
+'
+
+# First line of $1. A "| head -1" would close the pipe early and, under pipefail,
+# SIGPIPE the producer into a spurious failure.
+firstline() { printf '%s\n' "${1%%"$TESTLIB_NL"*}"; }
+
+# LIFO teardown: cleanup_push CMD ARG... registers a command word and its
+# arguments, expanded now, run in reverse on the way out. The first call installs
+# both traps, the signal half of which most tests never wrote (#773). A command,
+# not a shell snippet: the flat argv below is what keeps this eval-free.
+CLEANUP_ARGV=()
+CLEANUP_FRAMES=()
+cleanup_push() {
+    CLEANUP_FRAMES+=("${#CLEANUP_ARGV[@]}")
+    CLEANUP_ARGV+=("$@")
+    test "${#CLEANUP_FRAMES[@]}" -eq 1 || return 0
+    trap 'set +e; run_cleanups' EXIT
+    trap 'set +e; run_cleanups; exit 1' HUP INT QUIT PIPE TERM
+}
+
+# Drains the stack, so the EXIT trap that follows a signal is a no-op.
+run_cleanups() {
+    local i start
+    for ((i = ${#CLEANUP_FRAMES[@]} - 1; i >= 0; i--)); do
+        start=${CLEANUP_FRAMES[i]}
+        "${CLEANUP_ARGV[@]:start}" || true
+        CLEANUP_ARGV=(${CLEANUP_ARGV[@]+"${CLEANUP_ARGV[@]:0:start}"})
+    done
+    CLEANUP_FRAMES=()
+}
 
 # Python 3 interpreter, or empty: Windows only installs python.exe, and a bare
 # "python" may be 2.x or the Store stub.

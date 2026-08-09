@@ -3,9 +3,8 @@
 # htsserver.
 set -e
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/webhttracklib.sh
-. "${testdir}/webhttracklib.sh"
+. "$(dirname "$0")/webhttracklib.sh"
 
 # The Windows job builds httrack.exe only and reaches this file through its
 # *_local-*.test glob, so report a skip there rather than a pass.
@@ -21,8 +20,7 @@ cleanup() {
     htsserver_cleanup
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 printf '[webhttrack renders the options] ..\t'
 mkdir -p "${tmpdir}/home"

@@ -5,10 +5,8 @@
 
 set -euo pipefail
 
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # input : expected length : expected output
 cases=(
