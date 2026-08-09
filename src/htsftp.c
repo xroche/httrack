@@ -860,11 +860,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             htsblk_failf(&back->r, "PORT command error: %s", linejmp(line));
             back->r.statuscode = STATUSCODE_INVALID;
           }
-#ifdef _WIN32
-          closesocket(soc_servdat);
-#else
-          close(soc_servdat);
-#endif
+          /* invalidate, or the _CHECK_HALT_FTP below re-closes a stale fd */
+          deletesoc(soc_servdat);
+          soc_servdat = INVALID_SOCKET;
         } else {
           strcpybuff(back->r.msg, "Unable to listen to a port");
           back->r.statuscode = STATUSCODE_INVALID;
@@ -961,11 +959,9 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
             strcpybuff(back->r.msg, "Unable to write file");
             back->r.statuscode = STATUSCODE_INVALID;
           }
-#ifdef _WIN32
-          closesocket(soc_dat);
-#else
-          close(soc_dat);
-#endif
+          /* invalidate, or the _CHECK_HALT_FTP below re-closes a stale fd */
+          deletesoc(soc_dat);
+          soc_dat = INVALID_SOCKET;
 
           // 226 Transfer complete?
           if (back->r.statuscode != -1) {
