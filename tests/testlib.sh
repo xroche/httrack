@@ -4,8 +4,12 @@
 # $top_srcdir, and leaves shell options to the caller, since the suite drivers
 # source it too and errexit would end them on the first failing test.
 
+# shellcheck disable=SC2034 # resolved here for the caller, not used here
 testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-: "${top_srcdir:=${testdir}/..}"
+# Relative, as each test spelled it before: 100 hands this path straight to
+# python.exe, which cannot resolve an absolute MSYS one. make check exports its
+# own value, so the default only serves a hand-run and the Windows suite.
+: "${top_srcdir:=..}"
 
 fail() {
     echo "FAIL: $*" >&2
