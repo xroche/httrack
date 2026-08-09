@@ -171,6 +171,10 @@ jobs:
           set -euo pipefail
           jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           tools/hostile-net.sh make check -j"$jobs"
+          # A refusal landing before connect() returns skips on the older probe
+          # instead, leaving the settle this leg exists to guard unrun.
+          cat tests/246_engine-connect-stop.log
+          grep -q 'within 500 ms' tests/246_engine-connect-stop.log
 
       - name: Print the test log on failure
         if: failure()
