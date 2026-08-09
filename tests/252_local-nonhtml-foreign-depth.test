@@ -1,0 +1,125 @@
+#!/bin/bash
+# Issue #121: a link whose URL looks like an asset (".../distorted.jpg") on a
+# foreign host is taken for a file, then the server answers text/html. Its own
+# links are same-host, so scanning it with the referring page's depth budget
+# mirrors that whole site. On the unfixed engine the foreign host yields 3 files
+# under -n and 7 under +*.jpg, against the 1 page it is entitled to.
+set -eu
+
+: "${top_srcdir:=..}"
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_121.XXXXXX") || exit 1
+apid=
+bpid=
+cleanup() {
+    stop_server "$apid"
+    stop_server "$bpid"
+    rm -rf "$tmpdir"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT QUIT PIPE TERM
+
+fail() {
+    echo "FAIL: $1"
+    exit 1
+}
+
+server=$(nativepath "${testdir}/local-server.py")
+mkdir -p "${tmpdir}/aroot" "${tmpdir}/broot"
+
+# The foreign host, answering text/html on every path under /foreign/.
+blog="${tmpdir}/b-server.log"
+: >"$blog"
+"$python" "$server" --root "$(nativepath "${tmpdir}/broot")" \
+    >"$blog" 2>&1 </dev/null &
+bpid=$!
+bport=$(discover_server_port "$blog" "$bpid") || exit 1
+
+# The crawled site: the foreign link, plus a chain of its own the crawl must
+# still walk to the end.
+cat >"${tmpdir}/aroot/index.html" <<EOF
+<html><body>
+<a href="http://127.0.0.1:${bport}/foreign/s/xxx/distorted.jpg">foreign</a>
+<a href="a1.html">local</a>
+</body></html>
+EOF
+printf '<html><body><a href="a2.html">deeper</a></body></html>\n' \
+    >"${tmpdir}/aroot/a1.html"
+printf '<html><body>leaf</body></html>\n' >"${tmpdir}/aroot/a2.html"
+
+alog="${tmpdir}/a-server.log"
+: >"$alog"
+"$python" "$server" --root "$(nativepath "${tmpdir}/aroot")" \
+    >"$alog" 2>&1 </dev/null &
+apid=$!
+aport=$(discover_server_port "$alog" "$apid") || exit 1
+
+which httrack >/dev/null || fail "could not find httrack"
+
+crawl() { # crawl <label> [httrack args...]
+    local label=$1
+    shift
+    httrack "http://127.0.0.1:${aport}/index.html" -O "${tmpdir}/out-${label}" \
+        --quiet --max-time=120 --timeout=30 --robots=0 "$@" \
+        >"${tmpdir}/crawl-${label}.log" 2>&1 || fail "crawl ${label} failed"
+}
+
+mirrored() { # mirrored <label> <port>
+    local dir="${tmpdir}/out-$1/127.0.0.1_$2"
+    test -d "$dir" || return 0
+    find "$dir" -type f | sed "s#^${dir}/##" | sort
+}
+
+check() { # check <label> <host port> <expected listing>
+    local got
+    got=$(mirrored "$1" "$2")
+    test "$got" = "$3" || fail "$1: mirror of 127.0.0.1:$2 holds
+${got}
+expected
+$3"
+}
+
+# One page, plus the .readme the store-without-scan path leaves beside it.
+kept="foreign/s/xxx/distorted.html
+foreign/s/xxx/distorted.html.readme"
+# What scanning that page reaches: the server's chain and its embedded image.
+scanned="foreign/s/xxx/c1.html
+foreign/s/xxx/c2.html
+foreign/s/xxx/c3.html
+foreign/s/xxx/c4.html
+foreign/s/xxx/c5.html
+foreign/s/xxx/distorted.html
+foreign/s/xxx/pic.html"
+# Negative control: same-host recursion is untouched and still reaches a2.
+local_pages="a1.html
+a2.html
+index.html"
+
+# Near links (-n), then the scan rule WinHTTrack ships by default.
+crawl near -n
+check near "$bport" "$kept"
+check near "$aport" "$local_pages"
+test -s "${tmpdir}/out-near/127.0.0.1_${bport}/foreign/s/xxx/distorted.html" ||
+    fail "the foreign page was not stored"
+
+crawl jpg '+*.jpg'
+check jpg "$bport" "$kept"
+check jpg "$aport" "$local_pages"
+
+crawl jpgnear -n '+*.jpg'
+check jpgnear "$bport" "$kept"
+
+# A rule naming the host asks for that site: it keeps its depth and is scanned.
+crawl hostrule "+127.0.0.1:${bport}/*"
+check hostrule "$bport" "$scanned"
+check hostrule "$aport" "$local_pages"
+
+# Without either, the foreign link is out of scope to begin with.
+crawl none
+check none "$bport" ""
+check none "$aport" "$local_pages"

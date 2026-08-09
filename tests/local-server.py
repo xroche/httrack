@@ -2441,6 +2441,21 @@ class Handler(SimpleHTTPRequestHandler):
             "text/html; charset=" + self.SINGLEFILE_MARK_CHARSET,
         )
 
+    # A host answering text/html on every path whatever the extension, like the
+    # dropbox preview page of #121; the chain is what scanning one would pull in.
+    FOREIGN_CHAIN = 5
+
+    def route_foreign(self):
+        name = urlsplit(self.path).path.rsplit("/", 1)[-1]
+        step = re.fullmatch(r"c(\d+)\.html", name)
+        n = int(step.group(1)) if step else 0
+        if name == "pic.png" or n >= self.FOREIGN_CHAIN:
+            self.send_html("")
+        else:
+            self.send_html(
+                '\t<a href="c%d.html">next</a>\n\t<img src="pic.png" />\n' % (n + 1)
+            )
+
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
         "/cookies/entrance.php": route_entrance,
@@ -2840,6 +2855,9 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path.startswith("/big/"):
             self.route_big()
+            return True
+        if path.startswith("/foreign/"):
+            self.route_foreign()
             return True
         if path.startswith("/charset/"):
             self.route_charset()
