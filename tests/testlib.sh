@@ -29,7 +29,7 @@ make_tls_pem() {
     local dir=$1 src
     src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
     cat "$src/server.key" "$src/server.crt" >"$dir/both.pem" || {
-        echo "FAIL: cannot read the test cert fixture under $src" >&2
+        echo "FAIL: could not write $dir/both.pem from the fixture in $src" >&2
         exit 1
     }
 }
