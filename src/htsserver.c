@@ -1509,8 +1509,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
                           StringClear(tmpbuff);
                           if (format == 2) {
-                            /* the loop below only ever opens ids 2 and up, so
-                               the first option needs its own default check */
+                            /* Check the default here too: the loop only opens
+                             * ids 2 and up. */
                             StringCat(output, listDefault == 1
                                                   ? "<option value=1 selected>"
                                                   : "<option value=1>");
