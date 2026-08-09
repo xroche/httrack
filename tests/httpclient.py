@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Raw HTTP/1.0 client for the htsserver tests.
 
-Speaks the socket directly rather than through urllib: the tests assert on the
-status line and on header bytes urllib parses away, and they need a reply even
-when the server answers with a headerless fragment.
+Speaks the socket directly: the tests assert on status-line and header bytes
+urllib parses away, and need a reply even from a headerless fragment.
 """
 import argparse
 import socket

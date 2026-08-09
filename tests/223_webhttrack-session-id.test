@@ -19,9 +19,8 @@ cleanup() {
 trap 'set +e; cleanup' EXIT
 trap cleanup HUP INT QUIT PIPE TERM
 
-launch() { # $1 = tag; leaves the URL in ${HTS_URL}
-    mkdir -p "${work}/$1"
-    htsserver_start --home "${work}/$1" --log "${work}/$1.log"
+launch() { # $1 = tag, $2 = port; leaves the URL in ${HTS_URL}
+    htsserver_start --port "$2" --home "${work}/$1" --log "${work}/$1.log"
 }
 
 # Both servers have to read the same second off the clock, or the id they used
@@ -31,14 +30,18 @@ urla=
 urlb=
 for _ in $(seq 1 10); do
     rm -f "${work}"/*.log
+    mkdir -p "${work}/a" "${work}/b"
+    # Both ports up front: a python fork apiece inside the window below is most
+    # of it, and picking them together is what keeps the two apart.
+    read -r porta portb <<<"$(htsserver_freeport 2)"
     prev=$(date +%s)
     while test "$(date +%s)" = "${prev}"; do
         sleep 0.02
     done
     t0=$(date +%s)
-    launch a
+    launch a "${porta}"
     urla=${HTS_URL}
-    launch b
+    launch b "${portb}"
     urlb=${HTS_URL}
     t1=$(date +%s)
     test "${t0}" != "${t1}" || break

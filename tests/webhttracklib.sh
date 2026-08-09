@@ -17,29 +17,54 @@ fail() {
     exit 1
 }
 
+# 77 is automake's "skipped", not a failure.
 skip() {
     echo "$*; skipping" >&2
     exit 77
 }
 
-# First line of $1. A "| head -1" would close the pipe early and, under
-# pipefail, SIGPIPE the producer into a spurious failure.
-firstline() { printf '%s\n' "${1%%$'\n'*}"; }
+# Literals, not $'..': Apple's bash 3.2 loses quote state on that inside a
+# parameter expansion, and 21 tests source this file.
+HTS_NL='
+'
+HTS_CR=$(printf '\r')
 
-# What every test here needs. The Debian buildd chroot has no python3, so that
-# one skips rather than reds.
+# First line of $1. A "| head -1" would close the pipe early and, under pipefail,
+# SIGPIPE the producer into a spurious failure.
+firstline() { printf '%s\n' "${1%%"$HTS_NL"*}"; }
+
+# htsserver, plus a python3 the Debian buildd chroot may not have: that one skips.
 htsserver_require() {
     command -v htsserver >/dev/null || fail "no htsserver in PATH"
     HTS_PYTHON=$(find_python) || skip "python3 not found"
 }
 
-# A free loopback port; the socket is closed before htsserver rebinds it.
+# $1 free loopback ports (default 1), space separated. Bound together, so two
+# of them always differ; each is closed before htsserver rebinds it.
+# shellcheck disable=SC2120 # one port is the common case
 htsserver_freeport() {
-    "${HTS_PYTHON}" -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()'
+    "${HTS_PYTHON}" -c 'import socket, sys
+socks = [socket.socket() for _ in range(int(sys.argv[1]))]
+for s in socks:
+    s.bind(("127.0.0.1", 0))
+print(" ".join(str(s.getsockname()[1]) for s in socks))
+for s in socks:
+    s.close()' "${1:-1}"
+}
+
+# First URL= and PID= of the announcement, or empty. Windows announces no pid.
+htsserver_announced() {
+    local line
+    HTS_URL=
+    HTS_PID=
+    test -r "${HTS_LOG}" || return 0
+    while read -r line; do
+        line=${line%"$HTS_CR"}
+        case ${line} in
+        URL=*) test -n "${HTS_URL}" || HTS_URL=${line#URL=} ;;
+        PID=*) test -n "${HTS_PID}" || HTS_PID=${line#PID=} ;;
+        esac
+    done <"${HTS_LOG}"
 }
 
 # The server process; reads htsserver_start's locals and its background stdout.
@@ -58,10 +83,12 @@ htsserver_exec() {
 #   --root DIR       tree to serve (default: the dist root)
 #   --home DIR       $HOME for the server, so no ~/.httrack.ini leaks in
 #   --log FILE       where the announcement lands (default: a temp file)
-#   --write-limit N  ulimit -f N; the announcement then rides a pipe, exempt
+#   --port N         a port already picked, to keep the fork out of a
+#                    window the caller is timing
+#   --write-limit N  ulimit -f N; the log rides a pipe, which the cap spares
 # shellcheck disable=SC2120 # most callers need no htsserver argument
 htsserver_start() {
-    local root=${HTS_DISTDIR} home='' log='' wlimit=''
+    local root=${HTS_DISTDIR} home='' log='' wlimit='' port=''
     while test $# -gt 0; do
         case $1 in
         --root)
@@ -80,6 +107,10 @@ htsserver_start() {
             wlimit=$2
             shift 2
             ;;
+        --port)
+            port=$2
+            shift 2
+            ;;
         --)
             shift
             break
@@ -88,7 +119,9 @@ htsserver_start() {
         esac
     done
 
-    HTS_PORT=$(htsserver_freeport) || fail "no free loopback port"
+    HTS_PORT=${port}
+    test -n "${HTS_PORT}" ||
+        HTS_PORT=$(htsserver_freeport) || fail "no free loopback port"
     if test -z "${log}"; then
         log=$(mktemp)
         HTS_TMP_LOGS+=("${log}")
@@ -96,23 +129,27 @@ htsserver_start() {
     HTS_LOG=${log}
     : >"${HTS_LOG}"
     if test -n "${wlimit}"; then
-        htsserver_exec "$@" | cat >"${HTS_LOG}" &
+        # Process substitution, not a pipeline: $! must be the server. In a
+        # pipeline it is the reader, so a start that never announces leaves the
+        # server unkilled and parks the reaping wait on the whole job.
+        htsserver_exec "$@" > >(cat >"${HTS_LOG}") &
     else
         htsserver_exec "$@" >"${HTS_LOG}" &
     fi
     HTS_BGPID=$!
     HTS_BG_PIDS+=("${HTS_BGPID}")
 
-    HTS_URL=
-    for _ in $(seq 1 40); do
-        HTS_URL=$(sed -n 's/^URL=//p' "${HTS_LOG}" 2>/dev/null | tr -d '\r') &&
-            test -n "${HTS_URL}" && break
+    # A sed and a sleep per tick is a process per tick (#795), and the deadline
+    # self-extends rather than expiring on a loaded parallel run.
+    local start=$SECONDS
+    while :; do
+        htsserver_announced
+        test -z "${HTS_URL}" || break
         kill -0 "${HTS_BGPID}" 2>/dev/null || break
-        sleep 0.25
+        test "$((SECONDS - start))" -lt 60 || break
+        poll_wait 0.1
     done
     test -n "${HTS_URL}" || fail "htsserver did not come up: $(cat "${HTS_LOG}")"
-    HTS_URL=$(firstline "${HTS_URL}")
-    HTS_PID=$(firstline "$(sed -n 's/^PID=//p' "${HTS_LOG}" | tr -d '\r')")
     test -z "${HTS_PID}" || HTS_SRV_PIDS+=("${HTS_PID}")
 }
 
@@ -120,7 +157,8 @@ htsserver_start() {
 # htsserver_assert_reaped. Safe from a cleanup trap, and safe to call twice.
 htsserver_stop() {
     local pid
-    HTS_REAPED_PIDS=(${HTS_BG_PIDS[@]+"${HTS_BG_PIDS[@]}"})
+    HTS_REAPED_PIDS=(${HTS_BG_PIDS[@]+"${HTS_BG_PIDS[@]}"}
+        ${HTS_SRV_PIDS[@]+"${HTS_SRV_PIDS[@]}"})
     # Grouped: bash announces a killed job at any command boundary, so the
     # notice escapes a redirect on the wait alone once there are two servers.
     {
@@ -129,7 +167,7 @@ htsserver_stop() {
             kill -9 "${pid}" 2>/dev/null || true
         done
         for pid in ${HTS_BG_PIDS[@]+"${HTS_BG_PIDS[@]}"}; do
-            wait "${pid}" || true
+            reap_bounded "${pid}" || true
         done
     } 2>/dev/null
     HTS_SRV_PIDS=()
@@ -147,6 +185,7 @@ htsserver_cleanup() {
 # A leaked htsserver wedges the parallel harness behind a green log.
 htsserver_assert_reaped() {
     local pid
+    test "${#HTS_REAPED_PIDS[@]}" -gt 0 || fail "nothing was reaped to assert on"
     for pid in ${HTS_REAPED_PIDS[@]+"${HTS_REAPED_PIDS[@]}"}; do
         ! kill -0 "${pid}" 2>/dev/null || fail "htsserver ${pid} survived"
     done
