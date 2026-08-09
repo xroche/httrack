@@ -56,8 +56,10 @@ Please visit our Website: http://www.httrack.com
 #endif
 #endif
 
-// ftp mode passif
+// Passive FTP; overridable only so CI can compile the active branch (#1091).
+#ifndef FTP_PASV
 #define FTP_PASV 1
+#endif
 
 #define FTP_DEBUG 0
 

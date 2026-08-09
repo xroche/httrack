@@ -38,7 +38,9 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          # Advisory: a 403 from a runner-image repo we never install from must not
+          # red the job (#1097); the install below still fails loudly.
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
@@ -80,6 +82,20 @@ jobs:
       - name: Build
         run: make -j"$(nproc)"
 
+      # Nothing in the tree sets FTP_PASV=0, so the #if !FTP_PASV active-mode
+      # branch never reaches a compiler and rots unnoticed (#1091).
+      - name: Compile the FTP active-mode branch (-DFTP_PASV=0)
+        run: |
+          set -euo pipefail
+          objs="src/libhttrack_la-htsftp.lo src/libhttrack_la-htsftp.o
+                src/.libs/libhttrack_la-htsftp.o"
+          # Build left them up to date, so without this make skips the compile.
+          rm -f $objs
+          # -O2 so the flow-sensitive warnings fire; through make so the warning
+          # set configure probed for this compiler is the one applied.
+          make -C src libhttrack_la-htsftp.lo CFLAGS="-O2 -DFTP_PASV=0 -Werror"
+          rm -f $objs  # leave no active-mode object for `make check` to link
+
       # A backstop only: tests/test-timeout.sh bounds each test, and a healthy run
       # is a minute here, two on macOS. Without it a stall ran to the job's 6h default.
       - name: Test
@@ -108,7 +124,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -151,7 +167,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          apt-get update
+          apt-get update || true
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
@@ -292,7 +308,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -401,7 +417,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo dpkg --add-architecture i386
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential gcc-multilib autoconf automake libtool \
             autoconf-archive zlib1g-dev:i386 libssl-dev:i386 \
@@ -444,7 +460,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -499,7 +515,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev
@@ -548,7 +564,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -584,7 +600,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -614,7 +630,7 @@ jobs:
       - name: Install build dependencies (no libssl)
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive zlib1g-dev
 
@@ -651,7 +667,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -685,7 +701,7 @@ jobs:
       - name: Install packaging toolchain
         run: |
           set -euo pipefail
-          apt-get update
+          apt-get update || true
           apt-get install -y --no-install-recommends \
             ca-certificates git \
             build-essential autoconf automake libtool autoconf-archive \
@@ -730,7 +746,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -800,7 +816,7 @@ jobs:
       - name: Install linters
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true
           # noble ships shfmt 3.8.0 (universe), matching the pinned local dev
           # version; use it rather than fetching a release binary from github.com.
           sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
@@ -859,7 +875,7 @@ jobs:
             | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
           echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" \
             | sudo tee /etc/apt/sources.list.d/llvm-19.list >/dev/null
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends clang-format-19
           # The clang-format-19 package ships the git-clang-format driver;
           # expose it unsuffixed so "git clang-format" finds it.

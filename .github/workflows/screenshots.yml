@@ -34,7 +34,8 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          # Advisory: a flaky third-party runner-image repo must not red the job (#1097).
+          sudo apt-get update || true
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev

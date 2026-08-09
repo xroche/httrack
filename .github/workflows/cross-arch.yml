@@ -54,7 +54,8 @@ jobs:
           # the same source carrying two spellings of the keyring.
           sed -i 's/^Types: deb$/Types: deb deb-src/' \
             /etc/apt/sources.list.d/debian.sources
-          apt-get update
+          # Advisory: a flaky third-party runner-image repo must not red the job (#1097).
+          apt-get update || true
           apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             dpkg-dev git ca-certificates \
