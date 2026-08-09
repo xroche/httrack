@@ -233,4 +233,39 @@ wedge_leg >"$tmp/wedge.log" 2>&1 || {
     exit 1
 }
 
+# A sleep still holding the step's stdout keeps its reader waiting for EOF past the
+# trap that killed the heartbeat (#949); 171 shims sleep, forks nothing, is blind to it.
+fd_tick=15
+fd_kill=$tmp/fd-killed
+
+# Seconds between the producer's own kill and the reader seeing EOF.
+eof_latency() {
+    "$1" 2>>"$tmp/fd.err" | cat >"$tmp/fd.out"
+    echo $(($(date +%s) - $(cat "$fd_kill")))
+}
+
+# What the driver's EXIT trap does: signal the heartbeat shell mid-tick and let go.
+fd_leg() (
+    printf 'RUN 99_fd.test at 0s\n' >"$tmp/fd-progress.log"
+    sleep 30 >/dev/null 2>&1 & # a pid for the wedge branch, which cannot fire here
+    victim=$!
+    ci_suite_heartbeat 100000 "$fd_tick" "$tmp/fd-progress.log" 100000 "$victim" &
+    hb=$!
+    sleep 2 # well inside the first tick
+    date +%s >"$fd_kill"
+    kill "$hb" "$victim" 2>/dev/null || :
+)
+
+# Positive control: the same reader, against a child that does keep the pipe.
+fd_holder() (
+    sleep 6 &
+    date +%s >"$fd_kill"
+)
+
+lat=$(eof_latency fd_holder)
+test "$lat" -ge 3 || fail "EOF ${lat}s after a child kept the pipe: the reader cannot see one"
+lat=$(eof_latency fd_leg)
+test "$lat" -le 4 ||
+    fail "EOF ${lat}s after the heartbeat died: its sleep inherited the caller's stdout"
+
 echo "ci-windows driver OK"
