@@ -1,0 +1,128 @@
+#!/bin/bash
+#
+# The language menu must mark the language the page is actually rendered in,
+# index 1 included: the first option is opened before the loop carrying the
+# default. Asserting the menu alone cannot tell that from echoing the request.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+fail() {
+    echo "FAIL: $*" >&2
+    exit 1
+}
+
+command -v htsserver >/dev/null || fail "no htsserver in PATH"
+python=$(find_python) || {
+    echo "python3 not found; skipping" >&2
+    exit 77
+}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_lang.XXXXXX") || fail "no tmpdir"
+pids=
+cleanup() {
+    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
+    for p in ${pids}; do
+        kill -9 "${p}" 2>/dev/null || true
+    done
+    wait 2>/dev/null || true # absorb bash's async "Killed" notice
+    rm -rf "${work}"
+}
+trap 'set +e; cleanup' EXIT
+trap cleanup HUP INT QUIT PIPE TERM
+
+# Sets ${url}; it must not print it, or a caller's $(...) would collect ${pids} in a
+# subshell and leave every server running.
+url=
+serve() { # $1 = tag, $2.. = extra htsserver args
+    local log port
+    log="${work}/srv$1.log"
+    mkdir -p "${work}/h$1"
+    # An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
+    port=$("${python}" -c 'import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()')
+    local tag=$1
+    shift
+    (
+        trap '' TERM TTOU
+        export HOME="${work}/h${tag}"
+        exec htsserver "${distdir}/" --port "${port}" "$@" >"${log}" 2>&1
+    ) &
+    pids="${pids} $!"
+    url=
+    for _ in $(seq 1 40); do
+        url=$(sed -n 's/^URL=//p' "${log}") && test -n "${url}" && break
+        sleep 0.25
+    done
+    test -n "${url}" || fail "htsserver did not start: $(cat "${log}")"
+}
+
+# Indexes and labels come from lang.indexes and lang.def, not from observed output.
+# The heading word is that language's own greeting, so it proves which language
+# the body was rendered in.
+check() { # $1 = lang index, $2 = expected label, $3 = word in the page heading
+    serve "$1" lang "$1"
+    "${python}" - "${url}" "$1" "$2" "$3" <<'PY' || fail "wrong menu or body for language $2"
+import re, sys, urllib.request
+
+url, want_id, want_label, want_word = sys.argv[1:5]
+page = urllib.request.urlopen(url, timeout=20).read().decode("utf-8", "replace")
+block = re.search(r'<select name="lang".*?</select>', page, re.S)
+if not block:
+    sys.exit("no language <select> in the page")
+opts = re.findall(r"<option value=(\d+)( selected)?>([^<]*)</option>", block.group(0))
+# A menu that failed to expand would satisfy every check below vacuously.
+if len(opts) < 20:
+    sys.exit("only %d options: the list did not expand" % len(opts))
+selected = [(i, label) for i, sel, label in opts if sel]
+if len(selected) != 1:
+    sys.exit("expected exactly one selected option, got %r" % (selected,))
+got_id, got_label = selected[0]
+if got_id != want_id or got_label != want_label:
+    sys.exit("selected %s/%r, wanted %s/%r" % (got_id, got_label, want_id, want_label))
+# The menu must follow the language in force, not merely echo the request.
+heading = re.search(r"<h2[^>]*><em>([^<]*)</em>", page)
+if not heading:
+    sys.exit("no welcome heading in the page")
+if want_word not in heading.group(1):
+    sys.exit("body heading %r does not carry %r" % (heading.group(1), want_word))
+PY
+}
+
+# 1 is the boundary the loop cannot reach; 2 and 4 prove it tracks the input.
+check 1 English Welcome
+check 2 Francais Bienvenue
+check 4 Deutsch Willkommen
+
+# With no language set the menu falls back to its first entry, which must be the
+# one the page is rendered in. An empty placeholder option would show up blank.
+serve unset
+"${python}" - "${url}" <<'PY' || fail "unset language does not fall back to English"
+import re, sys, urllib.request
+
+page = urllib.request.urlopen(sys.argv[1], timeout=20).read().decode("utf-8", "replace")
+block = re.search(r'<select name="lang".*?</select>', page, re.S)
+if not block:
+    sys.exit("no language <select> in the page")
+opts = re.findall(r"<option value=(\d+)( selected)?>([^<]*)</option>", block.group(0))
+if len(opts) < 20:
+    sys.exit("only %d options: the list did not expand" % len(opts))
+blank = [i for i, _, label in opts if not label.strip()]
+if blank:
+    sys.exit("placeholder option(s) %r would render the menu blank" % (blank,))
+if opts[0][0] != "1" or opts[0][2] != "English":
+    sys.exit("first option is %r, wanted 1/English" % (opts[0],))
+heading = re.search(r"<h2[^>]*><em>([^<]*)</em>", page)
+if not heading or "Welcome" not in heading.group(1):
+    sys.exit("body is not English: %r" % (heading and heading.group(1),))
+PY
+
+echo "PASS"
