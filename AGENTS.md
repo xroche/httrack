@@ -46,6 +46,15 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   platform-specific: GNU `tail | head -c 3` survives, the uutils coreutils leg
   turns the same line into exit 141 with no output at all. Let the reader seek
   instead: `od -An -c -j <skip> -N <len> file`.
+- Never assert a fault by signal *number*: SIGBUS is 7 on x86, arm, powerpc and
+  s390x but 10 on hppa, alpha, mips and sparc. Map it with `kill -l "$n"` and
+  match the name. 183 failed on the hppa buildd for pinning `Caught signal 11`.
+- A fixture that needs a host to stay silent must settle (500ms), re-probe every
+  socket, and SKIP when one answered. The powerpc and ppc64 buildds refuse
+  TEST-NET-1 milliseconds after `connect()` where runners drop it, too late for
+  a probe taken the instant `connect()` returned (#1108). `tools/hostile-net.sh
+  make check` runs the suite on such a network; the `build (network refuses
+  TEST-NET-1)` CI leg is that same script.
 
 ## Hard invariants
 - **Generated autotools files are NOT in git.** `configure`, every

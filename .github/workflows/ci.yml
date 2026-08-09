@@ -138,6 +138,46 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # Several fixtures need a connect to TEST-NET-1 to stall. Runners drop it, the
+  # powerpc and ppc64 buildds refuse it a few ms later, and that gap failed
+  # 246_engine-connect-stop on both (#1108). tools/hostile-net.sh reproduces the
+  # refusing network; every dead-host test must skip under it, never fail.
+  hostile-network:
+    name: build (network refuses TEST-NET-1)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev iproute2
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test on a network that refuses TEST-NET-1
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          tools/hostile-net.sh make check -j"$jobs"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
   # The Ubuntu buildds run a development release every runner above is well behind.
   # That gap is what shipped 3.49.18 broken on every Ubuntu architecture but
   # riscv64, when 25.10 made uutils the default coreutils (#1042).
@@ -790,10 +830,7 @@ jobs:
         src/webhttrack.in
         tests/*.sh
         tests/*.test
-        tools/macos-app.sh
-        tools/macos-bundle.sh
-        tools/macos-release.sh
-        tools/mkdeb.sh
+        tools/*.sh
     steps:
       - uses: actions/checkout@v7
 
