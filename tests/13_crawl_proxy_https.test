@@ -16,8 +16,8 @@ if test "${HTTPS_SUPPORT:-}" == "no"; then
     exit 77
 fi
 python=$(find_python) || python=
-if test -z "$python" || ! command -v openssl >/dev/null 2>&1; then
-    echo "python3/openssl missing, skipping"
+if test -z "$python"; then
+    echo "python3 missing, skipping"
     exit 77
 fi
 

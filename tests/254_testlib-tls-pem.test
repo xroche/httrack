@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# A cert fixture that fails must say why: discarding openssl's output left tests
-# 13 and 52 exiting 1 with an empty log (#1094).
+# make_tls_pem must hand back the shipped cert and key, not mint one.
 
 set -euo pipefail
 
@@ -9,11 +8,6 @@ set -euo pipefail
 testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
 . "${testdir}/testlib.sh"
-
-command -v openssl >/dev/null 2>&1 || {
-    echo "openssl not found; skipping" >&2
-    exit 77
-}
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tlspem.XXXXXX")
 trap 'set +e; rm -rf "$tmpdir"' EXIT
@@ -24,53 +18,23 @@ fail() {
 }
 ok() { echo "OK: $*"; }
 
-# The working case first: a helper that never produces anything would otherwise
-# satisfy the failure case on its own.
-good="$tmpdir/good"
-mkdir -p "$good"
-make_tls_pem "$good"
-# awk, not grep piped into head: the pipe would SIGPIPE the reader.
-keyline=$(awk '/BEGIN .*PRIVATE KEY/ { print NR; exit }' "$good/both.pem")
-certline=$(awk '/BEGIN CERTIFICATE/ { print NR; exit }' "$good/both.pem")
-test -n "$keyline" || fail "both.pem has no private key"
-test -n "$certline" || fail "both.pem has no certificate"
-# load_cert_chain() in the callers' servers reads this order.
-test "$keyline" -lt "$certline" || fail "both.pem holds the certificate before the key"
-ok "make_tls_pem writes a key and then a certificate"
+make_tls_pem "$tmpdir"
 
-# Shim in an openssl that refuses, and require its reason to reach stderr.
-marker="openssl-stub-declined-to-issue"
-stub="$tmpdir/bin"
-broken="$tmpdir/broken"
-mkdir -p "$stub" "$broken"
-# The stub still writes the files it was asked for, so nothing but the helper's
-# own exit can make the status below non-zero.
-cat >"$stub/openssl" <<EOF
-#!/bin/sh
-while [ \$# -gt 0 ]; do
-    case \$1 in
-    -keyout | -out)
-        : >"\$2"
-        shift
-        ;;
-    esac
-    shift
-done
-echo "${marker}" >&2
-exit 3
-EOF
-chmod +x "$stub/openssl"
+# The shipped pair verbatim, key first, and not a fixture minted per run (#1099).
+cat "${testdir}/server.key" "${testdir}/server.crt" >"$tmpdir/want.pem"
+cmp -s "$tmpdir/both.pem" "$tmpdir/want.pem" ||
+    fail "both.pem is not tests/server.key followed by tests/server.crt"
+ok "make_tls_pem writes the shipped key and certificate"
 
-rc=0
-err=$(
-    PATH="$stub:$PATH"
-    make_tls_pem "$broken" 2>&1 1>/dev/null
-) || rc=$?
-
-# Also proves the shim was reached: the real openssl here would exit 0.
-test "$rc" -eq 1 || fail "make_tls_pem exited ${rc}, want 1, with an openssl that exits 3"
-case "$err" in
-*"$marker"*) ;;
-*) fail "openssl's reason never reached stderr, got: '${err}'" ;;
-esac
-ok "a failing openssl is reported on stderr"
+# What the callers' servers actually do with it: a cert whose key does not match
+# passes the comparison above and still fails here.
+python=$(find_python) || python=
+if test -z "$python"; then
+    echo "python3 missing, skipping the load_cert_chain check"
+    exit 0
+fi
+"$python" -c 'import ssl, sys
+ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER).load_cert_chain(sys.argv[1])' \
+    "$(nativepath "$tmpdir/both.pem")" ||
+    fail "load_cert_chain rejected both.pem"
+ok "load_cert_chain accepts both.pem"
