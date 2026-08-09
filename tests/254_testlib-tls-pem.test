@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# The TLS fixture the crawl tests hand their python servers: the shipped cert
-# and key in one file, key first, the order load_cert_chain() documents.
+# make_tls_pem must hand back the shipped cert and key, not mint one.
 
 set -euo pipefail
 
@@ -21,19 +20,21 @@ ok() { echo "OK: $*"; }
 
 make_tls_pem "$tmpdir"
 
-# awk, not grep piped into head: the pipe would SIGPIPE the reader.
-keyline=$(awk '/BEGIN .*PRIVATE KEY/ { print NR; exit }' "$tmpdir/both.pem")
-certline=$(awk '/BEGIN CERTIFICATE/ { print NR; exit }' "$tmpdir/both.pem")
-test -n "$keyline" || fail "both.pem has no private key"
-test -n "$certline" || fail "both.pem has no certificate"
-test "$keyline" -lt "$certline" || fail "both.pem holds the certificate before the key"
-ok "make_tls_pem writes a key and then a certificate"
+# The shipped pair verbatim, key first, and not a fixture minted per run (#1099).
+cat "${testdir}/server.key" "${testdir}/server.crt" >"$tmpdir/want.pem"
+cmp -s "$tmpdir/both.pem" "$tmpdir/want.pem" ||
+    fail "both.pem is not tests/server.key followed by tests/server.crt"
+ok "make_tls_pem writes the shipped key and certificate"
 
-# The shipped pair verbatim, not a fixture minted per run (#1099).
-awk -v start="$certline" 'NR >= start' "$tmpdir/both.pem" >"$tmpdir/cert.pem"
-cmp -s "$tmpdir/cert.pem" "${testdir}/server.crt" ||
-    fail "both.pem does not carry tests/server.crt"
-awk -v end="$certline" 'NR < end' "$tmpdir/both.pem" >"$tmpdir/key.pem"
-cmp -s "$tmpdir/key.pem" "${testdir}/server.key" ||
-    fail "both.pem does not carry tests/server.key"
-ok "make_tls_pem hands back the shipped cert and key"
+# What the callers' servers actually do with it: a cert whose key does not match
+# passes the comparison above and still fails here.
+python=$(find_python) || python=
+if test -z "$python"; then
+    echo "python3 missing, skipping the load_cert_chain check"
+    exit 0
+fi
+"$python" -c 'import ssl, sys
+ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER).load_cert_chain(sys.argv[1])' \
+    "$(nativepath "$tmpdir/both.pem")" ||
+    fail "load_cert_chain rejected both.pem"
+ok "load_cert_chain accepts both.pem"

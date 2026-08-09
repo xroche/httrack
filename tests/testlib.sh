@@ -24,8 +24,7 @@ nativepath() {
     fi
 }
 
-# The shipped cert and key joined into $1/both.pem, the single path
-# load_cert_chain() takes, key first as it documents.
+# Key before cert in $1/both.pem, the single path load_cert_chain() takes.
 make_tls_pem() {
     local dir=$1 src
     src=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
