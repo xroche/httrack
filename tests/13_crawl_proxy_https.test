@@ -34,10 +34,7 @@ cleanup() {
 trap 'set +e; cleanup' EXIT
 
 # self-signed cert for the local TLS origin (httrack does not verify certs)
-openssl req -x509 -newkey rsa:2048 -keyout "$tmpdir/key.pem" \
-    -out "$tmpdir/cert.pem" -days 2 -nodes -subj "/CN=127.0.0.1" \
-    >/dev/null 2>&1
-cat "$tmpdir/key.pem" "$tmpdir/cert.pem" >"$tmpdir/both.pem"
+make_tls_pem "$tmpdir"
 
 # start_server <logdir> <mode>: launches a proxy+origin pair, sets $origin_port
 # and $proxy_port from its announced ephemeral ports.
