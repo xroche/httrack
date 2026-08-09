@@ -247,11 +247,15 @@ eof_latency() {
 # What the driver's EXIT trap does: signal the heartbeat shell mid-tick and let go.
 fd_leg() (
     printf 'RUN 99_fd.test at 0s\n' >"$tmp/fd-progress.log"
+    rm -f "$tmp/fd-dead"
     sleep 30 >/dev/null 2>&1 & # a pid for the wedge branch, which cannot fire here
     victim=$!
     ci_suite_heartbeat 100000 "$fd_tick" "$tmp/fd-progress.log" 100000 "$victim" &
     hb=$!
     sleep 2 # well inside the first tick
+    # A heartbeat that ended early forks no sleep and gives a prompt EOF too, so the
+    # verdict below would be vacuous. Marked, not failed: this is a subshell.
+    kill -0 "$hb" 2>/dev/null || : >"$tmp/fd-dead"
     date +%s >"$fd_kill"
     kill "$hb" "$victim" 2>/dev/null || :
 )
@@ -265,6 +269,8 @@ fd_holder() (
 lat=$(eof_latency fd_holder)
 test "$lat" -ge 3 || fail "EOF ${lat}s after a child kept the pipe: the reader cannot see one"
 lat=$(eof_latency fd_leg)
+test ! -e "$tmp/fd-dead" ||
+    fail "the heartbeat was already dead at the kill, so a prompt EOF proves nothing"
 test "$lat" -le 4 ||
     fail "EOF ${lat}s after the heartbeat died: its sleep inherited the caller's stdout"
 
