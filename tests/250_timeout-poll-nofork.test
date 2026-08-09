@@ -41,16 +41,17 @@ cat >"$tmp/child.sh" <<'EOF'
 #!/bin/bash
 trap 'exit 0' TERM INT
 echo "$$" >"$PIDFILE"
-end=$((SECONDS + 5))
+end=$((SECONDS + ${CHILDLIFE:-5}))
 while test "$SECONDS" -lt "$end"; do :; done
 EOF
 
 # 60s, so a deadline firing in place of the guard shows up as a stall and a DUMP
 # line rather than as the same 124.
 run_timeout() {
-    local bin=$1 log=$2
+    local bin=$1 log=$2 life=${3:-5}
     env PATH="$bin:$PATH" \
         TICKFILE="$tmp/ticks" PIDFILE="$tmp/childpid" \
+        CHILDLIFE="$life" \
         HTTRACK_POLL_SLEEP=1 \
         HTTRACK_TEST_TIMEOUT=60 \
         HTTRACK_PROGRESS_LOG="$tmp/progress" \
@@ -61,7 +62,9 @@ run_timeout() {
 : >"$tmp/childpid"
 began=$SECONDS
 rc=0
-run_timeout "$tmp/dead" "$tmp/broken.log" || rc=$?
+# 20s of insurance, not 5: the kill is asserted with a 5s wait below, and a child
+# expiring on its own budget inside that window would read as a successful kill.
+run_timeout "$tmp/dead" "$tmp/broken.log" 20 || rc=$?
 spent=$((SECONDS - began))
 
 test "$rc" -eq 124 || fail "a tick that never waits exited $rc, not 124: $(cat "$tmp/broken.log")"
@@ -76,7 +79,10 @@ grep -q '^DUMP ' "$tmp/progress" && fail "the loop ran to its 60s deadline, not 
 test "$spent" -lt 30 || fail "took ${spent}s to give up on a tick that returns at once"
 childpid=$(cat "$tmp/childpid")
 test -n "$childpid" || fail "the child never started"
-kill -0 "$childpid" 2>/dev/null && fail "giving up left the wedged test running as $childpid"
+# Bounded, not instantaneous: the give-up branch skips reap_bounded on purpose, so
+# it returns with the kill barely delivered and the child not yet reaped (#1092).
+REAP_GRACE=5 reap_bounded "$childpid" ||
+    fail "giving up left the wedged test running as $childpid"
 
 # A tick that fails intermittently is a healthy box, and must never reach the
 # verdict: without the reset, any run long enough accumulates ten of them.

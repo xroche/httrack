@@ -37,10 +37,21 @@ static size_t oom_size = 0;
 static size_t last_request = 0;
 static jmp_buf oom_jump;
 
+/* Hands back a pointer no caller may dereference, so a growth loop can be run
+   to its end without allocating; alloc_budget caps a loop that never ends. */
+static int alloc_pretends = 0;
+static int alloc_budget = 0;
+static int alloc_calls = 0;
+static char pretend_buffer[1];
+
 static char *test_realloc(char *buff, size_t size) {
   last_request = size;
+  alloc_calls++;
   if (alloc_fails) {
     return NULL;
+  }
+  if (alloc_pretends) {
+    return alloc_calls > alloc_budget ? NULL : pretend_buffer;
   }
   return (char *) realloc(buff, size);
 }
@@ -206,6 +217,56 @@ static int buffn_case(void) {
   return 0;
 }
 
+/* Nothing reaches the halfway point through the API, so it is forced here. */
+static int saturate_case(void) {
+  StringCapacity(room) = ((size_t) -1) / 2 + 1;
+  alloc_fails = oom_jumps = 1;
+  if (setjmp(oom_jump) == 0) {
+    StringRoomTotal(room, (size_t) -1);
+    printf("saturate: FAIL (grew through a failing allocator)\n");
+    return 1;
+  }
+  if (!failure_reported("saturate")) {
+    return 1;
+  }
+  if (last_request != (size_t) -1) {
+    printf("saturate: FAIL (allocator asked for %lu bytes, want SIZE_MAX)\n",
+           (unsigned long) last_request);
+    return 1;
+  }
+  alloc_fails = 0;
+  StringBuffRW(room) = NULL;
+  StringFree(room);
+  printf("saturate: OK\n");
+  return 0;
+}
+
+/* saturate_case dies on the first allocation, so it never sees a second step.
+   Here the allocator keeps saying yes: a clamp that fails to raise the
+   capacity spins, and the budget turns that spin into a failure. */
+static int growloop_case(void) {
+  enum { maxSteps = 8 * sizeof(size_t) + 4 };
+
+  alloc_pretends = oom_jumps = 1;
+  alloc_budget = maxSteps;
+  alloc_calls = 0;
+  if (setjmp(oom_jump) != 0) {
+    printf("growloop: FAIL (still growing after %d steps)\n", maxSteps);
+    return 1;
+  }
+  StringRoomTotal(room, (size_t) -1);
+  if (StringCapacity(room) != (size_t) -1) {
+    printf("growloop: FAIL (stopped at capacity %lu)\n",
+           (unsigned long) StringCapacity(room));
+    return 1;
+  }
+  alloc_pretends = 0;
+  StringBuffRW(room) = NULL; /* the stub's pointer never came from malloc */
+  StringFree(room);
+  printf("growloop: OK\n");
+  return 0;
+}
+
 /* Runs the shipped handler, which must print and abort. */
 static int abort_case(void) {
   alloc_fails = 1;
@@ -227,9 +288,15 @@ int main(int argc, char **argv) {
     return sprintf_case();
   } else if (strcmp(mode, "buffn") == 0) {
     return buffn_case();
+  } else if (strcmp(mode, "saturate") == 0) {
+    return saturate_case();
+  } else if (strcmp(mode, "growloop") == 0) {
+    return growloop_case();
   } else if (strcmp(mode, "abort") == 0) {
     return abort_case();
   }
-  fprintf(stderr, "usage: %s grow|hook|keep|sprintf|buffn|abort\n", argv[0]);
+  fprintf(stderr,
+          "usage: %s grow|hook|keep|sprintf|buffn|saturate|growloop|abort\n",
+          argv[0]);
   return 2;
 }

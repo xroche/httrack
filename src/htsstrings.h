@@ -156,7 +156,14 @@ HTS_STATIC void StringOom_(size_t size) {
   do {                                                                         \
     const size_t capacity_ = (size_t) (CAPACITY);                              \
     while ((BLK).capacity_ < capacity_) {                                      \
-      const size_t newcap_ = (BLK).capacity_ < 16 ? 16 : (BLK).capacity_ * 2;  \
+      const size_t maxcap_ = (size_t) -1;                                      \
+      const size_t mincap_ = 16;                                               \
+      const size_t cur_ = (BLK).capacity_;                                     \
+      /* Past the halfway point cur_*2 wraps below cur_, which no further      \
+         doubling climbs back out of; ask for the requested total instead. */  \
+      const size_t newcap_ = cur_ < mincap_       ? mincap_                    \
+                             : cur_ > maxcap_ / 2 ? capacity_                  \
+                                                  : cur_ * 2;                  \
       char *const buff_ = STRING_REALLOC((BLK).buffer_, newcap_);              \
                                                                                \
       if (buff_ == NULL) {                                                     \

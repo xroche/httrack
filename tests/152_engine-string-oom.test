@@ -26,8 +26,8 @@ fi
 
 # Control first: with the stub allocating for real, growth must not reach the
 # failure path at all, and the capacity it announces must be writable to the
-# last byte. Then the three failure shapes, and the growers inside the header.
-for mode in grow hook keep sprintf buffn; do
+# last byte. Then the failure shapes, and the growers inside the header.
+for mode in grow hook keep sprintf buffn saturate growloop; do
     out=$("$STRINGOOM_BIN" "$mode") || fail "$mode case exited non-zero: $out"
     test "$out" = "$mode: OK" || fail "expected '$mode: OK', got: $out"
 done
