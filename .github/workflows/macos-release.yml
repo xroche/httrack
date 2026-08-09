@@ -153,9 +153,8 @@ jobs:
           set -euo pipefail
           dmg="$(echo "$RUNNER_TEMP"/HTTrack-*.dmg)"
           test -f "$dmg"
-          # The build is arm64-only and the Release name is the only one a user reads
-          # before downloading (#1083). Renamed here, not at build time: httrack-com's
-          # staging script matches the artifact's name exactly.
+          # Renamed here, not at build time, because httrack-com's staging script
+          # matches the artifact name exactly. The Release name is what a user reads (#1083).
           named="$RUNNER_TEMP/release/$(basename "${dmg%.dmg}")-macos-arm64.dmg"
           mkdir -p "$(dirname "$named")"
           cp "$dmg" "$named"
