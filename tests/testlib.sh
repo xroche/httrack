@@ -24,6 +24,18 @@ nativepath() {
     fi
 }
 
+# Self-signed cert for a local TLS origin, written to $1/both.pem, key first.
+# openssl's failure output is reported; discarding it left an empty log (#1094).
+make_tls_pem() {
+    local dir=$1 out
+    out=$(openssl req -x509 -newkey rsa:2048 -keyout "$dir/key.pem" \
+        -out "$dir/cert.pem" -days 2 -nodes -subj "/CN=127.0.0.1" 2>&1) || {
+        echo "FAIL: openssl req could not create a self-signed cert: $out" >&2
+        exit 1
+    }
+    cat "$dir/key.pem" "$dir/cert.pem" >"$dir/both.pem"
+}
+
 # Longest surviving run of char $2 in file $1, or 0: the length a field was
 # clipped to, read back out of a binary artifact.
 runlen() {
