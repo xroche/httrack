@@ -106,10 +106,11 @@ body {
 	.wrap.solo { display: block; }
 }
 
+/* Colour inherited: nothing lighter than --ink reaches 4.5:1 on the --field
+   this sits on, and at .8em it is small text. */
 footer {
 	max-width: 68rem;
 	margin: .5rem auto 0;
-	color: #eef;
 	font-size: .8em;
 }
 
