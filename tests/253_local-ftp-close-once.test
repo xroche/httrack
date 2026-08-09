@@ -12,8 +12,8 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 . "${testdir}/testlib.sh"
 
 if [ "$(uname -s)" != "Linux" ]; then
-    echo "close-once: LD_PRELOAD interposition is Linux-only here, skipping"
-    exit 0
+    echo "close-once: LD_PRELOAD interposition is Linux-only here, skipping" >&2
+    exit 77
 fi
 # A --disable-shared build has nothing to preload; anything else missing is a
 # build problem, not a skip, or the test would pass vacuously.
