@@ -2441,6 +2441,42 @@ class Handler(SimpleHTTPRequestHandler):
             "text/html; charset=" + self.SINGLEFILE_MARK_CHARSET,
         )
 
+    FOREIGN_CHAIN = 5
+
+    def route_foreign(self):
+        # text/html on every path whatever the extension, and a chain to follow.
+        name = urlsplit(self.path).path.rsplit("/", 1)[-1]
+        step = re.fullmatch(r"c(\d+)\.html", name)
+        n = int(step.group(1)) if step else 0
+        if name == "pic.png" or n >= self.FOREIGN_CHAIN:
+            self.send_html("")
+        else:
+            self.send_html(
+                '\t<a href="c%d.html">next</a>\n\t<img src="pic.png" />\n' % (n + 1)
+            )
+
+    # Honestly typed assets, each referencing a file only a parse can find.
+    ASSETS = {
+        "/asset/style.css": (b"body { background: url(bg.png); }\n", "text/css"),
+        "/asset/script.js": (
+            b'var i = new Image(); i.src = "pic2.png";\n',
+            "application/x-javascript",
+        ),
+        "/asset/vector.svg": (
+            b'<svg xmlns="http://www.w3.org/2000/svg">'
+            b'<image href="inner.png" /></svg>\n',
+            "image/svg+xml",
+        ),
+    }
+
+    def route_asset(self):
+        path = urlsplit(self.path).path
+        if path in self.ASSETS:
+            body, ctype = self.ASSETS[path]
+            self.send_raw(body, ctype)
+        else:
+            self.send_raw(self.FAKE_PNG, "image/png")
+
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
         "/cookies/entrance.php": route_entrance,
@@ -2840,6 +2876,12 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         if path.startswith("/big/"):
             self.route_big()
+            return True
+        if path.startswith("/foreign/"):
+            self.route_foreign()
+            return True
+        if path.startswith("/asset/"):
+            self.route_asset()
             return True
         if path.startswith("/charset/"):
             self.route_charset()

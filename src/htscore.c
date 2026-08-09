@@ -1693,6 +1693,21 @@ int httpmirror(char *url1, httrackp * opt) {
       // traitement (parsing)
       // ------------------------------------------------------
 
+      /* An asset URL on a foreign host that answers an HTML page gets no depth:
+         its links are same-host, and would mirror that whole site (#121). */
+      if (!is_binary && heap(ptr)->depth > 0 &&
+          is_html_mime_type(r.contenttype) &&
+          hts_link_is_foreign_asset(opt, ptr)) {
+        hts_log_print(
+            opt, LOG_INFO,
+            "Note: not scanning %s%s, an HTML page on a host foreign "
+            "to %s; mirror it by adding it as a starting URL",
+            /* normalized: a page-supplied link can carry credentials */
+            jump_identification_const(urladr()), urlfil(),
+            jump_identification_const(heap(heap(ptr)->precedent)->adr));
+        heap(ptr)->depth = 0;
+      }
+
       // traiter
       if (!is_binary && ((is_hypertext_mime(opt, r.contenttype, urlfil()))        /* Is HTML or Js, .. */
                          ||(may_be_hypertext_mime(opt, r.contenttype, urlfil()) && r.adr != NULL) /* Is real media, .. */
