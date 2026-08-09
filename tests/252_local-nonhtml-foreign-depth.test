@@ -38,12 +38,19 @@ blog="${tmpdir}/b-server.log"
 bpid=$!
 bport=$(discover_server_port "$blog" "$bpid") || exit 1
 
-# The crawled site: the foreign link, a chain of its own, and the same shape of
-# asset-looking HTML page served by A itself.
+alog="${tmpdir}/a-server.log"
+: >"$alog"
+"$python" "$server" --root "$(nativepath "${tmpdir}/aroot")" \
+    >"$alog" 2>&1 </dev/null &
+apid=$!
+aport=$(discover_server_port "$alog" "$apid") || exit 1
+
+# Written once A's port is known, since the same-host asset link has to be
+# absolute: a relative one would inherit whatever userinfo the crawl entered by.
 cat >"${tmpdir}/aroot/index.html" <<EOF
 <html><body>
 <a href="http://127.0.0.1:${bport}/foreign/s/xxx/distorted.jpg">foreign</a>
-<a href="/foreign/local/thing.jpg">same host</a>
+<a href="http://127.0.0.1:${aport}/foreign/local/thing.jpg">same host</a>
 <a href="a1.html">local</a>
 </body></html>
 EOF
@@ -59,13 +66,6 @@ cat >"${tmpdir}/aroot/assets.html" <<EOF
 <img src="http://127.0.0.1:${bport}/asset/vector.svg">
 </body></html>
 EOF
-
-alog="${tmpdir}/a-server.log"
-: >"$alog"
-"$python" "$server" --root "$(nativepath "${tmpdir}/aroot")" \
-    >"$alog" 2>&1 </dev/null &
-apid=$!
-aport=$(discover_server_port "$alog" "$apid") || exit 1
 
 which httrack >/dev/null || fail "could not find httrack"
 
@@ -150,6 +150,15 @@ stored jpgnear "$bport" foreign/s/xxx/distorted.html
 crawl hostrule /index.html "+127.0.0.1:${bport}/*"
 check hostrule "$bport" "$kept"
 check hostrule "$aport" "$untouched"
+
+# Entering through credentials puts them in the referer's address but not in
+# the page's own absolute links, which must still count as the same host.
+httrack "http://user:pw@127.0.0.1:${aport}/index.html" \
+    -O "${tmpdir}/out-userinfo" --quiet --max-time=120 --timeout=30 \
+    --robots=0 -n '+*.jpg' \
+    >"${tmpdir}/crawl-userinfo.log" 2>&1 || fail "crawl userinfo failed"
+check userinfo "$aport" "$untouched"
+check userinfo "$bport" "$kept"
 
 # A seeded host is its own referer, so nothing is foreign to it.
 httrack "http://127.0.0.1:${aport}/index.html" \

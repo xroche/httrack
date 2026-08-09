@@ -941,7 +941,11 @@ hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr) {
     return HTS_FALSE;
   if (ishtml(opt, heap(ptr)->fil) != 0) /* hypertext, or no telling */
     return HTS_FALSE;
-  return strfield2(heap(ptr)->adr, heap(parent)->adr) ? HTS_FALSE : HTS_TRUE;
+  /* adr carries the scheme and any user:pw@, so compare bare authorities. */
+  return strfield2(jump_identification_const(heap(ptr)->adr),
+                   jump_identification_const(heap(parent)->adr))
+             ? HTS_FALSE
+             : HTS_TRUE;
 }
 
 // tester taille

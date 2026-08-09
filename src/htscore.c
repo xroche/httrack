@@ -1698,10 +1698,12 @@ int httpmirror(char *url1, httrackp * opt) {
       if (!is_binary && heap(ptr)->depth > 0 &&
           is_html_mime_type(r.contenttype) &&
           hts_link_is_foreign_asset(opt, ptr)) {
-        hts_log_print(opt, LOG_INFO,
-                      "Note: not scanning %s%s, an HTML page on a host foreign "
-                      "to %s; mirror it by adding it as a starting URL",
-                      urladr(), urlfil(), heap(heap(ptr)->precedent)->adr);
+        hts_log_print(
+            opt, LOG_INFO,
+            "Note: not scanning %s%s, an HTML page on a host foreign "
+            "to %s; mirror it by adding it as a starting URL",
+            urladr(), urlfil(),
+            jump_identification_const(heap(heap(ptr)->precedent)->adr));
         heap(ptr)->depth = 0;
       }
 
