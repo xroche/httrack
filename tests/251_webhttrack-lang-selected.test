@@ -36,8 +36,11 @@ cleanup() {
 trap 'set +e; cleanup' EXIT
 trap cleanup HUP INT QUIT PIPE TERM
 
-serve() { # $1 = tag, $2.. = extra htsserver args; prints the URL
-    local log port url
+# Sets ${url}; it must not print it, or a caller's $(...) would collect ${pids} in a
+# subshell and leave every server running.
+url=
+serve() { # $1 = tag, $2.. = extra htsserver args
+    local log port
     log="${work}/srv$1.log"
     mkdir -p "${work}/h$1"
     # An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
@@ -60,15 +63,13 @@ s.close()')
         sleep 0.25
     done
     test -n "${url}" || fail "htsserver did not start: $(cat "${log}")"
-    echo "${url}"
 }
 
 # Indexes and labels come from lang.indexes and lang.def, not from observed output.
 # The heading word is that language's own greeting, so it proves which language
 # the body was rendered in.
 check() { # $1 = lang index, $2 = expected label, $3 = word in the page heading
-    local url
-    url=$(serve "$1" lang "$1")
+    serve "$1" lang "$1"
     "${python}" - "${url}" "$1" "$2" "$3" <<'PY' || fail "wrong menu or body for language $2"
 import re, sys, urllib.request
 
@@ -103,7 +104,7 @@ check 4 Deutsch Willkommen
 
 # With no language set the menu falls back to its first entry, which must be the
 # one the page is rendered in. An empty placeholder option would show up blank.
-url=$(serve unset)
+serve unset
 "${python}" - "${url}" <<'PY' || fail "unset language does not fall back to English"
 import re, sys, urllib.request
 
