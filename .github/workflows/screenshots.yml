@@ -34,7 +34,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
