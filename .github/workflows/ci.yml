@@ -138,10 +138,8 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
-  # Several fixtures need a connect to TEST-NET-1 to stall. Runners drop it, the
-  # powerpc and ppc64 buildds refuse it a few ms later, and that gap failed
-  # 246_engine-connect-stop on both (#1108). tools/hostile-net.sh reproduces the
-  # refusing network; every dead-host test must skip under it, never fail.
+  # Reproduces the buildds that refuse TEST-NET-1 instead of dropping it, where
+  # every fixture needing a stalled connect must skip rather than fail (#1108).
   hostile-network:
     name: build (network refuses TEST-NET-1)
     runs-on: ubuntu-24.04
