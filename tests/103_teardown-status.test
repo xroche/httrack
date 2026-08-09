@@ -58,7 +58,10 @@ done
 test "$scanned" -ge 50 || fail "scanned $scanned scripts in $top_srcdir/tests, want the whole suite"
 
 bad=$(awk '
-    FNR == 1 { errexit = 0 }
+    # The libraries set no shell options of their own, but every test that
+    # sources them does, so their EXIT traps run under errexit all the same --
+    # and testlib.sh now owns the teardown for most of the suite.
+    FNR == 1 { errexit = (FILENAME ~ /(testlib|proclib|webhttracklib)[.]sh$/) }
     /^[[:space:]]*set[[:space:]]+(-[a-z]*e|-o[[:space:]]+errexit)/ { errexit = 1 }
     !errexit { next }
     !/^[[:space:]]*trap[[:space:]]+.*[[:space:]]EXIT([[:space:]]|;|$)/ { next }

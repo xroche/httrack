@@ -17,6 +17,12 @@ cleanup_push rm -rf "$tmp"
 mkdir -p "$tmp/dead" "$tmp/flaky"
 cat >"$tmp/dead/sleep" <<'EOF'
 #!/bin/sh
+# Hold the first tick until the child has announced: the guard counts ticks, not
+# time, so this changes nothing it measures, and without it ten instant ticks can
+# outrun the child's first line and leave no pid to reap (#1092). Bounded, or a
+# child that dies before writing would wedge the run instead of failing it.
+n=0
+while test ! -s "$PIDFILE" && test "$n" -lt 100000; do n=$((n + 1)); done
 exit 126
 EOF
 cat >"$tmp/flaky/sleep" <<'EOF'

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# cleanup_push replaces the trap pair every test used to write by hand, so its
-# ordering, its argument handling and the exit status it leaves behind are what
-# ~60 teardowns now rest on.
+# cleanup_push replaces the trap pair every test used to write by hand. About 60
+# teardowns now rest on its order, its arguments and the status it leaves behind.
 
 set -euo pipefail
 
@@ -16,8 +15,8 @@ trap 'set +e; rm -rf "$tmpdir"' EXIT
 
 ok() { echo "OK: $*"; }
 
-# Runs $1 as a test would, and reports its status: the subject has to be its own
-# process, since the traps under test are the shell's.
+# Runs the written subject and reports its status. It has to be its own process,
+# since the traps under test are the shell's.
 subject() {
     local rc=0
     bash "$tmpdir/subject.sh" >"$tmpdir/out" 2>&1 || rc=$?
@@ -36,9 +35,11 @@ write_subject() {
 ## LIFO, verbatim arguments
 #
 # Two entries, since a FIFO drain passes any single-entry check. The argument
-# carries the spaces and quotes a bare re-expansion would resplit.
+# carries the spaces and quotes a bare re-expansion would resplit. The empty frame
+# between them is fatal on bash 3.2 if the drain slices an array without a guard.
 write_subject <<'EOF'
 cleanup_push note 'pushed first'
+cleanup_push
 cleanup_push note "pushed  second 'quoted'"
 EOF
 rc=$(subject)
@@ -49,13 +50,18 @@ test "$(cat "$tmpdir/log")" = "$want" || fail "wrong teardown order: $(cat "$tmp
 ok "cleanups run last-pushed-first with their arguments intact"
 
 ## a failing teardown does not become the test's verdict (#773)
+# The failure sits between two notes: pushed first it would drain LAST, and the
+# survivor would prove nothing about the drain continuing past it.
 write_subject <<'EOF'
+cleanup_push note 'below the failure'
 cleanup_push false
-cleanup_push note 'ran after the failure'
+cleanup_push note 'above the failure'
 EOF
 rc=$(subject)
 test "$rc" -eq 0 || fail "a failing cleanup left status $rc"
-test "$(cat "$tmpdir/log")" = 'ran after the failure' || fail "the stack stopped at the failure"
+want="above the failure
+below the failure"
+test "$(cat "$tmpdir/log")" = "$want" || fail "the drain stopped at the failure: $(cat "$tmpdir/log")"
 ok "a failing cleanup neither aborts the drain nor reds the test"
 
 # And the real status still reaches automake.
@@ -68,24 +74,43 @@ test "$rc" -eq 3 || fail "exit 3 was reported as $rc"
 test -s "$tmpdir/log" || fail "the teardown was skipped on a non-zero exit"
 ok "the script's own exit status survives the teardown"
 
-## a signal drains once, not twice
+## a signal drains once, and through the library's own trap
 #
-# The EXIT trap fires after the signal handler, so a stack that is not emptied
-# runs every cleanup a second time -- a double rm is silent, a double kill is not.
-write_subject <<'EOF'
+# Status 1 is the trap's own exit. An untrapped fatal signal also reaches the EXIT
+# trap, so it would drain the stack too, but leaves 128+n -- asserting "non-zero"
+# would hold with no signal trap at all. Each signal is sent, since a trap
+# covering TERM alone passes a TERM-only check.
+for sig in TERM INT HUP QUIT; do
+    write_subject <<EOF
 cleanup_push note 'drained'
-kill -TERM $$
+kill -${sig} \$\$
 sleep 30
 EOF
+    rc=$(subject)
+    test "$rc" -eq 1 || fail "SIG${sig} left status $rc, not the trap's exit 1"
+    test "$(cat "$tmpdir/log")" = drained ||
+        fail "SIG${sig} drained the stack $(wc -l <"$tmpdir/log") times"
+done
+ok "each trapped signal runs the teardown once and ends the test"
+
+## re-sourcing keeps a stack already built
+#
+# 172 sources a driver that sources this library a second time. A plain `=()`
+# there dropped what the caller had registered and leaked its temp tree.
+write_subject <<EOF
+cleanup_push note 'registered before the second source'
+. ${testdir}/testlib.sh
+EOF
 rc=$(subject)
-test "$rc" -ne 0 || fail "a SIGTERM'd subject reported success"
-test "$(cat "$tmpdir/log")" = drained || fail "SIGTERM drained the stack $(wc -l <"$tmpdir/log") times"
-ok "a signal runs the teardown exactly once and ends the test"
+test "$rc" -eq 0 || fail "the subject exited $rc: $(cat "$tmpdir/out")"
+test "$(cat "$tmpdir/log")" = 'registered before the second source' ||
+    fail "re-sourcing dropped the stack: $(cat "$tmpdir/log")"
+ok "re-sourcing the library keeps a stack already built"
 
 ## nothing pushed, no trap
 #
-# Sourcing must leave EXIT alone: 150 tests install their own, and a library
-# that grabbed it at source time would silently drop theirs.
+# Sourcing must leave EXIT alone: 150 tests install their own, and a library that
+# grabbed it at source time would drop theirs.
 write_subject <<'EOF'
 test -z "$(trap -p EXIT)" || note "sourcing installed: $(trap -p EXIT)"
 cleanup_push note 'pushed'

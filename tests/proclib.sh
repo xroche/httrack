@@ -3,6 +3,14 @@
 # Process forensics for a wedged test: what is still running, and a stack for
 # each engine process. Sourced after testlib.sh, not run.
 
+# Engine and fixture-server processes, matched on the executable basename only.
+# Matching the whole ps line instead would catch every unrelated command whose
+# arguments merely mention a path containing "httrack". Derived from testlib.sh's
+# ENGINE_EXES, never spelled out again (#1067).
+ENGINE_EXE_RE="^(lt-)?(${ENGINE_EXES// /|})([.]exe)?\$"
+# The same set against tasklist, whose first column is the image basename.
+# Anchored, or "notepad-httrack-notes.exe" reads as a leaked engine.
+ENGINE_IMAGE_RE="^(${ENGINE_EXES// /|})[.]exe"
 FIXTURE_SERVER_RE='^(local-server|proxy-https-server|proxy-connect-server|socks5-server|tls-stall-server)[.]py$'
 
 # awk prologue for the matchers below: under qemu-user the kernel reports the

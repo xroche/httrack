@@ -174,7 +174,10 @@ if ! is_windows && test -r /proc/self/stat; then
     )
     fake=$(cat "$tmp/fake.pid")
     outside=$(cat "$tmp/outside.pid")
-    trap 'set +e; kill "$fake" "$outside" 2>/dev/null; rm -rf "$tmp"' EXIT
+    # Pushed, not trapped: a bare EXIT trap here would drop the stack that holds
+    # $tmp and $shim, which is how $shim used to leak.
+    kill_probes() { kill "$fake" "$outside" 2>/dev/null || true; }
+    cleanup_push kill_probes
     # /proc holds the pid from the fork on, so a fake that never exec'd would fail
     # some later assertion instead of this one.
     running() {

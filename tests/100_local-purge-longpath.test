@@ -28,13 +28,16 @@ test -n "$httrack_bin" || {
 httrack_bin=$(cd "$(dirname "$httrack_bin")" && pwd)/$(basename "$httrack_bin")
 
 work=$(mktemp -d)
-trap 'set +e; kill -9 "${spid:-}" 2>/dev/null || true; rm -rf "$work"' EXIT
+cleanup_push rm -rf "$work"
 
 mkdir -p "$work/root" "$work/proj"
 
 "$python" "$top_srcdir/tests/local-server.py" --root "$work/root" \
     >"$work/server.out" 2>"$work/server.err" &
 spid=$!
+# Pushed here rather than with the temp dir: the pid exists only now, and LIFO
+# reaps the server before its root is removed.
+cleanup_push stop_server "$spid"
 
 port=$(discover_server_port "$work/server.out" "$spid") || exit 1
 

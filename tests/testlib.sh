@@ -1,9 +1,8 @@
 #!/bin/bash
 #
 # Helpers shared by the crawl tests. Sourced, not run: it resolves $testdir and
-# $top_srcdir, so a test opens with its own `set -euo pipefail` and the source
-# line and nothing else. Shell options stay the caller's -- the suite drivers
-# source this too, and errexit would end them on the first failing test.
+# $top_srcdir, and leaves shell options to the caller, since the suite drivers
+# source it too and errexit would end them on the first failing test.
 
 testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 : "${top_srcdir:=${testdir}/..}"
@@ -32,12 +31,13 @@ TESTLIB_NL='
 # SIGPIPE the producer into a spurious failure.
 firstline() { printf '%s\n' "${1%%"$TESTLIB_NL"*}"; }
 
-# LIFO teardown: cleanup_push CMD ARG... registers a command word and its
-# arguments, expanded now, run in reverse on the way out. The first call installs
-# both traps, the signal half of which most tests never wrote (#773). A command,
-# not a shell snippet: the flat argv below is what keeps this eval-free.
-CLEANUP_ARGV=()
-CLEANUP_FRAMES=()
+# LIFO teardown: cleanup_push CMD ARG... registers a command and its arguments,
+# expanded now, run in reverse on the way out; the first call installs both traps,
+# the signal half of which most tests never wrote (#773). A flat argv, not a shell
+# snippet, so no eval -- wrap a redirection or a late value in a function.
+# Self-preserving, since 172 sources a driver that sources this file a second time.
+CLEANUP_ARGV=(${CLEANUP_ARGV[@]+"${CLEANUP_ARGV[@]}"})
+CLEANUP_FRAMES=(${CLEANUP_FRAMES[@]+"${CLEANUP_FRAMES[@]}"})
 cleanup_push() {
     CLEANUP_FRAMES+=("${#CLEANUP_ARGV[@]}")
     CLEANUP_ARGV+=("$@")
@@ -46,12 +46,13 @@ cleanup_push() {
     trap 'set +e; run_cleanups; exit 1' HUP INT QUIT PIPE TERM
 }
 
-# Drains the stack, so the EXIT trap that follows a signal is a no-op.
+# Drains the stack, so the EXIT trap after a signal is a no-op. Both slices carry
+# the `[@]+` guard: on bash 3.2 an empty-array expansion under `set -u` is fatal.
 run_cleanups() {
     local i start
     for ((i = ${#CLEANUP_FRAMES[@]} - 1; i >= 0; i--)); do
         start=${CLEANUP_FRAMES[i]}
-        "${CLEANUP_ARGV[@]:start}" || true
+        ${CLEANUP_ARGV[@]+"${CLEANUP_ARGV[@]:start}"} || true
         CLEANUP_ARGV=(${CLEANUP_ARGV[@]+"${CLEANUP_ARGV[@]:0:start}"})
     done
     CLEANUP_FRAMES=()
@@ -312,18 +313,9 @@ kill_tree() {
     kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
 }
 
-# Engine and fixture-server processes, matched on the executable basename only.
-# Matching the whole ps line instead would catch every unrelated command whose
-# arguments merely mention a path containing "httrack". ENGINE_EXES feeds the
-# matchers and every Windows taskkill, here and in proclib.sh, which used to
-# drift apart (#1067).
+# The engine executables, one list so the kills here and the matchers proclib.sh
+# derives from it cannot drift apart again (#1067).
 ENGINE_EXES='httrack proxytrack htsserver webhttrack'
-# shellcheck disable=SC2034 # the matchers are read from proclib.sh
-ENGINE_EXE_RE="^(lt-)?(${ENGINE_EXES// /|})([.]exe)?\$"
-# The same set against tasklist, whose first column is the image basename.
-# Anchored, or "notepad-httrack-notes.exe" reads as a leaked engine.
-# shellcheck disable=SC2034 # ditto
-ENGINE_IMAGE_RE="^(${ENGINE_EXES// /|})[.]exe"
 
 # taskkill every engine image on the host. Windows only, and by name, so the
 # caller must be sure no wanted process shares one.
