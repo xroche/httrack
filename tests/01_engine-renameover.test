@@ -2,13 +2,15 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Drives -#test=renameover: hts_rename_over() must replace an existing dst, and
 # must leave dst alone when the rename failed for a reason moving dst aside
 # cannot fix (#779, #790). The selftest prints the regime and the restore
 # outcome it took; pin both per leg so none can pass having tested another.
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 case "$(uname -s)" in
 MINGW* | MSYS_NT*) want=fallback ;; # native rename() refuses an existing target

@@ -3,14 +3,15 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # HTML entity unescaping (hts_unescapeEntitiesWithCharset).
 # -#test=entities <string> prints the string with entities decoded (UTF-8 output).
-ent() {
-    test "$(httrack -O /dev/null -#test=entities "$1")" == "$2" || exit 1
-}
+ent() { assert_selftest "$2" entities "$1"; }
 # crash probe: malformed input must exit cleanly, not abort.
 runs() {
-    httrack -O /dev/null -#test=entities "$1" >/dev/null 2>&1 || exit 1
+    httrack -O /dev/null -#test=entities "$1" >/dev/null 2>&1 || fail "entities '$1' exited non-zero"
 }
 
 # named entities

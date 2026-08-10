@@ -4,9 +4,11 @@
 # built its target with an unbounded sprintf (#745).
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 httrack -O /dev/null -#test=structcheck "$dir" |
     grep -q "structcheck self-test OK"

@@ -5,9 +5,11 @@
 # deflate) must each be rejected per-entry, never crash, never taint the sibling.
 
 set -eu
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 # the smashed-header case logs expected "Corrupted cache entry" warnings on
 # stdout; the verdict is the last line

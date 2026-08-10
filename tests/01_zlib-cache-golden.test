@@ -13,6 +13,8 @@
 # committed file.
 
 set -eu
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 : "${top_srcdir:=..}"
 fixture="$top_srcdir/tests/fixtures/cache-golden"
@@ -23,7 +25,7 @@ test -e "$fixture/hts-cache/new.zip" || {
 }
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 # Read against a private copy so the source tree is never touched (a read
 # session does not write, but copying keeps the test hermetic). Create the dir

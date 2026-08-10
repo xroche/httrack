@@ -3,9 +3,11 @@
 # round-trip; it used to be clipped to sizeof(char*) - 1 bytes.
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 printf 'HTTP/1.1 404 Not Found Here At All\r\nContent-Type: text/html\r\nLast-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
 printf 'hello' >"$dir/body"

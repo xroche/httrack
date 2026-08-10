@@ -3,17 +3,16 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # Response header-line parsing (treathead via -#test=header <raw-line> ...).
 # Isolates the wire layer from url_savename, which strips traversal on its own.
 
 hdr() {
-    local want="$1"
+    local want=$1
     shift
-    out="$(httrack -O /dev/null -#test=header "$@" | grep '^contenttype=')"
-    test "$out" == "$want" || {
-        echo "FAIL: $* -> '$out' (want '$want')"
-        exit 1
-    }
+    assert_eq "$want" "$(httrack -O /dev/null -#test=header "$@" | grep '^contenttype=')" "$*"
 }
 
 hdr 'contenttype=application/pdf cdispo=' 'Content-Type: application/pdf'
@@ -30,13 +29,11 @@ hdr 'contenttype= cdispo=evil.pdf' \
 
 # An over-long header value must not overflow the parse scratch (ASan aborts
 # here on the pre-fix binary).
-test "$(httrack -O /dev/null -#test=headerlong 'Content-Type:')" \
-    == 'contenttype_len=32 contentencoding_len=0'
-test "$(httrack -O /dev/null -#test=headerlong 'Content-Encoding:')" \
-    == 'contenttype_len=0 contentencoding_len=0'
+assert_selftest 'contenttype_len=32 contentencoding_len=0' headerlong 'Content-Type:'
+assert_selftest 'contenttype_len=0 contentencoding_len=0' headerlong 'Content-Encoding:'
 
 # An empty Content-Encoding yields no token: leave it empty, don't read the
 # uninitialized scratch (MSan aborts here on the pre-fix binary).
 enc() { httrack -O /dev/null -#test=header "$1" | grep '^contentencoding='; }
-test "$(enc 'Content-Encoding:')" == 'contentencoding='
-test "$(enc 'Content-Encoding: gzip')" == 'contentencoding=gzip'
+assert_eq 'contentencoding=' "$(enc 'Content-Encoding:')"
+assert_eq 'contentencoding=gzip' "$(enc 'Content-Encoding: gzip')"

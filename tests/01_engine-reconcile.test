@@ -5,9 +5,11 @@
 # run, and restore the old one when an update transferred nothing.
 
 set -eu
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 out=$(httrack -#test=reconcile "$dir")
 

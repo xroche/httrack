@@ -4,9 +4,11 @@
 # legacy pair and leave the files untouched (httrack -#test=cache-legacy <dir>).
 
 set -eu
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 # the refusal errors land on stdout (no log file); pin them and the verdict
 out=$(httrack -#test=cache-legacy "$dir" 2>/dev/null)

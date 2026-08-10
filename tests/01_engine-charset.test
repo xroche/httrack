@@ -3,14 +3,15 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # charset -> UTF-8 conversion (hts_convertStringToUTF8).
 # -#test=charset <charset> <string> prints the string re-decoded from <charset> as UTF-8.
-conv() {
-    test "$(httrack -O /dev/null -#test=charset "$1" "$2")" == "$3" || exit 1
-}
+conv() { assert_selftest "$3" charset "$1" "$2"; }
 # crash probe: malformed input must exit cleanly, not abort.
 runs() {
-    httrack -O /dev/null -#test=charset "$1" "$2" >/dev/null 2>&1 || exit 1
+    httrack -O /dev/null -#test=charset "$1" "$2" >/dev/null 2>&1 || fail "charset '$1' '$2' exited non-zero"
 }
 
 # the source bytes below are UTF-8 (this file is UTF-8); "café" is 0x63 61 66 C3 A9.
@@ -31,7 +32,7 @@ conv 'us-ascii' 'hello' 'hello'
 # unknown charset: ASCII passes through unchanged, but non-ASCII input cannot be
 # decoded and yields empty output (an error is printed to stderr).
 conv 'no-such-charset-xyz' 'abc' 'abc'
-test "$(httrack -O /dev/null -#test=charset 'no-such-charset-xyz' 'café' 2>/dev/null)" == "" || exit 1
+assert_eq "" "$(httrack -O /dev/null -#test=charset 'no-such-charset-xyz' 'café' 2>/dev/null)"
 
 # malformed UTF-8 (lone continuation byte, truncated lead byte) must not crash
 runs 'utf-8' 'hex:80'
@@ -39,9 +40,7 @@ runs 'utf-8' 'hex:c3'
 
 # hts_getCharsetFromMeta: <meta> charset extraction, HTML5 and legacy forms.
 # -#test=metacharset <html> prints the charset, or "(none)".
-meta() {
-    test "$(httrack -O /dev/null -#test=metacharset "$1")" == "$2" || exit 1
-}
+meta() { assert_selftest "$2" metacharset "$1"; }
 
 # HTML5 form, quoting/spacing flavors
 meta '<meta charset="utf-8">' 'utf-8'
@@ -50,7 +49,7 @@ meta '<meta charset=utf-8>' 'utf-8'
 meta '<meta charset=utf-8 />' 'utf-8'
 meta '<meta charset=utf-8/>' 'utf-8'
 # charset labels are case-insensitive downstream; only require case-insensitive match
-test "$(httrack -O /dev/null -#test=metacharset '<META CHARSET=UTF-8>' | tr '[:upper:]' '[:lower:]')" == 'utf-8' || exit 1
+assert_eq 'utf-8' "$(httrack -O /dev/null -#test=metacharset '<META CHARSET=UTF-8>' | tr '[:upper:]' '[:lower:]')"
 meta '<html><head><meta   charset = "utf-8"  ></head>' 'utf-8'
 
 # legacy http-equiv form, attributes in any order
@@ -83,9 +82,7 @@ meta '<meta ' '(none)'
 meta '<meta' '(none)'
 
 # hts_isStringUTF8: valid-UTF-8 probe (guards the #180 link conversion).
-utf8() {
-    test "$(httrack -O /dev/null -#test=isutf8 "$1")" == "$2" || exit 1
-}
+utf8() { assert_selftest "$2" isutf8 "$1"; }
 utf8 'plain' '1'
 utf8 'café' '1'
 utf8 '统计' '1'

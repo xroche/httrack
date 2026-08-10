@@ -2,11 +2,13 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # --why: report which +/- filter rule decides for a URL, without crawling.
 
 tmpdir="$(mktemp -d)"
-trap 'set +e; rm -rf "$tmpdir"' EXIT
+cleanup_push rm -rf "$tmpdir"
 
 why() {
     local want="$1" out

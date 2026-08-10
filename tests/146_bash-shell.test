@@ -7,6 +7,8 @@
 # shellcheck disable=SC2016 # the probes are for the shell under test to expand
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 sh=${BASH_SHELL:-}
 test -n "$sh" || {
@@ -57,7 +59,7 @@ grep -q '^  *BASH_SHELL ' <<<"$help" || {
 }
 
 tmp=$(mktemp -d)
-trap 'set +e; rm -rf "$tmp"' EXIT
+cleanup_push rm -rf "$tmp"
 mkdir "$tmp/src" "$tmp/bld"
 ln -s "$sh" "$tmp/mybash"
 

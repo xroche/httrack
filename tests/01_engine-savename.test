@@ -2,17 +2,18 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Local save-name resolution (url_savename via -#test=savename <fil> <content-type> [key=value ...]).
 # name() asserts on the basename, full() on the whole path; prior= registers an
 # already-crawled link whose sav is rooted under the -O path (/dev/null here).
 
-# resolve httrack before cd: make check puts a RELATIVE ../src on PATH
-httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+httrack_bin=$(httrack_path)
 
 # scratch dir: body= and cached= write temp files (st-savename-body.tmp, hts-cache/)
 scratch=$(mktemp -d)
-trap 'set +e; rm -rf "$scratch"' EXIT
+cleanup_push rm -rf "$scratch"
 cd "$scratch"
 
 run() {

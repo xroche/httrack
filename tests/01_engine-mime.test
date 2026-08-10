@@ -3,14 +3,20 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # MIME type guessing from extension (get_httptype / give_mimext).
 # -#test=mime <path> prints "<path> is '<mime>'" then "and its local type is '.<ext>'".
 
+# Only the type line is pinned, so firstline rather than a pipe into head, which
+# would SIGPIPE the engine and, under pipefail, red the test for the wrong reason.
 mime() {
-    test "$(httrack -O /dev/null -#test=mime "$1" | head -1)" == "$1 is '$2'" || exit 1
+    assert_eq "$1 is '$2'" "$(firstline "$(httrack -O /dev/null -#test=mime "$1")")"
 }
 unknown() {
-    test "$(httrack -O /dev/null -#test=mime "$1" | head -1)" == "$1 is of an unknown MIME type" || exit 1
+    assert_eq "$1 is of an unknown MIME type" \
+        "$(firstline "$(httrack -O /dev/null -#test=mime "$1")")"
 }
 
 mime '/a/b.html' 'text/html'
