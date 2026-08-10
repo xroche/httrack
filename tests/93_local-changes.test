@@ -4,27 +4,18 @@
 # would call the whole site changed.
 set -euo pipefail
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
-root=$(nativepath "${testdir}/server-root")
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 python=$(find_python) || skip "python3 not found"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_changes.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
-"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-base="http://127.0.0.1:${port}"
+local_server_start
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -79,8 +70,7 @@ lines() { printf '%s\n' "$@" | sort; }
 digest() { cksum <"$1" | tr -d '[:space:]'; }
 
 # --- pass 1: nothing to compare against --------------------------------------
-httrack "${common[@]}" -O "$out" --purge-old=0 "${base}/changes/index.html" \
-    >"${tmpdir}/log1" 2>&1
+local_crawl --log "${tmpdir}/log1" "${common[@]}" -O "$out" --purge-old=0 "${BASEURL}/changes/index.html"
 test -s "$report" || {
     echo "FAIL: pass 1 wrote no ${report}"
     exit 1
@@ -98,15 +88,14 @@ grep -aq "first crawl" "${out}/hts-log.txt" || {
     exit 1
 }
 
-host="127.0.0.1_${port}"
+host="127.0.0.1_$SRV_PORT"
 resetdigest=$(digest "${out}/${host}/changes/reset.bin")
 # A leftover from some earlier failed attempt, at a name pass 2 fetches for the
 # first time: on disk, but never part of the previous mirror, so it is new.
 printf 'leftover junk' >"${out}/${host}/changes/fresh.html"
 
 # --- pass 2: two bodies move, pages appear and disappear ---------------------
-httrack "${common[@]}" -O "$out" --purge-old=0 --update \
-    "${base}/changes/index.html" >"${tmpdir}/log2" 2>&1
+local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" --purge-old=0 --update "${BASEURL}/changes/index.html"
 expect "pass 2 is not a first crawl" "false" "$(field first_crawl)"
 
 # The redirect behind sized.html now points at a much longer target name.
@@ -174,8 +163,7 @@ expect "a failed transfer keeps its bytes" "$resetdigest" \
     "$(digest "${out}/${host}/changes/reset.bin")"
 
 # --- pass 3: the same run with purging on ------------------------------------
-httrack "${common[@]}" -O "$out" --update "${base}/changes/index.html" \
-    >"${tmpdir}/log3" 2>&1
+local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --update "${BASEURL}/changes/index.html"
 expect "the report says files were purged" "true" "$(field purged)"
 expect "gone is the page that only pass 2 linked" \
     "${host}/changes/transient.html" "$(listed gone | sort)"
@@ -191,8 +179,7 @@ nocache="${tmpdir}/nocache"
 mkdir "$nocache"
 ncreport="${nocache}/hts-changes.json"
 for pass in 1 2; do
-    httrack "${common[@]}" -O "$nocache" -C0 "${base}/changes2/index.html" \
-        >"${tmpdir}/lognc${pass}" 2>&1
+    local_crawl --log "${tmpdir}/lognc${pass}" "${common[@]}" -O "$nocache" -C0 "${BASEURL}/changes2/index.html"
 done
 expect "with no cache first_crawl is undetermined, not guessed" "null" \
     "$(field first_crawl "$ncreport")" "$ncreport"

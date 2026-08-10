@@ -5,32 +5,24 @@
 # charset does represent must still go out as its encoded bytes.
 set -eu
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 root=$(nativepath "${testdir}/server-root")
 
-python=$(find_python) || skip "python3 not found"
 httrack=$(command -v httrack) || ! echo "could not find httrack" >&2 || exit 1
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_854.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
 reqlog="${tmpdir}/requests.txt"
 : >"$reqlog"
-CHARREF_LOG="$reqlog" "$python" "$server" --root "$root" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+local_server_start --env CHARREF_LOG="$reqlog" --root "$root"
 
 "$httrack" -O "${tmpdir}/crawl" --quiet --disable-security-limits --robots=0 \
-    --timeout=30 --retries=0 "http://127.0.0.1:${port}/charref/index.html" \
+    --timeout=30 --retries=0 "http://127.0.0.1:${SRV_PORT}/charref/index.html" \
     >"${tmpdir}/crawl.log" 2>&1 || true
 
 query_of() {

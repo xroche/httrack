@@ -6,8 +6,8 @@
 # mirror holding either one names which rewrite came back.
 set -eu
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 # The fixtures carry the raw bytes the requests decode back to, which NTFS
 # refuses.
@@ -15,9 +15,7 @@ set -eu
     exit 77
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_982.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
@@ -78,21 +76,15 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
 # fit too. Absolute, because a clipped relative link dies on the URL-length gate
 # anyway while a clipped absolute one lands just under it and gets fetched. The
 # port is only known once the server is up, hence a second crawl of our own.
-python=$(find_python) || skip "python3 not found"
 qdoc="${tmpdir}/qdoc"
 mkdir -p "$qdoc"
 printf 'placeholder\n' >"${qdoc}/index.html"
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
-LOCAL_SERVER_VERBOSE=1 "$python" "$(nativepath "${testdir}/local-server.py")" \
-    --root "$(nativepath "$qdoc")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+local_server_start --env LOCAL_SERVER_VERBOSE=1 --root "$qdoc"
 
 # 300 control bytes of path escape to ~900, under the URL-length gate; 380 more
 # of query escape to ~1140, which together overrun the 2 KB link buffer.
 {
-    printf '<html><body><a href="http://127.0.0.1:%s/a' "$port"
+    printf '<html><body><a href="http://127.0.0.1:%s/a' "$SRV_PORT"
     awk 'BEGIN { while (i++ < 300) printf "%c", 11 }'
     printf 'b.html?q='
     awk 'BEGIN { while (i++ < 380) printf "%c", 11 }'
@@ -100,12 +92,12 @@ port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 } >"${qdoc}/index.html"
 
 out="${tmpdir}/qout"
-httrack "http://127.0.0.1:${port}/index.html" -O "$out" -q -r3 -%v0 ||
+httrack "http://127.0.0.1:${SRV_PORT}/index.html" -O "$out" -q -r3 -%v0 ||
     fail "the query crawl did not run"
 # A clipped link went out as a 2 KB request and 404ed, so assert the outcome
 # and not just the refusal: nothing oversized asked for, nothing errored.
 errors=$(grep -acE '^[0-9:]*[[:space:]]Error:' "${out}/hts-log.txt" || true)
 test "$errors" -eq 0 || fail "the oversized query was fetched ($errors errors)"
 longest=$(awk '{ if (length($0) > n) n = length($0) } END { print n + 0 }' \
-    "$serverlog")
+    "$SRV_LOG")
 test "$longest" -lt 1024 || fail "a ${longest}-byte request line went out"

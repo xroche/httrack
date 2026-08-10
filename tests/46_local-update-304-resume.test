@@ -5,31 +5,21 @@
 # 304, and must recover the whole file.
 set -u
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 root=$(nativepath "${testdir}/server-root")
 
-python=$(find_python) || skip "python3 not found"
-
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_c7.XXXXXX") || exit 1
-serverpid=
 crawlpid=
 cleanup() {
     test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
 counter="${tmpdir}/reqcount"
 mark="${tmpdir}/got304"
-RESUME304_COUNTER="$counter" RESUME304_MARK="$mark" "$python" "$server" --root "$root" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-base="http://127.0.0.1:${port}"
+local_server_start --env RESUME304_COUNTER="$counter" --env RESUME304_MARK="$mark" --root "$root"
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -42,7 +32,7 @@ refdir="${out}/hts-cache/ref"
 
 # --- pass 1: crawl, interrupt once the blob download is underway -------------
 printf '[pass 1: interrupt mid-download] ..\t'
-httrack "${common[@]}" "${base}/resume304/index.html" >"${tmpdir}/log1" 2>&1 &
+httrack "${common[@]}" "${BASEURL}/resume304/index.html" >"${tmpdir}/log1" 2>&1 &
 crawlpid=$!
 for _ in $(seq 1 300); do
     test -s "$counter" && break
@@ -62,7 +52,7 @@ before=$(wc -c <"$counter" 2>/dev/null || echo 0)
 
 # --- pass 2: --continue -> resume Range -> bogus 304 -> drop + refetch --------
 printf '[pass 2: resume gets 304, must refetch] ..\t'
-httrack "${common[@]}" --continue "${base}/resume304/index.html" >"${tmpdir}/log2" 2>&1
+local_crawl --log "${tmpdir}/log2" "${common[@]}" --continue "${BASEURL}/resume304/index.html"
 echo "OK (terminated)"
 
 blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)

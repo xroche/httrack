@@ -6,26 +6,16 @@
 # so a build with neither fortify nor ASan still tests something.
 
 set -e
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
-
-python=$(find_python) || skip "python3 not found"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_spool.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
-"$python" "$server" --root "$(nativepath "${testdir}/server-root")" \
-    >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+local_server_start
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -33,10 +23,7 @@ which httrack >/dev/null || {
 }
 
 rc=0
-httrack -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 \
-    --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 \
-    "http://127.0.0.1:${port}/bakname/index.html" \
-    >"${tmpdir}/log" 2>&1 || rc=$?
+local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
 test "$rc" -eq 0 || {
     echo "httrack exited $rc"
     cat "${tmpdir}/log"

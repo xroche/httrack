@@ -10,14 +10,13 @@
 
 set -euo pipefail
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 if test "${V6_SUPPORT:-}" == "no"; then
     echo "no IPv6 support (resolver list/override is IPv6-only), skipping"
     exit 77
 fi
-python=$(find_python) || skip "python3 missing"
 # The fixture needs a second loopback IP (dead 127.0.0.2 + live 127.0.0.1) for
 # the fallback to have a target; GNU/Hurd has only 127.0.0.1, so skip there.
 case "$(uname -s)" in
@@ -27,29 +26,22 @@ GNU | GNU/*)
     ;;
 esac
 
-server=$(nativepath "$top_srcdir/tests/local-server.py")
-root=$(nativepath "$top_srcdir/tests/server-root")
 tmpdir=$(mktemp -d)
-serverpid=
 
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
 # bind the live server to 127.0.0.1 only, so 127.0.0.2 refuses the connect
-"$python" "$server" --root "$root" --bind 127.0.0.1 >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
-serverpid=$!
-port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
+local_server_start --log "$tmpdir/srv.out" --bind 127.0.0.1
 
 out="$tmpdir/crawl"
 # macOS has only 127.0.0.1, so the dead 127.0.0.x connects block to the timeout
 # instead of refusing instantly (as on Linux); a small --timeout + --retries=0
 # bound the stall without changing what the fallback exercises.
 HTTRACK_DEBUG_RESOLVE="deadhost:127.0.0.2,127.0.0.1" \
-    httrack "http://deadhost:$port/simple/basic.html" -O "$out" \
-    -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z >"$tmpdir/log" 2>&1
+    local_crawl --log "$tmpdir/log" "http://deadhost:${SRV_PORT}/simple/basic.html" -O "$out" -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z
 
 log="$out/hts-log.txt"
 
@@ -67,7 +59,7 @@ test "$errs" == "0" || {
     grep -iE "Error:" "$log"
     exit 1
 }
-test -f "$out/deadhost_$port/simple/basic.html" || {
+test -f "$out/deadhost_${SRV_PORT}/simple/basic.html" || {
     echo "FAIL: basic.html not downloaded via fallback"
     find "$out" -type f
     exit 1
@@ -77,8 +69,7 @@ test -f "$out/deadhost_$port/simple/basic.html" || {
 # timeout would catch a hang/loop)
 out2="$tmpdir/crawl2"
 HTTRACK_DEBUG_RESOLVE="alldead:127.0.0.2,127.0.0.3" \
-    httrack "http://alldead:$port/simple/basic.html" -O "$out2" \
-    -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z >"$tmpdir/log2" 2>&1
+    local_crawl --log "$tmpdir/log2" "http://alldead:${SRV_PORT}/simple/basic.html" -O "$out2" -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z
 log2="$out2/hts-log.txt"
 
 grep -q "trying next address" "$log2" || {
@@ -91,7 +82,7 @@ grep -iqE "^[0-9:]*[[:space:]]Error:" "$log2" || {
     cat "$log2"
     exit 1
 }
-test ! -f "$out2/alldead_$port/simple/basic.html" || {
+test ! -f "$out2/alldead_${SRV_PORT}/simple/basic.html" || {
     echo "FAIL: file downloaded despite every address failing"
     exit 1
 }

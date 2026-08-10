@@ -4,27 +4,16 @@
 # never ran the index pass, so any report it wrote would be false (#1061).
 set -euo pipefail
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
-root=$(nativepath "${testdir}/server-root")
-
-python=$(find_python) || skip "python3 not found"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_abort.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
-"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-base="http://127.0.0.1:${port}"
+local_server_start
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -51,8 +40,7 @@ no_tmp() { test -z "$(find "$out" -maxdepth 1 -name '*.tmp' -print -quit)"; }
 unpoisoned() { ! grep -qa "$poison" "$1"; }
 
 # --- pass 1: a complete crawl, to have something an abort could destroy ------
-httrack "${common[@]}" -O "$out" "${base}/changes/index.html" \
-    >"${tmpdir}/log1" 2>&1
+local_crawl --log "${tmpdir}/log1" "${common[@]}" -O "$out" "${BASEURL}/changes/index.html"
 test -s "$report" || {
     echo "FAIL: pass 1 wrote no ${report}"
     exit 1
@@ -68,8 +56,7 @@ done
 
 # --- pass 2: -#L trips the link limit deep in the crawl loop -----------------
 # -C0 so the pass re-downloads: a revisit-only pass declines to swap on its own.
-httrack "${common[@]}" -O "$out" -C0 -\#L4 "${base}/changes/index.html" \
-    >"${tmpdir}/log2" 2>&1
+local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" -C0 -\#L4 "${BASEURL}/changes/index.html"
 expect "the link limit aborted the crawl" \
     grep -aq "Too many URLs" "${out}/hts-log.txt"
 expect "the abort still committed the archive" \
@@ -83,10 +70,8 @@ cp "${out}/warc-out.warc.gz" "${tmpdir}/warc2.gz"
 cp "${out}/warc-out.cdx" "${tmpdir}/cdx2"
 
 # --- pass 3: server gone, so the no-data rollback restores the last session --
-stop_server "$serverpid"
-serverpid=
-httrack "${common[@]}" -O "$out" --retries=1 --update "${base}/changes/index.html" \
-    >"${tmpdir}/log3" 2>&1
+local_server_stop "$SRV_PID"
+local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --retries=1 --update "${BASEURL}/changes/index.html"
 expect "the dead pass rolled the session back" \
     grep -aq "restoring previous one" "${out}/hts-log.txt"
 expect "the rollback kept the previous change report" \
