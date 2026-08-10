@@ -44,5 +44,5 @@ the walk only works in English.
 - An existing mirror at the base path finishes from cache in no time, which turns
   the progress shot into a second copy of the finished screen. The walk runs under
   a throwaway `$HOME`, which also keeps the host's own projects out of the shots.
-- The language dropdown on the welcome screen shoots blank: its first entry is an
-  empty "leave as is" option, and that is what a first run selects.
+- Shoot on CI, not on a workstation: the pages ask for Trebuchet/Verdana, no runner
+  or box has either, and the fallback's metrics decide where every label wraps.
