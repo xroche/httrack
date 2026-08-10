@@ -88,10 +88,9 @@ function debug {
 function info { printf "[%s] ..\t" "$*" >&2; }
 function result { echo "$*" >&2; }
 
-# Teardown, pushed one frame at a time and run in reverse: the crawl dies first,
-# then the server local_server_start registered, and the tmpdir goes last. Both
-# read their global at teardown time, since a cleanup_push argument is expanded
-# at push time and neither pid nor path is known yet.
+# Teardown frames, run in reverse: the crawl first, then the server the library
+# registered, then the tmpdir. Functions, not arguments, since cleanup_push
+# expands its arguments at push time and neither value exists yet.
 function kill_crawl {
     test -n "$crawlpid" || return 0
     kill -9 "$crawlpid" 2>/dev/null
@@ -146,8 +145,8 @@ nopurge=
 cleanup_push purge_tmpdir
 
 # python3 is required; mirror check-network.sh's skip-with-77 convention. Found
-# here rather than inside local_server_start, so a host without it skips before
-# any of the setup below, and $python serves the validators too.
+# here rather than in local_server_start, so a host without it skips before any
+# setup, and the validators below share the interpreter.
 python=$(find_python) || ! echo "python3 not found; skipping local crawl tests" >&2 || exit 77
 SRV_PYTHON=$python
 
@@ -238,9 +237,8 @@ while test "$pos" -lt "$nargs"; do
 done
 
 # --- start the server --------------------------------------------------------
-# The library reaps it and reports a server that never announced its port; the
-# wording 72 and 105 key on ("server exited early", "could not discover server
-# port") comes from discover_server_port itself, on stderr.
+# The library reaps it and reports one that never announced its port. The
+# wording 72 and 105 skip on comes from discover_server_port, on stderr.
 local_server_start ${tlsargs[@]+"${tlsargs[@]}"} --root "$root"
 port=$SRV_PORT
 baseurl=$BASEURL
@@ -290,10 +288,10 @@ fi
 declare -a moreargs=(--quiet "--max-time=$CRAWL_MAX_TIME" --timeout=30 --disable-security-limits --robots=0)
 log="${tmpdir}/log"
 
-# One pass over the same mirror dir: $1 its log, $2 what to call it, the rest
-# extra httrack arguments. Leaves the status in $crawlres. Backgrounded here
-# rather than run through local_crawl, which would put the engine in its own
-# process group, out of reach of the suite watchdog's stack dump (105).
+# One pass: $1 its log, $2 its name in the diagnostics, the rest extra httrack
+# arguments; the status lands in $crawlres. Backgrounded here rather than run
+# through local_crawl, whose own process group would hide the engine from the
+# suite watchdog's stack dump (105).
 function run_pass {
     local passlog=$1 label=$2 deadline
     shift 2
@@ -307,8 +305,8 @@ function run_pass {
     test "$crawlres" -ne 124 || warning "${label} watchdog fired after ${deadline}s"
 }
 
-# End the run on a pass that failed, dumping its log: the engine's own output is
-# the only record of why it stopped.
+# End the run on a failed pass, dumping its log: the engine's own output is the
+# only record of why it stopped.
 function require_pass {
     test "$crawlres" -eq 0 && return 0
     result "$2 exited $crawlres"
@@ -454,7 +452,7 @@ if test -n "$rerun_dead"; then
     # Disarms its teardown too, so the reaping cannot signal a recycled pid.
     local_server_stop "$SRV_PID"
     info "re-running httrack against the stopped server"
-    # Status ignored: the rollback the assertions below make is the point.
+    # Status ignored: the assertions below are about the rollback, not the pass.
     run_pass "${log}.dead" "dead pass"
     result "OK (dead pass ran)"
     # The dead pass must have gone through the no-data rollback, not bailed out
