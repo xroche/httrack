@@ -2,15 +2,14 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # htsarrays.h growth macros (driven by 'httrack -#test=arrays').
 
 # Success path: growth reaches the requested room and the payload survives
 # every reallocation.
-rc=0
-out=$(httrack -#test=arrays run) || rc=$?
-test "$rc" -eq 0 || exit 1
-test "$out" == "arrays: OK" || exit 1
+assert_selftest "arrays: OK" arrays run
 
 # A hang is the pre-fix symptom here, so bound the runs where the shell can
 # (macOS ships no timeout(1); there the suite watchdog is the backstop).

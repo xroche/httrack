@@ -9,5 +9,4 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-httrack -O /dev/null -#test=contentcodings "$dir" run |
-    grep -q "contentcodings self-test OK"
+assert_selftest "contentcodings self-test OK" contentcodings "$dir" run
