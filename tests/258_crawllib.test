@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # crawllib's launch and crawl helpers, exercised from a subject process: a
-# firing assertion, and the reaping the library registers, both end that
-# process rather than this one.
+# firing assertion, and the library's own reaping, each end that process.
 
 # The subject snippets below are deliberately unexpanded: they run in the
 # subject, against its own tmpdir and the variables the library sets there.
@@ -100,6 +99,16 @@ read -r apid bpid <"${tmpdir}/s${subject}/pids"
 ! kill -0 "$bpid" 2>/dev/null || fail "server $bpid survived its test"
 ok "two servers get distinct ports and both are reaped on exit"
 
+## A test that stops its own server still exits clean, and reaps nothing twice
+holds 'local_server_start
+pid=$SRV_PID
+stop_server "$SRV_PID"
+! kill -0 "$pid" 2>/dev/null || fail "the mid-run stop left the server alive"
+printf "%s\n" "$pid" >"${tmpdir}/pid"'
+read -r pid <"${tmpdir}/s${subject}/pid"
+! kill -0 "$pid" 2>/dev/null || fail "server $pid survived"
+ok "a server stopped mid-test leaves the teardown a no-op"
+
 ## local_crawl's argument contract, read off a shim rather than a real crawl
 shim="${tmpdir}/bin"
 mkdir -p "$shim"
@@ -113,38 +122,64 @@ chmod +x "${shim}/httrack"
 argv="${tmpdir}/argv"
 export SHIM_ARGV="$argv"
 PATH="${shim}:$PATH"
+url="http://127.0.0.1:1/x"
 
-local_crawl -O /dev/null "http://127.0.0.1:1/x"
-grep -qx -- '--max-time=120' "$argv" || fail "local_crawl dropped its default --max-time"
-grep -qx -- '-O' "$argv" || fail "local_crawl dropped the caller's arguments"
-ok "local_crawl adds a --max-time backstop"
+# Truncate first, then require the URL back: an assertion that only reads $argv
+# would otherwise pass on the previous call's arguments when the crawl never ran.
+crawled() { # crawled ARGS...
+    local rc=0
+    : >"$argv"
+    # Not the last command, so its status is captured rather than the grep's.
+    local_crawl "$@" || rc=$?
+    grep -qxF -- "$url" "$argv" || fail "httrack never ran, or lost its URL"
+    return "$rc"
+}
+has() { grep -qxF -- "$1" "$argv" || fail "${2:-missing argument $1}"; }
+hasnt() { ! grep -qxF -- "$1" "$argv" || fail "${2:-unwanted argument $1}"; }
+
+crawled -O /dev/null "$url"
+has '--max-time=120' "local_crawl dropped its default --max-time"
+# Values, not just flags: an argv rebuilt from options alone would pass on flags.
+assert_eq "--max-time=120
+-O
+/dev/null
+$url" "$(cat "$argv")" "the caller's arguments reach httrack, in order, after the cap"
+ok "local_crawl adds a --max-time backstop ahead of the caller's arguments"
 
 # A caller's own cap wins: with two of them the engine takes one of the pair,
 # and the backstop exists to be the weaker.
-local_crawl --max-time=7 -O /dev/null "http://127.0.0.1:1/x"
-! grep -qx -- '--max-time=120' "$argv" || fail "local_crawl added a cap over the caller's"
-grep -qx -- '--max-time=7' "$argv" || fail "local_crawl dropped the caller's cap"
-local_crawl --max-time 7 -O /dev/null "http://127.0.0.1:1/x"
-! grep -qx -- '--max-time=120' "$argv" || fail "the spaced form did not suppress the default"
+crawled --max-time=7 -O /dev/null "$url"
+hasnt '--max-time=120' "local_crawl added a cap over the caller's"
+has '--max-time=7' "local_crawl dropped the caller's cap"
+crawled --max-time 7 -O /dev/null "$url"
+hasnt '--max-time=120' "the spaced form did not suppress the default"
+has '--max-time' "the spaced form lost the caller's cap"
+has '7' "the spaced form lost the cap's value"
+# Back to the default, so a library that only ever adds it once is caught.
+crawled -O /dev/null "$url"
+has '--max-time=120' "the default cap was added only on the first crawl"
 ok "a caller's own --max-time suppresses the default, in either spelling"
 
 ## The exit status is httrack's own
 export SHIM_RC=3
 rc=0
-local_crawl -O /dev/null "http://127.0.0.1:1/x" || rc=$?
+crawled -O /dev/null "$url" || rc=$?
 assert_eq 3 "$rc" "local_crawl returns httrack's status"
 unset SHIM_RC
 ok "local_crawl returns the crawl's exit status"
 
-## --log captures the crawl's output, and the default discards it
+## --log takes the crawl's output, and the default discards it
 cat >"${shim}/httrack" <<'SH'
 #!/bin/bash
 echo "crawl-said-this"
 SH
 chmod +x "${shim}/httrack"
-local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "http://127.0.0.1:1/x"
-assert_match "crawl-said-this" "$(cat "${tmpdir}/crawl.log")" "--log captured stdout"
-ok "--log captures the crawl output"
+local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "$url"
+assert_eq "crawl-said-this" "$(cat "${tmpdir}/crawl.log")" "--log took stdout"
+# Truncated, not appended: every call site it replaced used a plain > redirect.
+local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "$url"
+assert_eq "crawl-said-this" "$(cat "${tmpdir}/crawl.log")" "--log truncates per crawl"
+ok "--log takes the crawl output, one crawl at a time"
 
 ## The watchdog reds a crawl that never ends, from a subject: it ends the test
 cat >"${shim}/httrack" <<'SH'
@@ -152,11 +187,16 @@ cat >"${shim}/httrack" <<'SH'
 sleep 30
 SH
 chmod +x "${shim}/httrack"
-export PATH
+export PATH CRAWL_DEADLINE=2
 start=$SECONDS
-fires 'local_crawl --deadline 2 -O /dev/null "http://127.0.0.1:1/x"' \
+fires 'local_crawl -O /dev/null "http://127.0.0.1:1/x"' \
     'crawl watchdog fired after 2s'
-test "$((SECONDS - start))" -lt 20 || fail "the watchdog outran its own deadline"
-ok "the watchdog reds a wedged crawl instead of hanging the suite"
+elapsed=$((SECONDS - start))
+# Bounded both ways: firing early would red a healthy crawl, and a watchdog that
+# ignored CRAWL_DEADLINE would sit out the shim's whole sleep.
+test "$elapsed" -ge 1 || fail "the watchdog fired before its deadline"
+test "$elapsed" -lt 15 || fail "the watchdog outran its deadline: ${elapsed}s"
+unset CRAWL_DEADLINE
+ok "CRAWL_DEADLINE drives the watchdog, which reds a wedged crawl"
 
 echo "PASS"

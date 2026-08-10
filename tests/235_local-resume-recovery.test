@@ -23,8 +23,6 @@ cleanup() {
 }
 cleanup_push cleanup
 
-# stdin off the terminal: run_with_timeout toggles job control, and a background
-# job that touches the tty is stopped with SIGTTIN.
 local_server_start
 
 which httrack >/dev/null || {
@@ -92,7 +90,9 @@ test "$(blob_size "$out")" -eq "$have" || {
     exit 1
 }
 rc=0
-local_crawl --log "${out}.log2" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 -c1 --retries=0 --continue "${BASEURL}/resume206/index.html" || rc=$?
+run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=30 -c1 --retries=0 --continue \
+    "${BASEURL}/resume206/index.html" >"${out}.log2" 2>&1 || rc=$?
 test "$rc" -ne 124 || {
     echo "FAIL: the crawl never terminated"
     exit 1
@@ -123,7 +123,9 @@ out="${tmpdir}/loop"
 mkdir "$out"
 interrupt_pass1 "$out" resume206loop --retries=0
 rc=0
-local_crawl --log "${out}.log2" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 -c1 --retries=0 --continue "${BASEURL}/resume206loop/index.html" || rc=$?
+run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=30 -c1 --retries=0 --continue \
+    "${BASEURL}/resume206loop/index.html" >"${out}.log2" 2>&1 || rc=$?
 test "$rc" -ne 124 || {
     echo "FAIL: the crawl never terminated; the restart is unbounded"
     exit 1
@@ -148,7 +150,9 @@ printf '[alias redirect cannot reset the latch] ..\t'
 out="${tmpdir}/alias"
 mkdir "$out"
 rc=0
-local_crawl --log "${out}.log1" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 -c1 --retries=1 "${BASEURL}/alias206/index.html" || rc=$?
+run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=30 -c1 --retries=1 \
+    "${BASEURL}/alias206/index.html" >"${out}.log1" 2>&1 || rc=$?
 test "$rc" -ne 124 || {
     echo "FAIL: the crawl never terminated; the alias hop reset the latch"
     exit 1
@@ -205,7 +209,9 @@ attempts="${tmpdir}/attempts.txt"
 export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
 export UNLINKFAIL_MATCH=blob.bin UNLINKFAIL_LOG="$attempts" LD_PRELOAD="$UNLINKFAIL_LIB"
 rc=0
-local_crawl --log "${out}.log2" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 -c1 --retries=1 --continue "${BASEURL}/crange206mem/index.html" || rc=$?
+run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=30 -c1 --retries=1 --continue \
+    "${BASEURL}/crange206mem/index.html" >"${out}.log2" 2>&1 || rc=$?
 unset LD_PRELOAD
 test "$rc" -ne 124 || {
     echo "FAIL: the crawl never terminated"

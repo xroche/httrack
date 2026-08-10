@@ -6,10 +6,19 @@
 # shellcheck source=tests/testlib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/testlib.sh"
 
+# Reap the server unless it is already gone. A test that stops its own server
+# mid-run leaves the registered cleanup holding a dead pid, and stop_server's
+# Windows path answers an unresolvable pid by killing every python.exe.
+local_server_reap() {
+    kill -0 "$1" 2>/dev/null || return 0
+    stop_server "$1"
+}
+
 # Start local-server.py in the background on an ephemeral port and wait for its
 # "PORT n" line. Sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL, and registers the
-# reaping cleanup. Callable more than once; a caller wanting two servers saves
-# each set before starting the next. Options, ahead of any server argument:
+# reaping cleanup. A second call overwrites all four and truncates the default
+# log, so a caller wanting two servers saves each set and gives each its own
+# --log. Options, ahead of any server argument; -- ends them:
 #   --root DIR    tree to serve (default: the shared server-root fixture)
 #   --log FILE    where the announcement lands (default: $tmpdir/server.log)
 #   --env V=VAL   an environment variable for the server, repeatable
@@ -38,17 +47,19 @@ local_server_start() {
         esac
     done
 
-    test -n "${CRAWLLIB_PYTHON:-}" ||
-        CRAWLLIB_PYTHON=$(find_python) || skip "python3 not found"
+    test -n "${SRV_PYTHON:-}" ||
+        SRV_PYTHON=$(find_python) || skip "python3 not found"
     test -n "$log" || log="${tmpdir:?no tmpdir and no --log}/server.log"
     SRV_LOG=$log
     : >"$SRV_LOG"
 
-    env ${envs[@]+"${envs[@]}"} "$CRAWLLIB_PYTHON" \
+    # Stdin off the terminal: run_with_timeout toggles job control, and a
+    # background job that touches the tty is stopped with SIGTTIN.
+    env ${envs[@]+"${envs[@]}"} "$SRV_PYTHON" \
         "$(nativepath "${testdir}/local-server.py")" \
         --root "$(nativepath "$root")" "$@" >"$SRV_LOG" 2>&1 </dev/null &
     SRV_PID=$!
-    cleanup_push stop_server "$SRV_PID"
+    cleanup_push local_server_reap "$SRV_PID"
 
     SRV_PORT=$(discover_server_port "$SRV_LOG" "$SRV_PID") ||
         fail "local-server did not come up: $(cat "$SRV_LOG")"
@@ -60,16 +71,13 @@ local_server_start() {
 # backstops local-crawl.sh has and most of these tests lacked: a --max-time cap
 # (skipped when the caller sets its own) and a watchdog above it, so a wedge
 # outliving the engine limit reds the test instead of the 45-minute CI timeout.
-#   --deadline N   watchdog seconds (default: CRAWL_DEADLINE, else 180)
-#   --log FILE     crawl output, appended (default: discarded)
+# CRAWL_DEADLINE drives the watchdog, as it does for local-crawl.sh.
+# One option, ahead of any httrack argument; -- ends it:
+#   --log FILE     crawl output (default: discarded)
 local_crawl() {
     local deadline="${CRAWL_DEADLINE:-180}" log=/dev/null arg rc=0
     while test $# -gt 0; do
         case $1 in
-        --deadline)
-            deadline=$2
-            shift 2
-            ;;
         --log)
             log=$2
             shift 2
@@ -88,7 +96,7 @@ local_crawl() {
     done
     args+=("$@")
 
-    run_with_timeout "$deadline" httrack "${args[@]}" >>"$log" 2>&1 || rc=$?
+    run_with_timeout "$deadline" httrack "${args[@]}" >"$log" 2>&1 || rc=$?
     test "$rc" -ne 124 || fail "crawl watchdog fired after ${deadline}s"
     return "$rc"
 }

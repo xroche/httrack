@@ -15,7 +15,6 @@ cleanup() {
 }
 cleanup_push cleanup
 
-# --- start the server, discover its ephemeral port --------------------------
 # RESUME_COUNTER gets a byte per /resume/blob.txt request (pass-2 delta bounds re-gets).
 counter="${tmpdir}/blobcount"
 local_server_start --env RESUME_COUNTER="$counter" --root "$root"
