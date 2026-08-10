@@ -79,13 +79,13 @@ ok "the script's own exit status survives the teardown"
 # Status 1 is the trap's own exit. An untrapped fatal signal also reaches the EXIT
 # trap, so it would drain the stack too, but leaves 128+n -- asserting "non-zero"
 # would hold with no signal trap at all. Each signal is sent, since a trap
-# covering TERM alone passes a TERM-only check.
-# Every signal is reported, not just the first to break: they fail one platform at
-# a time, and a loop stopping at INT says nothing about HUP or QUIT. The elapsed
-# time separates the two ways a leg can break -- one that sat out the sleep never
-# had the signal delivered, one that returned at once had it and ignored the trap.
+# covering TERM alone passes a TERM-only check, and each is reported with the time
+# it took: a leg that sits out the sleep never had its signal delivered at all.
+# That is INT and QUIT on both Windows runners, where TERM and HUP arrive at once.
+sigs="TERM INT HUP QUIT"
+! is_windows || sigs="TERM HUP"
 bad=
-for sig in TERM INT HUP QUIT; do
+for sig in $sigs; do
     write_subject <<EOF
 cleanup_push note 'drained'
 kill -${sig} \$\$
