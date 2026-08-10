@@ -80,17 +80,25 @@ ok "the script's own exit status survives the teardown"
 # trap, so it would drain the stack too, but leaves 128+n -- asserting "non-zero"
 # would hold with no signal trap at all. Each signal is sent, since a trap
 # covering TERM alone passes a TERM-only check.
+# Every signal is reported, not just the first to break: they fail one platform at
+# a time, and a loop stopping at INT says nothing about HUP or QUIT. The elapsed
+# time separates the two ways a leg can break -- one that sat out the sleep never
+# had the signal delivered, one that returned at once had it and ignored the trap.
+bad=
 for sig in TERM INT HUP QUIT; do
     write_subject <<EOF
 cleanup_push note 'drained'
 kill -${sig} \$\$
 sleep 30
 EOF
+    start=$SECONDS
     rc=$(subject)
-    test "$rc" -eq 1 || fail "SIG${sig} left status $rc, not the trap's exit 1"
+    test "$rc" -eq 1 ||
+        bad="$bad [SIG${sig} left status $rc after $((SECONDS - start))s, not the trap's exit 1]"
     test "$(cat "$tmpdir/log")" = drained ||
-        fail "SIG${sig} drained the stack $(wc -l <"$tmpdir/log") times"
+        bad="$bad [SIG${sig} drained the stack $(wc -l <"$tmpdir/log") times]"
 done
+test -z "$bad" || fail "signal teardown:$bad"
 ok "each trapped signal runs the teardown once and ends the test"
 
 ## re-sourcing keeps a stack already built
