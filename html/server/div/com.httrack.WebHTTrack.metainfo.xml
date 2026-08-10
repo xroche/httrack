@@ -44,7 +44,9 @@
   <screenshots>
     <screenshot type="default">
       <caption>Choosing the addresses and options for a new mirror</caption>
-      <image>https://www.httrack.com/html/images/screenshot_01b.jpg</image>
+      <!-- A guide asset, so every screenshot reshoot refreshes this too.
+           appstream-network.yml resolves the URL weekly if the name moves. -->
+      <image>https://www.httrack.com/html/img/guide-web-project-setup.png</image>
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1"/>
