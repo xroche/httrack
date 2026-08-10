@@ -1,3 +1,13 @@
+httrack (3.49.20-1) unstable; urgency=medium
+
+  * New upstream release: an off-site link that looked like a file could pull
+    in the whole foreign site, a mirror asked to stop while receiving over FTP
+    hung, and the documentation was refreshed; full list in history.txt.
+  * debian/copyright: record the League Spartan webfont the documentation now
+    bundles (OFL-1.1).
+
+ -- Xavier Roche <xavier@debian.org>  Mon, 10 Aug 2026 21:08:40 +0200
+
 httrack (3.49.19-1) unstable; urgency=medium
 
   * New upstream release: mostly FTP fixes, plus stack-overflow, mirror
