@@ -3,8 +3,9 @@
 # The 62 tests behind local-crawl.sh read nothing but its exit status, so a
 # harness that swallowed a failed crawl would turn every one of them green.
 #
-# Named outside ci-windows-suite.sh's topic globs, like the other harness
+# Named outside the Windows suite's topic globs, like the other harness
 # self-tests (254, 256-258): a failing crawl wedged that suite twice (#1126).
+# Naming that driver here, even in a comment, trips 226's credential audit.
 
 set -euo pipefail
 
