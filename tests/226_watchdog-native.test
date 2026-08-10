@@ -110,10 +110,7 @@ scrubs "$tmp/unscrubbed.test" && fail "the scrub audit passes a test that does n
 
 # PATH holds MSYS-style entries only, and TMPDIR on Windows is a D:/... path
 # that would split it on the drive colon.
-posixtmp=$tmp
-if is_windows && command -v cygpath >/dev/null 2>&1; then
-    posixtmp=$(cygpath -u "$tmp")
-fi
+posixtmp=$(posixpath "$tmp")
 bin="$posixtmp/bin"
 mkdir -p "$bin"
 # Renamed into place, so the poll below cannot read a half-written file.
