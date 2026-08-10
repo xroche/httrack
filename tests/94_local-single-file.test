@@ -3,16 +3,13 @@
 # end over a real crawl, decoding the payloads against what the server served.
 set -e
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 python=$(find_python) || skip "python3 not found"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_713.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
@@ -66,12 +63,7 @@ printf '<svg xmlns="http://www.w3.org/2000/svg"><circle r="1"/></svg>\n' \
 } >"${doc}/big.svg"
 
 # --- server -----------------------------------------------------------------
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
-"$python" "$server" --root "$(nativepath "$doc")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-base="http://127.0.0.1:${port}"
+local_server_start --root "$doc"
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -84,10 +76,9 @@ out="${tmpdir}/crawl"
 mkdir "$out"
 opts=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0)
 common=(-O "$out" "${opts[@]}")
-httrack "${common[@]}" --single-file --single-file-max-size 4096 \
-    "${base}/index.html" >"${tmpdir}/log1" 2>&1
+local_crawl --log "${tmpdir}/log1" "${common[@]}" --single-file --single-file-max-size 4096 "${BASEURL}/index.html"
 
-page="${out}/127.0.0.1_${port}/index.html"
+page="${out}/127.0.0.1_${SRV_PORT}/index.html"
 test -f "$page" || {
     echo "FAIL: no mirrored page at $page"
     exit 1
@@ -139,7 +130,7 @@ if grep -q 'data-src="lazy.svg"' "$page"; then
     echo "FAIL: data-src kept its link"
     exit 1
 fi
-test -f "${out}/127.0.0.1_${port}/lazy.svg" || {
+test -f "${out}/127.0.0.1_${SRV_PORT}/lazy.svg" || {
     echo "FAIL: the lazy image was never downloaded, so nothing was proven"
     exit 1
 }
@@ -170,7 +161,7 @@ grep -q 'href="other.html"' "$page" || {
     echo "FAIL: the link to another page was not left relative"
     exit 1
 }
-test -f "${out}/127.0.0.1_${port}/other.html" || {
+test -f "${out}/127.0.0.1_${SRV_PORT}/other.html" || {
     echo "FAIL: the linked page is missing from the mirror"
     exit 1
 }
@@ -204,7 +195,7 @@ grep -q '<link href="style_norel.css">' "$page" || {
     echo "FAIL: a <link> with no rel was inlined"
     exit 1
 }
-test -f "${out}/127.0.0.1_${port}/style_norel.css" || {
+test -f "${out}/127.0.0.1_${SRV_PORT}/style_norel.css" || {
     echo "FAIL: style_norel.css is missing, so the probe proves nothing"
     exit 1
 }
@@ -215,7 +206,7 @@ grep -q 'src="big.svg"' "$page" || {
     echo "FAIL: the over-cap asset did not keep its link"
     exit 1
 }
-test -f "${out}/127.0.0.1_${port}/big.svg" || {
+test -f "${out}/127.0.0.1_${SRV_PORT}/big.svg" || {
     echo "FAIL: the over-cap asset is missing from the mirror"
     exit 1
 }
@@ -230,7 +221,7 @@ if grep -q 'href="style.css"' "$page"; then
     echo "FAIL: the stylesheet link survived"
     exit 1
 fi
-test -f "${out}/127.0.0.1_${port}/style.css" || {
+test -f "${out}/127.0.0.1_${SRV_PORT}/style.css" || {
     echo "FAIL: the mirror lost the standalone stylesheet"
     exit 1
 }
@@ -240,8 +231,7 @@ echo OK
 printf '[idempotent under --update] ..\t'
 # HTTrack stamps the time into its own footer comment, so compare without it.
 grep -v 'Mirrored from' "$page" >"${tmpdir}/page1.html"
-httrack "${common[@]}" --single-file --single-file-max-size 4096 --update \
-    "${base}/index.html" >"${tmpdir}/log2" 2>&1
+local_crawl --log "${tmpdir}/log2" "${common[@]}" --single-file --single-file-max-size 4096 --update "${BASEURL}/index.html"
 grep -v 'Mirrored from' "$page" >"${tmpdir}/page2.html"
 cmp -s "${tmpdir}/page1.html" "${tmpdir}/page2.html" || {
     echo "FAIL: the second run changed the page"
@@ -263,17 +253,16 @@ printf '[-%%Z0 and a bad cap] ..\t'
 # it; a non-numeric cap is rejected and the built-in default used instead.
 off="${tmpdir}/off"
 mkdir "$off"
-httrack -O "$off" "${opts[@]}" -%Z0 "${base}/index.html" >"${tmpdir}/log3" 2>&1
-offpage="${off}/127.0.0.1_${port}/index.html"
+local_crawl --log "${tmpdir}/log3" -O "$off" "${opts[@]}" -%Z0 "${BASEURL}/index.html"
+offpage="${off}/127.0.0.1_${SRV_PORT}/index.html"
 if grep -q 'base64,' "$offpage"; then
     echo "FAIL: -%Z0 still inlined"
     exit 1
 fi
 bad="${tmpdir}/bad"
 mkdir "$bad"
-httrack -O "$bad" "${opts[@]}" --single-file-max-size notanumber \
-    "${base}/index.html" >"${tmpdir}/log4" 2>&1
-badpage="${bad}/127.0.0.1_${port}/index.html"
+local_crawl --log "${tmpdir}/log4" -O "$bad" "${opts[@]}" --single-file-max-size notanumber "${BASEURL}/index.html"
+badpage="${bad}/127.0.0.1_${SRV_PORT}/index.html"
 # The default cap is 10 MB, so everything here inlines, big.svg included.
 grep -q 'data:image/svg+xml;base64,' "$badpage" || {
     echo "FAIL: a rejected cap did not fall back to the default"
@@ -301,7 +290,7 @@ printf '[a mark cannot ride in on a header] ..\t'
 # htsparse echoes the Content-Type charset into a <meta>, a channel the body
 # sweep cannot see, so /sfmark.html serves a mark there. It names pixel.svg, so
 # an expansion would leave a data: URI.
-markpage="${out}/127.0.0.1_${port}/sfmark.html"
+markpage="${out}/127.0.0.1_${SRV_PORT}/sfmark.html"
 test -f "$markpage" || {
     echo "FAIL: the charset-mark page was not mirrored"
     exit 1
@@ -325,7 +314,7 @@ printf '[no file keeps a mark] ..\t'
 # 1 clean, anything above that means the sweep never read the tree.
 st=0
 marked=$(grep -rlE '#![0-9a-f]{16}\.[-cj]\.[0-9]+' \
-    "${out}/127.0.0.1_${port}" 2>/dev/null) || st=$?
+    "${out}/127.0.0.1_$SRV_PORT" 2>/dev/null) || st=$?
 test "$st" -le 1 || {
     echo "FAIL: the mark sweep could not read the mirror (grep exit $st)"
     exit 1
@@ -374,7 +363,7 @@ echo OK
 
 printf '[-%%M refuses to pair with --single-file] ..\t'
 both=$(httrack -O "${tmpdir}/both" --quiet --robots=0 --retries=0 -%M \
-    --single-file "${base}/index.html" 2>&1 || true)
+    --single-file "${BASEURL}/index.html" 2>&1 || true)
 case "$both" in
 *"pick one"*) echo OK ;;
 *)
@@ -390,9 +379,8 @@ chg="${tmpdir}/chg"
 mkdir "$chg"
 # Its own -O: "$common" points at the first mirror, which left $chgpage absent
 # and every check below vacuous.
-httrack -O "$chg" "${opts[@]}" --single-file --changes "${base}/index.html" \
-    >"${tmpdir}/log6" 2>&1
-chgpage="${chg}/127.0.0.1_${port}/index.html"
+local_crawl --log "${tmpdir}/log6" -O "$chg" "${opts[@]}" --single-file --changes "${BASEURL}/index.html"
+chgpage="${chg}/127.0.0.1_${SRV_PORT}/index.html"
 test -f "$chgpage" || {
     echo "FAIL: --changes produced no mirrored page"
     exit 1
@@ -431,10 +419,9 @@ else
     mkdir "$umaskdir"
     (
         umask 077
-        httrack -O "$umaskdir" "${opts[@]}" --single-file \
-            "${base}/index.html" >"${tmpdir}/log5" 2>&1
+        local_crawl --log "${tmpdir}/log5" -O "$umaskdir" "${opts[@]}" --single-file "${BASEURL}/index.html"
     )
-    umaskroot="${umaskdir}/127.0.0.1_${port}"
+    umaskroot="${umaskdir}/127.0.0.1_$SRV_PORT"
     mode() { "$python" -c 'import os,sys
 print("%04o" % (os.stat(sys.argv[1]).st_mode & 0o777))' "$1"; }
     pagemode=$(mode "${umaskroot}/index.html")

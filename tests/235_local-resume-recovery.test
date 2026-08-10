@@ -4,10 +4,9 @@
 set -e
 set -u
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 server=$(nativepath "${testdir}/local-server.py")
-root=$(nativepath "${testdir}/server-root")
 
 python=$(find_python) || skip "python3 not found"
 
@@ -16,24 +15,17 @@ python=$(find_python) || skip "python3 not found"
 skip_on_windows "Windows: the pass-1 interrupt needs a signal MSYS cannot deliver"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_resume.XXXXXX") || exit 1
-serverpid=
 crawlpid=
 cleanup() {
     set +e
     test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
 # stdin off the terminal: run_with_timeout toggles job control, and a background
 # job that touches the tty is stopped with SIGTTIN.
-"$python" "$server" --root "$root" >"$serverlog" 2>&1 </dev/null &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-base="http://127.0.0.1:${port}"
+local_server_start
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -59,7 +51,7 @@ interrupt_pass1() { # interrupt_pass1 <out> <route> <extra httrack args...>
     shift 2
     local refdir="${out}/hts-cache/ref"
     httrack -O "$out" --quiet --disable-security-limits --robots=0 \
-        --timeout=30 -c1 "$@" "${base}/${route}/index.html" \
+        --timeout=30 -c1 "$@" "${BASEURL}/${route}/index.html" \
         >"${out}.log1" 2>&1 &
     crawlpid=$!
     local _
@@ -100,9 +92,7 @@ test "$(blob_size "$out")" -eq "$have" || {
     exit 1
 }
 rc=0
-run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
-    --robots=0 --timeout=30 -c1 --retries=0 --continue \
-    "${base}/resume206/index.html" >"${out}.log2" 2>&1 || rc=$?
+local_crawl --log "${out}.log2" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 -c1 --retries=0 --continue "${BASEURL}/resume206/index.html" || rc=$?
 test "$rc" -ne 124 || {
     echo "FAIL: the crawl never terminated"
     exit 1
@@ -133,9 +123,7 @@ out="${tmpdir}/loop"
 mkdir "$out"
 interrupt_pass1 "$out" resume206loop --retries=0
 rc=0
-run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
-    --robots=0 --timeout=30 -c1 --retries=0 --continue \
-    "${base}/resume206loop/index.html" >"${out}.log2" 2>&1 || rc=$?
+local_crawl --log "${out}.log2" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 -c1 --retries=0 --continue "${BASEURL}/resume206loop/index.html" || rc=$?
 test "$rc" -ne 124 || {
     echo "FAIL: the crawl never terminated; the restart is unbounded"
     exit 1
@@ -160,9 +148,7 @@ printf '[alias redirect cannot reset the latch] ..\t'
 out="${tmpdir}/alias"
 mkdir "$out"
 rc=0
-run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
-    --robots=0 --timeout=30 -c1 --retries=1 \
-    "${base}/alias206/index.html" >"${out}.log1" 2>&1 || rc=$?
+local_crawl --log "${out}.log1" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 -c1 --retries=1 "${BASEURL}/alias206/index.html" || rc=$?
 test "$rc" -ne 124 || {
     echo "FAIL: the crawl never terminated; the alias hop reset the latch"
     exit 1
@@ -219,9 +205,7 @@ attempts="${tmpdir}/attempts.txt"
 export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
 export UNLINKFAIL_MATCH=blob.bin UNLINKFAIL_LOG="$attempts" LD_PRELOAD="$UNLINKFAIL_LIB"
 rc=0
-run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
-    --robots=0 --timeout=30 -c1 --retries=1 --continue \
-    "${base}/crange206mem/index.html" >"${out}.log2" 2>&1 || rc=$?
+local_crawl --log "${out}.log2" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 -c1 --retries=1 --continue "${BASEURL}/crange206mem/index.html" || rc=$?
 unset LD_PRELOAD
 test "$rc" -ne 124 || {
     echo "FAIL: the crawl never terminated"

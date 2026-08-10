@@ -6,29 +6,18 @@
 # are UBSan-only: a normal build wraps to the same reject+restart.
 set -u
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
-root=$(nativepath "${testdir}/server-root")
-
-python=$(find_python) || skip "python3 not found"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_crange.XXXXXX") || exit 1
-serverpid=
 crawlpid=
 cleanup() {
     test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
-"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-base="http://127.0.0.1:${port}"
+local_server_start
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -41,7 +30,7 @@ refdir="${out}/hts-cache/ref"
 
 # --- pass 1: crawl, interrupt once the blob download is underway -------------
 printf '[pass 1: interrupt mid-download] ..\t'
-httrack "${common[@]}" "${base}/crange206/index.html" >"${tmpdir}/log1" 2>&1 &
+httrack "${common[@]}" "${BASEURL}/crange206/index.html" >"${tmpdir}/log1" 2>&1 &
 crawlpid=$!
 for _ in $(seq 1 300); do
     test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" && break
@@ -60,7 +49,7 @@ echo "OK (temp-ref present)"
 
 # --- pass 2: --continue -> resume -> hostile INT64_MAX Content-Range ----------
 printf '[pass 2: hostile 206, no overflow, refetch] ..\t'
-httrack "${common[@]}" --continue "${base}/crange206/index.html" >"${tmpdir}/log2" 2>&1
+local_crawl --log "${tmpdir}/log2" "${common[@]}" --continue "${BASEURL}/crange206/index.html"
 echo "OK (terminated)"
 
 blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)

@@ -3,32 +3,22 @@
 # 416. Pass 1 leaves a partial + temp-ref; pass 2 must terminate and not loop.
 set -u
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 root=$(nativepath "${testdir}/server-root")
 
-python=$(find_python) || skip "python3 not found"
-
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_206.XXXXXX") || exit 1
-serverpid=
 crawlpid=
 cleanup() {
     test -n "$crawlpid" && kill -9 "$crawlpid" 2>/dev/null
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
 # --- start the server, discover its ephemeral port --------------------------
 # RESUME_COUNTER gets a byte per /resume/blob.txt request (pass-2 delta bounds re-gets).
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
 counter="${tmpdir}/blobcount"
-RESUME_COUNTER="$counter" "$python" "$server" --root "$root" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-base="http://127.0.0.1:${port}"
+local_server_start --env RESUME_COUNTER="$counter" --root "$root"
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -41,7 +31,7 @@ refdir="${out}/hts-cache/ref"
 
 # --- pass 1: crawl, interrupt once the blob download is underway -------------
 printf '[pass 1: interrupt mid-download] ..\t'
-httrack "${common[@]}" "${base}/resume/index.html" >"${tmpdir}/log1" 2>&1 &
+httrack "${common[@]}" "${BASEURL}/resume/index.html" >"${tmpdir}/log1" 2>&1 &
 crawlpid=$!
 # Wait until blob.txt is requested, then SIGTERM so httrack's exit handler
 # finalizes the cache and serializes the temp-ref.
@@ -65,7 +55,7 @@ before=$(wc -c <"$counter" 2>/dev/null || echo 0)
 # Kill pass 2 after a deadline (portable stand-in for `timeout`, absent on macOS).
 printf '[pass 2: resume must terminate] ..\t'
 HANG_RC=137 # 128 + SIGKILL
-httrack "${common[@]}" --continue "${base}/resume/index.html" >"${tmpdir}/log2" 2>&1 &
+httrack "${common[@]}" --continue "${BASEURL}/resume/index.html" >"${tmpdir}/log2" 2>&1 &
 crawlpid=$!
 (sleep 30 && kill -9 "$crawlpid" 2>/dev/null) &
 guard=$!

@@ -3,28 +3,20 @@
 # follow the new geometry instead of the hardcoded 80x24 one.
 set -eu
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
-root=$(nativepath "${testdir}/server-root")
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 driver=$(nativepath "${testdir}/pty-resize.py")
 
 skip_on_windows "no pty on Windows"
 python=$(find_python) || skip "python3 not found"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_resize.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
-"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+local_server_start
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -33,7 +25,7 @@ which httrack >/dev/null || {
 
 # Trickled pages under a long path: the display keeps animating while the pty is
 # resized under it, and the URL is truncated at 80 columns but not at 200.
-deep="127.0.0.1:${port}/trickle/deep/a-long-directory-segment/another-long-segment"
+deep="127.0.0.1:${SRV_PORT}/trickle/deep/a-long-directory-segment/another-long-segment"
 out="${tmpdir}/crawl"
 mkdir "$out"
 rc=0

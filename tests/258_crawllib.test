@@ -1,0 +1,162 @@
+#!/bin/bash
+#
+# crawllib's launch and crawl helpers, exercised from a subject process: a
+# firing assertion, and the reaping the library registers, both end that
+# process rather than this one.
+
+# The subject snippets below are deliberately unexpanded: they run in the
+# subject, against its own tmpdir and the variables the library sets there.
+# shellcheck disable=SC2016
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
+
+find_python >/dev/null || skip "python3 not found"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_crawllib.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+
+ok() { echo "OK: $*"; }
+
+rc=0 out=
+run_subject() {
+    printf 'set -euo pipefail\n. "%s/crawllib.sh"\ntmpdir=%s\n%s\n' \
+        "$testdir" "$1" "$2" >"${1}/subject.sh"
+    rc=0
+    out=$(bash "${1}/subject.sh" 2>&1) || rc=$?
+}
+
+# Each subject gets its own tmpdir: the library defaults its log to $tmpdir and
+# registers cleanups there.
+subject=0
+holds() {
+    subject=$((subject + 1))
+    mkdir -p "${tmpdir}/s${subject}"
+    run_subject "${tmpdir}/s${subject}" "$1"
+    test "$rc" -eq 0 || fail "[$1] should have held, exited $rc: $out"
+}
+
+fires() {
+    subject=$((subject + 1))
+    mkdir -p "${tmpdir}/s${subject}"
+    run_subject "${tmpdir}/s${subject}" "$1"
+    test "$rc" -eq 1 || fail "[$1] should have failed, exited $rc: $out"
+    case "$out" in
+    *"$2"*) ;;
+    *) fail "[$1] failed without reporting '$2': $out" ;;
+    esac
+}
+
+## local_server_start announces a live server
+holds 'local_server_start
+test -n "$SRV_PORT" && test -n "$SRV_PID" && test -n "$SRV_LOG"
+test "$BASEURL" = "http://127.0.0.1:${SRV_PORT}"
+kill -0 "$SRV_PID"'
+ok "local_server_start sets BASEURL, SRV_PORT, SRV_PID and SRV_LOG"
+
+# A server that cannot bind must end the test, not leave SRV_PORT empty and let
+# every later assertion run against a dead port.
+fires 'local_server_start --bind 300.300.300.300' 'local-server did not come up'
+ok "a server that fails to bind fails the test"
+
+## --root picks what is served, and the default is the shared fixture
+holds 'mkdir -p "${tmpdir}/doc"
+printf "picked-this-root\n" >"${tmpdir}/doc/probe.html"
+local_server_start --root "${tmpdir}/doc"
+body=$("$(find_python)" - "$SRV_PORT" <<PY
+import sys, urllib.request
+print(urllib.request.urlopen("http://127.0.0.1:%s/probe.html" % sys.argv[1]).read().decode())
+PY
+)
+assert_match "picked-this-root" "$body" "served from --root"'
+ok "--root is what gets served"
+
+## --env reaches the server process
+holds 'local_server_start --env LOCAL_SERVER_VERBOSE=1
+"$(find_python)" - "$SRV_PORT" <<PY
+import sys, urllib.request
+urllib.request.urlopen("http://127.0.0.1:%s/simple/basic.html" % sys.argv[1]).read()
+PY
+grep -q "GET /simple/basic.html" "$SRV_LOG"'
+ok "--env is exported to the server"
+
+## Two servers coexist on their own ports, and both are reaped
+holds 'local_server_start --log "${tmpdir}/a.log"
+a=$SRV_PORT apid=$SRV_PID
+assert_eq "${tmpdir}/a.log" "$SRV_LOG" "--log is where the announcement went"
+local_server_start --log "${tmpdir}/b.log"
+test "$a" != "$SRV_PORT" || fail "both servers took port $a"
+# Two servers, two logs: one shared default would leave the second port
+# discoverable in the first log and hide a --log that never took effect.
+grep -q "PORT ${a}$" "${tmpdir}/a.log" || fail "a.log holds no announcement"
+grep -q "PORT ${SRV_PORT}$" "${tmpdir}/b.log" || fail "b.log holds no announcement"
+! grep -q "PORT ${SRV_PORT}$" "${tmpdir}/a.log" || fail "both servers logged to a.log"
+printf "%s %s\n" "$apid" "$SRV_PID" >"${tmpdir}/pids"'
+read -r apid bpid <"${tmpdir}/s${subject}/pids"
+# The subject has exited, so its cleanups have run.
+! kill -0 "$apid" 2>/dev/null || fail "server $apid survived its test"
+! kill -0 "$bpid" 2>/dev/null || fail "server $bpid survived its test"
+ok "two servers get distinct ports and both are reaped on exit"
+
+## local_crawl's argument contract, read off a shim rather than a real crawl
+shim="${tmpdir}/bin"
+mkdir -p "$shim"
+cat >"${shim}/httrack" <<'SH'
+#!/bin/bash
+printf '%s\n' "$@" >"${SHIM_ARGV:?}"
+exit "${SHIM_RC:-0}"
+SH
+chmod +x "${shim}/httrack"
+
+argv="${tmpdir}/argv"
+export SHIM_ARGV="$argv"
+PATH="${shim}:$PATH"
+
+local_crawl -O /dev/null "http://127.0.0.1:1/x"
+grep -qx -- '--max-time=120' "$argv" || fail "local_crawl dropped its default --max-time"
+grep -qx -- '-O' "$argv" || fail "local_crawl dropped the caller's arguments"
+ok "local_crawl adds a --max-time backstop"
+
+# A caller's own cap wins: with two of them the engine takes one of the pair,
+# and the backstop exists to be the weaker.
+local_crawl --max-time=7 -O /dev/null "http://127.0.0.1:1/x"
+! grep -qx -- '--max-time=120' "$argv" || fail "local_crawl added a cap over the caller's"
+grep -qx -- '--max-time=7' "$argv" || fail "local_crawl dropped the caller's cap"
+local_crawl --max-time 7 -O /dev/null "http://127.0.0.1:1/x"
+! grep -qx -- '--max-time=120' "$argv" || fail "the spaced form did not suppress the default"
+ok "a caller's own --max-time suppresses the default, in either spelling"
+
+## The exit status is httrack's own
+export SHIM_RC=3
+rc=0
+local_crawl -O /dev/null "http://127.0.0.1:1/x" || rc=$?
+assert_eq 3 "$rc" "local_crawl returns httrack's status"
+unset SHIM_RC
+ok "local_crawl returns the crawl's exit status"
+
+## --log captures the crawl's output, and the default discards it
+cat >"${shim}/httrack" <<'SH'
+#!/bin/bash
+echo "crawl-said-this"
+SH
+chmod +x "${shim}/httrack"
+local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "http://127.0.0.1:1/x"
+assert_match "crawl-said-this" "$(cat "${tmpdir}/crawl.log")" "--log captured stdout"
+ok "--log captures the crawl output"
+
+## The watchdog reds a crawl that never ends, from a subject: it ends the test
+cat >"${shim}/httrack" <<'SH'
+#!/bin/bash
+sleep 30
+SH
+chmod +x "${shim}/httrack"
+export PATH
+start=$SECONDS
+fires 'local_crawl --deadline 2 -O /dev/null "http://127.0.0.1:1/x"' \
+    'crawl watchdog fired after 2s'
+test "$((SECONDS - start))" -lt 20 || fail "the watchdog outran its own deadline"
+ok "the watchdog reds a wedged crawl instead of hanging the suite"
+
+echo "PASS"

@@ -7,31 +7,26 @@
 
 set -euo pipefail
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 if test "${V6_SUPPORT:-}" == "no"; then
     echo "no IPv6 support (resolver override compiled out), skipping"
     exit 77
 fi
-python=$(find_python) || skip "python3 missing"
 
-server=$(nativepath "$top_srcdir/tests/local-server.py")
+python=$(find_python) || skip "python3 missing" # freeport reads it from here
+
 root=$(nativepath "$top_srcdir/tests/server-root")
 tmpdir=$(mktemp -d)
-serverpid=
 
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
 # decoy origin: it must stay silent. LOCAL_SERVER_VERBOSE logs any request it gets.
-LOCAL_SERVER_VERBOSE=1 "$python" "$server" --root "$root" --bind 127.0.0.1 \
-    >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
-serverpid=$!
-port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
+local_server_start --env LOCAL_SERVER_VERBOSE=1 --root "$root" --bind 127.0.0.1
 
 # a proxy port nothing listens on: grab a free one and let it close (refuses).
 deadproxy=$(freeport)
@@ -40,16 +35,14 @@ deadproxy=$(freeport)
 # 127.0.0.1 (the decoy) is the one the old bypass reached.
 out="$tmpdir/crawl"
 HTTRACK_DEBUG_RESOLVE="decoyhost:127.0.0.2,127.0.0.1" \
-    httrack "http://decoyhost:$port/simple/basic.html" -O "$out" \
-    -P "127.0.0.1:$deadproxy" -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z \
-    >"$tmpdir/log" 2>&1
+    local_crawl --log "$tmpdir/log" "http://decoyhost:${SRV_PORT}/simple/basic.html" -O "$out" -P "127.0.0.1:$deadproxy" -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z
 
 log="$out/hts-log.txt"
 
 # the origin must have seen no connection (no leak/bypass)
-if grep -qE '"(GET|POST|HEAD|CONNECT) ' "$tmpdir/srv.err"; then
+if grep -qE '"(GET|POST|HEAD|CONNECT) ' "$SRV_LOG"; then
     echo "FAIL: origin was contacted directly, bypassing the proxy"
-    cat "$tmpdir/srv.err"
+    cat "$SRV_LOG"
     exit 1
 fi
 

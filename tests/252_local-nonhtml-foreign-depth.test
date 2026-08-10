@@ -4,38 +4,27 @@
 # engine mirrored 3 files of that host under -n and 7 under +*.jpg, against 1.
 set -eu
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-
-python=$(find_python) || skip "python3 not found"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_121.XXXXXX") || exit 1
-apid=
-bpid=
 cleanup() {
-    stop_server "$apid"
-    stop_server "$bpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-server=$(nativepath "${testdir}/local-server.py")
 mkdir -p "${tmpdir}/aroot" "${tmpdir}/broot"
 
 # The foreign host, answering text/html on every path under /foreign/.
 blog="${tmpdir}/b-server.log"
 : >"$blog"
-"$python" "$server" --root "$(nativepath "${tmpdir}/broot")" \
-    >"$blog" 2>&1 </dev/null &
-bpid=$!
-bport=$(discover_server_port "$blog" "$bpid") || exit 1
+local_server_start --root "${tmpdir}/broot" --log "$blog"
+bport=$SRV_PORT
 
 alog="${tmpdir}/a-server.log"
 : >"$alog"
-"$python" "$server" --root "$(nativepath "${tmpdir}/aroot")" \
-    >"$alog" 2>&1 </dev/null &
-apid=$!
-aport=$(discover_server_port "$alog" "$apid") || exit 1
+local_server_start --root "${tmpdir}/aroot" --log "$alog"
+aport=$SRV_PORT
 
 # Written once A's port is known, since the same-host asset link has to be
 # absolute: a relative one would inherit whatever userinfo the crawl entered by.
@@ -64,9 +53,7 @@ which httrack >/dev/null || fail "could not find httrack"
 crawl() { # crawl <label> <start path> [httrack args...]
     local label=$1 start=$2
     shift 2
-    httrack "http://127.0.0.1:${aport}${start}" -O "${tmpdir}/out-${label}" \
-        --quiet --max-time=120 --timeout=30 --robots=0 --debug-log "$@" \
-        >"${tmpdir}/crawl-${label}.log" 2>&1 || fail "crawl ${label} failed"
+    local_crawl --log "${tmpdir}/crawl-${label}.log" "http://127.0.0.1:${aport}${start}" -O "${tmpdir}/out-${label}" --quiet --max-time=120 --timeout=30 --robots=0 --debug-log "$@" || fail "crawl ${label} failed"
 }
 
 mirrored() { # mirrored <label> <port>
@@ -145,18 +132,12 @@ check hostrule "$aport" "$untouched"
 
 # Entering through credentials puts them in the referer's address but not in
 # the page's own absolute links, which must still count as the same host.
-httrack "http://user:pw@127.0.0.1:${aport}/index.html" \
-    -O "${tmpdir}/out-userinfo" --quiet --max-time=120 --timeout=30 \
-    --robots=0 -n '+*.jpg' \
-    >"${tmpdir}/crawl-userinfo.log" 2>&1 || fail "crawl userinfo failed"
+local_crawl --log "${tmpdir}/crawl-userinfo.log" "http://user:pw@127.0.0.1:${aport}/index.html" -O "${tmpdir}/out-userinfo" --quiet --max-time=120 --timeout=30 --robots=0 -n '+*.jpg' || fail "crawl userinfo failed"
 check userinfo "$aport" "$untouched"
 check userinfo "$bport" "$kept"
 
 # A seeded host is its own referer, so nothing is foreign to it.
-httrack "http://127.0.0.1:${aport}/index.html" \
-    "http://127.0.0.1:${bport}/foreign/s/xxx/distorted.jpg" \
-    -O "${tmpdir}/out-seed" --quiet --max-time=120 --timeout=30 --robots=0 \
-    >"${tmpdir}/crawl-seed.log" 2>&1 || fail "crawl seed failed"
+local_crawl --log "${tmpdir}/crawl-seed.log" "http://127.0.0.1:${aport}/index.html" "http://127.0.0.1:${bport}/foreign/s/xxx/distorted.jpg" -O "${tmpdir}/out-seed" --quiet --max-time=120 --timeout=30 --robots=0 || fail "crawl seed failed"
 check seed "$bport" "$scanned"
 
 # A foreign asset honestly typed is still parsed for what it references: the

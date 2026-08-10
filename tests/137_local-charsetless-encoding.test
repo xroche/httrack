@@ -4,28 +4,19 @@
 # the engine lifts out of it that already is UTF-8 must be left alone.
 
 set -e
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 python=$(find_python) || skip "python3 not found"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_833.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
 mkdir "${tmpdir}/docroot"
-"$python" "$server" --root "$(nativepath "${tmpdir}/docroot")" \
-    >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-base="http://127.0.0.1:${port}"
+local_server_start --root "${tmpdir}/docroot"
 
 which httrack >/dev/null || {
     echo "could not find httrack"
@@ -35,13 +26,11 @@ which httrack >/dev/null || {
 # One crawl per variant: the generated top index carries the seed page's title.
 for variant in u8 l1 declared gb2312 l1decl; do
     mkdir "${tmpdir}/${variant}"
-    httrack -O "${tmpdir}/${variant}" --quiet --disable-security-limits \
-        --robots=0 --timeout=30 --retries=0 \
-        "${base}/titleenc/${variant}.html" >"${tmpdir}/log-${variant}" 2>&1
+    local_crawl --log "${tmpdir}/log-${variant}" -O "${tmpdir}/${variant}" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 "${BASEURL}/titleenc/${variant}.html"
 done
 
 # Byte-level assertions in python: portable, and the shell cannot mangle them.
-"$python" - "$tmpdir" "$port" <<'PY'
+"$python" - "$tmpdir" "$SRV_PORT" <<'PY'
 import os
 import sys
 

@@ -7,12 +7,8 @@
 
 set -eu
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
-root=$(nativepath "${testdir}/server-root")
-
-python=$(find_python) || skip "python3 not found"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 probe=$(ASAN_OPTIONS=help=1 httrack -O /dev/null --version 2>&1 || true)
 case "$probe" in
@@ -24,22 +20,16 @@ case "$probe" in
 esac
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_304leak.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
 
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
-"$python" "$server" --root "$root" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+local_server_start
 
 out="${tmpdir}/crawl"
 mkdir "$out"
-url="http://127.0.0.1:${port}/mini304/index.html"
+url="http://127.0.0.1:${SRV_PORT}/mini304/index.html"
 
 # Last value wins in the sanitizer flag parser, so this overrides the job's
 # settings; the report file, not the exit status, is the verdict.
@@ -52,8 +42,7 @@ run_pass() {
     rm -f "${tmpdir}/asan".*
     printf '[%s] ..\t' "$label"
     ASAN_OPTIONS="${asan_base}:log_path=${tmpdir}/asan" \
-        httrack -O "$out" --quiet --disable-security-limits --robots=0 \
-        --timeout=30 --retries=1 -c1 "$@" "$url" >"${tmpdir}/log_${label}" 2>&1 || true
+        local_crawl --log "${tmpdir}/log_${label}" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=1 -c1 "$@" "$url" || true
     report=$(cat "${tmpdir}/asan".* 2>/dev/null || true)
     test -z "$report" || {
         echo "FAIL: sanitizer report on the ${label} pass"

@@ -3,16 +3,13 @@
 # fragment an SVG sprite selector needs to pick one icon out of the sheet.
 set -e
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server=$(nativepath "${testdir}/local-server.py")
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 
 python=$(find_python) || skip "python3 not found"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_766.XXXXXX") || exit 1
-serverpid=
 cleanup() {
-    stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
@@ -39,12 +36,7 @@ printf '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon-foo"/></svg>\n' \
 } >"${doc}/big.svg"
 
 # --- server -----------------------------------------------------------------
-serverlog="${tmpdir}/server.log"
-: >"$serverlog"
-"$python" "$server" --root "$(nativepath "$doc")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-base="http://127.0.0.1:${port}"
+local_server_start --root "$doc"
 
 which httrack >/dev/null || fail "could not find httrack"
 
@@ -53,11 +45,9 @@ which httrack >/dev/null || fail "could not find httrack"
 # for the rebase path.
 out="${tmpdir}/crawl"
 mkdir "$out"
-httrack -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 \
-    --retries=0 --single-file --single-file-max-size 4096 \
-    "${base}/index.html" >"${tmpdir}/log" 2>&1
+local_crawl --log "${tmpdir}/log" -O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 --single-file --single-file-max-size 4096 "${BASEURL}/index.html"
 
-root="${out}/127.0.0.1_${port}"
+root="${out}/127.0.0.1_$SRV_PORT"
 page="${root}/index.html"
 test -f "$page" || fail "no mirrored page at $page"
 test -f "${root}/big.svg" || fail "the over-cap asset never reached the mirror"
