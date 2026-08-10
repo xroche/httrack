@@ -68,10 +68,18 @@ class SiteHandler(BaseHTTPRequestHandler):
         pass
 
 
-def start_site():
-    httpd = ThreadingHTTPServer(("127.0.0.1", 0), SiteHandler)
+def start_site(host, port):
+    """Serve the site on loopback, addressed as `host` so the shots read like a site.
+
+    `host` only names the server; it has to resolve to 127.0.0.1 for the crawl to
+    reach it. Port 80 is left out of the URL, and needs the caller to have made it
+    bindable (see the screenshots workflow).
+    """
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), SiteHandler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
-    return httpd, "http://127.0.0.1:%d/" % httpd.socket.getsockname()[1]
+    bound = httpd.socket.getsockname()[1]
+    where = host if bound == 80 else "%s:%d" % (host, bound)
+    return httpd, "http://%s/" % where
 
 
 def free_port():
@@ -235,6 +243,17 @@ def main():
         "--lang", type=int, default=1, help="lang.indexes number (1 = English)"
     )
     ap.add_argument("--home", help="$HOME to run under; default is a throwaway one")
+    ap.add_argument(
+        "--site-host",
+        default="127.0.0.1",
+        help="name the crawled site answers to; must resolve to 127.0.0.1",
+    )
+    ap.add_argument(
+        "--site-port",
+        type=int,
+        default=0,
+        help="port to serve it on (default: any free one)",
+    )
     ap.add_argument("--width", type=int, default=1024)
     ap.add_argument("--height", type=int, default=768)
     ap.add_argument("--scale", type=float, default=2.0, help="device pixel ratio")
@@ -249,7 +268,7 @@ def main():
 
     from playwright.sync_api import sync_playwright
 
-    site, site_url = start_site()
+    site, site_url = start_site(args.site_host, args.site_port)
     # A pristine HOME by default: an existing mirror would finish from cache in
     # no time and turn the progress shot into a second copy of the finished
     # screen, and the project list would show whatever the host had lying

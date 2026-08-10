@@ -22,6 +22,13 @@ python3 tools/screenshot-walk.py --htsserver src/htsserver --root . --out shots
 `--root` is the dist root — the directory holding `lang.def`, `lang.indexes`,
 `lang/` and `html/`. A source tree qualifies, so nothing has to be installed first.
 
+A local run addresses the crawl as `127.0.0.1` on a random port, and that string is
+on screen in the wizard panes and names the mirror folder. The workflow instead maps
+`www.example.com` in `/etc/hosts` and lowers `net.ipv4.ip_unprivileged_port_start`
+so the site can answer on 80, which is what `--site-host` and `--site-port` are for.
+Shots meant for publication want that treatment; anything else is a developer
+artifact on display.
+
 ## Adding a screen
 
 Nothing to edit for an option page: the tabs are enumerated from the tab bar and
