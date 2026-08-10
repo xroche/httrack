@@ -52,14 +52,11 @@
 
 set -u
 
-# shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-server="${testdir}/local-server.py"
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
 root="${LOCAL_SERVER_ROOT:-${testdir}/server-root}"
-cert="${testdir}/server.crt"
-key="${testdir}/server.key"
 
-tls=
+tlsargs=()
 verbose=
 warc_validate=
 wacz_validate=
@@ -72,7 +69,6 @@ archive_kept=
 archive_replaced=
 archive_min_files=0
 tmpdir=
-serverpid=
 crawlpid=
 archive_poison="stale-archive-that-a-second-pass-must-replace"
 plant_poison="stale-leftover-that-a-second-pass-must-clobber"
@@ -92,16 +88,16 @@ function debug {
 function info { printf "[%s] ..\t" "$*" >&2; }
 function result { echo "$*" >&2; }
 
-function cleanup {
-    if test -n "$crawlpid"; then
-        kill -9 "$crawlpid" 2>/dev/null
-        crawlpid=
-    fi
-    stop_server "$serverpid"
-    serverpid=
-    if test -n "$tmpdir" && test -d "$tmpdir"; then
-        test -n "$nopurge" || rm -rf "$tmpdir"
-    fi
+# Run in reverse: the crawl dies first, then the server, then the tmpdir.
+# Functions, not arguments: cleanup_push expands its arguments at push time.
+function kill_crawl {
+    test -n "$crawlpid" || return 0
+    kill -9 "$crawlpid" 2>/dev/null
+    crawlpid=
+}
+function purge_tmpdir {
+    test -z "$nopurge" && test -n "$tmpdir" && test -d "$tmpdir" || return 0
+    rm -rf "$tmpdir"
 }
 
 hostroot=
@@ -145,10 +141,12 @@ function assert_equals {
 }
 
 nopurge=
-trap cleanup EXIT HUP INT QUIT PIPE TERM
+cleanup_push purge_tmpdir
 
-# python3 is required; mirror check-network.sh's skip-with-77 convention.
+# python3 is required; mirror check-network.sh's skip-with-77 convention. Found
+# here, not in local_server_start, so a host without it skips before any setup.
 python=$(find_python) || ! echo "python3 not found; skipping local crawl tests" >&2 || exit 77
+SRV_PYTHON=$python
 
 tmptopdir=${TMPDIR:-/tmp}
 test -d "$tmptopdir" || mkdir -p "$tmptopdir" || die "no temporary directory; set TMPDIR"
@@ -158,7 +156,6 @@ tmpdir=$(mktemp -d "${tmptopdir}/httrack_local.XXXXXX") || die "could not create
 declare -a audit=()
 declare -a cookies=()
 declare -a plants=()
-scheme=http
 pos=0
 args=("$@")
 nargs=$#
@@ -185,10 +182,7 @@ while test "$pos" -lt "$nargs"; do
     --cache-under-logroot)
         audit+=("--cache-under-logroot")
         ;;
-    --tls)
-        tls=1
-        scheme=https
-        ;;
+    --tls) tlsargs=(--tls) ;;
     --root)
         pos=$((pos + 1))
         root="${args[$pos]}"
@@ -241,27 +235,12 @@ while test "$pos" -lt "$nargs"; do
 done
 
 # --- start the server --------------------------------------------------------
-test -r "$server" || die "cannot read $server"
-serverlog="${tmpdir}/server.log"
-serverargs=(--root "$(nativepath "$root")")
-if test -n "$tls"; then
-    serverargs+=(--tls --cert "$(nativepath "$cert")" --key "$(nativepath "$key")")
-fi
-debug "starting $python $server ${serverargs[*]}"
-"$python" "$(nativepath "$server")" "${serverargs[@]}" >"$serverlog" 2>&1 &
-serverpid=$!
-
-# Wait for the "PORT <n>" line (server prints it once bound). A cold Python
-# start under a parallel `make check -jN` can lag past a second on a loaded Windows runner.
-port=$(discover_server_port "$serverlog" "$serverpid") || {
-    # A server that died is a hard failure; only the deadline is the announce race
-    # 72 and 105 skip on, and they key on this exact wording.
-    test "$?" -ne 2 || die "server exited early"
-    die "could not discover server port"
-}
-debug "server listening on ${scheme}://127.0.0.1:${port}"
-
-baseurl="${scheme}://127.0.0.1:${port}"
+# local_server_start reaps the server and reports one that never announced its
+# port. 72 and 105 skip on that wording, which discover_server_port writes.
+local_server_start ${tlsargs[@]+"${tlsargs[@]}"} --root "$root"
+port=$SRV_PORT
+baseurl=$BASEURL
+debug "server listening on $baseurl"
 
 # --- substitute BASEURL in the remaining (httrack) args ----------------------
 declare -a hts=()
@@ -302,26 +281,43 @@ elif test -n "$outdir_intl"; then
     logroot="$mirrorroot"
     odir="$mirrorroot"
 fi
-# Localhost is fast; disable the rate/bandwidth safety limits but keep a
-# max-time backstop so a hang cannot wedge the suite.
-declare -a moreargs=(--quiet --max-time=120 --timeout=30 --disable-security-limits --robots=0)
-# Watchdog above --max-time so the engine limit fires first when healthy; only a
-# genuine wedge trips it. CRAWL_DEADLINE lets 72_watchdog-crawl drive it low.
-crawl_deadline=${CRAWL_DEADLINE:-180}
+# Localhost is fast; disable the rate/bandwidth safety limits but keep the
+# engine cap so a hang cannot wedge the suite.
+declare -a moreargs=(--quiet "--max-time=$CRAWL_MAX_TIME" --timeout=30 --disable-security-limits --robots=0)
 log="${tmpdir}/log"
-info "running httrack ${hts[*]}"
-httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" "${moreargs[@]}" "${hts[@]}" >"$log" 2>&1 &
-crawlpid=$!
-wait_bounded "$crawlpid" "$crawl_deadline"
-crawlres=$?
-crawlpid=
-test "$crawlres" -ne 124 || warning "crawl watchdog fired after ${crawl_deadline}s"
-# httrack exits 0 even on hard connect/DNS errors, so this is a backstop only;
-# the real guard is the audit below (--errors 0 plus the host-root existence check).
-test "$crawlres" -eq 0 || ! result "httrack exited $crawlres" || {
-    cat "$log" >&2
+
+# One pass: $1 its log, $2 its name in the diagnostics, the rest extra httrack
+# arguments. Backgrounded here, not through local_crawl, whose own process group
+# would hide the engine from the suite watchdog's stack dump (105).
+function run_pass {
+    local passlog=$1 label=$2 deadline rc=0
+    shift 2
+    deadline=$(crawl_deadline)
+    httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
+        "${moreargs[@]}" "${hts[@]}" "$@" >"$passlog" 2>&1 &
+    crawlpid=$!
+    wait_bounded "$crawlpid" "$deadline" || rc=$?
+    crawlpid=
+    test "$rc" -ne 124 || warning "${label} watchdog fired after ${deadline}s"
+    return "$rc"
+}
+
+# A pass that has to succeed: same arguments, but a failure ends the run with
+# the engine's log, the only record of why it stopped.
+function require_pass {
+    local passlog=$1 label=$2 rc=0
+    run_pass "$@" || rc=$?
+    test "$rc" -eq 0 && return 0
+    result "$label exited $rc"
+    cat "$passlog" >&2
     exit 1
 }
+
+cleanup_push kill_crawl
+info "running httrack ${hts[*]}"
+# httrack exits 0 even on hard connect/DNS errors, so this is a backstop only;
+# the real guard is the audit below (--errors 0 plus the host-root existence check).
+require_pass "$log" crawl
 result "OK"
 grep -iE "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt" >&2
 
@@ -391,16 +387,7 @@ fi
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
 if test -n "$rerun"; then
     info "re-running httrack (update pass)"
-    httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
-        "${moreargs[@]}" "${hts[@]}" >"${log}.2" 2>&1 &
-    crawlpid=$!
-    wait_bounded "$crawlpid" "$crawl_deadline"
-    crawlres=$?
-    crawlpid=
-    test "$crawlres" -eq 0 || ! result "update pass exited $crawlres" || {
-        cat "${log}.2" >&2
-        exit 1
-    }
+    require_pass "${log}.2" "update pass"
     result "OK (update)"
     # The update summary reports "files updated"; a fresh crawl never does. Assert
     # it so a regression that bypasses the cache (re-crawls fresh) can't pass.
@@ -419,16 +406,7 @@ fi
 if test -n "$rerun_args"; then
     read -ra extra <<<"$rerun_args"
     info "re-running httrack with ${rerun_args}"
-    httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
-        "${moreargs[@]}" "${hts[@]}" "${extra[@]}" >"${log}.2" 2>&1 &
-    crawlpid=$!
-    wait_bounded "$crawlpid" "$crawl_deadline"
-    crawlres=$?
-    crawlpid=
-    test "$crawlres" -eq 0 || ! result "second pass exited $crawlres" || {
-        cat "${log}.2" >&2
-        exit 1
-    }
+    require_pass "${log}.2" "second pass" "${extra[@]}"
     result "OK (second pass)"
 fi
 
@@ -467,14 +445,11 @@ if test -n "$rerun_dead"; then
     test -s "$zip" || die "no cache was written by the first pass"
     cp "$zip" "${tmpdir}/cache-before.zip"
     cp "${logroot}/hts-log.txt" "${tmpdir}/log-before.txt"
-    stop_server "$serverpid"
-    serverpid=
+    # Disarms its teardown too, so the reaping cannot signal a recycled pid.
+    local_server_stop "$SRV_PID"
     info "re-running httrack against the stopped server"
-    httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
-        "${moreargs[@]}" "${hts[@]}" >"${log}.dead" 2>&1 &
-    crawlpid=$!
-    wait_bounded "$crawlpid" "$crawl_deadline" || true
-    crawlpid=
+    # Status ignored: the assertions below are about the rollback, not the pass.
+    run_pass "${log}.dead" "dead pass"
     result "OK (dead pass ran)"
     # The dead pass must have gone through the no-data rollback, not bailed out
     # before the mirror loop (which would leave the cache trivially untouched).

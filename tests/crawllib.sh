@@ -1,10 +1,17 @@
 #!/bin/bash
 #
-# local-server.py launch and crawl helpers, for the tests that drive the server
-# themselves instead of going through local-crawl.sh. Sourced, not run.
+# local-server.py launch and crawl helpers, shared by local-crawl.sh and by the
+# tests that drive the server themselves. Sourced, not run.
 
 # shellcheck source=tests/testlib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/testlib.sh"
+
+# Engine time cap, and the watchdog above it: the cap fires first on a healthy
+# crawl, so only a genuine wedge trips the watchdog.
+CRAWL_MAX_TIME=120
+# A function, not a value: 72_watchdog-crawl and 258 set CRAWL_DEADLINE after
+# this file is sourced.
+crawl_deadline() { printf '%s\n' "${CRAWL_DEADLINE:-180}"; }
 
 # Live servers, in start order; a stopped one leaves an empty slot. cleanup_push
 # expands its arguments at push time, so a teardown holding the pid itself could
@@ -32,21 +39,28 @@ local_server_stop() {
 }
 
 # Start local-server.py in the background on an ephemeral port and wait for its
-# "PORT n" line. Sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL, and registers the
-# reaping cleanup, and appends to SRV_PIDS. A second call overwrites all four
-# and truncates the default
-# log, so a caller wanting two servers saves each set and gives each its own --log. Options, ahead of any server argument; -- ends them:
+# "PORT n" line. Sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL, registers the
+# reaping cleanup and appends to SRV_PIDS. A second call overwrites all four and
+# truncates the default log, so a caller wanting two servers saves each set and
+# gives each its own --log. Options, ahead of any server argument; -- ends them:
 #   --root DIR    tree to serve (default: the shared server-root fixture)
 #   --log FILE    where the announcement lands (default: $tmpdir/server.log)
 #   --env V=VAL   an environment variable for the server, repeatable
+#   --tls         serve HTTPS with the test certificate; BASEURL says https
 # shellcheck disable=SC2120 # most callers want the fixture and no options
 local_server_start() {
-    local root="${testdir}/server-root" log='' envs=()
+    local root="${testdir}/server-root" log='' envs=() tls=() scheme=http
     while test $# -gt 0; do
         case $1 in
         --root)
             root=$2
             shift 2
+            ;;
+        --tls)
+            scheme=https
+            tls=(--tls --cert "$(nativepath "${testdir}/server.crt")")
+            tls+=(--key "$(nativepath "${testdir}/server.key")")
+            shift
             ;;
         --log)
             log=$2
@@ -74,7 +88,8 @@ local_server_start() {
     # background job that touches the tty is stopped with SIGTTIN.
     env ${envs[@]+"${envs[@]}"} "$SRV_PYTHON" \
         "$(nativepath "${testdir}/local-server.py")" \
-        --root "$(nativepath "$root")" "$@" >"$SRV_LOG" 2>&1 </dev/null &
+        --root "$(nativepath "$root")" ${tls[@]+"${tls[@]}"} "$@" \
+        >"$SRV_LOG" 2>&1 </dev/null &
     SRV_PID=$!
     SRV_PIDS+=("$SRV_PID")
     cleanup_push local_server_reap "$((${#SRV_PIDS[@]} - 1))"
@@ -82,18 +97,18 @@ local_server_start() {
     SRV_PORT=$(discover_server_port "$SRV_LOG" "$SRV_PID") ||
         fail "local-server did not come up: $(cat "$SRV_LOG")"
     # shellcheck disable=SC2034 # set here for the caller, not used here
-    BASEURL="http://127.0.0.1:${SRV_PORT}"
+    BASEURL="${scheme}://127.0.0.1:${SRV_PORT}"
 }
 
 # Run httrack against the local server, returning its exit status. Carries the
-# backstops local-crawl.sh has and most of these tests lacked: a --max-time cap
-# (skipped when the caller sets its own) and a watchdog above it, so a wedge
-# outliving the engine limit reds the test instead of the 45-minute CI timeout.
-# CRAWL_DEADLINE drives the watchdog, as it does for local-crawl.sh.
+# backstops most of these tests lacked: a --max-time cap (skipped when the caller
+# sets its own) and a watchdog above it, so a wedge outliving the engine limit
+# reds the test instead of the 45-minute CI timeout.
 # One option, ahead of any httrack argument; -- ends it:
 #   --log FILE     crawl output (default: discarded)
 local_crawl() {
-    local deadline="${CRAWL_DEADLINE:-180}" log=/dev/null arg rc=0
+    local deadline log=/dev/null arg rc=0
+    deadline=$(crawl_deadline)
     while test $# -gt 0; do
         case $1 in
         --log)
@@ -108,7 +123,7 @@ local_crawl() {
         esac
     done
 
-    local args=(--max-time=120)
+    local args=("--max-time=$CRAWL_MAX_TIME")
     for arg in "$@"; do
         case $arg in --max-time | --max-time=*) args=() ;; esac
     done

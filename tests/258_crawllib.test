@@ -72,6 +72,20 @@ PY
 assert_match "picked-this-root" "$body" "served from --root"'
 ok "--root is what gets served"
 
+## --tls serves HTTPS, and BASEURL says so
+# Fetched over TLS, not read off BASEURL: an option that set the scheme and left
+# the server plain would pass on the string alone.
+holds 'local_server_start --tls
+assert_eq "https://127.0.0.1:${SRV_PORT}" "$BASEURL" "--tls scheme"
+body=$("$(find_python)" - "$SRV_PORT" <<PY
+import ssl, sys, urllib.request
+url = "https://127.0.0.1:%s/simple/basic.html" % sys.argv[1]
+print(urllib.request.urlopen(url, context=ssl._create_unverified_context()).read().decode())
+PY
+)
+assert_match "<html" "$body" "served over TLS"'
+ok "--tls serves HTTPS, with the scheme in BASEURL"
+
 ## --env reaches the server process
 holds 'local_server_start --env LOCAL_SERVER_VERBOSE=1
 "$(find_python)" - "$SRV_PORT" <<PY

@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# The 62 tests behind local-crawl.sh read nothing but its exit status, so a
+# harness that swallowed a failed crawl would turn every one of them green.
+#
+# Named outside the Windows suite's topic globs, like the other harness
+# self-tests (254, 256-258): a failing crawl wedged that suite twice (#1126).
+# Naming that driver here, even in a comment, trips 226's credential audit.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+find_python >/dev/null || skip "python3 not found"
+command -v httrack >/dev/null || skip "no httrack in PATH"
+
+crawl="${testdir}/local-crawl.sh"
+url='BASEURL/simple/basic.html'
+rc=0 out=
+
+run() { # run ARGS...
+    rc=0
+    out=$(bash "$crawl" "$@" 2>&1) || rc=$?
+}
+
+ok() { echo "OK: $*"; }
+
+# Floor: the same crawl unmutated has to pass, or the failures below could be
+# coming from a broken fixture rather than from what they mean to exercise.
+run --errors 0 httrack "$url"
+test "$rc" -eq 0 || fail "a healthy crawl exited $rc: $out"
+ok "a healthy crawl succeeds"
+
+# A crawl the engine refuses: the status, the pass that failed and the engine's
+# own output must all reach the caller.
+run --errors 0 httrack "$url" --no-such-option
+test "$rc" -ne 0 || fail "a refused crawl reported success: $out"
+assert_match "crawl exited" "$out" "the failing pass is named"
+assert_match "Unknown option" "$out" "the engine's log is dumped"
+ok "a crawl the engine refuses fails the run, log included"
+
+# The same on a later pass, whose failure leaves the first pass's mirror intact:
+# the audits below it all hold, so only ending the run there reports anything.
+run --errors 0 --rerun-args '--no-such-option' httrack "$url"
+test "$rc" -ne 0 || fail "a failed second pass reported success: $out"
+assert_match "second pass exited" "$out" "the failing pass is named"
+ok "a later pass that fails ends the run, mirror notwithstanding"
+
+# An audit that does not hold fails too, naming what it wanted.
+run --errors 0 --files 999 httrack "$url"
+test "$rc" -ne 0 || fail "a wrong file count reported success: $out"
+assert_match "expected '999'" "$out" "the audit names the value it wanted"
+ok "a failing audit fails the run"
+
+echo "PASS"
