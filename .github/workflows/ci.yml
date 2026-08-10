@@ -38,7 +38,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
@@ -80,6 +80,27 @@ jobs:
       - name: Build
         run: make -j"$(nproc)"
 
+      # FTP_PASV is 1 in every build, so #if !FTP_PASV never reaches a compiler
+      # and rots unnoticed (#1091). Compiling is all this proves; nothing runs it.
+      - name: Compile the FTP active-mode branch
+        run: |
+          set -euo pipefail
+          objs="src/libhttrack_la-htsftp.lo src/libhttrack_la-htsftp.o src/.libs/libhttrack_la-htsftp.o"
+          # accept() marks active-mode code: absent from the object Build made,
+          # present below. One-sided, it passes on a file that ignored the define.
+          syms=$(nm --undefined-only src/.libs/libhttrack_la-htsftp.o)
+          if grep -qw accept <<<"$syms"; then
+            echo "::error::accept() is reachable with FTP_PASV=1; the marker no longer discriminates"
+            exit 1
+          fi
+          rm -f $objs
+          # Through CC: overriding CPPFLAGS would drop configure's
+          # -D_FORTIFY_SOURCE and the object-size warnings that come with it.
+          make -C src libhttrack_la-htsftp.lo CC="$CC -DFTP_PASV=0 -Werror"
+          syms=$(nm --undefined-only src/.libs/libhttrack_la-htsftp.o)
+          grep -qw accept <<<"$syms" || { echo "::error::-DFTP_PASV=0 built no active-mode code"; exit 1; }
+          rm -f $objs
+
       # A backstop only: tests/test-timeout.sh bounds each test, and a healthy run
       # is a minute here, two on macOS. Without it a stall ran to the job's 6h default.
       - name: Test
@@ -108,7 +129,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -133,6 +154,48 @@ jobs:
           ! command -v python3
           jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           make check -j"$jobs"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+  # Reproduces the buildds that refuse TEST-NET-1 instead of dropping it, where
+  # every fixture needing a stalled connect must skip rather than fail (#1108).
+  hostile-network:
+    name: build (network refuses TEST-NET-1)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev iproute2
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test on a network that refuses TEST-NET-1
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          tools/hostile-net.sh make check -j"$jobs"
+          # A refusal landing before connect() returns skips on the older probe
+          # instead, leaving the settle this leg exists to guard unrun.
+          cat tests/246_engine-connect-stop.log
+          grep -q 'within 500 ms' tests/246_engine-connect-stop.log
 
       - name: Print the test log on failure
         if: failure()
@@ -292,7 +355,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -401,7 +464,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo dpkg --add-architecture i386
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential gcc-multilib autoconf automake libtool \
             autoconf-archive zlib1g-dev:i386 libssl-dev:i386 \
@@ -444,7 +507,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -499,7 +562,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev
@@ -548,7 +611,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -584,7 +647,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential clang autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -614,7 +677,7 @@ jobs:
       - name: Install build dependencies (no libssl)
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive zlib1g-dev
 
@@ -651,7 +714,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -730,7 +793,7 @@ jobs:
       - name: Install build dependencies
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
@@ -790,17 +853,14 @@ jobs:
         src/webhttrack.in
         tests/*.sh
         tests/*.test
-        tools/macos-app.sh
-        tools/macos-bundle.sh
-        tools/macos-release.sh
-        tools/mkdeb.sh
+        tools/*.sh
     steps:
       - uses: actions/checkout@v7
 
       - name: Install linters
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           # noble ships shfmt 3.8.0 (universe), matching the pinned local dev
           # version; use it rather than fetching a release binary from github.com.
           sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
@@ -859,7 +919,7 @@ jobs:
             | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc >/dev/null
           echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" \
             | sudo tee /etc/apt/sources.list.d/llvm-19.list >/dev/null
-          sudo apt-get update
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
           sudo apt-get install -y --no-install-recommends clang-format-19
           # The clang-format-19 package ships the git-clang-format driver;
           # expose it unsuffixed so "git clang-format" finds it.

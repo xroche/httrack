@@ -4,14 +4,12 @@
 # would call the whole site changed.
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 server=$(nativepath "${testdir}/local-server.py")
 root=$(nativepath "${testdir}/server-root")
 
-python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+python=$(find_python) || skip "python3 not found"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_changes.XXXXXX") || exit 1
 serverpid=
@@ -19,8 +17,7 @@ cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 serverlog="${tmpdir}/server.log"
 : >"$serverlog"

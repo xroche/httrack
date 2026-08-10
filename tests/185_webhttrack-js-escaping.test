@@ -5,25 +5,14 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
-distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
-distdir=$(cd "${distdir}" && pwd)
-# shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+# shellcheck source=tests/webhttracklib.sh
+. "$(dirname "$0")/webhttracklib.sh"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-command -v htsserver >/dev/null || fail "no htsserver in PATH"
-python=$(find_python) || {
-    echo "python3 not found; skipping" >&2
-    exit 77
-}
+htsserver_require
+distdir=${HTS_DISTDIR}
 
 printf '[each template escapes for the position it interpolates into] ..\t'
-"${python}" - "${distdir}" <<'PY' || fail "the templates mix the escaping modes (see above)"
+"${HTS_PYTHON}" - "${distdir}" <<'PY' || fail "the templates mix the escaping modes (see above)"
 import glob, os, re, sys
 
 # A handler value is JS, everything else is HTML text: the two never swap.
@@ -200,18 +189,11 @@ PY
 echo OK
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_jsesc.XXXXXX") || fail "no tmpdir"
-srvlog=$(mktemp)
-srv=
-srvpid=
 cleanup() {
-    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
-    test -z "${srvpid}" || kill -9 "${srvpid}" 2>/dev/null || true
-    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
-    wait "${srv}" 2>/dev/null || true # absorb bash's async "Killed" notice
-    rm -rf "${work}" "${srvlog}"
+    htsserver_cleanup
+    rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 # A private data root, so LANGUAGE_2 can carry the hostile strings. distcheck's
 # srcdir is read-only and cp keeps that mode.
@@ -235,27 +217,9 @@ printf '%s\r\n' \
     >"${root}/lang/Francais.txt"
 
 printf '[a French tooltip survives the two decoders] ..\t'
-sport=$("${python}" -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()')
-(
-    trap '' TERM TTOU
-    # An isolated HOME keeps a stray ~/.httrack.ini out of the served settings.
-    export HOME="${work}"
-    exec htsserver "${root}/" --port "${sport}" >"${srvlog}" 2>&1
-) &
-srv=$!
-for _ in $(seq 1 40); do
-    url=$(sed -n 's/^URL=//p' "${srvlog}") && test -n "${url}" && break
-    kill -0 "${srv}" 2>/dev/null || break
-    sleep 0.25
-done
-test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
-srvpid=$(sed -n 's/^PID=//p' "${srvlog}") # absent on Windows
+htsserver_start --root "${root}" --home "${work}"
 
-"${python}" - "${url}" <<'PY' || fail "tooltips are not JS-escaped (see above)"
+"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "tooltips are not JS-escaped (see above)"
 import re, sys, urllib.request
 
 url = sys.argv[1].rstrip("/")

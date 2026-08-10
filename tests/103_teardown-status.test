@@ -6,15 +6,11 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 tmp=$(mktemp -d)
-trap 'set +e; rm -rf "$tmp"' EXIT
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+cleanup_push rm -rf "$tmp"
 
 # run <trap-body> <script-body>: exit status and stderr of a subject script.
 run() {
@@ -62,7 +58,10 @@ done
 test "$scanned" -ge 50 || fail "scanned $scanned scripts in $top_srcdir/tests, want the whole suite"
 
 bad=$(awk '
-    FNR == 1 { errexit = 0 }
+    # The libraries set no shell options of their own, but every test that
+    # sources them does, so their EXIT traps run under errexit all the same --
+    # and testlib.sh now owns the teardown for most of the suite.
+    FNR == 1 { errexit = (FILENAME ~ /(testlib|proclib|webhttracklib)[.]sh$/) }
     /^[[:space:]]*set[[:space:]]+(-[a-z]*e|-o[[:space:]]+errexit)/ { errexit = 1 }
     !errexit { next }
     !/^[[:space:]]*trap[[:space:]]+.*[[:space:]]EXIT([[:space:]]|;|$)/ { next }

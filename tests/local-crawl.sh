@@ -52,9 +52,8 @@
 
 set -u
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 server="${testdir}/local-server.py"
 root="${LOCAL_SERVER_ROOT:-${testdir}/server-root}"
 cert="${testdir}/server.crt"

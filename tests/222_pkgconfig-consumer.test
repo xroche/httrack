@@ -8,15 +8,6 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-skip() {
-    echo "$*; skipping" >&2
-    exit 77
-}
-
 # Unset means no automake run (the Windows job runs the scripts directly).
 [ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
 [ -f "${abs_top_builddir}/src/Makefile" ] || fail "${abs_top_builddir}/src is not configured"
@@ -35,7 +26,7 @@ command -v "${MAKE:-make}" >/dev/null 2>&1 || skip "no make (${MAKE:-make})"
 export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/pkgconf.XXXXXX") || fail "no tmpdir"
-trap 'set +e; rm -rf "${work}"' EXIT
+cleanup_push rm -rf "${work}"
 
 stage=${work}/stage
 stage_install_target install "${stage}" "${work}/install.log" ||

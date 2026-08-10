@@ -6,63 +6,25 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
-distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
-distdir=$(cd "${distdir}" && pwd)
-# shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+# shellcheck source=tests/webhttracklib.sh
+. "$(dirname "$0")/webhttracklib.sh"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-command -v htsserver >/dev/null || fail "no htsserver in PATH"
-python=$(find_python) || {
-    echo "python3 not found; skipping" >&2
-    exit 77
-}
+htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_lang.XXXXXX") || fail "no tmpdir"
-pids=
 cleanup() {
-    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
-    for p in ${pids}; do
-        kill -9 "${p}" 2>/dev/null || true
-    done
-    wait 2>/dev/null || true # absorb bash's async "Killed" notice
+    htsserver_cleanup
     rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
-# Sets ${url}; it must not print it, or a caller's $(...) would collect ${pids} in a
-# subshell and leave every server running.
-url=
+# Leaves the URL in ${HTS_URL}; never call it from a $(...), or the pids it
+# records would stay in the subshell and every server would keep running.
 serve() { # $1 = tag, $2.. = extra htsserver args
-    local log port
-    log="${work}/srv$1.log"
-    mkdir -p "${work}/h$1"
-    # An isolated HOME keeps a stray ~/.httrack.ini out of the server's settings.
-    port=$("${python}" -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()')
     local tag=$1
     shift
-    (
-        trap '' TERM TTOU
-        export HOME="${work}/h${tag}"
-        exec htsserver "${distdir}/" --port "${port}" "$@" >"${log}" 2>&1
-    ) &
-    pids="${pids} $!"
-    url=
-    for _ in $(seq 1 40); do
-        url=$(sed -n 's/^URL=//p' "${log}") && test -n "${url}" && break
-        sleep 0.25
-    done
-    test -n "${url}" || fail "htsserver did not start: $(cat "${log}")"
+    mkdir -p "${work}/h${tag}"
+    htsserver_start --home "${work}/h${tag}" --log "${work}/srv${tag}.log" "$@"
 }
 
 # Indexes and labels come from lang.indexes and lang.def, not from observed output.
@@ -70,7 +32,7 @@ s.close()')
 # the body was rendered in.
 check() { # $1 = lang index, $2 = expected label, $3 = word in the page heading
     serve "$1" lang "$1"
-    "${python}" - "${url}" "$1" "$2" "$3" <<'PY' || fail "wrong menu or body for language $2"
+    "${HTS_PYTHON}" - "${HTS_URL}" "$1" "$2" "$3" <<'PY' || fail "wrong menu or body for language $2"
 import re, sys, urllib.request
 
 url, want_id, want_label, want_word = sys.argv[1:5]
@@ -105,7 +67,7 @@ check 4 Deutsch Willkommen
 # With no language set the menu falls back to its first entry, which must be the
 # one the page is rendered in. An empty placeholder option would show up blank.
 serve unset
-"${python}" - "${url}" <<'PY' || fail "unset language does not fall back to English"
+"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "unset language does not fall back to English"
 import re, sys, urllib.request
 
 page = urllib.request.urlopen(sys.argv[1], timeout=20).read().decode("utf-8", "replace")

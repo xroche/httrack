@@ -6,10 +6,8 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 if [ "$(uname -s)" != "Linux" ]; then
     echo "close-once: LD_PRELOAD interposition is Linux-only here, skipping" >&2
@@ -32,7 +30,7 @@ for lib in "${CLOSETRACK_LIB:-}" "${FTPCANCEL_LIB:-}"; do
     }
 done
 
-python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+python=$(find_python) || skip "python3 not found"
 command -v httrack >/dev/null || {
     echo "could not find httrack" >&2
     exit 1
@@ -47,13 +45,8 @@ cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
 ok() { echo "OK: $*"; }
 
 root="${tmpdir}/root"

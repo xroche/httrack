@@ -7,19 +7,12 @@
 set -euo pipefail
 export LC_ALL=C
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
 cleanup() { rm -rf "$dir"; }
-trap 'set +e; cleanup' EXIT
-trap 'set +e; cleanup; exit 1' HUP INT TERM
-
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
+cleanup_push cleanup
 
 enc() { printf '%d\n%s' "${#1}" "$1"; }
 

@@ -10,19 +10,14 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-
 # shellcheck source=tests/testlib.sh
-. "$top_srcdir/tests/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 if test "${V6_SUPPORT:-}" == "no"; then
     echo "no IPv6 support (resolver list/override is IPv6-only), skipping"
     exit 77
 fi
-python=$(find_python) || {
-    echo "python3 missing, skipping"
-    exit 77
-}
+python=$(find_python) || skip "python3 missing"
 # The fixture needs a second loopback IP (dead 127.0.0.2 + live 127.0.0.1) for
 # the fallback to have a target; GNU/Hurd has only 127.0.0.1, so skip there.
 case "$(uname -s)" in
@@ -41,7 +36,7 @@ cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
+cleanup_push cleanup
 
 # bind the live server to 127.0.0.1 only, so 127.0.0.2 refuses the connect
 "$python" "$server" --root "$root" --bind 127.0.0.1 >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &

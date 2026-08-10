@@ -6,19 +6,14 @@
 
 set -euo pipefail
 
-: "${top_srcdir:=..}"
-
 # shellcheck source=tests/testlib.sh
-. "$top_srcdir/tests/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 
 if test "${HTTPS_SUPPORT:-}" == "no"; then
     echo "no https support compiled, skipping"
     exit 77
 fi
-python=$(find_python) || {
-    echo "python3 missing, skipping"
-    exit 77
-}
+python=$(find_python) || skip "python3 missing"
 
 server=$(nativepath "$top_srcdir/tests/tls-stall-server.py")
 tmpdir=$(mktemp -d)
@@ -28,7 +23,7 @@ cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
+cleanup_push cleanup
 
 # start_stall_server <tag> <mode-args...>: sets $port from the announced one.
 start_stall_server() {

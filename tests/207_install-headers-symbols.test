@@ -6,15 +6,8 @@
 
 set -euo pipefail
 
-fail() {
-    echo "FAIL: $1" >&2
-    exit 1
-}
-
-skip() {
-    echo "$1, skipping" >&2
-    exit 77
-}
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Unset means no automake run (the Windows job runs the scripts directly), so
 # there is no install rule to drive.
@@ -33,7 +26,7 @@ nm=${NM:-nm}
 command -v "$nm" >/dev/null 2>&1 || skip "no nm ($nm)"
 
 tmp=$(mktemp -d) || exit 1
-trap 'set +e; rm -rf "$tmp"' EXIT
+cleanup_push rm -rf "$tmp"
 
 # ELF only: BSD nm has no -D.
 "$nm" -D --defined-only "$lib" >"$tmp/exported.raw" 2>/dev/null ||

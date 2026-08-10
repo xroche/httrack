@@ -5,101 +5,20 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
-distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
-distdir=$(cd "${distdir}" && pwd)
-# shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+# shellcheck source=tests/webhttracklib.sh
+. "$(dirname "$0")/webhttracklib.sh"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+htsserver_require
 
-command -v htsserver >/dev/null || fail "no htsserver in PATH"
-command -v python3 >/dev/null || {
-    echo "python3 not found; skipping" >&2
-    exit 77
-}
-
-log=$(mktemp)
 work=$(mktemp -d)
 csrv=
-# start() runs in a command substitution, so its $! never reaches this shell. A
-# missed kill leaves an orphan holding the CI job open long after a green suite.
-srvpid() { sed -n 's/^PID=//p' "${log}" 2>/dev/null | head -1; }
 cleanup() {
-    local pid
-    pid=$(srvpid)
-    test -z "${pid}" || kill -9 "${pid}" 2>/dev/null || true
+    htsserver_cleanup
     test -z "${csrv}" || kill -9 "${csrv}" 2>/dev/null || true
     wait "${csrv}" 2>/dev/null || true # absorb bash's async "Killed" notice
-    rm -rf "${log}" "${work}"
+    rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
-
-freeport() {
-    python3 -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()'
-}
-
-# Echo the announced URL.
-start() {
-    local port url
-    port=$(freeport)
-    : >"${log}"
-    (
-        trap '' TERM TTOU
-        exec htsserver "${distdir}/" --port "${port}" >"${log}" 2>&1
-    ) &
-    for _ in $(seq 1 40); do
-        url=$(sed -n 's/^URL=//p' "${log}" 2>/dev/null) && test -n "${url}" && break
-        sleep 0.25
-    done
-    test -n "${url:-}" || fail "htsserver did not come up: $(cat "${log}")"
-    echo "${url}"
-}
-
-portof() { echo "${1##*:}" | tr -d /; }
-
-# GET $2 from 127.0.0.1:$1, headers into $3 and the body, byte for byte, into $4.
-fetch() {
-    python3 -c 'import socket, sys
-s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
-s.settimeout(20)
-s.sendall(("GET %s HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n" % sys.argv[2]).encode())
-out = b""
-while True:
-    b = s.recv(65536)
-    if not b:
-        break
-    out += b
-s.close()
-head, _, body = out.partition(b"\r\n\r\n")
-open(sys.argv[3], "wb").write(head)
-open(sys.argv[4], "wb").write(body)' "$1" "$2" "$3" "$4"
-}
-
-# POST the remaining args as urlencoded key=value fields to 127.0.0.1:$1.
-post() {
-    local port=$1
-    shift
-    python3 -c 'import socket, sys, urllib.parse
-body = "&".join("%s=%s" % (k, urllib.parse.quote(v, safe=""))
-                for k, v in (a.split("=", 1) for a in sys.argv[2:])).encode()
-s = socket.create_connection(("127.0.0.1", int(sys.argv[1])), 10)
-s.settimeout(30)
-s.sendall(b"POST /step4.html HTTP/1.0\r\nHost: 127.0.0.1\r\n"
-          b"Content-type: application/x-www-form-urlencoded\r\n"
-          b"Content-length: %d\r\n\r\n" % len(body) + body)
-while s.recv(65536):
-    pass
-s.close()' "${port}" "$@" >/dev/null
-}
+cleanup_push cleanup
 
 # LF-only, and a line ending in a backslash: the expander rewrites both, so a
 # mangled reply fails the byte comparison even where no directive is present.
@@ -111,27 +30,27 @@ body="${work}/body"
 # point it somewhere empty so a developer's own file cannot shadow the fields.
 export HOME="${work}"
 
-url=$(start)
-port=$(portof "${url}")
+htsserver_start
 
 # Positive control: the GUI's own templates must still expand. This is also
 # where the real token comes from, so its absence below can be asserted.
-fetch "${port}" /server/index.html "${hdr}" "${body}"
-sid=$(sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p' "${body}" | head -1)
+htsserver_client --path /server/index.html --head-file "${hdr}" --body-file "${body}"
+sid=$(firstline "$(sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p' "${body}")")
 test "${#sid}" -eq 32 || fail "GUI page did not expand \${sid} (got '${sid}')"
 
 # /website/ serves only the root the server itself recorded, so save a profile
 # (no command_do=start, so nothing crawls) to create it, then plant the file.
-post "${port}" "sid=${sid}" command=httrack command_do=save winprofile=x \
-    "path=${work}" projname=proj
+htsserver_client --path /step4.html --field "sid=${sid}" --field command=httrack \
+    --field command_do=save --field winprofile=x \
+    --field "path=${work}" --field projname=proj >/dev/null
 test -f "${work}/proj/hts-cache/winprofile.ini" ||
-    fail "profile save did not create the project: $(cat "${log}")"
+    fail "profile save did not create the project: $(cat "${HTS_LOG}")"
 mkdir -p "$(dirname "${mirror}")"
 # shellcheck disable=SC2016 # the directives are the payload, not shell expansions
 printf 'Hostile mirrored page.\nsid=${_sid} copy=${sid}\ntrailing backslash: \\\n' \
     >"${mirror}"
 
-fetch "${port}" /website/hostile.html "${hdr}" "${body}"
+htsserver_client --path /website/hostile.html --head-file "${hdr}" --body-file "${body}"
 grep -q '^HTTP/1\.0 200 ' "${hdr}" || fail "mirrored page not served: $(head -1 "${hdr}")"
 grep -qF "${sid}" "${body}" &&
     fail "the session id was expanded into mirrored content"
@@ -148,16 +67,17 @@ grep -qi '^Content-type: text/html' "${hdr}" ||
 # the GUI's own refresh page, so a /website/ URL stops naming mirrored content.
 # /trickle/ dribbles for a minute, which holds the crawl open for the probe.
 clog="${work}/content.log"
-python3 "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
+"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
 csrv=$!
 cport=$(discover_server_port "${clog}" "${csrv}") ||
     fail "content server did not come up"
 
-post "${port}" "sid=${sid}" "path=${work}" projname=crawl winprofile=x \
-    command_do=start \
-    "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/ -O ${work}/crawl"
+htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" \
+    --field projname=crawl --field winprofile=x --field command_do=start \
+    --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/ -O ${work}/crawl" \
+    >/dev/null
 
-fetch "${port}" /website/hostile.html "${hdr}" "${body}"
+htsserver_client --path /website/hostile.html --head-file "${hdr}" --body-file "${body}"
 grep -q '^HTTP/1\.0 200 ' "${hdr}" ||
     fail "running crawl: /website/ was not overridden to the GUI page: $(head -1 "${hdr}")"
 grep -qF "'crawl' - HTTrack Website Copier" "${body}" ||

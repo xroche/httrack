@@ -10,57 +10,22 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
-distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
-distdir=$(cd "${distdir}" && pwd)
-# shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+# shellcheck source=tests/webhttracklib.sh
+. "$(dirname "$0")/webhttracklib.sh"
 
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
-
-command -v htsserver >/dev/null || fail "no htsserver in PATH"
-python=$(find_python) || {
-    echo "python3 not found; skipping" >&2
-    exit 77
-}
+htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_charset.XXXXXX") || fail "no tmpdir"
-srvlog=$(mktemp)
-srv=
 cleanup() {
-    # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
-    test -z "${srv}" || kill -9 "${srv}" 2>/dev/null || true
-    wait "${srv}" 2>/dev/null || true # absorb bash's async "Killed" notice
-    rm -rf "${work}" "${srvlog}"
+    htsserver_cleanup
+    rm -rf "${work}"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
-# webhttrack server on a pre-picked port; an isolated HOME keeps a stray
-# ~/.httrack.ini out of it.
-sport=$("${python}" -c 'import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()')
-(
-    trap '' TERM TTOU
-    export HOME="${work}"
-    exec htsserver "${distdir}/" --port "${sport}" >"${srvlog}" 2>&1
-) &
-srv=$!
-for _ in $(seq 1 40); do
-    url=$(sed -n 's/^URL=//p' "${srvlog}") && test -n "${url}" && break
-    kill -0 "${srv}" 2>/dev/null || break
-    sleep 0.25
-done
-test -n "${url:-}" || fail "htsserver did not start: $(cat "${srvlog}")"
+htsserver_start --home "${work}"
 
 # Post a "start" whose -O dir is 'café' in the form's ISO-8859-1 charset.
-"${python}" - "${url}" "${work}" <<'PY'
+"${HTS_PYTHON}" - "${HTS_URL}" "${work}" <<'PY'
 import re, sys, urllib.parse, urllib.request
 
 url, work = sys.argv[1], sys.argv[2]
@@ -89,7 +54,7 @@ utf8dir="${work}/café"
 latin1dir="${work}/caf"$'\xe9'
 for _ in $(seq 1 80); do
     test -e "${utf8dir}" && break
-    kill -0 "${srv}" 2>/dev/null || break
+    kill -0 "${HTS_BGPID}" 2>/dev/null || break
     sleep 0.25
 done
 test -e "${utf8dir}" || fail "-O dir never landed as UTF-8 café/: $(find "${work}" -maxdepth 2 2>/dev/null)"

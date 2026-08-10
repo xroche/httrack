@@ -8,20 +8,18 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # Before the driver is sourced: with these set, anything it starts posts a commit
 # status on whatever the surrounding shell was last looking at.
 unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/ci-windows-suite.sh
 . "${testdir}/ci-windows-suite.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_hb.XXXXXX")
-trap 'set +e; rm -rf "$tmp"' EXIT
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+cleanup_push rm -rf "$tmp"
 
 progress="$tmp/progress"
 kill_tree() {

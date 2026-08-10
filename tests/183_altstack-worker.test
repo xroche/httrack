@@ -5,12 +5,10 @@
 
 set -euo pipefail
 
-ulimit -c 0 # a deliberate crash must not litter the box with cores
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
-fail() {
-    echo "$*" >&2
-    exit 1
-}
+ulimit -c 0 # a deliberate crash must not litter the box with cores
 
 case "$(uname -s)" in
 Linux) traced=1 ;;
@@ -56,7 +54,17 @@ if [ "$traced" -eq 0 ]; then
     exit 0
 fi
 
-grep -q "^Caught signal 11$" <<<"$worker" || fail "-#c=threadstack: no 'Caught signal 11' line"
+# Which fault a spent thread stack raises varies by port (hppa does not say
+# SIGSEGV); SIGABRT would instead mean the engine ended itself.
+# By name, not by number: SIGBUS is 7 on x86 and 10 on hppa.
+caught=$(sed -n '/^Caught signal [0-9][0-9]*$/{s/.* //;p;q;}' <<<"$worker")
+case "$(kill -l "${caught:-x}" 2>/dev/null || true)" in
+SEGV | BUS | ILL) ;;
+*)
+    printf '%s\n' "$worker" >&2
+    fail "-#c=threadstack: caught signal '${caught:-none}', expected a fault"
+    ;;
+esac
 
 # The main thread is parked in htsthread_wait_n() once the worker announced
 # itself, and only the worker recurses. A trace that deep is therefore the
@@ -93,7 +101,7 @@ fi
 [ -r "${ALTSTACKPROBE_LIB:-}" ] || fail "${ALTSTACKPROBE_LIB:-\$ALTSTACKPROBE_LIB} was not built"
 
 tmp=$(mktemp -d)
-trap 'set +e; rm -rf "$tmp"' EXIT
+cleanup_push rm -rf "$tmp"
 trap 'exit 1' HUP INT TERM
 
 # See 181: the shim loads ahead of libasan and allocates nothing.

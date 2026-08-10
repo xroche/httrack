@@ -3,19 +3,14 @@
 # follow the new geometry instead of the hardcoded 80x24 one.
 set -eu
 
-: "${top_srcdir:=..}"
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
 server=$(nativepath "${testdir}/local-server.py")
 root=$(nativepath "${testdir}/server-root")
 driver=$(nativepath "${testdir}/pty-resize.py")
 
-if is_windows; then
-    echo "no pty on Windows; skipping" >&2
-    exit 77
-fi
-python=$(find_python) || ! echo "python3 not found; skipping" >&2 || exit 77
+skip_on_windows "no pty on Windows"
+python=$(find_python) || skip "python3 not found"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_resize.XXXXXX") || exit 1
 serverpid=
@@ -23,8 +18,7 @@ cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
-trap 'set +e; cleanup' EXIT
-trap cleanup HUP INT QUIT PIPE TERM
+cleanup_push cleanup
 
 serverlog="${tmpdir}/server.log"
 : >"$serverlog"

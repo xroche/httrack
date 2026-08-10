@@ -7,9 +7,11 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_filelist.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmp"' EXIT
-trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmp"
 
 echo '<html><body>hi</body></html>' >"$tmp/index.html"
 

@@ -6,9 +6,10 @@
 
 set -eu
 
-testdir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=tests/testlib.sh
-. "${testdir}/testlib.sh"
+. "$(dirname "$0")/testlib.sh"
+# shellcheck source=tests/proclib.sh
+. "$(dirname "$0")/proclib.sh"
 
 driver="${testdir}/test-timeout.sh"
 test -r "$driver" || {
@@ -26,8 +27,7 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_sutmo.XXXXXX") || exit 1
 # A colon-free root for the PATH shim below: MSYS hands out a drive-letter TMPDIR
 # and a PATH entry carrying a colon is read as two, which leaves it unreachable.
 shim=$(mktemp -d /tmp/httrack_sutmoshim.XXXXXX 2>/dev/null) || shim="$tmp/starve"
-trap 'set +e; rm -rf "$tmp" "$shim"' EXIT
-trap 'rm -rf "$tmp" "$shim"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmp" "$shim"
 out="$tmp/out"
 
 # --- a hanging test is killed, named, and reported 124 ----------------------
@@ -174,7 +174,10 @@ if ! is_windows && test -r /proc/self/stat; then
     )
     fake=$(cat "$tmp/fake.pid")
     outside=$(cat "$tmp/outside.pid")
-    trap 'set +e; kill "$fake" "$outside" 2>/dev/null; rm -rf "$tmp"' EXIT
+    # Pushed, not trapped: a bare EXIT trap here would drop the stack that holds
+    # $tmp and $shim, which is how $shim used to leak.
+    kill_probes() { kill "$fake" "$outside" 2>/dev/null || true; }
+    cleanup_push kill_probes
     # /proc holds the pid from the fork on, so a fake that never exec'd would fail
     # some later assertion instead of this one.
     running() {
@@ -289,10 +292,7 @@ if is_windows; then
     echo "suite timeout OK (no stack capture on Windows)"
     exit 0
 fi
-command -v httrack >/dev/null || {
-    echo "SKIP: no httrack on PATH for the stack half" >&2
-    exit 77
-}
+command -v httrack >/dev/null || skip "no httrack on PATH for the stack half"
 
 # /watchdog/stall never answers, so the crawl wedges for real. CRAWL_DEADLINE is
 # raised past our budget so the guard under test is what fires, not local-crawl's.

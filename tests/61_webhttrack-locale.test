@@ -5,15 +5,12 @@
 
 set -euo pipefail
 
-testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 distdir=$(cd "${testdir}/.." && pwd)
 # The .in, not the generated script: only SRCHDISTPATH differs, and this stays in srcdir.
 script="${distdir}/src/webhttrack.in"
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
 
 test -r "${script}" || fail "no ${script}"
 test -r "${distdir}/lang.indexes" || fail "no ${distdir}/lang.indexes"
