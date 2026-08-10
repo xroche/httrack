@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# An asset a stylesheet reaches by url() has to be both installed and
+# distributed: dropping either rule styles the docs from a 404, and no build
+# step complains.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+builddir="${abs_top_builddir:?not run under make check}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/docassets.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+cleanup_push rm -rf "${work}"
+
+make -C "${builddir}/html" install DESTDIR="${work}/inst" >"${work}/log" 2>&1 ||
+    fail "make install failed: $(tail -3 "${work}/log")"
+make -C "${builddir}/html" distdir distdir="${work}/dist" \
+    top_distdir="${work}/dist" >>"${work}/log" 2>&1 ||
+    fail "make distdir failed: $(tail -3 "${work}/log")"
+
+# The stylesheets locate htmldir themselves, wherever --htmldir put them.
+installed=$(find "${work}/inst" -name doc.css -type f)
+test -n "${installed}" || fail "doc.css not installed"
+htmldir=$(dirname "${installed}")
+
+checked=0
+for css in "${srcdir}"/html/*.css; do
+    name=${css##*/}
+    while IFS= read -r raw; do
+        test -n "${raw}" || continue
+        ref=${raw#url(}
+        ref=${ref%)}
+        ref=${ref#[\"\']}
+        ref=${ref%[\"\']}
+        # Only a relative URL names something we ship.
+        case "${ref}" in
+        data:* | http://* | https://* | //* | /*) continue ;;
+        esac
+        test -f "${htmldir}/${ref}" ||
+            fail "${name} reaches ${ref}, which is not installed under ${htmldir}"
+        test -f "${work}/dist/${ref}" ||
+            fail "${name} reaches ${ref}, which is not in the tarball"
+        checked=$((checked + 1))
+    done <<<"$(grep -o 'url([^)]*)' "${css}" || true)"
+done
+
+# Floor: a scrape that matched nothing passes every check above.
+test "${checked}" -ge 2 || fail "only ${checked} url() reference(s) found to check"
+
+echo "doc assets: ${checked} url() references resolve in install and dist"
