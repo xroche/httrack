@@ -188,7 +188,7 @@ def chrome(page, content):
         '<header class="masthead">',
         '\t<img src="images/wordmark.svg" width="400" height="36"'
         ' alt="HTTrack Website Copier">',
-        '\t<div class="tagline">Open Source offline browser</div>',
+        '\t<div class="tagline">Free software offline browser</div>',
         "</header>",
         "",
         '<div class="wrap">',
