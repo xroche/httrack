@@ -118,6 +118,16 @@ nativepath() {
     fi
 }
 
+# POSIX form of a path. Anything MSYS splits on a colon needs it, a PATH entry
+# below the drive-letter TMPDIR above all.
+posixpath() {
+    if is_windows && command -v cygpath >/dev/null 2>&1; then
+        cygpath -u "$1"
+    else
+        printf '%s\n' "$1"
+    fi
+}
+
 # Key before cert in $1/both.pem, the single path load_cert_chain() takes.
 make_tls_pem() {
     local dir=$1 src

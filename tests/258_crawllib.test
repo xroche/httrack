@@ -140,7 +140,13 @@ chmod +x "${shim}/httrack"
 
 argv="${tmpdir}/argv"
 export SHIM_ARGV="$argv"
+# POSIX form, or MSYS reads the drive colon in "D:/a/..." as a PATH separator.
+shim=$(posixpath "$shim")
 PATH="${shim}:$PATH"
+# Proved by content, not by path spelling: an unreachable shim leaves the real
+# engine to run every case below, against the argv of a crawl that never happened.
+grep -q SHIM_ARGV "$(command -v httrack)" 2>/dev/null ||
+    fail "the shim is not on PATH: $(command -v httrack)"
 url="http://127.0.0.1:1/x"
 
 # Truncate first, then require the URL back: an assertion that only reads $argv

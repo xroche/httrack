@@ -184,8 +184,8 @@ pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
 # label:pattern, globbed rather than enumerated so a new NNN_engine-*.test or
 # NNN_local-*.test is picked up instead of silently getting zero coverage. Every
 # entry carries a metacharacter, or nullglob cannot empty it and the gate below
-# has nothing to catch. testlib and crawllib cover the libraries every test below
-# sources; 260 is named clear of them until #1126 explains the wedge it caused.
+# has nothing to catch. testlib and crawllib cover the libraries most tests here
+# rest on; 260 is named clear of both globs until #1126 explains its Win32 wedge.
 categories=(runnable:'00_runnable*.test' engine:'*_engine-*.test' zlib:'*_zlib-*.test'
     local:'*_local-*.test' watchdog:'*_watchdog*.test'
     testlib:'*_testlib-*.test' crawllib:'*_crawllib*.test'

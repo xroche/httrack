@@ -125,7 +125,7 @@ reporter_stopped() {
 # One per glob the driver enumerates: an empty category is counted as a failing
 # test named after the unexpanded pattern, which would drown the accounting.
 for t in 00_runnable 13_zlib-pass 14_local-pass 15_watchdog-pass \
-    16_crawl_proxy_https 17_crawl-log-salvage 18_testlib-pass 19_crawllib-pass; do
+    16_crawl_proxy_https 17_crawl-log-salvage 18_testlib-pass 19_crawllib; do
     printf '#!/bin/sh\nexit 0\n' >"$run/$t.test"
 done
 # One test reports back what it inherited: the token the step is handed can post
@@ -135,6 +135,9 @@ printf '#!/bin/sh\necho "TOKEN=${WATCHDOG_TOKEN:-}" >%s\nexit 0\n' "$tmp/childto
     >"$run/10_engine-pass.test"
 printf '#!/bin/sh\nexit 77\n' >"$run/11_engine-skip.test"
 printf '#!/bin/sh\nexit 3\n' >"$run/12_engine-fail.test"
+# Named the way 260 is, and selected by nothing: a crawl glob widened past
+# crawllib would put a deliberately failing crawl back on Windows (#1126).
+printf '#!/bin/sh\nexit 3\n' >"$run/20_crawl-harness-decoy.test"
 
 cd "$run"
 rc=0
@@ -149,6 +152,7 @@ grep -q '^ran=11 pass=9 fail=1 skip=1$' <<<"$out" ||
 grep -q '::error::only 9 tests passed (1 skipped)' <<<"$out" ||
     fail "the pass floor did not report the count"
 grep -q 'FAIL 12_engine-fail.test (exit 3)' <<<"$out" || fail "the failing test was not named"
+grep -q '20_crawl-harness-decoy' <<<"$out" && fail "a category selected the decoy: $out"
 
 # This launches the watchdog the way the real driver does, not through a test
 # sourcing the helper, proving it starts and holds a token nothing else sees.
@@ -171,6 +175,10 @@ grep -q '^RUN 12_engine-fail.test at ' suite-progress.log || fail "no RUN line f
 grep -q '^RERUN 12_engine-fail.test$' suite-progress.log || fail "the traced re-run was not noted"
 grep -q '^77 11_engine-skip.test$' suite-progress.log || fail "the skip's status was not recorded"
 test -s 12_engine-fail.test.log || fail "no per-test log for the failing test"
+# The category list is concatenated, never deduped, so two globs claiming one
+# test would run it twice and inflate every tally the gates read.
+dup=$(awk '/^RUN /{print $2}' suite-progress.log | sort | uniq -d)
+test -z "$dup" || fail "a test was selected by two categories: $dup"
 
 # An emptied category must name itself and stop the suite, rather than hand the
 # unexpanded pattern to test-timeout.sh and count it as a test failing 127 (#952).
