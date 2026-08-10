@@ -4,6 +4,7 @@ HelpHtmldir = $(htmldir)
 HelpHtmlimgdir = $(HelpHtmldir)/img
 HelpHtmldivdir = $(HelpHtmldir)/div
 HelpHtmlimagesdir = $(HelpHtmldir)/images
+HelpHtmlfontsdir = $(HelpHtmldir)/fonts
 HelpHtmlTxtdir = $(HelpHtmldir)
 WebHtmldir = $(HelpHtmldir)/server
 WebHtmlimagesdir = $(HelpHtmldir)/server/images
@@ -27,6 +28,8 @@ HelpHtml_DATA = $(srcdir)/*.html $(srcdir)/*.js $(srcdir)/*.css
 HelpHtmldiv_DATA = div/search.sh
 HelpHtmlimg_DATA  = $(srcdir)/img/*
 HelpHtmlimages_DATA = $(srcdir)/images/*
+# doc.css reaches the woff2 by a relative URL, so it installs beside the pages.
+HelpHtmlfonts_DATA = $(srcdir)/fonts/*
 HelpHtmlTxt_DATA = ../greetings.txt ../history.txt ../license.txt
 WebHtml_DATA = $(srcdir)/server/*.html $(srcdir)/server/*.js $(srcdir)/server/*.css
 WebHtmlimages_DATA = $(srcdir)/server/images/*
@@ -45,6 +48,7 @@ VFolderEntry_DATA = $(srcdir)/server/div/*.desktop
 MetaInfo_DATA = $(srcdir)/server/div/*.metainfo.xml
 
 EXTRA_DIST = $(HelpHtml_DATA) $(HelpHtmlimg_DATA) $(HelpHtmlimages_DATA) \
+	$(HelpHtmlfonts_DATA) \
 	$(HelpHtmldiv_DATA) $(WebHtml_DATA) $(WebHtmlimages_DATA) \
 	$(WebPixmap_DATA) $(WebIcon16x16_DATA) $(WebIcon32x32_DATA) $(WebIcon48x48_DATA) \
 	$(WebIcon64x64_DATA) $(WebIcon128x128_DATA) $(WebIcon256x256_DATA) \

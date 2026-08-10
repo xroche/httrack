@@ -6,8 +6,15 @@ body, td {
 	font: 14px "Trebuchet MS", Verdana, Arial, Helvetica, sans-serif;
 	}
 
+/* Take back the whitespace the SVG carries around the letters, so the bar sits on
+   the wordmark's baseline as it does on the doc pages (html/doc.css). */
+#title {
+	display: block;
+	margin: -1.7px 0 -1.1px;
+	}
+
 #subTitle {
-	background: #000;  color: #fff;  padding: 4px;  font-weight: bold; 
+	background: #000;  color: #fff;  padding: 4px;  font-weight: bold;
 	}
 
 .tabCtrl {
