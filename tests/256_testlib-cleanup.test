@@ -79,13 +79,14 @@ ok "the script's own exit status survives the teardown"
 # Status 1 is the trap's own exit. An untrapped fatal signal also reaches the EXIT
 # trap, so it would drain the stack too, but leaves 128+n -- asserting "non-zero"
 # would hold with no signal trap at all. Each signal is sent, since a trap
-# covering TERM alone passes a TERM-only check, and each is reported with the time
-# it took: a leg that sits out the sleep never had its signal delivered at all.
-# That is INT and QUIT on both Windows runners, where TERM and HUP arrive at once.
-sigs="TERM INT HUP QUIT"
-! is_windows || sigs="TERM HUP"
+# covering TERM alone passes a TERM-only check.
+# INT and QUIT never arrive on either Windows runner; TERM and HUP do.
+sigs=(TERM INT HUP QUIT PIPE)
+! is_windows || sigs=(TERM HUP)
+# Every leg is reported rather than the first to break: they fail one platform at
+# a time, and the elapsed time tells a signal never delivered from one ignored.
 bad=
-for sig in $sigs; do
+for sig in "${sigs[@]}"; do
     write_subject <<EOF
 cleanup_push note 'drained'
 kill -${sig} \$\$
@@ -99,7 +100,7 @@ EOF
         bad="$bad [SIG${sig} drained the stack $(wc -l <"$tmpdir/log") times]"
 done
 test -z "$bad" || fail "signal teardown:$bad"
-ok "each trapped signal runs the teardown once and ends the test"
+ok "each signal sent runs the teardown once and ends the test"
 
 ## re-sourcing keeps a stack already built
 #

@@ -184,8 +184,8 @@ pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
 # label:pattern, globbed rather than enumerated so a new NNN_engine-*.test or
 # NNN_local-*.test is picked up instead of silently getting zero coverage. Every
 # entry carries a metacharacter, or nullglob cannot empty it and the gate below
-# has nothing to catch. testlib and crawllib cover the libraries most tests here
-# rest on; 260 is named clear of both globs until #1126 explains its Win32 wedge.
+# has nothing to catch.
+# testlib and crawllib cover what most tests here rest on.
 categories=(runnable:'00_runnable*.test' engine:'*_engine-*.test' zlib:'*_zlib-*.test'
     local:'*_local-*.test' watchdog:'*_watchdog*.test'
     testlib:'*_testlib-*.test' crawllib:'*_crawllib*.test'
@@ -204,6 +204,15 @@ for c in "${categories[@]}"; do
     tests+=("${matched[@]}")
 done
 shopt -u nullglob
+
+# The one test deliberately failing a crawl, which wedged this leg twice at its
+# step timeout (#1126). Its name is what keeps it out of the globs above, so the
+# name is asserted: renaming it into one of them must red here, not on the runner.
+wedged=260_crawl-harness-fails-loudly.test
+test -e "$wedged" || {
+    echo "::error::$wedged is gone; a rename must stay clear of the globs above (#1126)"
+    exit 1
+}
 
 for t in "${tests[@]}"; do
     elapsed=$((SECONDS - started))

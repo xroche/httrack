@@ -140,11 +140,11 @@ chmod +x "${shim}/httrack"
 
 argv="${tmpdir}/argv"
 export SHIM_ARGV="$argv"
-# POSIX form, or MSYS reads the drive colon in "D:/a/..." as a PATH separator.
-shim=$(posixpath "$shim")
-PATH="${shim}:$PATH"
-# Proved by content, not by path spelling: an unreachable shim leaves the real
-# engine to run every case below, against the argv of a crawl that never happened.
+# A second name, kept to the PATH entry: MSYS reads the drive colon in "D:/a/..."
+# as a separator, while $shim stays native for anything that later needs it.
+PATH="$(posixpath "$shim"):$PATH"
+# By content, not by path spelling. crawled() below catches an unreachable shim
+# too, but names neither the real binary it reached nor the split PATH entry.
 grep -q SHIM_ARGV "$(command -v httrack)" 2>/dev/null ||
     fail "the shim is not on PATH: $(command -v httrack)"
 url="http://127.0.0.1:1/x"

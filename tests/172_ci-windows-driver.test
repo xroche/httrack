@@ -138,6 +138,9 @@ printf '#!/bin/sh\nexit 3\n' >"$run/12_engine-fail.test"
 # Named the way 260 is, and selected by nothing: a crawl glob widened past
 # crawllib would put a deliberately failing crawl back on Windows (#1126).
 printf '#!/bin/sh\nexit 3\n' >"$run/20_crawl-harness-decoy.test"
+# The driver asserts this one by name, so the stub tree has to carry it.
+wedged=260_crawl-harness-fails-loudly.test
+printf '#!/bin/sh\nexit 3\n' >"$run/$wedged"
 
 cd "$run"
 rc=0
@@ -179,6 +182,18 @@ grep -q '^RUN 12_engine-fail.test at ' suite-progress.log || fail "no RUN line f
 grep -q '^RERUN 12_engine-fail.test$' suite-progress.log || fail "the traced re-run was not noted"
 grep -q '^77 11_engine-skip.test$' suite-progress.log || fail "the skip's status was not recorded"
 test -s 12_engine-fail.test.log || fail "no per-test log for the failing test"
+
+# A 260 renamed into a glob would wedge this leg, so the driver names it and stops
+# when it is gone, rather than discovering the rename on the runner (#1126).
+mv "$run/$wedged" "$run/260_crawllib-fails-loudly.test"
+rc=0
+out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" \
+    bash ./ci-windows-suite.sh "$bin" 2>&1) || rc=$?
+assert_staged
+test "$rc" -eq 1 || fail "a renamed $wedged exited $rc, want 1"
+grep -q "::error::$wedged is gone" <<<"$out" || fail "the rename was not named: $out"
+grep -q '^ran=' <<<"$out" && fail "the suite ran a test with $wedged renamed: $out"
+mv "$run/260_crawllib-fails-loudly.test" "$run/$wedged"
 
 # An emptied category must name itself and stop the suite, rather than hand the
 # unexpanded pattern to test-timeout.sh and count it as a test failing 127 (#952).
