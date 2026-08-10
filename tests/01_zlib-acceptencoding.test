@@ -9,5 +9,6 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-httrack -O /dev/null -#test=acceptencoding "$dir" run |
-    grep -q "acceptencoding self-test OK"
+# The advertised codings are the contract, so pin the whole line.
+assert_selftest "acceptencoding self-test OK: gzip, deflate, identity;q=0.9" \
+    acceptencoding "$dir" run

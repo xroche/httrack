@@ -10,5 +10,4 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-httrack -O /dev/null -#test=topindex "$dir" run |
-    grep -q "topindex self-test OK"
+assert_selftest "topindex self-test OK" topindex "$dir" run

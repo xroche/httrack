@@ -2,15 +2,14 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # htssafe.h bounded string operations (driven by 'httrack -#test=strsafe').
 
 # Success path: every bounded op (strcpybuff/strcatbuff/strncatbuff/strlcpybuff)
 # must behave correctly. 'run' selects the success path (vs the overflow modes).
-rc=0
-out=$(httrack -#test=strsafe run) || rc=$?
-test "$rc" -eq 0 || exit 1
-test "$out" == "strsafe: OK" || exit 1
+assert_selftest "strsafe: OK" strsafe run
 
 # Overflow path: an over-capacity write into a sized buffer must be caught by
 # the bounded macro and abort the process, not be silently truncated/completed.
