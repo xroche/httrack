@@ -254,45 +254,59 @@ stop_server() {
     return 0
 }
 
-# Ephemeral port from the caller's $python, released before it is returned: the
-# process that binds it can lose the race, so pair it with start_proxytrack.
+# $1 free loopback ports (default 1), space separated, bound together so two of
+# them always differ. Each is closed before its caller binds it: see start_proxytrack.
 freeport() {
     # tr: Windows python's print leaves a CR that $() does not strip.
-    "${python:?freeport needs the caller python}" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()' |
-        tr -d '\r'
+    "${python:?freeport needs the caller python}" -c 'import socket, sys
+socks = [socket.socket() for _ in range(int(sys.argv[1]))]
+for s in socks:
+    s.bind(("127.0.0.1", 0))
+print(" ".join(str(s.getsockname()[1]) for s in socks))
+for s in socks:
+    s.close()' "${1:-1}" | tr -d '\r'
 }
 
-# 0 once $1 (its log) carries the listen banner, 1 if the bind lost its port.
+PT_LISTENING="HTTP Proxy installed on"
+PT_BIND_LOST="Unable to (initialize a temporary server|create the server)"
+
+# Returns 0 once $1 (its log) carries the listen banner, 1 if the bind lost its
+# port; a proxytrack that announces neither ends the test here.
 proxytrack_bound() { # proxytrack_bound LOG PID
     local log=$1 pid=$2 waited=0
-    until grep -qE "HTTP Proxy installed on|Unable to (initialize a temporary server|create the server)" "$log"; do
+    until grep -qE "$PT_LISTENING|$PT_BIND_LOST" "$log"; do
         # An exit flushes the log, so re-read it rather than calling this dead.
         kill -0 "$pid" 2>/dev/null || break
         test "$waited" -lt 50 || fail "proxytrack never announced its listen port: $(cat "$log")"
         sleep 0.1
         waited=$((waited + 1))
     done
-    grep -q "HTTP Proxy installed on" "$log"
+    grep -q "$PT_LISTENING" "$log" && return 0
+    grep -qE "$PT_BIND_LOST" "$log" || fail "proxytrack exited before listening: $(cat "$log")"
+    return 1
 }
 
-# proxytrack binds the ports itself, well after freeport dropped them, so a
-# parallel suite can steal one in between: re-pick and relaunch. LAUNCH is a
-# function reading $proxyport/$icpport and leaving the pid in $ptpid.
-start_proxytrack() { # start_proxytrack LOG LAUNCH
-    local log=$1 launch=$2 try
+# proxytrack binds the ports itself and can find one stolen in between, so retry
+# rather than red the suite. LAUNCH reads $proxyport/$icpport, writes $ptlog and
+# leaves the pid in $ptpid; on return $ptlog is the surviving attempt's log.
+start_proxytrack() { # start_proxytrack LOGBASE LAUNCH
+    local base=$1 launch=$2 try
     for try in 1 2 3; do
-        proxyport=$(freeport)
-        icpport=$(freeport)
-        # New inode, so a killed attempt's pty drainer cannot land its banner
-        # (or its .done marker) in the run below and answer for it.
-        rm -f "$log" "$log.done"
-        : >"$log"
+        read -r proxyport icpport <<<"$(freeport 2)"
+        # One log per attempt: a killed one's pty drainer creates its .done
+        # marker by path, and would answer for the attempt below.
+        ptlog="$base.$try"
+        : >"$ptlog"
+        ptpid=
         "$launch"
-        proxytrack_bound "$log" "$ptpid" && return 0
+        test -n "$ptpid" || fail "$launch left no proxytrack pid in \$ptpid"
+        proxytrack_bound "$ptlog" "$ptpid" && return 0
         stop_server "$ptpid"
         ptpid=
+        # Loud, so an intermittent bind regression cannot hide behind the retry.
+        echo "proxytrack did not get port $proxyport, retrying" >&2
     done
-    fail "proxytrack bound none of 3 port pairs: $(cat "$log")"
+    fail "proxytrack bound none of 3 port pairs: $(cat "$ptlog")"
 }
 
 # Echo the port local-server.py announces on $1 (its log), $2 being its pid, or

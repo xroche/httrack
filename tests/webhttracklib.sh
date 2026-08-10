@@ -20,17 +20,10 @@ htsserver_require() {
     HTS_PYTHON=$(find_python) || skip "python3 not found"
 }
 
-# $1 free loopback ports (default 1), space separated. Bound together, so two
-# of them always differ; each is closed before htsserver rebinds it.
 # shellcheck disable=SC2120 # one port is the common case
 htsserver_freeport() {
-    "${HTS_PYTHON}" -c 'import socket, sys
-socks = [socket.socket() for _ in range(int(sys.argv[1]))]
-for s in socks:
-    s.bind(("127.0.0.1", 0))
-print(" ".join(str(s.getsockname()[1]) for s in socks))
-for s in socks:
-    s.close()' "${1:-1}"
+    local python=${HTS_PYTHON}
+    freeport "$@"
 }
 
 # First URL= and PID= of the announcement, or empty. Windows announces no pid.

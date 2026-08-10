@@ -34,8 +34,7 @@ serverpid=$!
 port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
 
 # a proxy port nothing listens on: grab a free one and let it close (refuses).
-deadproxy=$("$python" -c \
-    'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
+deadproxy=$(freeport)
 
 # origin resolves to two addresses so a fallback would have a second to dial;
 # 127.0.0.1 (the decoy) is the one the old bypass reached.

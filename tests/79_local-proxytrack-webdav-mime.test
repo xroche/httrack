@@ -32,10 +32,10 @@ alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
 } >"$dir/in.arc"
 
 launch_proxytrack() {
-    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" >"$dir/pt.log" 2>&1 &
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" >"$ptlog" 2>&1 &
     ptpid=$!
 }
-start_proxytrack "$dir/pt.log" launch_proxytrack
+start_proxytrack "$dir/pt" launch_proxytrack
 
 # --max-time: an unbounded read here would wedge the runner rather than fail
 curl -s --max-time 30 -X PROPFIND -H "Depth: 1" \

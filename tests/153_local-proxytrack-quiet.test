@@ -20,7 +20,7 @@ skip_on_windows "windows: python has no pty, so a buffered leak would be invisib
 dir=$(mktemp -d)
 quietpid=
 loudpid=
-ptpid= # start_proxytrack's, until the launch it started is named below
+ptpid= # start_proxytrack's, until the launch below takes it over
 cleanup() {
     stop_server "$ptpid"
     stop_server "$quietpid"
@@ -96,13 +96,13 @@ wait_drained() { # log
 launch_quiet() {
     (
         unset HTS_LOG
-        exec "$python" -c "$pty_exec" "$dir/quiet.log" \
+        exec "$python" -c "$pty_exec" "$ptlog" \
             proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc"
     ) &
     ptpid=$!
 }
-start_proxytrack "$dir/quiet.log" launch_quiet
-quietport=$proxyport quietpid=$ptpid ptpid=
+start_proxytrack "$dir/quiet" launch_quiet
+quietlog=$ptlog quietport=$proxyport quietpid=$ptpid ptpid=
 
 # Both on one connection: the access log is written before send(), and only
 # proxytrack's keep-alive loop orders anything written after it, since the
@@ -111,7 +111,7 @@ resp=$(curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
     "http://127.0.0.1:$quietport/webdav/example.com/" \
     "http://127.0.0.1:$quietport/webdav/example.com/page.html") || {
     echo "FAIL: the PROPFINDs did not answer"
-    cat "$dir/quiet.log"
+    cat "$quietlog"
     exit 1
 }
 served=$(grep -c '^HTTP/1\.[01] 207 ' <<<"$resp" || true)
@@ -132,10 +132,10 @@ test "$listed" -eq 4 || {
 # The enumeration is what builds the table, so the served 207s are what make
 # the check below mean anything.
 waited=0
-until test "$(request_log "$dir/quiet.log" | grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' || true)" -ge 2; do
+until test "$(request_log "$quietlog" | grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' || true)" -ge 2; do
     test "$waited" -lt 50 || {
         echo "FAIL: fewer than two PROPFINDs were answered 207, so the check below proves nothing"
-        cat "$dir/quiet.log"
+        cat "$quietlog"
         exit 1
     }
     sleep 0.1
@@ -148,12 +148,12 @@ done
 # sleep is short enough to be sound or long enough to be reliable.
 stop_server "$quietpid"
 quietpid=
-wait_drained "$dir/quiet.log"
+wait_drained "$quietlog"
 
 # The property is that serving adds nothing but the access log, so whitelist
 # what a line may be; naming strings that must be absent would pass any
 # reworded or differently shaped leak.
-extra=$(request_log "$dir/quiet.log" | grep -vE '^( \* log: (HTTP|ICP) .*)?$' || true)
+extra=$(request_log "$quietlog" | grep -vE '^( \* log: (HTTP|ICP) .*)?$' || true)
 test -z "$extra" || {
     echo "FAIL: serving a PROPFIND wrote this to proxytrack's console:"
     printf '%s\n' "$extra"
@@ -163,16 +163,16 @@ test -z "$extra" || {
 # HTS_LOG brings the summary back, so the silence above is a routed handler and
 # not a deleted message, and the grep that asserted it does match when fed one.
 launch_loud() {
-    HTS_LOG=1 "$python" -c "$pty_exec" "$dir/loud.log" \
+    HTS_LOG=1 "$python" -c "$pty_exec" "$ptlog" \
         proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" &
     ptpid=$!
 }
-start_proxytrack "$dir/loud.log" launch_loud
-loudport=$proxyport loudpid=$ptpid ptpid=
+start_proxytrack "$dir/loud" launch_loud
+loudlog=$ptlog loudport=$proxyport loudpid=$ptpid ptpid=
 
 resp=$(propfind "$loudport" "") || {
     echo "FAIL: PROPFIND under HTS_LOG did not answer"
-    cat "$dir/loud.log"
+    cat "$loudlog"
     exit 1
 }
 grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
@@ -181,10 +181,10 @@ grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
     exit 1
 }
 waited=0
-until grep -qE 'hashtable .*summary:' "$dir/loud.log"; do
+until grep -qE 'hashtable .*summary:' "$loudlog"; do
     test "$waited" -lt 50 || {
         echo "FAIL: HTS_LOG=1 did not restore the hashtable summary"
-        cat "$dir/loud.log"
+        cat "$loudlog"
         exit 1
     }
     sleep 0.1
@@ -192,9 +192,9 @@ until grep -qE 'hashtable .*summary:' "$dir/loud.log"; do
 done
 # Pin the routed shape whole: a severity, then the message, and nothing in
 # between where the table address used to be.
-grep -qE '^ \* debug: hashtable "[^"]*" summary:' "$dir/loud.log" || {
+grep -qE '^ \* debug: hashtable "[^"]*" summary:' "$loudlog" || {
     echo "FAIL: the summary under HTS_LOG did not come through proxytrack's log"
-    cat "$dir/loud.log"
+    cat "$loudlog"
     exit 1
 }
 
