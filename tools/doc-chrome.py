@@ -102,9 +102,21 @@ DESCRIPTIONS = {
 
 FOOTER = "&copy; 1998-2026 Xavier Roche &amp; other contributors" " - Web Design: Leto Kauler."
 
+# Identical on every page, sidebar or not, so it is its own region: pages that
+# build their own navigation still get their masthead checked (#1115).
+MASTHEAD = [
+    '<a class="skip" href="#main">Skip to content</a>',
+    "",
+    '<header class="masthead">',
+    '\t<img src="images/wordmark.svg" width="400" height="36"'
+    ' alt="HTTrack Website Copier">',
+    '\t<div class="tagline">Free software offline browser</div>',
+    "</header>",
+]
+
 MARK = {
     part: (f"<!-- doc-chrome:{part} -->", f"<!-- /doc-chrome:{part} -->")
-    for part in ("head", "top", "bottom")
+    for part in ("head", "masthead", "top", "bottom")
 }
 
 
@@ -183,13 +195,7 @@ def chrome(page, content):
     nav.append("</nav>")
 
     top = [
-        '<a class="skip" href="#main">Skip to content</a>',
-        "",
-        '<header class="masthead">',
-        '\t<img src="images/wordmark.svg" width="400" height="36"'
-        ' alt="HTTrack Website Copier">',
-        '\t<div class="tagline">Free software offline browser</div>',
-        "</header>",
+        *MASTHEAD,
         "",
         '<div class="wrap">',
         "",
@@ -274,6 +280,10 @@ def convert(path):
 
 def rewrite(path, text):
     page = os.path.basename(path)
+    # A page owning its sidebar takes the masthead alone, and nothing else here
+    # applies to it: no head, no wrap, no generated navigation.
+    if MARK["top"][0] not in text:
+        return region(text, "masthead", "\n".join(MASTHEAD))
     open_, close = MARK["top"]
     body = text.split(close, 1)[1].split(MARK["bottom"][0], 1)[0]
     content, head, top, bottom = chrome(page, body)
@@ -302,7 +312,7 @@ def main():
         path = os.path.join(HTML, page)
         with open(path, encoding="utf-8") as fp:
             before = fp.read()
-        if MARK["top"][0] not in before:
+        if MARK["top"][0] not in before and MARK["masthead"][0] not in before:
             continue
         owned += 1
         after = rewrite(path, before)
