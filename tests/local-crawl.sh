@@ -88,9 +88,8 @@ function debug {
 function info { printf "[%s] ..\t" "$*" >&2; }
 function result { echo "$*" >&2; }
 
-# Teardown frames, run in reverse: the crawl first, then the server the library
-# registered, then the tmpdir. Functions, not arguments, since cleanup_push
-# expands its arguments at push time and neither value exists yet.
+# Run in reverse: the crawl dies first, then the server, then the tmpdir.
+# Functions, not arguments: cleanup_push expands its arguments at push time.
 function kill_crawl {
     test -n "$crawlpid" || return 0
     kill -9 "$crawlpid" 2>/dev/null
@@ -145,8 +144,7 @@ nopurge=
 cleanup_push purge_tmpdir
 
 # python3 is required; mirror check-network.sh's skip-with-77 convention. Found
-# here rather than in local_server_start, so a host without it skips before any
-# setup, and the validators below share the interpreter.
+# here, not in local_server_start, so a host without it skips before any setup.
 python=$(find_python) || ! echo "python3 not found; skipping local crawl tests" >&2 || exit 77
 SRV_PYTHON=$python
 
@@ -237,8 +235,8 @@ while test "$pos" -lt "$nargs"; do
 done
 
 # --- start the server --------------------------------------------------------
-# The library reaps it and reports one that never announced its port. The
-# wording 72 and 105 skip on comes from discover_server_port, on stderr.
+# local_server_start reaps the server and reports one that never announced its
+# port. 72 and 105 skip on that wording, which discover_server_port writes.
 local_server_start ${tlsargs[@]+"${tlsargs[@]}"} --root "$root"
 port=$SRV_PORT
 baseurl=$BASEURL
@@ -289,34 +287,34 @@ declare -a moreargs=(--quiet "--max-time=$CRAWL_MAX_TIME" --timeout=30 --disable
 log="${tmpdir}/log"
 
 # One pass: $1 its log, $2 its name in the diagnostics, the rest extra httrack
-# arguments; the status lands in $crawlres. Backgrounded here rather than run
-# through local_crawl, whose own process group would hide the engine from the
-# suite watchdog's stack dump (105).
+# arguments. Backgrounded here, not through local_crawl, whose own process group
+# would hide the engine from the suite watchdog's stack dump (105).
 function run_pass {
-    local passlog=$1 label=$2 deadline
+    local passlog=$1 label=$2 deadline rc=0
     shift 2
     deadline=$(crawl_deadline)
     httrack -O "$odir" --user-agent="httrack $ver local ($(uname -mrs))" \
         "${moreargs[@]}" "${hts[@]}" "$@" >"$passlog" 2>&1 &
     crawlpid=$!
-    wait_bounded "$crawlpid" "$deadline"
-    crawlres=$?
+    wait_bounded "$crawlpid" "$deadline" || rc=$?
     crawlpid=
-    test "$crawlres" -ne 124 || warning "${label} watchdog fired after ${deadline}s"
+    test "$rc" -ne 124 || warning "${label} watchdog fired after ${deadline}s"
+    return "$rc"
 }
 
-# End the run on a failed pass, dumping its log: the engine's own output is the
-# only record of why it stopped.
+# A pass that has to succeed: same arguments, but a failure ends the run with
+# the engine's log, the only record of why it stopped.
 function require_pass {
-    test "$crawlres" -eq 0 && return 0
-    result "$2 exited $crawlres"
-    cat "$1" >&2
+    local passlog=$1 label=$2 rc=0
+    run_pass "$@" || rc=$?
+    test "$rc" -eq 0 && return 0
+    result "$label exited $rc"
+    cat "$passlog" >&2
     exit 1
 }
 
 cleanup_push kill_crawl
 info "running httrack ${hts[*]}"
-run_pass "$log" crawl
 # httrack exits 0 even on hard connect/DNS errors, so this is a backstop only;
 # the real guard is the audit below (--errors 0 plus the host-root existence check).
 require_pass "$log" crawl
@@ -389,7 +387,6 @@ fi
 # --- optional second pass: re-mirror into the same dir (cache/update path) ----
 if test -n "$rerun"; then
     info "re-running httrack (update pass)"
-    run_pass "${log}.2" "update pass"
     require_pass "${log}.2" "update pass"
     result "OK (update)"
     # The update summary reports "files updated"; a fresh crawl never does. Assert
@@ -409,8 +406,7 @@ fi
 if test -n "$rerun_args"; then
     read -ra extra <<<"$rerun_args"
     info "re-running httrack with ${rerun_args}"
-    run_pass "${log}.2" "second pass" "${extra[@]}"
-    require_pass "${log}.2" "second pass"
+    require_pass "${log}.2" "second pass" "${extra[@]}"
     result "OK (second pass)"
 fi
 
