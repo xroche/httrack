@@ -5,11 +5,16 @@ HTTrack Website Copier release history:
 This file lists all changes and fixes that have been made for HTTrack
 
 3.49-20
-+ Fixed: a link to another host whose name looked like a file was scanned as a page, so one link could mirror the whole foreign site on the referring page's depth budget (#1093)
-+ Fixed: a mirror asked to stop while an FTP file was being received announced the exit and then waited forever on that slot (#1106)
-+ Fixed: WebHTTrack's welcome page opened its language menu blank instead of marking the language in force (#1086)
-+ Changed: the macOS disk image carries its architecture in its name, so an Intel user is no longer handed an arm64-only application without warning (#1085)
-+ Changed: refreshed the GUI guide and its screenshots, the documentation typography and footer contrast, and settled on one spelling of the product name across the docs and the site
++ Fixed: a link to another host whose name looked like a file was scanned as a page, so one link could mirror the whole foreign site on the referring page's depth budget (#121)
++ Fixed: a size-bounded filter built both of its filter URLs wrong when the path had no leading slash (#1095)
++ Fixed: a mirror told to quit while an FTP file was being received announced the exit and then waited forever on that slot (#1106)
++ Fixed: stopping an FTP transfer closed its data socket twice, so a threaded crawl could lose another worker's connection (#1090)
++ Fixed: WebHTTrack's welcome page opened its language menu blank instead of marking the language in use (#1084)
++ Fixed: two suite tests failed on the hppa, powerpc and ppc64 Debian buildds, holding the package back on those ports (#1108)
++ Fixed: a growable string could wrap its capacity to zero instead of saturating (#1062)
++ Changed: the macOS disk image carries its architecture in its name, so an Intel user can tell before downloading that the build is for Apple Silicon (#1083)
++ Changed: refreshed the GUI guide, its screenshots, the documentation typography and the footer contrast
++ Changed: settled on one spelling of the product name across the docs and the site
 + Changed: multiple internal hardening, build, test and CI improvements
 
 3.49-19

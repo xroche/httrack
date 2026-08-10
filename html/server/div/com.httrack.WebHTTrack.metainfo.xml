@@ -56,7 +56,8 @@
       <description>
         <ul>
           <li>A link pointing to another site is no longer mistaken for a page of your own and mirrored in full</li>
-          <li>Asking a mirror to stop now works while an FTP file is being received, instead of hanging</li>
+          <li>A mirror told to quit while an FTP file is being received now stops, instead of hanging</li>
+          <li>Stopping an FTP download no longer closes its connection twice, which could interrupt another download</li>
           <li>The welcome page's language menu shows the language in use</li>
           <li>The macOS download says in its name that it is for Apple Silicon</li>
           <li>Refreshed screenshots and typography throughout the documentation</li>

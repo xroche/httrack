@@ -29,8 +29,8 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:13:0: revision-only bump. Only a macro body and internal headers changed; no
-# installed struct moved and no export was added or removed.
+# 3:13:0: revision-only bump. htsstrings.h's StringRoomTotal grew saturation in
+# its macro body; no installed struct moved and no export came or went.
 # 3:12:0: revision-only bump. httrackp gained a tail field (singlefile_state) and
 # htsopt.h added volatile qualifiers; no layout moved, nothing went away.
 # 3:11:0: revision-only bump. #1001 moved SOCaddr_inetntoa_ out of htsnet.h, adding
