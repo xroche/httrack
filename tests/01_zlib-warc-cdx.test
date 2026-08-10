@@ -2,14 +2,16 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # --warc-cdx CDXJ index over synthetic transactions: sorted, one line per
 # response/revisit/resource, each offset/length inflates to the right member.
 
-httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+httrack_bin=$(httrack_path)
 
 scratch=$(mktemp -d)
-trap 'set +e; rm -rf "$scratch"' EXIT
+cleanup_push rm -rf "$scratch"
 
 out=$("$httrack_bin" -O /dev/null -#test=warc-cdx "$scratch/")
 echo "$out"

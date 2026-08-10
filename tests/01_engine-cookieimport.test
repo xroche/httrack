@@ -2,12 +2,14 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Drives -#test=cookieimport: load a cookie jar (and, on Windows, copied IE
 # cookies *@*.txt) from a long, non-ASCII folder through the UTF-8/long-path
 # file wrappers (#133,#630).
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 out=$(httrack -O /dev/null -#test=cookieimport "$dir")
-grep -q "cookieimport:.*OK" <<<"$out"
+assert_match "cookieimport:.*OK" "$out"

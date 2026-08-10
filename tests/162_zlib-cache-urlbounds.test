@@ -4,9 +4,11 @@
 # store and look up without aborting or aliasing a neighbouring key.
 
 set -eu
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 # stderr carries the expected "URL too long to be cached" warnings alongside the
 # self-test's own diagnostics: keep it out of the verdict, but not the report

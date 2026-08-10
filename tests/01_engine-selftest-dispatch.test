@@ -5,13 +5,16 @@
 
 set -eu
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # Bare -#test lists known tests (printed to stderr).
 list=$(httrack -#test 2>&1)
-grep -q "filter" <<<"$list" || exit 1
-grep -q "cache-writefail" <<<"$list" || exit 1
+assert_match 'filter +<pattern> <string>' "$list" 'the registry listing'
+assert_match 'cache-writefail +<dir>' "$list" 'the registry listing'
 
 # Unknown name: non-zero exit + diagnostic, and no test result line.
 rc=0
 err=$(httrack -#test=bogus 2>&1) || rc=$?
-test "$rc" -ne 0 || exit 1
-grep -q "Unknown self-test" <<<"$err" || exit 1
+test "$rc" -ne 0 || fail "an unknown self-test name exited 0"
+assert_match 'Unknown self-test' "$err"

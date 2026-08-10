@@ -3,13 +3,16 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # fa_strjoker_dual: merged verdict on the two URL forms the engine tests;
 # the match latest in the filter list wins, an unknown verdict defers.
 
 fdual() {
-    local want="$1"
+    local want=$1
     shift
-    test "$(httrack -O /dev/null -#test=filterdual "$@")" == "$want" || exit 1
+    assert_selftest "$want" filterdual "$@"
 }
 
 fdual 'verdict=unknown rule=0' zzz yyy '+a*'     # neither form matches

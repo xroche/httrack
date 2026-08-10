@@ -11,10 +11,12 @@
 #      (guards the update decision that reads the cached metadata).
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 site=$(mktemp -d)
 out=$(mktemp -d)
-trap 'set +e; rm -rf "$site" "$out"' EXIT
+cleanup_push rm -rf "$site" "$out"
 
 cat >"$site/index.html" <<EOF
 <a href="a.html">a</a> <a href="sub/b.html">b</a>

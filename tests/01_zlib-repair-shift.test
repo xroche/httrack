@@ -7,9 +7,11 @@
 # READ_32 shift an int past INT_MAX; UBSan aborts before the fix casts to uLong.
 
 set -eu
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 out=$(httrack -#test=zip-repair-shift "$dir")
 

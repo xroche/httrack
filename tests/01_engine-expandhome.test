@@ -6,6 +6,9 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # ~ expansion for the -O base path (expand_home). $HOME is pinned so the cases
 # cannot depend on the caller's, but MSYS rewrites it into a Windows path
 # before the native httrack.exe reads it: ask the engine what it saw rather
@@ -13,17 +16,15 @@ set -euo pipefail
 ask() {
     HOME=HTSHOME httrack -O /dev/null -#test=expandhome "$1"
 }
-exp() {
-    test "$(ask "$1")" == "expanded=$2" || exit 1
-}
+exp() { assert_eq "expanded=$2" "$(ask "$1")" "expandhome '$1'"; }
 
 home=$(ask '~')
 home=${home#expanded=}
 
 # or every case below is vacuous: '~' means expansion never fired, '.' means it
 # fell back to the default without ever reading $HOME
-test "$home" != '~' || exit 1
-test "$home" != '.' || exit 1
+test "$home" != '~' || fail "expansion never fired"
+test "$home" != '.' || fail "expansion fell back to the default without reading HOME"
 
 exp '~' "$home"
 exp '~/foo' "$home/foo"
@@ -41,13 +42,13 @@ exp './~/x' './~/x'
 exp 'foo~bar' 'foo~bar'
 
 # an unset or empty $HOME must not turn ~/foo into the absolute /foo
-test "$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
-test "$(HOME='' httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=./foo" || exit 1
+assert_eq "expanded=./foo" "$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')" 'unset HOME'
+assert_eq "expanded=./foo" "$(HOME='' httrack -O /dev/null -#test=expandhome '~/foo')" 'empty HOME'
 
 # A $HOME past the 2 * HTS_URLMAXSIZE buffer is left alone: strcatbuff aborts
 # rather than truncates. Only meaningful where the engine sees the value we set:
 # MSYS rewrites HOME into a path of its own choosing, long or not.
 if test "$home" = HTSHOME; then
     long=$(printf '%04096d' 0 | tr '0' 'A')
-    test "$(HOME="$long" httrack -O /dev/null -#test=expandhome '~/foo')" == "expanded=~/foo" || exit 1
+    assert_eq "expanded=~/foo" "$(HOME="$long" httrack -O /dev/null -#test=expandhome '~/foo')" 'over-long HOME'
 fi

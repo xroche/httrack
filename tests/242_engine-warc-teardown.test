@@ -3,12 +3,13 @@
 # A late emit used to reopen the closed archive, orphaning a .tmp (#1060).
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
-httrack_bin=$(cd "$(dirname "$(command -v httrack)")" && pwd)/httrack
+httrack_bin=$(httrack_path)
 
 scratch=$(mktemp -d)
-trap 'set +e; rm -rf "$scratch"' EXIT
-trap 'rm -rf "$scratch"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$scratch"
 
 out=$("$httrack_bin" -O /dev/null -#test=warc-teardown "$scratch/")
 echo "$out"

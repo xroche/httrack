@@ -4,11 +4,13 @@
 # serving <path>.tmp has its own copy truncated and then unlinked (#859).
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/spoolname.XXXXXX") || {
     echo "no tmpdir" >&2
     exit 1
 }
-trap 'set +e; rm -rf "${work}"' EXIT
+cleanup_push rm -rf "${work}"
 
 httrack -#test=spoolname "${work}"

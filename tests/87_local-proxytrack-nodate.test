@@ -3,9 +3,11 @@
 # convert: the ARC writer used to dereference the parsed date unchecked.
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 # $1 Last-Modified value (empty = omit the header), $2 expected archive date,
 # $3 label. The date is asserted exactly: a guard that fires unconditionally

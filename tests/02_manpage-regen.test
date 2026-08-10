@@ -5,8 +5,8 @@
 # followed by "make -C man regen-man".
 
 set -eu
-
-: "${top_srcdir:=..}"
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 gen="$top_srcdir/man/makeman.sh"
 committed="$top_srcdir/man/httrack.1"
@@ -24,7 +24,7 @@ command -v httrack >/dev/null 2>&1 || {
 tmp=$(mktemp) || exit 1
 committed_clean=$(mktemp) || exit 1
 generated_clean=$(mktemp) || exit 1
-trap 'set +e; rm -f "$tmp" "$committed_clean" "$generated_clean"' EXIT
+cleanup_push rm -f "$tmp" "$committed_clean" "$generated_clean"
 
 README="$top_srcdir/README" bash "$gen" httrack >"$tmp" 2>/dev/null || {
     echo "makeman.sh failed" >&2

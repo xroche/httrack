@@ -4,14 +4,15 @@
 # file past 4GB must size its buffer exactly or be refused, never wrap.
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 out=$(httrack -#test=growsize)
 echo "$out"
 test "$out" == "growsize self-test OK"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_growsize.XXXXXX")
-trap 'set +e; rm -rf "$tmp"' EXIT
-trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmp"
 
 echo '<html><body>hi</body></html>' >"$tmp/index.html"
 printf -- '-*/zzmarker*\n' >"$tmp/rules.txt"

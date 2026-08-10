@@ -3,9 +3,11 @@
 # sanitizer CI build turns any regression here into a hard stack/heap overflow.
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 # The first length-prefixed field declares far more than firstline[256] holds;
 # cache_brstr must clamp the copy to the destination, not the declared length.

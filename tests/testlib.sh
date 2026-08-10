@@ -26,6 +26,40 @@ skip() {
 # is merely not on Windows.
 skip_on_windows() { ! is_windows || skip "$*"; }
 
+# Assertions, each printing what it wanted beside what arrived: a bare
+# `|| exit 1` reds a test without naming the value that differed.
+assert_eq() { # assert_eq WANT GOT [LABEL]
+    test "$1" = "$2" || fail "${3:+$3: }expected [$1], got [$2]"
+}
+
+# Unanchored ERE: ^ and $ are the whole subject's ends, not a line's.
+# Keep $1 unquoted here, or bash 3.2 matches it as a literal string.
+assert_match() { # assert_match RE TEXT [LABEL]
+    [[ $2 =~ $1 ]] || fail "${3:+$3: }no match for /$1/ in: $2"
+}
+
+assert_file() { test -f "$1" || fail "${2:+$2: }missing file: $1"; }
+
+# Run engine self-test NAME: stdout must equal WANT, status must be 0 (which a
+# `test "$(...)" = ...` cannot see). expect_ok takes a command, for a real -O.
+assert_selftest() { # assert_selftest WANT NAME [ARGS...]
+    local want=$1 name=$2 got rc=0
+    shift 2
+    got=$(httrack -O /dev/null "-#test=$name" "$@") || rc=$?
+    test "$rc" -eq 0 || fail "-#test=$name $*: exited $rc, output: $got"
+    test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
+}
+
+# Absolute path to httrack, since make check's relative ../src breaks once a test
+# cd's away. assert_selftest runs the bare name, so a test that cd's calls this.
+httrack_path() {
+    local p dir
+    p=$(command -v httrack) || fail "no httrack in PATH"
+    # Assigned, so a failed cd is named here instead of yielding a bare /httrack.
+    dir=$(cd "$(dirname "$p")" && pwd) || fail "cannot reach $(dirname "$p")"
+    printf '%s\n' "$dir/$(basename "$p")"
+}
+
 # A literal, not $'..': Apple's bash 3.2 loses quote state on that inside a
 # parameter expansion and the whole file dies of "unexpected EOF".
 TESTLIB_NL='
@@ -218,6 +252,61 @@ stop_server() {
     if is_windows; then kill_tree "$1"; fi
     reap_bounded "$1" || true
     return 0
+}
+
+# $1 free loopback ports (default 1), space separated, bound together so two of
+# them always differ. Each is closed before its caller binds it: see start_proxytrack.
+freeport() {
+    # tr: Windows python's print leaves a CR that $() does not strip.
+    "${python:?freeport needs the caller python}" -c 'import socket, sys
+socks = [socket.socket() for _ in range(int(sys.argv[1]))]
+for s in socks:
+    s.bind(("127.0.0.1", 0))
+print(" ".join(str(s.getsockname()[1]) for s in socks))
+for s in socks:
+    s.close()' "${1:-1}" | tr -d '\r'
+}
+
+PT_LISTENING="HTTP Proxy installed on"
+PT_BIND_LOST="Unable to (initialize a temporary server|create the server)"
+
+# Returns 0 once $1 (its log) carries the listen banner, 1 if the bind lost its
+# port; a proxytrack that announces neither ends the test here.
+proxytrack_bound() { # proxytrack_bound LOG PID
+    local log=$1 pid=$2 waited=0
+    until grep -qE "$PT_LISTENING|$PT_BIND_LOST" "$log"; do
+        # An exit flushes the log, so re-read it rather than calling this dead.
+        kill -0 "$pid" 2>/dev/null || break
+        test "$waited" -lt 50 || fail "proxytrack never announced its listen port: $(cat "$log")"
+        sleep 0.1
+        waited=$((waited + 1))
+    done
+    grep -q "$PT_LISTENING" "$log" && return 0
+    grep -qE "$PT_BIND_LOST" "$log" || fail "proxytrack exited before listening: $(cat "$log")"
+    return 1
+}
+
+# proxytrack binds the ports itself and can find one stolen in between, so retry
+# rather than red the suite. LAUNCH reads $proxyport/$icpport, writes $ptlog and
+# leaves the pid in $ptpid; on return $ptlog is the surviving attempt's log.
+start_proxytrack() { # start_proxytrack LOGBASE LAUNCH
+    local base=$1 launch=$2 try
+    for try in 1 2 3; do
+        read -r proxyport icpport <<<"$(freeport 2)"
+        # One log per attempt: a killed one's pty drainer creates its .done
+        # marker by path, and would answer for the attempt below.
+        ptlog="$base.$try"
+        : >"$ptlog"
+        ptpid=
+        "$launch"
+        test -n "$ptpid" || fail "$launch left no proxytrack pid in \$ptpid"
+        proxytrack_bound "$ptlog" "$ptpid" && return 0
+        stop_server "$ptpid"
+        ptpid=
+        # Loud, so an intermittent bind regression cannot hide behind the retry.
+        echo "proxytrack did not get port $proxyport, retrying" >&2
+    done
+    fail "proxytrack bound none of 3 port pairs: $(cat "$ptlog")"
 }
 
 # Echo the port local-server.py announces on $1 (its log), $2 being its pid, or

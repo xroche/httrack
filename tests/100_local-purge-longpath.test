@@ -20,12 +20,7 @@ python=$(find_python) || skip "python3 not found"
 
 # Resolve httrack now: the harness prepends a RELATIVE dir to PATH, so the cd
 # below would otherwise silently fall through to an installed copy.
-httrack_bin=$(command -v httrack)
-test -n "$httrack_bin" || {
-    echo "httrack not on PATH" >&2
-    exit 1
-}
-httrack_bin=$(cd "$(dirname "$httrack_bin")" && pwd)/$(basename "$httrack_bin")
+httrack_bin=$(httrack_path)
 
 work=$(mktemp -d)
 cleanup_push rm -rf "$work"

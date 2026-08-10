@@ -2,11 +2,13 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Drives -#test=longpath: a >MAX_PATH round trip exercising hts_pathToUCS2's
 # \\?\ prefixing on Windows (#133); a positive control on POSIX.
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 out=$(httrack -O /dev/null -#test=longpath "$dir")
 grep -q "longpath:.*OK" <<<"$out"

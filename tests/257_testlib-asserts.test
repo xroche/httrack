@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# The assert_* helpers the engine self-test tier rests on, exercised from a
+# subject process, since a firing assertion would exit this script too.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_asserts.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+
+ok() { echo "OK: $*"; }
+
+rc=0 out=
+run_subject() {
+    printf 'set -euo pipefail\n. "%s/testlib.sh"\n%s\n' "$testdir" "$1" >"$tmpdir/subject.sh"
+    rc=0
+    out=$(bash "$tmpdir/subject.sh" 2>&1) || rc=$?
+}
+
+holds() {
+    run_subject "$1"
+    test "$rc" -eq 0 || fail "[$1] should have held, exited $rc: $out"
+}
+
+# Match $2 literally, not with assert_match, which is what this file tests.
+fires() {
+    run_subject "$1"
+    test "$rc" -eq 1 || fail "[$1] should have failed, exited $rc: $out"
+    case "$out" in
+    *"$2"*) ;;
+    *) fail "[$1] failed without reporting '$2': $out" ;;
+    esac
+}
+
+## assert_eq prints both sides
+holds 'assert_eq abc abc'
+holds 'assert_eq "a b" "a b"'
+fires 'assert_eq abc abd' 'expected [abc], got [abd]'
+# A got that merely starts with want must fire too, or a prefix compare passes.
+fires 'assert_eq abc abcd' 'expected [abc], got [abcd]'
+fires 'assert_eq abcd abc' 'expected [abcd], got [abc]'
+# Whitespace is part of the value, and the brackets are what makes it visible.
+fires 'assert_eq "a b" "a  b"' 'expected [a b], got [a  b]'
+fires 'assert_eq abc abd "reading the header"' 'reading the header: expected [abc]'
+ok "assert_eq fires on a difference and prints want beside got"
+
+## assert_match is an unanchored, case-sensitive ERE
+holds 'assert_match "^abc" abcde'
+holds 'assert_match "cd" abcde'
+fires 'assert_match "^bcd" abcde' 'no match for /^bcd/ in: abcde'
+# A metacharacter must act as one: both legs pass a substring matcher.
+holds 'assert_match "a.c" abc'
+fires 'assert_match "a.c" abbc' 'no match for /a.c/'
+# Case-folding would accept output the caller means to reject.
+fires 'assert_match "ABC" abc' 'no match for /ABC/'
+holds 'assert_match "^first" "first
+second"'
+# The anchors are the whole text's ends, so "^second" over multi-line output misses.
+fires 'assert_match "^second" "first
+second"' 'no match for /^second/'
+# The label is the only context a caller gives; it must reach the message.
+fires 'assert_match "zz" abc "the registry listing"' 'the registry listing: no match for /zz/'
+ok "assert_match is an unanchored, case-sensitive ERE"
+
+## assert_file wants a regular file, not merely something at that path
+mkdir "$tmpdir/adir"
+printf '12345' >"$tmpdir/afile"
+holds "assert_file $tmpdir/afile"
+fires "assert_file $tmpdir/adir" "missing file: $tmpdir/adir"
+fires "assert_file $tmpdir/nothing" "missing file: $tmpdir/nothing"
+fires "assert_file $tmpdir/adir 'the cache fixture'" "the cache fixture: missing file"
+ok "assert_file rejects a directory and a missing path alike"
+
+## assert_selftest
+holds 'assert_selftest "identabs self-test OK" identabs'
+holds 'assert_selftest "www.xn--caf-dma.com" idna-encode "www.café.com"'
+fires 'assert_selftest nope identabs' 'expected [nope], got [identabs self-test OK]'
+# The tail pins which branch fired: both carry the same "-#test=NAME args:" head.
+fires 'assert_selftest "x" idna-encode "www.café.com"' 'expected [x], got [www.xn--caf-dma.com]'
+# An unknown self-test writes nothing and exits 1, so the status is the only
+# signal; the exact status keeps a missing engine (127) from passing this leg.
+fires 'assert_selftest "" no-such-selftest' 'exited 1, output:'
+ok "assert_selftest pins the output and the exit status"
+
+## httrack_path. The relative PATH entry is the whole case: make check prepends
+# ../src, so a helper echoing `command -v` back would pass everything but this.
+# shellcheck disable=SC2016 # a subject is shell source, expanded by the subject
+holds 'cd "$(dirname "$(command -v httrack)")"
+PATH=.:$PATH
+p=$(httrack_path)
+case "$p" in /*) ;; *) fail "not absolute: $p" ;; esac
+cd /
+"$p" --version >/dev/null'
+fires 'PATH= httrack_path' 'no httrack in PATH'
+ok "httrack_path returns an absolute path that still runs from elsewhere"

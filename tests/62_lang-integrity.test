@@ -7,9 +7,11 @@
 # for the engine (linput_cpp) but not for us. None do today.
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
-langdir="${top_srcdir:-..}/lang"
-def="${top_srcdir:-..}/lang.def"
+langdir="$top_srcdir/lang"
+def="$top_srcdir/lang.def"
 eng="$langdir/English.txt"
 for f in "$eng" "$def"; do
     [ -f "$f" ] || {
@@ -19,7 +21,7 @@ for f in "$eng" "$def"; do
 done
 
 tmp=$(mktemp -d)
-trap 'set +e; rm -rf "$tmp"' EXIT
+cleanup_push rm -rf "$tmp"
 keys="$tmp/english.keys"
 
 # Byte-wise: each file is in its own declared legacy charset, lang.def is CRLF.
@@ -201,7 +203,7 @@ fi
 
 # An unknown ${LANG_*} renders as nothing rather than erroring, so check that
 # every macro the templates interpolate, in any wrapper form, resolves.
-LC_ALL=C grep -oh '[$]{[^}]*LANG_[A-Za-z0-9_]*}' "${top_srcdir:-..}"/html/server/*.html |
+LC_ALL=C grep -oh '[$]{[^}]*LANG_[A-Za-z0-9_]*}' "$top_srcdir"/html/server/*.html |
     LC_ALL=C sed 's|.*\(LANG_[A-Za-z0-9_]*\)}|\1|' | LC_ALL=C sort -u >"$tmp/used"
 nused=$(wc -l <"$tmp/used")
 if [ "$nused" -lt 100 ]; then

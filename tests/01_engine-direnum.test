@@ -2,11 +2,13 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Drives -#test=direnum: enumerate a long+non-ASCII directory through the
 # opendir/readdir wrappers, checking each child round-trips as UTF-8 (#133,#630).
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 out=$(httrack -O /dev/null -#test=direnum "$dir")
-grep -q "direnum:.*OK" <<<"$out"
+assert_match "direnum:.*OK" "$out"

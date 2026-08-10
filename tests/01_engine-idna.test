@@ -3,13 +3,18 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # IDNA / punycode encode (-#test=idna-encode) and decode (-#test=idna-decode). This code has a CVE history,
 # so the edge cases below cover passthrough, round-trips, and malformed input.
 
-enc() { test "$(httrack -O /dev/null -#test=idna-encode "$1")" == "$2" || exit 1; }
-dec() { test "$(httrack -O /dev/null -#test=idna-decode "$1")" == "$2" || exit 1; }
+enc() { assert_selftest "$2" idna-encode "$1"; }
+dec() { assert_selftest "$2" idna-decode "$1"; }
 # a malformed encode input must be rejected (empty output), not encoded or leaked.
-enc_bad() { test -z "$(httrack -O /dev/null -#test=idna-encode "$1" 2>/dev/null)" || exit 1; }
+enc_bad() {
+    assert_eq "" "$(httrack -O /dev/null -#test=idna-encode "$1" 2>/dev/null)" "idna-encode '$1'"
+}
 
 # encode
 enc 'www.café.com' 'www.xn--caf-dma.com'

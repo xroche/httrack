@@ -34,16 +34,10 @@ alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
     cat "$dir/hdr" "$dir/body"
 } >"$dir/in.arc"
 
-freeport() {
-    "$python" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()'
-}
-proxyport=$(freeport)
-icpport=$(freeport)
-
-: >"$dir/pt.log" # the drainer below creates it asynchronously
 # stdout to a file is fully buffered and SIGTERM never flushes it, so a leak on
 # stdout would be lost; a pty line-buffers it. The exec keeps $! on proxytrack.
-"$python" -c '
+launch_proxytrack() {
+    "$python" -c '
 import os, pty, sys
 master, slave = pty.openpty()
 if os.fork() == 0:
@@ -64,27 +58,10 @@ os.dup2(slave, 2)
 if slave > 2:
     os.close(slave)
 os.execvp(sys.argv[2], sys.argv[2:])
-' "$dir/pt.log" proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" &
-ptpid=$!
-waited=0
-until grep -qE "HTTP Proxy installed on|Unable to (initialize a temporary server|create the server)" "$dir/pt.log"; do
-    kill -0 "$ptpid" 2>/dev/null || {
-        echo "FAIL: proxytrack exited before listening"
-        cat "$dir/pt.log"
-        exit 1
-    }
-    test "$waited" -lt 50 || {
-        echo "FAIL: proxytrack never announced its listen port"
-        exit 1
-    }
-    sleep 0.1
-    waited=$((waited + 1))
-done
-grep -q "HTTP Proxy installed on" "$dir/pt.log" || {
-    echo "FAIL: proxytrack failed to bind"
-    cat "$dir/pt.log"
-    exit 1
+' "$ptlog" proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" &
+    ptpid=$!
 }
+start_proxytrack "$dir/pt" launch_proxytrack
 
 propfind() {
     local path=$1
@@ -95,7 +72,7 @@ propfind() {
 
 resp=$(propfind page.html) || {
     echo "FAIL: PROPFIND on an exact cache entry did not answer"
-    cat "$dir/pt.log"
+    cat "$ptlog"
     exit 1
 }
 grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
@@ -125,7 +102,7 @@ test "$responses" -eq 2 || {
 # The crash killed the process, so a second request is the liveness proof.
 resp=$(propfind "") || {
     echo "FAIL: proxytrack died serving the previous PROPFIND"
-    cat "$dir/pt.log"
+    cat "$ptlog"
     exit 1
 }
 grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
@@ -140,7 +117,7 @@ sentinel=PT911-DAV-BODY-CANARY
 pad=$(printf '%8192s' '')
 resp=$(propfind "" -H 'Expect:' --data-binary "$sentinel${pad// /x}") || {
     echo "FAIL: proxytrack died serving a PROPFIND carrying a body"
-    cat "$dir/pt.log"
+    cat "$ptlog"
     exit 1
 }
 grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
@@ -153,10 +130,10 @@ grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
 # PROPFIND is logged 403 without ever reaching the traces. It is logged after
 # them, so waiting on it also fences the drainer's copy.
 waited=0
-until test "$(grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' "$dir/pt.log" || true)" -ge 3; do
+until test "$(grep -ci ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' "$ptlog" || true)" -ge 3; do
     test "$waited" -lt 50 || {
         echo "FAIL: fewer than three PROPFINDs were answered 207, so the checks below prove nothing"
-        cat "$dir/pt.log"
+        cat "$ptlog"
         exit 1
     }
     sleep 0.1
@@ -165,7 +142,7 @@ done
 
 # Neither what the client sent nor the generated body is echoed anywhere; the
 # two literals name the exact regression on top.
-log=$(<"$dir/pt.log")
+log=$(<"$ptlog")
 for marker in "$sentinel" 'Default Document for the Folder' 'DEBUG: DAV-DATA' '^RESPONSE:'; do
     if grep -q "$marker" <<<"$log"; then
         echo "FAIL: a PROPFIND echoed '$marker' into proxytrack's output"

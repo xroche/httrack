@@ -5,10 +5,11 @@
 # mirror namespace (#774, #775).
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
-trap 'set +e; rm -rf "$dir"; exit 1' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$dir"
 
 rc=0
 out=$(httrack -O /dev/null -#test=refetchbackup "$dir" 2>&1) || rc=$?

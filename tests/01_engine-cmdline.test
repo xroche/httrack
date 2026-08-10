@@ -9,10 +9,11 @@
 # overrunning a fixed scratch buffer.
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cmdline.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmp"' EXIT
-trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmp"
 
 echo '<html><body>hello</body></html>' >"$tmp/index.html"
 
@@ -45,21 +46,21 @@ run_only() {
 # assert the value was accepted: clean exit and the fixture was mirrored
 accepted() {
     { test "$RC" -eq 0 && test -n "$(find "$1" -type f -path '*/index.html' -print -quit)"; } ||
-        ! echo "FAIL: $2 (exit $RC)" || exit 1
+        fail "$2 (exit $RC)"
 }
 
 # assert the value was refused cleanly: a normal error exit, never a crash
 # (a SIGABRT from an overflowed scratch buffer would surface as exit 134)
 refused() {
     { test "$RC" -ne 0 && test "$RC" -ne 134; } ||
-        ! echo "FAIL: $1 (exit $RC)" || exit 1
+        fail "$1 (exit $RC)"
 }
 
 # assert continue mode was entered: it drops the URL list, so with no cache to
 # resume the run ends on the usage screen rather than on any other error
 continued() {
     { test "$RC" -ne 0 && grep -q 'usage:' "$1/.log"; } ||
-        ! echo "FAIL: $2 (exit $RC)" || exit 1
+        fail "$2 (exit $RC)"
 }
 
 # a value past the old 126/256 caps but within the cap is accepted, on both the
@@ -165,11 +166,11 @@ accepted "$tmp/pre-proto" "#615: -@i2 before the URL broke the crawl"
 # stop tripping it if a trailing -K reset the count back to the default 4.
 warned() {
     grep -q 'simultaneous connections limited to' "$1/hts-log.txt" ||
-        ! echo "FAIL: $2" || exit 1
+        fail "$2"
 }
 not_warned() {
     ! grep -q 'simultaneous connections limited to' "$1/hts-log.txt" ||
-        ! echo "FAIL: $2" || exit 1
+        fail "$2"
 }
 run "$tmp/soc-c16" -c16
 warned "$tmp/soc-c16" "-c16 did not trip the socket-count warning (probe blind)"

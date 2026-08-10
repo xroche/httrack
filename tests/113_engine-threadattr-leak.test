@@ -6,6 +6,8 @@
 # interposer counts the init/destroy imbalance instead.
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 if [ "$(uname -s)" != "Linux" ]; then
     echo "threadattr: LD_PRELOAD interposition is Linux-only here, skipping"
@@ -27,8 +29,7 @@ if [ ! -r "${THREADATTRFAIL_LIB:-}" ]; then
 fi
 
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
-trap 'rm -rf "$dir"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$dir"
 
 # An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
 # refuses by default. The shim allocates nothing, so the ordering is harmless.

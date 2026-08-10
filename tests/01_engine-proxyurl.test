@@ -3,14 +3,15 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 # hts_parse_proxy splits a -P argument "[scheme://][user:pass@]host[:port]" into
 # the proxy host string and port. -#test=proxyurl <arg> prints
 # "name=.. port=.. host=.. kind=..", where host= is what the connect resolves and
 # kind= is the transport the scheme selects (http, socks or connect).
 
-p() {
-    test "$(httrack -O /dev/null -#test=proxyurl "$1")" == "$2" || exit 1
-}
+p() { assert_selftest "$2" proxyurl "$1"; }
 
 # bare host, with and without an explicit port
 p 'proxy.example.com:8080' 'name=proxy.example.com port=8080 host=proxy.example.com kind=http'

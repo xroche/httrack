@@ -4,6 +4,8 @@
 # parse it just drops WebHTTrack, with no error anyone sees.
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 srcdir="${abs_top_srcdir:?not run under make check}"
 
@@ -41,7 +43,7 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/appstream.XXXXXX") || {
     echo "no tmpdir" >&2
     exit 1
 }
-trap 'set +e; rm -rf "${work}"' EXIT
+cleanup_push rm -rf "${work}"
 
 for metainfo in "${metainfos[@]}"; do
     # Positive control: a validator that never fails would pass the check below.

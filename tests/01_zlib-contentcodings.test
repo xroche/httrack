@@ -2,10 +2,12 @@
 #
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # brotli/zstd decode, unknown codings, and the decoded-size budget.
 dir=$(mktemp -d)
-trap 'set +e; rm -rf "$dir"' EXIT
+cleanup_push rm -rf "$dir"
 
 httrack -O /dev/null -#test=contentcodings "$dir" run |
     grep -q "contentcodings self-test OK"

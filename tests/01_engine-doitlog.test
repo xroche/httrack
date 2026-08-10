@@ -15,21 +15,15 @@
 #      file and re-running with no url picks up the new content.
 
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Resolve httrack to an absolute path before we cd: PATH may hold a
 # build-relative entry that would not resolve from the temp directory.
-bin=$(command -v httrack) || {
-    echo "FAIL: httrack not found on PATH"
-    exit 1
-}
-case "$bin" in
-/*) ;;
-*) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
-esac
+bin=$(httrack_path)
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_doitlog.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmp"' EXIT
-trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmp"
 
 site="$tmp/site"
 out="$tmp/out"
@@ -50,10 +44,7 @@ test "$rc" -eq 0 || {
     echo "FAIL: initial mirror exited $rc"
     exit 1
 }
-test -f "$out/hts-cache/doit.log" || {
-    echo "FAIL: doit.log not written by the initial mirror"
-    exit 1
-}
+assert_file "$out/hts-cache/doit.log" "the initial mirror wrote no doit.log"
 
 # --- 1. no-url reprise re-mirrors cleanly -----------------------------------
 # No url on the command line, so the engine loads doit.log and re-inserts the

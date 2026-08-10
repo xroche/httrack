@@ -17,6 +17,8 @@
 # set -e with the intentional-nonzero httrack runs guarded explicitly (the
 # crawls below are expected to fail/abort and their status is inspected by hand).
 set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 # Resolve httrack to an absolute path before we cd: PATH may hold a build-relative
 # entry that would not resolve from the temp directory.
@@ -30,8 +32,7 @@ case "$bin" in
 esac
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_rcfile.XXXXXX") || exit 1
-trap 'set +e; rm -rf "$tmp"' EXIT
-trap 'rm -rf "$tmp"' HUP INT QUIT PIPE TERM
+cleanup_push rm -rf "$tmp"
 
 # HTS_HTTRACKRC is ".httrackrc" on POSIX but "httrackrc" on Windows: write both,
 # each platform reads the one it knows.
@@ -60,10 +61,7 @@ test "$rc" -eq 0 || {
     echo "FAIL: rc-file crawl exited $rc"
     exit 1
 }
-test -f "$d1/hts-cache/doit.log" || {
-    echo "FAIL: doit.log not written (rc file not processed)"
-    exit 1
-}
+assert_file "$d1/hts-cache/doit.log" "no doit.log, so the rc file was not processed"
 # A truncated copy would cut the token; require the full -F value.
 grep -q -- "-F $marker" "$d1/hts-cache/doit.log" || {
     echo "FAIL: user-agent alias missing or truncated in doit.log"
