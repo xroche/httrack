@@ -10,5 +10,4 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-httrack -O /dev/null -#test=makeindex "$dir" run |
-    grep -q "makeindex self-test OK"
+assert_selftest "makeindex self-test OK" makeindex "$dir" run

@@ -10,5 +10,4 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-httrack -O /dev/null -#test=structcheck "$dir" |
-    grep -q "structcheck self-test OK"
+assert_selftest "structcheck self-test OK" structcheck "$dir"
