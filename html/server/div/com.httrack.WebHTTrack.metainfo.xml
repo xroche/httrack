@@ -43,10 +43,12 @@
   </developer>
   <screenshots>
     <screenshot type="default">
-      <caption>Choosing the addresses and options for a new mirror</caption>
+      <caption>Choosing which files a mirror includes</caption>
       <!-- A guide asset, so every screenshot reshoot refreshes this too.
-           appstream-network.yml resolves the URL weekly if the name moves. -->
-      <image>https://www.httrack.com/html/img/guide-web-project-setup.png</image>
+           appstream-network.yml resolves the URL weekly if the name moves.
+           Not a wizard pane: the walk crawls a loopback server, so every pane
+           showing the address advertises 127.0.0.1 and an ephemeral port. -->
+      <image>https://www.httrack.com/html/img/guide-web-opt-scan-rules.png</image>
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1"/>
