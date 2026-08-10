@@ -10,9 +10,11 @@ set -euo pipefail
 # Isolates the wire layer from url_savename, which strips traversal on its own.
 
 hdr() {
-    local want=$1
+    local want=$1 got
     shift
-    assert_eq "$want" "$(httrack -O /dev/null -#test=header "$@" | grep '^contenttype=')" "$*"
+    # Assigned, not passed inline: set -e sees a failing engine only in an assignment.
+    got=$(httrack -O /dev/null -#test=header "$@" | grep '^contenttype=')
+    assert_eq "$want" "$got" "$*"
 }
 
 hdr 'contenttype=application/pdf cdispo=' 'Content-Type: application/pdf'

@@ -12,4 +12,4 @@ dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
 out=$(httrack -O /dev/null -#test=cookieimport "$dir")
-grep -q "cookieimport:.*OK" <<<"$out"
+assert_match "cookieimport:.*OK" "$out"

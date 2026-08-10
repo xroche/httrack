@@ -61,10 +61,7 @@ test "$rc" -eq 0 || {
     echo "FAIL: rc-file crawl exited $rc"
     exit 1
 }
-test -f "$d1/hts-cache/doit.log" || {
-    echo "FAIL: doit.log not written (rc file not processed)"
-    exit 1
-}
+assert_file "$d1/hts-cache/doit.log" "no doit.log, so the rc file was not processed"
 # A truncated copy would cut the token; require the full -F value.
 grep -q -- "-F $marker" "$d1/hts-cache/doit.log" || {
     echo "FAIL: user-agent alias missing or truncated in doit.log"

@@ -44,10 +44,7 @@ test "$rc" -eq 0 || {
     echo "FAIL: initial mirror exited $rc"
     exit 1
 }
-test -f "$out/hts-cache/doit.log" || {
-    echo "FAIL: doit.log not written by the initial mirror"
-    exit 1
-}
+assert_file "$out/hts-cache/doit.log" "the initial mirror wrote no doit.log"
 
 # --- 1. no-url reprise re-mirrors cleanly -----------------------------------
 # No url on the command line, so the engine loads doit.log and re-inserts the

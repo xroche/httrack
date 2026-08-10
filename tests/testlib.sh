@@ -32,31 +32,16 @@ assert_eq() { # assert_eq WANT GOT [LABEL]
     test "$1" = "$2" || fail "${3:+$3: }expected [$1], got [$2]"
 }
 
-# ERE, matched anywhere in TEXT: ^ and $ are TEXT's own ends, not a line's, so an
-# anchor over multi-line output never fires. The pattern must stay unquoted here,
-# or bash 3.2 takes it literally.
+# Unanchored ERE: ^ and $ are the whole subject's ends, not a line's.
+# Keep $1 unquoted here, or bash 3.2 matches it as a literal string.
 assert_match() { # assert_match RE TEXT [LABEL]
     [[ $2 =~ $1 ]] || fail "${3:+$3: }no match for /$1/ in: $2"
 }
 
-assert_no_match() { # assert_no_match RE TEXT [LABEL]
-    ! [[ $2 =~ $1 ]] || fail "${3:+$3: }unexpected match for /$1/ in: $2"
-}
-
 assert_file() { test -f "$1" || fail "${2:+$2: }missing file: $1"; }
-assert_dir() { test -d "$1" || fail "${2:+$2: }missing directory: $1"; }
 
-assert_min_bytes() { # assert_min_bytes PATH BYTES
-    local got
-    assert_file "$1"
-    got=$(wc -c <"$1")
-    # Arithmetic, since BSD wc pads its count with blanks.
-    test "$((got))" -ge "$2" || fail "$1: expected at least $2 bytes, got $((got))"
-}
-
-# Run engine self-test NAME and require its stdout to be exactly WANT. -O /dev/null
-# is fixed: a self-test writes no mirror, but the engine refuses to start without an
-# output path. A non-zero exit fails too, which a `test "$(...)" = ...` cannot see.
+# Run engine self-test NAME: stdout must equal WANT, status must be 0 (which a
+# `test "$(...)" = ...` cannot see). expect_ok takes a command, for a real -O.
 assert_selftest() { # assert_selftest WANT NAME [ARGS...]
     local want=$1 name=$2 got rc=0
     shift 2
@@ -65,13 +50,14 @@ assert_selftest() { # assert_selftest WANT NAME [ARGS...]
     test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
 }
 
-# Absolute path to the httrack under test, for a test that cd's away: make check
-# prepends a RELATIVE ../src, which from anywhere else resolves to an installed
-# copy, or to nothing.
+# Absolute path to httrack, since make check's relative ../src breaks once a test
+# cd's away. assert_selftest runs the bare name, so a test that cd's calls this.
 httrack_path() {
-    local p
+    local p dir
     p=$(command -v httrack) || fail "no httrack in PATH"
-    printf '%s\n' "$(cd "$(dirname "$p")" && pwd)/$(basename "$p")"
+    # Assigned, so a failed cd is named here instead of yielding a bare /httrack.
+    dir=$(cd "$(dirname "$p")" && pwd) || fail "cannot reach $(dirname "$p")"
+    printf '%s\n' "$dir/$(basename "$p")"
 }
 
 # A literal, not $'..': Apple's bash 3.2 loses quote state on that inside a

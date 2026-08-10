@@ -11,4 +11,4 @@ dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
 out=$(httrack -O /dev/null -#test=direnum "$dir")
-grep -q "direnum:.*OK" <<<"$out"
+assert_match "direnum:.*OK" "$out"

@@ -19,10 +19,7 @@ set -eu
 : "${top_srcdir:=..}"
 fixture="$top_srcdir/tests/fixtures/cache-golden"
 
-test -e "$fixture/hts-cache/new.zip" || {
-    echo "missing committed cache fixture: $fixture/hts-cache/new.zip" >&2
-    exit 1
-}
+assert_file "$fixture/hts-cache/new.zip" "the committed cache fixture is missing"
 
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"

@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The assert_* vocabulary the engine self-test tier now rests on. An assertion
-# that fires exits, so each case is judged from another process: what matters is
-# that it fires exactly when it should and names the value it saw.
+# The assert_* helpers the engine self-test tier rests on, exercised from a
+# subject process, since a firing assertion would exit this script too.
 
 set -euo pipefail
 
@@ -16,7 +15,7 @@ ok() { echo "OK: $*"; }
 
 rc=0 out=
 run_subject() {
-    printf 'set -euo pipefail\n. %s/testlib.sh\n%s\n' "$testdir" "$1" >"$tmpdir/subject.sh"
+    printf 'set -euo pipefail\n. "%s/testlib.sh"\n%s\n' "$testdir" "$1" >"$tmpdir/subject.sh"
     rc=0
     out=$(bash "$tmpdir/subject.sh" 2>&1) || rc=$?
 }
@@ -26,8 +25,7 @@ holds() {
     test "$rc" -eq 0 || fail "[$1] should have held, exited $rc: $out"
 }
 
-# Fires, and its message carries $2 verbatim. A literal case, not assert_match:
-# the library cannot be its own oracle here.
+# Match $2 literally, not with assert_match, which is what this file tests.
 fires() {
     run_subject "$1"
     test "$rc" -eq 1 || fail "[$1] should have failed, exited $rc: $out"
@@ -41,50 +39,50 @@ fires() {
 holds 'assert_eq abc abc'
 holds 'assert_eq "a b" "a b"'
 fires 'assert_eq abc abd' 'expected [abc], got [abd]'
+# A got that merely starts with want must fire too, or a prefix compare passes.
+fires 'assert_eq abc abcd' 'expected [abc], got [abcd]'
+fires 'assert_eq abcd abc' 'expected [abcd], got [abc]'
 # Whitespace is part of the value, and the brackets are what makes it visible.
 fires 'assert_eq "a b" "a  b"' 'expected [a b], got [a  b]'
 fires 'assert_eq abc abd "reading the header"' 'reading the header: expected [abc]'
 ok "assert_eq fires on a difference and prints want beside got"
 
-## assert_match / assert_no_match are unanchored EREs
+## assert_match is an unanchored, case-sensitive ERE
 holds 'assert_match "^abc" abcde'
 holds 'assert_match "cd" abcde'
 fires 'assert_match "^bcd" abcde' 'no match for /^bcd/ in: abcde'
 # A metacharacter must act as one: both legs pass a substring matcher.
 holds 'assert_match "a.c" abc'
 fires 'assert_match "a.c" abbc' 'no match for /a.c/'
-holds 'assert_no_match "^bcd" abcde'
-fires 'assert_no_match "cd" abcde' 'unexpected match for /cd/ in: abcde'
-# The anchors are the whole text's ends, so "^name" over multi-line output misses.
-fires 'assert_match "^second" "first
-second"' 'no match for /^second/'
+# Case-folding would accept output the caller means to reject.
+fires 'assert_match "ABC" abc' 'no match for /ABC/'
 holds 'assert_match "^first" "first
 second"'
-ok "assert_match and assert_no_match agree on the same ERE"
+# The anchors are the whole text's ends, so "^second" over multi-line output misses.
+fires 'assert_match "^second" "first
+second"' 'no match for /^second/'
+# The label is the only context a caller gives; it must reach the message.
+fires 'assert_match "zz" abc "the registry listing"' 'the registry listing: no match for /zz/'
+ok "assert_match is an unanchored, case-sensitive ERE"
 
-## file assertions tell a file from a directory
+## assert_file wants a regular file, not merely something at that path
 mkdir "$tmpdir/adir"
 printf '12345' >"$tmpdir/afile"
 holds "assert_file $tmpdir/afile"
-holds "assert_dir $tmpdir/adir"
 fires "assert_file $tmpdir/adir" "missing file: $tmpdir/adir"
-fires "assert_dir $tmpdir/afile" "missing directory: $tmpdir/afile"
 fires "assert_file $tmpdir/nothing" "missing file: $tmpdir/nothing"
-ok "assert_file and assert_dir reject each other's argument"
-
-## assert_min_bytes, at the boundary
-holds "assert_min_bytes $tmpdir/afile 5"
-fires "assert_min_bytes $tmpdir/afile 6" 'expected at least 6 bytes, got 5'
-fires "assert_min_bytes $tmpdir/nothing 1" "missing file: $tmpdir/nothing"
-ok "assert_min_bytes accepts exactly the requested size and no less"
+fires "assert_file $tmpdir/adir 'the cache fixture'" "the cache fixture: missing file"
+ok "assert_file rejects a directory and a missing path alike"
 
 ## assert_selftest
 holds 'assert_selftest "identabs self-test OK" identabs'
 holds 'assert_selftest "www.xn--caf-dma.com" idna-encode "www.café.com"'
 fires 'assert_selftest nope identabs' 'expected [nope], got [identabs self-test OK]'
-fires 'assert_selftest "x" idna-encode "www.café.com"' '-#test=idna-encode www.café.com:'
-# An unknown self-test writes nothing and exits 1: the status is the only signal.
-fires 'assert_selftest "" no-such-selftest' 'exited 1'
+# The tail pins which branch fired: both carry the same "-#test=NAME args:" head.
+fires 'assert_selftest "x" idna-encode "www.café.com"' 'expected [x], got [www.xn--caf-dma.com]'
+# An unknown self-test writes nothing and exits 1, so the status is the only
+# signal; the exact status keeps a missing engine (127) from passing this leg.
+fires 'assert_selftest "" no-such-selftest' 'exited 1, output:'
 ok "assert_selftest pins the output and the exit status"
 
 ## httrack_path. The relative PATH entry is the whole case: make check prepends
