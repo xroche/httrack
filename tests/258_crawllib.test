@@ -99,15 +99,20 @@ read -r apid bpid <"${tmpdir}/s${subject}/pids"
 ! kill -0 "$bpid" 2>/dev/null || fail "server $bpid survived its test"
 ok "two servers get distinct ports and both are reaped on exit"
 
-## A test that stops its own server still exits clean, and reaps nothing twice
-holds 'local_server_start
-pid=$SRV_PID
-stop_server "$SRV_PID"
-! kill -0 "$pid" 2>/dev/null || fail "the mid-run stop left the server alive"
-printf "%s\n" "$pid" >"${tmpdir}/pid"'
-read -r pid <"${tmpdir}/s${subject}/pid"
-! kill -0 "$pid" 2>/dev/null || fail "server $pid survived"
-ok "a server stopped mid-test leaves the teardown a no-op"
+## local_server_stop reaps now and disarms the teardown
+holds 'local_server_start --log "${tmpdir}/a.log"
+first=$SRV_PID
+local_server_start --log "${tmpdir}/b.log"
+local_server_stop "$first"
+! kill -0 "$first" 2>/dev/null || fail "the mid-run stop left the server alive"
+# The emptied slot is what stops teardown signalling a recycled pid number.
+test -z "${SRV_PIDS[0]}" || fail "the stopped server was left armed: ${SRV_PIDS[0]}"
+test "${SRV_PIDS[1]}" = "$SRV_PID" || fail "the running server lost its teardown"
+printf "%s %s\n" "$first" "$SRV_PID" >"${tmpdir}/pids"'
+read -r first second <"${tmpdir}/s${subject}/pids"
+! kill -0 "$first" 2>/dev/null || fail "server $first survived"
+! kill -0 "$second" 2>/dev/null || fail "server $second survived its test"
+ok "local_server_stop reaps its server and disarms only that teardown"
 
 ## local_crawl's argument contract, read off a shim rather than a real crawl
 shim="${tmpdir}/bin"

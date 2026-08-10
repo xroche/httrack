@@ -70,7 +70,7 @@ cp "${out}/warc-out.warc.gz" "${tmpdir}/warc2.gz"
 cp "${out}/warc-out.cdx" "${tmpdir}/cdx2"
 
 # --- pass 3: server gone, so the no-data rollback restores the last session --
-stop_server "$SRV_PID"
+local_server_stop "$SRV_PID"
 local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --retries=1 --update "${BASEURL}/changes/index.html"
 expect "the dead pass rolled the session back" \
     grep -aq "restoring previous one" "${out}/hts-log.txt"

@@ -6,19 +6,36 @@
 # shellcheck source=tests/testlib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/testlib.sh"
 
-# Reap the server unless it is already gone. A test that stops its own server
-# mid-run leaves the registered cleanup holding a dead pid, and stop_server's
-# Windows path answers an unresolvable pid by killing every python.exe.
+# Live servers, in start order; a stopped one leaves an empty slot. cleanup_push
+# expands its arguments at push time, so a teardown holding the pid itself could
+# not be disarmed, and 240 stops its server mid-test on purpose.
+SRV_PIDS=()
+
+# Teardown for the server in slot $1. Signalling a pid the system has since
+# recycled would kill an unrelated process and then stall reap_bounded for its
+# whole grace period, so a slot is read, not a pid.
 local_server_reap() {
-    kill -0 "$1" 2>/dev/null || return 0
+    local pid=${SRV_PIDS[$1]:-}
+    test -n "$pid" || return 0
+    SRV_PIDS[$1]=
+    stop_server "$pid"
+}
+
+# Stop server $1 now and disarm its teardown, for a test whose next step needs
+# the server gone.
+local_server_stop() {
+    local i
+    for ((i = 0; i < ${#SRV_PIDS[@]}; i++)); do
+        test "${SRV_PIDS[$i]:-}" != "$1" || SRV_PIDS[i]=
+    done
     stop_server "$1"
 }
 
 # Start local-server.py in the background on an ephemeral port and wait for its
 # "PORT n" line. Sets SRV_PORT, SRV_PID, SRV_LOG and BASEURL, and registers the
-# reaping cleanup. A second call overwrites all four and truncates the default
-# log, so a caller wanting two servers saves each set and gives each its own
-# --log. Options, ahead of any server argument; -- ends them:
+# reaping cleanup, and appends to SRV_PIDS. A second call overwrites all four
+# and truncates the default
+# log, so a caller wanting two servers saves each set and gives each its own --log. Options, ahead of any server argument; -- ends them:
 #   --root DIR    tree to serve (default: the shared server-root fixture)
 #   --log FILE    where the announcement lands (default: $tmpdir/server.log)
 #   --env V=VAL   an environment variable for the server, repeatable
@@ -59,7 +76,8 @@ local_server_start() {
         "$(nativepath "${testdir}/local-server.py")" \
         --root "$(nativepath "$root")" "$@" >"$SRV_LOG" 2>&1 </dev/null &
     SRV_PID=$!
-    cleanup_push local_server_reap "$SRV_PID"
+    SRV_PIDS+=("$SRV_PID")
+    cleanup_push local_server_reap "$((${#SRV_PIDS[@]} - 1))"
 
     SRV_PORT=$(discover_server_port "$SRV_LOG" "$SRV_PID") ||
         fail "local-server did not come up: $(cat "$SRV_LOG")"
