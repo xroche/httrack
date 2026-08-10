@@ -76,9 +76,8 @@ done
 # shellcheck disable=SC2016 # $env: is PowerShell's, not this shell's
 grep -q '\$env:WATCHDOG_TOKEN' "$wdscript" ||
     fail "the watchdog does not read its token from the environment"
-# Captured, not piped: grep -qi exits on the first match, and the SIGPIPE it
-# sends sed becomes the pipeline's status under pipefail, so a token found
-# here would read as absent.
+# Captured, not piped: grep -qi's early exit can SIGPIPE sed, and pipefail
+# would turn that into "no token found".
 params=$(sed -n '/^param(/,/^)/p' "$wdscript")
 if grep -qi 'token' <<<"$params"; then
     fail "the watchdog takes its token as a parameter, where the process list exposes it"
