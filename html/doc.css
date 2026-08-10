@@ -32,6 +32,20 @@
 	}
 }
 
+/* Additions stay out of the palette block above: it is kept byte-identical with the website's. */
+:root {
+	--body-font: system-ui, -apple-system, "Segoe UI", Roboto, "Trebuchet MS", Verdana, sans-serif;
+}
+
+/* Relative URL: the docs are read from an installed directory too. */
+@font-face {
+	font-family: "League Spartan";
+	src: url(fonts/league-spartan-700-latin.woff2) format("woff2");
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+}
+
 * { box-sizing: border-box; }
 
 /* The plain declaration before each var() is what IE11 gets: it drops the
@@ -44,6 +58,7 @@ body {
 	color: #111;
 	color: var(--ink);
 	font: 1em/1.6 "Trebuchet MS", Verdana, system-ui, -apple-system, "Segoe UI", sans-serif;
+	font-family: var(--body-font);
 }
 
 /* ---- page frame ---- */
@@ -120,6 +135,9 @@ footer {
 /* ---- typography ---- */
 
 h2, h3 { scroll-margin-top: 1rem; }
+
+/* Top two levels only: a display face reads worse than the system font over prose. */
+h1, h2 { font-family: "League Spartan", var(--body-font); font-weight: 700; }
 
 h1 { font-size: 1.9em; margin: 0 0 .3em; line-height: 1.2; }
 h2 { font-size: 1.45em; margin: 2.5em 0 .5em; padding-bottom: .2em; border-bottom: 2px solid var(--rule); }
