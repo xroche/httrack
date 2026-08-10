@@ -125,7 +125,7 @@ reporter_stopped() {
 # One per glob the driver enumerates: an empty category is counted as a failing
 # test named after the unexpanded pattern, which would drown the accounting.
 for t in 00_runnable 13_zlib-pass 14_local-pass 15_watchdog-pass \
-    16_crawl_proxy_https 17_crawl-log-salvage; do
+    16_crawl_proxy_https 17_crawl-log-salvage 18_testlib-pass 19_crawllib-pass; do
     printf '#!/bin/sh\nexit 0\n' >"$run/$t.test"
 done
 # One test reports back what it inherited: the token the step is handed can post
@@ -144,9 +144,9 @@ assert_staged
 # The skip set and the pass floor are pinned to the real suite, so a stub run
 # ends on the floor; what is under test is the tally that reaches it.
 test "$rc" -eq 1 || fail "stub suite exited $rc, want 1 from the pass floor"
-grep -q '^ran=9 pass=7 fail=1 skip=1$' <<<"$out" ||
+grep -q '^ran=11 pass=9 fail=1 skip=1$' <<<"$out" ||
     fail "wrong tally: $(grep '^ran=' <<<"$out")"
-grep -q '::error::only 7 tests passed (1 skipped)' <<<"$out" ||
+grep -q '::error::only 9 tests passed (1 skipped)' <<<"$out" ||
     fail "the pass floor did not report the count"
 grep -q 'FAIL 12_engine-fail.test (exit 3)' <<<"$out" || fail "the failing test was not named"
 
