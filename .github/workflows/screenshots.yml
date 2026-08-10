@@ -52,6 +52,15 @@ jobs:
           pip install --quiet playwright
           playwright install --with-deps chromium
 
+      # The address is on screen in the wizard panes and names the mirror folder,
+      # so the crawl needs a presentable host rather than 127.0.0.1 and a random
+      # port. example.com is reserved for documentation (RFC 2606).
+      - name: Let the crawl address a named site on port 80
+        run: |
+          set -euo pipefail
+          echo "127.0.0.1 www.example.com" | sudo tee -a /etc/hosts
+          sudo sysctl -w net.ipv4.ip_unprivileged_port_start=80  # bind 80 unprivileged
+
       - name: Capture
         env:
           LANGN: ${{ inputs.lang || '1' }}
@@ -61,6 +70,7 @@ jobs:
           # --root is the dist root; the source tree already holds every piece
           # htsserver reads, so this needs no install.
           python3 tools/screenshot-walk.py --htsserver src/htsserver --root . \
+            --site-host www.example.com --site-port 80 \
             --lang "$LANGN" --scale "$SCALE" --out shots
 
       - name: Upload the screens
