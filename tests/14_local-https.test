@@ -13,6 +13,9 @@ if test "$HTTPS_SUPPORT" == "no"; then
     exit 77
 fi
 
+# The scheme in the log is what proves TLS was used: a harness that dropped
+# --tls would serve and crawl plain http, and pass every other assertion here.
 bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 5 \
     --found 'simple/basic.html' \
+    --log-found 'https://127\.0\.0\.1:' \
     httrack 'BASEURL/simple/basic.html'
