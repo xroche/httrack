@@ -4119,6 +4119,12 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         XH_uninit;
         return;
       }
+      /* Same omission as the wait for the current link: with every slot busy
+         the mirror parks here instead, and the exit never lands (#1096). */
+      if (*stre->exit_xh_) {
+        XH_uninit;
+        return;
+      }
       Sleep(100);               // pause
     }
     opt->state._hts_in_html_parsing = prev;
@@ -4223,6 +4229,12 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       if (!back_checkmirror(opt)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
         *stre->exit_xh_ = 1;    // exit requested
+        XH_uninit;
+        return 0;
+      }
+      /* An exit asked of the engine must leave this wait too: only teardown
+         stops a live FTP worker, so waiting on its slot never ends (#1096). */
+      if (*stre->exit_xh_) {
         XH_uninit;
         return 0;
       }
