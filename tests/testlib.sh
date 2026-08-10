@@ -254,6 +254,47 @@ stop_server() {
     return 0
 }
 
+# Ephemeral port from the caller's $python, released before it is returned: the
+# process that binds it can lose the race, so pair it with start_proxytrack.
+freeport() {
+    # tr: Windows python's print leaves a CR that $() does not strip.
+    "${python:?freeport needs the caller python}" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()' |
+        tr -d '\r'
+}
+
+# 0 once $1 (its log) carries the listen banner, 1 if the bind lost its port.
+proxytrack_bound() { # proxytrack_bound LOG PID
+    local log=$1 pid=$2 waited=0
+    until grep -qE "HTTP Proxy installed on|Unable to (initialize a temporary server|create the server)" "$log"; do
+        # An exit flushes the log, so re-read it rather than calling this dead.
+        kill -0 "$pid" 2>/dev/null || break
+        test "$waited" -lt 50 || fail "proxytrack never announced its listen port: $(cat "$log")"
+        sleep 0.1
+        waited=$((waited + 1))
+    done
+    grep -q "HTTP Proxy installed on" "$log"
+}
+
+# proxytrack binds the ports itself, well after freeport dropped them, so a
+# parallel suite can steal one in between: re-pick and relaunch. LAUNCH is a
+# function reading $proxyport/$icpport and leaving the pid in $ptpid.
+start_proxytrack() { # start_proxytrack LOG LAUNCH
+    local log=$1 launch=$2 try
+    for try in 1 2 3; do
+        proxyport=$(freeport)
+        icpport=$(freeport)
+        # New inode, so a killed attempt's pty drainer cannot land its banner
+        # (or its .done marker) in the run below and answer for it.
+        rm -f "$log" "$log.done"
+        : >"$log"
+        "$launch"
+        proxytrack_bound "$log" "$ptpid" && return 0
+        stop_server "$ptpid"
+        ptpid=
+    done
+    fail "proxytrack bound none of 3 port pairs: $(cat "$log")"
+}
+
 # Echo the port local-server.py announces on $1 (its log), $2 being its pid, or
 # return 2 if the server died and 1 on the deadline: only the deadline is a race a
 # caller may skip on. Matches anywhere, since a warning merged via 2>&1 can precede
