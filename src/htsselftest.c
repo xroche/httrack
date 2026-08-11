@@ -62,6 +62,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssniff.h"
 #include "htscodec.h"
 #include "htsproxy.h"
+#include "htsrandom.h"
 #include "htssitemap.h"
 #include "htswarc.h"
 #include "htschanges.h"
@@ -1914,6 +1915,33 @@ static int st_pause(httrackp *opt, int argc, char **argv) {
       err = 1;
   }
   printf("pause: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_random(httrackp *opt, int argc, char **argv) {
+  enum { want = 64, pad = 16 };
+
+  unsigned char a[want + pad], b[want + pad];
+  int err = 0, all_zero = 1, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(a, 0xa5, sizeof(a)); /* non-zero canary, so a stray NUL shows */
+  memset(b, 0xa5, sizeof(b));
+  if (!hts_random_bytes(a, want) || !hts_random_bytes(b, want))
+    err = 1;
+  for (i = 0; i < pad; i++) {
+    if (a[want + i] != 0xa5 || b[want + i] != 0xa5)
+      err = 1; /* wrote past the requested length */
+  }
+  for (i = 0; i < want; i++)
+    all_zero &= (a[i] == 0);
+  if (all_zero || memcmp(a, b, want) == 0)
+    err = 1;
+  if (!hts_random_bytes(a, 0)) /* a zero-length ask is not a failure */
+    err = 1;
+  printf("random: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -8918,6 +8946,8 @@ static const struct selftest_entry {
      "a user stop drops the slots still waiting to connect (#1073)",
      st_backstop},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
+    {"random", "", "hts_random_bytes() fills exactly what was asked for",
+     st_random},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",

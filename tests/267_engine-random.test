@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# hts_random_bytes() (#1139): the CSPRNG must fill exactly the requested length,
+# whichever source the build ended up with, getrandom() or /dev/urandom.
+
+set -eu
+
+out=$(httrack -#test=random run)
+
+test "$out" = "random: OK" || {
+    echo "expected 'random: OK', got: $out" >&2
+    exit 1
+}

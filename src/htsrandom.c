@@ -40,7 +40,10 @@ Please visit our Website: http://www.httrack.com
 #else
 #include <errno.h>
 #include <stdio.h>
+/* getrandom() is declared only in <sys/random.h>, so one macro gates both the
+   include and the call: finding the symbol alone does not make it callable. */
 #if defined(HAVE_SYS_RANDOM_H) && defined(HAVE_GETRANDOM)
+#define HTS_USE_GETRANDOM
 #include <sys/random.h>
 #endif
 #endif
@@ -71,7 +74,14 @@ hts_boolean hts_random_bytes(void *buf, size_t len) {
   size_t got = 0;
   FILE *fp;
 
-#ifdef HAVE_GETRANDOM
+#ifdef HTS_USE_GETRANDOM
+  /* Without that prototype an implicit declaration returns int, so pin the
+     declared return type: a re-split guard divides by zero here instead. */
+  enum {
+    getrandom_is_prototyped =
+        1 / (sizeof(getrandom(p, len, 0)) == sizeof(ssize_t))
+  };
+
   while (got < len) {
     const ssize_t n = getrandom(p + got, len - got, 0);
 
