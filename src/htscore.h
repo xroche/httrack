@@ -416,7 +416,8 @@ const char *hts_host_alias_rules(httrackp *opt);
    credentials are kept. NULL when no rule applies, the mapping is a no-op, the
    rules loop, or the result would not fit DEST. */
 const char *hts_host_alias(const char *rules, const char *adr,
-                           hts_boolean collapse_www, char *dest, size_t destsize);
+                           hts_boolean collapse_www, char *dest,
+                           size_t destsize);
 
 /* HTS_TRUE when OPT's url hacks collapse www.host onto host. */
 hts_boolean hts_host_alias_collapse_www(httrackp *opt);

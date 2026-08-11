@@ -60,10 +60,19 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
 if test "$HTTPS_SUPPORT" != "no"; then
     bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 5 \
         --found hostalias/b.html --found hostalias/c.html \
+        --file-matches hostalias/index.html 'href="a\.html"' \
         --file-not-matches hostalias/index.html 'example\.invalid' \
         httrack 'BASEURL/hostalias/index.html' \
         --host-alias 'alias.example.invalid=https://BASEHOST'
 fi
+
+# the same crawl with the scheme spelled on both sides: proves a scheme-bearing
+# rule is parsed and fires, on a build with no TLS support too
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --found hostalias/c.html \
+    --file-not-matches hostalias/index.html 'example\.invalid' \
+    httrack 'BASEURL/hostalias/index.html' \
+    --host-alias 'http://alias.example.invalid=http://BASEHOST'
 
 # a rule the option cannot use is refused up front, not silently ignored
 out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
@@ -76,13 +85,20 @@ grep -q "Invalid host-alias rule" <<<"$out" || {
     exit 1
 }
 
-# a path is not part of an address: this option maps hosts
+# A path is not part of an address. The accepted rule differs from the refused
+# one by the path alone, so the refusal cannot be blamed on the scheme.
+httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
+    --host-alias 'https://a.example/=ftp://b.example/' >/dev/null 2>&1
+test $? -ne 2 || {
+    echo "FAIL: httrack refused a scheme-bearing --host-alias rule"
+    exit 1
+}
 out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
     --host-alias 'https://a.example/=ftp://b.example/pub/' 2>&1) && {
     echo "FAIL: httrack accepted a --host-alias rule naming a path"
     exit 1
 }
-grep -q "Invalid host-alias rule" <<<"$out" || {
-    echo "FAIL: no diagnostic for a --host-alias rule naming a path: $out"
+grep -q "a path" <<<"$out" || {
+    echo "FAIL: the diagnostic does not name the path: $out"
     exit 1
 }

@@ -3702,7 +3702,8 @@ const char *hts_host_alias_rules(httrackp *opt) {
    is the scheme://host form a scheme-qualified pattern matches; NOWWW collapses
    the www. prefix of both the pattern and the host. */
 static const char *hts_host_alias_match(const char *rules, const char *host,
-                                        const char *full, hts_boolean collapse_www,
+                                        const char *full,
+                                        hts_boolean collapse_www,
                                         size_t *canonlen) {
   const char *p;
   const char *canon = NULL;
@@ -3728,7 +3729,7 @@ static const char *hts_host_alias_match(const char *rules, const char *host,
       char BIGSTK glob[HTS_URLMAXSIZE * 2];
 
       while (len > 0 && (*start == ' ' || *start == '\t')) {
-        start++;                /* "a.com, b.com=c.com" */
+        start++; /* "a.com, b.com=c.com" */
         len--;
       }
       while (len > 0 && (start[len - 1] == ' ' || start[len - 1] == '\t' ||
@@ -3769,7 +3770,8 @@ static hts_boolean hts_host_alias_subject(const char *url, const char *host,
                                           char *dest, size_t destsize) {
   /* An address with no scheme is the engine's plain-http form. Spell that one
      out, or a rule naming http:// could never match anything. */
-  const hts_boolean bare = jump_protocol_const(url) == url ? HTS_TRUE : HTS_FALSE;
+  const hts_boolean bare =
+      jump_protocol_const(url) == url ? HTS_TRUE : HTS_FALSE;
   const char *const scheme = bare ? "http://" : url;
   const size_t schemelen =
       bare ? strlen("http://") : (size_t) (jump_protocol_const(url) - url);
@@ -3821,7 +3823,8 @@ static const char *hts_host_alias_resolve(const char *rules, const char *adr,
   hostsubj = collapse_www ? jump_normalized_const(host) : host;
   if (!hts_host_alias_subject(adr, hostsubj, fullsubj, sizeof(fullsubj)))
     return NULL;
-  canon = hts_host_alias_match(rules, hostsubj, fullsubj, collapse_www, &canonlen);
+  canon =
+      hts_host_alias_match(rules, hostsubj, fullsubj, collapse_www, &canonlen);
   if (canon == NULL)
     return NULL;
 
@@ -3837,10 +3840,11 @@ static const char *hts_host_alias_resolve(const char *rules, const char *adr,
        earlier in the chain named one. The link's credentials are kept. */
     if (canonlen >= sizeof(canonbuf))
       return NULL;
-    while (canonlen > 0 && (canon[canonlen - 1] == '/' ||
-                            canon[canonlen - 1] == ' ' ||
-                            canon[canonlen - 1] == '\t'))
-      canonlen--; /* a trailing slash is not a path, and a space is not a host */
+    while (canonlen > 0 &&
+           (canon[canonlen - 1] == '/' || canon[canonlen - 1] == ' ' ||
+            canon[canonlen - 1] == '\t'))
+      canonlen--; /* a trailing slash is not a path, and a space is not a host
+                   */
     while (canonlen > 0 && (*canon == ' ' || *canon == '\t')) {
       canon++;
       canonlen--;
@@ -3894,7 +3898,8 @@ static const char *hts_host_alias_resolve(const char *rules, const char *adr,
 
 /* see htscore.h */
 const char *hts_host_alias(const char *rules, const char *adr,
-                           hts_boolean collapse_www, char *dest, size_t destsize) {
+                           hts_boolean collapse_www, char *dest,
+                           size_t destsize) {
   return hts_host_alias_resolve(rules, adr, collapse_www, dest, destsize, NULL);
 }
 
@@ -3952,7 +3957,7 @@ static hts_boolean hts_host_alias_token_ok(const char *token, size_t len,
   memcpy(buff, token, len);
   buff[len] = '\0';
   while (len > 0 && buff[len - 1] == '/')
-    buff[--len] = '\0';         /* the matcher strips the whole run */
+    buff[--len] = '\0'; /* the matcher strips the whole run */
   /* the scheme may itself be a glob on the alias side, so cut on "://" */
   host = strstr(buff, "://") != NULL ? strstr(buff, "://") + 3
                                      : jump_protocol_const(buff);
@@ -4015,8 +4020,8 @@ const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
         continue;
       memcpy(canon, eq + 1, len);
       canon[len] = '\0';
-      (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp, sizeof(tmp),
-                                    &settled);
+      (void) hts_host_alias_resolve(rules, canon, collapse_www, tmp,
+                                    sizeof(tmp), &settled);
       if (!settled) {
         if (strlen(canon) >= destsize)
           continue; /* cannot name it in full: keep looking */

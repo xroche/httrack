@@ -3559,7 +3559,8 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   /* A plain-http address carries no scheme, so http:// has to be spelled out
      for the rule to reach it: naming the default scheme must not be dead. */
   assertf(strcmp(hts_host_alias("http://b.com=a.com", "b.com", HTS_TRUE, dest,
-                                sizeof(dest)), "a.com") == 0);
+                                sizeof(dest)),
+                 "a.com") == 0);
   assertf(hts_host_alias("http://b.com=a.com", "https://b.com", HTS_TRUE, dest,
                          sizeof(dest)) == NULL);
   /* a scheme named mid-chain stays in effect: the hop after it names none, and
@@ -3570,18 +3571,22 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   /* the spaces a user leaves around a token are not part of the host */
   assertf(hts_host_alias_rule_ok("b.com = a.com"));
   assertf(strcmp(hts_host_alias("b.com = a.com", "http://b.com", HTS_TRUE, dest,
-                                sizeof(dest)), "http://a.com") == 0);
+                                sizeof(dest)),
+                 "http://a.com") == 0);
   assertf(strcmp(hts_host_alias("b.com\t=\ta.com", "http://b.com", HTS_TRUE,
-                                dest, sizeof(dest)), "http://a.com") == 0);
+                                dest, sizeof(dest)),
+                 "http://a.com") == 0);
   /* a pattern naming no scheme is matched against the bare host, not the URL */
   assertf(hts_host_alias("http*=x.com", "http://b.com", HTS_TRUE, dest,
                          sizeof(dest)) == NULL);
   /* the "//host" form names a host, and a glob may stand where a scheme goes */
   assertf(strcmp(hts_host_alias("//b.com=a.com", "http://b.com", HTS_TRUE, dest,
-                                sizeof(dest)), "http://a.com") == 0);
+                                sizeof(dest)),
+                 "http://a.com") == 0);
   assertf(hts_host_alias_rule_ok("*://b.com=a.com"));
-  assertf(strcmp(hts_host_alias("*://b.com=a.com", "ftp://b.com", HTS_TRUE, dest,
-                                sizeof(dest)), "ftp://a.com") == 0);
+  assertf(strcmp(hts_host_alias("*://b.com=a.com", "ftp://b.com", HTS_TRUE,
+                                dest, sizeof(dest)),
+                 "ftp://a.com") == 0);
   /* an IPv6 literal is a host; a scheme with none behind it is not, nor is the
      engine's own pseudo-host */
   assertf(hts_host_alias_rule_ok("b.com=[::1]"));
