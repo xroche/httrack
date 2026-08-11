@@ -9,14 +9,15 @@ set -euo pipefail
 . "$(dirname "$0")/testlib.sh"
 
 srcdir="${abs_top_srcdir:?not run under make check}"
-checker="${srcdir}/tests/guide-image-check.py"
+checker="${testdir}/guide-image-check.py"
 
-command -v python3 >/dev/null 2>&1 || skip "no python3"
-python3 -c 'import PIL.Image' >/dev/null 2>&1 || skip "no PIL"
-test -r "${checker}" || skip "no ${checker}"
+python=$(find_python) || skip "python3 not found"
+# In EXTRA_DIST, so an absent checker is a packaging bug, not an environment.
+test -r "${checker}" || fail "no ${checker}"
 
-# The assertion this test exists for.
-python3 "${checker}" "${srcdir}/html" ||
+# The assertion this test exists for. It also pins the IHDR reader: 55 PNGs
+# written by Pillow, whose sizes it has to reproduce to the digit.
+"${python}" "${checker}" "${srcdir}/html" ||
     fail "guide.html's declared image sizes are out of sync with html/img/"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/guideimg.XXXXXX") || {
@@ -31,6 +32,7 @@ cp -a "${srcdir}/html" "${pristine}"
 chmod -R u+w "${pristine}"
 guide="${work}/html/guide.html"
 shot="${work}/html/img/guide-web-start.png"
+other="${pristine}/img/guide-win-language.png"
 restore() { rm -rf "${work}/html" && cp -a "${pristine}" "${work}/html"; }
 restore
 
@@ -44,7 +46,7 @@ edit() { # edit FROM TO: one sed substitution in guide.html, proven to apply
 
 expect_fail() { # expect_fail RE LABEL: the checker must reject, and say why
     local out
-    if out=$(python3 "${checker}" "${work}/html" 2>&1); then
+    if out=$("${python}" "${checker}" "${work}/html" 2>&1); then
         fail "${2}: the checker still passes: ${out}"
     fi
     grep -q "$1" <<<"${out}" || fail "${2}: no /$1/ in: ${out}"
@@ -59,20 +61,28 @@ edit 'width="1024" height="387"' 'width="1024" height="386"'
 expect_fail 'says 1024x386, the file is 1024x387' "a height off by one"
 restore
 
-# The only arm that reads the PNG, and the one #1187 is about: every other
-# mutant here would pass against a checker that never opened a file.
-python3 -c 'import sys
-from PIL import Image
-f = sys.argv[1]
-im = Image.open(f)
-out = im.resize((1017, 387))
-im.close()
-out.save(f)' "${shot}"
-expect_fail 'says 1024x387, the file is 1017x387' "a recaptured image"
+# Swapping in another shipped PNG is the one mutant that touches the image
+# side; every other one here would pass against a checker echoing the markup.
+size=$(sed -n \
+    's|.*src="img/guide-win-language.png"[^>]*width="\([0-9]*\)" height="\([0-9]*\)".*|\1x\2|p' \
+    "${pristine}/guide.html")
+if test -z "${size}" || test "${size}" = "1024x387"; then
+    fail "no distinct geometry to swap in, got [${size}]"
+fi
+cp "${other}" "${shot}"
+expect_fail "says 1024x387, the file is ${size}" "a recaptured image"
 restore
 
-printf 'not a png' >"${shot}"
-expect_fail 'guide-web-start.png: not a readable image' "a corrupt image"
+dd if="${other}" of="${shot}" bs=20 count=1 2>/dev/null
+expect_fail 'guide-web-start.png: truncated inside the IHDR' "a truncated PNG"
+restore
+
+printf 'not a png at all' >"${shot}"
+expect_fail 'guide-web-start.png: not a PNG' "a file that is not a PNG"
+restore
+
+printf 'ihdr' | dd of="${shot}" bs=1 seek=12 conv=notrunc 2>/dev/null
+expect_fail 'guide-web-start.png: no IHDR where a PNG keeps it' "a moved IHDR"
 restore
 
 edit 'width="1024" height="387"' 'width="1024"'
@@ -114,7 +124,7 @@ if grep -q 'src="img/' "${guide}"; then
     fail "the img-less guide still references img/"
 fi
 expect_fail 'want at least' "an img-less guide"
-out=$(python3 "${checker}" "${work}/html" 2>&1 >/dev/null) || true
+out=$("${python}" "${checker}" "${work}/html" 2>&1 >/dev/null) || true
 nbad=$(grep -c '^FAIL:' <<<"${out}" || true)
 test "${nbad}" -eq 1 || fail "the floor is not the only arm firing: ${out}"
 

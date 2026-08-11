@@ -2,21 +2,40 @@
 """Compare guide.html's hardcoded <img> geometry against the files it ships.
 
 Usage: guide-image-check.py <html-dir>
+
+Stdlib only: the suite cannot assume Pillow on a build host, and no CI leg
+has it.
 """
 
 import os
 import re
+import struct
 import sys
-
-from PIL import Image
 
 # Floor: a parse that matched nothing would satisfy every check below.
 MIN_IMAGES = 40
+
+SIGNATURE = b"\x89PNG\r\n\x1a\n"
+# Signature, then the first chunk's length, its IHDR type, and the two sizes.
+HEADER = len(SIGNATURE) + 4 + 4 + 4 + 4
 
 COMMENT = re.compile(r"<!--.*?-->", re.S)
 IMG_TAG = re.compile(r"<img\b[^>]*>", re.I)
 # The leading space keeps data-height="..." one key rather than a height.
 ATTR = re.compile(r'\s([A-Za-z-]+)="([^"]*)"')
+
+
+def png_size(path):
+    """Width and height out of the IHDR. Raises ValueError on anything else."""
+    with open(path, "rb") as fp:
+        head = fp.read(HEADER)
+    if head[: len(SIGNATURE)] != SIGNATURE:
+        raise ValueError("not a PNG, so its size cannot be read")
+    if len(head) < HEADER:
+        raise ValueError("truncated inside the IHDR")
+    if head[12:16] != b"IHDR":
+        raise ValueError("no IHDR where a PNG keeps it")
+    return struct.unpack(">II", head[16:HEADER])
 
 
 def attributes(tag):
@@ -55,10 +74,9 @@ def check(html_dir):
             bad.append("%s: <img> carries no width/height" % src)
             continue
         try:
-            with Image.open(path) as im:
-                width, height = im.size
-        except OSError as exc:
-            bad.append("%s: not a readable image (%s)" % (src, exc))
+            width, height = png_size(path)
+        except (OSError, ValueError) as exc:
+            bad.append("%s: %s" % (src, exc))
             continue
         if (attrs["width"], attrs["height"]) != (str(width), str(height)):
             bad.append(
