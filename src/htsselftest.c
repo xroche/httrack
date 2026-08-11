@@ -1919,28 +1919,58 @@ static int st_pause(httrackp *opt, int argc, char **argv) {
 }
 
 static int st_random(httrackp *opt, int argc, char **argv) {
-  enum { want = 64, pad = 16 };
+  enum { want = 64, pad = 16, rounds = 8 };
 
-  unsigned char a[want + pad], b[want + pad];
-  int err = 0, all_zero = 1, i;
+  unsigned char buf[want + pad], first[want], touched[want], varies[want];
+  int err = 0, live = 0, r, i;
 
   (void) opt;
   (void) argc;
   (void) argv;
-  memset(a, 0xa5, sizeof(a)); /* non-zero canary, so a stray NUL shows */
-  memset(b, 0xa5, sizeof(b));
-  if (!hts_random_bytes(a, want) || !hts_random_bytes(b, want))
-    err = 1;
-  for (i = 0; i < pad; i++) {
-    if (a[want + i] != 0xa5 || b[want + i] != 0xa5)
-      err = 1; /* wrote past the requested length */
+  memset(touched, 0, sizeof(touched));
+  memset(varies, 0, sizeof(varies));
+  for (r = 0; r < rounds; r++) {
+    /* A fresh non-zero filler each round: a byte the fill skips keeps every one
+       of them, which a single canary value cannot tell from a written byte. */
+    const unsigned char filler = (unsigned char) (0xa5 + r);
+
+    memset(buf, filler, sizeof(buf));
+    if (!hts_random_bytes(buf, want))
+      err = 1;
+    for (i = 0; i < want; i++) {
+      if (buf[i] != filler)
+        touched[i] = 1;
+    }
+    for (i = 0; i < pad; i++) {
+      if (buf[want + i] != filler)
+        err = 1; /* wrote past the requested length */
+    }
+    if (r == 0) {
+      memcpy(first, buf, want);
+    } else {
+      for (i = 0; i < want; i++) {
+        if (buf[i] != first[i])
+          varies[i] = 1;
+      }
+    }
   }
-  for (i = 0; i < want; i++)
-    all_zero &= (a[i] == 0);
-  if (all_zero || memcmp(a, b, want) == 0)
+  for (i = 0; i < want; i++) {
+    if (!touched[i])
+      err = 1; /* a short fill left this byte alone in every round */
+    live += varies[i];
+  }
+  /* Over 8 draws a live source moves all 64 bytes; half is a floor no real one
+     misses, and a source stuck on one byte or a constant cannot reach it. */
+  if (live < want / 2)
     err = 1;
-  if (!hts_random_bytes(a, 0)) /* a zero-length ask is not a failure */
+  /* a zero-length ask succeeds and writes nothing */
+  memset(buf, 0x5a, sizeof(buf));
+  if (!hts_random_bytes(buf, 0))
     err = 1;
+  for (i = 0; i < (int) sizeof(buf); i++) {
+    if (buf[i] != 0x5a)
+      err = 1;
+  }
   printf("random: %s\n", err ? "FAIL" : "OK");
   return err;
 }
@@ -8946,7 +8976,7 @@ static const struct selftest_entry {
      "a user stop drops the slots still waiting to connect (#1073)",
      st_backstop},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
-    {"random", "", "hts_random_bytes() fills exactly what was asked for",
+    {"random", "", "hts_random_bytes() fills exactly the requested length",
      st_random},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},

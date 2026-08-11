@@ -1,11 +1,14 @@
 #!/bin/bash
 #
-# hts_random_bytes() (#1139): the CSPRNG must fill exactly the requested length,
-# whichever source the build ended up with, getrandom() or /dev/urandom.
+# Checks that hts_random_bytes() (#1139) fills exactly the requested length,
+# whichever source the build ended up with: getrandom() or /dev/urandom.
 
 set -eu
 
-out=$(httrack -#test=random run)
+out=$(httrack -#test=random run) || {
+    echo "httrack -#test=random exited non-zero: $out" >&2
+    exit 1
+}
 
 test "$out" = "random: OK" || {
     echo "expected 'random: OK', got: $out" >&2
