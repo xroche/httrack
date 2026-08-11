@@ -450,19 +450,29 @@ EOF
     test "$(command -v sleep)" = "$dir/sleep" || return 1
 }
 
-# Skip when the next of $1 remaining steps, at 1.5x the $2 seconds the last one
-# took, no longer fits the budget meant to catch a wedge (hppa spends ~150s on one
-# configure run and would else FTBFS). One step ahead rather than all of them: 196
-# shares a config.cache, so its first step costs several times the rest and
-# projecting it over them would skip a run that fits.
-skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took>
-    local budget=${HTTRACK_TEST_TIMEOUT:-600} need=$(($2 + $2 / 2))
+# Skip when the steps left of a run of $2, at 1.5x the $3 seconds the last one
+# took, no longer fit the budget meant to catch a wedge (hppa spends ~150s on one
+# configure run and would else FTBFS on the harness kill). Every step left, not
+# just the next: 151 pays for a full configure only in its last four cases, so a
+# reserve of one cheap reject let it walk into the kill with four to go. Step 1
+# is the exception, projected over itself alone -- 196 warms a shared
+# config.cache there, and over the rest that would skip a run that fits.
+skip_if_out_of_budget() { # skip_if_out_of_budget <steps done> <steps total> <seconds the last took>
+    local budget=${HTTRACK_TEST_TIMEOUT:-600} left=$(($2 - $1)) need
 
     case "$budget" in '' | *[!0-9]*) budget=600 ;; esac
-    test "$1" -gt 0 && test "$budget" -gt 0 || return 0
+    test "$left" -gt 0 && test "$budget" -gt 0 || return 0
+    need=$(($3 + $3 / 2))
+    test "$1" -le 1 || need=$((left * $3 + $3 / 2))
     test "$((SECONDS + need))" -ge "$budget" || return 0
-    echo "$1 steps left, the last took ${2}s and the budget is ${budget}s; skipping" >&2
+    echo "$left steps left, the last took ${3}s and the budget is ${budget}s; skipping" >&2
     exit 77
+}
+
+# Every step the pacer projects against ran: a skip is an exit, so a loop that
+# quietly ran fewer would leave the budget paced against a count that is a lie.
+assert_steps_ran() { # assert_steps_ran <steps done> <steps total>
+    test "$1" -eq "$2" || fail "ran $1 steps, not the $2 the budget is paced against"
 }
 
 # Collect a killed job, giving up after REAP_GRACE seconds. kill_tree can fail to

@@ -132,18 +132,27 @@ saw_budget 0 "a disabled guard"
 # does not.
 cat >"$tmp/94_pacer.test" <<EOF
 . "${testdir}/testlib.sh"
-skip_if_out_of_budget 0 9999 # nothing left to run
-skip_if_out_of_budget 5 0    # steps that cost nothing
-skip_if_out_of_budget 5 40   # the next step alone wants 60s
+skip_if_out_of_budget 9 9 40  # nothing left to run
+skip_if_out_of_budget 5 10 0  # steps that cost nothing
+skip_if_out_of_budget 1 10 80 # step 1 is projected over itself alone: 120s
 echo "the pacer let it through"
 EOF
 rc=0
 HTTRACK_TEST_TIMEOUT=20 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
-test "$rc" -eq 77 || fail "a 60s step under a 20s budget reported $rc, want 77"
+test "$rc" -eq 77 || fail "a 120s step under a 20s budget reported $rc, want 77"
 rc=0
 HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
-test "$rc" -eq 0 || fail "a 60s step under a 600s budget reported $rc, want 0"
+test "$rc" -eq 0 || fail "a 120s step under a 600s budget reported $rc, want 0"
 grep -q 'the pacer let it through' "$out" || fail "the pacer skipped a test that fits"
+
+# Past step 1 every step left is reserved for, not just the next: 151 spent its
+# budget on twelve cheap cases and was killed with four expensive ones to go. The
+# step above is the control, same cost and budget, skipped only for being step 1.
+printf '. "%s"\nskip_if_out_of_budget 2 10 80\n' "${testdir}/testlib.sh" \
+    >"$tmp/96_project.test"
+rc=0
+HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/96_project.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 77 || fail "eight 80s steps under a 600s budget reported $rc, want 77"
 
 # --- the process lists survive a host with no ps ----------------------------
 # Fedora's build root ships no procps, and the guard then named nothing (#1021).
@@ -172,19 +181,30 @@ if ! is_windows && test -r /proc/self/stat; then
         "$tmp/httrack" -c "$hold" &
         echo $! >"$tmp/outside.pid"
     )
+    # A third, in the shape an emulated buildd hands the kernel: binfmt_misc with
+    # its P flag leaves the interpreter in argv[0] and the engine one place right.
+    # "exec -a" stands in for the qemu-user no runner here has.
+    mkdir "$tmp/emul"
+    printf '%s\n' "$hold" >"$tmp/emul/httrack"
+    (
+        exec -a /usr/libexec/qemu-binfmt/hppa-binfmt-P \
+            "$tmp/httrack" "$tmp/emul/httrack" &
+        echo $! >"$tmp/emul.pid"
+    )
     fake=$(cat "$tmp/fake.pid")
     outside=$(cat "$tmp/outside.pid")
+    emul=$(cat "$tmp/emul.pid")
     # Pushed, not trapped: a bare EXIT trap here would drop the stack that holds
     # $tmp and $shim, which is how $shim used to leak.
-    kill_probes() { kill "$fake" "$outside" 2>/dev/null || true; }
+    kill_probes() { kill "$fake" "$outside" "$emul" 2>/dev/null || true; }
     cleanup_push kill_probes
     # /proc holds the pid from the fork on, so a fake that never exec'd would fail
-    # some later assertion instead of this one.
+    # some later assertion instead of this one. Ten seconds: an emulated buildd
+    # spends whole seconds on an exec, and this returns as soon as it matches.
     running() {
-        local i=0 argv0
-        while test "$i" -lt 20; do
-            { read -r -d '' argv0 <"/proc/$1/cmdline"; } 2>/dev/null &&
-                test "${argv0##*/}" = httrack && return 0
+        local i=0
+        while test "$i" -lt 100; do
+            test "$(proc_program_name "$1")" = httrack && return 0
             sleep 0.1
             i=$((i + 1))
         done
@@ -192,6 +212,7 @@ if ! is_windows && test -r /proc/self/stat; then
     }
     running "$fake" || fail "the fake engine never started"
     running "$outside" || fail "the outsider never started"
+    running "$emul" || fail "an engine behind its binfmt interpreter never started"
     # ppid and pgid of $1: the oracle the listing is checked against.
     procfields() { awk '{ sub(/.*\) /, ""); print $2, $3 }' "/proc/$1/stat"; }
     procstate() { awk '{ sub(/.*\) /, ""); print $1 }' "/proc/$1/stat" 2>/dev/null || echo gone; }
@@ -214,6 +235,8 @@ if ! is_windows && test -r /proc/self/stat; then
             fail "no-ps row for $fake reads ppid/pgid '$rppid $rpgid', want '$fppid $pgid'"
         engines=$(list_engine_pids "$pgid")
         grep -qx "$fake" <<<"$engines" || fail "no-ps engine list lost pid $fake"
+        grep -qx "$emul" <<<"$engines" ||
+            fail "no-ps engine list lost emulated pid $emul"
         ! grep -qx "$outside" <<<"$engines" ||
             fail "no-ps engine list reached outside the group (pid $outside)"
         # A platform with no stack mechanism must say so and leave the engine
@@ -257,7 +280,8 @@ if ! is_windows && test -r /proc/self/stat; then
 fi
 
 # --- an emulated buildd hides the engine behind its binfmt interpreter -------
-# Synthetic rows: no runner here has qemu-user, and the column shift is the point.
+# The controls a real process cannot carry: a wrapper, and an emulator handed a
+# disk image rather than a program. No runner here has qemu-user, so synthesize.
 if ! is_windows; then
     (
         # shellcheck disable=SC2317 # reached through the two matchers below
