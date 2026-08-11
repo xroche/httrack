@@ -572,10 +572,9 @@ static void cat_cmdline_arglist(String *output, const char *value,
   }
 }
 
-/* winprofile.ini keys html/server/step4.html writes as ${ztest:<var>:0:1}: a
-   cleared checkbox lives in the session as an empty value, and only these get
-   the inverse on the way back in. Kept in step4.html's order; tests/274 fails
-   on drift. */
+/* Keys html/server/step4.html writes as ${ztest:<var>:0:1}: a cleared checkbox
+   is empty in the session, so only these get the inverse on the way back in.
+   tests/274 checks the list against step4.html. */
 static const char *const ini_checkbox_keys[] = {
     "Near",
     "Test",
@@ -612,11 +611,13 @@ static const char *const ini_checkbox_keys[] = {
     "Changes",
     "SingleFile",
     "UseHTTPProxyForFTP",
+    /* Not a ${ztest:} key, but its HTTP entry is the empty one and
+       option10.html already reads 0 as that entry. */
+    "ProxyType",
     NULL,
 };
 
-/* Whether key is a checkbox one, so that a stored 0 means "unchecked" rather
-   than the number zero. Case-sensitive, as ${do:copy:} is. */
+/* A stored 0 means "unchecked" for these keys, not the number zero. */
 static hts_boolean ini_key_is_checkbox(const char *key) {
   size_t i;
 
@@ -971,6 +972,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 if (pos[0] == '0' && pos[1] == '\0' &&
                     ini_key_is_checkbox(line))
                   *pos = '\0';
+                /* A key in the file overwrites the default even when it is
+                   empty, and an acquired NULL reads back as absent (#1186). */
+                StringClear(escline);
                 unescapeini(pos, &escline);
                 coucal_write(NewLangList, line,
                               (intptr_t) StringAcquire(&escline));

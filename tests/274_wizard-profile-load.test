@@ -11,19 +11,26 @@ distdir=$(cd "${distdir}" && pwd)
 # shellcheck source=tests/webhttracklib.sh
 . "${testdir}/webhttracklib.sh"
 
+htsserver_require
+
 printf '[the checkbox table matches step4.html] ..\t'
 # The reader's exception list is only correct while it mirrors the keys the
 # writer emits with ${ztest:}; nothing else ties the two files together.
-written=$(sed -n 's/^\([A-Za-z0-9]*\)=[$]{ztest:.*/\1/p' \
-    "${distdir}/html/server/step4.html" | sort -u)
-listed=$(awk '/ini_checkbox_keys\[\] = \{/,/\};/' "${distdir}/src/htsserver.c" |
-    grep -o '"[A-Za-z0-9]*"' | tr -d '"' | sort -u)
-test -n "${written}" || fail "no ztest key found in step4.html"
+# Both sides match any key spelling, or a key the other side cannot even see
+# leaves the two sets equal and the guard blind to the drift it exists for.
+# ProxyType is the one entry the writer does not spell with ${ztest:}.
+written=$({
+    sed -n 's/^\([^=]*\)=[$]{ztest:.*/\1/p' "${distdir}/html/server/step4.html"
+    echo ProxyType
+} | sort -u)
+listed=$(awk '/ini_checkbox_keys\[\] = /,/^\};/' "${distdir}/src/htsserver.c" |
+    grep -o '"[^"]*"' | tr -d '"' | sort -u)
+# Floor: two gutted lists compare equal.
+test "$(printf '%s\n' "${written}" | wc -l)" -ge 30 ||
+    fail "only $(printf '%s\n' "${written}" | wc -l) ztest keys in step4.html"
 test "${written}" = "${listed}" ||
     fail "$(diff <(echo "${written}") <(echo "${listed}"))"
 echo OK
-
-htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_profile.XXXXXX") || fail "no tmpdir"
 cleanup() {
@@ -40,11 +47,15 @@ CurrentUrl=http://example.com/
 MaxRate=0
 MaxTime=0
 Depth=3
+UserID=
+KeepAlive=0
 Warc=0
 Wacz=1
 NoExternalPages=0
 HostAlias=a=b%0D%0A%09c=d
 Footer=x%%y
+SitemapUrl=http://example.com/s.xml%
+ProxyType=0
 EOF
 
 printf '[reloading a project reads its winprofile.ini] ..\t'
@@ -77,8 +88,8 @@ loaded = urllib.request.urlopen(
     urllib.request.Request(url + "/server/step2.html",
                            data=body.encode("latin-1"), method="POST"),
     timeout=20).read().decode("latin-1")
-if 'name="sid"' not in loaded:
-    sys.exit("step2.html did not render the loaded project\n%s" % loaded[:400])
+if "http://example.com/" not in loaded:
+    sys.exit("step2.html did not load the project\n%s" % loaded[:400])
 
 
 def textarea(page, name):
@@ -125,9 +136,33 @@ if maxrate is None or maxrate.group(1) != "0":
 reject("--warc")
 reject("--replace-external")
 want("--wacz")
+option9 = get("option9.html?sid=" + sid)
+for box, ticked in [("warc", False), ("wacz", True)]:
+    tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="%s"[^>]*>' % box,
+                     option9)
+    if len(tag) != 1:
+        sys.exit("option9.html renders %d %s boxes" % (len(tag), box))
+    if ("checked" in tag[0]) != ticked:
+        sys.exit("the %s box came back %r" % (box, tag[0]))
 for key, value in [("Warc", "0"), ("Wacz", "1"), ("NoExternalPages", "0")]:
     if ini.get(key) != value:
         sys.exit("%s saved back as %r, wanted %r" % (key, ini.get(key), value))
+
+# A key in the file wins over the startup default even when it holds nothing,
+# and a checkbox the wizard defaults to on is only clearable that way (#1186).
+want('--user-agent ""')
+reject("--keep-alive")
+if ini.get("UserID") != "" or ini.get("KeepAlive") != "0":
+    sys.exit("the cleared fields came back as %r / %r"
+             % (ini.get("UserID"), ini.get("KeepAlive")))
+option4 = get("option4.html?sid=" + sid)
+tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="ka"[^>]*>', option4)
+if len(tag) != 1 or "checked" in tag[0]:
+    sys.exit("the keep-alive box came back %r" % tag)
+# Control: an absent key still takes the default, or the two are the same test.
+want("--sockets=4")
+if "Sockets" not in ini or ini["Sockets"] != "4":
+    sys.exit("an absent Sockets did not default: %r" % ini.get("Sockets"))
 
 # One separator, whatever the run: unescapeini() folds an encoded CR LF TAB
 # into a single break, and the rules box must show exactly that.
@@ -141,5 +176,42 @@ want('--host-alias "c=d"')
 want('--footer "x%y"')
 if ini.get("Footer") != "x%%y":
     sys.exit("Footer round-tripped as %r" % ini.get("Footer"))
+
+# A truncated escape has no digits to read: decoding one walks past the
+# terminator and spills the rest of the buffer into the value. The form body
+# takes the same escape through unescapehttp(), so send one raw.
+want('--sitemap-url "http://example.com/s.xml%"')
+posted = urllib.request.urlopen(
+    urllib.request.Request(url + "/server/step4.html",
+                           data=("sid=%s&footer=z%%" % sid).encode("latin-1"),
+                           method="POST"), timeout=20).read().decode("latin-1")
+if '--footer "z%"' not in textarea(posted, "command"):
+    sys.exit("a posted trailing %% did not come back verbatim\n%s"
+             % textarea(posted, "command"))
+
+
+# ProxyType 0 is the HTTP entry, so it prefixes no scheme. The proxy box itself
+# is session state, so fill it before reading the flag.
+def proxy_flag(fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
+                    [("sid", sid)] + fields)
+    page = urllib.request.urlopen(
+        urllib.request.Request(url + "/server/step4.html",
+                               data=body.encode("latin-1"), method="POST"),
+        timeout=20).read().decode("latin-1")
+    got = [line.strip() for line in textarea(page, "command").split("\n")
+           if line.strip().startswith("--proxy ")]
+    if len(got) != 1:
+        sys.exit("step4.html emitted %d proxy flags" % len(got))
+    return got[0]
+
+
+box = [("prox", "p.example.com"), ("portprox", "8080")]
+for fields, wanted in [(box, '--proxy "p.example.com:8080"'),
+                       (box + [("proxytype", "1")],
+                        '--proxy "socks5://p.example.com:8080"')]:
+    got = proxy_flag(fields)
+    if got != wanted:
+        sys.exit("proxy flag is %r, wanted %r" % (got, wanted))
 PY
 echo OK

@@ -281,7 +281,9 @@ HTS_UNUSED static void unescapehttp(const char *s, String * tempo) {
     if (s[i] == '%' && s[i + 1] == '%') {
       i++;
       StringAddchar(*tempo, '%');
-    } else if (s[i] == '%') {
+      /* Both digits, or ehex() reads past the terminator and the walk resumes
+         beyond it, spilling whatever the buffer still held. */
+    } else if (s[i] == '%' && s[i + 1] != '\0' && s[i + 2] != '\0') {
       char hc;
 
       i++;
@@ -303,7 +305,8 @@ HTS_UNUSED static void unescapeini(char *s, String * tempo) {
     if (s[i] == '%' && s[i + 1] == '%') {
       i++;
       StringAddchar(*tempo, lastc = '%');
-    } else if (s[i] == '%') {
+      /* Both digits, as in unescapehttp() above. */
+    } else if (s[i] == '%' && s[i + 1] != '\0' && s[i + 2] != '\0') {
       char hc;
 
       i++;
