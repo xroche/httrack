@@ -108,14 +108,9 @@ static const char *key_host_alias(const hash_struct *hash, const char *adr,
   return canon != NULL ? canon : adr;
 }
 
-/* Pseudo-key (lien_url structure) hash function */
-static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
-                                              coucal_key_const value, 
-                                              const int former) {
-  hash_struct *const hash = (hash_struct*) arg;
-  const lien_url*const lien = (const lien_url*) value;
-  const char *const adr = !former ? lien->adr : lien->former_adr;
-  const char *const fil = !former ? lien->fil : lien->former_fil;
+/* see htshash.h */
+const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
+                         char *dst, size_t dstsize) {
   char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
   const char *const adr_canon =
       adr != NULL ? key_host_alias(hash, adr, aliasbuf, sizeof(aliasbuf))
@@ -128,12 +123,9 @@ static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
 
   // copy address
   assertf(adr_norm != NULL);
-  /* Clip, never abort: both halves come off the wire. The key only feeds the
-     hash — equality is decided by key_adrfil_equals_generic — so a clipped key
-     costs a collision, not a wrong dedup. */
-  hash->normfil[0] = '\0';
-  strlncatbuff(hash->normfil, adr_norm, sizeof(hash->normfil),
-               sizeof(hash->normfil) - 1);
+  /* clip, don't abort: a wire URL feeds this, and the key only feeds the hash,
+     so a clipped one costs a collision and never a wrong dedup */
+  (void) strclipbuff(dst, dstsize, adr_norm);
 
   // copy link
   assertf(fil != NULL);
@@ -142,21 +134,33 @@ static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
     char BIGSTK keybuf[HTS_URLMAXSIZE];
     const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
                                                   fil, keybuf, sizeof(keybuf));
-    const size_t used = strlen(hash->normfil);
-    const size_t avail = sizeof(hash->normfil) - used;
+    const size_t used = strlen(dst);
+    char *const tail = &dst[used];
+    const size_t avail = dstsize - used;
 
-    /* normalizing never expands, so a path that fits fits normalized too */
+    /* normalizing never expands, and it takes a path of at most its own
+       HTS_URLMAXSIZE * 2, so bound on both */
     if ((hash->norm_slash || hash->norm_query || keys != NULL) &&
-        strlen(fil) < avail) {
-      fil_normalized_filtered_ex(fil, &hash->normfil[used], keys,
-                                 hash->norm_slash, hash->norm_query);
+        strlen(fil) < avail && strlen(fil) < HTS_URLMAXSIZE * 2) {
+      fil_normalized_filtered_ex(fil, tail, keys, hash->norm_slash,
+                                 hash->norm_query);
     } else {
-      strlncatbuff(hash->normfil, fil, sizeof(hash->normfil), avail - 1);
+      (void) strclipbuff(tail, avail, fil);
     }
   }
+  return dst;
+}
 
-  // hash
-  return coucal_hash_string(hash->normfil);
+/* Pseudo-key (lien_url structure) hash function */
+static coucal_hashkeys
+key_adrfil_hashes_generic(void *arg, coucal_key_const value, const int former) {
+  hash_struct *const hash = (hash_struct *) arg;
+  const lien_url *const lien = (const lien_url *) value;
+  const char *const adr = !former ? lien->adr : lien->former_adr;
+  const char *const fil = !former ? lien->fil : lien->former_fil;
+
+  return coucal_hash_string(
+      hash_url_key(hash, adr, fil, hash->normfil, sizeof(hash->normfil)));
 }
 
 /* Pseudo-key (lien_url structure) comparison function */
@@ -335,33 +339,6 @@ void hash_free(hash_struct *hash) {
     coucal_delete(&hash->adrfil);
     coucal_delete(&hash->former_adrfil);
   }
-}
-
-/* see htshash.h */
-hts_boolean hash_url_key(httrackp *opt, const char *adr, const char *fil,
-                         char *key, size_t keysize) {
-  hash_struct hash;
-  lien_url lien;
-  hts_boolean inbounds = HTS_TRUE;
-  size_t i;
-
-  memset(&lien, 0, sizeof(lien));
-  lien.adr = key_duphandler(NULL, adr);
-  lien.fil = key_duphandler(NULL, fil);
-  hash_init(opt, &hash, opt->urlhack);
-  /* poisoned, not zeroed: the stray NUL of an off-by-one must show too */
-  memset(hash.normfil2, 'Z', sizeof(hash.normfil2));
-  (void) key_adrfil_hashes(&hash, &lien);
-  for (i = 0; i < sizeof(hash.normfil2); i++) {
-    if (hash.normfil2[i] != 'Z') {
-      inbounds = HTS_FALSE;
-      break;
-    }
-  }
-  key[0] = '\0';
-  strlncatbuff(key, hash.normfil, keysize, keysize - 1);
-  hash_free(&hash);
-  return inbounds;
 }
 
 /* Test helper: do the two URLs dedupe to the same key under opt's urlhack

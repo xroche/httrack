@@ -3776,23 +3776,45 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* The dedup key is a host and a path built in one scratch buffer: two halves
-   at the engine's per-field maximum must fit whole, and anything longer must
-   clip rather than run into the field behind it (#1160). */
+/* Build the key for ADR/FIL into ARENA, whose KEYSIZE bytes are followed by
+   GUARD poisoned ones, and report whether those are still untouched. */
+static hts_boolean st_hashkey(httrackp *opt, const char *adr, const char *fil,
+                              char *arena, size_t keysize, size_t guard) {
+  hash_struct hash;
+  size_t i;
+
+  /* poisoned with '#', not 0, or the stray NUL of an off-by-one would read as
+     untouched */
+  memset(arena, '#', keysize + guard);
+  hash_init(opt, &hash, opt->urlhack);
+  hash_url_key(&hash, adr, fil, arena, keysize);
+  hash_free(&hash);
+  for (i = keysize; i < keysize + guard; i++) {
+    if (arena[i] != '#')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* The dedup key is a host and a path built in one buffer: two halves at the
+   engine's per-field maximum must fit whole, and either half alone must clip
+   rather than run past the end (#1160). */
 static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   /* what lien_adrfil.adr / .fil hold, and what a whole key needs */
-  enum { field = HTS_URLMAXSIZE * 2, keysize = 2 * field };
+  enum { field = HTS_URLMAXSIZE * 2, keysize = 2 * field, guard = 64 };
 
-  char *adr = malloct(2 * field);
-  char *fil = malloct(2 * field);
-  char *cat = malloct(4 * field);
-  char *key = malloct(keysize);
-  int overlong;
+  char *adr = malloct(2 * keysize);
+  char *fil = malloct(2 * keysize);
+  char *cat = malloct(4 * keysize);
+  char *arena = malloct(keysize + guard);
+  int hack;
 
   (void) argc;
   (void) argv;
-  assertf(adr != NULL && fil != NULL && cat != NULL && key != NULL);
+  assertf(adr != NULL && fil != NULL && cat != NULL && arena != NULL);
   opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
+  /* the crawler's own key buffer, or every maximal URL would collide */
+  assertf(sizeof(((hash_struct *) NULL)->normfil) >= (size_t) keysize);
 
   /* a host and a path one byte short of their own buffers: nothing here
      normalizes away, so the key is the plain concatenation */
@@ -3801,42 +3823,65 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   fil[0] = '/';
   memset(fil + 1, 'b', field - 2);
   fil[field - 1] = '\0';
-  snprintf(cat, 4 * field, "%s%s", adr, fil);
-  opt->urlhack = HTS_FALSE;
-  assertf(hash_url_key(opt, adr, fil, key, keysize));
-  assertf(strcmp(key, cat) == 0);
-  opt->urlhack = HTS_TRUE; /* the normalizing branch writes the same key */
-  assertf(hash_url_key(opt, adr, fil, key, keysize));
-  assertf(strcmp(key, cat) == 0);
-
-  /* past those maxima the key clips to a prefix, in both branches */
-  memset(adr, 'a', 2 * field - 1);
-  adr[2 * field - 1] = '\0';
-  fil[0] = '/';
-  memset(fil + 1, 'b', 2 * field - 2);
-  fil[2 * field - 1] = '\0';
-  snprintf(cat, 4 * field, "%s%s", adr, fil);
-  for (overlong = 0; overlong < 2; overlong++) {
-    opt->urlhack = overlong == 0 ? HTS_FALSE : HTS_TRUE;
-    assertf(hash_url_key(opt, adr, fil, key, keysize));
-    assertf(strlen(key) != 0 && strlen(key) < keysize);
-    assertf(strncmp(key, cat, strlen(key)) == 0);
+  snprintf(cat, 4 * keysize, "%s%s", adr, fil);
+  for (hack = 0; hack < 2; hack++) {
+    opt->urlhack = hack != 0 ? HTS_TRUE : HTS_FALSE;
+    assertf(st_hashkey(opt, adr, fil, arena, keysize, guard));
+    assertf(strcmp(arena, cat) == 0);
   }
 
-  /* the match string --strip-query builds from the same two halves used to
-     abort on the same input */
-  {
-    char keys[64];
-    const char *const k =
-        hts_query_strip_keys("*=sid", adr, fil, keys, sizeof(keys));
+  /* either half alone past the whole key: each copy is bounded on its own */
+  for (hack = 0; hack < 4; hack++) {
+    const hts_boolean longadr = (hack & 1) != 0 ? HTS_TRUE : HTS_FALSE;
 
+    memset(adr, 'a', longadr ? keysize + 32 : 8);
+    adr[longadr ? keysize + 32 : 8] = '\0';
+    fil[0] = '/';
+    memset(fil + 1, 'b', longadr ? 8 : keysize + 32);
+    fil[(longadr ? 8 : keysize + 32) + 1] = '\0';
+    snprintf(cat, 4 * keysize, "%s%s", adr, fil);
+    opt->urlhack = (hack & 2) != 0 ? HTS_TRUE : HTS_FALSE;
+    assertf(st_hashkey(opt, adr, fil, arena, keysize, guard));
+    /* clipped and terminated, and a prefix of the pair rather than garbage */
+    assertf(strlen(arena) == keysize - 1);
+    assertf(strncmp(arena, cat, strlen(arena)) == 0);
+  }
+
+  /* --strip-query builds its match string from the same two halves, and used
+     to abort on a maximal pair. Past STRJOKER_MAXLEN no rule can match, so a
+     clipped string would answer where the whole one must stay silent. */
+  {
+    const char *const rules = "*=other\n*bbz=sid";
+    char keys[64];
+    const char *k;
+
+    /* control: the rules do match a short URL */
+    k = hts_query_strip_keys(rules, "h.com", "/bbz", keys, sizeof(keys));
     assertf(k != NULL && strcmp(k, "sid") == 0);
+    memset(adr, 'a', field - 1);
+    adr[field - 1] = '\0';
+    fil[0] = '/';
+    memset(fil + 1, 'b', field - 3);
+    fil[field - 2] = 'z';
+    fil[field - 1] = '\0';
+    assertf(hts_query_strip_keys(rules, adr, fil, keys, sizeof(keys)) == NULL);
+    opt->urlhack = HTS_TRUE; /* and the key builder survives the same pair */
+    StringCopy(opt->strip_query, rules);
+    assertf(st_hashkey(opt, adr, fil, arena, keysize, guard));
+
+    /* a matching rule plus a query longer than the normalizer's own scratch:
+       the key builder must clip instead of handing it over */
+    snprintf(fil, 2 * keysize, "/bbz?");
+    memset(&fil[5], 'q', field + 64); /* past the normalizer, inside the key */
+    fil[5 + field + 64] = '\0';
+    assertf(st_hashkey(opt, "h.com", fil, arena, keysize, guard));
+    StringCopy(opt->strip_query, "");
   }
 
   freet(adr);
   freet(fil);
   freet(cat);
-  freet(key);
+  freet(arena);
   printf("hashkey-bounds self-test OK\n");
   return 0;
 }

@@ -57,11 +57,11 @@ void hash_free(hash_struct *hash);
    flags. */
 hts_boolean hash_url_equals(httrackp *opt, const char *adra, const char *fila,
                             const char *adrb, const char *filb);
-/* Test helper: build the dedup key of ADR/FIL under opt's urlhack flags into
-   KEY (KEYSIZE bytes, clipped). HTS_FALSE if building it wrote past the key
-   scratch buffer, into the poisoned field behind it. */
-hts_boolean hash_url_key(httrackp *opt, const char *adr, const char *fil,
-                         char *key, size_t keysize);
+/* Build the dedup key of ADR/FIL, the canonical host then the path, into DST
+   (DSTSIZE bytes) and return it. Each half is clipped to fit, so DST is always
+   NUL-terminated; it only feeds the hash, never a comparison. */
+const char *hash_url_key(hash_struct *hash, const char *adr, const char *fil,
+                         char *dst, size_t dstsize);
 int hash_read(const hash_struct * hash, const char *nom1, const char *nom2,
               hash_struct_type type);
 void hash_write(hash_struct * hash, size_t lpos);
