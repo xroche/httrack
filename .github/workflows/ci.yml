@@ -878,6 +878,7 @@ jobs:
           fi
 
   lint:
+    # The name is a required status check on master; renaming it blocks every PR.
     name: lint (shellcheck, shfmt)
     runs-on: ubuntu-24.04
     # Every tracked shell script; the globs expand at run time. Kept here so the
@@ -906,14 +907,29 @@ jobs:
           # version; use it rather than fetching a release binary from github.com.
           sudo apt-get install -y --no-install-recommends shellcheck shfmt appstream \
             appstream-util
+          # Pinned to the local dev versions: black's stable style moves across
+          # majors, so the runner image's build would reformat on its own schedule.
+          pip install --quiet black==25.1.0 flake8==7.1.1
           shfmt --version
           appstreamcli --version
+          black --version
+          flake8 --version
 
       - name: shellcheck
         run: shellcheck $SHELL_SCRIPTS
 
       - name: shfmt
         run: shfmt -d -i 4 $SHELL_SCRIPTS
+
+      # .flake8's 88 columns is black's width; ls-files so a .py in a new
+      # directory cannot escape the way a hand-kept glob list would.
+      - name: black and flake8
+        run: |
+          set -euo pipefail
+          mapfile -t PYTHON_FILES < <(git ls-files '*.py')
+          echo "${#PYTHON_FILES[@]} tracked Python files"
+          black --check --diff "${PYTHON_FILES[@]}"
+          flake8 "${PYTHON_FILES[@]}"
 
       # A misnamed test falls outside the glob "make check" runs, so it goes
       # missing without failing anything.
