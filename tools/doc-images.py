@@ -2,7 +2,7 @@
 """Prepare the GUI-guide screenshots from the three capture sets in httrack-works.
 
 Maps each set's capture order onto shared names (the sets number their option
-tabs differently), downscales, and writes html/img/guide/<platform>/<name>.
+tabs differently), downscales, and writes html/img/guide-<platform>-<name>.<fmt>.
 """
 
 import os
