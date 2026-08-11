@@ -3395,6 +3395,65 @@ static int st_urlhack(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The filter each wizard answer emits, printed for an ad-hoc <n> <adr> <fil>
+   [up], asserted against the expected patterns otherwise (#1119). */
+static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
+  char pattern[HTS_URLMAXSIZE * 2];
+  htsbuff f = htsbuff_array(pattern);
+
+  (void) opt;
+  if (argc >= 3) {
+    wizard_answer_filter(&f, atoi(argv[0]), argv[1], argv[2],
+                         argc >= 4 && atoi(argv[3]) != 0 ? HTS_TRUE
+                                                         : HTS_FALSE);
+    printf("%s\n", pattern);
+    return 0;
+  }
+#define EMITS(n, adr, fil, up, expect)                                         \
+  do {                                                                         \
+    wizard_answer_filter(&f, (n), (adr), (fil), (up));                         \
+    assertf(strcmp(pattern, (expect)) == 0);                                   \
+  } while (0)
+
+  /* the host-wide answers: 2 forbids, 5 (allowed to go up) and 6 authorize */
+  EMITS(2, "foo.com", "/index.html", HTS_FALSE, "-foo.com/*");
+  EMITS(5, "foo.com", "/dir/page.html", HTS_TRUE, "+foo.com/*");
+  EMITS(6, "foo.com", "/dir/page.html", HTS_FALSE, "+foo.com/*");
+  /* the port is part of the host, the credentials are not */
+  EMITS(6, "foo.com:8080", "/x", HTS_FALSE, "+foo.com:8080/*");
+  EMITS(6, "user:pass@foo.com", "/x", HTS_FALSE, "+foo.com/*");
+
+  /* the trailing slash is what keeps a longer host out */
+  assertf(strjoker("foo.com/index.html", pattern + 1, NULL, NULL) != NULL);
+  assertf(strjoker("foo.com/", pattern + 1, NULL, NULL) != NULL);
+  assertf(strjoker("foo.com.evil.org/x", pattern + 1, NULL, NULL) == NULL);
+  assertf(strjoker("foo.com:8080/x", pattern + 1, NULL, NULL) == NULL);
+
+  /* the link and directory answers, unchanged */
+  EMITS(0, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/page.html");
+  EMITS(0, "foo.com", "index.html", HTS_FALSE, "-foo.com/index.html");
+  EMITS(1, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/*");
+  EMITS(1, "foo.com", "/page.html", HTS_FALSE, "-foo.com/*");
+  EMITS(5, "foo.com", "/dir/page.html", HTS_FALSE, "+foo.com/dir/*");
+  EMITS(7, "foo.com", "/dir/page.html", HTS_FALSE, "+foo.com/dir/*[file]");
+  /* answer 1 collapses a doubled trailing slash, answers 5 and 7 keep it */
+  EMITS(1, "foo.com", "/dir//page.html", HTS_FALSE, "-foo.com/dir/*");
+  EMITS(5, "foo.com", "/dir//page.html", HTS_FALSE, "+foo.com/dir//*");
+  /* no directory to anchor on, so answers 1, 5 and 7 emit nothing */
+  EMITS(1, "foo.com", "page.html", HTS_FALSE, "");
+  EMITS(5, "foo.com", "page.html", HTS_FALSE, "");
+  EMITS(7, "foo.com", "page.html", HTS_FALSE, "");
+
+  /* the answers that add no filter at all */
+  EMITS(-1, "foo.com", "/x", HTS_FALSE, "");
+  EMITS(3, "foo.com", "/x", HTS_FALSE, "");
+  EMITS(4, "foo.com", "/x", HTS_FALSE, "");
+  EMITS(50, "foo.com", "/x", HTS_FALSE, "");
+#undef EMITS
+  printf("wizardfilter self-test OK\n");
+  return 0;
+}
+
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
 static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
@@ -8868,6 +8927,8 @@ static const struct selftest_entry {
      st_urlhack},
     {"redirect-samefile", "", "same-file redirect detection self-test (#159)",
      st_redirect_samefile},
+    {"wizardfilter", "[<answer> <adr> <fil> [up]]",
+     "filter emitted by a wizard answer", st_wizardfilter},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},

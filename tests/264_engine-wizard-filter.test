@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# #1119: the wizard answers that cover a whole host must anchor on it. The
+# emitted patterns are asserted in the self-test; here the host-wide one is fed
+# back to the matcher, which is what decides whether a link is authorized.
+
+# 2 forbids the host, 5 (allowed to go up) and 6 authorize it
+assert_selftest "-foo.com/*" wizardfilter 2 foo.com /a/b.html
+assert_selftest "+foo.com/*" wizardfilter 5 foo.com /a/b.html 1
+assert_selftest "+foo.com/*" wizardfilter 6 foo.com /a/b.html
+
+pattern=$(httrack -O /dev/null -#test=wizardfilter 6 foo.com /a/b.html)
+pattern=${pattern#+}
+assert_selftest "foo.com/b.html does match $pattern" filter "$pattern" foo.com/b.html
+assert_selftest "foo.com/ does match $pattern" filter "$pattern" foo.com/
+assert_selftest "foo.com.evil.org/x does NOT match $pattern" filter "$pattern" foo.com.evil.org/x
+
+# answers 0, 1, 5 (no up), 7, the ones adding nothing, credentials and port
+assert_selftest "wizardfilter self-test OK" wizardfilter
