@@ -13,32 +13,19 @@ ENGINE_EXE_RE="^(lt-)?(${ENGINE_EXES// /|})([.]exe)?\$"
 ENGINE_IMAGE_RE="^(${ENGINE_EXES// /|})[.]exe"
 FIXTURE_SERVER_RE='^(local-server|proxy-https-server|proxy-connect-server|socks5-server|tls-stall-server)[.]py$'
 
-# Under qemu-user the kernel reports the binfmt interpreter as the command, and
-# the program's own argv[0] lands one place right (Debian's hppa buildd
-# emulates). qemu-img and friends take a disk image, not a program; these lists
-# feed kill, so shifting past one would read the image path as the process.
-QEMU_INTERP_RE='^qemu-[[:alnum:]_]+(-static)?$|^[[:alnum:]_]+-binfmt(-[[:upper:]]+)?$'
-QEMU_IMAGE_TOOL_RE='^qemu-(img|nbd|io|ga|edid|keymap)(-static)?$'
-
-# awk prologue for the matchers below, taking those two as -v qint and -v qimg.
+# awk prologue for the matchers below: under qemu-user the kernel reports the
+# binfmt interpreter as the command, so the name we match on lands one column
+# right (Debian's hppa buildd emulates).
 # shellcheck disable=SC2016 # awk fields, not shell expansions
 AWK_PROC_NAMES='
 function basen(s) { sub(/.*[\/\\]/, "", s); return s }
 function qemushift(  n) {
     n = basen($6)
-    if (n ~ qimg) return 0
-    return n ~ qint ? 1 : 0
+    # qemu-img and friends take an image, not a program, and this list is fed to
+    # kill: shifting past them would read a disk path as the process name.
+    if (n ~ /^qemu-(img|nbd|io|ga|edid|keymap)$/) return 0
+    return n ~ /^qemu-[[:alnum:]_]+(-static)?$|^[[:alnum:]_]+-binfmt(-[[:upper:]]+)?$/ ? 1 : 0
 }'
-
-# The name of the program pid $1 is running, empty if it is gone. Fed to the
-# prologue above as a one-row listing, so the shift is decided in one place.
-proc_program_name() { # proc_program_name <pid>
-    local a args=
-    { while IFS= read -r -d '' a; do args="${args:+$args }$a"; done <"/proc/$1/cmdline"; } 2>/dev/null
-    test -n "$args" || return 1
-    awk -v qint="$QEMU_INTERP_RE" -v qimg="$QEMU_IMAGE_TOOL_RE" "$AWK_PROC_NAMES"'
-        { print basen($(6 + qemushift())) }' <<<"1 1 1 0 S $args"
-}
 
 # Every process as "PID PPID PGID ELAPSED S COMMAND", header first. A Fedora
 # build root has no procps, and an empty list reads as "nothing running" (#1021).
@@ -108,7 +95,6 @@ list_stray_processes() {
         # and its script, for the Python fixtures).
         ps_snapshot |
             awk -v pg="$pgid" -v mode="$mode" -v eng="$ENGINE_EXE_RE" -v srv="$FIXTURE_SERVER_RE" \
-                -v qint="$QEMU_INTERP_RE" -v qimg="$QEMU_IMAGE_TOOL_RE" \
                 "$AWK_PROC_NAMES"'
                 NR == 1 { print; next }
                 { ingroup = (pg > 0 && $3 == pg)
@@ -155,8 +141,7 @@ list_engine_pids() {
     local pgid=${1:-0}
     test "$pgid" -gt 0 2>/dev/null || return 0
     ps_snapshot |
-        awk -v pg="$pgid" -v eng="$ENGINE_EXE_RE" \
-            -v qint="$QEMU_INTERP_RE" -v qimg="$QEMU_IMAGE_TOOL_RE" "$AWK_PROC_NAMES"'
+        awk -v pg="$pgid" -v eng="$ENGINE_EXE_RE" "$AWK_PROC_NAMES"'
             NR > 1 && $3 == pg { if (basen($(6 + qemushift())) ~ eng) print $1 }'
 }
 
