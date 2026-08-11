@@ -1,0 +1,106 @@
+# Build HTTraQt, the only consumer of our installed headers, against this branch.
+name: HTTraQt
+
+# Filtered, so it must never join the required set: a check that a path filter
+# skips stays "Expected" forever and blocks the merge.
+on:
+  push:
+    branches: [master]
+    paths: ['src/**', 'm4/**', 'configure.ac', '.github/workflows/httraqt.yml']
+  pull_request:
+    paths: ['src/**', 'm4/**', 'configure.ac', '.github/workflows/httraqt.yml']
+  schedule:
+    - cron: '37 05 * * 1'  # upstream is pinned; this catches drift in Qt and the runner image
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: httraqt-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Unofficial mirror of the SourceForge tree, so no PR depends on a third-party host.
+  HTTRAQT_REPO: https://github.com/xroche/httraqt-ci-mirror.git
+  HTTRAQT_REF: a1175565c61ab9afd7bda2dc96ed1182c2d44ec3  # 1.4.11 + cmake patch, upstream HEAD since 2023-01-06
+  PREFIX: /usr/local
+
+jobs:
+  build:
+    name: build HTTraQt against this branch
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
+            cmake qt6-base-dev qt6-multimedia-dev
+
+      - name: Build and install libhttrack
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          bld="$RUNNER_TEMP/bld"
+          mkdir -p "$bld"
+          (cd "$bld" && "$GITHUB_WORKSPACE/configure" --prefix="$PREFIX" --disable-static)
+          make -C "$bld" -j"$(nproc)"
+          sudo make -C "$bld" install
+          sudo ldconfig
+
+      - name: Assert no distribution libhttrack can shadow ours
+        run: |
+          set -euo pipefail
+          # FindHttrack.cmake hardcodes /usr/include/httrack first, so a stray libhttrack-dev would test Debian's headers.
+          for stray in /usr/include/httrack /usr/lib/libhttrack.so /usr/lib/*/libhttrack.so; do
+            if [ -e "$stray" ]; then
+              echo "::error::$stray exists; HTTraQt would build against it, not this branch"
+              exit 1
+            fi
+          done
+          test -f "$PREFIX/include/httrack/htsglobal.h"
+
+      - name: Fetch HTTraQt
+        run: |
+          set -euo pipefail
+          # Fetching the SHA itself needs no pin check afterwards, and keeps the
+          # tree out of the workspace so our own build cannot pick it up.
+          rm -rf "$RUNNER_TEMP/httraqt"
+          git init -q "$RUNNER_TEMP/httraqt"
+          ok=
+          for attempt in 1 2 3; do
+            if git -C "$RUNNER_TEMP/httraqt" fetch -q --depth 1 "$HTTRAQT_REPO" "$HTTRAQT_REF"; then ok=1; break; fi
+            echo "fetch failed (attempt $attempt)"
+            [ "$attempt" -eq 3 ] || sleep $((attempt * 15))
+          done
+          [ -n "$ok" ] || { echo "::error::cannot reach $HTTRAQT_REPO"; exit 1; }
+          git -C "$RUNNER_TEMP/httraqt" checkout -q --detach FETCH_HEAD
+
+      - name: Configure HTTraQt
+        run: |
+          set -euo pipefail
+          # CMAKE_MINIMUM_REQUIRED is 2.8 upstream, which CMake 4 rejects outright.
+          # The redirect is load-bearing: a bare MESSAGE() is NOTICE mode, which goes to stderr.
+          cmake -S "$RUNNER_TEMP/httraqt" -B "$RUNNER_TEMP/httraqt-bld" \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            2>&1 | tee "$RUNNER_TEMP/cmake.log"
+          # A configure that resolved elsewhere would compile someone else's headers.
+          grep -q "httrack header directory found: $PREFIX/include/httrack/" "$RUNNER_TEMP/cmake.log"
+
+      - name: Build HTTraQt
+        run: cmake --build "$RUNNER_TEMP/httraqt-bld" -j"$(nproc)"
+
+      - name: Assert it linked against the libhttrack we just built
+        run: |
+          set -euo pipefail
+          # Not bin/: CMAKE_RUNTIME_OUTPUT_DIRECTORY is set after ADD_EXECUTABLE, too late.
+          bin="$RUNNER_TEMP/httraqt-bld/httraqt"
+          ldd "$bin" | grep -E "libhttrack\.so.* => $PREFIX/lib/" \
+            || { ldd "$bin"; exit 1; }
