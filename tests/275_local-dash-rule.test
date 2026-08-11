@@ -11,6 +11,10 @@ set -euo pipefail
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_dashrule.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
+# absolute: noparam runs from another directory, and make check puts the build's
+# src/ on PATH relatively, so a bare name resolves to nothing once it cds
+bin=$(httrack_path)
+
 url='http://127.0.0.1:1/'
 # only the alias layer, which owns the guard, words it this way; the engine's
 # own message for the same option says "blank space"
@@ -20,7 +24,7 @@ syntax_re='Syntax error'
 # status in $rc; --testscan opens no socket, so the dead URL is never dialled
 parse() {
     rc=0
-    out=$(httrack -O "$tmp/out" --quiet --testscan "$url" "$@" 2>&1) || rc=$?
+    out=$("$bin" -O "$tmp/out" --quiet --testscan "$url" "$@" 2>&1) || rc=$?
 }
 
 accepted() { # accepted LABEL
@@ -88,7 +92,7 @@ noparam() { # noparam LABEL ARG...
     local label=$1
     shift
     rc=0
-    out=$(cd "$tmp/cwd" && httrack "$@" "$url" 2>&1) || rc=$?
+    out=$(cd "$tmp/cwd" && "$bin" "$@" "$url" 2>&1) || rc=$?
     refused "$syntax_re" "$label"
     test -z "$(ls -A "$tmp/cwd")" || fail "$label mirrored into $(ls -A "$tmp/cwd")"
 }
