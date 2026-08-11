@@ -1,0 +1,116 @@
+#!/bin/bash
+#
+# back_wait() discarded select()'s return, and EINTR leaves the fd sets exactly
+# as they were filled: every socket then read back as an exception and the slot
+# died as "Receive Error" (#1110). The prompt ^C users rely on came from that
+# same accident, so the stop check that replaces it is asserted here too.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
+
+skip_on_windows "MSYS cannot signal a native httrack.exe"
+command -v httrack >/dev/null || fail "could not find httrack"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_sigrecv.XXXXXX")
+crawlpid=
+cleanup() {
+    test -z "$crawlpid" || kill_tree "$crawlpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+ok() { echo "OK: $*"; }
+
+# Verbose, so a request line in the server log says a body is in flight.
+local_server_start --env LOCAL_SERVER_VERBOSE=1
+
+out="${tmpdir}/crawl"
+log="${tmpdir}/log"
+start_crawl() {
+    local url=$1
+    shift
+    rm -rf "${out:?}"
+    mkdir -p "$out"
+    httrack "$url" -O "$out" --quiet --disable-security-limits --robots=0 \
+        --retries=0 "$@" >"$log" 2>&1 &
+    crawlpid=$!
+}
+
+# wait_bounded folds its timeout and the crawl's own status into one return, so
+# a crash reads as a hang. Tell them apart, or the message names the wrong bug.
+await_exit() {
+    local rc=0
+    wait_bounded "$crawlpid" "$1" || rc=$?
+    crawlpid=
+    test "$rc" -ne 124 || fail "$2 was still running ${1}s later"
+    test "$rc" -eq 0 || fail "$2 exited $rc instead of unwinding cleanly"
+}
+
+# $1 requests, as the server logs them, before the crawl is deemed in flight.
+await_requests() {
+    local deadline=$((SECONDS + 60))
+    until test "$(command grep -ac "$1" "$SRV_LOG" || true)" -ge "$2"; do
+        test "$SECONDS" -lt "$deadline" || fail "the crawl never fetched $1"
+        poll_wait 1
+    done
+}
+
+# --- a benign signal must cost nothing ---------------------------------------
+# SIGCHLD is caught (sig_ignore) and asks for nothing: the one shape of signal
+# that has no business ending a transfer. /dcancel/ trickles 4096 bytes over
+# 1.6s apiece, so the burst below spans bodies that are in flight throughout.
+start_crawl "${BASEURL}/dcancel/index.html" --timeout=30 --max-time=0 -c4
+await_requests 'GET /dcancel/p0.bin' 1
+for _ in $(seq 1 40); do
+    kill -CHLD "$crawlpid" 2>/dev/null || break
+    poll_wait 0.1
+done
+await_exit 120 "the signalled crawl"
+
+! command grep -q 'Receive Error' "${out}/hts-log.txt" ||
+    fail "a benign signal was reported as a socket error: $(cat "${out}/hts-log.txt")"
+# And what the retry queue makes of it afterwards is not the engine's choice to
+# make: the bodies have to arrive whole.
+mirror="${out}/127.0.0.1_${SRV_PORT}/dcancel"
+for i in 0 1 2 3 4 5 6 7; do
+    size=$(wc -c <"${mirror}/p${i}.bin" 2>/dev/null || echo 0)
+    test "$size" -eq 4096 ||
+        fail "p${i}.bin is ${size} bytes, not 4096: $(find "$out" -type f)"
+done
+ok "40 SIGCHLDs cost no transfer"
+
+# --- the same crawl, unsignalled ---------------------------------------------
+# Nothing above is evidence if the fixture cannot mirror on its own.
+start_crawl "${BASEURL}/dcancel/index.html" --timeout=30 --max-time=0 -c4
+await_exit 120 "the plain crawl"
+for i in 0 1 2 3 4 5 6 7; do
+    size=$(wc -c <"${mirror}/p${i}.bin" 2>/dev/null || echo 0)
+    test "$size" -eq 4096 ||
+        fail "unsignalled p${i}.bin is ${size} bytes, not 4096"
+done
+ok "an unsignalled crawl mirrors the same eight files"
+
+# --- ^C still ends a stalled transfer, and says why --------------------------
+# --timeout=0 --max-time=0: no bound of any kind is left, so only the stop
+# check can end this crawl, and it cannot be mistaken for a timeout firing.
+start_crawl "${BASEURL}/watchdog/stall" --timeout=0 --max-time=0
+await_requests 'GET /watchdog/stall' 1
+started=$SECONDS
+kill -INT "$crawlpid"
+await_exit 60 "the interrupted crawl"
+elapsed=$((SECONDS - started))
+test "$elapsed" -lt 15 || fail "^C took ${elapsed}s to end a stalled transfer"
+command grep -q 'Finishing pending transfers' "$log" ||
+    fail "the ^C never reached sig_leave: $(cat "$log")"
+command grep -q 'Thanks for using HTTrack' "$log" ||
+    fail "the stop skipped teardown: $(cat "$log")"
+htslog=$(cat "${out}/hts-log.txt")
+command grep -q 'stopped by user' <<<"$htslog" ||
+    fail "the abort was not reported as the user's stop: ${htslog}"
+# The fabricated error is the bug: a stop reported as a socket failure is what
+# sends the link to the retry queue and marks the mirror broken.
+! command grep -q 'Receive Error' <<<"$htslog" ||
+    fail "the stop was reported as a socket error: ${htslog}"
+ok "^C ended the stalled transfer in ${elapsed}s, reported as a stop"

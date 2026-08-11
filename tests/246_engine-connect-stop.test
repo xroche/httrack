@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# A user stop must drop the slots still waiting to connect, instead of holding
-# the drain for the whole --timeout (#1073).
+# A user stop must drop every slot, waiting to connect (#1073) or receiving
+# (#1110), instead of holding the drain for the whole --timeout. All but the
+# FTP one, whose worker thread is still writing through it.
 
 set -euo pipefail
 

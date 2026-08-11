@@ -2771,35 +2771,44 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
   }
 }
 
-/* Slot waiting for a connection to come up: nothing requested on it yet. */
-static hts_boolean back_is_preconnect(const int status) {
-  return status == STATUS_WAIT_DNS || status == STATUS_CONNECTING ||
-         status == STATUS_SSL_WAIT_HANDSHAKE;
-}
-
-/* Drop the slots still waiting to connect: nothing to finish there, and left
-   alone they hold the drain for --timeout (#1073). Receiving slots stay. */
-static void back_stop_preconnect(httrackp *opt, struct_back *sback) {
+/* Tear down every live non-FTP slot with this outcome, returning the count: an
+   FTP slot is its worker thread's, which owns socket and slot. trunc archives a
+   partial body under that WARC-Truncated reason, WARC_TRUNC_NONE drops it. */
+static int back_abort_inflight(httrackp *opt, struct_back *sback,
+                               const int statuscode, const char *msg,
+                               const int trunc) {
   lien_back *const back = sback->lnk;
   int aborted = 0;
   int i;
 
   for (i = 0; i < sback->count; i++) {
-    if (!back_is_preconnect(back[i].status))
+    if (back[i].status <= 0 || back[i].status >= STATUS_FTP_TRANSFER)
       continue;
+    /* A cap-truncated body is deliberate, not broken: archive what arrived
+       with WARC-Truncated before the abort overwrites the slot's real 2xx
+       status. HTTrack still treats the slot as incomplete afterwards. */
+    if (trunc != WARC_TRUNC_NONE && StringNotEmpty(opt->warc_file) &&
+        back[i].r.statuscode > 0 && back[i].r.warc_resphdr != NULL &&
+        back[i].r.size > 0 &&
+        !(back[i].r.is_write && IS_DELAYED_EXT(back[i].url_sav))) {
+      if (back[i].r.is_write && back[i].r.out != NULL)
+        fflush(back[i].r.out);
+      back[i].r.warc_truncated = trunc;
+      warc_write_backtransaction(opt, &back[i]);
+    }
     if (back[i].r.soc != INVALID_SOCKET)
       deletehttp(&back[i].r);
     back[i].r.soc = INVALID_SOCKET;
-    /* fatal, as back_add() reports it: a stop must not schedule a retry */
-    back[i].r.statuscode = STATUSCODE_INVALID;
-    strcpybuff(back[i].r.msg, "mirror stopped by user");
+    /* drop a .delayed placeholder; real partials survive for resume */
+    if (back[i].r.is_write && IS_DELAYED_EXT(back[i].url_sav))
+      back_delayed_discard(opt, &back[i]);
+    back[i].r.statuscode = statuscode;
+    strcpybuff(back[i].r.msg, msg);
+    back[i].status = STATUS_READY;
     back_set_finished(sback, i);
     aborted++;
   }
-  if (aborted > 0)
-    hts_log_print(opt, LOG_WARNING,
-                  "Mirror stopped by user, %d pending connection(s) aborted",
-                  aborted);
+  return aborted;
 }
 
 // attente (gestion des buffers des sockets)
@@ -2831,50 +2840,30 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   back_clean(opt, cache, sback);
 #endif
 
-  if (opt->state.stop)
-    back_stop_preconnect(opt, sback);
+  /* A stop finishes nothing, and a slot left in flight holds the drain for
+     --timeout (#1073, #1110). Fatal, so the link is not queued again. */
+  if (opt->state.stop) {
+    const int aborted =
+        back_abort_inflight(opt, sback, STATUSCODE_INVALID,
+                            "mirror stopped by user", WARC_TRUNC_NONE);
+
+    if (aborted > 0)
+      hts_log_print(opt, LOG_WARNING,
+                    "Mirror stopped by user, %d transfer(s) aborted", aborted);
+  }
 
   /* Time/size limit exceeded past grace: abort in-flight transfers so no wait
-     loop starves (#481, #77). FTP slots stay, their thread owns the socket. */
+     loop starves (#481, #77). */
   if (!back_checkmirror(opt)) {
     const hts_mirror_limit limit = back_mirror_limit(opt);
     const char *const reason =
         (limit == HTS_MIRROR_LIMIT_SIZE) ? "size limit" : "time limit";
-    const char *const slotmsg = (limit == HTS_MIRROR_LIMIT_SIZE)
-                                    ? "Mirror Size Limit"
-                                    : "Mirror Time Out";
-    int aborted = 0;
-    unsigned int i;
+    const int aborted = back_abort_inflight(
+        opt, sback, STATUSCODE_TIMEOUT,
+        (limit == HTS_MIRROR_LIMIT_SIZE) ? "Mirror Size Limit"
+                                         : "Mirror Time Out",
+        (limit == HTS_MIRROR_LIMIT_SIZE) ? WARC_TRUNC_LENGTH : WARC_TRUNC_TIME);
 
-    for (i = 0; i < (unsigned int) back_max; i++) {
-      if (back[i].status > 0 && back[i].status < STATUS_FTP_TRANSFER) {
-        /* A cap-truncated body is deliberate, not broken: archive what arrived
-           with WARC-Truncated before the abort overwrites the slot's real 2xx
-           status. HTTrack still treats the slot as incomplete afterwards. */
-        if (StringNotEmpty(opt->warc_file) && back[i].r.statuscode > 0 &&
-            back[i].r.warc_resphdr != NULL && back[i].r.size > 0 &&
-            !(back[i].r.is_write && IS_DELAYED_EXT(back[i].url_sav))) {
-          if (back[i].r.is_write && back[i].r.out != NULL)
-            fflush(back[i].r.out);
-          back[i].r.warc_truncated = (limit == HTS_MIRROR_LIMIT_SIZE)
-                                         ? WARC_TRUNC_LENGTH
-                                         : WARC_TRUNC_TIME;
-          warc_write_backtransaction(opt, &back[i]);
-        }
-        if (back[i].r.soc != INVALID_SOCKET) {
-          deletehttp(&back[i].r);
-        }
-        back[i].r.soc = INVALID_SOCKET;
-        /* drop a .delayed placeholder; real partials survive for resume */
-        if (back[i].r.is_write && IS_DELAYED_EXT(back[i].url_sav))
-          back_delayed_discard(opt, &back[i]);
-        back[i].r.statuscode = STATUSCODE_TIMEOUT;
-        strcpybuff(back[i].r.msg, slotmsg);
-        back[i].status = STATUS_READY;
-        back_set_finished(sback, i);
-        aborted++;
-      }
-    }
     if (aborted > 0)
       hts_log_print(opt, LOG_WARNING, "%s reached, %d transfer(s) aborted",
                     reason, aborted);
@@ -2999,7 +2988,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #if HTS_WIDE_DEBUG
       DEBUG_W("select\n");
 #endif
-      select((int) nfds, &fds, &fds_c, &fds_e, &tv);
+      /* An interrupted select() leaves the sets filled: read as-is, every
+         socket reads back as an exception and the loop kills it (#1110). */
+      if (select((int) nfds, &fds, &fds_c, &fds_e, &tv) <= 0) {
+        FD_ZERO(&fds);
+        FD_ZERO(&fds_c);
+        FD_ZERO(&fds_e);
+      }
 #if HTS_WIDE_DEBUG
       DEBUG_W("select done\n");
 #endif
