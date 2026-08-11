@@ -41,20 +41,9 @@ Please visit our Website: http://www.httrack.com
 #include <stdlib.h>
 #include <string.h>
 
-/* GCC extension */
-#ifndef HTS_UNUSED
-#ifdef __GNUC__
-#define HTS_UNUSED __attribute__((unused))
-
-#define HTS_STATIC static __attribute__((unused))
-
-#define HTS_PRINTF_FUN(fmt, arg) __attribute__((format(printf, fmt, arg)))
-#else
-#define HTS_UNUSED
-#define HTS_STATIC static
-#define HTS_PRINTF_FUN(fmt, arg)
-#endif
-#endif
+/* Take the attribute helpers from their single definition: a partial copy here
+   would win their #ifndef guard and starve later headers of the rest. */
+#include "htsglobal.h"
 
 /** Forward definitions **/
 #ifndef HTS_DEF_FWSTRUCT_String

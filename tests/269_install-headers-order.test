@@ -1,0 +1,122 @@
+#!/bin/bash
+#
+# A consumer picks its own include order, so every ordered pair of installed
+# headers must compile. 205 and 206 compile each one alone, where all of them
+# pass, so neither can see an order-only break. Pairs are the practical bound:
+# a break needing three headers, or a macro the consumer defined first, is out
+# of reach here.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+if [ -z "${abs_top_builddir:-}" ]; then
+    echo "abs_top_builddir unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+make=${MAKE:-make}
+command -v "$make" >/dev/null 2>&1 || skip "no make ($make)"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+cpp_argv=(-I"$tmp/include")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    cpp_argv+=("${extra_argv[@]}")
+fi
+
+# Positive control: a compiler that cannot find its own libc headers would
+# blame ours instead.
+printf '#include <stdio.h>\n' >"$tmp/tu.c"
+if ! "${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+    head -5 "$tmp/cc.log" >&2
+    echo "${cc_argv[*]} cannot compile a bare <stdio.h>, skipping" >&2
+    exit 77
+fi
+
+env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+    DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
+    {
+        cat "$tmp/install.log" >&2
+        fail "install-DevIncludesDATA failed"
+    }
+
+headers=()
+for h in "$tmp/include/httrack"/*.h; do headers+=("$(basename "$h")"); done
+# A sweep over a set that quietly lost members passes for the wrong reason.
+declared=$(declared_header_count)
+[ "$declared" -ge 10 ] || fail "read only $declared headers out of DevIncludes_DATA, the parse is wrong"
+[ "${#headers[@]}" -eq "$declared" ] ||
+    fail "${#headers[@]} headers installed, DevIncludes_DATA declares $declared"
+for h in htssafe.h htsstrings.h htsbasenet.h htsopt.h; do
+    [ -f "$tmp/include/httrack/$h" ] || fail "$h was not installed"
+done
+
+cxx=""
+for cand in "${CXX:-}" g++ clang++ c++; do
+    [ -n "$cand" ] && command -v "$cand" >/dev/null 2>&1 && {
+        cxx="$cand"
+        break
+    }
+done
+[ -n "$cxx" ] || echo "no C++ compiler found, C leg only" >&2
+
+# Compile one ordered pair in every mode the sweep uses. Callers read $bad.
+sweep_pair() { # sweep_pair FIRST SECOND
+    local a=$1 b=$2 mode
+    printf '#include <httrack/%s>\n#include <httrack/%s>\n' "$a" "$b" >"$tmp/tu.c"
+    cp "$tmp/tu.c" "$tmp/tu.cpp"
+    for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
+        if ! "${cc_argv[@]}" "${cpp_argv[@]}" "$mode" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+            echo "$a then $b does not compile as C ($mode):" >&2
+            head -5 "$tmp/cc.log" >&2
+            bad=1
+        fi
+        [ -n "$cxx" ] || continue
+        if ! "$cxx" "${cpp_argv[@]}" "$mode" -fsyntax-only "$tmp/tu.cpp" 2>"$tmp/cc.log"; then
+            echo "$a then $b does not compile as C++ ($mode):" >&2
+            head -5 "$tmp/cc.log" >&2
+            bad=1
+        fi
+    done
+}
+
+# Control: a pair that breaks in one order only, which the sweep must catch.
+# Synthetic, because asserting a real header still breaks would forbid ever
+# hardening it.
+mkdir -p "$tmp/include/httrack"
+printf '#define HTS_PROBE_269_TAKEN 1\n' >"$tmp/include/httrack/probe269-first.h"
+printf '#ifndef HTS_PROBE_269_TAKEN\ntypedef int probe269_t;\n#endif\nprobe269_t probe269_f(void);\n' \
+    >"$tmp/include/httrack/probe269-second.h"
+cleanup_push rm -f "$tmp/include/httrack/probe269-first.h" "$tmp/include/httrack/probe269-second.h"
+bad=0
+sweep_pair probe269-second.h probe269-first.h
+[ "$bad" -eq 0 ] || fail "the probe pair fails in its good order too, the control is broken"
+sweep_pair probe269-first.h probe269-second.h 2>/dev/null
+[ "$bad" -ne 0 ] || fail "the sweep missed a pair that only compiles in one order, so it proves nothing"
+rm -f "$tmp/include/httrack/probe269-first.h" "$tmp/include/httrack/probe269-second.h"
+
+bad=0
+for a in "${headers[@]}"; do
+    for b in "${headers[@]}"; do
+        [ "$a" = "$b" ] || sweep_pair "$a" "$b"
+    done
+done
+[ "$bad" -eq 0 ] || fail "installed headers do not survive every include order"
+
+echo "swept ${#headers[@]} headers pairwise x 2 bytecode modes${cxx:+, C and C++}" >&2
+
+# The loop above is only meaningful if this compiler rejects a missing include.
+printf '#include "no-such-header-269.h"\n' >"$tmp/tu.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    fail "${cc_argv[*]} accepted a missing include, the checks above proved nothing"
+fi
+
+exit 0
