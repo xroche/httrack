@@ -181,9 +181,10 @@ ${LANG_SITEMAPURL}
 <br><br>
 
 ${LANG_STRIPQUERY}
-<input name="stripquery" value="${attr:stripquery}" size="40"
+<br>
+<textarea name="stripquery" cols="60" rows="4"
 			title='${html:LANG_STRIPQUERYTIP}' onMouseOver="info('${js:LANG_STRIPQUERYTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
->
+>${do:output-mode:html}${stripquery}${do:output-mode:}</textarea>
 <br><br>
 
 ${LANG_HOSTALIAS}

@@ -707,7 +707,10 @@ bottom are the ones that keep you welcome.</p>
 	<div class="opt-head"><span class="opt-name">Strip query keys</span><span class="cli">-%g, --strip-query</span></div>
 	<p>Comma-separated query keys to drop when naming saved files, such as
 	<code>sid,utm_source</code>. Keeps one page from being saved several times under tracking
-	parameters that change nothing.</p>
+	parameters that change nothing. You can scope a rule to the addresses it covers, for example
+	<code>shop.example.com/*=sid</code>.</p>
+	<p data-for="web">The box takes one rule per line. Only the last matching rule applies, so keep
+	the keys for one scope together on a line rather than on lines of their own.</p>
 </div>
 
 <div class="opt" data-for="win web droid">
