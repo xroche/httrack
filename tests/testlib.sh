@@ -186,19 +186,24 @@ stage_install_exec() {
     stage_install_target install-exec "$1" "$2"
 }
 
-# How many headers DevIncludes_DATA declares, so a caller can tell a shrunken
-# install from a complete one and refuse to sweep a set that lost members.
-declared_header_count() {
+# The headers DevIncludes_DATA declares, spelled as it spells them: relative to
+# src/, so "../config.h" still names the build product it is.
+declared_headers() {
     awk '/^DevIncludes_DATA[[:space:]]*=/ { inlist = 1 }
         inlist {
             last = ($0 !~ /\\$/)
             sub(/^[^=]*=/, "")
             gsub(/\\/, " ")
             for (i = 1; i <= NF; i++)
-                if ($i ~ /\.h$/) n++
+                if ($i ~ /\.h$/) print $i
             if (last) exit
-        }
-        END { print n + 0 }' "${abs_top_srcdir:?}/src/Makefile.am"
+        }' "${abs_top_srcdir:?}/src/Makefile.am"
+}
+
+# How many, so a caller can tell a shrunken install from a complete one and
+# refuse to sweep a set that lost members.
+declared_header_count() {
+    declared_headers | awk 'END { print NR + 0 }'
 }
 
 IS_WINDOWS=

@@ -167,6 +167,30 @@ jobs:
             throw "CRT mismatch across the boundary: libhttrack.dll=$a httrack.exe=$b"
           }
 
+      # The DLL build only proves the engine's own fixed include order, which is
+      # the one order a consumer need not use, and 205/206/207/269 all gate on an
+      # automake environment this job has not (#1153). Two cl runs, not one per
+      # unit: a spawn costs more here than the compile.
+      - name: Compile the installed headers standalone and pairwise
+        shell: pwsh
+        timeout-minutes: 20
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -property installationPath | Select-Object -First 1
+          if (-not $vs) { throw "Visual Studio not found" }
+          Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+          $arch = if ("${{ matrix.platform }}" -eq "x64") { "x64" } else { "x86" }
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation `
+            -DevCmdArguments "-arch=$arch -host_arch=x64"
+          # htsbasenet.h reaches for <openssl/ssl.h> unless a consumer turns it
+          # off, so the sweep needs what vcpkg installed for the build.
+          $inc = @(Get-ChildItem -Path "src\vcpkg_installed\*\include" -Directory |
+                   ForEach-Object { "-I" + $_.FullName })
+          if ($inc.Count -eq 0) { throw "no vcpkg include directory to compile against" }
+          bash tests/install-headers-sweep.sh --backend cl --srcdir . -- @inc
+          if ($LASTEXITCODE -ne 0) { throw "the installed headers do not compile standalone and pairwise" }
+
       # The engine ships ~90 tests and none had ever run on Windows: "make check"
       # is Linux/macOS only. These are the offline ones, driven from Git Bash
       # against the native httrack.exe. They subsume the self-tests this step

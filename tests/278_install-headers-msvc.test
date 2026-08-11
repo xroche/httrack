@@ -1,0 +1,144 @@
+#!/bin/bash
+#
+# 205, 206, 207 and 269 all gate on abs_top_builddir, so the MSVC job -- which
+# runs the scripts with no automake around them -- exits 77 on all four, and the
+# installed headers were never compiled standalone or pairwise on the one
+# toolchain whose preprocessor diverges most from ours (#1153). That coverage is
+# a workflow step, which no sweep can notice the loss of: audit the wiring here,
+# and drive the staging path only that step uses.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+sweep="$testdir/install-headers-sweep.sh"
+workflow="$top/.github/workflows/windows-build.yml"
+
+test -r "$sweep" || fail "no $sweep"
+# EXTRA_DIST, or a dist tarball ships 269 without the sweep it drives.
+grep -q 'install-headers-sweep\.sh' "$testdir/Makefile.am" ||
+    fail "install-headers-sweep.sh is not in EXTRA_DIST"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+# The MSVC step stages DevIncludes_DATA out of the source tree rather than
+# through the install rule 269 drives, so nothing else exercises that half.
+read -r -a cc_argv <<<"${CC:-cc}"
+if ! command -v "${cc_argv[0]}" >/dev/null 2>&1; then
+    echo "note: no C compiler (${cc_argv[0]}), the staging path was not driven" >&2
+else
+    cxx=""
+    for cand in "${CXX:-}" g++ clang++ c++; do
+        [ -n "$cand" ] && command -v "$cand" >/dev/null 2>&1 && {
+            cxx=$cand
+            break
+        }
+    done
+    argv=(--srcdir "$top" --cc "${CC:-cc}" --cxx "$cxx" --self-test)
+    [ -z "${abs_top_builddir:-}" ] || argv+=(--builddir "$abs_top_builddir")
+    if [ -n "${TEST_CPPFLAGS:-}" ]; then
+        read -r -a cpp_argv <<<"$TEST_CPPFLAGS"
+        [ "${#cpp_argv[@]}" -eq 0 ] || argv+=(-- "${cpp_argv[@]}")
+    fi
+    out=$(bash "$sweep" "${argv[@]}" 2>&1) || fail "the sweep self-test failed: $out"
+    grep -q '^self-test ok:' <<<"$out" || fail "the sweep self-test said: $out"
+    echo "$out" >&2
+fi
+
+py=$(find_python || true)
+if ! test -r "$workflow"; then
+    test -d "$top/.github" && fail "$workflow is gone but $top/.github is not"
+    echo "note: no .github under $top (dist tarball), the workflow audit did not run" >&2
+    exit 0
+fi
+if test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
+    echo "note: no python3 with PyYAML here, the workflow audit did not run" >&2
+    exit 0
+fi
+
+# Parsed, not grepped: the step has to be read out of the job that owns it, and
+# an ordinary reformatting of the workflow must not move any verdict.
+cat >"$tmp/wf.py" <<'PY'
+import sys
+
+import yaml
+
+SWEEP = "install-headers-sweep.sh"
+
+
+def jobs_of(wf):
+    return list((wf.get("jobs") or {}).values())
+
+
+def sweep_steps(job):
+    return [s for s in (job.get("steps") or []) if SWEEP in str(s.get("run", ""))]
+
+
+def builds(job):
+    return any(".vcxproj" in str(s.get("run", "")) for s in (job.get("steps") or []))
+
+
+def audit(wf):
+    bad = []
+    found = [(j, s) for j in jobs_of(wf) for s in sweep_steps(j)]
+    if len(found) != 1:
+        bad.append("%d steps run the sweep, want exactly one" % len(found))
+        return bad
+    job, step = found[0]
+    if not builds(job):
+        bad.append("the sweep runs in a job that builds nothing, so it has no vcpkg headers")
+    # A conditional step that does not run reads as a green job.
+    if "if" in step:
+        bad.append("the sweep step is conditional: %r" % step["if"])
+    if "--backend cl" not in str(step.get("run", "")):
+        bad.append("the sweep step does not ask for the cl backend")
+    return bad
+
+
+def mutate(wf, kind):
+    job = [j for j in jobs_of(wf) if sweep_steps(j)][0]
+    if kind == "drop":
+        job["steps"] = [s for s in job["steps"] if SWEEP not in str(s.get("run", ""))]
+    elif kind == "cond":
+        sweep_steps(job)[0]["if"] = "github.event_name == 'push'"
+    elif kind == "backend":
+        step = sweep_steps(job)[0]
+        step["run"] = step["run"].replace("--backend cl", "--backend cc")
+    elif kind == "nobuild":
+        job["steps"] = [s for s in job["steps"] if ".vcxproj" not in str(s.get("run", ""))]
+    elif kind != "none":
+        raise SystemExit("unknown mutation " + kind)
+    return wf
+
+
+wf = yaml.safe_load(open(sys.argv[2]))
+if sys.argv[1] == "mutate":
+    yaml.safe_dump(mutate(wf, sys.argv[3]), sys.stdout)
+else:
+    for b in audit(wf):
+        print("BAD " + b)
+PY
+
+said=$("$py" "$tmp/wf.py" audit "$workflow") || fail "the workflow audit did not run: $said"
+test -z "$said" || fail "$(grep '^BAD ' <<<"$said" | sed 's/^BAD //')"
+
+# One control per verdict, or an audit that stopped looking at one would ride on
+# another still firing. "none" round-trips the file through the parser, which
+# rewrites quoting, order and flow style: no verdict may move.
+for m in none:'' drop:'want exactly one' cond:'is conditional' \
+    backend:'does not ask for the cl backend' nobuild:'builds nothing'; do
+    "$py" "$tmp/wf.py" mutate "$workflow" "${m%%:*}" >"$tmp/wf.yml"
+    said=$("$py" "$tmp/wf.py" audit "$tmp/wf.yml") ||
+        fail "the workflow audit did not run on the ${m%%:*} control: $said"
+    if test -z "${m#*:}"; then
+        test -z "$said" || fail "a reformatted workflow fails the audit: $said"
+    else
+        grep -q "^BAD .*${m#*:}" <<<"$said" ||
+            fail "the ${m%%:*} control did not trip the audit: $said"
+    fi
+done
+
+exit 0
