@@ -3720,11 +3720,18 @@ static const char *hts_host_alias_match(const char *rules, const char *host,
     for (pat = line; pat < eq;) {
       const char *const sep = memchr(pat, ',', (size_t) (eq - pat));
       const char *const end = sep != NULL ? sep : eq;
-      const size_t len = (size_t) (end - pat);
+      const char *start = pat;
+      size_t len = (size_t) (end - pat);
       char BIGSTK glob[HTS_URLMAXSIZE * 2];
 
-      if (len < sizeof(glob)) {
-        memcpy(glob, pat, len);
+      while (len > 0 && *start == ' ') { /* "a.com, b.com=c.com" */
+        start++;
+        len--;
+      }
+      while (len > 0 && start[len - 1] == ' ')
+        len--;
+      if (len != 0 && len < sizeof(glob)) {
+        memcpy(glob, start, len);
         glob[len] = '\0';
         if (strjoker(host, glob, NULL, NULL) != NULL) {
           canon = eq + 1;
@@ -3738,12 +3745,23 @@ static const char *hts_host_alias_match(const char *rules, const char *host,
   return canon;
 }
 
-/* see htscore.h */
-const char *hts_host_alias(const char *rules, const char *adr, char *dest,
-                           size_t destsize) {
+/* Chain hops resolved before giving up. A longer chain, or a loop, is a
+   misconfiguration; the fold leaves those hosts alone rather than settle on an
+   arbitrary hop, which would depend on how often a link is named. */
+enum { HTS_HOST_ALIAS_MAXHOPS = 8 };
+
+/* hts_host_alias(), reporting through SETTLED (may be NULL) whether the chain
+   ended within HTS_HOST_ALIAS_MAXHOPS. */
+static const char *hts_host_alias_resolve(const char *rules, const char *adr,
+                                          hts_boolean nowww, char *dest,
+                                          size_t destsize,
+                                          hts_boolean *settled) {
   const char *host, *canon;
   size_t prefixlen, canonlen = 0;
+  int hop;
 
+  if (settled != NULL)
+    *settled = HTS_TRUE;
   if (rules == NULL || *rules == '\0' || adr == NULL || destsize == 0)
     return NULL;
   /* engine pseudo-hosts: a "*=host" rule must not swallow them */
@@ -3751,35 +3769,64 @@ const char *hts_host_alias(const char *rules, const char *adr, char *dest,
       strcmp(adr, "file://") == 0)
     return NULL;
   host = jump_identification_const(adr);
-  canon = hts_host_alias_match(rules, host, &canonlen);
-  if (canon == NULL) {
-    /* A rule naming the bare host also catches its www. forms: those collapse
-       onto that host under -%u, and would otherwise key apart from its
-       canonical one. */
-    const char *const bare = jump_normalized_const(host);
-
-    if (bare != host)
-      canon = hts_host_alias_match(rules, bare, &canonlen);
-  }
+  /* Match the host in the form the dedup layer uses: under the www. collapse a
+     rule naming example.com covers www.example.com, and with the collapse off
+     the rule matches the name as the link spells it. */
+  canon = hts_host_alias_match(
+      rules, nowww ? jump_normalized_const(host) : host, &canonlen);
   if (canon == NULL)
     return NULL;
 
-  /* keep the scheme and any credentials, replace the host */
+  /* Follow the chain to its end, so the fold is a fixpoint: url_savename names
+     the same link more than once, each time from the host it wrote last. */
   prefixlen = (size_t) (host - adr);
-  if (prefixlen >= destsize || canonlen >= destsize - prefixlen)
-    return NULL; /* would not fit: leave the URL alone */
-  memcpy(dest, adr, prefixlen);
-  memcpy(dest + prefixlen, canon, canonlen);
-  dest[prefixlen + canonlen] = '\0';
-  /* a rule matching its own target maps to itself: keep the fast path */
+  for (hop = 0;; hop++) {
+    const char *next, *dhost;
+    size_t nextlen = 0;
+
+    /* keep the scheme and any credentials, replace the host */
+    if (prefixlen >= destsize || canonlen >= destsize - prefixlen)
+      return NULL; /* would not fit: leave the URL alone */
+    memcpy(dest, adr, prefixlen);
+    memcpy(dest + prefixlen, canon, canonlen);
+    dest[prefixlen + canonlen] = '\0';
+
+    dhost = dest + prefixlen;
+    next = hts_host_alias_match(
+        rules, nowww ? jump_normalized_const(dhost) : dhost, &nextlen);
+    if (next == NULL)
+      break; /* settled: no rule maps this host further */
+    if (nextlen == canonlen && strncasecmp(next, canon, canonlen) == 0)
+      break; /* a rule matching its own target */
+    if (hop + 1 >= HTS_HOST_ALIAS_MAXHOPS) {
+      if (settled != NULL)
+        *settled = HTS_FALSE;
+      return NULL;
+    }
+    canon = next;
+    canonlen = nextlen;
+  }
+  /* a host that maps to itself: keep the callers' fast path */
   return strcasecmp(dest, adr) != 0 ? dest : NULL;
+}
+
+/* see htscore.h */
+const char *hts_host_alias(const char *rules, const char *adr,
+                           hts_boolean nowww, char *dest, size_t destsize) {
+  return hts_host_alias_resolve(rules, adr, nowww, dest, destsize, NULL);
+}
+
+/* see htscore.h */
+hts_boolean hts_host_alias_nowww(httrackp *opt) {
+  return opt->urlhack && !opt->no_www_dedup ? HTS_TRUE : HTS_FALSE;
 }
 
 /* see htscore.h */
 const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af) {
   char BIGSTK canon[HTS_URLMAXSIZE * 2];
   const char *const alias =
-      hts_host_alias(hts_host_alias_rules(opt), af->adr, canon, sizeof(canon));
+      hts_host_alias(hts_host_alias_rules(opt), af->adr,
+                     hts_host_alias_nowww(opt), canon, sizeof(canon));
 
   if (alias != NULL)
     strcpybuff(af->adr, alias);
@@ -3788,14 +3835,14 @@ const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af) {
 
 /* see htscore.h */
 hts_boolean hts_host_same_alias(const char *rules, const char *adra,
-                                const char *adrb) {
+                                const char *adrb, hts_boolean nowww) {
   char BIGSTK ca[HTS_URLMAXSIZE * 2], cb[HTS_URLMAXSIZE * 2];
   const char *a, *b;
 
   if (rules == NULL || *rules == '\0' || adra == NULL || adrb == NULL)
     return HTS_FALSE;
-  a = hts_host_alias(rules, adra, ca, sizeof(ca));
-  b = hts_host_alias(rules, adrb, cb, sizeof(cb));
+  a = hts_host_alias(rules, adra, nowww, ca, sizeof(ca));
+  b = hts_host_alias(rules, adrb, nowww, cb, sizeof(cb));
   if (a == NULL && b == NULL)
     return HTS_FALSE; /* neither is aliased: the caller's own test */
   return strcasecmp(jump_identification_const(a != NULL ? a : adra),
@@ -3808,15 +3855,17 @@ hts_boolean hts_host_same_alias(const char *rules, const char *adra,
 hts_boolean hts_host_alias_rule_ok(const char *rule) {
   const char *const eq = rule != NULL ? strchr(rule, '=') : NULL;
 
+  /* one host after the '=': no second rule, no glob (strjoker's set, plus ; and
+     \), no path or fragment, no space */
   return eq != NULL && eq != rule && eq[1] != '\0' &&
-                 strpbrk(eq + 1, "=,*?[]()/") == NULL
+                 strpbrk(eq + 1, "=,*?[]();\\/# \t") == NULL
              ? HTS_TRUE
              : HTS_FALSE;
 }
 
 /* see htscore.h */
-const char *hts_host_alias_chained(const char *rules, char *dest,
-                                   size_t destsize) {
+const char *hts_host_alias_looping(const char *rules, hts_boolean nowww,
+                                   char *dest, size_t destsize) {
   const char *p;
 
   if (rules == NULL || destsize == 0)
@@ -3836,12 +3885,17 @@ const char *hts_host_alias_chained(const char *rules, char *dest,
     {
       const size_t len = (size_t) (eol - eq - 1);
       char BIGSTK canon[HTS_URLMAXSIZE * 2], tmp[HTS_URLMAXSIZE * 2];
+      hts_boolean settled;
 
       if (len >= sizeof(canon))
         continue;
       memcpy(canon, eq + 1, len);
       canon[len] = '\0';
-      if (hts_host_alias(rules, canon, tmp, sizeof(tmp)) != NULL) {
+      (void) hts_host_alias_resolve(rules, canon, nowww, tmp, sizeof(tmp),
+                                    &settled);
+      if (!settled) {
+        if (strlen(canon) >= destsize)
+          continue; /* cannot name it in full: keep looking */
         strlcpybuff(dest, canon, destsize);
         return dest;
       }

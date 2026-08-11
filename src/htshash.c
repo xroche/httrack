@@ -102,7 +102,8 @@ static const char* value_sav_debug_print(void *arg, coucal_value_const a) {
    the urlhack collapse would otherwise have eaten. */
 static const char *key_host_alias(const hash_struct *hash, const char *adr,
                                   char *buf, size_t bufsize) {
-  const char *const canon = hts_host_alias(hash->host_alias, adr, buf, bufsize);
+  const char *const canon =
+      hts_host_alias(hash->host_alias, adr, hash->norm_host, buf, bufsize);
 
   return canon != NULL ? canon : adr;
 }

@@ -411,32 +411,33 @@ const char *hts_host_alias_rules(httrackp *opt);
 
 /* ADR with its host replaced by the canonical one, from the '\n'-separated
    "alias[,alias...]=canonical" RULES (aliases matched with strjoker, last
-   wins); NULL when no rule applies, the mapping is a no-op, or the result would
-   not fit DEST. Scheme and credentials are kept; the "primary"/"file://"
-   pseudo-hosts are never aliased. Single pass: a canonical host is not itself
-   re-aliased. */
-const char *hts_host_alias(const char *rules, const char *adr, char *dest,
-                           size_t destsize);
+   wins). NOWWW matches the host with its www. prefix collapsed, as -%u keys it.
+   Chains are followed to their end, so the result is a fixpoint. Scheme and
+   credentials are kept. NULL when no rule applies, the mapping is a no-op, the
+   rules loop, or the result would not fit DEST. */
+const char *hts_host_alias(const char *rules, const char *adr,
+                           hts_boolean nowww, char *dest, size_t destsize);
+
+/* HTS_TRUE when OPT's url hacks collapse www.host onto host. */
+hts_boolean hts_host_alias_nowww(httrackp *opt);
 
 /* Rewrite AF's host to its --host-alias canonical form, in place, and return
-   it: from here on the link is the canonical one for every consumer, the
-   type-probe and the fetch included. Idempotent; returns af->adr unchanged when
-   no rule applies. */
+   it. Idempotent; returns af->adr unchanged when no rule applies. */
 const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af);
 
 /* HTS_TRUE if ADRA and ADRB name the same host once RULES are applied. */
 hts_boolean hts_host_same_alias(const char *rules, const char *adra,
-                                const char *adrb);
+                                const char *adrb, hts_boolean nowww);
 
 /* HTS_TRUE if RULE is a well-formed "alias[,alias...]=canonical" line: one
    literal canonical host (no glob, no comma, no path or scheme). */
 hts_boolean hts_host_alias_rule_ok(const char *rule);
 
-/* First canonical host in RULES that is itself aliased by RULES, copied into
-   DEST, or NULL if there is none. Such a chain ("a=b" plus "b=c") keys a as b
-   and b as c, so the hosts the user meant to merge never dedup together. */
-const char *hts_host_alias_chained(const char *rules, char *dest,
-                                   size_t destsize);
+/* First canonical host in RULES whose chain never ends ("a=b" plus "b=a"),
+   copied into DEST, or NULL if every chain settles. Those hosts are left
+   unaliased, so the engine reports them rather than picking a hop. */
+const char *hts_host_alias_looping(const char *rules, hts_boolean nowww,
+                                   char *dest, size_t destsize);
 
 /* Read a whole file into a freshly malloc'd, NUL-terminated buffer; the caller
    owns it and must release it with freet(). Return NULL on missing/unreadable

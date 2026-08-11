@@ -2077,6 +2077,24 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def route_hostalias_noext(self):
+        # no extension, so the type probe re-requests this URL: it must already
+        # carry the canonical host by then
+        self.send_raw(
+            b"<html><body>type known only from the probe</body></html>",
+            "text/html",
+        )
+
+    def route_hostalias_sitemap(self):
+        # the sitemap seeder records a link without naming it first
+        self.send_raw(
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+            "<url><loc>http://alias.example.invalid/hostalias/e.html</loc></url>"
+            "</urlset>\n".encode(),
+            "application/xml",
+        )
+
     def route_delayed_chain(self):
         # chain1..chain9: one more hop than the type-check redirect budget
         n = int(urlsplit(self.path).path.rsplit("chain", 1)[1].split(".")[0])
@@ -2639,6 +2657,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/cdispo/fetch.php": route_cdispo,
         "/cdispo/evil.php": route_cdispo,
         "/hostalias/moved.html": route_hostalias_moved,
+        "/hostalias/noext": route_hostalias_noext,
+        "/hostalias/sitemap.xml": route_hostalias_sitemap,
         "/delayed/index.html": route_delayed_index,
         "/abortpurge/index.html": route_abortpurge_index,
         "/abortpurge/slow.html": route_abortpurge_slow,

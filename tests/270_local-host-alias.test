@@ -1,21 +1,24 @@
 #!/bin/bash
 #
-# End-to-end --host-alias (#16). The fixture reaches a second hostname three
-# ways: a page the crawled host also links (dedup: one saved file, not two), a
-# page nothing else links (scope: reached only because the alias is declared,
-# and named under the canonical host), and a redirect to it (the shape a real
-# two-domain site has). The control fetches neither and keeps the alias URL
-# absolute. Locks the CLI->opt->scope/savename/hash/fetch plumbing the engine
-# self-test cannot reach.
+# End-to-end --host-alias (#16). The fixture reaches a second hostname once per
+# engine path that has to fold it: a page the crawled host also links (dedup), a
+# page nothing else links (scope), a redirect to it, a page whose type is known
+# only after a probe (the probe re-requests the URL), and a sitemap entry
+# (recorded without being named first). The control fetches none of them and
+# keeps the alias URL absolute in the page.
 
 set -e
 
 : "${top_srcdir:=..}"
 
-# aliased: the alias links resolve locally, its own pages come down under the
-# canonical host, and the alias name survives nowhere in the page
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 4 \
-    --found hostalias/b.html --found hostalias/c.html \
+# aliased: every alias link resolves to a local file under the canonical host,
+# and the alias name survives nowhere in the mirrored page
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --found hostalias/index.html --found hostalias/a.html \
+    --found hostalias/b.html --found hostalias/noext.html \
+    --file-matches hostalias/index.html 'href="a\.html"' \
+    --file-matches hostalias/b.html 'only the alias hostname links here' \
+    --file-matches hostalias/c.html 'through a redirect' \
     --file-not-matches hostalias/index.html 'example\.invalid' \
     httrack 'BASEURL/hostalias/index.html' \
     --host-alias 'alias.example.invalid=BASEHOST'
@@ -27,15 +30,38 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
 
 # the fold applies with url-hack off (-%u0): the dedup key, the saved name and
 # the scope test must not depend on it
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 4 \
-    --found hostalias/b.html --found hostalias/c.html \
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --found hostalias/c.html \
     --file-not-matches hostalias/index.html 'example\.invalid' \
     httrack 'BASEURL/hostalias/index.html' -%u0 \
     --host-alias 'alias.example.invalid=BASEHOST'
 
-# a glob alias matches the same host
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 4 \
-    --found hostalias/b.html --found hostalias/c.html \
+# repeated options accumulate, and a glob alias matches: the rule that fires is
+# the second one, so the '\n' the CLI joins them with has to parse
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --found hostalias/c.html \
     --file-not-matches hostalias/index.html 'example\.invalid' \
     httrack 'BASEURL/hostalias/index.html' \
+    --host-alias 'nothing.example.invalid=BASEHOST' \
     --host-alias '*.example.invalid=BASEHOST'
+
+# a sitemap URL on the alias host: the seeder records it without a save name,
+# the one path url_savename does not fold. Three files: the start page, the
+# sitemap document itself, and the page it lists.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
+    --found hostalias/e.html \
+    --file-matches hostalias/e.html 'listed only in the sitemap' \
+    httrack 'BASEURL/hostalias/a.html' \
+    --sitemap-url 'BASEURL/hostalias/sitemap.xml' \
+    --host-alias 'alias.example.invalid=BASEHOST'
+
+# a rule the option cannot use is refused up front, not silently ignored
+out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
+    --host-alias 'no-equals-sign' 2>&1) && {
+    echo "FAIL: httrack accepted a malformed --host-alias rule"
+    exit 1
+}
+grep -q "Invalid host-alias rule" <<<"$out" || {
+    echo "FAIL: no diagnostic for a malformed --host-alias rule: $out"
+    exit 1
+}

@@ -2835,18 +2835,17 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     "* security warning: !!! BYPASSING SECURITY LIMITS - MONITOR THIS SESSION WITH EXTREME CARE !!!");
     }
 
-    /* A chained --host-alias keys each host under the next one, so the names
-       the user meant to merge never dedup together. */
+    /* --host-alias rules pointing in a circle have no canonical host */
     {
-      char BIGSTK chained[HTS_URLMAXSIZE * 2];
+      char BIGSTK looping[HTS_URLMAXSIZE * 2];
 
-      if (hts_host_alias_chained(hts_host_alias_rules(opt), chained,
-                                 sizeof(chained)) != NULL) {
-        hts_log_print(
-            opt, LOG_WARNING,
-            "* host-alias '%s' is both a canonical host and an alias: "
-            "chained rules do not merge, point them all at one host",
-            chained);
+      if (hts_host_alias_looping(hts_host_alias_rules(opt),
+                                 hts_host_alias_nowww(opt), looping,
+                                 sizeof(looping)) != NULL) {
+        hts_log_print(opt, LOG_WARNING,
+                      "* host-alias rules for '%s' point in a circle: those "
+                      "hosts are left alone, point them all at one host",
+                      looping);
       }
     }
 

@@ -393,7 +393,6 @@ static int hts_record_link_(httrackp * opt,
   if (link == NULL) {
     return 0;
   }
-
   // record string fields
   if ( (link->adr = hts_record_link_strdup(opt, address)) == NULL
     || (link->fil = hts_record_link_strdup(opt, file)) == NULL
