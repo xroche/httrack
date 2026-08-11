@@ -1,11 +1,10 @@
 #!/bin/bash
 #
-# 205, 206, 207 and 269 all gate on abs_top_builddir, so the MSVC job -- which
-# runs the scripts with no automake around them -- exits 77 on all four, and the
-# installed headers were never compiled standalone or pairwise on the one
-# toolchain whose preprocessor diverges most from ours (#1153). That coverage is
-# a workflow step, which no sweep can notice the loss of: audit the wiring here,
-# and drive the staging path only that step uses.
+# 205, 206, 207 and 269 all gate on abs_top_builddir, so the MSVC job, which runs
+# the scripts with no automake around them, exits 77 on all four and never
+# compiles the installed headers on the preprocessor least like ours (#1153).
+# A sweep cannot see its own step get dropped, so audit the wiring here, and
+# drive the staging path only that step uses.
 
 set -euo pipefail
 
@@ -37,15 +36,29 @@ else
             break
         }
     done
-    argv=(--srcdir "$top" --cc "${CC:-cc}" --cxx "$cxx" --self-test)
-    [ -z "${abs_top_builddir:-}" ] || argv+=(--builddir "$abs_top_builddir")
-    if [ -n "${TEST_CPPFLAGS:-}" ]; then
-        read -r -a cpp_argv <<<"$TEST_CPPFLAGS"
+    cpp_argv=()
+    [ -z "${TEST_CPPFLAGS:-}" ] || read -r -a cpp_argv <<<"$TEST_CPPFLAGS"
+
+    # Counts, not the literal. The message is the only window on what was staged,
+    # and a grep for it passes on a sweep that staged half the set.
+    declared=$(declared_header_count)
+    [ "$declared" -ge 10 ] || fail "read only $declared headers out of DevIncludes_DATA"
+    selftest() { # selftest WANT_HEADERS EXTRA_ARG...
+        local want=$1 out staged units
+        shift
+        argv=(--srcdir "$top" --cc "${CC:-cc}" --cxx "$cxx" --self-test "$@")
         [ "${#cpp_argv[@]}" -eq 0 ] || argv+=(-- "${cpp_argv[@]}")
-    fi
-    out=$(bash "$sweep" "${argv[@]}" 2>&1) || fail "the sweep self-test failed: $out"
-    grep -q '^self-test ok:' <<<"$out" || fail "the sweep self-test said: $out"
-    echo "$out" >&2
+        out=$(bash "$sweep" "${argv[@]}" 2>&1) || fail "the sweep self-test failed: $out"
+        staged=$(sed -n 's/^self-test ok: \([0-9]*\) headers staged.*/\1/p' <<<"$out")
+        units=$(sed -n 's/^self-test ok:.* \([0-9]*\) units.*/\1/p' <<<"$out")
+        assert_eq "$want" "${staged:-none}" "headers staged ($out)"
+        assert_eq "$((want * want))" "${units:-none}" "units generated ($out)"
+        echo "$out" >&2
+    }
+    # Both argument shapes: the MSVC step passes no --builddir, so config.h -- the
+    # one entry outside src/ -- falls out of its set and nowhere else's.
+    selftest "$((declared - 1))"
+    [ -z "${abs_top_builddir:-}" ] || selftest "$declared" --builddir "$abs_top_builddir"
 fi
 
 py=$(find_python || true)
@@ -59,8 +72,8 @@ if test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
     exit 0
 fi
 
-# Parsed, not grepped: the step has to be read out of the job that owns it, and
-# an ordinary reformatting of the workflow must not move any verdict.
+# Parsed, not grepped. The step has to be read out of the job that owns it, and
+# reformatting the workflow must move no verdict.
 cat >"$tmp/wf.py" <<'PY'
 import sys
 
@@ -73,12 +86,25 @@ def jobs_of(wf):
     return list((wf.get("jobs") or {}).values())
 
 
+def steps_of(job):
+    return job.get("steps") or []
+
+
+# Commented out, the invocation still reads as a mention of the script.
+def script_of(step):
+    lines = str(step.get("run", "")).splitlines()
+    return "\n".join(ln for ln in lines if not ln.lstrip().startswith("#"))
+
+
 def sweep_steps(job):
-    return [s for s in (job.get("steps") or []) if SWEEP in str(s.get("run", ""))]
+    return [s for s in steps_of(job) if SWEEP in script_of(s)]
 
 
-def builds(job):
-    return any(".vcxproj" in str(s.get("run", "")) for s in (job.get("steps") or []))
+def index_of(job, needle):
+    for i, s in enumerate(steps_of(job)):
+        if needle in script_of(s):
+            return i
+    return -1
 
 
 def audit(wf):
@@ -88,27 +114,56 @@ def audit(wf):
         bad.append("%d steps run the sweep, want exactly one" % len(found))
         return bad
     job, step = found[0]
-    if not builds(job):
+    build = index_of(job, ".vcxproj")
+    if build < 0:
         bad.append("the sweep runs in a job that builds nothing, so it has no vcpkg headers")
-    # A conditional step that does not run reads as a green job.
-    if "if" in step:
-        bad.append("the sweep step is conditional: %r" % step["if"])
-    if "--backend cl" not in str(step.get("run", "")):
+    elif index_of(job, SWEEP) < build:
+        bad.append("the sweep runs before the build, so vcpkg has installed nothing yet")
+    # A step that does not run, or whose failure is forgiven, reads as a green job.
+    for owner, what in ((step, "step"), (job, "job")):
+        if "if" in owner:
+            bad.append("the sweep %s is conditional: %r" % (what, owner["if"]))
+        if "continue-on-error" in owner:
+            bad.append("the sweep %s forgives its own failure: continue-on-error" % what)
+    run = script_of(step)
+    if "--backend cl" not in run:
         bad.append("the sweep step does not ask for the cl backend")
+    if "--self-test" in run:
+        bad.append("the sweep step only self-tests, so CI never compiles the headers")
     return bad
+
+
+def comment_out(step, prefix):
+    step["run"] = "\n".join(
+        ("# " + ln) if ln.startswith(prefix) else ln for ln in step["run"].splitlines()
+    )
 
 
 def mutate(wf, kind):
     job = [j for j in jobs_of(wf) if sweep_steps(j)][0]
+    step = sweep_steps(job)[0]
     if kind == "drop":
-        job["steps"] = [s for s in job["steps"] if SWEEP not in str(s.get("run", ""))]
+        job["steps"] = [s for s in steps_of(job) if s is not step]
+    elif kind == "comment":
+        comment_out(step, "bash ")
     elif kind == "cond":
-        sweep_steps(job)[0]["if"] = "github.event_name == 'push'"
+        step["if"] = "github.event_name == 'push'"
+    elif kind == "jobcond":
+        job["if"] = "github.event_name == 'push'"
+    elif kind == "coe":
+        step["continue-on-error"] = True
+    elif kind == "jobcoe":
+        job["continue-on-error"] = True
     elif kind == "backend":
-        step = sweep_steps(job)[0]
         step["run"] = step["run"].replace("--backend cl", "--backend cc")
+    elif kind == "backendincomment":
+        step["run"] = step["run"].replace("--backend cl", "--backend cc") + "\n# --backend cl\n"
+    elif kind == "selftest":
+        step["run"] = step["run"].replace("--backend cl", "--backend cl --self-test")
     elif kind == "nobuild":
-        job["steps"] = [s for s in job["steps"] if ".vcxproj" not in str(s.get("run", ""))]
+        job["steps"] = [s for s in steps_of(job) if ".vcxproj" not in script_of(s)]
+    elif kind == "reorder":
+        job["steps"] = [step] + [s for s in steps_of(job) if s is not step]
     elif kind != "none":
         raise SystemExit("unknown mutation " + kind)
     return wf
@@ -128,8 +183,12 @@ test -z "$said" || fail "$(grep '^BAD ' <<<"$said" | sed 's/^BAD //')"
 # One control per verdict, or an audit that stopped looking at one would ride on
 # another still firing. "none" round-trips the file through the parser, which
 # rewrites quoting, order and flow style: no verdict may move.
-for m in none:'' drop:'want exactly one' cond:'is conditional' \
-    backend:'does not ask for the cl backend' nobuild:'builds nothing'; do
+for m in none:'' drop:'want exactly one' comment:'want exactly one' \
+    cond:'step is conditional' jobcond:'job is conditional' \
+    coe:'step forgives' jobcoe:'job forgives' \
+    backend:'does not ask for the cl backend' \
+    backendincomment:'does not ask for the cl backend' \
+    selftest:'only self-tests' nobuild:'builds nothing' reorder:'runs before the build'; do
     "$py" "$tmp/wf.py" mutate "$workflow" "${m%%:*}" >"$tmp/wf.yml"
     said=$("$py" "$tmp/wf.py" audit "$tmp/wf.yml") ||
         fail "the workflow audit did not run on the ${m%%:*} control: $said"

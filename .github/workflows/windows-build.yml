@@ -167,10 +167,9 @@ jobs:
             throw "CRT mismatch across the boundary: libhttrack.dll=$a httrack.exe=$b"
           }
 
-      # The DLL build only proves the engine's own fixed include order, which is
-      # the one order a consumer need not use, and 205/206/207/269 all gate on an
-      # automake environment this job has not (#1153). Two cl runs, not one per
-      # unit: a spawn costs more here than the compile.
+      # The DLL build only proves the engine's own fixed include order, the one
+      # order a consumer need not use, and 205/206/207/269 all gate on an automake
+      # environment this job has not (#1153).
       - name: Compile the installed headers standalone and pairwise
         shell: pwsh
         timeout-minutes: 20

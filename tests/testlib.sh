@@ -186,8 +186,8 @@ stage_install_exec() {
     stage_install_target install-exec "$1" "$2"
 }
 
-# The headers DevIncludes_DATA declares, spelled as it spells them: relative to
-# src/, so "../config.h" still names the build product it is.
+# The headers DevIncludes_DATA declares, kept relative to src/ as it writes them,
+# so "../config.h" still names the build product it is.
 declared_headers() {
     awk '/^DevIncludes_DATA[[:space:]]*=/ { inlist = 1 }
         inlist {

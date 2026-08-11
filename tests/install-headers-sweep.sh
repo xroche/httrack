@@ -1,10 +1,10 @@
 #!/bin/bash
 #
 # Compile every installed header on its own and in each ordered pair, in both
-# HTS_INTERNAL_BYTECODE states, one compiler run per language: on the Windows
-# runner a spawn per unit costs more than the compile. 269 drives this over what
-# automake installed; the MSVC job has no automake and stages the same list out
-# of DevIncludes_DATA instead (#1153). Units are named after the headers they
+# HTS_INTERNAL_BYTECODE states. One compiler run per batch: a spawn per unit
+# costs more than the compile on the Windows runner. 269 sweeps what automake
+# installed; the MSVC job has no automake and stages the same DevIncludes_DATA
+# list out of the source tree (#1153). Units carry the names of the headers they
 # include, so the compiler's own diagnostic says which pair broke.
 
 set -euo pipefail
@@ -117,15 +117,16 @@ else
     while read -r h; do declared+=("$h"); done < <(abs_top_srcdir=$srcdir declared_headers)
     [ "${#declared[@]}" -ge 10 ] ||
         fail "read only ${#declared[@]} headers out of DevIncludes_DATA, the parse is wrong"
-    # An entry outside src/ is a build product; MSVC generates no config.h, which
-    # htsglobal.h includes on its POSIX branch only.
+    # An entry outside src/ is a build product: it comes from the build tree or
+    # not at all. MSVC generates no config.h, which htsglobal.h includes on its
+    # POSIX branch only. Never $srcdir/src/../, which would stage a stray file.
     absent=()
     for h in "${declared[@]}"; do
-        from=$srcdir/src/$h
         case $h in
-        ../*) [ -z "$builddir" ] || from=$builddir/${h#../} ;;
+        ../*) from=${builddir:+$builddir/${h#../}} ;;
+        *) from=$srcdir/src/$h ;;
         esac
-        if [ -f "$from" ]; then
+        if [ -n "$from" ] && [ -f "$from" ]; then
             cp "$from" "$tmp/include/httrack/${h##*/}"
             headers+=("${h##*/}")
         elif [ "${h#../}" != "$h" ]; then
@@ -140,49 +141,47 @@ fi
 
 n=${#headers[@]}
 [ "$n" -ge 10 ] || fail "only $n headers to sweep, the list cannot be right"
+# The count alone cannot see a Makefile.am reformat the awk mis-parses: a set that
+# lost these and stayed above the floor would sweep, and pass, without them.
+for h in htsglobal.h httrack-library.h htssafe.h htsbasenet.h htsopt.h; do
+    [ -f "$tmp/include/httrack/$h" ] || fail "$h is not in the set to sweep"
+done
 
-# One unit per (bytecode mode, first header, optional second header). The define
-# rides in the unit, so the whole batch shares one command line.
-gen() { # gen NAME BYTECODE HEADER...
-    local f=$1 def=$2
-    shift 2
-    {
-        [ "$def" = 0 ] || printf '#define HTS_INTERNAL_BYTECODE 1\n'
-        printf '#include <httrack/%s>\n' "$@"
-    } >"$tmp/tu/$f.c"
+modes=(-UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE)
+
+gen() { # gen NAME HEADER...
+    local f=$1
+    shift
+    printf '#include <httrack/%s>\n' "$@" >"$tmp/tu/$f.c"
 }
 
 units=()
-for def in 0 1; do
-    sfx=""
-    [ "$def" = 0 ] || sfx="__bc"
-    for a in "${headers[@]}"; do
-        gen "${a%.h}$sfx" "$def" "$a"
-        units+=("../tu/${a%.h}$sfx.c")
-        for b in "${headers[@]}"; do
-            [ "$a" != "$b" ] || continue
-            gen "${a%.h}--${b%.h}$sfx" "$def" "$a" "$b"
-            units+=("../tu/${a%.h}--${b%.h}$sfx.c")
-        done
+for a in "${headers[@]}"; do
+    gen "${a%.h}" "$a"
+    units+=("../tu/${a%.h}.c")
+    for b in "${headers[@]}"; do
+        [ "$a" != "$b" ] || continue
+        gen "${a%.h}--${b%.h}" "$a" "$b"
+        units+=("../tu/${a%.h}--${b%.h}.c")
     done
 done
-# 2 modes x n first headers x (itself + n-1 seconds). A generator that lost a
-# nesting level, or that collided two names, would still sweep something.
-[ "${#units[@]}" -eq $((2 * n * n)) ] ||
-    fail "generated ${#units[@]} units, want $((2 * n * n))"
+# n first headers x (itself + n-1 seconds). A generator that lost a nesting
+# level, or that collided two names, would still sweep something.
+[ "${#units[@]}" -eq $((n * n)) ] || fail "generated ${#units[@]} units, want $((n * n))"
 written=("$tmp"/tu/*.c)
 [ "${#written[@]}" -eq "${#units[@]}" ] || fail "the unit names are not unique"
 
-# Run from obj/ with relative operands: cl drops each .obj in the working
-# directory, and MSYS rewrites no argument that is not a leading-slash path.
+# Run from obj/ with relative operands. cl drops each .obj in the working
+# directory, and MSYS rewrites no argument that is not a leading-slash path, so
+# anything passed after -- must be absolute.
 cd "$tmp/obj"
 
 sweep_log=$tmp/obj/cc.log
-compile() { # compile c|cxx UNIT...
-    local lang=$1 rc=0
-    shift
+compile() { # compile c|cxx MODE UNIT...
+    local lang=$1 mode=$2 rc=0
+    shift 2
     {
-        printf '%s\n' "${common[@]}" -I../include
+        printf '%s\n' "${common[@]}" -I../include "$mode"
         [ "${#extra[@]}" -eq 0 ] || printf '%s\n' "${extra[@]}"
         if [ "$lang" = c ]; then printf '%s\n' "${c_lang[@]}"; else printf '%s\n' "${cxx_lang[@]}"; fi
         printf '%s\n' "$@"
@@ -204,21 +203,31 @@ printf '#include "no-such-header-1153.h"\n' >"$tmp/tu/missing.c"
 printf '#define HTS_SWEEP_TAKEN 1\n' >"$tmp/include/httrack/sweep-first.h"
 printf '#ifndef HTS_SWEEP_TAKEN\ntypedef int sweep_t;\n#endif\nsweep_t sweep_f(void);\n' \
     >"$tmp/include/httrack/sweep-second.h"
-gen good 0 sweep-second.h sweep-first.h
-gen bad 0 sweep-first.h sweep-second.h
+# A header must react to the bytecode mode, or both halves run the same case
+# twice and the unit count still reads right. TEST_CPPFLAGS carrying -D does it.
+printf '#ifndef HTS_INTERNAL_BYTECODE\n#error not in bytecode mode\n#endif\n' \
+    >"$tmp/include/httrack/sweep-bytecode.h"
+gen good sweep-second.h sweep-first.h
+gen bad sweep-first.h sweep-second.h
+gen bytecode sweep-bytecode.h
 
 for lang in "${langs[@]}"; do
-    compile "$lang" ../tu/ok.c ../tu/good.c || {
+    compile "$lang" "${modes[0]}" ../tu/ok.c ../tu/good.c || {
         cat "$sweep_log" >&2
         fail "the $backend $lang driver cannot compile <stdio.h> and the control pair"
     }
-    ! compile "$lang" ../tu/missing.c 2>/dev/null ||
+    ! compile "$lang" "${modes[0]}" ../tu/missing.c ||
         fail "the $backend $lang driver accepted a missing include, the sweep proves nothing"
-    ! compile "$lang" ../tu/ok.c ../tu/bad.c ../tu/good.c 2>/dev/null ||
+    ! compile "$lang" "${modes[0]}" ../tu/ok.c ../tu/bad.c ../tu/good.c ||
         fail "the $backend $lang driver missed a one-order-only pair inside a batch"
+    compile "$lang" "${modes[1]}" ../tu/bytecode.c ||
+        fail "${modes[1]} does not reach a $lang header, so that half of the sweep is a duplicate"
+    ! compile "$lang" "${modes[0]}" ../tu/bytecode.c ||
+        fail "${modes[0]} leaves HTS_INTERNAL_BYTECODE defined for $lang, so both halves are one"
 done
 rm -f "$tmp/include/httrack/sweep-first.h" "$tmp/include/httrack/sweep-second.h" \
-    "$tmp/tu/ok.c" "$tmp/tu/missing.c" "$tmp/tu/good.c" "$tmp/tu/bad.c"
+    "$tmp/include/httrack/sweep-bytecode.h" "$tmp/tu/ok.c" "$tmp/tu/missing.c" \
+    "$tmp/tu/good.c" "$tmp/tu/bad.c" "$tmp/tu/bytecode.c"
 
 # Staging, generation and the controls, without paying for the whole set again.
 if [ "$selftest" = 1 ]; then
@@ -229,13 +238,15 @@ fi
 began=$SECONDS
 bad=0
 for lang in "${langs[@]}"; do
-    compile "$lang" "${units[@]}" || {
-        head -40 "$sweep_log" >&2
-        echo "the installed headers do not compile as $lang standalone and pairwise" >&2
-        bad=1
-    }
+    for mode in "${modes[@]}"; do
+        compile "$lang" "$mode" "${units[@]}" || {
+            head -40 "$sweep_log" >&2
+            echo "the headers do not compile as $lang standalone and pairwise ($mode)" >&2
+            bad=1
+        }
+    done
 done
-echo "swept $n headers standalone and pairwise x 2 bytecode modes x ${langs[*]}" \
-    "= $((${#langs[@]} * ${#units[@]})) units in $((SECONDS - began))s with $backend"
+echo "swept $n headers standalone and pairwise x ${#modes[@]} bytecode modes x ${langs[*]}" \
+    "= $((${#modes[@]} * ${#langs[@]} * ${#units[@]})) units in $((SECONDS - began))s with $backend"
 [ "$bad" -eq 0 ] || exit 1
 exit 0
