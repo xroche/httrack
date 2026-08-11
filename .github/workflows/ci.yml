@@ -921,15 +921,21 @@ jobs:
       - name: shfmt
         run: shfmt -d -i 4 $SHELL_SCRIPTS
 
-      # .flake8's 88 columns is black's width; ls-files so a .py in a new
-      # directory cannot escape the way a hand-kept glob list would.
-      - name: black and flake8
+      # Read the list rather than hand-keeping one: a .py added in a new
+      # directory then gets checked without anyone widening a glob.
+      - name: List the tracked Python files
         run: |
           set -euo pipefail
-          mapfile -t PYTHON_FILES < <(git ls-files '*.py')
-          echo "${#PYTHON_FILES[@]} tracked Python files"
-          black --check --diff "${PYTHON_FILES[@]}"
-          flake8 "${PYTHON_FILES[@]}"
+          mapfile -t py < <(git ls-files '*.py')
+          test "${#py[@]}" -gt 0  # flake8 given no paths exits 0, checking nothing
+          echo "${#py[@]} tracked Python files"
+          echo "PYTHON_FILES=${py[*]}" >> "$GITHUB_ENV"
+
+      - name: black
+        run: black --check --diff $PYTHON_FILES
+
+      - name: flake8
+        run: flake8 $PYTHON_FILES
 
       # A misnamed test falls outside the glob "make check" runs, so it goes
       # missing without failing anything.
