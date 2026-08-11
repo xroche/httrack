@@ -124,8 +124,14 @@ body {
    this sits on, and at .8em it is small text. */
 footer {
 	max-width: 68rem;
-	margin: .5rem auto 0;
+	/* No top margin and no prose leading: the line sits on the panel's black edge. */
+	margin: 0 auto;
 	font-size: .8em;
+	line-height: 1.3;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 1rem;
 }
 
 @media (prefers-color-scheme: dark) {

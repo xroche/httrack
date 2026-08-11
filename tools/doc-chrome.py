@@ -100,7 +100,19 @@ DESCRIPTIONS = {
     "scripting.html": "Driving the httrack command-line program from shell and" " batch scripts.",
 }
 
-FOOTER = "&copy; 1998-2026 Xavier Roche &amp; other contributors" " - Web Design: Leto Kauler."
+# Year left static: --check diffs the regenerated chrome against the shipped
+# bytes, so a computed one would red CI every 1st of January.
+FOOTER = [
+    "<footer>",
+    "\t<small>&copy; 1998-2026 Xavier Roche &amp; other contributors"
+    " - Web Design: Leto Kauler.</small>",
+    # Local copy: an absolute src would be a broken image offline, and a call home.
+    '\t<a href="https://endsoftwarepatents.org/innovating-without-patents/"'
+    ' target="_blank" title="This site is innovating without patents!">'
+    '<img src="images/esp_chicklet.png" width="91" height="17"'
+    ' alt="End Software Patents"></a>',
+    "</footer>",
+]
 
 # Identical on every page, sidebar or not, so it is its own region: pages that
 # build their own navigation still get their masthead checked (#1115).
@@ -116,7 +128,7 @@ MASTHEAD = [
 
 MARK = {
     part: (f"<!-- doc-chrome:{part} -->", f"<!-- /doc-chrome:{part} -->")
-    for part in ("head", "masthead", "top", "bottom")
+    for part in ("head", "masthead", "top", "bottom", "footer")
 }
 
 
@@ -212,8 +224,6 @@ def chrome(page, content):
         "</div>",
         "",
         '<dialog id="zoom" aria-label="Enlarged image"><img src="" alt=""></dialog>',
-        "",
-        f"<footer>{FOOTER}</footer>",
     ]
 
     return content, "\n".join(head), "\n".join(top), "\n".join(bottom)
@@ -274,6 +284,9 @@ def convert(path):
             MARK["bottom"][0],
             MARK["bottom"][1],
             "",
+            MARK["footer"][0],
+            MARK["footer"][1],
+            "",
             "</body>",
             "</html>",
             "",
@@ -283,6 +296,7 @@ def convert(path):
 
 def rewrite(path, text):
     page = os.path.basename(path)
+    text = region(text, "footer", "\n".join(FOOTER))
     # A page owning its sidebar takes the masthead alone, and nothing else here
     # applies to it: no head, no wrap, no generated navigation.
     if MARK["top"][0] not in text:
@@ -322,6 +336,12 @@ def main():
                 stale += 1
             continue
         owned += 1
+        # Unlike the masthead, nested in top and re-emitted with it, the footer
+        # has no region to rewrite once its markers are gone.
+        if MARK["footer"][0] not in before:
+            print(f"{page}: no {MARK['footer'][0]} marker")
+            stale += 1
+            continue
         after = rewrite(path, before)
         # Check the bytes that ship, not the regenerated form, which always has it.
         if MARK["masthead"][0] not in (before if args.check else after):
