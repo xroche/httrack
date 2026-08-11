@@ -1,0 +1,137 @@
+#!/bin/bash
+#
+# The Strip query keys field holds several rules: the template must emit one
+# --strip-query per rule, and the engine must take the flag name it emits.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+
+printf '[project reload maps the key back] ..\t'
+grep -q "do:copy:StripQuery:stripquery" "${distdir}/html/server/step2.html" ||
+    fail "step2.html does not restore StripQuery"
+echo OK
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_stripquery.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+printf '[webhttrack emits one --strip-query per rule] ..\t'
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" "${work}/emitted" <<'PY' || fail "the Strip query keys field is not wired (see above)"
+import re, shlex, sys, urllib.parse, urllib.request
+
+url, emitted = sys.argv[1].rstrip("/"), sys.argv[2]
+# Scoped rules, because the engine applies the last one matching an address: a
+# browser posts the textarea lines CRLF-separated.
+RULES = ["shop.example.com/*=sid,utm_source",
+         "www.example.org/*=ref"]
+RULE = "\r\n".join(RULES)
+
+form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1).decode()
+
+# A single-line input renders the name too, so match the tag: only a textarea
+# can hold a second rule.
+page = urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
+                              timeout=20).read().decode("latin-1")
+for want in ('<textarea name="stripquery"', "Strip query keys:"):
+    if want not in page:
+        sys.exit("option8.html does not render %r" % want)
+
+
+def post(fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
+                    [("sid", sid)] + fields)
+    req = urllib.request.Request(url + "/server/step4.html",
+                                 data=body.encode("latin-1"), method="POST")
+    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+
+
+def textarea(page, name):
+    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
+    if m is None:
+        sys.exit("no %s textarea in the rendered step4.html" % name)
+    return m.group(1)
+
+
+page = post([("stripquery", RULE)])
+cmd = textarea(page, "command")
+lines = [l.strip() for l in cmd.split("\n")]
+for rule in RULES:
+    if '--strip-query "%s"' % rule not in lines:
+        sys.exit('--strip-query "%s" missing from the command line\n%s'
+                 % (rule, cmd))
+# One ini line holds both rules, their separator percent-encoded.
+ini = [l for l in textarea(page, "winprofile").split("\n")
+       if l.startswith("StripQuery=")]
+if not ini or not all(rule in ini[0] for rule in RULES):
+    sys.exit("winprofile.ini does not carry both rules\n%s" % ini)
+
+# Reopening the page must show both rules back, one per line: a name the state
+# never writes renders an empty box and the project loses them on every reload.
+back = textarea(urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
+                                       timeout=20).read().decode("latin-1"),
+                "stripquery")
+for rule in RULES:
+    if rule not in back:
+        sys.exit("option8.html does not render %r back\n%s" % (rule, back))
+
+
+def emitted_rules(value):
+    """The rules the template emits for a box holding VALUE."""
+    flag = '--strip-query "'
+    return [line.strip()[len(flag):-1]
+            for line in textarea(post([("stripquery", value)]),
+                                 "command").split("\n")
+            if flag in line]
+
+
+# Whitespace beside the ',' that separates two keys or the '=' that scopes them
+# stays inside its rule; a blank line and an empty box emit no flag at all,
+# which the engine would refuse.
+for value, want in [(" ".join(RULES), RULES),
+                    ("\r\n" + "\r\n\r\n".join(RULES) + "\r\n", RULES),
+                    ("ex.com/* = sid, utm", ["ex.com/*=sid,utm"]),
+                    ("sid\r\nutm", ["sid", "utm"]),
+                    (" \r\n\t ", []),
+                    ("", [])]:
+    got = emitted_rules(value)
+    if got != want:
+        sys.exit("%r emitted %r, wanted %r" % (value, got, want))
+
+# Hand the engine below both flags the template actually emitted, not literals.
+emit = [lines[lines.index('--strip-query "%s"' % rule)] for rule in RULES]
+open(emitted, "w").write("\n".join(w for e in emit for w in shlex.split(e))
+                         + "\n")
+PY
+echo OK
+
+printf '[the engine knows the flag] ..\t'
+# macOS runs the suite under bash 3.2, which has no mapfile
+argv=()
+while IFS= read -r arg; do
+    argv+=("${arg}")
+done <"${work}/emitted"
+# Rejected flags exit 255 like a URL-less run, so match the diagnostic.
+out=$(httrack "${argv[@]}" 2>&1) || true
+if grep -q "Unknown option" <<<"${out}"; then
+    fail "the engine rejects ${argv[0]}: ${out}"
+fi
+# Control: the same probe on a flag that does not exist.
+out=$(httrack "${argv[0]}es" "${argv[1]}" 2>&1) || true
+grep -q "Unknown option" <<<"${out}" || fail "the unknown-option probe proves nothing"
+echo OK

@@ -185,7 +185,7 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:keepqueryorder:--keep-query-order}
 	${test:cookiesfile:--cookies-file "}${arg:cookiesfile}${test:cookiesfile:"}
 	${test:pausefiles:--pause "}${arg:pausefiles}${test:pausefiles:"}
-	${test:stripquery:--strip-query "}${arg:stripquery}${test:stripquery:"}
+	${arglist:stripquery:--strip-query}
 	${arglist:hostalias:--host-alias}
 	${test:toler:--tolerant}
 	${test:http10:--http-10}
