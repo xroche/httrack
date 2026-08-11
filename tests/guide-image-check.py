@@ -10,21 +10,41 @@ import sys
 
 from PIL import Image
 
-# Floor: a parse that collapses to a handful matched the markup, not the tags.
+# Floor: a parse that matched nothing would satisfy every check below.
 MIN_IMAGES = 40
+
+COMMENT = re.compile(r"<!--.*?-->", re.S)
+IMG_TAG = re.compile(r"<img\b[^>]*>", re.I)
+# The leading space keeps data-height="..." one key rather than a height.
+ATTR = re.compile(r'\s([A-Za-z-]+)="([^"]*)"')
+
+
+def attributes(tag):
+    """First value wins, as a browser does with a repeated attribute."""
+    attrs = {}
+    for name, value in ATTR.findall(tag):
+        attrs.setdefault(name.lower(), value)
+    return attrs
 
 
 def check(html_dir):
     """Return (number of img/ tags, list of defect messages)."""
     with open(os.path.join(html_dir, "guide.html"), encoding="utf-8") as fp:
-        text = fp.read()
+        # A commented-out screenshot is not a reference.
+        text = COMMENT.sub("", fp.read())
 
     refs = []
     bad = []
-    for tag in re.findall(r"<img\b[^>]*>", text):
-        attrs = dict(re.findall(r'\b([a-z]+)="([^"]*)"', tag))
-        src = attrs.get("src", "")
+    for tag in IMG_TAG.findall(text):
+        attrs = attributes(tag)
+        src = attrs.get("src")
+        if src is None:
+            bad.append("%s: no src this checker can read" % tag)
+            continue
         if not src.startswith("img/"):
+            # Every other src is chrome, shared with the rest of the doc set.
+            if "img/" in src:
+                bad.append("%s: an img/ path spelled past the check" % src)
             continue
         refs.append(src)
         path = os.path.join(html_dir, src)
@@ -34,8 +54,12 @@ def check(html_dir):
         if "width" not in attrs or "height" not in attrs:
             bad.append("%s: <img> carries no width/height" % src)
             continue
-        with Image.open(path) as im:
-            width, height = im.size
+        try:
+            with Image.open(path) as im:
+                width, height = im.size
+        except OSError as exc:
+            bad.append("%s: not a readable image (%s)" % (src, exc))
+            continue
         if (attrs["width"], attrs["height"]) != (str(width), str(height)):
             bad.append(
                 "%s: guide.html says %sx%s, the file is %dx%d"
