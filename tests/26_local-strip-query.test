@@ -22,16 +22,16 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
     httrack 'BASEURL/stripquery/index.html' -%u0 --strip-query 'utm_source'
 
-# several flags accumulate, as the wizard's rules box now emits them. The scoped
-# rule matches no host here, so either order must leave utm_source stripping.
+# several flags accumulate, as the wizard's rules box now emits them: one rule
+# of each pair matches, so either order needs both to survive
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
     httrack 'BASEURL/stripquery/index.html' \
-    --strip-query 'other.invalid/*=nothing' --strip-query 'utm_source'
+    --strip-query 'other.invalid/*=utm_source' --strip-query '*/stripquery/*=utm_source'
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
     httrack 'BASEURL/stripquery/index.html' \
-    --strip-query 'utm_source' --strip-query 'other.invalid/*=nothing'
+    --strip-query '*/stripquery/*=utm_source' --strip-query 'other.invalid/*=utm_source'
 
-# control: the scoped rule alone strips nothing, so the pair above owes its
-# result to the utm_source rule surviving accumulation
+# control: same keys behind a host that never matches strip nothing, so the pair
+# above owes its result to the pattern and not to the keys being listed at all
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
-    httrack 'BASEURL/stripquery/index.html' --strip-query 'other.invalid/*=nothing'
+    httrack 'BASEURL/stripquery/index.html' --strip-query 'other.invalid/*=utm_source'

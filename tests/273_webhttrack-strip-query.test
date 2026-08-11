@@ -13,7 +13,7 @@ distdir=$(cd "${distdir}" && pwd)
 
 htsserver_require
 
-printf '[project reload maps the key back] ..\t'
+printf '[the project key stays bound to the field] ..\t'
 grep -q "do:copy:StripQuery:stripquery" "${distdir}/html/server/step2.html" ||
     fail "step2.html does not restore StripQuery"
 echo OK
@@ -44,8 +44,8 @@ if not m:
     sys.exit("no session id in server/index.html")
 sid = m.group(1).decode()
 
-# A single-line input renders the name too, so match the tag: only a textarea
-# can hold a second rule.
+# The tag, because a single-line input renders the name too; the label text,
+# because an unknown ${LANG_*} renders empty.
 page = urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
                               timeout=20).read().decode("latin-1")
 for want in ('<textarea name="stripquery"', "Strip query keys:"):
@@ -75,24 +75,25 @@ for rule in RULES:
     if '--strip-query "%s"' % rule not in lines:
         sys.exit('--strip-query "%s" missing from the command line\n%s'
                  % (rule, cmd))
-# One ini line holds both rules, their separator percent-encoded.
-ini = [l for l in textarea(page, "winprofile").split("\n")
+# Exactly one ini line, holding both rules with the CRLF between them
+# percent-encoded: a separator dropped here merges them into one bad rule.
+want = "StripQuery=" + "%0d%0a".join(RULES)
+ini = [l.strip() for l in textarea(page, "winprofile").split("\n")
        if l.startswith("StripQuery=")]
-if not ini or not all(rule in ini[0] for rule in RULES):
-    sys.exit("winprofile.ini does not carry both rules\n%s" % ini)
+if ini != [want]:
+    sys.exit("winprofile.ini reads %s, wanted [%r]" % (ini, want))
 
-# Reopening the page must show both rules back, one per line: a name the state
-# never writes renders an empty box and the project loses them on every reload.
+# Reopening the page must show the rules back on their own lines: a name the
+# session state never writes renders an empty box, and rules run together come
+# back as one.
 back = textarea(urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
                                        timeout=20).read().decode("latin-1"),
                 "stripquery")
-for rule in RULES:
-    if rule not in back:
-        sys.exit("option8.html does not render %r back\n%s" % (rule, back))
+if [l.strip() for l in back.split("\n") if l.strip()] != RULES:
+    sys.exit("option8.html renders %r back, wanted the two rules" % back)
 
 
 def emitted_rules(value):
-    """The rules the template emits for a box holding VALUE."""
     flag = '--strip-query "'
     return [line.strip()[len(flag):-1]
             for line in textarea(post([("stripquery", value)]),
@@ -100,12 +101,13 @@ def emitted_rules(value):
             if flag in line]
 
 
-# Whitespace beside the ',' that separates two keys or the '=' that scopes them
-# stays inside its rule; a blank line and an empty box emit no flag at all,
-# which the engine would refuse.
+# Whitespace beside the ',' between two keys or the '=' scoping them stays in
+# the rule; elsewhere it separates two. An empty box must emit no flag at all.
 for value, want in [(" ".join(RULES), RULES),
                     ("\r\n" + "\r\n\r\n".join(RULES) + "\r\n", RULES),
                     ("ex.com/* = sid, utm", ["ex.com/*=sid,utm"]),
+                    ("a ,b", ["a,b"]),
+                    ("sid,utm ref", ["sid,utm", "ref"]),
                     ("sid\r\nutm", ["sid", "utm"]),
                     (" \r\n\t ", []),
                     ("", [])]:
