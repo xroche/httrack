@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# The command line htscoremain.c rebuilds (aliases expanded, doit.log replayed)
+# was allocated at argc + 1024 slots and never re-checked, so a long enough
+# expansion wrote past the block (#1189). Its two writers are separate call
+# sites and need separate coverage: cmdl_add for the command line, where an
+# option spelled --opt=value expands to two tokens, and cmdl_ins for the
+# hts-cache/doit.log replay, bounded only by the 8000-byte line the reader
+# accepts. Both runs end in a self-test, which is dispatched from the rebuilt
+# argv, so each one proves the tail tokens survived in order and costs no crawl.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argvoflow.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+want="barfoobar does match *foo*"
+
+# --- 1. command line: two-token expansion outruns the slots ------------------
+# 2000 arguments become 4001 tokens, past the 3028 the old sizing allowed.
+args=()
+for ((i = 0; i < 2000; i++)); do
+    args+=("--why=$i")
+done
+rc=0
+got=$("$bin" "${args[@]}" -\#test=filter '*foo*' barfoobar 2>&1) || rc=$?
+assert_eq 0 "$rc" "4001-token command line exited"
+assert_eq "$want" "$got" "tokens after the expansion"
+
+# --- 2. doit.log replay: one insertion per recorded token --------------------
+mirror="$tmp/mirror"
+mkdir -p "$mirror/hts-cache"
+{
+    for ((i = 0; i < 1900; i++)); do printf -- '-#f '; done
+    printf -- '-#test=filter *foo* barfoobar\n'
+} >"$mirror/hts-cache/doit.log"
+
+rc=0
+got=$(cd "$mirror" && "$bin" 2>&1) || rc=$?
+assert_eq 0 "$rc" "1903-token doit.log replay exited"
+assert_eq "$want" "$got" "tokens replayed from doit.log"
+
+exit 0

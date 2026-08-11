@@ -34,6 +34,8 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSALIAS_DEFH
 #define HTSALIAS_DEFH
 
+#include "htsglobal.h"
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 extern const char *hts_optalias[][4];
@@ -44,8 +46,6 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 int optalias_find(const char *token);
 const char *optalias_help(const char *token);
 int optreal_find(const char *token);
-int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
-                    size_t x_argvblk_size, int *x_ptr);
 const char *optreal_value(int p);
 const char *optalias_value(int p);
 const char *opttype_value(int p);
@@ -53,33 +53,36 @@ const char *opthelp_value(int p);
 const char *hts_gethome(void);
 void expand_home(String * str);
 
-/* Command-line argv-block builders, shared by htscoremain.c (the CLI parser)
-   and htsalias.c (config-file alias expansion). Tokens are packed back-to-back
-   into x_argvblk (total capacity bufsize); each argv[] entry points into the
-   block. cmdl_room bounds every copy: the running offset ptr can outrun the
-   block (alias / doit.log expansion outpacing the +32768 slack), so it yields
-   0 rather than a wrapped size_t and the bounded copy aborts cleanly. */
-#define cmdl_room(bufsize, ptr)                                                \
-  ((ptr) < (size_t) (bufsize) ? (size_t) (bufsize) - (ptr) : 0)
+/* The command line being rebuilt by htscoremain.c (CLI parsing) and
+   htsalias.c (config-file alias expansion): argc slots, each pointing into
+   blk, where the tokens are packed back-to-back. Config files and doit.log
+   append an input-defined number of tokens, so the slot array is grown on
+   demand and the invariant argc <= size is re-established before every write.
+   blk does not grow: a token that no longer fits aborts in the bounded copy
+   rather than being written past the end. */
+typedef struct {
+  char **argv; /* argc slots used out of size allocated */
+  int argc;
+  int size;
+  char *blk; /* token bytes, blk_used of blk_size in use */
+  size_t blk_size;
+  size_t blk_used;
+} cmdl_argv;
 
-/* Append a token as a new argv[argc]. */
-#define cmdl_add(token, argc, argv, buff, bufsize, ptr)                        \
-  argv[argc] = (buff + ptr);                                                   \
-  strlcpybuff(argv[argc], token, cmdl_room(bufsize, ptr));                     \
-  ptr += (int) (strlen(argv[argc]) + 1);                                       \
-  argc++
+/* Grow the slot array to hold at least count entries. HTS_FALSE if that many
+   slots can not be allocated, leaving cmd usable and unchanged. */
+hts_boolean cmdl_reserve(cmdl_argv *cmd, int count);
 
-/* Insert a token at argv[0], shifting the existing argc entries up by one. */
-#define cmdl_ins(token, argc, argv, buff, bufsize, ptr)                        \
-  {                                                                            \
-    int i;                                                                     \
-    for (i = argc; i > 0; i--)                                                 \
-      argv[i] = argv[i - 1];                                                   \
-  }                                                                            \
-  argv[0] = (buff + ptr);                                                      \
-  strlcpybuff(argv[0], token, cmdl_room(bufsize, ptr));                        \
-  ptr += (int) (strlen(argv[0]) + 1);                                          \
-  argc++
+/* Append token as the last entry. HTS_FALSE if the array can not be grown. */
+hts_boolean cmdl_add(cmdl_argv *cmd, const char *token);
+
+/* Insert token at 0 <= pos <= argc, shifting the entries above it up by one.
+   HTS_FALSE if the array can not be grown. */
+hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos);
+
+/* Expand a config file into cmd, inserting after its program name. Returns
+   whether the file could be read. */
+hts_boolean optinclude_file(const char *name, cmdl_argv *cmd);
 #endif
 
 #endif

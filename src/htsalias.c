@@ -480,6 +480,55 @@ const char *optalias_help(const char *token) {
     return NULL;
 }
 
+/* Largest slot count whose byte size can not wrap. */
+#define CMDL_MAX_SLOTS ((int) (INT_MAX / sizeof(char *)))
+
+hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
+  char **slots;
+  int size;
+
+  if (count <= cmd->size)
+    return HTS_TRUE;
+  if (count > CMDL_MAX_SLOTS) /* count alone: the product below can not wrap */
+    return HTS_FALSE;
+  /* double, so rebuilding an n-token command line stays amortized O(n) */
+  size = cmd->size <= CMDL_MAX_SLOTS / 2 ? cmd->size * 2 : CMDL_MAX_SLOTS;
+  if (size < count)
+    size = count;
+  slots = (char **) realloct(cmd->argv, sizeof(char *) * (size_t) size);
+  if (slots == NULL)
+    return HTS_FALSE;
+  cmd->argv = slots;
+  cmd->size = size;
+  return HTS_TRUE;
+}
+
+/* Room left in the token block; 0 makes the bounded copy abort rather than
+   write past it. */
+static size_t cmdl_room(const cmdl_argv *cmd) {
+  return cmd->blk_used < cmd->blk_size ? cmd->blk_size - cmd->blk_used : 0;
+}
+
+hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
+  int i;
+
+  assertf(pos >= 0 && pos <= cmd->argc);
+  /* argc <= size <= CMDL_MAX_SLOTS holds here, so argc + 1 can not wrap */
+  if (!cmdl_reserve(cmd, cmd->argc + 1))
+    return HTS_FALSE;
+  for (i = cmd->argc; i > pos; i--)
+    cmd->argv[i] = cmd->argv[i - 1];
+  cmd->argv[pos] = cmd->blk + cmd->blk_used;
+  strlcpybuff(cmd->argv[pos], token, cmdl_room(cmd));
+  cmd->blk_used += strlen(cmd->argv[pos]) + 1;
+  cmd->argc++;
+  return HTS_TRUE;
+}
+
+hts_boolean cmdl_add(cmdl_argv *cmd, const char *token) {
+  return cmdl_ins(cmd, token, cmd->argc);
+}
+
 /* Include a file to the current command line */
 /* example:
   set sockets 8
@@ -488,8 +537,7 @@ const char *optalias_help(const char *token) {
   deny ad.*
 */
 /* Note: NOT utf-8 */
-int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
-                    size_t x_argvblk_size, int *x_ptr) {
+hts_boolean optinclude_file(const char *name, cmdl_argv *cmd) {
   FILE *fp;
 
   fp = fopen(name, "rb");
@@ -555,35 +603,25 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
             if (!result) {
               printf("%s\n", return_error);
             } else {
-              int insert_after_argc;
-
-              /* Insert parameters BUT so that they can be in the same order */
-              /* temporary argc: Number of parameters after minus insert_after_argc */
-              insert_after_argc = (*argc) - insert_after;
-              cmdl_ins((tmp_argv[2]), insert_after_argc, (argv + insert_after),
-                       x_argvblk, x_argvblk_size, (*x_ptr));
-              *argc = insert_after_argc + insert_after;
-              insert_after++;
-              /* Second one */
-              if (return_argc > 1) {
-                insert_after_argc = (*argc) - insert_after;
-                cmdl_ins((tmp_argv[3]), insert_after_argc,
-                         (argv + insert_after), x_argvblk, x_argvblk_size,
-                         (*x_ptr));
-                *argc = insert_after_argc + insert_after;
-                insert_after++;
+              /* Insert the option and its parameter after the ones already
+                 inserted, so that the file order is preserved */
+              if (!cmdl_ins(cmd, tmp_argv[2], insert_after) ||
+                  (return_argc > 1 &&
+                   !cmdl_ins(cmd, tmp_argv[3], insert_after + 1))) {
+                printf("Error, not enough memory\n");
+                fclose(fp);
+                return HTS_TRUE;
               }
-              /* increment to nbr of used parameters */
-              /* insert_after+=result; */
+              insert_after += return_argc > 1 ? 2 : 1;
             }
           }
         }
       }
     }
     fclose(fp);
-    return 1;
+    return HTS_TRUE;
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 /* Get home directory, '.' if unset or empty */
