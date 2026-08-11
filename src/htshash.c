@@ -98,6 +98,15 @@ static const char* value_sav_debug_print(void *arg, coucal_value_const a) {
   return (char*) a.ptr;
 }
 
+/* Dedup-key host for ADR: --host-alias first, so a rule may name the www. form
+   the urlhack collapse would otherwise have eaten. */
+static const char *key_host_alias(const hash_struct *hash, const char *adr,
+                                  char *buf, size_t bufsize) {
+  const char *const canon = hts_host_alias(hash->host_alias, adr, buf, bufsize);
+
+  return canon != NULL ? canon : adr;
+}
+
 /* Pseudo-key (lien_url structure) hash function */
 static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
                                               coucal_key_const value, 
@@ -106,10 +115,15 @@ static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
   const lien_url*const lien = (const lien_url*) value;
   const char *const adr = !former ? lien->adr : lien->former_adr;
   const char *const fil = !former ? lien->fil : lien->former_fil;
-  const char *const adr_norm =
-      adr != NULL ? (hash->norm_host ? jump_normalized_const(adr)
-                                     : jump_identification_const(adr))
+  char BIGSTK aliasbuf[HTS_URLMAXSIZE * 2];
+  const char *const adr_canon =
+      adr != NULL ? key_host_alias(hash, adr, aliasbuf, sizeof(aliasbuf))
                   : NULL;
+  const char *const adr_norm =
+      adr_canon != NULL
+          ? (hash->norm_host ? jump_normalized_const(adr_canon)
+                             : jump_identification_const(adr_canon))
+          : NULL;
 
   // copy address
   assertf(adr_norm != NULL);
@@ -120,8 +134,8 @@ static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
   {
     /* resolve the per-URL strip keys; strip applies even when urlhack is off */
     char BIGSTK keybuf[HTS_URLMAXSIZE];
-    const char *const keys = hts_query_strip_keys(hash->strip_query, adr, fil,
-                                                  keybuf, sizeof(keybuf));
+    const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
+                                                  fil, keybuf, sizeof(keybuf));
 
     if (hash->norm_slash || hash->norm_query || keys != NULL) {
       fil_normalized_filtered_ex(fil, &hash->normfil[strlen(hash->normfil)],
@@ -147,6 +161,8 @@ static int key_adrfil_equals_generic(void *arg,
   const char *const b_adr = !former ? b->adr : b->former_adr;
   const char *const a_fil = !former ? a->fil : a->former_fil;
   const char *const b_fil = !former ? b->fil : b->former_fil;
+  char BIGSTK a_aliasbuf[HTS_URLMAXSIZE * 2], b_aliasbuf[HTS_URLMAXSIZE * 2];
+  const char *a_canon, *b_canon;
   const char *ja;
   const char *jb;
 
@@ -156,11 +172,14 @@ static int key_adrfil_equals_generic(void *arg,
   assertf(a_fil != NULL);
   assertf(b_fil != NULL);
 
+  a_canon = key_host_alias(hash, a_adr, a_aliasbuf, sizeof(a_aliasbuf));
+  b_canon = key_host_alias(hash, b_adr, b_aliasbuf, sizeof(b_aliasbuf));
+
   // skip scheme and authentication to the domain (possibly without www.)
-  ja = hash->norm_host ? jump_normalized_const(a_adr)
-                       : jump_identification_const(a_adr);
-  jb = hash->norm_host ? jump_normalized_const(b_adr)
-                       : jump_identification_const(b_adr);
+  ja = hash->norm_host ? jump_normalized_const(a_canon)
+                       : jump_identification_const(a_canon);
+  jb = hash->norm_host ? jump_normalized_const(b_canon)
+                       : jump_identification_const(b_canon);
   assertf(ja != NULL);
   assertf(jb != NULL);
   if (strcasecmp(ja, jb) != 0) {
@@ -171,9 +190,9 @@ static int key_adrfil_equals_generic(void *arg,
   {
     char BIGSTK ka[HTS_URLMAXSIZE], kb[HTS_URLMAXSIZE];
     const char *const keysa =
-        hts_query_strip_keys(hash->strip_query, a_adr, a_fil, ka, sizeof(ka));
+        hts_query_strip_keys(hash->strip_query, a_canon, a_fil, ka, sizeof(ka));
     const char *const keysb =
-        hts_query_strip_keys(hash->strip_query, b_adr, b_fil, kb, sizeof(kb));
+        hts_query_strip_keys(hash->strip_query, b_canon, b_fil, kb, sizeof(kb));
 
     if (hash->norm_slash || hash->norm_query || keysa != NULL ||
         keysb != NULL) {
@@ -251,6 +270,8 @@ void hash_init(httrackp *opt, hash_struct *hash, hts_boolean normalized) {
   /* snapshot the query-strip list (not owned; valid for the hash lifetime) */
   hash->strip_query =
       StringNotEmpty(opt->strip_query) ? StringBuff(opt->strip_query) : NULL;
+  /* same for the host-alias rules: they apply whatever urlhack says */
+  hash->host_alias = hts_host_alias_rules(opt);
 
   hts_set_hash_handler(hash->sav, opt);
   hts_set_hash_handler(hash->adrfil, opt);

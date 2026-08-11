@@ -17,6 +17,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c a
 	server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \
+	server-root/hostalias/index.html server-root/hostalias/a.html \
 	server-root/fraglink/index.html server-root/fraglink/target.html \
 	fixtures/cache-golden/hts-cache/new.zip \
 	install-manifest.txt

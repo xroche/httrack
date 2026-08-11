@@ -3453,6 +3453,137 @@ static int st_urlhack(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* --host-alias (#16): rule resolution, and the dedup key it feeds. */
+static int st_hostalias(httrackp *opt, int argc, char **argv) {
+  char dest[HTS_URLMAXSIZE * 2];
+  /* two rules, three aliases of a.com */
+  static const char *const rules = "b.com=a.com\nc.com,d.com=a.com";
+
+  (void) argc;
+  (void) argv;
+
+  /* nothing declared, or nothing matching: the host is left alone */
+  assertf(hts_host_alias(NULL, "b.com", dest, sizeof(dest)) == NULL);
+  assertf(hts_host_alias("", "b.com", dest, sizeof(dest)) == NULL);
+  assertf(hts_host_alias(rules, "other.com", dest, sizeof(dest)) == NULL);
+  /* a rule mapping a host to itself is a no-op, not a rewrite */
+  assertf(hts_host_alias("a.com=a.com", "a.com", dest, sizeof(dest)) == NULL);
+
+  /* exact, comma-list and glob aliases */
+  assertf(strcmp(hts_host_alias(rules, "b.com", dest, sizeof(dest)), "a.com") ==
+          0);
+  assertf(strcmp(hts_host_alias(rules, "d.com", dest, sizeof(dest)), "a.com") ==
+          0);
+  assertf(strcmp(hts_host_alias("*.cdn.b.com=a.com", "img.cdn.b.com", dest,
+                                sizeof(dest)),
+                 "a.com") == 0);
+  /* hosts compare case-insensitively, like the filters */
+  assertf(strcmp(hts_host_alias(rules, "B.CoM", dest, sizeof(dest)), "a.com") ==
+          0);
+  /* the port is part of the matched host */
+  assertf(strcmp(hts_host_alias("b.com:8080=a.com:80", "b.com:8080", dest,
+                                sizeof(dest)),
+                 "a.com:80") == 0);
+  assertf(hts_host_alias("b.com:8080=a.com", "b.com", dest, sizeof(dest)) ==
+          NULL);
+  /* last match wins */
+  assertf(strcmp(hts_host_alias("b.com=a.com\nb.com=z.com", "b.com", dest,
+                                sizeof(dest)),
+                 "z.com") == 0);
+  /* an aliased host keeps deduping with its www. forms (-%u would key those
+     onto the bare host, i.e. away from the canonical one) */
+  assertf(strcmp(hts_host_alias(rules, "www.b.com", dest, sizeof(dest)),
+                 "a.com") == 0);
+  assertf(strcmp(hts_host_alias(rules, "www-42.b.com", dest, sizeof(dest)),
+                 "a.com") == 0);
+
+  /* scheme and credentials survive, only the host is replaced */
+  assertf(strcmp(hts_host_alias(rules, "https://b.com", dest, sizeof(dest)),
+                 "https://a.com") == 0);
+  assertf(
+      strcmp(hts_host_alias(rules, "http://user:pw@b.com", dest, sizeof(dest)),
+             "http://user:pw@a.com") == 0);
+
+  /* engine pseudo-hosts survive a catch-all rule */
+  assertf(hts_host_alias("*=a.com", "primary", dest, sizeof(dest)) == NULL);
+  assertf(hts_host_alias("*=a.com", "file://", dest, sizeof(dest)) == NULL);
+  assertf(hts_host_alias("*=a.com", "", dest, sizeof(dest)) == NULL);
+  /* control: the catch-all does rewrite a real host */
+  assertf(strcmp(hts_host_alias("*=a.com", "b.com", dest, sizeof(dest)),
+                 "a.com") == 0);
+
+  /* one pass only: "a=b" plus "b=c" keys a as b, and the chain is reported */
+  {
+    static const char *const chain = "a.com=b.com\nb.com=c.com";
+    char chained[HTS_URLMAXSIZE * 2];
+
+    assertf(strcmp(hts_host_alias(chain, "a.com", dest, sizeof(dest)),
+                   "b.com") == 0);
+    assertf(strcmp(hts_host_alias_chained(chain, chained, sizeof(chained)),
+                   "b.com") == 0);
+    assertf(hts_host_alias_chained(rules, chained, sizeof(chained)) == NULL);
+  }
+
+  /* a canonical host that would not fit leaves the URL alone: never a
+     truncated (and therefore wrong) hostname */
+  {
+    char small[5]; /* "a.com" needs 6 with its terminator */
+
+    assertf(hts_host_alias(rules, "b.com", small, sizeof(small)) == NULL);
+    assertf(hts_host_alias(rules, "https://b.com", small, sizeof(small)) ==
+            NULL);
+    /* control: one more byte and it fits */
+    assertf(strcmp(hts_host_alias(rules, "b.com", dest, 6), "a.com") == 0);
+  }
+
+  /* malformed rules are ignored... */
+  assertf(hts_host_alias("b.com", "b.com", dest, sizeof(dest)) == NULL);
+  assertf(hts_host_alias("=a.com", "b.com", dest, sizeof(dest)) == NULL);
+  assertf(hts_host_alias("b.com=", "b.com", dest, sizeof(dest)) == NULL);
+  /* ...and the command line refuses them up front */
+  assertf(hts_host_alias_rule_ok("b.com,c.com=a.com"));
+  assertf(hts_host_alias_rule_ok("*.b.com=a.com:8080"));
+  assertf(!hts_host_alias_rule_ok(NULL));
+  assertf(!hts_host_alias_rule_ok("b.com"));
+  assertf(!hts_host_alias_rule_ok("=a.com"));
+  assertf(!hts_host_alias_rule_ok("b.com="));
+  assertf(!hts_host_alias_rule_ok("b.com=a.com,z.com"));
+  assertf(!hts_host_alias_rule_ok("b.com=*.a.com"));
+  assertf(!hts_host_alias_rule_ok("b.com=http://a.com/"));
+
+  /* the same-address test the wizard uses to decide scope */
+  assertf(hts_host_same_alias(rules, "b.com", "a.com"));
+  assertf(hts_host_same_alias(rules, "https://b.com", "http://a.com"));
+  assertf(
+      hts_host_same_alias(rules, "b.com", "d.com")); /* two aliases of one */
+  assertf(!hts_host_same_alias(rules, "b.com", "other.com"));
+  assertf(!hts_host_same_alias(rules, "other.com", "elsewhere.com"));
+  /* no rules: the caller's own exact compare decides, not this one */
+  assertf(!hts_host_same_alias(NULL, "b.com", "b.com"));
+
+  /* The dedup key itself: aliases collapse whatever the url hacks say, so
+     --host-alias never silently no-ops under -%u0. */
+  StringCopy(opt->host_alias, rules);
+#define EQ(aa, fa, ab, fb) hash_url_equals(opt, aa, fa, ab, fb)
+  opt->urlhack = HTS_TRUE;
+  opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
+  assertf(EQ("b.com", "/x", "a.com", "/x"));
+  assertf(EQ("b.com", "/x", "d.com", "/x"));
+  assertf(EQ("www.b.com", "/x", "a.com", "/x"));
+  assertf(!EQ("b.com", "/x", "a.com", "/y"));
+  assertf(!EQ("other.com", "/x", "a.com", "/x"));
+  opt->urlhack = HTS_FALSE;
+  assertf(EQ("b.com", "/x", "a.com", "/x"));
+  assertf(EQ("www.b.com", "/x", "a.com", "/x"));
+  assertf(!EQ("other.com", "/x", "a.com", "/x"));
+  opt->urlhack = HTS_TRUE;
+#undef EQ
+  StringCopy(opt->host_alias, "");
+
+  printf("host-alias self-test OK\n");
+  return 0;
+}
+
 /* Prints the filter answer <n> emits for (adr, fil) [up]; with no arguments,
    asserts every answer against its expected pattern (#1119). */
 static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
@@ -9021,6 +9152,7 @@ static const struct selftest_entry {
      st_stripquery},
     {"urlhack", "", "-%u url-hack sub-flag (www/slash/query) self-test",
      st_urlhack},
+    {"hostalias", "", "--host-alias hostname folding self-test", st_hostalias},
     {"redirect-samefile", "", "same-file redirect detection self-test (#159)",
      st_redirect_samefile},
     {"wizardfilter", "[<answer> <adr> <fil> [up]]",

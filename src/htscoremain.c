@@ -1854,6 +1854,31 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   StringCat(opt->strip_query, argv[na]);
                 }
                 break;
+
+              case 'C': // host-alias: accumulate "alias[,alias...]=host" rules
+                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                  HTS_PANIC_PRINTF("Option host-alias needs a blank space and "
+                                   "alias[,alias...]=canonical-host");
+                  printf("Example: --host-alias "
+                         "\"www2.example.com,m.example.com=example.com\"\n");
+                  htsmain_free();
+                  return -1;
+                } else {
+                  na++;
+                  if (!hts_host_alias_rule_ok(argv[na])) {
+                    HTS_PANIC_PRINTF("Invalid host-alias rule: expected "
+                                     "alias[,alias...]=canonical-host");
+                    printf("Rejected: %s\n", argv[na]);
+                    printf("The '=' takes a single literal host, no glob and "
+                           "no path\n");
+                    htsmain_free();
+                    return -1;
+                  }
+                  if (StringNotEmpty(opt->host_alias))
+                    StringCat(opt->host_alias, "\n");
+                  StringCat(opt->host_alias, argv[na]);
+                }
+                break;
               case 'K': // cookies-file: extra Netscape cookies.txt to preload
                 if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
                   HTS_PANIC_PRINTF(
@@ -2808,6 +2833,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     } else {
       hts_log_print(opt, LOG_WARNING,
                     "* security warning: !!! BYPASSING SECURITY LIMITS - MONITOR THIS SESSION WITH EXTREME CARE !!!");
+    }
+
+    /* A chained --host-alias keys each host under the next one, so the names
+       the user meant to merge never dedup together. */
+    {
+      char BIGSTK chained[HTS_URLMAXSIZE * 2];
+
+      if (hts_host_alias_chained(hts_host_alias_rules(opt), chained,
+                                 sizeof(chained)) != NULL) {
+        hts_log_print(
+            opt, LOG_WARNING,
+            "* host-alias '%s' is both a canonical host and an alias: "
+            "chained rules do not merge, point them all at one host",
+            chained);
+      }
     }
 
     /* Info for wrappers */

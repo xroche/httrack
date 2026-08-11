@@ -3692,6 +3692,153 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
   return result;
 }
 
+/* see htscore.h */
+const char *hts_host_alias_rules(httrackp *opt) {
+  return StringNotEmpty(opt->host_alias) ? StringBuff(opt->host_alias) : NULL;
+}
+
+/* Last rule of RULES whose alias list matches HOST (strjoker, last wins as in
+   the +/- filter list): its canonical host, of length *CANONLEN, or NULL. */
+static const char *hts_host_alias_match(const char *rules, const char *host,
+                                        size_t *canonlen) {
+  const char *p;
+  const char *canon = NULL;
+
+  /* Walk the '\n' entries "alias[,alias...]=canonical" */
+  for (p = rules; *p != '\0';) {
+    const char *const line = p;
+    const char *eol, *eq, *pat;
+
+    while (*p != '\0' && *p != '\n')
+      p++;
+    eol = p;
+    if (*p == '\n')
+      p++;
+    eq = memchr(line, '=', (size_t) (eol - line));
+    if (eq == NULL || eq == line || eq + 1 == eol)
+      continue; /* not "alias=canonical" */
+    for (pat = line; pat < eq;) {
+      const char *const sep = memchr(pat, ',', (size_t) (eq - pat));
+      const char *const end = sep != NULL ? sep : eq;
+      const size_t len = (size_t) (end - pat);
+      char BIGSTK glob[HTS_URLMAXSIZE * 2];
+
+      if (len < sizeof(glob)) {
+        memcpy(glob, pat, len);
+        glob[len] = '\0';
+        if (strjoker(host, glob, NULL, NULL) != NULL) {
+          canon = eq + 1;
+          *canonlen = (size_t) (eol - canon);
+          break;
+        }
+      }
+      pat = end + 1;
+    }
+  }
+  return canon;
+}
+
+/* see htscore.h */
+const char *hts_host_alias(const char *rules, const char *adr, char *dest,
+                           size_t destsize) {
+  const char *host, *canon;
+  size_t prefixlen, canonlen = 0;
+
+  if (rules == NULL || *rules == '\0' || adr == NULL || destsize == 0)
+    return NULL;
+  /* engine pseudo-hosts: a "*=host" rule must not swallow them */
+  if (adr[0] == '\0' || strcmp(adr, "primary") == 0 ||
+      strcmp(adr, "file://") == 0)
+    return NULL;
+  host = jump_identification_const(adr);
+  canon = hts_host_alias_match(rules, host, &canonlen);
+  if (canon == NULL) {
+    /* A rule naming the bare host also catches its www. forms: those collapse
+       onto that host under -%u, and would otherwise key apart from its
+       canonical one. */
+    const char *const bare = jump_normalized_const(host);
+
+    if (bare != host)
+      canon = hts_host_alias_match(rules, bare, &canonlen);
+  }
+  if (canon == NULL)
+    return NULL;
+
+  /* keep the scheme and any credentials, replace the host */
+  prefixlen = (size_t) (host - adr);
+  if (prefixlen >= destsize || canonlen >= destsize - prefixlen)
+    return NULL; /* would not fit: leave the URL alone */
+  memcpy(dest, adr, prefixlen);
+  memcpy(dest + prefixlen, canon, canonlen);
+  dest[prefixlen + canonlen] = '\0';
+  /* a rule matching its own target maps to itself: keep the fast path */
+  return strcasecmp(dest, adr) != 0 ? dest : NULL;
+}
+
+/* see htscore.h */
+hts_boolean hts_host_same_alias(const char *rules, const char *adra,
+                                const char *adrb) {
+  char BIGSTK ca[HTS_URLMAXSIZE * 2], cb[HTS_URLMAXSIZE * 2];
+  const char *a, *b;
+
+  if (rules == NULL || *rules == '\0' || adra == NULL || adrb == NULL)
+    return HTS_FALSE;
+  a = hts_host_alias(rules, adra, ca, sizeof(ca));
+  b = hts_host_alias(rules, adrb, cb, sizeof(cb));
+  if (a == NULL && b == NULL)
+    return HTS_FALSE; /* neither is aliased: the caller's own test */
+  return strcasecmp(jump_identification_const(a != NULL ? a : adra),
+                    jump_identification_const(b != NULL ? b : adrb)) == 0
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* see htscore.h */
+hts_boolean hts_host_alias_rule_ok(const char *rule) {
+  const char *const eq = rule != NULL ? strchr(rule, '=') : NULL;
+
+  return eq != NULL && eq != rule && eq[1] != '\0' &&
+                 strpbrk(eq + 1, "=,*?[]()/") == NULL
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
+/* see htscore.h */
+const char *hts_host_alias_chained(const char *rules, char *dest,
+                                   size_t destsize) {
+  const char *p;
+
+  if (rules == NULL || destsize == 0)
+    return NULL;
+  for (p = rules; *p != '\0';) {
+    const char *const line = p;
+    const char *eol, *eq;
+
+    while (*p != '\0' && *p != '\n')
+      p++;
+    eol = p;
+    if (*p == '\n')
+      p++;
+    eq = memchr(line, '=', (size_t) (eol - line));
+    if (eq == NULL || eq + 1 == eol)
+      continue;
+    {
+      const size_t len = (size_t) (eol - eq - 1);
+      char BIGSTK canon[HTS_URLMAXSIZE * 2], tmp[HTS_URLMAXSIZE * 2];
+
+      if (len >= sizeof(canon))
+        continue;
+      memcpy(canon, eq + 1, len);
+      canon[len] = '\0';
+      if (hts_host_alias(rules, canon, tmp, sizeof(tmp)) != NULL) {
+        strlcpybuff(dest, canon, destsize);
+        return dest;
+      }
+    }
+  }
+  return NULL;
+}
+
 #define endwith(a) ( (len >= (sizeof(a)-1)) ? ( strncmp(dest, a+len-(sizeof(a)-1), sizeof(a)-1) == 0 ) : 0 );
 HTSEXT_API char *adr_normalized_sized(const char *source, char *dest,
                                       size_t destsize) {
@@ -6078,6 +6225,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->no_query_dedup = HTS_FALSE;
   StringCopy(opt->footer, HTS_DEFAULT_FOOTER);
   StringCopy(opt->strip_query, "");
+  StringCopy(opt->host_alias, "");
   StringCopy(opt->cookies_file, "");
   StringCopy(opt->warc_file, "");
   StringCopy(opt->sitemap_url, "");
@@ -6239,6 +6387,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->footer);
     StringFree(opt->mod_blacklist);
     StringFree(opt->strip_query);
+    StringFree(opt->host_alias);
     StringFree(opt->cookies_file);
     StringFree(opt->why_url);
     StringFree(opt->warc_file);

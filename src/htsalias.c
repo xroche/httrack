@@ -112,6 +112,8 @@ const char *hts_optalias[][4] = {
   {"include-query-string", "-%q", "single", ""},
   {"strip-query", "-%g", "param1",
    "strip [host/pattern=]key1,key2,... from URLs"},
+  {"host-alias", "-%C", "param1",
+   "fold other hostnames of one site onto it (alias[,alias...]=canonical)"},
   {"cookies-file", "-%K", "param1",
    "load extra cookies from a Netscape cookies.txt"},
   {"changes", "-%d", "single",

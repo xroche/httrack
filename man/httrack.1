@@ -48,6 +48,7 @@ httrack \- offline browser : copy websites to a local directory
 [ \fB\-%x, \-\-disable\-passwords\fR ]
 [ \fB\-%q, \-\-include\-query\-string\fR ]
 [ \fB\-%g, \-\-strip\-query\fR ]
+[ \fB\-%C, \-\-host\-alias\fR ]
 [ \fB\-o, \-\-generate\-errors\fR ]
 [ \fB\-X, \-\-purge\-old[=N]\fR ]
 [ \fB\-%p, \-\-preserve\fR ]
@@ -219,6 +220,8 @@ do not include any password for external password protected websites (%x0 includ
 *include query string for local files (useless, for information purpose only) (%q0 don't include) (\-\-include\-query\-string)
 .IP \-%g
 strip query keys for dedup ([host/pattern=]key1,key2,...) (\-\-strip\-query <param>)
+.IP \-%C
+fold other hostnames of one site onto it (alias[,alias...]=canonical) (\-\-host\-alias <param>)
 .IP \-o
 *save the server's error pages (404..) (o0 discard them) (\-\-generate\-errors)
 .IP \-X

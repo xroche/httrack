@@ -7,7 +7,7 @@
 # audits the mirror. The server is always killed and the tmpdir removed on exit.
 #
 # The token BASEURL in any httrack argument is replaced with the discovered
-# http(s)://127.0.0.1:$PORT base. --found/--directory paths are relative to the
+# http(s)://127.0.0.1:$PORT base, and BASEHOST with the bare 127.0.0.1:$PORT. --found/--directory paths are relative to the
 # discovered host root (127.0.0.1_<port>/), since the random port leaks into
 # the mirror directory name.
 #
@@ -242,10 +242,11 @@ port=$SRV_PORT
 baseurl=$BASEURL
 debug "server listening on $baseurl"
 
-# --- substitute BASEURL in the remaining (httrack) args ----------------------
+# --- substitute BASEURL/BASEHOST in the remaining (httrack) args -------------
 declare -a hts=()
 while test "$pos" -lt "$nargs"; do
-    hts+=("${args[$pos]//BASEURL/$baseurl}")
+    arg="${args[$pos]//BASEURL/$baseurl}"
+    hts+=("${arg//BASEHOST/127.0.0.1:$port}")
     pos=$((pos + 1))
 done
 

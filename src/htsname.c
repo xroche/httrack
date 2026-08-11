@@ -352,7 +352,13 @@ int url_savename(lien_adrfilsave *const afs,
   /* */
   char BIGSTK fil[HTS_URLMAXSIZE * 2];       /* ="" */
 
-  const char *const adr_complete = afs->af.adr;
+  /* --host-alias: the canonical host decides the dedup key AND the saved
+     directory, so a mirror lands in one tree whichever name was seen first */
+  char BIGSTK aliasadr_[HTS_URLMAXSIZE * 2];
+  const char *const alias_complete = hts_host_alias(
+      hts_host_alias_rules(opt), afs->af.adr, aliasadr_, sizeof(aliasadr_));
+  const char *const adr_complete =
+      alias_complete != NULL ? alias_complete : afs->af.adr;
   const char *const fil_complete = afs->af.fil;
 
   /*char BIGSTK normadr_[HTS_URLMAXSIZE*2]; */

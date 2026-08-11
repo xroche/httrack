@@ -94,7 +94,8 @@ offline browser : copy websites to a local directory</p>
 --long-names[=N]</b> ] [ <b>-KN, --keep-links[=N]</b> ] [
 <b>-x, --replace-external</b> ] [ <b>-%x,
 --disable-passwords</b> ] [ <b>-%q,
---include-query-string</b> ] [ <b>-%g, --strip-query</b> ] [
+--include-query-string</b> ] [ <b>-%g, --strip-query</b> ] [ <b>-%C,
+--host-alias</b> ] [
 <b>-o, --generate-errors</b> ] [ <b>-X, --purge-old[=N]</b>
 ] [ <b>-%p, --preserve</b> ] [ <b>-%T, --utf8-conversion</b>
 ] [ <b>-bN, --cookies[=N]</b> ] [ <b>-%K, --cookies-file</b>
@@ -766,6 +767,19 @@ information purpose only) (%q0 don&rsquo;t include)
 
 <p>strip query keys for dedup
 ([host/pattern=]key1,key2,...) (--strip-query
+&lt;param&gt;)</p> </td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="4%">
+
+
+<p>-%C</p></td>
+<td width="5%"></td>
+<td width="82%">
+
+
+<p>fold other hostnames of one site onto it
+(alias[,alias...]=canonical) (--host-alias
 &lt;param&gt;)</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>

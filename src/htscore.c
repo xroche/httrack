@@ -387,11 +387,19 @@ static int hts_record_link_(httrackp * opt,
                             const char *address, const char *file, const char *save,
                             const char *ref_address, const char *ref_file,
                             const char *codebase) {
+  // --host-alias: crawl the canonical host, so one name reaches the wire, the
+  // cache and the archive whichever alias linked here (the referrer is kept)
+  char BIGSTK canonadr[HTS_URLMAXSIZE * 2];
+  const char *const canon = hts_host_alias(hts_host_alias_rules(opt), address,
+                                           canonadr, sizeof(canonadr));
   // create a new entry
   const size_t lien_tot = hts_record_link_alloc(opt);
   lien_url*const link = lien_tot != (size_t) -1 ? opt->liens[lien_tot] : NULL;
   if (link == NULL) {
     return 0;
+  }
+  if (canon != NULL) {
+    address = canon;
   }
 
   // record string fields
@@ -3734,6 +3742,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->strip_query))
     StringCopyS(to->strip_query, from->strip_query);
+
+  if (StringNotEmpty(from->host_alias))
+    StringCopyS(to->host_alias, from->host_alias);
 
   if (StringNotEmpty(from->cookies_file))
     StringCopyS(to->cookies_file, from->cookies_file);

@@ -240,6 +240,8 @@ struct hash_struct {
   hts_boolean norm_query;
   /* query-strip keys (not owned); set from opt->strip_query at hash_init */
   const char *strip_query;
+  /* host-alias rules (not owned); set from opt->host_alias at hash_init */
+  const char *host_alias;
   char normfil[HTS_URLMAXSIZE * 2];
   char normfil2[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
@@ -403,6 +405,32 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
    strjoker, last wins); NULL if none match. Feeds fil_normalized_filtered(). */
 const char *hts_query_strip_keys(const char *rules, const char *adr,
                                  const char *fil, char *dest, size_t destsize);
+
+/* The --host-alias rules of OPT, or NULL when the option was not given. */
+const char *hts_host_alias_rules(httrackp *opt);
+
+/* ADR with its host replaced by the canonical one, from the '\n'-separated
+   "alias[,alias...]=canonical" RULES (aliases matched with strjoker, last
+   wins); NULL when no rule applies, the mapping is a no-op, or the result would
+   not fit DEST. Scheme and credentials are kept; the "primary"/"file://"
+   pseudo-hosts are never aliased. Single pass: a canonical host is not itself
+   re-aliased. */
+const char *hts_host_alias(const char *rules, const char *adr, char *dest,
+                           size_t destsize);
+
+/* HTS_TRUE if ADRA and ADRB name the same host once RULES are applied. */
+hts_boolean hts_host_same_alias(const char *rules, const char *adra,
+                                const char *adrb);
+
+/* HTS_TRUE if RULE is a well-formed "alias[,alias...]=canonical" line: one
+   literal canonical host (no glob, no comma, no path or scheme). */
+hts_boolean hts_host_alias_rule_ok(const char *rule);
+
+/* First canonical host in RULES that is itself aliased by RULES, copied into
+   DEST, or NULL if there is none. Such a chain ("a=b" plus "b=c") keys a as b
+   and b as c, so the hosts the user meant to merge never dedup together. */
+const char *hts_host_alias_chained(const char *rules, char *dest,
+                                   size_t destsize);
 
 /* Read a whole file into a freshly malloc'd, NUL-terminated buffer; the caller
    owns it and must release it with freet(). Return NULL on missing/unreadable
