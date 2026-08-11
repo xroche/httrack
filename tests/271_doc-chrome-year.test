@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# --check tolerates a footer year older than the generator's, and nothing else
+# reaches that branch: the tree ships the year it was generated in, so the
+# comparison only diverges once a New Year has rolled the generator forward.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+chrome_src="${srcdir}/tools/doc-chrome.py"
+
+command -v python3 >/dev/null 2>&1 || skip "no python3"
+test -r "${chrome_src}" || skip "no ${chrome_src}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/docyear.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+cleanup_push rm -rf "${work}"
+
+# doc-chrome.py finds html/ relative to its own path, so it needs both trees.
+cp -a "${srcdir}/tools" "${srcdir}/html" "${work}/"
+chrome="${work}/tools/doc-chrome.py"
+page="${work}/html/index.html"
+
+later=2027
+epoch=$(python3 -c \
+    "import datetime;print(int(datetime.datetime(${later},7,1,tzinfo=datetime.timezone.utc).timestamp()))")
+
+shipped=$(grep -o '&copy; 1998-[0-9]\{4\}' "${page}" | head -1 | grep -o '[0-9]\{4\}$')
+test -n "${shipped}" || fail "no footer copyright year in ${page}"
+# Everything below compares the two, so an equal pair would pass vacuously.
+test "${shipped}" -ne "${later}" || fail "tree already ships ${later}"
+
+pristine="${work}/pristine"
+cp -a "${work}/html" "${pristine}"
+restore() { rm -rf "${work}/html" && cp -a "${pristine}" "${work}/html"; }
+
+# The assertion this test exists for: a lagging year is in sync.
+SOURCE_DATE_EPOCH="${epoch}" python3 "${chrome}" --check >/dev/null 2>&1 ||
+    fail "--check rejects a footer year of ${shipped} when the generator is at ${later}"
+
+# A drifted footer must still fail, or the line above passes for the wrong reason.
+python3 - "${page}" <<'EOF'
+import re, sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+out = re.sub(r'\n\t<a href="https://endsoftwarepatents[^\n]*\n', "\n", text)
+assert out != text, "chicklet anchor not found"
+open(path, "w", encoding="utf-8").write(out)
+EOF
+if SOURCE_DATE_EPOCH="${epoch}" python3 "${chrome}" --check >/dev/null 2>&1; then
+    fail "--check accepts a footer missing its chicklet"
+fi
+restore
+
+# The mask is [0-9], not \d, which also matches Arabic-Indic and fullwidth digits.
+python3 - "${page}" <<'EOF'
+import sys
+path = sys.argv[1]
+text = open(path, encoding="utf-8").read()
+out = text.replace("1998-2026", "1998-٢٠٢٦", 1)
+assert out != text, "no footer year to replace"
+open(path, "w", encoding="utf-8").write(out)
+EOF
+if SOURCE_DATE_EPOCH="${epoch}" python3 "${chrome}" --check >/dev/null 2>&1; then
+    fail "--check accepts non-ASCII digits in the footer year"
+fi
+restore
+
+# SOURCE_DATE_EPOCH has to reach the stamp, or every check above is vacuous.
+SOURCE_DATE_EPOCH="${epoch}" python3 "${chrome}" >/dev/null 2>&1 ||
+    fail "regeneration under SOURCE_DATE_EPOCH failed"
+grep -q "&copy; 1998-${later} " "${page}" ||
+    fail "SOURCE_DATE_EPOCH=${epoch} did not stamp ${later} into the footer"
+
+# The tolerance is symmetric: today's generator accepts the ${later} tree.
+python3 "${chrome}" --check >/dev/null 2>&1 ||
+    fail "--check rejects a footer year of ${later} when the generator is older"
+
+echo "doc chrome year: ${shipped} and ${later} interchange, drift still caught"

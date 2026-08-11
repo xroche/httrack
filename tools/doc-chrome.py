@@ -12,6 +12,7 @@ doc.css; --convert adds them to a page still using the 2007 table layout.
 """
 
 import argparse
+import datetime
 import os
 import re
 import sys
@@ -100,12 +101,21 @@ DESCRIPTIONS = {
     "scripting.html": "Driving the httrack command-line program from shell and" " batch scripts.",
 }
 
-# Year left static: --check diffs the regenerated chrome against the shipped
-# bytes, so a computed one would red CI every 1st of January.
+# Pinned by SOURCE_DATE_EPOCH when set, as man/makeman.sh does, so a test can ask
+# for another year.
+_EPOCH = os.environ.get("SOURCE_DATE_EPOCH")
+YEAR = (
+    datetime.datetime.fromtimestamp(int(_EPOCH), datetime.timezone.utc).year
+    if _EPOCH
+    else datetime.date.today().year
+)
+
+# Stamped at regeneration time; --check masks the year, so a page shipped in an
+# earlier year still matches.
 FOOTER = [
     "<footer>",
-    "\t<small>&copy; 1998-2026 Xavier Roche &amp; other contributors"
-    " - Web Design: Leto Kauler.</small>",
+    f"\t<small>&copy; 1998-{YEAR} Xavier Roche"
+    " &amp; other contributors - Web Design: Leto Kauler.</small>",
     # Local copy: an absolute src breaks the image offline and makes a network request.
     '\t<a href="https://endsoftwarepatents.org/innovating-without-patents/"'
     ' target="_blank" rel="noopener"'
@@ -140,6 +150,22 @@ def region(text, part, body):
     if not pattern.search(text):
         raise SystemExit(f"missing {open_} marker")
     return pattern.sub(open_ + "\n" + body.rstrip("\n") + "\n" + close, text, count=1)
+
+
+def mask_footer_year(text):
+    """The page with the footer's copyright year masked, for comparison only.
+
+    Scoped to the footer region so the mask cannot reach a 1998-YYYY elsewhere on
+    the page, such as contact.html's licence line.
+    """
+    open_, close = MARK["footer"]
+    pattern = re.compile(re.escape(open_) + ".*?" + re.escape(close), re.S)
+
+    def mask(match):
+        # [0-9], not \d: \d also matches Arabic-Indic and fullwidth digits.
+        return re.sub(r"1998-[0-9]{4}", "1998-YYYY", match.group(0))
+
+    return pattern.sub(mask, text, count=1)
 
 
 def slug(heading):
@@ -356,7 +382,10 @@ def main():
         if MARK["masthead"][0] not in (before if args.check else after):
             print(f"{page}: no {MARK['masthead'][0]} marker")
             stale += 1
+        # A rewrite restamps the year; --check tolerates the one already shipped.
         if after == before:
+            continue
+        if args.check and mask_footer_year(after) == mask_footer_year(before):
             continue
         if args.check:
             print(f"{page}: chrome is out of sync with tools/doc-chrome.py")
