@@ -39,6 +39,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htslib.h"
 
+#include <limits.h>
+
 #define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
 
 /*
@@ -526,6 +528,76 @@ const char *optalias_help(const char *token) {
     return NULL;
 }
 
+/* Largest slot count whose byte size can not wrap. */
+#define CMDL_MAX_SLOTS ((int) (INT_MAX / sizeof(char *)))
+
+/* Grow the slot array to hold at least count entries, leaving cmd unchanged
+   if it cannot. */
+static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
+  char **slots;
+  int capacity;
+
+  if (count <= cmd->capacity)
+    return HTS_TRUE;
+  if (count > CMDL_MAX_SLOTS) /* count alone: the product below can not wrap */
+    return HTS_FALSE;
+  /* double, so rebuilding an n-token command line stays amortized O(n) */
+  capacity =
+      cmd->capacity <= CMDL_MAX_SLOTS / 2 ? cmd->capacity * 2 : CMDL_MAX_SLOTS;
+  if (capacity < count)
+    capacity = count;
+  slots = (char **) realloct(cmd->argv, sizeof(char *) * (size_t) capacity);
+  if (slots == NULL)
+    return HTS_FALSE;
+  cmd->argv = slots;
+  cmd->capacity = capacity;
+  return HTS_TRUE;
+}
+
+hts_boolean cmdl_init(cmdl_argv *cmd, size_t blk_size, int slots) {
+  memset(cmd, 0, sizeof(*cmd));
+  cmd->blk = blk_size != 0 ? (char *) malloct(blk_size) : NULL;
+  if (cmd->blk == NULL || !cmdl_reserve(cmd, slots)) {
+    cmdl_free(cmd);
+    return HTS_FALSE;
+  }
+  cmd->blk_size = blk_size;
+  cmd->blk[0] = '\0';
+  return HTS_TRUE;
+}
+
+void cmdl_free(cmdl_argv *cmd) {
+  freet(cmd->blk);
+  freet(cmd->argv);
+  memset(cmd, 0, sizeof(*cmd));
+}
+
+/* Room left in the token block; 0 makes the bounded copy abort rather than
+   write past it. */
+static size_t cmdl_room(const cmdl_argv *cmd) {
+  return cmd->blk_used < cmd->blk_size ? cmd->blk_size - cmd->blk_used : 0;
+}
+
+hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
+  int i;
+
+  assertf(pos >= 0 && pos <= cmd->argc);
+  /* argc <= capacity <= CMDL_MAX_SLOTS holds here, so argc + 1 can not wrap */
+  if (!cmdl_reserve(cmd, cmd->argc + 1))
+    return HTS_FALSE;
+  for (i = cmd->argc; i > pos; i--)
+    cmd->argv[i] = cmd->argv[i - 1];
+  cmd->argv[pos] = cmd->blk + cmd->blk_used;
+  strlcpybuff(cmd->argv[pos], token, cmdl_room(cmd));
+  cmd->blk_used += strlen(cmd->argv[pos]) + 1;
+  cmd->argc++;
+  return HTS_TRUE;
+}
+
+hts_boolean cmdl_add(cmdl_argv *cmd, const char *token) {
+  return cmdl_ins(cmd, token, cmd->argc);
+}
+
 /* Include a file to the current command line */
 /* example:
   set sockets 8
@@ -534,8 +606,7 @@ const char *optalias_help(const char *token) {
   deny ad.*
 */
 /* Note: NOT utf-8 */
-int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
-                    size_t x_argvblk_size, int *x_ptr) {
+cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
   FILE *fp;
 
   fp = fopen(name, "rb");
@@ -601,35 +672,24 @@ int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
             if (!result) {
               printf("%s\n", return_error);
             } else {
-              int insert_after_argc;
-
-              /* Insert parameters BUT so that they can be in the same order */
-              /* temporary argc: Number of parameters after minus insert_after_argc */
-              insert_after_argc = (*argc) - insert_after;
-              cmdl_ins((tmp_argv[2]), insert_after_argc, (argv + insert_after),
-                       x_argvblk, x_argvblk_size, (*x_ptr));
-              *argc = insert_after_argc + insert_after;
-              insert_after++;
-              /* Second one */
-              if (return_argc > 1) {
-                insert_after_argc = (*argc) - insert_after;
-                cmdl_ins((tmp_argv[3]), insert_after_argc,
-                         (argv + insert_after), x_argvblk, x_argvblk_size,
-                         (*x_ptr));
-                *argc = insert_after_argc + insert_after;
-                insert_after++;
+              /* Insert the option and its parameter after the ones already
+                 inserted, so that the file order is preserved */
+              if (!cmdl_ins(cmd, tmp_argv[2], insert_after) ||
+                  (return_argc > 1 &&
+                   !cmdl_ins(cmd, tmp_argv[3], insert_after + 1))) {
+                fclose(fp);
+                return CMDL_FILE_NOMEM;
               }
-              /* increment to nbr of used parameters */
-              /* insert_after+=result; */
+              insert_after += return_argc > 1 ? 2 : 1;
             }
           }
         }
       }
     }
     fclose(fp);
-    return 1;
+    return CMDL_FILE_READ;
   }
-  return 0;
+  return CMDL_FILE_MISSING;
 }
 
 /* Get home directory, '.' if unset or empty */
