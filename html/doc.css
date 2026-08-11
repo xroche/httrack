@@ -121,10 +121,10 @@ body {
 }
 
 /* Colour inherited: nothing lighter than --ink reaches 4.5:1 on the --field
-   this sits on, and at .8em it is small text. */
+   this sits on, and at this size it is small text. */
+/* Mirrors site.css's .sitefooter: flush on the panel's black edge, chicklet at the far end. */
 footer {
 	max-width: 68rem;
-	/* No top margin and no prose leading: the line sits on the panel's black edge. */
 	margin: 0 auto;
 	font-size: .8em;
 	line-height: 1.3;

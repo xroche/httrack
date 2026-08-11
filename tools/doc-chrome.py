@@ -106,9 +106,10 @@ FOOTER = [
     "<footer>",
     "\t<small>&copy; 1998-2026 Xavier Roche &amp; other contributors"
     " - Web Design: Leto Kauler.</small>",
-    # Local copy: an absolute src would be a broken image offline, and a call home.
+    # Local copy: an absolute src breaks the image offline and makes a network request.
     '\t<a href="https://endsoftwarepatents.org/innovating-without-patents/"'
-    ' target="_blank" title="This site is innovating without patents!">'
+    ' target="_blank" rel="noopener"'
+    ' title="This site is innovating without patents!">'
     '<img src="images/esp_chicklet.png" width="91" height="17"'
     ' alt="End Software Patents"></a>',
     "</footer>",
@@ -336,13 +337,21 @@ def main():
                 stale += 1
             continue
         owned += 1
-        # Unlike the masthead, nested in top and re-emitted with it, the footer
-        # has no region to rewrite once its markers are gone.
-        if MARK["footer"][0] not in before:
-            print(f"{page}: no {MARK['footer'][0]} marker")
+        # region() rewrites the first pair only, so a second one would ship unchecked.
+        double = [
+            o for o, c in MARK.values() if before.count(o) > 1 or before.count(c) > 1
+        ]
+        if double:
+            print(f"{page}: duplicate {double[0]} marker")
             stale += 1
             continue
-        after = rewrite(path, before)
+        try:
+            after = rewrite(path, before)
+        except SystemExit as exc:
+            # Malformed markers, e.g. an unclosed region: name the page, keep going.
+            print(f"{page}: {exc}")
+            stale += 1
+            continue
         # Check the bytes that ship, not the regenerated form, which always has it.
         if MARK["masthead"][0] not in (before if args.check else after):
             print(f"{page}: no {MARK['masthead'][0]} marker")
