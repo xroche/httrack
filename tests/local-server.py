@@ -2153,6 +2153,22 @@ class Handler(SimpleHTTPRequestHandler):
     def route_trickle_index(self):
         self.send_bin_index()
 
+    # #1109: slow.html outlasts any small -E budget and is the only source of
+    # the leaf links, which a stopped parser then drops.
+    ABORTPURGE_SECONDS = 5
+
+    def route_abortpurge_index(self):
+        self.send_html('\t<a href="slow.html">slow</a>\n')
+
+    def route_abortpurge_slow(self):
+        time.sleep(self.ABORTPURGE_SECONDS)
+        self.send_html(
+            "".join('\t<a href="x%d.html">x%d</a>\n' % (i, i) for i in range(6))
+        )
+
+    def route_abortpurge_leaf(self):
+        self.send_html("\t<p>leaf</p>\n")
+
     # #97: a path long enough that the CLI in-progress column truncates it at 80
     # columns but not at 200. Its own index: /trickle/ is asserted on elsewhere.
     def route_deeptrickle_index(self):
@@ -2616,6 +2632,14 @@ class Handler(SimpleHTTPRequestHandler):
         "/cdispo/fetch.php": route_cdispo,
         "/cdispo/evil.php": route_cdispo,
         "/delayed/index.html": route_delayed_index,
+        "/abortpurge/index.html": route_abortpurge_index,
+        "/abortpurge/slow.html": route_abortpurge_slow,
+        "/abortpurge/x0.html": route_abortpurge_leaf,
+        "/abortpurge/x1.html": route_abortpurge_leaf,
+        "/abortpurge/x2.html": route_abortpurge_leaf,
+        "/abortpurge/x3.html": route_abortpurge_leaf,
+        "/abortpurge/x4.html": route_abortpurge_leaf,
+        "/abortpurge/x5.html": route_abortpurge_leaf,
         "/trickle/index.html": route_trickle_index,
         "/xssjob/": route_xssjob_index,
         "/xssjob/index.html": route_xssjob_index,

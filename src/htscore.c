@@ -2070,12 +2070,8 @@ int httpmirror(char *url1, httrackp * opt) {
         }
       }
     }
-    /* links left here means new.lst is only a partial view of the mirror */
-    const hts_boolean links_left = ptr < opt->lien_tot;
-
     // a-t-on dépassé le quota?
     if (!back_checkmirror(opt)) {
-      aborted = links_left;
       ptr = opt->lien_tot;
     } else if (opt->state.exit_xh) {    // sortir
       if (opt->state.exit_xh == 1) {
@@ -2083,10 +2079,13 @@ int httpmirror(char *url1, httrackp * opt) {
       } else {
         hts_log_print(opt, LOG_ERROR, "Exit requested by engine");
       }
-      aborted = links_left;
       ptr = opt->lien_tot;
     }
   } while(ptr < opt->lien_tot);
+
+  /* A stop request cuts the mirror short whether or not the loop ran out of
+     links: with one pending, the parser stops queueing the links it finds. */
+  aborted = opt->state.stop != 0 || opt->state.exit_xh != 0;
   //
   //
   //
