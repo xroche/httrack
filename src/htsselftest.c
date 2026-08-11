@@ -3406,9 +3406,9 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Expands the option words into the short form optalias_check() emits, joined
-   by a space when it returns two, or NULL when it refuses them. USED takes the
-   number of words consumed. */
+/* The short form optalias_check() emits for the option words, both joined by a
+   space when it returns two, or NULL when it refuses them; *used counts the
+   words consumed. */
 static const char *st_optalias_expand(char *dest, size_t dest_size,
                                       const char *word, const char *next,
                                       int *used) {
@@ -3421,7 +3421,7 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
 
   argv[0] = word;
   argv[1] = next;
-  out[0][0] = out[1][0] = '\0';
+  out[0][0] = out[1][0] = dest[0] = '\0';
   *used = optalias_check(argc, argv, 0, &outc, outv, sizeof(out[0]), error,
                          sizeof(error));
   if (*used == 0)
@@ -3442,6 +3442,15 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   int i, used;
 
   (void) opt;
+  /* -list feeds 282 the rows to try against the engine's own parser */
+  if (argc == 1 && strcmp(argv[0], "-list") == 0) {
+    for (i = 0; optalias_value(i)[0] != '\0'; i++) {
+      if (strcmp(opttype_value(i), "onoff") == 0 ||
+          strcmp(opttype_value(i), "level") == 0)
+        printf("%s %s\n", opttype_value(i), optalias_value(i));
+    }
+    return 0;
+  }
   if (argc >= 1) {
     const char *const out = st_optalias_expand(
         got, sizeof(got), argv[0], argc >= 2 ? argv[1] : NULL, &used);
@@ -3458,7 +3467,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
 #define REFUSES(word, next)                                                    \
   assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used) == NULL)
 
-  /* the value -I0 has always taken, now reachable from the long form */
+  /* -I0 has always disabled the index; now the long form can say it too */
   EXPANDS("-I0", "--index=0", NULL);
   EXPANDS("-I0", "--index=off", NULL);
   EXPANDS("-I0", "--noindex", NULL);
@@ -3504,19 +3513,19 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-P proxy:8080", "--proxy", "proxy:8080");
   EXPANDS("+*.gif", "--allow", "*.gif");
 
-  /* the invariant: the bare long form of every name still emits its short form
-     verbatim, and one that needs a separate parameter still demands one. A
-     duplicate name (test, continue) resolves to the first row holding it */
-  for (i = 0; hts_optalias[i][0][0] != '\0'; i++) {
-    const int p = optalias_find(hts_optalias[i][0]);
+  /* invariant: every name's bare long form still emits its short form, and a
+     param name still demands its own value. A duplicate name (test, continue)
+     resolves to its first row */
+  for (i = 0; optalias_value(i)[0] != '\0'; i++) {
+    const int p = optalias_find(optalias_value(i));
     char word[HTS_CDLMAXSIZE];
 
     assertf(p >= 0);
-    snprintf(word, sizeof(word), "--%s", hts_optalias[i][0]);
-    if (strncmp(hts_optalias[p][2], "param", 5) == 0) {
+    snprintf(word, sizeof(word), "--%s", optalias_value(i));
+    if (strncmp(opttype_value(p), "param", 5) == 0) {
       REFUSES(word, NULL);
     } else {
-      EXPANDS(hts_optalias[p][1], word, NULL);
+      EXPANDS(optreal_value(p), word, NULL);
       assertf(used == 1);
     }
   }
@@ -9576,7 +9585,7 @@ static const struct selftest_entry {
      st_stripquery},
     {"urlhack", "", "-%u url-hack sub-flag (www/slash/query) self-test",
      st_urlhack},
-    {"optalias", "[<option> [<value>]]",
+    {"optalias", "[-list | <option> [<value>]]",
      "long-option alias expansion (--index=0 and friends)", st_optalias},
     {"hostalias", "", "--host-alias hostname folding self-test", st_hostalias},
     {"hashkey-bounds", "", "dedup key holds a maximal host+path (#1160)",

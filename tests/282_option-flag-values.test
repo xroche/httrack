@@ -15,7 +15,7 @@ cleanup_push rm -rf "${tmp}"
 assert_selftest "optalias self-test OK" optalias
 
 # The engine end of it: the top index is <out>/index.html, next to the mirrored
-# tree. RC carries the exit status, INDEX whether the index was written.
+# tree, which lands under out/file/.
 echo '<html><body>hello</body></html>' >"${tmp}/page.html"
 crawl() {
     rm -rf "${tmp}/out"
@@ -44,16 +44,33 @@ indexed yes --index
 indexed yes --index=1
 indexed yes -I
 
-# A value the option cannot take stops the run instead of being dropped; 134
-# would be an abort, not a refusal.
-refused() { # refused ARG...
+# A value the option cannot take stops the run instead of being dropped. The
+# message has to name the reason, or a mangled flag the engine happens to reject
+# would read as a refusal; 134 would be an abort rather than either.
+refused() { # refused WANTED-MESSAGE ARG...
+    local want=$1
+    shift
     crawl "$@"
     { test "${RC}" -ne 0 && test "${RC}" -ne 134; } || fail "$* not refused (exit ${RC})"
+    grep -q "${want}" "${tmp}/out/.log" ||
+        fail "$* refused without saying why: $(cat "${tmp}/out/.log")"
 }
 
-refused --index=2
-refused --mirror=0
-refused --nomirror
+refused 'does not take the value' --index=2
+refused 'does not take the value' --mirror=0
+refused 'Unknown option: nomirror' --nomirror
+
+# Every option that now carries a value must emit a short form the engine parses
+# whole: a digit left over reaches "invalid option" and kills the run (#1200).
+# Only =0 is swept, since =1 is the bare flag for onoff and blocks for
+# --advanced-wait, and it is the suffix that is new to all of them.
+rows=$(httrack -O /dev/null "-#test=optalias" -list)
+test "$(grep -c . <<<"${rows}")" -ge 30 || fail "short value-option list: ${rows}"
+while read -r class name; do
+    crawl "--${name}=0"
+    ! grep -q 'invalid option' "${tmp}/out/.log" ||
+        fail "--${name}=0 (${class}) emits a short form the engine rejects"
+done <<<"${rows}"
 
 # The wizard end: a cleared box, and a project reload carrying Index=0, must
 # both emit the disabling form.
@@ -91,20 +108,25 @@ def command(fields):
     return m.group(1).split()
 
 
-# A checkbox posts nothing when cleared and "0" when a profile seeded it.
-for value in ("", "0"):
-    for field, off, on in (("index", "--index=0", "--index"),
-                           ("index2", "--search-index=0", "--search-index")):
-        cmd = command([(field, value)])
-        if off not in cmd:
-            print("FAIL: %s=%r does not emit %s" % (field, value, off))
-            rc = 1
-        if on in cmd:
-            print("FAIL: %s=%r emits the enabling %s" % (field, value, on))
-            rc = 1
-        if off in command([(field, "on")]):
-            print("FAIL: a ticked %s emits %s" % (field, off))
-            rc = 1
+def flags(cmd, name):
+    return [w for w in cmd if w == name or w.startswith(name + "=")]
+
+
+def check(field, value, want, name):
+    global rc
+    got = flags(command([(field, value)]), name)
+    if got != want:
+        print("FAIL: %s=%r emits %s, want %s" % (field, value, got, want))
+        rc = 1
+
+
+# A cleared checkbox posts nothing, and "0" is what a reloaded profile seeds.
+# The whole emitted set is asserted: a wrong value would pass a bare "in cmd".
+for field, name, ticked in (("index", "--index", []),
+                            ("index2", "--search-index", ["--search-index"])):
+    for value in ("", "0"):
+        check(field, value, [name + "=0"], name)
+    check(field, "on", ticked, name)
 
 sys.exit(rc)
 PY

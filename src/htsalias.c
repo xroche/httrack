@@ -281,8 +281,8 @@ const char *hts_optalias[][4] = {
 };
 /* clang-format on */
 
-/* Suffix the short form takes for VALUE ("0", "2", none), or NULL when this
-   class refuses it: an "onoff" flag reads 0/1 only, a "level" one a number. */
+/* Suffix the short form takes for a value ("0", "2", or none), or NULL when
+   the class refuses it: onoff reads 0/1 only, level reads a number. */
 static const char *optalias_suffix(const char *type, const char *value) {
   const hts_boolean level = strcmp(type, "level") == 0 ? HTS_TRUE : HTS_FALSE;
 
@@ -291,7 +291,7 @@ static const char *optalias_suffix(const char *type, const char *value) {
   if (level && isdigit((unsigned char) value[0])) {
     size_t i;
 
-    /* bounded: an absurd run of digits is refused, not concatenated */
+    /* bounded: an overlong digit run is refused, not appended */
     for (i = 0; value[i] != '\0' && i < 16; i++) {
       if (!isdigit((unsigned char) value[i]))
         return NULL;
@@ -433,8 +433,9 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
               else
                 snprintf(return_error, return_error_size,
                          "Syntax error:\n\tOption --%s does not take the value "
-                         "%s\n",
-                         hts_optalias[pos][0], param);
+                         "%s\n\t%s\n",
+                         hts_optalias[pos][0], param,
+                         _NOT_NULL(optalias_help(hts_optalias[pos][0])));
               return 0;
             }
             strlcatbuff(return_argv[0], suffix, return_argv_size);
