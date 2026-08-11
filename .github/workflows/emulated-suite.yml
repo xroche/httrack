@@ -1,0 +1,79 @@
+# cross-arch.yml compiles for the ports architectures and stops there, so the
+# Debian buildd is the first machine anywhere to run the suite on one -- and it
+# reports by failing the package build (#1146, #1148). This runs it under
+# qemu-user, where a process is not the shape a native one is and every step
+# costs a multiple of what it costs here.
+name: Emulated suite
+
+on:
+  # The harness is where a native-shape assumption lands, so gate on it rather
+  # than on every PR: this leg is slow and is not a required check.
+  pull_request:
+    paths:
+      - "tests/**"
+      - "tools/emulated-suite.sh"
+      - ".github/workflows/emulated-suite.yml"
+  push:
+    branches: [master]
+  schedule:
+    - cron: "41 5 * * 1"
+  workflow_dispatch:
+
+# Least privilege: the workflow only needs to read the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: emulated-suite-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulated:
+    name: emulated suite (${{ matrix.arch }})
+    runs-on: ubuntu-24.04
+    # An emulated configure and build take the bulk of it; the suite itself is
+    # minutes. Well under the 6h ceiling, and a wedge should not sit there.
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        # s390x, not the hppa that reported #1146: it is a release architecture,
+        # so the container image and its build-deps come from the main archive
+        # rather than debian-ports. Big-endian into the bargain, which nothing
+        # else here runs.
+        arch: [s390x]
+    steps:
+      - name: Register the binfmt handlers
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          # Registered with the F flag, so the kernel holds the interpreter open
+          # and the container needs no copy of it.
+          sudo apt-get install -y --no-install-recommends qemu-user-static binfmt-support
+          test -e "/proc/sys/fs/binfmt_misc/qemu-${{ matrix.arch }}" ||
+            { ls /proc/sys/fs/binfmt_misc; exit 1; }
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Build and run the suite emulated
+        run: |
+          set -euo pipefail
+          # The build dir rides a mounted volume, or the suite log dies with the
+          # container and the failure this leg exists to report has no detail.
+          mkdir -p "$RUNNER_TEMP/emul-bld"
+          docker run --rm --platform "linux/${{ matrix.arch }}" \
+            -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
+            -v "$RUNNER_TEMP/emul-bld:/bld" \
+            -e "GITHUB_WORKSPACE=$GITHUB_WORKSPACE" \
+            -e "EMULATED_ARCH=${{ matrix.arch }}" \
+            debian:sid bash ./tools/emulated-suite.sh
+
+      - name: Collect the suite log
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: emulated-suite-${{ matrix.arch }}-log
+          path: ${{ runner.temp }}/emul-bld/tests/test-suite.log
+          if-no-files-found: warn
