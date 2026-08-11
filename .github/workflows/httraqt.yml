@@ -21,8 +21,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # SourceForge is the only copy; a mirror we control would remove that dependency.
-  HTTRAQT_REPO: https://git.code.sf.net/p/httraqt/code
+  # Our mirror of the SourceForge tree, so no PR depends on a third-party host.
+  HTTRAQT_REPO: https://github.com/xroche/httraqt.git
   HTTRAQT_REF: a1175565c61ab9afd7bda2dc96ed1182c2d44ec3  # 1.4.11 + cmake patch, upstream HEAD since 2023-01-06
   PREFIX: /usr/local
 
@@ -70,16 +70,18 @@ jobs:
       - name: Fetch HTTraQt
         run: |
           set -euo pipefail
-          # SourceForge does not serve arbitrary SHAs to a shallow fetch, so clone whole.
+          # Fetching the SHA itself needs no pin check afterwards, and keeps the
+          # tree out of the workspace so our own build cannot pick it up.
+          rm -rf "$RUNNER_TEMP/httraqt"
+          git init -q "$RUNNER_TEMP/httraqt"
           ok=
           for attempt in 1 2 3; do
-            rm -rf "$RUNNER_TEMP/httraqt"
-            if git clone "$HTTRAQT_REPO" "$RUNNER_TEMP/httraqt"; then ok=1; break; fi
-            echo "clone failed (attempt $attempt)"
-            sleep $((attempt * 15))
+            if git -C "$RUNNER_TEMP/httraqt" fetch -q --depth 1 "$HTTRAQT_REPO" "$HTTRAQT_REF"; then ok=1; break; fi
+            echo "fetch failed (attempt $attempt)"
+            [ "$attempt" -eq 3 ] || sleep $((attempt * 15))
           done
           [ -n "$ok" ] || { echo "::error::cannot reach $HTTRAQT_REPO"; exit 1; }
-          git -C "$RUNNER_TEMP/httraqt" checkout --detach "$HTTRAQT_REF"
+          git -C "$RUNNER_TEMP/httraqt" checkout -q --detach FETCH_HEAD
 
       - name: Configure HTTraQt
         run: |
