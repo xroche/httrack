@@ -98,7 +98,8 @@ DESCRIPTIONS = {
     "library.html": "Linking against the libhttrack library.",
     "plug.html": "Plugging your own C functions into the HTTrack engine.",
     "plug_330.html": "The HTTrack callback API as it was in release 3.30 and earlier.",
-    "scripting.html": "Driving the httrack command-line program from shell and" " batch scripts.",
+    "scripting.html": "Driving the httrack command-line program from shell and"
+    " batch scripts.",
 }
 
 # Pinned by SOURCE_DATE_EPOCH when set, as man/makeman.sh does, so a test can ask
@@ -256,7 +257,9 @@ def chrome(page, content):
     return content, "\n".join(head), "\n".join(top), "\n".join(bottom)
 
 
-LEGACY = re.compile(r"<!--=*\s*End prologue\s*=*-->(.*?)<!--=*\s*Start epilogue\s*=*-->", re.S)
+LEGACY = re.compile(
+    r"<!--=*\s*End prologue\s*=*-->(.*?)<!--=*\s*Start epilogue\s*=*-->", re.S
+)
 
 
 def convert(path):
@@ -331,7 +334,9 @@ def rewrite(path, text):
     open_, close = MARK["top"]
     body = text.split(close, 1)[1].split(MARK["bottom"][0], 1)[0]
     content, head, top, bottom = chrome(page, body)
-    text = text.replace(close + body + MARK["bottom"][0], close + content + MARK["bottom"][0], 1)
+    text = text.replace(
+        close + body + MARK["bottom"][0], close + content + MARK["bottom"][0], 1
+    )
     text = region(text, "head", head)
     text = region(text, "top", top)
     return region(text, "bottom", bottom)
@@ -340,11 +345,15 @@ def rewrite(path, text):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="report drift, change nothing")
-    ap.add_argument("--convert", nargs="*", metavar="FILE", help="migrate legacy pages first")
+    ap.add_argument(
+        "--convert", nargs="*", metavar="FILE", help="migrate legacy pages first"
+    )
     args = ap.parse_args()
 
     for name in args.convert or []:
-        path = name if os.path.isabs(name) else os.path.join(HTML, os.path.basename(name))
+        path = (
+            name if os.path.isabs(name) else os.path.join(HTML, os.path.basename(name))
+        )
         text = convert(path)
         with open(path, "w", encoding="utf-8") as fp:
             fp.write(text)

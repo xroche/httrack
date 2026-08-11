@@ -31,7 +31,7 @@ for _ in $(seq 1 10); do
     mkdir -p "${work}/a" "${work}/b"
     # Both ports up front: a python fork apiece inside the window below is most
     # of it, and picking them together is what keeps the two apart.
-    read -r porta portb <<<"$(htsserver_freeport 2)"
+    read -r porta portb <<<"$(htsserver_freeport tcp tcp)"
     prev=$(date +%s)
     while test "$(date +%s)" = "${prev}"; do
         sleep 0.02

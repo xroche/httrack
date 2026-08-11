@@ -27,17 +27,41 @@ SCREENS = {
     "legacy-import": (None, None, "00_legacy_import_dialog"),
     "options-menu": (None, None, "04_options_menu"),
     # the eleven option tabs
-    "opt-scan-rules": ("05_options_scan_rules", "11_options_scan_rules", "05_options_scan_rules"),
+    "opt-scan-rules": (
+        "05_options_scan_rules",
+        "11_options_scan_rules",
+        "05_options_scan_rules",
+    ),
     "opt-limits": ("06_options_limits", "08_options_limits", "06_options_limits"),
-    "opt-flow-control": ("07_options_flow_control", "07_options_flow_control", "07_options_flow_control"),
+    "opt-flow-control": (
+        "07_options_flow_control",
+        "07_options_flow_control",
+        "07_options_flow_control",
+    ),
     "opt-links": ("08_options_links", "04_options_links", "08_options_links"),
     "opt-build": ("09_options_build", "05_options_build", "09_options_build"),
-    "opt-browser-id": ("12_options_browser_id", "10_options_browser_id", "10_options_browser_id"),
+    "opt-browser-id": (
+        "12_options_browser_id",
+        "10_options_browser_id",
+        "10_options_browser_id",
+    ),
     "opt-spider": ("10_options_spider", "12_options_spider", "11_options_spider"),
     "opt-proxy": ("04_options_proxy", "14_options_proxy", "12_options_proxy_address"),
-    "opt-log-index-cache": ("13_options_log_index_cache", "13_options_log_index_cache", "13_options_log_index_cache"),
-    "opt-mime-types": ("11_options_mime_types", "09_options_mime_types", "14_options_type_mime_associations"),
-    "opt-experts-only": ("14_options_experts_only", "06_options_experts_only", "15_options_experts_only"),
+    "opt-log-index-cache": (
+        "13_options_log_index_cache",
+        "13_options_log_index_cache",
+        "13_options_log_index_cache",
+    ),
+    "opt-mime-types": (
+        "11_options_mime_types",
+        "09_options_mime_types",
+        "14_options_type_mime_associations",
+    ),
+    "opt-experts-only": (
+        "14_options_experts_only",
+        "06_options_experts_only",
+        "15_options_experts_only",
+    ),
 }
 
 # (output dir, capture set, max width) — the Windows shots are already small
@@ -60,14 +84,18 @@ def convert(src, dst, max_width, fmt):
         # Median cut, not max coverage: the latter spreads the palette over the
         # colour cube whatever each entry costs in pixels, which greys out the
         # large flat backgrounds these shots are mostly made of.
-        im.convert("RGB").quantize(colors=256, dither=Image.Dither.NONE).save(dst, "PNG", optimize=True)
+        im.convert("RGB").quantize(colors=256, dither=Image.Dither.NONE).save(
+            dst, "PNG", optimize=True
+        )
     return im.size, os.path.getsize(dst)
 
 
 def main():
     fmt = sys.argv[1] if len(sys.argv) > 1 else "webp"
     works = os.path.expanduser("~/git/httrack-works")
-    out_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "html", "img")
+    out_root = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "html", "img"
+    )
 
     total = 0
     for index, (platform, capture_set, max_width) in enumerate(PLATFORMS):
@@ -82,7 +110,10 @@ def main():
             dst = os.path.join(out_root, "guide-%s-%s.%s" % (platform, name, fmt))
             size, written = convert(src, dst, max_width, fmt)
             total += written
-            print("%-6s %-22s %4dx%-5d %6dK" % (platform, name, size[0], size[1], written // 1024))
+            print(
+                "%-6s %-22s %4dx%-5d %6dK"
+                % (platform, name, size[0], size[1], written // 1024)
+            )
     print("TOTAL %d K in %s" % (total // 1024, fmt))
 
 
