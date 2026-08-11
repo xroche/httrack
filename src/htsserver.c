@@ -514,19 +514,59 @@ static void cat_js_escaped(String *dst, const char *value) {
   }
 }
 
-/* Append the value of a double-quoted command-line argument: escaped for HTML,
-   which the browser undoes when it posts the command line back, and for the
-   argv splitter, which does not. */
-static void cat_cmdline_arg(String *output, const char *value) {
-  const char *a;
+/* Append LEN bytes of the value of a double-quoted command-line argument:
+   escaped for HTML, which the browser undoes when it posts the command line
+   back, and for the argv splitter, which does not. */
+static void cat_cmdline_argn(String *output, const char *value, size_t len) {
+  size_t i;
 
-  for (a = value; *a != '\0'; a++) {
-    if (*a == '\\' || *a == '\"') {
+  for (i = 0; i < len; i++) {
+    if (value[i] == '\\' || value[i] == '\"') {
       StringCat(*output, "\\");
     }
-    if (!cat_html_escaped(output, *a)) {
-      StringMemcat(*output, a, 1);
+    if (!cat_html_escaped(output, value[i])) {
+      StringMemcat(*output, &value[i], 1);
     }
+  }
+}
+
+/* see cat_cmdline_argn() */
+static void cat_cmdline_arg(String *output, const char *value) {
+  cat_cmdline_argn(output, value, strlen(value));
+}
+
+/* Append FLAG "<rule>" once per rule in VALUE, the way the engine takes the
+   options it accumulates: one flag per rule. Any whitespace separates two
+   rules, as it separates two URLs in the wizard's URL box, except beside a ','
+   or '=' where it belongs to the rule the parser trims it out of. */
+static void cat_cmdline_arglist(String *output, const char *value,
+                                const char *flag) {
+  static const char *const ws = " \t\r\n";
+  const char *p = value + strspn(value, ws);
+  hts_boolean first = HTS_TRUE;
+
+  while (*p != '\0') {
+    hts_boolean more = HTS_TRUE;
+
+    if (!first) {
+      StringCat(*output, "\n\t");
+    }
+    StringCat(*output, flag);
+    StringCat(*output, " \"");
+    first = HTS_FALSE;
+    while (more) {
+      const size_t len = strcspn(p, ws);
+      const char *const next = p + len + strspn(p + len, ws);
+
+      cat_cmdline_argn(output, p, len);
+      more = *next != '\0' &&
+                     (*next == ',' || *next == '=' ||
+                      (len != 0 && (p[len - 1] == ',' || p[len - 1] == '=')))
+                 ? HTS_TRUE
+                 : HTS_FALSE;
+      p = next;
+    }
+    StringCat(*output, "\"");
   }
 }
 
@@ -1325,6 +1365,26 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           } else {
                             coucal_write(NewLangList, pos2, (intptr_t) NULL);
                           }
+                        }
+                      }
+                    }
+                    /* arglist:<field>:<flag>
+                       one "<flag> "rule"" per non-empty line of the field */
+                    else if ((p = strfield(name, "arglist:"))) {
+                      char *pos2;
+
+                      langstr = "";
+                      literal = HTS_TRUE;
+                      name += p;
+                      pos2 = strchr(name, ':');
+                      if (pos2 != NULL && outputmode != -1) {
+                        intptr_t adr = 0;
+
+                        *pos2 = '\0';
+                        if (coucal_readptr(NewLangList, name, &adr) &&
+                            adr != 0) {
+                          cat_cmdline_arglist(&output, (const char *) adr,
+                                              pos2 + 1);
                         }
                       }
                     }

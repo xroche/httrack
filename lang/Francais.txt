@@ -1046,5 +1046,5 @@ Start a new WARC segment once the current one grows past this many bytes; leave 
 Commencer un nouveau segment WARC dès que le courant dépasse ce nombre d'octets ; laissez vide ou 0 pour un fichier unique.
 Host aliases:
 Host aliases:
-Other hostnames serving this same site, folded onto one (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one (e.g. www2.example.com,m.example.com=example.com).
+Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).

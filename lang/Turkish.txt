@@ -1016,5 +1016,5 @@ Start a new WARC segment once the current one grows past this many bytes; leave 
 Geçerli parça bu bayt sayýsýný aþtýðýnda yeni bir WARC parçasý baþlat; tek dosya için boþ býrakýn veya 0 girin.
 Host aliases:
 Host aliases:
-Other hostnames serving this same site, folded onto one (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one (e.g. www2.example.com,m.example.com=example.com).
+Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).

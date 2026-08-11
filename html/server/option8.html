@@ -187,9 +187,10 @@ ${LANG_STRIPQUERY}
 <br><br>
 
 ${LANG_HOSTALIAS}
-<input name="hostalias" value="${attr:hostalias}" size="40"
+<br>
+<textarea name="hostalias" cols="60" rows="4"
 			title='${html:LANG_HOSTALIASTIP}' onMouseOver="info('${js:LANG_HOSTALIASTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
->
+>${do:output-mode:html}${hostalias}${do:output-mode:}</textarea>
 <br><br>
 
 <input type="checkbox" name="toler" ${checked:toler}
