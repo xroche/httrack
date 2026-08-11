@@ -41,7 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdlib.h>
 #include <string.h>
 
-/* The attribute helpers, from their single definition: a partial copy here
+/* Take the attribute helpers from their single definition: a partial copy here
    would win their #ifndef guard and starve later headers of the rest. */
 #include "htsglobal.h"
 

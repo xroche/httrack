@@ -39,8 +39,8 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_DEFBASENETH
 #define HTS_DEFBASENETH
 
-/* HTS_INET6 and HTS_USEOPENSSL are tested below, and this guard gives only the
-   first include a chance to act on them. */
+/* Must precede the HTS_INET6 and HTS_USEOPENSSL tests below, which
+   HTS_DEFBASENETH lets only the first include reach. */
 #include "htsglobal.h"
 
 #ifdef _WIN32

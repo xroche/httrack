@@ -1,8 +1,8 @@
 #!/bin/bash
 #
 # A consumer picks its own include order, so every ordered pair of installed
-# headers must compile. Each one alone already does (205, 206), which is what
-# let two order-only breaks ship: a partial macro copy and a config-less guard.
+# headers must compile. 205 and 206 compile each one alone, where all of them
+# pass, so neither can see an order-only break.
 
 set -euo pipefail
 
@@ -59,9 +59,8 @@ for cand in "${CXX:-}" g++ clang++ c++; do
 done
 [ -n "$cxx" ] || echo "no C++ compiler found, C leg only" >&2
 
-# Before trusting the sweep, prove it sees the shape it is here for: a
-# consumer that defined one attribute helper first used to starve htssafe.h of
-# HTS_CHECK_RESULT, because the guard is over the block, not the macro.
+# Prove the sweep can see a real break: the guard covers the whole attribute
+# block, so a pre-defined HTS_UNUSED must still make htssafe.h fail.
 printf '#define HTS_UNUSED\n#include <httrack/htssafe.h>\n' >"$tmp/poison.c"
 if "${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/poison.c" 2>/dev/null; then
     fail "a pre-defined HTS_UNUSED no longer breaks htssafe.h, this sweep proves nothing"
@@ -91,7 +90,7 @@ done
 echo "swept ${#headers[@]} headers pairwise, both orders${cxx:+, C and C++}" >&2
 
 # The loop above is only meaningful if this compiler rejects a missing include.
-printf '#include "no-such-header-261.h"\n' >"$tmp/tu.c"
+printf '#include "no-such-header-269.h"\n' >"$tmp/tu.c"
 if "${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
     fail "${cc_argv[*]} accepted a missing include, the checks above proved nothing"
 fi
