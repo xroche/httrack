@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+# A --strip-query key or --host-alias pattern that begins with '-' is content,
+# not a missing parameter (#1179): the engine read it as the next option name
+# and aborted before the mirror, throwing away the valid rules beside it.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_dashrule.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+url='http://127.0.0.1:1/'
+
+# parse the command line and stop, leaving the diagnostic in $out and the exit
+# status in $rc; --testscan never opens a socket, so the dead URL is never dialled
+parse() {
+    rc=0
+    out=$(httrack -O "$tmp/out" --quiet --testscan "$url" "$@" 2>&1) || rc=$?
+}
+
+accepted() { # accepted LABEL
+    test "$rc" -eq 0 || fail "$1: exited $rc: $out"
+}
+
+refused() { # refused RE LABEL
+    test "$rc" -ne 0 || fail "$2: accepted an option with no parameter"
+    assert_match "$1" "$out" "$2"
+}
+
+# Every spelling of a dash-leading rule: the space form is what the wizard's
+# rules box emits, the '=' form skips the alias guard and lands on the engine's
+# own, and a "-quoted argument is unquoted between the two.
+printf '[a dash-leading rule is taken, in every form] ..\t'
+parse --strip-query -utm
+accepted "--strip-query -utm"
+parse --strip-query=-utm
+accepted "--strip-query=-utm"
+parse "-%g" -utm
+accepted "-%g -utm"
+parse --strip-query '"-utm"'
+accepted '--strip-query "-utm"'
+parse --strip-query sid --strip-query -utm
+accepted "a dash rule beside a plain one"
+parse --host-alias '-old.example.com=example.com'
+accepted "--host-alias -old.example.com=example.com"
+echo OK
+
+# A malformed rule now reaches the grammar check, which names the option and
+# quotes what it rejected, instead of dying on the alias name the wizard's Host
+# aliases box never mentions.
+printf '[a malformed dash rule is named, not blamed on -%%C] ..\t'
+parse --host-alias -nope
+refused 'Invalid host-alias rule' "malformed --host-alias"
+! grep -q '%C' <<<"$out" || fail "the host-alias error still names -%C: $out"
+echo OK
+
+# The guard stays for every other option: relaxing it wholesale would turn
+# `-O -q url` into a silent mirror into a directory named -q. The wording each
+# is matched on is the alias layer's, which owns the guard; the engine's own
+# message for the same option reads differently, so a relaxation there alone
+# still reds this.
+printf '[an option genuinely missing its parameter still errors] ..\t'
+parse --strip-query
+refused 'needs to be followed by a parameter' "--strip-query with nothing after it"
+parse --host-alias
+refused 'needs to be followed by a parameter' "--host-alias with nothing after it"
+# no -O, so run where an accidental mirror lands under $tmp
+mkdir -p "$tmp/cwd"
+noparam() { # noparam RE LABEL ARG...
+    local re=$1 label=$2
+    shift 2
+    rc=0
+    out=$(cd "$tmp/cwd" && httrack "$@" "$url" 2>&1) || rc=$?
+    refused "$re" "$label"
+}
+noparam 'Option -O needs to be followed by a parameter' "-O -q" -O -q
+noparam 'Option -O needs to be followed by a parameter' "--path -q" --path -q
+noparam 'Option N needs a number' "-N -q" -N -q
+noparam 'needs to be followed by a parameter' "--user-agent -q" --user-agent -q
+test -z "$(ls -A "$tmp/cwd")" || fail "-O -q mirrored into $(ls -A "$tmp/cwd")"
+echo OK
+
+# The rule is stored, not merely accepted: the engine applies the last rule
+# matching an address, so the unscoped dash rule wins when it comes second and
+# nothing is stripped (3 files), and yields to the scoped one when it comes
+# first (2 files). An accepted-then-dropped rule would save 2 files both times.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
+    httrack 'BASEURL/stripquery/index.html' \
+    --strip-query '-nokey' --strip-query '*/stripquery/*=utm_source'
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
+    httrack 'BASEURL/stripquery/index.html' \
+    --strip-query '*/stripquery/*=utm_source' --strip-query '-nokey'
