@@ -279,8 +279,54 @@ const char *hts_optalias[][4] = {
 };
 /* clang-format on */
 
-/* 
-  Check for alias in command-line 
+/* Whether TOKEN is an option name, rather than a value that begins with '-'.
+   Only the spellings optalias_check() resolves: a cluster (-c8) is a value. */
+static hts_boolean optreal_or_alias(const char *token) {
+  char name[64];
+  const char *eq;
+  size_t len;
+
+  if (optreal_find(token) >= 0)
+    return HTS_TRUE;
+  if (token[0] != '-' || token[1] != '-')
+    return HTS_FALSE;
+  eq = strchr(token + 2, '=');
+  len = eq != NULL ? (size_t) (eq - (token + 2)) : strlen(token + 2);
+  if (len == 0 || len >= sizeof(name))
+    return HTS_FALSE;
+  memcpy(name, token + 2, len);
+  name[len] = '\0';
+  if (optalias_find(name) >= 0)
+    return HTS_TRUE;
+  if (strncmp(name, "no", 2) == 0 && optalias_find(name + 2) >= 0)
+    return HTS_TRUE;
+  return (strncmp(name, "wide-", 5) == 0 || strncmp(name, "tiny-", 5) == 0) &&
+         optalias_find(name + 5) >= 0;
+}
+
+/* Whether the real option OPT at ARGV[N_ARG] lacks the separate parameter it
+   needs. A strip-query key or a host-alias pattern may begin with '-' (#1179),
+   so those two take any following token that is not an option name; write
+   --strip-query=-q to hand them one that is. */
+static hts_boolean optparam_missing(int argc, const char *const *argv,
+                                    int n_arg, const char *opt) {
+  /* keep in sync with the strip-query and host-alias cases in htscoremain.c */
+  static const char *const rule_opt[] = {"-%g", "-%C", NULL};
+  int i;
+
+  if (n_arg + 1 >= argc)
+    return HTS_TRUE;
+  if (argv[n_arg + 1][0] != '-')
+    return HTS_FALSE;
+  for (i = 0; rule_opt[i] != NULL; i++) {
+    if (strcmp(opt, rule_opt[i]) == 0)
+      return optreal_or_alias(argv[n_arg + 1]);
+  }
+  return HTS_TRUE;
+}
+
+/*
+  Check for alias in command-line
   argc,argv     as in main()
   n_arg         argument position
   return_argv   a char[2][] where to put result
@@ -346,7 +392,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
           /* Copy parameters? */
           if (need_param == 2) {
-            if ((n_arg + 1 >= argc) || (argv[n_arg + 1][0] == '-')) {   /* no supplemental parameter */
+            if (optparam_missing(argc, argv, n_arg, command)) {
               snprintf(return_error, return_error_size,
                        "Syntax error:\n\tOption %s needs to be followed by a "
                        "parameter: %s <param>\n\t%s\n",
@@ -404,7 +450,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
-        if ((n_arg + 1 >= argc) || (argv[n_arg + 1][0] == '-')) {       /* no supplemental parameter */
+        if (optparam_missing(argc, argv, n_arg, argv[n_arg])) {
           snprintf(return_error, return_error_size,
                    "Syntax error:\n\tOption %s needs to be followed by a "
                    "parameter: %s <param>\n\t%s\n",

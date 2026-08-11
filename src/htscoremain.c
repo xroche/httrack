@@ -1840,7 +1840,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
 
               case 'g': // strip-query: accumulate "[pattern=]keys" entries
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                /* a key may begin with '-' (#1179) */
+                if (na + 1 >= argc) {
                   HTS_PANIC_PRINTF("Option strip-query needs a blank space and "
                                    "[host/pattern=]key1,key2,...");
                   printf("Example: --strip-query "
@@ -1856,7 +1857,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
 
               case 'C': // host-alias: accumulate "alias[,alias...]=host" rules
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                /* an alias may begin with '-' (#1179) */
+                if (na + 1 >= argc) {
                   HTS_PANIC_PRINTF("Option host-alias needs a blank space and "
                                    "alias[,alias...]=canonical-host");
                   printf("Example: --host-alias "
