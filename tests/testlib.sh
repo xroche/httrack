@@ -287,17 +287,36 @@ stop_server() {
     return 0
 }
 
-# $1 free loopback ports (default 1), space separated, bound together so two of
-# them always differ. Each is closed before its caller binds it: see start_proxytrack.
-freeport() {
+# Free loopback ports, one per protocol in $@ (tcp/udp, default a single tcp),
+# space separated and all distinct, each closed before its caller binds it: see
+# start_proxytrack. Probed in the protocol the caller binds, since free in tcp
+# says nothing about udp and Windows excludes port ranges per protocol (#1178).
+freeport() { # freeport [PROTO...]
+    local out
+    # Captured, not piped into tr, which would swallow a failed probe's status.
+    out=$("${python:?freeport needs the caller python}" -c 'import socket, sys
+kinds = {"tcp": socket.SOCK_STREAM, "udp": socket.SOCK_DGRAM}
+held, ports = [], []
+for proto in sys.argv[1:] or ["tcp"]:
+    if proto not in kinds:
+        sys.exit("freeport: unknown protocol " + proto)
+    for _ in range(10):
+        s = socket.socket(socket.AF_INET, kinds[proto])
+        s.bind(("127.0.0.1", 0))
+        held.append(s)
+        port = s.getsockname()[1]
+        # tcp and udp draw from separate spaces, so the same number can come
+        # back twice: hold that one too and draw again.
+        if port not in ports:
+            break
+    else:
+        sys.exit("freeport: no distinct " + proto + " port")
+    ports.append(port)
+print(" ".join(str(p) for p in ports))
+for s in held:
+    s.close()' "$@") || return 1
     # tr: Windows python's print leaves a CR that $() does not strip.
-    "${python:?freeport needs the caller python}" -c 'import socket, sys
-socks = [socket.socket() for _ in range(int(sys.argv[1]))]
-for s in socks:
-    s.bind(("127.0.0.1", 0))
-print(" ".join(str(s.getsockname()[1]) for s in socks))
-for s in socks:
-    s.close()' "${1:-1}" | tr -d '\r'
+    printf '%s\n' "$out" | tr -d '\r'
 }
 
 PT_LISTENING="HTTP Proxy installed on"
@@ -325,7 +344,7 @@ proxytrack_bound() { # proxytrack_bound LOG PID
 start_proxytrack() { # start_proxytrack LOGBASE LAUNCH
     local base=$1 launch=$2 try
     for try in 1 2 3; do
-        read -r proxyport icpport <<<"$(freeport 2)"
+        read -r proxyport icpport <<<"$(freeport tcp udp)"
         # One log per attempt: a killed one's pty drainer creates its .done
         # marker by path, and would answer for the attempt below.
         ptlog="$base.$try"
