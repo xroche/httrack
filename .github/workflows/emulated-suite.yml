@@ -1,8 +1,7 @@
-# cross-arch.yml compiles for the ports architectures and stops there, so the
-# Debian buildd is the first machine anywhere to run the suite on one -- and it
-# reports by failing the package build (#1146, #1148). This runs it under
-# qemu-user, where a process is not the shape a native one is and every step
-# costs a multiple of what it costs here.
+# cross-arch.yml stops at compile for the ports architectures, so the Debian
+# buildd is the first machine to run the suite on one, and it reports by failing
+# the package build (#1146, #1148). This runs it under qemu-user, where a process
+# is not the shape a native one is and every step costs far more.
 name: Emulated suite
 
 on:
@@ -31,16 +30,16 @@ jobs:
   emulated:
     name: emulated suite (${{ matrix.arch }})
     runs-on: ubuntu-24.04
-    # An emulated configure and build take the bulk of it; the suite itself is
-    # minutes. Well under the 6h ceiling, and a wedge should not sit there.
+    # The emulated apt, configure and build take the bulk of it, well under the
+    # 6h ceiling: a wedge should not run that long.
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
-        # s390x, not the hppa that reported #1146: it is a release architecture,
-        # so the container image and its build-deps come from the main archive
-        # rather than debian-ports. Big-endian into the bargain, which nothing
-        # else here runs.
+        # Emulation is what is under test, not parisc: the hppa that reported
+        # #1146 lives in debian-ports, with no container image and a far more
+        # fragile archive. s390x is in main, and big-endian, which nothing else
+        # here covers.
         arch: [s390x]
     steps:
       - name: Register the binfmt handlers
@@ -60,8 +59,8 @@ jobs:
       - name: Build and run the suite emulated
         run: |
           set -euo pipefail
-          # The build dir rides a mounted volume, or the suite log dies with the
-          # container and the failure this leg exists to report has no detail.
+          # The build dir is a mounted volume, so the suite log outlives the
+          # container: a failure here has no detail otherwise.
           mkdir -p "$RUNNER_TEMP/emul-bld"
           docker run --rm --platform "linux/${{ matrix.arch }}" \
             -v "$GITHUB_WORKSPACE:$GITHUB_WORKSPACE" -w "$GITHUB_WORKSPACE" \
