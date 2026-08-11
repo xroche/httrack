@@ -2125,8 +2125,7 @@ int httpmirror(char *url1, httrackp * opt) {
     cache.lst = opt->state.strc.lst = NULL;
     /* old.lst minus new.lst is the set of files the previous mirror had and
        this one does not. --changes reports it; only --purge-old acts on it.
-       An aborted run never reached every link, so that difference is mostly
-       what it did not get to: purging against it deletes a live mirror. */
+       For a stopped mirror it is mostly what the run never got to. */
     if (aborted) {
       if (opt->delete_old || opt->changes) {
         hts_log_print(opt, LOG_WARNING,

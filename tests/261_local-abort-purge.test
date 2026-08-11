@@ -36,9 +36,8 @@ mkdir -p "$root" "$out"
 names=(a b c d e)
 write_bodies() {
     local gen=$1 name
-    # a.bin is fetched first and alone exceeds the 32768 bytes below which the
-    # engine calls the session dead and rolls it back: that path skips the purge
-    # on its own and would pass the abort leg whatever the loop did.
+    # a.bin alone exceeds the 32768 bytes below which the engine calls the
+    # session dead and rolls back, a path that skips the purge on its own.
     "$python" -c 'import sys
 sys.stdout.buffer.write((sys.argv[1] + "-a-").encode() * 24000)' "$gen" \
         >"${root}/a.bin"
@@ -79,9 +78,8 @@ done
 ok "pass 1 mirrored six files"
 
 # --- pass 2: a complete re-crawl of five of the six --------------------------
-# The purge is what deletes f.bin. Without this leg, gating the purge on nothing
-# at all would pass the abort leg below. Not --update: that pass restores the
-# previous seed list from the cache, and f.bin with it.
+# Deleting f.bin is the control the abort legs below need. Not --update: that
+# restores the previous seed list from the cache, and f.bin with it.
 urls_of "${names[@]}"
 run_with_timeout 300 httrack "${urls[@]}" -O "$out" "${common[@]}" \
     --timeout=20 --max-time=120 >"${tmpdir}/log2" 2>&1
