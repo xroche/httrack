@@ -656,9 +656,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   {
     char pth[1024];
 
-    const char *initOn[] = { "parseall", "Cache", "ka",
-      "cookies", "parsejava", "testall", "updhack", "urlhack", "index", NULL
-    };
+    /* "cache" beside "Cache": step2.html must not re-default it on every
+       render, or a reloaded profile that cleared it flips back. */
+    const char *initOn[] = {"parseall", "Cache",     "cache",   "ka",
+                            "cookies",  "parsejava", "testall", "updhack",
+                            "urlhack",  "index",     NULL};
     const initIntElt initInt[] = {
       {"filter", 4},
       {"travel", 2},

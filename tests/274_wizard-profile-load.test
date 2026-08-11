@@ -11,8 +11,8 @@ distdir=$(cd "${distdir}" && pwd)
 # shellcheck source=tests/webhttracklib.sh
 . "${testdir}/webhttracklib.sh"
 
-htsserver_require
-
+# Ahead of htsserver_require, which skips where python3 is absent: this block
+# is pure text and must still run there.
 printf '[the checkbox table matches step4.html] ..\t'
 # Nothing else ties ini_checkbox_keys[] to the ${ztest:} keys step4.html
 # writes. ProxyType is the one entry step4.html does not spell that way.
@@ -27,7 +27,11 @@ test "$(printf '%s\n' "${written}" | wc -l)" -ge 30 ||
     fail "only $(printf '%s\n' "${written}" | wc -l) ztest keys in step4.html"
 test "${written}" = "${listed}" ||
     fail "$(diff <(echo "${written}") <(echo "${listed}"))"
+! command grep -q '^ProxyType=[$]{ztest:' "${distdir}/html/server/step4.html" ||
+    fail "ProxyType is a ztest key now, so the exception hides drift"
 echo OK
+
+htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_profile.XXXXXX") || fail "no tmpdir"
 cleanup() {
@@ -47,6 +51,9 @@ MaxTime=0
 Depth=3
 UserID=
 KeepAlive=0
+Cookies=0
+Index=0
+Cache=0
 Warc=0
 Wacz=1
 NoExternalPages=0
@@ -158,6 +165,10 @@ reject("--keep-alive")
 if ini.get("UserID") != "" or ini.get("KeepAlive") != "0":
     sys.exit("the cleared fields came back as %r / %r"
              % (ini.get("UserID"), ini.get("KeepAlive")))
+# --cookies=0 is emitted only for an empty value, and --index=0 only for a
+# literal 0, so together they pin the coercion from both sides.
+want("--cookies=0")
+reject("--index=0")
 option4 = get("option4.html?sid=" + sid)
 tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="ka"[^>]*>', option4)
 if len(tag) != 1 or "checked" in tag[0]:
@@ -166,6 +177,14 @@ if len(tag) != 1 or "checked" in tag[0]:
 want("--sockets=4")
 if "Sockets" not in ini or ini["Sockets"] != "4":
     sys.exit("an absent Sockets did not default: %r" % ini.get("Sockets"))
+
+# Re-rendering step2.html must not re-apply a startup default over the loaded
+# value; only a fresh session may take it.
+for page in ["step2.html?sid=" + sid, "option3.html?sid=" + sid]:
+    tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="cache"[^>]*>',
+                     get(page))
+    if tag and "checked" in tag[0]:
+        sys.exit("the cache box came back ticked after %s" % page)
 
 # One separator, whatever the run: unescapeini() folds an encoded CR LF TAB
 # into a single break, and the rules box must show exactly that.
@@ -185,9 +204,10 @@ if ini.get("Footer") != "x%%y":
 want('--sitemap-url "http://example.com/s.xml%"')
 posted = urllib.request.urlopen(
     urllib.request.Request(url + "/server/step4.html",
-                           data=("sid=%s&footer=z%%" % sid).encode("latin-1"),
+                           data=("sid=%s&cookiesfile=z%%&x=1"
+                                 % sid).encode("latin-1"),
                            method="POST"), timeout=20).read().decode("latin-1")
-if '--footer "z%"' not in textarea(posted, "command"):
+if '--cookies-file "z%"' not in textarea(posted, "command"):
     sys.exit("a posted trailing %% did not come back verbatim\n%s"
              % textarea(posted, "command"))
 
