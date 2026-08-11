@@ -1,35 +1,40 @@
 #!/bin/bash
 #
-# End-to-end --host-alias (#16): a link to another hostname of the same site is
-# in scope, is fetched from the canonical host and lands in the single mirrored
-# file, so the alias name survives nowhere in the page. The control keeps it as
-# an external absolute URL. Locks the CLI->opt->scope/savename/hash plumbing the
-# engine self-test cannot reach.
+# End-to-end --host-alias (#16). The fixture links to a second hostname twice:
+# once to a page the crawled host also links (dedup: one saved file, not two),
+# once to a page nothing else links (scope: reached only because the alias is
+# declared, and named under the canonical host). The control keeps the alias
+# URL absolute in the page and never fetches that second page. Locks the
+# CLI->opt->scope/savename/hash/fetch plumbing the self-test cannot reach.
 
 set -e
 
 : "${top_srcdir:=..}"
 
-# aliased: the foreign name folds onto the crawled host, one file for both links
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
+# aliased: both alias links resolve locally, the alias-only page comes down
+# under the canonical host, and the alias name survives nowhere in the page
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
+    --found hostalias/b.html \
     --file-not-matches hostalias/index.html 'example\.invalid' \
     httrack 'BASEURL/hostalias/index.html' \
     --host-alias 'alias.example.invalid=BASEHOST'
 
-# control: without the option the alias is a foreign host, left as-is in the page
+# control: a foreign host, left absolute in the page and never crawled
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
     --file-matches hostalias/index.html 'example\.invalid' \
     httrack 'BASEURL/hostalias/index.html'
 
 # the fold applies with url-hack off (-%u0): the dedup key, the saved name and
 # the scope test must not depend on it
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
+    --found hostalias/b.html \
     --file-not-matches hostalias/index.html 'example\.invalid' \
     httrack 'BASEURL/hostalias/index.html' -%u0 \
     --host-alias 'alias.example.invalid=BASEHOST'
 
 # a glob alias matches the same host
-bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
+    --found hostalias/b.html \
     --file-not-matches hostalias/index.html 'example\.invalid' \
     httrack 'BASEURL/hostalias/index.html' \
     --host-alias '*.example.invalid=BASEHOST'
