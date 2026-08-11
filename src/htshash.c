@@ -128,7 +128,12 @@ static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
 
   // copy address
   assertf(adr_norm != NULL);
-  strcpy(hash->normfil, adr_norm);
+  /* Clip, never abort: both halves come off the wire. The key only feeds the
+     hash — equality is decided by key_adrfil_equals_generic — so a clipped key
+     costs a collision, not a wrong dedup. */
+  hash->normfil[0] = '\0';
+  strlncatbuff(hash->normfil, adr_norm, sizeof(hash->normfil),
+               sizeof(hash->normfil) - 1);
 
   // copy link
   assertf(fil != NULL);
@@ -137,12 +142,16 @@ static coucal_hashkeys key_adrfil_hashes_generic(void *arg,
     char BIGSTK keybuf[HTS_URLMAXSIZE];
     const char *const keys = hts_query_strip_keys(hash->strip_query, adr_canon,
                                                   fil, keybuf, sizeof(keybuf));
+    const size_t used = strlen(hash->normfil);
+    const size_t avail = sizeof(hash->normfil) - used;
 
-    if (hash->norm_slash || hash->norm_query || keys != NULL) {
-      fil_normalized_filtered_ex(fil, &hash->normfil[strlen(hash->normfil)],
-                                 keys, hash->norm_slash, hash->norm_query);
+    /* normalizing never expands, so a path that fits fits normalized too */
+    if ((hash->norm_slash || hash->norm_query || keys != NULL) &&
+        strlen(fil) < avail) {
+      fil_normalized_filtered_ex(fil, &hash->normfil[used], keys,
+                                 hash->norm_slash, hash->norm_query);
     } else {
-      strcpy(&hash->normfil[strlen(hash->normfil)], fil);
+      strlncatbuff(hash->normfil, fil, sizeof(hash->normfil), avail - 1);
     }
   }
 
@@ -326,6 +335,33 @@ void hash_free(hash_struct *hash) {
     coucal_delete(&hash->adrfil);
     coucal_delete(&hash->former_adrfil);
   }
+}
+
+/* see htshash.h */
+hts_boolean hash_url_key(httrackp *opt, const char *adr, const char *fil,
+                         char *key, size_t keysize) {
+  hash_struct hash;
+  lien_url lien;
+  hts_boolean inbounds = HTS_TRUE;
+  size_t i;
+
+  memset(&lien, 0, sizeof(lien));
+  lien.adr = key_duphandler(NULL, adr);
+  lien.fil = key_duphandler(NULL, fil);
+  hash_init(opt, &hash, opt->urlhack);
+  /* poisoned, not zeroed: the stray NUL of an off-by-one must show too */
+  memset(hash.normfil2, 'Z', sizeof(hash.normfil2));
+  (void) key_adrfil_hashes(&hash, &lien);
+  for (i = 0; i < sizeof(hash.normfil2); i++) {
+    if (hash.normfil2[i] != 'Z') {
+      inbounds = HTS_FALSE;
+      break;
+    }
+  }
+  key[0] = '\0';
+  strlncatbuff(key, hash.normfil, keysize, keysize - 1);
+  hash_free(&hash);
+  return inbounds;
 }
 
 /* Test helper: do the two URLs dedupe to the same key under opt's urlhack

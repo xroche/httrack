@@ -242,8 +242,9 @@ struct hash_struct {
   const char *strip_query;
   /* host-alias rules (not owned); set from opt->host_alias at hash_init */
   const char *host_alias;
-  char normfil[HTS_URLMAXSIZE * 2];
-  char normfil2[HTS_URLMAXSIZE * 2];
+  /* key scratch: holds a host and a path, each up to HTS_URLMAXSIZE * 2 */
+  char normfil[HTS_URLMAXSIZE * 4];
+  char normfil2[HTS_URLMAXSIZE * 4];
   char catbuff[CATBUFF_SIZE];
 };
 

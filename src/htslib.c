@@ -3641,15 +3641,19 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
   /* Match string = normalized host/path, query removed. jump_normalized_const
      collapses www+scheme/auth so read and write (double-normalized) agree;
      query excluded keeps the decision on host/path only. */
+  /* clip rather than abort: an overlong host+path is hostile input, and the
+     worst a clipped match string can do is pick another rule */
   url[0] = '\0';
-  strcatbuff(url, jump_normalized_const(adr));
+  strlncatbuff(url, jump_normalized_const(adr), sizeof(url), sizeof(url) - 1);
   if (fil[0] != '/')
-    strcatbuff(url, "/");
+    strlncatbuff(url, "/", sizeof(url), sizeof(url) - strlen(url) - 1);
   q = strchr(fil, '?');
-  if (q != NULL)
-    strncatbuff(url, fil, (int) (q - fil));
-  else
-    strcatbuff(url, fil);
+  {
+    const size_t avail = sizeof(url) - strlen(url) - 1;
+    const size_t fillen = q != NULL ? (size_t) (q - fil) : strlen(fil);
+
+    strlncatbuff(url, fil, sizeof(url), fillen < avail ? fillen : avail);
+  }
 
   /* Walk the '\n' entries; last match wins (like the +/- filter eval). Each is
      "pattern=keys"; no '=' is the bare form, pattern "*". */

@@ -3776,6 +3776,71 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The dedup key is a host and a path built in one scratch buffer: two halves
+   at the engine's per-field maximum must fit whole, and anything longer must
+   clip rather than run into the field behind it (#1160). */
+static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
+  /* what lien_adrfil.adr / .fil hold, and what a whole key needs */
+  enum { field = HTS_URLMAXSIZE * 2, keysize = 2 * field };
+
+  char *adr = malloct(2 * field);
+  char *fil = malloct(2 * field);
+  char *cat = malloct(4 * field);
+  char *key = malloct(keysize);
+  int overlong;
+
+  (void) argc;
+  (void) argv;
+  assertf(adr != NULL && fil != NULL && cat != NULL && key != NULL);
+  opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;
+
+  /* a host and a path one byte short of their own buffers: nothing here
+     normalizes away, so the key is the plain concatenation */
+  memset(adr, 'a', field - 1);
+  adr[field - 1] = '\0';
+  fil[0] = '/';
+  memset(fil + 1, 'b', field - 2);
+  fil[field - 1] = '\0';
+  snprintf(cat, 4 * field, "%s%s", adr, fil);
+  opt->urlhack = HTS_FALSE;
+  assertf(hash_url_key(opt, adr, fil, key, keysize));
+  assertf(strcmp(key, cat) == 0);
+  opt->urlhack = HTS_TRUE; /* the normalizing branch writes the same key */
+  assertf(hash_url_key(opt, adr, fil, key, keysize));
+  assertf(strcmp(key, cat) == 0);
+
+  /* past those maxima the key clips to a prefix, in both branches */
+  memset(adr, 'a', 2 * field - 1);
+  adr[2 * field - 1] = '\0';
+  fil[0] = '/';
+  memset(fil + 1, 'b', 2 * field - 2);
+  fil[2 * field - 1] = '\0';
+  snprintf(cat, 4 * field, "%s%s", adr, fil);
+  for (overlong = 0; overlong < 2; overlong++) {
+    opt->urlhack = overlong == 0 ? HTS_FALSE : HTS_TRUE;
+    assertf(hash_url_key(opt, adr, fil, key, keysize));
+    assertf(strlen(key) != 0 && strlen(key) < keysize);
+    assertf(strncmp(key, cat, strlen(key)) == 0);
+  }
+
+  /* the match string --strip-query builds from the same two halves used to
+     abort on the same input */
+  {
+    char keys[64];
+    const char *const k =
+        hts_query_strip_keys("*=sid", adr, fil, keys, sizeof(keys));
+
+    assertf(k != NULL && strcmp(k, "sid") == 0);
+  }
+
+  freet(adr);
+  freet(fil);
+  freet(cat);
+  freet(key);
+  printf("hashkey-bounds self-test OK\n");
+  return 0;
+}
+
 /* Prints the filter answer <n> emits for (adr, fil) [up]; with no arguments,
    asserts every answer against its expected pattern (#1119). */
 static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
@@ -9345,6 +9410,8 @@ static const struct selftest_entry {
     {"urlhack", "", "-%u url-hack sub-flag (www/slash/query) self-test",
      st_urlhack},
     {"hostalias", "", "--host-alias hostname folding self-test", st_hostalias},
+    {"hashkey-bounds", "", "dedup key holds a maximal host+path (#1160)",
+     st_hashkey_bounds},
     {"redirect-samefile", "", "same-file redirect detection self-test (#159)",
      st_redirect_samefile},
     {"wizardfilter", "[<answer> <adr> <fil> [up]]",
