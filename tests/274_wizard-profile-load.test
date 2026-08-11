@@ -1,0 +1,145 @@
+#!/bin/bash
+#
+# Reloading a saved project must run the winprofile.ini reader: nothing else in
+# the suite reaches it, so unescapeini() and the "0" coercion were unguarded.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+printf '[the checkbox table matches step4.html] ..\t'
+# The reader's exception list is only correct while it mirrors the keys the
+# writer emits with ${ztest:}; nothing else ties the two files together.
+written=$(sed -n 's/^\([A-Za-z0-9]*\)=[$]{ztest:.*/\1/p' \
+    "${distdir}/html/server/step4.html" | sort -u)
+listed=$(awk '/ini_checkbox_keys\[\] = \{/,/\};/' "${distdir}/src/htsserver.c" |
+    grep -o '"[A-Za-z0-9]*"' | tr -d '"' | sort -u)
+test -n "${written}" || fail "no ztest key found in step4.html"
+test "${written}" = "${listed}" ||
+    fail "$(diff <(echo "${written}") <(echo "${listed}"))"
+echo OK
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_profile.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+mkdir -p "${work}/proj/hts-cache"
+# What the wizard itself writes: checkboxes as 0/1, values verbatim, and every
+# separator of a rules box percent-encoded one byte at a time.
+cat >"${work}/proj/hts-cache/winprofile.ini" <<'EOF'
+CurrentUrl=http://example.com/
+MaxRate=0
+MaxTime=0
+Depth=3
+Warc=0
+Wacz=1
+NoExternalPages=0
+HostAlias=a=b%0D%0A%09c=d
+Footer=x%%y
+EOF
+
+printf '[reloading a project reads its winprofile.ini] ..\t'
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
+import re
+import sys
+import urllib.parse
+import urllib.request
+
+url, work = sys.argv[1].rstrip("/"), sys.argv[2]
+
+
+def get(page):
+    return urllib.request.urlopen(url + "/server/" + page,
+                                  timeout=20).read().decode("latin-1")
+
+
+m = re.search(r'name="sid" value="([0-9a-f]+)"', get("index.html"))
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1)
+
+# The only request that opens the file: a GET of an option page renders the
+# session the server already holds and never touches the disk.
+body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
+                [("sid", sid), ("path", work), ("loadprojname", "proj")])
+loaded = urllib.request.urlopen(
+    urllib.request.Request(url + "/server/step2.html",
+                           data=body.encode("latin-1"), method="POST"),
+    timeout=20).read().decode("latin-1")
+if 'name="sid"' not in loaded:
+    sys.exit("step2.html did not render the loaded project\n%s" % loaded[:400])
+
+
+def textarea(page, name):
+    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page,
+                  re.S)
+    if m is None:
+        sys.exit("no %s textarea in the rendered page" % name)
+    return m.group(1)
+
+
+step4 = get("step4.html?sid=" + sid)
+flags = [line.strip() for line in textarea(step4, "command").split("\n")]
+ini = dict(line.split("=", 1) for line in textarea(step4, "winprofile")
+           .replace("\r\n", "\n").split("\n") if "=" in line)
+
+
+def want(flag):
+    if flag not in flags:
+        sys.exit("%s missing from the reloaded command line\n%s"
+                 % (flag, "\n".join(flags)))
+
+
+def reject(flag):
+    if flag in flags:
+        sys.exit("%s came back from the reloaded profile\n%s"
+                 % (flag, "\n".join(flags)))
+
+
+# A value field: zero is the user's answer, and dropping it hands the engine a
+# default two orders of magnitude away (#1177).
+want("--max-rate=0")
+want("--max-time=0")
+want("--depth=3")
+if ini.get("MaxRate") != "0" or ini.get("MaxTime") != "0":
+    sys.exit("saving the reloaded project loses the zeros: %r" % ini)
+maxrate = re.search(r'name="maxrate" value="([^"]*)"',
+                    get("option5.html?sid=" + sid))
+if maxrate is None or maxrate.group(1) != "0":
+    sys.exit("option5.html shows %r in the rate box"
+             % (maxrate and maxrate.group(1)))
+
+# A checkbox field: the writer spells "cleared" as 0, so it must not come back
+# as a flag. Wacz is the control, on the same page and the same shape.
+reject("--warc")
+reject("--replace-external")
+want("--wacz")
+for key, value in [("Warc", "0"), ("Wacz", "1"), ("NoExternalPages", "0")]:
+    if ini.get(key) != value:
+        sys.exit("%s saved back as %r, wanted %r" % (key, ini.get(key), value))
+
+# One separator, whatever the run: unescapeini() folds an encoded CR LF TAB
+# into a single break, and the rules box must show exactly that.
+alias = textarea(get("option8.html?sid=" + sid), "hostalias")
+if alias != "a=b\rc=d":
+    sys.exit("the rules box holds %r, wanted one separator" % alias)
+want('--host-alias "a=b"')
+want('--host-alias "c=d"')
+
+# %% is the escape for a literal percent, and the writer puts it back.
+want('--footer "x%y"')
+if ini.get("Footer") != "x%%y":
+    sys.exit("Footer round-tripped as %r" % ini.get("Footer"))
+PY
+echo OK

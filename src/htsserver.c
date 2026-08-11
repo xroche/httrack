@@ -572,6 +572,61 @@ static void cat_cmdline_arglist(String *output, const char *value,
   }
 }
 
+/* winprofile.ini keys html/server/step4.html writes as ${ztest:<var>:0:1}: a
+   cleared checkbox lives in the session as an empty value, and only these get
+   the inverse on the way back in. Kept in step4.html's order; tests/274 fails
+   on drift. */
+static const char *const ini_checkbox_keys[] = {
+    "Near",
+    "Test",
+    "ParseAll",
+    "HTMLFirst",
+    "Cache",
+    "NoRecatch",
+    "Index",
+    "WordIndex",
+    "Log",
+    "RemoveTimeout",
+    "RemoveRateout",
+    "KeepAlive",
+    "NoErrorPages",
+    "NoExternalPages",
+    "NoPwdInPages",
+    "NoQueryStrings",
+    "NoPurgeOldFiles",
+    "Cookies",
+    "CheckType",
+    "ParseJava",
+    "HTTP10",
+    "TolerantRequests",
+    "UpdateHack",
+    "URLHack",
+    "KeepWww",
+    "KeepSlashes",
+    "KeepQueryOrder",
+    "StoreAllInCache",
+    "Sitemap",
+    "Warc",
+    "WarcCdx",
+    "Wacz",
+    "Changes",
+    "SingleFile",
+    "UseHTTPProxyForFTP",
+    NULL,
+};
+
+/* Whether key is a checkbox one, so that a stored 0 means "unchecked" rather
+   than the number zero. Case-sensitive, as ${do:copy:} is. */
+static hts_boolean ini_key_is_checkbox(const char *key) {
+  size_t i;
+
+  for (i = 0; ini_checkbox_keys[i] != NULL; i++) {
+    if (strcmp(key, ini_checkbox_keys[i]) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   int timeout = 30;
   int retour = 0;
@@ -911,8 +966,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 String escline = STRING_EMPTY;
 
                 *pos++ = '\0';
-                if (pos[0] == '0' && pos[1] == '\0')
-                  *pos = '\0';  /* 0 => empty */
+                /* Only a checkbox: elsewhere zero is the user's value, and
+                   emptying it silently restores the wizard default (#1177). */
+                if (pos[0] == '0' && pos[1] == '\0' &&
+                    ini_key_is_checkbox(line))
+                  *pos = '\0';
                 unescapeini(pos, &escline);
                 coucal_write(NewLangList, line,
                               (intptr_t) StringAcquire(&escline));
