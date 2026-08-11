@@ -194,8 +194,11 @@ def chrome(page, content):
         nav.append("\t</ul>")
     nav.append("</nav>")
 
+    # Marked even inside top: httrack.com injects its site menu right after it.
     top = [
+        MARK["masthead"][0],
         *MASTHEAD,
+        MARK["masthead"][1],
         "",
         '<div class="wrap">',
         "",
@@ -313,9 +316,17 @@ def main():
         with open(path, encoding="utf-8") as fp:
             before = fp.read()
         if MARK["top"][0] not in before and MARK["masthead"][0] not in before:
+            # A doc.css page without markers would drop out of the check, not fail it.
+            if 'href="doc.css"' in before:
+                print(f"{page}: loads doc.css but carries no doc-chrome marker")
+                stale += 1
             continue
         owned += 1
         after = rewrite(path, before)
+        # Assert the bytes that ship, not the regenerated form, which always has it.
+        if MARK["masthead"][0] not in (before if args.check else after):
+            print(f"{page}: no {MARK['masthead'][0]} marker")
+            stale += 1
         if after == before:
             continue
         if args.check:
