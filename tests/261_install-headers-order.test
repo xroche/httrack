@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# A consumer picks its own include order, so every ordered pair of installed
+# headers must compile. Each one alone already does (205, 206), which is what
+# let two order-only breaks ship: a partial macro copy and a config-less guard.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+if [ -z "${abs_top_builddir:-}" ]; then
+    echo "abs_top_builddir unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+make=${MAKE:-make}
+command -v "$make" >/dev/null 2>&1 || skip "no make ($make)"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+cpp_argv=(-I"$tmp/include")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    cpp_argv+=("${extra_argv[@]}")
+fi
+
+# Positive control: a compiler that cannot find its own libc headers would
+# blame ours instead.
+printf '#include <stdio.h>\n' >"$tmp/tu.c"
+if ! "${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+    head -5 "$tmp/cc.log" >&2
+    echo "${cc_argv[*]} cannot compile a bare <stdio.h>, skipping" >&2
+    exit 77
+fi
+
+env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+    DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
+    {
+        cat "$tmp/install.log" >&2
+        fail "install-DevIncludesDATA failed"
+    }
+
+headers=()
+for h in "$tmp/include/httrack"/*.h; do headers+=("$(basename "$h")"); done
+[ "${#headers[@]}" -ge 10 ] || fail "only ${#headers[@]} headers installed, the list cannot be right"
+
+cxx=""
+for cand in "${CXX:-}" g++ clang++ c++; do
+    [ -n "$cand" ] && command -v "$cand" >/dev/null 2>&1 && {
+        cxx="$cand"
+        break
+    }
+done
+[ -n "$cxx" ] || echo "no C++ compiler found, C leg only" >&2
+
+# Before trusting the sweep, prove it sees the shape it is here for: a
+# consumer that defined one attribute helper first used to starve htssafe.h of
+# HTS_CHECK_RESULT, because the guard is over the block, not the macro.
+printf '#define HTS_UNUSED\n#include <httrack/htssafe.h>\n' >"$tmp/poison.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/poison.c" 2>/dev/null; then
+    fail "a pre-defined HTS_UNUSED no longer breaks htssafe.h, this sweep proves nothing"
+fi
+
+bad=0
+for a in "${headers[@]}"; do
+    for b in "${headers[@]}"; do
+        [ "$a" = "$b" ] && continue
+        printf '#include <httrack/%s>\n#include <httrack/%s>\n' "$a" "$b" >"$tmp/tu.c"
+        if ! "${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+            echo "$a then $b does not compile as C:" >&2
+            head -5 "$tmp/cc.log" >&2
+            bad=1
+        fi
+        [ -n "$cxx" ] || continue
+        cp "$tmp/tu.c" "$tmp/tu.cpp"
+        if ! "$cxx" "${cpp_argv[@]}" -fsyntax-only "$tmp/tu.cpp" 2>"$tmp/cc.log"; then
+            echo "$a then $b does not compile as C++:" >&2
+            head -5 "$tmp/cc.log" >&2
+            bad=1
+        fi
+    done
+done
+[ "$bad" -eq 0 ] || fail "installed headers do not survive every include order"
+
+echo "swept ${#headers[@]} headers pairwise, both orders${cxx:+, C and C++}" >&2
+
+# The loop above is only meaningful if this compiler rejects a missing include.
+printf '#include "no-such-header-261.h"\n' >"$tmp/tu.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    fail "${cc_argv[*]} accepted a missing include, the checks above proved nothing"
+fi
+
+exit 0

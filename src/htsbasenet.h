@@ -39,6 +39,10 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_DEFBASENETH
 #define HTS_DEFBASENETH
 
+/* HTS_INET6 and HTS_USEOPENSSL are tested below, and this guard gives only the
+   first include a chance to act on them. */
+#include "htsglobal.h"
+
 #ifdef _WIN32
 
 #if HTS_INET6 == 0
