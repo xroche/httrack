@@ -207,22 +207,42 @@ else
             cxx_stds+=("$std")
     done
     [ "${#cxx_stds[@]}" -gt 0 ] || echo "$cxx accepts neither -std=c++11 nor -std=c++17, skipping the C++ leg" >&2
+    # Qt permits -fno-exceptions/-fno-rtti, so a consumer's TU may see the
+    # headers that way. Additive: the default mode keeps its own coverage.
+    noexc=()
+    exc_modes=1
+    printf 'int main() { return 0; }\n' >"$tmp/tu.cpp"
+    if "$cxx" "${base_cpp_argv[@]}" -fno-exceptions -fno-rtti -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>/dev/null; then
+        noexc=(-fno-exceptions -fno-rtti)
+        exc_modes=2
+    else
+        echo "$cxx rejects -fno-exceptions -fno-rtti, skipping that mode" >&2
+    fi
+    # Marks instead of failing, so one broken header does not cut the sweep short.
+    cxx_compile() {
+        local label=$1
+        shift
+        "$cxx" "$@" -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>"$tmp/cc.log" && return 0
+        echo "$label:" >&2
+        head -5 "$tmp/cc.log" >&2
+        bad=1
+    }
     for h in "${headers[@]}"; do
         b=$(basename "$h")
         argv=("${base_cpp_argv[@]}" -Wall -Wextra -Werror)
         printf '#include <httrack/%s>\nint main() { return 0; }\n' "$b" >"$tmp/tu.cpp"
         for std in "${cxx_stds[@]}"; do
             for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
-                if ! "$cxx" "${argv[@]}" "-std=$std" "$mode" -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>"$tmp/cc.log"; then
-                    echo "$b does not compile as C++ under -std=$std ($mode):" >&2
-                    head -5 "$tmp/cc.log" >&2
-                    bad=1
-                fi
+                cxx_compile "$b does not compile as C++ under -std=$std ($mode)" \
+                    "${argv[@]}" "-std=$std" "$mode"
+                [ "$exc_modes" -eq 1 ] ||
+                    cxx_compile "$b does not compile as C++ under -std=$std ($mode ${noexc[*]})" \
+                        "${argv[@]}" "-std=$std" "$mode" "${noexc[@]}"
             done
         done
     done
     [ "${#cxx_stds[@]}" -eq 0 ] ||
-        echo "compiled ${#headers[@]} headers x ${#cxx_stds[@]} C++ std x 2 bytecode modes with $cxx" >&2
+        echo "compiled ${#headers[@]} headers x ${#cxx_stds[@]} C++ std x 2 bytecode modes x $exc_modes exception modes with $cxx" >&2
 fi
 [ "$bad" -eq 0 ] || fail "installed headers do not compile as C++"
 
