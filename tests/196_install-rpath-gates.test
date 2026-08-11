@@ -76,4 +76,4 @@ expect no "a 32-bit multilib libdir does not" --prefix=/usr --libdir=/usr/lib32
 expect no "--disable-origin-rpath is honoured" --prefix="${work}/inst" --disable-origin-rpath
 expect no "a static build does not" --prefix="${work}/inst" --disable-shared
 
-test "${n}" -eq "${cases}" || fail "ran ${n} cases, not the ${cases} the budget is paced against"
+assert_steps_ran "${cases}" "${n}"
