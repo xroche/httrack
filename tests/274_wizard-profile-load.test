@@ -86,6 +86,13 @@ if not m:
     sys.exit("no session id in server/index.html")
 sid = m.group(1)
 
+# Control, before anything is loaded: a fresh session ticks the cache box, so
+# the assertions below measure the profile rather than an absent default.
+tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="cache"[^>]*>',
+                 get("option3.html?sid=" + sid))
+if len(tag) != 1 or "checked" not in tag[0]:
+    sys.exit("a new project does not default to caching: %r" % tag)
+
 # The only request that opens the file: a GET of an option page renders the
 # session the server already holds and never touches the disk.
 body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
