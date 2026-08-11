@@ -3753,8 +3753,18 @@ static const char *hts_host_alias_match(const char *rules, const char *host,
         if (strjoker(strstr(glob, "://") != NULL ? full : host,
                      strstr(glob, "://") != NULL ? glob : ghost, NULL,
                      NULL) != NULL) {
+          const char *end = eol;
+
           canon = eq + 1;
-          *canonlen = (size_t) (eol - canon);
+          /* Trim here, where the canonical is produced: the resolver compares
+             one match against the next to see a chain settle, and an untrimmed
+             one never equals the trimmed bytes it emits. */
+          while (canon < end && (*canon == ' ' || *canon == '\t'))
+            canon++;
+          while (end > canon &&
+                 (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '/'))
+            end--;
+          *canonlen = (size_t) (end - canon);
           break;
         }
       }
@@ -3840,15 +3850,6 @@ static const char *hts_host_alias_resolve(const char *rules, const char *adr,
        earlier in the chain named one. The link's credentials are kept. */
     if (canonlen >= sizeof(canonbuf))
       return NULL;
-    while (canonlen > 0 &&
-           (canon[canonlen - 1] == '/' || canon[canonlen - 1] == ' ' ||
-            canon[canonlen - 1] == '\t'))
-      canonlen--; /* a trailing slash is not a path, and a space is not a host
-                   */
-    while (canonlen > 0 && (*canon == ' ' || *canon == '\t')) {
-      canon++;
-      canonlen--;
-    }
     memcpy(canonbuf, canon, canonlen);
     canonbuf[canonlen] = '\0';
     chost = jump_protocol_const(canonbuf);
@@ -3968,8 +3969,8 @@ static hts_boolean hts_host_alias_token_ok(const char *token, size_t len,
   /* --host-alias maps hosts: a path belongs to no part of an address */
   if (strchr(host, '/') != NULL)
     return HTS_FALSE;
-  return strpbrk(host, glob ? "=# \t" : "=,*?();\\# \t") == NULL ? HTS_TRUE
-                                                                 : HTS_FALSE;
+  return strpbrk(host, glob ? "=# \t" : "=,*?();\\#@ \t") == NULL ? HTS_TRUE
+                                                                  : HTS_FALSE;
 }
 
 /* see htscore.h */

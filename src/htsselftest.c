@@ -3598,6 +3598,15 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
                          sizeof(dest)) == NULL);
   /* a run of trailing slashes is stripped by both the check and the fold */
   assertf(hts_host_alias_rule_ok("b.com//=a.com//"));
+  /* a canonical whose trailing slash is trimmed must still settle: the chain
+     compares one match against the next, and an untrimmed one never equals it
+   */
+  assertf(strcmp(hts_host_alias("*=a.com/", "http://b.com", HTS_TRUE, dest,
+                                sizeof(dest)),
+                 "http://a.com") == 0);
+  /* credentials belong to the link: a canonical carrying its own would be
+     prepended to them again on every re-fold */
+  assertf(!hts_host_alias_rule_ok("a.com=user:pw@a.com"));
   /* a trailing slash is not a path */
   assertf(strcmp(hts_host_alias("b.com/=https://a.com/", "http://b.com",
                                 HTS_TRUE, dest, sizeof(dest)),
