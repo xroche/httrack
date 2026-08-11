@@ -1014,3 +1014,7 @@ WARC segment size limit:
 WARC-segmendi suurim maht:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Alusta uut WARC-segmenti, kui praegune ületab selle baitide arvu; jäta tühjaks või 0, et hoida üks fail.
+Host aliases:
+Host aliases:
+Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).

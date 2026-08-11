@@ -1014,3 +1014,7 @@ WARC segment size limit:
 WARC セグメントの最大サイズ:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 現在のセグメントがこのバイト数を超えたら新しい WARC セグメントを開始します。空欄または 0 で単一ファイルのままにします。
+Host aliases:
+Host aliases:
+Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).

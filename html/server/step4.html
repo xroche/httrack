@@ -186,6 +186,7 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:cookiesfile:--cookies-file "}${arg:cookiesfile}${test:cookiesfile:"}
 	${test:pausefiles:--pause "}${arg:pausefiles}${test:pausefiles:"}
 	${test:stripquery:--strip-query "}${arg:stripquery}${test:stripquery:"}
+	${arglist:hostalias:--host-alias}
 	${test:toler:--tolerant}
 	${test:http10:--http-10}
 	${test:cache2:--store-all-in-cache}
@@ -248,6 +249,7 @@ KeepWww=${ztest:keepwww:0:1}
 KeepSlashes=${ztest:keepslashes:0:1}
 KeepQueryOrder=${ztest:keepqueryorder:0:1}
 StripQuery=${stripquery}
+HostAlias=${hostalias}
 StoreAllInCache=${ztest:cache2:0:1}
 Sitemap=${ztest:sitemap:0:1}
 SitemapUrl=${sitemapurl}

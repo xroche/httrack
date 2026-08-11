@@ -186,6 +186,13 @@ ${LANG_STRIPQUERY}
 >
 <br><br>
 
+${LANG_HOSTALIAS}
+<br>
+<textarea name="hostalias" cols="60" rows="4"
+			title='${html:LANG_HOSTALIASTIP}' onMouseOver="info('${js:LANG_HOSTALIASTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
+>${do:output-mode:html}${hostalias}${do:output-mode:}</textarea>
+<br><br>
+
 <input type="checkbox" name="toler" ${checked:toler}
 			title='${html:LANG_I1i}' onMouseOver="info('${js:LANG_I1i}'); return true" onMouseOut="info('&nbsp;'); return true"
 > ${LANG_I62}
