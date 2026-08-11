@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# freeport must reserve each port in the protocol its caller will bind: a
+# tcp-probed number can sit inside a Windows udp exclusion, and every retry
+# then loses the same way (#1178).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+real_python=$(find_python) || skip "python3 missing"
+python=$real_python # freeport reads it from here
+
+tmpdir=$(mktemp -d)
+cleanup_push rm -rf "$tmpdir"
+typelog="$tmpdir/socktypes"
+
+bindable() { # bindable PROTO PORT
+    "$real_python" -c 'import socket, sys
+kinds = {"tcp": socket.SOCK_STREAM, "udp": socket.SOCK_DGRAM}
+s = socket.socket(socket.AF_INET, kinds[sys.argv[1]])
+s.bind(("127.0.0.1", int(sys.argv[2])))
+s.close()' "$1" "$2"
+}
+
+# Off Windows a tcp-probed number binds as udp just as well, so the port alone
+# cannot say which protocol reserved it: wrap the probe and record what it opened.
+spy_python() { # spy_python -c SCRIPT [PROTO...]
+    local script=$2
+    test "$1" = "-c" || fail "freeport no longer runs python with -c: $1"
+    shift 2
+    "$real_python" -c 'import socket, sys
+log, code = sys.argv[1], sys.argv[2]
+real = socket.socket
+
+
+def spy(family=socket.AF_INET, type=socket.SOCK_STREAM, *a, **kw):
+    with open(log, "a") as f:
+        f.write(socket.SocketKind(type).name + "\n")
+    return real(family, type, *a, **kw)
+
+
+socket.socket = spy
+sys.argv = sys.argv[2:]
+exec(code)' "$typelog" "$script" ${1+"$@"}
+}
+
+spied() { # spied [PROTO...]: echoes the ports, leaves the types in $typelog
+    : >"$typelog"
+    (
+        python=spy_python
+        freeport ${1+"$@"}
+    )
+}
+
+kinds() { sort -u "$typelog" | tr '\n' ','; }
+
+## a port nothing holds is bindable, one already bound is not
+port=$(freeport) || fail "default freeport failed"
+assert_match '^[0-9]+$' "$port" "default freeport"
+bindable tcp "$port" || fail "the default port $port does not bind as tcp"
+
+"$real_python" -c 'import socket, sys, time
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.bind(("127.0.0.1", 0))
+print("PORT %d" % s.getsockname()[1])
+sys.stdout.flush()
+time.sleep(60)' >"$tmpdir/holder.log" 2>&1 &
+holder=$!
+cleanup_push stop_server "$holder"
+held=$(discover_server_port "$tmpdir/holder.log" "$holder") || fail "no udp holder"
+# Control: a bindable that cannot fail proves nothing about the ports above.
+! bindable udp "$held" 2>/dev/null || fail "bindable udp accepted $held, already bound"
+
+## each protocol is probed in its own
+port=$(spied tcp) || fail "freeport tcp failed"
+bindable tcp "$port" || fail "the tcp port $port does not bind as tcp"
+assert_eq "SOCK_STREAM," "$(kinds)" "socket types freeport tcp opened"
+
+port=$(spied udp) || fail "freeport udp failed"
+bindable udp "$port" || fail "the udp port $port does not bind as udp"
+assert_eq "SOCK_DGRAM," "$(kinds)" "socket types freeport udp opened"
+
+## a mixed pair, the shape start_proxytrack asks for
+read -r tcpport udpport <<<"$(spied tcp udp)"
+assert_eq "SOCK_DGRAM,SOCK_STREAM," "$(kinds)" "socket types freeport tcp udp opened"
+test "$tcpport" != "$udpport" || fail "both ports came back as $tcpport"
+bindable tcp "$tcpport" || fail "the tcp port $tcpport does not bind as tcp"
+bindable udp "$udpport" || fail "the udp port $udpport does not bind as udp"
+
+## a typo must not read as a port
+rc=0
+out=$(freeport sctp 2>&1) || rc=$?
+test "$rc" -ne 0 || fail "freeport accepted an unknown protocol: $out"
+assert_match 'unknown protocol sctp' "$out" "freeport sctp"
+
+echo "OK: freeport reserves tcp and udp ports in their own protocol"
