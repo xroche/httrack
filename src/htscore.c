@@ -545,6 +545,7 @@ int httpmirror(char *url1, httrackp * opt) {
   int retcode = 1; // return code for the single exit; a bailout sets -1
   hts_boolean rollback = HTS_FALSE;  // set to roll back the cache at cleanup
   hts_boolean completed = HTS_FALSE; // set once the crawl loop reaches its end
+  hts_boolean aborted = HTS_FALSE; // set when it stops with links left instead
 
   //
   int numero_passe = 0;         // deux passes pour html puis images
@@ -2081,6 +2082,10 @@ int httpmirror(char *url1, httrackp * opt) {
       ptr = opt->lien_tot;
     }
   } while(ptr < opt->lien_tot);
+
+  /* A stop request cuts the mirror short whether or not the loop ran out of
+     links: with one pending, the parser stops queueing the links it finds. */
+  aborted = opt->state.stop != 0 || opt->state.exit_xh != 0;
   //
   //
   //
@@ -2119,8 +2124,14 @@ int httpmirror(char *url1, httrackp * opt) {
     fclose(cache.lst);
     cache.lst = opt->state.strc.lst = NULL;
     /* old.lst minus new.lst is the set of files the previous mirror had and
-       this one does not. --changes reports it; only --purge-old acts on it. */
-    if (opt->delete_old || opt->changes) {
+       this one does not. --changes reports it; only --purge-old acts on it.
+       For a stopped mirror it is mostly what the run never got to. */
+    if (aborted) {
+      if (opt->delete_old || opt->changes) {
+        hts_log_print(opt, LOG_WARNING,
+                      "Mirror aborted: keeping all previously mirrored files");
+      }
+    } else if (opt->delete_old || opt->changes) {
       FILE *old_lst, *new_lst;
 
       hts_changes_indexed(opt);
@@ -2263,11 +2274,12 @@ int httpmirror(char *url1, httrackp * opt) {
     }
     finalInfo[0] = '\0';
     sprintf(finalInfo + strlen(finalInfo),
-            "HTTrack Website Copier/" HTTRACK_VERSION
-            " mirror complete in %s : " "%d links scanned, %d files written ("
-            LLintP " bytes overall)%s " "[" LLintP " bytes received at " LLintP
-            " bytes/sec]", htstime, (int) opt->lien_tot - 1,
-            (int) HTS_STAT.stat_files, (LLint) HTS_STAT.stat_bytes, infoupdated,
+            "HTTrack Website Copier/" HTTRACK_VERSION " mirror %s %s : "
+            "%d links scanned, %d files written (" LLintP " bytes overall)%s "
+            "[" LLintP " bytes received at " LLintP " bytes/sec]",
+            aborted ? "aborted after" : "complete in", htstime,
+            (int) opt->lien_tot - 1, (int) HTS_STAT.stat_files,
+            (LLint) HTS_STAT.stat_bytes, infoupdated,
             (LLint) HTS_STAT.HTS_TOTAL_RECV, (LLint) n);
 
     if (HTS_STAT.total_packed > 0 && HTS_STAT.total_unpacked > 0) {
@@ -2307,7 +2319,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
   // ending
   usercommand(opt, 0, NULL, NULL, NULL, NULL);
-  completed = HTS_TRUE;
+  completed = !aborted;
 
 cleanup:
   /* single exit: every bailout jumps here, so the closes below always run */
