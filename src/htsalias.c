@@ -39,6 +39,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htslib.h"
 
+#include <limits.h>
+
 #define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
 
 /*
