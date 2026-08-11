@@ -54,6 +54,7 @@ KeepAlive=0
 Cookies=0
 Index=0
 Cache=0
+URLHack=0
 Warc=0
 Wacz=1
 NoExternalPages=0
@@ -166,9 +167,12 @@ if ini.get("UserID") != "" or ini.get("KeepAlive") != "0":
     sys.exit("the cleared fields came back as %r / %r"
              % (ini.get("UserID"), ini.get("KeepAlive")))
 # --cookies=0 is emitted only for an empty value, and --index=0 only for a
-# literal 0, so together they pin the coercion from both sides.
+# literal 0, so together they pin the coercion from both sides. A cleared box
+# has to reach the engine, not just untick.
 want("--cookies=0")
 reject("--index=0")
+want("--cache=0")
+want("--urlhack=0")
 option4 = get("option4.html?sid=" + sid)
 tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="ka"[^>]*>', option4)
 if len(tag) != 1 or "checked" in tag[0]:
