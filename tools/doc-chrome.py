@@ -101,11 +101,20 @@ DESCRIPTIONS = {
     "scripting.html": "Driving the httrack command-line program from shell and" " batch scripts.",
 }
 
-# A regeneration stamps the current year; --check ignores the digits, so a page
-# shipped in an earlier year is in sync until something else rewrites it.
+# Pinned by SOURCE_DATE_EPOCH when set, as man/makeman.sh does, so a test can ask
+# for another year.
+_EPOCH = os.environ.get("SOURCE_DATE_EPOCH")
+YEAR = (
+    datetime.datetime.fromtimestamp(int(_EPOCH), datetime.timezone.utc).year
+    if _EPOCH
+    else datetime.date.today().year
+)
+
+# Stamped at regeneration time; --check masks the year, so a page shipped in an
+# earlier year still matches.
 FOOTER = [
     "<footer>",
-    f"\t<small>&copy; 1998-{datetime.date.today().year} Xavier Roche"
+    f"\t<small>&copy; 1998-{YEAR} Xavier Roche"
     " &amp; other contributors - Web Design: Leto Kauler.</small>",
     # Local copy: an absolute src breaks the image offline and makes a network request.
     '\t<a href="https://endsoftwarepatents.org/innovating-without-patents/"'
@@ -143,17 +152,18 @@ def region(text, part, body):
     return pattern.sub(open_ + "\n" + body.rstrip("\n") + "\n" + close, text, count=1)
 
 
-def undated(text):
+def mask_footer_year(text):
     """The page with the footer's copyright year masked, for comparison only.
 
-    Scoped to the footer region: contact.html carries a second 1998-YYYY in its
-    licence text, and that one has to stay byte-exact.
+    Scoped to the footer region so the mask cannot reach a 1998-YYYY elsewhere on
+    the page, such as contact.html's licence line.
     """
     open_, close = MARK["footer"]
     pattern = re.compile(re.escape(open_) + ".*?" + re.escape(close), re.S)
 
     def mask(match):
-        return re.sub(r"1998-\d{4}", "1998-YYYY", match.group(0))
+        # [0-9], not \d: \d also matches Arabic-Indic and fullwidth digits.
+        return re.sub(r"1998-[0-9]{4}", "1998-YYYY", match.group(0))
 
     return pattern.sub(mask, text, count=1)
 
@@ -373,7 +383,9 @@ def main():
             print(f"{page}: no {MARK['masthead'][0]} marker")
             stale += 1
         # A rewrite restamps the year; --check tolerates the one already shipped.
-        if after == before or (args.check and undated(after) == undated(before)):
+        if after == before:
+            continue
+        if args.check and mask_footer_year(after) == mask_footer_year(before):
             continue
         if args.check:
             print(f"{page}: chrome is out of sync with tools/doc-chrome.py")
