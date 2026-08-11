@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# guide.html hardcodes width/height on every screenshot, and a recapture at
+# another geometry ships stretched with nothing to say so (#1187).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+checker="${srcdir}/tests/guide-image-check.py"
+
+command -v python3 >/dev/null 2>&1 || skip "no python3"
+python3 -c 'import PIL.Image' >/dev/null 2>&1 || skip "no PIL"
+test -r "${checker}" || skip "no ${checker}"
+
+# The assertion this test exists for.
+python3 "${checker}" "${srcdir}/html" ||
+    fail "guide.html's declared image sizes are out of sync with html/img/"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/guideimg.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+cleanup_push rm -rf "${work}"
+
+pristine="${work}/pristine"
+cp -a "${srcdir}/html" "${pristine}"
+guide="${work}/html/guide.html"
+restore() { rm -rf "${work}/html" && cp -a "${pristine}" "${work}/html"; }
+restore
+
+edit() { # edit FROM TO: one sed substitution in guide.html, proven to apply
+    sed "s|$1|$2|" "${guide}" >"${work}/edited"
+    if cmp -s "${guide}" "${work}/edited"; then
+        fail "mutant did not apply: $1"
+    fi
+    mv "${work}/edited" "${guide}"
+}
+
+expect_fail() { # expect_fail RE LABEL: the checker must reject, and say why
+    local out
+    if out=$(python3 "${checker}" "${work}/html" 2>&1); then
+        fail "${2}: the checker still passes: ${out}"
+    fi
+    grep -q "$1" <<<"${out}" || fail "${2}: no /$1/ in: ${out}"
+}
+
+# Each arm on its own, or one of them could be carrying the others.
+edit 'width="1024" height="387"' 'width="1023" height="387"'
+expect_fail 'says 1023x387, the file is 1024x387' "a width off by one"
+restore
+
+edit 'width="1024" height="387"' 'width="1024" height="386"'
+expect_fail 'says 1024x386, the file is 1024x387' "a height off by one"
+restore
+
+edit ' width="1024" height="387"' ''
+expect_fail 'guide-web-start.png: <img> carries no width/height' "an unsized img"
+restore
+
+rm "${work}/html/img/guide-web-start.png"
+expect_fail 'guide-web-start.png: referenced by guide.html, not shipped' "a deleted image"
+restore
+
+cp "${work}/html/img/guide-web-start.png" "${work}/html/img/guide-web-dropped.png"
+expect_fail 'guide-web-dropped.png: shipped, but guide.html no longer shows it' "an orphan"
+restore
+
+# Vacuity: a parse that yields nothing satisfies every check above. Empty img/
+# too, so the floor is the only thing left that can fire.
+rm -f "${work}"/html/img/*
+sed 's|<img [^>]*>||g' "${pristine}/guide.html" >"${guide}"
+if grep -q 'src="img/' "${guide}"; then
+    fail "the img-less guide still references img/"
+fi
+expect_fail 'want at least' "an img-less guide"
+out=$(python3 "${checker}" "${work}/html" 2>&1 >/dev/null) || true
+nbad=$(grep -c '^FAIL:' <<<"${out}" || true)
+test "${nbad}" -eq 1 || fail "the floor is not the only arm firing: ${out}"
+
+echo "guide images: geometry, existence and orphans all checked, each arm proven"
