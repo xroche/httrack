@@ -40,6 +40,12 @@ assert_match() { # assert_match RE TEXT [LABEL]
 
 assert_file() { test -f "$1" || fail "${2:+$2: }missing file: $1"; }
 
+# Every step skip_if_out_of_budget projects against ran. A skip is an exit, so a
+# loop that quietly ran fewer paces against a count that is a lie.
+assert_steps_ran() { # assert_steps_ran WANT GOT
+    assert_eq "$1" "$2" "steps the budget is paced against"
+}
+
 # Run engine self-test NAME: stdout must equal WANT, status must be 0 (which a
 # `test "$(...)" = ...` cannot see). expect_ok takes a command, for a real -O.
 assert_selftest() { # assert_selftest WANT NAME [ARGS...]
@@ -450,29 +456,21 @@ EOF
     test "$(command -v sleep)" = "$dir/sleep" || return 1
 }
 
-# Skip when the steps left of a run of $2, at 1.5x the $3 seconds the last one
-# took, no longer fit the budget meant to catch a wedge (hppa spends ~150s on one
-# configure run and would else FTBFS on the harness kill). Every step left, not
-# just the next: 151 pays for a full configure only in its last four cases, so a
-# reserve of one cheap reject let it walk into the kill with four to go. Step 1
-# is the exception, projected over itself alone -- 196 warms a shared
-# config.cache there, and over the rest that would skip a run that fits.
-skip_if_out_of_budget() { # skip_if_out_of_budget <steps done> <steps total> <seconds the last took>
-    local budget=${HTTRACK_TEST_TIMEOUT:-600} left=$(($2 - $1)) need
+# Skip when the next of $1 remaining steps, at 1.5x the $2 seconds the last one
+# took, no longer fits the budget meant to catch a wedge (hppa spends ~150s on one
+# configure run and would else FTBFS). One step ahead rather than all of them:
+# projecting a single sample over the whole tail skips a run that fits whenever
+# one step is slower than its neighbours. It asks an ordering of the callers
+# instead, expensive steps first, so no step left can outrun the reserve the one
+# before it set (#1146).
+skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took>
+    local budget=${HTTRACK_TEST_TIMEOUT:-600} need=$(($2 + $2 / 2))
 
     case "$budget" in '' | *[!0-9]*) budget=600 ;; esac
-    test "$left" -gt 0 && test "$budget" -gt 0 || return 0
-    need=$(($3 + $3 / 2))
-    test "$1" -le 1 || need=$((left * $3 + $3 / 2))
+    test "$1" -gt 0 && test "$budget" -gt 0 || return 0
     test "$((SECONDS + need))" -ge "$budget" || return 0
-    echo "$left steps left, the last took ${3}s and the budget is ${budget}s; skipping" >&2
+    echo "$1 steps left, the last took ${2}s and the budget is ${budget}s; skipping" >&2
     exit 77
-}
-
-# Every step the pacer projects against ran: a skip is an exit, so a loop that
-# quietly ran fewer would leave the budget paced against a count that is a lie.
-assert_steps_ran() { # assert_steps_ran <steps done> <steps total>
-    test "$1" -eq "$2" || fail "ran $1 steps, not the $2 the budget is paced against"
 }
 
 # Collect a killed job, giving up after REAP_GRACE seconds. kill_tree can fail to

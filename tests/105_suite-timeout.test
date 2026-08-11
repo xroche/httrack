@@ -132,27 +132,29 @@ saw_budget 0 "a disabled guard"
 # does not.
 cat >"$tmp/94_pacer.test" <<EOF
 . "${testdir}/testlib.sh"
-skip_if_out_of_budget 9 9 40  # nothing left to run
-skip_if_out_of_budget 5 10 0  # steps that cost nothing
-skip_if_out_of_budget 1 10 80 # step 1 is projected over itself alone: 120s
+skip_if_out_of_budget 0 9999 # nothing left to run
+skip_if_out_of_budget 5 0    # steps that cost nothing
+skip_if_out_of_budget 5 40   # the next step alone wants 60s
 echo "the pacer let it through"
 EOF
 rc=0
 HTTRACK_TEST_TIMEOUT=20 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
-test "$rc" -eq 77 || fail "a 120s step under a 20s budget reported $rc, want 77"
+test "$rc" -eq 77 || fail "a 60s step under a 20s budget reported $rc, want 77"
 rc=0
 HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/94_pacer.test" >"$out" 2>&1 || rc=$?
-test "$rc" -eq 0 || fail "a 120s step under a 600s budget reported $rc, want 0"
+test "$rc" -eq 0 || fail "a 60s step under a 600s budget reported $rc, want 0"
 grep -q 'the pacer let it through' "$out" || fail "the pacer skipped a test that fits"
 
-# Past step 1 every step left is reserved for, not just the next: 151 spent its
-# budget on twelve cheap cases and was killed with four expensive ones to go. The
-# step above is the control, same cost and budget, skipped only for being step 1.
-printf '. "%s"\nskip_if_out_of_budget 2 10 80\n' "${testdir}/testlib.sh" \
-    >"$tmp/96_project.test"
-rc=0
-HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/96_project.test" >"$out" 2>&1 || rc=$?
-test "$rc" -eq 77 || fail "eight 80s steps under a 600s budget reported $rc, want 77"
+# The reserve is half a step over the last one, and only a budget between the two
+# sizes proves it: 100s alone would fit under 140, 150s does not.
+printf '. "%s"\nskip_if_out_of_budget 5 100\n' "${testdir}/testlib.sh" \
+    >"$tmp/96_margin.test"
+for want in 140:77 200:0; do
+    rc=0
+    HTTRACK_TEST_TIMEOUT=${want%%:*} bash "$driver" "$tmp/96_margin.test" >"$out" 2>&1 || rc=$?
+    test "$rc" -eq "${want##*:}" ||
+        fail "a 100s step under a ${want%%:*}s budget reported $rc, want ${want##*:}"
+done
 
 # --- the process lists survive a host with no ps ----------------------------
 # Fedora's build root ships no procps, and the guard then named nothing (#1021).
@@ -181,9 +183,9 @@ if ! is_windows && test -r /proc/self/stat; then
         "$tmp/httrack" -c "$hold" &
         echo $! >"$tmp/outside.pid"
     )
-    # A third, in the shape an emulated buildd hands the kernel: binfmt_misc with
-    # its P flag leaves the interpreter in argv[0] and the engine one place right.
-    # "exec -a" stands in for the qemu-user no runner here has.
+    # A third, as binfmt_misc's P flag hands it over: the interpreter in argv[0]
+    # and the engine one place right. "exec -a" stands in for the qemu no runner
+    # here has.
     mkdir "$tmp/emul"
     printf '%s\n' "$hold" >"$tmp/emul/httrack"
     (
@@ -198,9 +200,8 @@ if ! is_windows && test -r /proc/self/stat; then
     # $tmp and $shim, which is how $shim used to leak.
     kill_probes() { kill "$fake" "$outside" "$emul" 2>/dev/null || true; }
     cleanup_push kill_probes
-    # /proc holds the pid from the fork on, so a fake that never exec'd would fail
-    # some later assertion instead of this one. Ten seconds: an emulated buildd
-    # spends whole seconds on an exec, and this returns as soon as it matches.
+    # /proc holds the pid from the fork on, so a never-exec'd fake fails later,
+    # not here. Ten seconds covers an emulated exec, and it returns on the match.
     running() {
         local i=0
         while test "$i" -lt 100; do
@@ -276,12 +277,12 @@ if ! is_windows && test -r /proc/self/stat; then
         grep -q 'no process list' <<<"$(list_stray_processes "$pgid" group)" ||
             fail "a host with no ps and no /proc produced no notice"
     )
-    kill "$fake" "$outside" 2>/dev/null || true
+    kill "$fake" "$outside" "$emul" 2>/dev/null || true
 fi
 
 # --- an emulated buildd hides the engine behind its binfmt interpreter -------
-# The controls a real process cannot carry: a wrapper, and an emulator handed a
-# disk image rather than a program. No runner here has qemu-user, so synthesize.
+# Two cases the process above cannot carry: a wrapper, and an emulator given a
+# disk image instead of a program. No runner has qemu-user, so synthesize them.
 if ! is_windows; then
     (
         # shellcheck disable=SC2317 # reached through the two matchers below
@@ -293,7 +294,7 @@ PID PPID PGID ELAPSED S COMMAND
 13 1 40 12 S /bld/src/httrack -q http://h/
 14 1 40 12 S /usr/bin/strace /bld/src/httrack -q http://h/
 15 1 40 12 S /usr/bin/qemu-img convert /srv/local-server.py out.raw
-16 1 40 12 S /usr/bin/qemu-nbd /mnt/httrack
+16 1 40 12 S /usr/bin/qemu-nbd-static /mnt/httrack
 17 1 40 12 S /opt/my-custom-binfmt /mnt/httrack
 EOF
         }

@@ -13,12 +13,12 @@ ENGINE_EXE_RE="^(lt-)?(${ENGINE_EXES// /|})([.]exe)?\$"
 ENGINE_IMAGE_RE="^(${ENGINE_EXES// /|})[.]exe"
 FIXTURE_SERVER_RE='^(local-server|proxy-https-server|proxy-connect-server|socks5-server|tls-stall-server)[.]py$'
 
-# Under qemu-user the kernel reports the binfmt interpreter as the command and
+# Under qemu-user the kernel reports the binfmt interpreter as the command, and
 # the program's own argv[0] lands one place right (Debian's hppa buildd
-# emulates). qemu-img and friends take a disk image, not a program, and these
-# lists feed kill: shifting past them would read the image path as the process.
+# emulates). qemu-img and friends take a disk image, not a program; these lists
+# feed kill, so shifting past one would read the image path as the process.
 QEMU_INTERP_RE='^qemu-[[:alnum:]_]+(-static)?$|^[[:alnum:]_]+-binfmt(-[[:upper:]]+)?$'
-QEMU_IMAGE_TOOL_RE='^qemu-(img|nbd|io|ga|edid|keymap)$'
+QEMU_IMAGE_TOOL_RE='^qemu-(img|nbd|io|ga|edid|keymap)(-static)?$'
 
 # awk prologue for the matchers below, taking those two as -v qint and -v qimg.
 # shellcheck disable=SC2016 # awk fields, not shell expansions
@@ -30,19 +30,14 @@ function qemushift(  n) {
     return n ~ qint ? 1 : 0
 }'
 
-# The name of the program pid $1 is running, empty if it is gone. Same shift as
-# qemushift(), against /proc rather than a process listing.
+# The name of the program pid $1 is running, empty if it is gone. Fed to the
+# prologue above as a one-row listing, so the shift is decided in one place.
 proc_program_name() { # proc_program_name <pid>
-    local a n
-    local -a argv=()
-    { while IFS= read -r -d '' a; do argv+=("$a"); done <"/proc/$1/cmdline"; } 2>/dev/null
-    test "${#argv[@]}" -gt 0 || return 1
-    n=${argv[0]##*/}
-    if test "${#argv[@]}" -gt 1 && [[ $n =~ $QEMU_INTERP_RE ]] &&
-        ! [[ $n =~ $QEMU_IMAGE_TOOL_RE ]]; then
-        n=${argv[1]##*/}
-    fi
-    printf '%s\n' "$n"
+    local a args=
+    { while IFS= read -r -d '' a; do args="${args:+$args }$a"; done <"/proc/$1/cmdline"; } 2>/dev/null
+    test -n "$args" || return 1
+    awk -v qint="$QEMU_INTERP_RE" -v qimg="$QEMU_IMAGE_TOOL_RE" "$AWK_PROC_NAMES"'
+        { print basen($(6 + qemushift())) }' <<<"1 1 1 0 S $args"
 }
 
 # Every process as "PID PPID PGID ELAPSED S COMMAND", header first. A Fedora

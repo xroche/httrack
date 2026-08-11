@@ -64,7 +64,7 @@ expect() {
     test "${got}" = "${want}" ||
         fail "${desc}: libhttrack.pc rpath is '${got}', expected '${want}': ${line}"
     echo "ok: ${desc} -> ${want}"
-    skip_if_out_of_budget "${n}" "${cases}" "$((SECONDS - began))"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 }
 
 # The positive control first, or every "no" below could come from a probe that
@@ -76,4 +76,4 @@ expect no "a 32-bit multilib libdir does not" --prefix=/usr --libdir=/usr/lib32
 expect no "--disable-origin-rpath is honoured" --prefix="${work}/inst" --disable-origin-rpath
 expect no "a static build does not" --prefix="${work}/inst" --disable-shared
 
-assert_steps_ran "${n}" "${cases}"
+assert_steps_ran "${cases}" "${n}"

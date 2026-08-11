@@ -81,7 +81,7 @@ run() { # run <label> <env argument>...
     wait "$pid" || status=$?
     log=$(cat "$rundir/log")
     echo "run $n ($label): exit $status"
-    skip_if_out_of_budget "$n" "$cases" "$((SECONDS - began))"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 }
 
 reject() { # reject <label> <expected message> <env argument>...
@@ -127,6 +127,16 @@ accept() {
     fi
 }
 
+# The four that configure to completion run first. A reject stops at the
+# BASH_SHELL check and costs a fraction of one, and the pacer projects the step it
+# just timed: behind the cheap ones it read far too low and 151 met the harness
+# kill instead (#1146). Positive control first, as in 196.
+accept override "$tmp/mybash" '' "BASH_SHELL=$tmp/mybash"
+accept empty '' '' BASH_SHELL=
+# No override: an unusable bash is a warning, so a box that has none still builds.
+accept searched "$tmp/fakebin/bash" 'no usable bash found' -u BASH_SHELL "PATH=$tmp/fakebin:$PATH"
+accept searched-posix-env '' 'POSIXLY_CORRECT or SHELLOPTS' -u BASH_SHELL POSIXLY_CORRECT=1
+
 reject relative 'BASH_SHELL must be an absolute path' BASH_SHELL=relbash
 notreg='is not an executable regular file'
 reject missing "$notreg" "BASH_SHELL=$tmp/missing/bash"
@@ -161,11 +171,5 @@ if grep -q 'POSIXLY_CORRECT or SHELLOPTS' <<<"$log"; then
     exit 1
 fi
 
-accept override "$tmp/mybash" '' "BASH_SHELL=$tmp/mybash"
-accept empty '' '' BASH_SHELL=
-# No override: an unusable bash is a warning, so a box that has none still builds.
-accept searched "$tmp/fakebin/bash" 'no usable bash found' -u BASH_SHELL "PATH=$tmp/fakebin:$PATH"
-accept searched-posix-env '' 'POSIXLY_CORRECT or SHELLOPTS' -u BASH_SHELL POSIXLY_CORRECT=1
-
-assert_steps_ran "$n" "$cases"
+assert_steps_ran "$cases" "$n"
 echo "configure validated $n BASH_SHELL values"
