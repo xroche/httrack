@@ -541,7 +541,9 @@ static void cat_cmdline_arg(String *output, const char *value) {
    or '=' where it belongs to the rule the parser trims it out of. */
 static void cat_cmdline_arglist(String *output, const char *value,
                                 const char *flag) {
-  static const char *const ws = " \t\r\n";
+  /* isspace()'s C-locale set, so a rules box splits the same here and in the
+     Android app, whose Java \s covers \v and \f too. */
+  static const char *const ws = " \t\r\n\v\f";
   const char *p = value + strspn(value, ws);
   hts_boolean first = HTS_TRUE;
 

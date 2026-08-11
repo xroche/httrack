@@ -109,11 +109,13 @@ for value, want in [(" ".join(RULES), RULES),
                     ("\r\n" + "\r\n\r\n".join(RULES) + "\r\n", RULES),
                     ("a=b  c=d", ["a=b", "c=d"]),
                     ("a=b\tc=d", ["a=b", "c=d"]),
+                    ("a=b\vc=d", ["a=b", "c=d"]),
+                    ("a=b\fc=d", ["a=b", "c=d"]),
                     ("a=b \r\n\t c=d", ["a=b", "c=d"]),
                     ("  \r\n a=b \r\n  ", ["a=b"]),
                     ("a.com  ,  b.com  =  c.com", ["a.com,b.com=c.com"]),
                     ("a.com,\r\nb.com=c.com", ["a.com,b.com=c.com"]),
-                    (" \r\n\t ", []),
+                    (" \r\n\t\v\f ", []),
                     ("", [])]:
     got = emitted_rules(value)
     if got != want:
