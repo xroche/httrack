@@ -33,9 +33,8 @@ refused() { # refused RE LABEL
     assert_match "$1" "$out" "$2"
 }
 
-# The space form is what the wizard's rules box emits. The '=' form never
-# reaches the alias guard, so it lands on the engine's own; a "-quoted argument
-# is unquoted between the two and lands there as well.
+# The space form is what the wizard's rules box emits. The '=' form skips the
+# alias guard and lands on the engine's own, as does a "-quoted argument.
 printf '[a dash-leading rule is taken, in every form] ..\t'
 parse --strip-query -utm
 accepted "--strip-query -utm"
@@ -55,8 +54,8 @@ parse "-%C" '-old.example.com=example.com'
 accepted "-%C -old.example.com=example.com"
 echo OK
 
-# A token that names a real option is still a mistake, so the diagnostic
-# survives for it. The '=' form is the way to hand a rule option one anyway.
+# A token that names a real option is still a mistake, and the '=' form is the
+# way to hand a rule option one on purpose.
 printf '[a rule option still refuses a real option name] ..\t'
 for opt in --strip-query --host-alias; do
     for next in --sockets -q -O --nocache --wide-mirror; do
@@ -68,9 +67,8 @@ parse --strip-query=-q
 accepted "--strip-query=-q"
 echo OK
 
-# The rule reaches the grammar check, which names the option and quotes what it
-# rejected. Quoting it back proves the leading '-' survived into the rule, which
-# no crawl below can see: no address begins with one.
+# The rule reaches the grammar check, which quotes it back: proof the leading
+# '-' survived, which no crawl can show since no address begins with one.
 printf '[a malformed dash rule is named, not blamed on -%%C] ..\t'
 parse --host-alias -nope
 refused 'Rejected: -nope' "malformed --host-alias"
@@ -100,17 +98,17 @@ noparam "--user-structure -q" --user-structure -q
 noparam "--user-agent -q" --user-agent -q
 echo OK
 
-# The rule is stored byte for byte, not merely accepted. The engine applies the
-# last rule matching an address, so the unscoped dash rule yields to the scoped
-# one when it comes first (2 files) and wins when it comes second (3 files); a
-# rule accepted and then dropped would save 2 both times.
+# The rule is stored, not merely accepted: the engine applies the last rule
+# matching an address, so the unscoped dash rule yields to the scoped one when
+# it comes first (2 files) and wins when it comes second (3 files). A rule
+# accepted and then dropped would save 2 both times.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
     httrack 'BASEURL/stripquery/index.html' \
     --strip-query '-nokey' --strip-query '*/stripquery/*=utm_source'
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
     httrack 'BASEURL/stripquery/index.html' \
     --strip-query '*/stripquery/*=utm_source' --strip-query '-nokey'
-# ...and the fixture's key is utm_source, so a stored -utm_source strips
+# Byte for byte: the fixture's key is utm_source, so -utm_source must strip
 # nothing. Trimming the '-' anywhere on the way in would save 2 files here.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
     httrack 'BASEURL/stripquery/index.html' --strip-query '-utm_source'

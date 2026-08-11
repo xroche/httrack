@@ -279,9 +279,8 @@ const char *hts_optalias[][4] = {
 };
 /* clang-format on */
 
-/* Whether TOKEN is an option this file would resolve, rather than a value that
-   happens to begin with '-'. Only the spellings optalias_check() takes below:
-   a short cluster (-c8) reads as a value. */
+/* Whether TOKEN is an option name, rather than a value that begins with '-'.
+   Only the spellings optalias_check() resolves: a cluster (-c8) is a value. */
 static hts_boolean optreal_or_alias(const char *token) {
   char name[64];
   const char *eq;
@@ -308,8 +307,8 @@ static hts_boolean optreal_or_alias(const char *token) {
 }
 
 /* Whether the real option OPT at ARGV[N_ARG] lacks the separate parameter it
-   needs. A strip-query key or a host-alias pattern may itself begin with '-'
-   (#1179), so those two take anything that is not an option name; write
+   needs. A strip-query key or a host-alias pattern may begin with '-' (#1179),
+   so those two take any following token that is not an option name; write
    --strip-query=-q to hand them one that is. */
 static hts_boolean optparam_missing(int argc, const char *const *argv,
                                     int n_arg, const char *opt) {
