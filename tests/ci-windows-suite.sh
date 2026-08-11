@@ -24,9 +24,12 @@ ci_annotate() {
 # End a wedged suite before its runner dies: a step that fails on its own terms
 # keeps its log, a lost runner keeps nothing, annotations included (#795). Quiet
 # for $1s, then names the test in flight from $3 every $2s; kills $5 once $3 has
-# been static for $4s. Staticness, never elapsed time: a healthy test in flight and
-# a wedged one look identical by the clock, but every outcome writes a line, the
-# per-test timeout included, so $4 past that timeout means it never fired.
+# been static for $4s, or unconditionally $6s in (0: never). Staticness, never
+# elapsed time: a healthy test in flight and a wedged one look identical by the
+# clock, but every outcome writes a line, the per-test timeout included, so $4 past
+# that timeout means it never fired. The cap covers what staticness cannot: each of
+# those lines buys another $4s, so a tail of blown budgets walks the step onto the
+# workflow timeout, which keeps neither the log nor the artifacts (#1126).
 # Assigns into hb_time rather than printing: reading the clock forks nothing, which
 # matters when the box has none to spare. Overridable for the unit test virtual clock.
 hb_time=0
@@ -67,8 +70,21 @@ ci_start_native_watchdog() {
     return 1
 }
 
+# End the step, announcing $2 first: the kill runs no EXIT trap, so an unexplained
+# death is all the log would otherwise hold.
+ci_heartbeat_kill() {
+    local main=$1
+    ci_annotate error "suite watchdog" "$2"
+    # Ahead of the kill, which runs no EXIT trap: an orphan would outlive the
+    # step and overwrite its last status with a frozen tail.
+    test -z "${watchdog:-}" || kill_pid "$watchdog"
+    # Direct first: kill_tree may reap this watchdog before its own root (#953).
+    kill_pid "$main"
+    kill_tree "$main"
+}
+
 ci_suite_heartbeat() {
-    local quiet=$1 every=$2 progress=$3 stuck=$4 main=$5
+    local quiet=$1 every=$2 progress=$3 stuck=$4 main=$5 hard=${6:-0}
     local tick=$2 begin now line said moved last=''
     # Measured, never accumulated: the starvation this watchdog exists to catch is
     # exactly what makes a sleep overshoot, and drift only ever delays the kill.
@@ -85,17 +101,19 @@ ci_suite_heartbeat() {
         # end the watchdog in silence, which reads as protection and is not.
         line=$(tail -n 1 "$progress" 2>/dev/null || true)
         test "$line" = "$last" || { last=$line moved=$now; }
+        # Ahead of the quiet window, which only delays the staticness verdict: a
+        # cap that inherited that delay could not be set below it.
+        if test "$hard" -gt 0 && test $((now - begin)) -ge "$hard"; then
+            ci_heartbeat_kill "$main" \
+                "killing the step: ${hard}s cap reached, in flight: $last"
+            return 0
+        fi
         test $((now - begin)) -ge "$quiet" || continue
         # Every tick, not on the annotation cadence, which would let a late wedge
         # outlive the step's own timeout before being caught.
         if test $((now - moved)) -ge "$stuck"; then
-            ci_annotate error "suite watchdog" "killing the step: $((now - moved))s without progress, in flight: $last"
-            # Ahead of the kill, which runs no EXIT trap: an orphan would outlive the
-            # step and overwrite its last status with a frozen tail.
-            test -z "${watchdog:-}" || kill_pid "$watchdog"
-            # Direct first: kill_tree may reap this watchdog before its own root (#953).
-            kill_pid "$main"
-            kill_tree "$main"
+            ci_heartbeat_kill "$main" \
+                "killing the step: $((now - moved))s without progress, in flight: $last"
             return 0
         fi
         test $((now - said)) -ge "$every" || continue
@@ -174,9 +192,15 @@ stuck=900
 # 960s of quiet and 900s of static log, and every #795 death measured so far
 # lands inside the first 750s of the step.
 watchdog='' ci_watchdog_pid=''
+# Wall-clock backstop, because staticness alone bounds nothing: the deadline above
+# is read between tests, and past it one test may still spend $per_test and then a
+# traced rerun, each writing a progress line that re-arms $stuck. 2400s clears that
+# 1500+600 worst case with room for the hang dump, and leaves 300s of the step's
+# 45 minutes to fail on our own terms and upload (#1126).
+hard_deadline=2400
 ci_start_native_watchdog "$PWD/$progress" && watchdog=$ci_watchdog_pid
 test -n "$watchdog" || echo "no off-box watchdog: no usable PowerShell"
-ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ &
+ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ "$hard_deadline" &
 heartbeat=$!
 trap 'set +e; kill "$heartbeat" 2>/dev/null; test -z "$watchdog" || kill_pid "$watchdog"' EXIT
 
@@ -189,6 +213,7 @@ pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
 categories=(runnable:'00_runnable*.test' engine:'*_engine-*.test' zlib:'*_zlib-*.test'
     local:'*_local-*.test' watchdog:'*_watchdog*.test'
     testlib:'*_testlib-*.test' crawllib:'*_crawllib*.test'
+    crawl-harness:'*_crawl-harness-*.test'
     proxy-https:'*_crawl_proxy_https.test' log-salvage:'*_crawl-log-salvage.test')
 tests=()
 shopt -s nullglob
@@ -204,15 +229,6 @@ for c in "${categories[@]}"; do
     tests+=("${matched[@]}")
 done
 shopt -u nullglob
-
-# The one test deliberately failing a crawl, which wedged this leg twice at its
-# step timeout (#1126). Its name is what keeps it out of the globs above, so the
-# name is asserted: renaming it into one of them must red here, not on the runner.
-wedged=260_crawl-harness-fails-loudly.test
-test -e "$wedged" || {
-    echo "::error::$wedged is gone; a rename must stay clear of the globs above (#1126)"
-    exit 1
-}
 
 for t in "${tests[@]}"; do
     elapsed=$((SECONDS - started))
@@ -252,10 +268,19 @@ for t in "${tests[@]}"; do
         echo "FAIL $t (exit $rc)"
         # These assert with `test "$(...)" == "..." || exit 1`, which
         # says nothing at all on failure. Re-run traced, still bounded.
-        # Noted first, or a slow trace reads as a wedge to the watchdog,
-        # which would then kill the step in the middle of writing it.
-        echo "RERUN $t" >>"$progress"
-        run_with_timeout "$per_test" bash -x "$t" >>"$t.log" 2>&1 || true
+        # Charged to the suite deadline rather than given a budget of its
+        # own: a failure just under that deadline would else spend
+        # $per_test twice and land on the workflow's own timeout (#1126).
+        left=$((suite_deadline - (SECONDS - started)))
+        test "$left" -le "$per_test" || left=$per_test
+        if [ "$left" -gt 0 ]; then
+            # Noted first, or a slow trace reads as a wedge to the watchdog,
+            # which would then kill the step in the middle of writing it.
+            echo "RERUN $t" >>"$progress"
+            run_with_timeout "$left" bash -x "$t" >>"$t.log" 2>&1 || true
+        else
+            echo "no trace: past the ${suite_deadline}s suite deadline"
+        fi
         tail -n 25 "$t.log" | sed 's/^/      /'
         ;;
     esac
@@ -288,8 +313,9 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # decode back to, which NTFS refuses;
 # memresume, repaircache and resume-recovery interrupt pass 1 with a signal
 # MSYS cannot deliver to a native exe;
-# ftp-deadhost-interrupt, ftp-sigterm, signal-receive and ftp-stop-window need
-# that same signal (deadhost's --timeout half runs, as 245);
+# ftp-deadhost-interrupt, ftp-sigterm, abort-purge, signal-receive and
+# ftp-stop-window need that same signal (deadhost's --timeout half runs as 245,
+# abort-purge's --max-time half as 268);
 # close-once interposes close() through LD_PRELOAD, which MSYS has no equivalent for.
 expected_skips="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -303,6 +329,7 @@ expected_skips="01_engine-footer-overflow.test
 215_engine-datadir-ospath.test
 243_local-ftp-deadhost-interrupt.test
 255_local-ftp-sigterm.test
+261_local-abort-purge.test
 262_local-signal-receive.test
 263_local-ftp-stop-window.test
 235_local-resume-recovery.test

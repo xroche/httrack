@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# A run stopped by --max-time purged the files it never reached (#1109). The
+# cap fires while slow.html is in flight, and the parser then drops the leaf
+# links that page carries, so the crawl loop runs out of links without ever
+# queueing them: an abort the cursor cannot see. 261 covers the signalled half.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
+
+command -v httrack >/dev/null || fail "could not find httrack"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_capped.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+ok() { echo "OK: $*"; }
+
+out="${tmpdir}/crawl"
+mkdir -p "$out"
+leaves=(x0 x1 x2 x3 x4 x5)
+common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1)
+
+local_server_start --log "${tmpdir}/server.log"
+host="127.0.0.1_${SRV_PORT}"
+
+# --- pass 1: the full mirror the capped run could destroy --------------------
+local_crawl --log "${tmpdir}/log1" "${common[@]}" -O "$out" --timeout=20 \
+    "${BASEURL}/abortpurge/index.html"
+for name in "${leaves[@]}"; do
+    test -s "${out}/${host}/abortpurge/${name}.html" ||
+        fail "pass 1 did not mirror ${name}.html"
+done
+ok "pass 1 mirrored the six leaves"
+
+# --- pass 2: the same crawl, cut short by the cap ----------------------------
+# Deleting the cache is what makes the parser drop the links rather than follow
+# them from the previous session, and is something users do to reclaim space.
+rm -f "${out}/hts-cache/new.zip"
+rc=0
+local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" --timeout=0 \
+    --max-time=2 "${BASEURL}/abortpurge/index.html" || rc=$?
+test "$rc" -ne 124 || fail "the capped crawl overran its deadline"
+
+log=$(cat "${out}/hts-log.txt")
+grep -q 'giving up' <<<"$log" || fail "the time cap never fired: ${log}"
+# Fewer links than pass 1 saw is what says some were dropped; without it this
+# passes on a mirror that simply finished.
+scanned=$(sed -n 's/.* : \([0-9][0-9]*\) links scanned.*/\1/p' <<<"$log" | tail -1)
+test "${scanned:-99}" -lt 8 ||
+    fail "the stop dropped no link, so nothing was left unreached (${scanned} scanned)"
+ok "the cap left the leaf links unqueued"
+
+for name in "${leaves[@]}"; do
+    test -s "${out}/${host}/abortpurge/${name}.html" ||
+        fail "${name}.html was purged by a run that stopped before queueing it"
+done
+ok "the capped run kept the files it never reached"
+
+grep -q 'mirror aborted after' <<<"$log" ||
+    fail "the capped run still reports a complete mirror: ${log}"
+ok "the summary reports the abort"

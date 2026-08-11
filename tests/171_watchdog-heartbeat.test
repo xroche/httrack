@@ -156,6 +156,21 @@ test -n "$killed" || fail "a suite static from the start was never killed"
 test "$killed" -ge 9960 || fail "killed at $killed, inside the 960s quiet window"
 test "$killed" -le 10080 || fail "killed at $killed, want 9960 within a tick"
 
+# The wall-clock cap, on a suite that never stops reporting: back at 5000 the stub
+# writes a progress line every tick, so the staticness window is nowhere near and
+# only the cap can end this. Set under the quiet window, which it must not wait out.
+vnow=5000
+ticks=0
+printf 'RUN 95_slow.test at 0s\n' >"$progress"
+hb_depth=$BASH_SUBSHELL
+ci_suite_heartbeat 960 360 "$progress" 900 4242 480 >"$tmp/capped" 2>&1
+killed=$(sed -n 's/^KILL 4242 at \([0-9]*\)$/\1/p' "$tmp/capped")
+test -n "$killed" || fail "a suite still reporting outlived its wall-clock cap"
+test "$killed" -ge 5480 || fail "capped at $killed, inside the 480s cap"
+test "$killed" -le 5600 || fail "capped at $killed, want 5480 within a tick"
+grep -q '480s cap reached' "$tmp/capped" || fail "the cap kill was announced as something else"
+test "$(cat "$tmp/lastwrite")" -ge 5480 || fail "the log stopped moving: nothing here needed the cap"
+
 # taskkill is a grandchild of its own target, so a leaves-first /T would reap the
 # watchdog before the root (#953): kill_tree here never returns, and the stubs
 # record the order, which the code under test cannot write to. The reporter goes
@@ -168,7 +183,10 @@ printf 'RUN 96_wedged.test at 0s\n' >"$progress"
 rc=0
 (
     watchdog=777
+    # Both are reached from the heartbeat's kill path, which shellcheck cannot see.
+    # shellcheck disable=SC2317
     kill_pid() { echo "DIRECT $1" >>"$rec"; }
+    # shellcheck disable=SC2317
     kill_tree() {
         echo "TREE $1" >>"$rec"
         exit 9

@@ -62,6 +62,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssniff.h"
 #include "htscodec.h"
 #include "htsproxy.h"
+#include "htsrandom.h"
 #include "htssitemap.h"
 #include "htswarc.h"
 #include "htschanges.h"
@@ -1917,6 +1918,63 @@ static int st_pause(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static int st_random(httrackp *opt, int argc, char **argv) {
+  enum { want = 64, pad = 16, rounds = 8 };
+
+  unsigned char buf[want + pad], first[want], touched[want], varies[want];
+  int err = 0, live = 0, r, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(touched, 0, sizeof(touched));
+  memset(varies, 0, sizeof(varies));
+  for (r = 0; r < rounds; r++) {
+    /* A fresh non-zero filler each round: a byte the fill skips keeps every one
+       of them, which a single canary value cannot tell from a written byte. */
+    const unsigned char filler = (unsigned char) (0xa5 + r);
+
+    memset(buf, filler, sizeof(buf));
+    if (!hts_random_bytes(buf, want))
+      err = 1;
+    for (i = 0; i < want; i++) {
+      if (buf[i] != filler)
+        touched[i] = 1;
+    }
+    for (i = 0; i < pad; i++) {
+      if (buf[want + i] != filler)
+        err = 1; /* wrote past the requested length */
+    }
+    if (r == 0) {
+      memcpy(first, buf, want);
+    } else {
+      for (i = 0; i < want; i++) {
+        if (buf[i] != first[i])
+          varies[i] = 1;
+      }
+    }
+  }
+  for (i = 0; i < want; i++) {
+    if (!touched[i])
+      err = 1; /* a short fill left this byte alone in every round */
+    live += varies[i];
+  }
+  /* Over 8 draws a live source moves all 64 bytes; half is a floor no real one
+     misses, and a source stuck on one byte or a constant cannot reach it. */
+  if (live < want / 2)
+    err = 1;
+  /* a zero-length ask succeeds and writes nothing */
+  memset(buf, 0x5a, sizeof(buf));
+  if (!hts_random_bytes(buf, 0))
+    err = 1;
+  for (i = 0; i < (int) sizeof(buf); i++) {
+    if (buf[i] != 0x5a)
+      err = 1;
+  }
+  printf("random: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_relative(httrackp *opt, int argc, char **argv) {
   char s[HTS_URLMAXSIZE * 2];
 
@@ -3392,6 +3450,70 @@ static int st_urlhack(httrackp *opt, int argc, char **argv) {
   assertf(!EQ("foo.com", "/a//b", "foo.com", "/a/b"));
 #undef EQ
   printf("urlhack self-test OK\n");
+  return 0;
+}
+
+/* Prints the filter answer <n> emits for (adr, fil) [up]; with no arguments,
+   asserts every answer against its expected pattern (#1119). */
+static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
+  char pattern[HTS_URLMAXSIZE * 2];
+  htsbuff f = htsbuff_array(pattern);
+
+  (void) opt;
+  if (argc >= 3) {
+    hts_wizard_answer_filter(&f, atoi(argv[0]), argv[1], argv[2],
+                             argc >= 4 && atoi(argv[3]) != 0 ? HTS_TRUE
+                                                             : HTS_FALSE);
+    printf("%s\n", pattern);
+    return 0;
+  }
+#define EMITS(n, adr, fil, up, expect)                                         \
+  do {                                                                         \
+    hts_wizard_answer_filter(&f, (n), (adr), (fil), (up));                     \
+    assertf(strcmp(pattern, (expect)) == 0);                                   \
+  } while (0)
+
+  /* the host-wide answers: 2 forbids, 5 (allowed to go up) and 6 authorize */
+  EMITS(2, "foo.com", "/index.html", HTS_FALSE, "-foo.com/*");
+  EMITS(5, "foo.com", "/dir/page.html", HTS_TRUE, "+foo.com/*");
+  EMITS(6, "foo.com", "/dir/page.html", HTS_FALSE, "+foo.com/*");
+  /* the port is part of the host, the credentials are not */
+  EMITS(2, "foo.com:8080", "/x", HTS_FALSE, "-foo.com:8080/*");
+  EMITS(2, "user:pass@foo.com", "/x", HTS_FALSE, "-foo.com/*");
+  EMITS(5, "foo.com:8080", "/x", HTS_TRUE, "+foo.com:8080/*");
+  EMITS(5, "user:pass@foo.com", "/x", HTS_TRUE, "+foo.com/*");
+  EMITS(6, "foo.com:8080", "/x", HTS_FALSE, "+foo.com:8080/*");
+  EMITS(6, "user:pass@foo.com", "/x", HTS_FALSE, "+foo.com/*");
+
+  /* the trailing slash is what keeps a longer host out */
+  assertf(strjoker("foo.com/index.html", pattern + 1, NULL, NULL) != NULL);
+  assertf(strjoker("foo.com/", pattern + 1, NULL, NULL) != NULL);
+  assertf(strjoker("foo.com.evil.org/x", pattern + 1, NULL, NULL) == NULL);
+  assertf(strjoker("foo.com:8080/x", pattern + 1, NULL, NULL) == NULL);
+
+  /* the link and directory answers */
+  EMITS(0, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/page.html");
+  EMITS(0, "foo.com", "index.html", HTS_FALSE, "-foo.com/index.html");
+  EMITS(1, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/*");
+  EMITS(1, "foo.com", "/page.html", HTS_FALSE, "-foo.com/*");
+  EMITS(5, "foo.com", "/dir/page.html", HTS_FALSE, "+foo.com/dir/*");
+  EMITS(7, "foo.com", "/dir/page.html", HTS_FALSE, "+foo.com/dir/*[file]");
+  /* answer 1 collapses a doubled trailing slash, answers 5 and 7 keep it */
+  EMITS(1, "foo.com", "/dir//page.html", HTS_FALSE, "-foo.com/dir/*");
+  EMITS(5, "foo.com", "/dir//page.html", HTS_FALSE, "+foo.com/dir//*");
+  EMITS(7, "foo.com", "/dir//page.html", HTS_FALSE, "+foo.com/dir//*[file]");
+  /* no directory to anchor on, so answers 1, 5 and 7 emit nothing */
+  EMITS(1, "foo.com", "page.html", HTS_FALSE, "");
+  EMITS(5, "foo.com", "page.html", HTS_FALSE, "");
+  EMITS(7, "foo.com", "page.html", HTS_FALSE, "");
+
+  /* the answers that add no filter at all */
+  EMITS(-1, "foo.com", "/x", HTS_FALSE, "");
+  EMITS(3, "foo.com", "/x", HTS_FALSE, "");
+  EMITS(4, "foo.com", "/x", HTS_FALSE, "");
+  EMITS(50, "foo.com", "/x", HTS_FALSE, "");
+#undef EMITS
+  printf("wizardfilter self-test OK\n");
   return 0;
 }
 
@@ -8901,6 +9023,8 @@ static const struct selftest_entry {
      st_urlhack},
     {"redirect-samefile", "", "same-file redirect detection self-test (#159)",
      st_redirect_samefile},
+    {"wizardfilter", "[<answer> <adr> <fil> [up]]",
+     "filter emitted by a wizard answer", st_wizardfilter},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
@@ -8951,6 +9075,8 @@ static const struct selftest_entry {
      "a user stop drops the slots still waiting to connect (#1073)",
      st_backstop},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
+    {"random", "", "hts_random_bytes() fills exactly the requested length",
+     st_random},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",

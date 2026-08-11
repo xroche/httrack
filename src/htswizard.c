@@ -166,6 +166,78 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
   return HTS_TRUE;
 }
 
+/* "<sign><host>", with any user:password@ stripped. */
+static void wizard_cat_host(htsbuff *f, const char *sign, const char *adr) {
+  htsbuff_cpy(f, sign);
+  htsbuff_cat(f, jump_identification_const(adr));
+}
+
+/* "<sign><host>/" then the first len characters of fil ((size_t) -1: all). */
+static void wizard_cat_path(htsbuff *f, const char *sign, const char *adr,
+                            const char *fil, size_t len) {
+  wizard_cat_host(f, sign, adr);
+  if (*fil != '/')
+    htsbuff_cat(f, "/");
+  htsbuff_catn(f, fil, len);
+}
+
+void hts_wizard_answer_filter(htsbuff *f, int n, const char *adr,
+                              const char *fil, hts_boolean seeker_up) {
+  size_t dir = hts_lastcharoffset(fil);
+
+  while (fil[dir] != '/' && dir > 0)
+    dir--;
+
+  htsbuff_cpy(f, "");
+  switch (n) {
+  case 0: /* this link only */
+    wizard_cat_path(f, "-", adr, fil, (size_t) -1);
+    break;
+
+  case 1: /* this directory and below */
+    if (fil[dir] == '/') {
+      /* stops before the last slash, so a doubled one collapses */
+      wizard_cat_path(f, "-", adr, fil, dir);
+      if (f->buf[f->len - 1] != '/')
+        htsbuff_cat(f, "/");
+      htsbuff_cat(f, "*");
+    }
+    break;
+
+  case 2: /* the whole host */
+    wizard_cat_host(f, "-", adr);
+    htsbuff_cat(f, "/*");
+    break;
+
+  case 5: /* this directory and below, or the whole host */
+    if (!seeker_up) {
+      if (fil[dir] == '/') {
+        wizard_cat_path(f, "+", adr, fil, dir + 1);
+        htsbuff_cat(f, "*");
+      }
+    } else {
+      wizard_cat_host(f, "+", adr);
+      htsbuff_cat(f, "/*");
+    }
+    break;
+
+  case 6: /* the whole host */
+    wizard_cat_host(f, "+", adr);
+    htsbuff_cat(f, "/*");
+    break;
+
+  case 7: /* this directory, files only */
+    if (fil[dir] == '/') {
+      wizard_cat_path(f, "+", adr, fil, dir + 1);
+      htsbuff_cat(f, "*[file]");
+    }
+    break;
+
+  default: /* the other answers add no filter */
+    break;
+  }
+}
+
 static int hts_acceptlink_(httrackp * opt, int ptr,
                            const char *adr, const char *fil, const char *tag,
                            const char *attribute, int *set_prio_to,
@@ -710,55 +782,9 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         opt->wizard = HTS_WIZARD_AUTO; // sauter tout le reste
         break;
       case 0: // forbid the same link: adr/fil
-        forbidden_url = 1;
-        HT_INSERT_FILTERS0; // insert at slot 0
-        {
-          htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
-
-          htsbuff_cpy(&f, "-");
-          htsbuff_cat(&f, jump_identification_const(adr));
-          if (*fil != '/')
-            htsbuff_cat(&f, "/");
-          htsbuff_cat(&f, fil);
-        }
-        break;
-
       case 1: // forbid the whole directory and subdirs: adr/path/*
+      case 2: // the whole address: adr/*
         forbidden_url = 1;
-        {
-          size_t i = hts_lastcharoffset(fil);
-
-          while((fil[i] != '/') && (i > 0))
-            i--;
-          if (fil[i] == '/') {
-            htsbuff f;
-
-            HT_INSERT_FILTERS0; // insert at slot 0
-            f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
-            htsbuff_cpy(&f, "-");
-            htsbuff_cat(&f, jump_identification_const(adr));
-            if (*fil != '/')
-              htsbuff_cat(&f, "/");
-            htsbuff_catn(&f, fil, i);
-            if (f.len > 0 && f.buf[f.len - 1] != '/')
-              htsbuff_cat(&f, "/");
-            htsbuff_cat(&f, "*");
-          }
-        }
-
-        // ** ...
-        break;
-
-      case 2: // the whole address: adr*
-        forbidden_url = 1;
-        HT_INSERT_FILTERS0; // insert at slot 0
-        {
-          htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
-
-          htsbuff_cpy(&f, "-");
-          htsbuff_cat(&f, jump_identification_const(adr));
-          htsbuff_cat(&f, "*");
-        }
         break;
 
       case 3:                  // ** A FAIRE
@@ -790,74 +816,28 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
         break;
 
-      case 5: // allow the whole directory and its children
-        if ((opt->seeker & HTS_SEEKER_UP) == 0) { // not allowed to go up
-          size_t i = hts_lastcharoffset(fil);
-
-          while((fil[i] != '/') && (i > 0))
-            i--;
-          if (fil[i] == '/') {
-            HT_INSERT_FILTERS0; // insert at slot 0
-            {
-              htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
-
-              htsbuff_cpy(&f, "+");
-              htsbuff_cat(&f, jump_identification_const(adr));
-              if (*fil != '/')
-                htsbuff_cat(&f, "/");
-              htsbuff_catn(&f, fil, i + 1);
-              htsbuff_cat(&f, "*");
-            }
-          }
-        } else {              // then allow the domain
-          HT_INSERT_FILTERS0; // insert at slot 0
-          {
-            htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
-
-            htsbuff_cpy(&f, "+");
-            htsbuff_cat(&f, jump_identification_const(adr));
-            htsbuff_cat(&f, "*");
-          }
-        }
-        break;
-
-      case 6:                  // same domain
-        HT_INSERT_FILTERS0;    // insert at slot 0
-        {
-          htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
-
-          htsbuff_cpy(&f, "+");
-          htsbuff_cat(&f, jump_identification_const(adr));
-          htsbuff_cat(&f, "*");
-        }
-        break;
-        //
+      case 5: // allow the whole directory and its children, or the domain
+      case 6: // same domain
       case 7: // allow this directory
+        break;
+
+      case 50: // nothing to do
+        break;
+      } // switch
+
+      /* the pattern half of the answer: a new answer needs both switches */
       {
-        size_t i = hts_lastcharoffset(fil);
+        char BIGSTK pattern[HTS_FILTER_SLOT_SIZE];
+        htsbuff f = htsbuff_array(pattern);
 
-        while ((fil[i] != '/') && (i > 0))
-          i--;
-        if (fil[i] == '/') {
+        hts_wizard_answer_filter(
+            &f, n, adr, fil,
+            (opt->seeker & HTS_SEEKER_UP) != 0 ? HTS_TRUE : HTS_FALSE);
+        if (f.len != 0) {
           HT_INSERT_FILTERS0; // insert at slot 0
-          {
-            htsbuff f = htsbuff_ptr(_FILTERS[0], HTS_FILTER_SLOT_SIZE);
-
-            htsbuff_cpy(&f, "+");
-            htsbuff_cat(&f, jump_identification_const(adr));
-            if (*fil != '/')
-              htsbuff_cat(&f, "/");
-            htsbuff_catn(&f, fil, i + 1);
-            htsbuff_cat(&f, "*[file]");
-          }
+          strlcpybuff(_FILTERS[0], pattern, HTS_FILTER_SLOT_SIZE);
         }
       }
-
-      break;
-
-      case 50:                 // on fait rien
-        break;
-      }                         // switch 
 
     }                           // test du wizard sur l'url
   }                             // fin du test wizard..
