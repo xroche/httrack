@@ -92,26 +92,32 @@ for rule in RULES:
     if rule not in back:
         sys.exit("option8.html does not render %r back\n%s" % (rule, back))
 
-# A blank line, and the trailing one a user leaves behind, emit nothing: the
-# engine refuses an empty rule.
-blanks = textarea(post([("hostalias",
-                         "\r\n" + "\r\n\r\n".join(RULES) + "\r\n")]),
-                  "command")
-if blanks.count("--host-alias") != len(RULES) or '--host-alias ""' in blanks:
-    sys.exit("blank lines reach the command line\n%s" % blanks)
+def emitted_rules(value):
+    """The rules the template emits for a box holding VALUE."""
+    flag = '--host-alias "'
+    return [line.strip()[len(flag):-1]
+            for line in textarea(post([("hostalias", value)]),
+                                 "command").split("\n")
+            if flag in line]
 
-# Rules separate on any whitespace, like the URLs box. A space beside a ',' or
-# an '=' is inside its rule, which is why the parser trims it.
-spaced = textarea(post([("hostalias", " ".join(RULES))]), "command")
-if spaced.count("--host-alias") != len(RULES):
-    sys.exit("a space does not separate two rules\n%s" % spaced)
-joined = textarea(post([("hostalias", "a.com , b.com = c.com")]), "command")
-if joined.count("--host-alias") != 1 or '"a.com,b.com=c.com"' not in joined:
-    sys.exit("a spaced-out single rule was split\n%s" % joined)
 
-# An empty field must drop the flag, not emit a valueless --host-alias.
-if "--host-alias" in textarea(post([("hostalias", "")]), "command"):
-    sys.exit("an empty Host aliases field still emits --host-alias")
+# Any whitespace separates two rules, whatever the mix and the run length, and
+# a run beside a ',' or an '=' stays inside its rule, which is why the parser
+# trims it. The empty cases matter most: the engine refuses an empty rule, so
+# neither a blank line nor an empty box may emit --host-alias "".
+for value, want in [(" ".join(RULES), RULES),
+                    ("\r\n" + "\r\n\r\n".join(RULES) + "\r\n", RULES),
+                    ("a=b  c=d", ["a=b", "c=d"]),
+                    ("a=b\tc=d", ["a=b", "c=d"]),
+                    ("a=b \r\n\t c=d", ["a=b", "c=d"]),
+                    ("  \r\n a=b \r\n  ", ["a=b"]),
+                    ("a.com  ,  b.com  =  c.com", ["a.com,b.com=c.com"]),
+                    ("a.com,\r\nb.com=c.com", ["a.com,b.com=c.com"]),
+                    (" \r\n\t ", []),
+                    ("", [])]:
+    got = emitted_rules(value)
+    if got != want:
+        sys.exit("%r emitted %r, wanted %r" % (value, got, want))
 
 # Hand the engine below what the template actually emitted, not a literal.
 emit = lines[lines.index('--host-alias "%s"' % RULES[0])]
