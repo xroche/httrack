@@ -1,13 +1,12 @@
 #!/bin/bash
 #
-# The command line htscoremain.c rebuilds (aliases expanded, doit.log replayed)
-# was allocated at argc + 1024 slots and never re-checked, so a long enough
-# expansion wrote past the block (#1189). Its two writers are separate call
-# sites and need separate coverage: cmdl_add for the command line, where an
-# option spelled --opt=value expands to two tokens, and cmdl_ins for the
-# hts-cache/doit.log replay, bounded only by the 8000-byte line the reader
-# accepts. Both runs end in a self-test, which is dispatched from the rebuilt
-# argv, so each one proves the tail tokens survived in order and costs no crawl.
+# Grow the rebuilt command line past the slot count that used to be fixed
+# (#1189). Its three writers are separate call sites and need separate
+# coverage: cmdl_add for the command line, where an option spelled
+# --opt=value expands to two tokens, and cmdl_ins for the hts-cache/doit.log
+# replay and for the config file. Each run ends in a self-test dispatched
+# from the rebuilt argv, so it checks the tail tokens for order as well as
+# survival, and costs no crawl.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh

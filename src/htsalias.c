@@ -485,24 +485,45 @@ const char *optalias_help(const char *token) {
 /* Largest slot count whose byte size can not wrap. */
 #define CMDL_MAX_SLOTS ((int) (INT_MAX / sizeof(char *)))
 
-hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
+/* Grow the slot array to hold at least count entries, leaving cmd unchanged
+   if it cannot. */
+static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
   char **slots;
-  int size;
+  int capacity;
 
-  if (count <= cmd->size)
+  if (count <= cmd->capacity)
     return HTS_TRUE;
   if (count > CMDL_MAX_SLOTS) /* count alone: the product below can not wrap */
     return HTS_FALSE;
   /* double, so rebuilding an n-token command line stays amortized O(n) */
-  size = cmd->size <= CMDL_MAX_SLOTS / 2 ? cmd->size * 2 : CMDL_MAX_SLOTS;
-  if (size < count)
-    size = count;
-  slots = (char **) realloct(cmd->argv, sizeof(char *) * (size_t) size);
+  capacity =
+      cmd->capacity <= CMDL_MAX_SLOTS / 2 ? cmd->capacity * 2 : CMDL_MAX_SLOTS;
+  if (capacity < count)
+    capacity = count;
+  slots = (char **) realloct(cmd->argv, sizeof(char *) * (size_t) capacity);
   if (slots == NULL)
     return HTS_FALSE;
   cmd->argv = slots;
-  cmd->size = size;
+  cmd->capacity = capacity;
   return HTS_TRUE;
+}
+
+hts_boolean cmdl_init(cmdl_argv *cmd, size_t blk_size, int slots) {
+  memset(cmd, 0, sizeof(*cmd));
+  cmd->blk = blk_size != 0 ? (char *) malloct(blk_size) : NULL;
+  if (cmd->blk == NULL || !cmdl_reserve(cmd, slots)) {
+    cmdl_free(cmd);
+    return HTS_FALSE;
+  }
+  cmd->blk_size = blk_size;
+  cmd->blk[0] = '\0';
+  return HTS_TRUE;
+}
+
+void cmdl_free(cmdl_argv *cmd) {
+  freet(cmd->blk);
+  freet(cmd->argv);
+  memset(cmd, 0, sizeof(*cmd));
 }
 
 /* Room left in the token block; 0 makes the bounded copy abort rather than
@@ -515,7 +536,7 @@ hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
   int i;
 
   assertf(pos >= 0 && pos <= cmd->argc);
-  /* argc <= size <= CMDL_MAX_SLOTS holds here, so argc + 1 can not wrap */
+  /* argc <= capacity <= CMDL_MAX_SLOTS holds here, so argc + 1 can not wrap */
   if (!cmdl_reserve(cmd, cmd->argc + 1))
     return HTS_FALSE;
   for (i = cmd->argc; i > pos; i--)
@@ -539,7 +560,7 @@ hts_boolean cmdl_add(cmdl_argv *cmd, const char *token) {
   deny ad.*
 */
 /* Note: NOT utf-8 */
-hts_boolean optinclude_file(const char *name, cmdl_argv *cmd) {
+cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
   FILE *fp;
 
   fp = fopen(name, "rb");
@@ -610,9 +631,8 @@ hts_boolean optinclude_file(const char *name, cmdl_argv *cmd) {
               if (!cmdl_ins(cmd, tmp_argv[2], insert_after) ||
                   (return_argc > 1 &&
                    !cmdl_ins(cmd, tmp_argv[3], insert_after + 1))) {
-                printf("Error, not enough memory\n");
                 fclose(fp);
-                return HTS_TRUE;
+                return CMDL_FILE_NOMEM;
               }
               insert_after += return_argc > 1 ? 2 : 1;
             }
@@ -621,9 +641,9 @@ hts_boolean optinclude_file(const char *name, cmdl_argv *cmd) {
       }
     }
     fclose(fp);
-    return HTS_TRUE;
+    return CMDL_FILE_READ;
   }
-  return HTS_FALSE;
+  return CMDL_FILE_MISSING;
 }
 
 /* Get home directory, '.' if unset or empty */

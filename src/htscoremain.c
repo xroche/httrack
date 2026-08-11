@@ -322,17 +322,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       current_size += strlen(argv[na]) + 1;
     /* a huge file named "config" must saturate, not wrap, the capacity */
     blk_size = llint_grow_size_t(current_size, size > 0 ? size : 0, 32768);
-    x_cmd.blk = blk_size != (size_t) -1 ? (char *) malloct(blk_size) : NULL;
     /* argc slots to start with; alias expansion and doit.log grow the array */
-    if (x_cmd.blk == NULL || !cmdl_reserve(&x_cmd, argc)) {
-      freet(x_cmd.blk);
-      freet(x_cmd.argv);
+    if (blk_size == (size_t) -1 || !cmdl_init(&x_cmd, blk_size, argc)) {
       HTS_PANIC_PRINTF("Error, not enough memory");
       htsmain_free();
       return -1;
     }
-    x_cmd.blk_size = blk_size;
-    x_cmd.blk[0] = '\0';
   }
 
   /* Create new argc/argv, replace alias, count URLs, treat -h, -q, -i */
@@ -349,6 +344,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     argv_url = 0;               /* pour comptage */
     //
     if (!cmdl_add(&x_cmd, argv[0])) {
+      cmdl_free(&x_cmd);
       HTS_PANIC_PRINTF("Error, not enough memory");
       htsmain_free();
       return -1;
@@ -375,6 +371,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         /* Copier */
         if (!cmdl_add(&x_cmd, tmp_argv[0]) ||
             (tmp_argc > 1 && !cmdl_add(&x_cmd, tmp_argv[1]))) {
+          cmdl_free(&x_cmd);
           HTS_PANIC_PRINTF("Error, not enough memory");
           htsmain_free();
           return -1;
@@ -540,20 +537,29 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                                   StringBuff(opt->path_log),
                                   "hts-cache/doit.log"))) ||
             (argv_url > 0)) {
-          if (!optinclude_file(
-                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                          StringBuff(opt->path_log), HTS_HTTRACKRC),
-                  &x_cmd))
-            if (!optinclude_file(HTS_HTTRACKRC, &x_cmd)) {
-              if (!optinclude_file(fconcat(OPT_GET_BUFF(opt),
-                                           OPT_GET_BUFF_SIZE(opt),
-                                           hts_gethome(), "/" HTS_HTTRACKRC),
-                                   &x_cmd)) {
+          /* first rc file that exists wins */
+          cmdl_file_result res =
+              optinclude_file(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                      StringBuff(opt->path_log), HTS_HTTRACKRC),
+                              &x_cmd);
+
+          if (res == CMDL_FILE_MISSING)
+            res = optinclude_file(HTS_HTTRACKRC, &x_cmd);
+          if (res == CMDL_FILE_MISSING)
+            res = optinclude_file(fconcat(OPT_GET_BUFF(opt),
+                                          OPT_GET_BUFF_SIZE(opt), hts_gethome(),
+                                          "/" HTS_HTTRACKRC),
+                                  &x_cmd);
 #ifdef HTS_HTTRACKCNF
-                optinclude_file(HTS_HTTRACKCNF, &x_cmd);
+          if (res == CMDL_FILE_MISSING)
+            res = optinclude_file(HTS_HTTRACKCNF, &x_cmd);
 #endif
-              }
-            }
+          if (res == CMDL_FILE_NOMEM) {
+            cmdl_free(&x_cmd);
+            HTS_PANIC_PRINTF("Error, not enough memory");
+            htsmain_free();
+            return -1;
+          }
           /* the array may have been grown and moved */
           argv = x_cmd.argv;
           argc = x_cmd.argc;
@@ -602,6 +608,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         if (lastp) {
           if (strnotempty(lastp) || quoted) {
             if (!cmdl_ins(&x_cmd, lastp, insert_after)) {
+              cmdl_free(&x_cmd);
               HTS_PANIC_PRINTF("Error, not enough memory");
               htsmain_free();
               return -1;
@@ -2961,8 +2968,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     UNLINK(n_lock);
   }
 
-  freet(x_cmd.blk);
-  freet(x_cmd.argv);
+  cmdl_free(&x_cmd);
   if (url)
     freet(url);
 

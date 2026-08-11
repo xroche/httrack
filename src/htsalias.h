@@ -53,36 +53,42 @@ const char *opthelp_value(int p);
 const char *hts_gethome(void);
 void expand_home(String * str);
 
-/* The command line being rebuilt by htscoremain.c (CLI parsing) and
-   htsalias.c (config-file alias expansion): argc slots, each pointing into
-   blk, where the tokens are packed back-to-back. Config files and doit.log
-   append an input-defined number of tokens, so the slot array is grown on
-   demand and the invariant argc <= size is re-established before every write.
-   blk does not grow: a token that no longer fits aborts in the bounded copy
-   rather than being written past the end. */
+/* Command line rebuilt from argv, config files and doit.log: argc slots
+   pointing into blk, where the tokens are packed back-to-back. The slots grow
+   on demand, since a config file and a doit.log each add a token count the
+   input decides; blk does not, so a token that no longer fits aborts in the
+   bounded copy instead of overrunning. */
 typedef struct {
-  char **argv; /* argc slots used out of size allocated */
+  char **argv; /* argc slots used out of capacity allocated */
   int argc;
-  int size;
+  int capacity;
   char *blk; /* token bytes, blk_used of blk_size in use */
   size_t blk_size;
   size_t blk_used;
 } cmdl_argv;
 
-/* Grow the slot array to hold at least count entries. HTS_FALSE if that many
-   slots can not be allocated, leaving cmd usable and unchanged. */
-hts_boolean cmdl_reserve(cmdl_argv *cmd, int count);
+/* Allocate a token block of blk_size bytes and room for slots entries.
+   HTS_FALSE if either fails, leaving cmd empty. */
+hts_boolean cmdl_init(cmdl_argv *cmd, size_t blk_size, int slots);
 
-/* Append token as the last entry. HTS_FALSE if the array can not be grown. */
+/* Release cmd; the tokens its argv pointed at die with it. */
+void cmdl_free(cmdl_argv *cmd);
+
+/* Append token as the last entry. HTS_FALSE if the slots can not be grown. */
 hts_boolean cmdl_add(cmdl_argv *cmd, const char *token);
 
 /* Insert token at 0 <= pos <= argc, shifting the entries above it up by one.
-   HTS_FALSE if the array can not be grown. */
+   HTS_FALSE if the slots can not be grown. */
 hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos);
 
-/* Expand a config file into cmd, inserting after its program name. Returns
-   whether the file could be read. */
-hts_boolean optinclude_file(const char *name, cmdl_argv *cmd);
+typedef enum {
+  CMDL_FILE_MISSING, /* not found, or unreadable */
+  CMDL_FILE_READ,    /* expanded into the command line */
+  CMDL_FILE_NOMEM    /* out of memory, leaving the command line half expanded */
+} cmdl_file_result;
+
+/* Expand a config file into cmd, inserting after its program name. */
+cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd);
 #endif
 
 #endif
