@@ -3633,23 +3633,27 @@ const char *hts_query_strip_keys(const char *rules, const char *adr,
                                  const char *fil, char *dest, size_t destsize) {
   const char *p, *q;
   const char *result = NULL;
-  char BIGSTK url[HTS_URLMAXSIZE * 2];
+  /* holds a host and a path, each up to HTS_URLMAXSIZE * 2 */
+  char BIGSTK url[HTS_URLMAXSIZE * 4];
 
   if (rules == NULL || *rules == '\0' || destsize == 0)
     return NULL;
 
   /* Match string = normalized host/path, query removed. jump_normalized_const
      collapses www+scheme/auth so read and write (double-normalized) agree;
-     query excluded keeps the decision on host/path only. */
-  url[0] = '\0';
-  strcatbuff(url, jump_normalized_const(adr));
+     query excluded keeps the decision on host/path only. Clipped rather than
+     aborting: a longer one is hostile input, and which rule it picks is a
+     filter decision, not a memory error. */
+  (void) strclipbuff(url, sizeof(url), jump_normalized_const(adr));
   if (fil[0] != '/')
-    strcatbuff(url, "/");
+    (void) strclipbuff(&url[strlen(url)], sizeof(url) - strlen(url), "/");
   q = strchr(fil, '?');
-  if (q != NULL)
-    strncatbuff(url, fil, (int) (q - fil));
-  else
-    strcatbuff(url, fil);
+  {
+    const size_t room = sizeof(url) - strlen(url) - 1;
+    const size_t fillen = q != NULL ? (size_t) (q - fil) : strlen(fil);
+
+    strlncatbuff(url, fil, sizeof(url), fillen < room ? fillen : room);
+  }
 
   /* Walk the '\n' entries; last match wins (like the +/- filter eval). Each is
      "pattern=keys"; no '=' is the bare form, pattern "*". */

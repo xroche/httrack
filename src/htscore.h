@@ -242,7 +242,8 @@ struct hash_struct {
   const char *strip_query;
   /* host-alias rules (not owned); set from opt->host_alias at hash_init */
   const char *host_alias;
-  char normfil[HTS_URLMAXSIZE * 2];
+  /* scratch: the hash key is a host plus a path, the compare one a path */
+  char normfil[HTS_URLMAXSIZE * 4];
   char normfil2[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
 };
