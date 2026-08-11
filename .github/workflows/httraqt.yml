@@ -1,12 +1,16 @@
 # Build HTTraQt, the only consumer of our installed headers, against this branch.
 name: HTTraQt
 
+# Filtered, so it must never join the required set: a check that a path filter
+# skips stays "Expected" forever and blocks the merge.
 on:
   push:
     branches: [master]
-    paths: ['src/**', 'configure.ac', '.github/workflows/httraqt.yml']
+    paths: ['src/**', 'm4/**', 'configure.ac', '.github/workflows/httraqt.yml']
   pull_request:
-    paths: ['src/**', 'configure.ac', '.github/workflows/httraqt.yml']
+    paths: ['src/**', 'm4/**', 'configure.ac', '.github/workflows/httraqt.yml']
+  schedule:
+    - cron: '37 05 * * 1'  # upstream is pinned; this catches drift in Qt and the runner image
   workflow_dispatch:
 
 permissions:
@@ -38,7 +42,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
-            cmake qt6-base-dev qt6-multimedia-dev libgl-dev
+            cmake qt6-base-dev qt6-multimedia-dev
 
       - name: Build and install libhttrack
         run: |
@@ -54,9 +58,8 @@ jobs:
       - name: Assert no distribution libhttrack can shadow ours
         run: |
           set -euo pipefail
-          # FindHttrack.cmake hardcodes /usr/include/httrack first, so a stray
-          # libhttrack-dev would silently make this job test Debian's headers.
-          for stray in /usr/include/httrack /usr/lib/*/libhttrack.so; do
+          # FindHttrack.cmake hardcodes /usr/include/httrack first, so a stray libhttrack-dev would test Debian's headers.
+          for stray in /usr/include/httrack /usr/lib/libhttrack.so /usr/lib/*/libhttrack.so; do
             if [ -e "$stray" ]; then
               echo "::error::$stray exists; HTTraQt would build against it, not this branch"
               exit 1
@@ -81,8 +84,8 @@ jobs:
       - name: Configure HTTraQt
         run: |
           set -euo pipefail
-          # CMAKE_MINIMUM_REQUIRED is 2.8 upstream; CMake 4 rejects it outright.
-          # 2>&1 because a bare MESSAGE() is NOTICE mode, which CMake writes to stderr.
+          # CMAKE_MINIMUM_REQUIRED is 2.8 upstream, which CMake 4 rejects outright.
+          # The redirect is load-bearing: a bare MESSAGE() is NOTICE mode, which goes to stderr.
           cmake -S "$RUNNER_TEMP/httraqt" -B "$RUNNER_TEMP/httraqt-bld" \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
             2>&1 | tee "$RUNNER_TEMP/cmake.log"
