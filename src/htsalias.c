@@ -301,9 +301,7 @@ static hts_boolean optreal_or_alias(const char *token) {
   if (strncmp(name, "no", 2) == 0 && optalias_find(name + 2) >= 0)
     return HTS_TRUE;
   return (strncmp(name, "wide-", 5) == 0 || strncmp(name, "tiny-", 5) == 0) &&
-                 optalias_find(name + 5) >= 0
-             ? HTS_TRUE
-             : HTS_FALSE;
+         optalias_find(name + 5) >= 0;
 }
 
 /* Whether the real option OPT at ARGV[N_ARG] lacks the separate parameter it
