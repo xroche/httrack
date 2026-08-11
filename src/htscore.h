@@ -429,8 +429,8 @@ const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af);
 hts_boolean hts_host_same_alias(const char *rules, const char *adra,
                                 const char *adrb, hts_boolean nowww);
 
-/* HTS_TRUE if RULE is a well-formed "alias[,alias...]=canonical" line: one
-   literal canonical host (no glob, no comma, no path or scheme). */
+/* HTS_TRUE if RULE is a well-formed "alias[,alias...]=canonical" line: hosts
+   only, each optionally behind its scheme, one literal host after the '='. */
 hts_boolean hts_host_alias_rule_ok(const char *rule);
 
 /* First canonical host in RULES whose chain never ends ("a=b" plus "b=a"),

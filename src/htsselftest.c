@@ -3506,23 +3506,63 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
           NULL);
   assertf(strcmp(hts_host_alias(rules, "b.com", HTS_FALSE, dest, sizeof(dest)),
                  "a.com") == 0);
-  /* a rule naming the www. form is inert under the collapse, which has already
-     made the two names one: it must not split them back apart */
-  assertf(hts_host_alias("www.b.com=a.com", "www.b.com", HTS_TRUE, dest,
-                         sizeof(dest)) == NULL);
-  assertf(hts_host_alias("www.b.com=a.com", "b.com", HTS_TRUE, dest,
-                         sizeof(dest)) == NULL);
+  /* Under the collapse a rule may spell either form of its alias and both names
+     fold, so naming www.b.com cannot split the pair -%u had merged. */
+  assertf(strcmp(hts_host_alias("www.b.com=a.com", "www.b.com", HTS_TRUE, dest,
+                                sizeof(dest)),
+                 "a.com") == 0);
+  assertf(strcmp(hts_host_alias("www.b.com=a.com", "b.com", HTS_TRUE, dest,
+                                sizeof(dest)),
+                 "a.com") == 0);
+  /* with the collapse off the two names are distinct, and so are the rules */
   assertf(strcmp(hts_host_alias("www.b.com=a.com", "www.b.com", HTS_FALSE, dest,
                                 sizeof(dest)),
                  "a.com") == 0);
+  assertf(hts_host_alias("www.b.com=a.com", "b.com", HTS_FALSE, dest,
+                         sizeof(dest)) == NULL);
 
-  /* scheme and credentials survive, only the host is replaced */
+  /* every scheme keeps its prefix, only the host is replaced */
   assertf(strcmp(hts_host_alias(rules, "https://b.com", HTS_TRUE, dest,
                                 sizeof(dest)),
                  "https://a.com") == 0);
   assertf(strcmp(hts_host_alias(rules, "http://user:pw@b.com", HTS_TRUE, dest,
                                 sizeof(dest)),
                  "http://user:pw@a.com") == 0);
+
+  assertf(
+      strcmp(hts_host_alias(rules, "ftp://b.com", HTS_TRUE, dest, sizeof(dest)),
+             "ftp://a.com") == 0);
+  assertf(
+      strcmp(hts_host_alias("b.com:8080=a.com:80", "https://user:pw@b.com:8080",
+                            HTS_TRUE, dest, sizeof(dest)),
+             "https://user:pw@a.com:80") == 0);
+  /* A rule may name the scheme on either side. On the alias side it then only
+     matches that scheme; on the canonical side it replaces the link's, for a
+     host that answers on one scheme only. */
+  assertf(strcmp(hts_host_alias("b.com=https://a.com", "http://b.com", HTS_TRUE,
+                                dest, sizeof(dest)),
+                 "https://a.com") == 0);
+  assertf(strcmp(hts_host_alias("https://www.foo.com=ftp://ftp.foo.com",
+                                "https://www.foo.com", HTS_TRUE, dest,
+                                sizeof(dest)),
+                 "ftp://ftp.foo.com") == 0);
+  assertf(hts_host_alias("https://www.foo.com=ftp://ftp.foo.com",
+                         "http://www.foo.com", HTS_TRUE, dest,
+                         sizeof(dest)) == NULL);
+  /* a rule without a scheme still matches whichever scheme the link uses */
+  assertf(
+      strcmp(hts_host_alias(rules, "ftp://b.com", HTS_TRUE, dest, sizeof(dest)),
+             "ftp://a.com") == 0);
+  /* credentials are the link's, whichever side names the scheme */
+  assertf(strcmp(hts_host_alias("b.com=ftp://a.com", "http://user:pw@b.com",
+                                HTS_TRUE, dest, sizeof(dest)),
+                 "ftp://user:pw@a.com") == 0);
+  /* a trailing slash is a typing reflex, not a path */
+  assertf(strcmp(hts_host_alias("b.com/=https://a.com/", "http://b.com",
+                                HTS_TRUE, dest, sizeof(dest)),
+                 "https://a.com") == 0);
+  /* ...and http and https of one host are one site to the scope test */
+  assertf(hts_host_same_alias(rules, "ftp://b.com", "https://a.com", HTS_TRUE));
 
   /* engine pseudo-hosts survive a catch-all rule */
   assertf(hts_host_alias("*=a.com", "primary", HTS_TRUE, dest, sizeof(dest)) ==
@@ -3607,9 +3647,16 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   assertf(!hts_host_alias_rule_ok("b.com="));
   assertf(!hts_host_alias_rule_ok("b.com=a.com,z.com"));
   assertf(!hts_host_alias_rule_ok("b.com=*.a.com"));
-  assertf(!hts_host_alias_rule_ok("b.com=http://a.com/"));
   assertf(!hts_host_alias_rule_ok("b.com=a com"));
   assertf(!hts_host_alias_rule_ok("b.com=a.com#x"));
+  /* a scheme is part of an address, a path is not */
+  assertf(hts_host_alias_rule_ok("https://www.foo.com=ftp://ftp.foo.com"));
+  assertf(hts_host_alias_rule_ok("https://www.foo.com/=ftp://ftp.foo.com/"));
+  assertf(
+      !hts_host_alias_rule_ok("https://www.foo.com/=ftp://ftp.foo.com/pub/"));
+  assertf(!hts_host_alias_rule_ok("https://www.foo.com/a=ftp://ftp.foo.com"));
+  assertf(!hts_host_alias_rule_ok("a.com,b.com/deep=c.com"));
+  assertf(!hts_host_alias_rule_ok("b.com=http://a.com/x"));
 
   /* the same-address test the wizard uses to decide scope */
   assertf(hts_host_same_alias(rules, "b.com", "a.com", HTS_TRUE));

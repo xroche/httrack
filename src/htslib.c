@@ -3700,6 +3700,7 @@ const char *hts_host_alias_rules(httrackp *opt) {
 /* Last rule of RULES whose alias list matches HOST (strjoker, last wins as in
    the +/- filter list): its canonical host, of length *CANONLEN, or NULL. */
 static const char *hts_host_alias_match(const char *rules, const char *host,
+                                        const char *full, hts_boolean nowww,
                                         size_t *canonlen) {
   const char *p;
   const char *canon = NULL;
@@ -3728,12 +3729,26 @@ static const char *hts_host_alias_match(const char *rules, const char *host,
         start++;
         len--;
       }
-      while (len > 0 && start[len - 1] == ' ')
-        len--;
+      while (len > 0 && (start[len - 1] == ' ' || start[len - 1] == '/'))
+        len--; /* a trailing slash is not a path */
       if (len != 0 && len < sizeof(glob)) {
+        char *ghost;
+
         memcpy(glob, start, len);
         glob[len] = '\0';
-        if (strjoker(host, glob, NULL, NULL) != NULL) {
+        /* the collapse applies to the pattern too, so a rule may spell either
+           www.example.com or example.com under -%u */
+        ghost = glob + (jump_protocol_const(glob) - glob);
+        if (nowww) {
+          const char *const bare = jump_normalized_const(ghost);
+
+          if (bare != ghost)
+            memmove(ghost, bare, strlen(bare) + 1);
+        }
+        /* a pattern naming a scheme is matched against it, one without against
+           the bare host, so an existing rule keeps matching every scheme */
+        if (strjoker(strstr(glob, "://") != NULL ? full : host, glob, NULL,
+                     NULL) != NULL) {
           canon = eq + 1;
           *canonlen = (size_t) (eol - canon);
           break;
@@ -3743,6 +3758,21 @@ static const char *hts_host_alias_match(const char *rules, const char *host,
     }
   }
   return canon;
+}
+
+/* Build "scheme://host" from URL's scheme and HOST, for the rules that name a
+   scheme. HTS_FALSE if it does not fit DEST. */
+static hts_boolean hts_host_alias_subject(const char *url, const char *host,
+                                          char *dest, size_t destsize) {
+  const size_t schemelen = (size_t) (jump_protocol_const(url) - url);
+  const size_t hostlen = strlen(host);
+
+  if (schemelen >= destsize || hostlen >= destsize - schemelen)
+    return HTS_FALSE;
+  memcpy(dest, url, schemelen);
+  memcpy(dest + schemelen, host, hostlen);
+  dest[schemelen + hostlen] = '\0';
+  return HTS_TRUE;
 }
 
 /* Chain hops resolved before giving up. A longer chain, or a loop, is a
@@ -3756,8 +3786,9 @@ static const char *hts_host_alias_resolve(const char *rules, const char *adr,
                                           hts_boolean nowww, char *dest,
                                           size_t destsize,
                                           hts_boolean *settled) {
-  const char *host, *canon;
-  size_t prefixlen, canonlen = 0;
+  const char *proto, *host, *hostsubj, *canon;
+  char BIGSTK fullsubj[HTS_URLMAXSIZE * 2];
+  size_t canonlen = 0;
   int hop;
 
   if (settled != NULL)
@@ -3768,32 +3799,54 @@ static const char *hts_host_alias_resolve(const char *rules, const char *adr,
   if (adr[0] == '\0' || strcmp(adr, "primary") == 0 ||
       strcmp(adr, "file://") == 0)
     return NULL;
-  host = jump_identification_const(adr);
+  proto = jump_protocol_const(adr);      /* after the scheme */
+  host = jump_identification_const(adr); /* after the credentials */
   /* Match the host in the form the dedup layer uses: under the www. collapse a
      rule naming example.com covers www.example.com, and with the collapse off
      the rule matches the name as the link spells it. */
-  canon = hts_host_alias_match(
-      rules, nowww ? jump_normalized_const(host) : host, &canonlen);
+  hostsubj = nowww ? jump_normalized_const(host) : host;
+  if (!hts_host_alias_subject(adr, hostsubj, fullsubj, sizeof(fullsubj)))
+    return NULL;
+  canon = hts_host_alias_match(rules, hostsubj, fullsubj, nowww, &canonlen);
   if (canon == NULL)
     return NULL;
 
   /* Follow the chain to its end, so the fold is a fixpoint: url_savename names
      the same link more than once, each time from the host it wrote last. */
-  prefixlen = (size_t) (host - adr);
   for (hop = 0;; hop++) {
-    const char *next, *dhost;
-    size_t nextlen = 0;
+    char BIGSTK canonbuf[HTS_URLMAXSIZE * 2];
+    const char *next, *dhost, *chost, *scheme;
+    size_t nextlen = 0, schemelen, credlen, hostlen;
 
-    /* keep the scheme and any credentials, replace the host */
-    if (prefixlen >= destsize || canonlen >= destsize - prefixlen)
+    /* The rule may name the scheme the canonical host speaks; when it does not,
+       the link keeps its own. Its credentials are kept either way. */
+    if (canonlen >= sizeof(canonbuf))
+      return NULL;
+    while (canonlen > 0 && canon[canonlen - 1] == '/')
+      canonlen--; /* a trailing slash is not a path */
+    memcpy(canonbuf, canon, canonlen);
+    canonbuf[canonlen] = '\0';
+    chost = jump_protocol_const(canonbuf);
+    hostlen = canonlen - (size_t) (chost - canonbuf);
+    scheme = chost != canonbuf ? canonbuf : adr;
+    schemelen = chost != canonbuf ? (size_t) (chost - canonbuf)
+                                  : (size_t) (proto - adr);
+    credlen = (size_t) (host - proto);
+
+    if (schemelen >= destsize || credlen >= destsize - schemelen ||
+        hostlen >= destsize - schemelen - credlen)
       return NULL; /* would not fit: leave the URL alone */
-    memcpy(dest, adr, prefixlen);
-    memcpy(dest + prefixlen, canon, canonlen);
-    dest[prefixlen + canonlen] = '\0';
+    memcpy(dest, scheme, schemelen);
+    memcpy(dest + schemelen, proto, credlen);
+    memcpy(dest + schemelen + credlen, chost, hostlen);
+    dest[schemelen + credlen + hostlen] = '\0';
 
-    dhost = dest + prefixlen;
-    next = hts_host_alias_match(
-        rules, nowww ? jump_normalized_const(dhost) : dhost, &nextlen);
+    dhost = jump_identification_const(dest);
+    if (nowww)
+      dhost = jump_normalized_const(dhost);
+    if (!hts_host_alias_subject(dest, dhost, fullsubj, sizeof(fullsubj)))
+      return NULL;
+    next = hts_host_alias_match(rules, dhost, fullsubj, nowww, &nextlen);
     if (next == NULL)
       break; /* settled: no rule maps this host further */
     if (nextlen == canonlen && strncasecmp(next, canon, canonlen) == 0)
@@ -3851,16 +3904,54 @@ hts_boolean hts_host_same_alias(const char *rules, const char *adra,
              : HTS_FALSE;
 }
 
+/* HTS_TRUE if TOKEN[0..LEN) is a host, optionally behind the scheme it speaks
+   and with a trailing slash. GLOB keeps the filter metacharacters legal, which
+   only the alias side of a rule may use. */
+static hts_boolean hts_host_alias_token_ok(const char *token, size_t len,
+                                           hts_boolean glob) {
+  char BIGSTK buff[HTS_URLMAXSIZE * 2];
+  const char *host, *slash;
+
+  while (len > 0 && (*token == ' ' || *token == '\t')) {
+    token++;
+    len--;
+  }
+  while (len > 0 && (token[len - 1] == ' ' || token[len - 1] == '\t'))
+    len--;
+  if (len == 0 || len >= sizeof(buff))
+    return HTS_FALSE;
+  memcpy(buff, token, len);
+  buff[len] = '\0';
+  host = jump_protocol_const(buff);
+  if (*host == '\0')
+    return HTS_FALSE;
+  /* --host-alias maps hosts: a path belongs to no part of an address */
+  slash = strchr(host, '/');
+  if (slash != NULL && slash[1] != '\0')
+    return HTS_FALSE;
+  return strpbrk(host, glob ? "=# \t" : "=,*?[]();\\# \t") == NULL ? HTS_TRUE
+                                                                   : HTS_FALSE;
+}
+
 /* see htscore.h */
 hts_boolean hts_host_alias_rule_ok(const char *rule) {
   const char *const eq = rule != NULL ? strchr(rule, '=') : NULL;
+  const char *pat;
 
-  /* one host after the '=': no second rule, no glob (strjoker's set, plus ; and
-     \), no path or fragment, no space */
-  return eq != NULL && eq != rule && eq[1] != '\0' &&
-                 strpbrk(eq + 1, "=,*?[]();\\/# \t") == NULL
-             ? HTS_TRUE
-             : HTS_FALSE;
+  if (eq == NULL || eq == rule || eq[1] == '\0')
+    return HTS_FALSE;
+  /* one host after the '=', each alias before it */
+  if (!hts_host_alias_token_ok(eq + 1, strlen(eq + 1), HTS_FALSE))
+    return HTS_FALSE;
+  for (pat = rule; pat < eq;) {
+    const char *const sep = memchr(pat, ',', (size_t) (eq - pat));
+    const char *const end = sep != NULL ? sep : eq;
+
+    if (!hts_host_alias_token_ok(pat, (size_t) (end - pat), HTS_TRUE))
+      return HTS_FALSE;
+    pat = end + 1;
+  }
+  return HTS_TRUE;
 }
 
 /* see htscore.h */

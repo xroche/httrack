@@ -55,6 +55,16 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
     --sitemap-url 'BASEURL/hostalias/sitemap.xml' \
     --host-alias 'alias.example.invalid=BASEHOST'
 
+# over TLS the alias links, spelled http://, would reach a port that speaks
+# only TLS: the canonical side names the scheme the host really answers on
+if test "$HTTPS_SUPPORT" != "no"; then
+    bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 5 \
+        --found hostalias/b.html --found hostalias/c.html \
+        --file-not-matches hostalias/index.html 'example\.invalid' \
+        httrack 'BASEURL/hostalias/index.html' \
+        --host-alias 'alias.example.invalid=https://BASEHOST'
+fi
+
 # a rule the option cannot use is refused up front, not silently ignored
 out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
     --host-alias 'no-equals-sign' 2>&1) && {
@@ -63,5 +73,16 @@ out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
 }
 grep -q "Invalid host-alias rule" <<<"$out" || {
     echo "FAIL: no diagnostic for a malformed --host-alias rule: $out"
+    exit 1
+}
+
+# a path is not part of an address: this option maps hosts
+out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
+    --host-alias 'https://a.example/=ftp://b.example/pub/' 2>&1) && {
+    echo "FAIL: httrack accepted a --host-alias rule naming a path"
+    exit 1
+}
+grep -q "Invalid host-alias rule" <<<"$out" || {
+    echo "FAIL: no diagnostic for a --host-alias rule naming a path: $out"
     exit 1
 }

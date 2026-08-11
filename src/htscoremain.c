@@ -1861,6 +1861,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                                    "alias[,alias...]=canonical-host");
                   printf("Example: --host-alias "
                          "\"www2.example.com,m.example.com=example.com\"\n");
+                  printf("Example: --host-alias "
+                         "\"legacy.example.com=https://example.com\"\n");
                   htsmain_free();
                   return -1;
                 } else {
@@ -1869,8 +1871,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     HTS_PANIC_PRINTF("Invalid host-alias rule: expected "
                                      "alias[,alias...]=canonical-host");
                     printf("Rejected: %s\n", argv[na]);
-                    printf("The '=' takes a single literal host, no glob and "
-                           "no path\n");
+                    printf("Each side names a host, optionally behind its "
+                           "scheme; a path is not part of an address\n");
                     htsmain_free();
                     return -1;
                   }
