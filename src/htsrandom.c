@@ -40,7 +40,10 @@ Please visit our Website: http://www.httrack.com
 #else
 #include <errno.h>
 #include <stdio.h>
+/* One macro gates both the include and the call: <sys/random.h> is the only
+   declaration of getrandom(), so the symbol alone does not make it callable. */
 #if defined(HAVE_SYS_RANDOM_H) && defined(HAVE_GETRANDOM)
+#define HTS_USE_GETRANDOM
 #include <sys/random.h>
 #endif
 #endif
@@ -51,6 +54,8 @@ typedef BOOLEAN(WINAPI *hts_rtlgenrandom_t)(PVOID buffer, ULONG length);
 #endif
 
 hts_boolean hts_random_bytes(void *buf, size_t len) {
+  if (len == 0) /* nothing to ask any source for, on every platform alike */
+    return HTS_TRUE;
 #ifdef _WIN32
   hts_boolean ok = HTS_FALSE;
   HMODULE dll = LoadLibraryA("advapi32.dll");
@@ -71,7 +76,14 @@ hts_boolean hts_random_bytes(void *buf, size_t len) {
   size_t got = 0;
   FILE *fp;
 
-#ifdef HAVE_GETRANDOM
+#ifdef HTS_USE_GETRANDOM
+  /* Breaks the build if the two guards ever split again: an implicit
+     declaration would return int, not ssize_t. */
+  enum {
+    getrandom_is_prototyped =
+        1 / (sizeof(getrandom(p, len, 0)) == sizeof(ssize_t))
+  };
+
   while (got < len) {
     const ssize_t n = getrandom(p + got, len - got, 0);
 

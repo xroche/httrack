@@ -62,6 +62,7 @@ Please visit our Website: http://www.httrack.com
 #include "htssniff.h"
 #include "htscodec.h"
 #include "htsproxy.h"
+#include "htsrandom.h"
 #include "htssitemap.h"
 #include "htswarc.h"
 #include "htschanges.h"
@@ -1914,6 +1915,63 @@ static int st_pause(httrackp *opt, int argc, char **argv) {
       err = 1;
   }
   printf("pause: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_random(httrackp *opt, int argc, char **argv) {
+  enum { want = 64, pad = 16, rounds = 8 };
+
+  unsigned char buf[want + pad], first[want], touched[want], varies[want];
+  int err = 0, live = 0, r, i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  memset(touched, 0, sizeof(touched));
+  memset(varies, 0, sizeof(varies));
+  for (r = 0; r < rounds; r++) {
+    /* A fresh non-zero filler each round: a byte the fill skips keeps every one
+       of them, which a single canary value cannot tell from a written byte. */
+    const unsigned char filler = (unsigned char) (0xa5 + r);
+
+    memset(buf, filler, sizeof(buf));
+    if (!hts_random_bytes(buf, want))
+      err = 1;
+    for (i = 0; i < want; i++) {
+      if (buf[i] != filler)
+        touched[i] = 1;
+    }
+    for (i = 0; i < pad; i++) {
+      if (buf[want + i] != filler)
+        err = 1; /* wrote past the requested length */
+    }
+    if (r == 0) {
+      memcpy(first, buf, want);
+    } else {
+      for (i = 0; i < want; i++) {
+        if (buf[i] != first[i])
+          varies[i] = 1;
+      }
+    }
+  }
+  for (i = 0; i < want; i++) {
+    if (!touched[i])
+      err = 1; /* a short fill left this byte alone in every round */
+    live += varies[i];
+  }
+  /* Over 8 draws a live source moves all 64 bytes; half is a floor no real one
+     misses, and a source stuck on one byte or a constant cannot reach it. */
+  if (live < want / 2)
+    err = 1;
+  /* a zero-length ask succeeds and writes nothing */
+  memset(buf, 0x5a, sizeof(buf));
+  if (!hts_random_bytes(buf, 0))
+    err = 1;
+  for (i = 0; i < (int) sizeof(buf); i++) {
+    if (buf[i] != 0x5a)
+      err = 1;
+  }
+  printf("random: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -8984,6 +9042,8 @@ static const struct selftest_entry {
      "a user stop drops the slots still waiting to connect (#1073)",
      st_backstop},
     {"pause", "", "randomized inter-file pause target self-test", st_pause},
+    {"random", "", "hts_random_bytes() fills exactly the requested length",
+     st_random},
     {"relative", "<link> <curr-file>", "relative link between two paths",
      st_relative},
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
