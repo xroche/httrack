@@ -87,7 +87,9 @@ cleanup_push() {
     CLEANUP_ARGV+=("$@")
     test "${#CLEANUP_FRAMES[@]}" -eq 1 || return 0
     trap 'set +e; run_cleanups' EXIT
-    trap 'set +e; run_cleanups; exit 1' HUP INT QUIT PIPE TERM
+    # No PIPE: bash cannot trap a signal it inherited as ignored, which is how the
+    # runners hand SIGPIPE down, and a real one drains via the EXIT trap (#1136).
+    trap 'set +e; run_cleanups; exit 1' HUP INT QUIT TERM
 }
 
 # Drains the stack, so the EXIT trap after a signal is a no-op. Both slices carry

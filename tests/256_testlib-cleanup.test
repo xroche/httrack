@@ -74,6 +74,16 @@ test "$rc" -eq 3 || fail "exit 3 was reported as $rc"
 test -s "$tmpdir/log" || fail "the teardown was skipped on a non-zero exit"
 ok "the script's own exit status survives the teardown"
 
+## the trap list is the one this test knows
+#
+# The names on the trap line, not what a shell installed off it: which of them it
+# accepts is bash's business, and the legs below already prove the ones they send.
+trapped=(HUP INT QUIT TERM)
+want=$(printf '%s\n' "${trapped[@]}" | sort | tr '\n' ' ')
+got=$(sed -n "s/.*run_cleanups; exit 1' //p" "$testdir/testlib.sh" | tr ' ' '\n' | sort | tr '\n' ' ')
+assert_eq "$want" "$got" "cleanup_push's trap line names a signal no leg below sends"
+ok "cleanup_push traps no signal unknown to this test"
+
 ## a signal drains once, and through the library's own trap
 #
 # Status 1 is the trap's own exit. An untrapped fatal signal also reaches the EXIT
@@ -81,8 +91,9 @@ ok "the script's own exit status survives the teardown"
 # would hold with no signal trap at all. Each signal is sent, since a trap
 # covering TERM alone passes a TERM-only check.
 # INT and QUIT never arrive on either Windows runner; TERM and HUP do.
-sigs=(TERM INT HUP QUIT)
+sigs=("${trapped[@]}")
 ! is_windows || sigs=(TERM HUP)
+
 # Every leg is reported rather than the first to break: they fail one platform at
 # a time, and the elapsed time tells a signal never delivered from one ignored.
 bad=
