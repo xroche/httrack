@@ -572,6 +572,61 @@ static void cat_cmdline_arglist(String *output, const char *value,
   }
 }
 
+/* step4.html writes these keys as ${ztest:<var>:0:1}; a cleared checkbox is
+   empty in session state, so only they need the 0-to-empty inverse here. */
+static const char *const ini_checkbox_keys[] = {
+    "Near",
+    "Test",
+    "ParseAll",
+    "HTMLFirst",
+    "Cache",
+    "NoRecatch",
+    "Index",
+    "WordIndex",
+    "Log",
+    "RemoveTimeout",
+    "RemoveRateout",
+    "KeepAlive",
+    "NoErrorPages",
+    "NoExternalPages",
+    "NoPwdInPages",
+    "NoQueryStrings",
+    "NoPurgeOldFiles",
+    "Cookies",
+    "CheckType",
+    "ParseJava",
+    "HTTP10",
+    "TolerantRequests",
+    "UpdateHack",
+    "URLHack",
+    "KeepWww",
+    "KeepSlashes",
+    "KeepQueryOrder",
+    "StoreAllInCache",
+    "Sitemap",
+    "Warc",
+    "WarcCdx",
+    "Wacz",
+    "Changes",
+    "SingleFile",
+    "UseHTTPProxyForFTP",
+    /* Not a ${ztest:} key, but its HTTP entry is the empty one and
+       option10.html already reads 0 as that entry. */
+    "ProxyType",
+    NULL,
+};
+
+/* A stored 0 means "unchecked" for these keys, not the number zero. */
+static hts_boolean ini_key_is_checkbox(const char *key) {
+  size_t i;
+
+  for (i = 0; ini_checkbox_keys[i] != NULL; i++) {
+    if (strcmp(key, ini_checkbox_keys[i]) == 0)
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
 int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   int timeout = 30;
   int retour = 0;
@@ -601,9 +656,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   {
     char pth[1024];
 
-    const char *initOn[] = { "parseall", "Cache", "ka",
-      "cookies", "parsejava", "testall", "updhack", "urlhack", "index", NULL
-    };
+    /* "cache" beside "Cache": step2.html must not re-default it on every
+       render, or a reloaded profile that cleared it flips back. */
+    const char *initOn[] = {"parseall", "Cache",     "cache",   "ka",
+                            "cookies",  "parsejava", "testall", "updhack",
+                            "urlhack",  "index",     NULL};
     const initIntElt initInt[] = {
       {"filter", 4},
       {"travel", 2},
@@ -911,8 +968,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 String escline = STRING_EMPTY;
 
                 *pos++ = '\0';
-                if (pos[0] == '0' && pos[1] == '\0')
-                  *pos = '\0';  /* 0 => empty */
+                /* Only a checkbox: elsewhere zero is the user's value, and
+                   emptying it silently restores the wizard default (#1177). */
+                if (pos[0] == '0' && pos[1] == '\0' &&
+                    ini_key_is_checkbox(line))
+                  *pos = '\0';
+                /* A key in the file overwrites the default even when it is
+                   empty, and an acquired NULL reads back as absent (#1186). */
+                StringClear(escline);
                 unescapeini(pos, &escline);
                 coucal_write(NewLangList, line,
                               (intptr_t) StringAcquire(&escline));
