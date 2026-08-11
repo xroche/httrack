@@ -1,13 +1,14 @@
 #!/bin/bash
 #
-# An aborted run purged against the truncated new.lst of what it had reached,
-# deleting everything it never got to (#1109). Pass 2 is a complete crawl that
-# still purges, so a fix that only silences the purge fails here.
+# A SIGTERM'd --update purged against the truncated new.lst of what it had
+# reached, deleting everything it never got to (#1109). Pass 2 is a complete
+# crawl that still purges, so a fix that only silences the purge fails here.
+# 268 covers the same loss without a signal.
 
 set -euo pipefail
 
-# shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
 skip_on_windows "MSYS cannot signal a native httrack.exe"
@@ -142,39 +143,3 @@ ok "the files the aborted run never reached kept their previous copies"
 grep -q 'mirror aborted after' <<<"$log" ||
     fail "the aborted run still reports a complete mirror: ${log}"
 ok "the summary reports the abort"
-
-# --- pass 4: a --max-time stop, over links the crawl never even queued -------
-# The cap fires while slow.html is in flight, and the parser then drops the
-# leaf links it carries: the loop runs out of links without reaching them, so
-# an abort is not always visible in the cursor. Deleting the cache is what
-# makes the drop happen, and is something users do to reclaim space.
-out2="${tmpdir}/crawl2"
-mkdir -p "$out2"
-local_server_start --log "${tmpdir}/http.log"
-host2="127.0.0.1_${SRV_PORT}"
-leaves=(x0 x1 x2 x3 x4 x5)
-run_with_timeout 300 httrack "${BASEURL}/abortpurge/index.html" -O "$out2" \
-    "${common[@]}" --timeout=20 --max-time=120 >"${tmpdir}/log4" 2>&1
-for name in "${leaves[@]}"; do
-    test -s "${out2}/${host2}/abortpurge/${name}.html" ||
-        fail "pass 4 did not mirror ${name}.html"
-done
-ok "pass 4 mirrored the six leaves"
-
-rm -f "${out2}/hts-cache/new.zip"
-rc=0
-run_with_timeout 300 httrack "${BASEURL}/abortpurge/index.html" -O "$out2" \
-    "${common[@]}" --timeout=0 --max-time=2 >"${tmpdir}/log5" 2>&1 || rc=$?
-test "$rc" -ne 124 || fail "the capped crawl overran its deadline"
-capped=$(cat "${out2}/hts-log.txt")
-grep -q 'giving up' <<<"$capped" || fail "the time cap never fired: ${capped}"
-# Fewer links than pass 4 saw is what says the parser dropped some; without it
-# this leg passes on a mirror that simply finished.
-scanned=$(sed -n 's/.* : \([0-9][0-9]*\) links scanned.*/\1/p' <<<"$capped" | tail -1)
-test "${scanned:-99}" -lt 8 ||
-    fail "the stop dropped no link, so nothing was left unreached (${scanned} scanned)"
-for name in "${leaves[@]}"; do
-    test -s "${out2}/${host2}/abortpurge/${name}.html" ||
-        fail "${name}.html was purged by a run that stopped before queueing it"
-done
-ok "a capped run keeps the files its parser never queued"

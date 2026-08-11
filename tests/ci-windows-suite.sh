@@ -288,8 +288,8 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # decode back to, which NTFS refuses;
 # memresume, repaircache and resume-recovery interrupt pass 1 with a signal
 # MSYS cannot deliver to a native exe;
-# ftp-deadhost-interrupt and ftp-sigterm need that same signal (deadhost's
-# --timeout half runs, as 245);
+# ftp-deadhost-interrupt, ftp-sigterm and abort-purge need that same signal
+# (deadhost's --timeout half runs as 245, abort-purge's --max-time half as 268);
 # close-once interposes close() through LD_PRELOAD, which MSYS has no equivalent for.
 expected_skips="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
@@ -303,6 +303,7 @@ expected_skips="01_engine-footer-overflow.test
 215_engine-datadir-ospath.test
 243_local-ftp-deadhost-interrupt.test
 255_local-ftp-sigterm.test
+261_local-abort-purge.test
 235_local-resume-recovery.test
 48_local-crange-memresume.test
 71_local-crange-repaircache.test
