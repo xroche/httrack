@@ -3406,6 +3406,128 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Expands the option words into the short form optalias_check() emits, joined
+   by a space when it returns two, or NULL when it refuses them. USED takes the
+   number of words consumed. */
+static const char *st_optalias_expand(char *dest, size_t dest_size,
+                                      const char *word, const char *next,
+                                      int *used) {
+  char BIGSTK out[2][HTS_CDLMAXSIZE];
+  char *outv[2] = {out[0], out[1]};
+  const char *argv[2];
+  char error[256];
+  const int argc = next != NULL ? 2 : 1;
+  int outc = 0;
+
+  argv[0] = word;
+  argv[1] = next;
+  out[0][0] = out[1][0] = '\0';
+  *used = optalias_check(argc, argv, 0, &outc, outv, sizeof(out[0]), error,
+                         sizeof(error));
+  if (*used == 0)
+    return NULL;
+  assertf(outc >= 1 && outc <= 2);
+  strlcpybuff(dest, out[0], dest_size);
+  if (outc == 2) {
+    strlcatbuff(dest, " ", dest_size);
+    strlcatbuff(dest, out[1], dest_size);
+  }
+  return dest;
+}
+
+/* Long-option value handling (#1195): a value the option's class did not take
+   was dropped, so --index=0 read back as the enabling bare --index. */
+static int st_optalias(httrackp *opt, int argc, char **argv) {
+  char got[HTS_CDLMAXSIZE * 2];
+  int i, used;
+
+  (void) opt;
+  if (argc >= 1) {
+    const char *const out = st_optalias_expand(
+        got, sizeof(got), argv[0], argc >= 2 ? argv[1] : NULL, &used);
+
+    printf("%s\n", out != NULL ? out : "(refused)");
+    return out != NULL ? 0 : 1;
+  }
+#define EXPANDS(want, word, next)                                              \
+  do {                                                                         \
+    const char *const out__ =                                                  \
+        st_optalias_expand(got, sizeof(got), (word), (next), &used);           \
+    assertf(out__ != NULL && strcmp(out__, (want)) == 0);                      \
+  } while (0)
+#define REFUSES(word, next)                                                    \
+  assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used) == NULL)
+
+  /* the value -I0 has always taken, now reachable from the long form */
+  EXPANDS("-I0", "--index=0", NULL);
+  EXPANDS("-I0", "--index=off", NULL);
+  EXPANDS("-I0", "--noindex", NULL);
+  EXPANDS("-I", "--index=1", NULL);
+  EXPANDS("-I", "--index=on", NULL);
+  /* detached, as a config file writes it ("index off"), and never a URL */
+  EXPANDS("-I0", "--index", "off");
+  assertf(used == 2);
+  EXPANDS("-I", "--index", "http://foo/");
+  assertf(used == 1);
+  EXPANDS("-I", "--index", NULL);
+  assertf(used == 1);
+  /* -I takes 0 alone, so an out-of-range value is an error, not a bare -I */
+  REFUSES("--index=2", NULL);
+  REFUSES("--index=yes", NULL);
+
+  /* a numeric level reaches the short form whole */
+  EXPANDS("-%I0", "--search-index=0", NULL);
+  EXPANDS("-%I2", "--search-index=2", NULL);
+  EXPANDS("-%v2", "--display=2", NULL);
+  EXPANDS("-%N0", "--delayed-type-check=0", NULL);
+  EXPANDS("-o0", "--generate-errors=0", NULL);
+  REFUSES("--display=full", NULL);
+  REFUSES("--display=99999999999999999999", NULL);
+
+  /* a flag that takes no value refuses one rather than dropping it */
+  REFUSES("--mirror=0", NULL);
+  REFUSES("--nomirror", NULL);
+  REFUSES("--warc=0", NULL);
+  REFUSES("--single-file=s", NULL);
+  /* ...and so does a compound alias, whose value would land in the cluster */
+  REFUSES("--spider=0", NULL);
+
+  /* an alias whose own name begins with "no" is not a negation */
+  EXPANDS("-%T0", "--no-utf8-conversion", NULL);
+  EXPANDS("-y0", "--no-background-on-suspend", NULL);
+  EXPANDS("-%T", "--utf8-conversion", NULL);
+
+  /* the value-taking classes are untouched */
+  EXPANDS("-C0", "--cache=0", NULL);
+  EXPANDS("-C0", "--nocache", NULL);
+  EXPANDS("-C2", "--cache", "2");
+  EXPANDS("-P proxy:8080", "--proxy", "proxy:8080");
+  EXPANDS("+*.gif", "--allow", "*.gif");
+
+  /* the invariant: the bare long form of every name still emits its short form
+     verbatim, and one that needs a separate parameter still demands one. A
+     duplicate name (test, continue) resolves to the first row holding it */
+  for (i = 0; hts_optalias[i][0][0] != '\0'; i++) {
+    const int p = optalias_find(hts_optalias[i][0]);
+    char word[HTS_CDLMAXSIZE];
+
+    assertf(p >= 0);
+    snprintf(word, sizeof(word), "--%s", hts_optalias[i][0]);
+    if (strncmp(hts_optalias[p][2], "param", 5) == 0) {
+      REFUSES(word, NULL);
+    } else {
+      EXPANDS(hts_optalias[p][1], word, NULL);
+      assertf(used == 1);
+    }
+  }
+  assertf(i > 100); /* the table was walked, not skipped */
+#undef EXPANDS
+#undef REFUSES
+
+  printf("optalias self-test OK\n");
+  return 0;
+}
+
 /* -%u url-hack split (#271): each sub-flag must toggle independently. */
 static int st_urlhack(httrackp *opt, int argc, char **argv) {
   (void) argc;
@@ -9454,6 +9576,8 @@ static const struct selftest_entry {
      st_stripquery},
     {"urlhack", "", "-%u url-hack sub-flag (www/slash/query) self-test",
      st_urlhack},
+    {"optalias", "[<option> [<value>]]",
+     "long-option alias expansion (--index=0 and friends)", st_optalias},
     {"hostalias", "", "--host-alias hostname folding self-test", st_hostalias},
     {"hashkey-bounds", "", "dedup key holds a maximal host+path (#1160)",
      st_hashkey_bounds},

@@ -1,0 +1,115 @@
+#!/bin/bash
+#
+# A long option must honour the value its short form takes: --index=0 dropped
+# its value and read back as the enabling bare --index (#1195).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_flagvalue.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+assert_selftest "optalias self-test OK" optalias
+
+# The engine end of it: the top index is <out>/index.html, next to the mirrored
+# tree. RC carries the exit status, INDEX whether the index was written.
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+crawl() {
+    rm -rf "${tmp}/out"
+    mkdir -p "${tmp}/out"
+    RC=0
+    httrack "file://${tmp}/page.html" -O "${tmp}/out" --quiet -n "$@" \
+        >"${tmp}/out/.log" 2>&1 || RC=$?
+    INDEX=no
+    test ! -f "${tmp}/out/index.html" || INDEX=yes
+}
+
+indexed() { # indexed WANT ARG...
+    local want=$1
+    shift
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    assert_eq "${want}" "${INDEX}" "$* wrote a top index"
+}
+
+indexed no -I0
+indexed no --index=0
+indexed no --index=off
+indexed no --noindex
+indexed no --index off
+indexed yes --index
+indexed yes --index=1
+indexed yes -I
+
+# A value the option cannot take stops the run instead of being dropped; 134
+# would be an abort, not a refusal.
+refused() { # refused ARG...
+    crawl "$@"
+    { test "${RC}" -ne 0 && test "${RC}" -ne 134; } || fail "$* not refused (exit ${RC})"
+}
+
+refused --index=2
+refused --mirror=0
+refused --nomirror
+
+# The wizard end: a cleared box, and a project reload carrying Index=0, must
+# both emit the disabling form.
+htsserver_require
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_flagvalue.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "the index boxes do not disable the index (see above)"
+import re, sys, urllib.parse, urllib.request
+
+url = sys.argv[1].rstrip("/")
+form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1).decode()
+rc = 0
+
+
+def command(fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
+                    [("sid", sid)] + fields)
+    req = urllib.request.Request(url + "/server/step4.html",
+                                 data=body.encode("latin-1"), method="POST")
+    page = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+    m = re.search(r'<textarea name="command".*?>(.*?)</textarea>', page, re.S)
+    if m is None:
+        sys.exit("no command textarea in the rendered step4.html")
+    return m.group(1).split()
+
+
+# A checkbox posts nothing when cleared and "0" when a profile seeded it.
+for value in ("", "0"):
+    for field, off, on in (("index", "--index=0", "--index"),
+                           ("index2", "--search-index=0", "--search-index")):
+        cmd = command([(field, value)])
+        if off not in cmd:
+            print("FAIL: %s=%r does not emit %s" % (field, value, off))
+            rc = 1
+        if on in cmd:
+            print("FAIL: %s=%r emits the enabling %s" % (field, value, on))
+            rc = 1
+        if off in command([(field, "on")]):
+            print("FAIL: a ticked %s emits %s" % (field, off))
+            rc = 1
+
+sys.exit(rc)
+PY
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "PASS"

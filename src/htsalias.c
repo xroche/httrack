@@ -54,15 +54,17 @@ Please visit our Website: http://www.httrack.com
   set sockets 8     cache off
 
 */
+/* clang-format off: hand-aligned table; clang-format reflows the whole
+   initializer (2->4 space) and the class list on any edit. */
+/* clang-format off */
 /*
-  single : no options
+  single : no options, and a value (--index=0, --noindex) is refused
+  onoff  : optional 0/1 value, whose short form takes a 0 suffix (-I0)
+  level  : optional numeric value, which the short form parses (-%v2)
   param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
 */
-/* clang-format off: hand-aligned table; clang-format reflows the whole
-   initializer (2->4 space) on any edit, churning every untouched row. */
-/* clang-format off */
 const char *hts_optalias[][4] = {
   /*   {"","","",""}, */
   {"path", "-O", "param1", "output path"},
@@ -92,10 +94,10 @@ const char *hts_optalias[][4] = {
   {"host-control", "-H", "param", ""},
   {"extended-parsing", "-%P", "param", ""},
   {"near", "-n", "single", ""},
-  {"delayed-type-check", "-%N", "single", ""},
-  {"cached-delayed-type-check", "-%D", "single", ""},
+  {"delayed-type-check", "-%N", "level", ""},
+  {"cached-delayed-type-check", "-%D", "onoff", ""},
   {"delayed-type-check-always", "-%N2", "single", ""},
-  {"disable-security-limits", "-%!", "single", ""},
+  {"disable-security-limits", "-%!", "onoff", ""},
   {"test", "-t", "single", ""},
   {"list", "-%L", "param1", ""},
   {"urllist", "-%S", "param1", ""},
@@ -105,11 +107,11 @@ const char *hts_optalias[][4] = {
   {"structure", "-N", "param", ""}, {"user-structure", "-N", "param1", ""},
   {"long-names", "-L", "param", ""},
   {"keep-links", "-K", "param", ""},
-  {"mime-html", "-%M", "single", ""}, {"mht", "-%M", "single", ""},
+  {"mime-html", "-%M", "onoff", ""}, {"mht", "-%M", "onoff", ""},
   {"replace-external", "-x", "single", ""},
-  {"disable-passwords", "-%x", "single", ""}, {"disable-password", "-%x",
-                                               "single", ""},
-  {"include-query-string", "-%q", "single", ""},
+  {"disable-passwords", "-%x", "onoff", ""}, {"disable-password", "-%x",
+                                               "onoff", ""},
+  {"include-query-string", "-%q", "onoff", ""},
   {"strip-query", "-%g", "param1",
    "strip [host/pattern=]key1,key2,... from URLs"},
   {"host-alias", "-%C", "param1",
@@ -117,7 +119,7 @@ const char *hts_optalias[][4] = {
    "([scheme://]alias[,...]=[scheme://]host)"},
   {"cookies-file", "-%K", "param1",
    "load extra cookies from a Netscape cookies.txt"},
-  {"changes", "-%d", "single",
+  {"changes", "-%d", "onoff",
    "write hts-changes.json: what this crawl changed vs. the previous mirror"},
   {"sitemap", "-%m", "single",
    "seed the crawl from the start host's sitemap (robots.txt, then "
@@ -132,7 +134,7 @@ const char *hts_optalias[][4] = {
   {"warc-cdxj", "-%rc", "single", ""},
   {"wacz", "-%rz", "single",
    "package the WARC archive, CDXJ index and pages as a WACZ file"},
-  {"single-file", "-%Z", "single",
+  {"single-file", "-%Z", "onoff",
    "after the mirror, inline each page's assets as data: URIs"},
   {"single-file-max-size", "-%Zs", "param1",
    "per-asset cap for --single-file, in bytes (implies it; default 10485760)"},
@@ -140,7 +142,7 @@ const char *hts_optalias[][4] = {
    "explain which filter rule accepts or rejects a URL, then exit"},
   {"pause", "-%G", "param1",
    "random pause of MIN[:MAX] seconds between files"},
-  {"generate-errors", "-o", "single", ""},
+  {"generate-errors", "-o", "level", ""},
   {"do-not-generate-errors", "-o0", "single", ""},
   {"purge-old", "-X", "param", ""},
   {"cookies", "-b", "param", ""},
@@ -149,31 +151,31 @@ const char *hts_optalias[][4] = {
   {"parse-java", "-j", "param", ""},
   {"protocol", "-@i", "param", ""},
   {"robots", "-s", "param", ""},
-  {"http-10", "-%h", "single", ""}, {"http-1.0", "-%h", "single", ""},
-  {"keep-alive", "-%k", "single", ""},
-  {"build-top-index", "-%i", "single", ""},
-  {"disable-compression", "-%z", "single", ""},
-  {"tolerant", "-%B", "single", ""},
-  {"updatehack", "-%s", "single", ""}, {"sizehack", "-%s", "single", ""},
-  {"urlhack", "-%u", "single", ""},
-  {"keep-www-prefix", "-%j", "single", ""},
-  {"keep-double-slashes", "-%o", "single", ""},
-  {"keep-query-order", "-%y", "single", ""},
+  {"http-10", "-%h", "onoff", ""}, {"http-1.0", "-%h", "onoff", ""},
+  {"keep-alive", "-%k", "onoff", ""},
+  {"build-top-index", "-%i", "onoff", ""},
+  {"disable-compression", "-%z", "onoff", ""},
+  {"tolerant", "-%B", "onoff", ""},
+  {"updatehack", "-%s", "onoff", ""}, {"sizehack", "-%s", "onoff", ""},
+  {"urlhack", "-%u", "onoff", ""},
+  {"keep-www-prefix", "-%j", "onoff", ""},
+  {"keep-double-slashes", "-%o", "onoff", ""},
+  {"keep-query-order", "-%y", "onoff", ""},
   {"user-agent", "-F", "param1", "user-agent identity"},
   {"referer", "-%R", "param1", "default referer URL"},
   {"from", "-%E", "param1", "from email address"},
   {"footer", "-%F", "param1", ""},
   {"cache", "-C", "param", "number of retries for non-fatal errors"},
   {"store-all-in-cache", "-k", "single", ""},
-  {"do-not-recatch", "-%n", "single", ""},
+  {"do-not-recatch", "-%n", "onoff", ""},
   {"do-not-log", "-Q", "single", ""},
   {"extra-log", "-z", "single", ""},
   {"debug-log", "-Z", "single", ""},
   {"verbose", "-v", "single", ""},
   {"file-log", "-f", "single", ""},
   {"single-log", "-f2", "single", ""},
-  {"index", "-I", "single", ""},
-  {"search-index", "-%I", "single", ""},
+  {"index", "-I", "onoff", ""},
+  {"search-index", "-%I", "level", ""},
   {"priority", "-p", "param", ""},
   {"debug-headers", "-%H", "single", ""},
   {"userdef-cmd", "-V", "param1", ""},
@@ -182,14 +184,14 @@ const char *hts_optalias[][4] = {
                                                                "plug an external callback"},
   {"structure", "-N", "param1", "user-defined structure"},
   {"usercommand", "-V", "param1", "user-defined command"},
-  {"display", "-%v", "single",
+  {"display", "-%v", "level",
    "show files transferred and other funny realtime information"},
   {"dos83", "-L0", "single", ""},
   {"iso9660", "-L2", "single", ""},
   {"disable-module", "-%w", "param1", ""},
   {"no-background-on-suspend", "-y0", "single", ""},
-  {"background-on-suspend", "-y", "single", ""},
-  {"utf8-conversion", "-%T", "single", ""},
+  {"background-on-suspend", "-y", "onoff", ""},
+  {"utf8-conversion", "-%T", "onoff", ""},
   {"no-utf8-conversion", "-%T0", "single", ""},
   /* */
 
@@ -219,12 +221,12 @@ const char *hts_optalias[][4] = {
   {"catch-url", "-#P", "single", "catch complex URL through proxy"},
   /*{"debug-oldftp","-#R","single",""}, */
   {"debug-xfrstats", "-#T", "single", ""},
-  {"advanced-wait", "-#u", "single", ""},
+  {"advanced-wait", "-#u", "level", ""},
   {"debug-ratestats", "-#Z", "single", ""},
-  {"fast-engine", "-#X", "single", "Enable fast routines"},
+  {"fast-engine", "-#X", "onoff", "Enable fast routines"},
   {"debug-overflows", "-#X0", "single", "Attempt to detect buffer overflows"},
   {"debug-cache", "-#C", "param1", "List files in the cache"},
-  {"extract-cache", "-#C", "single", "Extract meta-data"},
+  {"extract-cache", "-#C", "level", "Extract meta-data"},
   {"debug-parsing", "-#d", "single", "debug: test parser"},
   {"repair-cache", "-#R", "single", "repair the damaged cache ZIP file"},
     {"repair", "-#R", "single", ""},
@@ -252,7 +254,7 @@ const char *hts_optalias[][4] = {
   {"wide", "-c32", "single", ""},
   {"tiny", "-c1", "single", ""},
   {"ultrawide", "-c48", "single", ""},
-  {"http10", "-%h", "single", ""},
+  {"http10", "-%h", "onoff", ""},
   {"filelist", "-%L", "single", ""}, {"list", "-%L", "single", ""},
   {"filterlist", "-%S", "single", ""},
   /* END OF ALIASES */
@@ -278,6 +280,30 @@ const char *hts_optalias[][4] = {
   {"", "", "", ""}
 };
 /* clang-format on */
+
+/* Suffix the short form takes for VALUE ("0", "2", none), or NULL when this
+   class refuses it: an "onoff" flag reads 0/1 only, a "level" one a number. */
+static const char *optalias_suffix(const char *type, const char *value) {
+  const hts_boolean level = strcmp(type, "level") == 0 ? HTS_TRUE : HTS_FALSE;
+
+  if (!level && strcmp(type, "onoff") != 0)
+    return NULL;
+  if (level && isdigit((unsigned char) value[0])) {
+    size_t i;
+
+    /* bounded: an absurd run of digits is refused, not concatenated */
+    for (i = 0; value[i] != '\0' && i < 16; i++) {
+      if (!isdigit((unsigned char) value[i]))
+        return NULL;
+    }
+    return value[i] == '\0' ? value : NULL;
+  }
+  if (strcmp(value, "0") == 0 || strcmp(value, "off") == 0)
+    return "0";
+  if (strcmp(value, "1") == 0 || strcmp(value, "on") == 0)
+    return ""; /* enabling is what the bare flag already means */
+  return NULL;
+}
 
 /* 
   Check for alias in command-line 
@@ -306,6 +332,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       /* */
       char *position;
       int need_param = 1;
+      hts_boolean negated = HTS_FALSE;
 
       int pos;
 
@@ -319,10 +346,12 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         /* Copy parameter */
         strcpybuff(param, position + 1);
       }
-      /* --nocache */
-      else if (strncmp(argv[n_arg] + 2, "no", 2) == 0) {
+      /* --nocache, unless the whole name is an alias (--no-utf8-conversion) */
+      else if (strncmp(argv[n_arg] + 2, "no", 2) == 0 &&
+               optalias_find(argv[n_arg] + 2) < 0) {
         strcpybuff(command, argv[n_arg] + 4);
         strcpybuff(param, "0");
+        negated = HTS_TRUE;
       }
       /* --sockets 8 */
       else {
@@ -356,7 +385,12 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
             strcpybuff(param, argv[n_arg + 1]);
             need_param = 2;
           }
-        } else
+        }
+        /* a detached value, but only a word that cannot be a URL of its own */
+        else if (need_param == 2 && n_arg + 1 < argc &&
+                 optalias_suffix(hts_optalias[pos][2], argv[n_arg + 1]) != NULL)
+          strcpybuff(param, argv[n_arg + 1]);
+        else
           need_param = 1;
 
         /* Final result */
@@ -386,6 +420,24 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
               // on is the default
             } else
               strlcatbuff(return_argv[0], param, return_argv_size);
+          } else if (param[0] != '\0') {
+            const char *const suffix =
+                optalias_suffix(hts_optalias[pos][2], param);
+
+            /* refuse rather than drop: a dropped --index=0 reads back as the
+               enabling bare --index */
+            if (suffix == NULL) {
+              if (negated)
+                snprintf(return_error, return_error_size,
+                         "Unknown option: %s\n", argv[n_arg] + 2);
+              else
+                snprintf(return_error, return_error_size,
+                         "Syntax error:\n\tOption --%s does not take the value "
+                         "%s\n",
+                         hts_optalias[pos][0], param);
+              return 0;
+            }
+            strlcatbuff(return_argv[0], suffix, return_argv_size);
           }
           *return_argc = 1;     /* 1 parameter returned */
         }
