@@ -84,9 +84,12 @@ want=$(printf '%s\n' "${trapped[@]}" | sort | tr '\n' ' ')
 got=$(sed -n "s/.*run_cleanups; exit 1' //p" "$testdir/testlib.sh" | tr ' ' '\n' | sort | tr '\n' ' ')
 assert_eq "$want" "$got" "cleanup_push's trap line names a signal no leg below sends"
 
-write_subject <<'EOF'
+# Redirected, never piped: a pipeline element is a subshell, and bash 3.2 resets its
+# traps at the fork, so "trap -p |" reads back empty on macOS.
+write_subject <<EOF
 cleanup_push true
-trap -p | awk '/run_cleanups/ && $NF != "EXIT" { sub(/^SIG/, "", $NF); print $NF }' | sort | tr '\n' ' '
+trap -p >"$tmpdir/traps"
+awk '/run_cleanups/ && \$NF != "EXIT" { sub(/^SIG/, "", \$NF); print \$NF }' "$tmpdir/traps" | sort | tr '\n' ' '
 EOF
 rc=$(subject)
 test "$rc" -eq 0 || fail "the subject exited $rc: $(cat "$tmpdir/out")"
