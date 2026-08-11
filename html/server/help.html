@@ -57,7 +57,7 @@ function info(str) {
 
 <table class="tableWidth" border="0" width="100%" cellspacing="0">
 <tr><td class="tabCtrl" align="left">
-<a style="background:black;color: white" href="about.html" target="_new"
+<a style="background:black;color: white" href="about.html" target="_blank"
 			title='${html:LANG_G21}' onMouseOver="info('${js:LANG_G21}'); return true" onMouseOut="info('&nbsp;'); return true"
 			>
 ${LANG_O16}...
@@ -66,7 +66,7 @@ ${LANG_O16}...
 
 <tr><td class="tabCtrl" align="left">
 <a style="background:black;color: white" 
-   href="http://www.httrack.com/update.php3?Product=HTTrack&Version=${attr:HTTRACK_VERSIONID}&VersionStr=${attr:HTTRACK_VERSION}&Platform=${attr:HTS_PLATFORM}&LanguageId=${attr:lang}" target="_new"
+   href="http://www.httrack.com/update.php3?Product=HTTrack&Version=${attr:HTTRACK_VERSIONID}&VersionStr=${attr:HTTRACK_VERSION}&Platform=${attr:HTS_PLATFORM}&LanguageId=${attr:lang}" target="_blank"
 			title='${html:LANG_O17}' onMouseOver="info('${js:LANG_O17}'); return true" onMouseOut="info('&nbsp;'); return true"
    >
 ${LANG_O17}...
@@ -77,7 +77,7 @@ ${/* show help only if available */}
 ${do:if-file-exists:html/index.html}
 <tr><td class="tabCtrl" align="left">
 <a style="background:black;color: white" 
-   href="/index.html" target="_new"
+   href="/index.html" target="_blank"
 			title='${html:LANG_TIPHELP}' onMouseOver="info('${js:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
    >
 ${LANG_P16}
