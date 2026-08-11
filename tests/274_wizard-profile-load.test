@@ -14,11 +14,8 @@ distdir=$(cd "${distdir}" && pwd)
 htsserver_require
 
 printf '[the checkbox table matches step4.html] ..\t'
-# The reader's exception list is only correct while it mirrors the keys the
-# writer emits with ${ztest:}; nothing else ties the two files together.
-# Both sides match any key spelling, or a key the other side cannot even see
-# leaves the two sets equal and the guard blind to the drift it exists for.
-# ProxyType is the one entry the writer does not spell with ${ztest:}.
+# Nothing else ties ini_checkbox_keys[] to the ${ztest:} keys step4.html
+# writes. ProxyType is the one entry step4.html does not spell that way.
 written=$({
     sed -n 's/^\([^=]*\)=[$]{ztest:.*/\1/p' "${distdir}/html/server/step4.html"
     echo ProxyType
@@ -44,6 +41,7 @@ mkdir -p "${work}/proj/hts-cache"
 # separator of a rules box percent-encoded one byte at a time.
 cat >"${work}/proj/hts-cache/winprofile.ini" <<'EOF'
 CurrentUrl=http://example.com/
+Category=c%
 MaxRate=0
 MaxTime=0
 Depth=3
@@ -90,6 +88,11 @@ loaded = urllib.request.urlopen(
     timeout=20).read().decode("latin-1")
 if "http://example.com/" not in loaded:
     sys.exit("step2.html did not load the project\n%s" % loaded[:400])
+# The category dropdown comes from a second, independent reader in htstools.c
+# that decodes the same escapes out of the same file.
+if '<option value="c%">' not in loaded:
+    sys.exit("the category list lost the trailing escape\n%s"
+             % re.findall(r"<option[^>]*>[^<]*</option>", loaded))
 
 
 def textarea(page, name):
@@ -177,9 +180,8 @@ want('--footer "x%y"')
 if ini.get("Footer") != "x%%y":
     sys.exit("Footer round-tripped as %r" % ini.get("Footer"))
 
-# A truncated escape has no digits to read: decoding one walks past the
-# terminator and spills the rest of the buffer into the value. The form body
-# takes the same escape through unescapehttp(), so send one raw.
+# The form body decodes through unescapehttp() rather than unescapeini(), and
+# only a raw % reaches it: urlencoding one would defeat the probe.
 want('--sitemap-url "http://example.com/s.xml%"')
 posted = urllib.request.urlopen(
     urllib.request.Request(url + "/server/step4.html",

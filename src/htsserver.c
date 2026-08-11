@@ -572,9 +572,8 @@ static void cat_cmdline_arglist(String *output, const char *value,
   }
 }
 
-/* Keys html/server/step4.html writes as ${ztest:<var>:0:1}: a cleared checkbox
-   is empty in the session, so only these get the inverse on the way back in.
-   tests/274 checks the list against step4.html. */
+/* step4.html writes these keys as ${ztest:<var>:0:1}; a cleared checkbox is
+   empty in session state, so only they need the 0-to-empty inverse here. */
 static const char *const ini_checkbox_keys[] = {
     "Near",
     "Test",
