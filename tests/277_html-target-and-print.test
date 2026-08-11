@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# Two html/ defects that render invisibly: target="_new" is a named context, not
+# a keyword, so every such link reuses one tab; and a print block that resets
+# only body leaves the dark palette live on paper.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+htmldir="${srcdir}/html"
+test -d "${htmldir}" || fail "no ${htmldir}"
+
+# ---- target="_new" ----
+
+pages=()
+while IFS= read -r f; do
+    pages+=("$f")
+done < <(find "${htmldir}" -type f \
+    \( -name '*.html' -o -name '*.css' -o -name '*.js' -o -name '*.xml' \) | LC_ALL=C sort)
+
+# A silently empty candidate list would pass the scan below proving nothing.
+test "${#pages[@]}" -ge 60 || fail "only ${#pages[@]} markup files under html/"
+listing=$(printf '%s\n' "${pages[@]}")
+for want in faq.html cache.html server/file.html server/finished.html server/help.html; do
+    grep -qxF "${htmldir}/${want}" <<<"${listing}" ||
+        fail "candidate list misses html/${want}: the scan cannot see the pages it is for"
+done
+
+offenders=$(grep -l 'target="_new"' "${pages[@]}" || true)
+test -z "${offenders}" || fail "target=\"_new\" is a named context, use _blank: ${offenders}"
+
+# ---- print palette ----
+
+css="${htmldir}/doc.css"
+test -r "${css}" || fail "no ${css}"
+
+# Emits "scope name value" for every custom property in a :root block.
+tokens=$(awk '
+/^@media print \{$/                          { media = "print"; next }
+/^@media \(prefers-color-scheme: dark\) \{$/ { media = "dark";  next }
+/^@media/                                    { media = "other"; next }
+/^\}$/                                       { media = ""; inroot = 0; next }
+/^\t?\}$/                                    { inroot = 0; next }
+/^\t?:root \{$/                              { inroot = 1; next }
+inroot && match($0, /--[a-z-]+:/) {
+    name = substr($0, RSTART, RLENGTH - 1)
+    value = substr($0, RSTART + RLENGTH)
+    sub(/^[ \t]+/, "", value)
+    sub(/;.*$/, "", value)
+    scope = (media == "" ? "light" : media)
+    print scope, name, value
+}' "${css}")
+
+value_of() { awk -v s="$1" -v n="$2" '$1 == s && $2 == n { $1 = ""; $2 = ""; sub(/^ +/, ""); print }' <<<"${tokens}"; }
+
+dark_names=$(awk '$1 == "dark" { print $2 }' <<<"${tokens}")
+test "$(grep -c . <<<"${dark_names}")" -ge 5 ||
+    fail "found no dark palette to compare against: awk parse of ${css} is broken"
+
+for name in ${dark_names}; do
+    light=$(value_of light "${name}")
+    printed=$(value_of print "${name}")
+    test -n "${light}" || fail "${name} has no light value"
+    test -n "${printed}" || fail "@media print leaves the dark ${name} live on paper"
+    test "${printed}" = "${light}" ||
+        fail "@media print sets ${name} to '${printed}', not the light '${light}'"
+done
+
+echo "html hygiene: ${#pages[@]} markup files free of _new, print restores $(grep -c . <<<"${dark_names}") palette tokens"

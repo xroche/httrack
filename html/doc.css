@@ -366,8 +366,26 @@ dialog#zoom::backdrop { background: rgba(0, 0, 0, .8); }
 	z-index: 10;
 }
 
+/* Some browsers still match prefers-color-scheme: dark while printing, putting
+   #e6e6ee ink on white paper. Reset the palette, not each rule that reads it. */
 @media print {
+	:root {
+		--field: #77b;
+		--panel: #ccd;
+		--accent: #99c;
+		--ink: #111;
+		--ink-soft: #444;
+		--rule: #aab;
+		--link: #00c;
+		--link-hover: #c00;
+		--code-bg: #e8e8f2;
+		--chip: #dde;
+		--shadow: rgba(0, 0, 0, .25);
+	}
+
 	body { background: #fff; }
 	.toc, .filter { display: none; }
 	.wrap { display: block; border: 0; }
+	/* Not a token, same paper: the dark scheme inverts the wordmark to white. */
+	.masthead img { filter: none; }
 }
