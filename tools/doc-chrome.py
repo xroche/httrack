@@ -3,8 +3,8 @@
 
 The documentation is read from disk as often as over http, so it cannot use server
 includes: the navigation is real markup in every page, written here and verified by
-CI. Pages opt in by carrying the doc-chrome markers; --convert adds them to a page
-still using the 2007 table layout.
+CI. Pages opt in by carrying the doc-chrome markers, mandatory once a page loads
+doc.css; --convert adds them to a page still using the 2007 table layout.
 
     tools/doc-chrome.py                 rewrite the chrome regions in place
     tools/doc-chrome.py --check         fail if any page is out of sync
@@ -194,8 +194,11 @@ def chrome(page, content):
         nav.append("\t</ul>")
     nav.append("</nav>")
 
+    # Marked inside top too, so every page exposes httrack.com's injection point.
     top = [
+        MARK["masthead"][0],
         *MASTHEAD,
+        MARK["masthead"][1],
         "",
         '<div class="wrap">',
         "",
@@ -313,9 +316,17 @@ def main():
         with open(path, encoding="utf-8") as fp:
             before = fp.read()
         if MARK["top"][0] not in before and MARK["masthead"][0] not in before:
+            # A doc.css page without markers would drop out of the check, not fail it.
+            if 'href="doc.css"' in before:
+                print(f"{page}: loads doc.css but carries no doc-chrome marker")
+                stale += 1
             continue
         owned += 1
         after = rewrite(path, before)
+        # Check the bytes that ship, not the regenerated form, which always has it.
+        if MARK["masthead"][0] not in (before if args.check else after):
+            print(f"{page}: no {MARK['masthead'][0]} marker")
+            stale += 1
         if after == before:
             continue
         if args.check:
