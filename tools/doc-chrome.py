@@ -12,6 +12,7 @@ doc.css; --convert adds them to a page still using the 2007 table layout.
 """
 
 import argparse
+import datetime
 import os
 import re
 import sys
@@ -100,12 +101,12 @@ DESCRIPTIONS = {
     "scripting.html": "Driving the httrack command-line program from shell and" " batch scripts.",
 }
 
-# Year left static: --check diffs the regenerated chrome against the shipped
-# bytes, so a computed one would red CI every 1st of January.
+# A regeneration stamps the current year; --check ignores the digits, so a page
+# shipped in an earlier year is in sync until something else rewrites it.
 FOOTER = [
     "<footer>",
-    "\t<small>&copy; 1998-2026 Xavier Roche &amp; other contributors"
-    " - Web Design: Leto Kauler.</small>",
+    f"\t<small>&copy; 1998-{datetime.date.today().year} Xavier Roche"
+    " &amp; other contributors - Web Design: Leto Kauler.</small>",
     # Local copy: an absolute src breaks the image offline and makes a network request.
     '\t<a href="https://endsoftwarepatents.org/innovating-without-patents/"'
     ' target="_blank" rel="noopener"'
@@ -140,6 +141,21 @@ def region(text, part, body):
     if not pattern.search(text):
         raise SystemExit(f"missing {open_} marker")
     return pattern.sub(open_ + "\n" + body.rstrip("\n") + "\n" + close, text, count=1)
+
+
+def undated(text):
+    """The page with the footer's copyright year masked, for comparison only.
+
+    Scoped to the footer region: contact.html carries a second 1998-YYYY in its
+    licence text, and that one has to stay byte-exact.
+    """
+    open_, close = MARK["footer"]
+    pattern = re.compile(re.escape(open_) + ".*?" + re.escape(close), re.S)
+
+    def mask(match):
+        return re.sub(r"1998-\d{4}", "1998-YYYY", match.group(0))
+
+    return pattern.sub(mask, text, count=1)
 
 
 def slug(heading):
@@ -356,7 +372,8 @@ def main():
         if MARK["masthead"][0] not in (before if args.check else after):
             print(f"{page}: no {MARK['masthead'][0]} marker")
             stale += 1
-        if after == before:
+        # A rewrite restamps the year; --check tolerates the one already shipped.
+        if after == before or (args.check and undated(after) == undated(before)):
             continue
         if args.check:
             print(f"{page}: chrome is out of sync with tools/doc-chrome.py")
