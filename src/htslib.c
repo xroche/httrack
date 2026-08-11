@@ -3842,7 +3842,7 @@ static const char *hts_host_alias_resolve(const char *rules, const char *adr,
      the same link more than once, each time from the host it wrote last. */
   for (hop = 0;; hop++) {
     char BIGSTK canonbuf[HTS_URLMAXSIZE * 2];
-    const char *next, *dhost, *chost;
+    const char *next, *dhost, *chost, *cproto;
     size_t nextlen = 0, credlen, hostlen;
 
     /* The rule may name the scheme the canonical host speaks; when it does not,
@@ -3852,10 +3852,13 @@ static const char *hts_host_alias_resolve(const char *rules, const char *adr,
       return NULL;
     memcpy(canonbuf, canon, canonlen);
     canonbuf[canonlen] = '\0';
-    chost = jump_protocol_const(canonbuf);
+    /* the link's credentials are the ones kept, so drop any the rule carries:
+       they would otherwise be prepended to them again on every re-fold */
+    cproto = jump_protocol_const(canonbuf);
+    chost = jump_identification_const(cproto);
     hostlen = canonlen - (size_t) (chost - canonbuf);
-    if (chost != canonbuf) {
-      const size_t len = (size_t) (chost - canonbuf);
+    if (cproto != canonbuf) { /* the rule names a scheme */
+      const size_t len = (size_t) (cproto - canonbuf);
 
       if (len >= sizeof(schemebuf))
         return NULL;

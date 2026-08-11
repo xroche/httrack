@@ -3604,9 +3604,19 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(hts_host_alias("*=a.com/", "http://b.com", HTS_TRUE, dest,
                                 sizeof(dest)),
                  "http://a.com") == 0);
-  /* credentials belong to the link: a canonical carrying its own would be
-     prepended to them again on every re-fold */
+  /* Credentials belong to the link. The command line refuses a rule carrying
+     its own, and the fold drops them, since a caller can set the rules without
+     going through that check: kept, they would be prepended to the link's again
+     on every re-fold, growing the address until it no longer fits. */
   assertf(!hts_host_alias_rule_ok("a.com=user:pw@a.com"));
+  assertf(strcmp(hts_host_alias("*=u:p@b.com", "z.com", HTS_TRUE, dest,
+                                sizeof(dest)),
+                 "b.com") == 0);
+  assertf(hts_host_alias("*=u:p@b.com", "b.com", HTS_TRUE, dest,
+                         sizeof(dest)) == NULL);
+  assertf(strcmp(hts_host_alias("*=u:p@b.com", "http://user:pw@z.com", HTS_TRUE,
+                                dest, sizeof(dest)),
+                 "http://user:pw@b.com") == 0);
   /* a trailing slash is not a path */
   assertf(strcmp(hts_host_alias("b.com/=https://a.com/", "http://b.com",
                                 HTS_TRUE, dest, sizeof(dest)),
