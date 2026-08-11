@@ -3395,23 +3395,23 @@ static int st_urlhack(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* The filter each wizard answer emits, printed for an ad-hoc <n> <adr> <fil>
-   [up], asserted against the expected patterns otherwise (#1119). */
+/* Prints the filter answer <n> emits for (adr, fil) [up]; with no arguments,
+   asserts every answer against its expected pattern (#1119). */
 static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   char pattern[HTS_URLMAXSIZE * 2];
   htsbuff f = htsbuff_array(pattern);
 
   (void) opt;
   if (argc >= 3) {
-    wizard_answer_filter(&f, atoi(argv[0]), argv[1], argv[2],
-                         argc >= 4 && atoi(argv[3]) != 0 ? HTS_TRUE
-                                                         : HTS_FALSE);
+    hts_wizard_answer_filter(&f, atoi(argv[0]), argv[1], argv[2],
+                             argc >= 4 && atoi(argv[3]) != 0 ? HTS_TRUE
+                                                             : HTS_FALSE);
     printf("%s\n", pattern);
     return 0;
   }
 #define EMITS(n, adr, fil, up, expect)                                         \
   do {                                                                         \
-    wizard_answer_filter(&f, (n), (adr), (fil), (up));                         \
+    hts_wizard_answer_filter(&f, (n), (adr), (fil), (up));                     \
     assertf(strcmp(pattern, (expect)) == 0);                                   \
   } while (0)
 
@@ -3420,6 +3420,10 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   EMITS(5, "foo.com", "/dir/page.html", HTS_TRUE, "+foo.com/*");
   EMITS(6, "foo.com", "/dir/page.html", HTS_FALSE, "+foo.com/*");
   /* the port is part of the host, the credentials are not */
+  EMITS(2, "foo.com:8080", "/x", HTS_FALSE, "-foo.com:8080/*");
+  EMITS(2, "user:pass@foo.com", "/x", HTS_FALSE, "-foo.com/*");
+  EMITS(5, "foo.com:8080", "/x", HTS_TRUE, "+foo.com:8080/*");
+  EMITS(5, "user:pass@foo.com", "/x", HTS_TRUE, "+foo.com/*");
   EMITS(6, "foo.com:8080", "/x", HTS_FALSE, "+foo.com:8080/*");
   EMITS(6, "user:pass@foo.com", "/x", HTS_FALSE, "+foo.com/*");
 
@@ -3429,7 +3433,7 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   assertf(strjoker("foo.com.evil.org/x", pattern + 1, NULL, NULL) == NULL);
   assertf(strjoker("foo.com:8080/x", pattern + 1, NULL, NULL) == NULL);
 
-  /* the link and directory answers, unchanged */
+  /* the link and directory answers */
   EMITS(0, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/page.html");
   EMITS(0, "foo.com", "index.html", HTS_FALSE, "-foo.com/index.html");
   EMITS(1, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/*");
@@ -3439,6 +3443,7 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   /* answer 1 collapses a doubled trailing slash, answers 5 and 7 keep it */
   EMITS(1, "foo.com", "/dir//page.html", HTS_FALSE, "-foo.com/dir/*");
   EMITS(5, "foo.com", "/dir//page.html", HTS_FALSE, "+foo.com/dir//*");
+  EMITS(7, "foo.com", "/dir//page.html", HTS_FALSE, "+foo.com/dir//*[file]");
   /* no directory to anchor on, so answers 1, 5 and 7 emit nothing */
   EMITS(1, "foo.com", "page.html", HTS_FALSE, "");
   EMITS(5, "foo.com", "page.html", HTS_FALSE, "");

@@ -57,13 +57,11 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
                                hts_boolean filters_decided,
                                hts_boolean filters_refused);
 
-/* Build into `f` the filter the wizard's answer `n` adds for the link
-   (adr,fil), or leave it empty when that answer adds none. `seeker_up` is the
-   HTS_SEEKER_UP bit of opt->seeker, which answer 5 reads. A host-wide answer
-   puts a slash before the wildcard, anchoring it on the host so foo.com does
-   not also accept foo.com.evil.org (#1119). */
-void wizard_answer_filter(htsbuff *f, int n, const char *adr, const char *fil,
-                          hts_boolean seeker_up);
+/* Builds into `f` the filter answer `n` adds for the link (adr,fil), and leaves
+   `f` empty when the answer adds none. `seeker_up` is the HTS_SEEKER_UP bit of
+   opt->seeker, read by answer 5. */
+void hts_wizard_answer_filter(htsbuff *f, int n, const char *adr,
+                              const char *fil, hts_boolean seeker_up);
 
 /* A (tag, attribute) pair naming a reference kind. */
 #ifndef HTS_DEF_DEFSTRUCT_htspair_t

@@ -181,8 +181,8 @@ static void wizard_cat_path(htsbuff *f, const char *sign, const char *adr,
   htsbuff_catn(f, fil, len);
 }
 
-void wizard_answer_filter(htsbuff *f, int n, const char *adr, const char *fil,
-                          hts_boolean seeker_up) {
+void hts_wizard_answer_filter(htsbuff *f, int n, const char *adr,
+                              const char *fil, hts_boolean seeker_up) {
   size_t dir = hts_lastcharoffset(fil);
 
   while (fil[dir] != '/' && dir > 0)
@@ -825,14 +825,14 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         break;
       } // switch
 
-      /* the answers that add a filter emit it here */
+      /* the pattern half of the answer: a new answer needs both switches */
       {
         char BIGSTK pattern[HTS_FILTER_SLOT_SIZE];
         htsbuff f = htsbuff_array(pattern);
 
-        wizard_answer_filter(&f, n, adr, fil,
-                             (opt->seeker & HTS_SEEKER_UP) != 0 ? HTS_TRUE
-                                                                : HTS_FALSE);
+        hts_wizard_answer_filter(
+            &f, n, adr, fil,
+            (opt->seeker & HTS_SEEKER_UP) != 0 ? HTS_TRUE : HTS_FALSE);
         if (f.len != 0) {
           HT_INSERT_FILTERS0; // insert at slot 0
           strlcpybuff(_FILTERS[0], pattern, HTS_FILTER_SLOT_SIZE);

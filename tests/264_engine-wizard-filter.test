@@ -6,9 +6,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
 
-# #1119: the wizard answers that cover a whole host must anchor on it. The
-# emitted patterns are asserted in the self-test; here the host-wide one is fed
-# back to the matcher, which is what decides whether a link is authorized.
+# #1119: the self-test asserts the emitted patterns, this feeds the host-wide
+# one back through the matcher that decides whether a link is authorized.
 
 # 2 forbids the host, 5 (allowed to go up) and 6 authorize it
 assert_selftest "-foo.com/*" wizardfilter 2 foo.com /a/b.html
