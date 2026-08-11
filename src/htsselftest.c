@@ -8014,9 +8014,45 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     CHECK(back[SLOT_FTP].r.statuscode == STATUSCODE_TIMEOUT);
     CHECK(strcmp(back[SLOT_FTP].r.msg, "untouched") == 0);
   }
+
+  /* A cap raises the stop flag itself and leaves the transfers already running
+     a grace (#77, #481): the sweep takes the pre-connect slots only until the
+     grace overruns, and back_wait's own limit block ends the rest. */
+  if (!err) {
+    const LLint recv_was = HTS_STAT.HTS_TOTAL_RECV;
+
+    opt->state.stop = 0;
+    if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
+      skipped = 1;
+      goto cleanup;
+    }
+    for (i = 0; i < SLOTS; i++)
+      swept[i] = r[i].soc;
+    /* cap reached, a tenth of it still to overrun before the hard stop */
+    HTS_STAT.HTS_TOTAL_RECV = 1000;
+    opt->maxsite = 1000;
+    hts_request_stop(opt, 0);
+
+    back_wait(sback, opt, &cache, 0);
+
+    for (i = SLOT_DNS; i < SLOT_HEADERS; i++) {
+      CHECK(back[i].status == STATUS_READY);
+      CHECK(back[i].r.statuscode == STATUSCODE_INVALID);
+    }
+    for (i = SLOT_HEADERS; i < SLOTS; i++) {
+      CHECK(back[i].status == status[i]);
+      CHECK(back[i].r.soc == swept[i]);
+      CHECK(st_backstop_soc_open(back[i].r.soc));
+      CHECK(back[i].r.statuscode == STATUSCODE_TIMEOUT);
+      CHECK(strcmp(back[i].r.msg, "untouched") == 0);
+    }
+    opt->maxsite = 0;
+    HTS_STAT.HTS_TOTAL_RECV = recv_was;
+  }
 #undef CHECK
 
 cleanup:
+  opt->maxsite = 0;
   opt->state.stop = 0;
   for (i = 0; i < SLOTS; i++)
     deletehttp(&back[i].r);
