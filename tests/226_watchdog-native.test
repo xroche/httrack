@@ -307,11 +307,21 @@ PY
     # The heartbeat still owns the kill and must beat the step timeout.
     stuck=$(sed -n 's/^stuck=\([0-9]*\)$/\1/p' "$driver")
     deadline=$(sed -n 's/^suite_deadline=\([0-9]*\)$/\1/p' "$driver")
+    pertest=$(sed -n 's/^per_test=\([0-9]*\)$/\1/p' "$driver")
+    hard=$(sed -n 's/^hard_deadline=\([0-9]*\)$/\1/p' "$driver")
     test -n "$stuck" || fail "cannot read the heartbeat's static window"
     test -n "$deadline" || fail "cannot read the driver's suite deadline"
+    test -n "$pertest" || fail "cannot read the driver's per-test budget"
+    test -n "$hard" || fail "cannot read the heartbeat's wall-clock cap"
     # A test may start one second under the deadline and never report again.
     test $((deadline + stuck + 240)) -le "$cap" ||
         fail "a kill at ${deadline}+${stuck}s leaves under 240s before the ${cap}s step timeout"
+    # The cap is what bounds a suite that keeps reporting, so it decides the step:
+    # it has to sit above the longest legitimate tail and still clear the timeout.
+    test $((hard + 240)) -le "$cap" ||
+        fail "the ${hard}s cap leaves under 240s before the ${cap}s step timeout"
+    test "$hard" -ge $((deadline + pertest)) ||
+        fail "the ${hard}s cap fires inside the $((deadline + pertest))s a test started at the deadline may take"
 
     # The watchdog's own stop is its MaxSeconds, which must land inside the step.
     # shellcheck disable=SC2016 # $MaxSeconds is PowerShell's
