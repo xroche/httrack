@@ -74,19 +74,10 @@ test "$rc" -eq 3 || fail "exit 3 was reported as $rc"
 test -s "$tmpdir/log" || fail "the teardown was skipped on a non-zero exit"
 ok "the script's own exit status survives the teardown"
 
-## a signal drains once, and through the library's own trap
+## the trap list is the one this test knows
 #
-# Status 1 is the trap's own exit. An untrapped fatal signal also reaches the EXIT
-# trap, so it would drain the stack too, but leaves 128+n -- asserting "non-zero"
-# would hold with no signal trap at all. Each signal is sent, since a trap
-# covering TERM alone passes a TERM-only check.
-# INT and QUIT never arrive on either Windows runner; TERM and HUP do.
+# Read back live, so a signal added to the library with no leg below goes red (#1136).
 trapped=(HUP INT QUIT TERM)
-sigs=("${trapped[@]}")
-! is_windows || sigs=(TERM HUP)
-
-# What the library traps is read back, not assumed: PIPE sat in that list untested
-# for as long as the list was only ever read by eye (#1136).
 write_subject <<'EOF'
 cleanup_push true
 trap -p | awk '$NF != "EXIT" { sub(/^SIG/, "", $NF); print $NF }' | sort | tr '\n' ' '
@@ -94,8 +85,18 @@ EOF
 rc=$(subject)
 test "$rc" -eq 0 || fail "the subject exited $rc: $(cat "$tmpdir/out")"
 assert_eq "$(printf '%s\n' "${trapped[@]}" | sort | tr '\n' ' ')" "$(cat "$tmpdir/out")" \
-    "cleanup_push traps a signal no leg below sends"
-ok "every signal cleanup_push traps has a leg here"
+    "cleanup_push's trap list is not the one this test knows"
+ok "cleanup_push traps no signal unknown to this test"
+
+## a signal drains once, and through the library's own trap
+#
+# Status 1 is the trap's own exit. An untrapped fatal signal also reaches the EXIT
+# trap, so it would drain the stack too, but leaves 128+n -- asserting "non-zero"
+# would hold with no signal trap at all. Each signal is sent, since a trap
+# covering TERM alone passes a TERM-only check.
+# INT and QUIT never arrive on either Windows runner; TERM and HUP do.
+sigs=("${trapped[@]}")
+! is_windows || sigs=(TERM HUP)
 
 # Every leg is reported rather than the first to break: they fail one platform at
 # a time, and the elapsed time tells a signal never delivered from one ignored.
