@@ -366,8 +366,8 @@ dialog#zoom::backdrop { background: rgba(0, 0, 0, .8); }
 	z-index: 10;
 }
 
-/* Some browsers still match prefers-color-scheme: dark while printing, putting
-   #e6e6ee ink on white paper. Reset the palette, not each rule that reads it. */
+/* Some browsers still apply prefers-color-scheme: dark when printing, so the ink
+   comes out #e6e6ee on white paper. Reset the palette, not each rule reading it. */
 @media print {
 	:root {
 		--field: #77b;
