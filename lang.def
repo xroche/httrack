@@ -1034,6 +1034,10 @@ LANG_STRIPQUERY
 Strip query keys:
 LANG_STRIPQUERYTIP
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
+LANG_HOSTALIAS
+Host aliases:
+LANG_HOSTALIASTIP
+Other hostnames serving this same site, folded onto one (e.g. www2.example.com,m.example.com=example.com).
 LANG_WARC
 Write a WARC archive of the crawl
 LANG_WARCTIP

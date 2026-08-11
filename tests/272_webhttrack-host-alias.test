@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+# The Host aliases field must reach the command line, winprofile.ini and the
+# engine: a template-only check cannot see a flag name the engine rejects.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+
+printf '[project reload maps the key back] ..\t'
+grep -q "do:copy:HostAlias:hostalias" "${distdir}/html/server/step2.html" ||
+    fail "step2.html does not restore HostAlias"
+echo OK
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_hostalias.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+printf '[webhttrack emits --host-alias] ..\t'
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" "${work}/emitted" <<'PY' || fail "the Host aliases field is not wired (see above)"
+import re, shlex, sys, urllib.parse, urllib.request
+
+url, emitted = sys.argv[1].rstrip("/"), sys.argv[2]
+RULE = "www2.example.com,m.example.com=example.com"
+
+form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1).decode()
+
+# An unknown ${LANG_*} renders empty, so assert the label text, not its absence.
+page = urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
+                              timeout=20).read().decode("latin-1")
+for want in ('name="hostalias"', "Host aliases:"):
+    if want not in page:
+        sys.exit("option8.html does not render %r" % want)
+
+
+def post(fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
+                    [("sid", sid)] + fields)
+    req = urllib.request.Request(url + "/server/step4.html",
+                                 data=body.encode("latin-1"), method="POST")
+    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+
+
+def textarea(page, name):
+    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
+    if m is None:
+        sys.exit("no %s textarea in the rendered step4.html" % name)
+    return m.group(1)
+
+
+page = post([("hostalias", RULE)])
+cmd = textarea(page, "command")
+# Whole lines: the rule carries the separators the argv splitter reads.
+want = '--host-alias "%s"' % RULE
+lines = [l.strip() for l in cmd.split("\n")]
+if want not in lines:
+    sys.exit("%s missing from the command line\n%s" % (want, cmd))
+ini = textarea(page, "winprofile").replace("\r\n", "\n")
+if "\nHostAlias=%s\n" % RULE not in ini:
+    sys.exit("HostAlias missing from winprofile.ini\n%s" % ini)
+
+# An empty field must drop the flag, not emit a valueless --host-alias.
+if "--host-alias" in textarea(post([("hostalias", "")]), "command"):
+    sys.exit("an empty Host aliases field still emits --host-alias")
+
+# Hand the engine below what the template actually emitted, not a literal.
+open(emitted, "w").write("\n".join(shlex.split(lines[lines.index(want)])) + "\n")
+PY
+echo OK
+
+printf '[the engine knows the flag] ..\t'
+mapfile -t argv <"${work}/emitted"
+# Rejected flags exit 255 like a URL-less run, so match the diagnostic.
+out=$(httrack "${argv[@]}" 2>&1) || true
+if grep -q "Unknown option" <<<"${out}"; then
+    fail "the engine rejects ${argv[0]}: ${out}"
+fi
+# Control: the same probe on a flag that does not exist.
+out=$(httrack "${argv[0]}es" "${argv[1]}" 2>&1) || true
+grep -q "Unknown option" <<<"${out}" || fail "the unknown-option probe proves nothing"
+echo OK

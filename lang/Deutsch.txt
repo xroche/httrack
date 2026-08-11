@@ -1014,3 +1014,7 @@ WARC segment size limit:
 Maximale Größe eines WARC-Segments:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Ein neues WARC-Segment beginnen, sobald das aktuelle diese Anzahl Bytes überschreitet; leer lassen oder 0 für eine einzige Datei.
+Host aliases:
+Host aliases:
+Other hostnames serving this same site, folded onto one (e.g. www2.example.com,m.example.com=example.com).
+Other hostnames serving this same site, folded onto one (e.g. www2.example.com,m.example.com=example.com).

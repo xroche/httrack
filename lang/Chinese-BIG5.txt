@@ -1014,3 +1014,7 @@ WARC segment size limit:
 WARC 分段大小上限：
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 目前分段超過此位元組數時開始新的 WARC 分段；留空或填 0 則保持單一檔案。
+Host aliases:
+Host aliases:
+Other hostnames serving this same site, folded onto one (e.g. www2.example.com,m.example.com=example.com).
+Other hostnames serving this same site, folded onto one (e.g. www2.example.com,m.example.com=example.com).
