@@ -96,6 +96,7 @@ typedef enum {
 } hts_mirror_limit;
 
 static hts_mirror_limit back_mirror_limit(httrackp *opt);
+static hts_boolean back_mirror_capped(const httrackp *opt);
 
 struct_back *back_new(httrackp *opt, int back_max) {
   int i;
@@ -2777,29 +2778,83 @@ static hts_boolean back_is_preconnect(const int status) {
          status == STATUS_SSL_WAIT_HANDSHAKE;
 }
 
-/* Drop the slots still waiting to connect: nothing to finish there, and left
-   alone they hold the drain for --timeout (#1073). Receiving slots stay. */
-static void back_stop_preconnect(httrackp *opt, struct_back *sback) {
-  lien_back *const back = sback->lnk;
+/* Slot carrying a transfer of ours. An FTP one is its worker thread's, which
+   owns socket and slot, so no sweep below may touch it. */
+static hts_boolean back_is_live(const int status) {
+  return status > 0 && status < STATUS_FTP_TRANSFER;
+}
+
+/* Tear down live slot p, reported as statuscode/msg. trunc is the
+   WARC-Truncated reason to archive its partial body under, WARC_TRUNC_NONE to
+   leave the body unarchived. */
+static void back_abort_slot(httrackp *opt, struct_back *sback, const int p,
+                            const int statuscode, const char *msg,
+                            const int trunc) {
+  lien_back *const back = &sback->lnk[p];
+
+  /* A cap-truncated body is deliberate, not broken: archive what arrived with
+     WARC-Truncated before the abort overwrites the slot's real 2xx status.
+     HTTrack still treats the slot as incomplete afterwards. */
+  if (trunc != WARC_TRUNC_NONE && StringNotEmpty(opt->warc_file) &&
+      back->r.statuscode > 0 && back->r.warc_resphdr != NULL &&
+      back->r.size > 0 &&
+      !(back->r.is_write && IS_DELAYED_EXT(back->url_sav))) {
+    if (back->r.is_write && back->r.out != NULL)
+      fflush(back->r.out);
+    back->r.warc_truncated = trunc;
+    warc_write_backtransaction(opt, back);
+  }
+  if (back->r.soc != INVALID_SOCKET)
+    deletehttp(&back->r);
+  back->r.soc = INVALID_SOCKET;
+  /* drop a .delayed placeholder; real partials survive for resume */
+  if (back->r.is_write && IS_DELAYED_EXT(back->url_sav))
+    back_delayed_discard(opt, back);
+  back->r.statuscode = statuscode;
+  strcpybuff(back->r.msg, msg);
+  back->status = STATUS_READY;
+  back_set_finished(sback, p);
+}
+
+/* Drop what a user stop must not leave running, and return the count. A cap
+   raises the stop flag itself, then grants the transfers already running a
+   grace that only back_abort_limit() may end (#77, #481). A slot still waiting
+   to connect has nothing to finish and would hold the drain (#1073). */
+static int back_abort_stopped(httrackp *opt, struct_back *sback) {
+  const hts_boolean grace = back_mirror_capped(opt);
   int aborted = 0;
   int i;
 
   for (i = 0; i < sback->count; i++) {
-    if (!back_is_preconnect(back[i].status))
+    const int status = sback->lnk[i].status;
+
+    if (!back_is_live(status) || (grace && !back_is_preconnect(status)))
       continue;
-    if (back[i].r.soc != INVALID_SOCKET)
-      deletehttp(&back[i].r);
-    back[i].r.soc = INVALID_SOCKET;
-    /* fatal, as back_add() reports it: a stop must not schedule a retry */
-    back[i].r.statuscode = STATUSCODE_INVALID;
-    strcpybuff(back[i].r.msg, "mirror stopped by user");
-    back_set_finished(sback, i);
+    /* fatal, as back_add() reports a stop: no retry may reschedule the link */
+    back_abort_slot(opt, sback, i, STATUSCODE_INVALID, "mirror stopped by user",
+                    WARC_TRUNC_NONE);
     aborted++;
   }
-  if (aborted > 0)
-    hts_log_print(opt, LOG_WARNING,
-                  "Mirror stopped by user, %d pending connection(s) aborted",
-                  aborted);
+  return aborted;
+}
+
+/* Abort every live slot once a cap has overrun its grace, and return the
+   count. Its partial body is archived: the truncation is the user's own cap. */
+static int back_abort_limit(httrackp *opt, struct_back *sback,
+                            const hts_mirror_limit limit) {
+  const hts_boolean size = limit == HTS_MIRROR_LIMIT_SIZE;
+  int aborted = 0;
+  int i;
+
+  for (i = 0; i < sback->count; i++) {
+    if (!back_is_live(sback->lnk[i].status))
+      continue;
+    back_abort_slot(opt, sback, i, STATUSCODE_TIMEOUT,
+                    size ? "Mirror Size Limit" : "Mirror Time Out",
+                    size ? WARC_TRUNC_LENGTH : WARC_TRUNC_TIME);
+    aborted++;
+  }
+  return aborted;
 }
 
 // attente (gestion des buffers des sockets)
@@ -2831,50 +2886,22 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
   back_clean(opt, cache, sback);
 #endif
 
-  if (opt->state.stop)
-    back_stop_preconnect(opt, sback);
+  if (opt->state.stop) {
+    const int aborted = back_abort_stopped(opt, sback);
+
+    if (aborted > 0)
+      hts_log_print(opt, LOG_WARNING,
+                    "Mirror stopped by user, %d transfer(s) aborted", aborted);
+  }
 
   /* Time/size limit exceeded past grace: abort in-flight transfers so no wait
-     loop starves (#481, #77). FTP slots stay, their thread owns the socket. */
+     loop starves (#481, #77). */
   if (!back_checkmirror(opt)) {
     const hts_mirror_limit limit = back_mirror_limit(opt);
     const char *const reason =
         (limit == HTS_MIRROR_LIMIT_SIZE) ? "size limit" : "time limit";
-    const char *const slotmsg = (limit == HTS_MIRROR_LIMIT_SIZE)
-                                    ? "Mirror Size Limit"
-                                    : "Mirror Time Out";
-    int aborted = 0;
-    unsigned int i;
+    const int aborted = back_abort_limit(opt, sback, limit);
 
-    for (i = 0; i < (unsigned int) back_max; i++) {
-      if (back[i].status > 0 && back[i].status < STATUS_FTP_TRANSFER) {
-        /* A cap-truncated body is deliberate, not broken: archive what arrived
-           with WARC-Truncated before the abort overwrites the slot's real 2xx
-           status. HTTrack still treats the slot as incomplete afterwards. */
-        if (StringNotEmpty(opt->warc_file) && back[i].r.statuscode > 0 &&
-            back[i].r.warc_resphdr != NULL && back[i].r.size > 0 &&
-            !(back[i].r.is_write && IS_DELAYED_EXT(back[i].url_sav))) {
-          if (back[i].r.is_write && back[i].r.out != NULL)
-            fflush(back[i].r.out);
-          back[i].r.warc_truncated = (limit == HTS_MIRROR_LIMIT_SIZE)
-                                         ? WARC_TRUNC_LENGTH
-                                         : WARC_TRUNC_TIME;
-          warc_write_backtransaction(opt, &back[i]);
-        }
-        if (back[i].r.soc != INVALID_SOCKET) {
-          deletehttp(&back[i].r);
-        }
-        back[i].r.soc = INVALID_SOCKET;
-        /* drop a .delayed placeholder; real partials survive for resume */
-        if (back[i].r.is_write && IS_DELAYED_EXT(back[i].url_sav))
-          back_delayed_discard(opt, &back[i]);
-        back[i].r.statuscode = STATUSCODE_TIMEOUT;
-        strcpybuff(back[i].r.msg, slotmsg);
-        back[i].status = STATUS_READY;
-        back_set_finished(sback, i);
-        aborted++;
-      }
-    }
     if (aborted > 0)
       hts_log_print(opt, LOG_WARNING, "%s reached, %d transfer(s) aborted",
                     reason, aborted);
@@ -2999,7 +3026,13 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #if HTS_WIDE_DEBUG
       DEBUG_W("select\n");
 #endif
-      select((int) nfds, &fds, &fds_c, &fds_e, &tv);
+      /* Discard the sets select() did not write: on EINTR they still hold
+         every socket we filled in, which reads back as an error (#1110). */
+      if (select((int) nfds, &fds, &fds_c, &fds_e, &tv) <= 0) {
+        FD_ZERO(&fds);
+        FD_ZERO(&fds_c);
+        FD_ZERO(&fds_e);
+      }
 #if HTS_WIDE_DEBUG
       DEBUG_W("select done\n");
 #endif
@@ -4754,16 +4787,32 @@ static LLint back_maxsize_grace(const LLint maxsite) { return maxsite / 10; }
 /* Which cap has overrun its grace and must hard-stop the mirror (#77, #481).
    -M measures received volume (HTS_TOTAL_RECV), not saved 200-only stat_bytes
    which undercounts redirect/error-heavy crawls (#520). */
+static hts_boolean back_maxsize_reached(const httrackp *opt) {
+  return opt->maxsite > 0 && HTS_STAT.HTS_TOTAL_RECV >= opt->maxsite;
+}
+
+static hts_boolean back_maxtime_reached(const httrackp *opt) {
+  return opt->maxtime > 0 &&
+         (time_local() - HTS_STAT.stat_timestart) >= opt->maxtime;
+}
+
+/* A cap has been reached, so back_checkmirror() below is what raised the stop
+   flag: the stop the mirror is under is the engine's, not the user's. */
+static hts_boolean back_mirror_capped(const httrackp *opt) {
+  return back_maxsize_reached(opt) || back_maxtime_reached(opt);
+}
+
 static hts_mirror_limit back_mirror_limit(httrackp *opt) {
-  if (opt->maxsite > 0 && HTS_STAT.HTS_TOTAL_RECV >= opt->maxsite &&
-      HTS_STAT.HTS_TOTAL_RECV - opt->maxsite >=
-          back_maxsize_grace(opt->maxsite))
-    return HTS_MIRROR_LIMIT_SIZE;
-  if (opt->maxtime > 0) {
+  if (back_maxsize_reached(opt)) {
+    const LLint over = HTS_STAT.HTS_TOTAL_RECV - opt->maxsite;
+
+    if (over >= back_maxsize_grace(opt->maxsite))
+      return HTS_MIRROR_LIMIT_SIZE;
+  }
+  if (back_maxtime_reached(opt)) {
     const TStamp elapsed = time_local() - HTS_STAT.stat_timestart;
 
-    if (elapsed >= opt->maxtime &&
-        elapsed - opt->maxtime >= back_maxtime_grace(opt->maxtime))
+    if (elapsed - opt->maxtime >= back_maxtime_grace(opt->maxtime))
       return HTS_MIRROR_LIMIT_TIME;
   }
   return HTS_MIRROR_LIMIT_NONE;
@@ -4771,16 +4820,14 @@ static hts_mirror_limit back_mirror_limit(httrackp *opt) {
 
 int back_checkmirror(httrackp *opt) {
   /* request a smooth stop the first time each cap is reached */
-  if (opt->maxsite > 0 && HTS_STAT.HTS_TOTAL_RECV >= opt->maxsite &&
-      !opt->state.stop) {
+  if (back_maxsize_reached(opt) && !opt->state.stop) {
     hts_log_print(opt, LOG_ERROR,
                   "More than " LLintP
                   " bytes have been transferred.. giving up",
                   (LLint) opt->maxsite);
     hts_request_stop(opt, 0);
   }
-  if (opt->maxtime > 0 && !opt->state.stop &&
-      (time_local() - HTS_STAT.stat_timestart) >= opt->maxtime) {
+  if (back_maxtime_reached(opt) && !opt->state.stop) {
     hts_log_print(opt, LOG_ERROR, "More than %d seconds passed.. giving up",
                   opt->maxtime);
     hts_request_stop(opt, 0);

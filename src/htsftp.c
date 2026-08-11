@@ -992,7 +992,10 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
     _CHECK_HALT_FTP;
     strcpybuff(back->info, "quit");
     send_line(soc_ctl, "QUIT"); // bye bye
-    get_ftp_line(back, soc_ctl, NULL, 0, timeout, opt);
+    /* A stopped mirror skips the second --timeout window this courtesy reply
+       costs on a silent server; its text is discarded anyway (#1096). */
+    if (!opt->state.stop)
+      get_ftp_line(back, soc_ctl, NULL, 0, timeout, opt);
 #ifdef _WIN32
     closesocket(soc_ctl);
 #else
