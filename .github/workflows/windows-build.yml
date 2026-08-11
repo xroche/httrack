@@ -183,10 +183,14 @@ jobs:
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation `
             -DevCmdArguments "-arch=$arch -host_arch=x64"
           # htsbasenet.h reaches for <openssl/ssl.h> unless a consumer turns it
-          # off, so the sweep needs what vcpkg installed for the build.
-          $inc = @(Get-ChildItem -Path "src\vcpkg_installed\*\include" -Directory |
-                   ForEach-Object { "-I" + $_.FullName })
-          if ($inc.Count -eq 0) { throw "no vcpkg include directory to compile against" }
+          # off, so the sweep needs what vcpkg installed for the build. Searched,
+          # not spelled: the install root nests the triplet twice.
+          $dirs = @(Get-ChildItem -Path "src\vcpkg_installed" -Recurse -Depth 3 `
+                      -Directory -Filter include -ErrorAction SilentlyContinue)
+          if (-not ($dirs | Where-Object { Test-Path (Join-Path $_.FullName "openssl\ssl.h") })) {
+            throw "no vcpkg include directory under src\vcpkg_installed holds openssl/ssl.h"
+          }
+          $inc = @($dirs | ForEach-Object { "-I" + $_.FullName })
           bash tests/install-headers-sweep.sh --backend cl --srcdir . -- @inc
           if ($LASTEXITCODE -ne 0) { throw "the installed headers do not compile standalone and pairwise" }
 
