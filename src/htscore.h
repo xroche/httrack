@@ -416,10 +416,10 @@ const char *hts_host_alias_rules(httrackp *opt);
    credentials are kept. NULL when no rule applies, the mapping is a no-op, the
    rules loop, or the result would not fit DEST. */
 const char *hts_host_alias(const char *rules, const char *adr,
-                           hts_boolean nowww, char *dest, size_t destsize);
+                           hts_boolean collapse_www, char *dest, size_t destsize);
 
 /* HTS_TRUE when OPT's url hacks collapse www.host onto host. */
-hts_boolean hts_host_alias_nowww(httrackp *opt);
+hts_boolean hts_host_alias_collapse_www(httrackp *opt);
 
 /* Rewrite AF's host to its --host-alias canonical form, in place, and return
    it. Idempotent; returns af->adr unchanged when no rule applies. */
@@ -427,16 +427,16 @@ const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af);
 
 /* HTS_TRUE if ADRA and ADRB name the same host once RULES are applied. */
 hts_boolean hts_host_same_alias(const char *rules, const char *adra,
-                                const char *adrb, hts_boolean nowww);
+                                const char *adrb, hts_boolean collapse_www);
 
-/* HTS_TRUE if RULE is a well-formed "alias[,alias...]=canonical" line: hosts
-   only, each optionally behind its scheme, one literal host after the '='. */
+/* HTS_TRUE if RULE is a well-formed "[scheme://]alias[,...]=[scheme://]host"
+   line: one literal host after the '=', and no path on either side. */
 hts_boolean hts_host_alias_rule_ok(const char *rule);
 
 /* First canonical host in RULES whose chain never ends ("a=b" plus "b=a"),
    copied into DEST, or NULL if every chain settles. Those hosts are left
    unaliased, so the engine reports them rather than picking a hop. */
-const char *hts_host_alias_looping(const char *rules, hts_boolean nowww,
+const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
                                    char *dest, size_t destsize);
 
 /* Read a whole file into a freshly malloc'd, NUL-terminated buffer; the caller

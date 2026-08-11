@@ -2842,7 +2842,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       char BIGSTK looping[HTS_URLMAXSIZE * 2];
 
       if (hts_host_alias_looping(hts_host_alias_rules(opt),
-                                 hts_host_alias_nowww(opt), looping,
+                                 hts_host_alias_collapse_www(opt), looping,
                                  sizeof(looping)) != NULL) {
         hts_log_print(opt, LOG_WARNING,
                       "* host-alias rules for '%s' point in a circle: those "

@@ -3521,7 +3521,7 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   assertf(hts_host_alias("www.b.com=a.com", "b.com", HTS_FALSE, dest,
                          sizeof(dest)) == NULL);
 
-  /* every scheme keeps its prefix, only the host is replaced */
+  /* scheme and credentials survive, only the host is replaced */
   assertf(strcmp(hts_host_alias(rules, "https://b.com", HTS_TRUE, dest,
                                 sizeof(dest)),
                  "https://a.com") == 0);
@@ -3536,9 +3536,8 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
       strcmp(hts_host_alias("b.com:8080=a.com:80", "https://user:pw@b.com:8080",
                             HTS_TRUE, dest, sizeof(dest)),
              "https://user:pw@a.com:80") == 0);
-  /* A rule may name the scheme on either side. On the alias side it then only
-     matches that scheme; on the canonical side it replaces the link's, for a
-     host that answers on one scheme only. */
+  /* An alias-side scheme narrows the match to it; a canonical-side scheme
+     replaces the link's, for a host that speaks one scheme only. */
   assertf(strcmp(hts_host_alias("b.com=https://a.com", "http://b.com", HTS_TRUE,
                                 dest, sizeof(dest)),
                  "https://a.com") == 0);
@@ -3557,11 +3556,48 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   assertf(strcmp(hts_host_alias("b.com=ftp://a.com", "http://user:pw@b.com",
                                 HTS_TRUE, dest, sizeof(dest)),
                  "ftp://user:pw@a.com") == 0);
-  /* a trailing slash is a typing reflex, not a path */
+  /* A plain-http address carries no scheme, so http:// has to be spelled out
+     for the rule to reach it: naming the default scheme must not be dead. */
+  assertf(strcmp(hts_host_alias("http://b.com=a.com", "b.com", HTS_TRUE, dest,
+                                sizeof(dest)), "a.com") == 0);
+  assertf(hts_host_alias("http://b.com=a.com", "https://b.com", HTS_TRUE, dest,
+                         sizeof(dest)) == NULL);
+  /* a scheme named mid-chain stays in effect: the hop after it names none, and
+     dropping back to the link's would undo the reachability the rule bought */
+  assertf(strcmp(hts_host_alias("a.com=https://b.com\nb.com=c.com",
+                                "http://a.com", HTS_TRUE, dest, sizeof(dest)),
+                 "https://c.com") == 0);
+  /* the spaces a user leaves around a token are not part of the host */
+  assertf(hts_host_alias_rule_ok("b.com = a.com"));
+  assertf(strcmp(hts_host_alias("b.com = a.com", "http://b.com", HTS_TRUE, dest,
+                                sizeof(dest)), "http://a.com") == 0);
+  assertf(strcmp(hts_host_alias("b.com\t=\ta.com", "http://b.com", HTS_TRUE,
+                                dest, sizeof(dest)), "http://a.com") == 0);
+  /* a pattern naming no scheme is matched against the bare host, not the URL */
+  assertf(hts_host_alias("http*=x.com", "http://b.com", HTS_TRUE, dest,
+                         sizeof(dest)) == NULL);
+  /* the "//host" form names a host, and a glob may stand where a scheme goes */
+  assertf(strcmp(hts_host_alias("//b.com=a.com", "http://b.com", HTS_TRUE, dest,
+                                sizeof(dest)), "http://a.com") == 0);
+  assertf(hts_host_alias_rule_ok("*://b.com=a.com"));
+  assertf(strcmp(hts_host_alias("*://b.com=a.com", "ftp://b.com", HTS_TRUE, dest,
+                                sizeof(dest)), "ftp://a.com") == 0);
+  /* an IPv6 literal is a host; a scheme with none behind it is not, nor is the
+     engine's own pseudo-host */
+  assertf(hts_host_alias_rule_ok("b.com=[::1]"));
+  assertf(hts_host_alias_rule_ok("b.com=[::1]:8080"));
+  assertf(!hts_host_alias_rule_ok("b.com=https://"));
+  assertf(!hts_host_alias_rule_ok("b.com=///"));
+  assertf(!hts_host_alias_rule_ok("b.com=primary"));
+  assertf(hts_host_alias("b.com=///", "http://b.com", HTS_TRUE, dest,
+                         sizeof(dest)) == NULL);
+  /* a run of trailing slashes is stripped by both the check and the fold */
+  assertf(hts_host_alias_rule_ok("b.com//=a.com//"));
+  /* a trailing slash is not a path */
   assertf(strcmp(hts_host_alias("b.com/=https://a.com/", "http://b.com",
                                 HTS_TRUE, dest, sizeof(dest)),
                  "https://a.com") == 0);
-  /* ...and http and https of one host are one site to the scope test */
+  /* every scheme of one host is one site to the scope test */
   assertf(hts_host_same_alias(rules, "ftp://b.com", "https://a.com", HTS_TRUE));
 
   /* engine pseudo-hosts survive a catch-all rule */
