@@ -183,7 +183,10 @@ printf 'RUN 96_wedged.test at 0s\n' >"$progress"
 rc=0
 (
     watchdog=777
+    # Both are reached from the heartbeat's kill path, which shellcheck cannot see.
+    # shellcheck disable=SC2317
     kill_pid() { echo "DIRECT $1" >>"$rec"; }
+    # shellcheck disable=SC2317
     kill_tree() {
         echo "TREE $1" >>"$rec"
         exit 9
