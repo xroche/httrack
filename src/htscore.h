@@ -418,6 +418,12 @@ const char *hts_host_alias_rules(httrackp *opt);
 const char *hts_host_alias(const char *rules, const char *adr, char *dest,
                            size_t destsize);
 
+/* Rewrite AF's host to its --host-alias canonical form, in place, and return
+   it: from here on the link is the canonical one for every consumer, the
+   type-probe and the fetch included. Idempotent; returns af->adr unchanged when
+   no rule applies. */
+const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af);
+
 /* HTS_TRUE if ADRA and ADRB name the same host once RULES are applied. */
 hts_boolean hts_host_same_alias(const char *rules, const char *adra,
                                 const char *adrb);

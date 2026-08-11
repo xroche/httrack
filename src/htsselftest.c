@@ -3561,9 +3561,27 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   /* no rules: the caller's own exact compare decides, not this one */
   assertf(!hts_host_same_alias(NULL, "b.com", "b.com"));
 
+  StringCopy(opt->host_alias, rules);
+
+  /* the in-place fold every link goes through before it is probed and fetched
+   */
+  {
+    lien_adrfil af;
+
+    memset(&af, 0, sizeof(af));
+    strcpybuff(af.adr, "https://b.com");
+    strcpybuff(af.fil, "/x");
+    assertf(strcmp(hts_host_alias_fold(opt, &af), "https://a.com") == 0);
+    assertf(strcmp(af.adr, "https://a.com") == 0); /* rewritten in place */
+    assertf(strcmp(af.fil, "/x") == 0);            /* the path is not touched */
+    /* idempotent: the delayed-type path names the same link again */
+    assertf(strcmp(hts_host_alias_fold(opt, &af), "https://a.com") == 0);
+    strcpybuff(af.adr, "other.com");
+    assertf(strcmp(hts_host_alias_fold(opt, &af), "other.com") == 0);
+  }
+
   /* The dedup key itself: aliases collapse whatever the url hacks say, so
      --host-alias never silently no-ops under -%u0. */
-  StringCopy(opt->host_alias, rules);
 #define EQ(aa, fa, ab, fb) hash_url_equals(opt, aa, fa, ab, fb)
   opt->urlhack = HTS_TRUE;
   opt->no_www_dedup = opt->no_slash_dedup = opt->no_query_dedup = HTS_FALSE;

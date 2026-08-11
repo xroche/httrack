@@ -3776,6 +3776,17 @@ const char *hts_host_alias(const char *rules, const char *adr, char *dest,
 }
 
 /* see htscore.h */
+const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af) {
+  char BIGSTK canon[HTS_URLMAXSIZE * 2];
+  const char *const alias =
+      hts_host_alias(hts_host_alias_rules(opt), af->adr, canon, sizeof(canon));
+
+  if (alias != NULL)
+    strcpybuff(af->adr, alias);
+  return af->adr;
+}
+
+/* see htscore.h */
 hts_boolean hts_host_same_alias(const char *rules, const char *adra,
                                 const char *adrb) {
   char BIGSTK ca[HTS_URLMAXSIZE * 2], cb[HTS_URLMAXSIZE * 2];

@@ -2070,6 +2070,13 @@ class Handler(SimpleHTTPRequestHandler):
     def route_delayed_selfloop(self):
         self.send_redirect("selfloop.php")
 
+    def route_hostalias_moved(self):
+        # 301 to another hostname of this site: what --host-alias is really for
+        self.send_response(301, "Moved Permanently")
+        self.send_header("Location", "http://alias.example.invalid/hostalias/c.html")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
     def route_delayed_chain(self):
         # chain1..chain9: one more hop than the type-check redirect budget
         n = int(urlsplit(self.path).path.rsplit("chain", 1)[1].split(".")[0])
@@ -2631,6 +2638,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/cdispo/index.html": route_cdispo_index,
         "/cdispo/fetch.php": route_cdispo,
         "/cdispo/evil.php": route_cdispo,
+        "/hostalias/moved.html": route_hostalias_moved,
         "/delayed/index.html": route_delayed_index,
         "/abortpurge/index.html": route_abortpurge_index,
         "/abortpurge/slow.html": route_abortpurge_slow,
