@@ -713,10 +713,10 @@ bottom are the ones that keep you welcome.</p>
 <div class="opt" data-for="web">
 	<div class="opt-head"><span class="opt-name">Host aliases</span><span class="cli">-%C, --host-alias</span></div>
 	<p>Names the other hostnames one site answers to, written
-	<code>www2.example.com,m.example.com=example.com</code>. They then count as the starting host:
-	their links travel under the same rules and each page is saved once instead of once per name.
-	Either side may carry a scheme, as in <code>legacy.example.com=https://example.com</code>. A path
-	is refused, this maps hosts and not addresses.</p>
+	<code>www2.example.com,m.example.com=example.com</code>. They fold onto that host: their links
+	travel under the same rules and each page is saved once instead of once per name. Either side may
+	carry a scheme, as in <code>legacy.example.com=https://example.com</code>. A trailing slash is
+	ignored, but a path is refused: this maps hosts, not addresses.</p>
 </div>
 </section>
 
