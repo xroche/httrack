@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #ifdef HTS_INTERNAL_BYTECODE
 
 #include "htsglobal.h"
+#include "htssafe.h"
 
 /* Forward definitions */
 #ifndef HTS_DEF_FWSTRUCT_httrackp
@@ -55,6 +56,12 @@ typedef struct lien_url lien_url;
 hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
                                hts_boolean filters_decided,
                                hts_boolean filters_refused);
+
+/* Builds into `f` the filter answer `n` adds for the link (adr,fil), and leaves
+   `f` empty when the answer adds none. `seeker_up` is the HTS_SEEKER_UP bit of
+   opt->seeker, read by answer 5. */
+void hts_wizard_answer_filter(htsbuff *f, int n, const char *adr,
+                              const char *fil, hts_boolean seeker_up);
 
 /* A (tag, attribute) pair naming a reference kind. */
 #ifndef HTS_DEF_DEFSTRUCT_htspair_t
