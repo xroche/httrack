@@ -545,6 +545,7 @@ int httpmirror(char *url1, httrackp * opt) {
   int retcode = 1; // return code for the single exit; a bailout sets -1
   hts_boolean rollback = HTS_FALSE;  // set to roll back the cache at cleanup
   hts_boolean completed = HTS_FALSE; // set once the crawl loop reaches its end
+  hts_boolean aborted = HTS_FALSE; // set when it stops with links left instead
 
   //
   int numero_passe = 0;         // deux passes pour html puis images
@@ -2069,8 +2070,12 @@ int httpmirror(char *url1, httrackp * opt) {
         }
       }
     }
+    /* links left here means new.lst is only a partial view of the mirror */
+    const hts_boolean links_left = ptr < opt->lien_tot;
+
     // a-t-on dépassé le quota?
     if (!back_checkmirror(opt)) {
+      aborted = links_left;
       ptr = opt->lien_tot;
     } else if (opt->state.exit_xh) {    // sortir
       if (opt->state.exit_xh == 1) {
@@ -2078,6 +2083,7 @@ int httpmirror(char *url1, httrackp * opt) {
       } else {
         hts_log_print(opt, LOG_ERROR, "Exit requested by engine");
       }
+      aborted = links_left;
       ptr = opt->lien_tot;
     }
   } while(ptr < opt->lien_tot);
@@ -2119,8 +2125,15 @@ int httpmirror(char *url1, httrackp * opt) {
     fclose(cache.lst);
     cache.lst = opt->state.strc.lst = NULL;
     /* old.lst minus new.lst is the set of files the previous mirror had and
-       this one does not. --changes reports it; only --purge-old acts on it. */
-    if (opt->delete_old || opt->changes) {
+       this one does not. --changes reports it; only --purge-old acts on it.
+       An aborted run never reached every link, so that difference is mostly
+       what it did not get to: purging against it deletes a live mirror. */
+    if (aborted) {
+      if (opt->delete_old || opt->changes) {
+        hts_log_print(opt, LOG_WARNING,
+                      "Mirror aborted: keeping all previously mirrored files");
+      }
+    } else if (opt->delete_old || opt->changes) {
       FILE *old_lst, *new_lst;
 
       hts_changes_indexed(opt);
@@ -2263,11 +2276,12 @@ int httpmirror(char *url1, httrackp * opt) {
     }
     finalInfo[0] = '\0';
     sprintf(finalInfo + strlen(finalInfo),
-            "HTTrack Website Copier/" HTTRACK_VERSION
-            " mirror complete in %s : " "%d links scanned, %d files written ("
-            LLintP " bytes overall)%s " "[" LLintP " bytes received at " LLintP
-            " bytes/sec]", htstime, (int) opt->lien_tot - 1,
-            (int) HTS_STAT.stat_files, (LLint) HTS_STAT.stat_bytes, infoupdated,
+            "HTTrack Website Copier/" HTTRACK_VERSION " mirror %s %s : "
+            "%d links scanned, %d files written (" LLintP " bytes overall)%s "
+            "[" LLintP " bytes received at " LLintP " bytes/sec]",
+            aborted ? "aborted after" : "complete in", htstime,
+            (int) opt->lien_tot - 1, (int) HTS_STAT.stat_files,
+            (LLint) HTS_STAT.stat_bytes, infoupdated,
             (LLint) HTS_STAT.HTS_TOTAL_RECV, (LLint) n);
 
     if (HTS_STAT.total_packed > 0 && HTS_STAT.total_unpacked > 0) {
@@ -2307,7 +2321,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
   // ending
   usercommand(opt, 0, NULL, NULL, NULL, NULL);
-  completed = HTS_TRUE;
+  completed = !aborted;
 
 cleanup:
   /* single exit: every bailout jumps here, so the closes below always run */

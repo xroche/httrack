@@ -1,0 +1,147 @@
+#!/bin/bash
+#
+# An aborted --update run purged against the truncated new.lst it had reached,
+# so everything it never got to was deleted (#1109). The complete pass before
+# it does purge a dropped file, so a fix that only silences the purge, or that
+# moves it elsewhere in the same fall-through, fails here.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+python=$(find_python) || skip "python3 not found"
+skip_on_windows "MSYS cannot signal a native httrack.exe"
+command -v httrack >/dev/null || fail "could not find httrack"
+
+server=$(nativepath "${testdir}/ftp-server.py")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_abortpurge.XXXXXX")
+serverpid=
+crawlpid=
+cleanup() {
+    test -z "$crawlpid" || kill_tree "$crawlpid"
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+ok() { echo "OK: $*"; }
+
+root="${tmpdir}/root"
+out="${tmpdir}/crawl"
+modes="${tmpdir}/modes"
+cmds="${tmpdir}/cmds"
+lst="${out}/hts-cache"
+mkdir -p "$root" "$out"
+
+names=(a b c d e)
+write_bodies() {
+    local gen=$1 name
+    # a.bin is fetched first and alone exceeds the 32768 bytes below which the
+    # engine calls the session dead and rolls it back: that path skips the purge
+    # on its own and would pass the abort leg whatever the loop did.
+    "$python" -c 'import sys
+sys.stdout.buffer.write((sys.argv[1] + "-a-").encode() * 24000)' "$gen" \
+        >"${root}/a.bin"
+    for name in "${names[@]:1}" f; do
+        "$python" -c 'import sys
+sys.stdout.buffer.write((sys.argv[1] + "-" + sys.argv[2] + "-").encode() * 400)' \
+            "$gen" "$name" >"${root}/${name}.bin"
+    done
+}
+write_bodies V1
+: >"$modes"
+
+serverlog="${tmpdir}/server.out"
+"$python" "$server" --root "$(nativepath "$root")" \
+    --mode-file "$(nativepath "$modes")" \
+    --log "$(nativepath "$cmds")" >"$serverlog" 2>&1 &
+serverpid=$!
+port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+host="127.0.0.1_${port}"
+
+urls=()
+urls_of() {
+    local name
+    urls=()
+    for name in "$@"; do urls+=("ftp://127.0.0.1:${port}/${name}.bin"); done
+}
+# -c1: a parallel FTP crawl loses whole transfers to an older backlog bug (#797),
+# and one socket also pins the order in which the links are reached.
+common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1)
+
+# --- pass 1: the full mirror an abort could destroy --------------------------
+urls_of "${names[@]}" f
+run_with_timeout 300 httrack "${urls[@]}" -O "$out" "${common[@]}" \
+    --timeout=20 --max-time=120 >"${tmpdir}/log1" 2>&1
+for name in "${names[@]}" f; do
+    test -s "${out}/${host}/${name}.bin" || fail "pass 1 did not mirror ${name}.bin"
+done
+ok "pass 1 mirrored six files"
+
+# --- pass 2: a complete re-crawl of five of the six --------------------------
+# The purge is what deletes f.bin. Without this leg, gating the purge on nothing
+# at all would pass the abort leg below. Not --update: that pass restores the
+# previous seed list from the cache, and f.bin with it.
+urls_of "${names[@]}"
+run_with_timeout 300 httrack "${urls[@]}" -O "$out" "${common[@]}" \
+    --timeout=20 --max-time=120 >"${tmpdir}/log2" 2>&1
+grep -aq 'mirror complete in' "${out}/hts-log.txt" ||
+    fail "pass 2 did not run to completion: $(cat "${out}/hts-log.txt")"
+test ! -f "${out}/${host}/f.bin" ||
+    fail "a completed crawl no longer purges the file it dropped"
+ok "a completed crawl still purges"
+
+mkdir "${tmpdir}/snap"
+cp "${out}/${host}"/*.bin "${tmpdir}/snap/"
+
+# --- pass 3: the same update, aborted while b.bin stalls ---------------------
+# No --timeout or --max-time: any bound would end this crawl by itself, through
+# the quota branch rather than the exit one.
+write_bodies V3
+printf '/b.bin stall\n' >"$modes"
+: >"$cmds"
+urls_of "${names[@]}"
+httrack "${urls[@]}" -O "$out" "${common[@]}" --update --timeout=0 --max-time=0 \
+    >"${tmpdir}/log3" 2>&1 &
+crawlpid=$!
+
+# Observed, not slept for: the stalled RETR is what says a.bin is done and the
+# crawl is parked with c, d and e still unreached.
+deadline=$((SECONDS + 120))
+until grep -aq 'RETR .*b\.bin' "$cmds" 2>/dev/null; do
+    test "$SECONDS" -lt "$deadline" || fail "the crawl never reached b.bin"
+    poll_wait 1
+done
+kill -TERM "$crawlpid"
+rc=0
+wait_bounded "$crawlpid" 120 || rc=$?
+crawlpid=
+test "$rc" -ne 124 || fail "the terminated crawl was still running 120s later"
+
+log=$(cat "${out}/hts-log.txt")
+# The exit has to land in the outer loop's own branch, the one that falls
+# through to the purge. A bailout jumps past it and proves nothing.
+grep -q 'Exit requested by shell or user' <<<"$log" ||
+    fail "the crawl did not end through the engine's exit path: ${log}"
+! grep -q 'restoring previous one' <<<"$log" ||
+    fail "the abort rolled the session back, which skips the purge anyway: ${log}"
+# And the run must really have left links behind, or there is nothing to purge.
+for name in c d e; do
+    ! grep -aq "${name}\.bin" "${lst}/new.lst" ||
+        fail "${name}.bin was reached after all; the abort came too late"
+done
+grep -aq "V3-a-" "${out}/${host}/a.bin" ||
+    fail "the aborted run never transferred a.bin, so it wrote no file at all"
+ok "the abort left c.bin, d.bin and e.bin unreached"
+
+for name in c d e; do
+    cmp -s "${out}/${host}/${name}.bin" "${tmpdir}/snap/${name}.bin" ||
+        fail "${name}.bin no longer holds the previous mirror's bytes: $(find \
+            "${out}/${host}" -type f)"
+done
+ok "the files the aborted run never reached kept their previous copies"
+
+grep -q 'mirror aborted after' <<<"$log" ||
+    fail "the aborted run still reports a complete mirror: ${log}"
+ok "the summary reports the abort"
