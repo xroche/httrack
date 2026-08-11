@@ -300,8 +300,7 @@ static int socket_last_error(void) {
 #endif
 }
 
-/* Text for socket_last_error(): winsock codes are outside strerror()'s table,
-   so read them from the system message table instead. */
+/* Winsock codes are not in strerror(); read the system message table. */
 static const char *socket_error_string(int err, char *buf, size_t size) {
 #ifdef _WIN32
   DWORD len =
@@ -321,9 +320,12 @@ static const char *socket_error_string(int err, char *buf, size_t size) {
   return buf;
 }
 
-/* On failure *lasterr carries the error, read before the close() that would
-   overwrite it. */
-static T_SOC smallserver_init(const char *adr, int port, int family,
+/* gethost() resolves through getaddrinfo(), which never sets errno. */
+#define SMALLSERVER_ERR_RESOLVE (-1)
+
+/* socktype is SOCK_STREAM or SOCK_DGRAM. On INVALID_SOCKET *lasterr carries the
+   error, read before the close() that would overwrite it. */
+static T_SOC smallserver_init(const char *adr, int port, int socktype,
                               int *lasterr) {
   SOCaddr server;
   SOCaddr_initany(server);
@@ -331,12 +333,11 @@ static T_SOC smallserver_init(const char *adr, int port, int family,
   if (gethost(adr, &server)) {     // host name
     T_SOC soc = INVALID_SOCKET;
 
-    if ((soc =
-         (T_SOC) socket(SOCaddr_sinfamily(server), family,
-                        0)) != INVALID_SOCKET) {
+    if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), socktype, 0)) !=
+        INVALID_SOCKET) {
       SOCaddr_initport(server, port);
       if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
-        if (family != SOCK_STREAM || listen(soc, 10) >= 0) {
+        if (socktype != SOCK_STREAM || listen(soc, 10) >= 0) {
           return soc;
         } else {
           *lasterr = socket_last_error();
@@ -360,7 +361,7 @@ static T_SOC smallserver_init(const char *adr, int port, int family,
       *lasterr = socket_last_error();
     }
   } else {
-    *lasterr = socket_last_error();
+    *lasterr = SMALLSERVER_ERR_RESOLVE;
   }
   return INVALID_SOCKET;
 }
@@ -407,11 +408,17 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
     const int err = icpFailed ? udpErr : tcpErr;
     char errbuf[192];
 
-    fprintf(stderr,
-            "Unable to initialize a temporary server : cannot bind %s port %d "
-            "on %s: %s (%d)\n",
-            icpFailed ? "udp" : "tcp", icpFailed ? icpPort : proxyPort,
-            proxyAddr, socket_error_string(err, errbuf, sizeof(errbuf)), err);
+    if (err == SMALLSERVER_ERR_RESOLVE) {
+      fprintf(stderr,
+              "Unable to initialize a temporary server : cannot resolve %s\n",
+              proxyAddr);
+    } else {
+      fprintf(stderr,
+              "Unable to initialize a temporary server : cannot bind %s port %d"
+              " on %s: %s (%d)\n",
+              icpFailed ? "udp" : "tcp", icpFailed ? icpPort : proxyPort,
+              proxyAddr, socket_error_string(err, errbuf, sizeof(errbuf)), err);
+    }
     returncode = 1;
   }
   printf("EXITED\n");
