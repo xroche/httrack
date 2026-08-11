@@ -184,6 +184,21 @@ stage_install_exec() {
     stage_install_target install-exec "$1" "$2"
 }
 
+# How many headers DevIncludes_DATA declares, so a caller can tell a shrunken
+# install from a complete one and refuse to sweep a set that lost members.
+declared_header_count() {
+    awk '/^DevIncludes_DATA[[:space:]]*=/ { inlist = 1 }
+        inlist {
+            last = ($0 !~ /\\$/)
+            sub(/^[^=]*=/, "")
+            gsub(/\\/, " ")
+            for (i = 1; i <= NF; i++)
+                if ($i ~ /\.h$/) n++
+            if (last) exit
+        }
+        END { print n + 0 }' "${abs_top_srcdir:?}/src/Makefile.am"
+}
+
 IS_WINDOWS=
 is_windows() {
     if test -z "$IS_WINDOWS"; then

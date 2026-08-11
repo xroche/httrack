@@ -79,16 +79,7 @@ env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDAT
 headers=("$tmp/include/httrack"/*.h)
 # Derived from DevIncludes_DATA so a new header needs no edit here. A header
 # dropped from that list moves both sides, hence the named checks below.
-declared=$(awk '/^DevIncludes_DATA[[:space:]]*=/ { inlist = 1 }
-    inlist {
-        last = ($0 !~ /\\$/)
-        sub(/^[^=]*=/, "")
-        gsub(/\\/, " ")
-        for (i = 1; i <= NF; i++)
-            if ($i ~ /\.h$/) n++
-        if (last) exit
-    }
-    END { print n + 0 }' "${abs_top_srcdir:?}/src/Makefile.am")
+declared=$(declared_header_count)
 [ "$declared" -ge 10 ] || fail "read only $declared headers out of DevIncludes_DATA, the parse is wrong"
 [ "${#headers[@]}" -eq "$declared" ] ||
     fail "${#headers[@]} headers installed, DevIncludes_DATA declares $declared"
