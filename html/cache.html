@@ -77,8 +77,8 @@ The main advantages of this cache are:
 
 <ul>
 <li>One single file for a complete website cache archive</li>
-<li>Standard <a href="http://www.pkware.com/products/enterprise/white_papers/appnote.txt" target="_new">ZIP</a> format, that can be easily reused on most platforms and languages</li>
-<li>Compressed data with the efficient and opened <a href="http://www.gzip.org/zlib/" target="_new">zlib</a> format</li>
+<li>Standard <a href="http://www.pkware.com/products/enterprise/white_papers/appnote.txt" target="_blank">ZIP</a> format, that can be easily reused on most platforms and languages</li>
+<li>Compressed data with the efficient and opened <a href="http://www.gzip.org/zlib/" target="_blank">zlib</a> format</li>
 </ul>
 
 The cache is made of ZIP files entries ; with one ZIP file entry per fetched URL (successfully or not - errors are also stored).<br />
@@ -86,7 +86,7 @@ For each entry:
 <ul>
 <li>The ZIP file name is the original URL [<small><a href="#orig">see notes below</a></small>]</li>
 <li>The ZIP file contents, <b>if available</b>, is the original (compressed, using the deflate algorythm) data</li>
-<li>The ZIP file extra field (in the local file header) contains a list of meta-fields, very similar to the <a href="http://www.ietf.org/rfc/rfc2616.txt?number=2616" target="new_">HTTP</a> headers fields. See also <a href="http://www.ietf.org/rfc/rfc2396.txt?number=2396" target="new_">RFC</a>.</li><br />
+<li>The ZIP file extra field (in the local file header) contains a list of meta-fields, very similar to the <a href="http://www.ietf.org/rfc/rfc2616.txt?number=2616" target="_blank">HTTP</a> headers fields. See also <a href="http://www.ietf.org/rfc/rfc2396.txt?number=2396" target="_blank">RFC</a>.</li><br />
 <li>The ZIP file timestamp follows the "Last-Modified-Since" field given for this URL, if any</li>
 </ul>
 
