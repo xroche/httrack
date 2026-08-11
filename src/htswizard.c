@@ -300,7 +300,11 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
   // ------------------------------------------------------
   // doit-on traiter ce lien?.. vérifier droits de déplacement
-  meme_adresse = strfield2(adr, urladr());
+  /* --host-alias makes the declared names one address, so a link to another
+     name of the same site travels under the same-address rules */
+  meme_adresse = strfield2(adr, urladr()) ||
+                 hts_host_same_alias(hts_host_alias_rules(opt), adr, urladr(),
+                                     hts_host_alias_collapse_www(opt));
   if (meme_adresse)
     hts_log_print(opt, LOG_DEBUG, "Compare addresses: %s=%s", adr, urladr());
   else

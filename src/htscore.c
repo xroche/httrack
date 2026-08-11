@@ -393,7 +393,6 @@ static int hts_record_link_(httrackp * opt,
   if (link == NULL) {
     return 0;
   }
-
   // record string fields
   if ( (link->adr = hts_record_link_strdup(opt, address)) == NULL
     || (link->fil = hts_record_link_strdup(opt, file)) == NULL
@@ -3734,6 +3733,9 @@ HTSEXT_API int copy_htsopt(const httrackp * from, httrackp * to) {
 
   if (StringNotEmpty(from->strip_query))
     StringCopyS(to->strip_query, from->strip_query);
+
+  if (StringNotEmpty(from->host_alias))
+    StringCopyS(to->host_alias, from->host_alias);
 
   if (StringNotEmpty(from->cookies_file))
     StringCopyS(to->cookies_file, from->cookies_file);

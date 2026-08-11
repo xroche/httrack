@@ -558,6 +558,8 @@ void help(const char *app, int more) {
   infomsg
     (" %q *include query string for local files (useless, for information purpose only) (%q0 don't include)");
   infomsg(" %g  strip query keys for dedup ([host/pattern=]key1,key2,...)");
+  infomsg(" %C  fold other hostnames of one site onto it "
+          "([scheme://]alias[,...]=[scheme://]host)");
   infomsg("  o *save the server's error pages (404..) (o0 discard them)");
   infomsg("  X *purge old files after update (X0 keep delete)");
   infomsg(" %p  preserve html files 'as is' (identical to '-K4 -%F \"\"')");

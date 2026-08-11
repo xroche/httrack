@@ -240,6 +240,8 @@ struct hash_struct {
   hts_boolean norm_query;
   /* query-strip keys (not owned); set from opt->strip_query at hash_init */
   const char *strip_query;
+  /* host-alias rules (not owned); set from opt->host_alias at hash_init */
+  const char *host_alias;
   char normfil[HTS_URLMAXSIZE * 2];
   char normfil2[HTS_URLMAXSIZE * 2];
   char catbuff[CATBUFF_SIZE];
@@ -403,6 +405,40 @@ char *fil_normalized_filtered_ex(const char *source, char *dest,
    strjoker, last wins); NULL if none match. Feeds fil_normalized_filtered(). */
 const char *hts_query_strip_keys(const char *rules, const char *adr,
                                  const char *fil, char *dest, size_t destsize);
+
+/* The --host-alias rules of OPT, or NULL when the option was not given. */
+const char *hts_host_alias_rules(httrackp *opt);
+
+/* ADR with its host replaced by the canonical one, from the '\n'-separated
+   "alias[,alias...]=canonical" RULES (aliases matched with strjoker, last
+   wins). NOWWW matches the host with its www. prefix collapsed, as -%u keys it.
+   Chains are followed to their end, so the result is a fixpoint. Scheme and
+   credentials are kept. NULL when no rule applies, the mapping is a no-op, the
+   rules loop, or the result would not fit DEST. */
+const char *hts_host_alias(const char *rules, const char *adr,
+                           hts_boolean collapse_www, char *dest,
+                           size_t destsize);
+
+/* HTS_TRUE when OPT's url hacks collapse www.host onto host. */
+hts_boolean hts_host_alias_collapse_www(httrackp *opt);
+
+/* Rewrite AF's host to its --host-alias canonical form, in place, and return
+   it. Idempotent; returns af->adr unchanged when no rule applies. */
+const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af);
+
+/* HTS_TRUE if ADRA and ADRB name the same host once RULES are applied. */
+hts_boolean hts_host_same_alias(const char *rules, const char *adra,
+                                const char *adrb, hts_boolean collapse_www);
+
+/* HTS_TRUE if RULE is a well-formed "[scheme://]alias[,...]=[scheme://]host"
+   line: one literal host after the '=', and no path on either side. */
+hts_boolean hts_host_alias_rule_ok(const char *rule);
+
+/* First canonical host in RULES whose chain never ends ("a=b" plus "b=a"),
+   copied into DEST, or NULL if every chain settles. Those hosts are left
+   unaliased, so the engine reports them rather than picking a hop. */
+const char *hts_host_alias_looping(const char *rules, hts_boolean collapse_www,
+                                   char *dest, size_t destsize);
 
 /* Read a whole file into a freshly malloc'd, NUL-terminated buffer; the caller
    owns it and must release it with freet(). Return NULL on missing/unreadable

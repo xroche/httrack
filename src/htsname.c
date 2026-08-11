@@ -352,7 +352,7 @@ int url_savename(lien_adrfilsave *const afs,
   /* */
   char BIGSTK fil[HTS_URLMAXSIZE * 2];       /* ="" */
 
-  const char *const adr_complete = afs->af.adr;
+  const char *const adr_complete = hts_host_alias_fold(opt, &afs->af);
   const char *const fil_complete = afs->af.fil;
 
   /*char BIGSTK normadr_[HTS_URLMAXSIZE*2]; */

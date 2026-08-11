@@ -1,0 +1,104 @@
+#!/bin/bash
+#
+# End-to-end --host-alias (#16). The fixture reaches a second hostname once per
+# engine path that has to fold it: a page the crawled host also links (dedup), a
+# page nothing else links (scope), a redirect to it, a page whose type is known
+# only after a probe (the probe re-requests the URL), and a sitemap entry
+# (recorded without being named first). The control fetches none of them and
+# keeps the alias URL absolute in the page.
+
+set -e
+
+: "${top_srcdir:=..}"
+
+# aliased: every alias link resolves to a local file under the canonical host,
+# and the alias name survives nowhere in the mirrored page
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --found hostalias/index.html --found hostalias/a.html \
+    --found hostalias/b.html --found hostalias/noext.html \
+    --file-matches hostalias/index.html 'href="a\.html"' \
+    --file-matches hostalias/b.html 'only the alias hostname links here' \
+    --file-matches hostalias/c.html 'through a redirect' \
+    --file-not-matches hostalias/index.html 'example\.invalid' \
+    httrack 'BASEURL/hostalias/index.html' \
+    --host-alias 'alias.example.invalid=BASEHOST'
+
+# control: a foreign host, left absolute in the page and never crawled
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
+    --file-matches hostalias/index.html 'example\.invalid' \
+    httrack 'BASEURL/hostalias/index.html'
+
+# the fold applies with url-hack off (-%u0): the dedup key, the saved name and
+# the scope test must not depend on it
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --found hostalias/c.html \
+    --file-not-matches hostalias/index.html 'example\.invalid' \
+    httrack 'BASEURL/hostalias/index.html' -%u0 \
+    --host-alias 'alias.example.invalid=BASEHOST'
+
+# repeated options accumulate, and a glob alias matches: the rule that fires is
+# the second one, so the '\n' the CLI joins them with has to parse
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --found hostalias/c.html \
+    --file-not-matches hostalias/index.html 'example\.invalid' \
+    httrack 'BASEURL/hostalias/index.html' \
+    --host-alias 'nothing.example.invalid=BASEHOST' \
+    --host-alias '*.example.invalid=BASEHOST'
+
+# a sitemap URL on the alias host: the seeder records it without a save name,
+# the one path url_savename does not fold. Three files: the start page, the
+# sitemap document itself, and the page it lists.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
+    --found hostalias/e.html \
+    --file-matches hostalias/e.html 'listed only in the sitemap' \
+    httrack 'BASEURL/hostalias/a.html' \
+    --sitemap-url 'BASEURL/hostalias/sitemap.xml' \
+    --host-alias 'alias.example.invalid=BASEHOST'
+
+# over TLS the alias links, spelled http://, would reach a port that speaks
+# only TLS: the canonical side names the scheme the host really answers on
+if test "$HTTPS_SUPPORT" != "no"; then
+    bash "$top_srcdir/tests/local-crawl.sh" --tls --errors 0 --files 5 \
+        --found hostalias/b.html --found hostalias/c.html \
+        --file-matches hostalias/index.html 'href="a\.html"' \
+        --file-not-matches hostalias/index.html 'example\.invalid' \
+        httrack 'BASEURL/hostalias/index.html' \
+        --host-alias 'alias.example.invalid=https://BASEHOST'
+fi
+
+# the same crawl with the scheme spelled on both sides: proves a scheme-bearing
+# rule is parsed and fires, on a build with no TLS support too
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --found hostalias/c.html \
+    --file-not-matches hostalias/index.html 'example\.invalid' \
+    httrack 'BASEURL/hostalias/index.html' \
+    --host-alias 'http://alias.example.invalid=http://BASEHOST'
+
+# a rule the option cannot use is refused up front, not silently ignored
+out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
+    --host-alias 'no-equals-sign' 2>&1) && {
+    echo "FAIL: httrack accepted a malformed --host-alias rule"
+    exit 1
+}
+grep -q "Invalid host-alias rule" <<<"$out" || {
+    echo "FAIL: no diagnostic for a malformed --host-alias rule: $out"
+    exit 1
+}
+
+# A path is not part of an address. The accepted rule differs from the refused
+# one by the path alone, so the refusal cannot be blamed on the scheme.
+httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
+    --host-alias 'https://a.example/=ftp://b.example/' >/dev/null 2>&1
+test $? -ne 2 || {
+    echo "FAIL: httrack refused a scheme-bearing --host-alias rule"
+    exit 1
+}
+out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
+    --host-alias 'https://a.example/=ftp://b.example/pub/' 2>&1) && {
+    echo "FAIL: httrack accepted a --host-alias rule naming a path"
+    exit 1
+}
+grep -q "a path" <<<"$out" || {
+    echo "FAIL: the diagnostic does not name the path: $out"
+    exit 1
+}

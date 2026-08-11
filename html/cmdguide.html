@@ -119,6 +119,7 @@ the index" problems disappear.</p>
   <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--depth (-r)</tt></td><td>Maximum link depth. <b>The start page is level 1</b>, so one level of links out is <tt>-r2</tt>, not <tt>-r1</tt>.</td></tr>
   <tr><td><tt>--stay-on-same-address (-a), --stay-on-same-domain (-d), --stay-on-same-tld (-l), --go-everywhere (-e)</tt></td><td>How far off the starting host the crawl may travel: same address (host), same principal domain, same top-level domain (for example .com), or everywhere. The default keeps you on the starting host.</td></tr>
+  <tr><td><tt>--host-alias (-%C)</tt></td><td>Declares that several hostnames serve the same site, for example <tt>--host-alias "www2.example.com,m.example.com=example.com"</tt>. Those names then count as the starting host: their links travel under the same-address rules, are fetched from the canonical host, and are saved once rather than once per name. The left side takes filter-style globs and comma-separated names, the right side one literal host, port included. Either side may name a scheme (<tt>legacy.example.com=https://example.com</tt> reaches a host that only answers over HTTPS, and <tt>https://www.example.com=ftp://files.example.com</tt> matches only the HTTPS form). A path is refused: this maps hosts, not URLs.</td></tr>
   <tr><td><tt>--can-go-down (-D), --can-go-up (-U), --stay-on-same-dir (-S), --can-go-up-and-down (-B)</tt></td><td>Directory travel: down into subdirectories only, up to parent directories only, stay in the same directory, or both up and down.</td></tr>
   <tr><td><tt>--near (-n)</tt></td><td>Also fetch non-HTML files "near" a followed link, such as an image linked from a page you kept but hosted elsewhere.</td></tr>
   <tr><td><tt>--ext-depth (-%e)</tt></td><td>How many levels of external links to follow once the crawl leaves your scope (default 0).</td></tr>
@@ -148,7 +149,9 @@ usually not a scope option at all: it is an off-host redirect. A start URL of
 <tt>http://example.com/</tt> that redirects to <tt>https://www.example.com/</tt>
 lands you on a different host, and same-host scope stops the crawl there. Start
 from the final URL, or add a filter that re-admits the real host (see
-<a href="#filters">Filters</a>). The log will show the redirect.</p>
+<a href="#filters">Filters</a>). The log will show the redirect. When both names
+really are one site, <tt>--host-alias</tt> says so once and the mirror stops
+depending on which one you started from.</p>
 
 <p><tt>-n</tt> is the fix for pages that render locally without their images or
 stylesheets: it lets HTTrack pull in requisites that sit just outside scope. Note
