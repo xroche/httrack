@@ -143,11 +143,8 @@ function assert_equals {
 nopurge=
 cleanup_push purge_tmpdir
 
-# What the mirror itself wrote. Line 2 echoes the engine's whole command line,
-# absolute paths included, so a build or output directory named after a searched
-# word would otherwise answer for the crawl (#1220). The banner above it stays:
-# it names the URL, which audits do match. Left in place if it ever stops
-# looking like that echo, since hiding a real match is the worse failure.
+# Line 2 echoes the engine's command line, so a path named after a searched word
+# would answer for the crawl (#1220). The banner stays: audits match its URL.
 log_body() { awk 'NR == 2 && /^\(/ { next } { print }' "${logroot}/hts-log.txt"; }
 
 # python3 is required; mirror check-network.sh's skip-with-77 convention. Found
