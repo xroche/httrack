@@ -30,6 +30,11 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   check`, or `PATH="<bld>/src:$PATH"` for a manual run.
 - Give new `.test` scripts `set -e`: the older ones predate the rule, so several
   `local-crawl.sh` calls with no `set -e` report PASS on any non-last failure.
+- Each test runs under a 600s wall-clock guard that reports a wedge as 124. A test
+  whose own work outlasts it raises the budget with a `# TEST_TIMEOUT_AT_LEAST: N`
+  line, at column 0 within its first 40 lines, and paces itself with
+  `skip_if_out_of_budget` so a host too slow to finish skips instead. The value only
+  ever raises the budget: nothing can disarm the guard.
 - Run teardown with errexit off: `trap 'set +e; cleanup' EXIT`. Under `set -e` a
   failing cleanup command becomes the test's exit status (#773). Keep the other
   signals on their own `trap` line, or errexit stays off for the rest of the run.

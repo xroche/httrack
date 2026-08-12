@@ -539,14 +539,37 @@ EOF
 # one step is slower than its neighbours. It asks an ordering of the callers
 # instead, expensive steps first, so no step left can outrun the reserve the one
 # before it set (#1146).
-skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took>
-    local budget=${HTTRACK_TEST_TIMEOUT:-600} need=$(($2 + $2 / 2))
+# The budget test-timeout.sh enforces, in seconds, 0 being the guard off. The one
+# parser: a value bash arithmetic or test would choke on falls back to the default,
+# and a leading zero would otherwise read as octal in one place and decimal in the next.
+budget_secs() {
+    local budget=${HTTRACK_TEST_TIMEOUT:-600}
+    case "$budget" in '' | *[!0-9]* | ???????*) budget=600 ;; esac
+    echo "$((10#$budget))"
+}
 
-    case "$budget" in '' | *[!0-9]*) budget=600 ;; esac
+skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last took>
+    local budget need=$(($2 + $2 / 2))
+
+    budget=$(budget_secs)
     test "$1" -gt 0 && test "$budget" -gt 0 || return 0
     test "$((SECONDS + need))" -ge "$budget" || return 0
     echo "$1 steps left, the last took ${2}s and the budget is ${budget}s; skipping" >&2
     exit 77
+}
+
+# Seconds left of the budget, for a child pacing itself against it (269 hands it to
+# the sweep). Never below 1 unless the guard is off, when it stays 0.
+budget_left() {
+    local budget left
+    budget=$(budget_secs)
+    test "$budget" -gt 0 || {
+        echo 0
+        return 0
+    }
+    left=$((budget - SECONDS))
+    test "$left" -ge 1 || left=1
+    echo "$left"
 }
 
 # Collect a killed job, giving up after REAP_GRACE seconds. kill_tree can fail to
