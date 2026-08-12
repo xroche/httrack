@@ -31,7 +31,7 @@ jobs:
           Say '```'
 
           # ---------------------------------------------------------------
-          # Part 1: is the hazard present at all?
+          # Part 1: is the hazard even present?
           # ---------------------------------------------------------------
           Say "== PART 1: recorded-parent state of the runner's own processes =="
 
@@ -71,7 +71,7 @@ jobs:
           }
 
           $interesting = @($snap | Where-Object {
-            $_.Name -like 'Runner.*' -or $_.Name -like 'Agent.*' -or
+            $_.Name -like 'Runner.*' -or $_.Name -like 'Agent.*' -or $_.Name -like 'hosted-*' -or
             $_.Name -eq 'bash.exe' -or $_.Name -eq 'pwsh.exe' -or
             $_.Name -eq 'powershell.exe' -or $_.Name -eq 'dotnet.exe' -or
             $_.Name -eq 'node.exe' -or $_.Name -eq 'cmd.exe' -or
@@ -82,10 +82,9 @@ jobs:
           foreach ($p in $interesting) {
             $st = Classify ([int]$p.ProcessId)
             Say ("  {0,-24} pid={1,-7} ppid={2,-7} {3,-16} {4}" -f $p.Name, $p.ProcessId, $p.ParentProcessId, $st, (Chain ([int]$p.ProcessId)))
-            if ($st -ne 'OK' -and ($p.Name -like 'Runner.*' -or $p.Name -like 'Agent.*')) { $armed++ }
+            if ($st -ne 'OK' -and ($p.Name -like 'Runner.*' -or $p.Name -like 'Agent.*' -or $p.Name -like 'hosted-*')) { $armed++ }
           }
 
-          # Box-wide census, and the map of dead PPIDs that live processes still record.
           $dead = 0; $rec = 0; $ok = 0
           $boxOrphan = @{}
           foreach ($p in $snap) {
@@ -99,7 +98,6 @@ jobs:
           }
           Say ""
           Say ("box-wide: {0} processes, {1} with a DEAD recorded parent, {2} with a RECYCLED one, {3} sound" -f $snap.Count, $dead, $rec, $ok)
-          Say ("distinct dead PPIDs recorded box-wide: {0}" -f $boxOrphan.Keys.Count)
           foreach ($k in ($boxOrphan.Keys | Sort-Object)) {
             Say ("  dead ppid {0,-7} still claimed as parent by: {1}" -f $k, ($boxOrphan[$k] -join ', '))
           }
@@ -107,16 +105,23 @@ jobs:
           if ($armed -gt 0) {
             Say "PART 1 VERDICT: HAZARD PRESENT - $armed runner-agent process(es) record a parent PID that is dead or already recycled."
           } elseif ($dead -gt 0) {
-            Say "PART 1 VERDICT: no Runner.*/Agent.* process has a stale recorded parent, but $dead other live processes do (blast radius exists, agent not in it at this instant)."
+            Say "PART 1 VERDICT: no Runner.*/Agent.* process has a stale recorded parent, but $dead other live processes do."
           } else {
             Say "PART 1 VERDICT: NOT ARMED - every live process's recorded parent is alive and older."
           }
           Say ""
 
           # ---------------------------------------------------------------
-          # Part 2: does the tree walk follow a stale PPID?
+          # Part 2. Run 1 found 0 collisions in 8095 spawns against 300 dead
+          # orphan-parent PIDs, which is ~100x below chance -- so those PIDs were
+          # not merely unlucky, they were unavailable. Four sets, freed at the
+          # same instant, separate the candidate reasons:
+          #   A  plain ping, killed, .NET handle disposed        (baseline: reuse works?)
+          #   C  plain ping, killed, handle deliberately HELD    (does an open handle pin the PID?)
+          #   D  cmd orphan-maker, child killed, handle disposed (is the construction sound?)
+          #   B  cmd orphan-maker, child left ALIVE, disposed    (the real question)
           # ---------------------------------------------------------------
-          Say "== PART 2: does taskkill /F /T follow a recorded parent PID that was recycled? =="
+          Say "== PART 2: can a dead parent's PID be handed out again, and does taskkill /T follow it? =="
 
           function New-Ping {
             $psi = New-Object System.Diagnostics.ProcessStartInfo
@@ -143,7 +148,9 @@ jobs:
             return (Get-CimInstance Win32_Process -Filter "ProcessId = $q" -ErrorAction SilentlyContinue | Select-Object -First 1)
           }
 
-          # --- 2.0 positive control: a tree kill of a LIVE parent must kill its child.
+          function New-Set { return (New-Object 'System.Collections.Generic.HashSet[int]') }
+
+          # --- control: a tree kill of a LIVE parent must kill its child, or the probe is blind.
           Say ""
           Say "-- control: taskkill /F /T on a live cmd whose child ping is genuine"
           $ctlPsi = New-Object System.Diagnostics.ProcessStartInfo
@@ -160,88 +167,118 @@ jobs:
           } else {
             $kp = [int]$ctlKid[0].ProcessId
             Say ("  cmd {0} -> child {1}/{2}" -f $ctl.Id, $kp, $ctlKid[0].Name)
-            $o = (& taskkill.exe /F /T /PID $ctl.Id 2>&1 | Out-String).Trim()
-            Say ("  taskkill: " + ($o -replace "`r?`n", ' | '))
+            $co = (& taskkill.exe /F /T /PID $ctl.Id 2>&1 | Out-String).Trim()
+            Say ("  taskkill: " + ($co -replace "`r?`n", ' | '))
             Start-Sleep -Milliseconds 800
             $still = Get-Proc $kp
-            Say ("  control result: child {0} {1} => tree kill of a live parent {2}" -f $kp, $(if ($null -eq $still) { 'GONE' } else { 'STILL ALIVE' }), $(if ($null -eq $still) { 'WORKS (probe can observe a kill)' } else { 'DID NOT propagate - probe is blind, treat part 2 as inconclusive' }))
+            Say ("  control result: child {0} {1}" -f $kp, $(if ($null -eq $still) { 'GONE - the probe can observe a tree kill' } else { 'STILL ALIVE - probe is blind, part 2 is inconclusive' }))
           }
+          try { $ctl.Dispose() } catch { }
 
-          # --- 2.1 make ~300 orphans.
-          $NORPH = 300
+          $conBefore = @(Get-Process conhost -ErrorAction SilentlyContinue).Count
+
+          # --- build the four sets.
+          $NB = 300; $NA = 200; $NC = 200; $ND = 200
           Say ""
-          Say "-- creating $NORPH orphans (cmd dies, ping survives with cmd's dead PID as recorded parent)"
-          $cmdPids = New-Object 'System.Collections.Generic.List[int]'
-          $cmdSeen = New-Object 'System.Collections.Generic.HashSet[int]'
-          $cmdDup = 0
-          $t0 = [Diagnostics.Stopwatch]::StartNew()
-          for ($i = 0; $i -lt $NORPH; $i++) {
-            try {
-              $c = New-Orphan
-              $cmdPids.Add($c.Id)
-              if (-not $cmdSeen.Add($c.Id)) { $cmdDup++ }
-            } catch { }
-          }
-          $t0.Stop()
-          Say ("  spawned {0} cmd in {1:N1}s; {2} of those PIDs were ALREADY handed out to an earlier cmd in this same burst ({3} distinct)" -f $cmdPids.Count, $t0.Elapsed.TotalSeconds, $cmdDup, $cmdSeen.Count)
+          Say "-- building sets: B=$NB orphan-makers with a live child, D=$ND orphan-makers with the child killed, A=$NA plain (handle disposed), C=$NC plain (handle held)"
+
+          $bCmd = New-Object 'System.Collections.Generic.List[System.Diagnostics.Process]'
+          for ($i = 0; $i -lt $NB; $i++) { try { $bCmd.Add((New-Orphan)) } catch { } }
+          $dCmd = New-Object 'System.Collections.Generic.List[System.Diagnostics.Process]'
+          for ($i = 0; $i -lt $ND; $i++) { try { $dCmd.Add((New-Orphan)) } catch { } }
+          $aProc = New-Object 'System.Collections.Generic.List[System.Diagnostics.Process]'
+          for ($i = 0; $i -lt $NA; $i++) { try { $aProc.Add((New-Ping)) } catch { } }
+          $pinned = New-Object 'System.Collections.Generic.List[System.Diagnostics.Process]'
+          for ($i = 0; $i -lt $NC; $i++) { try { $pinned.Add((New-Ping)) } catch { } }
+
+          $bPid = New-Set; foreach ($p in $bCmd) { [void]$bPid.Add($p.Id) }
+          $dPid = New-Set; foreach ($p in $dCmd) { [void]$dPid.Add($p.Id) }
+          $aPid = New-Set; foreach ($p in $aProc) { [void]$aPid.Add($p.Id) }
+          $cPid = New-Set; foreach ($p in $pinned) { [void]$cPid.Add($p.Id) }
+          Say ("  distinct PIDs: B={0} D={1} A={2} C={3}" -f $bPid.Count, $dPid.Count, $aPid.Count, $cPid.Count)
 
           Start-Sleep -Seconds 2
 
-          # Map orphan pings back to their dead cmd parents.
+          # Map the orphan pings back to the cmd that made them.
           $orphan = @{}
-          $nOrphan = 0
+          $dKids = New-Object 'System.Collections.Generic.List[int]'
+          $nB = 0
           foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name = 'ping.exe'")) {
             $pp = [int]$p.ParentProcessId
-            if ($cmdSeen.Contains($pp)) {
+            if ($bPid.Contains($pp)) {
               if (-not $orphan.ContainsKey($pp)) { $orphan[$pp] = @() }
               $orphan[$pp] += [pscustomobject]@{ Pid = [int]$p.ProcessId; Created = $p.CreationDate }
-              $nOrphan++
+              $nB++
+            } elseif ($dPid.Contains($pp)) {
+              $dKids.Add([int]$p.ProcessId)
             }
           }
-          $liveNow = New-Object 'System.Collections.Generic.HashSet[int]'
-          foreach ($p in @(Get-CimInstance Win32_Process)) { [void]$liveNow.Add([int]$p.ProcessId) }
-          $targets = New-Object 'System.Collections.Generic.HashSet[int]'
-          foreach ($k in $orphan.Keys) { if (-not $liveNow.Contains($k)) { [void]$targets.Add([int]$k) } }
-          Say ("  {0} orphan ping.exe alive, under {1} distinct recorded parents, {2} of which are dead PIDs free for reuse" -f $nOrphan, $orphan.Keys.Count, $targets.Count)
-          if ($targets.Count -eq 0) {
-            Say "  no reusable dead parent PID: cannot hunt. STOP."
-            Say '```'
-            exit 0
-          }
-          Say ("  target PIDs: {0}" -f (($targets | Sort-Object) -join ' '))
+          Say ("  orphan pings found: {0} under {1} B-parents, {2} under D-parents" -f $nB, $orphan.Keys.Count, $dKids.Count)
 
-          # --- 2.2 hunt a collision.
-          $hits = 0
-          $spawns = 0
-          $distinct = New-Object 'System.Collections.Generic.HashSet[int]'
+          # Free everything at the same instant: dispose A/B/D handles, keep C's.
+          foreach ($p in $bCmd) { try { $p.WaitForExit(2000) | Out-Null } catch { }; try { $p.Dispose() } catch { } }
+          foreach ($p in $dCmd) { try { $p.WaitForExit(2000) | Out-Null } catch { }; try { $p.Dispose() } catch { } }
+          foreach ($p in $aProc) { try { $p.Kill() } catch { } }
+          foreach ($p in $pinned) { try { $p.Kill() } catch { } }
+          Start-Sleep -Milliseconds 800
+          foreach ($p in $aProc) { try { $p.Dispose() } catch { } }
+          $aProc.Clear()
+          $bCmd.Clear(); $dCmd.Clear()
+          if ($dKids.Count -gt 0) { Stop-Process -Id $dKids.ToArray() -Force -ErrorAction SilentlyContinue }
+          [GC]::Collect(); [GC]::WaitForPendingFinalizers(); [GC]::Collect()
+          Start-Sleep -Seconds 2
+
+          # Sanity: every set member must actually be gone from the process table.
+          $liveNow = New-Set
+          foreach ($p in @(Get-CimInstance Win32_Process)) { [void]$liveNow.Add([int]$p.ProcessId) }
+          function CountLive($s) { $n = 0; foreach ($x in $s) { if ($liveNow.Contains($x)) { $n++ } }; return $n }
+          Say ("  still live (must be 0): B={0} D={1} A={2} C={3}" -f (CountLive $bPid), (CountLive $dPid), (CountLive $aPid), (CountLive $cPid))
+          $conAfter = @(Get-Process conhost -ErrorAction SilentlyContinue).Count
+          Say ("  conhost.exe count: {0} before the sets, {1} after (a surviving console holds a handle on its creator)" -f $conBefore, $conAfter)
+          $bAlive = 0
+          foreach ($k in $orphan.Keys) { foreach ($o in $orphan[$k]) { if ($liveNow.Contains($o.Pid)) { $bAlive++ } } }
+          Say ("  B orphan children still alive: {0} (these are what a stale-PPID tree kill would reap)" -f $bAlive)
+
+          # --- hunt.
+          $hitA = 0; $hitB = 0; $hitC = 0; $hitD = 0; $boxHits = 0
+          $spawns = 0; $bTested = 0
+          $distinct = New-Set
           $window = New-Object 'System.Collections.Generic.Queue[System.Diagnostics.Process]'
-          $held = New-Object 'System.Collections.Generic.List[System.Diagnostics.Process]'
-          $boxHits = 0
           $minPid = [int]::MaxValue; $maxPid = 0
 
           function Test-Hit([int]$np) {
-            # returns $true when the experiment is done
+            if ($script:aPid.Contains($np)) { $script:hitA++ }
+            if ($script:cPid.Contains($np)) {
+              $script:hitC++
+              Say ("!! set C hit: PID $np came back although a .NET process handle on it is still open")
+            }
+            if ($script:dPid.Contains($np)) { $script:hitD++ }
             if ($script:boxOrphan.ContainsKey($np)) {
               $script:boxHits++
               Say ""
-              Say ("!! REAL COLLISION: our spawn got PID $np, which $($script:boxOrphan[$np].Count) live box process(es) still record as their parent: $($script:boxOrphan[$np] -join ', ')")
+              Say ("!! REAL COLLISION: our spawn got PID $np, which live box process(es) still record as their parent: $($script:boxOrphan[$np] -join ', ')")
               Say "   (not tree-killing this one: it would reap a process we did not start)"
               Say ""
             }
-            if (-not $script:targets.Contains($np)) { return $false }
+            if (-not $script:bPid.Contains($np)) { return $false }
 
-            $script:hits++
+            $script:hitB++
             Say ""
-            Say ("### HIT #$($script:hits): spawn #$($script:spawns) at t=$([int]$script:sw.Elapsed.TotalSeconds)s was given PID $np, a dead orphan-parent PID")
+            Say ("### SET B HIT #$($script:hitB): spawn #$($script:spawns) at t=$([int]$script:sw.Elapsed.TotalSeconds)s was given PID $np, a dead orphan-parent PID")
             $kids = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $np")
-            foreach ($k in $kids) { Say ("   process table says child of $np : {0}/{1} created {2}" -f $k.ProcessId, $k.Name, $k.CreationDate) }
+            foreach ($k in $kids) { Say ("   the process table calls this a child of $np : {0}/{1} created {2}" -f $k.ProcessId, $k.Name, $k.CreationDate) }
             $before = @()
             foreach ($o in $script:orphan[$np]) {
               $cur = Get-Proc $o.Pid
               $alive = ($null -ne $cur -and $cur.CreationDate -eq $o.Created)
               $before += [pscustomobject]@{ Pid = $o.Pid; Created = $o.Created; Alive = $alive }
-              Say ("   orphan ping {0} (created {1}) alive-before={2}" -f $o.Pid, $o.Created, $alive)
+              Say ("   orphan ping {0} alive-before={1}" -f $o.Pid, $alive)
             }
+            if (($before | Where-Object { $_.Alive }).Count -eq 0) {
+              Say "   no live orphan left under this PID, nothing to measure; skipping the taskkill"
+              return $false
+            }
+            $script:bTested++
             Say ("   issuing: taskkill /F /T /PID $np")
             $out = (& taskkill.exe /F /T /PID $np 2>&1 | Out-String).Trim()
             Say ("   taskkill said: " + ($out -replace "`r?`n", ' | '))
@@ -254,70 +291,55 @@ jobs:
               Say ("   orphan ping {0}: before={1} after={2}" -f $b.Pid, $b.Alive, $alive)
             }
             if ($anyDied) {
-              Say "   >>> THE TREE WALK FOLLOWED A STALE PPID. taskkill /T does NOT validate creation time. Mechanism confirmed."
+              Say "   >>> THE TREE WALK FOLLOWED A STALE PPID: taskkill /T does not validate creation time. Mechanism confirmed."
             } else {
-              Say "   >>> orphan survived: taskkill /T did NOT follow the stale PPID on this image."
+              Say "   >>> the orphan survived: taskkill /T did not follow the stale PPID."
             }
             Say ""
-            return ($script:hits -ge 3)
+            return ($script:bTested -ge 3)
           }
 
           $sw = [Diagnostics.Stopwatch]::StartNew()
           Say ""
-          Say "-- phase A: hold every spawn alive (forces the allocator to dig into the free list), cap 700 / 120s"
+          Say "-- hunting: rolling window of 200 live spawns, 300s cap"
           $done = $false
-          while (-not $done -and $sw.Elapsed.TotalSeconds -lt 120 -and $held.Count -lt 700) {
+          while (-not $done -and $sw.Elapsed.TotalSeconds -lt 300) {
             try { $np = (New-Ping) } catch { Start-Sleep -Milliseconds 50; continue }
-            $held.Add($np)
+            $window.Enqueue($np)
             $spawns++
             $id = $np.Id
             [void]$distinct.Add($id)
             if ($id -lt $minPid) { $minPid = $id }
             if ($id -gt $maxPid) { $maxPid = $id }
             $done = Test-Hit $id
-            if (($spawns % 100) -eq 0) { Write-Host ("   ... phase A spawn $spawns, held $($held.Count), distinct $($distinct.Count), t=$([int]$sw.Elapsed.TotalSeconds)s") }
-          }
-          Say ("  phase A: {0} spawns, {1} distinct PIDs, {2:N1}s, {3} hits" -f $spawns, $distinct.Count, $sw.Elapsed.TotalSeconds, $hits)
-
-          if (-not $done) {
-            Say ""
-            Say "-- phase B: rolling window of 200 (kill the oldest, keep the allocator exploring), 180s"
-            $swB = [Diagnostics.Stopwatch]::StartNew()
-            $spawnB = 0
-            while (-not $done -and $swB.Elapsed.TotalSeconds -lt 180) {
-              try { $np = (New-Ping) } catch { Start-Sleep -Milliseconds 50; continue }
-              $window.Enqueue($np)
-              $spawns++; $spawnB++
-              $id = $np.Id
-              [void]$distinct.Add($id)
-              if ($id -lt $minPid) { $minPid = $id }
-              if ($id -gt $maxPid) { $maxPid = $id }
-              $done = Test-Hit $id
-              while ($window.Count -gt 200) {
-                $old = $window.Dequeue()
-                try { $old.Kill() } catch { }
-                try { $old.Dispose() } catch { }
-              }
-              if (($spawnB % 200) -eq 0) { Write-Host ("   ... phase B spawn $spawnB, distinct $($distinct.Count), t=$([int]$swB.Elapsed.TotalSeconds)s") }
+            while ($window.Count -gt 200) {
+              $old = $window.Dequeue()
+              try { $old.Kill() } catch { }
+              try { $old.Dispose() } catch { }
             }
-            Say ("  phase B: {0} spawns in {1:N1}s" -f $spawnB, $swB.Elapsed.TotalSeconds)
+            if (($spawns % 250) -eq 0) { Write-Host ("   ... spawn $spawns, distinct $($distinct.Count), A=$hitA B=$hitB C=$hitC D=$hitD, t=$([int]$sw.Elapsed.TotalSeconds)s") }
           }
 
           Say ""
           Say "== RESULT =="
-          Say ("targets held: {0} dead parent PIDs, each with a live orphan child" -f $targets.Count)
-          Say ("spawns issued: {0}; distinct PIDs seen: {1}; PID range {2}..{3}" -f $spawns, $distinct.Count, $minPid, $maxPid)
-          Say ("hits on a target: {0}" -f $hits)
-          if ($hits -gt 0) {
-            Say ("collision rate: 1 hit per {0:N0} spawns against {1} targets" -f ($spawns / $hits), $targets.Count)
+          Say ("spawns {0}, distinct PIDs {1}, range {2}..{3}, {4:N0}s" -f $spawns, $distinct.Count, $minPid, $maxPid, $sw.Elapsed.TotalSeconds)
+          Say ("hits by set (each set held ~200-300 freed PIDs):")
+          Say ("  A  killed, handle disposed, no child : {0}" -f $hitA)
+          Say ("  C  killed, handle still OPEN         : {0}" -f $hitC)
+          Say ("  D  dead orphan-maker, child killed   : {0}" -f $hitD)
+          Say ("  B  dead orphan-maker, child ALIVE    : {0}   <- the one the theory needs" -f $hitB)
+          Say ("  collisions with a dead PPID recorded by a process we did NOT start: {0}" -f $boxHits)
+          if ($hitA -eq 0) {
+            Say "INTERPRETATION: even the baseline set never came back. The allocator did not recycle any PID we freed, so this run says nothing about B."
+          } elseif ($hitB -gt 0) {
+            Say "INTERPRETATION: a dead parent's PID IS handed out again while a live process still records it as its parent. See the SET B HIT block above for what taskkill /T then did."
+          } elseif ($hitD -gt 0) {
+            Say "INTERPRETATION: the orphan construction recycles fine once the child is dead (D), but the PID of a parent with a LIVE recorded child never came back (B=0). The PID stays reserved while a process records it, so a tree kill can never land on it."
           } else {
-            Say ("no collision in {0} spawns against {1} targets: per-spawn hit rate below 1/{0}" -f $spawns, $targets.Count)
+            Say "INTERPRETATION: A recycles but neither D nor B does: the orphan-maker construction itself pins the PID (a surviving console host holds a handle), so B is not a clean test."
           }
-          Say ("collisions with a dead PPID recorded by a process we did NOT start: {0}" -f $boxHits)
           Say '```'
 
-          # cleanup
-          foreach ($p in $held) { try { $p.Kill() } catch { } }
           while ($window.Count -gt 0) { $o = $window.Dequeue(); try { $o.Kill() } catch { } }
           try { Get-Process ping -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue } catch { }
           Write-Host "probe done"
