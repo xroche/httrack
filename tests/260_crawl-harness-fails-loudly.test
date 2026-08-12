@@ -49,4 +49,27 @@ test "$rc" -ne 0 || fail "a wrong file count reported success: $out"
 assert_match "expected '999'" "$out" "the audit names the value it wanted"
 ok "a failing audit fails the run"
 
+# A directory named after a searched word must not answer for the crawl (#1220):
+# TMPDIR plants one on the command line the log echoes.
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_logbody.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+mkdir -p "$tmp/assert-and-panic"
+rc=0
+out=$(TMPDIR="$tmp/assert-and-panic" bash "$crawl" --errors 0 \
+    --log-not-found 'assert|[Pp]anic' httrack "$url" 2>&1) || rc=$?
+test "$rc" -eq 0 || fail "the audit matched the path the crawl ran from: $out"
+ok "a log audit ignores the command line the banner echoes"
+
+# Teeth: it still reads the body, or the line above would pass on anything.
+run --errors 0 --log-not-found 'Information, Warnings and Errors' httrack "$url"
+test "$rc" -ne 0 || fail "a log audit matched nothing in the body: $out"
+ok "a log audit still sees what the mirror wrote"
+
+# And the banner, which only the echo below it is skipped: dropping both is the
+# mistake this fix was written twice to avoid. 14_local-https covers it only
+# where TLS is built.
+run --errors 0 --log-found 'launched on' httrack "$url"
+test "$rc" -eq 0 || fail "a log audit stopped seeing the banner: $out"
+ok "a log audit still sees the launch banner"
+
 echo "PASS"

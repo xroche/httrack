@@ -143,6 +143,10 @@ function assert_equals {
 nopurge=
 cleanup_push purge_tmpdir
 
+# Line 2 echoes the engine's command line, so a path named after a searched word
+# would answer for the crawl (#1220). The banner stays: audits match its URL.
+log_body() { awk 'NR == 2 && /^\(/ { next } { print }' "${logroot}/hts-log.txt"; }
+
 # python3 is required; mirror check-network.sh's skip-with-77 convention. Found
 # here, not in local_server_start, so a host without it skips before any setup.
 python=$(find_python) || ! echo "python3 not found; skipping local crawl tests" >&2 || exit 77
@@ -151,6 +155,7 @@ SRV_PYTHON=$python
 tmptopdir=${TMPDIR:-/tmp}
 test -d "$tmptopdir" || mkdir -p "$tmptopdir" || die "no temporary directory; set TMPDIR"
 tmpdir=$(mktemp -d "${tmptopdir}/httrack_local.XXXXXX") || die "could not create tmpdir"
+logbody="${tmpdir}/hts-log-body.txt"
 
 # --- parse leading control flags --------------------------------------------
 declare -a audit=()
@@ -660,7 +665,8 @@ while test "$i" -lt "${#audit[@]}"; do
     --log-found)
         i=$((i + 1))
         info "checking log matches ${audit[$i]}"
-        if grep -aqE "${audit[$i]}" "${logroot}/hts-log.txt"; then result "OK"; else
+        log_body >"$logbody"
+        if grep -aqE "${audit[$i]}" "$logbody"; then result "OK"; else
             result "not in log"
             exit 1
         fi
@@ -668,7 +674,8 @@ while test "$i" -lt "${#audit[@]}"; do
     --log-not-found)
         i=$((i + 1))
         info "checking log lacks ${audit[$i]}"
-        if grep -aqE "${audit[$i]}" "${logroot}/hts-log.txt"; then
+        log_body >"$logbody"
+        if grep -aqE "${audit[$i]}" "$logbody"; then
             result "present in log"
             exit 1
         else result "OK"; fi
