@@ -627,6 +627,12 @@ static hts_boolean ini_key_is_checkbox(const char *key) {
   return HTS_FALSE;
 }
 
+/* gmtime accepts the whole int range, where a footer can show four digits and
+   the tm_year + 1900 of a year past INT_MAX - 1900 overflows. */
+static hts_boolean tm_year_is_printable(const struct tm *tm) {
+  return tm->tm_year >= -1900 && tm->tm_year <= 8099 ? HTS_TRUE : HTS_FALSE;
+}
+
 int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   int timeout = 30;
   int retour = 0;
@@ -1283,6 +1289,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     hts_boolean unquoted = HTS_FALSE;
                     /* value comes from the template, not from the settings */
                     hts_boolean literal = HTS_FALSE;
+                    char datebuff[16];
 
                     name[0] = '\0';
                     strlncatbuff(name, str, sizeof(name_), n);
@@ -1310,6 +1317,44 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "liststr:"))) {
                       name += p;
                       format = -2;
+                    } else if ((p = strfield(name, "date:"))) {
+                      /* Expanded on each request, so the footer year cannot
+                         drift from the calendar the way a stamped one does
+                         (#1165). SOURCE_DATE_EPOCH pins it, so a test can ask
+                         for another year. */
+                      const char *epoch = getenv("SOURCE_DATE_EPOCH");
+                      struct tm tmv;
+                      hts_boolean ok = HTS_FALSE;
+
+                      name += p;
+                      format = 0;
+                      langstr = "";
+                      if (strcmp(name, "year") == 0) {
+                        if (epoch != NULL && *epoch) {
+                          char *end;
+                          const long long secs = strtoll(epoch, &end, 10);
+
+                          /* UTC, as the variable is defined; one that does not
+                             fit time_t would narrow into an unrelated date */
+                          if (*end == '\0' && secs >= 0 &&
+                              secs == (long long) (time_t) secs)
+                            ok = hts_gmtime((time_t) secs, &tmv) &&
+                                 tm_year_is_printable(&tmv);
+                        }
+                        /* an override we cannot use falls back to the clock: a
+                           footer reading 1998-1970 is worse than an ignored
+                           override */
+                        if (!ok)
+                          ok = hts_localtime(time(NULL), &tmv) &&
+                               tm_year_is_printable(&tmv);
+                        if (ok) {
+                          /* four digits, as test 185 exempts date: from the
+                             escaping it demands of runtime data */
+                          snprintf(datebuff, sizeof(datebuff), "%04d",
+                                   tmv.tm_year + 1900);
+                          langstr = datebuff;
+                        }
+                      }
                     } else if ((p = strfield(name, "file-exists:"))) {
                       char *pos2;
 
