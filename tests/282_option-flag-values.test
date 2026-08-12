@@ -60,6 +60,30 @@ refused 'does not take the value' --index=2
 refused 'does not take the value' --mirror=0
 refused 'Unknown option: nomirror' --nomirror
 
+# The three rows that were misclassified "param" (#1200). That class demands a
+# following token, so =1 died on "invalid option 1" and the space form was worse.
+for opt in purge-old httpproxy-ftp extended-parsing; do
+    for form in "--${opt}" "--${opt}=0" "--${opt}=1" "--no${opt}"; do
+        crawl "${form}"
+        assert_eq 0 "${RC}" "${form} exited"
+    done
+    for value in 0 1; do
+        crawl "--${opt}" "${value}"
+        assert_eq 0 "${RC}" "--${opt} ${value} exited"
+    done
+done
+
+# ...and a URL after one of them is a URL again: as "param" it was eaten as the
+# value, and the run mirrored nothing.
+rm -rf "${tmp}/out"
+mkdir -p "${tmp}/out"
+RC=0
+httrack --purge-old "file://${tmp}/page.html" -O "${tmp}/out" --quiet -n \
+    >"${tmp}/out/.log" 2>&1 || RC=$?
+assert_eq 0 "${RC}" "--purge-old before the URL exited"
+test -n "$(find "${tmp}/out" -type f -name page.html -print -quit)" ||
+    fail "--purge-old before the URL swallowed it: nothing was mirrored"
+
 # Every option that now carries a value must emit a short form the engine parses
 # whole: a digit left over reaches "invalid option" and kills the run (#1200).
 # Only =0 is swept, since =1 is the bare flag for onoff and blocks for
@@ -73,7 +97,8 @@ while read -r class name; do
 done <<<"${rows}"
 
 # The wizard end: a cleared box, and a project reload carrying Index=0, must
-# both emit the disabling form.
+# both emit the disabling form. The purge-old flags land in a file the shell
+# then feeds back to the engine, which is the #1200 chain end to end.
 htsserver_require
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_flagvalue.XXXXXX") || fail "no tmpdir"
 cleanup() {
@@ -84,7 +109,7 @@ cleanup_push cleanup
 
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "the index boxes do not disable the index (see above)"
+"${HTS_PYTHON}" - "${HTS_URL}" "${tmp}/purge-flags" <<'PY' || fail "the wizard emits the wrong flags (see above)"
 import re, sys, urllib.parse, urllib.request
 
 url = sys.argv[1].rstrip("/")
@@ -128,8 +153,21 @@ for field, name, ticked in (("index", "--index", []),
         check(field, value, [name + "=0"], name)
     check(field, "on", ticked, name)
 
+# NoPurgeOldFiles=0 in a profile seeds nopurge=0, which emits --purge-old=1.
+purge = flags(command([("nopurge", "0")]), "--purge-old")
+if purge != ["--purge-old=1"]:
+    print("FAIL: a profile with NoPurgeOldFiles=0 emits %s" % purge)
+    rc = 1
+open(sys.argv[2], "w").write(" ".join(purge) + "\n")
+
 sys.exit(rc)
 PY
+
+# The engine has to start on what the wizard just wrote (#1200).
+read -r purge_flags <"${tmp}/purge-flags"
+test -n "${purge_flags}" || fail "the wizard emitted no --purge-old flag"
+crawl "${purge_flags}"
+assert_eq 0 "${RC}" "the wizard's ${purge_flags} exited"
 
 htsserver_cleanup
 htsserver_assert_reaped

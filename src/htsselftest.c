@@ -3493,6 +3493,22 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   REFUSES("--display=full", NULL);
   REFUSES("--display=99999999999999999999", NULL);
 
+  /* three rows were "param", a class that demands a following token: the URL
+     after --purge-old became its value, and =1 died on "invalid option 1" */
+  EXPANDS("-X", "--purge-old", NULL);
+  EXPANDS("-X", "--purge-old", "http://foo/");
+  assertf(used == 1);
+  EXPANDS("-X0", "--purge-old=0", NULL);
+  EXPANDS("-X", "--purge-old=1", NULL);
+  EXPANDS("-X0", "--purge-old", "0");
+  assertf(used == 2);
+  EXPANDS("-X", "--purge-old", "1");
+  EXPANDS("-X0", "--nopurge-old", NULL);
+  EXPANDS("-%f0", "--httpproxy-ftp=0", NULL);
+  EXPANDS("-%f", "--httpproxy-ftp=1", NULL);
+  EXPANDS("-%P0", "--extended-parsing=0", NULL);
+  EXPANDS("-%P", "--extended-parsing=1", NULL);
+
   /* a flag that takes no value refuses one rather than dropping it */
   REFUSES("--mirror=0", NULL);
   REFUSES("--nomirror", NULL);
