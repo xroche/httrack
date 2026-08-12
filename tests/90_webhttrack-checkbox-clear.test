@@ -89,8 +89,6 @@ def checked(page, name):
 
 
 # What each state puts on the command line (None: nothing) and its profile key.
-# Only a value-taking alias can carry a disabling flag: -I and -%I are "single"
-# (htsalias.c), so a --index=0 would read back as the bare enabling flag.
 BOXES = [
     # field           profile key           set                          cleared
     ("parseall", "ParseAll", "--near", None),
@@ -123,8 +121,8 @@ BOXES = [
     ("changes", "Changes", "--changes", None),
     ("norecatch", "NoRecatch", "--do-not-recatch", None),
     ("logf", "Log", "--single-log", None),
-    ("index", "Index", None, None),
-    ("index2", "WordIndex", "--search-index", None),
+    ("index", "Index", None, "--index=0"),
+    ("index2", "WordIndex", "--search-index", "--search-index=0"),
     ("ftpprox", "UseHTTPProxyForFTP", "--httpproxy-ftp", None),
     ("singlefile", "SingleFile", "--single-file", None),
 ]

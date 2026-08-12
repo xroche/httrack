@@ -203,8 +203,8 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:norecatch:--do-not-recatch}
 	${test:logf:--single-log}
 	${test:logtype:::--extra-log:--debug-log}
-	${test:index:--index=0:}
-	${test:index2:--search-index=0:--search-index}
+	${ztest:index:--index=0:}
+	${ztest:index2:--search-index=0:--search-index}
 	${test:prox:--proxy "}${do:if-not-empty:prox}${test:proxytype::socks5:connect}${test:proxytype:\3A//}${do:end-if}${do:output-mode:html}${arg:prox}${test:prox:\3A}${arg:portprox}${test:prox:"}
 	${test:ftpprox:--httpproxy-ftp=0:--httpproxy-ftp}
 </textarea>

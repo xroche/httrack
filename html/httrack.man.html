@@ -76,7 +76,7 @@ offline browser : copy websites to a local directory</p>
 [ <b>-w, --mirror</b> ] [ <b>-W, --mirror-wizard</b> ] [
 <b>-g, --get-files</b> ] [ <b>-i, --continue</b> ] [ <b>-Y,
 --mirrorlinks</b> ] [ <b>-P, --proxy</b> ] [ <b>-%f,
---httpproxy-ftp[=N]</b> ] [ <b>-%b, --bind</b> ] [ <b>-rN,
+--httpproxy-ftp[=0]</b> ] [ <b>-%b, --bind</b> ] [ <b>-rN,
 --depth[=N]</b> ] [ <b>-%eN, --ext-depth[=N]</b> ] [ <b>-mN,
 --max-files[=N]</b> ] [ <b>-MN, --max-size[=N]</b> ] [
 <b>-EN, --max-time[=N]</b> ] [ <b>-AN, --max-rate[=N]</b> ]
@@ -85,49 +85,50 @@ offline browser : copy websites to a local directory</p>
 --sockets[=N]</b> ] [ <b>-TN, --timeout[=N]</b> ] [ <b>-RN,
 --retries[=N]</b> ] [ <b>-JN, --min-rate[=N]</b> ] [ <b>-HN,
 --host-control[=N]</b> ] [ <b>-%P,
---extended-parsing[=N]</b> ] [ <b>-n, --near</b> ] [ <b>-t,
+--extended-parsing[=0]</b> ] [ <b>-n, --near</b> ] [ <b>-t,
 --test</b> ] [ <b>-%L, --list</b> ] [ <b>-%S, --urllist</b>
 ] [ <b>-%m, --sitemap</b> ] [ <b>-NN, --structure[=N]</b> ]
-[ <b>-%N, --delayed-type-check</b> ] [ <b>-%D,
---cached-delayed-type-check</b> ] [ <b>-%M, --mime-html</b>
-] [ <b>-%Z, --single-file</b> ] [ <b>-LN,
---long-names[=N]</b> ] [ <b>-KN, --keep-links[=N]</b> ] [
-<b>-x, --replace-external</b> ] [ <b>-%x,
---disable-passwords</b> ] [ <b>-%q,
---include-query-string</b> ] [ <b>-%g, --strip-query</b> ] [ <b>-%C,
---host-alias</b> ] [
-<b>-o, --generate-errors</b> ] [ <b>-X, --purge-old[=N]</b>
-] [ <b>-%p, --preserve</b> ] [ <b>-%T, --utf8-conversion</b>
+[ <b>-%N, --delayed-type-check[=N]</b> ] [ <b>-%D,
+--cached-delayed-type-check[=0]</b> ] [ <b>-%M,
+--mime-html[=0]</b> ] [ <b>-%Z, --single-file[=0]</b> ] [
+<b>-LN, --long-names[=N]</b> ] [ <b>-KN,
+--keep-links[=N]</b> ] [ <b>-x, --replace-external</b> ] [
+<b>-%x, --disable-passwords[=0]</b> ] [ <b>-%q,
+--include-query-string[=0]</b> ] [ <b>-%g, --strip-query</b>
+] [ <b>-%C, --host-alias</b> ] [ <b>-o,
+--generate-errors[=N]</b> ] [ <b>-X, --purge-old[=0]</b> ] [
+<b>-%p, --preserve</b> ] [ <b>-%T, --utf8-conversion[=0]</b>
 ] [ <b>-bN, --cookies[=N]</b> ] [ <b>-%K, --cookies-file</b>
 ] [ <b>-%Y, --why</b> ] [ <b>-u, --check-type[=N]</b> ] [
 <b>-j, --parse-java[=N]</b> ] [ <b>-sN, --robots[=N]</b> ] [
-<b>-%h, --http-10</b> ] [ <b>-%k, --keep-alive</b> ] [
-<b>-%z, --disable-compression</b> ] [ <b>-%B, --tolerant</b>
-] [ <b>-%s, --updatehack</b> ] [ <b>-%u, --urlhack</b> ] [
-<b>-%A, --assume</b> ] [ <b>-@iN, --protocol[=N]</b> ] [
-<b>-%w, --disable-module</b> ] [ <b>-F, --user-agent</b> ] [
-<b>-%R, --referer</b> ] [ <b>-%E, --from</b> ] [ <b>-%F,
---footer</b> ] [ <b>-%l, --language</b> ] [ <b>-%a,
---accept</b> ] [ <b>-%X, --headers</b> ] [ <b>-C,
---cache[=N]</b> ] [ <b>-k, --store-all-in-cache</b> ] [
-<b>-%r, --warc</b> ] [ <b>-%d, --changes</b> ] [ <b>-%n,
---do-not-recatch</b> ] [ <b>-%v, --display</b> ] [ <b>-Q,
---do-not-log</b> ] [ <b>-q, --quiet</b> ] [ <b>-z,
---extra-log</b> ] [ <b>-Z, --debug-log</b> ] [ <b>-v,
---verbose</b> ] [ <b>-f, --file-log</b> ] [ <b>-f2,
---single-log</b> ] [ <b>-I, --index</b> ] [ <b>-%i,
---build-top-index</b> ] [ <b>-%I, --search-index</b> ] [
-<b>-pN, --priority[=N]</b> ] [ <b>-S, --stay-on-same-dir</b>
-] [ <b>-D, --can-go-down</b> ] [ <b>-U, --can-go-up</b> ] [
+<b>-%h, --http-10[=0]</b> ] [ <b>-%k, --keep-alive[=0]</b> ]
+[ <b>-%z, --disable-compression[=0]</b> ] [ <b>-%B,
+--tolerant[=0]</b> ] [ <b>-%s, --updatehack[=0]</b> ] [
+<b>-%u, --urlhack[=0]</b> ] [ <b>-%A, --assume</b> ] [
+<b>-@iN, --protocol[=N]</b> ] [ <b>-%w, --disable-module</b>
+] [ <b>-F, --user-agent</b> ] [ <b>-%R, --referer</b> ] [
+<b>-%E, --from</b> ] [ <b>-%F, --footer</b> ] [ <b>-%l,
+--language</b> ] [ <b>-%a, --accept</b> ] [ <b>-%X,
+--headers</b> ] [ <b>-C, --cache[=N]</b> ] [ <b>-k,
+--store-all-in-cache</b> ] [ <b>-%r, --warc</b> ] [ <b>-%d,
+--changes[=0]</b> ] [ <b>-%n, --do-not-recatch[=0]</b> ] [
+<b>-%v, --display[=N]</b> ] [ <b>-Q, --do-not-log</b> ] [
+<b>-q, --quiet</b> ] [ <b>-z, --extra-log</b> ] [ <b>-Z,
+--debug-log</b> ] [ <b>-v, --verbose</b> ] [ <b>-f,
+--file-log</b> ] [ <b>-f2, --single-log</b> ] [ <b>-I,
+--index[=0]</b> ] [ <b>-%i, --build-top-index[=0]</b> ] [
+<b>-%I, --search-index[=N]</b> ] [ <b>-pN,
+--priority[=N]</b> ] [ <b>-S, --stay-on-same-dir</b> ] [
+<b>-D, --can-go-down</b> ] [ <b>-U, --can-go-up</b> ] [
 <b>-B, --can-go-up-and-down</b> ] [ <b>-a,
 --stay-on-same-address</b> ] [ <b>-d,
 --stay-on-same-domain</b> ] [ <b>-l, --stay-on-same-tld</b>
 ] [ <b>-e, --go-everywhere</b> ] [ <b>-%H,
 --debug-headers</b> ] [ <b>-%!,
---disable-security-limits</b> ] [ <b>-V, --userdef-cmd</b> ]
-[ <b>-%W, --callback</b> ] [ <b>-y,
---background-on-suspend</b> ] [ <b>-K, --keep-links[=N]</b>
-]</p>
+--disable-security-limits[=0]</b> ] [ <b>-V,
+--userdef-cmd</b> ] [ <b>-%W, --callback</b> ] [ <b>-y,
+--background-on-suspend[=0]</b> ] [ <b>-K,
+--keep-links[=N]</b> ]</p>
 
 <h2>DESCRIPTION
 <a name="DESCRIPTION"></a>
@@ -298,7 +299,7 @@ httrack --continue</b></p>
 
 
 <p>*use proxy for ftp (f0 don&rsquo;t use)
-(--httpproxy-ftp[=N])</p> </td></tr>
+(--httpproxy-ftp[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -530,7 +531,7 @@ errors (*R1) (--retries[=N])</p></td></tr>
 
 <p style="margin-top: 1em">*extended parsing, attempt to
 parse all links, even in unknown tags or Javascript (%P0
-don&rsquo;t use) (--extended-parsing[=N])</p></td></tr>
+don&rsquo;t use) (--extended-parsing[=0])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -636,7 +637,7 @@ structure, 1+: see below) (--structure[=N])</p></td></tr>
 make any link test but wait for files download to start
 instead (experimental) (%N0 don&rsquo;t use, %N1 use for
 unknown extensions, * %N2 always use)
-(--delayed-type-check)</p> </td></tr>
+(--delayed-type-check[=N])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -649,7 +650,7 @@ unknown extensions, * %N2 always use)
 
 <p>cached delayed type check, don&rsquo;t wait for remote
 type during updates, to speedup them (%D0 wait, * %D1
-don&rsquo;t wait) (--cached-delayed-type-check)</p></td></tr>
+don&rsquo;t wait) (--cached-delayed-type-check[=0])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -661,7 +662,7 @@ don&rsquo;t wait) (--cached-delayed-type-check)</p></td></tr>
 
 
 <p>generate a RFC MIME-encapsulated full-archive (.mht)
-(--mime-html)</p> </td></tr>
+(--mime-html[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -679,7 +680,7 @@ between pages stay relative; audio and video stay links);
 --single-file-max-size N caps each asset (default 10485760
 bytes). %M is the better container where a Chromium-family
 browser is a given: one archive, no base64 tax on text, a
-shared asset stored once (--single-file)</p></td></tr>
+shared asset stored once (--single-file[=0])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -741,7 +742,8 @@ absolute URI links, K5 transparent proxy link)
 
 
 <p>do not include any password for external password
-protected websites (%x0 include) (--disable-passwords)</p></td></tr>
+protected websites (%x0 include)
+(--disable-passwords[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -754,7 +756,7 @@ protected websites (%x0 include) (--disable-passwords)</p></td></tr>
 
 <p>*include query string for local files (useless, for
 information purpose only) (%q0 don&rsquo;t include)
-(--include-query-string)</p> </td></tr>
+(--include-query-string[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -792,7 +794,7 @@ information purpose only) (%q0 don&rsquo;t include)
 
 
 <p>*save the server&rsquo;s error pages (404..) (o0 discard
-them) (--generate-errors)</p></td></tr>
+them) (--generate-errors[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -804,7 +806,7 @@ them) (--generate-errors)</p></td></tr>
 
 
 <p>*purge old files after update (X0 keep delete)
-(--purge-old[=N])</p> </td></tr>
+(--purge-old[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -827,7 +829,7 @@ them) (--generate-errors)</p></td></tr>
 <td width="82%">
 
 
-<p>links conversion to UTF-8 (--utf8-conversion)</p></td></tr>
+<p>links conversion to UTF-8 (--utf8-conversion[=0])</p></td></tr>
 </table>
 
 <h3>Spider options:
@@ -923,7 +925,7 @@ rules)) (--robots[=N])</p></td></tr>
 
 
 <p>force HTTP/1.0 requests (reduce update features, only
-for old servers or proxies) (--http-10)</p></td></tr>
+for old servers or proxies) (--http-10[=0])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -936,7 +938,7 @@ for old servers or proxies) (--http-10)</p></td></tr>
 
 <p>use keep-alive if possible, greately reducing latency
 for small files and test requests (%k0 don&rsquo;t use)
-(--keep-alive)</p> </td></tr>
+(--keep-alive[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -948,7 +950,7 @@ for small files and test requests (%k0 don&rsquo;t use)
 
 
 <p>do not request compressed content (%z0 request)
-(--disable-compression)</p> </td></tr>
+(--disable-compression[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -960,7 +962,7 @@ for small files and test requests (%k0 don&rsquo;t use)
 
 
 <p>tolerant requests (accept bogus responses on some
-servers, but not standard!) (--tolerant)</p></td></tr>
+servers, but not standard!) (--tolerant[=0])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -973,7 +975,7 @@ servers, but not standard!) (--tolerant)</p></td></tr>
 
 <p>update hacks: various hacks to limit re-transfers when
 updating (identical size, bogus response..)
-(--updatehack)</p> </td></tr>
+(--updatehack[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -985,7 +987,7 @@ updating (identical size, bogus response..)
 
 
 <p>url hacks: various hacks to limit duplicate URLs (strip
-//, www.foo.com==foo.com..) (--urlhack)</p></td></tr>
+//, www.foo.com==foo.com..) (--urlhack[=0])</p></td></tr>
 </table>
 
 <p style="margin-left:18%;">opt out of one url-hack part:
@@ -1200,7 +1202,7 @@ past N bytes, --warc-cdx also writes a sorted CDXJ index,
 
 <p>write hts-changes.json listing what this crawl left new,
 changed, unchanged and gone compared to the previous mirror
-(--changes)</p> </td></tr>
+(--changes[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -1212,7 +1214,7 @@ changed, unchanged and gone compared to the previous mirror
 
 
 <p>do not re-download locally erased files
-(--do-not-recatch)</p> </td></tr>
+(--do-not-recatch[=0])</p> </td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -1224,7 +1226,7 @@ changed, unchanged and gone compared to the previous mirror
 
 
 <p>display on screen filenames downloaded (in realtime) - *
-%v1 short version - %v2 full animation (--display)</p></td></tr>
+%v1 short version - %v2 full animation (--display[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -1312,7 +1314,7 @@ changed, unchanged and gone compared to the previous mirror
 <td width="82%">
 
 
-<p>*make an index (I0 don&rsquo;t make) (--index)</p></td></tr>
+<p>*make an index (I0 don&rsquo;t make) (--index[=0])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -1324,7 +1326,7 @@ changed, unchanged and gone compared to the previous mirror
 
 
 <p>make a top index for a project folder (* %i0 don&rsquo;t
-make) (--build-top-index)</p></td></tr>
+make) (--build-top-index[=0])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="4%">
@@ -1336,7 +1338,7 @@ make) (--build-top-index)</p></td></tr>
 
 
 <p>make an searchable index for this mirror (* %I0
-don&rsquo;t make) (--search-index)</p></td></tr>
+don&rsquo;t make) (--search-index[=N])</p></td></tr>
 </table>
 
 <h3>Expert options:
@@ -1641,7 +1643,7 @@ with -#test=NAME [args])</p></td></tr>
 <td width="82%">
 
 
-<p>wait time (--advanced-wait)</p></td></tr>
+<p>wait time (--advanced-wait[=N])</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="8%">
@@ -1675,7 +1677,7 @@ with -#test=NAME [args])</p></td></tr>
 
 <p style="margin-top: 1em">bypass built-in security limits
 aimed to avoid bandwidth abuses (bandwidth, simultaneous
-connections) (--disable-security-limits)</p></td></tr>
+connections) (--disable-security-limits[=0])</p></td></tr>
 </table>
 
 <p style="margin-left:18%;">IMPORTANT NOTE: DANGEROUS
@@ -1725,7 +1727,7 @@ myfoo.so[,myparameters]) (--callback &lt;param&gt;)</p></td></tr>
 
 
 <p>go to background when suspended (y0 don&rsquo;t)
-(--background-on-suspend)</p> </td></tr>
+(--background-on-suspend[=0])</p> </td></tr>
 </table>
 
 <h3>Details: Option N
