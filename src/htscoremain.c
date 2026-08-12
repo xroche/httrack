@@ -314,16 +314,13 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   /* create the token block for the transformed command line */
   {
     size_t current_size = 0;
-    const LLint size = fsize("config");
-    size_t blk_size;
     int na;
 
     for(na = 0; na < argc; na++)
       current_size += strlen(argv[na]) + 1;
-    /* a huge file named "config" must saturate, not wrap, the capacity */
-    blk_size = llint_grow_size_t(current_size, size > 0 ? size : 0, 32768);
-    /* argc slots to start with; alias expansion and doit.log grow the array */
-    if (blk_size == (size_t) -1 || !cmdl_init(&x_cmd, blk_size, argc)) {
+    /* the current argv and argc slots to start with; alias expansion, the
+       config files and doit.log grow both */
+    if (!cmdl_init(&x_cmd, current_size, argc)) {
       HTS_PANIC_PRINTF("Error, not enough memory");
       htsmain_free();
       return -1;
@@ -837,7 +834,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                               StringBuff(opt->path_log),
                               "hts-cache/doit.log"))) { // un cache est présent
-        if (x_cmd.blk != NULL) {
+        if (x_cmd.chunks != NULL) {
           int m;
 
           // établir mode - mode cache: 1 (cache valide) 2 (cache à vérifier)
@@ -865,7 +862,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               HT_PRINT("OK to Update ");
             }
             HT_PRINT("httrack ");
-            HT_PRINT(x_cmd.blk);
+            HT_PRINT(x_cmd.argv[0]);
             HT_PRINT("?" LF);
             HT_REQUEST_END;
             if (!ask_continue(opt)) {

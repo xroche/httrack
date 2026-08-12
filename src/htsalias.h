@@ -53,32 +53,37 @@ const char *opthelp_value(int p);
 const char *hts_gethome(void);
 void expand_home(String * str);
 
+/* One token-block allocation, its bytes following the link. */
+typedef struct cmdl_chunk cmdl_chunk;
+
 /* Command line rebuilt from argv, config files and doit.log: argc slots
-   pointing into blk, where the tokens are packed back-to-back. The slots grow
-   on demand, since a config file and a doit.log each add a token count the
-   input decides; blk does not, so a token that no longer fits aborts in the
-   bounded copy instead of overrunning. */
+   pointing into the token chunks, where the tokens are packed back-to-back.
+   Both grow on demand, since a config file and a doit.log each add a token
+   count only the input knows. A chunk is never resized, so every argv[] slot,
+   and every pointer a caller kept into one, survives the growth. */
 typedef struct {
   char **argv; /* argc slots used out of capacity allocated */
   int argc;
   int capacity;
-  char *blk; /* token bytes, blk_used of blk_size in use */
-  size_t blk_size;
+  cmdl_chunk *chunks; /* newest first; tokens are cut from the newest */
+  size_t blk_size;    /* the newest chunk, blk_used of blk_size in use */
   size_t blk_used;
 } cmdl_argv;
 
-/* Allocate a token block of blk_size bytes and room for slots entries.
-   HTS_FALSE if either fails, leaving cmd empty. */
+/* Allocate a first token chunk of at least blk_size bytes and room for slots
+   entries. HTS_FALSE if either fails, leaving cmd empty. */
 hts_boolean cmdl_init(cmdl_argv *cmd, size_t blk_size, int slots);
 
 /* Release cmd; the tokens its argv pointed at die with it. */
 void cmdl_free(cmdl_argv *cmd);
 
-/* Append token as the last entry. HTS_FALSE if the slots can not be grown. */
+/* Append token as the last entry. HTS_FALSE if it does not fit and neither the
+   slots nor the chunks can be grown. */
 hts_boolean cmdl_add(cmdl_argv *cmd, const char *token);
 
 /* Insert token at 0 <= pos <= argc, shifting the entries above it up by one.
-   HTS_FALSE if the slots can not be grown. */
+   HTS_FALSE if it does not fit and neither the slots nor the chunks can be
+   grown. */
 hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos);
 
 typedef enum {

@@ -554,42 +554,78 @@ static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
   return HTS_TRUE;
 }
 
+struct cmdl_chunk {
+  cmdl_chunk *next;
+};
+
+/* The token bytes an allocated chunk carries. */
+#define CMDL_CHUNK_DATA(chunk) ((char *) ((chunk) + 1))
+
+/* Chunk floor, so a command line of ordinary length needs one allocation and a
+   long one a count proportional to its size. */
+#define CMDL_CHUNK_MIN 32768
+
+/* Take a chunk with room for at least need bytes as the one tokens are cut
+   from, leaving cmd unchanged if it cannot be allocated. */
+static hts_boolean cmdl_grow(cmdl_argv *cmd, size_t need) {
+  size_t size = need > CMDL_CHUNK_MIN ? need : CMDL_CHUNK_MIN;
+  cmdl_chunk *chunk;
+
+  if (size > (size_t) -1 - sizeof(cmdl_chunk))
+    return HTS_FALSE;
+  chunk = (cmdl_chunk *) malloct(sizeof(cmdl_chunk) + size);
+  if (chunk == NULL)
+    return HTS_FALSE;
+  chunk->next = cmd->chunks;
+  cmd->chunks = chunk;
+  cmd->blk_size = size;
+  cmd->blk_used = 0;
+  return HTS_TRUE;
+}
+
 hts_boolean cmdl_init(cmdl_argv *cmd, size_t blk_size, int slots) {
   memset(cmd, 0, sizeof(*cmd));
-  cmd->blk = blk_size != 0 ? (char *) malloct(blk_size) : NULL;
-  if (cmd->blk == NULL || !cmdl_reserve(cmd, slots)) {
+  if (!cmdl_grow(cmd, blk_size) || !cmdl_reserve(cmd, slots)) {
     cmdl_free(cmd);
     return HTS_FALSE;
   }
-  cmd->blk_size = blk_size;
-  cmd->blk[0] = '\0';
   return HTS_TRUE;
 }
 
 void cmdl_free(cmdl_argv *cmd) {
-  freet(cmd->blk);
+  cmdl_chunk *chunk = cmd->chunks;
+
+  while (chunk != NULL) {
+    cmdl_chunk *const next = chunk->next;
+
+    freet(chunk);
+    chunk = next;
+  }
   freet(cmd->argv);
   memset(cmd, 0, sizeof(*cmd));
 }
 
-/* Room left in the token block; 0 makes the bounded copy abort rather than
+/* Room left in the newest chunk; 0 makes the bounded copy abort rather than
    write past it. */
 static size_t cmdl_room(const cmdl_argv *cmd) {
   return cmd->blk_used < cmd->blk_size ? cmd->blk_size - cmd->blk_used : 0;
 }
 
 hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
+  const size_t len = strlen(token) + 1;
   int i;
 
   assertf(pos >= 0 && pos <= cmd->argc);
   /* argc <= capacity <= CMDL_MAX_SLOTS holds here, so argc + 1 can not wrap */
   if (!cmdl_reserve(cmd, cmd->argc + 1))
     return HTS_FALSE;
+  if (len > cmdl_room(cmd) && !cmdl_grow(cmd, len))
+    return HTS_FALSE;
   for (i = cmd->argc; i > pos; i--)
     cmd->argv[i] = cmd->argv[i - 1];
-  cmd->argv[pos] = cmd->blk + cmd->blk_used;
+  cmd->argv[pos] = CMDL_CHUNK_DATA(cmd->chunks) + cmd->blk_used;
   strlcpybuff(cmd->argv[pos], token, cmdl_room(cmd));
-  cmd->blk_used += strlen(cmd->argv[pos]) + 1;
+  cmd->blk_used += len;
   cmd->argc++;
   return HTS_TRUE;
 }
