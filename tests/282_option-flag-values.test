@@ -6,6 +6,7 @@
 set -euo pipefail
 
 testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=$(cd "${top_srcdir:-${testdir}/..}" && pwd)
 # shellcheck source=tests/webhttracklib.sh
 . "${testdir}/webhttracklib.sh"
 
@@ -84,17 +85,36 @@ assert_eq 0 "${RC}" "--purge-old before the URL exited"
 test -n "$(find "${tmp}/out" -type f -name page.html -print -quit)" ||
     fail "--purge-old before the URL swallowed it: nothing was mirrored"
 
-# Every option that now carries a value must emit a short form the engine parses
+# Every option that carries a value must emit a short form the engine parses
 # whole: a digit left over reaches "invalid option" and kills the run (#1200).
-# Only =0 is swept, since =1 is the bare flag for onoff and blocks for
-# --advanced-wait, and it is the suffix that is new to all of them.
 rows=$(httrack -O /dev/null "-#test=optalias" -list)
-test "$(grep -c . <<<"${rows}")" -ge 30 || fail "short value-option list: ${rows}"
+test "$(grep -c . <<<"${rows}")" -ge 150 || fail "short option list: ${rows}"
 while read -r class name; do
-    crawl "--${name}=0"
-    ! grep -q 'invalid option' "${tmp}/out/.log" ||
-        fail "--${name}=0 (${class}) emits a short form the engine rejects"
+    case ${class} in
+    onoff | level) ;;
+    *) continue ;;
+    esac
+    for value in 0 1; do
+        # --advanced-wait=N is a sleep, so only its 0 comes back
+        test "${name}" != advanced-wait || test "${value}" = 0 || continue
+        crawl "--${name}=${value}"
+        ! grep -q 'invalid option' "${tmp}/out/.log" ||
+            fail "--${name}=${value} (${class}) emits a short form the engine rejects"
+    done
 done <<<"${rows}"
+
+# Non-circular control on the classes, since the sweep above reads the table it
+# is checking: every --name=0 the wizard writes has to be a row that takes a
+# value, or the flag means the opposite of the box (#1195, #1200).
+literals=$(grep -o -- '--[a-z0-9-]*=0' "${distdir}/html/server/step4.html" |
+    sed -e 's/^--//' -e 's/=0$//' | sort -u)
+test "$(grep -c . <<<"${literals}")" -ge 10 || fail "step4.html scan came up short"
+while read -r name; do
+    class=$(grep -m1 -E "^[a-z0-9]+ ${name}\$" <<<"${rows}" || true)
+    test -n "${class}" || fail "step4.html writes --${name}=0, which is no option"
+    test "${class%% *}" != single ||
+        fail "step4.html writes --${name}=0, but its class takes no value"
+done <<<"${literals}"
 
 # The wizard end: a cleared box, and a project reload carrying Index=0, must
 # both emit the disabling form. The purge-old flags land in a file the shell

@@ -3424,8 +3424,10 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
   out[0][0] = out[1][0] = dest[0] = '\0';
   *used = optalias_check(argc, argv, 0, &outc, outv, sizeof(out[0]), error,
                          sizeof(error));
-  if (*used == 0)
+  if (*used == 0) {
+    assertf(error[0] != '\0'); /* a refusal has to say why */
     return NULL;
+  }
   assertf(outc >= 1 && outc <= 2);
   strlcpybuff(dest, out[0], dest_size);
   if (outc == 2) {
@@ -3442,13 +3444,11 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   int i, used;
 
   (void) opt;
-  /* -list feeds 282 the rows to try against the engine's own parser */
+  /* -list gives 282 the whole table: the rows to try against the engine's
+     own parser, and the class of every name the wizard writes a value to */
   if (argc == 1 && strcmp(argv[0], "-list") == 0) {
-    for (i = 0; optalias_value(i)[0] != '\0'; i++) {
-      if (strcmp(opttype_value(i), "onoff") == 0 ||
-          strcmp(opttype_value(i), "level") == 0)
-        printf("%s %s\n", opttype_value(i), optalias_value(i));
-    }
+    for (i = 0; optalias_value(i)[0] != '\0'; i++)
+      printf("%s %s\n", opttype_value(i), optalias_value(i));
     return 0;
   }
   if (argc >= 1) {
