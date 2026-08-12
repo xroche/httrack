@@ -8,6 +8,8 @@ set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
+# shellcheck source=tests/proclib.sh
+. "$(dirname "$0")/proclib.sh"
 
 sh=${BASH_SHELL:-}
 test -n "$sh" || {
@@ -75,9 +77,15 @@ run() { # run <label> <env argument>...
     status=0
     # Capped: configure executes the candidate, and a hang wedges "make check" with no output
     # at all. Polled, not a backgrounded "sleep" watchdog, which outlives the run it guards.
+    local had_m=
+    case "$-" in *m*) had_m=1 ;; esac
+    # Own process group, so the kills below reach what configure spawned: bash 3.2 keeps
+    # the subshell it runs in, and killing that alone leaves the child running (macOS).
+    set -m
     (cd "$rundir" && env "$@" "${configure_cmd[@]}") \
         >"$rundir/log" 2>&1 &
     local pid=$! waited=0 quiet=0 size=0 now left
+    test -n "$had_m" || set +m
     # A hang is silence, not slowness: configure writes a line per probe,
     # but hppa's emulated run can take longer overall than a runner's whole budget (#1146).
     while kill -0 "$pid" 2>/dev/null; do
@@ -92,7 +100,7 @@ run() { # run <label> <env argument>...
             quiet=$((quiet + SAMPLE))
         fi
         test "$quiet" -lt "$SILENCE" || {
-            kill -9 "$pid" 2>/dev/null
+            kill_tree "$pid"
             echo "configure wrote nothing for ${quiet}s of ${waited}s for $label" >&2
             tail -5 "$rundir/log" >&2
             exit 1
@@ -104,7 +112,7 @@ run() { # run <label> <env argument>...
         left=$(budget_left)
         if test "$quiet" -eq 0 && test "$left" -ne 0 &&
             test "$left" -le "$((RESERVE + SILENCE))"; then
-            kill -9 "$pid" 2>/dev/null
+            kill_tree "$pid"
             echo "$label was still configuring ${waited}s in and the budget is out; skipping" >&2
             exit 77
         fi
@@ -188,6 +196,13 @@ grep -q 'wrote nothing' "$tmp/probe.log" || fail "the hang was not named: $(cat 
 # Slow but talking is the emulated buildd, and a skip there beats the harness kill.
 rc=$(probe 91 6 bash -c 'while :; do echo tick; sleep 1; done')
 test "$rc" -eq 77 || fail "a slow but writing configure with 6s of budget reported $rc, want 77"
+# The kill has to reach what configure spawned. bash 3.2 keeps the subshell around the
+# child, so killing that alone leaves a live configure behind: it outlives "make check"
+# and holds the CI step open to its own timeout, with the suite reporting no failure.
+rc=$(probe 92 6 bash -c 'sleep 987 & wait')
+test "$rc" -eq 1 || fail "a silent configure with a child of its own reported $rc, want 1"
+sleep 1
+! ps_snapshot | grep -q '[s]leep 987' || fail "the killed run left its child running"
 # The pacer must not fire before the case is judged: run() returns with the verdict
 # still unread, and a skip there would bury a configure that answered wrongly. Through
 # the real run(), since a stub cannot see a pacer left inside the one it replaced.
