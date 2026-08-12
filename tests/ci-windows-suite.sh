@@ -268,8 +268,8 @@ run_one_test() (
         ;;
     *)
         echo "FAIL $t (exit $rc)"
-        # Kept before the trace below appends to the same log: on an
-        # intermittent failure the trace passes, and its tail reports a pass.
+        # Captured before the trace appends below, or an intermittent failure
+        # reports the tail of the re-run that passed.
         tail -n 25 "$t.log" | sed 's/^/      /' >"$results/$t.tail"
         # These assert with `test "$(...)" == "..." || exit 1`, which
         # says nothing at all on failure. Re-run traced, still bounded.
