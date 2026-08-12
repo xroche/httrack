@@ -188,8 +188,15 @@ rc=0
     kill_pid() { echo "DIRECT $1" >>"$rec"; }
     # shellcheck disable=SC2317
     kill_tree() {
-        echo "TREE $1" >>"$rec"
+        echo "TREE $*" >>"$rec"
         exit 9
+    }
+    # The suite's own pid has no /proc entry here, so the capture answers what a
+    # POSIX box answers: empty, and the kill goes on unguarded.
+    # shellcheck disable=SC2317
+    win_capture() {
+        echo "CAPTURE $1" >>"$rec"
+        WIN_PID=4242 WIN_IMAGE=bash.exe
     }
     hb_depth=$BASH_SUBSHELL
     ci_suite_heartbeat 960 360 "$progress" 900 4242 >"$tmp/hedge" 2>&1
@@ -197,11 +204,13 @@ rc=0
 test "$rc" -eq 9 || fail "the tree kill never fired: watchdog returned $rc"
 test "$(sed -n 1p "$rec")" = "DIRECT 777" ||
     fail "the reporter was not killed ahead of the suite: $(tr '\n' '/' <"$rec")"
-test "$(sed -n 2p "$rec")" = "DIRECT 4242" ||
+test "$(sed -n 2p "$rec")" = "CAPTURE 4242" ||
+    fail "the winpid was not read before the target was signalled: $(tr '\n' '/' <"$rec")"
+test "$(sed -n 3p "$rec")" = "DIRECT 4242" ||
     fail "the target was not signalled directly ahead of the tree walk: $(tr '\n' '/' <"$rec")"
-test "$(sed -n 3p "$rec")" = "TREE 4242" ||
-    fail "the tree was not killed after the direct signal: $(tr '\n' '/' <"$rec")"
-test "$(sed -n '$=' "$rec")" -eq 3 || fail "extra kills: $(tr '\n' '/' <"$rec")"
+test "$(sed -n 4p "$rec")" = "TREE 4242 4242 bash.exe" ||
+    fail "the tree kill did not carry what was captured: $(tr '\n' '/' <"$rec")"
+test "$(sed -n '$=' "$rec")" -eq 4 || fail "extra kills: $(tr '\n' '/' <"$rec")"
 
 test ! -e "$tmp/forked" || fail "the clock was read through a subshell, a fork a starved box cannot spare"
 
