@@ -443,15 +443,18 @@ kill_pid() {
 # native processes MSYS can't signal, so taskkill /T ends it by Windows PID.
 # Single-slash switches: the workflow sets MSYS_NO_PATHCONV/MSYS2_ARG_CONV_EXCL,
 # so args pass verbatim and a //T would reach taskkill unfolded and be rejected.
+# $2 is that Windows PID when the caller read it while the job was certainly
+# alive: /proc/<pid>/winpid is already gone for a job that has just died, and
+# without it the only route left is the host-wide sweep below.
 kill_tree() {
-    local pid=$1
+    local pid=$1 winpid=${2:-}
     if is_windows; then
-        local winpid
-        winpid=$(win_pid "$pid")
+        test -n "$winpid" || winpid=$(win_pid "$pid")
         if test -n "$winpid"; then
             taskkill /F /T /PID "$winpid" >/dev/null 2>&1 || true
-        else
-            # The offline suite runs serially, so no wanted process races this.
+        # Last resort, so it is opt-in: it kills every engine and every python on
+        # the host, siblings of a parallel run included (HTTRACK_EXCLUSIVE_HOST).
+        elif test -n "${HTTRACK_EXCLUSIVE_HOST:-}"; then
             taskkill_engines
             taskkill /F /IM python.exe >/dev/null 2>&1 || true
         fi
@@ -543,10 +546,13 @@ run_with_timeout() {
     "$@" &
     local pid=$!
     test -n "$had_m" || is_windows || set +m
+    # Read while the job is certainly alive: by kill time /proc/<pid>/winpid is gone.
+    local winpid=''
+    ! is_windows || winpid=$(win_pid "$pid")
     local start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then
-            kill_tree "$pid"
+            kill_tree "$pid" "$winpid"
             reap_bounded "$pid" || true
             return 124
         fi

@@ -68,6 +68,7 @@ Please visit our Website: http://www.httrack.com
 
 /* Dynamic typed arrays */
 #include "htsarrays.h"
+#include "htsarena.h"
 
 /* END specific definitions */
 
@@ -200,58 +201,22 @@ struct lien_buffers {
   /* Main array of pointers. 
      This is the real "lien_url **liens" pointer base. */
   TypedArray(lien_url*) ptr;
-  /* String pool, chunked. */
-  char *string_buffer;
-  size_t string_buffer_size;
-  size_t string_buffer_capa;
-  TypedArray(char*) string_buffers;
-  /* Structure list, chunked. */
-  lien_url *lien_buffer;
-  size_t lien_buffer_size;
-  size_t lien_buffer_capa;
-  TypedArray(lien_url*) lien_buffers;
+  /* Strings and structures both live where their addresses cannot move: the
+     entries below point into them. */
+  hts_arena strings;
+  hts_arena liens;
 };
 
 // duplicate a string, or return NULL upon error (out-of-memory)
-static char* hts_record_link_strdup_(httrackp *opt, const char *s) {
-  static const size_t block_capa = 32768;
+static char *hts_record_link_strdup_(httrackp *opt, const char *s) {
   lien_buffers *const liensbuf = opt->liensbuf;
-  const size_t len = strlen(s) + 1;  /* including terminating \0 */
   char *s_dup;
 
   assertf(liensbuf != NULL);
-  assertf(len < block_capa);
-
-  // not enough capacity ? then create a new chunk
-  if (len + liensbuf->string_buffer_size > liensbuf->string_buffer_capa) {
-    // backup current block pointer for later free
-    if (liensbuf->string_buffer != NULL) {
-      TypedArrayAdd(liensbuf->string_buffers, liensbuf->string_buffer);
-      liensbuf->string_buffer = NULL;
-      liensbuf->string_buffer_size = 0;
-    }
-
-    // Double capacity for each new chained block
-    liensbuf->string_buffer_capa = 
-      liensbuf->string_buffer_capa < block_capa 
-      ? block_capa : liensbuf->string_buffer_capa * 2;
-
-    liensbuf->string_buffer = malloct(liensbuf->string_buffer_capa);
-    if (liensbuf->string_buffer == NULL) {
-      hts_record_assert_memory_failed(liensbuf->string_buffer_capa);
-    }
-    liensbuf->string_buffer_size = 0;
-
-    hts_log_print(opt, LOG_DEBUG,
-      "reallocated %d new bytes of strings room",
-      (int) liensbuf->string_buffer_capa);
+  s_dup = hts_arena_strdup(&liensbuf->strings, s);
+  if (s_dup == NULL) {
+    hts_record_assert_memory_failed(strlen(s) + 1);
   }
-
-  assertf(len + liensbuf->string_buffer_size <= liensbuf->string_buffer_capa);
-  s_dup = &liensbuf->string_buffer[liensbuf->string_buffer_size];
-  memcpy(s_dup, s, len);
-  liensbuf->string_buffer_size += len;
-  
   return s_dup;
 }
 
@@ -272,7 +237,6 @@ size_t hts_record_link_latest(httrackp *opt) {
 // or (size_t) -1 upon error (out-of-memory)
 // the returned index is the osset within opt->liens[]
 static size_t hts_record_link_alloc(httrackp *opt) {
-  static const size_t block_capa = 256;
   lien_buffers *const liensbuf = opt->liensbuf;
   lien_url *link;
 
@@ -284,35 +248,11 @@ static size_t hts_record_link_alloc(httrackp *opt) {
     return (size_t) -1;
   }
 
-  // Create a new chunk of lien_url[]
-  // There are references to item pointers, so we can not just realloc()
-  if (liensbuf->lien_buffer_size == liensbuf->lien_buffer_capa) {
-    size_t capa_bytes;
-
-    if (liensbuf->lien_buffer != NULL) {
-      TypedArrayAdd(liensbuf->lien_buffers, liensbuf->lien_buffer);
-      liensbuf->lien_buffer_size = 0;
-    }
-
-    // Double capacity for each new chained block
-    liensbuf->lien_buffer_capa = 
-      liensbuf->lien_buffer_capa < block_capa 
-      ? block_capa : liensbuf->lien_buffer_capa * 2;
-
-    capa_bytes = liensbuf->lien_buffer_capa*sizeof(*liensbuf->lien_buffer);
-    liensbuf->lien_buffer = (lien_url*) malloct(capa_bytes);
-    if (liensbuf->lien_buffer == NULL) {
-      hts_record_assert_memory_failed(capa_bytes);
-    }
-    liensbuf->lien_buffer_size = 0;
-
-    hts_log_print(opt, LOG_DEBUG, "reallocated %d new link placeholders",
-      (int) liensbuf->lien_buffer_capa);
+  // The entries are pointed at from elsewhere, so they must keep their address
+  link = (lien_url *) hts_arena_alloc(&liensbuf->liens, sizeof(*link));
+  if (link == NULL) {
+    hts_record_assert_memory_failed(sizeof(*link));
   }
-
-  // Take next lien_url item
-  assertf(liensbuf->lien_buffer_size < liensbuf->lien_buffer_capa);
-  link = &liensbuf->lien_buffer[liensbuf->lien_buffer_size++];
   memset(link, 0, sizeof(*link));
 
   // Add new lien_url pointer to the array of links
@@ -347,33 +287,10 @@ void hts_record_free(httrackp *opt) {
   lien_buffers *const liensbuf = opt->liensbuf;
 
   if (liensbuf != NULL) {
-    size_t i;
-
     TypedArrayFree(liensbuf->ptr);
 
-    if (liensbuf->string_buffer != NULL) {
-      freet(liensbuf->string_buffer);
-      liensbuf->string_buffer = NULL;
-      liensbuf->string_buffer_size = 0;
-      liensbuf->string_buffer_capa = 0;
-    }
-
-    for(i = 0 ; i < TypedArraySize(liensbuf->string_buffers) ; i++) {
-      freet(TypedArrayNth(liensbuf->string_buffers, i));
-      TypedArrayNth(liensbuf->string_buffers, i) = NULL;
-    }
-    TypedArrayFree(liensbuf->string_buffers);
-
-    if (liensbuf->lien_buffer != NULL) {
-      freet(liensbuf->lien_buffer);
-      liensbuf->lien_buffer = NULL;
-    }
-
-    for(i = 0 ; i < TypedArraySize(liensbuf->lien_buffers) ; i++) {
-      freet(TypedArrayNth(liensbuf->lien_buffers, i));
-      TypedArrayNth(liensbuf->lien_buffers, i) = NULL;
-    }
-    TypedArrayFree(liensbuf->lien_buffers);
+    hts_arena_free(&liensbuf->strings);
+    hts_arena_free(&liensbuf->liens);
 
     freet(opt->liensbuf);
     opt->liensbuf = NULL;

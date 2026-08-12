@@ -72,16 +72,29 @@ jobs:
         run: New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
 
       # x-gha is gone (vcpkg-tool #1662 dropped it after GitHub changed the cache
-      # API), so cache the binary archives directly. Keyed on the manifest, which
-      # carries the builtin-baseline, so a Dependabot bump busts it; restore-keys
-      # still seeds the unchanged ports' archives, so only the bumped one rebuilds.
-      - name: Cache vcpkg binary archives
-        uses: actions/cache@v6
+      # API), so cache the binary archives directly. An exact key hit skips the save,
+      # so a cache orphaned by a toolchain bump pins itself, and naming every input
+      # vcpkg's ABI hash folds in is a list that can come up short: key on the run
+      # id instead, and restore by prefix.
+      - name: Restore the vcpkg binary archives
+        uses: actions/cache/restore@v6
         with:
           path: ${{ github.workspace }}\vcpkg_cache
-          key: vcpkg-${{ matrix.platform }}-${{ hashFiles('src/vcpkg.json') }}
+          key: vcpkg-${{ matrix.platform }}-${{ hashFiles('src/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
+            vcpkg-${{ matrix.platform }}-${{ hashFiles('src/vcpkg.json') }}-
             vcpkg-${{ matrix.platform }}-
+
+      # Counted before the build, or vcpkg's own writes during it make a cold cache
+      # look warm.
+      - name: Count the restored vcpkg archives
+        shell: pwsh
+        run: |
+          $a = @(Get-ChildItem -Recurse -File -Filter *.zip `
+            $env:VCPKG_DEFAULT_BINARY_CACHE -EA SilentlyContinue)
+          Write-Host "restored $($a.Count) archive(s)"
+          $a.FullName | Out-File -FilePath vcpkg-restored.txt
+          "VCPKG_ARCHIVES_BEFORE=$($a.Count)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       # The runner image's vcpkg checkout is pinned to some commit; our manifest's
       # builtin-baseline is usually newer, so `git show <baseline>:versions/...`
@@ -111,6 +124,50 @@ jobs:
               /flp:LogFile=msbuild-$proj.log`;Verbosity=normal
             if ($LASTEXITCODE -ne 0) { throw "$proj failed" }
           }
+
+      # A stale cache and a warm one both restore and rebuild; only archives
+      # restored and unmatched prove staleness.
+      - name: Check whether vcpkg could use the restored archives
+        id: vcpkg
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          $before = [int]$env:VCPKG_ARCHIVES_BEFORE
+          $stale = $false
+          # The log is missing when the build never reached MSBuild.
+          if (Test-Path msbuild-libhttrack.log) {
+            $m = Select-String -Path msbuild-libhttrack.log -Pattern 'Restored (\d+) package' |
+              Select-Object -First 1
+            if ($m) {
+              $restored = [int]$m.Matches[0].Groups[1].Value
+              Write-Host "vcpkg restored $restored of $before archive(s)"
+              $stale = ($restored -eq 0 -and $before -gt 0)
+            } else { Write-Host "no vcpkg restore line in the build log" }
+          } else { Write-Host "no build log" }
+          if ($stale) {
+            Write-Host "::warning::stale vcpkg cache: $before archives, none matching this toolchain; every port rebuilt from source"
+            # Provably dead: drop them rather than carry every past toolchain
+            # generation in the saved entry forever. -LiteralPath because a piped
+            # string binds -Path, which globs on a name carrying [ ].
+            Get-Content vcpkg-restored.txt -EA SilentlyContinue | Where-Object { $_ } |
+              ForEach-Object { Remove-Item -LiteralPath $_ -Force -EA SilentlyContinue }
+          }
+          $after = @(Get-ChildItem -Recurse -File -Filter *.zip `
+            $env:VCPKG_DEFAULT_BINARY_CACHE -EA SilentlyContinue).Count
+          Write-Host "$after archive(s) to cache"
+          # Pruning can leave the count unmoved while replacing every archive, so the
+          # stale case saves on its own account rather than on growth.
+          "save=$($stale -or ($after -gt $before))".ToLower() |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      # Only when the archive set changed, so a warm run adds no entry and the
+      # eviction budget stays for the runs that rebuilt something.
+      - name: Save the vcpkg binary archives
+        if: ${{ !cancelled() && steps.vcpkg.outputs.save == 'true' }}
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ github.workspace }}\vcpkg_cache
+          key: vcpkg-${{ matrix.platform }}-${{ hashFiles('src/vcpkg.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       # WinHTTrack links src\$(Platform)\$(Configuration)\libhttrack.lib, so the
       # import lib and the DLL both have to land there under that exact name.

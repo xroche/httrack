@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# Re-run in a mirror directory and the engine offers to resume, quoting the
+# command line it would run (#1204). The obvious way to print it aborts:
+# HT_PRINT appends into a 2 KB buffer whose helper dies on overflow, which a
+# real command line outgrows.
+
+set -eu
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+ttyrun=$(nativepath "$(dirname "$0")/ttyrun.py")
+
+skip_on_windows "no pty on Windows"
+python=$(find_python) || skip "python3 not found"
+
+bin=$(httrack_path)
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_resume.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+echo '<html><body>hi</body></html>' >"$tmp/index.html"
+url="file://$tmp/index.html"
+
+# The prompt only appears when the replayed command line leaves quiet unset, so
+# the seeding crawl passes neither --quiet nor -%v0.
+seed() { # seed DIR ARG...
+    local dir=$1
+    shift
+    mkdir -p "$dir"
+    (cd "$dir" && "$bin" "$url" -n "$@" >/dev/null 2>&1) || true
+    assert_file "$dir/hts-cache/doit.log" "seeding crawl left no doit.log"
+}
+
+# The offer needs a terminal, and one ENTER answers it.
+ask() { # ask DIR
+    local cap="$tmp/cap.$$"
+    rm -f "$cap"
+    "$python" "$ttyrun" "$cap" --stdin tty --send enter -- \
+        sh -c "cd '$1' && exec '$bin'" >/dev/null 2>&1 || true
+    cat "$cap"
+}
+
+printf '[the offer quotes the command line, not the binary] ..\t'
+seed "$tmp/plain" --footer 'zzzmarker'
+out=$(ask "$tmp/plain")
+assert_match 'OK to (Continue|Update) httrack ' "$out" "no resume offer"
+assert_match 'zzzmarker' "$out" "the offer dropped the options"
+! grep -qF -- "$bin" <<<"$out" || {
+    echo "FAIL: the offer still quotes the program path"
+    exit 1
+}
+echo OK
+
+# Teeth for the clip: doit.log replays up to 8000 bytes, so a command line built
+# from many filters outruns the 2 KB buffer several times over.
+printf '[a command line too long to fit is clipped, not fatal] ..\t'
+long=()
+for i in $(seq 1 40); do
+    long+=("+*/zzzfilter${i}_$(printf 'b%.0s' $(seq 1 60))*")
+done
+seed "$tmp/long" "${long[@]}"
+out=$(ask "$tmp/long")
+assert_match 'OK to (Continue|Update) httrack .*\.\.\.\?' "$out" \
+    "a command line past the buffer was not clipped"
+# htssafe names the file it aborts in; the offer must not be one of them.
+! grep -qE 'overflow while copying' <<<"$out" || {
+    echo "FAIL: the offer aborted on the bounds check instead of clipping"
+    exit 1
+}
+echo OK

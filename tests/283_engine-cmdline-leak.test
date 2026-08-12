@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# An early exit from hts_main_internal must release the rebuilt command line,
+# the token chunks plus the slot array (#1206). Only a leak checker sees this,
+# and the sanitized CI leg runs with detect_leaks off, so turn it back on around
+# two runs that bail out after the block is allocated.
+
+set -eu
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+probe=$(ASAN_OPTIONS=help=1 httrack -O /dev/null --version 2>&1 || true)
+case "$probe" in
+*AddressSanitizer*) ;;
+*)
+    echo "not a sanitized build, skipping" >&2
+    exit 77
+    ;;
+esac
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cmdlleak.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# Last value wins in the sanitizer flag parser, so this overrides the job's
+# settings; the report file, not the exit status, is the verdict.
+asan_base="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=1:abort_on_error=0:exitcode=0"
+
+# The port is never dialled: each run aborts while still parsing options.
+url='http://127.0.0.1:1/'
+
+bail() { # bail LABEL WANT_RE ARG...
+    local label=$1 want=$2
+    shift 2
+    rm -f "$tmp/asan".*
+    printf '[%s] ..\t' "$label"
+    out=$(ASAN_OPTIONS="${asan_base}:log_path=$tmp/asan" \
+        httrack -O "$tmp/out" "$@" "$url" 2>&1 || true)
+    # Teeth: a run that never reached the early exit would report clean without
+    # exercising the leak.
+    assert_match "$want" "$out" "$label"
+    report=$(cat "$tmp/asan".* 2>/dev/null || true)
+    test -z "$report" || {
+        echo "FAIL: $label leaked"
+        echo "$report"
+        exit 1
+    }
+    echo "OK"
+}
+
+bail 'a rule the grammar refuses' 'Invalid host-alias rule' --host-alias nope
+bail 'an option that does not exist' 'Unknown option' --no-such-option

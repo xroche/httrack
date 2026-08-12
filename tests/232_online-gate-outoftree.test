@@ -67,10 +67,11 @@ var_re="$invoke$quote"'\$\{?[A-Za-z_][A-Za-z0-9_]*\}?'"$quote"'([[:space:]]|$)'
 # would match and this file would pin itself.
 eval_re='(^|[;&|(`])[[:space:]]*eval[[:space:]]'
 
-# The only two call sites that mean the cwd: each cd's into a directory it has
-# just filled with copies, and the copy is the target. Named rather than matched
-# by shape, because a shape exemption cannot tell them from #1016 in disguise.
+# The only call sites that mean the cwd: each cd's into a directory it has just
+# filled with copies, and the copy is the target. Named rather than matched by
+# shape, because a shape exemption cannot tell them from #1016 in disguise.
 allowed='172_ci-windows-driver.test ci-windows-suite.sh
+286_ci-windows-pool.test ci-windows-suite.sh
 ci-windows-suite.sh test-timeout.sh'
 
 # Matching lines of the given files as file:line:text, comments dropped:

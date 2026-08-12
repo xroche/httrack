@@ -1,0 +1,163 @@
+#!/bin/bash
+#
+# The offline suite's worker pool (ci-windows-suite.sh): the requested width really
+# runs at once, the tally still counts every test, and each gets its own TMPDIR.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# Before the driver is sourced: with these set, anything it starts posts a commit
+# status on whatever the surrounding shell was last looking at.
+unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
+
+driver="$testdir/ci-windows-suite.sh"
+# Asked of the bash the driver will run under, not of this one: the pool needs
+# its wait -n (4.3), and macOS runs the tests with a 3.2 that has none.
+bash -c 'test "${BASH_VERSINFO[0]}" -ge 5 ||
+    { test "${BASH_VERSINFO[0]}" -eq 4 && test "${BASH_VERSINFO[1]}" -ge 3; }' ||
+    skip "the bash on PATH has no wait -n, so the driver runs one test at a time"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_pool.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+bin=$tmp/bin
+mkdir -p "$bin"
+printf '#!/bin/sh\nexit 0\n' >"$bin/httrack"
+# shellcheck disable=SC2016 # $2 is the stub's own expansion
+printf '#!/bin/sh\necho "$2"\n' >"$bin/cygpath"
+chmod +x "$bin/httrack" "$bin/cygpath"
+# Ahead of the driver's own command -v, which asks access(X_OK) and reads false here.
+test -x "$bin/httrack" || skip "${TMPDIR:-/tmp} is noexec, the stub bindir cannot be run"
+
+# Where the stubs report from, outside every RUNNER_TEMP below: the shared-TMPDIR
+# mutant deletes those wholesale.
+share=$tmp/share
+mkdir -p "$share"
+export POOLSHARE=$share
+
+# Each stub records the TMPDIR it was handed, so a run says which test got what.
+stub() { # stub <path> <exit status> [shell line]
+    # shellcheck disable=SC2016 # the stub's own expansions, not this shell's
+    printf '#!/bin/sh\nprintf "%%s %%s\\n" "$0" "$TMPDIR" >>"$POOLSHARE/tmpdirs"\n%s\nexit %s\n' \
+        "${3:-:}" "$2" >"$1"
+}
+
+# A copy of the driver: $testdir decides whose testlib and watchdog it finds, no
+# .ps1 goes with it (so no PowerShell), and the reap is neutered, or it would kill
+# a sibling's engine under "make check -j".
+stage() { # stage <dir>
+    local d=$1 t
+    mkdir -p "$d/rt"
+    cp "$driver" "$testdir/testlib.sh" "$testdir/proclib.sh" "$testdir/test-timeout.sh" "$d/"
+    chmod u+w "$d"/*.sh # distcheck's srcdir is read-only, and cp carries that over
+    cat >>"$d/proclib.sh" <<'EOF'
+reap_leftover_processes() { return 0; }
+EOF
+    # One per glob the driver enumerates: an empty category stops the suite before
+    # it runs anything at all.
+    for t in 00_runnable 10_engine-pass 13_zlib-pass 14_local-pass 15_watchdog-pass \
+        16_crawl_proxy_https 17_crawl-log-salvage 18_testlib-pass 19_crawllib \
+        20_crawl-harness-pass; do
+        stub "$d/$t.test" 0
+    done
+    stub "$d/11_engine-skip.test" 77
+    stub "$d/12_engine-fail.test" 3
+}
+
+# Drive the suite staged in $1 with $2 workers, into $tmp/out; $spent is its wall
+# clock. Exit 1 is the pass floor, which a stub suite of twelve always trips.
+spent=0
+run_suite() { # run_suite <dir> <jobs>
+    local rc=0 began=$SECONDS
+    (
+        cd "$1"
+        RUNNER_TEMP="$1/rt" GITHUB_STEP_SUMMARY="$tmp/summary" HTTRACK_SUITE_JOBS="$2" \
+            bash ./ci-windows-suite.sh "$bin"
+    ) >"$tmp/out" 2>&1 || rc=$?
+    spent=$((SECONDS - began))
+    test "$rc" -eq 1 ||
+        fail "the stub suite exited $rc, want 1 from the pass floor: $(cat "$tmp/out")"
+}
+
+assert_tally() {
+    local got
+    got=$(grep '^ran=' "$tmp/out" || true)
+    test "$got" = 'ran=12 pass=10 fail=1 skip=1' || fail "$1: wrong tally: $got"
+    grep -q 'FAIL 12_engine-fail.test (exit 3)' "$tmp/out" || fail "$1: the failing test was not named"
+    grep -q '^SKIP 11_engine-skip.test$' "$tmp/out" || fail "$1: the skipped test was not named"
+}
+
+# Tests handed a TMPDIR that is not the suite.<name> dir of their own name.
+strays() { awk '{ n = $1; sub(/.*\//, "", n); if (index($2, "/suite." n) == 0) print }' \
+    "$share/tmpdirs"; }
+# Deepest overlap the markers below recorded: a pool silently capped narrower than
+# it was asked for cannot reach the width, where a timing ratio still would.
+peak() { awk '$0 == "+" { if (++n > m) m = n } $0 == "-" { n-- } END { print m + 0 }' "$share/conc"; }
+
+# The six the driver dispatches first, each marking the window it is in flight
+# for: serially they cost 12s, so six workers have to come in far under that.
+par=$tmp/par
+stage "$par"
+# shellcheck disable=SC2016 # the stub's own expansions, not this shell's
+busy='echo + >>"$POOLSHARE/conc"; sleep 2; echo - >>"$POOLSHARE/conc"'
+for t in 00_runnable:0 10_engine-pass:0 11_engine-skip:77 12_engine-fail:3 \
+    13_zlib-pass:0 14_local-pass:0; do
+    stub "$par/${t%:*}.test" "${t#*:}" "$busy"
+done
+
+: >"$share/tmpdirs"
+: >"$share/conc"
+run_suite "$par" 6
+fast=$spent
+assert_tally "at six workers"
+wide=$(peak)
+test "$wide" -ge 6 || fail "at most $wide tests in flight at once, want the 6 workers asked for"
+
+# The traced re-run of the failing test runs outside test-timeout.sh, so it is the
+# one leg whose TMPDIR the driver itself decides.
+records=$(grep -c . "$share/tmpdirs" || true)
+test "$records" -eq 13 ||
+    fail "$records tests reported a TMPDIR, want 13 (twelve plus the traced re-run)"
+stray=$(strays)
+test -z "$stray" || fail "a test was handed a TMPDIR that is not its own: $stray"
+
+# Serial, on the same stubs: it says the sleeps really cost what the comparison
+# above rests on, it drives the fallback a bash without wait -n takes, and it is
+# the control on the marker file, which must read 1 where the pool read 6.
+: >"$share/tmpdirs"
+: >"$share/conc"
+run_suite "$par" 1
+slow=$spent
+assert_tally "one at a time"
+test "$(peak)" -eq 1 || fail "$(peak) tests in flight at once with a single worker"
+test "$slow" -ge 10 || fail "twelve stubs, six of them sleeping 2s, ran serially in ${slow}s"
+test "$fast" -le $((slow / 2)) ||
+    fail "six workers took ${fast}s against ${slow}s serial: nothing ran in parallel"
+
+# The mutant the assertion above exists to catch: one TMPDIR for the whole suite.
+mut=$tmp/mut
+stage "$mut"
+# shellcheck disable=SC2016 # the driver's expansions, quoted for sed
+sed 's|ttmp="$TMPDIR/suite.$t"|ttmp="$TMPDIR"|' "$par/ci-windows-suite.sh" \
+    >"$mut/ci-windows-suite.sh"
+cmp -s "$par/ci-windows-suite.sh" "$mut/ci-windows-suite.sh" &&
+    fail "the shared-TMPDIR mutant changed nothing, so it proves nothing"
+: >"$share/tmpdirs"
+run_suite "$mut" 6
+stray=$(strays)
+test -n "$stray" || fail "a suite sharing one TMPDIR passed the check above"
+
+# What a shared TMPDIR costs: dump_crawl_logs empties the one it is given, so two
+# tests sharing it is one deleting the other's evidence.
+mkdir -p "$tmp/mine/httrack_local.a/crawl" "$tmp/theirs/httrack_local.b/crawl"
+echo MINECRAWL >"$tmp/mine/httrack_local.a/crawl/hts-log.txt"
+echo THEIRSCRAWL >"$tmp/theirs/httrack_local.b/crawl/hts-log.txt"
+dumped=$(TMPDIR="$tmp/mine" dump_crawl_logs)
+grep -q MINECRAWL <<<"$dumped" || fail "the dump did not report its own crawl log: $dumped"
+grep -q THEIRSCRAWL <<<"$dumped" && fail "the dump reached a crawl log outside its TMPDIR"
+test ! -d "$tmp/mine/httrack_local.a" || fail "the dump kept the crawl dir it reported"
+test -d "$tmp/theirs/httrack_local.b" || fail "the dump deleted a crawl dir outside its TMPDIR"
+
+echo "ci-windows pool OK (${fast}s at six workers, ${slow}s serially)"

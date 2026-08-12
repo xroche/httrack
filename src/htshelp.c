@@ -89,8 +89,11 @@ void infomsg(const char *msg) {
               }
               if (p >= 0) {
                 /* fings type of parameter: number,param,param concatenated,single cmd */
-                if (strcmp(opttype_value(p), "param") == 0)
+                if (strcmp(opttype_value(p), "param") == 0 ||
+                    strcmp(opttype_value(p), "level") == 0)
                   printf("%s (--%s[=N])\n", msg, optalias_value(p));
+                else if (strcmp(opttype_value(p), "onoff") == 0)
+                  printf("%s (--%s[=0])\n", msg, optalias_value(p));
                 else if (strcmp(opttype_value(p), "param1") == 0)
                   printf("%s (--%s <param>)\n", msg, optalias_value(p));
                 else if (strcmp(opttype_value(p), "param0") == 0)

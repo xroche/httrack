@@ -1,0 +1,195 @@
+#!/bin/bash
+#
+# A long option must honour the value its short form takes: --index=0 dropped
+# its value and read back as the enabling bare --index (#1195).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=$(cd "${top_srcdir:-${testdir}/..}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_flagvalue.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+assert_selftest "optalias self-test OK" optalias
+
+# The engine end of it: the top index is <out>/index.html, next to the mirrored
+# tree, which lands under out/file/.
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+crawl() {
+    rm -rf "${tmp}/out"
+    mkdir -p "${tmp}/out"
+    RC=0
+    httrack "file://${tmp}/page.html" -O "${tmp}/out" --quiet -n "$@" \
+        >"${tmp}/out/.log" 2>&1 || RC=$?
+    INDEX=no
+    test ! -f "${tmp}/out/index.html" || INDEX=yes
+}
+
+indexed() { # indexed WANT ARG...
+    local want=$1
+    shift
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    assert_eq "${want}" "${INDEX}" "$* wrote a top index"
+}
+
+indexed no -I0
+indexed no --index=0
+indexed no --index=off
+indexed no --noindex
+indexed no --index off
+indexed yes --index
+indexed yes --index=1
+indexed yes -I
+
+# A value the option cannot take stops the run instead of being dropped. The
+# message has to name the reason, or a mangled flag the engine happens to reject
+# would read as a refusal; 134 would be an abort rather than either.
+refused() { # refused WANTED-MESSAGE ARG...
+    local want=$1
+    shift
+    crawl "$@"
+    { test "${RC}" -ne 0 && test "${RC}" -ne 134; } || fail "$* not refused (exit ${RC})"
+    grep -q "${want}" "${tmp}/out/.log" ||
+        fail "$* refused without saying why: $(cat "${tmp}/out/.log")"
+}
+
+refused 'does not take the value' --index=2
+refused 'does not take the value' --mirror=0
+refused 'Unknown option: nomirror' --nomirror
+
+# The three rows that were misclassified "param" (#1200). That class demands a
+# following token, so =1 died on "invalid option 1" and the space form was worse.
+for opt in purge-old httpproxy-ftp extended-parsing; do
+    for form in "--${opt}" "--${opt}=0" "--${opt}=1" "--no${opt}"; do
+        crawl "${form}"
+        assert_eq 0 "${RC}" "${form} exited"
+    done
+    for value in 0 1; do
+        crawl "--${opt}" "${value}"
+        assert_eq 0 "${RC}" "--${opt} ${value} exited"
+    done
+done
+
+# ...and a URL after one of them is a URL again: as "param" it was eaten as the
+# value, and the run mirrored nothing.
+rm -rf "${tmp}/out"
+mkdir -p "${tmp}/out"
+RC=0
+httrack --purge-old "file://${tmp}/page.html" -O "${tmp}/out" --quiet -n \
+    >"${tmp}/out/.log" 2>&1 || RC=$?
+assert_eq 0 "${RC}" "--purge-old before the URL exited"
+test -n "$(find "${tmp}/out" -type f -name page.html -print -quit)" ||
+    fail "--purge-old before the URL swallowed it: nothing was mirrored"
+
+# Every option that carries a value must emit a short form the engine parses
+# whole: a digit left over reaches "invalid option" and kills the run (#1200).
+rows=$(httrack -O /dev/null "-#test=optalias" -list)
+test "$(grep -c . <<<"${rows}")" -ge 150 || fail "short option list: ${rows}"
+while read -r class name; do
+    case ${class} in
+    onoff | level) ;;
+    *) continue ;;
+    esac
+    for value in 0 1; do
+        # --advanced-wait=N is a sleep, so only its 0 comes back
+        test "${name}" != advanced-wait || test "${value}" = 0 || continue
+        crawl "--${name}=${value}"
+        ! grep -q 'invalid option' "${tmp}/out/.log" ||
+            fail "--${name}=${value} (${class}) emits a short form the engine rejects"
+    done
+done <<<"${rows}"
+
+# Non-circular control on the classes, since the sweep above reads the table it
+# is checking: every --name=0 the wizard writes has to be a row that takes a
+# value, or the flag means the opposite of the box (#1195, #1200).
+literals=$(grep -o -- '--[a-z0-9-]*=0' "${distdir}/html/server/step4.html" |
+    sed -e 's/^--//' -e 's/=0$//' | sort -u)
+test "$(grep -c . <<<"${literals}")" -ge 10 || fail "step4.html scan came up short"
+while read -r name; do
+    class=$(grep -m1 -E "^[a-z0-9]+ ${name}\$" <<<"${rows}" || true)
+    test -n "${class}" || fail "step4.html writes --${name}=0, which is no option"
+    test "${class%% *}" != single ||
+        fail "step4.html writes --${name}=0, but its class takes no value"
+done <<<"${literals}"
+
+# The wizard end: a cleared box, and a project reload carrying Index=0, must
+# both emit the disabling form. The purge-old flags land in a file the shell
+# then feeds back to the engine, which is the #1200 chain end to end.
+htsserver_require
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_flagvalue.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" "${tmp}/purge-flags" <<'PY' || fail "the wizard emits the wrong flags (see above)"
+import re, sys, urllib.parse, urllib.request
+
+url = sys.argv[1].rstrip("/")
+form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1).decode()
+rc = 0
+
+
+def command(fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
+                    [("sid", sid)] + fields)
+    req = urllib.request.Request(url + "/server/step4.html",
+                                 data=body.encode("latin-1"), method="POST")
+    page = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+    m = re.search(r'<textarea name="command".*?>(.*?)</textarea>', page, re.S)
+    if m is None:
+        sys.exit("no command textarea in the rendered step4.html")
+    return m.group(1).split()
+
+
+def flags(cmd, name):
+    return [w for w in cmd if w == name or w.startswith(name + "=")]
+
+
+def check(field, value, want, name):
+    global rc
+    got = flags(command([(field, value)]), name)
+    if got != want:
+        print("FAIL: %s=%r emits %s, want %s" % (field, value, got, want))
+        rc = 1
+
+
+# A cleared checkbox posts nothing, and "0" is what a reloaded profile seeds.
+# The whole emitted set is asserted: a wrong value would pass a bare "in cmd".
+for field, name, ticked in (("index", "--index", []),
+                            ("index2", "--search-index", ["--search-index"])):
+    for value in ("", "0"):
+        check(field, value, [name + "=0"], name)
+    check(field, "on", ticked, name)
+
+# NoPurgeOldFiles=0 in a profile seeds nopurge=0, which emits --purge-old=1.
+purge = flags(command([("nopurge", "0")]), "--purge-old")
+if purge != ["--purge-old=1"]:
+    print("FAIL: a profile with NoPurgeOldFiles=0 emits %s" % purge)
+    rc = 1
+open(sys.argv[2], "w").write(" ".join(purge) + "\n")
+
+sys.exit(rc)
+PY
+
+# The engine has to start on what the wizard just wrote (#1200).
+read -r purge_flags <"${tmp}/purge-flags"
+test -n "${purge_flags}" || fail "the wizard emitted no --purge-old flag"
+crawl "${purge_flags}"
+assert_eq 0 "${RC}" "the wizard's ${purge_flags} exited"
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "PASS"
