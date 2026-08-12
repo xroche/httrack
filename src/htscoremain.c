@@ -182,7 +182,10 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
     const size_t used = strlen(opt->state.HTbuff);
 
     if (used >= spare || strlen(cmd->argv[i]) >= spare - used) {
-      HT_PRINT(" ...");
+      /* clipped rather than HT_PRINT'd, so the mark fits whatever the caller
+         wrote before it */
+      strlncatbuff(opt->state.HTbuff, " ...", sizeof(opt->state.HTbuff),
+                   sizeof(opt->state.HTbuff) - 1 - used);
       return;
     }
     HT_PRINT(" ");
