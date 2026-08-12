@@ -300,11 +300,12 @@ for t in "${tests[@]}"; do
     echo "$rc $t" >>"$progress"
     # Never fatal: Windows may still hold a file the killed tree left open.
     rm -rf "$ttmp" 2>/dev/null || true
-    # An orphaned native httrack.exe spins and starves the runner, which
-    # is how this job dies with "lost communication" rather than a plain
-    # timeout. Clear them between tests and name whoever leaked them.
-    reap_leftover_processes "$t" | tee -a "$progress"
 done
+# An orphaned native httrack.exe spins and starves the runner, which is how this
+# job dies with "lost communication" rather than a plain timeout. Once, at the
+# end: matching by image name, a reap between two tests cannot tell a leak from a
+# neighbour's live engine. What bounds a wedge is the per-test tree kill above.
+reap_leftover_processes "the suite" | tee -a "$progress"
 echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
     tee -a "$GITHUB_STEP_SUMMARY"
 
