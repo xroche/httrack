@@ -8,8 +8,7 @@
 #      user-agent expands to two tokens (-F <value>), so it exercises both
 #      cmdl_ins insertions.
 #   2. The block grows: an rc file whose expansions outrun the first chunk many
-#      times over is read to the end, and its last token still reaches doit.log
-#      (#1198). It used to abort in the bounded copy once the block filled.
+#      times over is read to the end, and its tokens still reach doit.log.
 
 # set -e with the intentional-nonzero httrack runs guarded explicitly (their
 # status is inspected by hand).
@@ -71,10 +70,8 @@ d2="$tmp/grow"
 mkdir -p "$d2"
 echo '<html><body>hi</body></html>' >"$d2/index.html"
 
-# Each line inserts two tokens of ~200 bytes; 2000 of them need some 400 KB,
-# which is a dozen times the 32 KB chunk floor. The first and last values are
-# distinct: doit.log then shows both that the tail of the file made it in, and
-# that a token written before the growth is still readable after it.
+# Two tokens of ~200 bytes per line, so 2000 lines need some 400 KB against a
+# 32 KB chunk floor. The first marker is read back after a dozen growths.
 val=$(printf 'a%.0s' $(seq 1 200))
 first='zzz_rcfile_marker_first_line_grown'
 last='zzz_rcfile_marker_last_line_grown'
@@ -89,14 +86,22 @@ last='zzz_rcfile_marker_last_line_grown'
 rc=0
 (cd "$d2" && "$bin" "file://$d2/index.html" --quiet -n >.log 2>&1) || rc=$?
 
-# A block that cannot grow aborts in the bounded copy (exit 134, a message
-# naming htsalias.c); an unbounded one used to overrun the heap here.
+# A block that cannot grow aborts in the bounded copy (exit 134).
 test "$rc" -eq 0 || {
     echo "FAIL: large rc-file crawl exited $rc, the token block did not grow"
     tail -3 "$d2/.log"
     exit 1
 }
 assert_file "$d2/hts-cache/doit.log" "no doit.log, so the rc file was not processed"
+# Clipping a token to the room left, instead of growing, would keep both
+# markers: only the tokens straddling a chunk boundary lose bytes. Line 1 alone
+# is the command line, so the prose below it cannot answer for a token.
+short=$(sed -n '1p' "$d2/hts-cache/doit.log" | tr ' ' '\n' |
+    awk -v n="${#val}" '/^a+$/ && length($0) != n {c++} END {print c + 0}')
+test "$short" -eq 0 || {
+    echo "FAIL: $short user-agent value(s) reached doit.log clipped"
+    exit 1
+}
 for marker in "$first" "$last"; do
     grep -q -- "-F $marker" "$d2/hts-cache/doit.log" || {
         echo "FAIL: $marker never reached the rebuilt command line"

@@ -56,23 +56,21 @@ void expand_home(String * str);
 /* One token-block allocation, its bytes following the link. */
 typedef struct cmdl_chunk cmdl_chunk;
 
-/* Command line rebuilt from argv, config files and doit.log: argc slots
-   pointing into the token chunks, where the tokens are packed back-to-back.
-   Both grow on demand, since a config file and a doit.log each add a token
-   count only the input knows. A chunk is never resized, so every argv[] slot,
-   and every pointer a caller kept into one, survives the growth. */
+/* Command line rebuilt from argv, config files and doit.log, both parts growing
+   on demand. A chunk is never resized, so every argv[] slot, and every pointer
+   a caller kept into one, survives the growth. */
 typedef struct {
   char **argv; /* argc slots used out of capacity allocated */
   int argc;
   int capacity;
   cmdl_chunk *chunks; /* newest first; tokens are cut from the newest */
-  size_t blk_size;    /* the newest chunk, blk_used of blk_size in use */
-  size_t blk_used;
+  size_t chunk_size;  /* the newest chunk, chunk_used of chunk_size in use */
+  size_t chunk_used;
 } cmdl_argv;
 
-/* Allocate a first token chunk of at least blk_size bytes and room for slots
+/* Allocate a first token chunk of at least chunk_size bytes and room for slots
    entries. HTS_FALSE if either fails, leaving cmd empty. */
-hts_boolean cmdl_init(cmdl_argv *cmd, size_t blk_size, int slots);
+hts_boolean cmdl_init(cmdl_argv *cmd, size_t chunk_size, int slots);
 
 /* Release cmd; the tokens its argv pointed at die with it. */
 void cmdl_free(cmdl_argv *cmd);
