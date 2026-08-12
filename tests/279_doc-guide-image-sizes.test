@@ -1,0 +1,131 @@
+#!/bin/bash
+#
+# guide.html hardcodes width/height on every screenshot, and a recapture at
+# another geometry ships stretched with nothing to say so (#1187).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+checker="${testdir}/guide-image-check.py"
+
+python=$(find_python) || skip "python3 not found"
+# In EXTRA_DIST, so an absent checker is a packaging bug, not an environment.
+test -r "${checker}" || fail "no ${checker}"
+
+# The assertion this test exists for. It also pins the IHDR reader: 55 PNGs
+# written by Pillow, whose sizes it has to reproduce to the digit.
+"${python}" "${checker}" "${srcdir}/html" ||
+    fail "guide.html's declared image sizes are out of sync with html/img/"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/guideimg.XXXXXX") || {
+    echo "no tmpdir" >&2
+    exit 1
+}
+cleanup_push rm -rf "${work}"
+
+pristine="${work}/pristine"
+cp -a "${srcdir}/html" "${pristine}"
+# distcheck's srcdir is read-only, and cp -a carries that over.
+chmod -R u+w "${pristine}"
+guide="${work}/html/guide.html"
+shot="${work}/html/img/guide-web-start.png"
+other="${pristine}/img/guide-win-language.png"
+restore() { rm -rf "${work}/html" && cp -a "${pristine}" "${work}/html"; }
+restore
+
+edit() { # edit FROM TO: one sed substitution in guide.html, proven to apply
+    sed "s|$1|$2|" "${guide}" >"${work}/edited"
+    if cmp -s "${guide}" "${work}/edited"; then
+        fail "mutant did not apply: $1"
+    fi
+    mv "${work}/edited" "${guide}"
+}
+
+expect_fail() { # expect_fail RE LABEL: the checker must reject, and say why
+    local out
+    if out=$("${python}" "${checker}" "${work}/html" 2>&1); then
+        fail "${2}: the checker still passes: ${out}"
+    fi
+    grep -q "$1" <<<"${out}" || fail "${2}: no /$1/ in: ${out}"
+}
+
+# One defect at a time, or one arm could be covering for another.
+edit 'width="1024" height="387"' 'width="1023" height="387"'
+expect_fail 'says 1023x387, the file is 1024x387' "a width off by one"
+restore
+
+edit 'width="1024" height="387"' 'width="1024" height="386"'
+expect_fail 'says 1024x386, the file is 1024x387' "a height off by one"
+restore
+
+# Swapping in another shipped PNG is the one mutant that touches the image
+# side; every other one here would pass against a checker echoing the markup.
+size=$(sed -n \
+    's|.*src="img/guide-win-language.png"[^>]*width="\([0-9]*\)" height="\([0-9]*\)".*|\1x\2|p' \
+    "${pristine}/guide.html")
+if test -z "${size}" || test "${size}" = "1024x387"; then
+    fail "no distinct geometry to swap in, got [${size}]"
+fi
+cp "${other}" "${shot}"
+expect_fail "says 1024x387, the file is ${size}" "a recaptured image"
+restore
+
+dd if="${other}" of="${shot}" bs=20 count=1 2>/dev/null
+expect_fail 'guide-web-start.png: truncated inside the IHDR' "a truncated PNG"
+restore
+
+printf 'not a png at all' >"${shot}"
+expect_fail 'guide-web-start.png: not a PNG' "a file that is not a PNG"
+restore
+
+printf 'ihdr' | dd of="${shot}" bs=1 seek=12 conv=notrunc 2>/dev/null
+expect_fail 'guide-web-start.png: no IHDR where a PNG keeps it' "a moved IHDR"
+restore
+
+edit 'width="1024" height="387"' 'width="1024"'
+expect_fail 'guide-web-start.png: <img> carries no width/height' "an unsized img"
+restore
+
+# A browser lays out the first of a repeated attribute, so the check must too.
+edit 'width="1024" height="387"' 'width="99" width="1024" height="387"'
+expect_fail 'says 99x387, the file is 1024x387' "a repeated width"
+restore
+
+edit 'src="img/guide-web-start.png"' "src='img/guide-web-start.png'"
+expect_fail 'no src this checker can read' "a spelling the parse cannot read"
+restore
+
+edit 'src="img/guide-web-start.png"' 'src="./img/guide-web-start.png"'
+expect_fail 'an img/ path spelled past the check' "a src the img/ filter drops"
+restore
+
+edit '<img data-for="web" src="img/guide-web-start.png"' \
+    '<!-- <img data-for="web" src="img/guide-web-start.png" --><img src="x"'
+expect_fail 'guide-web-start.png: shipped, but guide.html no longer shows it' \
+    "a commented-out img"
+restore
+
+rm "${shot}"
+expect_fail 'guide-web-start.png: referenced by guide.html, not shipped' "a deleted image"
+restore
+
+cp "${shot}" "${work}/html/img/guide-web-dropped.png"
+expect_fail 'guide-web-dropped.png: shipped, but guide.html no longer shows it' "an orphan"
+restore
+
+# A guide with no img tags passes every check above. Empty img/ too, so the
+# floor is the only arm left that can fire.
+rm -f "${work}"/html/img/*
+sed 's|<img [^>]*>||g' "${pristine}/guide.html" >"${guide}"
+if grep -q 'src="img/' "${guide}"; then
+    fail "the img-less guide still references img/"
+fi
+expect_fail 'want at least' "an img-less guide"
+out=$("${python}" "${checker}" "${work}/html" 2>&1 >/dev/null) || true
+nbad=$(grep -c '^FAIL:' <<<"${out}" || true)
+test "${nbad}" -eq 1 || fail "the floor is not the only arm firing: ${out}"
+
+echo "guide images: geometry, existence and orphans all checked, each arm proven"

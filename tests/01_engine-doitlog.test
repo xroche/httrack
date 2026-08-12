@@ -3,9 +3,9 @@
 
 # doit.log reprise (no network). Re-running httrack in a mirror directory with
 # NO url makes the engine read hts-cache/doit.log and re-insert every recorded
-# argument into the command line through htscoremain.c's cmdl_ins macro (the
-# x_argvblk builder). That path is distinct from the rc-file one in
-# 01_engine-rcfile.test (htsalias.c) and from the url-on-command-line update in
+# argument into the command line through cmdl_ins() (the token-block builder).
+# That path is distinct from the rc-file one in 01_engine-rcfile.test
+# (htsalias.c) and from the url-on-command-line update in
 # 02_update-cache.test, and nothing else exercises it. Two properties:
 #   1. A multi-token reprise re-mirrors cleanly: every token (the url and each
 #      option) survives the back-to-back packing, so the no-url run reproduces

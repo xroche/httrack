@@ -1,0 +1,126 @@
+#!/bin/bash
+#
+# A --strip-query key or --host-alias pattern may begin with '-' (#1179): the
+# engine read it as the next option name and aborted before the mirror, losing
+# the valid rules beside it.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_dashrule.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# absolute: noparam runs from another directory, and make check puts the build's
+# src/ on PATH relatively, so a bare name resolves to nothing once it cds
+bin=$(httrack_path)
+
+url='http://127.0.0.1:1/'
+# only the alias layer, which owns the guard, words it this way; the engine's
+# own message for the same option says "blank space"
+syntax_re='Syntax error'
+
+# parse the command line and stop, leaving the diagnostic in $out and the exit
+# status in $rc; --testscan opens no socket, so the dead URL is never dialled
+parse() {
+    rc=0
+    out=$("$bin" -O "$tmp/out" --quiet --testscan "$url" "$@" 2>&1) || rc=$?
+}
+
+accepted() { # accepted LABEL
+    test "$rc" -eq 0 || fail "$1: exited $rc: $out"
+    ! grep -q "$syntax_re" <<<"$out" || fail "$1: $out"
+}
+
+refused() { # refused RE LABEL
+    test "$rc" -ne 0 || fail "$2: the option took the token after it"
+    assert_match "$1" "$out" "$2"
+}
+
+# The space form is what the wizard's rules box emits. The '=' form skips the
+# alias guard and lands on the engine's own, as does a "-quoted argument.
+printf '[a dash-leading rule is taken, in every form] ..\t'
+parse --strip-query -utm
+accepted "--strip-query -utm"
+parse --strip-query=-utm
+accepted "--strip-query=-utm"
+parse "-%g" -utm
+accepted "-%g -utm"
+parse --strip-query '"-utm"'
+accepted '--strip-query "-utm"'
+parse --strip-query sid --strip-query -utm
+accepted "a dash rule beside a plain one"
+parse --host-alias '-old.example.com=example.com'
+accepted "--host-alias -old.example.com=example.com"
+parse --host-alias=-old.example.com=example.com
+accepted "--host-alias=-old.example.com=example.com"
+parse "-%C" '-old.example.com=example.com'
+accepted "-%C -old.example.com=example.com"
+echo OK
+
+# A token that names a real option is still a mistake, and the '=' form is the
+# way to hand a rule option one on purpose.
+printf '[a rule option still refuses a real option name] ..\t'
+for opt in --strip-query --host-alias; do
+    for next in --sockets -q -O --nocache --wide-mirror; do
+        parse "$opt" "$next" 4
+        refused "$syntax_re" "$opt $next"
+    done
+done
+parse --strip-query=-q
+accepted "--strip-query=-q"
+echo OK
+
+# The rule reaches the grammar check, which quotes it back: proof the leading
+# '-' survived, which no crawl can show since no address begins with one.
+printf '[a malformed dash rule is named, not blamed on -%%C] ..\t'
+parse --host-alias -nope
+refused 'Rejected: -nope' "malformed --host-alias"
+! grep -q '%C' <<<"$out" || fail "the host-alias error still names -%C: $out"
+echo OK
+
+# Every other option keeps the guess it has always made: relaxing it wholesale
+# would turn `-O -q url` into a silent mirror into a directory named -q.
+printf '[an option genuinely missing its parameter still errors] ..\t'
+parse --strip-query
+refused "$syntax_re" "--strip-query with nothing after it"
+parse --host-alias
+refused "$syntax_re" "--host-alias with nothing after it"
+# no -O, so run where an accidental mirror lands under $tmp
+mkdir -p "$tmp/cwd"
+noparam() { # noparam LABEL ARG...
+    local label=$1
+    shift
+    rc=0
+    out=$(cd "$tmp/cwd" && "$bin" "$@" "$url" 2>&1) || rc=$?
+    refused "$syntax_re" "$label"
+    test -z "$(ls -A "$tmp/cwd")" || fail "$label mirrored into $(ls -A "$tmp/cwd")"
+}
+noparam "-O -q" -O -q
+noparam "--path -q" --path -q
+noparam "--user-structure -q" --user-structure -q
+noparam "--user-agent -q" --user-agent -q
+echo OK
+
+# The rule is stored, not merely accepted: the engine applies the last rule
+# matching an address, so the unscoped dash rule yields to the scoped one when
+# it comes first (2 files) and wins when it comes second (3 files). A rule
+# accepted and then dropped would save 2 both times.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 2 \
+    httrack 'BASEURL/stripquery/index.html' \
+    --strip-query '-nokey' --strip-query '*/stripquery/*=utm_source'
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
+    httrack 'BASEURL/stripquery/index.html' \
+    --strip-query '*/stripquery/*=utm_source' --strip-query '-nokey'
+# Byte for byte: the fixture's key is utm_source, so -utm_source must strip
+# nothing. Trimming the '-' anywhere on the way in would save 2 files here.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 3 \
+    httrack 'BASEURL/stripquery/index.html' --strip-query '-utm_source'
+
+# --host-alias likewise: the dash rule matches no address, and the fold the
+# valid rule beside it asks for still happens (the 5 files of test 270).
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
+    --file-not-matches hostalias/index.html 'example\.invalid' \
+    httrack 'BASEURL/hostalias/index.html' \
+    --host-alias '-dash.example.invalid=BASEHOST' \
+    --host-alias 'alias.example.invalid=BASEHOST'
