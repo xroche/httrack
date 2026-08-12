@@ -168,12 +168,14 @@ export LC_ALL=C.UTF-8
 per_test=600
 
 # The whole suite must give up before the workflow's 45-minute step
-# timeout. A cancelled step keeps neither its log nor the artifacts the
-# later if:always() steps would upload, so an overrun that ends in a
-# cancel tells us nothing; failing on our own terms keeps both. Healthy
-# runs take 4 min at the pool width below. The check sits before each
-# dispatch, so the step can still reach 10 min plus one per-test budget.
-suite_deadline=600
+# timeout: a cancelled step keeps neither its log nor the artifacts the
+# later if:always() steps would upload, one failing on its own terms keeps
+# both. Left at the serial budget though the pool costs 4 min, because it
+# bounds a wedge and not a healthy run: fitted to the pool it reds a merely
+# slow run and every jobs=1 one (23 min), and the traced rerun below gets
+# only what is left of it, so a tight value drops the trace on exactly the
+# runs worth diagnosing.
+suite_deadline=1500
 started=$SECONDS
 
 # Reaches the artifact whenever the step ends on its own terms, which the
@@ -184,30 +186,30 @@ export HTTRACK_PROGRESS_LOG="$PWD/$progress"
 
 # A dying runner takes both, and every annotation with them (measured, see
 # #795), so the watchdog's job is to end the step first: one that fails on
-# its own terms keeps its log. Quiet past 5 min, clear of the 4 a healthy
-# run measures here, and a kill 700s after the last progress line clears
-# the longest legitimate gap, one $per_test.
-stuck=700
+# its own terms keeps its log. Also left at the serial budget: under the pool
+# any live worker keeps the log moving, so staticness now catches a stalled
+# suite and nothing narrower -- one wedged test is bounded by $per_test and
+# by $hard_deadline below.
+stuck=900
 # Orthogonal to that heartbeat rather than a spare of it: the heartbeat needs
-# 300s of quiet and 700s of static log, and every #795 death measured so far
+# 960s of quiet and 900s of static log, and every #795 death measured so far
 # lands inside the first 750s of the step.
 watchdog='' ci_watchdog_pid=''
 # Wall-clock backstop, because staticness alone bounds nothing: the deadline above
 # is read before each dispatch, and past it the tests in flight may still spend
 # $per_test and then a traced rerun, each writing a progress line that re-arms
-# $stuck. 1500s clears that 600+600 worst case with room for the hang dump, and
-# leaves 20 minutes of the step's 45 to fail on our own terms and upload (#1126).
-hard_deadline=1500
+# $stuck. 2400s clears that 1500+600 worst case with room for the hang dump, and
+# leaves 300s of the step's 45 minutes to fail on our own terms and upload (#1126).
+hard_deadline=2400
 ci_start_native_watchdog "$PWD/$progress" && watchdog=$ci_watchdog_pid
 test -n "$watchdog" || echo "no off-box watchdog: no usable PowerShell"
-ci_suite_heartbeat 300 120 "$progress" "$stuck" $$ "$hard_deadline" &
+ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ "$hard_deadline" &
 heartbeat=$!
 trap 'set +e; kill "$heartbeat" 2>/dev/null; test -z "$watchdog" || kill_pid "$watchdog"' EXIT
 
 pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
 # Tests in flight at once, min(2*nproc, 16) as ci.yml gives "make check" on every
-# platform: each test binds its own ephemeral-port server, so they never contend,
-# and they spend most of their wall time asleep. Serial, this suite takes 23 min.
+# platform: each binds its own ephemeral-port server, and they mostly sleep.
 cores=$(nproc 2>/dev/null || echo "${NUMBER_OF_PROCESSORS:-2}")
 case "$cores" in '' | 0 | *[!0-9]*) cores=2 ;; esac
 jobs=$((cores * 2))
@@ -240,14 +242,12 @@ results=suite-results
 rm -rf "$results"
 mkdir -p "$results"
 
-# Run test $1 to completion: its one-line verdict on stdout, the 25 lines a
-# failure has to show into $results/$1.tail, and its status last of all into
-# $results/$1.rc, which is what says the worker got that far.
+# Run test $1 to completion: its verdict on stdout, a failure's 25-line tail into
+# $results/$1.tail, and its status last into $results/$1.rc, which says it got there.
 run_one_test() (
     local t=$1 rc=0 left ttmp
-    # Its own TMPDIR, so dump_crawl_logs (testlib.sh) deletes this test's crawl
-    # dirs and no one else's: it globs the whole of TMPDIR. Windows-shaped like
-    # the export above, since the tests hand it to a native httrack.exe.
+    # Its own TMPDIR, since dump_crawl_logs (testlib.sh) globs the whole of it.
+    # Windows-shaped like the export above: the tests hand it to a native exe.
     ttmp="$TMPDIR/suite.$t"
     rm -rf "$ttmp" 2>/dev/null || true
     mkdir -p "$ttmp"
@@ -294,9 +294,8 @@ run_one_test() (
     echo "$rc" >"$results/$t.rc"
 )
 
-# Workers still running, into $workers. Counted rather than taken from wait -n,
-# which returns for any job -- the heartbeat is one too -- and before bash 5.1
-# cannot be told which pids to watch.
+# Workers still running, into $workers. Counted, not taken from wait -n, which
+# returns for any job (the heartbeat included) and cannot be told which to watch.
 workers=0
 count_workers() {
     local p
@@ -345,7 +344,9 @@ for t in "${tests[@]}"; do
     echo "RUN $t at ${elapsed}s" >>"$progress"
     ran_tests+=("$t")
     if test "$jobs" -eq 1; then
-        run_one_test "$t"
+        # Never fatal: a worker killed by a signal is one failed test, not the
+        # end of the suite, and only the gates below may stop it (errexit).
+        run_one_test "$t" || true
         continue
     fi
     count_workers
@@ -377,10 +378,8 @@ for t in ${ran_tests[@]+"${ran_tests[@]}"}; do
     esac
     test ! -s "$results/$t.tail" || cat "$results/$t.tail"
 done
-# An orphaned native httrack.exe spins and starves the runner, which is how this
-# job dies with "lost communication" rather than a plain timeout. Once, at the
-# end: matching by image name, a reap between two tests cannot tell a leak from a
-# neighbour's live engine. What bounds a wedge is the per-test tree kill above.
+# An orphaned httrack.exe spins and starves the runner ("lost communication"). Once,
+# at the end: matching by image name, an earlier reap cannot spare a live sibling.
 reap_leftover_processes "the suite" | tee -a "$progress"
 echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
     tee -a "$GITHUB_STEP_SUMMARY"
