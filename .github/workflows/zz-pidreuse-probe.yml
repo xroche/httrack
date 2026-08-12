@@ -247,18 +247,23 @@ jobs:
           Say ("  orphan children still alive under a dead B/E parent: {0}" -f $kidsAlive)
 
           # --- hunt.
-          $hitA = 0; $hitB = 0; $hitC = 0; $hitD = 0; $hitE = 0; $boxHits = 0
-          $spawns = 0; $tested = 0; $followed = 0
+          $hitA = New-Object 'System.Collections.Generic.HashSet[int]'
+          $hitB = New-Object 'System.Collections.Generic.HashSet[int]'
+          $hitC = New-Object 'System.Collections.Generic.HashSet[int]'
+          $hitD = New-Object 'System.Collections.Generic.HashSet[int]'
+          $hitE = New-Object 'System.Collections.Generic.HashSet[int]'
+          $boxHits = 0
+          $spawns = 0; $tested = 0; $followed = 0; $survived = 0
+          $KILLCAP = 25
           $distinct = New-Object 'System.Collections.Generic.HashSet[int]'
           $window = New-Object 'System.Collections.Generic.Queue[System.Diagnostics.Process]'
           $minPid = [int]::MaxValue; $maxPid = 0
 
           function Test-Hit([int]$np) {
-            if ($script:aPid.Contains($np)) { $script:hitA++ }
-            if ($script:dPid.Contains($np)) { $script:hitD++ }
+            if ($script:aPid.Contains($np)) { [void]$script:hitA.Add($np) }
+            if ($script:dPid.Contains($np)) { [void]$script:hitD.Add($np) }
             if ($script:cPid.Contains($np)) {
-              $script:hitC++
-              if ($script:hitC -le 5) { Say ("!! set C hit: PID $np was handed out although an open process handle on it is still held") }
+              if ($script:hitC.Add($np) -and $script:hitC.Count -le 5) { Say ("!! set C hit: PID $np was handed out although an open process handle on it is still held") }
             }
             if ($script:boxOrphan.ContainsKey($np)) {
               $script:boxHits++
@@ -270,7 +275,8 @@ jobs:
             $isB = $script:bPid.Contains($np)
             $isE = $script:ePid.Contains($np)
             if (-not ($isB -or $isE)) { return $false }
-            if ($isB) { $script:hitB++ } else { $script:hitE++ }
+            if ($isB) { [void]$script:hitB.Add($np) } else { [void]$script:hitE.Add($np) }
+            if ($script:tested -ge $script:KILLCAP) { return $false }
 
             $live = @()
             foreach ($o in $script:orphan[$np]) {
@@ -297,6 +303,7 @@ jobs:
               if (-not $alive) { $anyDied = $true }
               Say ("   stale-PPID orphan {0}: alive after the kill = {1}" -f $o.Pid, $alive)
             }
+            if (-not $anyDied) { $script:survived++ }
             if ($anyDied) {
               $script:followed++
               Say "   >>> THE TREE WALK FOLLOWED A STALE PPID. taskkill /T does not validate that the recorded parent is the real one."
@@ -304,7 +311,7 @@ jobs:
               Say "   >>> the orphan survived: taskkill /T did not follow the stale PPID."
             }
             Say ""
-            return ($script:tested -ge 5)
+            return $false
           }
 
           $sw = [Diagnostics.Stopwatch]::StartNew()
@@ -325,22 +332,24 @@ jobs:
               try { $old.Kill() } catch { }
               try { $old.Dispose() } catch { }
             }
-            if (($spawns % 250) -eq 0) { Write-Host ("   ... spawn $spawns, distinct $($distinct.Count), A=$hitA B=$hitB C=$hitC D=$hitD E=$hitE, t=$([int]$sw.Elapsed.TotalSeconds)s") }
+            if (($spawns % 250) -eq 0) { Write-Host ("   ... spawn $spawns, distinct $($distinct.Count), A=$($hitA.Count) B=$($hitB.Count) C=$($hitC.Count) D=$($hitD.Count) E=$($hitE.Count), t=$([int]$sw.Elapsed.TotalSeconds)s") }
           }
 
           Say ""
           Say "== RESULT =="
           Say ("spawns {0}, distinct PIDs {1}, range {2}..{3}, {4:N0}s" -f $spawns, $distinct.Count, $minPid, $maxPid, $sw.Elapsed.TotalSeconds)
-          Say ("hits, by set (each set freed 200-300 PIDs at the same instant):")
-          Say ("  A  killed, handle disposed, no child   : {0} / {1} PIDs" -f $hitA, $aPid.Count)
-          Say ("  C  killed, handle still OPEN           : {0} / {1} PIDs" -f $hitC, $cPid.Count)
-          Say ("  D  dead orphan-maker, child killed     : {0} / {1} PIDs" -f $hitD, $dPid.Count)
-          Say ("  B  dead orphan-maker, ping child ALIVE : {0} / {1} PIDs" -f $hitB, $bPid.Count)
-          Say ("  E  dead orphan-maker, wscript ALIVE    : {0} / {1} PIDs" -f $hitE, $ePid.Count)
-          Say ("tree kills issued on a reused stale-parent PID: {0}; of those, kills that reached the orphan: {1}" -f $tested, $followed)
+          Say ("distinct set PIDs reissued, by set:")
+          Say ("  A  killed, handle disposed, no child   : {0} of {1}" -f $hitA.Count, $aPid.Count)
+          Say ("  C  killed, handle still OPEN           : {0} of {1}" -f $hitC.Count, $cPid.Count)
+          Say ("  D  dead orphan-maker, child killed     : {0} of {1}" -f $hitD.Count, $dPid.Count)
+          Say ("  B  dead orphan-maker, ping child ALIVE : {0} of {1}" -f $hitB.Count, $bPid.Count)
+          Say ("  E  dead orphan-maker, wscript ALIVE    : {0} of {1}" -f $hitE.Count, $ePid.Count)
+          Say ("tree kills issued on a reissued stale-parent PID: {0}; reached the orphan: {1}; orphan survived: {2}" -f $tested, $followed, $survived)
           Say ("collisions with a dead PPID recorded by a process we did NOT start: {0}" -f $boxHits)
-          if ($hitA -eq 0) {
-            Say "INTERPRETATION: even the baseline never came back, so this run recycled nothing and says nothing about B or E."
+          if ($tested -gt 0 -and $followed -eq 0) {
+            Say "INTERPRETATION: a dead parent's PID IS reissued while a live process still records it as its parent, in $tested measured cases, and taskkill /F /T left that process alone every time. The tree walk does not follow a stale PPID: it skips a claimed child that predates the process now holding the PID."
+          } elseif ($hitA.Count -eq 0 -and $hitB.Count -eq 0 -and $hitE.Count -eq 0) {
+            Say "INTERPRETATION: nothing came back, so this run recycled nothing and says nothing either way."
           } elseif ($tested -eq 0) {
             Say "INTERPRETATION: PIDs recycle (A>0) but no PID with a live process recording it as parent ever came back. On this kernel such a PID stays reserved, so a tree kill cannot land on one and the stale-PPID mechanism cannot fire."
           } elseif ($followed -gt 0) {
