@@ -1737,6 +1737,56 @@ static int array_growth_selftests(void) {
   return err;
 }
 
+/* The arena's promise is that what it hands out never moves, so this keeps
+   every pointer it returns and re-reads them all at the end. */
+static int st_arena(httrackp *opt, int argc, char **argv) {
+  enum { count = 4096 };
+
+  hts_arena arena = {NULL, 0, 0};
+  char **kept = (char **) calloct(count, sizeof(*kept));
+  char BIGSTK big[HTS_ARENA_MIN * 2];
+  char token[256];
+  int i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(kept != NULL);
+
+  /* Enough tokens to span many chunks, each holding its own index. */
+  for (i = 0; i < count; i++) {
+    snprintf(token, sizeof(token), "%d-%*s", i, 200, "x");
+    kept[i] = hts_arena_strdup(&arena, token);
+    assertf(kept[i] != NULL);
+  }
+  /* One allocation larger than a whole chunk takes one of its own. */
+  memset(big, 'b', sizeof(big) - 1);
+  big[sizeof(big) - 1] = '\0';
+  assertf(hts_arena_strdup(&arena, big) != NULL);
+  /* An aligned allocation is aligned whatever the byte-sized ones did to it. */
+  for (i = 0; i < 8; i++) {
+    void *const p = hts_arena_alloc(&arena, sizeof(hts_arena_align));
+
+    assertf(p != NULL);
+    assertf(((size_t) (char *) p) % HTS_ARENA_ALIGN == 0);
+    assertf(hts_arena_strdup(&arena, "x") != NULL);
+  }
+  /* Nothing moved: every token still reads back as itself. */
+  for (i = 0; i < count; i++) {
+    snprintf(token, sizeof(token), "%d-%*s", i, 200, "x");
+    assertf(strcmp(kept[i], token) == 0);
+  }
+  /* A size that would wrap when rounded up is refused, not truncated. */
+  assertf(hts_arena_alloc(&arena, (size_t) -1) == NULL);
+
+  freet(kept);
+  hts_arena_free(&arena);
+  assertf(arena.chunks == NULL && arena.size == 0 && arena.used == 0);
+  hts_arena_free(&arena); /* releasing an empty arena is a no-op */
+  printf("arena self-test OK\n");
+  return 0;
+}
+
 static int st_arrays(httrackp *opt, int argc, char **argv) {
   /* volatile keeps the sizes below opaque, so these stay runtime checks rather
      than compile-time allocation warnings. */
@@ -9500,6 +9550,7 @@ static const struct selftest_entry {
      "bounded string-op self-test", st_strsafe},
     {"strsprintf", "", "StringSprintf grows to fit at every capacity boundary",
      st_strsprintf},
+    {"arena", "", "htsarena.h hands out addresses that never move", st_arena},
     {"arrays", "[overflow-capa|overflow-loop]",
      "htsarrays.h growth reaches the requested room, overflow aborts",
      st_arrays},

@@ -554,37 +554,9 @@ static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
   return HTS_TRUE;
 }
 
-struct cmdl_chunk {
-  cmdl_chunk *next;
-};
-
-/* The token bytes CHUNK carries, which follow it. */
-static char *cmdl_chunk_data(cmdl_chunk *chunk) { return (char *) (chunk + 1); }
-
-/* Chunk floor, so an ordinary command line needs one allocation. */
-#define CMDL_CHUNK_MIN 32768
-
-/* Cut later tokens from a new chunk of at least need bytes; cmd is unchanged
-   on failure. */
-static hts_boolean cmdl_grow(cmdl_argv *cmd, size_t need) {
-  size_t size = need > CMDL_CHUNK_MIN ? need : CMDL_CHUNK_MIN;
-  cmdl_chunk *chunk;
-
-  if (size > (size_t) -1 - sizeof(cmdl_chunk))
-    return HTS_FALSE;
-  chunk = (cmdl_chunk *) malloct(sizeof(cmdl_chunk) + size);
-  if (chunk == NULL)
-    return HTS_FALSE;
-  chunk->next = cmd->chunks;
-  cmd->chunks = chunk;
-  cmd->chunk_size = size;
-  cmd->chunk_used = 0;
-  return HTS_TRUE;
-}
-
-hts_boolean cmdl_init(cmdl_argv *cmd, size_t chunk_size, int slots) {
+hts_boolean cmdl_init(cmdl_argv *cmd, int slots) {
   memset(cmd, 0, sizeof(*cmd));
-  if (!cmdl_grow(cmd, chunk_size) || !cmdl_reserve(cmd, slots)) {
+  if (!cmdl_reserve(cmd, slots)) {
     cmdl_free(cmd);
     return HTS_FALSE;
   }
@@ -592,40 +564,25 @@ hts_boolean cmdl_init(cmdl_argv *cmd, size_t chunk_size, int slots) {
 }
 
 void cmdl_free(cmdl_argv *cmd) {
-  cmdl_chunk *chunk = cmd->chunks;
-
-  while (chunk != NULL) {
-    cmdl_chunk *const next = chunk->next;
-
-    freet(chunk);
-    chunk = next;
-  }
+  hts_arena_free(&cmd->tokens);
   freet(cmd->argv);
   memset(cmd, 0, sizeof(*cmd));
 }
 
-/* Room left in the newest chunk; 0 makes the bounded copy abort rather than
-   write past it. */
-static size_t cmdl_room(const cmdl_argv *cmd) {
-  return cmd->chunk_used < cmd->chunk_size ? cmd->chunk_size - cmd->chunk_used
-                                           : 0;
-}
-
 hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
-  const size_t len = strlen(token) + 1;
+  char *copy;
   int i;
 
   assertf(pos >= 0 && pos <= cmd->argc);
   /* argc <= capacity <= CMDL_MAX_SLOTS holds here, so argc + 1 can not wrap */
   if (!cmdl_reserve(cmd, cmd->argc + 1))
     return HTS_FALSE;
-  if (len > cmdl_room(cmd) && !cmdl_grow(cmd, len))
+  copy = hts_arena_strdup(&cmd->tokens, token);
+  if (copy == NULL)
     return HTS_FALSE;
   for (i = cmd->argc; i > pos; i--)
     cmd->argv[i] = cmd->argv[i - 1];
-  cmd->argv[pos] = cmdl_chunk_data(cmd->chunks) + cmd->chunk_used;
-  strlcpybuff(cmd->argv[pos], token, cmdl_room(cmd));
-  cmd->chunk_used += len;
+  cmd->argv[pos] = copy;
   cmd->argc++;
   return HTS_TRUE;
 }

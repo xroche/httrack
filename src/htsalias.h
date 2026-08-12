@@ -35,6 +35,7 @@ Please visit our Website: http://www.httrack.com
 #define HTSALIAS_DEFH
 
 #include "htsglobal.h"
+#include "htsarena.h"
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
@@ -53,34 +54,29 @@ const char *opthelp_value(int p);
 const char *hts_gethome(void);
 void expand_home(String * str);
 
-/* One token-block allocation, its bytes following the link. */
-typedef struct cmdl_chunk cmdl_chunk;
-
-/* Command line rebuilt from argv, config files and doit.log, both parts growing
-   on demand. A chunk is never resized, so every argv[] slot, and every pointer
-   a caller kept into one, survives the growth. */
+/* Command line rebuilt from argv, config files and doit.log: slots into an
+   arena holding the tokens, both growing on demand. The arena is what keeps
+   every argv[] slot, and every pointer a caller kept into one, valid. */
 typedef struct {
   char **argv; /* argc slots used out of capacity allocated */
   int argc;
   int capacity;
-  cmdl_chunk *chunks; /* newest first; tokens are cut from the newest */
-  size_t chunk_size;  /* the newest chunk, chunk_used of chunk_size in use */
-  size_t chunk_used;
+  hts_arena tokens;
 } cmdl_argv;
 
-/* Allocate a first token chunk of at least chunk_size bytes and room for slots
-   entries. HTS_FALSE if either fails, leaving cmd empty. */
-hts_boolean cmdl_init(cmdl_argv *cmd, size_t chunk_size, int slots);
+/* Prepare an empty command line with room for slots entries. HTS_FALSE if the
+   slots cannot be allocated. */
+hts_boolean cmdl_init(cmdl_argv *cmd, int slots);
 
 /* Release cmd; the tokens its argv pointed at die with it. */
 void cmdl_free(cmdl_argv *cmd);
 
 /* Append token as the last entry. HTS_FALSE if it does not fit and neither the
-   slots nor the chunks can be grown. */
+   slots nor the arena can be grown. */
 hts_boolean cmdl_add(cmdl_argv *cmd, const char *token);
 
 /* Insert token at 0 <= pos <= argc, shifting the entries above it up by one.
-   HTS_FALSE if it does not fit and neither the slots nor the chunks can be
+   HTS_FALSE if it does not fit and neither the slots nor the arena can be
    grown. */
 hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos);
 

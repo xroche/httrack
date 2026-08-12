@@ -224,7 +224,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   /* command line rebuilt from argv, config files and doit.log */
-  cmdl_argv x_cmd = {NULL, 0, 0, NULL, 0, 0};
+  cmdl_argv x_cmd = {NULL, 0, 0, {NULL, 0, 0}};
 
   //
   int argv_url = -1;            // ==0 : utiliser cache et doit.log
@@ -312,19 +312,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   }
 
   /* create the token block for the transformed command line */
-  {
-    size_t current_size = 0;
-    int na;
-
-    for(na = 0; na < argc; na++)
-      current_size += strlen(argv[na]) + 1;
-    /* the current argv and argc slots to start with; alias expansion, the
-       config files and doit.log grow both */
-    if (!cmdl_init(&x_cmd, current_size, argc)) {
-      HTS_PANIC_PRINTF("Error, not enough memory");
-      htsmain_free();
-      return -1;
-    }
+  if (!cmdl_init(&x_cmd, argc)) {
+    HTS_PANIC_PRINTF("Error, not enough memory");
+    htsmain_free();
+    return -1;
   }
 
   /* Create new argc/argv, replace alias, count URLs, treat -h, -q, -i */
@@ -834,7 +825,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                               StringBuff(opt->path_log),
                               "hts-cache/doit.log"))) { // un cache est présent
-        if (x_cmd.chunks != NULL) {
+        if (x_cmd.tokens.chunks != NULL) {
           int m;
 
           // établir mode - mode cache: 1 (cache valide) 2 (cache à vérifier)
