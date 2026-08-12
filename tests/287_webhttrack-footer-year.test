@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# The WebHTTrack footer year is expanded on each request (#1165), so it cannot
-# drift from the calendar the way the 23 hardcoded copies did.
+# The WebHTTrack footer year comes from the clock (#1165), so it cannot drift
+# from the calendar the way the 23 hardcoded copies did.
 
 set -euo pipefail
 
@@ -20,8 +20,8 @@ cleanup_push cleanup
 
 printf '[every server footer takes its year from the clock] ..\t'
 
-# Converting one page and leaving 22 stamped renders correctly on the page the
-# request below reads, so sweep the tree rather than trust that one reply.
+# The probe below reads one page, so sweep them all here: converting index.html
+# and leaving the other 22 stamped would still serve a correct-looking reply.
 stamped=$({ grep -l '&copy; 1998-[0-9]' "${distdir}"/html/server/*.html || true; })
 test -z "${stamped}" || fail "footers still carry a stamped year: ${stamped}"
 footers=$({ grep -l 'id="footer"' "${distdir}"/html/server/*.html || true; } | wc -l)
@@ -42,12 +42,17 @@ chmod -R u+w "${root}"
 printf '%s\n' 'year=[${date:year}] unknown=[${date:month}] longer=[${date:yearly}]' \
     >"${root}/html/server/probe-1165.html"
 
-# An hour before New Year UTC, read from 14 hours east of it: the pinned year is
-# 2019 through gmtime and 2020 through localtime, so this says which one runs.
+# One hour before New Year UTC, read 14 hours east of it: gmtime says 2019 and
+# localtime says 2020, so the reply names which one ran.
 pinned=2019
 epoch=$("${HTS_PYTHON}" -c \
     "import datetime;print(int(datetime.datetime(${pinned},12,31,23,tzinfo=datetime.timezone.utc).timestamp()))")
 export TZ=XXX-14
+
+# The server shares this libc: where the offset is ignored the two agree, and
+# the assertion below passes without seeing anything.
+local_year=$("${HTS_PYTHON}" -c "import time;print(time.localtime(${epoch}).tm_year)")
+test "${local_year}" -eq $((pinned + 1)) || skip "TZ=${TZ} is not honored here"
 
 # Pinned first: a year hardcoded in C would pass every clock check below.
 export SOURCE_DATE_EPOCH="${epoch}"
@@ -59,7 +64,7 @@ grep -q "year=\[${pinned}\]" <<<"${reply}" ||
 grep -q 'unknown=\[\] longer=\[\]' <<<"${reply}" ||
     fail "a field that is not year expands to something: ${reply}"
 
-# ... and a shipped page has to carry the token rather than a stamped year.
+# A shipped page must carry the token, not a stamped year.
 reply=$(htsserver_get /server/index.html)
 grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "index.html: ${reply}"
 grep -q "&copy; 1998-${pinned} Xavier Roche &amp; other contributors" <<<"${reply}" ||
@@ -71,9 +76,10 @@ esac
 htsserver_stop
 unset TZ
 
-# No override, then two the parser cannot use: all three take the real clock,
-# because a footer reading 1998-1970 is worse than an ignored override.
-for override in '' abc 99999999999999999999; do
+# No override, then five the code must refuse: unparsable, past time_t, negative,
+# and two whose year gmtime returns but no footer can show (the last overflows
+# the add). Each takes the real clock: an ignored override beats 1998-1970.
+for override in '' abc 99999999999999999999 -1 -62230000000 67768036191676799; do
     if test -n "${override}"; then
         export SOURCE_DATE_EPOCH="${override}"
     else

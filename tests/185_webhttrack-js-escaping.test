@@ -23,9 +23,10 @@ subst = re.compile(r"\$\{([^}]*)\}")
 # themselves. unquoted: only rewrites ", so it needs the mode like a bare key.
 directive = re.compile(r"/\*|^(do|test|ztest|checked|list|liststr|listid|fexist"
                        r"|file-exists|arg):")
-# Shipped translations, build-time constants and the digits the server computes
-# itself (date:); everything else is runtime data.
-constant = re.compile(r"^(LANG_|LANGUAGE_|HTTRACK_|HTS_PLATFORM|date:)")
+# Shipped translations, build-time constants and the four digits the server
+# computes itself; everything else is runtime data. Only the date: field that
+# exists is exempt, so a later one carrying text has to argue its own case.
+constant = re.compile(r"^(LANG_|LANGUAGE_|HTTRACK_|HTS_PLATFORM|date:year$)")
 # One attribute; an unquoted value ends on whitespace, so it closes as easily.
 attribute = re.compile(r"""\s*(?P<name>[A-Za-z][A-Za-z0-9:_.-]*)
                            (?:\s*=\s*(?:"(?P<dq>[^"]*)"|'(?P<sq>[^']*)'
@@ -157,11 +158,12 @@ for what, text in [
         ("a bare key in a handler", "<a onClick=\"f('${LANG_X}')\">"),
         ("an unclosed output-mode region",
          '${do:output-mode:html-urlescaped}\n<input value="${LANG_X}">'),
-        # the date: exemption below must not open element body to anything
-        # else, nor every key that carries a colon
+        # the date:year exemption below must not open element body to anything
+        # else: another key with a colon, or another field under date:
         ("a settings value in element body", "<p>${projname}</p>"),
         ("a colon-bearing runtime key in element body",
-         "<p>${unquoted:projname}</p>")]:
+         "<p>${unquoted:projname}</p>"),
+        ("an unexempted date: field", "<p>${date:month}</p>")]:
     if not scan("control.html", text)[0]:
         sys.exit("the scanner does not see %s" % what)
 for what, text in [
