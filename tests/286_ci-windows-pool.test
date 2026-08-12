@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The offline suite's worker pool (ci-windows-suite.sh): tests really do run side
-# by side, the tally still accounts for every one of them, and each is handed a
-# TMPDIR of its own, without which one test's crawl-log dump deletes another's.
+# The offline suite's worker pool (ci-windows-suite.sh): the requested width really
+# runs at once, the tally still counts every test, and each gets its own TMPDIR.
 
 set -euo pipefail
 
@@ -45,10 +44,9 @@ stub() { # stub <path> <exit status> [shell line]
         "${3:-:}" "$2" >"$1"
 }
 
-# A copy of the driver, since $testdir decides whose testlib and whose watchdog it
-# finds. No ci-windows-watchdog.ps1 goes with it, so it starts no PowerShell, and
-# the reap is neutered: matching engines by name, it would kill a sibling's under
-# "make check -j".
+# A copy of the driver: $testdir decides whose testlib and watchdog it finds, no
+# .ps1 goes with it (so no PowerShell), and the reap is neutered, or it would kill
+# a sibling's engine under "make check -j".
 stage() { # stage <dir>
     local d=$1 t
     mkdir -p "$d/rt"
@@ -91,34 +89,49 @@ assert_tally() {
     grep -q '^SKIP 11_engine-skip.test$' "$tmp/out" || fail "$1: the skipped test was not named"
 }
 
-# Six tests that do nothing but sleep: serially they cost 12s, so a pool six wide
-# has to come in far under that.
+# Tests handed a TMPDIR that is not the suite.<name> dir of their own name.
+strays() { awk '{ n = $1; sub(/.*\//, "", n); if (index($2, "/suite." n) == 0) print }' \
+    "$share/tmpdirs"; }
+# Deepest overlap the markers below recorded: a pool silently capped narrower than
+# it was asked for cannot reach the width, where a timing ratio still would.
+peak() { awk '$0 == "+" { if (++n > m) m = n } $0 == "-" { n-- } END { print m + 0 }' "$share/conc"; }
+
+# The six the driver dispatches first, each marking the window it is in flight
+# for: serially they cost 12s, so six workers have to come in far under that.
 par=$tmp/par
 stage "$par"
-for t in 00_runnable 13_zlib-pass 14_local-pass 15_watchdog-pass 18_testlib-pass 19_crawllib; do
-    stub "$par/$t.test" 0 'sleep 2'
+# shellcheck disable=SC2016 # the stub's own expansions, not this shell's
+busy='echo + >>"$POOLSHARE/conc"; sleep 2; echo - >>"$POOLSHARE/conc"'
+for t in 00_runnable:0 10_engine-pass:0 11_engine-skip:77 12_engine-fail:3 \
+    13_zlib-pass:0 14_local-pass:0; do
+    stub "$par/${t%:*}.test" "${t#*:}" "$busy"
 done
 
 : >"$share/tmpdirs"
+: >"$share/conc"
 run_suite "$par" 6
 fast=$spent
 assert_tally "at six workers"
+wide=$(peak)
+test "$wide" -ge 6 || fail "at most $wide tests in flight at once, want the 6 workers asked for"
 
 # The traced re-run of the failing test runs outside test-timeout.sh, so it is the
 # one leg whose TMPDIR the driver itself decides.
 records=$(grep -c . "$share/tmpdirs" || true)
 test "$records" -eq 13 ||
     fail "$records tests reported a TMPDIR, want 13 (twelve plus the traced re-run)"
-stray=$(awk '{ n = $1; sub(/.*\//, "", n); if (index($2, "/suite." n) == 0) print }' \
-    "$share/tmpdirs")
+stray=$(strays)
 test -z "$stray" || fail "a test was handed a TMPDIR that is not its own: $stray"
 
 # Serial, on the same stubs: it says the sleeps really cost what the comparison
-# above rests on, and it drives the fallback a bash without wait -n takes.
+# above rests on, it drives the fallback a bash without wait -n takes, and it is
+# the control on the marker file, which must read 1 where the pool read 6.
 : >"$share/tmpdirs"
+: >"$share/conc"
 run_suite "$par" 1
 slow=$spent
 assert_tally "one at a time"
+test "$(peak)" -eq 1 || fail "$(peak) tests in flight at once with a single worker"
 test "$slow" -ge 10 || fail "twelve stubs, six of them sleeping 2s, ran serially in ${slow}s"
 test "$fast" -le $((slow / 2)) ||
     fail "six workers took ${fast}s against ${slow}s serial: nothing ran in parallel"
@@ -133,8 +146,7 @@ cmp -s "$par/ci-windows-suite.sh" "$mut/ci-windows-suite.sh" &&
     fail "the shared-TMPDIR mutant changed nothing, so it proves nothing"
 : >"$share/tmpdirs"
 run_suite "$mut" 6
-stray=$(awk '{ n = $1; sub(/.*\//, "", n); if (index($2, "/suite." n) == 0) print }' \
-    "$share/tmpdirs")
+stray=$(strays)
 test -n "$stray" || fail "a suite sharing one TMPDIR passed the check above"
 
 # What a shared TMPDIR costs: dump_crawl_logs empties the one it is given, so two
