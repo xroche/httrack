@@ -15,7 +15,7 @@ if test "${V6_SUPPORT:-}" == "no"; then
     exit 77
 fi
 
-python=$(find_python) || skip "python3 missing" # freeport reads it from here
+python=$(find_python) || skip "python3 missing" # hold_port reads it from here
 
 root=$(nativepath "$top_srcdir/tests/server-root")
 tmpdir=$(mktemp -d)
@@ -28,8 +28,29 @@ cleanup_push cleanup
 # decoy origin: it must stay silent. LOCAL_SERVER_VERBOSE logs any request it gets.
 local_server_start --env LOCAL_SERVER_VERBOSE=1 --root "$root" --bind 127.0.0.1
 
-# a proxy port nothing listens on: grab a free one and let it close (refuses).
-deadproxy=$(freeport)
+# a proxy port nothing listens on, held for the whole crawl: a freeport number a
+# neighbour then binds would answer, retiring the premise silently (#1218).
+# Not on macOS, which drops the SYN on a held port where Linux resets it, so the
+# crawl would time out instead of failing to connect and stop testing the bypass.
+# That leaves the #1218 race here on macOS alone, as it was everywhere before.
+if test "$(uname -s)" = Darwin; then
+    deadproxy=$(freeport)
+else
+    hold_port
+    deadproxy=$HELD_PORT
+fi
+
+# Checked rather than trusted, whichever branch picked it: anything answering
+# here would retire the premise while the crawl still failed.
+"$python" -c 'import socket, sys
+s = socket.socket()
+s.settimeout(2)
+try:
+    s.connect(("127.0.0.1", int(sys.argv[1])))
+    sys.exit("accepted")
+except OSError:
+    pass
+s.close()' "$deadproxy" || fail "the held proxy port $deadproxy answers a connect"
 
 # origin resolves to two addresses so a fallback would have a second to dial;
 # 127.0.0.1 (the decoy) is the one the old bypass reached.

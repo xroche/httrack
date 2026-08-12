@@ -393,7 +393,7 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # webdav-default and proxytrack-quiet read proxytrack's console through a pty,
 # which Windows Python does not build;
 # badmtime needs a filesystem that stores an mtime past gmtime's range;
-# single-file-gui drives htsserver, which this job does not build;
+# single-file-gui and holdport drive htsserver, which this job does not build;
 # update-304-leak and cmdline-leak need a LeakSanitizer build, which MSVC has no
 # equivalent of;
 # crash-symbolize and backtrace-empty need backtrace(), which Windows has no
@@ -430,7 +430,8 @@ expected_skips="01_engine-footer-overflow.test
 71_local-crange-repaircache.test
 80_engine-crash-symbolize.test
 88_local-proxytrack-badmtime.test
-241_local-single-file-gui.test"
+241_local-single-file-gui.test
+288_testlib-holdport.test"
 # First, or the deadline reads as an unexplained shortfall in the gates below.
 [ "$deadline" -eq 0 ] || {
     echo "::error::suite did not finish within ${suite_deadline}s"
