@@ -211,11 +211,17 @@ request_engine_backtraces() {
 # reach a native httrack.exe. cdb ships with the SDK on the runner image but that
 # is incidental, so probe for it and say so when it is missing. The MSVC build
 # writes PDBs beside the binaries, which the test step already puts on PATH, so
-# frames resolve to names. Serial runners only: it stacks every engine process it
-# finds, having no process group to scope by.
+# frames resolve to names. Opt-in (HTTRACK_EXCLUSIVE_HOST), because with no
+# process group to scope by it stacks every engine on the host: under a parallel
+# run that freezes each sibling's for up to 60s, and a cdb killed by its own
+# timeout can take its debuggee with it.
 dump_windows_stacks() {
     local c p
     local cdb='' found=''
+    if test -z "${HTTRACK_EXCLUSIVE_HOST:-}"; then
+        printf 'no stacks: other tests are running on this host\n'
+        return 0
+    fi
     for c in "$(command -v cdb 2>/dev/null)" \
         "/c/Program Files (x86)/Windows Kits/10/Debuggers/x64/cdb.exe" \
         "/c/Program Files (x86)/Windows Kits/10/Debuggers/x86/cdb.exe"; do
