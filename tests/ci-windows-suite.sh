@@ -246,11 +246,18 @@ for t in "${tests[@]}"; do
     fi
     echo "RUN $t at ${elapsed}s" >>"$progress"
     rc=0
+    # Its own TMPDIR, so dump_crawl_logs (testlib.sh) deletes this test's crawl
+    # dirs and no one else's: it globs the whole of TMPDIR. Windows-shaped like
+    # the export above, since the tests hand it to a native httrack.exe.
+    ttmp="$TMPDIR/suite.$t"
+    rm -rf "$ttmp" 2>/dev/null || true
+    mkdir -p "$ttmp"
     # Same guard "make check" uses on POSIX, so a wedge is diagnosed the
     # same way on every platform. It dumps before it kills, which a bare
     # run_with_timeout cannot: by the time that returns, the tree whose
     # stack we wanted is already gone.
-    HTTRACK_TEST_TIMEOUT=$per_test bash ./test-timeout.sh "$t" >"$t.log" 2>&1 || rc=$?
+    HTTRACK_TEST_TIMEOUT=$per_test TMPDIR="$ttmp" \
+        bash ./test-timeout.sh "$t" >"$t.log" 2>&1 || rc=$?
     case "$rc" in
     0)
         pass=$((pass + 1))
@@ -281,7 +288,9 @@ for t in "${tests[@]}"; do
             # Noted first, or a slow trace reads as a wedge to the watchdog,
             # which would then kill the step in the middle of writing it.
             echo "RERUN $t" >>"$progress"
-            run_with_timeout "$left" bash -x "$t" >>"$t.log" 2>&1 || true
+            # Handed the same TMPDIR: the trace runs outside test-timeout.sh,
+            # which is what gave the first run one of its own.
+            TMPDIR="$ttmp" run_with_timeout "$left" bash -x "$t" >>"$t.log" 2>&1 || true
         else
             echo "no trace: past the ${suite_deadline}s suite deadline"
         fi
@@ -289,6 +298,8 @@ for t in "${tests[@]}"; do
         ;;
     esac
     echo "$rc $t" >>"$progress"
+    # Never fatal: Windows may still hold a file the killed tree left open.
+    rm -rf "$ttmp" 2>/dev/null || true
     # An orphaned native httrack.exe spins and starves the runner, which
     # is how this job dies with "lost communication" rather than a plain
     # timeout. Clear them between tests and name whoever leaked them.
