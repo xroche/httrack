@@ -135,7 +135,23 @@ done
 printf '#!/bin/sh\necho "TOKEN=${WATCHDOG_TOKEN:-}" >%s\nexit 0\n' "$tmp/childtoken" \
     >"$run/10_engine-pass.test"
 printf '#!/bin/sh\nexit 77\n' >"$run/11_engine-skip.test"
-printf '#!/bin/sh\nexit 3\n' >"$run/12_engine-fail.test"
+# Intermittent, and chatty on the re-run: the trace appends to the failing run's
+# log, so only a stub that passes the second time and outruns the 25-line tail
+# can tell a report that kept the failure from one that kept the trace.
+cat >"$run/12_engine-fail.test" <<EOF
+#!/bin/sh
+if test -e "$tmp/failedonce"; then
+    i=0
+    while [ \$i -lt 40 ]; do
+        echo "trace line \$i"
+        i=\$((i + 1))
+    done
+    exit 0
+fi
+: >"$tmp/failedonce"
+echo "the first run said so"
+exit 3
+EOF
 cd "$run"
 rc=0
 out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" WATCHDOG_TOKEN=s3cr3t \
@@ -153,6 +169,12 @@ grep -q '^ran=12 pass=10 fail=1 skip=1$' <<<"$out" ||
 grep -q '::error::only 10 tests passed (1 skipped)' <<<"$out" ||
     fail "the pass floor did not report the count"
 grep -q 'FAIL 12_engine-fail.test (exit 3)' <<<"$out" || fail "the failing test was not named"
+# The report has to carry the run that failed. The trace is kept too, but it is
+# the one that passed here, so a report built from it alone says nothing.
+grep -q 'the first run said so' <<<"$out" ||
+    fail "the failing run's tail was lost to the traced re-run"
+grep -q -- '--- traced re-run ---' <<<"$out" || fail "the traced re-run was not reported"
+grep -q 'trace line 39' <<<"$out" || fail "the traced re-run's own tail was dropped"
 
 # This launches the watchdog the way the real driver does, not through a test
 # sourcing the helper, proving it starts and holds a token nothing else sees.

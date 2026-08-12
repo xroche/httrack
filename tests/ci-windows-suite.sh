@@ -268,6 +268,9 @@ run_one_test() (
         ;;
     *)
         echo "FAIL $t (exit $rc)"
+        # Kept before the trace below appends to the same log: on an
+        # intermittent failure the trace passes, and its tail reports a pass.
+        tail -n 25 "$t.log" | sed 's/^/      /' >"$results/$t.tail"
         # These assert with `test "$(...)" == "..." || exit 1`, which
         # says nothing at all on failure. Re-run traced, still bounded.
         # Charged to the suite deadline rather than given a budget of its
@@ -282,10 +285,12 @@ run_one_test() (
             # Handed the same TMPDIR: the trace runs outside test-timeout.sh,
             # which is what gave the first run one of its own.
             TMPDIR="$ttmp" run_with_timeout "$left" bash -x "$t" >>"$t.log" 2>&1 || true
+            echo "      --- traced re-run ---" >>"$results/$t.tail"
+            tail -n 25 "$t.log" | sed 's/^/      /' >>"$results/$t.tail"
         else
-            echo "no trace: past the ${suite_deadline}s suite deadline" >>"$t.log"
+            echo "no trace: past the ${suite_deadline}s suite deadline" |
+                tee -a "$t.log" | sed 's/^/      /' >>"$results/$t.tail"
         fi
-        tail -n 25 "$t.log" | sed 's/^/      /' >"$results/$t.tail"
         ;;
     esac
     echo "$rc $t" >>"$progress"
