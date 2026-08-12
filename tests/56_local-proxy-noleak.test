@@ -34,18 +34,18 @@ hold_port
 deadproxy=$HELD_PORT
 
 # hold_port's contract, checked rather than trusted: anything answering on the
-# port would retire the premise while the crawl still failed.
+# port would retire the premise while the crawl still failed. Refusal is not the
+# assertion, since macOS drops the SYN where Linux resets it; what matters is
+# that no server answers.
 "$python" -c 'import socket, sys
 s = socket.socket()
-s.settimeout(10)
+s.settimeout(2)
 try:
     s.connect(("127.0.0.1", int(sys.argv[1])))
     sys.exit("accepted")
-except ConnectionRefusedError:
+except OSError:
     pass
-except OSError as e:
-    sys.exit("errno %d" % (e.errno,))
-s.close()' "$deadproxy" || fail "the held proxy port $deadproxy does not refuse a connect"
+s.close()' "$deadproxy" || fail "the held proxy port $deadproxy answers a connect"
 
 # origin resolves to two addresses so a fallback would have a second to dial;
 # 127.0.0.1 (the decoy) is the one the old bypass reached.

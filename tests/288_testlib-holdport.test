@@ -31,11 +31,12 @@ s.close()' "$1" "$2" 2>/dev/null
 }
 
 # What a client dialling PORT gets: REFUSED, ACCEPTED, or the errno name, so a
-# timeout or an unreachable address cannot read as a refusal.
+# timeout or an unreachable address cannot read as a refusal. A timeout prints
+# None, since that is the errno TimeoutError carries.
 dial() { # dial PORT
     "$real_python" -c 'import errno, socket, sys
 s = socket.socket()
-s.settimeout(10)
+s.settimeout(2)
 try:
     s.connect(("127.0.0.1", int(sys.argv[1])))
     print("ACCEPTED")
@@ -46,16 +47,18 @@ except OSError as e:
 s.close()' "$1"
 }
 
-## a held port is nobody else's, and refuses a connect as a dead one does
+## a held port is nobody else's, and serves nobody
 hold_port
 held=$HELD_PORT
 holder=$HELD_PID
 assert_match '^[0-9]+$' "$held" "hold_port"
 ! bindable tcp "$held" || fail "a competing bind took held port $held"
-assert_eq REFUSED "$(dial "$held")" "a dial of held port $held"
-ok "the held port $held cannot be bound and refuses a connect"
+# Not REFUSED: Linux resets a bound-but-unlistening port, macOS drops the SYN
+# and the dial times out instead. Both leave the caller with no server.
+test "$(dial "$held")" != ACCEPTED || fail "held port $held accepted a connect"
+ok "the held port $held cannot be bound and serves nobody"
 
-## control: the dial probe can say something other than REFUSED
+## control: the dial probe can say something other than a refusal
 local_server_start --root "$tmpdir" --bind 127.0.0.1
 assert_eq ACCEPTED "$(dial "$SRV_PORT")" "a dial of the listening server"
 ok "the dial probe reports a live listener as ACCEPTED"
