@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# The two answers to freeport handing back a port it has already released
+# (#1218): hold_port keeps the number, so a competing bind loses it while held
+# and wins once released, and htsserver_start redraws one taken in between.
+# Refusal alone would prove nothing, since an unbound port refuses too.
+
+set -euo pipefail
+
+# crawllib, for the listening server the dial probe is controlled against.
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
+# shellcheck source=tests/webhttracklib.sh
+. "$(dirname "$0")/webhttracklib.sh"
+
+real_python=$(find_python) || skip "python3 missing"
+python=$real_python # hold_port reads it from here
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_holdport.XXXXXX")
+cleanup_push rm -rf "$tmpdir"
+
+ok() { echo "OK: $*"; }
+
+# Exit 0 if PORT is still free in PROTO, non-zero if something holds it.
+bindable() { # bindable PROTO PORT
+    "$real_python" -c 'import socket, sys
+kinds = {"tcp": socket.SOCK_STREAM, "udp": socket.SOCK_DGRAM}
+s = socket.socket(socket.AF_INET, kinds[sys.argv[1]])
+s.bind(("127.0.0.1", int(sys.argv[2])))
+s.close()' "$1" "$2" 2>/dev/null
+}
+
+# What a client dialling PORT gets: REFUSED, ACCEPTED, or the errno name, so a
+# timeout or an unreachable address cannot read as a refusal. A timeout prints
+# None, since that is the errno TimeoutError carries.
+dial() { # dial PORT
+    "$real_python" -c 'import errno, socket, sys
+s = socket.socket()
+s.settimeout(2)
+try:
+    s.connect(("127.0.0.1", int(sys.argv[1])))
+    print("ACCEPTED")
+except ConnectionRefusedError:
+    print("REFUSED")
+except OSError as e:
+    print(errno.errorcode.get(e.errno, str(e.errno)))
+s.close()' "$1"
+}
+
+## a held port is nobody else's, and serves nobody
+hold_port
+held=$HELD_PORT
+holder=$HELD_PID
+assert_match '^[0-9]+$' "$held" "hold_port"
+! bindable tcp "$held" || fail "a competing bind took held port $held"
+# Not REFUSED: Linux resets a bound-but-unlistening port, macOS drops the SYN
+# and the dial times out instead. Both leave the caller with no server.
+test "$(dial "$held")" != ACCEPTED || fail "held port $held accepted a connect"
+ok "the held port $held cannot be bound and serves nobody"
+
+## control: the dial probe can say something other than a refusal
+local_server_start --root "$tmpdir" --bind 127.0.0.1
+assert_eq ACCEPTED "$(dial "$SRV_PORT")" "a dial of the listening server"
+ok "the dial probe reports a live listener as ACCEPTED"
+
+## control: the bind probe can win, so its loss above was the hold
+stop_server "$holder"
+bindable tcp "$held" || fail "the released port $held still refuses a bind"
+ok "releasing the hold hands port $held back"
+
+## htsserver_start redraws a drawn port a neighbour got first
+command -v htsserver >/dev/null || skip "no htsserver in PATH"
+htsserver_require
+
+hold_port
+taken=$HELD_PORT
+
+# The port the caller picked is the caller's problem: nothing to redraw.
+rc=0
+out=$(htsserver_start --log "$tmpdir/hts.log" --port "$taken" 2>&1) || rc=$?
+test "$rc" -ne 0 || fail "htsserver_start took a port it cannot bind: $out"
+assert_match "could not bind port $taken" "$out" "htsserver_start --port"
+ok "a caller-owned port that is taken fails where it was picked"
+
+# Hand out the taken port once, as a neighbour winning the race would. A file,
+# not a variable: the draw runs in a command substitution, whose subshell would
+# hand the next attempt the taken port again.
+: >"$tmpdir/steal"
+htsserver_freeport() {
+    if test -f "$tmpdir/steal"; then
+        rm -f "$tmpdir/steal"
+        printf '%s\n' "$taken"
+    else
+        freeport
+    fi
+}
+
+# Captured stderr hides the message of a fail inside htsserver_start; replay it.
+cleanup_push cat "$tmpdir/retry.err"
+htsserver_start --log "$tmpdir/hts.log" 2>"$tmpdir/retry.err"
+test ! -f "$tmpdir/steal" || fail "htsserver_start never drew the stolen port"
+test "$HTS_PORT" != "$taken" || fail "htsserver_start served the taken port"
+assert_match "did not get port $taken, retrying" "$(cat "$tmpdir/retry.err")" "the retry notice"
+htsserver_cleanup
+ok "a stolen draw is redrawn, loudly, and the server comes up on port $HTS_PORT"

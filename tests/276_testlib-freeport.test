@@ -2,7 +2,7 @@
 #
 # freeport must reserve each port in the protocol its caller will bind (#1178),
 # and proxytrack must name which of its two sockets lost, in words the harness's
-# own PT_BIND_LOST regex still reads.
+# own BIND_LOST regex still reads.
 
 set -euo pipefail
 
@@ -24,21 +24,6 @@ kinds = {"tcp": socket.SOCK_STREAM, "udp": socket.SOCK_DGRAM}
 s = socket.socket(socket.AF_INET, kinds[sys.argv[1]])
 s.bind(("127.0.0.1", int(sys.argv[2])))
 s.close()' "$1" "$2"
-}
-
-# A port held for the rest of the test, so a bind of it must lose.
-hold_port() { # hold_port PROTO
-    local log="$tmpdir/hold-$1.log" pid
-    "$real_python" -c 'import socket, sys, time
-kinds = {"tcp": socket.SOCK_STREAM, "udp": socket.SOCK_DGRAM}
-s = socket.socket(socket.AF_INET, kinds[sys.argv[1]])
-s.bind(("127.0.0.1", 0))
-print("PORT %d" % s.getsockname()[1])
-sys.stdout.flush()
-time.sleep(120)' "$1" >"$log" 2>&1 &
-    pid=$!
-    cleanup_push stop_server "$pid"
-    discover_server_port "$log" "$pid" || fail "the $1 holder never announced a port"
 }
 
 # Off Windows a tcp-probed number binds as udp just as well, so the port alone
@@ -104,8 +89,10 @@ port=$(freeport) || fail "default freeport failed"
 assert_match '^[0-9]+$' "$port" "default freeport"
 bindable tcp "$port" || fail "the default port $port does not bind as tcp"
 
-udpheld=$(hold_port udp)
-tcpheld=$(hold_port tcp)
+hold_port udp
+udpheld=$HELD_PORT
+hold_port tcp
+tcpheld=$HELD_PORT
 # Control: a bindable that cannot fail proves nothing about the ports above.
 ! bindable udp "$udpheld" 2>/dev/null || fail "bindable udp took $udpheld, held"
 ! bindable tcp "$tcpheld" 2>/dev/null || fail "bindable tcp took $tcpheld, held"
@@ -161,15 +148,40 @@ proxytrack_fails() { # proxytrack_fails HTTP_ADDR ICP_ADDR: echoes its error lin
         fail "proxytrack failed without the harness's banner: $(cat "$log")"
 }
 
-# Both destinations, or the message could name one protocol for either failure.
-# The surviving socket's port is drawn late: a neighbour test stealing it would
-# report the wrong protocol.
-out=$(proxytrack_fails "127.0.0.1:$tcpheld" "127.0.0.1:$(freeport udp)")
-assert_match "$PT_BIND_LOST" "$out" "the harness reads proxytrack's http bind loss"
+# Both destinations get one, or the message could name one protocol for either
+# failure; the socket that must survive can only take a freeport number, which a
+# neighbour test may bind first, so redraw and retry on that outcome (#1218).
+proxytrack_lost() { # proxytrack_lost tcp|udp HELDPORT: echoes the error line
+    local proto=$1 port=$2 other alt out try
+    if test "$proto" = tcp; then other=udp; else other=tcp; fi
+    for try in 1 2 3; do
+        alt=$(freeport "$other") || fail "freeport $other failed"
+        if test "$proto" = tcp; then
+            out=$(proxytrack_fails "127.0.0.1:$port" "127.0.0.1:$alt")
+        else
+            out=$(proxytrack_fails "127.0.0.1:$alt" "127.0.0.1:$port")
+        fi
+        case $out in
+        # Loud, so a socket-naming regression cannot hide behind the retry.
+        *"cannot bind $other port"*)
+            echo "proxytrack lost the redrawn $other port $alt, retrying" >&2
+            ;;
+        *"cannot bind $proto port $port on"*)
+            printf '%s\n' "$out"
+            return 0
+            ;;
+        *) fail "proxytrack lost neither socket as named: $out" ;;
+        esac
+    done
+    fail "proxytrack lost the redrawn $other port 3 times: $out"
+}
+
+out=$(proxytrack_lost tcp "$tcpheld")
+assert_match "$BIND_LOST" "$out" "the harness reads proxytrack's http bind loss"
 assert_match "^.*cannot bind tcp port $tcpheld on 127\.0\.0\.1: .+ \([1-9][0-9]*\)\$" "$out"
 
-out=$(proxytrack_fails "127.0.0.1:$(freeport tcp)" "127.0.0.1:$udpheld")
-assert_match "$PT_BIND_LOST" "$out" "the harness reads proxytrack's icp bind loss"
+out=$(proxytrack_lost udp "$udpheld")
+assert_match "$BIND_LOST" "$out" "the harness reads proxytrack's icp bind loss"
 assert_match "^.*cannot bind udp port $udpheld on 127\.0\.0\.1: .+ \([1-9][0-9]*\)\$" "$out"
 
 # The cause is the whole point: winsock leaves errno at "No error" (#1178).
@@ -187,7 +199,7 @@ except OSError:
     sys.exit(0)
 sys.exit(1)' "$badhost"; then
     out=$(proxytrack_fails "$badhost:1" "$badhost:2")
-    assert_match "$PT_BIND_LOST" "$out" "the harness reads proxytrack's resolver loss"
+    assert_match "$BIND_LOST" "$out" "the harness reads proxytrack's resolver loss"
     assert_match "cannot resolve $badhost" "$out"
     ok "a resolver failure is reported as one, not as a bind error"
 else

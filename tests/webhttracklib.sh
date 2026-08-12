@@ -57,8 +57,9 @@ htsserver_exec() {
 #   --root DIR       tree to serve (default: the dist root)
 #   --home DIR       $HOME for the server, so no ~/.httrack.ini leaks in
 #   --log FILE       where the announcement lands (default: a temp file)
-#   --port N         a port already picked, to keep the fork out of a
-#                    window the caller is timing
+#   --port N         a port already picked, to keep the fork out of a window the
+#                    caller is timing; owned by the caller, so a lost bind fails
+#                    rather than being redrawn
 #   --write-limit N  ulimit -f N; the log rides a pipe, which the cap spares
 # shellcheck disable=SC2120 # most callers need no htsserver argument
 htsserver_start() {
@@ -93,37 +94,53 @@ htsserver_start() {
         esac
     done
 
-    HTS_PORT=${port}
-    test -n "${HTS_PORT}" ||
-        HTS_PORT=$(htsserver_freeport) || fail "no free loopback port"
-    if test -z "${log}"; then
-        log=$(mktemp)
-        HTS_TMP_LOGS+=("${log}")
-    fi
-    HTS_LOG=${log}
-    : >"${HTS_LOG}"
-    if test -n "${wlimit}"; then
-        # Process substitution, not a pipeline: $! must be the server. In a
-        # pipeline it is the reader, so a start that never announces leaves the
-        # server unkilled and parks the reaping wait on the whole job.
-        htsserver_exec "$@" > >(cat >"${HTS_LOG}") &
-    else
-        htsserver_exec "$@" >"${HTS_LOG}" &
-    fi
-    HTS_BGPID=$!
-    HTS_BG_PIDS+=("${HTS_BGPID}")
+    # freeport hands back a port it has already released, so a neighbour can take
+    # it before the server binds: redraw and retry, as start_proxytrack does.
+    local ownlog='' try start
+    test -n "${log}" || ownlog=1
+    for try in 1 2 3; do
+        HTS_PORT=${port}
+        test -n "${HTS_PORT}" ||
+            HTS_PORT=$(htsserver_freeport) || fail "no free loopback port"
+        # One log per attempt: a killed attempt's writer can still be draining.
+        if test -n "${ownlog}"; then
+            log=$(mktemp)
+            HTS_TMP_LOGS+=("${log}")
+        fi
+        HTS_LOG=${log}
+        : >"${HTS_LOG}"
+        if test -n "${wlimit}"; then
+            # Process substitution, not a pipeline: $! must be the server. In a
+            # pipeline it is the reader, so a start that never announces leaves the
+            # server unkilled and parks the reaping wait on the whole job.
+            htsserver_exec "$@" > >(cat >"${HTS_LOG}") &
+        else
+            htsserver_exec "$@" >"${HTS_LOG}" &
+        fi
+        HTS_BGPID=$!
+        HTS_BG_PIDS+=("${HTS_BGPID}")
 
-    # A sed and a sleep per tick is a process per tick (#795), and the deadline
-    # self-extends rather than expiring on a loaded parallel run.
-    local start=$SECONDS
-    while :; do
-        htsserver_announced
+        # A sed and a sleep per tick is a process per tick (#795), and the deadline
+        # self-extends rather than expiring on a loaded parallel run.
+        start=$SECONDS
+        while :; do
+            htsserver_announced
+            test -z "${HTS_URL}" || break
+            kill -0 "${HTS_BGPID}" 2>/dev/null || break
+            test "$((SECONDS - start))" -lt 60 || break
+            poll_wait 0.1
+        done
         test -z "${HTS_URL}" || break
-        kill -0 "${HTS_BGPID}" 2>/dev/null || break
-        test "$((SECONDS - start))" -lt 60 || break
-        poll_wait 0.1
+        # Only a lost bind is worth redrawing; anything else is a regression.
+        grep -qE "${BIND_LOST}" "${HTS_LOG}" ||
+            fail "htsserver did not come up: $(cat "${HTS_LOG}")"
+        test -z "${port}" ||
+            fail "htsserver could not bind port ${port}: $(cat "${HTS_LOG}")"
+        stop_server "${HTS_BGPID}"
+        # Loud, so an intermittent bind regression cannot hide behind the retry.
+        echo "htsserver did not get port ${HTS_PORT}, retrying" >&2
     done
-    test -n "${HTS_URL}" || fail "htsserver did not come up: $(cat "${HTS_LOG}")"
+    test -n "${HTS_URL}" || fail "htsserver bound none of 3 ports: $(cat "${HTS_LOG}")"
     test -z "${HTS_PID}" || HTS_SRV_PIDS+=("${HTS_PID}")
 }
 

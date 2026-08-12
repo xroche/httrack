@@ -135,7 +135,22 @@ done
 printf '#!/bin/sh\necho "TOKEN=${WATCHDOG_TOKEN:-}" >%s\nexit 0\n' "$tmp/childtoken" \
     >"$run/10_engine-pass.test"
 printf '#!/bin/sh\nexit 77\n' >"$run/11_engine-skip.test"
-printf '#!/bin/sh\nexit 3\n' >"$run/12_engine-fail.test"
+# Intermittent and chatty on the re-run: only a stub that passes the second time
+# and outruns the 25-line tail can tell a kept failure from a kept trace.
+cat >"$run/12_engine-fail.test" <<EOF
+#!/bin/sh
+if test -e "$tmp/failedonce"; then
+    i=0
+    while [ \$i -lt 40 ]; do
+        echo "trace line \$i"
+        i=\$((i + 1))
+    done
+    exit 0
+fi
+: >"$tmp/failedonce"
+echo "the first run said so"
+exit 3
+EOF
 cd "$run"
 rc=0
 out=$(RUNNER_TEMP="$tmp" GITHUB_STEP_SUMMARY="$tmp/summary" WATCHDOG_TOKEN=s3cr3t \
@@ -153,6 +168,17 @@ grep -q '^ran=12 pass=10 fail=1 skip=1$' <<<"$out" ||
 grep -q '::error::only 10 tests passed (1 skipped)' <<<"$out" ||
     fail "the pass floor did not report the count"
 grep -q 'FAIL 12_engine-fail.test (exit 3)' <<<"$out" || fail "the failing test was not named"
+# The report has to carry the run that failed, not just the trace that passed,
+# and carry it under its own label: reported after the separator it reads as
+# part of the trace. Captured, since a pipe would take grep -q's SIGPIPE.
+grep -q -- '--- traced re-run ---' <<<"$out" || fail "the traced re-run was not reported"
+first=$(sed -n '1,/--- traced re-run ---/p' <<<"$out")
+grep -q 'the first run said so' <<<"$first" ||
+    fail "the failing run's tail was lost to the traced re-run"
+grep -q 'trace line 39' <<<"$out" || fail "the traced re-run's own tail was dropped"
+# Both halves stay tails: an unbounded report would carry the trace's first line
+# as well as its last, and a CI failure would print the whole log.
+grep -q 'trace line 0$' <<<"$out" && fail "the report is not bounded to a tail"
 
 # This launches the watchdog the way the real driver does, not through a test
 # sourcing the helper, proving it starts and holds a token nothing else sees.
