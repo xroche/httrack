@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# htsarena.h, the pool the link records and the rebuilt command line hold raw
+# pointers into (driven by 'httrack -#test=arena'). It keeps every address it
+# is handed across thousands of allocations and re-reads them all, so a pool
+# that grew by moving its bytes fails here rather than in a crawl.
+assert_selftest "arena self-test OK" arena
+
+exit 0

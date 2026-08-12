@@ -176,7 +176,7 @@ Action options:
 
 Proxy options:
   P  proxy use (-P proxy:port or -P user:pass@proxy:port) (--proxy &lt;param&gt;)
- %f *use proxy for ftp (f0 don't use) (--httpproxy-ftp[=N])
+ %f *use proxy for ftp (f0 don't use) (--httpproxy-ftp[=0])
 
 Limits options:
   rN set the mirror depth to N (* r9999) (--depth[=N])
@@ -197,7 +197,7 @@ Flow control:
   HN host is abandoned if: 0=never, 1=timeout, 2=slow, 3=timeout or slow (--host-control[=N])
 
 Links options:
- %P *extended parsing, attempt to parse all links, even in unknown tags or Javascript (%P0 don't use) (--extended-parsing[=N])
+ %P *extended parsing, attempt to parse all links, even in unknown tags or Javascript (%P0 don't use) (--extended-parsing[=0])
   n  get non-html files 'near' an html file (ex: an image located outside) (--near)
   t  test all URLs (even forbidden ones) (--test)
  %L &lt;file&gt; add all URL located in this text file (one URL per line) (--list &lt;param&gt;)
@@ -211,7 +211,7 @@ Build options:
  %x  do not include any password for external password protected websites (%x0 include) (--no-passwords)
  %q *include query string for local files (useless, for information purpose only) (%q0 don't include) (--include-query-string)
   o *save the server's error pages (404..) (o0 discard them) (--generate-errors)
-  X *purge old files after update (X0 keep delete) (--purge-old[=N])
+  X *purge old files after update (X0 keep delete) (--purge-old[=0])
 
 Spider options:
   bN accept cookies in cookies.txt (0=do not accept,* 1=accept) (--cookies[=N])
