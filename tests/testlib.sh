@@ -546,10 +546,9 @@ run_with_timeout() {
     "$@" &
     local pid=$!
     test -n "$had_m" || is_windows || set +m
-    # Now, while the job is certainly alive: read at kill time it comes back empty
-    # and kill_tree is left with nothing to signal but the whole host.
-    local winpid
-    winpid=$(win_pid "$pid")
+    # Read while the job is certainly alive: by kill time /proc/<pid>/winpid is gone.
+    local winpid=''
+    ! is_windows || winpid=$(win_pid "$pid")
     local start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then

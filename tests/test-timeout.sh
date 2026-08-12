@@ -53,9 +53,9 @@ test -n "$windows" || set -m # own process group, so kill_tree can signal the gr
 "$BASH" "$@" &
 pid=$!
 test -n "$had_m" || test -n "$windows" || set +m
-# Now, while the test is certainly alive: read at kill time it comes back empty and
-# kill_tree is left with nothing to signal but the whole host, siblings included.
-winpid=$(win_pid "$pid")
+# Read while the test is certainly alive: by kill time /proc/<pid>/winpid is gone.
+winpid=''
+test -z "$windows" || winpid=$(win_pid "$pid")
 
 # Poll, because bash cannot wait with a deadline and a watchdog subshell would
 # have to signal across process groups, which MSYS cannot do. The interval is the
