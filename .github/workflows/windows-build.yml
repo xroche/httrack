@@ -88,10 +88,11 @@ jobs:
       - name: Count the restored vcpkg archives
         shell: pwsh
         run: |
-          $n = @(Get-ChildItem -Recurse -File -Filter *.zip `
-            $env:VCPKG_DEFAULT_BINARY_CACHE -EA SilentlyContinue).Count
-          Write-Host "restored $n archive(s)"
-          "VCPKG_ARCHIVES_BEFORE=$n" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $a = @(Get-ChildItem -Recurse -File -Filter *.zip `
+            $env:VCPKG_DEFAULT_BINARY_CACHE -EA SilentlyContinue)
+          Write-Host "restored $($a.Count) archive(s)"
+          $a.FullName | Out-File -FilePath vcpkg-restored.txt
+          "VCPKG_ARCHIVES_BEFORE=$($a.Count)" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       # The runner image's vcpkg checkout is pinned to some commit; our manifest's
       # builtin-baseline is usually newer, so `git show <baseline>:versions/...`
@@ -130,25 +131,38 @@ jobs:
         shell: pwsh
         run: |
           $before = [int]$env:VCPKG_ARCHIVES_BEFORE
+          $stale = $false
+          # The log is absent whenever the build never reached MSBuild, which this
+          # step outlives.
+          if (Test-Path msbuild-libhttrack.log) {
+            $m = Select-String -Path msbuild-libhttrack.log -Pattern 'Restored (\d+) package' |
+              Select-Object -First 1
+            if ($m) {
+              $restored = [int]$m.Matches[0].Groups[1].Value
+              Write-Host "vcpkg restored $restored of $before archive(s)"
+              $stale = ($restored -eq 0 -and $before -gt 0)
+            } else { Write-Host "no vcpkg restore line in the build log" }
+          } else { Write-Host "no build log" }
+          if ($stale) {
+            Write-Host "::warning::stale vcpkg cache: $before archives, none matching this toolchain; every port rebuilt from source"
+            # Provably dead, vcpkg matched none of them, so drop them rather than
+            # carry every past toolchain generation in the saved entry forever.
+            Get-Content vcpkg-restored.txt -EA SilentlyContinue | Where-Object { $_ } |
+              Remove-Item -Force -EA SilentlyContinue
+          }
           $after = @(Get-ChildItem -Recurse -File -Filter *.zip `
             $env:VCPKG_DEFAULT_BINARY_CACHE -EA SilentlyContinue).Count
-          "grew=$($after -gt $before)".ToLower() | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-          # Absent whenever the build never reached MSBuild, which this step outlives.
-          if (-not (Test-Path msbuild-libhttrack.log)) { Write-Host "no build log"; exit 0 }
-          $m = Select-String -Path msbuild-libhttrack.log -Pattern 'Restored (\d+) package' |
-            Select-Object -First 1
-          if (-not $m) { Write-Host "no vcpkg restore line in the build log"; exit 0 }
-          $restored = [int]$m.Matches[0].Groups[1].Value
-          Write-Host "vcpkg restored $restored of $before archive(s); $after now cached"
-          if ($restored -eq 0 -and $before -gt 0) {
-            Write-Host "::warning::stale vcpkg cache: $before archives, none matching this toolchain; every port rebuilt from source"
-          }
+          Write-Host "$after archive(s) to cache"
+          # Pruning can leave the count unmoved while replacing every archive, so the
+          # stale case saves on its own account rather than on growth.
+          "save=$($stale -or ($after -gt $before))".ToLower() |
+            Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      # Only on growth, so a warm run adds no entry and the eviction budget stays for
-      # the runs that did build something: a cold cache, a manifest bump, or a
-      # toolchain whose ABI hash moved for a reason the key cannot name.
+      # Only when the archive set actually changed, so a warm run adds no entry and
+      # the eviction budget stays for the runs that did build something: a cold
+      # cache, a manifest bump, or a toolchain whose ABI hash moved.
       - name: Save the vcpkg binary archives
-        if: ${{ !cancelled() && steps.vcpkg.outputs.grew == 'true' }}
+        if: ${{ !cancelled() && steps.vcpkg.outputs.save == 'true' }}
         uses: actions/cache/save@v6
         with:
           path: ${{ github.workspace }}\vcpkg_cache
