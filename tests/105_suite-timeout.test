@@ -41,6 +41,7 @@ EOF
 rc=0
 fired=
 marked=
+total=
 run_wedged() { # run_wedged <budget> [VAR=VAL...]
     local budget=$1 start=$SECONDS pid
     shift
@@ -61,8 +62,9 @@ run_wedged() { # run_wedged <budget> [VAR=VAL...]
         poll_wait 0.1 || sleep 1
     done
     wait "$pid" || rc=$?
+    total=$((SECONDS - start))
     # Missed between two polls: the whole run then bounds the latency from above.
-    test -n "$fired" || fired=$((SECONDS - start))
+    test -n "$fired" || fired=$total
 }
 
 # Retried once, because a dump short enough to fall between two polls is a race, not a
@@ -87,6 +89,20 @@ grep -q 'marker: the wedged test started' "$out" || fail "the test's own output 
 grep -q '^===== TIMEOUT: 90_wedged.test exceeded' "$out" ||
     fail "the diagnostics do not name the test"
 grep -q "own process tree" "$out" || fail "no process list in the diagnostics"
+
+# Announced BEFORE the dump, not merely at some point during it: the watchdog reading
+# that log takes the silence of a dump for a wedge. Only a slow dump tells the two
+# orderings apart, and the dump's own ps is what this makes slow.
+if ! is_windows; then
+    printf '#!/bin/sh\nsleep 3\nexec %s "$@"\n' "$(command -v ps)" >"$shim/ps"
+    chmod +x "$shim/ps"
+    run_wedged 5 "PATH=$shim:$PATH"
+    rm -f "$shim/ps" # before the starve shim shares this directory
+    test "$rc" -eq 124 || fail "the guard reported $rc under a slow dump, want 124"
+    test -n "$marked" || fail "no announcement under a slow dump"
+    test "$((total - fired))" -ge 2 ||
+        fail "announced with the dump (${fired}s of ${total}s), not before it"
+fi
 
 # The budget is read, not hard-coded: well under it, the same shape survives.
 printf 'sleep 3\necho "slow but healthy"\n' >"$tmp/92_slow.test"

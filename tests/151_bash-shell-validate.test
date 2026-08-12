@@ -174,6 +174,7 @@ probe() { # probe <run number> <seconds of budget left> <command>...
     (
         # shellcheck disable=SC2030 # the isolation is the point: the real count is next door
         n=$want_n SAMPLE=1 SILENCE=2
+        # shellcheck disable=SC2030,SC2031 # likewise: the budget here is the probe's own
         export HTTRACK_TEST_TIMEOUT=$((SECONDS + left))
         configure_cmd=("$@")
         run probe
@@ -188,23 +189,28 @@ grep -q 'wrote nothing' "$tmp/probe.log" || fail "the hang was not named: $(cat 
 rc=$(probe 91 6 bash -c 'while :; do echo tick; sleep 1; done')
 test "$rc" -eq 77 || fail "a slow but writing configure with 6s of budget reported $rc, want 77"
 # The pacer must not fire before the case is judged: run() returns with the verdict
-# still unread, and a skip there would bury a configure that answered wrongly.
-verdict() { # verdict <accept|reject> <status the stub reports>
-    local rc=0 stub_status=$2
+# still unread, and a skip there would bury a configure that answered wrongly. Through
+# the real run(), since a stub cannot see a pacer left inside the one it replaced.
+verdict() { # verdict <accept|reject> <run number> <status the child exits with>
+    local rc=0
     (
-        # shellcheck disable=SC2030,SC2031,SC2317 # a stub, reached through accept/reject
-        run() { # stub: judged, and the budget spent
-            n=$((n + 1))
-            status=$stub_status
-            log=
-            took=99999
-        }
-        "$1" stub-verdict '' ''
+        # shellcheck disable=SC2030,SC2031 # the isolation is the point: the real run is next door
+        n=$2 SAMPLE=1
+        # Spent by the time the run ends, so a pacer anywhere after it would fire.
+        # shellcheck disable=SC2030,SC2031 # likewise: the budget here is the probe's own
+        export HTTRACK_TEST_TIMEOUT=$((SECONDS + 4))
+        configure_cmd=(bash -c "sleep 3; exit $3")
+        # Their arities differ, and an extra argument would reach run() as an env
+        # assignment: the child would then fail to exec and answer the wrong question.
+        case "$1" in
+        accept) accept probe-verdict '' '' ;;
+        *) reject probe-verdict '' ;;
+        esac
     ) >/dev/null 2>&1 || rc=$?
     test "$rc" -eq 1 || fail "$1 of a wrong answer with the budget spent reported $rc, want 1"
 }
-verdict accept 1 # configure rejected what it must accept
-verdict reject 0 # configure accepted what it must reject
+verdict accept 80 1 # configure rejected what it must accept
+verdict reject 81 0 # configure accepted what it must reject
 # The probes ran in subshells, so the real cases below start from a clean count.
 n=0
 status=0
