@@ -2,10 +2,10 @@
 #
 
 # Config-file alias loading (no network). A .httrackrc in the working directory
-# is read by optinclude_file(), whose cmdl_ins macro inserts each alias-expanded
-# token into the x_argvblk block. That macro used to copy with an unbounded
-# strcpy on a bare char*; it is now bounded (strlcpybuff + cmdl_room over the
-# block capacity). Two properties are checked:
+# is read by optinclude_file(), whose cmdl_ins() inserts each alias-expanded
+# token into the shared token block. That copy used to be an unbounded strcpy
+# on a bare char*; it is now bounded by the block capacity. Two properties are
+# checked:
 #   1. The bound does not truncate: a long user-agent alias reaches doit.log
 #      intact. user-agent expands to two tokens (-F <value>), so it exercises
 #      both cmdl_ins insertions.

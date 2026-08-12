@@ -34,6 +34,8 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTSALIAS_DEFH
 #define HTSALIAS_DEFH
 
+#include "htsglobal.h"
+
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 extern const char *hts_optalias[][4];
@@ -44,8 +46,6 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 int optalias_find(const char *token);
 const char *optalias_help(const char *token);
 int optreal_find(const char *token);
-int optinclude_file(const char *name, int *argc, char **argv, char *x_argvblk,
-                    size_t x_argvblk_size, int *x_ptr);
 const char *optreal_value(int p);
 const char *optalias_value(int p);
 const char *opttype_value(int p);
@@ -53,33 +53,42 @@ const char *opthelp_value(int p);
 const char *hts_gethome(void);
 void expand_home(String * str);
 
-/* Command-line argv-block builders, shared by htscoremain.c (the CLI parser)
-   and htsalias.c (config-file alias expansion). Tokens are packed back-to-back
-   into x_argvblk (total capacity bufsize); each argv[] entry points into the
-   block. cmdl_room bounds every copy: the running offset ptr can outrun the
-   block (alias / doit.log expansion outpacing the +32768 slack), so it yields
-   0 rather than a wrapped size_t and the bounded copy aborts cleanly. */
-#define cmdl_room(bufsize, ptr)                                                \
-  ((ptr) < (size_t) (bufsize) ? (size_t) (bufsize) - (ptr) : 0)
+/* Command line rebuilt from argv, config files and doit.log: argc slots
+   pointing into blk, where the tokens are packed back-to-back. The slots grow
+   on demand, since a config file and a doit.log each add a token count the
+   input decides; blk does not, so a token that no longer fits aborts in the
+   bounded copy instead of overrunning. */
+typedef struct {
+  char **argv; /* argc slots used out of capacity allocated */
+  int argc;
+  int capacity;
+  char *blk; /* token bytes, blk_used of blk_size in use */
+  size_t blk_size;
+  size_t blk_used;
+} cmdl_argv;
 
-/* Append a token as a new argv[argc]. */
-#define cmdl_add(token, argc, argv, buff, bufsize, ptr)                        \
-  argv[argc] = (buff + ptr);                                                   \
-  strlcpybuff(argv[argc], token, cmdl_room(bufsize, ptr));                     \
-  ptr += (int) (strlen(argv[argc]) + 1);                                       \
-  argc++
+/* Allocate a token block of blk_size bytes and room for slots entries.
+   HTS_FALSE if either fails, leaving cmd empty. */
+hts_boolean cmdl_init(cmdl_argv *cmd, size_t blk_size, int slots);
 
-/* Insert a token at argv[0], shifting the existing argc entries up by one. */
-#define cmdl_ins(token, argc, argv, buff, bufsize, ptr)                        \
-  {                                                                            \
-    int i;                                                                     \
-    for (i = argc; i > 0; i--)                                                 \
-      argv[i] = argv[i - 1];                                                   \
-  }                                                                            \
-  argv[0] = (buff + ptr);                                                      \
-  strlcpybuff(argv[0], token, cmdl_room(bufsize, ptr));                        \
-  ptr += (int) (strlen(argv[0]) + 1);                                          \
-  argc++
+/* Release cmd; the tokens its argv pointed at die with it. */
+void cmdl_free(cmdl_argv *cmd);
+
+/* Append token as the last entry. HTS_FALSE if the slots can not be grown. */
+hts_boolean cmdl_add(cmdl_argv *cmd, const char *token);
+
+/* Insert token at 0 <= pos <= argc, shifting the entries above it up by one.
+   HTS_FALSE if the slots can not be grown. */
+hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos);
+
+typedef enum {
+  CMDL_FILE_MISSING, /* not found, or unreadable */
+  CMDL_FILE_READ,    /* expanded into the command line */
+  CMDL_FILE_NOMEM    /* out of memory, leaving the command line half expanded */
+} cmdl_file_result;
+
+/* Expand a config file into cmd, inserting after its program name. */
+cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd);
 #endif
 
 #endif

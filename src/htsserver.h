@@ -277,11 +277,12 @@ static int ehex(const char *s) {
 HTS_UNUSED static void unescapehttp(const char *s, String * tempo) {
   size_t i;
 
+  /* A truncated escape has no digits: decoding one runs past the terminator. */
   for(i = 0; s[i] != '\0'; i++) {
     if (s[i] == '%' && s[i + 1] == '%') {
       i++;
       StringAddchar(*tempo, '%');
-    } else if (s[i] == '%') {
+    } else if (s[i] == '%' && s[i + 1] != '\0' && s[i + 2] != '\0') {
       char hc;
 
       i++;
@@ -299,11 +300,12 @@ HTS_UNUSED static void unescapeini(char *s, String * tempo) {
   size_t i;
   char lastc = 0;
 
+  /* A truncated escape has no digits: decoding one runs past the terminator. */
   for(i = 0; s[i] != '\0'; i++) {
     if (s[i] == '%' && s[i + 1] == '%') {
       i++;
       StringAddchar(*tempo, lastc = '%');
-    } else if (s[i] == '%') {
+    } else if (s[i] == '%' && s[i + 1] != '\0' && s[i + 2] != '\0') {
       char hc;
 
       i++;

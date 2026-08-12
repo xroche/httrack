@@ -223,10 +223,8 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
 }
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt) {
-  char **x_argv = NULL;         // Patch pour argv et argc: en cas de récupération de ligne de commande
-  char *x_argvblk = NULL;       // (reprise ou update)
-  size_t x_argvblk_size = 0;    // total capacity of x_argvblk
-  int x_ptr = 0;                // offset
+  /* command line rebuilt from argv, config files and doit.log */
+  cmdl_argv x_cmd = {NULL, 0, 0, NULL, 0, 0};
 
   //
   int argv_url = -1;            // ==0 : utiliser cache et doit.log
@@ -313,7 +311,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     }
   }
 
-  /* create x_argvblk buffer for transformed command line */
+  /* create the token block for the transformed command line */
   {
     size_t current_size = 0;
     const LLint size = fsize("config");
@@ -324,18 +322,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       current_size += strlen(argv[na]) + 1;
     /* a huge file named "config" must saturate, not wrap, the capacity */
     blk_size = llint_grow_size_t(current_size, size > 0 ? size : 0, 32768);
-    x_argvblk = blk_size != (size_t) -1 ? (char *) malloct(blk_size) : NULL;
-    if (x_argvblk == NULL) {
+    /* argc slots to start with; alias expansion and doit.log grow the array */
+    if (blk_size == (size_t) -1 || !cmdl_init(&x_cmd, blk_size, argc)) {
       HTS_PANIC_PRINTF("Error, not enough memory");
       htsmain_free();
       return -1;
     }
-    x_argvblk_size = blk_size;
-    x_argvblk[0] = '\0';
-    x_ptr = 0;
-
-    /* Create argv */
-    x_argv = (char **) malloct(sizeof(char *) * (argc + 1024));
   }
 
   /* Create new argc/argv, replace alias, count URLs, treat -h, -q, -i */
@@ -344,7 +336,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     char BIGSTK tmp_error[HTS_CDLMAXSIZE];
     char *tmp_argv[2];
     int tmp_argc;
-    int x_argc = 0;
     int na;
 
     tmp_argv[0] = _tmp_argv[0];
@@ -352,7 +343,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     //
     argv_url = 0;               /* pour comptage */
     //
-    cmdl_add(argv[0], x_argc, x_argv, x_argvblk, x_argvblk_size, x_ptr);
+    if (!cmdl_add(&x_cmd, argv[0])) {
+      cmdl_free(&x_cmd);
+      HTS_PANIC_PRINTF("Error, not enough memory");
+      htsmain_free();
+      return -1;
+    }
     na = 1;                     /* commencer après nom_prg */
     while(na < argc) {
       int result = 1;
@@ -373,10 +369,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         }
 
         /* Copier */
-        cmdl_add(tmp_argv[0], x_argc, x_argv, x_argvblk, x_argvblk_size, x_ptr);
-        if (tmp_argc > 1) {
-          cmdl_add(tmp_argv[1], x_argc, x_argv, x_argvblk, x_argvblk_size,
-                   x_ptr);
+        if (!cmdl_add(&x_cmd, tmp_argv[0]) ||
+            (tmp_argc > 1 && !cmdl_add(&x_cmd, tmp_argv[1]))) {
+          cmdl_free(&x_cmd);
+          HTS_PANIC_PRINTF("Error, not enough memory");
+          htsmain_free();
+          return -1;
         }
 
         /* Compter URLs et détecter -i,-q.. */
@@ -387,7 +385,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                             // previous options
             argv_url++;
             if (!argv_firsturl)
-              argv_firsturl = x_argv[x_argc - 1];
+              argv_firsturl = x_cmd.argv[x_cmd.argc - 1];
           } else {
             if (strcmp(tmp_argv[0], "-h") == 0) {
               help(argv[0], !opt->quiet);
@@ -429,8 +427,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       argv_url = 0;
 
     /* Nouveaux argc et argv */
-    argv = x_argv;
-    argc = x_argc;
+    argv = x_cmd.argv;
+    argc = x_cmd.argc;
   }
 
   // Option O and includerc
@@ -539,22 +537,32 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                                   StringBuff(opt->path_log),
                                   "hts-cache/doit.log"))) ||
             (argv_url > 0)) {
-          if (!optinclude_file(
-                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                          StringBuff(opt->path_log), HTS_HTTRACKRC),
-                  &argc, argv, x_argvblk, x_argvblk_size, &x_ptr))
-            if (!optinclude_file(HTS_HTTRACKRC, &argc, argv, x_argvblk,
-                                 x_argvblk_size, &x_ptr)) {
-              if (!optinclude_file(
-                      fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                              hts_gethome(), "/" HTS_HTTRACKRC),
-                      &argc, argv, x_argvblk, x_argvblk_size, &x_ptr)) {
+          /* first rc file that exists wins */
+          cmdl_file_result res =
+              optinclude_file(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                                      StringBuff(opt->path_log), HTS_HTTRACKRC),
+                              &x_cmd);
+
+          if (res == CMDL_FILE_MISSING)
+            res = optinclude_file(HTS_HTTRACKRC, &x_cmd);
+          if (res == CMDL_FILE_MISSING)
+            res = optinclude_file(fconcat(OPT_GET_BUFF(opt),
+                                          OPT_GET_BUFF_SIZE(opt), hts_gethome(),
+                                          "/" HTS_HTTRACKRC),
+                                  &x_cmd);
 #ifdef HTS_HTTRACKCNF
-                optinclude_file(HTS_HTTRACKCNF, &argc, argv, x_argvblk,
-                                x_argvblk_size, &x_ptr);
+          if (res == CMDL_FILE_MISSING)
+            res = optinclude_file(HTS_HTTRACKCNF, &x_cmd);
 #endif
-              }
-            }
+          if (res == CMDL_FILE_NOMEM) {
+            cmdl_free(&x_cmd);
+            HTS_PANIC_PRINTF("Error, not enough memory");
+            htsmain_free();
+            return -1;
+          }
+          /* the array may have been grown and moved */
+          argv = x_cmd.argv;
+          argc = x_cmd.argc;
         } else
           loops++;              // do not loop once again
       }
@@ -583,7 +591,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       fp = NULL;
       p = buff;
       do {
-        int insert_after_argc;
         int quoted; /* "" unquotes to empty but is still a real token (#106) */
 
         // read next
@@ -600,14 +607,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         /* Insert parameters BUT so that they can be in the same order */
         if (lastp) {
           if (strnotempty(lastp) || quoted) {
-            insert_after_argc = argc - insert_after;
-            cmdl_ins(lastp, insert_after_argc, (argv + insert_after), x_argvblk,
-                     x_argvblk_size, x_ptr);
-            argc = insert_after_argc + insert_after;
+            if (!cmdl_ins(&x_cmd, lastp, insert_after)) {
+              cmdl_free(&x_cmd);
+              HTS_PANIC_PRINTF("Error, not enough memory");
+              htsmain_free();
+              return -1;
+            }
             insert_after++;
           }
         }
       } while (lastp != NULL);
+      /* the array may have been grown and moved */
+      argv = x_cmd.argv;
+      argc = x_cmd.argc;
     }
   }
 
@@ -825,7 +837,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                               StringBuff(opt->path_log),
                               "hts-cache/doit.log"))) { // un cache est présent
-        if (x_argvblk != NULL) {
+        if (x_cmd.blk != NULL) {
           int m;
 
           // établir mode - mode cache: 1 (cache valide) 2 (cache à vérifier)
@@ -853,7 +865,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               HT_PRINT("OK to Update ");
             }
             HT_PRINT("httrack ");
-            HT_PRINT(x_argvblk);
+            HT_PRINT(x_cmd.blk);
             HT_PRINT("?" LF);
             HT_REQUEST_END;
             if (!ask_continue(opt)) {
@@ -1840,7 +1852,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
 
               case 'g': // strip-query: accumulate "[pattern=]keys" entries
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                /* a key may begin with '-' (#1179) */
+                if (na + 1 >= argc) {
                   HTS_PANIC_PRINTF("Option strip-query needs a blank space and "
                                    "[host/pattern=]key1,key2,...");
                   printf("Example: --strip-query "
@@ -1856,7 +1869,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 break;
 
               case 'C': // host-alias: accumulate "alias[,alias...]=host" rules
-                if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
+                /* an alias may begin with '-' (#1179) */
+                if (na + 1 >= argc) {
                   HTS_PANIC_PRINTF("Option host-alias needs a blank space and "
                                    "alias[,alias...]=canonical-host");
                   printf("Example: --host-alias "
@@ -2956,10 +2970,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     UNLINK(n_lock);
   }
 
-  if (x_argvblk)
-    freet(x_argvblk);
-  if (x_argv)
-    freet(x_argv);
+  cmdl_free(&x_cmd);
   if (url)
     freet(url);
 

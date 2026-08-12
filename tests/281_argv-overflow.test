@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# Grow the rebuilt command line past the slot count that used to be fixed
+# (#1189). Its three writers are separate call sites and need separate
+# coverage: cmdl_add for the command line, where an option spelled
+# --opt=value expands to two tokens, and cmdl_ins for the hts-cache/doit.log
+# replay and for the config file. Each run ends in a self-test dispatched
+# from the rebuilt argv, so it checks the tail tokens for order as well as
+# survival, and costs no crawl.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argvoflow.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+want="barfoobar does match *foo*"
+
+# --- 1. command line: two-token expansion outruns the slots ------------------
+# 2000 arguments become 4001 tokens, past the 3028 the old sizing allowed.
+args=()
+for ((i = 0; i < 2000; i++)); do
+    args+=("--why=$i")
+done
+rc=0
+got=$("$bin" "${args[@]}" -\#test=filter '*foo*' barfoobar 2>&1) || rc=$?
+assert_eq 0 "$rc" "4001-token command line exited"
+assert_eq "$want" "$got" "tokens after the expansion"
+
+# --- 2. doit.log replay: one insertion per recorded token --------------------
+mirror="$tmp/mirror"
+mkdir -p "$mirror/hts-cache"
+{
+    for ((i = 0; i < 1900; i++)); do printf -- '-#f '; done
+    printf -- '-#test=filter *foo* barfoobar\n'
+} >"$mirror/hts-cache/doit.log"
+
+rc=0
+got=$(cd "$mirror" && "$bin" 2>&1) || rc=$?
+assert_eq 0 "$rc" "1903-token doit.log replay exited"
+assert_eq "$want" "$got" "tokens replayed from doit.log"
+
+# --- 3. config file: the third writer, and the only one that reallocs mid-scan
+# The rc file is read from the working directory, once per pass of the -O loop,
+# and each line inserts two tokens; the caller re-reads the array afterwards.
+rcdir="$tmp/rc"
+mkdir -p "$rcdir"
+for ((i = 0; i < 600; i++)); do
+    printf 'set footer f%d\n' "$i"
+done >"$rcdir/.httrackrc"
+
+rc=0
+got=$(cd "$rcdir" && "$bin" -\#test=filter '*foo*' barfoobar 2>&1) || rc=$?
+assert_eq 0 "$rc" "2400-token config-file expansion exited"
+assert_eq "$want" "$got" "tokens after the config-file expansion"
+
+exit 0

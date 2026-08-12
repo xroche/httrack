@@ -144,7 +144,7 @@ ${do:end-if}${do:output-mode:html}
 	${test:hidequery:--include-query-string=1:--include-query-string=0}
 	${test:nopurge:--purge-old=1:--purge-old=0}
 \
-	${test:cache:--cache=0:}
+	${ztest:cache:--cache=0:}
 	${test:filter::--priority=0:--priority=1:--priority=2:--priority=7}
 	${test:travel::--stay-on-same-dir:--can-go-down:--can-go-up:--can-go-up-and-down}
 	${test:travel2::--stay-on-same-address:--stay-on-same-domain:--stay-on-same-tld:--go-everywhere}
@@ -179,7 +179,7 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${ztest:cookies:--cookies=0:}
 	${ztest:parsejava:--parse-java=0:}
 	${test:updhack:--updatehack}
-	${test:urlhack:--urlhack=0:--urlhack}
+	${ztest:urlhack:--urlhack=0:--urlhack}
 	${test:keepwww:--keep-www-prefix}
 	${test:keepslashes:--keep-double-slashes}
 	${test:keepqueryorder:--keep-query-order}
