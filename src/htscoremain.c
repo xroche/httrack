@@ -169,11 +169,15 @@ void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
   snprintf(dst, dstsize, "%s", fallback);
 }
 
-#define htsmain_free() do { \
-  if (url != NULL) { \
-    free(url); \
-  } \
-} while(0)
+/* Every caller returns straight after, which is what makes releasing the
+   command line here safe: it is the only thing every early exit runs. */
+#define htsmain_free()                                                         \
+  do {                                                                         \
+    if (url != NULL) {                                                         \
+      free(url);                                                               \
+    }                                                                          \
+    cmdl_free(&x_cmd);                                                         \
+  } while (0)
 
 #define ensureUrlCapacity(url, urlsize, size) do { \
   if (urlsize < size || url == NULL) { \
