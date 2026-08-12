@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# An early exit from hts_main_internal used to leak the rebuilt command line,
-# the token chunk plus the slot array (#1206). Only a leak checker sees it, and
-# the sanitized CI leg runs with detect_leaks off, so this turns it back on
-# around two runs that bail out after the block is allocated.
+# An early exit from hts_main_internal must release the rebuilt command line,
+# the token chunks plus the slot array (#1206). Only a leak checker sees this,
+# and the sanitized CI leg runs with detect_leaks off, so turn it back on around
+# two runs that bail out after the block is allocated.
 
 set -eu
 
@@ -36,8 +36,8 @@ bail() { # bail LABEL WANT_RE ARG...
     printf '[%s] ..\t' "$label"
     out=$(ASAN_OPTIONS="${asan_base}:log_path=$tmp/asan" \
         httrack -O "$tmp/out" "$@" "$url" 2>&1 || true)
-    # Teeth: a run that never reached the early exit would report clean having
-    # tested nothing.
+    # Teeth: a run that never reached the early exit would report clean without
+    # exercising the leak.
     assert_match "$want" "$out" "$label"
     report=$(cat "$tmp/asan".* 2>/dev/null || true)
     test -z "$report" || {

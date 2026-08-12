@@ -169,8 +169,8 @@ void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
   snprintf(dst, dstsize, "%s", fallback);
 }
 
-/* Every caller returns straight after, which is what makes releasing the
-   command line here safe: it is the only thing every early exit runs. */
+/* Every expansion is followed by a return, so nothing reads the command line
+   after this releases it. */
 #define htsmain_free()                                                         \
   do {                                                                         \
     if (url != NULL) {                                                         \
