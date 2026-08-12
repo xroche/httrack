@@ -154,6 +154,10 @@ export MSYS2_ARG_CONV_EXCL='*'
 TMPDIR="$(cygpath -m "$RUNNER_TEMP")"
 export TMPDIR
 
+# One test at a time, so kill_tree's last-resort sweep (testlib.sh) -- every engine
+# and every python on the host -- races nothing anyone wants.
+export HTTRACK_EXCLUSIVE_HOST=1
+
 # Mirror what configure hands the suite. LC_ALL sets the codeset MSYS maps
 # a UTF-8 mirror name onto UTF-16 with, which the intl crawls "test -f".
 export HTTPS_SUPPORT=yes BROTLI_ENABLED=yes ZSTD_ENABLED=yes
