@@ -1283,6 +1283,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     hts_boolean unquoted = HTS_FALSE;
                     /* value comes from the template, not from the settings */
                     hts_boolean literal = HTS_FALSE;
+                    char datebuff[16];
 
                     name[0] = '\0';
                     strlncatbuff(name, str, sizeof(name_), n);
@@ -1310,6 +1311,33 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     } else if ((p = strfield(name, "liststr:"))) {
                       name += p;
                       format = -2;
+                    } else if ((p = strfield(name, "date:"))) {
+                      /* Expanded on each request, so the footer year cannot
+                         drift from the calendar the way a stamped one does
+                         (#1165). Pinned by SOURCE_DATE_EPOCH, as makeman.sh
+                         and doc-chrome.py are, to give a test another year. */
+                      const char *epoch = getenv("SOURCE_DATE_EPOCH");
+                      struct tm tmv;
+                      time_t tt = time(NULL);
+
+                      name += p;
+                      format = 0;
+                      langstr = "";
+                      if (strcmp(name, "year") == 0) {
+                        hts_boolean ok;
+
+                        if (epoch != NULL && *epoch) {
+                          tt = (time_t) strtoll(epoch, NULL, 10);
+                          ok = hts_gmtime(tt, &tmv);
+                        } else {
+                          ok = hts_localtime(tt, &tmv);
+                        }
+                        if (ok) {
+                          snprintf(datebuff, sizeof(datebuff), "%d",
+                                   tmv.tm_year + 1900);
+                          langstr = datebuff;
+                        }
+                      }
                     } else if ((p = strfield(name, "file-exists:"))) {
                       char *pos2;
 

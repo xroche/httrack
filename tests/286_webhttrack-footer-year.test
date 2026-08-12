@@ -1,0 +1,71 @@
+#!/bin/bash
+#
+# The WebHTTrack footer year is expanded on each request (#1165), so it cannot
+# drift from the calendar the way the 23 hardcoded copies did.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "$(dirname "$0")/webhttracklib.sh"
+
+htsserver_require
+distdir=${HTS_DISTDIR}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_year.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+# A private root, so the probe below can sit beside the shipped pages.
+root="${work}/root"
+mkdir -p "${root}"
+cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
+chmod -R u+w "${root}"
+
+# Bracketed: an empty expansion has to be distinguishable from a dropped line,
+# and a field the branch does not know must come out empty, not as its token.
+# shellcheck disable=SC2016 # the literal ${...} is what the server expands
+printf '%s\n' 'year=[${date:year}] unknown=[${date:month}]' \
+    >"${root}/html/server/probe-1165.html"
+
+pinned=2019
+epoch=$("${HTS_PYTHON}" -c \
+    "import datetime;print(int(datetime.datetime(${pinned},7,1,tzinfo=datetime.timezone.utc).timestamp()))")
+
+printf '[the footer year follows the clock, not the shipped bytes] ..\t'
+
+# Pinned first: a year hardcoded in C would pass every unpinned check below.
+export SOURCE_DATE_EPOCH="${epoch}"
+htsserver_start --root "${root}" --home "${work}"
+reply=$(htsserver_get /server/probe-1165.html)
+grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "probe page: ${reply}"
+grep -q "year=\[${pinned}\]" <<<"${reply}" ||
+    fail "SOURCE_DATE_EPOCH=${epoch} did not reach the expansion: ${reply}"
+grep -q 'unknown=\[\]' <<<"${reply}" ||
+    fail "an unknown date field does not expand to nothing: ${reply}"
+
+# ... and a shipped page has to carry the token rather than a stamped year.
+reply=$(htsserver_get /server/index.html)
+grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "index.html: ${reply}"
+grep -q "&copy; 1998-${pinned} Xavier Roche &amp; other contributors" <<<"${reply}" ||
+    fail "the index.html footer does not follow the clock: ${reply}"
+# shellcheck disable=SC2016 # ditto: the raw token must not survive
+case ${reply} in
+*'${date:'*) fail "index.html serves the raw token: ${reply}" ;;
+esac
+htsserver_stop
+
+# Unpinned, which is the path users get: the year is computed, not read off
+# the environment.
+unset SOURCE_DATE_EPOCH
+now=$(date +%Y)
+htsserver_start --root "${root}" --home "${work}"
+reply=$(htsserver_get /server/probe-1165.html)
+# Re-read: a New Year crossing mid-request is not a failure.
+after=$(date +%Y)
+grep -qE "year=\[(${now}|${after})\]" <<<"${reply}" ||
+    fail "the unpinned year is neither ${now} nor ${after}: ${reply}"
+
+echo OK
