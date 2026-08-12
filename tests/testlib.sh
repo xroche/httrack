@@ -293,9 +293,11 @@ stop_server() {
 }
 
 # Free loopback ports, one per protocol in $@ (tcp/udp, default a single tcp),
-# space separated and all distinct, each closed before its caller binds it: see
-# start_proxytrack. Probed in the protocol the caller binds, since free in tcp
-# says nothing about udp and Windows excludes port ranges per protocol (#1178).
+# space separated and all distinct, each closed before it returns: the number is
+# only a hint, so a caller must retry its bind (start_proxytrack) or take
+# hold_port instead when the port has to still be free later (#1218).
+# Probed in the protocol the caller binds, since free in tcp says nothing about
+# udp and Windows excludes port ranges per protocol (#1178).
 freeport() { # freeport [PROTO...]
     local out
     # Captured, not piped into tr, which would swallow a failed probe's status.
@@ -324,14 +326,41 @@ for s in held:
     printf '%s\n' "$out" | tr -d '\r'
 }
 
+# Holds a free loopback port instead of sampling it: the socket stays bound and
+# unlistened, so the number is nobody else's while a connect to it is refused as
+# on a dead port. Sets HELD_PORT and HELD_PID and registers the release, which
+# stop_server "$HELD_PID" runs early for a caller wanting the port back sooner.
+# shellcheck disable=SC2120 # tcp is the common case
+hold_port() { # hold_port [PROTO]
+    local proto=${1:-tcp} log
+    log=$(mktemp "${TMPDIR:-/tmp}/httrack_hold.XXXXXX") || fail "hold_port: no temp log"
+    # Stdin off the tty: a background job that touches it is stopped by SIGTTIN.
+    "${python:?hold_port needs the caller python}" -c 'import socket, sys, time
+kinds = {"tcp": socket.SOCK_STREAM, "udp": socket.SOCK_DGRAM}
+if sys.argv[1] not in kinds:
+    sys.exit("hold_port: unknown protocol " + sys.argv[1])
+s = socket.socket(socket.AF_INET, kinds[sys.argv[1]])
+s.bind(("127.0.0.1", 0))
+sys.stdout.reconfigure(newline="\n")  # no CR for discover_server_port to read
+print("PORT %d" % s.getsockname()[1], flush=True)
+time.sleep(900)  # bounded, so a SIGKILLed test cannot pin the port for the run
+' "$proto" >"$log" 2>&1 </dev/null &
+    HELD_PID=$!
+    cleanup_push rm -f "$log"
+    cleanup_push stop_server "$HELD_PID"
+    HELD_PORT=$(discover_server_port "$log" "$HELD_PID") ||
+        fail "the $proto port holder did not come up: $(cat "$log")"
+}
+
 PT_LISTENING="HTTP Proxy installed on"
-PT_BIND_LOST="Unable to (initialize a temporary server|create the server)"
+# Both proxytrack and htsserver announce a lost bind with this, out of the engine.
+BIND_LOST="Unable to (initialize a temporary server|create the server)"
 
 # Returns 0 once $1 (its log) carries the listen banner, 1 if the bind lost its
 # port; a proxytrack that announces neither ends the test here.
 proxytrack_bound() { # proxytrack_bound LOG PID
     local log=$1 pid=$2 waited=0
-    until grep -qE "$PT_LISTENING|$PT_BIND_LOST" "$log"; do
+    until grep -qE "$PT_LISTENING|$BIND_LOST" "$log"; do
         # An exit flushes the log, so re-read it rather than calling this dead.
         kill -0 "$pid" 2>/dev/null || break
         test "$waited" -lt 50 || fail "proxytrack never announced its listen port: $(cat "$log")"
@@ -339,7 +368,7 @@ proxytrack_bound() { # proxytrack_bound LOG PID
         waited=$((waited + 1))
     done
     grep -q "$PT_LISTENING" "$log" && return 0
-    grep -qE "$PT_BIND_LOST" "$log" || fail "proxytrack exited before listening: $(cat "$log")"
+    grep -qE "$BIND_LOST" "$log" || fail "proxytrack exited before listening: $(cat "$log")"
     return 1
 }
 
