@@ -195,7 +195,8 @@ verdict() { # verdict <accept|reject> <run number> <status the child exits with>
     local rc=0
     (
         # shellcheck disable=SC2030,SC2031 # the isolation is the point: the real run is next door
-        n=$2 SAMPLE=1
+        # Cases still to come, or the pacer this is looking for would decline to fire.
+        n=$2 cases=$(($2 + 5)) SAMPLE=1
         # Spent by the time the run ends, so a pacer anywhere after it would fire.
         # shellcheck disable=SC2030,SC2031 # likewise: the budget here is the probe's own
         export HTTRACK_TEST_TIMEOUT=$((SECONDS + 4))
@@ -212,6 +213,7 @@ verdict() { # verdict <accept|reject> <run number> <status the child exits with>
 verdict accept 80 1 # configure rejected what it must accept
 verdict reject 81 0 # configure accepted what it must reject
 # The probes ran in subshells, so the real cases below start from a clean count.
+cases=16
 n=0
 status=0
 log=
