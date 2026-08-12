@@ -276,6 +276,11 @@ typedef int hts_tristate;
 /* Compile-time check, usable as an expression. */
 #define HTS_COMPILE_ASSERT(cond) ((void) sizeof(char[(cond) ? 1 : -1]))
 
+/* The same where a declaration goes, which is where a rule tying constants
+   together belongs. NAME is what the diagnostic points at. Takes a ';'. */
+#define HTS_STATIC_ASSERT(cond, name)                                          \
+  enum { hts_static_assert_##name = 1 / !!(cond) }
+
 /* 'inline' where the dialect supports it (C++), nothing in plain C. */
 #ifdef __cplusplus
 #define HTS_INLINE inline
