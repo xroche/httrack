@@ -1318,20 +1318,25 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                          and doc-chrome.py are, to give a test another year. */
                       const char *epoch = getenv("SOURCE_DATE_EPOCH");
                       struct tm tmv;
-                      time_t tt = time(NULL);
+                      hts_boolean ok = HTS_FALSE;
 
                       name += p;
                       format = 0;
                       langstr = "";
                       if (strcmp(name, "year") == 0) {
-                        hts_boolean ok;
-
                         if (epoch != NULL && *epoch) {
-                          tt = (time_t) strtoll(epoch, NULL, 10);
-                          ok = hts_gmtime(tt, &tmv);
-                        } else {
-                          ok = hts_localtime(tt, &tmv);
+                          char *end;
+                          const long long secs = strtoll(epoch, &end, 10);
+
+                          /* UTC, as the variable is defined */
+                          if (*end == '\0')
+                            ok = hts_gmtime((time_t) secs, &tmv);
                         }
+                        /* a value we cannot use falls back to the clock: a
+                           footer reading 1998-1970 is worse than an ignored
+                           override */
+                        if (!ok)
+                          ok = hts_localtime(time(NULL), &tmv);
                         if (ok) {
                           snprintf(datebuff, sizeof(datebuff), "%d",
                                    tmv.tm_year + 1900);

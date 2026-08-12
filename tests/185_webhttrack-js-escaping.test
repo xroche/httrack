@@ -157,8 +157,11 @@ for what, text in [
         ("a bare key in a handler", "<a onClick=\"f('${LANG_X}')\">"),
         ("an unclosed output-mode region",
          '${do:output-mode:html-urlescaped}\n<input value="${LANG_X}">'),
-        # the date: exemption below must not open element body to anything else
-        ("a settings value in element body", "<p>${projname}</p>")]:
+        # the date: exemption below must not open element body to anything
+        # else, nor every key that carries a colon
+        ("a settings value in element body", "<p>${projname}</p>"),
+        ("a colon-bearing runtime key in element body",
+         "<p>${unquoted:projname}</p>")]:
     if not scan("control.html", text)[0]:
         sys.exit("the scanner does not see %s" % what)
 for what, text in [
