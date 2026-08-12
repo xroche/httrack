@@ -173,11 +173,10 @@ reject("--keep-alive")
 if ini.get("UserID") != "" or ini.get("KeepAlive") != "0":
     sys.exit("the cleared fields came back as %r / %r"
              % (ini.get("UserID"), ini.get("KeepAlive")))
-# --cookies=0 is emitted only for an empty value, and --index=0 only for a
-# literal 0, so together they pin the coercion from both sides. A cleared box
-# has to reach the engine, not just untick.
+# A cleared box has to reach the engine, not just untick: the file spells all
+# four 0, the reader empties them, and each one still emits its disabling flag.
 want("--cookies=0")
-reject("--index=0")
+want("--index=0")
 want("--cache=0")
 want("--urlhack=0")
 option4 = get("option4.html?sid=" + sid)
