@@ -193,11 +193,15 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   }
 }
 
-#define htsmain_free() do { \
-  if (url != NULL) { \
-    free(url); \
-  } \
-} while(0)
+/* Every expansion is followed by a return, so nothing reads the command line
+   after this releases it. */
+#define htsmain_free()                                                         \
+  do {                                                                         \
+    if (url != NULL) {                                                         \
+      free(url);                                                               \
+    }                                                                          \
+    cmdl_free(&x_cmd);                                                         \
+  } while (0)
 
 #define ensureUrlCapacity(url, urlsize, size) do { \
   if (urlsize < size || url == NULL) { \

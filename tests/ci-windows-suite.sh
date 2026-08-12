@@ -303,7 +303,8 @@ echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
 # which Windows Python does not build;
 # badmtime needs a filesystem that stores an mtime past gmtime's range;
 # single-file-gui drives htsserver, which this job does not build;
-# update-304-leak needs a LeakSanitizer build, which MSVC has no equivalent of;
+# update-304-leak and cmdline-leak need a LeakSanitizer build, which MSVC has no
+# equivalent of;
 # crash-symbolize and backtrace-empty need backtrace(), which Windows has no
 # equivalent of;
 # string-oom drives a helper binary that only the automake build produces;
@@ -322,6 +323,7 @@ expected_skips="01_engine-footer-overflow.test
 100_local-purge-longpath.test
 158_local-link-control-bytes.test
 114_local-update-304-leak.test
+283_engine-cmdline-leak.test
 120_local-proxytrack-webdav-default.test
 143_engine-backtrace-empty.test
 152_engine-string-oom.test
