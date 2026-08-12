@@ -4,6 +4,24 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-21
++ New: --host-alias (-%C) folds the several hostnames of one site onto a single canonical host, so a site that answers under more than one hostname is fetched once instead of once per name (#16)
++ New: the WebHTTrack wizard can set the host-alias rules and the guide documents them for every front end; a malformed rule is refused where it can still be corrected, through a newly exported hts_host_alias_rule_ok() (#1161, #1172, #1192)
++ Fixed: any signal caught during a mirror killed every transfer in flight, so a burst of them silently truncated the mirror; a stop now ends an HTTP transfer as the user's stop rather than a fabricated receive error (#1110)
++ Fixed: stopping an FTP transfer against a silent server waited out --timeout twice, once on the data socket and again on a QUIT reply nobody was going to send (#1096)
++ Fixed: a crawl that ended early ran --update's purge against the files it had never reached, deleting good ones (#1109)
++ Fixed: a long URL overflowed the duplicate-detection key buffer (#1160)
++ Fixed: a long command line, a large doit.log or a large .httrackrc aborted the engine while it rebuilt its arguments (#1189, #1198)
++ Fixed: a scan rule beginning with a dash ended the whole run (#1179)
++ Fixed: --index=0 and --noindex enabled the index rather than disabling it, and --purge-old=1 killed the run; an option that takes no value now refuses one instead of silently dropping it (#1195, #1200)
++ Fixed: reloading a WebHTTrack project lost every zero and every cleared field, so a rate limit of 0 came back as 100 KB/s and a cleared user-agent refilled itself (#1177, #1171, #1186)
++ Fixed: the wizard kept only the last of several --strip-query rules, and its domain answers matched beyond the domain they named (#1168, #1119)
++ Fixed: the offer to resume an interrupted mirror printed the program path instead of the command line it would rerun (#1204)
++ Fixed: the build failed where getrandom() has no declaration, and the installed headers did not compile under some include orders (#1139, #1150, #1151)
++ Changed: the documentation and the WebHTTrack pages compute their copyright year instead of carrying a fixed one (#1163, #1165)
++ Changed: refreshed the guide screenshots for all three interfaces, and repaired the documentation's dark mode and its search-target tabs (#1164, #1158)
++ Changed: multiple internal hardening, build, test and CI improvements
+
 3.49-20
 + Fixed: a link to another host whose name looked like a file was scanned as a page, so one link could mirror the whole foreign site on the referring page's depth budget (#121)
 + Fixed: a size-bounded filter built both of its filter URLs wrong when the path had no leading slash (#1095)

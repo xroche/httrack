@@ -53,6 +53,19 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.49.21" date="2026-08-12">
+      <description>
+        <ul>
+          <li>A site that answers to several names is mirrored once, instead of once per name</li>
+          <li>Stopping a mirror ends the transfers under way instead of reporting them as network errors</li>
+          <li>A mirror that ends early no longer deletes files the update pass never reached</li>
+          <li>Reloading a project keeps the boxes you cleared and the values you set to zero</li>
+          <li>Clearing the option to build an index page now turns it off</li>
+          <li>A very long address, or a very large settings file, no longer stops the mirror</li>
+          <li>Refreshed screenshots throughout the documentation</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.20" date="2026-08-10">
       <description>
         <ul>

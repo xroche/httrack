@@ -1,3 +1,12 @@
+httrack (3.49.21-1) unstable; urgency=medium
+
+  * New upstream release: a site answering to several hostnames can now be
+    mirrored once rather than once per name, plus fixes to mirror
+    interruption, to an update pass that purged files it had never reached,
+    and to several buffer overflows; full list in history.txt.
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 12 Aug 2026 15:05:15 +0200
+
 httrack (3.49.20-1) unstable; urgency=medium
 
   * New upstream release: an off-site link that looked like a file could pull
