@@ -3935,6 +3935,10 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   assertf(!hts_host_alias_rule_ok("b.com=a.com\f"));
   assertf(!hts_host_alias_rule_ok("b.com=a\x7f.com"));
   assertf(!hts_host_alias_rule_ok("b\v.com=a.com"));
+  /* a high byte is a host in some local charset, not a control byte */
+  assertf(hts_host_alias_rule_ok("caf\xe9.example.com=h\xf4tel.example.com"));
+  /* an alias may lead with '-': why case 'C' carries no dash guard (#1179) */
+  assertf(hts_host_alias_rule_ok("-legacy.example.com=example.com"));
   assertf(!hts_host_alias_rule_ok("b.com=x://a.com"));
   assertf(!hts_host_alias_rule_ok("b.com=a.com://c.com"));
   assertf(hts_host_alias_rule_ok("b.com=ftp://a.com"));
