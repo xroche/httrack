@@ -31,8 +31,15 @@ for e in xhttrack httrackx httrack.dll python.exe ''; do
     if [[ $e =~ $ENGINE_EXE_RE ]]; then fail "ENGINE_EXE_RE matches '$e'"; fi
 done
 
+# Nothing at all by default: the sweep below would take down a parallel sibling's
+# engine and the python fixture server behind it.
 : >"$tmp/killed"
 kill_tree 4242
+test ! -s "$tmp/killed" || fail "kill_tree swept the host unasked: $(cat "$tmp/killed")"
+
+# The opt-in a runner with one test in flight sets.
+: >"$tmp/killed"
+HTTRACK_EXCLUSIVE_HOST=1 kill_tree 4242
 # Spelled out, not built from $ENGINE_EXES: dropping a name from that list has to
 # fail here, and an expectation derived from it would shrink along with the bug.
 want='/F /IM htsserver.exe
@@ -46,6 +53,16 @@ test "$got" = "$want" || fail "kill_tree without a winpid ran: $got"
 for e in $ENGINE_EXES; do
     grep -qxF "/F /IM $e.exe" "$tmp/killed" || fail "kill_tree leaves $e.exe running"
 done
+
+# The pid the caller read while the job was alive, which is what spares the host
+# once /proc/<pid>/winpid is gone. win_pid answers something else, or a kill_tree
+# deriving first and falling back to the argument would pass here for free.
+# shellcheck disable=SC2317 # unreachable is the property: only the bug calls it
+win_pid() { echo 9999; }
+: >"$tmp/killed"
+HTTRACK_EXCLUSIVE_HOST=1 kill_tree 99 4242
+got=$(cat "$tmp/killed")
+test "$got" = '/F /T /PID 4242' || fail "kill_tree with a pre-resolved winpid ran: $got"
 
 # With a winpid it is one tree kill and nothing by name, or a parallel sibling's
 # engine would go down with the target.

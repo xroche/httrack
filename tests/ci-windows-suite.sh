@@ -168,11 +168,13 @@ export LC_ALL=C.UTF-8
 per_test=600
 
 # The whole suite must give up before the workflow's 45-minute step
-# timeout. A cancelled step keeps neither its log nor the artifacts the
-# later if:always() steps would upload, so an overrun that ends in a
-# cancel tells us nothing; failing on our own terms keeps both. Healthy
-# runs take 13 min. The check sits between tests, so the step can still
-# reach 25 min plus one per-test budget, inside the 45.
+# timeout: a cancelled step keeps neither its log nor the artifacts the
+# later if:always() steps would upload, one failing on its own terms keeps
+# both. Left at the serial budget though the pool costs 4 min, because it
+# bounds a wedge and not a healthy run: fitted to the pool it reds a merely
+# slow run and every jobs=1 one (23 min), and the traced rerun below gets
+# only what is left of it, so a tight value drops the trace on exactly the
+# runs worth diagnosing.
 suite_deadline=1500
 started=$SECONDS
 
@@ -184,19 +186,20 @@ export HTTRACK_PROGRESS_LOG="$PWD/$progress"
 
 # A dying runner takes both, and every annotation with them (measured, see
 # #795), so the watchdog's job is to end the step first: one that fails on
-# its own terms keeps its log. Quiet past 16 min, clear of the 13 a healthy
-# run measures here, and a kill 900s after the last progress line clears
-# the longest legitimate gap, one $per_test.
+# its own terms keeps its log. Also left at the serial budget: under the pool
+# any live worker keeps the log moving, so staticness now catches a stalled
+# suite and nothing narrower -- one wedged test is bounded by $per_test and
+# by $hard_deadline below.
 stuck=900
 # Orthogonal to that heartbeat rather than a spare of it: the heartbeat needs
 # 960s of quiet and 900s of static log, and every #795 death measured so far
 # lands inside the first 750s of the step.
 watchdog='' ci_watchdog_pid=''
 # Wall-clock backstop, because staticness alone bounds nothing: the deadline above
-# is read between tests, and past it one test may still spend $per_test and then a
-# traced rerun, each writing a progress line that re-arms $stuck. 2400s clears that
-# 1500+600 worst case with room for the hang dump, and leaves 300s of the step's
-# 45 minutes to fail on our own terms and upload (#1126).
+# is read before each dispatch, and past it the tests in flight may still spend
+# $per_test and then a traced rerun, each writing a progress line that re-arms
+# $stuck. 2400s clears that 1500+600 worst case with room for the hang dump, and
+# leaves 300s of the step's 45 minutes to fail on our own terms and upload (#1126).
 hard_deadline=2400
 ci_start_native_watchdog "$PWD/$progress" && watchdog=$ci_watchdog_pid
 test -n "$watchdog" || echo "no off-box watchdog: no usable PowerShell"
@@ -205,6 +208,103 @@ heartbeat=$!
 trap 'set +e; kill "$heartbeat" 2>/dev/null; test -z "$watchdog" || kill_pid "$watchdog"' EXIT
 
 pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
+# Tests in flight at once, min(2*nproc, 16) as ci.yml gives "make check" on every
+# platform: each binds its own ephemeral-port server, and they mostly sleep.
+cores=$(nproc 2>/dev/null || echo "${NUMBER_OF_PROCESSORS:-2}")
+case "$cores" in '' | 0 | *[!0-9]*) cores=2 ;; esac
+jobs=$((cores * 2))
+test "$jobs" -le 16 || jobs=16
+# So a test can pin the width; a nonsense value is named rather than obeyed.
+case "${HTTRACK_SUITE_JOBS:-}" in
+'') ;;
+0 | *[!0-9]*) echo "::warning::ignoring HTTRACK_SUITE_JOBS=$HTTRACK_SUITE_JOBS" ;;
+*) jobs=$HTTRACK_SUITE_JOBS ;;
+esac
+# wait -n is bash 4.3, and macOS drives this script under 3.2
+# (172_ci-windows-driver.test): with no way to wait for a free slot, run serially.
+pool=
+if test "${BASH_VERSINFO[0]}" -gt 4 ||
+    { test "${BASH_VERSINFO[0]}" -eq 4 && test "${BASH_VERSINFO[1]}" -ge 3; }; then
+    pool=1
+fi
+test -n "$pool" || jobs=1
+# kill_tree's last-resort sweep (testlib.sh) kills every engine and every python
+# on the host, so it is sound only while one test is in flight.
+if test "$jobs" -gt 1; then
+    unset HTTRACK_EXCLUSIVE_HOST
+else
+    export HTTRACK_EXCLUSIVE_HOST=1
+fi
+
+# A worker cannot increment a counter of ours, so every outcome is written here
+# and the tally read back once the pool has drained.
+results=suite-results
+rm -rf "$results"
+mkdir -p "$results"
+
+# Run test $1 to completion: its verdict on stdout, a failure's 25-line tail into
+# $results/$1.tail, and its status last into $results/$1.rc, which says it got there.
+run_one_test() (
+    local t=$1 rc=0 left ttmp
+    # Its own TMPDIR, since dump_crawl_logs (testlib.sh) globs the whole of it.
+    # Windows-shaped like the export above: the tests hand it to a native exe.
+    ttmp="$TMPDIR/suite.$t"
+    rm -rf "$ttmp" 2>/dev/null || true
+    mkdir -p "$ttmp"
+    # Same guard "make check" uses on POSIX, so a wedge is diagnosed the
+    # same way on every platform. It dumps before it kills, which a bare
+    # run_with_timeout cannot: by the time that returns, the tree whose
+    # stack we wanted is already gone.
+    HTTRACK_TEST_TIMEOUT=$per_test TMPDIR="$ttmp" \
+        bash ./test-timeout.sh "$t" >"$t.log" 2>&1 || rc=$?
+    case "$rc" in
+    0) echo "PASS $t" ;;
+    77) echo "SKIP $t" ;;
+    124)
+        # test-timeout.sh has already written the process list, the stacks
+        # and the killed crawl's own logs into $t.log.
+        echo "FAIL $t (timed out, tree killed)"
+        tail -n 25 "$t.log" | sed 's/^/      /' >"$results/$t.tail"
+        ;;
+    *)
+        echo "FAIL $t (exit $rc)"
+        # These assert with `test "$(...)" == "..." || exit 1`, which
+        # says nothing at all on failure. Re-run traced, still bounded.
+        # Charged to the suite deadline rather than given a budget of its
+        # own: a failure just under that deadline would else spend
+        # $per_test twice and land on the workflow's own timeout (#1126).
+        left=$((suite_deadline - (SECONDS - started)))
+        test "$left" -le "$per_test" || left=$per_test
+        if [ "$left" -gt 0 ]; then
+            # Noted first, or a slow trace reads as a wedge to the watchdog,
+            # which would then kill the step in the middle of writing it.
+            echo "RERUN $t" >>"$progress"
+            # Handed the same TMPDIR: the trace runs outside test-timeout.sh,
+            # which is what gave the first run one of its own.
+            TMPDIR="$ttmp" run_with_timeout "$left" bash -x "$t" >>"$t.log" 2>&1 || true
+        else
+            echo "no trace: past the ${suite_deadline}s suite deadline" >>"$t.log"
+        fi
+        tail -n 25 "$t.log" | sed 's/^/      /' >"$results/$t.tail"
+        ;;
+    esac
+    echo "$rc $t" >>"$progress"
+    # Never fatal: Windows may still hold a file the killed tree left open.
+    rm -rf "$ttmp" 2>/dev/null || true
+    echo "$rc" >"$results/$t.rc"
+)
+
+# Workers still running, into $workers. Counted, not taken from wait -n, which
+# returns for any job (the heartbeat included) and cannot be told which to watch.
+workers=0
+count_workers() {
+    local p
+    workers=0
+    for p in ${pids[@]+"${pids[@]}"}; do
+        if kill -0 "$p" 2>/dev/null; then workers=$((workers + 1)); fi
+    done
+}
+
 # label:pattern, globbed rather than enumerated so a new NNN_engine-*.test or
 # NNN_local-*.test is picked up instead of silently getting zero coverage. Every
 # entry carries a metacharacter, or nullglob cannot empty it and the gate below
@@ -230,6 +330,7 @@ for c in "${categories[@]}"; do
 done
 shopt -u nullglob
 
+pids=() ran_tests=()
 for t in "${tests[@]}"; do
     elapsed=$((SECONDS - started))
     if [ "$elapsed" -ge "$suite_deadline" ]; then
@@ -241,55 +342,45 @@ for t in "${tests[@]}"; do
         break
     fi
     echo "RUN $t at ${elapsed}s" >>"$progress"
-    rc=0
-    # Same guard "make check" uses on POSIX, so a wedge is diagnosed the
-    # same way on every platform. It dumps before it kills, which a bare
-    # run_with_timeout cannot: by the time that returns, the tree whose
-    # stack we wanted is already gone.
-    HTTRACK_TEST_TIMEOUT=$per_test bash ./test-timeout.sh "$t" >"$t.log" 2>&1 || rc=$?
+    ran_tests+=("$t")
+    if test "$jobs" -eq 1; then
+        # Never fatal: a worker killed by a signal is one failed test, not the
+        # end of the suite, and only the gates below may stop it (errexit).
+        run_one_test "$t" || true
+        continue
+    fi
+    count_workers
+    while test "$workers" -ge "$jobs"; do
+        wait -n 2>/dev/null || true
+        count_workers
+    done
+    run_one_test "$t" &
+    pids+=("$!")
+done
+# Never a bare wait, which would also wait on the heartbeat and never return.
+for p in ${pids[@]+"${pids[@]}"}; do
+    wait "$p" 2>/dev/null || true
+done
+# In test order, once nothing is still writing: eight workers interleaving their
+# failure tails is noise.
+for t in ${ran_tests[@]+"${ran_tests[@]}"}; do
+    # read, not $(cat): a fork per test costs tens of milliseconds under MSYS.
+    rc=
+    test ! -r "$results/$t.rc" || read -r rc <"$results/$t.rc" || true
     case "$rc" in
-    0)
-        pass=$((pass + 1))
-        echo "PASS $t"
-        ;;
-    77)
-        skip=$((skip + 1)) skipped="$skipped $t"
-        echo "SKIP $t"
-        ;;
-    124)
-        fail=$((fail + 1)) failed="$failed $t"
-        # test-timeout.sh has already written the process list, the stacks
-        # and the killed crawl's own logs into $t.log.
-        echo "FAIL $t (timed out, tree killed)"
-        tail -n 25 "$t.log" | sed 's/^/      /'
-        ;;
+    0) pass=$((pass + 1)) ;;
+    77) skip=$((skip + 1)) skipped="$skipped $t" ;;
     *)
         fail=$((fail + 1)) failed="$failed $t"
-        echo "FAIL $t (exit $rc)"
-        # These assert with `test "$(...)" == "..." || exit 1`, which
-        # says nothing at all on failure. Re-run traced, still bounded.
-        # Charged to the suite deadline rather than given a budget of its
-        # own: a failure just under that deadline would else spend
-        # $per_test twice and land on the workflow's own timeout (#1126).
-        left=$((suite_deadline - (SECONDS - started)))
-        test "$left" -le "$per_test" || left=$per_test
-        if [ "$left" -gt 0 ]; then
-            # Noted first, or a slow trace reads as a wedge to the watchdog,
-            # which would then kill the step in the middle of writing it.
-            echo "RERUN $t" >>"$progress"
-            run_with_timeout "$left" bash -x "$t" >>"$t.log" 2>&1 || true
-        else
-            echo "no trace: past the ${suite_deadline}s suite deadline"
-        fi
-        tail -n 25 "$t.log" | sed 's/^/      /'
+        # A worker killed before it could report leaves no status behind.
+        test -n "$rc" || echo "FAIL $t (its worker left no status)"
         ;;
     esac
-    echo "$rc $t" >>"$progress"
-    # An orphaned native httrack.exe spins and starves the runner, which
-    # is how this job dies with "lost communication" rather than a plain
-    # timeout. Clear them between tests and name whoever leaked them.
-    reap_leftover_processes "$t" | tee -a "$progress"
+    test ! -s "$results/$t.tail" || cat "$results/$t.tail"
 done
+# An orphaned httrack.exe spins and starves the runner ("lost communication"). Once,
+# at the end: matching by image name, an earlier reap cannot spare a live sibling.
+reap_leftover_processes "the suite" | tee -a "$progress"
 echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
     tee -a "$GITHUB_STEP_SUMMARY"
 
