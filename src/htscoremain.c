@@ -169,6 +169,27 @@ void hts_resolve_datadir(char *dst, size_t dstsize, const char *selfpath,
   snprintf(dst, dstsize, "%s", fallback);
 }
 
+/* Append CMD's arguments to the pending request, each behind a space, ending
+   in " ..." if they do not all fit. Clipped rather than bounded because
+   HT_PRINT aborts on overflow and a command line outgrows HTbuff easily. */
+static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
+  /* what the caller still has to append: "?", the line break, the NUL */
+  static const size_t tail = sizeof("?" LF);
+  int i;
+
+  for (i = 1; i < cmd->argc; i++) {
+    const size_t spare = sizeof(opt->state.HTbuff) - tail - sizeof(" ...");
+    const size_t used = strlen(opt->state.HTbuff);
+
+    if (used >= spare || strlen(cmd->argv[i]) >= spare - used) {
+      HT_PRINT(" ...");
+      return;
+    }
+    HT_PRINT(" ");
+    HT_PRINT(cmd->argv[i]);
+  }
+}
+
 #define htsmain_free() do { \
   if (url != NULL) { \
     free(url); \
@@ -861,8 +882,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                        LF);
               HT_PRINT("OK to Update ");
             }
-            HT_PRINT("httrack ");
-            HT_PRINT(x_cmd.argv[0]);
+            HT_PRINT("httrack");
+            cmdl_print_args(opt, &x_cmd);
             HT_PRINT("?" LF);
             HT_REQUEST_END;
             if (!ask_continue(opt)) {
