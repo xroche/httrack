@@ -148,14 +148,39 @@ proxytrack_fails() { # proxytrack_fails HTTP_ADDR ICP_ADDR: echoes its error lin
         fail "proxytrack failed without the harness's banner: $(cat "$log")"
 }
 
-# Both destinations, or the message could name one protocol for either failure.
-# The surviving socket's port is drawn late: a neighbour test stealing it would
-# report the wrong protocol.
-out=$(proxytrack_fails "127.0.0.1:$tcpheld" "127.0.0.1:$(freeport udp)")
+# Both destinations get one, or the message could name one protocol for either
+# failure; the socket that must survive can only take a freeport number, which a
+# neighbour test may bind first, so redraw and retry on that outcome (#1218).
+proxytrack_lost() { # proxytrack_lost tcp|udp HELDPORT: echoes the error line
+    local proto=$1 port=$2 other alt out try
+    if test "$proto" = tcp; then other=udp; else other=tcp; fi
+    for try in 1 2 3; do
+        alt=$(freeport "$other") || fail "freeport $other failed"
+        if test "$proto" = tcp; then
+            out=$(proxytrack_fails "127.0.0.1:$port" "127.0.0.1:$alt")
+        else
+            out=$(proxytrack_fails "127.0.0.1:$alt" "127.0.0.1:$port")
+        fi
+        case $out in
+        # Loud, so a socket-naming regression cannot hide behind the retry.
+        *"cannot bind $other port"*)
+            echo "proxytrack lost the redrawn $other port $alt, retrying" >&2
+            ;;
+        *"cannot bind $proto port $port on"*)
+            printf '%s\n' "$out"
+            return 0
+            ;;
+        *) fail "proxytrack lost neither socket as named: $out" ;;
+        esac
+    done
+    fail "proxytrack lost the redrawn $other port 3 times: $out"
+}
+
+out=$(proxytrack_lost tcp "$tcpheld")
 assert_match "$BIND_LOST" "$out" "the harness reads proxytrack's http bind loss"
 assert_match "^.*cannot bind tcp port $tcpheld on 127\.0\.0\.1: .+ \([1-9][0-9]*\)\$" "$out"
 
-out=$(proxytrack_fails "127.0.0.1:$(freeport tcp)" "127.0.0.1:$udpheld")
+out=$(proxytrack_lost udp "$udpheld")
 assert_match "$BIND_LOST" "$out" "the harness reads proxytrack's icp bind loss"
 assert_match "^.*cannot bind udp port $udpheld on 127\.0\.0\.1: .+ \([1-9][0-9]*\)\$" "$out"
 
