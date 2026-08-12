@@ -340,7 +340,7 @@ static const char *optalias_suffix(const char *type, const char *value) {
     size_t i;
 
     /* bounded: an overlong digit run is refused, not appended */
-    for (i = 0; value[i] != '\0' && i < 16; i++) {
+    for (i = 0; i < 16 && value[i] != '\0'; i++) {
       if (!isdigit((unsigned char) value[i]))
         return NULL;
     }
