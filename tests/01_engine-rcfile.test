@@ -3,19 +3,15 @@
 
 # Config-file alias loading (no network). A .httrackrc in the working directory
 # is read by optinclude_file(), whose cmdl_ins() inserts each alias-expanded
-# token into the shared token block. That copy used to be an unbounded strcpy
-# on a bare char*; it is now bounded by the block capacity. Two properties are
-# checked:
-#   1. The bound does not truncate: a long user-agent alias reaches doit.log
-#      intact. user-agent expands to two tokens (-F <value>), so it exercises
-#      both cmdl_ins insertions.
-#   2. The bound holds under exhaustion: a pathological .httrackrc whose alias
-#      expansions overflow the block aborts cleanly through the htssafe bounds
-#      check (a message naming htsalias.c) instead of overrunning the heap. The
-#      unbounded version segfaulted here.
+# token into the token block. Two properties are checked:
+#   1. No truncation: a long user-agent alias reaches doit.log intact.
+#      user-agent expands to two tokens (-F <value>), so it exercises both
+#      cmdl_ins insertions.
+#   2. The block grows: an rc file whose expansions outrun the first chunk many
+#      times over is read to the end, and its tokens still reach doit.log.
 
-# set -e with the intentional-nonzero httrack runs guarded explicitly (the
-# crawls below are expected to fail/abort and their status is inspected by hand).
+# set -e with the intentional-nonzero httrack runs guarded explicitly (their
+# status is inspected by hand).
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
@@ -69,29 +65,48 @@ grep -q -- "-F $marker" "$d1/hts-cache/doit.log" || {
     exit 1
 }
 
-# --- 2. block exhaustion aborts through the bound, not the heap -------------
-d2="$tmp/exhaust"
+# --- 2. the block grows past its first chunk --------------------------------
+d2="$tmp/grow"
 mkdir -p "$d2"
 echo '<html><body>hi</body></html>' >"$d2/index.html"
 
-# Each line inserts ~two tokens of ~200 bytes; 400 lines overflow the block's
-# fixed slack (current_size + 32768) many times over, deterministically.
+# Two tokens of ~200 bytes per line, so 2000 lines need some 400 KB against a
+# 32 KB chunk floor. The first marker is read back after a dozen growths.
 val=$(printf 'a%.0s' $(seq 1 200))
-for _ in $(seq 1 400); do
-    printf 'user-agent=%s\n' "$val"
-done | write_rc "$d2"
+first='zzz_rcfile_marker_first_line_grown'
+last='zzz_rcfile_marker_last_line_grown'
+{
+    printf 'user-agent=%s\n' "$first"
+    for _ in $(seq 1 2000); do
+        printf 'user-agent=%s\n' "$val"
+    done
+    printf 'user-agent=%s\n' "$last"
+} | write_rc "$d2"
 
-# The process aborts (httrack turns the fatal signal into exit 134 either way),
-# so the exit code does not distinguish the bounded abort from a heap overflow;
-# the stderr diagnostic does. The htssafe bounds check names the offending file.
-# Expected to fail, so the nonzero exit is swallowed; only the log is inspected.
-(cd "$d2" && "$bin" "file://$d2/index.html" --quiet -n >.log 2>&1) || true
+rc=0
+(cd "$d2" && "$bin" "file://$d2/index.html" --quiet -n >.log 2>&1) || rc=$?
 
-grep -Eq "overflow while copying.*htsalias\.c" "$d2/.log" || {
-    echo "FAIL: exhausted rc file did not abort through the htsalias.c bound"
-    echo "(an unbounded copy would overrun the heap here)"
+# A block that cannot grow aborts in the bounded copy (exit 134).
+test "$rc" -eq 0 || {
+    echo "FAIL: large rc-file crawl exited $rc, the token block did not grow"
     tail -3 "$d2/.log"
     exit 1
 }
+assert_file "$d2/hts-cache/doit.log" "no doit.log, so the rc file was not processed"
+# Clipping a token to the room left, instead of growing, would keep both
+# markers: only the tokens straddling a chunk boundary lose bytes. Line 1 alone
+# is the command line, so the prose below it cannot answer for a token.
+short=$(sed -n '1p' "$d2/hts-cache/doit.log" | tr ' ' '\n' |
+    awk -v n="${#val}" '/^a+$/ && length($0) != n {c++} END {print c + 0}')
+test "$short" -eq 0 || {
+    echo "FAIL: $short user-agent value(s) reached doit.log clipped"
+    exit 1
+}
+for marker in "$first" "$last"; do
+    grep -q -- "-F $marker" "$d2/hts-cache/doit.log" || {
+        echo "FAIL: $marker never reached the rebuilt command line"
+        exit 1
+    }
+done
 
 exit 0
