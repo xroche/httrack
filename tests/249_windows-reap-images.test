@@ -55,11 +55,14 @@ for e in $ENGINE_EXES; do
 done
 
 # The pid the caller read while the job was alive, which is what spares the host
-# once /proc/<pid>/winpid is gone.
+# once /proc/<pid>/winpid is gone. win_pid answers something else, or a kill_tree
+# deriving first and falling back to the argument would pass here for free.
+# shellcheck disable=SC2317 # unreachable is the property: only the bug calls it
+win_pid() { echo 9999; }
 : >"$tmp/killed"
 HTTRACK_EXCLUSIVE_HOST=1 kill_tree 99 4242
-test "$(cat "$tmp/killed")" = '/F /T /PID 4242' ||
-    fail "kill_tree with a pre-resolved winpid ran: $(cat "$tmp/killed")"
+got=$(cat "$tmp/killed")
+test "$got" = '/F /T /PID 4242' || fail "kill_tree with a pre-resolved winpid ran: $got"
 
 # With a winpid it is one tree kill and nothing by name, or a parallel sibling's
 # engine would go down with the target.
