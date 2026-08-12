@@ -1776,8 +1776,19 @@ static int st_arena(httrackp *opt, int argc, char **argv) {
     snprintf(token, sizeof(token), "%d-%*s", i, 200, "x");
     assertf(strcmp(kept[i], token) == 0);
   }
-  /* A size that would wrap when rounded up is refused, not truncated. */
+  /* A size no allocation could hold is refused, not truncated. */
   assertf(hts_arena_alloc(&arena, (size_t) -1) == NULL);
+  /* Strings are packed: alignment is charged where it is needed, not to every
+     allocation, which would cost several bytes on each link a mirror records.
+   */
+  {
+    hts_arena packed = {NULL, 0, 0};
+    const char *const a = hts_arena_strdup(&packed, "abc");
+    const char *const b = hts_arena_strdup(&packed, "de");
+
+    assertf(a != NULL && b == a + sizeof("abc"));
+    hts_arena_free(&packed);
+  }
 
   freet(kept);
   hts_arena_free(&arena);

@@ -22,8 +22,7 @@ Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: htsarena.h subroutines:                                */
-/*       bump allocator whose allocations never move            */
+/* File: htsarena.h bump allocator whose allocations never move  */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
@@ -35,13 +34,12 @@ Please visit our Website: http://www.httrack.com
 
 #include <string.h>
 
-/* A bump allocator over chunks that are never resized, so what it hands out
-   keeps its address. That is what the realloc-based String and TypedArray
-   cannot promise, and what the link records and the rebuilt command line need,
-   both holding raw pointers into their own storage. Nothing is released until
-   the whole arena is. */
+/** @file htsarena.h
+ *  Bump allocator over chunks that are never resized, so what it hands out
+ *  keeps its address, which the realloc-based String and TypedArray cannot
+ *  promise. Nothing is released until the whole arena is. **/
 
-/* Alignment fit for anything an arena is asked to hold. */
+/** Alignment fit for anything an arena is asked to hold. **/
 typedef union {
   void *p;
   long l;
@@ -62,24 +60,16 @@ typedef struct {
 
 #define HTS_ARENA_ALIGN sizeof(hts_arena_align)
 
-/* Smallest chunk, then doubling up to the largest, so an arena holding a lot
-   keeps few chunks and one holding little wastes none. */
+/** Smallest chunk, then doubling up to the largest. **/
 #define HTS_ARENA_MIN 32768
 #define HTS_ARENA_MAX (16 * 1024 * 1024)
 
-/* First aligned offset past the chunk header, where its bytes begin. */
+/** First aligned offset past the chunk header, where its bytes begin. **/
 #define HTS_ARENA_HDR                                                          \
   ((sizeof(hts_arena_chunk) + HTS_ARENA_ALIGN - 1) &                           \
    ~(size_t) (HTS_ARENA_ALIGN - 1))
 
-/* SIZE rounded up to the arena's alignment, or 0 if that would wrap. */
-static HTS_INLINE HTS_UNUSED size_t hts_arena_round_(size_t size) {
-  return size <= (size_t) -1 - (HTS_ARENA_ALIGN - 1)
-             ? (size + HTS_ARENA_ALIGN - 1) & ~(size_t) (HTS_ARENA_ALIGN - 1)
-             : 0;
-}
-
-/* Take a chunk with room for NEED bytes; ARENA is unchanged on failure. */
+/** Take a chunk with room for NEED bytes; ARENA is unchanged on failure. **/
 static HTS_UNUSED hts_boolean hts_arena_grow_(hts_arena *arena, size_t need) {
   size_t size = arena->size < HTS_ARENA_MAX / 2 ? arena->size * 2
                                                 : (size_t) HTS_ARENA_MAX;
@@ -101,33 +91,49 @@ static HTS_UNUSED hts_boolean hts_arena_grow_(hts_arena *arena, size_t need) {
   return HTS_TRUE;
 }
 
-/* SIZE bytes from ARENA, aligned for any type, or NULL when out of memory.
-   The address stays valid until hts_arena_free(). */
-static HTS_UNUSED void *hts_arena_alloc(hts_arena *arena, size_t size) {
-  const size_t need = hts_arena_round_(size);
+/** SIZE bytes from ARENA, starting on an ALIGN boundary (a power of two), or
+    NULL when out of memory. Padding is charged where it is needed rather than
+    to every size, so a run of strings stays packed. **/
+static HTS_UNUSED void *hts_arena_take_(hts_arena *arena, size_t size,
+                                        size_t align) {
+  if (arena->chunks != NULL) {
+    /* used never passes size, so the room below can not go negative */
+    const size_t room = arena->size - arena->used;
+    const size_t pad = (align - (arena->used & (align - 1))) & (align - 1);
 
-  if (need == 0 && size != 0) /* the rounding wrapped */
-    return NULL;
-  /* need alone on one side: used never passes size, so the difference holds */
-  if (arena->chunks == NULL || need > arena->size - arena->used) {
-    if (!hts_arena_grow_(arena, need))
-      return NULL;
+    /* pad, then size, each alone on one side: neither test can wrap */
+    if (pad <= room && size <= room - pad) {
+      char *const at =
+          (char *) arena->chunks + HTS_ARENA_HDR + arena->used + pad;
+
+      arena->used += pad + size;
+      return at;
+    }
   }
-  arena->used += need;
-  return (char *) arena->chunks + HTS_ARENA_HDR + arena->used - need;
+  /* a fresh chunk begins aligned, so it needs no padding */
+  if (!hts_arena_grow_(arena, size))
+    return NULL;
+  arena->used = size;
+  return (char *) arena->chunks + HTS_ARENA_HDR;
 }
 
-/* A copy of S in ARENA, or NULL when out of memory. */
+/** SIZE bytes from ARENA, aligned for any type, or NULL when out of memory.
+    The address stays valid until hts_arena_free(). **/
+static HTS_UNUSED void *hts_arena_alloc(hts_arena *arena, size_t size) {
+  return hts_arena_take_(arena, size, HTS_ARENA_ALIGN);
+}
+
+/** A copy of S in ARENA, or NULL when out of memory. **/
 static HTS_UNUSED char *hts_arena_strdup(hts_arena *arena, const char *s) {
   const size_t len = strlen(s) + 1;
-  char *const copy = (char *) hts_arena_alloc(arena, len);
+  char *const copy = (char *) hts_arena_take_(arena, len, 1);
 
   if (copy != NULL)
     memcpy(copy, s, len);
   return copy;
 }
 
-/* Release every chunk, and with them everything the arena handed out. */
+/** Release every chunk, and with them everything the arena handed out. **/
 static HTS_UNUSED void hts_arena_free(hts_arena *arena) {
   hts_arena_chunk *chunk = arena->chunks;
 

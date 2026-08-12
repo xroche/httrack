@@ -54,9 +54,9 @@ const char *opthelp_value(int p);
 const char *hts_gethome(void);
 void expand_home(String * str);
 
-/* Command line rebuilt from argv, config files and doit.log: slots into an
-   arena holding the tokens, both growing on demand. The arena is what keeps
-   every argv[] slot, and every pointer a caller kept into one, valid. */
+/* Command line rebuilt from argv, config files and doit.log. The slots and the
+   token arena each grow on demand; the arena is what keeps every argv[] slot,
+   and every pointer a caller kept into one, valid. */
 typedef struct {
   char **argv; /* argc slots used out of capacity allocated */
   int argc;
