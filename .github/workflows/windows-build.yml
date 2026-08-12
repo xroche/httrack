@@ -31,6 +31,11 @@ jobs:
       matrix:
         platform: [x64, Win32]
         configuration: [Release]
+    # Windows runs from other branches starve this one's runner (#1213), so cap
+    # them repo-wide at one per platform. queue: max: the default cancels a waiter.
+    concurrency:
+      group: windows-build-${{ matrix.platform }}
+      queue: max
     # Redirect vcpkg's default `files` binary cache into the workspace so
     # actions/cache can persist it. vcpkg builds openssl/brotli/zlib/zstd from
     # source otherwise, several minutes every run.
