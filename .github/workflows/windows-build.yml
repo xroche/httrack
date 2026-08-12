@@ -67,13 +67,10 @@ jobs:
         run: New-Item -ItemType Directory -Force -Path $env:VCPKG_DEFAULT_BINARY_CACHE | Out-Null
 
       # x-gha is gone (vcpkg-tool #1662 dropped it after GitHub changed the cache
-      # API), so cache the binary archives directly. The run id keeps the primary key
-      # unique so it never scores an exact hit, which is what makes this self-healing:
-      # an archive is named for vcpkg's ABI hash, and anything that hash folds in
-      # (compiler, vcpkg-tool, its cmake) can orphan every archive at once, but on an
-      # exact hit actions/cache skips the save and the dead entry pins itself. A key
-      # naming those inputs is a list that can always be one short; restoring by
-      # prefix takes the newest entry whatever moved.
+      # API), so cache the binary archives directly. An exact key hit skips the save,
+      # so a cache orphaned by a toolchain bump pins itself, and naming every input
+      # vcpkg's ABI hash folds in is a list that can come up short: key on the run
+      # id instead, and restore by prefix.
       - name: Restore the vcpkg binary archives
         uses: actions/cache/restore@v6
         with:
@@ -84,7 +81,7 @@ jobs:
             vcpkg-${{ matrix.platform }}-
 
       # Counted before the build, or vcpkg's own writes during it make a cold cache
-      # read as a warm one.
+      # look warm.
       - name: Count the restored vcpkg archives
         shell: pwsh
         run: |
@@ -123,8 +120,8 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "$proj failed" }
           }
 
-      # A stale cache and a warm one look alike by wall clock: both restore, both
-      # rebuild. Only archives-restored-but-none-matched is diagnostic.
+      # A stale cache and a warm one both restore and rebuild; only archives
+      # restored and unmatched prove staleness.
       - name: Check whether vcpkg could use the restored archives
         id: vcpkg
         if: ${{ !cancelled() }}
@@ -132,8 +129,7 @@ jobs:
         run: |
           $before = [int]$env:VCPKG_ARCHIVES_BEFORE
           $stale = $false
-          # The log is absent whenever the build never reached MSBuild, which this
-          # step outlives.
+          # The log is missing when the build never reached MSBuild.
           if (Test-Path msbuild-libhttrack.log) {
             $m = Select-String -Path msbuild-libhttrack.log -Pattern 'Restored (\d+) package' |
               Select-Object -First 1
@@ -145,10 +141,11 @@ jobs:
           } else { Write-Host "no build log" }
           if ($stale) {
             Write-Host "::warning::stale vcpkg cache: $before archives, none matching this toolchain; every port rebuilt from source"
-            # Provably dead, vcpkg matched none of them, so drop them rather than
-            # carry every past toolchain generation in the saved entry forever.
+            # Provably dead: drop them rather than carry every past toolchain
+            # generation in the saved entry forever. -LiteralPath because a piped
+            # string binds -Path, which globs on a name carrying [ ].
             Get-Content vcpkg-restored.txt -EA SilentlyContinue | Where-Object { $_ } |
-              Remove-Item -Force -EA SilentlyContinue
+              ForEach-Object { Remove-Item -LiteralPath $_ -Force -EA SilentlyContinue }
           }
           $after = @(Get-ChildItem -Recurse -File -Filter *.zip `
             $env:VCPKG_DEFAULT_BINARY_CACHE -EA SilentlyContinue).Count
@@ -158,9 +155,8 @@ jobs:
           "save=$($stale -or ($after -gt $before))".ToLower() |
             Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      # Only when the archive set actually changed, so a warm run adds no entry and
-      # the eviction budget stays for the runs that did build something: a cold
-      # cache, a manifest bump, or a toolchain whose ABI hash moved.
+      # Only when the archive set changed, so a warm run adds no entry and the
+      # eviction budget stays for the runs that rebuilt something.
       - name: Save the vcpkg binary archives
         if: ${{ !cancelled() && steps.vcpkg.outputs.save == 'true' }}
         uses: actions/cache/save@v6
