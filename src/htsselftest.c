@@ -3717,6 +3717,13 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   assertf(!hts_host_alias_rule_ok("https://www.foo.com/a=ftp://ftp.foo.com"));
   assertf(!hts_host_alias_rule_ok("a.com,b.com/deep=c.com"));
   assertf(!hts_host_alias_rule_ok("b.com=http://a.com/x"));
+  /* the store joins rules with '\n', so one rule may not carry one: the matcher
+     would take the fragment past it for a second, '='-less rule and drop it */
+  assertf(!hts_host_alias_rule_ok("b.com=a.com\nc.com"));
+  assertf(!hts_host_alias_rule_ok("b.com\nc.com=a.com"));
+  assertf(!hts_host_alias_rule_ok("b.com=a.com\nc.com=d.com"));
+  assertf(!hts_host_alias_rule_ok("b.com=a.com\n"));
+  assertf(!hts_host_alias_rule_ok("\nb.com=a.com"));
 
   /* the same-address test the wizard uses to decide scope */
   assertf(hts_host_same_alias(rules, "b.com", "a.com", HTS_TRUE));

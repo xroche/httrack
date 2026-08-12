@@ -3980,11 +3980,14 @@ static hts_boolean hts_host_alias_token_ok(const char *token, size_t len,
                                                                   : HTS_FALSE;
 }
 
-/* see htscore.h */
-hts_boolean hts_host_alias_rule_ok(const char *rule) {
+/* see httrack-library.h */
+HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule) {
   const char *const eq = rule != NULL ? strchr(rule, '=') : NULL;
   const char *pat;
 
+  /* the store separates rules with '\n', so a rule carrying one is not one */
+  if (rule != NULL && strchr(rule, '\n') != NULL)
+    return HTS_FALSE;
   if (eq == NULL || eq == rule || eq[1] == '\0')
     return HTS_FALSE;
   if (!hts_host_alias_token_ok(eq + 1, strlen(eq + 1), HTS_FALSE))
