@@ -3966,9 +3966,9 @@ static hts_boolean hts_host_alias_token_ok(const char *token, size_t len,
   buff[len] = '\0';
   while (len > 0 && buff[len - 1] == '/')
     buff[--len] = '\0'; /* the matcher strips the whole run */
-  /* the scheme may itself be a glob on the alias side, so cut on "://" */
-  host = strstr(buff, "://") != NULL ? strstr(buff, "://") + 3
-                                     : jump_protocol_const(buff);
+  /* an alias may glob its scheme; an unknown canonical one lands in the host */
+  host = glob && strstr(buff, "://") != NULL ? strstr(buff, "://") + 3
+                                             : jump_protocol_const(buff);
   /* a scheme with no host behind it, and the engine's own pseudo-host, name
      nothing the fold could write into an address */
   if (*host == '\0' || strcmp(host, "primary") == 0)
@@ -3976,8 +3976,14 @@ static hts_boolean hts_host_alias_token_ok(const char *token, size_t len,
   /* --host-alias maps hosts: a path belongs to no part of an address */
   if (strchr(host, '/') != NULL)
     return HTS_FALSE;
-  return strpbrk(host, glob ? "=# \t" : "=,*?();\\#@ \t") == NULL ? HTS_TRUE
-                                                                  : HTS_FALSE;
+  /* a control byte names no host, and '\n' would split the store's rule list */
+  for (; *host != '\0'; host++) {
+    if ((unsigned char) *host < ' ' || *host == '\x7f')
+      return HTS_FALSE;
+    if (strchr(glob ? "=# " : "=,*?();\\#@ ", *host) != NULL)
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
 }
 
 /* see httrack-library.h */
@@ -3985,9 +3991,6 @@ HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule) {
   const char *const eq = rule != NULL ? strchr(rule, '=') : NULL;
   const char *pat;
 
-  /* the store separates rules with '\n', so a rule carrying one is not one */
-  if (rule != NULL && strchr(rule, '\n') != NULL)
-    return HTS_FALSE;
   if (eq == NULL || eq == rule || eq[1] == '\0')
     return HTS_FALSE;
   if (!hts_host_alias_token_ok(eq + 1, strlen(eq + 1), HTS_FALSE))

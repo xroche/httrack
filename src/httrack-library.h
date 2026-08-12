@@ -354,6 +354,13 @@ HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
    to is left untouched. The user-agent string is deep-copied. @return 0. */
 HTSEXT_API int copy_htsopt(const httrackp *from, httrackp *to);
 
+/** Whether @p rule is one well-formed "[scheme://]alias[,...]=[scheme://]host",
+    so a front end can refuse it while the user can still edit it. Only the
+   alias side may glob; neither side may carry a path or a control byte, and the
+    canonical scheme must be one the engine speaks. @return HTS_TRUE if valid.
+ */
+HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule);
+
 /** Return the engine's last error message, or NULL. The string is owned by
     @p opt; do not free it, and use it only while @p opt lives. */
 HTSEXT_API char *hts_errmsg(httrackp *opt);
@@ -384,14 +391,6 @@ HTSEXT_API void hts_cancel_parsing(httrackp *opt);
 /** Nonzero once the mirror has fully ended. Read under the engine state lock,
    so safe to poll from another thread. Wait for this before hts_free_opt(). */
 HTSEXT_API hts_boolean hts_has_stopped(httrackp *opt);
-
-/** Whether @p rule is one well-formed --host-alias rule,
-    "[scheme://]alias[,alias...]=[scheme://]host": filter metacharacters are
-    legal on the alias side only, no path on either side, and no '\\n', which
-    the engine uses to join the rules it accepted. For a front end offering the
-    option, to reject a rule while the user can still fix it.
-    @return HTS_TRUE if the engine would accept it. */
-HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule);
 
 /* Tools */
 /** Ensure the directory chain leading to @p path exists, creating missing

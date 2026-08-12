@@ -79,6 +79,17 @@ refused 'Rejected: -nope' "malformed --host-alias"
 ! grep -q '%C' <<<"$out" || fail "the host-alias error still names -%C: $out"
 echo OK
 
+# Both would land in the host verbatim. '\v' and not '\n': the argv filter
+# rewrites only CR, LF and TAB.
+printf '[a rule the fold could not use is refused] ..\t'
+parse --host-alias 'b.com=x://a.com'
+refused 'Rejected: b.com=x://a.com' "unknown canonical scheme"
+parse --host-alias "$(printf 'b.com=a.com\v')"
+refused 'Rejected: b.com=a.com' "control byte in the canonical"
+parse --host-alias 'b.com=ftp://a.com'
+accepted "--host-alias b.com=ftp://a.com"
+echo OK
+
 # Every other option keeps the guess it has always made: relaxing it wholesale
 # would turn `-O -q url` into a silent mirror into a directory named -q.
 printf '[an option genuinely missing its parameter still errors] ..\t'
