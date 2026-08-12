@@ -622,6 +622,9 @@ for psrun in "${psruns[@]}"; do
     mutate failed-not-reported "s/'x={0}' -f \$Failed/'x={0}' -f 0/" 'failed-post count is not what the caller'
     # shellcheck disable=SC2016
     mutate tcp-total-not-delta 's/(\$Cur\[0\] - \$Prev\[0\])/($Cur[0])/' 'total was reported where the delta'
+    # shellcheck disable=SC2016
+    mutate lag-not-a-peak 's/if (\$lag -gt \$Peak) { return \$lag }/if ($false) { return $lag }/' \
+        'overshot by 200ms'
     # The production cadence: no leg below runs without a schedule of its own.
     # shellcheck disable=SC2016
     mutate default-cadence 's/\[int\]\$IntervalSeconds = 15/[int]$IntervalSeconds = 1500/' \
@@ -728,7 +731,8 @@ for psrun in "${psruns[@]}"; do
     # shellcheck disable=SC2016
     mutate_leg backoff-never-skips 's/if (\$skip -gt 0)/if ($false)/' backoff 'nothing backs off'
     # shellcheck disable=SC2016
-    mutate_leg failures-not-counted 's/if (\$ok) { \$failed = 0 } else { \$failed++ }/$failed = 0/' \
+    mutate_leg failures-not-counted \
+        's/if (\$ok) { \$failed = 0; \$lagMax = 0 } else { \$failed++ }/$failed = 0/' \
         backoff 'counted the failures before it'
     if test "$devfull" -eq 1; then
         mutate_leg log-write-fatal 's/try { \(Write-Host .*\) } catch { }/\1/' \

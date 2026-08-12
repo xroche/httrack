@@ -271,8 +271,7 @@ jobs:
           WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WATCHDOG_REPO: ${{ github.repository }}
           # The PR head, not github.sha: a merge commit is garbage-collected, and
-          # these statuses are the only trace a lost runner leaves (#1228). The
-          # cost is that they show up in the PR's checks list.
+          # these statuses are the only trace a lost runner leaves (#1228).
           WATCHDOG_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
           WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

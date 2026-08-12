@@ -72,26 +72,29 @@ kill_tree 99
 test "$(cat "$tmp/killed")" = '/F /T /PID 4242' || fail "kill_tree with a winpid ran: $(cat "$tmp/killed")"
 win_pid() { :; }
 
-# The image the caller read while the target was alive. A winpid outlives its
-# process and Windows hands the number straight back out, so a kill that skips
-# this check reaps a stranger and, through /T, its children too (#1228).
+# The image read while the target was alive: a freed winpid can already be a
+# stranger's, and /T would take its children too (#1228).
 : >"$tmp/killed"
 kill_tree 99 4242 PROXYTRACK.EXE
 test "$(cat "$tmp/killed")" = '/F /T /PID 4242' ||
     fail "a verified tree kill did not run: $(cat "$tmp/killed")"
 : >"$tmp/killed"
-out=$(kill_tree 99 4242 python.exe 2>&1)
+out=$(kill_tree 99 4242 python.exe)
 test ! -s "$tmp/killed" || fail "pid 4242 was killed as a python.exe: $(cat "$tmp/killed")"
-grep -q '::warning::pid 4242 is no longer python.exe' <<<"$out" ||
+grep -q '::warning::pid 4242 no longer runs python.exe' <<<"$out" ||
     fail "the skipped kill was not reported: $out"
 # Gone from the table entirely, which is what a freed winpid usually looks like.
 : >"$tmp/killed"
-kill_tree 99 4343 proxytrack.exe >/dev/null 2>&1
+kill_tree 99 4343 proxytrack.exe >/dev/null
 test ! -s "$tmp/killed" || fail "a pid tasklist does not list was killed: $(cat "$tmp/killed")"
+# A stranger's pid leaves the caller with no target, so the serial runner's last
+# resort still applies: skipping it too would leave the engines running.
+: >"$tmp/killed"
+HTTRACK_EXCLUSIVE_HOST=1 kill_tree 99 4242 python.exe >/dev/null
+got=$(sort "$tmp/killed")
+test "$got" = "$want" || fail "an unverified pid skipped the last-resort sweep: $got"
 
-# The winpid stop_server hands over must be read before it signals: the one it
-# used to re-derive afterwards was that of a process already dead. Graded on the
-# order, since only a read taken while the target lived can name it.
+# Graded on the order, since only a winpid read while the target lived names it.
 : >"$tmp/killed"
 : >"$tmp/order"
 kill() { echo "kill $*" >>"$tmp/order"; }

@@ -55,6 +55,15 @@ function Format-WatchdogStatus {
     return $s
 }
 
+# The worse of the running peak and how much longer the last iteration took than
+# the poll it asked for. Peak, not last: a status covers several iterations.
+function Get-MaxLag {
+    param([int]$Peak, [double]$Elapsed, [double]$Since, [int]$Poll)
+    $lag = [int]($Elapsed - $Since - $Poll * 1000)
+    if ($lag -gt $Peak) { return $lag }
+    return $Peak
+}
+
 # The TCP counters are cumulative since boot, so only the change over a status
 # period says what the suite did; $Prev is $null on the first sample.
 function Get-TcpDelta {
@@ -69,8 +78,7 @@ $script:LastTcp = $null
 
 # One try/catch per counter: a probe that fails costs its own field, not the loop.
 # In-process only. A CIM query is richer, but its connect to a wedged WMI service
-# is unbounded, and would hang the one reporter still standing. Ordered by what a
-# clipped line must keep, memory last: it stays an order of magnitude off the box.
+# is unbounded, and would hang the one reporter still standing.
 function Get-WatchdogCounters {
     param([int]$LagMs = 0, [int]$Failed = 0)
     $f = New-Object System.Collections.ArrayList
@@ -226,6 +234,9 @@ function Invoke-WatchdogSelfTest {
     }
     Assert-That ($c -match '(^| )l=120( |$)') ('the loop lag is not what the caller measured: {0}' -f $c)
     Assert-That ($c -match '(^| )x=3( |$)') ('the failed-post count is not what the caller passed: {0}' -f $c)
+    Assert-That ((Get-MaxLag 0 6200 1000 5) -eq 200) 'a poll that overshot by 200ms was not measured'
+    Assert-That ((Get-MaxLag 500 6200 1000 5) -eq 500) 'a smaller lag replaced the peak'
+    Assert-That ((Get-MaxLag 0 5900 1000 5) -eq 0) 'a poll that returned early reported a lag'
     Assert-That ((Get-TcpDelta $null @(70, 9)) -eq 'n=? f=?') 'a first sample with no predecessor reported a delta'
     Assert-That ((Get-TcpDelta @(64, 7) @(70, 9)) -eq 'n=6 f=2') 'a total was reported where the delta was asked for'
     # 140 less the 16 of t=/q= and the 33 a clipped test name and its separator take.
@@ -271,9 +282,10 @@ while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {
     # Measured, never accumulated: starvation is what makes a sleep overshoot.
     $ms = $sw.Elapsed.TotalMilliseconds
     $now = [int]($ms / 1000)
-    # Overshoot of the poll we asked for, kept at its worst until a status carries it.
-    $lag = [int]($ms - $tickAt - $PollSeconds * 1000)
-    if ($lag -gt $lagMax) { $lagMax = $lag }
+    # Measured at the top, so the lag covers the probes and the post as well as
+    # the sleep: starvation stretches all three.
+    $lagMax = Get-MaxLag $lagMax $ms $tickAt $PollSeconds
+    $tickAt = $ms
     try {
         $tail = Get-ProgressTail -Path $ProgressLog
         if ($tail.Ok -and $tail.Signature -ne $lastSig) {
@@ -285,7 +297,6 @@ while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {
             $static = -1
             if ($tail.Ok) { $static = $now - $movedAt }
             $desc = Format-WatchdogStatus $now $static $tail.Line (Get-WatchdogCounters $lagMax $failed)
-            $lagMax = 0
             # Logged whatever the backoff decides: it throttles the API, not the
             # artifact, which is all a run whose token cannot post will leave.
             Write-WatchdogLog $desc
@@ -293,7 +304,9 @@ while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {
                 $skip--
             } else {
                 $ok = Send-WatchdogStatus $desc
-                if ($ok) { $failed = 0 } else { $failed++ }
+                # Cleared together, and only by a status that landed: a peak reached
+                # while nothing was getting through is what the next one has to carry.
+                if ($ok) { $failed = 0; $lagMax = 0 } else { $failed++ }
                 $next = Get-NextThrottle $ok $backoff
                 $skip = $next[0]
                 $backoff = $next[1]
@@ -302,7 +315,6 @@ while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {
     } catch {
         Write-WatchdogLog ('tick failed: {0}' -f $_.Exception.Message)
     }
-    $tickAt = $sw.Elapsed.TotalMilliseconds
     Start-Sleep -Seconds $PollSeconds
 }
 

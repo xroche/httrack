@@ -39,15 +39,8 @@ test "$((SECONDS - start))" -lt 15 || fail "watchdog fired late"
 rc=0
 if is_windows; then
     # Existence by exact Windows PID, not a global ping.exe count: the timing
-    # sub-test above leaves a still-dying ping that a count would race. Plain
-    # tasklist, no switches (the workflow's MSYS2_ARG_CONV_EXCL='*' mangles a
-    # //FI filter arg into a silent no-match); $2 is the PID, and $1 must be
-    # ping.exe too, since Windows hands a freed PID straight back out. Folded
-    # case, as the tasklist matchers in proclib.sh already are.
-    alive() {
-        tasklist 2>/dev/null |
-            awk -v p="$1" 'tolower($1) == "ping.exe" && $2 == p {f = 1} END {exit !f}'
-    }
+    # sub-test above leaves a still-dying ping that a count would race.
+    alive() { win_pid_runs "$1" ping.exe; }
     # alive() is a conjunction now, and one that never matches would call every
     # survivor reaped. Prove it fires on a live ping, reached the same way.
     ping -n 20 127.0.0.1 >/dev/null 2>&1 &
@@ -55,13 +48,12 @@ if is_windows; then
     cw=$(cat "/proc/$cpid/winpid" 2>/dev/null)
     test -n "$cw" || fail "could not read a live ping's Windows PID"
     alive "$cw" || fail "alive() cannot see a running ping.exe (pid $cw)"
-    # What kill_tree verifies before firing (#1228), on a live process: the image
-    # has to be readable from /proc, and has to be the name tasklist answers with,
-    # or the guard is disarmed on every kill and nothing says so.
+    # What kill_tree checks before firing (#1228), on a live process: /proc must
+    # name the image tasklist answers with, or the check passes nothing on.
     win_capture "$cpid"
     test "$WIN_PID" = "$cw" || fail "win_capture read winpid '$WIN_PID', /proc says $cw"
-    win_pid_is "$cw" "$WIN_IMAGE" || fail "tasklist does not call pid $cw a '$WIN_IMAGE'"
-    ! win_pid_is "$cw" no-such-image.exe || fail "win_pid_is accepts any image at all"
+    win_pid_runs "$cw" "$WIN_IMAGE" || fail "tasklist does not call pid $cw a '$WIN_IMAGE'"
+    ! win_pid_runs "$cw" no-such-image.exe || fail "win_pid_runs accepts any image at all"
     kill_tree "$cpid" "$cw"
     wait "$cpid" 2>/dev/null || true
     # The grandchild ping records its own Windows PID: non-empty proves it ran

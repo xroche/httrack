@@ -53,10 +53,9 @@ test -n "$windows" || set -m # own process group, so kill_tree can signal the gr
 "$BASH" "$@" &
 pid=$!
 test -n "$had_m" || test -n "$windows" || set +m
-# Read while the test is certainly alive: by kill time /proc/<pid>/winpid is gone,
-# and the number it named may belong to a stranger.
-win_capture "$pid"
-winpid=$WIN_PID winimage=$WIN_IMAGE
+# Read while the test is certainly alive: by kill time /proc/<pid>/winpid is gone.
+winpid=''
+test -z "$windows" || winpid=$(win_pid "$pid")
 
 # Poll, because bash cannot wait with a deadline and a watchdog subshell would
 # have to signal across process groups, which MSYS cannot do. The interval is the
@@ -83,7 +82,7 @@ while kill -0 "$pid" 2>/dev/null; do
         # watching, or the silence reads as a wedge and the step dies mid-stack.
         test -z "${HTTRACK_PROGRESS_LOG:-}" || echo "DUMP $name" >>"$HTTRACK_PROGRESS_LOG"
         dump_hang_diagnostics "$pid" "$name" "$budget"
-        kill_tree "$pid" "$winpid" "$winimage"
+        kill_tree "$pid" "$winpid"
         reap_bounded "$pid" || echo "hang: the tree outlived the kill; see the process list above"
         # After the kill, so a crawl log holds the backtrace its engine just wrote.
         dump_crawl_logs
@@ -99,7 +98,7 @@ while kill -0 "$pid" 2>/dev/null; do
     # commit status behind (#795).
     test -z "${HTTRACK_PROGRESS_LOG:-}" || echo "NOFORK $name" >>"$HTTRACK_PROGRESS_LOG"
     echo "hang: the poll tick ran $nowait times without waiting; this box cannot start a process"
-    kill_tree "$pid" "$winpid" "$winimage"
+    kill_tree "$pid" "$winpid"
     # No reap_bounded here: it polls on the same broken tick, which is the spin
     # this branch exists to end.
     # The EXIT trap deletes TMPDIR, so a crawl log left undumped is a destroyed one.
