@@ -328,11 +328,14 @@ for s in held:
 
 # Holds a free loopback port instead of sampling it: the socket stays bound and
 # unlistened, so the number is nobody else's while a connect to it is refused as
-# on a dead port. Sets HELD_PORT and HELD_PID and registers the release, which
-# stop_server "$HELD_PID" runs early for a caller wanting the port back sooner.
+# on a dead port. Sets HELD_PORT and HELD_PID, and registers the release; call
+# stop_server "$HELD_PID" to free the port sooner.
 # shellcheck disable=SC2120 # tcp is the common case
 hold_port() { # hold_port [PROTO]
     local proto=${1:-tcp} log
+    # In a subshell the release is registered where it dies, pinning the port 900s.
+    test "${BASHPID:-$$}" = "$$" ||
+        fail "hold_port ran in a subshell: call it in the current shell, not as \$(hold_port), and read HELD_PORT"
     log=$(mktemp "${TMPDIR:-/tmp}/httrack_hold.XXXXXX") || fail "hold_port: no temp log"
     # Stdin off the tty: a background job that touches it is stopped by SIGTTIN.
     "${python:?hold_port needs the caller python}" -c 'import socket, sys, time
