@@ -60,7 +60,7 @@
           <li>Stopping a mirror ends the transfers under way instead of reporting them as network errors</li>
           <li>A mirror that ends early no longer deletes files the update pass never reached</li>
           <li>Reloading a project keeps the boxes you cleared and the values you set to zero</li>
-          <li>Clearing "create a top index" now turns the index off</li>
+          <li>Clearing the option to build an index page now turns it off</li>
           <li>A very long address, or a very large settings file, no longer stops the mirror</li>
           <li>Refreshed screenshots throughout the documentation</li>
         </ul>
