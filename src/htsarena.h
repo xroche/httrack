@@ -66,9 +66,7 @@ typedef struct {
 
 /** The padding below assumes a power of two, and a header that is already a
     multiple of it; neither can change without this failing to compile. **/
-typedef char hts_arena_align_is_pow2_[(HTS_ARENA_ALIGN & (HTS_ARENA_ALIGN - 1))
-                                          ? -1
-                                          : 1];
+HTS_STATIC_ASSERT(!(HTS_ARENA_ALIGN & (HTS_ARENA_ALIGN - 1)), arena_align_pow2);
 
 /** First aligned offset past the chunk header, where its bytes begin. **/
 #define HTS_ARENA_HDR                                                          \
@@ -97,8 +95,7 @@ static HTS_UNUSED hts_boolean hts_arena_grow_(hts_arena *arena, size_t need) {
   return HTS_TRUE;
 }
 
-typedef char
-    hts_arena_hdr_is_aligned_[(HTS_ARENA_HDR % HTS_ARENA_ALIGN) ? -1 : 1];
+HTS_STATIC_ASSERT(HTS_ARENA_HDR % HTS_ARENA_ALIGN == 0, arena_hdr_aligned);
 
 /** SIZE bytes from ARENA, starting on an ALIGN boundary (a power of two), or
     NULL when out of memory. Padding is charged where it is needed rather than
