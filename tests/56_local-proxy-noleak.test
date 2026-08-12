@@ -30,13 +30,18 @@ local_server_start --env LOCAL_SERVER_VERBOSE=1 --root "$root" --bind 127.0.0.1
 
 # a proxy port nothing listens on, held for the whole crawl: a freeport number a
 # neighbour then binds would answer, retiring the premise silently (#1218).
-hold_port
-deadproxy=$HELD_PORT
+# Not on macOS, which drops the SYN on a held port where Linux resets it, so the
+# crawl would time out instead of failing to connect and stop testing the bypass.
+# That leaves the #1218 race here on macOS alone, as it was everywhere before.
+if test "$(uname -s)" = Darwin; then
+    deadproxy=$(freeport)
+else
+    hold_port
+    deadproxy=$HELD_PORT
+fi
 
-# hold_port's contract, checked rather than trusted: anything answering on the
-# port would retire the premise while the crawl still failed. Refusal is not the
-# assertion, since macOS drops the SYN where Linux resets it; what matters is
-# that no server answers.
+# Checked rather than trusted, whichever branch picked it: anything answering
+# here would retire the premise while the crawl still failed.
 "$python" -c 'import socket, sys
 s = socket.socket()
 s.settimeout(2)
