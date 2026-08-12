@@ -73,14 +73,18 @@ ci_start_native_watchdog() {
 # End the step, announcing $2 first: the kill runs no EXIT trap, so an unexplained
 # death is all the log would otherwise hold.
 ci_heartbeat_kill() {
-    local main=$1
+    local main=$1 winpid winimage
     ci_annotate error "suite watchdog" "$2"
     # Ahead of the kill, which runs no EXIT trap: an orphan would outlive the
     # step and overwrite its last status with a frozen tail.
     test -z "${watchdog:-}" || kill_pid "$watchdog"
+    # Read before the two kills below, which would leave the winpid naming
+    # whoever Windows hands the number to next (#1228).
+    win_capture "$main"
+    winpid=$WIN_PID winimage=$WIN_IMAGE
     # Direct first: kill_tree may reap this watchdog before its own root (#953).
     kill_pid "$main"
-    kill_tree "$main"
+    kill_tree "$main" "$winpid" "$winimage"
 }
 
 ci_suite_heartbeat() {

@@ -55,6 +55,13 @@ if is_windows; then
     cw=$(cat "/proc/$cpid/winpid" 2>/dev/null)
     test -n "$cw" || fail "could not read a live ping's Windows PID"
     alive "$cw" || fail "alive() cannot see a running ping.exe (pid $cw)"
+    # What kill_tree verifies before firing (#1228), on a live process: the image
+    # has to be readable from /proc, and has to be the name tasklist answers with,
+    # or the guard is disarmed on every kill and nothing says so.
+    win_capture "$cpid"
+    test "$WIN_PID" = "$cw" || fail "win_capture read winpid '$WIN_PID', /proc says $cw"
+    win_pid_is "$cw" "$WIN_IMAGE" || fail "tasklist does not call pid $cw a '$WIN_IMAGE'"
+    ! win_pid_is "$cw" no-such-image.exe || fail "win_pid_is accepts any image at all"
     kill_tree "$cpid" "$cw"
     wait "$cpid" 2>/dev/null || true
     # The grandchild ping records its own Windows PID: non-empty proves it ran

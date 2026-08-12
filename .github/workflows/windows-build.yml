@@ -270,8 +270,10 @@ jobs:
           # Through the environment, never argv, which the process list exposes.
           WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WATCHDOG_REPO: ${{ github.repository }}
-          # github.sha here is the PR's merge commit, so statuses posted against it stay out of the PR's checks UI.
-          WATCHDOG_SHA: ${{ github.sha }}
+          # The PR head, not github.sha: a merge commit is garbage-collected, and
+          # these statuses are the only trace a lost runner leaves (#1228). The
+          # cost is that they show up in the PR's checks list.
+          WATCHDOG_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
           WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |

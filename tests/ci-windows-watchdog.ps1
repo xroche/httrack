@@ -3,7 +3,8 @@
 # channel that outlives a dead runner. Every status carries the same state.
 param(
     [string]$ProgressLog = '',
-    [int]$IntervalSeconds = 30,
+    # 15s, not 30: a lost runner dies inside a single status period (#1228).
+    [int]$IntervalSeconds = 15,
     [int]$PollSeconds = 5,
     # Cannot outlive the step, whatever the caller forgets to kill.
     [int]$MaxSeconds = 2700,
@@ -48,19 +49,32 @@ function Format-WatchdogStatus {
     $q = '?'
     if ($Static -ge 0) { $q = [string]$Static }
     $t = ($InFlight -replace '\s+', ' ').Trim()
-    if ($t.Length -gt 46) { $t = $t.Substring(0, 46) }
+    if ($t.Length -gt 30) { $t = $t.Substring(0, 30) }
     $s = 't={0}s q={1}s {2} | {3}' -f $Elapsed, $q, $t, $Counters
     if ($s.Length -gt 140) { $s = $s.Substring(0, 140) }
     return $s
 }
 
+# The TCP counters are cumulative since boot, so only the change over a status
+# period says what the suite did; $Prev is $null on the first sample.
+function Get-TcpDelta {
+    param($Prev, $Cur)
+    if ($null -eq $Prev) { return 'n=? f=?' }
+    return 'n={0} f={1}' -f ($Cur[0] - $Prev[0]), ($Cur[1] - $Prev[1])
+}
+
 # --- probes ------------------------------------------------------------------
+
+$script:LastTcp = $null
 
 # One try/catch per counter: a probe that fails costs its own field, not the loop.
 # In-process only. A CIM query is richer, but its connect to a wedged WMI service
-# is unbounded, and would hang the one reporter still standing.
+# is unbounded, and would hang the one reporter still standing. Ordered by what a
+# clipped line must keep, memory last: it stays an order of magnitude off the box.
 function Get-WatchdogCounters {
+    param([int]$LagMs = 0, [int]$Failed = 0)
     $f = New-Object System.Collections.ArrayList
+    $ps = @()
     try {
         $ps = @(Get-Process)
         [void]$f.Add('p={0}' -f $ps.Count)
@@ -68,8 +82,31 @@ function Get-WatchdogCounters {
     } catch { [void]$f.Add('p=? h=?') }
     try {
         $drive = New-Object System.IO.DriveInfo($env:SystemDrive + '\')
-        [void]$f.Add('d={0}' -f [int]($drive.AvailableFreeSpace / 1MB))
+        [void]$f.Add('d={0}' -f [int]($drive.AvailableFreeSpace / 1GB))
     } catch { [void]$f.Add('d=?') }
+    # The ramp detector: starvation is what makes a poll overshoot.
+    [void]$f.Add('l={0}' -f $LagMs)
+    # Box-stop against network-break: the status that lands after an outage says
+    # how many it swallowed, and a box that stopped never lands one.
+    [void]$f.Add('x={0}' -f $Failed)
+    try {
+        # One GetTcpStatisticsEx; GetActiveTcpConnections() would allocate per socket.
+        $t = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetTcpIPv4Statistics()
+        $cur = @($t.ConnectionsInitiated, ($t.FailedConnectionAttempts + $t.ResetConnections))
+        [void]$f.Add((Get-TcpDelta $script:LastTcp $cur))
+        $script:LastTcp = $cur
+        [void]$f.Add('e={0}' -f $t.CurrentConnections)
+    } catch { [void]$f.Add('n=? f=? e=?') }
+    try {
+        if ($ps.Count -lt 1) { throw 'no process list' }
+        [void]$f.Add('m={0}' -f [int]((($ps | Measure-Object -Property WorkingSet64 -Sum).Sum) / 1MB))
+        [void]$f.Add('c={0}' -f [int]((($ps | Measure-Object -Property PagedMemorySize64 -Sum).Sum) / 1MB))
+        # Its own field: the agent is what stops reporting, and the box total hides it.
+        $agent = @($ps | Where-Object { $_.Name -eq 'Runner.Worker' })
+        $ws = 0
+        if ($agent.Count -gt 0) { $ws = [int]((($agent | Measure-Object -Property WorkingSet64 -Sum).Sum) / 1MB) }
+        [void]$f.Add('a={0}' -f $ws)
+    } catch { [void]$f.Add('m=? c=? a=?') }
     return ($f -join ' ')
 }
 
@@ -156,14 +193,15 @@ function Invoke-WatchdogSelfTest {
     Assert-That ($ko[0] -eq 8 -and $ko[1] -eq 8) 'a repeat rejection does not widen the gap'
 
     $long = '43_local-update-truncate-with-a-very-long-name-indeed.test'
-    $line = Format-WatchdogStatus 812 41 $long 'p=118 h=41230 d=13210'
+    # The widest real counter line, so a status that fits here fits on the runner.
+    $line = Format-WatchdogStatus 2700 2700 $long 'p=201 h=54598 d=85 l=120 x=0 n=412 f=0 e=180 m=3100 c=4200 a=210'
     Assert-That ($line.Length -le 140) ('status description is {0} characters' -f $line.Length)
-    Assert-That ($line -like 't=812s q=41s 43_local-update-truncate*') ('status leads with the wrong fields: {0}' -f $line)
-    Assert-That ($line -like '*d=13210') 'the counters did not survive a long test name'
+    Assert-That ($line -like 't=2700s q=2700s 43_local-update-truncate*') ('status leads with the wrong fields: {0}' -f $line)
+    Assert-That ($line -like '*a=210') 'the counters did not survive a long test name'
     # -match, not -like: '?' is a wildcard there, so q=0s would satisfy it too.
     Assert-That ((Format-WatchdogStatus 8 -1 'x' 'y') -match '^t=8s q=\?s x \| y$') 'an unknown staticness reads as a number'
     $clip = Format-WatchdogStatus 1 2 ('x' * 80) 'c'
-    Assert-That ($clip -match '^t=1s q=2s x{46} \| c$') ('the in-flight name was not clipped to 46: {0}' -f $clip)
+    Assert-That ($clip -match '^t=1s q=2s x{30} \| c$') ('the in-flight name was not clipped to 30: {0}' -f $clip)
     $wide = Format-WatchdogStatus 1 2 ('x' * 300) ('y' * 300)
     Assert-That ($wide.Length -le 140) ('an oversized status was not clipped: {0}' -f $wide.Length)
     # Cut from the tail: the head carries the fields a wedge is read for.
@@ -181,15 +219,20 @@ function Invoke-WatchdogSelfTest {
 
     # Space-separated key=value: the counters share the 140-char description with
     # the fields a wedge is read for, and '?' from a failed probe is a value.
-    $c = Get-WatchdogCounters
+    $c = Get-WatchdogCounters 120 3
     Assert-That ($c -match '^[a-z]+=\S+( [a-z]+=\S+)*$') ('the counters are not key=value pairs: {0}' -f $c)
-    foreach ($k in 'p', 'h', 'd') {
+    foreach ($k in 'p', 'h', 'd', 'l', 'x', 'n', 'f', 'e', 'm', 'c', 'a') {
         Assert-That ($c -match ('(^| ){0}=' -f $k)) ('the counters dropped {0}=: {1}' -f $k, $c)
     }
-    Assert-That ($c.Length -le 60) ('the counters take {0} of the 140 characters' -f $c.Length)
+    Assert-That ($c -match '(^| )l=120( |$)') ('the loop lag is not what the caller measured: {0}' -f $c)
+    Assert-That ($c -match '(^| )x=3( |$)') ('the failed-post count is not what the caller passed: {0}' -f $c)
+    Assert-That ((Get-TcpDelta $null @(70, 9)) -eq 'n=? f=?') 'a first sample with no predecessor reported a delta'
+    Assert-That ((Get-TcpDelta @(64, 7) @(70, 9)) -eq 'n=6 f=2') 'a total was reported where the delta was asked for'
+    # 140 less the 16 of t=/q= and the 33 a clipped test name and its separator take.
+    Assert-That ($c.Length -le 91) ('the counters take {0} of the 140 characters' -f $c.Length)
 
     # Nothing else reads these: every other leg passes its own schedule.
-    Assert-That ($IntervalSeconds -eq 30) ('the default status cadence is {0}s' -f $IntervalSeconds)
+    Assert-That ($IntervalSeconds -eq 15) ('the default status cadence is {0}s' -f $IntervalSeconds)
     Assert-That ($PollSeconds -eq 5) ('the default poll is {0}s' -f $PollSeconds)
 
     Assert-That (-not (Send-WatchdogStatus 'self-test')) 'the self-test can reach the API'
@@ -216,6 +259,9 @@ $movedAt = 0
 $postedAt = -$IntervalSeconds
 $backoff = 0
 $skip = 0
+$lagMax = 0
+$failed = 0
+$tickAt = $sw.Elapsed.TotalMilliseconds
 
 # Guarded like the rest; the launcher waits for this exact line.
 try { Write-Host 'watchdog ready' } catch { }
@@ -223,7 +269,11 @@ Write-WatchdogLog ('watching {0} every {1}s' -f $ProgressLog, $IntervalSeconds)
 
 while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {
     # Measured, never accumulated: starvation is what makes a sleep overshoot.
-    $now = [int]$sw.Elapsed.TotalSeconds
+    $ms = $sw.Elapsed.TotalMilliseconds
+    $now = [int]($ms / 1000)
+    # Overshoot of the poll we asked for, kept at its worst until a status carries it.
+    $lag = [int]($ms - $tickAt - $PollSeconds * 1000)
+    if ($lag -gt $lagMax) { $lagMax = $lag }
     try {
         $tail = Get-ProgressTail -Path $ProgressLog
         if ($tail.Ok -and $tail.Signature -ne $lastSig) {
@@ -234,14 +284,17 @@ while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {
             $postedAt = $now
             $static = -1
             if ($tail.Ok) { $static = $now - $movedAt }
-            $desc = Format-WatchdogStatus $now $static $tail.Line (Get-WatchdogCounters)
+            $desc = Format-WatchdogStatus $now $static $tail.Line (Get-WatchdogCounters $lagMax $failed)
+            $lagMax = 0
             # Logged whatever the backoff decides: it throttles the API, not the
             # artifact, which is all a run whose token cannot post will leave.
             Write-WatchdogLog $desc
             if ($skip -gt 0) {
                 $skip--
             } else {
-                $next = Get-NextThrottle (Send-WatchdogStatus $desc) $backoff
+                $ok = Send-WatchdogStatus $desc
+                if ($ok) { $failed = 0 } else { $failed++ }
+                $next = Get-NextThrottle $ok $backoff
                 $skip = $next[0]
                 $backoff = $next[1]
             }
@@ -249,6 +302,7 @@ while ($sw.Elapsed.TotalSeconds -lt $MaxSeconds) {
     } catch {
         Write-WatchdogLog ('tick failed: {0}' -f $_.Exception.Message)
     }
+    $tickAt = $sw.Elapsed.TotalMilliseconds
     Start-Sleep -Seconds $PollSeconds
 }
 

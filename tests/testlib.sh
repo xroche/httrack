@@ -286,8 +286,13 @@ poll_wait() {
 # trap, where a survivor would turn a passing test into a harness timeout.
 stop_server() {
     test -n "${1:-}" || return 0
+    local winpid winimage
+    # Before the signal, not after: this is the suite's most frequent kill, and
+    # the winpid it used to re-derive here was that of a process already dead.
+    win_capture "$1"
+    winpid=$WIN_PID winimage=$WIN_IMAGE
     kill "$1" 2>/dev/null || true
-    if is_windows; then kill_tree "$1"; fi
+    if is_windows; then kill_tree "$1" "$winpid" "$winimage"; fi
     reap_bounded "$1" || true
     return 0
 }
@@ -454,6 +459,30 @@ win_pid() {
     fi
 }
 
+# WIN_PID and WIN_IMAGE for MSYS pid $1, to be read while it is still alive: /proc
+# keeps the entry after the process is gone and Windows reissues the number at
+# once, so a later read can name a stranger (#1228). Assigned rather than echoed,
+# since this runs per fixture server and a command substitution is a fork (#795).
+win_capture() { # win_capture <pid>
+    WIN_PID='' WIN_IMAGE=''
+    is_windows || return 0
+    # Unguarded reads: a missing file leaves the empty value set above, and read
+    # reports EOF on an unterminated line having already assigned it.
+    { read -r WIN_PID <"/proc/$1/winpid"; } 2>/dev/null || true
+    { read -r WIN_IMAGE <"/proc/$1/winexename"; } 2>/dev/null || true
+    test -n "$WIN_IMAGE" || { read -r WIN_IMAGE <"/proc/$1/exename"; } 2>/dev/null || true
+    WIN_IMAGE=${WIN_IMAGE##*[\\/]}
+    return 0
+}
+
+# Whether Windows PID $1 is still running image $2. Case-folded and by both
+# columns at once, as 58_watchdog.test's liveness check is: either alone answers
+# for a recycled PID.
+win_pid_is() { # win_pid_is <winpid> <image>
+    tasklist 2>/dev/null |
+        awk -v p="$1" -v i="$2" 'tolower($1) == tolower(i) && $2 == p { f = 1 } END { exit !f }'
+}
+
 # Signal one process, never its descendants: a caller inside the target's own
 # tree cannot rely on kill_tree, whose taskkill is then a grandchild of it (#953).
 kill_pid() {
@@ -477,12 +506,18 @@ kill_pid() {
 # so args pass verbatim and a //T would reach taskkill unfolded and be rejected.
 # $2 is that Windows PID when the caller read it while the job was certainly
 # alive: /proc/<pid>/winpid is already gone for a job that has just died, and
-# without it the only route left is the host-wide sweep below.
+# without it the only route left is the host-wide sweep below. $3 is the image it
+# was running then, checked before firing so a PID Windows has already handed on
+# is skipped rather than tree-killed along with a stranger's children (#1228).
 kill_tree() {
-    local pid=$1 winpid=${2:-}
+    local pid=$1 winpid=${2:-} image=${3:-}
     if is_windows; then
         test -n "$winpid" || winpid=$(win_pid "$pid")
         if test -n "$winpid"; then
+            if test -n "$image" && ! win_pid_is "$winpid" "$image"; then
+                printf '::warning::pid %s is no longer %s, not killing it\n' "$winpid" "$image" >&2
+                return 0
+            fi
             taskkill /F /T /PID "$winpid" >/dev/null 2>&1 || true
         # Last resort, so it is opt-in: it kills every engine and every python on
         # the host, siblings of a parallel run included (HTTRACK_EXCLUSIVE_HOST).
@@ -579,12 +614,12 @@ run_with_timeout() {
     local pid=$!
     test -n "$had_m" || is_windows || set +m
     # Read while the job is certainly alive: by kill time /proc/<pid>/winpid is gone.
-    local winpid=''
-    ! is_windows || winpid=$(win_pid "$pid")
+    win_capture "$pid"
+    local winpid=$WIN_PID winimage=$WIN_IMAGE
     local start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then
-            kill_tree "$pid" "$winpid"
+            kill_tree "$pid" "$winpid" "$winimage"
             reap_bounded "$pid" || true
             return 124
         fi
@@ -597,9 +632,12 @@ run_with_timeout() {
 # on overrun: a wedge past --max-time would else block wait() forever and hang the CI step.
 wait_bounded() {
     local pid=$1 secs=$2 start=$SECONDS
+    # Same as run_with_timeout: the crawl is alive now, and may not be at kill time.
+    win_capture "$pid"
+    local winpid=$WIN_PID winimage=$WIN_IMAGE
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then
-            kill_tree "$pid"
+            kill_tree "$pid" "$winpid" "$winimage"
             reap_bounded "$pid" || true
             return 124
         fi
