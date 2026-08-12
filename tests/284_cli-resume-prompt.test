@@ -1,9 +1,9 @@
 #!/bin/bash
 #
 # Re-run in a mirror directory and the engine offers to resume, quoting the
-# command line it would run. It quoted its own path instead (#1204), and the
-# obvious fix aborts: HT_PRINT appends into a 2 KB buffer whose helper dies on
-# overflow, which a real command line outgrows.
+# command line it would run (#1204). The obvious way to print it aborts:
+# HT_PRINT appends into a 2 KB buffer whose helper dies on overflow, which a
+# real command line outgrows.
 
 set -eu
 
@@ -45,7 +45,6 @@ seed "$tmp/plain" --footer 'zzzmarker'
 out=$(ask "$tmp/plain")
 assert_match 'OK to (Continue|Update) httrack ' "$out" "no resume offer"
 assert_match 'zzzmarker' "$out" "the offer dropped the options"
-# The binary's own path is what it used to print in their place.
 ! grep -qF -- "$bin" <<<"$out" || {
     echo "FAIL: the offer still quotes the program path"
     exit 1
