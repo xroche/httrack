@@ -354,6 +354,13 @@ HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt);
    to is left untouched. The user-agent string is deep-copied. @return 0. */
 HTSEXT_API int copy_htsopt(const httrackp *from, httrackp *to);
 
+/** Whether @p rule is one well-formed "[scheme://]alias[,...]=[scheme://]host",
+    so a front end can refuse it while the user can still edit it. Only the
+   alias side may glob; neither side may carry a path or a control byte, and the
+    canonical scheme must be one the engine speaks. @return HTS_TRUE if valid.
+ */
+HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule);
+
 /** Return the engine's last error message, or NULL. The string is owned by
     @p opt; do not free it, and use it only while @p opt lives. */
 HTSEXT_API char *hts_errmsg(httrackp *opt);

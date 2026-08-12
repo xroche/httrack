@@ -431,10 +431,6 @@ const char *hts_host_alias_fold(httrackp *opt, lien_adrfil *af);
 hts_boolean hts_host_same_alias(const char *rules, const char *adra,
                                 const char *adrb, hts_boolean collapse_www);
 
-/* HTS_TRUE if RULE is a well-formed "[scheme://]alias[,...]=[scheme://]host"
-   line: one literal host after the '=', and no path on either side. */
-hts_boolean hts_host_alias_rule_ok(const char *rule);
-
 /* First canonical host in RULES whose chain never ends ("a=b" plus "b=a"),
    copied into DEST, or NULL if every chain settles. Those hosts are left
    unaliased, so the engine reports them rather than picking a hop. */

@@ -3717,6 +3717,20 @@ static int st_hostalias(httrackp *opt, int argc, char **argv) {
   assertf(!hts_host_alias_rule_ok("https://www.foo.com/a=ftp://ftp.foo.com"));
   assertf(!hts_host_alias_rule_ok("a.com,b.com/deep=c.com"));
   assertf(!hts_host_alias_rule_ok("b.com=http://a.com/x"));
+  /* a control byte, or a scheme the fold cannot parse, lands in the host */
+  assertf(!hts_host_alias_rule_ok("b.com=a.com\nc.com"));
+  assertf(!hts_host_alias_rule_ok("b.com\nc.com=a.com"));
+  assertf(!hts_host_alias_rule_ok("b.com=a.com\n"));
+  assertf(!hts_host_alias_rule_ok("\nb.com=a.com"));
+  assertf(!hts_host_alias_rule_ok("b.com=a.com\r"));
+  assertf(!hts_host_alias_rule_ok("b.com=a.com\v"));
+  assertf(!hts_host_alias_rule_ok("b.com=a.com\f"));
+  assertf(!hts_host_alias_rule_ok("b.com=a\x7f.com"));
+  assertf(!hts_host_alias_rule_ok("b\v.com=a.com"));
+  assertf(!hts_host_alias_rule_ok("b.com=x://a.com"));
+  assertf(!hts_host_alias_rule_ok("b.com=a.com://c.com"));
+  assertf(hts_host_alias_rule_ok("b.com=ftp://a.com"));
+  assertf(hts_host_alias_rule_ok("*://b.com=a.com"));
 
   /* the same-address test the wizard uses to decide scope */
   assertf(hts_host_same_alias(rules, "b.com", "a.com", HTS_TRUE));
