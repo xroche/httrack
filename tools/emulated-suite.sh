@@ -51,7 +51,7 @@ make -j"$(nproc)"
 rc=0
 make check -j"$(nproc)" || rc=$?
 # Always, not only where automake prints it: this leg exists to say what an emulated
-# host does, and a test that paced itself out reads as coverage without the reasons.
+# host does. A paced-out skip must not read as coverage with no reason given.
 cat tests/test-suite.log || true
 test "$rc" -eq 0 || exit "$rc"
 

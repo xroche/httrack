@@ -14,7 +14,8 @@ set -euo pipefail
 
 usage() {
     echo "usage: ${0##*/} {--srcdir DIR [--builddir DIR] | --headers-dir DIR}" \
-        "[--backend cl|cc] [--cc CMD] [--cxx CMD] [--self-test] [-- CPPFLAGS...]" >&2
+        "[--backend cl|cc] [--cc CMD] [--cxx CMD] [--budget SECONDS] [--self-test]" \
+        "[-- CPPFLAGS...]" >&2
     exit 1
 }
 
@@ -26,12 +27,17 @@ cc_cmd=""
 cxx_cmd=""
 cxx_set=0
 selftest=0
+budget=
 extra=()
 while [ $# -gt 0 ]; do
     case $1 in
     --self-test)
         selftest=1
         shift
+        ;;
+    --budget)
+        budget=${2-}
+        shift 2 || usage
         ;;
     --srcdir)
         srcdir=${2-}
@@ -237,31 +243,45 @@ fi
 
 began=$SECONDS
 bad=0
-# Sliced so the sweep can be given up on: one call per batch cannot be interrupted, and
-# an emulated compiler wants longer for it than the harness allows a test (#1146). Still
-# nowhere near a spawn per unit, which costs more than the compile on the Windows runner.
-slices=8
+# Sliced only for a caller that gave a budget: one call per batch cannot be given up on,
+# and an emulated compiler needs more time for it than the harness allows a test (#1146).
+# Unsliced elsewhere, so the Windows job keeps paying one compiler spawn per batch.
+if [ -n "$budget" ] && [ "$budget" -gt 0 ]; then
+    export HTTRACK_TEST_TIMEOUT=$budget
+    slices=8
+else
+    slices=1
+fi
 slice=$(((${#units[@]} + slices - 1) / slices))
-left=$((${#langs[@]} * ${#modes[@]} * slices))
+# From the slice size, not from $slices: they differ whenever the units do not divide
+# evenly, and a step count that outlives the loop leaves the pacer projecting forever.
+per=$(((${#units[@]} + slice - 1) / slice))
+left=$((${#langs[@]} * ${#modes[@]} * per))
+swept=0
 for lang in "${langs[@]}"; do
     for mode in "${modes[@]}"; do
         i=0
         while [ "$i" -lt "${#units[@]}" ]; do
             step=$SECONDS
-            compile "$lang" "$mode" "${units[@]:i:slice}" || {
+            chunk=("${units[@]:i:slice}")
+            swept=$((swept + ${#chunk[@]}))
+            compile "$lang" "$mode" "${chunk[@]}" || {
                 head -40 "$sweep_log" >&2
                 echo "the headers do not compile as $lang standalone and pairwise ($mode)" >&2
                 bad=1
             }
             i=$((i + slice))
             left=$((left - 1))
-            # Only under a caller that set the budget (269, not the MSVC job), and only
-            # while nothing has failed: a skip past a real break would bury it.
-            [ "$bad" -ne 0 ] || [ -z "${HTTRACK_TEST_TIMEOUT:-}" ] ||
+            # Only while nothing has failed: a skip past a real break would bury it.
+            [ "$bad" -ne 0 ] || [ -z "$budget" ] ||
                 skip_if_out_of_budget "$left" "$((SECONDS - step))"
         done
     done
 done
+# What reached the compiler, not what was generated: a slice loop that steps past a unit
+# would otherwise report the full set and pass.
+want=$((${#langs[@]} * ${#modes[@]} * ${#units[@]}))
+[ "$swept" -eq "$want" ] || fail "compiled $swept units of $want, the slicing lost some"
 echo "swept $n headers standalone and pairwise x ${#modes[@]} bytecode modes x ${langs[*]}" \
     "= $((${#modes[@]} * ${#langs[@]} * ${#units[@]})) units in $((SECONDS - began))s with $backend"
 [ "$bad" -eq 0 ] || exit 1

@@ -22,28 +22,27 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 # (CRAWL_DEADLINE, 180s a pass) -- budget below that and a slow-but-legitimate
 # run would be killed. The slowest healthy test measures 39s. A non-numeric or
 # absurd value falls back; 0 disables the guard, for use under a debugger.
-budget=${HTTRACK_TEST_TIMEOUT:-600}
-case "$budget" in
-'' | *[!0-9]*) budget=600 ;;
-esac
+budget=$(budget_secs)
 
 # The test script is the last argument; automake passes no others today.
 for path in "$@"; do :; done
 name=$(basename "$path")
 
 # A test whose work legitimately outlasts the wedge budget says so in its header
-# (269 sweeps n^2 compiles and paces itself inside it). Upwards only, so no test can
-# disarm the guard, and read with the shell to keep it off the per-test fork bill.
+# (269 sweeps n^2 compiles and paces itself inside it). The name carries the rule the
+# reader cannot see: it raises the budget, so no test can disarm the guard. Read with
+# the shell to keep it off the per-test fork bill, and bounded, since bash's `test`
+# errors rather than compares past intmax and would leave the guard unarmed.
 if test "$budget" -gt 0 && test -r "$path"; then
     read_lines=0
     while test "$read_lines" -lt 40 && IFS= read -r line; do
         read_lines=$((read_lines + 1))
         case "$line" in
-        '# TEST_TIMEOUT: '*)
-            want=${line#'# TEST_TIMEOUT: '}
+        '# TEST_TIMEOUT_AT_LEAST: '*)
+            want=${line#'# TEST_TIMEOUT_AT_LEAST: '}
             case "$want" in
-            '' | *[!0-9]*) ;;
-            *) test "$want" -le "$budget" || budget=$want ;;
+            '' | *[!0-9]* | ???????*) ;;
+            *) test "$((10#$want))" -le "$budget" || budget=$((10#$want)) ;;
             esac
             break
             ;;

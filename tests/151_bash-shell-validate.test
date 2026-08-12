@@ -62,6 +62,10 @@ cases=16 # reject/accept calls below; pinned again once they have all run
 status=0
 log=
 rundir=
+took=0
+# What run() launches, so the checks below can hand it a child that hangs or one that
+# only crawls; nothing else may override it.
+configure_cmd=(bash "$tmp/src/configure" --disable-https)
 run() { # run <label> <env argument>...
     local label=$1 began=$SECONDS
     shift
@@ -71,11 +75,11 @@ run() { # run <label> <env argument>...
     status=0
     # Capped: configure executes the candidate, and a hang wedges "make check" with no output
     # at all. Polled, not a backgrounded "sleep" watchdog, which outlives the run it guards.
-    (cd "$rundir" && env "$@" bash "$tmp/src/configure" --disable-https) \
+    (cd "$rundir" && env "$@" "${configure_cmd[@]}") \
         >"$rundir/log" 2>&1 &
     local pid=$! waited=0 quiet=0 size=0 now left
-    # A hang is silence, not slowness: configure writes a line per probe, where hppa's
-    # emulated one spends longer on the whole run than a runner's whole budget (#1146).
+    # A hang is silence, not slowness: configure writes a line per probe,
+    # but hppa's emulated run can take longer overall than a runner's whole budget (#1146).
     while kill -0 "$pid" 2>/dev/null; do
         sleep 1
         waited=$((waited + 1))
@@ -93,19 +97,28 @@ run() { # run <label> <env argument>...
             tail -5 "$rundir/log" >&2
             exit 1
         }
-        # Making progress but out of time: the harness would kill the whole test at the
-        # budget, and 124 takes the build down where a skip does not. 0 is the guard off.
+        # Still writing but out of time: skip, where the harness would kill the whole test
+        # and take the build down with it. Only while writing, and only with a full silence
+        # window still affordable, or a hang would reach this before the check above fires
+        # and a wedge would report a skip. 0 is the guard off.
         left=$(budget_left)
-        test "$left" -eq 0 || test "$left" -gt "$RESERVE" || {
+        if test "$quiet" -eq 0 && test "$left" -ne 0 &&
+            test "$left" -le "$((RESERVE + SILENCE))"; then
             kill -9 "$pid" 2>/dev/null
             echo "$label was still configuring ${waited}s in and the budget is out; skipping" >&2
             exit 77
-        }
+        fi
     done
     wait "$pid" || status=$?
     log=$(cat "$rundir/log")
+    took=$((SECONDS - began))
     echo "run $n ($label): exit $status"
-    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+}
+
+# Pace here rather than in run(), which returns with the answer still unjudged: a
+# skip between the two would bury a configure that answered wrongly.
+paced() {
+    skip_if_out_of_budget "$((cases - n))" "$took"
 }
 
 reject() { # reject <label> <expected message> <env argument>...
@@ -121,6 +134,7 @@ reject() { # reject <label> <expected message> <env argument>...
         tail -5 <<<"$log" >&2
         exit 1
     }
+    paced
 }
 
 # accept <label> <expected $(BASH_SHELL), "" for any> <expected message, "" for none> <env argument>...
@@ -149,7 +163,53 @@ accept() {
             exit 1
         }
     fi
+    paced
 }
+
+# --- what run() does to a child that hangs, and to one that is merely slow -------
+# Driven through configure_cmd, since the real configure can do neither on demand.
+probe() { # probe <run number> <seconds of budget left> <command>...
+    local want_n=$1 left=$2 rc=0
+    shift 2
+    (
+        # shellcheck disable=SC2030 # the isolation is the point: the real count is next door
+        n=$want_n SAMPLE=1 SILENCE=2
+        export HTTRACK_TEST_TIMEOUT=$((SECONDS + left))
+        configure_cmd=("$@")
+        run probe
+    ) >"$tmp/probe.log" 2>&1 || rc=$?
+    echo "$rc"
+}
+# A wedge must fail even with the budget gone, or #922 comes back as a skip.
+rc=$(probe 90 6 sleep 999)
+test "$rc" -eq 1 || fail "a silent configure with 6s of budget reported $rc, want 1"
+grep -q 'wrote nothing' "$tmp/probe.log" || fail "the hang was not named: $(cat "$tmp/probe.log")"
+# Slow but talking is the emulated buildd, and a skip there beats the harness kill.
+rc=$(probe 91 6 bash -c 'while :; do echo tick; sleep 1; done')
+test "$rc" -eq 77 || fail "a slow but writing configure with 6s of budget reported $rc, want 77"
+# The pacer must not fire before the case is judged: run() returns with the verdict
+# still unread, and a skip there would bury a configure that answered wrongly.
+verdict() { # verdict <accept|reject> <status the stub reports>
+    local rc=0 stub_status=$2
+    (
+        # shellcheck disable=SC2030,SC2031,SC2317 # a stub, reached through accept/reject
+        run() { # stub: judged, and the budget spent
+            n=$((n + 1))
+            status=$stub_status
+            log=
+            took=99999
+        }
+        "$1" stub-verdict '' ''
+    ) >/dev/null 2>&1 || rc=$?
+    test "$rc" -eq 1 || fail "$1 of a wrong answer with the budget spent reported $rc, want 1"
+}
+verdict accept 1 # configure rejected what it must accept
+verdict reject 0 # configure accepted what it must reject
+# The probes ran in subshells, so the real cases below start from a clean count.
+n=0
+status=0
+log=
+took=0
 
 # The four that configure to completion run first. A reject stops at the
 # BASH_SHELL check and costs a fraction of one, and the pacer projects the step it

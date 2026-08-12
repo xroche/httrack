@@ -38,29 +38,39 @@ EOF
 
 # Time the guard to its DUMP announcement, not to the driver's exit: the dump that
 # follows runs for minutes on an emulated host, and that is not what is under test.
-# Leaves the latency in $fired and the driver's status in $rc.
+rc=0
+fired=
+marked=
 run_wedged() { # run_wedged <budget> [VAR=VAL...]
     local budget=$1 start=$SECONDS pid
     shift
     : >"$tmp/progress"
     rc=0
     fired=
+    marked=
     env "$@" HTTRACK_PROGRESS_LOG="$tmp/progress" HTTRACK_TEST_TIMEOUT="$budget" \
         bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
-        if grep -qx 'DUMP 90_wedged.test' "$tmp/progress" 2>/dev/null; then
+        # Read with the shell: a fork per poll would blur the latency being measured.
+        if read -r line <"$tmp/progress" 2>/dev/null && test "$line" = "DUMP 90_wedged.test"; then
             fired=$((SECONDS - start))
+            marked=1
             break
         fi
-        poll_wait 0.2 || sleep 1
+        poll_wait 0.1 || sleep 1
     done
     wait "$pid" || rc=$?
     # Missed between two polls: the whole run then bounds the latency from above.
     test -n "$fired" || fired=$((SECONDS - start))
 }
 
+# Retried once, because a dump short enough to fall between two polls is a race, not a
+# regression; announcing after the dump loses both attempts.
 run_wedged 5
+test -n "$marked" || run_wedged 5
+test -n "$marked" ||
+    fail "the announcement was never seen while the guard ran, so its latency is unknown"
 
 # Announced when the dump starts, which runs for minutes: a suite watchdog
 # reading that log would take the silence for a wedge and kill the step.
@@ -148,47 +158,74 @@ saw_budget 0 "a disabled guard"
 # emulated host; anything else asking would be disarming the guard.
 raiser() { # raiser <asked for>
     # shellcheck disable=SC2016 # the fixture has to read the variable, not us
-    printf '# TEST_TIMEOUT: %s\necho "budget=${HTTRACK_TEST_TIMEOUT-unset}"\n' \
+    printf '# TEST_TIMEOUT_AT_LEAST: %s\necho "budget=${HTTRACK_TEST_TIMEOUT-unset}"\n' \
         "$1" >"$tmp/97_raise.test"
 }
-for want in 900:900 5:600 garbage:600; do
+# 0900 must not read as octal, and a value past intmax must not reach `test`, which
+# errors on it rather than comparing and would leave the guard unarmed.
+for want in 900:900 5:600 garbage:600 0900:900 99999999999999999999:600 ' 900':600; do
     raiser "${want%%:*}"
     HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/97_raise.test" >"$out" 2>&1
-    saw_budget "${want##*:}" "a test asking for ${want%%:*}"
+    saw_budget "${want##*:}" "a test asking for '${want%%:*}'"
 done
 raiser 900
 HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/97_raise.test" >"$out" 2>&1
 saw_budget 0 "a raise under a disabled guard"
-# Read from the header, or a test's own data would be one: 151 writes this very line.
-{
-    for i in {1..45}; do echo "# pad $i"; done
-    cat "$tmp/97_raise.test"
-} >"$tmp/97_deep.test"
-HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/97_deep.test" >"$out" 2>&1
-saw_budget 600 "a raise past the header"
+# Read from the header only, or a test's own data would be one: 151 writes this line.
+window() { # window <lines of padding> <budget wanted>
+    {
+        i=0
+        while test "$i" -lt "$1"; do
+            i=$((i + 1))
+            echo "# pad $i"
+        done
+        cat "$tmp/97_raise.test"
+    } >"$tmp/97_deep.test"
+    HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/97_deep.test" >"$out" 2>&1
+    saw_budget "$2" "a raise on line $(($1 + 1))"
+}
+raiser 900
+window 39 900 # the last line the header reaches
+window 40 600
 
-# The guard has to enforce the raise, not just export it.
-printf '# TEST_TIMEOUT: 900\nsleep 4\necho "outlived the default"\n' >"$tmp/97_raise.test"
+# Enforced, not merely exported: the number the guard uses is the one it kills on.
+printf '# TEST_TIMEOUT_AT_LEAST: 900\nsleep 4\necho "outlived the default"\n' \
+    >"$tmp/97_raise.test"
 rc=0
 HTTRACK_TEST_TIMEOUT=2 bash "$driver" "$tmp/97_raise.test" >"$out" 2>&1 || rc=$?
 test "$rc" -eq 0 || fail "a 4s test that raised the budget to 900 reported $rc"
 grep -q 'outlived the default' "$out" || fail "the raised budget killed the test anyway"
+printf '# TEST_TIMEOUT_AT_LEAST: 1\nsleep 3\necho "not shrunk"\n' >"$tmp/97_raise.test"
+rc=0
+HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/97_raise.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "a 3s test asking for a 1s budget reported $rc"
+grep -q 'not shrunk' "$out" || fail "the header shrank the budget and killed the test"
+
+# --- one budget parser, and what is left of it ------------------------------
+secs() { # secs <value in the environment> <seconds it must read as>
+    local got
+    got=$(HTTRACK_TEST_TIMEOUT=$1 bash -c '. "$1"; budget_secs' _ "${testdir}/testlib.sh" 2>&1)
+    test "$got" = "$2" || fail "budget_secs read '$1' as '$got', want $2"
+}
+secs 45 45
+secs 0900 900 # decimal, or $((...)) and test disagree on the same string
+secs garbage 600
+secs 99999999999999999999 600 # past intmax, where test errors instead of comparing
+secs 0 0
 
 # budget_left hands a child what is left of it, and keeps 0 meaning "no guard".
 # shellcheck disable=SC2016 # the fixture has to call the helper, not us
-printf '. "%s"\nsleep 2\necho "left=$(budget_left)"\n' "${testdir}/testlib.sh" \
+printf '. "%s"\nsleep 2\necho "left=$(budget_left) at=$SECONDS"\n' "${testdir}/testlib.sh" \
     >"$tmp/98_left.test"
-saw_left() { # saw_left <lowest> <highest> <label> <budget>
-    local got
-    HTTRACK_TEST_TIMEOUT=$4 bash "$driver" "$tmp/98_left.test" >"$out" 2>&1
-    got=$(sed -n 's/^left=//p' "$out")
-    case "$got" in '' | *[!0-9]*) fail "$3 left '$got', want $1..$2" ;; esac
-    if test "$got" -lt "$1" || test "$got" -gt "$2"; then
-        fail "$3 left '$got', want $1..$2"
-    fi
-}
-saw_left 50 58 "a 60s budget two seconds in" 60
-saw_left 0 0 "a disabled guard" 0
+# Exact, against the clock the child itself read: a tolerance would pass a wrong epoch.
+HTTRACK_TEST_TIMEOUT=60 bash "$driver" "$tmp/98_left.test" >"$out" 2>&1
+got=$(sed -n 's/^left=\([0-9][0-9]*\) .*/\1/p' "$out")
+at=$(sed -n 's/^left=[0-9][0-9]* at=\([0-9][0-9]*\)$/\1/p' "$out")
+case "$got$at" in '' | *[!0-9]*) fail "a 60s budget printed '$(cat "$out")'" ;; esac
+test "$got" -eq "$((60 - at))" ||
+    fail "a 60s budget left $got with $at gone, want $((60 - at))"
+HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/98_left.test" >"$out" 2>&1
+grep -q '^left=0 ' "$out" || fail "a disabled guard left '$(cat "$out")', want 0"
 # Never 0 on an exhausted budget: a child would read that as the guard being off.
 HTTRACK_TEST_TIMEOUT=1 bash -c '. "$1"; sleep 2; echo "left=$(budget_left)"' \
     _ "${testdir}/testlib.sh" >"$out" 2>&1
