@@ -36,11 +36,31 @@ echo "marker: the wedged test started"
 sleep 300
 EOF
 
-start=$SECONDS
-rc=0
-HTTRACK_PROGRESS_LOG="$tmp/progress" HTTRACK_TEST_TIMEOUT=5 \
-    bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
-elapsed=$((SECONDS - start))
+# Time the guard to its DUMP announcement, not to the driver's exit: the dump that
+# follows runs for minutes on an emulated host, and that is not what is under test.
+# Leaves the latency in $fired and the driver's status in $rc.
+run_wedged() { # run_wedged <budget> [VAR=VAL...]
+    local budget=$1 start=$SECONDS pid
+    shift
+    : >"$tmp/progress"
+    rc=0
+    fired=
+    env "$@" HTTRACK_PROGRESS_LOG="$tmp/progress" HTTRACK_TEST_TIMEOUT="$budget" \
+        bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        if grep -qx 'DUMP 90_wedged.test' "$tmp/progress" 2>/dev/null; then
+            fired=$((SECONDS - start))
+            break
+        fi
+        poll_wait 0.2 || sleep 1
+    done
+    wait "$pid" || rc=$?
+    # Missed between two polls: the whole run then bounds the latency from above.
+    test -n "$fired" || fired=$((SECONDS - start))
+}
+
+run_wedged 5
 
 # Announced when the dump starts, which runs for minutes: a suite watchdog
 # reading that log would take the silence for a wedge and kill the step.
@@ -49,8 +69,8 @@ grep -qx 'DUMP 90_wedged.test' "$tmp/progress" ||
 
 test "$rc" -eq 124 || fail "wedged test reported $rc, want 124"
 # Never before the budget, or a slow-but-healthy test would be killed too.
-test "$elapsed" -ge 5 || fail "the guard fired early (${elapsed}s of a 5s budget)"
-test "$elapsed" -lt 30 || fail "the guard fired late (${elapsed}s)"
+test "$fired" -ge 5 || fail "the guard fired early (${fired}s of a 5s budget)"
+test "$fired" -lt 30 || fail "the guard fired late (${fired}s)"
 grep -q 'marker: the wedged test started' "$out" || fail "the test's own output was lost"
 # The header, not a bare name: the process list quotes the test's path too, so a
 # wrapper that named nothing would still match that.
@@ -78,15 +98,11 @@ sleep 1
 # the loop it stretches is the same one poll_wait's fd tick drives.
 (
     starve_sleep "$shim" 4 || fail "could not install the slow sleep"
-    start=$SECONDS
-    rc=0
-    HTTRACK_POLL_SLEEP=1 HTTRACK_TEST_TIMEOUT=1 \
-        bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 || rc=$?
-    elapsed=$((SECONDS - start))
+    run_wedged 1 HTTRACK_POLL_SLEEP=1
     test "$rc" -eq 124 || fail "starved guard reported $rc, want 124"
-    # Generous: the diagnostics dump runs inside this window too.
-    test "$elapsed" -lt 25 ||
-        fail "budget counted polls, not seconds: ${elapsed}s for a 1s budget"
+    # 10 stretched polls would be 40s; a handful of them is the whole margin here.
+    test "$fired" -lt 25 ||
+        fail "budget counted polls, not seconds: ${fired}s for a 1s budget"
 )
 
 # --- exit status and output of a healthy test pass straight through ----------
@@ -126,6 +142,57 @@ saw_budget 45 "an explicit budget"
 # 0 execs the test directly, so the pacer has to see the guard is off too.
 HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/95_budget.test" >"$out" 2>&1
 saw_budget 0 "a disabled guard"
+
+# --- a test may raise the budget, never lower it ----------------------------
+# 269's header sweep is n^2 compiles, real work that outlasts the wedge budget on an
+# emulated host; anything else asking would be disarming the guard.
+raiser() { # raiser <asked for>
+    # shellcheck disable=SC2016 # the fixture has to read the variable, not us
+    printf '# TEST_TIMEOUT: %s\necho "budget=${HTTRACK_TEST_TIMEOUT-unset}"\n' \
+        "$1" >"$tmp/97_raise.test"
+}
+for want in 900:900 5:600 garbage:600; do
+    raiser "${want%%:*}"
+    HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/97_raise.test" >"$out" 2>&1
+    saw_budget "${want##*:}" "a test asking for ${want%%:*}"
+done
+raiser 900
+HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/97_raise.test" >"$out" 2>&1
+saw_budget 0 "a raise under a disabled guard"
+# Read from the header, or a test's own data would be one: 151 writes this very line.
+{
+    for i in {1..45}; do echo "# pad $i"; done
+    cat "$tmp/97_raise.test"
+} >"$tmp/97_deep.test"
+HTTRACK_TEST_TIMEOUT=600 bash "$driver" "$tmp/97_deep.test" >"$out" 2>&1
+saw_budget 600 "a raise past the header"
+
+# The guard has to enforce the raise, not just export it.
+printf '# TEST_TIMEOUT: 900\nsleep 4\necho "outlived the default"\n' >"$tmp/97_raise.test"
+rc=0
+HTTRACK_TEST_TIMEOUT=2 bash "$driver" "$tmp/97_raise.test" >"$out" 2>&1 || rc=$?
+test "$rc" -eq 0 || fail "a 4s test that raised the budget to 900 reported $rc"
+grep -q 'outlived the default' "$out" || fail "the raised budget killed the test anyway"
+
+# budget_left hands a child what is left of it, and keeps 0 meaning "no guard".
+# shellcheck disable=SC2016 # the fixture has to call the helper, not us
+printf '. "%s"\nsleep 2\necho "left=$(budget_left)"\n' "${testdir}/testlib.sh" \
+    >"$tmp/98_left.test"
+saw_left() { # saw_left <lowest> <highest> <label> <budget>
+    local got
+    HTTRACK_TEST_TIMEOUT=$4 bash "$driver" "$tmp/98_left.test" >"$out" 2>&1
+    got=$(sed -n 's/^left=//p' "$out")
+    case "$got" in '' | *[!0-9]*) fail "$3 left '$got', want $1..$2" ;; esac
+    if test "$got" -lt "$1" || test "$got" -gt "$2"; then
+        fail "$3 left '$got', want $1..$2"
+    fi
+}
+saw_left 50 58 "a 60s budget two seconds in" 60
+saw_left 0 0 "a disabled guard" 0
+# Never 0 on an exhausted budget: a child would read that as the guard being off.
+HTTRACK_TEST_TIMEOUT=1 bash -c '. "$1"; sleep 2; echo "left=$(budget_left)"' \
+    _ "${testdir}/testlib.sh" >"$out" 2>&1
+grep -qx 'left=1' "$out" || fail "an exhausted budget left '$(cat "$out")', want 1"
 
 # --- a test too slow to finish skips instead of being killed ----------------
 # hppa spends ~150s on one configure run, and 124 takes the build down where 77

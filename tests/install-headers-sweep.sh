@@ -237,13 +237,29 @@ fi
 
 began=$SECONDS
 bad=0
+# Sliced so the sweep can be given up on: one call per batch cannot be interrupted, and
+# an emulated compiler wants longer for it than the harness allows a test (#1146). Still
+# nowhere near a spawn per unit, which costs more than the compile on the Windows runner.
+slices=8
+slice=$(((${#units[@]} + slices - 1) / slices))
+left=$((${#langs[@]} * ${#modes[@]} * slices))
 for lang in "${langs[@]}"; do
     for mode in "${modes[@]}"; do
-        compile "$lang" "$mode" "${units[@]}" || {
-            head -40 "$sweep_log" >&2
-            echo "the headers do not compile as $lang standalone and pairwise ($mode)" >&2
-            bad=1
-        }
+        i=0
+        while [ "$i" -lt "${#units[@]}" ]; do
+            step=$SECONDS
+            compile "$lang" "$mode" "${units[@]:i:slice}" || {
+                head -40 "$sweep_log" >&2
+                echo "the headers do not compile as $lang standalone and pairwise ($mode)" >&2
+                bad=1
+            }
+            i=$((i + slice))
+            left=$((left - 1))
+            # Only under a caller that set the budget (269, not the MSVC job), and only
+            # while nothing has failed: a skip past a real break would bury it.
+            [ "$bad" -ne 0 ] || [ -z "${HTTRACK_TEST_TIMEOUT:-}" ] ||
+                skip_if_out_of_budget "$left" "$((SECONDS - step))"
+        done
     done
 done
 echo "swept $n headers standalone and pairwise x ${#modes[@]} bytecode modes x ${langs[*]}" \

@@ -549,6 +549,20 @@ skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last
     exit 77
 }
 
+# Seconds left of the budget, for a child pacing itself against it (269 hands it to
+# the sweep). Never below 1 unless the guard is off, which 0 must keep meaning.
+budget_left() {
+    local budget=${HTTRACK_TEST_TIMEOUT:-600} left
+    case "$budget" in '' | *[!0-9]*) budget=600 ;; esac
+    test "$budget" -gt 0 || {
+        echo 0
+        return 0
+    }
+    left=$((budget - SECONDS))
+    test "$left" -ge 1 || left=1
+    echo "$left"
+}
+
 # Collect a killed job, giving up after REAP_GRACE seconds. kill_tree can fail to
 # reap a native Windows descendant -- the very case these watchdogs exist for --
 # and a bare `wait` then blocks the watchdog itself forever, so the timeout it was

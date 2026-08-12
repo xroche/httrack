@@ -48,7 +48,12 @@ cd /bld
 bash "${GITHUB_WORKSPACE:-/src}/configure"
 make -j"$(nproc)"
 # The buildd's own invocation, so a failure here is the one it would report.
-make check -j"$(nproc)"
+rc=0
+make check -j"$(nproc)" || rc=$?
+# Always, not only where automake prints it: this leg exists to say what an emulated
+# host does, and a test that paced itself out reads as coverage without the reasons.
+cat tests/test-suite.log || true
+test "$rc" -eq 0 || exit "$rc"
 
 # make check exits 0 for an all-SKIP run, and this leg skips a lot by design, so
 # a container that quietly lost a dependency would report a green covering

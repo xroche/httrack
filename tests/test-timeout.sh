@@ -26,14 +26,35 @@ budget=${HTTRACK_TEST_TIMEOUT:-600}
 case "$budget" in
 '' | *[!0-9]*) budget=600 ;;
 esac
+
+# The test script is the last argument; automake passes no others today.
+for path in "$@"; do :; done
+name=$(basename "$path")
+
+# A test whose work legitimately outlasts the wedge budget says so in its header
+# (269 sweeps n^2 compiles and paces itself inside it). Upwards only, so no test can
+# disarm the guard, and read with the shell to keep it off the per-test fork bill.
+if test "$budget" -gt 0 && test -r "$path"; then
+    read_lines=0
+    while test "$read_lines" -lt 40 && IFS= read -r line; do
+        read_lines=$((read_lines + 1))
+        case "$line" in
+        '# TEST_TIMEOUT: '*)
+            want=${line#'# TEST_TIMEOUT: '}
+            case "$want" in
+            '' | *[!0-9]*) ;;
+            *) test "$want" -le "$budget" || budget=$want ;;
+            esac
+            break
+            ;;
+        esac
+    done <"$path"
+fi
+
 # Exported so a test can pace itself against the same number (skip_if_out_of_budget)
 # instead of being killed halfway.
 export HTTRACK_TEST_TIMEOUT="$budget"
 test "$budget" -gt 0 || exec "$BASH" "$@"
-
-# The test script is the last argument; automake passes no others today.
-for name in "$@"; do :; done
-name=$(basename "$name")
 
 # Give the test its own TMPDIR, so the hang dump can salvage exactly this test's
 # crawl logs instead of racing (and deleting) a sibling's under "make check -j".

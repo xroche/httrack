@@ -51,6 +51,12 @@ chmod 755 "$tmp/fakebin/bash"
 mkfifo "$tmp/fifo"
 chmod 755 "$tmp/fifo"
 
+# Sampled rather than polled per second: the size read is a fork, and an emulated
+# host pays for it. SILENCE clears the slowest single configure probe there.
+SAMPLE=5
+SILENCE=${HTTRACK_CONFIGURE_SILENCE:-120}
+RESERVE=15 # what killing the run and skipping still needs of the budget
+
 n=0
 cases=16 # reject/accept calls below; pinned again once they have all run
 status=0
@@ -67,17 +73,35 @@ run() { # run <label> <env argument>...
     # at all. Polled, not a backgrounded "sleep" watchdog, which outlives the run it guards.
     (cd "$rundir" && env "$@" bash "$tmp/src/configure" --disable-https) \
         >"$rundir/log" 2>&1 &
-    local pid=$! waited=0
-    while test "$waited" -lt 300 && kill -0 "$pid" 2>/dev/null; do
+    local pid=$! waited=0 quiet=0 size=0 now left
+    # A hang is silence, not slowness: configure writes a line per probe, where hppa's
+    # emulated one spends longer on the whole run than a runner's whole budget (#1146).
+    while kill -0 "$pid" 2>/dev/null; do
         sleep 1
         waited=$((waited + 1))
+        test "$((waited % SAMPLE))" -eq 0 || continue
+        now=$(wc -c <"$rundir/log")
+        if test "$now" -gt "$size"; then
+            size=$now
+            quiet=0
+        else
+            quiet=$((quiet + SAMPLE))
+        fi
+        test "$quiet" -lt "$SILENCE" || {
+            kill -9 "$pid" 2>/dev/null
+            echo "configure wrote nothing for ${quiet}s of ${waited}s for $label" >&2
+            tail -5 "$rundir/log" >&2
+            exit 1
+        }
+        # Making progress but out of time: the harness would kill the whole test at the
+        # budget, and 124 takes the build down where a skip does not. 0 is the guard off.
+        left=$(budget_left)
+        test "$left" -eq 0 || test "$left" -gt "$RESERVE" || {
+            kill -9 "$pid" 2>/dev/null
+            echo "$label was still configuring ${waited}s in and the budget is out; skipping" >&2
+            exit 77
+        }
     done
-    if kill -0 "$pid" 2>/dev/null; then
-        kill -9 "$pid" 2>/dev/null
-        echo "configure did not return within ${waited}s for $label" >&2
-        tail -5 "$rundir/log" >&2
-        exit 1
-    fi
     wait "$pid" || status=$?
     log=$(cat "$rundir/log")
     echo "run $n ($label): exit $status"
