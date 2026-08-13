@@ -34,15 +34,32 @@ function ping_server() {
   }
 }
 
+// The session id this page carries, empty on the few pages that hold no form.
+function ping_sid() {
+  var f = document.getElementsByName('sid');
+  return f && f.length ? f[0].value : "";
+}
+
 // Closing the window is the common case, and waiting out the timeout for it
-// would hold the server open long after the user considers it gone.
+// would hold the server open long after the user considers it gone. The server
+// takes this only from a request holding the session id, so it goes as a POST;
+// a page without one falls back to the timeout.
 function ping_leaving() {
+  var sid = ping_sid();
+  if (!sid) {
+    return;
+  }
   var url = ping_url("e=bye");
+  var body = "sid=" + encodeURIComponent(sid);
+  var type = "application/x-www-form-urlencoded";
   if (navigator.sendBeacon) {
-    navigator.sendBeacon(url);
-  } else {
-    // A request the page's own teardown cannot cancel.
-    new Image().src = url;
+    navigator.sendBeacon(url, new Blob([ body ], {type : type}));
+  } else if (window.XMLHttpRequest) {
+    // Synchronous: the page is going away, and an async send dies with it.
+    var x = new XMLHttpRequest();
+    x.open("POST", url, false);
+    x.setRequestHeader("Content-Type", type);
+    x.send(body);
   }
 }
 

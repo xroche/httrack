@@ -392,10 +392,9 @@ static void copy_header_value(char *dst, size_t size, const char *value) {
   strlncatbuff(dst, value, size, size - 1);
 }
 
-/** Copy the value of query parameter "name" into dst, keeping only the
-    alphanumerics a window id is made of. True when a non-empty value fit.
-    Deliberately not the body walker below: this one fetches one value out of a
-    URL, where that one validates every occurrence of a field in a POST body. */
+/** Copy query parameter "name"'s alphanumeric value into dst; true when a
+    non-empty one fit, and dst is left empty otherwise. Query-string counterpart
+    to the POST-body checker below. */
 static hts_boolean query_alnum_value(char *dst, size_t size, const char *query,
                                      const char *name) {
   const size_t namelen = strlen(name);
@@ -414,8 +413,13 @@ static hts_boolean query_alnum_value(char *dst, size_t size, const char *query,
         dst[n++] = *v++;
       }
       dst[n] = '\0';
-      /* A truncated or otherwise unusable id is no id at all. */
-      return n > 0 && (*v == '\0' || *v == '&') ? HTS_TRUE : HTS_FALSE;
+      /* Truncated, or not alphanumeric to its end, is no value at all: it must
+         not reach a caller that trusted the return. */
+      if (n > 0 && (*v == '\0' || *v == '&')) {
+        return HTS_TRUE;
+      }
+      dst[0] = '\0';
+      return HTS_FALSE;
     }
     if (amp == NULL) {
       break;
@@ -763,6 +767,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     LLint length = 0;
     const char *error_redirect = NULL;
     hts_boolean denied = HTS_FALSE;
+    /* The request proved it holds the session id. */
+    hts_boolean authed = HTS_FALSE;
     char origin[256];
     char host[256];
 
@@ -903,6 +909,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           buffer[0] = '\0';
           meth = 0;
           denied = HTS_TRUE;
+        } else {
+          authed = HTS_TRUE;
         }
       }
 
@@ -1846,11 +1854,15 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             if (query_alnum_value(window, sizeof(window), query, "w")) {
               char verb[SMALLSERVER_WINDOW_ID_MAX + 1];
 
-              client_event(query_alnum_value(verb, sizeof(verb), query, "e") &&
-                                   strcmp(verb, "bye") == 0
-                               ? SMALLSERVER_CLIENT_LEAVING
-                               : SMALLSERVER_CLIENT_PING,
-                           window);
+              /* Ending a session is a command, so it carries the session id
+                 like every other one. A heartbeat can only extend a life, and
+                 any local peer or visited page can send one of those. */
+              client_event(
+                  authed && query_alnum_value(verb, sizeof(verb), query, "e") &&
+                          strcmp(verb, "bye") == 0
+                      ? SMALLSERVER_CLIENT_LEAVING
+                      : SMALLSERVER_CLIENT_PING,
+                  window);
             }
           } else {
             char error_hdr[] =

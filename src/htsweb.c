@@ -105,11 +105,10 @@ static void htsweb_sig_brpipe(int code) {
 /* Threads that never return; no wait may count on them draining. */
 static int nonjoinable_threads = 0;
 
-/* Session lifetime: each UI window pings every PING_PERIOD seconds under its
-   own id and drops that id when it closes, so an abandoned server stops instead
-   of outliving the session and holding its payload open (a mounted disk image,
-   on macOS). Windows are counted, not merely timed: closing one of two must not
-   end a session the other is still using. */
+/* Session lifetime: each window pings under its own id and drops it when it
+   closes, so an abandoned server stops instead of outliving the session and
+   holding its payload open (a mounted disk image, on macOS). Windows are
+   counted, not timed: closing one of several must not end the session. */
 #define PING_PERIOD 5
 /* Silence tolerated from one window. Generous: a hidden tab has its timers
    throttled to as little as one wake-up a minute. */
@@ -117,8 +116,8 @@ static int pingTimeout = 120;
 /* Once the last window leaves, only a page navigation can bring one back, and
    that takes a fraction of a second over the loopback. */
 #define LEAVE_GRACE max(2, min(5, pingTimeout / 4))
-/* Windows tracked at once. Past this the oldest is dropped, which costs that
-   one the prompt exit and nothing else. */
+/* Windows tracked at once. A full table refuses newcomers rather than evicting:
+   dropping a live window is what would let a flood of ids end the session. */
 #define MAX_WINDOWS 16
 
 static htsmutex pingMutex = HTSMUTEX_INIT;
@@ -128,16 +127,17 @@ static int ticks = 0;
 
 static struct {
   char id[SMALLSERVER_WINDOW_ID_MAX + 1];
-  int seen;
+  int last_seen;
 } windows[MAX_WINDOWS];
 
 static int windowCount = 0;
-static int emptySince = 0; /* tick the last window left at */
-static int anyWindow = 0;  /* some window has claimed an id */
-static int lastSeen = 0;   /* tick of the last request of any kind */
-static int anyRequest = 0; /* something has connected at least once */
+static int emptySince = 0;                /* tick the last window left at */
+static hts_boolean anyWindow = HTS_FALSE; /* a window has claimed an id */
+static int lastSeen = 0; /* tick of the last request of any kind */
+static hts_boolean anyRequest = HTS_FALSE; /* something has connected */
 
-/* Drop windows[i]. Caller holds pingMutex. */
+/* Drop windows[i], moving the last entry into its slot: a caller removing while
+   it iterates must walk backwards. Caller holds pingMutex. */
 static void window_forget(int i) {
   windows[i] = windows[--windowCount];
   if (windowCount == 0) {
@@ -152,9 +152,9 @@ static void pingHandler(void *arg, smallserver_client_event ev,
   (void) arg;
   hts_mutexlock(&pingMutex);
   lastSeen = ticks;
-  anyRequest = 1;
-  /* A bare request vouches for no window: any local peer can open a connection,
-     and none of them may cancel a real window's departure. */
+  anyRequest = HTS_TRUE;
+  /* A bare request names no window: any local peer can open a connection, but
+     none may cancel a real window's departure. */
   if (window != NULL) {
     while (i < windowCount && strcmp(windows[i].id, window) != 0) {
       i++;
@@ -164,27 +164,27 @@ static void pingHandler(void *arg, smallserver_client_event ev,
         window_forget(i);
       }
     } else if (i < windowCount) {
-      windows[i].seen = ticks;
-    } else {
-      if (windowCount == MAX_WINDOWS) {
-        window_forget(0);
-      }
-      strcpybuff(windows[windowCount].id, window);
-      windows[windowCount++].seen = ticks;
-      anyWindow = 1;
+      windows[i].last_seen = ticks;
+    } else if (windowCount < MAX_WINDOWS) {
+      windows[windowCount].id[0] = '\0';
+      strlncatbuff(windows[windowCount].id, window,
+                   sizeof(windows[windowCount].id),
+                   sizeof(windows[windowCount].id) - 1);
+      windows[windowCount++].last_seen = ticks;
+      anyWindow = HTS_TRUE;
     }
   }
   hts_mutexrelease(&pingMutex);
 }
 
 /* True unless the launcher we were started from is known to be gone. */
-static int parent_is_alive(pid_t ppid) {
+static hts_boolean parent_is_alive(pid_t ppid) {
 #ifdef _WIN32
   (void) ppid;
-  return 1; /* no cheap probe; the heartbeat carries this */
+  return HTS_TRUE; /* no cheap probe; the heartbeat carries this */
 #else
   /* kill(0) would signal our own process group, never a parent. */
-  return ppid <= 0 || kill(ppid, 0) == 0;
+  return ppid <= 0 || kill(ppid, 0) == 0 ? HTS_TRUE : HTS_FALSE;
 #endif
 }
 
@@ -206,7 +206,7 @@ static void client_ping(void *pP) {
     /* A window that stops pinging without a goodbye crashed with its browser.
      */
     for (i = windowCount; i-- > 0;) {
-      if (ticks - windows[i].seen >= pingTimeout) {
+      if (ticks - windows[i].last_seen >= pingTimeout) {
         window_forget(i);
       }
     }
@@ -214,10 +214,9 @@ static void client_ping(void *pP) {
       why = "the interface was closed";
     } else if (!anyWindow &&
                ticks - lastSeen >= pingTimeout
-               /* No window ever claimed an id, so this is a browser too old to
-                  ping, or one that never opened. Silence alone must not end a
-                  session a reader may still be looking at, so fall back to the
-                  launcher, which dies with that browser. */
+               /* No window ever pinged: a browser too old for it, or none
+                  opened. Fall back to the launcher dying with that browser,
+                  rather than to silence, which a reader also produces. */
                && (!anyRequest || !parent_is_alive(ppid))) {
       why = "the interface went silent";
     }
@@ -373,10 +372,16 @@ int main(int argc, char *argv[]) {
         return -1;
       }
     } else if (strcmp(argv[i], "--ping-timeout") == 0 && i + 1 < argc) {
-      if (sscanf(argv[i + 1], "%d", &pingTimeout) != 1 || pingTimeout < 1) {
+      /* Bounded, not just parsed: %d wrapping a huge value into a plausible one
+         is what #614 cost on --port, two cases above. */
+      char *end = NULL;
+      const long v = strtol(argv[i + 1], &end, 10);
+
+      if (end == argv[i + 1] || *end != '\0' || v < 1 || v > 86400) {
         fprintf(stderr, "couldn't set the ping timeout to %s\n", argv[i + 1]);
         return -1;
       }
+      pingTimeout = (int) v;
     } else if (i + 1 < argc) {
       smallserver_setkey(argv[i], argv[i + 1]);
     } else {

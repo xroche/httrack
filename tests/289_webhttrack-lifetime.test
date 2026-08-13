@@ -41,6 +41,16 @@ start_case() {
 
 get() { "${HTS_PYTHON}" "${testdir}/httpclient.py" --port "$1" --path "$2"; }
 ping() { get "$1" "/ping?w=$2&t=${RANDOM}${3:+&$3}" >/dev/null; }
+# The session id every UI page carries, which the server demands of a farewell.
+page_sid() {
+    firstline "$(get "$1" /server/index.html |
+        sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p')"
+}
+# A farewell as the page sends one: a POST holding that id.
+bye() {
+    "${HTS_PYTHON}" "${testdir}/httpclient.py" --port "$1" \
+        --path "/ping?w=$2&t=${RANDOM}&e=bye" --field "sid=$3" >/dev/null
+}
 
 # Wait up to $2 seconds for $1 to go away.
 died_within() {
@@ -59,12 +69,16 @@ printf '[an abandoned WebHTTrack server stops on its own] ..\t'
 js="${HTS_DISTDIR}/html/server/ping.js"
 grep -qF '"/ping?w=" + PING_WINDOW' "${js}" || fail "ping.js stopped naming its window"
 grep -qF 'ping_url("e=bye")' "${js}" || fail "ping.js stopped saying goodbye"
+grep -qF '"sid=" + encodeURIComponent(sid)' "${js}" ||
+    fail "ping.js stopped signing its goodbye, which the server then ignores"
 
 # 1. The heartbeat must never be answered from a cache: a reply the browser
 # reuses is one the server never sees, and silence is what kills it.
 start_case
 bye_pid=${HTS_PID}
 bye_port=${HTS_PORT}
+sid=$(page_sid "${bye_port}")
+test "${#sid}" -eq 32 || fail "no session id on the wizard's first page"
 reply=$(get "${bye_port}" '/ping?w=w1')
 grep -q '^HTTP/1\.0 200 ' <<<"${reply}" || fail "no pong: $(head -1 <<<"${reply}")"
 grep -qi '^Cache-Control:.*no-cache' <<<"${reply}" ||
@@ -74,14 +88,22 @@ grep -qi '^Cache-Control:.*no-cache' <<<"${reply}" ||
 # A hidden tab has its timers throttled to as little as one wake-up a minute, so
 # this cannot rest on the survivor answering inside the grace.
 ping "${bye_port}" w2
-ping "${bye_port}" w1 e=bye
+bye "${bye_port}" w1 "${sid}"
 sleep $((grace + 2))
 kill -0 "${bye_pid}" 2>/dev/null ||
     fail "closing one window ended a session another window still had open"
 
-# 3. The last window leaving takes the server with it, well inside the idle
-# timeout that would otherwise apply.
+# 3. An unsigned farewell is not one: /ping is a GET, so it clears neither the
+# session-id nor the Origin gate, and any local process or visited page can send
+# it. Only a heartbeat may go unproven, and a heartbeat only extends a life.
 ping "${bye_port}" w2 e=bye
+sleep $((grace + 2))
+kill -0 "${bye_pid}" 2>/dev/null ||
+    fail "an unauthenticated goodbye ended the session"
+
+# 4. The last window leaving takes the server with it, well inside the idle
+# timeout that would otherwise apply.
+bye "${bye_port}" w2 "${sid}"
 bye_at=${SECONDS}
 died_within "${bye_pid}" $((timeout - 1)) ||
     fail "the server outlived its last window by $((SECONDS - bye_at))s"
@@ -90,13 +112,13 @@ test "$((SECONDS - bye_at))" -le $((grace + 3)) ||
 
 # The four cases below share one wait, so they cost one timeout, not four.
 
-# 4. A window that stops pinging without a goodbye has crashed with its browser.
+# 5. A window that stops pinging without a goodbye has crashed with its browser.
 start_case
 lost_pid=${HTS_PID}
 ping "${HTS_PORT}" w1
 lost_at=${SECONDS}
 
-# 5. A window that keeps pinging keeps its server, past that same deadline.
+# 6. A window that keeps pinging keeps its server, past that same deadline.
 start_case
 live_pid=${HTS_PID}
 live_port=${HTS_PORT}
@@ -110,7 +132,7 @@ pingfail="${work}/pingfail"
 ) &
 pinger=$!
 
-# 6. A client that never pings at all is a browser too old for the heartbeat, or
+# 7. A client that never pings at all is a browser too old for the heartbeat, or
 # one with scripting off, and may be a user reading the page: only the
 # launcher's death may end that session, and nothing here kills this shell.
 start_case
@@ -118,7 +140,7 @@ quiet_pid=${HTS_PID}
 quiet_at=${SECONDS}
 get "${HTS_PORT}" /server/index.html >/dev/null
 
-# 7. ..and when that launcher does die, the same session ends: it is the only
+# 8. ..and when that launcher does die, the same session ends: it is the only
 # signal such a browser produces. A process of our own stands in for it.
 sleep 600 &
 sleeper=$!
@@ -143,9 +165,10 @@ died_within "${legacy_pid}" $((timeout * 3)) ||
     fail "a server outlived its launcher by $((SECONDS - legacy_at))s"
 
 # Both survivors started after the crashed one, so its death is too early to
-# judge them by: wait until each has outlived a timeout of its own.
-while test "$((SECONDS - live_at))" -le $((timeout + 2)) ||
-    test "$((SECONDS - quiet_at))" -le $((timeout + 2)); do
+# judge them by. Two timeouts, not one: a window whose refresh stopped working
+# would still be inside its first.
+while test "$((SECONDS - live_at))" -le $((timeout * 2)) ||
+    test "$((SECONDS - quiet_at))" -le $((timeout * 2)); do
     poll_wait 0.5
 done
 # Aliveness first: a server that dies also fails the pings aimed at it, and the
@@ -157,9 +180,9 @@ kill -0 "${quiet_pid}" 2>/dev/null ||
 kill "${pinger}" 2>/dev/null || true
 pinger=
 
-# 8. Closing the window while a mirror runs must not take the mirror down: it
-# may have hours of crawling behind it, and its page can be reopened. The veto
-# has to lift when the crawl ends, or the server it saved becomes immortal.
+# 9. Closing the window while a mirror runs must not take the mirror down: it
+# may have hours of crawling behind it. The veto has to lift when the crawl
+# ends, or the server it saved becomes immortal.
 start_case
 crawl_pid=${HTS_PID}
 crawl_port=${HTS_PORT}
@@ -168,8 +191,7 @@ clog="${work}/content.log"
 csrv=$!
 cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
 
-sid=$(firstline "$(get "${crawl_port}" /server/index.html |
-    sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p')")
+sid=$(page_sid "${crawl_port}")
 test "${#sid}" -eq 32 || fail "no session id to start a mirror with"
 # Its index links one page that sleeps 5s, so the crawl outlasts the grace and
 # still ends inside the test.
@@ -180,7 +202,7 @@ test "${#sid}" -eq 32 || fail "no session id to start a mirror with"
     >/dev/null
 
 ping "${crawl_port}" w1
-ping "${crawl_port}" w1 e=bye
+bye "${crawl_port}" w1 "${sid}"
 sleep $((grace + 2))
 kill -0 "${crawl_pid}" 2>/dev/null ||
     fail "the crawling server quit, taking its mirror with it"
@@ -191,13 +213,11 @@ test -d "${work}/crawl/hts-cache" || fail "no mirror ever started: $(cat "${clog
 died_within "${crawl_pid}" $((timeout * 3)) ||
     fail "the server never left once its mirror had finished"
 
-# 9. The wizard's own Quit button is the other way out, and the only one that
-# leaves through smallserver(). It used to report a server it could not create,
-# because that function returned its untouched initializer.
+# 10. The wizard's own Quit button is the other way out, and the only one that
+# leaves through smallserver(), which has to report the server it did create.
 start_case
 quit_pid=${HTS_PID}
-sid=$(firstline "$(get "${HTS_PORT}" /server/index.html |
-    sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p')")
+sid=$(page_sid "${HTS_PORT}")
 test "${#sid}" -eq 32 || fail "no session id to quit with"
 "${HTS_PYTHON}" "${testdir}/httpclient.py" --port "${HTS_PORT}" \
     --path /server/exit.html --field "sid=${sid}" --field command=quit >/dev/null
