@@ -452,6 +452,23 @@ HTSEXT_API char *jump_identification(char *);
 
 HTSEXT_API const char *jump_identification_const(const char *);
 
+/** Write into dst the k-th domain scope the wizard can offer for the string
+    query3 was handed (an "adr" or an "adr[/fil]"). Scopes widen as k grows: for
+    download.example.co.uk/x, "download.example.co.uk", then "example.co.uk",
+    then "co.uk". A front end enumerates its menu by looping until this returns
+    HTS_FALSE, and answers HTS_WIZARD_SCOPE_INCLUDE+k or
+    HTS_WIZARD_SCOPE_EXCLUDE+k.
+
+    A bare TLD is never offered, and an IP literal has no scopes, so an empty
+    menu is normal. Protocol and credentials are stripped and the port is kept,
+    so a caller must not split the host itself.
+
+    dst is emptied on every failure, and HTS_URLMAXSIZE bytes always suffice. A
+    shorter dst also returns HTS_FALSE, which the loop cannot tell from the end
+    of the list. */
+HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
+                                             char *dst, size_t dstsize);
+
 /** Like jump_identification() and also strip a leading "www." host prefix,
     returning a pointer into the input to the normalized host. */
 HTSEXT_API char *jump_normalized(char *);

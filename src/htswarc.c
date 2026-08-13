@@ -557,19 +557,6 @@ static char *path_basename_dup(const char *path) {
   return strdupt(b);
 }
 
-/* A host made only of digits and dots is an IPv4 literal (never reversed). */
-static int surt_host_is_ip(const char *h, size_t n) {
-  size_t i;
-  int dots = 0;
-  for (i = 0; i < n; i++) {
-    if (h[i] == '.')
-      dots++;
-    else if (h[i] < '0' || h[i] > '9')
-      return 0;
-  }
-  return dots > 0;
-}
-
 /* SURT-canonicalize url into out (no newline): scheme and userinfo dropped,
    host lowercased with a leading www[digits] label stripped and the scheme
    default port removed, labels reversed and comma-joined then ')', path+query
@@ -637,7 +624,7 @@ static int surt_canon(const char *url, wbuf *out) {
   hostbuf[hlen] = '\0';
 
   if (!is_ipv6)
-    is_ip = surt_host_is_ip(hostbuf, hlen);
+    is_ip = hts_host_is_ipv4(hostbuf, hlen);
 
   if (!is_ipv6 && !is_ip && hlen >= 4 && hostbuf[0] == 'w' &&
       hostbuf[1] == 'w' && hostbuf[2] == 'w') {

@@ -181,7 +181,84 @@ static void wizard_cat_path(htsbuff *f, const char *sign, const char *adr,
   htsbuff_catn(f, fil, len);
 }
 
-void hts_wizard_answer_filter(htsbuff *f, int n, const char *adr,
+HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
+                                             char *dst, size_t dstsize) {
+  const char *host, *port, *slash, *end, *scope;
+  size_t len;
+
+  if (dst == NULL || dstsize == 0)
+    return HTS_FALSE;
+  dst[0] = '\0';
+  if (question == NULL || k < 0)
+    return HTS_FALSE;
+
+  host = jump_identification_const(question);
+  port = jump_toport_const(question);
+  slash = strchr(host, '/');
+  end = host + strlen(host);
+  scope = host;
+  if (slash != NULL && slash < end)
+    end = slash;
+  /* the port belongs to the filter, so keep it and only bound the label walk */
+  if (port != NULL && port < end)
+    slash = port;
+  else
+    slash = end;
+  /* a fully-qualified "foo.com." ends on the root label, which is not one */
+  if (slash > host && slash[-1] == '.')
+    slash--;
+  if (slash == host || *host == '[') /* no host, or an IPv6 literal */
+    return HTS_FALSE;
+  if (hts_host_is_ipv4(host, (size_t) (slash - host)))
+    return HTS_FALSE;
+
+  /* widen by dropping one leading label per step, and never offer a bare TLD */
+  for (; k > 0; k--) {
+    const char *dot = memchr(scope, '.', (size_t) (slash - scope));
+
+    if (dot == NULL)
+      return HTS_FALSE;
+    scope = dot + 1;
+  }
+  if (memchr(scope, '.', (size_t) (slash - scope)) == NULL)
+    return HTS_FALSE;
+
+  len = (size_t) (end - scope);
+  if (len >= dstsize)
+    return HTS_FALSE;
+  memcpy(dst, scope, len);
+  dst[len] = '\0';
+  return HTS_TRUE;
+}
+
+hts_tristate hts_wizard_scope_answer(int n) {
+  if (n >= HTS_WIZARD_SCOPE_EXCLUDE)
+    return HTS_TRUE;
+  if (n >= HTS_WIZARD_SCOPE_INCLUDE)
+    return HTS_FALSE;
+  return HTS_DEFAULT;
+}
+
+/* The subdomain form of the scope in slot 0, its apex in slot 1: the starred
+   one does not match the apex, so a whole-domain answer needs both. */
+static void wizard_cat_scope(htsbuff *f, const char *sign, const char *adr,
+                             int n, int slot) {
+  char scope[HTS_URLMAXSIZE];
+  const int k =
+      n - (hts_wizard_scope_answer(n) == HTS_TRUE ? HTS_WIZARD_SCOPE_EXCLUDE
+                                                  : HTS_WIZARD_SCOPE_INCLUDE);
+
+  if (slot >= HTS_WIZARD_MAX_FILTERS ||
+      !hts_wizard_host_scope(adr, k, scope, sizeof(scope)))
+    return;
+  htsbuff_cpy(f, sign);
+  if (slot == 0)
+    htsbuff_cat(f, "*.");
+  htsbuff_cat(f, scope);
+  htsbuff_cat(f, "/*");
+}
+
+void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up) {
   size_t dir = hts_lastcharoffset(fil);
 
@@ -189,6 +266,13 @@ void hts_wizard_answer_filter(htsbuff *f, int n, const char *adr,
     dir--;
 
   htsbuff_cpy(f, "");
+  if (hts_wizard_scope_answer(n) != HTS_DEFAULT) {
+    wizard_cat_scope(f, hts_wizard_scope_answer(n) == HTS_TRUE ? "-" : "+", adr,
+                     n, slot);
+    return;
+  }
+  if (slot != 0) /* every other answer emits a single filter */
+    return;
   switch (n) {
   case 0: /* this link only */
     wizard_cat_path(f, "-", adr, fil, (size_t) -1);
@@ -765,8 +849,9 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
           n = force_mirror;
       }
 
-      /* sanity check - reallocate filters HERE */
-      if ((*_FILTERS_PTR) + 1 >= opt->maxfilter) {
+      /* sanity check - reallocate filters HERE (a host-scope answer emits two)
+       */
+      if ((*_FILTERS_PTR) + 2 >= opt->maxfilter) {
         opt->maxfilter += HTS_FILTERSINC;
         if (filters_init(&_FILTERS, opt->maxfilter, HTS_FILTERSINC) == 0) {
           printf("PANIC! : Too many filters : >%d [%d]\n", (*_FILTERS_PTR),
@@ -827,17 +912,34 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
       case 50: // nothing to do
         break;
+
+      case -999: // the "!" answer, and anything the front end could not parse
+        break;
+
+      default:
+        /* a scope answer forbids like 2 or allows like 6 */
+        if (hts_wizard_scope_answer(n) == HTS_TRUE)
+          forbidden_url = 1;
+        else if (hts_wizard_scope_answer(n) == HTS_DEFAULT)
+          hts_log_print(opt, LOG_WARNING,
+                        "(wizard) unknown answer %d at %s%s, keeping the "
+                        "computed verdict",
+                        n, adr, fil);
+        break;
       } // switch
 
       /* the pattern half of the answer: a new answer needs both switches */
       {
         char BIGSTK pattern[HTS_FILTER_SLOT_SIZE];
         htsbuff f = htsbuff_array(pattern);
+        int slot;
 
-        hts_wizard_answer_filter(
-            &f, n, adr, fil,
-            (opt->seeker & HTS_SEEKER_UP) != 0 ? HTS_TRUE : HTS_FALSE);
-        if (f.len != 0) {
+        for (slot = 0; slot < HTS_WIZARD_MAX_FILTERS; slot++) {
+          hts_wizard_answer_filter(
+              &f, slot, n, adr, fil,
+              (opt->seeker & HTS_SEEKER_UP) != 0 ? HTS_TRUE : HTS_FALSE);
+          if (f.len == 0)
+            break;
           HT_INSERT_FILTERS0; // insert at slot 0
           strlcpybuff(_FILTERS[0], pattern, HTS_FILTER_SLOT_SIZE);
         }

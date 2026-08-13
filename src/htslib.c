@@ -4136,6 +4136,19 @@ hts_boolean hts_is_control_free(const char *str) {
   return hts_is_control_free_sized(str, strlen(str));
 }
 
+hts_boolean hts_host_is_ipv4(const char *host, size_t len) {
+  size_t i;
+  int dots = 0;
+
+  for (i = 0; i < len; i++) {
+    if (host[i] == '.')
+      dots++;
+    else if (host[i] < '0' || host[i] > '9')
+      return HTS_FALSE;
+  }
+  return dots > 0 ? HTS_TRUE : HTS_FALSE;
+}
+
 hts_boolean hts_proxy_is_socks(const char *name) {
   if (name == NULL)
     return HTS_FALSE;
