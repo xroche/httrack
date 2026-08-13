@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+# A -%F footer whose expansion exactly filled the on-page buffer aborted the
+# crawl (SIGABRT): the emitter appends its closing newline with strcatbuff,
+# which aborts rather than clips. #670 covered the overflow, not the exact fit.
+
+set -eu
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# The emitter's buffer, 1024 + 2 * HTS_URLMAXSIZE. Only the sweep window is
+# derived from it; a wrong value makes the crossing check below fail loudly.
+bufsize=3072
+mark=ZFOOTERZ
+
+seg=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+deep="$dir/$seg/$seg"
+mkdir -p "$deep"
+page="$deep/index.html"
+printf '<html><body>hi</body></html>' >"$page"
+
+mir="$dir/mir"
+body=
+crawl() { # crawl FOOTER, leaving the mirrored page in $body
+    rm -rf "$mir"
+    httrack "file://$page" -O "$mir" -%F "$1" -q -s0 -%v0 >/dev/null 2>&1 ||
+        fail "crawl died (exit $?) on a ${#1}-char footer"
+    # Under file/, not $mir: the makeindex top index carries no -%F footer.
+    found=$(find "$mir/file" -name index.html)
+    test -n "$found" || fail "page not mirrored; the footer path never ran"
+    body=$(cat "$found")
+}
+
+# {path} is the longest field a file:// crawl can hand the footer, and the
+# -%F argument caps at 253 chars, so the sweep needs few, long repeats.
+crawl '{path}'
+line=$(sed -n 2p <<<"$body")
+plen=${#line}
+test "$plen" -gt 100 || fail "{path} expands to only ${plen} chars"
+
+# Walk the total expansion from below the drop point to past it, one byte at a
+# time: the abort sat on a single length, so a coarser sweep steps over it.
+reps=$(((bufsize - 16) / plen))
+seen_footer=0
+seen_dropped=0
+for total in $(seq $((bufsize - 16)) $((bufsize + 8))); do
+    pad=$((total - reps * plen))
+    test "$pad" -ge ${#mark} || fail "sweep needs ${pad} chars of padding"
+    footer="${mark}$(printf 'A%.0s' $(seq 1 $((pad - ${#mark}))))"
+    footer="${footer}$(printf '{path}%.0s' $(seq 1 "$reps"))"
+    test ${#footer} -lt 254 || fail "footer template is ${#footer} chars"
+    crawl "$footer"
+    if grep -q "$mark" <<<"$body"; then
+        seen_footer=$((seen_footer + 1))
+    else
+        seen_dropped=$((seen_dropped + 1))
+    fi
+done
+
+# Both outcomes prove the window straddles the drop point, where the abort was.
+test "$seen_footer" -gt 0 ||
+    fail "no length in the sweep emitted a footer at all"
+test "$seen_dropped" -gt 0 ||
+    fail "no length in the sweep was dropped; the window missed the boundary"
