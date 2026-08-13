@@ -109,10 +109,12 @@ while test "$((SECONDS - live_at))" -le $((timeout + 2)) ||
     test "$((SECONDS - quiet_at))" -le $((timeout + 2)); do
     poll_wait 0.5
 done
-! test -f "${pingfail}" || fail "the probe's own pings failed; nothing was proven"
+# Aliveness first: a server that dies also fails the pings aimed at it, and the
+# probe's own failure would then be the only thing reported.
 kill -0 "${live_pid}" 2>/dev/null || fail "a pinged server was killed anyway"
 kill -0 "${quiet_pid}" 2>/dev/null ||
     fail "a server whose client never pings was killed under a live launcher"
+! test -f "${pingfail}" || fail "the probe's own pings failed; nothing was proven"
 kill "${pinger}" 2>/dev/null || true
 pinger=
 
