@@ -1,3 +1,13 @@
+httrack (3.49.21-2) unstable; urgency=medium
+
+  * Fix the FTBFS on hppa: three suite tests measured the build host rather
+    than the property they cover, and failed on the qemu-user buildd purely
+    for being slower there.  Patched from upstream, which now skips a step a
+    host is too slow to finish instead of failing the build
+    (skip-emulated-host-test-failures.patch).
+
+ -- Xavier Roche <xavier@debian.org>  Thu, 13 Aug 2026 07:26:38 +0200
+
 httrack (3.49.21-1) unstable; urgency=medium
 
   * New upstream release: a site answering to several hostnames can now be
