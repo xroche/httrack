@@ -22,7 +22,8 @@
 #   -o, --outdir DIR           output directory (default: <repo>/dist)
 #       --orig FILE            reuse this upstream orig tarball instead of
 #                              regenerating it (required for a Debian revision
-#                              >= 2, whose orig is frozen in the archive)
+#                              >= 2, whose orig is frozen in the archive, and
+#                              whenever debian/patches carries a patch)
 #   -s, --source-only          build only the source package
 #   -u, --unsigned             do not sign anything (implies no release sigs)
 #       --no-release-artifacts skip the orig tarball .asc/.md5/.sha1
@@ -39,7 +40,9 @@
 #
 # The Debian revision in debian/changelog decides the orig: revision 1 builds a
 # fresh upstream tarball; revision >= 2 must reuse the orig frozen at revision 1
-# (the .dsc references it by checksum), so pass it with --orig.
+# (the .dsc references it by checksum), so pass it with --orig. debian/patches
+# needs the same tarball for a different reason: a patch backported from upstream
+# no longer applies to a tree that has the fix, which is what HEAD would give.
 #
 # SOURCE_DATE_EPOCH is honored for reproducible output.
 
@@ -166,6 +169,13 @@ main() {
     # regenerate it, since it can never reach the archive.
     if [[ -z $orig_in && $rev != 1 && $unsigned -eq 0 ]]; then
         die "Debian revision $rev needs --orig FILE (the orig is frozen from revision 1)"
+    fi
+
+    # A quilt patch is written against the orig it is applied to. Once the fix is
+    # upstream, HEAD already carries it, so a regenerated orig makes the patch fail
+    # or, worse, apply with fuzz. Unsigned too: this one breaks the build, not policy.
+    if [[ -z $orig_in && -s $export_dir/debian/patches/series ]]; then
+        die "debian/patches is not empty, so --orig FILE is required: the orig built from HEAD already carries the patches"
     fi
 
     if [[ -n $orig_in ]]; then
