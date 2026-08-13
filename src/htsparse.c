@@ -877,12 +877,11 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     // Overflow (<0) leaves tempo unterminated, and the closing
                     // eol is reserved below because strcatbuff aborts rather
                     // than clips: either one would kill the crawl.
-                    if (hts_footer_format(tempo + strlen(tempo),
-                                          sizeof(tempo) - strlen(tempo) -
-                                              strlen(eol),
-                                          StringBuff(opt->footer), fields,
-                                          sizeof(fields) / sizeof(fields[0])) >=
-                        0) {
+                    if (hts_footer_format(
+                            tempo + strlen(tempo),
+                            sizeof(tempo) - strlen(tempo) - strlen(eol),
+                            StringBuff(opt->footer), fields,
+                            sizeof(fields) / sizeof(fields[0])) >= 0) {
                       strcatbuff(tempo, eol);
                       HT_ADD(tempo);
                     }
