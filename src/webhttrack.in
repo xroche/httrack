@@ -160,8 +160,8 @@ function cleanup {
 # Cleanup in case of emergency
 trap "cleanup now; exit" HUP INT QUIT PIPE TERM
 
-# Got SRVURL, launch browser. Backgrounded so this process can outlive a browser
-# that returns at once and still stop with one that does not.
+# Got SRVURL, launch browser. Backgrounded so the wait below can watch the
+# server too, rather than only the browser.
 launch_browser "${BROWSEREXE}" "${SRVURL}" &
 BROWSERPID=$!
 # Deliberately not SRVPID, which cleanup would then kill, taking a running mirror

@@ -96,14 +96,18 @@ extern httrackp *global_opt;
 
 /* What the UI just told us about itself, reported to the ping handler. */
 typedef enum {
-  SMALLSERVER_CLIENT_REQUEST, /* any request: a page is attached */
-  SMALLSERVER_CLIENT_PING,    /* its heartbeat, so silence will mean gone */
-  SMALLSERVER_CLIENT_LEAVING  /* the page is closing */
+  SMALLSERVER_CLIENT_REQUEST, /* any request; claims no window */
+  SMALLSERVER_CLIENT_PING,    /* one window's heartbeat */
+  SMALLSERVER_CLIENT_LEAVING  /* that window is closing */
 } smallserver_client_event;
 
-extern void smallserver_setpinghandler(void (*fun)(void *,
-                                                   smallserver_client_event),
-                                       void *arg);
+/* Longest window id a page may claim; a longer one is ignored. */
+#define SMALLSERVER_WINDOW_ID_MAX 32
+
+/* fun() receives the id of the window the event came from, NULL when no window
+   claimed it. */
+extern void smallserver_setpinghandler(
+    void (*fun)(void *, smallserver_client_event, const char *), void *arg);
 extern int smallserver_setkey(const char *key, const char *value);
 extern int smallserver_setkeyint(const char *key, LLint value);
 extern int smallserver_setkeyarr(const char *key, int id, const char *key2, const char *value);

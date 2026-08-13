@@ -105,35 +105,73 @@ static void htsweb_sig_brpipe(int code) {
 /* Threads that never return; no wait may count on them draining. */
 static int nonjoinable_threads = 0;
 
-/* Server/client ping handling: the UI pings every PING_PERIOD seconds and says
-   goodbye when it closes, so an abandoned server can stop holding its payload
-   open (a mounted disk image, on macOS) instead of outliving the session. */
+/* Session lifetime: each UI window pings every PING_PERIOD seconds under its
+   own id and drops that id when it closes, so an abandoned server stops instead
+   of outliving the session and holding its payload open (a mounted disk image,
+   on macOS). Windows are counted, not merely timed: closing one of two must not
+   end a session the other is still using. */
 #define PING_PERIOD 5
-/* Silence tolerated from a client whose heartbeat we have seen. Generous, and
-   deliberately so: a backgrounded tab has its timers throttled, and the prompt
-   exit is the goodbye's job, not this one's. */
+/* Silence tolerated from one window. Generous: a hidden tab has its timers
+   throttled to as little as one wake-up a minute. */
 static int pingTimeout = 120;
-/* A goodbye only starts a countdown: another window may still be open, and its
-   next ping cancels the departure, so this must outlast PING_PERIOD. */
-#define LEAVE_GRACE max(1, min(12, pingTimeout / 4))
+/* Once the last window leaves, only a page navigation can bring one back, and
+   that takes a fraction of a second over the loopback. */
+#define LEAVE_GRACE max(2, min(5, pingTimeout / 4))
+/* Windows tracked at once. Past this the oldest is dropped, which costs that
+   one the prompt exit and nothing else. */
+#define MAX_WINDOWS 16
 
 static htsmutex pingMutex = HTSMUTEX_INIT;
-static time_t lastSeen = 0; /* last request from the UI */
-static time_t leaveAt = 0;  /* when a pending goodbye expires, 0 if none */
-static int anyRequest = 0;  /* the UI reached us at least once */
-static int pingSeen = 0; /* ..and its heartbeat works, so silence means gone */
+/* Seconds the watchdog has been awake, not wall-clock: time(NULL) jumps across
+   a laptop suspend, and a suspended machine must not age a session. */
+static int ticks = 0;
 
-static void pingHandler(void *arg, smallserver_client_event ev) {
+static struct {
+  char id[SMALLSERVER_WINDOW_ID_MAX + 1];
+  int seen;
+} windows[MAX_WINDOWS];
+
+static int windowCount = 0;
+static int emptySince = 0; /* tick the last window left at */
+static int anyWindow = 0;  /* some window has claimed an id */
+static int lastSeen = 0;   /* tick of the last request of any kind */
+static int anyRequest = 0; /* something has connected at least once */
+
+/* Drop windows[i]. Caller holds pingMutex. */
+static void window_forget(int i) {
+  windows[i] = windows[--windowCount];
+  if (windowCount == 0) {
+    emptySince = ticks;
+  }
+}
+
+static void pingHandler(void *arg, smallserver_client_event ev,
+                        const char *window) {
+  int i = 0;
+
   (void) arg;
   hts_mutexlock(&pingMutex);
-  lastSeen = time(NULL);
+  lastSeen = ticks;
   anyRequest = 1;
-  if (ev == SMALLSERVER_CLIENT_LEAVING) {
-    leaveAt = lastSeen + LEAVE_GRACE;
-  } else {
-    leaveAt = 0;
-    if (ev == SMALLSERVER_CLIENT_PING) {
-      pingSeen = 1;
+  /* A bare request vouches for no window: any local peer can open a connection,
+     and none of them may cancel a real window's departure. */
+  if (window != NULL) {
+    while (i < windowCount && strcmp(windows[i].id, window) != 0) {
+      i++;
+    }
+    if (ev == SMALLSERVER_CLIENT_LEAVING) {
+      if (i < windowCount) {
+        window_forget(i);
+      }
+    } else if (i < windowCount) {
+      windows[i].seen = ticks;
+    } else {
+      if (windowCount == MAX_WINDOWS) {
+        window_forget(0);
+      }
+      strcpybuff(windows[windowCount].id, window);
+      windows[windowCount++].seen = ticks;
+      anyWindow = 1;
     }
   }
   hts_mutexrelease(&pingMutex);
@@ -154,12 +192,8 @@ static void client_ping(void *pP) {
   const pid_t ppid = (pid_t) (uintptr_t) pP;
   const char *why = NULL;
 
-  hts_mutexlock(&pingMutex);
-  lastSeen = time(NULL);
-  hts_mutexrelease(&pingMutex);
-
   while (why == NULL) {
-    time_t now;
+    int i;
 
     Sleep(1000);
     /* A mirror in flight outranks every rule below: it may have hours of
@@ -168,17 +202,31 @@ static void client_ping(void *pP) {
       continue;
     }
     hts_mutexlock(&pingMutex);
-    now = time(NULL);
-    if (leaveAt != 0 && now >= leaveAt) {
+    ticks++;
+    /* A window that stops pinging without a goodbye crashed with its browser.
+     */
+    for (i = windowCount; i-- > 0;) {
+      if (ticks - windows[i].seen >= pingTimeout) {
+        window_forget(i);
+      }
+    }
+    if (anyWindow && windowCount == 0 && ticks - emptySince >= LEAVE_GRACE) {
       why = "the interface was closed";
-    } else if (now >= lastSeen + pingTimeout
-               /* Silence proves nothing about a client that never pings: it may
-                  simply be a user reading the page. Falling back to the
-                  launcher's death keeps such a browser working. */
-               && (pingSeen || !anyRequest || !parent_is_alive(ppid))) {
+    } else if (!anyWindow &&
+               ticks - lastSeen >= pingTimeout
+               /* No window ever claimed an id, so this is a browser too old to
+                  ping, or one that never opened. Silence alone must not end a
+                  session a reader may still be looking at, so fall back to the
+                  launcher, which dies with that browser. */
+               && (!anyRequest || !parent_is_alive(ppid))) {
       why = "the interface went silent";
     }
     hts_mutexrelease(&pingMutex);
+    /* Re-read after the decision: a mirror may have started while it was made,
+       and exiting now would lose it. */
+    if (commandRunning) {
+      why = NULL;
+    }
   }
 
   fprintf(stderr, "Exiting: %s\n", why);
@@ -428,7 +476,13 @@ static void back_launch_cmd(void *pP) {
 void webhttrack_main(char *cmd) {
   commandRunning = 1;
   DEBUG(fprintf(stderr, "commandRunning=1\n"));
-  hts_newthread(back_launch_cmd, (void *) strdup(cmd));
+  if (hts_newthread(back_launch_cmd, (void *) strdup(cmd)) != 0) {
+    /* Nothing else clears the flag, and while it is set the watchdog holds the
+       server open for a mirror that never started. */
+    commandRunning = 0;
+    commandEnd = 1;
+    commandReturn = -1;
+  }
 }
 
 void webhttrack_lock(void) {

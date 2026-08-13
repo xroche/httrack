@@ -1,11 +1,16 @@
 // Tell the server this window is alive, so an abandoned server stops instead of
-// outliving the session. The period is the one htsweb.c derives its timeout
-// from.
+// outliving the session. The period is the one htsweb.c sizes its timeout from.
 var PING_PERIOD = 5000;
+
+// Identifies this window for as long as it is open. The server counts windows,
+// so closing one of two must not read as the session ending.
+var PING_WINDOW =
+    String(Math.random()).replace(/[^0-9]/g, "") + String(new Date().getTime());
 
 function ping_url(extra) {
   // Unique, or a cached response would never reach the server again.
-  return "/ping?t=" + new Date().getTime() + (extra ? "&" + extra : "");
+  return "/ping?w=" + PING_WINDOW + "&t=" + new Date().getTime() +
+         (extra ? "&" + extra : "");
 }
 
 // An iframe is the fallback only: reassigning its src can push a history entry,
@@ -43,8 +48,8 @@ function ping_leaving() {
 
 // Old browsers reach none of this and stay on the legacy "wait for the launcher
 // to die" mode.
-if (document && document.createElement && document.body
-    && document.body.appendChild && document.getElementById) {
+if (document && document.createElement && document.body &&
+    document.body.appendChild && document.getElementById) {
   if (!window.fetch) {
     var iframe = document.createElement('iframe');
     if (iframe) {

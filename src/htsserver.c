@@ -93,13 +93,13 @@ int commandReturnSet = 0;
 
 httrackp *global_opt = NULL;
 
-static void (*pingFun)(void *, smallserver_client_event) = NULL;
+static void (*pingFun)(void *, smallserver_client_event, const char *) = NULL;
 static void* pingFunArg = NULL;
 
 /* Report a client liveness event, if anybody is listening. */
-static void client_event(smallserver_client_event ev) {
+static void client_event(smallserver_client_event ev, const char *window) {
   if (pingFun != NULL) {
-    pingFun(pingFunArg, ev);
+    pingFun(pingFunArg, ev, window);
   }
 }
 
@@ -390,6 +390,39 @@ static void copy_header_value(char *dst, size_t size, const char *value) {
   }
   dst[0] = '\0';
   strlncatbuff(dst, value, size, size - 1);
+}
+
+/** Copy the value of query parameter "name" into dst, keeping only the
+    alphanumerics a window id is made of. True when a non-empty value fit.
+    Deliberately not the body walker below: this one fetches one value out of a
+    URL, where that one validates every occurrence of a field in a POST body. */
+static hts_boolean query_alnum_value(char *dst, size_t size, const char *query,
+                                     const char *name) {
+  const size_t namelen = strlen(name);
+  const char *s = query;
+
+  dst[0] = '\0';
+  while (*s != '\0') {
+    const char *const amp = strchr(s, '&');
+
+    if (strncmp(s, name, namelen) == 0 && s[namelen] == '=') {
+      const char *v = s + namelen + 1;
+      size_t n = 0;
+
+      while (*v != '\0' && *v != '&' && n + 1 < size &&
+             isalnum((unsigned char) *v)) {
+        dst[n++] = *v++;
+      }
+      dst[n] = '\0';
+      /* A truncated or otherwise unusable id is no id at all. */
+      return n > 0 && (*v == '\0' || *v == '&') ? HTS_TRUE : HTS_FALSE;
+    }
+    if (amp == NULL) {
+      break;
+    }
+    s = amp + 1;
+  }
+  return HTS_FALSE;
 }
 
 /** Does the urlencoded request body present the expected session id?
@@ -760,7 +793,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     while((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) ;
 
     /* Ping */
-    client_event(SMALLSERVER_CLIENT_REQUEST);
+    client_event(SMALLSERVER_CLIENT_REQUEST, NULL);
 
     /* Lock */
     webhttrack_lock();
@@ -1799,7 +1832,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             fclose(fp);
           } else if (strcmp(file, "/ping") == 0) {
             /* A cached heartbeat would never reach us again, and silence is
-               what the watchdog reads as a dead client. */
+               what the watchdog reads as a dead window. */
             char error_hdr[] =
                 "HTTP/1.0 200 Pong\r\n"
                 "Server: httrack small server\r\n"
@@ -1807,10 +1840,18 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 "Cache-Control: no-cache, must-revalidate, private\r\n"
                 "Pragma: no-cache\r\n";
 
+            char window[SMALLSERVER_WINDOW_ID_MAX + 1];
+
             StringCat(headers, error_hdr);
-            client_event(strstr(query, "e=bye") != NULL
-                             ? SMALLSERVER_CLIENT_LEAVING
-                             : SMALLSERVER_CLIENT_PING);
+            if (query_alnum_value(window, sizeof(window), query, "w")) {
+              char verb[SMALLSERVER_WINDOW_ID_MAX + 1];
+
+              client_event(query_alnum_value(verb, sizeof(verb), query, "e") &&
+                                   strcmp(verb, "bye") == 0
+                               ? SMALLSERVER_CLIENT_LEAVING
+                               : SMALLSERVER_CLIENT_PING,
+                           window);
+            }
           } else {
             char error_hdr[] =
               "HTTP/1.0 404 Not Found\r\n" "Server: httrack small server\r\n"
@@ -1936,7 +1977,8 @@ int htslang_uninit(void) {
   return 1;
 }
 
-void smallserver_setpinghandler(void (*fun)(void *, smallserver_client_event),
+void smallserver_setpinghandler(void (*fun)(void *, smallserver_client_event,
+                                            const char *),
                                 void *arg) {
   pingFun = fun;
   pingFunArg = arg;
