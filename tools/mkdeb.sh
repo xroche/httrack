@@ -130,6 +130,10 @@ main() {
     if [[ $unsigned -eq 0 ]]; then
         need gpg
         [[ -n $key ]] || die "no signing key (pass --key or set DEBSIGN_KEYID, or use --unsigned)"
+        # Here rather than at debsign, which runs once the tarball is built: a key id gpg
+        # cannot resolve to a secret key would otherwise cost the whole build first.
+        gpg --list-secret-keys -- "$key" >/dev/null 2>&1 ||
+            die "gpg has no secret key for '$key' (an 0x-prefixed full fingerprint is unambiguous)"
     fi
 
     local repo
