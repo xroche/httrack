@@ -13,7 +13,7 @@ set -eu
 bufsize=3072
 # A {path} of this length divides the buffer with room left for the literal
 # padding that tunes the last few bytes, and keeps the mirror under MAX_PATH.
-pathlen=100
+pathlen=120
 mark=ZFOOTERZ
 
 dir=$(mktemp -d)
@@ -34,10 +34,10 @@ make_page() { # make_page SEGLEN, leaving an LF page at $page
 # "\r\n" and moves the boundary two bytes.
 write_page() { printf '%s' "$1" >"$page"; }
 
-crawl() { # crawl FOOTER, leaving the mirrored page in $body
+crawl() { # crawl FOOTER [LABEL], leaving the mirrored page in $body
     rm -rf "$mir"
     httrack "file://$page" -O "$mir" -%F "$1" -q -s0 -%v0 >/dev/null 2>&1 ||
-        fail "crawl died (exit $?) on a ${#1}-char footer"
+        fail "crawl died (exit $?) on ${2:-a ${#1}-char footer}"
     # Under file/, not $mir: the makeindex top index carries no -%F footer.
     local found
     found=$(find "$mir/file" -name index.html 2>/dev/null || true)
@@ -62,8 +62,10 @@ path_expansion() { # the length {path} expands to
 # exactly pathlen, rather than inherit whatever length mktemp handed out.
 make_page 8
 fixed=$(($(path_expansion) - 8))
+# Loudly, not a skip: the Windows leg compares the skip set exactly, so a skip
+# reds it there anyway and quietly drops the coverage everywhere else.
 test "$fixed" -lt "$pathlen" ||
-    skip "temp path is ${fixed} chars, leaving no room for a ${pathlen}-char one"
+    fail "temp path is ${fixed} chars, leaving no room for a ${pathlen}-char one"
 make_page $((pathlen - fixed))
 got=$(path_expansion)
 test "$got" -eq "$pathlen" || fail "{path} is ${got} chars, wanted ${pathlen}"
@@ -78,7 +80,7 @@ sweep() { # sweep LABEL: walk the expansion across the point where footers drop
         footer="${mark}$(printf 'A%.0s' $(seq 1 $((pad - ${#mark}))))"
         footer="${footer}$(printf '{path}%.0s' $(seq 1 "$reps"))"
         test ${#footer} -lt 254 || fail "footer template is ${#footer} chars"
-        crawl "$footer"
+        crawl "$footer" "a $1 page at expansion ${total}"
         if grep -q "$mark" <<<"$body"; then
             line=$(footer_line)
             # Whole or not at all: a clipped footer runs into the page below it.
