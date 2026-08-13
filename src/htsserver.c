@@ -93,8 +93,15 @@ int commandReturnSet = 0;
 
 httrackp *global_opt = NULL;
 
-static void (*pingFun)(void*) = NULL;
+static void (*pingFun)(void *, smallserver_client_event) = NULL;
 static void* pingFunArg = NULL;
+
+/* Report a client liveness event, if anybody is listening. */
+static void client_event(smallserver_client_event ev) {
+  if (pingFun != NULL) {
+    pingFun(pingFunArg, ev);
+  }
+}
 
 /* Extern */
 extern void webhttrack_main(char *cmd);
@@ -753,9 +760,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     while((soc_c = (T_SOC) accept(soc, NULL, NULL)) == INVALID_SOCKET) ;
 
     /* Ping */
-    if (pingFun != NULL) {
-      pingFun(pingFunArg);
-    }
+    client_event(SMALLSERVER_CLIENT_REQUEST);
 
     /* Lock */
     webhttrack_lock();
@@ -1158,6 +1163,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         if (url && *++url == '/' && (pos = strchr(url, ' ')) && !(*pos = '\0')) {
           char fsfile[1024];
           const char *file;
+          const char *query = "";
           FILE *fp;
           char *qpos;
 
@@ -1166,6 +1172,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           if (error_redirect == NULL) {
             if ((qpos = strchr(url, '?'))) {
               *qpos = '\0';
+              query = qpos + 1;
             }
             if (strcmp(url, "/") == 0) {
               file = "/server/index.html";
@@ -1790,13 +1797,20 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               }
             }
             fclose(fp);
-          } else if (strcmp(file, "/ping") == 0 ||
-                     strncmp(file, "/ping?", 6) == 0) {
+          } else if (strcmp(file, "/ping") == 0) {
+            /* A cached heartbeat would never reach us again, and silence is
+               what the watchdog reads as a dead client. */
             char error_hdr[] =
-              "HTTP/1.0 200 Pong\r\n" "Server: httrack small server\r\n"
-              "Content-type: text/html\r\n";
+                "HTTP/1.0 200 Pong\r\n"
+                "Server: httrack small server\r\n"
+                "Content-type: text/html\r\n"
+                "Cache-Control: no-cache, must-revalidate, private\r\n"
+                "Pragma: no-cache\r\n";
 
             StringCat(headers, error_hdr);
+            client_event(strstr(query, "e=bye") != NULL
+                             ? SMALLSERVER_CLIENT_LEAVING
+                             : SMALLSERVER_CLIENT_PING);
           } else {
             char error_hdr[] =
               "HTTP/1.0 404 Not Found\r\n" "Server: httrack small server\r\n"
@@ -1873,6 +1887,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 #endif
   }
 
+  /* Only the UI asking to quit is a clean stop; losing the socket or the buffer
+     is what the caller reports as a failure. */
+  retour = willexit;
+
   StringFree(headers);
   StringFree(output);
   StringFree(tmpbuff);
@@ -1918,7 +1936,8 @@ int htslang_uninit(void) {
   return 1;
 }
 
-void smallserver_setpinghandler(void (*fun)(void*), void*arg) {
+void smallserver_setpinghandler(void (*fun)(void *, smallserver_client_event),
+                                void *arg) {
   pingFun = fun;
   pingFunArg = arg;
 }

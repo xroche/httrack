@@ -1,26 +1,63 @@
-// Function aimed to ping the webhttrack server regularly to keep it alive
-// If the browser window is closed, the server will eventually shutdown
-function ping_server() {
-	var iframe = document.getElementById('pingiframe');
-	if (iframe && iframe.src) {
-		iframe.src = iframe.src;
-		setTimeout(ping_server, 30000);
-	}
+// Tell the server this window is alive, so an abandoned server stops instead of
+// outliving the session. The period is the one htsweb.c derives its timeout
+// from.
+var PING_PERIOD = 5000;
+
+function ping_url(extra) {
+  // Unique, or a cached response would never reach the server again.
+  return "/ping?t=" + new Date().getTime() + (extra ? "&" + extra : "");
 }
 
-// Create an invisible iframe to hold the server ping result
-// Only modern browsers will support that, but old browsers are compatible
-// with the legacy "wait for browser PID" mode
+// An iframe is the fallback only: reassigning its src can push a history entry,
+// which would turn the Back button into a walk through past heartbeats.
+function ping_send(url) {
+  if (window.fetch) {
+    fetch(url, {cache : "no-store"});
+    return true;
+  }
+  var iframe = document.getElementById('pingiframe');
+  if (!iframe) {
+    return false;
+  }
+  iframe.src = url;
+  return true;
+}
+
+function ping_server() {
+  if (ping_send(ping_url())) {
+    setTimeout(ping_server, PING_PERIOD);
+  }
+}
+
+// Closing the window is the common case, and waiting out the timeout for it
+// would hold the server open long after the user considers it gone.
+function ping_leaving() {
+  var url = ping_url("e=bye");
+  if (navigator.sendBeacon) {
+    navigator.sendBeacon(url);
+  } else {
+    // A request the page's own teardown cannot cancel.
+    new Image().src = url;
+  }
+}
+
+// Old browsers reach none of this and stay on the legacy "wait for the launcher
+// to die" mode.
 if (document && document.createElement && document.body
     && document.body.appendChild && document.getElementById) {
-	var iframe = document.createElement('iframe');
-	if (iframe) {
-		iframe.id = 'pingiframe';
-		iframe.style.display = "none";
-		iframe.style.visibility = "hidden";
-		iframe.width = iframe.height = 0;
-		iframe.src = "/ping";
-		document.body.appendChild(iframe);
-		ping_server();
-	}
+  if (!window.fetch) {
+    var iframe = document.createElement('iframe');
+    if (iframe) {
+      iframe.id = 'pingiframe';
+      iframe.style.display = "none";
+      iframe.style.visibility = "hidden";
+      iframe.width = iframe.height = 0;
+      document.body.appendChild(iframe);
+    }
+  }
+  ping_server();
+  // pagehide, not unload: Safari's back/forward cache never fires unload.
+  if (window.addEventListener) {
+    window.addEventListener('pagehide', ping_leaving, false);
+  }
 }

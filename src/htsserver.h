@@ -94,7 +94,16 @@ extern httrackp *global_opt;
 #define min(a,b) ((a)>(b)?(b):(a))
 #define max(a,b) ((a)>(b)?(a):(b))
 
-extern void smallserver_setpinghandler(void (*fun)(void*), void*arg);
+/* What the UI just told us about itself, reported to the ping handler. */
+typedef enum {
+  SMALLSERVER_CLIENT_REQUEST, /* any request: a page is attached */
+  SMALLSERVER_CLIENT_PING,    /* its heartbeat, so silence will mean gone */
+  SMALLSERVER_CLIENT_LEAVING  /* the page is closing */
+} smallserver_client_event;
+
+extern void smallserver_setpinghandler(void (*fun)(void *,
+                                                   smallserver_client_event),
+                                       void *arg);
 extern int smallserver_setkey(const char *key, const char *value);
 extern int smallserver_setkeyint(const char *key, LLint value);
 extern int smallserver_setkeyarr(const char *key, int id, const char *key2, const char *value);

@@ -1,0 +1,140 @@
+#!/bin/bash
+#
+# An abandoned htsserver has to stop on its own: it holds its payload open, and
+# on macOS that payload is a disk image the user then cannot eject.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "$(dirname "$0")/webhttracklib.sh"
+
+htsserver_require
+
+# Short enough to sit in the suite, long enough that a loaded parallel run
+# cannot starve a ping past it. The server derives the goodbye grace from it.
+timeout=10
+grace=2
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_life.XXXXXX") || fail "no tmpdir"
+pinger=
+csrv=
+cleanup() {
+    htsserver_cleanup
+    test -z "${pinger}" || kill "${pinger}" 2>/dev/null || true
+    test -z "${csrv}" || kill -9 "${csrv}" 2>/dev/null || true
+    wait "${pinger}" "${csrv}" 2>/dev/null || true
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+export HOME="${work}"
+
+# Each case owns a server, so save its handle: the library keeps only the last.
+start_case() {
+    htsserver_start --home "${work}" -- --ppid $$ --ping-timeout "${timeout}"
+    test -n "${HTS_PID}" || skip "this platform announces no server pid"
+}
+
+get() { "${HTS_PYTHON}" "${testdir}/httpclient.py" --port "$1" --path "$2"; }
+
+# Wait up to $2 seconds for $1 to go away.
+died_within() {
+    local pid=$1 limit=$2 start=$SECONDS
+    while kill -0 "${pid}" 2>/dev/null; do
+        test "$((SECONDS - start))" -lt "${limit}" || return 1
+        poll_wait 0.2
+    done
+}
+
+printf '[an abandoned WebHTTrack server stops on its own] ..\t'
+
+# 1. The heartbeat must never be answered from a cache: a reply the browser
+# reuses is one the server never sees, and silence is what kills it.
+start_case
+bye_pid=${HTS_PID}
+reply=$(get "${HTS_PORT}" /ping)
+grep -q '^HTTP/1\.0 200 ' <<<"${reply}" || fail "no pong: $(head -1 <<<"${reply}")"
+grep -qi '^Cache-Control:.*no-cache' <<<"${reply}" ||
+    fail "the heartbeat is cacheable: ${reply}"
+
+# 2. A window that says goodbye takes the server with it, well inside the idle
+# timeout that would otherwise apply.
+get "${HTS_PORT}" '/ping?t=1&e=bye' >/dev/null
+bye_at=${SECONDS}
+died_within "${bye_pid}" $((timeout - 1)) ||
+    fail "the server outlived its goodbye by $((SECONDS - bye_at))s"
+test "$((SECONDS - bye_at))" -le $((grace + 3)) ||
+    fail "the goodbye took $((SECONDS - bye_at))s, past the ${grace}s grace"
+
+# The three cases below share one wait, so they cost one timeout, not three.
+
+# 3. A client whose heartbeat we have seen and then lost is gone for good: this
+# is the crash path, where no goodbye is ever sent.
+start_case
+lost_pid=${HTS_PID}
+get "${HTS_PORT}" /server/index.html >/dev/null
+get "${HTS_PORT}" /ping >/dev/null
+lost_at=${SECONDS}
+
+# 4. A client that keeps pinging keeps its server, past that same deadline.
+start_case
+live_pid=${HTS_PID}
+live_port=${HTS_PORT}
+pingfail="${work}/pingfail"
+(
+    while :; do
+        get "${live_port}" /ping >/dev/null 2>&1 || echo failed >>"${pingfail}"
+        poll_wait 0.5
+    done
+) &
+pinger=$!
+
+# 5. A client that never pings at all is a browser too old for the heartbeat, or
+# one with scripting off, and may be a user reading the page: only the
+# launcher's death may end that session, and nothing here kills the launcher.
+start_case
+quiet_pid=${HTS_PID}
+get "${HTS_PORT}" /server/index.html >/dev/null
+
+died_within "${lost_pid}" $((timeout * 3)) ||
+    fail "a server whose client stopped pinging survived $((SECONDS - lost_at))s"
+test "$((SECONDS - lost_at))" -ge $((timeout - 2)) ||
+    fail "the idle timeout fired after $((SECONDS - lost_at))s, under ${timeout}s"
+! test -f "${pingfail}" || fail "the probe's own pings failed; nothing was proven"
+kill -0 "${live_pid}" 2>/dev/null || fail "a pinged server was killed anyway"
+kill -0 "${quiet_pid}" 2>/dev/null ||
+    fail "a server whose client never pings was killed under a live launcher"
+kill "${pinger}" 2>/dev/null || true
+pinger=
+
+# 6. Closing the window while a mirror runs must not take the mirror down: it
+# may have hours of crawling behind it, and its page can be reopened. Without
+# that veto the goodbye below would end this server in ${grace}s.
+start_case
+crawl_pid=${HTS_PID}
+crawl_port=${HTS_PORT}
+clog="${work}/content.log"
+"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
+
+sid=$(firstline "$(get "${crawl_port}" /server/index.html |
+    sed -n 's/.*name="sid" value="\([0-9a-f]*\)".*/\1/p')")
+test "${#sid}" -eq 32 || fail "no session id to start a mirror with"
+# Its .bin pages dribble for a minute, holding the crawl open past the timeout.
+"${HTS_PYTHON}" "${testdir}/httpclient.py" --port "${crawl_port}" \
+    --path /step4.html --field "sid=${sid}" --field "path=${work}" \
+    --field projname=crawl --field winprofile=x --field command_do=start \
+    --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/index.html -O ${work}/crawl" \
+    >/dev/null
+
+get "${crawl_port}" '/ping?t=1&e=bye' >/dev/null
+! died_within "${crawl_pid}" $((timeout * 2)) ||
+    fail "the crawling server quit, taking its mirror with it"
+# A crawl that never started would leave the veto unexercised, and the survival
+# above would prove nothing.
+test -d "${work}/crawl/hts-cache" || fail "no mirror ever started: $(cat "${clog}")"
+
+htsserver_stop
+htsserver_assert_reaped
+echo OK

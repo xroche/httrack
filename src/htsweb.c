@@ -105,49 +105,82 @@ static void htsweb_sig_brpipe(int code) {
 /* Threads that never return; no wait may count on them draining. */
 static int nonjoinable_threads = 0;
 
-/* Server/client ping handling */
+/* Server/client ping handling: the UI pings every PING_PERIOD seconds and says
+   goodbye when it closes, so an abandoned server can stop holding its payload
+   open (a mounted disk image, on macOS) instead of outliving the session. */
+#define PING_PERIOD 5
+/* Silence tolerated from a client whose heartbeat we have seen. */
+static int pingTimeout = 90;
+/* A goodbye only starts a countdown: another window may still be open, and its
+   next ping cancels the departure, so this must outlast PING_PERIOD. */
+#define LEAVE_GRACE max(1, min(12, pingTimeout / 4))
+
 static htsmutex pingMutex = HTSMUTEX_INIT;
-static unsigned int pingId = 0;
-static unsigned int getPingId(void) {
-  unsigned int id;
+static time_t lastSeen = 0; /* last request from the UI */
+static time_t leaveAt = 0;  /* when a pending goodbye expires, 0 if none */
+static int anyRequest = 0;  /* the UI reached us at least once */
+static int pingSeen = 0; /* ..and its heartbeat works, so silence means gone */
+
+static void pingHandler(void *arg, smallserver_client_event ev) {
+  (void) arg;
   hts_mutexlock(&pingMutex);
-  id = pingId;
-  hts_mutexrelease(&pingMutex);
-  return id;
-}
-static void ping(void) {
-  hts_mutexlock(&pingMutex);
-  pingId++;
+  lastSeen = time(NULL);
+  anyRequest = 1;
+  if (ev == SMALLSERVER_CLIENT_LEAVING) {
+    leaveAt = lastSeen + LEAVE_GRACE;
+  } else {
+    leaveAt = 0;
+    if (ev == SMALLSERVER_CLIENT_PING) {
+      pingSeen = 1;
+    }
+  }
   hts_mutexrelease(&pingMutex);
 }
 
-static void client_ping(void *pP) {
-#ifndef _WIN32
-  /* Timeout to 120s ; normally client pings every 30 second */
-  static int timeout = 120;
-  /* Wait for parent to die (legacy browser mode). */
-  const pid_t ppid = (pid_t) (uintptr_t) pP;
-  while (!kill(ppid, 0)) {
-    sleep(1);
-  }
-  /* Parent (webhttrack script) is dead: is client pinging ? */
-  for(;;) {
-    unsigned int id = getPingId();
-    sleep(timeout);
-    if (getPingId() == id) {
-      break;
-    }
-  }
-  /* Die! */
-  fprintf(stderr,
-          "Parent process %d died, and client did not ping for %ds: exiting!\n",
-          (int) ppid, timeout);
-  exit(EXIT_FAILURE);
+/* True unless the launcher we were started from is known to be gone. */
+static int parent_is_alive(pid_t ppid) {
+#ifdef _WIN32
+  (void) ppid;
+  return 1; /* no cheap probe; the heartbeat carries this */
+#else
+  /* kill(0) would signal our own process group, never a parent. */
+  return ppid <= 0 || kill(ppid, 0) == 0;
 #endif
 }
 
-static void pingHandler(void*arg) {
-  ping();
+static void client_ping(void *pP) {
+  const pid_t ppid = (pid_t) (uintptr_t) pP;
+  const char *why = NULL;
+
+  hts_mutexlock(&pingMutex);
+  lastSeen = time(NULL);
+  hts_mutexrelease(&pingMutex);
+
+  while (why == NULL) {
+    time_t now;
+
+    Sleep(1000);
+    /* A mirror in flight outranks every rule below: it may have hours of
+       crawling behind it, and the user can always come back to its page. */
+    if (commandRunning) {
+      continue;
+    }
+    hts_mutexlock(&pingMutex);
+    now = time(NULL);
+    if (leaveAt != 0 && now >= leaveAt) {
+      why = "the interface was closed";
+    } else if (now >= lastSeen + pingTimeout
+               /* Silence proves nothing about a client that never pings: it may
+                  simply be a user reading the page. Falling back to the
+                  launcher's death keeps such a browser working. */
+               && (pingSeen || !anyRequest || !parent_is_alive(ppid))) {
+      why = "the interface went silent";
+    }
+    hts_mutexrelease(&pingMutex);
+  }
+
+  fprintf(stderr, "Exiting: %s\n", why);
+  exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
@@ -184,6 +217,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "** Warning: use the webhttrack frontend if available\n");
     fprintf(stderr,
             "usage: %s [--port <port>] [--bind <address>] [--ppid parent-pid] "
+            "[--ping-timeout <seconds>] "
             "<path-to-html-root-dir> [key value [key value]..]\n",
             argv[0]);
     fprintf(stderr, "example: %s /usr/share/httrack/\n", argv[0]);
@@ -288,6 +322,11 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "couldn't set the parent PID to %s\n", argv[i + 1]);
         return -1;
       }
+    } else if (strcmp(argv[i], "--ping-timeout") == 0 && i + 1 < argc) {
+      if (sscanf(argv[i + 1], "%d", &pingTimeout) != 1 || pingTimeout < 1) {
+        fprintf(stderr, "couldn't set the ping timeout to %s\n", argv[i + 1]);
+        return -1;
+      }
     } else if (i + 1 < argc) {
       smallserver_setkey(argv[i], argv[i + 1]);
     } else {
@@ -304,9 +343,7 @@ int main(int argc, char *argv[]) {
   /* pinger */
   if (parentPid > 0) {
     if (hts_newthread(client_ping, (void *) (uintptr_t) parentPid) == 0) {
-#ifndef _WIN32
       nonjoinable_threads++; /* client_ping() only ever leaves through exit() */
-#endif
     }
     smallserver_setpinghandler(pingHandler, NULL);
   }
