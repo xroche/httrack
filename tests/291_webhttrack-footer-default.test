@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # WebHTTrack prefills the engine's default footer, and a new project must get
-# the named fields: a "%s" anywhere would put the whole template, a user's own
-# additions included, back on the legacy positional model.
+# the named fields (see HTS_DEFAULT_FOOTER on why a stray "%s" is fatal).
 
 set -euo pipefail
 
