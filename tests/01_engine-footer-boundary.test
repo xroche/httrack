@@ -8,47 +8,66 @@ set -eu
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
 
-dir=$(mktemp -d)
-cleanup_push rm -rf "$dir"
-
-# The emitter's buffer, 1024 + 2 * HTS_URLMAXSIZE. Only the sweep window is
-# derived from it; a wrong value makes the crossing check below fail loudly.
+# The emitter's buffer, 1024 + 2 * HTS_URLMAXSIZE. The sweep window is derived
+# from it; a wrong value makes the crossing check below fail loudly.
 bufsize=3072
+# A {path} of this length divides the buffer with room left for the literal
+# padding that tunes the last few bytes, and keeps the mirror under MAX_PATH.
+pathlen=100
 mark=ZFOOTERZ
 
-seg=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-deep="$dir/$seg/$seg"
-mkdir -p "$deep"
-page="$deep/index.html"
-printf '<html><body>hi</body></html>' >"$page"
-
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
 mir="$dir/mir"
+page=
 body=
+
+make_page() { # make_page SEGLEN, leaving the page at $page
+    local seg
+    seg=$(printf 'a%.0s' $(seq 1 "$1"))
+    mkdir -p "$dir/$seg"
+    page="$dir/$seg/index.html"
+    printf '<html><body>hi</body></html>' >"$page"
+}
+
 crawl() { # crawl FOOTER, leaving the mirrored page in $body
     rm -rf "$mir"
     httrack "file://$page" -O "$mir" -%F "$1" -q -s0 -%v0 >/dev/null 2>&1 ||
         fail "crawl died (exit $?) on a ${#1}-char footer"
     # Under file/, not $mir: the makeindex top index carries no -%F footer.
+    local found
     found=$(find "$mir/file" -name index.html)
     test -n "$found" || fail "page not mirrored; the footer path never ran"
     body=$(cat "$found")
 }
 
-# {path} is the longest field a file:// crawl can hand the footer, and the
-# -%F argument caps at 253 chars, so the sweep needs few, long repeats.
-crawl '{path}'
-line=$(sed -n 2p <<<"$body")
-plen=${#line}
-test "$plen" -gt 100 || fail "{path} expands to only ${plen} chars"
+expansion() { # expansion FOOTER -> the length it expands to
+    crawl "$1"
+    local line
+    line=$(sed -n 2p <<<"$body")
+    printf '%s\n' "${#line}"
+}
 
-# Walk the total expansion from below the drop point to past it, one byte at a
-# time: the abort sat on a single length, so a coarser sweep steps over it.
-reps=$(((bufsize - 16) / plen))
+# -%F caps at 253 chars, so reaching a ~3 KB expansion takes repeats of the
+# longest field a file:// crawl offers. Size the directory to make {path}
+# exactly pathlen, rather than inherit whatever length mktemp handed out.
+make_page 8
+fixed=$(($(expansion '{path}') - 8))
+test "$fixed" -lt "$pathlen" ||
+    skip "temp path is ${fixed} chars, leaving no room for a ${pathlen}-char one"
+make_page $((pathlen - fixed))
+got=$(expansion '{path}')
+test "$got" -eq "$pathlen" || fail "{path} is ${got} chars, wanted ${pathlen}"
+
+# Walk the total expansion across the point where the footer starts being
+# dropped: the abort sat on a single length, so a coarser sweep steps over it.
+# The window holds that point for a "\n" page and for a "\r\n" one.
+reps=$(((bufsize - 72) / pathlen))
 seen_footer=0
 seen_dropped=0
-for total in $(seq $((bufsize - 16)) $((bufsize + 8))); do
-    pad=$((total - reps * plen))
-    test "$pad" -ge ${#mark} || fail "sweep needs ${pad} chars of padding"
+for total in $(seq $((bufsize - 6)) "$bufsize"); do
+    pad=$((total - reps * pathlen))
+    test "$pad" -ge ${#mark} || fail "padding is down to ${pad} chars"
     footer="${mark}$(printf 'A%.0s' $(seq 1 $((pad - ${#mark}))))"
     footer="${footer}$(printf '{path}%.0s' $(seq 1 "$reps"))"
     test ${#footer} -lt 254 || fail "footer template is ${#footer} chars"
