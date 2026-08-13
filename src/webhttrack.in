@@ -59,6 +59,18 @@ function launch_browser {
     log "Browser (or helper) exited"
 }
 
+# Wait until the server stops (the interface closed, so this process has nothing
+# left to represent) or the browser exits, whichever comes first. An old browser
+# only ever signals by exiting.
+function wait_for_session {
+    local browserpid=$1 sessionpid=$2
+    while test -n "${sessionpid}${browserpid}"; do
+        test -n "${sessionpid}" && ! kill -0 "${sessionpid}" 2>/dev/null && break
+        test -n "${browserpid}" && ! kill -0 "${browserpid}" 2>/dev/null && break
+        sleep 1
+    done
+}
+
 # First ensure that we can launch the server
 BINPATH=
 for i in "${SRCHPATH[@]}"; do
@@ -147,8 +159,14 @@ function cleanup {
 # Cleanup in case of emergency
 trap "cleanup now; exit" HUP INT QUIT PIPE TERM
 
-# Got SRVURL, launch browser
-launch_browser "${BROWSEREXE}" "${SRVURL}"
+# Got SRVURL, launch browser. Backgrounded so the wait below can watch the
+# server too, rather than only the browser.
+launch_browser "${BROWSEREXE}" "${SRVURL}" &
+BROWSERPID=$!
+# Deliberately not SRVPID, which cleanup would then kill, taking a running mirror
+# with it.
+SESSIONPID=$(grep -E PID= "${TMPSRVFILE}" | cut -f2- -d=)
+wait_for_session "${BROWSERPID}" "${SESSIONPID}"
 
 # That's all, folks!
 trap "" HUP INT QUIT PIPE TERM

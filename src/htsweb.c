@@ -105,49 +105,133 @@ static void htsweb_sig_brpipe(int code) {
 /* Threads that never return; no wait may count on them draining. */
 static int nonjoinable_threads = 0;
 
-/* Server/client ping handling */
+/* Session lifetime: each window pings under its own id and drops it when it
+   closes, so an abandoned server stops instead of outliving the session and
+   holding its payload open (a mounted disk image, on macOS). Windows are
+   counted, not timed: closing one of several must not end the session. */
+#define PING_PERIOD 5
+/* Silence tolerated from one window. Generous: a hidden tab has its timers
+   throttled to as little as one wake-up a minute. */
+static int pingTimeout = 120;
+/* Once the last window leaves, only a page navigation can bring one back, and
+   that takes a fraction of a second over the loopback. */
+#define LEAVE_GRACE max(2, min(5, pingTimeout / 4))
+/* Windows tracked at once. A full table refuses newcomers rather than evicting:
+   dropping a live window is what would let a flood of ids end the session. */
+#define MAX_WINDOWS 16
+
 static htsmutex pingMutex = HTSMUTEX_INIT;
-static unsigned int pingId = 0;
-static unsigned int getPingId(void) {
-  unsigned int id;
-  hts_mutexlock(&pingMutex);
-  id = pingId;
-  hts_mutexrelease(&pingMutex);
-  return id;
+/* Seconds the watchdog has been awake, not wall-clock: time(NULL) jumps across
+   a laptop suspend, and a suspended machine must not age a session. */
+static int ticks = 0;
+
+static struct {
+  char id[SMALLSERVER_WINDOW_ID_MAX + 1];
+  int last_seen;
+} windows[MAX_WINDOWS];
+
+static int windowCount = 0;
+static int emptySince = 0;                /* tick the last window left at */
+static hts_boolean anyWindow = HTS_FALSE; /* a window has claimed an id */
+static int lastSeen = 0; /* tick of the last request of any kind */
+static hts_boolean anyRequest = HTS_FALSE; /* something has connected */
+
+/* Drop windows[i], moving the last entry into its slot: a caller removing while
+   it iterates must walk backwards. Caller holds pingMutex. */
+static void window_forget(int i) {
+  windows[i] = windows[--windowCount];
+  if (windowCount == 0) {
+    emptySince = ticks;
+  }
 }
-static void ping(void) {
+
+static void pingHandler(void *arg, smallserver_client_event ev,
+                        const char *window) {
+  int i = 0;
+
+  (void) arg;
   hts_mutexlock(&pingMutex);
-  pingId++;
+  lastSeen = ticks;
+  anyRequest = HTS_TRUE;
+  /* A bare request names no window: any local peer can open a connection, but
+     none may cancel a real window's departure. */
+  if (window != NULL) {
+    while (i < windowCount && strcmp(windows[i].id, window) != 0) {
+      i++;
+    }
+    if (ev == SMALLSERVER_CLIENT_LEAVING) {
+      if (i < windowCount) {
+        window_forget(i);
+      }
+    } else if (i < windowCount) {
+      windows[i].last_seen = ticks;
+    } else if (windowCount < MAX_WINDOWS) {
+      windows[windowCount].id[0] = '\0';
+      strlncatbuff(windows[windowCount].id, window,
+                   sizeof(windows[windowCount].id),
+                   sizeof(windows[windowCount].id) - 1);
+      windows[windowCount++].last_seen = ticks;
+      anyWindow = HTS_TRUE;
+    }
+  }
   hts_mutexrelease(&pingMutex);
 }
 
-static void client_ping(void *pP) {
-#ifndef _WIN32
-  /* Timeout to 120s ; normally client pings every 30 second */
-  static int timeout = 120;
-  /* Wait for parent to die (legacy browser mode). */
-  const pid_t ppid = (pid_t) (uintptr_t) pP;
-  while (!kill(ppid, 0)) {
-    sleep(1);
-  }
-  /* Parent (webhttrack script) is dead: is client pinging ? */
-  for(;;) {
-    unsigned int id = getPingId();
-    sleep(timeout);
-    if (getPingId() == id) {
-      break;
-    }
-  }
-  /* Die! */
-  fprintf(stderr,
-          "Parent process %d died, and client did not ping for %ds: exiting!\n",
-          (int) ppid, timeout);
-  exit(EXIT_FAILURE);
+/* True unless the launcher we were started from is known to be gone. */
+static hts_boolean parent_is_alive(uintptr_t ppid) {
+#ifdef _WIN32
+  (void) ppid;
+  return HTS_TRUE; /* no cheap probe; the heartbeat carries this */
+#else
+  /* kill(0) would signal our own process group, never a parent. */
+  return ppid == 0 || kill((pid_t) ppid, 0) == 0 ? HTS_TRUE : HTS_FALSE;
 #endif
 }
 
-static void pingHandler(void*arg) {
-  ping();
+static void client_ping(void *pP) {
+  /* uintptr_t, not pid_t: MSVC has no such type, and this signature is not
+     inside a POSIX guard. */
+  const uintptr_t ppid = (uintptr_t) pP;
+  const char *why = NULL;
+
+  while (why == NULL) {
+    int i;
+
+    Sleep(1000);
+    /* A mirror in flight outranks every rule below: it may have hours of
+       crawling behind it, and the user can always come back to its page. */
+    if (commandRunning) {
+      continue;
+    }
+    hts_mutexlock(&pingMutex);
+    ticks++;
+    /* A window that stops pinging without a goodbye crashed with its browser.
+     */
+    for (i = windowCount; i-- > 0;) {
+      if (ticks - windows[i].last_seen >= pingTimeout) {
+        window_forget(i);
+      }
+    }
+    if (anyWindow && windowCount == 0 && ticks - emptySince >= LEAVE_GRACE) {
+      why = "the interface was closed";
+    } else if (!anyWindow &&
+               ticks - lastSeen >= pingTimeout
+               /* No window ever pinged: a browser too old for it, or none
+                  opened. Fall back to the launcher dying with that browser,
+                  rather than to silence, which a reader also produces. */
+               && (!anyRequest || !parent_is_alive(ppid))) {
+      why = "the interface went silent";
+    }
+    hts_mutexrelease(&pingMutex);
+    /* Re-read after the decision: a mirror may have started while it was made,
+       and exiting now would lose it. */
+    if (commandRunning) {
+      why = NULL;
+    }
+  }
+
+  fprintf(stderr, "Exiting: %s\n", why);
+  exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
@@ -184,6 +268,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "** Warning: use the webhttrack frontend if available\n");
     fprintf(stderr,
             "usage: %s [--port <port>] [--bind <address>] [--ppid parent-pid] "
+            "[--ping-timeout <seconds>] "
             "<path-to-html-root-dir> [key value [key value]..]\n",
             argv[0]);
     fprintf(stderr, "example: %s /usr/share/httrack/\n", argv[0]);
@@ -288,6 +373,17 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "couldn't set the parent PID to %s\n", argv[i + 1]);
         return -1;
       }
+    } else if (strcmp(argv[i], "--ping-timeout") == 0 && i + 1 < argc) {
+      /* Bounded, not just parsed: %d wrapping a huge value into a plausible one
+         is what #614 cost on --port, two cases above. */
+      char *end = NULL;
+      const long v = strtol(argv[i + 1], &end, 10);
+
+      if (end == argv[i + 1] || *end != '\0' || v < 1 || v > 86400) {
+        fprintf(stderr, "couldn't set the ping timeout to %s\n", argv[i + 1]);
+        return -1;
+      }
+      pingTimeout = (int) v;
     } else if (i + 1 < argc) {
       smallserver_setkey(argv[i], argv[i + 1]);
     } else {
@@ -304,9 +400,7 @@ int main(int argc, char *argv[]) {
   /* pinger */
   if (parentPid > 0) {
     if (hts_newthread(client_ping, (void *) (uintptr_t) parentPid) == 0) {
-#ifndef _WIN32
       nonjoinable_threads++; /* client_ping() only ever leaves through exit() */
-#endif
     }
     smallserver_setpinghandler(pingHandler, NULL);
   }
@@ -389,7 +483,13 @@ static void back_launch_cmd(void *pP) {
 void webhttrack_main(char *cmd) {
   commandRunning = 1;
   DEBUG(fprintf(stderr, "commandRunning=1\n"));
-  hts_newthread(back_launch_cmd, (void *) strdup(cmd));
+  if (hts_newthread(back_launch_cmd, (void *) strdup(cmd)) != 0) {
+    /* Nothing else clears the flag, and while it is set the watchdog holds the
+       server open for a mirror that never started. */
+    commandRunning = 0;
+    commandEnd = 1;
+    commandReturn = -1;
+  }
 }
 
 void webhttrack_lock(void) {
