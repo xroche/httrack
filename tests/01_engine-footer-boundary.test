@@ -22,13 +22,17 @@ mir="$dir/mir"
 page=
 body=
 
-make_page() { # make_page SEGLEN, leaving the page at $page
+make_page() { # make_page SEGLEN, leaving an LF page at $page
     local seg
     seg=$(printf 'a%.0s' $(seq 1 "$1"))
     mkdir -p "$dir/$seg"
     page="$dir/$seg/index.html"
-    printf '<html><body>hi</body></html>' >"$page"
+    write_page '<html><body>hi</body></html>'
 }
+
+# The emitter follows the page's own line ending, so the CR here is what picks
+# "\r\n" and moves the boundary two bytes.
+write_page() { printf '%s' "$1" >"$page"; }
 
 crawl() { # crawl FOOTER, leaving the mirrored page in $body
     rm -rf "$mir"
@@ -36,51 +40,63 @@ crawl() { # crawl FOOTER, leaving the mirrored page in $body
         fail "crawl died (exit $?) on a ${#1}-char footer"
     # Under file/, not $mir: the makeindex top index carries no -%F footer.
     local found
-    found=$(find "$mir/file" -name index.html)
+    found=$(find "$mir/file" -name index.html 2>/dev/null || true)
     test -n "$found" || fail "page not mirrored; the footer path never ran"
     body=$(cat "$found")
 }
 
-expansion() { # expansion FOOTER -> the length it expands to
-    crawl "$1"
+# Which line the footer lands on follows the page's own newlines, so find it by
+# its marker rather than by position.
+footer_line() { firstline "$(tr -d '\r' <<<"$body" | grep -F "$mark" || true)"; }
+
+path_expansion() { # the length {path} expands to
     local line
-    line=$(sed -n 2p <<<"$body")
-    printf '%s\n' "${#line}"
+    crawl "${mark}{path}"
+    line=$(footer_line)
+    test -n "$line" || fail "no footer emitted while measuring {path}"
+    printf '%s\n' "$((${#line} - ${#mark}))"
 }
 
 # -%F caps at 253 chars, so reaching a ~3 KB expansion takes repeats of the
 # longest field a file:// crawl offers. Size the directory to make {path}
 # exactly pathlen, rather than inherit whatever length mktemp handed out.
 make_page 8
-fixed=$(($(expansion '{path}') - 8))
+fixed=$(($(path_expansion) - 8))
 test "$fixed" -lt "$pathlen" ||
     skip "temp path is ${fixed} chars, leaving no room for a ${pathlen}-char one"
 make_page $((pathlen - fixed))
-got=$(expansion '{path}')
+got=$(path_expansion)
 test "$got" -eq "$pathlen" || fail "{path} is ${got} chars, wanted ${pathlen}"
 
-# Walk the total expansion across the point where the footer starts being
-# dropped: the abort sat on a single length, so a coarser sweep steps over it.
-# The window holds that point for a "\n" page and for a "\r\n" one.
 reps=$(((bufsize - 72) / pathlen))
-seen_footer=0
-seen_dropped=0
-for total in $(seq $((bufsize - 6)) "$bufsize"); do
-    pad=$((total - reps * pathlen))
-    test "$pad" -ge ${#mark} || fail "padding is down to ${pad} chars"
-    footer="${mark}$(printf 'A%.0s' $(seq 1 $((pad - ${#mark}))))"
-    footer="${footer}$(printf '{path}%.0s' $(seq 1 "$reps"))"
-    test ${#footer} -lt 254 || fail "footer template is ${#footer} chars"
-    crawl "$footer"
-    if grep -q "$mark" <<<"$body"; then
-        seen_footer=$((seen_footer + 1))
-    else
-        seen_dropped=$((seen_dropped + 1))
-    fi
-done
 
-# Both outcomes prove the window straddles the drop point, where the abort was.
-test "$seen_footer" -gt 0 ||
-    fail "no length in the sweep emitted a footer at all"
-test "$seen_dropped" -gt 0 ||
-    fail "no length in the sweep was dropped; the window missed the boundary"
+sweep() { # sweep LABEL: walk the expansion across the point where footers drop
+    local total pad footer line emitted=0 dropped=0
+    for total in $(seq $((bufsize - 6)) "$bufsize"); do
+        pad=$((total - reps * pathlen))
+        test "$pad" -gt ${#mark} || fail "padding is down to ${pad} chars"
+        footer="${mark}$(printf 'A%.0s' $(seq 1 $((pad - ${#mark}))))"
+        footer="${footer}$(printf '{path}%.0s' $(seq 1 "$reps"))"
+        test ${#footer} -lt 254 || fail "footer template is ${#footer} chars"
+        crawl "$footer"
+        if grep -q "$mark" <<<"$body"; then
+            line=$(footer_line)
+            # Whole or not at all: a clipped footer runs into the page below it.
+            test "${#line}" -eq "$total" ||
+                fail "$1: ${total}-char footer emitted as ${#line} chars"
+            emitted=$((emitted + 1))
+        else
+            dropped=$((dropped + 1))
+        fi
+    done
+    # Both outcomes prove the window straddles the drop point, where the abort
+    # was. All-emitted or all-dropped means the window missed it.
+    test "$emitted" -gt 0 || fail "$1: no length in the sweep emitted a footer"
+    test "$dropped" -gt 0 || fail "$1: no length in the sweep was dropped"
+}
+
+sweep LF
+# CRLF costs two bytes at each end, so the boundary sits two lengths lower: a
+# fix reserving one byte rather than strlen(eol) still aborts here.
+write_page $'<html>\r\n<body>hi</body></html>'
+sweep CRLF
