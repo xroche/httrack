@@ -29,7 +29,10 @@ Description: Copy websites to your computer (Offline browser)
 Package: webhttrack
 Architecture: any
 Multi-Arch: foreign
-Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, sensible-utils, chromium | firefox-esr | www-browser
+Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, sensible-utils
+# Recommends, not Depends: the autoremoval chain reads only a disjunction's first
+# alternative, which tied webhttrack to whichever browser we happened to lead with.
+Recommends: firefox-esr | chromium | www-browser
 Replaces: webhttrack-common (<< 3.43.9-2)
 Breaks: webhttrack-common (<< 3.43.9-2)
 Suggests: httrack, httrack-doc
