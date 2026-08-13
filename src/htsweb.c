@@ -178,18 +178,20 @@ static void pingHandler(void *arg, smallserver_client_event ev,
 }
 
 /* True unless the launcher we were started from is known to be gone. */
-static hts_boolean parent_is_alive(pid_t ppid) {
+static hts_boolean parent_is_alive(uintptr_t ppid) {
 #ifdef _WIN32
   (void) ppid;
   return HTS_TRUE; /* no cheap probe; the heartbeat carries this */
 #else
   /* kill(0) would signal our own process group, never a parent. */
-  return ppid <= 0 || kill(ppid, 0) == 0 ? HTS_TRUE : HTS_FALSE;
+  return ppid == 0 || kill((pid_t) ppid, 0) == 0 ? HTS_TRUE : HTS_FALSE;
 #endif
 }
 
 static void client_ping(void *pP) {
-  const pid_t ppid = (pid_t) (uintptr_t) pP;
+  /* uintptr_t, not pid_t: MSVC has no such type, and this signature is not
+     inside a POSIX guard. */
+  const uintptr_t ppid = (uintptr_t) pP;
   const char *why = NULL;
 
   while (why == NULL) {
