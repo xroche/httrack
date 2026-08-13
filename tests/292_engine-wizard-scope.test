@@ -9,11 +9,16 @@ set -euo pipefail
 # #1117: the self-test asserts the scopes and the patterns; this feeds the pair
 # a scope answer emits back through the matcher that authorizes a link.
 
-# the front end enumerates by looping until the engine stops answering
+# The front end enumerates by looping until the engine stops answering. Strip
+# the CRs: MSYS hands the engine a text-mode stdout and $(...) eats only the
+# trailing newline, so an assertion spanning several lines keeps the interior
+# ones. Every other assert_selftest here compares a single line and cannot see
+# this.
 want="0 download.example.co.uk
 1 example.co.uk
 2 co.uk"
-assert_selftest "$want" wizardscope download.example.co.uk/x
+got=$(httrack -O /dev/null -#test=wizardscope download.example.co.uk/x | tr -d '\r')
+test "$got" = "$want" || fail "wizardscope enumeration: got [$got]"
 
 # widening stops before a bare TLD, and an IP literal offers nothing at all
 assert_selftest "0 example.com" wizardscope example.com/x
