@@ -286,8 +286,12 @@ poll_wait() {
 # trap, where a survivor would turn a passing test into a harness timeout.
 stop_server() {
     test -n "${1:-}" || return 0
+    local winpid winimage
+    # Before the signal: a winpid read after it can already name a stranger.
+    win_capture "$1"
+    winpid=$WIN_PID winimage=$WIN_IMAGE
     kill "$1" 2>/dev/null || true
-    if is_windows; then kill_tree "$1"; fi
+    if is_windows; then kill_tree "$1" "$winpid" "$winimage"; fi
     reap_bounded "$1" || true
     return 0
 }
@@ -454,6 +458,29 @@ win_pid() {
     fi
 }
 
+# WIN_PID and WIN_IMAGE for MSYS pid $1, read while it is alive: /proc keeps the
+# entry once the process is gone and Windows reissues the number at once, so a
+# later read can name a stranger (#1228). Not for a job just backgrounded: until
+# its exec lands, tens of milliseconds later, both still name the forking shell.
+# Assigned rather than echoed, a command substitution being a fork (#795).
+win_capture() { # win_capture <pid>
+    WIN_PID='' WIN_IMAGE=''
+    is_windows || return 0
+    # Unguarded reads: a missing file leaves the empty value set above, and read
+    # reports EOF on an unterminated line having already assigned it.
+    { read -r WIN_PID <"/proc/$1/winpid"; } 2>/dev/null || true
+    { read -r WIN_IMAGE <"/proc/$1/winexename"; } 2>/dev/null || true
+    WIN_IMAGE=${WIN_IMAGE##*[\\/]}
+    return 0
+}
+
+# Whether Windows PID $1 runs image $2. Both columns at once, since either alone
+# answers for a recycled PID, and case-folded as the proclib.sh matchers are.
+win_pid_runs() { # win_pid_runs <winpid> <image>
+    tasklist 2>/dev/null |
+        awk -v p="$1" -v i="$2" 'tolower($1) == tolower(i) && $2 == p { f = 1 } END { exit !f }'
+}
+
 # Signal one process, never its descendants: a caller inside the target's own
 # tree cannot rely on kill_tree, whose taskkill is then a grandchild of it (#953).
 kill_pid() {
@@ -477,11 +504,17 @@ kill_pid() {
 # so args pass verbatim and a //T would reach taskkill unfolded and be rejected.
 # $2 is that Windows PID when the caller read it while the job was certainly
 # alive: /proc/<pid>/winpid is already gone for a job that has just died, and
-# without it the only route left is the host-wide sweep below.
+# without it the only route left is the host-wide sweep below. $3 is the image it
+# ran then: a number that no longer runs it was reissued while we were not
+# looking, and naming a stranger is as good as naming nobody (#1228).
 kill_tree() {
-    local pid=$1 winpid=${2:-}
+    local pid=$1 winpid=${2:-} image=${3:-}
     if is_windows; then
         test -n "$winpid" || winpid=$(win_pid "$pid")
+        if test -n "$winpid" && test -n "$image" && ! win_pid_runs "$winpid" "$image"; then
+            printf '::warning::pid %s no longer runs %s, not killing it\n' "$winpid" "$image"
+            winpid=
+        fi
         if test -n "$winpid"; then
             taskkill /F /T /PID "$winpid" >/dev/null 2>&1 || true
         # Last resort, so it is opt-in: it kills every engine and every python on
