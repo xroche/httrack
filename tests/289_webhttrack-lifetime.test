@@ -80,6 +80,7 @@ lost_at=${SECONDS}
 start_case
 live_pid=${HTS_PID}
 live_port=${HTS_PORT}
+live_at=${SECONDS}
 pingfail="${work}/pingfail"
 (
     while :; do
@@ -94,12 +95,20 @@ pinger=$!
 # launcher's death may end that session, and nothing here kills the launcher.
 start_case
 quiet_pid=${HTS_PID}
+quiet_at=${SECONDS}
 get "${HTS_PORT}" /server/index.html >/dev/null
 
 died_within "${lost_pid}" $((timeout * 3)) ||
     fail "a server whose client stopped pinging survived $((SECONDS - lost_at))s"
 test "$((SECONDS - lost_at))" -ge $((timeout - 2)) ||
     fail "the idle timeout fired after $((SECONDS - lost_at))s, under ${timeout}s"
+
+# Both survivors started after that one, so its death is too early to judge them
+# by: wait until each has outlived a timeout of its own.
+while test "$((SECONDS - live_at))" -le $((timeout + 2)) ||
+    test "$((SECONDS - quiet_at))" -le $((timeout + 2)); do
+    poll_wait 0.5
+done
 ! test -f "${pingfail}" || fail "the probe's own pings failed; nothing was proven"
 kill -0 "${live_pid}" 2>/dev/null || fail "a pinged server was killed anyway"
 kill -0 "${quiet_pid}" 2>/dev/null ||

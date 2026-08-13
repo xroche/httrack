@@ -109,8 +109,10 @@ static int nonjoinable_threads = 0;
    goodbye when it closes, so an abandoned server can stop holding its payload
    open (a mounted disk image, on macOS) instead of outliving the session. */
 #define PING_PERIOD 5
-/* Silence tolerated from a client whose heartbeat we have seen. */
-static int pingTimeout = 90;
+/* Silence tolerated from a client whose heartbeat we have seen. Generous, and
+   deliberately so: a backgrounded tab has its timers throttled, and the prompt
+   exit is the goodbye's job, not this one's. */
+static int pingTimeout = 120;
 /* A goodbye only starts a countdown: another window may still be open, and its
    next ping cancels the departure, so this must outlast PING_PERIOD. */
 #define LEAVE_GRACE max(1, min(12, pingTimeout / 4))
