@@ -101,7 +101,20 @@ sleep $((grace + 2))
 kill -0 "${bye_pid}" 2>/dev/null ||
     fail "an unauthenticated goodbye ended the session"
 
-# 4. The last window leaving takes the server with it, well inside the idle
+# 4. A flood of window ids must not push a real window out of the table: with
+# the last real one evicted, saying goodbye to the flood would end the session.
+# One more than the table holds, so the refusal itself is exercised.
+for i in $(seq 0 16); do
+    ping "${bye_port}" "f${i}"
+done
+for i in $(seq 0 16); do
+    bye "${bye_port}" "f${i}" "${sid}"
+done
+sleep $((grace + 2))
+kill -0 "${bye_pid}" 2>/dev/null ||
+    fail "a flood of window ids evicted the real window and ended the session"
+
+# 5. The last window leaving takes the server with it, well inside the idle
 # timeout that would otherwise apply.
 bye "${bye_port}" w2 "${sid}"
 bye_at=${SECONDS}
@@ -112,13 +125,13 @@ test "$((SECONDS - bye_at))" -le $((grace + 3)) ||
 
 # The four cases below share one wait, so they cost one timeout, not four.
 
-# 5. A window that stops pinging without a goodbye has crashed with its browser.
+# 6. A window that stops pinging without a goodbye has crashed with its browser.
 start_case
 lost_pid=${HTS_PID}
 ping "${HTS_PORT}" w1
 lost_at=${SECONDS}
 
-# 6. A window that keeps pinging keeps its server, past that same deadline.
+# 7. A window that keeps pinging keeps its server, past that same deadline.
 start_case
 live_pid=${HTS_PID}
 live_port=${HTS_PORT}
@@ -132,7 +145,7 @@ pingfail="${work}/pingfail"
 ) &
 pinger=$!
 
-# 7. A client that never pings at all is a browser too old for the heartbeat, or
+# 8. A client that never pings at all is a browser too old for the heartbeat, or
 # one with scripting off, and may be a user reading the page: only the
 # launcher's death may end that session, and nothing here kills this shell.
 start_case
@@ -140,7 +153,7 @@ quiet_pid=${HTS_PID}
 quiet_at=${SECONDS}
 get "${HTS_PORT}" /server/index.html >/dev/null
 
-# 8. ..and when that launcher does die, the same session ends: it is the only
+# 9. ..and when that launcher does die, the same session ends: it is the only
 # signal such a browser produces. A process of our own stands in for it.
 sleep 600 &
 sleeper=$!
@@ -180,7 +193,7 @@ kill -0 "${quiet_pid}" 2>/dev/null ||
 kill "${pinger}" 2>/dev/null || true
 pinger=
 
-# 9. Closing the window while a mirror runs must not take the mirror down: it
+# 10. Closing the window while a mirror runs must not take the mirror down: it
 # may have hours of crawling behind it. The veto has to lift when the crawl
 # ends, or the server it saved becomes immortal.
 start_case
@@ -213,7 +226,7 @@ test -d "${work}/crawl/hts-cache" || fail "no mirror ever started: $(cat "${clog
 died_within "${crawl_pid}" $((timeout * 3)) ||
     fail "the server never left once its mirror had finished"
 
-# 10. The wizard's own Quit button is the other way out, and the only one that
+# 11. The wizard's own Quit button is the other way out, and the only one that
 # leaves through smallserver(), which has to report the server it did create.
 start_case
 quit_pid=${HTS_PID}
