@@ -33,8 +33,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTTRACK_DEFTMPL
 #define HTTRACK_DEFTMPL
 
-/* Generated data, not code: clang-format rewrites a whole literal table
-   the moment one line inside it is touched. */
+/* Generated data: clang-format rewrites the whole table if one line is touched. */
 /* clang-format off */
 
 /* Index for each project */
