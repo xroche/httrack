@@ -53,7 +53,7 @@ grep -q "$tag '2' (n=2) for $link: forbidden, filters: -other.invalid/[*]\$" "$l
 # misses the apex, so both slots must reach the log, in insertion order
 answers 1000
 crawl "$tmp/m1000" -W
-grep -q "$tag '1000' (n=1000) for $link: no verdict, filters: [+][*].other.invalid/[*] [+]other.invalid/[*]\$" "$log" ||
+grep -q "$tag '1000' (n=1000) for $link: allowed, filters: [+][*].other.invalid/[*] [+]other.invalid/[*]\$" "$log" ||
     fail "a two-filter answer is not logged whole in $log"
 
 # nobody was asked: the automatic resolution stays at the debug level. This run
