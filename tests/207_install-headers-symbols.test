@@ -34,7 +34,11 @@ cleanup_push rm -rf "$tmp"
 "$nm" --defined-only "$lib" >"$tmp/all.raw" 2>/dev/null ||
     skip "$nm cannot read the symbol table of $lib"
 awk 'NF >= 3 { print $3 }' "$tmp/exported.raw" | sort -u >"$tmp/exported"
-awk 'NF >= 3 { print $3 }' "$tmp/all.raw" | sort -u >"$tmp/all"
+# LTO and the IPA clones rename a local to "name.lto_priv.0", which stops
+# matching the header identifier and collapses the candidate list to nothing.
+awk 'NF >= 3 { print $3 }' "$tmp/all.raw" |
+    sed -E 's/(\.(lto_priv|constprop|isra|part|cold|llvm)(\.[0-9]+)*)+$//' |
+    sort -u >"$tmp/all"
 comm -23 "$tmp/all" "$tmp/exported" >"$tmp/hidden"
 n_exported=$(wc -l <"$tmp/exported")
 n_hidden=$(wc -l <"$tmp/hidden")
