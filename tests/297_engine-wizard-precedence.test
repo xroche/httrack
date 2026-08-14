@@ -1,12 +1,11 @@
 #!/bin/bash
 #
+# #1250: last match wins, so the order below is each answer's precedence.
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
-
-# #1250: last match wins, so the order below is each answer's precedence.
 
 # answering "ignore this link" and then "mirror the whole host" takes it back
 list=$(httrack -O /dev/null -#test=wizardinsert h /dir/one.html 0 6)
