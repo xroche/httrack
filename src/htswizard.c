@@ -339,7 +339,7 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     break;
 
   case 4: /* wizard filters both allow and forbid, so an isolated link taken
-             with no depth limit would mirror the world */
+             with no depth limit would mirror the whole site */
     *set_prio_to = 0 + 1; /* recursion level 0 */
     break;
 

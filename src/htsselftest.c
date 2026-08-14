@@ -4333,8 +4333,8 @@ static int st_wizardscopeanswer(httrackp *opt, int argc, char **argv) {
    the level the crawl uses. */
 #define PRIO_UNSET 42
 
-/* Prints what a wizard answer applies; with no arguments, asserts it for every
-   answer, from both an allowed and an already refused link. */
+/* Prints what answer `n` does to the crawl; with no arguments, asserts every
+   answer, on both an allowed and an already refused link. */
 static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   const hts_wizard asked = opt->wizard;
   FILE *const projectlog = opt->log;
@@ -4354,8 +4354,8 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
     return 0;
   }
   opt->log = NULL; /* the battery walks the answers that warn */
-/* answer `n` over a link the crawl had left at `in` decides `forbidden`, and
-   raises the wizard mode or the recursion cap only where said. */
+/* answer `n` over a link the crawl had left at `in`: the verdict it must leave,
+   whether it stops the questions, and the recursion cap it must set. */
 #define APPLIES(n, in, forbidden, stop, prio)                                  \
   do {                                                                         \
     url = (in);                                                                \
