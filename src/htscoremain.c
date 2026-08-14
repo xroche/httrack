@@ -1565,7 +1565,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return -1;
                 } else {
                   na++;
-                  if (strlen(argv[na]) >= 254) {
+                  if (strlen(argv[na]) >= HTS_FILELIST_MAXSIZE) {
                     HTS_PANIC_PRINTF("File list string too long");
                     htsmain_free();
                     return -1;
@@ -1582,7 +1582,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return -1;
                 } else {
                   na++;
-                  if (strlen(argv[na]) >= 254) {
+                  if (strlen(argv[na]) >= HTS_BINDHOST_MAXSIZE) {
                     HTS_PANIC_PRINTF("Hostname string too long");
                     htsmain_free();
                     return -1;
@@ -1683,7 +1683,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return -1;
                 } else {
                   na++;
-                  if (strlen(argv[na]) >= 62) {
+                  if (strlen(argv[na]) >= HTS_LANGISO_MAXSIZE) {
                     HTS_PANIC_PRINTF("Lang list string too long");
                     htsmain_free();
                     return -1;
@@ -1740,7 +1740,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return -1;
                 } else {
                   na++;
-                  if (strlen(argv[na]) >= 254) {
+                  if (strlen(argv[na]) >= HTS_FOOTER_MAXSIZE) {
                     HTS_PANIC_PRINTF("Footer string too long");
                     htsmain_free();
                     return -1;
@@ -1841,7 +1841,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return -1;
                 } else {
                   na++;
-                  if (strlen(argv[na]) >= 254) {
+                  if (strlen(argv[na]) >= HTS_REFERER_MAXSIZE) {
                     HTS_PANIC_PRINTF("Referer URL too long");
                     htsmain_free();
                     return -1;
@@ -1858,7 +1858,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   return -1;
                 } else {
                   na++;
-                  if (strlen(argv[na]) >= 254) {
+                  if (strlen(argv[na]) >= HTS_FROMEMAIL_MAXSIZE) {
                     HTS_PANIC_PRINTF("From email too long");
                     htsmain_free();
                     return -1;
@@ -2734,9 +2734,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                    "wb");
         if (fp) {
           for(i = 0 + 1; i < argc; i++) {
-            if (((strchr(argv[i], ' ') != NULL)
-                 || (strchr(argv[i], '"') != NULL)
-                 || (strchr(argv[i], '\\') != NULL)) && (argv[i][0] != '"')) {
+            /* argv[] is already unquoted here, so a leading quote is data */
+            if ((strchr(argv[i], ' ') != NULL) ||
+                (strchr(argv[i], '"') != NULL) ||
+                (strchr(argv[i], '\\') != NULL)) {
               size_t j;
 
               fprintf(fp, "\"");
@@ -2749,9 +2750,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   fprintf(fp, "%c", argv[i][j]);
               }
               fprintf(fp, "\"");
-            } else if (strnotempty(argv[i]) == 0) {     // ""
+            } else if (strnotempty(argv[i]) == 0) { // ""
               fprintf(fp, "\"\"");
-            } else {            // non critique
+            } else { // nothing to escape
               fprintf(fp, "%s", argv[i]);
             }
             if (i < argc - 1)

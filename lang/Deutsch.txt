@@ -946,6 +946,36 @@ Server terminated
 Der Server wurde beendet
 A fatal error has occurred during this mirror
 Fataler Fehler während der Webseiten-Kopie
+View Documentation
+Dokumentation anzeigen
+Go To HTTrack Website
+Zur HTTrack-Website
+Go To HTTrack Forum
+Zum HTTrack-Forum
+View License
+Lizenz anzeigen
+Beware: you local browser might be unable to browse files with embedded filenames
+Achtung: Ihr lokaler Browser kann Dateien mit eingebetteten Dateinamen möglicherweise nicht öffnen
+Recreated HTTrack internal cached resources
+Interne zwischengespeicherte Ressourcen von HTTrack neu angelegt
+Could not create internal cached resources
+Interne zwischengespeicherte Ressourcen konnten nicht angelegt werden
+Could not get the system external storage directory
+Der externe Systemspeicher konnte nicht ermittelt werden
+Could not write to:
+Schreiben nicht möglich in:
+Read-only media (SDCARD)
+Schreibgeschützter Datenträger (SDCARD)
+No storage media (SDCARD)
+Kein Datenträger vorhanden (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Solange dieses Problem besteht, kann HTTrack möglicherweise keine Websites herunterladen
+HTTrack: mirror '%s' stopped!
+HTTrack: Kopie "%s" wurde angehalten!
+Click on this notification to restart the interrupted mirror
+Tippen Sie auf diese Benachrichtigung, um die unterbrochene Kopie fortzusetzen
+HTTrack: could not save profile for '%s'!
+HTTrack: Profil für "%s" konnte nicht gespeichert werden!
 Proxy type:
 Proxy-Typ:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Maximale Größe eines WARC-Segments:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Ein neues WARC-Segment beginnen, sobald das aktuelle diese Anzahl Bytes überschreitet; leer lassen oder 0 für eine einzige Datei.
 Host aliases:
-Host aliases:
+Host-Aliase:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Weitere Hostnamen derselben Website, auf einen zusammengefasst, eine Regel pro Zeile (z. B. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+%s und alle darunter liegenden Hosts kopieren
+Ignore %s and every host below it
+%s und alle darunter liegenden Hosts ignorieren

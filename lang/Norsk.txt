@@ -946,6 +946,36 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+View Documentation
+Vis dokumentasjonen
+Go To HTTrack Website
+Gå til HTTracks nettsted
+Go To HTTrack Forum
+Gå til HTTracks forum
+View License
+Vis lisensen
+Beware: you local browser might be unable to browse files with embedded filenames
+Merk: den lokale nettleseren din klarer kanskje ikke å åpne filer med innebygde filnavn
+Recreated HTTrack internal cached resources
+HTTracks interne bufrede ressurser er opprettet på nytt
+Could not create internal cached resources
+Klarte ikke å opprette de interne bufrede ressursene
+Could not get the system external storage directory
+Fant ikke systemets eksterne lagringsmappe
+Could not write to:
+Klarte ikke å skrive til:
+Read-only media (SDCARD)
+Skrivebeskyttet medium (SDCARD)
+No storage media (SDCARD)
+Intet lagringsmedium (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Så lenge dette problemet varer, klarer HTTrack kanskje ikke å laste ned nettsteder
+HTTrack: mirror '%s' stopped!
+HTTrack: kopien "%s" ble stoppet!
+Click on this notification to restart the interrupted mirror
+Trykk på dette varselet for å fortsette den avbrutte kopien
+HTTrack: could not save profile for '%s'!
+HTTrack: klarte ikke å lagre profilen for "%s"!
 Proxy type:
 Proxytype:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Største størrelse på WARC-segment:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Begynn et nytt WARC-segment når det gjeldende overstiger dette antallet byte; la feltet stå tomt eller 0 for én fil.
 Host aliases:
-Host aliases:
+Vertsaliaser:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Andre vertsnavn som betjener det samme nettstedet, slått sammen til ett, én regel per linje (f.eks. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Kopier %s og alle verter under den
+Ignore %s and every host below it
+Ignorer %s og alle verter under den

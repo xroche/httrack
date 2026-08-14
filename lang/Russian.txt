@@ -946,6 +946,36 @@ Server terminated
 Server terminated
 A fatal error has occurred during this mirror
 Во время текущей закачки произошла фатальная ошибка
+View Documentation
+Показать документацию
+Go To HTTrack Website
+Перейти на сайт HTTrack
+Go To HTTrack Forum
+Перейти на форум HTTrack
+View License
+Показать лицензию
+Beware: you local browser might be unable to browse files with embedded filenames
+Внимание: локальный браузер может не открыть файлы со встроенными именами файлов
+Recreated HTTrack internal cached resources
+Внутренние кэшированные ресурсы HTTrack созданы заново
+Could not create internal cached resources
+Не удалось создать внутренние кэшированные ресурсы
+Could not get the system external storage directory
+Не удалось найти внешнее хранилище системы
+Could not write to:
+Не удалось записать в:
+Read-only media (SDCARD)
+Носитель только для чтения (SDCARD)
+No storage media (SDCARD)
+Нет носителя для хранения (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Пока эта проблема не устранена, HTTrack может не загружать сайты
+HTTrack: mirror '%s' stopped!
+HTTrack: зеркало «%s» остановлено!
+Click on this notification to restart the interrupted mirror
+Нажмите на это уведомление, чтобы продолжить прерванное создание зеркала
+HTTrack: could not save profile for '%s'!
+HTTrack: не удалось сохранить профиль для «%s»!
 Proxy type:
 Тип прокси:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC segment size limit:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Начинать новый сегмент WARC, когда текущий превысит указанное число байт; оставьте пустым или 0 для одного файла.
 Host aliases:
-Host aliases:
+Псевдонимы хоста:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Другие имена хостов, обслуживающие этот же сайт, сведённые к одному, по одному правилу в строке (напр. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Сделать зеркало %s и всех хостов под ним
+Ignore %s and every host below it
+Игнорировать %s и все хосты под ним

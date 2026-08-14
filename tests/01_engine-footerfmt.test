@@ -3,8 +3,8 @@
 
 set -euo pipefail
 
-# -%F footer expansion (hts_footer_format via -#test=footerfmt). Fixed fields:
-# addr=host.example path=/dir/page.html date=DATE version=VER.
+# -%F footer expansion (hts_footer_format via -#test=footerfmt). The expected
+# strings below also pin each field name to its engine enum slot.
 ftr() {
     out="$(httrack -O /dev/null -#test=footerfmt "$1")"
     test "$out" == "$2" || {
@@ -36,7 +36,7 @@ ftr '100% {path}' '100% /dir/page.html'
 # %s anywhere forces legacy mode, so a mixed template leaves {addr} literal.
 ftr '{addr} %s' '{addr} host.example'
 
-# The added named fields (url, lastmodified, mime, charset, status, size).
+# Distinct values per field, so a slot transposition shows as swapped text.
 ftr '{url}' 'http://host.example/dir/page.html'
 ftr 'src {lastmodified}, got {date}' 'src LASTMOD, got DATE'
 ftr '{mime}; {charset}; {status}; {size}' 'text/html; utf-8; 200; 1234'

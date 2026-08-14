@@ -1045,6 +1045,10 @@ Tamanho máximo do segmento WARC:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Iniciar um novo segmento WARC quando o atual passar deste número de bytes; deixe em branco ou 0 para um único arquivo.
 Host aliases:
-Host aliases:
+Apelidos de host:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Outros nomes de host que servem este mesmo site, unificados em um só, uma regra por linha (ex.: www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Copiar %s e todos os hosts abaixo dele
+Ignore %s and every host below it
+Ignorar %s e todos os hosts abaixo dele

@@ -740,6 +740,10 @@ LANG_M8
 Mirror domain
 LANG_M9
 Ignore all
+LANG_M10
+Mirror %s and every host below it
+LANG_M11
+Ignore %s and every host below it
 LANG_N1
 Wizard query
 LANG_N2
