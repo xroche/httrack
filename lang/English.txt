@@ -1048,3 +1048,7 @@ Host aliases:
 Host aliases:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Mirror %s and every host below it
+Ignore %s and every host below it
+Ignore %s and every host below it

@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+# Pin each option's cap against the macro htsglobal.h declares for it, so the
+# header and the engine cannot drift apart. Limits are read from the header
+# rather than copied here, which is the duplication the macros exist to end.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+bin=$(httrack_path)
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+hdr="$(cd "${top_srcdir:-${testdir}/..}" && pwd)/src/htsglobal.h"
+assert_file "$hdr" "no htsglobal.h to read the caps from"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argcaps.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+echo '<html><body>x</body></html>' >"$tmp/page.html"
+
+# POSIX BRE only: BSD sed has no \+
+cap() {
+    sed -n "s/^#define $1[[:space:]][[:space:]]*\([0-9][0-9]*\).*/\1/p" "$hdr"
+}
+
+run() { # option value tag
+    "$bin" "file://$tmp/page.html" -O "$tmp/out$3" --quiet -n -%v0 "$1" "$2" 2>&1
+}
+
+# option macro message
+caps="-%F HTS_FOOTER_MAXSIZE Footer string too long
+-%l HTS_LANGISO_MAXSIZE Lang list string too long
+-%R HTS_REFERER_MAXSIZE Referer URL too long
+-%L HTS_FILELIST_MAXSIZE File list string too long
+-%b HTS_BINDHOST_MAXSIZE Hostname string too long
+-%E HTS_FROMEMAIL_MAXSIZE From email too long"
+
+n=0
+while read -r opt macro msg; do
+    n=$((n + 1))
+    limit=$(cap "$macro")
+    test "${limit:-0}" -gt 1 || fail "$macro: no usable cap read from htsglobal.h"
+    val=$(printf "%*s" "$limit" "" | tr ' ' a)
+
+    rc=0
+    run "$opt" "${val%a}" "${n}a" >/dev/null || rc=$?
+    assert_eq 0 "$rc" "$opt rejected a value one byte under $macro ($limit)"
+
+    rc=0
+    out=$(run "$opt" "$val" "${n}b") || rc=$?
+    test "$rc" -ne 0 || fail "$opt accepted a value of exactly $macro ($limit)"
+    # the message pins which check fired, so an unrelated panic cannot pass
+    grep -qF "$msg" <<<"$out" || fail "$opt was not rejected by \"$msg\""
+done <<<"$caps"
+
+test "$n" -eq 6 || fail "expected 6 caps, checked $n"
+
+exit 0

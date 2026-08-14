@@ -890,20 +890,39 @@ int hts_template_format_str(char *buffer, size_t size, const char *format, ...) 
   return success;
 }
 
-// Value of the named field, or "" if absent (never NULL, so callers can pass it
-// straight to a formatter).
-static const char *footer_field_value(const hts_footer_field *fields,
-                                      size_t nfields, const char *name) {
-  size_t j;
-  for (j = 0; j < nfields; j++) {
-    if (strcmp(fields[j].name, name) == 0)
-      return fields[j].value != NULL ? fields[j].value : "";
+// Indexed by hts_footer_field_id. Sized by the initializer, then pinned below:
+// a new id without a name here is a compile error, not a NULL slot.
+static const char *const footer_field_names[] = {
+    "addr",    "path", "url",     "date",   "lastmodified",
+    "version", "mime", "charset", "status", "size"};
+
+enum {
+  footer_field_names_complete =
+      1 / (int) (sizeof(footer_field_names) / sizeof(footer_field_names[0]) ==
+                 HTS_FOOTER_FIELD_COUNT)
+};
+
+HTSEXT_API hts_boolean hts_footer_field_ok(const char *name) {
+  size_t i;
+
+  if (name == NULL)
+    return HTS_FALSE;
+  for (i = 0; i < HTS_FOOTER_FIELD_COUNT; i++) {
+    if (strcmp(footer_field_names[i], name) == 0)
+      return HTS_TRUE;
   }
-  return "";
+  return HTS_FALSE;
+}
+
+// Value of a field, or "" (never NULL, so callers can pass it straight to a
+// formatter).
+static const char *footer_field_value(const char *const *values,
+                                      hts_footer_field_id id) {
+  return values[id] != NULL ? values[id] : "";
 }
 
 int hts_footer_format(char *buffer, size_t size, const char *footer,
-                      const hts_footer_field *fields, size_t nfields) {
+                      const char *const values[HTS_FOOTER_FIELD_COUNT]) {
   hts_template_format_buf buf = {NULL, buffer, size, 0};
   size_t i;
 
@@ -914,10 +933,10 @@ int hts_footer_format(char *buffer, size_t size, const char *footer,
   // order-independent.
   if (strstr(footer, "%s") != NULL)
     return hts_template_format_str(
-        buffer, size, footer, footer_field_value(fields, nfields, "addr"),
-        footer_field_value(fields, nfields, "path"),
-        footer_field_value(fields, nfields, "date"),
-        footer_field_value(fields, nfields, "version"), /* EOF */ NULL);
+        buffer, size, footer, footer_field_value(values, HTS_FOOTER_ADDR),
+        footer_field_value(values, HTS_FOOTER_PATH),
+        footer_field_value(values, HTS_FOOTER_DATE),
+        footer_field_value(values, HTS_FOOTER_VERSION), /* EOF */ NULL);
   // "{{"/"}}" emit a literal brace; an unknown "{...}" is left verbatim so
   // typos stay visible.
   for (i = 0; footer[i] != '\0'; i++) {
@@ -936,11 +955,11 @@ int hts_footer_format(char *buffer, size_t size, const char *footer,
       if (end != NULL) {
         const size_t namelen = (size_t) (end - (footer + i + 1));
         size_t j;
-        for (j = 0; j < nfields; j++) {
-          if (strlen(fields[j].name) == namelen &&
-              strncmp(fields[j].name, footer + i + 1, namelen) == 0) {
-            if (htsfmt_puts(&buf,
-                            fields[j].value != NULL ? fields[j].value : "") < 0)
+        for (j = 0; j < HTS_FOOTER_FIELD_COUNT; j++) {
+          if (strlen(footer_field_names[j]) == namelen &&
+              strncmp(footer_field_names[j], footer + i + 1, namelen) == 0) {
+            if (htsfmt_puts(&buf, footer_field_value(
+                                      values, (hts_footer_field_id) j)) < 0)
               return -1;
             i += namelen + 1; // consume the name and its closing '}'
             matched = 1;

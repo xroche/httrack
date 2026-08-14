@@ -946,6 +946,36 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+View Documentation
+Vaata dokumentatsiooni
+Go To HTTrack Website
+Ava HTTracki veebisait
+Go To HTTrack Forum
+Ava HTTracki foorum
+View License
+Vaata litsentsi
+Beware: you local browser might be unable to browse files with embedded filenames
+Tähelepanu: kohalik brauser ei pruugi suuta avada faile, mille nimi on faili sisse põimitud
+Recreated HTTrack internal cached resources
+HTTracki sisemised puhverdatud ressursid loodi uuesti
+Could not create internal cached resources
+Sisemisi puhverdatud ressursse ei õnnestunud luua
+Could not get the system external storage directory
+Süsteemi välist salvestusruumi ei leitud
+Could not write to:
+Ei saa kirjutada asukohta:
+Read-only media (SDCARD)
+Kirjutuskaitstud andmekandja (SDCARD)
+No storage media (SDCARD)
+Andmekandjat pole (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Kuni see probleem püsib, ei pruugi HTTrack veebisaite alla laadida
+HTTrack: mirror '%s' stopped!
+HTTrack: koopia "%s" peatati!
+Click on this notification to restart the interrupted mirror
+Katkenud koopia jätkamiseks puuduta seda teadet
+HTTrack: could not save profile for '%s'!
+HTTrack: profiili "%s" ei õnnestunud salvestada!
 Proxy type:
 Proxy tüüp:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC-segmendi suurim maht:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Alusta uut WARC-segmenti, kui praegune ületab selle baitide arvu; jäta tühjaks või 0, et hoida üks fail.
 Host aliases:
-Host aliases:
+Hosti aliased:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Muud sama saiti teenindavad hostinimed, koondatud üheks, üks reegel rea kohta (nt www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Kopeeri %s ja kõik selle all olevad hostid
+Ignore %s and every host below it
+Ignoreeri %s ja kõiki selle all olevaid hoste
