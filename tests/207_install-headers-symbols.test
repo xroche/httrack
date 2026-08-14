@@ -34,7 +34,11 @@ cleanup_push rm -rf "$tmp"
 "$nm" --defined-only "$lib" >"$tmp/all.raw" 2>/dev/null ||
     skip "$nm cannot read the symbol table of $lib"
 awk 'NF >= 3 { print $3 }' "$tmp/exported.raw" | sort -u >"$tmp/exported"
-awk 'NF >= 3 { print $3 }' "$tmp/all.raw" | sort -u >"$tmp/all"
+# LTO and the optimizer's clones rename a local to "name.lto_priv.0", which
+# stops matching the header identifier and empties the candidate list.
+clone_alt='lto_priv|constprop|isra|part|cold|llvm'
+strip_clones="s/(\\.($clone_alt)(\\.[0-9]+)*)+\$//"
+awk 'NF >= 3 { print $3 }' "$tmp/all.raw" | sed -E "$strip_clones" | sort -u >"$tmp/all"
 comm -23 "$tmp/all" "$tmp/exported" >"$tmp/hidden"
 n_exported=$(wc -l <"$tmp/exported")
 n_hidden=$(wc -l <"$tmp/hidden")
@@ -89,7 +93,26 @@ env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDAT
 # A synthetic leak the loop must report: every real candidate is a static defined
 # in the header, which links from the probe's own copy and so proves nothing.
 canary=zzz-canary.h
-printf 'extern void %s(void);\n' "$neg" >"$tmp/include/httrack/$canary"
+canaries=("$neg")
+
+# One name per clone suffix, taken from the raw table: a strip that drops a
+# suffix fails here instead of quietly shedding the candidates carrying it.
+# Listed again on purpose; sharing $clone_alt would let one edit disarm both.
+awk 'NF >= 3 && $3 !~ /\./ { print $3 }' "$tmp/all.raw" | sort -u >"$tmp/plain"
+for suffix in lto_priv constprop isra part cold llvm; do
+    awk -v s="$suffix" 'NF >= 3 && $3 ~ "\\." s "([.$]|$)" { print $3 }' "$tmp/all.raw" |
+        sed -E 's/(\.[A-Za-z_][A-Za-z0-9_]*(\.[0-9]+)*)+$//' | sort -u >"$tmp/cloned"
+    sym=$(comm -23 <(comm -23 "$tmp/cloned" "$tmp/plain") "$tmp/exported" |
+        awk '/^[A-Za-z_][A-Za-z0-9_]*$/ { print; exit }')
+    if [ -n "$sym" ]; then
+        canaries+=("$sym")
+    fi
+done
+mapfile -t canaries < <(printf '%s\n' "${canaries[@]}" | sort -u)
+
+for sym in "${canaries[@]}"; do
+    printf 'extern void %s(void);\n' "$sym"
+done >"$tmp/include/httrack/$canary"
 
 headers=("$tmp/include/httrack"/*.h)
 [ "${#headers[@]}" -ge 10 ] || fail "only ${#headers[@]} headers installed, the list cannot be right"
@@ -113,7 +136,7 @@ ours {
 EOF
 
 probed=0
-leaks=""
+leaks=()
 for h in "${headers[@]}"; do
     b=$(basename "$h")
     # config.h first, as a consumer must: it is what turns HTS_USEOPENSSL on, and
@@ -136,16 +159,26 @@ for h in "${headers[@]}"; do
             "$tmp/probe.c" 2>/dev/null || continue
         probed=$((probed + 1))
         "${cc_argv[@]}" -w -o "$tmp/probe" "$tmp/probe.o" "$lib" 2>/dev/null ||
-            leaks="$leaks $b:$sym"
+            leaks+=("$b:$sym")
     done < <(comm -12 "$tmp/hidden" "$tmp/ids")
 done
 
 echo "linked $probed reachable symbol(s) from ${#headers[@]} installed headers" \
     "($n_hidden hidden, $n_exported exported)"
 [ "$probed" -ge 5 ] || fail "only $probed symbols reached the link probe, the candidate list is broken"
-[ "${leaks#* "$canary":"$neg"}" != "$leaks" ] ||
-    fail "the synthetic $canary:$neg leak went unreported, the candidate list is broken"
-leaks=${leaks/ "$canary":"$neg"/}
-[ -z "$leaks" ] || fail "installed headers declare symbols $lib does not export:$leaks"
+for sym in "${canaries[@]}"; do
+    case " ${leaks[*]} " in
+    *" $canary:$sym "*) ;;
+    *) fail "the synthetic $canary:$sym leak went unreported, the candidate list is broken" ;;
+    esac
+done
+real=()
+for leak in "${leaks[@]}"; do
+    case $leak in
+    "$canary":*) ;;
+    *) real+=("$leak") ;;
+    esac
+done
+[ "${#real[@]}" -eq 0 ] || fail "installed headers declare symbols $lib does not export: ${real[*]}"
 
 exit 0

@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# The verdict half of a wizard answer, driven without the interactive callback.
+
+assert_selftest "forbidden=1 stop=1 prio=42" wizardverdict -1
+assert_selftest "forbidden=0 stop=0 prio=42" wizardverdict 6
+
+# every answer, both scope ranges, and a link the crawl had already refused
+assert_selftest "wizardverdict self-test OK" wizardverdict
