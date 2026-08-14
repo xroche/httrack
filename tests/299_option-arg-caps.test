@@ -1,0 +1,49 @@
+#!/bin/bash
+#
+# The per-option argument caps in htsglobal.h are a cross-repo contract: the
+# GUI front ends validate their input fields against the same numbers, and a
+# mirror only dies once the engine rejects a value the GUI accepted. Pin both
+# sides of each bound, and match each option's own message so a cap wired to
+# the wrong option shows up as the wrong rejection rather than as a pass.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argcaps.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+echo '<html><body>x</body></html>' >"$tmp/page.html"
+
+# option limit message
+caps="-%F 254 Footer string too long
+-%l 62 Lang list string too long
+-%R 254 Referer URL too long
+-%L 254 File list string too long
+-%b 254 Hostname string too long
+-%E 254 From email too long"
+
+run() { # option value tag
+    "$bin" "file://$tmp/page.html" -O "$tmp/out$3" --quiet -n -%v0 "$1" "$2" 2>&1
+}
+
+n=0
+while read -r opt limit msg; do
+    n=$((n + 1))
+    val=$(printf "%*s" "$limit" "" | tr ' ' a)
+
+    rc=0
+    out=$(run "$opt" "${val%a}" "${n}a") || rc=$?
+    assert_eq 0 "$rc" "$opt rejected a value one byte under its cap"
+
+    rc=0
+    out=$(run "$opt" "$val" "${n}b") || rc=$?
+    test "$rc" -ne 0 || fail "$opt accepted a value of exactly $limit bytes"
+    grep -qF "$msg" <<<"$out" || fail "$opt rejected at its cap, but not with \"$msg\""
+done <<<"$caps"
+
+test "$n" -eq 6 || fail "expected 6 caps, checked $n"
+
+exit 0
