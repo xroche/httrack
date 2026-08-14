@@ -33,6 +33,10 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTTRACK_DEFTMPL
 #define HTTRACK_DEFTMPL
 
+/* Generated data, not code: clang-format rewrites a whole literal table
+   the moment one line inside it is touched. */
+/* clang-format off */
+
 /* Index for each project */
 /*
 regen:
@@ -168,7 +172,7 @@ regen:
   "	<BR>"LF\
   "	<BR>"LF\
   "  	<H6 ALIGN=\"RIGHT\">"LF\
-  "	<I>Mirror and index made by HTTrack Website Copier [XR&amp;CO'2014]</I>"LF\
+  "	<I>Mirror and index made by HTTrack Website Copier [XR&amp;CO]</I>"LF\
   "	</H6>"LF\
   "	%s"LF\
   "	<!-- Thanks for using HTTrack Website Copier! -->"LF\
@@ -186,7 +190,7 @@ regen:
   ""LF\
   "<table width=\"76%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
   "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 2014 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
+  "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>"LF\
   "	</tr>"LF\
   "</table>"LF\
   ""LF\
@@ -317,7 +321,7 @@ regen:
   "	</TABLE>"LF\
   "	<BR>"LF\
   "	<H6 ALIGN=\"RIGHT\">"LF\
-  "         <I>Mirror and index made by HTTrack Website Copier [XR&CO'2014]</I>"LF\
+  "         <I>Mirror and index made by HTTrack Website Copier [XR&CO]</I>"LF\
   "	</H6>"LF\
   "	%s"LF\
   "	<!-- Thanks for using HTTrack Website Copier! -->"LF\
@@ -335,7 +339,7 @@ regen:
   ""LF\
   "<table width=\"76%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
   "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 2014 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
+  "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>"LF\
   "	</tr>"LF\
   "</table>"LF\
   ""LF\
@@ -475,7 +479,7 @@ regen:
   ""LF\
   "<table width=\"76%%\" height=\"100%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
   "	<tr>"LF\
-  "	<td id=\"footer\"><small>&copy; 2014 Xavier Roche & other contributors - Web Design: Kauler Leto.</small></td>"LF\
+  "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>"LF\
   "	</tr>"LF\
   "</table>"LF\
   ""LF\
@@ -784,5 +788,7 @@ regen:
   "\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x0\x21\xf9\x4\x1\x0\x0\xd8\x0\x2c\x0\x0\x0\x0\x8\x0\x8\x0\x0\x8"\
   "\x19\x0\xaf\x61\x13\x48\x10\xdb\xc0\x83\x4\xb\x16\x44\x88\x50\xe1\x41\x86\x9\x21\x1a\x74\x78\x2d\x20\x0\x3b\xff"
 #define HTS_DATA_FADE_GIF_LEN 828
+
+/* clang-format on */
 
 #endif

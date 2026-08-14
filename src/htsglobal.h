@@ -220,7 +220,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_MIMETYPE_SIZE 128
 
 /* Copyright (C) 1998 Xavier Roche and other contributors */
-#define HTTRACK_AFF_AUTHORS "[XR&CO'2014]"
+#define HTTRACK_AFF_AUTHORS "[XR&CO]"
 /* Named fields (hts_footer_format); a "%s" anywhere would switch the template
    back to the legacy positional model, a user's own additions included. */
 #define HTS_DEFAULT_FOOTER                                                     \
