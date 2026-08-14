@@ -946,6 +946,36 @@ Server terminated
 Poslužitelj je razriješen
 A fatal error has occurred during this mirror
 Tijekom ovog zrcaljenja je nastala fatalna pogreška
+View Documentation
+Prikaži dokumentaciju
+Go To HTTrack Website
+Otvori mrežno mjesto HTTrack
+Go To HTTrack Forum
+Otvori forum HTTrack
+View License
+Prikaži licencu
+Beware: you local browser might be unable to browse files with embedded filenames
+Pozor: vaš lokalni preglednik možda neæe moæi otvoriti datoteke s ugraðenim nazivima datoteka
+Recreated HTTrack internal cached resources
+Interni predmemorirani resursi HTTracka ponovno su stvoreni
+Could not create internal cached resources
+Interne predmemorirane resurse nije moguæe stvoriti
+Could not get the system external storage directory
+Nije moguæe pronaæi vanjsku pohranu sustava
+Could not write to:
+Nije moguæe pisati u:
+Read-only media (SDCARD)
+Medij samo za èitanje (SDCARD)
+No storage media (SDCARD)
+Nema medija za pohranu (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Dok se taj problem ne riješi, HTTrack možda neæe moæi preuzimati mrežna mjesta
+HTTrack: mirror '%s' stopped!
+HTTrack: zrcaljenje „%s” je zaustavljeno!
+Click on this notification to restart the interrupted mirror
+Dodirnite tu obavijest za nastavak prekinutog zrcaljenja
+HTTrack: could not save profile for '%s'!
+HTTrack: profil za „%s” nije moguæe spremiti!
 Proxy type:
 Vrsta posrednika:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Najveæa velièina WARC segmenta:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Zapoèni novi WARC segment kada trenutni prijeðe ovaj broj bajtova; ostavite prazno ili 0 za jednu datoteku.
 Host aliases:
-Host aliases:
+Aliasi poslužitelja:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Ostala imena poslužitelja koja poslužuju isto mrežno mjesto, sažeta u jedno, jedno pravilo po retku (npr. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Zrcali %s i sve poslužitelje ispod njega
+Ignore %s and every host below it
+Zanemari %s i sve poslužitelje ispod njega

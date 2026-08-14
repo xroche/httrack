@@ -8,8 +8,6 @@ set -euo pipefail
 # shellcheck source=tests/crawllib.sh
 . "$(dirname "$0")/crawllib.sh"
 
-httrack=$(httrack_path)
-
 # "mirror this link"
 WIZARD_MIRROR=5
 # spare answers: an empty one means "ignore this link", and EOF spins the
@@ -41,16 +39,10 @@ local_server_start --root "${tmpdir}/root"
 answers="${tmpdir}/answers"
 for _ in $(seq "$WIZARD_SPARES"); do echo "$WIZARD_MIRROR"; done >"$answers"
 
-# redirect here, not in run_with_timeout's args: it backgrounds the job with
-# stdin closed (#1258)
-crawl() { "$httrack" "$@" <"$answers"; }
-
 rc=0
-run_with_timeout "$(crawl_deadline)" crawl --max-time="$CRAWL_MAX_TIME" \
+local_crawl --stdin "$answers" --log "${tmpdir}/crawl.log" -- \
     -O "${tmpdir}/mirror" -W --robots=0 --retries=0 \
-    "http://127.0.0.1:${SRV_PORT}/wizdelayed/index.html" \
-    >"${tmpdir}/crawl.log" 2>&1 || rc=$?
-test "$rc" -ne 124 || fail "the crawl never returned"
+    "http://127.0.0.1:${SRV_PORT}/wizdelayed/index.html" || rc=$?
 test "$rc" -eq 0 || fail "the crawl exited $rc"
 
 grep -q 'beyond this mirror scope' "${tmpdir}/crawl.log" ||

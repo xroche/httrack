@@ -946,6 +946,36 @@ Server terminated
 Server terminated
 A fatal error has occurred during this mirror
 Joriy ko’chirish vaqtida jiddiy xatolik yuz berdi
+View Documentation
+Hujjatlarni ko'rish
+Go To HTTrack Website
+HTTrack veb-saytiga o'tish
+Go To HTTrack Forum
+HTTrack forumiga o'tish
+View License
+Litsenziyani ko'rish
+Beware: you local browser might be unable to browse files with embedded filenames
+Diqqat: mahalliy brauzeringiz nomi ichiga joylangan fayllarni ocholmasligi mumkin
+Recreated HTTrack internal cached resources
+HTTrack ichki kesh resurslari qayta yaratildi
+Could not create internal cached resources
+Ichki kesh resurslarini yaratib bo'lmadi
+Could not get the system external storage directory
+Tizimning tashqi xotira jildini topib bo'lmadi
+Could not write to:
+Quyidagiga yozib bo'lmadi:
+Read-only media (SDCARD)
+Faqat o'qish uchun tashuvchi (SDCARD)
+No storage media (SDCARD)
+Xotira tashuvchisi yo'q (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Bu muammo bartaraf etilmaguncha HTTrack veb-saytlarni yuklab ololmasligi mumkin
+HTTrack: mirror '%s' stopped!
+HTTrack: "%s" nusxasi to'xtatildi!
+Click on this notification to restart the interrupted mirror
+Uzilgan nusxani davom ettirish uchun bu bildirishnomani bosing
+HTTrack: could not save profile for '%s'!
+HTTrack: "%s" uchun profilni saqlab bo'lmadi!
 Proxy type:
 Proksi turi:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC segmentining eng katta hajmi:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Joriy segment shu baytlar sonidan oshganda yangi WARC segmentini boshlash; bitta fayl uchun bo’sh qoldiring yoki 0 kiriting.
 Host aliases:
-Host aliases:
+Xost taxalluslari:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Shu saytga xizmat qiluvchi va bittaga birlashtiriladigan boshqa xost nomlari; har satrda bitta qoida (masalan www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+%s va uning ostidagi barcha xostlardan nusxa olish
+Ignore %s and every host below it
+%s va uning ostidagi barcha xostlarni e'tiborsiz qoldirish
