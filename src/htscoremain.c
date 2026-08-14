@@ -2750,9 +2750,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   fprintf(fp, "%c", argv[i][j]);
               }
               fprintf(fp, "\"");
-            } else if (strnotempty(argv[i]) == 0) {     // ""
+            } else if (strnotempty(argv[i]) == 0) { // ""
               fprintf(fp, "\"\"");
-            } else {            // non critique
+            } else { // nothing to escape
               fprintf(fp, "%s", argv[i]);
             }
             if (i < argc - 1)
