@@ -361,9 +361,8 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     break;
   }
 
-  /* the question is asked only while the verdict is undecided, so an answer
-     that did not forbid has authorized: -1 records the link type-unresolved,
-     under its .delayed placeholder name */
+  /* the question is asked only while undecided; an answer that does not forbid
+     authorizes the link */
   if (*forbidden_url == -1)
     *forbidden_url = 0;
 }

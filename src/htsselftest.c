@@ -4389,7 +4389,7 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(HTS_WIZARD_SCOPE_EXCLUDE - 1, 0, 0, 0, PRIO_UNSET);
   APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, 0, 1, 0, PRIO_UNSET);
   APPLIES(INT_MAX, 0, 1, 0, PRIO_UNSET);
-  /* an answer in no range overturns neither an accept nor a refusal */
+  /* an answer in no range never overturns an accept or a refusal */
   APPLIES(8, 0, 0, 0, PRIO_UNSET);
   APPLIES(8, 1, 1, 0, PRIO_UNSET);
   APPLIES(999, 0, 0, 0, PRIO_UNSET);
@@ -4397,18 +4397,21 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(-1000, 0, 0, 0, PRIO_UNSET);
   APPLIES(INT_MIN, 0, 0, 0, PRIO_UNSET);
   APPLIES(HTS_WIZARD_SCOPE_INCLUDE - 1, 0, 0, 0, PRIO_UNSET);
-  /* the state the question is asked in: an answer that did not refuse must
-     leave the link allowed, never undecided */
+  /* an answer that does not refuse leaves the link allowed, never undecided */
   APPLIES(4, -1, 0, 0, 1);
   APPLIES(5, -1, 0, 0, PRIO_UNSET);
   APPLIES(6, -1, 0, 0, PRIO_UNSET);
   APPLIES(7, -1, 0, 0, PRIO_UNSET);
   APPLIES(50, -1, 0, 0, PRIO_UNSET);
-  APPLIES(-999, -1, 0, 0, PRIO_UNSET);
-  APPLIES(8, -1, 0, 0, PRIO_UNSET);
+  APPLIES(8, -1, 0, 0, PRIO_UNSET); /* -999 is #1259's, not asserted here */
   APPLIES(HTS_WIZARD_SCOPE_INCLUDE, -1, 0, 0, PRIO_UNSET);
-  APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, -1, 1, 0, PRIO_UNSET);
+  /* and one that does refuse must still refuse it */
+  APPLIES(-1, -1, 1, 1, PRIO_UNSET);
   APPLIES(0, -1, 1, 0, PRIO_UNSET);
+  APPLIES(1, -1, 1, 0, PRIO_UNSET);
+  APPLIES(2, -1, 1, 0, PRIO_UNSET);
+  APPLIES(3, -1, 1, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, -1, 1, 0, PRIO_UNSET);
 #undef APPLIES
 
   /* the warning is all an unknown answer does, so a known one must be silent */
