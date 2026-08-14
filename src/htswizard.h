@@ -61,12 +61,22 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
    caller stops at the first empty one. */
 #define HTS_WIZARD_MAX_FILTERS 2
 
+/* The longest suffix an answer appends after the link (answer 7). */
+#define HTS_WIZARD_FILTER_SUFFIX "*[file]"
+
+/* Capacity of one filters[] slot, and the stride filters_init() allocates in
+   htscore.c: change the two together. Sized for the longest pattern an answer
+   can build (sign, host, separator, path, suffix), because clipping one widens
+   it: "*[file]" cut back to "*" allows every file below, not just this one. */
+#define HTS_FILTER_SLOT_SIZE                                                   \
+  (1 + (HTS_URLMAXSIZE * 2 - 1) + 1 + (HTS_URLMAXSIZE * 2 - 1) +               \
+   sizeof(HTS_WIZARD_FILTER_SUFFIX))
+
 /* Builds into `f` the `slot`-th filter answer `n` adds for the link (adr,fil),
    and leaves `f` empty past the last one. Only the host-scope answers emit a
    second, because their starred form misses the apex. `seeker_up` is the
-   HTS_SEEKER_UP bit of opt->seeker, read by answer 5. A pattern too long for
-   `f` is clipped rather than aborted: only its tail is lost, so it stays
-   anchored on the link it was cut from. */
+   HTS_SEEKER_UP bit of opt->seeker, read by answer 5. `f` must have a full
+   HTS_FILTER_SLOT_SIZE of capacity, so no pattern is ever truncated. */
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 

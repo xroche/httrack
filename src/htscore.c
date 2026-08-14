@@ -698,7 +698,7 @@ int httpmirror(char *url1, httrackp * opt) {
             }
           }
           {
-            htsbuff fb = htsbuff_ptr(filters[filptr], HTS_URLMAXSIZE * 2);
+            htsbuff fb = htsbuff_ptr(filters[filptr], HTS_FILTER_SLOT_SIZE);
             htsbuff_cpy(&fb, type ? "+" : "-");
             htsbuff_cat(&fb, tempo);
           }
@@ -2348,7 +2348,7 @@ void host_ban(httrackp * opt, int ptr,
   // interdire host
   assertf((*_FILTERS_PTR) < opt->maxfilter);
   if (*_FILTERS_PTR < opt->maxfilter) {
-    htsbuff fb = htsbuff_ptr(_FILTERS[*_FILTERS_PTR], HTS_URLMAXSIZE * 2);
+    htsbuff fb = htsbuff_ptr(_FILTERS[*_FILTERS_PTR], HTS_FILTER_SLOT_SIZE);
     htsbuff_cpy(&fb, "-");
     htsbuff_cat(&fb, host);
     htsbuff_cat(&fb, "/*"); // forbid host/*
@@ -2438,16 +2438,13 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
   }
   if (filters) {
     if (filters[0] == NULL) {
-      filters[0] =
-        (char *) malloct(sizeof(char) * (filter_max + 2) *
-                         (HTS_URLMAXSIZE * 2));
+      filters[0] = (char *) malloct(sizeof(char) * (filter_max + 2) *
+                                    HTS_FILTER_SLOT_SIZE);
       memset(filters[0], 0,
-             sizeof(char) * (filter_max + 2) * (HTS_URLMAXSIZE * 2));
+             sizeof(char) * (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
     } else {
-      filters[0] =
-        (char *) realloct(filters[0],
-                          sizeof(char) * (filter_max +
-                                          2) * (HTS_URLMAXSIZE * 2));
+      filters[0] = (char *) realloct(
+          filters[0], sizeof(char) * (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
     }
     if (filters[0] == NULL) {
       freet(filters);
@@ -2463,7 +2460,7 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
     else
       from = filter_max - filterinc;
     for(i = 0; i <= filter_max; i++) {  // PLUS UN (sécurité)
-      filters[i] = filters[0] + i * (HTS_URLMAXSIZE * 2);
+      filters[i] = filters[0] + i * HTS_FILTER_SLOT_SIZE;
     }
     for(i = from; i <= filter_max; i++) {       // PLUS UN (sécurité)
       filters[i][0] = '\0';     // clear
