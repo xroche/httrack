@@ -428,16 +428,15 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define CBSTRUCT(OPT) ((t_hts_htmlcheck_callbacks*) ((OPT)->callbacks_fun))
 #define GET_USERCALLBACK(OPT, NAME) ( CBSTRUCT(OPT)-> NAME .fun )
 #define GET_USERARG(OPT, NAME) ( CBSTRUCT(OPT)-> NAME .carg )
-#define GET_USERDEF(OPT, NAME) ( \
-  (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)-> NAME .fun != NULL) \
-	? ( GET_USERARG(OPT, NAME) ) \
-	: ( default_callbacks. NAME .carg ) \
-)
-#define GET_CALLBACK(OPT, NAME) ( \
-  (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)-> NAME .fun != NULL) \
-	? ( GET_USERCALLBACK(OPT, NAME ) ) \
-  : ( default_callbacks. NAME .fun ) \
-)
+/* True when a front end chained its own NAME callback */
+#define HAS_CALLBACK(OPT, NAME)                                                \
+  (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)->NAME.fun != NULL)
+#define GET_USERDEF(OPT, NAME)                                                 \
+  (HAS_CALLBACK(OPT, NAME) ? (GET_USERARG(OPT, NAME))                          \
+                           : (default_callbacks.NAME.carg))
+#define GET_CALLBACK(OPT, NAME)                                                \
+  (HAS_CALLBACK(OPT, NAME) ? (GET_USERCALLBACK(OPT, NAME))                     \
+                           : (default_callbacks.NAME.fun))
 
 /* Predefined macros */
 #define RUN_CALLBACK_NOARG(OPT, NAME) GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME))

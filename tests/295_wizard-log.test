@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# A wizard session must be readable afterwards: one line per answer, carrying
+# the raw reply and the filters it inserted, reaches hts-log.txt at the default
+# verbosity, and a run where nobody was asked stays silent.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wizardlog.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+site="$tmp/site"
+mkdir -p "$site"
+printf '<a href="a.html">a</a> <a href="http://other.invalid/x.html">e</a>' \
+    >"$site/index.html"
+echo hello >"$site/a.html"
+
+# the CLI re-prompts until the reply is not empty, so never run out of answers
+answers() { printf '%s\n' "$1" "$1" "$1" "$1" "$1" >"$tmp/answers"; }
+
+crawl() { # crawl MIRRORDIR [httrack args...], sets $log
+    local out=$1
+    shift
+    "$bin" "file://$site/index.html" -O "$out" --quiet "$@" \
+        <"$tmp/answers" >/dev/null 2>&1
+    log="$out/hts-log.txt"
+}
+
+# "ignore this link": the answer forbids it and inserts the single-link filter
+answers 0
+crawl "$tmp/m0" -W
+grep -q "(wizard) answer '0' (n=0) for other.invalid/x.html: forbidden, filters: -other.invalid/x.html$" "$log" ||
+    fail "the answer line is wrong in $log"
+
+# "ignore the whole host": same reply path, a different filter. The log echoes
+# what was inserted, so a hardcoded pattern would still read -.../x.html here.
+answers 2
+crawl "$tmp/m2" -W
+grep -q "(wizard) answer '2' (n=2) for other.invalid/x.html: forbidden, filters: -other.invalid/[*]$" "$log" ||
+    fail "the answer line does not echo the inserted filter in $log"
+
+# nobody was asked: the automatic resolution stays at the debug level
+answers 0
+crawl "$tmp/mauto"
+! grep -q "(wizard) answer" "$log" ||
+    fail "a non-interactive run logged a question in $log"
