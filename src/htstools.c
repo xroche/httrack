@@ -890,11 +890,17 @@ int hts_template_format_str(char *buffer, size_t size, const char *format, ...) 
   return success;
 }
 
-// The engine owns the footer field names; front ends validate against
-// hts_footer_field_ok() rather than a copy. Indexed by hts_footer_field_id.
-static const char *const footer_field_names[HTS_FOOTER_FIELD_COUNT] = {
+// Indexed by hts_footer_field_id. Sized by the initializer, then pinned below:
+// a new id without a name here is a compile error, not a NULL slot.
+static const char *const footer_field_names[] = {
     "addr",    "path", "url",     "date",   "lastmodified",
     "version", "mime", "charset", "status", "size"};
+
+enum {
+  footer_field_names_complete =
+      1 / (int) (sizeof(footer_field_names) / sizeof(footer_field_names[0]) ==
+                 HTS_FOOTER_FIELD_COUNT)
+};
 
 HTSEXT_API hts_boolean hts_footer_field_ok(const char *name) {
   size_t i;

@@ -362,8 +362,8 @@ HTSEXT_API int copy_htsopt(const httrackp *from, httrackp *to);
 HTSEXT_API hts_boolean hts_host_alias_rule_ok(const char *rule);
 
 /** Whether @p name is a field the -%F footer expands as "{name}", so a front
-    end can validate a template against the engine's own list instead of a copy
-   that silently rots when a field is renamed. @return HTS_TRUE if known. */
+    end can validate a template against the engine's own list. Matching is
+   exact, as the expander's is. @return HTS_TRUE if known. */
 HTSEXT_API hts_boolean hts_footer_field_ok(const char *name);
 
 /** Return the engine's last error message, or NULL. The string is owned by

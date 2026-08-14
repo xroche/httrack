@@ -1283,24 +1283,32 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
 // tests/01_engine-footerfmt.test). Also asserts the published field names and
 // the overflow/zero-size returns the CLI cap keeps out of reach.
 static int st_footerfmt(httrackp *opt, int argc, char **argv) {
-  static const char *const values[HTS_FOOTER_FIELD_COUNT] = {
-      "host.example", "/dir/page.html", "http://host.example/dir/page.html",
-      "DATE",         "LASTMOD",        "VER",
-      "text/html",    "utf-8",          "200",
-      "1234",
-  };
   // Spelled out, not read back from the engine: these ten are the published
   // contract front ends validate their templates against.
   static const char *const names[] = {
       "addr",    "path", "url",     "date",   "lastmodified",
       "version", "mime", "charset", "status", "size"};
+  // Filled by id, as htsparse.c does, so the .test's expected strings pin each
+  // name to its enum slot; a positional list would not see them drift apart.
+  const char *values[HTS_FOOTER_FIELD_COUNT] = {NULL};
   size_t i;
   char out[1024];
   char tiny[4];
 
   (void) opt;
+  values[HTS_FOOTER_ADDR] = "host.example";
+  values[HTS_FOOTER_PATH] = "/dir/page.html";
+  values[HTS_FOOTER_URL] = "http://host.example/dir/page.html";
+  values[HTS_FOOTER_DATE] = "DATE";
+  values[HTS_FOOTER_LASTMODIFIED] = "LASTMOD";
+  values[HTS_FOOTER_VERSION] = "VER";
+  values[HTS_FOOTER_MIME] = "text/html";
+  values[HTS_FOOTER_CHARSET] = "utf-8";
+  values[HTS_FOOTER_STATUS] = "200";
+  values[HTS_FOOTER_SIZE] = "1234";
+
   for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
-    assertf(hts_footer_field_ok(names[i]));
+    assertf(hts_footer_field_ok(names[i]) == HTS_TRUE);
   }
   assertf(!hts_footer_field_ok(NULL));
   assertf(!hts_footer_field_ok(""));
@@ -1309,6 +1317,9 @@ static int st_footerfmt(httrackp *opt, int argc, char **argv) {
   // validate alike.
   assertf(!hts_footer_field_ok("add"));
   assertf(!hts_footer_field_ok("addrx"));
+  // Matching is exact: the expander is case-sensitive, so a validator that
+  // accepted "{ADDR}" would green-light a template the crawl emits verbatim.
+  assertf(!hts_footer_field_ok("Addr"));
   // Overflow (named and legacy) and a zero-size buffer must return <0, never
   // truncate silently or write out of bounds.
   assertf(hts_footer_format(tiny, sizeof(tiny), "{addr}", values) < 0);

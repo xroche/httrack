@@ -855,7 +855,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     // footer sits inside an HTML comment, so a value holding
                     // "-->" would otherwise close it and inject markup (#165).
                     // status/size are formatted integers and need no escaping.
-                    const char *values[HTS_FOOTER_FIELD_COUNT];
+                    // Zeroed first: a field added to the enum expands empty
+                    // here until this block fills it, never a stale pointer.
+                    const char *values[HTS_FOOTER_FIELD_COUNT] = {NULL};
 
                     values[HTS_FOOTER_ADDR] = safe_adr;
                     values[HTS_FOOTER_PATH] = safe_fil;
