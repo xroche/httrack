@@ -322,6 +322,46 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
   }
 }
 
+void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
+                              const char *fil, int *forbidden_url,
+                              int *set_prio_to) {
+  switch (n) {
+  case -1: /* skip this link and every question after it */
+    *forbidden_url = 1;
+    opt->wizard = HTS_WIZARD_AUTO;
+    break;
+
+  case 0: /* this link */
+  case 1: /* this directory and below */
+  case 2: /* the whole host */
+  case 3: /* the parent directory, which emits no filter yet */
+    *forbidden_url = 1;
+    break;
+
+  case 4: /* wizard filters both allow and forbid, so an isolated link taken
+             with no depth limit would mirror the whole site */
+    *set_prio_to = 0 + 1; /* recursion level 0 */
+    break;
+
+  case 5:    /* this directory and below, or the whole host */
+  case 6:    /* the whole host */
+  case 7:    /* this directory, files only */
+  case 50:   /* nothing to do */
+  case -999: /* the "!" answer, and anything the front end could not parse */
+    break;
+
+  default: /* a scope answer forbids like 2 or allows like 6 */
+    if (hts_wizard_scope_answer(n) == HTS_TRUE)
+      *forbidden_url = 1;
+    else if (hts_wizard_scope_answer(n) == HTS_DEFAULT)
+      hts_log_print(opt, LOG_WARNING,
+                    "(wizard) unknown answer %d at %s%s, keeping the computed "
+                    "verdict",
+                    n, adr, fil);
+    break;
+  }
+}
+
 static int hts_acceptlink_(httrackp * opt, int ptr,
                            const char *adr, const char *fil, const char *tag,
                            const char *attribute, int *set_prio_to,
@@ -865,70 +905,10 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
         }
       }
       // here we have enough room for a new filter if necessary
-      switch (n) {
-      case -1:                 // sauter tout le reste
-        forbidden_url = 1;
-        opt->wizard = HTS_WIZARD_AUTO; // sauter tout le reste
-        break;
-      case 0: // forbid the same link: adr/fil
-      case 1: // forbid the whole directory and subdirs: adr/path/*
-      case 2: // the whole address: adr/*
-        forbidden_url = 1;
-        break;
 
-      case 3:                  // ** A FAIRE
-        forbidden_url = 1;
-        /*
-           {
-           int i=strlen(adr)-1;
-           while((adr[i]!='/') && (i>0)) i--;
-           if (i>0) {
+      hts_wizard_apply_verdict(opt, n, adr, fil, &forbidden_url, set_prio_to);
 
-           }
-
-           } */
-
-        break;
-        //
-      case 4:                  // same link
-        // PAS BESOIN!!
-        /*HT_INSERT_FILTERS0;    // insérer en 0                                
-           strcpybuff(_FILTERS[0],"+");
-           strcatbuff(_FILTERS[0],adr);
-           if (*fil!='/') strcatbuff(_FILTERS[0],"/");
-           strcatbuff(_FILTERS[0],fil); */
-
-        // étant donné le renversement wizard/primary filter (les primary autorisent up/down ET interdisent)
-        // il faut éviter d'un lien isolé effectue un miroir total..
-
-        *set_prio_to = 0 + 1;   // niveau de récursion=0 (pas de miroir)
-
-        break;
-
-      case 5: // allow the whole directory and its children, or the domain
-      case 6: // same domain
-      case 7: // allow this directory
-        break;
-
-      case 50: // nothing to do
-        break;
-
-      case -999: // the "!" answer, and anything the front end could not parse
-        break;
-
-      default:
-        /* a scope answer forbids like 2 or allows like 6 */
-        if (hts_wizard_scope_answer(n) == HTS_TRUE)
-          forbidden_url = 1;
-        else if (hts_wizard_scope_answer(n) == HTS_DEFAULT)
-          hts_log_print(opt, LOG_WARNING,
-                        "(wizard) unknown answer %d at %s%s, keeping the "
-                        "computed verdict",
-                        n, adr, fil);
-        break;
-      } // switch
-
-      /* the pattern half of the answer: a new answer needs both switches */
+      /* the pattern half of the answer */
       {
         char BIGSTK pattern[HTS_FILTER_SLOT_SIZE];
         /* the log echoes the inserted slots, so it cannot drift from them */

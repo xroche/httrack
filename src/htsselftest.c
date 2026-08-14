@@ -4329,6 +4329,96 @@ static int st_wizardscopeanswer(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Poison: comparing the recursion cap against 0 would not see a stray write of
+   the level the crawl uses. */
+#define PRIO_UNSET 42
+
+/* Prints what answer `n` does to the crawl; with no arguments, asserts every
+   answer, on both an allowed and an already refused link. */
+static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
+  const hts_wizard asked = opt->wizard;
+  FILE *const projectlog = opt->log;
+  char line[HTS_URLMAXSIZE];
+  FILE *log;
+  int url, depth;
+
+  url = 0;
+  depth = PRIO_UNSET;
+  opt->wizard = HTS_WIZARD_ASK;
+  if (argc >= 1) {
+    hts_wizard_apply_verdict(opt, atoi(argv[0]), "foo.com", "/a/b.html", &url,
+                             &depth);
+    printf("forbidden=%d stop=%d prio=%d\n", url,
+           opt->wizard == HTS_WIZARD_AUTO, depth);
+    opt->wizard = asked;
+    return 0;
+  }
+  opt->log = NULL; /* the battery walks the answers that warn */
+/* answer `n` over a link the crawl had left at `in`: the verdict it must leave,
+   whether it stops the questions, and the recursion cap it must set. */
+#define APPLIES(n, in, forbidden, stop, prio)                                  \
+  do {                                                                         \
+    url = (in);                                                                \
+    depth = PRIO_UNSET;                                                        \
+    opt->wizard = HTS_WIZARD_ASK;                                              \
+    hts_wizard_apply_verdict(opt, (n), "foo.com", "/a/b.html", &url, &depth);  \
+    assertf(url == (forbidden));                                               \
+    assertf(opt->wizard == ((stop) ? HTS_WIZARD_AUTO : HTS_WIZARD_ASK));       \
+    assertf(depth == (prio));                                                  \
+  } while (0)
+  /* '*' refuses and stops the questions */
+  APPLIES(-1, 0, 1, 1, PRIO_UNSET);
+  APPLIES(-1, 1, 1, 1, PRIO_UNSET);
+  /* the refusing answers, 3 included although it emits no filter yet */
+  APPLIES(0, 0, 1, 0, PRIO_UNSET);
+  APPLIES(1, 0, 1, 0, PRIO_UNSET);
+  APPLIES(2, 0, 1, 0, PRIO_UNSET);
+  APPLIES(3, 0, 1, 0, PRIO_UNSET);
+  /* 4 caps the recursion and decides the link neither way */
+  APPLIES(4, 0, 0, 0, 1);
+  APPLIES(4, 1, 1, 0, 1);
+  /* an accepting answer never clears a refusal the crawl already computed */
+  APPLIES(5, 1, 1, 0, PRIO_UNSET);
+  APPLIES(6, 1, 1, 0, PRIO_UNSET);
+  APPLIES(7, 1, 1, 0, PRIO_UNSET);
+  APPLIES(50, 1, 1, 0, PRIO_UNSET);
+  APPLIES(-999, 1, 1, 0, PRIO_UNSET);
+  APPLIES(6, 0, 0, 0, PRIO_UNSET);
+  /* both ends of each scope range: include allows, exclude forbids */
+  APPLIES(HTS_WIZARD_SCOPE_INCLUDE, 0, 0, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_EXCLUDE - 1, 0, 0, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, 0, 1, 0, PRIO_UNSET);
+  APPLIES(INT_MAX, 0, 1, 0, PRIO_UNSET);
+  /* an answer in no range is not taken for an accept, nor for a refusal */
+  APPLIES(8, 0, 0, 0, PRIO_UNSET);
+  APPLIES(8, 1, 1, 0, PRIO_UNSET);
+  APPLIES(999, 0, 0, 0, PRIO_UNSET);
+  APPLIES(-2, 0, 0, 0, PRIO_UNSET);
+  APPLIES(-1000, 0, 0, 0, PRIO_UNSET);
+  APPLIES(INT_MIN, 0, 0, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_INCLUDE - 1, 0, 0, 0, PRIO_UNSET);
+#undef APPLIES
+
+  /* the warning is all an unknown answer does, so a known one must be silent */
+  log = tmpfile();
+  assertf(log != NULL);
+  opt->log = log;
+  hts_wizard_apply_verdict(opt, 6, "foo.com", "/a/b.html", &url, &depth);
+  hts_wizard_apply_verdict(opt, 8, "foo.com", "/a/b.html", &url, &depth);
+  rewind(log);
+  assertf(fgets(line, (int) sizeof(line), log) != NULL);
+  assertf(strstr(line, "unknown answer 8") != NULL);
+  assertf(fgets(line, (int) sizeof(line), log) == NULL);
+  fclose(log);
+
+  opt->log = projectlog;
+  opt->wizard = asked;
+  printf("wizardverdict self-test OK\n");
+  return 0;
+}
+
+#undef PRIO_UNSET
+
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
 static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
@@ -9846,6 +9936,8 @@ static const struct selftest_entry {
      "domain scopes the wizard can offer for a host", st_wizardscope},
     {"wizardscopeanswer", "", "host-scope range of a wizard answer",
      st_wizardscopeanswer},
+    {"wizardverdict", "[<answer>]", "what a wizard answer applies",
+     st_wizardverdict},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
