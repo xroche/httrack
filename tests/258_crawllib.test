@@ -214,7 +214,9 @@ ok "--log takes the crawl output, one crawl at a time"
 cat >"${shim}/httrack" <<'SH'
 #!/bin/bash
 printf 'stdin=['
-cat 2>/dev/null || printf closed
+# uutils cat does not fail on a closed fd, so ask the shell; the subshell keeps
+# an exec redirection error from taking bash 3.2 down with it
+if (exec 3<&0) 2>/dev/null; then cat 2>/dev/null; else printf closed; fi
 printf ']\n'
 SH
 chmod +x "${shim}/httrack"
