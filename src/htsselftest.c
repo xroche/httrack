@@ -1279,40 +1279,49 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-// -#test=footerfmt <template>: expand a -%F footer with fixed fields (drives
-// tests/01_engine-footerfmt.test). Also asserts the overflow/zero-size returns
-// the CLI cap keeps out of reach.
+// -#test=footerfmt <template>: expand a -%F footer with fixed values (drives
+// tests/01_engine-footerfmt.test). Also asserts the published field names and
+// the overflow/zero-size returns the CLI cap keeps out of reach.
 static int st_footerfmt(httrackp *opt, int argc, char **argv) {
-  static const hts_footer_field fields[] = {
-      {"addr", "host.example"},
-      {"path", "/dir/page.html"},
-      {"url", "http://host.example/dir/page.html"},
-      {"date", "DATE"},
-      {"lastmodified", "LASTMOD"},
-      {"version", "VER"},
-      {"mime", "text/html"},
-      {"charset", "utf-8"},
-      {"status", "200"},
-      {"size", "1234"},
+  static const char *const values[HTS_FOOTER_FIELD_COUNT] = {
+      "host.example", "/dir/page.html", "http://host.example/dir/page.html",
+      "DATE",         "LASTMOD",        "VER",
+      "text/html",    "utf-8",          "200",
+      "1234",
   };
-  const size_t nfields = sizeof(fields) / sizeof(fields[0]);
+  // Spelled out, not read back from the engine: these ten are the published
+  // contract front ends validate their templates against.
+  static const char *const names[] = {
+      "addr",    "path", "url",     "date",   "lastmodified",
+      "version", "mime", "charset", "status", "size"};
+  size_t i;
   char out[1024];
   char tiny[4];
 
   (void) opt;
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    assertf(hts_footer_field_ok(names[i]));
+  }
+  assertf(!hts_footer_field_ok(NULL));
+  assertf(!hts_footer_field_ok(""));
+  assertf(!hts_footer_field_ok("nosuchfield"));
+  // A prefix or a longer name must not match, or "{addr}" and "{addrx}" would
+  // validate alike.
+  assertf(!hts_footer_field_ok("add"));
+  assertf(!hts_footer_field_ok("addrx"));
   // Overflow (named and legacy) and a zero-size buffer must return <0, never
   // truncate silently or write out of bounds.
-  assertf(hts_footer_format(tiny, sizeof(tiny), "{addr}", fields, nfields) < 0);
-  assertf(hts_footer_format(tiny, sizeof(tiny), "a %s b", fields, nfields) < 0);
-  assertf(hts_footer_format(out, 0, "", fields, nfields) < 0);
+  assertf(hts_footer_format(tiny, sizeof(tiny), "{addr}", values) < 0);
+  assertf(hts_footer_format(tiny, sizeof(tiny), "a %s b", values) < 0);
+  assertf(hts_footer_format(out, 0, "", values) < 0);
   // An empty template yields an empty, terminated string.
-  assertf(hts_footer_format(out, sizeof(out), "", fields, nfields) == 1 &&
+  assertf(hts_footer_format(out, sizeof(out), "", values) == 1 &&
           out[0] == '\0');
   if (argc < 1) {
     fprintf(stderr, "footerfmt: needs a template\n");
     return 1;
   }
-  if (hts_footer_format(out, sizeof(out), argv[0], fields, nfields) < 0) {
+  if (hts_footer_format(out, sizeof(out), argv[0], values) < 0) {
     fprintf(stderr, "footerfmt: overflow\n");
     return 1;
   }
