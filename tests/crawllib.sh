@@ -104,15 +104,23 @@ local_server_start() {
 # backstops most of these tests lacked: a --max-time cap (skipped when the caller
 # sets its own) and a watchdog above it, so a wedge outliving the engine limit
 # reds the test instead of the 45-minute CI timeout.
-# One option, ahead of any httrack argument; -- ends it:
+# Options, ahead of any httrack argument; -- ends them:
 #   --log FILE     crawl output (default: discarded)
+#   --stdin FILE   what the engine reads on stdin, for a test answering an
+#                  interactive prompt; the word "closed" hands it no descriptor
+#                  at all. Redirecting the local_crawl call instead does not
+#                  reach the engine (#1258).
 local_crawl() {
-    local deadline log=/dev/null arg rc=0
+    local deadline log=/dev/null stdin=() arg rc=0
     deadline=$(crawl_deadline)
     while test $# -gt 0; do
         case $1 in
         --log)
             log=$2
+            shift 2
+            ;;
+        --stdin)
+            stdin=(--stdin "$2")
             shift 2
             ;;
         --)
@@ -129,7 +137,8 @@ local_crawl() {
     done
     args+=("$@")
 
-    run_with_timeout "$deadline" httrack "${args[@]}" >"$log" 2>&1 || rc=$?
+    run_with_timeout ${stdin[@]+"${stdin[@]}"} "$deadline" httrack "${args[@]}" \
+        >"$log" 2>&1 || rc=$?
     test "$rc" -ne 124 || fail "crawl watchdog fired after ${deadline}s"
     return "$rc"
 }

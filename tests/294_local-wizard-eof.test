@@ -5,8 +5,6 @@ set -eu
 # shellcheck source=tests/crawllib.sh
 . "$(dirname "$0")/crawllib.sh"
 
-httrack=$(command -v httrack) || ! echo "could not find httrack" >&2 || exit 1
-
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_1247.XXXXXX") || exit 1
 cleanup() {
     rm -rf "$tmpdir"
@@ -33,15 +31,14 @@ cat >"${tmpdir}/root/wizardeof/index.html" <<EOF
 EOF
 local_server_start --root "${tmpdir}/root"
 
-# crawl LABEL; the caller redirects the stdin the wizard will read from
+# crawl LABEL STDIN; STDIN is what the wizard reads from
 crawl() {
     local label=$1 rc=0 asked
 
-    run_with_timeout 60 "$httrack" -O "${tmpdir}/$label" -W --robots=0 \
-        --retries=0 "http://127.0.0.1:${SRV_PORT}/wizardeof/index.html" \
-        >"${tmpdir}/$label.log" 2>&1 || rc=$?
+    local_crawl --stdin "$2" --log "${tmpdir}/$label.log" -- \
+        -O "${tmpdir}/$label" -W --robots=0 --retries=0 \
+        "http://127.0.0.1:${SRV_PORT}/wizardeof/index.html" || rc=$?
 
-    test "$rc" -ne 124 || fail "$label: the wizard never returned"
     test "$rc" -eq 0 || fail "$label: the crawl exited $rc"
     # asked once and then stopped: refusing this one link would ask again
     asked=$(grep -c "beyond this mirror scope" "${tmpdir}/$label.log" || true)
@@ -52,6 +49,6 @@ crawl() {
         fail "$label: the refused link was mirrored"
 }
 
-crawl eof </dev/null
+crawl eof /dev/null
 # a closed descriptor sets only ferror, where EOF sets only feof
-crawl closed <&-
+crawl closed closed
