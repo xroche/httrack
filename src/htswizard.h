@@ -72,6 +72,19 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
    HTS_FALSE includes it, HTS_DEFAULT for any answer outside both ranges. */
 hts_tristate hts_wizard_scope_answer(int n);
 
+/* What an answer decides besides the filters it adds. Each field is one-way: no
+   answer clears a verdict the wizard already computed. */
+typedef struct hts_wizard_verdict {
+  hts_boolean forbids;     /**< refuse the link */
+  hts_boolean stop_asking; /**< and ask nothing more this run */
+  hts_boolean link_only;   /**< take the link, do not recurse from it */
+  hts_boolean unknown;     /**< answer outside every range the engine knows */
+} hts_wizard_verdict;
+
+/* The verdict half of answer `n`, the filter half being
+   hts_wizard_answer_filter(); a new answer needs both. */
+hts_wizard_verdict hts_wizard_answer_verdict(int n);
+
 /* A (tag, attribute) pair naming a reference kind. */
 #ifndef HTS_DEF_DEFSTRUCT_htspair_t
 #define HTS_DEF_DEFSTRUCT_htspair_t

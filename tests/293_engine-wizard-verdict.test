@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# #1239 left the verdict half of an answer reachable only through the
+# interactive callback; it now answers on its own.
+
+assert_selftest "forbids=1 stop=1 link-only=0 unknown=0" wizardverdict -1
+assert_selftest "forbids=1 stop=0 link-only=0 unknown=0" wizardverdict 2
+assert_selftest "forbids=0 stop=0 link-only=1 unknown=0" wizardverdict 4
+assert_selftest "forbids=0 stop=0 link-only=0 unknown=0" wizardverdict 6
+# a scope answer forbids like 2 or allows like 6, one out of range is unknown
+assert_selftest "forbids=1 stop=0 link-only=0 unknown=0" wizardverdict 2000
+assert_selftest "forbids=0 stop=0 link-only=0 unknown=0" wizardverdict 1000
+assert_selftest "forbids=0 stop=0 link-only=0 unknown=1" wizardverdict 999
+
+# every answer, and both range boundaries
+assert_selftest "wizardverdict self-test OK" wizardverdict

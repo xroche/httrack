@@ -4329,6 +4329,54 @@ static int st_wizardscopeanswer(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Prints the verdict a wizard answer decides; with no arguments, asserts every
+   answer against it. */
+static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  if (argc >= 1) {
+    const hts_wizard_verdict v = hts_wizard_answer_verdict(atoi(argv[0]));
+
+    printf("forbids=%d stop=%d link-only=%d unknown=%d\n", v.forbids,
+           v.stop_asking, v.link_only, v.unknown);
+    return 0;
+  }
+#define VERDICT(n, f, s, l, u)                                                 \
+  do {                                                                         \
+    const hts_wizard_verdict v = hts_wizard_answer_verdict(n);                 \
+    assertf(v.forbids == (f) && v.stop_asking == (s) && v.link_only == (l) &&  \
+            v.unknown == (u));                                                 \
+  } while (0)
+  /* '*' is the only answer that also stops the questions */
+  VERDICT(-1, HTS_TRUE, HTS_TRUE, HTS_FALSE, HTS_FALSE);
+  /* the refusing answers, 3 included although it emits no filter yet */
+  VERDICT(0, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  VERDICT(1, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  VERDICT(2, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  VERDICT(3, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  /* 4 takes the link without recursing from it */
+  VERDICT(4, HTS_FALSE, HTS_FALSE, HTS_TRUE, HTS_FALSE);
+  /* the accepting answers decide nothing, and neither does an unparsed one */
+  VERDICT(5, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  VERDICT(6, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  VERDICT(7, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  VERDICT(50, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  VERDICT(-999, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  /* both ends of each scope range: include allows, exclude forbids */
+  VERDICT(HTS_WIZARD_SCOPE_INCLUDE, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  VERDICT(HTS_WIZARD_SCOPE_EXCLUDE - 1, HTS_FALSE, HTS_FALSE, HTS_FALSE,
+          HTS_FALSE);
+  VERDICT(HTS_WIZARD_SCOPE_EXCLUDE, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  VERDICT(INT_MAX, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  /* anything else is unknown rather than silently accepted */
+  VERDICT(8, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_TRUE);
+  VERDICT(-2, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_TRUE);
+  VERDICT(HTS_WIZARD_SCOPE_INCLUDE - 1, HTS_FALSE, HTS_FALSE, HTS_FALSE,
+          HTS_TRUE);
+#undef VERDICT
+  printf("wizardverdict self-test OK\n");
+  return 0;
+}
+
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
 static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
@@ -9846,6 +9894,8 @@ static const struct selftest_entry {
      "domain scopes the wizard can offer for a host", st_wizardscope},
     {"wizardscopeanswer", "", "host-scope range of a wizard answer",
      st_wizardscopeanswer},
+    {"wizardverdict", "[<answer>]", "verdict decided by a wizard answer",
+     st_wizardverdict},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
