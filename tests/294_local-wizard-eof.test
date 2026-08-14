@@ -1,5 +1,5 @@
 #!/bin/bash
-# #1247: at EOF the wizard's answer loop read an empty line forever.
+# #1247: with no answer to be had, the wizard's answer loop re-prompted forever.
 set -eu
 
 # shellcheck source=tests/crawllib.sh
@@ -16,17 +16,25 @@ cleanup_push cleanup
 
 local_server_start --root "$root"
 
-rc=0
-run_with_timeout 60 "$httrack" -O "${tmpdir}/crawl" -W --robots=0 --retries=0 \
-    --timeout=10 "http://127.0.0.1:${SRV_PORT}/wizardeof/index.html" \
-    </dev/null >"${tmpdir}/crawl.log" 2>&1 || rc=$?
+# crawl LABEL; the caller redirects the stdin the wizard will read from
+crawl() {
+    local label=$1 rc=0
 
-test "$rc" -ne 124 || fail "the wizard never returned at EOF"
+    run_with_timeout 60 "$httrack" -O "${tmpdir}/$label" -W --robots=0 \
+        --retries=0 --timeout=10 \
+        "http://127.0.0.1:${SRV_PORT}/wizardeof/index.html" \
+        >"${tmpdir}/$label.log" 2>&1 || rc=$?
 
-# the question must have been asked, or the crawl proved nothing
-grep -q "beyond this mirror scope" "${tmpdir}/crawl.log" ||
-    fail "the wizard asked nothing, so the EOF path was not exercised"
+    test "$rc" -ne 124 || fail "$label: the wizard never returned"
+    # or the crawl never reached the wizard and proved nothing
+    grep -q "beyond this mirror scope" "${tmpdir}/$label.log" ||
+        fail "$label: the wizard asked nothing"
+    test -f "${tmpdir}/$label/127.0.0.1_${SRV_PORT}/wizardeof/index.html" ||
+        fail "$label: the start page was not mirrored"
+    test ! -d "${tmpdir}/$label/192.0.2.1" ||
+        fail "$label: the refused link was mirrored"
+}
 
-test -f "${tmpdir}/crawl/127.0.0.1_${SRV_PORT}/wizardeof/index.html" ||
-    fail "the start page was not mirrored"
-test ! -d "${tmpdir}/crawl/192.0.2.1" || fail "the refused link was mirrored"
+crawl eof </dev/null
+# a closed descriptor sets only ferror, where EOF sets only feof
+crawl closed <&-
