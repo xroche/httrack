@@ -730,6 +730,9 @@ static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
     printf(">> ");
     io_flush;
     linput(stdin, line, 200);
+    /* linput() cannot report EOF, so an unanswerable prompt would spin here */
+    if (!strnotempty(line) && feof(stdin))
+      strcpybuff(line, "*"); /* refuse this link and ask nothing more */
   } while(!strnotempty(line));
   printf("ok..\n");
   return line;

@@ -1,0 +1,32 @@
+#!/bin/bash
+# #1247: at EOF the wizard's answer loop read an empty line forever.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
+root=$(nativepath "${testdir}/server-root")
+
+httrack=$(command -v httrack) || ! echo "could not find httrack" >&2 || exit 1
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_1247.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+local_server_start --root "$root"
+
+rc=0
+run_with_timeout 60 "$httrack" -O "${tmpdir}/crawl" -W --robots=0 --retries=0 \
+    --timeout=10 "http://127.0.0.1:${SRV_PORT}/wizardeof/index.html" \
+    </dev/null >"${tmpdir}/crawl.log" 2>&1 || rc=$?
+
+test "$rc" -ne 124 || fail "the wizard never returned at EOF"
+
+# the question must have been asked, or the crawl proved nothing
+grep -q "beyond this mirror scope" "${tmpdir}/crawl.log" ||
+    fail "the wizard asked nothing, so the EOF path was not exercised"
+
+test -f "${tmpdir}/crawl/127.0.0.1_${SRV_PORT}/wizardeof/index.html" ||
+    fail "the start page was not mirrored"
+test ! -d "${tmpdir}/crawl/192.0.2.1" || fail "the refused link was mirrored"
