@@ -59,6 +59,9 @@ void expand_home(String * str);
    and every pointer a caller kept into one, valid. */
 typedef struct {
   char **argv; /* argc slots used out of capacity allocated */
+  /* per slot: the token arrived already unquoted, so the parser must not strip
+     a quote pair off it again (doit.log tokens, unquoted by next_token) */
+  hts_boolean *unquoted;
   int argc;
   int capacity;
   hts_arena tokens;
@@ -79,6 +82,10 @@ hts_boolean cmdl_add(cmdl_argv *cmd, const char *token);
    HTS_FALSE if it does not fit and neither the slots nor the arena can be
    grown. */
 hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos);
+
+/* cmdl_ins for a token that has already been unquoted by its reader, marking
+   it so the parser leaves its quotes alone. */
+hts_boolean cmdl_ins_unquoted(cmdl_argv *cmd, const char *token, int pos);
 
 typedef enum {
   CMDL_FILE_MISSING, /* not found, or unreadable */
