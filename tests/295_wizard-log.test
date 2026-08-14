@@ -35,6 +35,9 @@ answers 0
 crawl "$tmp/m0" -W
 grep -q "(wizard) answer '0' (n=0) for other.invalid/x.html: forbidden, filters: -other.invalid/x.html$" "$log" ||
     fail "the answer line is wrong in $log"
+# the prefix fspc() tallies by: a notice is a message, never a warning
+grep -q "Info:.*(wizard) answer '0'" "$log" ||
+    fail "the answer is not tallied as a message in $log"
 
 # "ignore the whole host": same reply path, a different filter. The log echoes
 # what was inserted, so a hardcoded pattern would still read -.../x.html here.

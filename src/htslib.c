@@ -6231,9 +6231,9 @@ HTSEXT_API void hts_log_vprint(httrackp * opt, int type, const char *format, va_
       s_type = "debug";
       break;
     case LOG_INFO:
+    case LOG_NOTICE: /* not a warning; fspc() tallies "info" as a message */
       s_type = "info";
       break;
-    case LOG_NOTICE:
     case LOG_WARNING:
       s_type = "warning";
       break;
