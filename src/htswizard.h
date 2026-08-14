@@ -68,6 +68,13 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
+/* Writes into `dst` (capacity `dstsize`, NUL included) the "<host>/<path>" the
+   wizard prompt asks about. Clips rather than aborting, so the prompt can lose
+   its tail on a link longer than `dstsize`; the answer is still recorded
+   against the whole (adr,fil). */
+void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
+                           const char *fil);
+
 /* Which host-scope range answer `n` falls in: HTS_TRUE excludes the scope,
    HTS_FALSE includes it, HTS_DEFAULT for any answer outside both ranges. */
 hts_tristate hts_wizard_scope_answer(int n);

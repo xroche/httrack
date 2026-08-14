@@ -30,7 +30,12 @@ assert_selftest "" wizardfilter 1000 127.0.0.1:8080 /x 0 1
 assert_selftest "forbidden=0 stop=0 prio=42" wizardverdict 1000
 
 # the fallback is a rule that covers the rest of the host
-pattern=$(httrack -O /dev/null -#test=wizardfilter 1000 127.0.0.1:8080 /x)
-pattern=${pattern#+}
+pattern='127.0.0.1:8080/*'
 assert_selftest "127.0.0.1:8080/two.html does match $pattern" filter "$pattern" 127.0.0.1:8080/two.html
 assert_selftest "127.0.0.1:8081/two.html does NOT match $pattern" filter "$pattern" 127.0.0.1:8081/two.html
+
+# the prompt the answer is given about, host and path joined by one slash
+assert_selftest "foo.com/dir/page.html" wizardprompt foo.com /dir/page.html
+assert_selftest "foo.com/index.html" wizardprompt foo.com index.html
+# a link longer than the prompt buffer is clipped, not fatal
+assert_selftest "wizardprompt self-test OK" wizardprompt

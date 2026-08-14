@@ -181,6 +181,19 @@ static void wizard_cat_path(htsbuff *f, const char *sign, const char *adr,
   htsbuff_catn(f, fil, len);
 }
 
+void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
+                           const char *fil) {
+  if (dst == NULL || dstsize == 0)
+    return;
+  /* clipped, never aborting: adr and fil are cut from a crawled link and
+     together outgrow any prompt buffer */
+  dst[0] = '\0';
+  strlncatbuff(dst, adr, dstsize, dstsize - 1);
+  if (*fil != '/')
+    strlncatbuff(dst, "/", dstsize, dstsize - 1 - strlen(dst));
+  strlncatbuff(dst, fil, dstsize, dstsize - 1 - strlen(dst));
+}
+
 HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
                                              char *dst, size_t dstsize) {
   const char *host, *port, *slash, *end, *scope;
@@ -877,13 +890,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       if ((ptr != 0) && (force_mirror == 0)) {
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
-        /* defensive: the engine reads the scope index off adr alone, so a
-           fil the parser never emits without one still needs the separator */
-        tempo[0] = '\0';
-        strcatbuff(tempo, adr);
-        if (*fil != '/')
-          strcatbuff(tempo, "/");
-        strcatbuff(tempo, fil);
+        hts_wizard_prompt_url(tempo, sizeof(tempo), adr, fil);
         s = RUN_CALLBACK1(opt, query3, tempo);
         if (strnotempty(s) == 0)        // entrée
           n = 0;

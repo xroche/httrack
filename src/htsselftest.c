@@ -4155,8 +4155,10 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   /* the link and directory answers */
   EMITS(0, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/page.html");
   EMITS(0, "foo.com", "index.html", HTS_FALSE, "-foo.com/index.html");
-  /* #1251: an answer we could not read records that same default */
+  /* #1251: an answer we could not read records that same default, separator
+     included */
   EMITS(-999, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/page.html");
+  EMITS(-999, "foo.com", "index.html", HTS_FALSE, "-foo.com/index.html");
   EMITS(1, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/*");
   EMITS(1, "foo.com", "/page.html", HTS_FALSE, "-foo.com/*");
   EMITS(5, "foo.com", "/dir/page.html", HTS_FALSE, "+foo.com/dir/*");
@@ -4448,6 +4450,60 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
 }
 
 #undef PRIO_UNSET
+
+/* Prints the prompt the wizard asks about <adr> <fil>; with no argument,
+   asserts it. */
+static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
+  char prompt[HTS_URLMAXSIZE * 2];
+  char adr[HTS_URLMAXSIZE], fil[HTS_URLMAXSIZE * 2];
+
+  (void) opt;
+  if (argc >= 2) {
+    hts_wizard_prompt_url(prompt, sizeof(prompt), argv[0], argv[1]);
+    printf("%s\n", prompt);
+    return 0;
+  }
+#define ASKS(adr_, fil_, expect)                                               \
+  do {                                                                         \
+    hts_wizard_prompt_url(prompt, sizeof(prompt), (adr_), (fil_));             \
+    assertf(strcmp(prompt, (expect)) == 0);                                    \
+  } while (0)
+  ASKS("foo.com", "/dir/page.html", "foo.com/dir/page.html");
+  ASKS("foo.com:8080", "/", "foo.com:8080/");
+  ASKS("user:pass@foo.com", "/x", "user:pass@foo.com/x");
+  /* the separator, for the slash-less forms the parser does not emit today */
+  ASKS("foo.com", "index.html", "foo.com/index.html");
+  ASKS("foo.com", "", "foo.com/");
+#undef ASKS
+
+  /* #1251: a link too long for the prompt is clipped, not fatal, and what is
+     left still names the host it came from */
+  memset(adr, 'a', sizeof(adr) - 1);
+  adr[sizeof(adr) - 1] = '\0';
+  memset(fil, 'b', sizeof(fil) - 1);
+  fil[sizeof(fil) - 1] = '\0';
+  fil[0] = '/';
+  hts_wizard_prompt_url(prompt, sizeof(prompt), adr, fil);
+  assertf(strlen(prompt) == sizeof(prompt) - 1);
+  assertf(strncmp(prompt, adr, sizeof(adr) - 1) == 0);
+  assertf(prompt[sizeof(adr) - 1] == '/');
+  /* and again with the separator to insert, which eats one more byte */
+  fil[0] = 'b';
+  hts_wizard_prompt_url(prompt, sizeof(prompt), adr, fil);
+  assertf(strlen(prompt) == sizeof(prompt) - 1);
+  assertf(strncmp(prompt, adr, sizeof(adr) - 1) == 0);
+  assertf(prompt[sizeof(adr) - 1] == '/');
+  assertf(prompt[sizeof(adr)] == 'b');
+  /* a host alone long enough to fill it leaves no room for either */
+  memset(fil, 'b', sizeof(fil) - 1);
+  fil[0] = '/';
+  hts_wizard_prompt_url(prompt, sizeof(prompt), fil, fil);
+  assertf(strlen(prompt) == sizeof(prompt) - 1);
+  assertf(strncmp(prompt, fil, sizeof(prompt) - 1) == 0);
+
+  printf("wizardprompt self-test OK\n");
+  return 0;
+}
 
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
@@ -9968,6 +10024,8 @@ static const struct selftest_entry {
      st_wizardscopeanswer},
     {"wizardverdict", "[<answer>]", "what a wizard answer applies",
      st_wizardverdict},
+    {"wizardprompt", "[<adr> <fil>]", "URL the wizard prompt asks about",
+     st_wizardprompt},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
