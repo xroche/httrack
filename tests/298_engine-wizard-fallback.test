@@ -13,7 +13,7 @@ set -euo pipefail
 assert_selftest "-foo.com/dir/page.html" wizardfilter -999 foo.com /dir/page.html
 reply=$(httrack -O /dev/null -#test=wizardverdict -999)
 grep -q "forbidden=1 stop=0 prio=42" <<<"$reply" || fail "-999 did not refuse: $reply"
-grep -q "unreadable answer" <<<"$reply" || fail "-999 refused silently: $reply"
+grep -q "could not read your answer" <<<"$reply" || fail "-999 refused silently: $reply"
 
 # a host with no domain below it takes the scope answer over the host itself
 assert_selftest "+127.0.0.1:8080/*" wizardfilter 1000 127.0.0.1:8080 /x
@@ -29,7 +29,7 @@ assert_selftest "" wizardfilter 1000 127.0.0.1:8080 /x 0 1
 # a host that does have scopes is honoured in full, so nothing is logged
 assert_selftest "forbidden=0 stop=0 prio=42" wizardverdict 1000
 
-# the fallback is a rule that really covers the rest of the host
+# the fallback is a rule that covers the rest of the host
 pattern=$(httrack -O /dev/null -#test=wizardfilter 1000 127.0.0.1:8080 /x)
 pattern=${pattern#+}
 assert_selftest "127.0.0.1:8080/two.html does match $pattern" filter "$pattern" 127.0.0.1:8080/two.html

@@ -361,8 +361,9 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
   case -999: /* the "!" answer, and anything the front end could not parse */
     *forbidden_url = 1;
     hts_log_print(opt, LOG_WARNING,
-                  "(wizard) unreadable answer at %s%s, ignoring the link", adr,
-                  fil);
+                  "(wizard) could not read your answer at %s%s: link refused, "
+                  "and the refusal recorded",
+                  adr, fil);
     break;
 
   case 5:  /* this directory and below, or the whole host */
@@ -371,7 +372,8 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
   case 50: /* nothing to do */
     break;
 
-  default: /* a scope answer forbids like 2 or allows like 6 */
+  default: /* a scope answer forbids like 2 or allows like 6; anything else is
+              unknown */
     if (hts_wizard_scope_answer(n) == HTS_DEFAULT) {
       hts_log_print(opt, LOG_WARNING,
                     "(wizard) unknown answer %d at %s%s, keeping the computed "
@@ -386,9 +388,9 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
 
       if (!wizard_answer_scope(adr, n, scope, sizeof(scope)))
         hts_log_print(opt, LOG_WARNING,
-                      "(wizard) no domain scope %d for %s, answer applied to "
-                      "the whole host",
-                      n, adr);
+                      "(wizard) %s has no domain above it, answer %d applied "
+                      "to the whole host",
+                      adr, n);
     }
     break;
   }
@@ -875,8 +877,12 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       if ((ptr != 0) && (force_mirror == 0)) {
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
+        /* defensive: the engine reads the scope index off adr alone, so a
+           fil the parser never emits without one still needs the separator */
         tempo[0] = '\0';
         strcatbuff(tempo, adr);
+        if (*fil != '/')
+          strcatbuff(tempo, "/");
         strcatbuff(tempo, fil);
         s = RUN_CALLBACK1(opt, query3, tempo);
         if (strnotempty(s) == 0)        // entrée

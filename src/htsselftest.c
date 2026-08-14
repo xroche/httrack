@@ -4200,11 +4200,13 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
              "+*.foo.com:8080/*");
   EMITS_SLOT(1, SCOPE_IN, "user:pass@www.foo.com", "/x", HTS_FALSE,
              "+www.foo.com/*");
-  /* #1251: a host with no domain below it takes the answer over itself */
+  /* #1251: a host with no domain below takes the answer on the host itself */
   EMITS_SLOT(0, SCOPE_IN + 2, "www.foo.com", "/x", HTS_FALSE, "+www.foo.com/*");
   EMITS_SLOT(1, SCOPE_IN + 2, "www.foo.com", "/x", HTS_FALSE, "");
   EMITS_SLOT(0, SCOPE_IN, "127.0.0.1:8080", "/x", HTS_FALSE,
              "+127.0.0.1:8080/*");
+  EMITS_SLOT(0, SCOPE_IN, "user:pass@127.0.0.1", "/x", HTS_FALSE,
+             "+127.0.0.1/*");
   EMITS_SLOT(1, SCOPE_IN, "127.0.0.1:8080", "/x", HTS_FALSE, "");
   EMITS_SLOT(0, SCOPE_EX, "localhost", "/x", HTS_FALSE, "-localhost/*");
   EMITS_SLOT(0, SCOPE_EX, "[::1]", "/x", HTS_FALSE, "-[::1]/*");
@@ -4411,11 +4413,9 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(HTS_WIZARD_SCOPE_INCLUDE - 1, 0, 0, 0, PRIO_UNSET);
 #undef APPLIES
 
-/* the one log line answer `n` leaves for `adr`, "" for none at all */
+/* the one log line answer `n` leaves for `adr`, "" for none */
 #define WARNS(n, adr, expect)                                                  \
   do {                                                                         \
-    const char *const want = (expect);                                         \
-                                                                               \
     log = tmpfile();                                                           \
     assertf(log != NULL);                                                      \
     opt->log = log;                                                            \
@@ -4423,21 +4423,22 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
     depth = PRIO_UNSET;                                                        \
     hts_wizard_apply_verdict(opt, (n), (adr), "/a/b.html", &url, &depth);      \
     rewind(log);                                                               \
-    if (*want != '\0') {                                                       \
-      assertf(fgets(line, (int) sizeof(line), log) != NULL);                   \
-      assertf(strstr(line, want) != NULL);                                     \
-    }                                                                          \
-    assertf(fgets(line, (int) sizeof(line), log) == NULL);                     \
+    if (fgets(line, (int) sizeof(line), log) == NULL)                          \
+      line[0] = '\0';                                                          \
+    /* the wanted text, an empty log where there is none, nothing after it */  \
+    assertf(strstr(line, (expect)) != NULL &&                                  \
+            ((expect)[0] != '\0') == (line[0] != '\0') &&                      \
+            fgets(line, (int) sizeof(line), log) == NULL);                     \
     fclose(log);                                                               \
   } while (0)
   /* an answer the engine can honour in full says nothing */
   WARNS(6, "foo.com", "");
   WARNS(8, "foo.com", "unknown answer 8");
   WARNS(HTS_WIZARD_SCOPE_INCLUDE, "www.foo.com", "");
-  /* #1251: the two the engine cannot honour as asked, and used to swallow */
-  WARNS(-999, "foo.com", "unreadable answer");
-  WARNS(HTS_WIZARD_SCOPE_INCLUDE, "127.0.0.1", "no domain scope");
-  WARNS(HTS_WIZARD_SCOPE_EXCLUDE + 5, "www.foo.com", "no domain scope");
+  /* #1251: the answers the engine cannot honour as asked */
+  WARNS(-999, "foo.com", "could not read your answer");
+  WARNS(HTS_WIZARD_SCOPE_INCLUDE, "127.0.0.1", "has no domain above it");
+  WARNS(HTS_WIZARD_SCOPE_EXCLUDE + 5, "www.foo.com", "has no domain above it");
 #undef WARNS
 
   opt->log = projectlog;
