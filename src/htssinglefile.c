@@ -517,11 +517,11 @@ static void sf_warn_oversize(sf_ctx *ctx, const char *path, LLint size,
   if (*ctx->warn_budget <= 0)
     return;
   if (--(*ctx->warn_budget) == 0) {
-    hts_log_print(ctx->opt, LOG_NOTICE,
+    hts_log_print(ctx->opt, LOG_WARNING,
                   "single-file: further over-cap assets not reported");
     return;
   }
-  hts_log_print(ctx->opt, LOG_NOTICE,
+  hts_log_print(ctx->opt, LOG_WARNING,
                 "single-file: %s left as a link (" LLintP
                 " bytes, over the " LLintP "-byte cap)",
                 path, size, cap);
