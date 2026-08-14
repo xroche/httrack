@@ -160,10 +160,8 @@ grep -qF -- '-%F "\"<!-- MARK -->" -r2' "$out3/hts-cache/doit.log" || {
 }
 
 # --- 5. a plain argument keeps its leading quote too (#1263) -----------------
-# A filter, not an option value, so it also meets the second strip pass. Three
-# leading quotes, because that pass and the -O one each eat one. The reader
-# unquotes through next_token, so stripping the token again aborts the reprise,
-# and the abort precedes the writer, so every later run repeats it.
+# A filter, not an option value, so it meets the second strip pass too. Three
+# leading quotes: that pass and the -O one each eat one.
 out4="$tmp/out4"
 site4="$tmp/site4"
 mkdir -p "$site4"
