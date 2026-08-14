@@ -4112,25 +4112,27 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Prints the filter answer <n> emits for (adr, fil) [up]; with no arguments,
-   asserts every answer against its expected pattern (#1119). */
+/* Prints the filter answer <n> emits for (adr, fil) [up] in [slot]; with no
+   arguments, asserts every answer against its expected pattern (#1119). */
 static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   char pattern[HTS_URLMAXSIZE * 2];
   htsbuff f = htsbuff_array(pattern);
 
   (void) opt;
   if (argc >= 3) {
-    hts_wizard_answer_filter(&f, atoi(argv[0]), argv[1], argv[2],
-                             argc >= 4 && atoi(argv[3]) != 0 ? HTS_TRUE
-                                                             : HTS_FALSE);
+    hts_wizard_answer_filter(
+        &f, argc >= 5 ? atoi(argv[4]) : 0, atoi(argv[0]), argv[1], argv[2],
+        argc >= 4 && atoi(argv[3]) != 0 ? HTS_TRUE : HTS_FALSE);
     printf("%s\n", pattern);
     return 0;
   }
-#define EMITS(n, adr, fil, up, expect)                                         \
+#define EMITS_SLOT(slot, n, adr, fil, up, expect)                              \
   do {                                                                         \
-    hts_wizard_answer_filter(&f, (n), (adr), (fil), (up));                     \
+    hts_wizard_answer_filter(&f, (slot), (n), (adr), (fil), (up));             \
     assertf(strcmp(pattern, (expect)) == 0);                                   \
   } while (0)
+#define EMITS(n, adr, fil, up, expect)                                         \
+  EMITS_SLOT(0, (n), (adr), (fil), (up), (expect))
 
   /* the host-wide answers: 2 forbids, 5 (allowed to go up) and 6 authorize */
   EMITS(2, "foo.com", "/index.html", HTS_FALSE, "-foo.com/*");
@@ -4171,8 +4173,159 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   EMITS(3, "foo.com", "/x", HTS_FALSE, "");
   EMITS(4, "foo.com", "/x", HTS_FALSE, "");
   EMITS(50, "foo.com", "/x", HTS_FALSE, "");
+  /* only slot 0 is ever filled outside the host-scope answers */
+  EMITS_SLOT(1, 2, "foo.com", "/x", HTS_FALSE, "");
+  EMITS_SLOT(1, 6, "foo.com", "/x", HTS_FALSE, "");
+
+  /* the host-scope answers (#1117): both slots, the starred one missing the
+     apex is why the second exists */
+#define SCOPE_IN HTS_WIZARD_SCOPE_INCLUDE
+#define SCOPE_EX HTS_WIZARD_SCOPE_EXCLUDE
+  EMITS_SLOT(0, SCOPE_IN, "www.example.co.uk", "/x", HTS_FALSE,
+             "+*.www.example.co.uk/*");
+  EMITS_SLOT(1, SCOPE_IN, "www.example.co.uk", "/x", HTS_FALSE,
+             "+www.example.co.uk/*");
+  EMITS_SLOT(0, SCOPE_IN + 1, "www.example.co.uk", "/x", HTS_FALSE,
+             "+*.example.co.uk/*");
+  EMITS_SLOT(1, SCOPE_IN + 1, "www.example.co.uk", "/x", HTS_FALSE,
+             "+example.co.uk/*");
+  EMITS_SLOT(0, SCOPE_EX + 1, "www.example.co.uk", "/x", HTS_FALSE,
+             "-*.example.co.uk/*");
+  EMITS_SLOT(1, SCOPE_EX + 1, "www.example.co.uk", "/x", HTS_FALSE,
+             "-example.co.uk/*");
+  /* the port rides along, the credentials do not */
+  EMITS_SLOT(0, SCOPE_IN + 1, "www.foo.com:8080", "/x", HTS_FALSE,
+             "+*.foo.com:8080/*");
+  EMITS_SLOT(1, SCOPE_IN, "user:pass@www.foo.com", "/x", HTS_FALSE,
+             "+www.foo.com/*");
+  /* past the last scope, and slot 2, emit nothing */
+  EMITS_SLOT(0, SCOPE_IN + 2, "www.foo.com", "/x", HTS_FALSE, "");
+  EMITS_SLOT(2, SCOPE_IN, "www.foo.com", "/x", HTS_FALSE, "");
+
+  /* what the pair must and must not catch */
+  EMITS_SLOT(0, SCOPE_IN + 1, "www.example.co.uk", "/x", HTS_FALSE,
+             "+*.example.co.uk/*");
+  assertf(strjoker("a.b.example.co.uk/x", pattern + 1, NULL, NULL) != NULL);
+  assertf(strjoker("example.co.uk/x", pattern + 1, NULL, NULL) == NULL);
+  assertf(strjoker("notexample.co.uk/x", pattern + 1, NULL, NULL) == NULL);
+  assertf(strjoker("example.co.uk.evil.com/x", pattern + 1, NULL, NULL) ==
+          NULL);
+  EMITS_SLOT(1, SCOPE_IN + 1, "www.example.co.uk", "/x", HTS_FALSE,
+             "+example.co.uk/*");
+  assertf(strjoker("example.co.uk/x", pattern + 1, NULL, NULL) != NULL);
+  assertf(strjoker("notexample.co.uk/x", pattern + 1, NULL, NULL) == NULL);
+#undef SCOPE_IN
+#undef SCOPE_EX
+#undef EMITS_SLOT
 #undef EMITS
   printf("wizardfilter self-test OK\n");
+  return 0;
+}
+
+/* Prints the domain scopes offered for <question>; with no argument, asserts
+   the enumeration (#1117). */
+static int st_wizardscope(httrackp *opt, int argc, char **argv) {
+  char scope[HTS_URLMAXSIZE];
+  int k;
+
+  (void) opt;
+  if (argc >= 1) {
+    for (k = 0; hts_wizard_host_scope(argv[0], k, scope, sizeof(scope)); k++)
+      printf("%d %s\n", k, scope);
+    return 0;
+  }
+#define SCOPE(question, k, expect)                                             \
+  do {                                                                         \
+    assertf(hts_wizard_host_scope((question), (k), scope, sizeof(scope)));     \
+    assertf(strcmp(scope, (expect)) == 0);                                     \
+  } while (0)
+/* poisoned first: comparing against '\0' cannot see a clear that never ran */
+#define NOSCOPE_SIZED(question, k, size)                                       \
+  do {                                                                         \
+    memset(scope, 'X', sizeof(scope));                                         \
+    assertf(!hts_wizard_host_scope((question), (k), scope, (size)));           \
+    assertf(scope[0] == '\0');                                                 \
+  } while (0)
+#define NOSCOPE(question, k) NOSCOPE_SIZED((question), (k), sizeof(scope))
+
+  /* k widens by one label at a time, starting at the host itself */
+  SCOPE("download.example.co.uk/x", 0, "download.example.co.uk");
+  SCOPE("download.example.co.uk/x", 1, "example.co.uk");
+  SCOPE("download.example.co.uk/x", 2, "co.uk");
+  NOSCOPE("download.example.co.uk/x", 3); /* "uk" is a bare TLD */
+  SCOPE("example.com", 0, "example.com"); /* an adr with no fil works */
+  NOSCOPE("example.com", 1);
+  NOSCOPE("localhost/x", 0); /* nothing to widen into */
+  NOSCOPE("download.example.co.uk/x", -1);
+
+  /* protocol and credentials are stripped, the port kept */
+  SCOPE("ftp://user:pass@www.foo.com/x", 1, "foo.com");
+  SCOPE("www.foo.com:8080/x", 0, "www.foo.com:8080");
+  SCOPE("www.foo.com:8080/x", 1, "foo.com:8080");
+  NOSCOPE("www.foo.com:8080/x", 2);
+  /* a path that carries dots or a colon must not be read as host labels */
+  SCOPE("foo.com/a.b.c/d:e", 0, "foo.com");
+  NOSCOPE("foo.com/a.b.c/d:e", 1);
+
+  /* the shared predicate: a dotless run of digits is a hostname, not an IP */
+  assertf(hts_host_is_ipv4("1.2.3.4", 7));
+  assertf(!hts_host_is_ipv4("12345", 5));
+  assertf(!hts_host_is_ipv4("foo.com", 7));
+
+  /* an IP literal splits on dots without being a domain */
+  NOSCOPE("192.168.1.1/x", 0);
+  NOSCOPE("192.168.1.1:8080/x", 0);
+  NOSCOPE("[3ffe:b80:1234::1]/x", 0);
+  /* the dots inside this one reach the label walk unless brackets are refused
+   */
+  NOSCOPE("[::ffff:1.2.3.4]/x", 0);
+
+  /* the root label of a fully-qualified host is not a label */
+  SCOPE("www.foo.com./x", 0, "www.foo.com.");
+  SCOPE("www.foo.com./x", 1, "foo.com.");
+  NOSCOPE("www.foo.com./x", 2); /* "com." is still a bare TLD */
+  NOSCOPE(".", 0);
+
+  /* the destination must fit the scope and its terminator, and never truncate
+   */
+  {
+    const char *q = "www.example.com/x";
+    const size_t need = strlen("www.example.com");
+
+    memset(scope, 'X', sizeof(scope));
+    assertf(hts_wizard_host_scope(q, 0, scope, need + 1));
+    assertf(strcmp(scope, "www.example.com") == 0);
+    NOSCOPE_SIZED(q, 0, need);
+    NOSCOPE_SIZED(q, 0, 4);
+    NOSCOPE_SIZED(q, 0, 1);
+  }
+#undef SCOPE
+#undef NOSCOPE
+#undef NOSCOPE_SIZED
+  printf("wizardscope self-test OK\n");
+  return 0;
+}
+
+/* #1117: which host-scope range an answer falls in. */
+static int st_wizardscopeanswer(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+#define ANSWER(n, expect) assertf(hts_wizard_scope_answer(n) == (expect))
+  /* the plain answers, and the boundary just below the first range */
+  ANSWER(-999, HTS_DEFAULT);
+  ANSWER(-1, HTS_DEFAULT);
+  ANSWER(0, HTS_DEFAULT);
+  ANSWER(7, HTS_DEFAULT);
+  ANSWER(50, HTS_DEFAULT);
+  ANSWER(HTS_WIZARD_SCOPE_INCLUDE - 1, HTS_DEFAULT);
+  /* include runs up to the exclude base, and exclude has no upper end */
+  ANSWER(HTS_WIZARD_SCOPE_INCLUDE, HTS_FALSE);
+  ANSWER(HTS_WIZARD_SCOPE_EXCLUDE - 1, HTS_FALSE);
+  ANSWER(HTS_WIZARD_SCOPE_EXCLUDE, HTS_TRUE);
+  ANSWER(INT_MAX, HTS_TRUE);
+#undef ANSWER
+  printf("wizardscopeanswer self-test OK\n");
   return 0;
 }
 
@@ -9687,8 +9840,12 @@ static const struct selftest_entry {
      st_hashkey_bounds},
     {"redirect-samefile", "", "same-file redirect detection self-test (#159)",
      st_redirect_samefile},
-    {"wizardfilter", "[<answer> <adr> <fil> [up]]",
+    {"wizardfilter", "[<answer> <adr> <fil> [up [slot]]]",
      "filter emitted by a wizard answer", st_wizardfilter},
+    {"wizardscope", "[<question>]",
+     "domain scopes the wizard can offer for a host", st_wizardscope},
+    {"wizardscopeanswer", "", "host-scope range of a wizard answer",
+     st_wizardscopeanswer},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},

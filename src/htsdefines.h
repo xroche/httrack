@@ -146,6 +146,13 @@ typedef const char *(*t_hts_htmlcheck_query3)(t_hts_callbackarg *carg,
                                               httrackp *opt,
                                               const char *question);
 
+/* query3 answers HTS_WIZARD_SCOPE_INCLUDE+k and HTS_WIZARD_SCOPE_EXCLUDE+k take
+   or drop the k-th host scope hts_wizard_host_scope() enumerates. The stride
+   outruns any hostname's label count, so it cannot collide with the plain
+   single-digit answers. */
+#define HTS_WIZARD_SCOPE_INCLUDE 1000
+#define HTS_WIZARD_SCOPE_EXCLUDE 2000
+
 /* Per-tick progress hook: 'back' is the transfer slot array of 'back_max'
    entries, back_index the active one; lien_tot/lien_ntot and stats report
    queue size and running totals, stat_time the elapsed time. */

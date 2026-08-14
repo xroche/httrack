@@ -255,6 +255,10 @@ hts_boolean hts_is_control_free_sized(const char *str, size_t len);
 /* Same over a NUL-terminated string. */
 hts_boolean hts_is_control_free(const char *str);
 
+/* TRUE if host[0..len) is an IPv4 literal: digits and dots, at least one dot.
+   Such a host has no domain structure to reverse or to widen into. */
+hts_boolean hts_host_is_ipv4(const char *host, size_t len);
+
 /* TRUE if this -P proxy name (which keeps its scheme) is a SOCKS5 proxy. */
 hts_boolean hts_proxy_is_socks(const char *name);
 

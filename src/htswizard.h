@@ -57,11 +57,20 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
                                hts_boolean filters_decided,
                                hts_boolean filters_refused);
 
-/* Builds into `f` the filter answer `n` adds for the link (adr,fil), and leaves
-   `f` empty when the answer adds none. `seeker_up` is the HTS_SEEKER_UP bit of
-   opt->seeker, read by answer 5. */
-void hts_wizard_answer_filter(htsbuff *f, int n, const char *adr,
+/* Most filters one wizard answer can add. Slots must stay contiguous: the
+   caller stops at the first empty one. */
+#define HTS_WIZARD_MAX_FILTERS 2
+
+/* Builds into `f` the `slot`-th filter answer `n` adds for the link (adr,fil),
+   and leaves `f` empty past the last one. Only the host-scope answers emit a
+   second, because their starred form misses the apex. `seeker_up` is the
+   HTS_SEEKER_UP bit of opt->seeker, read by answer 5. */
+void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
+
+/* Which host-scope range answer `n` falls in: HTS_TRUE excludes the scope,
+   HTS_FALSE includes it, HTS_DEFAULT for any answer outside both ranges. */
+hts_tristate hts_wizard_scope_answer(int n);
 
 /* A (tag, attribute) pair naming a reference kind. */
 #ifndef HTS_DEF_DEFSTRUCT_htspair_t

@@ -712,6 +712,20 @@ static const char *__cdecl htsshow_query3(t_hts_callbackarg * carg,
          "5 Mirror this link (useful)\n"
          "6 Mirror all links located on the same domain as this link\n" "\n",
          question);
+  /* the domain scopes are host-dependent, so the engine enumerates them */
+  {
+    char scope[HTS_URLMAXSIZE];
+    int k;
+
+    for (k = 0; hts_wizard_host_scope(question, k, scope, sizeof(scope)); k++)
+      printf("%d Mirror %s and every host below it\n",
+             HTS_WIZARD_SCOPE_INCLUDE + k, scope);
+    for (k = 0; hts_wizard_host_scope(question, k, scope, sizeof(scope)); k++)
+      printf("%d Ignore %s and every host below it\n",
+             HTS_WIZARD_SCOPE_EXCLUDE + k, scope);
+    if (k != 0)
+      printf("\n");
+  }
   do {
     printf(">> ");
     io_flush;
