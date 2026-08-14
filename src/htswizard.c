@@ -360,6 +360,11 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
                     n, adr, fil);
     break;
   }
+
+  /* the question is asked only while undecided; an answer that does not forbid
+     authorizes the link */
+  if (*forbidden_url == -1)
+    *forbidden_url = 0;
 }
 
 static int hts_acceptlink_(httrackp * opt, int ptr,
