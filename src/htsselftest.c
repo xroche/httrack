@@ -4329,53 +4329,95 @@ static int st_wizardscopeanswer(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* Prints the verdict a wizard answer decides; with no arguments, asserts every
-   answer against it. */
-static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
-  (void) opt;
-  if (argc >= 1) {
-    const hts_wizard_verdict v = hts_wizard_answer_verdict(atoi(argv[0]));
+/* Poison: comparing the recursion cap against 0 would not see a stray write of
+   the level the crawl uses. */
+#define PRIO_UNSET 42
 
-    printf("forbids=%d stop=%d link-only=%d unknown=%d\n", v.forbids,
-           v.stop_asking, v.link_only, v.unknown);
+/* Prints what a wizard answer applies; with no arguments, asserts it for every
+   answer, from both an allowed and an already refused link. */
+static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
+  const hts_wizard asked = opt->wizard;
+  FILE *const projectlog = opt->log;
+  char line[HTS_URLMAXSIZE];
+  FILE *log;
+  int url, depth;
+
+  url = 0;
+  depth = PRIO_UNSET;
+  opt->wizard = HTS_WIZARD_ASK;
+  if (argc >= 1) {
+    hts_wizard_apply_verdict(opt, atoi(argv[0]), "foo.com", "/a/b.html", &url,
+                             &depth);
+    printf("forbidden=%d stop=%d prio=%d\n", url,
+           opt->wizard == HTS_WIZARD_AUTO, depth);
+    opt->wizard = asked;
     return 0;
   }
-#define VERDICT(n, f, s, l, u)                                                 \
+  opt->log = NULL; /* the battery walks the answers that warn */
+/* answer `n` over a link the crawl had left at `in` decides `forbidden`, and
+   raises the wizard mode or the recursion cap only where said. */
+#define APPLIES(n, in, forbidden, stop, prio)                                  \
   do {                                                                         \
-    const hts_wizard_verdict v = hts_wizard_answer_verdict(n);                 \
-    assertf(v.forbids == (f) && v.stop_asking == (s) && v.link_only == (l) &&  \
-            v.unknown == (u));                                                 \
+    url = (in);                                                                \
+    depth = PRIO_UNSET;                                                        \
+    opt->wizard = HTS_WIZARD_ASK;                                              \
+    hts_wizard_apply_verdict(opt, (n), "foo.com", "/a/b.html", &url, &depth);  \
+    assertf(url == (forbidden));                                               \
+    assertf(opt->wizard == ((stop) ? HTS_WIZARD_AUTO : HTS_WIZARD_ASK));       \
+    assertf(depth == (prio));                                                  \
   } while (0)
-  /* '*' is the only answer that also stops the questions */
-  VERDICT(-1, HTS_TRUE, HTS_TRUE, HTS_FALSE, HTS_FALSE);
+  /* '*' refuses and stops the questions */
+  APPLIES(-1, 0, 1, 1, PRIO_UNSET);
+  APPLIES(-1, 1, 1, 1, PRIO_UNSET);
   /* the refusing answers, 3 included although it emits no filter yet */
-  VERDICT(0, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  VERDICT(1, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  VERDICT(2, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  VERDICT(3, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  /* 4 takes the link without recursing from it */
-  VERDICT(4, HTS_FALSE, HTS_FALSE, HTS_TRUE, HTS_FALSE);
-  /* the accepting answers decide nothing, and neither does an unparsed one */
-  VERDICT(5, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  VERDICT(6, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  VERDICT(7, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  VERDICT(50, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  VERDICT(-999, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
+  APPLIES(0, 0, 1, 0, PRIO_UNSET);
+  APPLIES(1, 0, 1, 0, PRIO_UNSET);
+  APPLIES(2, 0, 1, 0, PRIO_UNSET);
+  APPLIES(3, 0, 1, 0, PRIO_UNSET);
+  /* 4 caps the recursion and decides the link neither way */
+  APPLIES(4, 0, 0, 0, 1);
+  APPLIES(4, 1, 1, 0, 1);
+  /* an accepting answer never clears a refusal the crawl already computed */
+  APPLIES(5, 1, 1, 0, PRIO_UNSET);
+  APPLIES(6, 1, 1, 0, PRIO_UNSET);
+  APPLIES(7, 1, 1, 0, PRIO_UNSET);
+  APPLIES(50, 1, 1, 0, PRIO_UNSET);
+  APPLIES(-999, 1, 1, 0, PRIO_UNSET);
+  APPLIES(6, 0, 0, 0, PRIO_UNSET);
   /* both ends of each scope range: include allows, exclude forbids */
-  VERDICT(HTS_WIZARD_SCOPE_INCLUDE, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  VERDICT(HTS_WIZARD_SCOPE_EXCLUDE - 1, HTS_FALSE, HTS_FALSE, HTS_FALSE,
-          HTS_FALSE);
-  VERDICT(HTS_WIZARD_SCOPE_EXCLUDE, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  VERDICT(INT_MAX, HTS_TRUE, HTS_FALSE, HTS_FALSE, HTS_FALSE);
-  /* anything else is unknown rather than silently accepted */
-  VERDICT(8, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_TRUE);
-  VERDICT(-2, HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_TRUE);
-  VERDICT(HTS_WIZARD_SCOPE_INCLUDE - 1, HTS_FALSE, HTS_FALSE, HTS_FALSE,
-          HTS_TRUE);
-#undef VERDICT
+  APPLIES(HTS_WIZARD_SCOPE_INCLUDE, 0, 0, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_EXCLUDE - 1, 0, 0, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, 0, 1, 0, PRIO_UNSET);
+  APPLIES(INT_MAX, 0, 1, 0, PRIO_UNSET);
+  /* an answer in no range is not taken for an accept, nor for a refusal */
+  APPLIES(8, 0, 0, 0, PRIO_UNSET);
+  APPLIES(8, 1, 1, 0, PRIO_UNSET);
+  APPLIES(999, 0, 0, 0, PRIO_UNSET);
+  APPLIES(-2, 0, 0, 0, PRIO_UNSET);
+  APPLIES(-1000, 0, 0, 0, PRIO_UNSET);
+  APPLIES(INT_MIN, 0, 0, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_INCLUDE - 1, 0, 0, 0, PRIO_UNSET);
+#undef APPLIES
+
+  /* the warning is all an unknown answer does, so a known one must be silent */
+  log = tmpfile();
+  assertf(log != NULL);
+  opt->log = log;
+  hts_wizard_apply_verdict(opt, 6, "foo.com", "/a/b.html", &url, &depth);
+  hts_wizard_apply_verdict(opt, 8, "foo.com", "/a/b.html", &url, &depth);
+  rewind(log);
+  assertf(fgets(line, (int) sizeof(line), log) != NULL);
+  assertf(strstr(line, "unknown answer 8") != NULL);
+  assertf(fgets(line, (int) sizeof(line), log) == NULL);
+  fclose(log);
+
+  opt->log = projectlog;
+  opt->wizard = asked;
   printf("wizardverdict self-test OK\n");
   return 0;
 }
+
+#undef PRIO_UNSET
 
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
@@ -9894,7 +9936,7 @@ static const struct selftest_entry {
      "domain scopes the wizard can offer for a host", st_wizardscope},
     {"wizardscopeanswer", "", "host-scope range of a wizard answer",
      st_wizardscopeanswer},
-    {"wizardverdict", "[<answer>]", "verdict decided by a wizard answer",
+    {"wizardverdict", "[<answer>]", "what a wizard answer applies",
      st_wizardverdict},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",

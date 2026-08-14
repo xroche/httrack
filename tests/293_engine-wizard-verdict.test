@@ -6,17 +6,10 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
 
-# #1239 left the verdict half of an answer reachable only through the
-# interactive callback; it now answers on its own.
+# The verdict half of a wizard answer, driven without the interactive callback.
 
-assert_selftest "forbids=1 stop=1 link-only=0 unknown=0" wizardverdict -1
-assert_selftest "forbids=1 stop=0 link-only=0 unknown=0" wizardverdict 2
-assert_selftest "forbids=0 stop=0 link-only=1 unknown=0" wizardverdict 4
-assert_selftest "forbids=0 stop=0 link-only=0 unknown=0" wizardverdict 6
-# a scope answer forbids like 2 or allows like 6, one out of range is unknown
-assert_selftest "forbids=1 stop=0 link-only=0 unknown=0" wizardverdict 2000
-assert_selftest "forbids=0 stop=0 link-only=0 unknown=0" wizardverdict 1000
-assert_selftest "forbids=0 stop=0 link-only=0 unknown=1" wizardverdict 999
+assert_selftest "forbidden=1 stop=1 prio=42" wizardverdict -1
+assert_selftest "forbidden=0 stop=0 prio=42" wizardverdict 6
 
-# every answer, and both range boundaries
+# every answer, both scope ranges, and a link the crawl had already refused
 assert_selftest "wizardverdict self-test OK" wizardverdict

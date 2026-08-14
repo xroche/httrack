@@ -322,24 +322,25 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
   }
 }
 
-hts_wizard_verdict hts_wizard_answer_verdict(int n) {
-  hts_wizard_verdict v = {HTS_FALSE, HTS_FALSE, HTS_FALSE, HTS_FALSE};
-
+void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
+                              const char *fil, int *forbidden_url,
+                              int *set_prio_to) {
   switch (n) {
   case -1: /* skip this link and every question after it */
-    v.forbids = v.stop_asking = HTS_TRUE;
+    *forbidden_url = 1;
+    opt->wizard = HTS_WIZARD_AUTO;
     break;
 
   case 0: /* this link */
   case 1: /* this directory and below */
   case 2: /* the whole host */
   case 3: /* the parent directory, which emits no filter yet */
-    v.forbids = HTS_TRUE;
+    *forbidden_url = 1;
     break;
 
   case 4: /* wizard filters both allow and forbid, so an isolated link taken
              with no depth limit would mirror the world */
-    v.link_only = HTS_TRUE;
+    *set_prio_to = 0 + 1; /* recursion level 0 */
     break;
 
   case 5:    /* this directory and below, or the whole host */
@@ -351,12 +352,14 @@ hts_wizard_verdict hts_wizard_answer_verdict(int n) {
 
   default: /* a scope answer forbids like 2 or allows like 6 */
     if (hts_wizard_scope_answer(n) == HTS_TRUE)
-      v.forbids = HTS_TRUE;
+      *forbidden_url = 1;
     else if (hts_wizard_scope_answer(n) == HTS_DEFAULT)
-      v.unknown = HTS_TRUE;
+      hts_log_print(opt, LOG_WARNING,
+                    "(wizard) unknown answer %d at %s%s, keeping the computed "
+                    "verdict",
+                    n, adr, fil);
     break;
   }
-  return v;
 }
 
 static int hts_acceptlink_(httrackp * opt, int ptr,
@@ -903,22 +906,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       }
       // here we have enough room for a new filter if necessary
 
-      /* the verdict half of the answer */
-      {
-        const hts_wizard_verdict v = hts_wizard_answer_verdict(n);
-
-        if (v.forbids)
-          forbidden_url = 1;
-        if (v.stop_asking)
-          opt->wizard = HTS_WIZARD_AUTO;
-        if (v.link_only)
-          *set_prio_to = 0 + 1; // recursion level 0
-        if (v.unknown)
-          hts_log_print(opt, LOG_WARNING,
-                        "(wizard) unknown answer %d at %s%s, keeping the "
-                        "computed verdict",
-                        n, adr, fil);
-      }
+      hts_wizard_apply_verdict(opt, n, adr, fil, &forbidden_url, set_prio_to);
 
       /* the pattern half of the answer */
       {

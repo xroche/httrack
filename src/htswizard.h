@@ -72,18 +72,14 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
    HTS_FALSE includes it, HTS_DEFAULT for any answer outside both ranges. */
 hts_tristate hts_wizard_scope_answer(int n);
 
-/* What an answer decides besides the filters it adds. Each field is one-way: no
-   answer clears a verdict the wizard already computed. */
-typedef struct hts_wizard_verdict {
-  hts_boolean forbids;     /**< refuse the link */
-  hts_boolean stop_asking; /**< and ask nothing more this run */
-  hts_boolean link_only;   /**< take the link, do not recurse from it */
-  hts_boolean unknown;     /**< answer outside every range the engine knows */
-} hts_wizard_verdict;
-
-/* The verdict half of answer `n`, the filter half being
-   hts_wizard_answer_filter(); a new answer needs both. */
-hts_wizard_verdict hts_wizard_answer_verdict(int n);
+/* Applies the verdict half of answer `n` for the link (adr,fil): refuses the
+   link, stops the questions, or bans recursion from it. Each effect is one-way,
+   so an answer deciding none of them leaves *forbidden_url, *set_prio_to and
+   opt->wizard as they were. The filter half is hts_wizard_answer_filter(); a
+   new answer needs both. */
+void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
+                              const char *fil, int *forbidden_url,
+                              int *set_prio_to);
 
 /* A (tag, attribute) pair naming a reference kind. */
 #ifndef HTS_DEF_DEFSTRUCT_htspair_t
