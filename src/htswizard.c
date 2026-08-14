@@ -239,18 +239,32 @@ hts_tristate hts_wizard_scope_answer(int n) {
   return HTS_DEFAULT;
 }
 
+/* The domain a scope answer names, or HTS_FALSE for a host that has none. */
+static hts_boolean wizard_answer_scope(const char *adr, int n, char *dst,
+                                       size_t dstsize) {
+  const int k =
+      n - (hts_wizard_scope_answer(n) == HTS_TRUE ? HTS_WIZARD_SCOPE_EXCLUDE
+                                                  : HTS_WIZARD_SCOPE_INCLUDE);
+
+  return hts_wizard_host_scope(adr, k, dst, dstsize);
+}
+
 /* The subdomain form of the scope in slot 0, its apex in slot 1: the starred
    one does not match the apex, so a whole-domain answer needs both. */
 static void wizard_cat_scope(htsbuff *f, const char *sign, const char *adr,
                              int n, int slot) {
   char scope[HTS_URLMAXSIZE];
-  const int k =
-      n - (hts_wizard_scope_answer(n) == HTS_TRUE ? HTS_WIZARD_SCOPE_EXCLUDE
-                                                  : HTS_WIZARD_SCOPE_INCLUDE);
 
-  if (slot >= HTS_WIZARD_MAX_FILTERS ||
-      !hts_wizard_host_scope(adr, k, scope, sizeof(scope)))
+  if (slot >= HTS_WIZARD_MAX_FILTERS)
     return;
+  /* no domain lives below this host, so the host itself is the widest scope */
+  if (!wizard_answer_scope(adr, n, scope, sizeof(scope))) {
+    if (slot == 0) {
+      wizard_cat_host(f, sign, adr);
+      htsbuff_cat(f, "/*");
+    }
+    return;
+  }
   htsbuff_cpy(f, sign);
   if (slot == 0)
     htsbuff_cat(f, "*.");
@@ -274,7 +288,8 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
   if (slot != 0) /* every other answer emits a single filter */
     return;
   switch (n) {
-  case 0: /* this link only */
+  case 0:    /* this link only */
+  case -999: /* an unreadable answer falls back to that same default */
     wizard_cat_path(f, "-", adr, fil, (size_t) -1);
     break;
 
@@ -343,21 +358,38 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     *set_prio_to = 0 + 1; /* recursion level 0 */
     break;
 
-  case 5:    /* this directory and below, or the whole host */
-  case 6:    /* the whole host */
-  case 7:    /* this directory, files only */
-  case 50:   /* nothing to do */
   case -999: /* the "!" answer, and anything the front end could not parse */
+    *forbidden_url = 1;
+    hts_log_print(opt, LOG_WARNING,
+                  "(wizard) unreadable answer at %s%s, ignoring the link", adr,
+                  fil);
+    break;
+
+  case 5:  /* this directory and below, or the whole host */
+  case 6:  /* the whole host */
+  case 7:  /* this directory, files only */
+  case 50: /* nothing to do */
     break;
 
   default: /* a scope answer forbids like 2 or allows like 6 */
-    if (hts_wizard_scope_answer(n) == HTS_TRUE)
-      *forbidden_url = 1;
-    else if (hts_wizard_scope_answer(n) == HTS_DEFAULT)
+    if (hts_wizard_scope_answer(n) == HTS_DEFAULT) {
       hts_log_print(opt, LOG_WARNING,
                     "(wizard) unknown answer %d at %s%s, keeping the computed "
                     "verdict",
                     n, adr, fil);
+      break;
+    }
+    if (hts_wizard_scope_answer(n) == HTS_TRUE)
+      *forbidden_url = 1;
+    {
+      char scope[HTS_URLMAXSIZE];
+
+      if (!wizard_answer_scope(adr, n, scope, sizeof(scope)))
+        hts_log_print(opt, LOG_WARNING,
+                      "(wizard) no domain scope %d for %s, answer applied to "
+                      "the whole host",
+                      n, adr);
+    }
     break;
   }
 }
