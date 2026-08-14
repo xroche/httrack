@@ -2734,9 +2734,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                    "wb");
         if (fp) {
           for(i = 0 + 1; i < argc; i++) {
-            if (((strchr(argv[i], ' ') != NULL)
-                 || (strchr(argv[i], '"') != NULL)
-                 || (strchr(argv[i], '\\') != NULL)) && (argv[i][0] != '"')) {
+            /* argv[] is already unquoted here, so a leading quote is data */
+            if ((strchr(argv[i], ' ') != NULL) ||
+                (strchr(argv[i], '"') != NULL) ||
+                (strchr(argv[i], '\\') != NULL)) {
               size_t j;
 
               fprintf(fp, "\"");

@@ -114,4 +114,52 @@ grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
     exit 1
 }
 
+# --- 4. a value whose first character is a quote survives the round-trip -----
+# The command line needs two leading quotes: the -O pass strips one pair in
+# place, leaving the footer "<!-- MARK -->, which the writer must escape. Left
+# raw it reopens a quote, so the reader swallows the rest of the line into the
+# footer and -r2 is lost for good. Asserted on the mirrored page, not just on
+# doit.log, so a writer/reader pair that agrees on a wrong value still fails.
+out3="$tmp/out3"
+site3="$tmp/site3"
+footer='"<!-- MARK -->'
+# the footer is injected into the html body, so this fixture needs real tags
+mkdir -p "$site3"
+printf '<html><body><a href="a.html">a</a></body></html>' >"$site3/index.html"
+echo '<html><body>aaa</body></html>' >"$site3/a.html"
+rc=0
+"$bin" "file://$site3/index.html" -O "$out3" --quiet -n -%v0 \
+    -%F "\"$footer\"" -r2 >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: initial mirror with a leading-quote footer exited $rc"
+    exit 1
+}
+page=$(find "$out3" -path '*/site3/index.html' -print -quit)
+test -n "$page" || {
+    echo "FAIL: mirrored page missing after the leading-quote mirror"
+    exit 1
+}
+grep -qF "$footer" "$page" || {
+    echo "FAIL: run 1 did not inject the footer verbatim"
+    exit 1
+}
+rc=0
+"$bin" -O "$out3" --quiet >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: leading-quote reprise exited $rc"
+    exit 1
+}
+grep -qF "$footer" "$page" || {
+    echo "FAIL: the footer changed across the reprise (leading quote written raw?)"
+    grep -o '<!--[^>]*MARK[^>]*-->' "$page" | head -1
+    exit 1
+}
+# -r2 sits after the footer. A plain ' -r2' match would also hit it *inside* a
+# swallowed footer, so pin the escaped token and its neighbour instead.
+grep -qF -- '-%F "\"<!-- MARK -->" -r2' "$out3/hts-cache/doit.log" || {
+    echo "FAIL: footer and -r2 are not two tokens in the regenerated doit.log"
+    head -1 "$out3/hts-cache/doit.log"
+    exit 1
+}
+
 exit 0
