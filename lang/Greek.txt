@@ -946,6 +946,36 @@ Server terminated
 Ακυρώθηκε από τον εξυπηρετητή
 A fatal error has occurred during this mirror
 Ένα καταστροφικό σφάλμα προκλήθηκε κατά την αντιγραφή αυτού του τόπου
+View Documentation
+Προβολή τεκμηρίωσης
+Go To HTTrack Website
+Μετάβαση στον ιστότοπο του HTTrack
+Go To HTTrack Forum
+Μετάβαση στο φόρουμ του HTTrack
+View License
+Προβολή άδειας χρήσης
+Beware: you local browser might be unable to browse files with embedded filenames
+Προσοχή: ο τοπικός σας browser ίσως δεν μπορεί να ανοίξει αρχεία με ενσωματωμένα ονόματα αρχείων
+Recreated HTTrack internal cached resources
+Οι εσωτερικοί προσωρινοί πόροι του HTTrack δημιουργήθηκαν ξανά
+Could not create internal cached resources
+Δεν ήταν δυνατή η δημιουργία των εσωτερικών προσωρινών πόρων
+Could not get the system external storage directory
+Δεν ήταν δυνατή η εύρεση του εξωτερικού χώρου αποθήκευσης του συστήματος
+Could not write to:
+Δεν ήταν δυνατή η εγγραφή στο:
+Read-only media (SDCARD)
+Μέσο μόνο για ανάγνωση (SDCARD)
+No storage media (SDCARD)
+Δεν υπάρχει μέσο αποθήκευσης (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Μέχρι να διορθωθεί αυτό το πρόβλημα, το HTTrack ίσως δεν μπορεί να κατεβάσει ιστότοπους
+HTTrack: mirror '%s' stopped!
+HTTrack: η αντιγραφή «%s» σταμάτησε!
+Click on this notification to restart the interrupted mirror
+Πατήστε αυτή την ειδοποίηση για να συνεχίσετε τη διακοπείσα αντιγραφή
+HTTrack: could not save profile for '%s'!
+HTTrack: δεν ήταν δυνατή η αποθήκευση του προφίλ «%s»!
 Proxy type:
 Τύπος proxy:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC segment size limit:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Έναρξη νέου τμήματος WARC μόλις το τρέχον ξεπεράσει αυτόν τον αριθμό byte. Αφήστε κενό ή 0 για ένα ενιαίο αρχείο.
 Host aliases:
-Host aliases:
+Ψευδώνυμα host:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Άλλα ονόματα host που εξυπηρετούν την ίδια τοποθεσία, ενοποιημένα σε ένα, ένας κανόνας ανά γραμμή (π.χ. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Αντιγραφή του %s και κάθε host κάτω από αυτό
+Ignore %s and every host below it
+Αγνόηση του %s και κάθε host κάτω από αυτό

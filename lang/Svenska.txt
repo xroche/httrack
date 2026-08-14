@@ -946,6 +946,36 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+View Documentation
+Visa dokumentationen
+Go To HTTrack Website
+Gå till HTTracks webbplats
+Go To HTTrack Forum
+Gå till HTTracks forum
+View License
+Visa licensen
+Beware: you local browser might be unable to browse files with embedded filenames
+Obs: din lokala webbläsare kan kanske inte öppna filer med inbäddade filnamn
+Recreated HTTrack internal cached resources
+HTTracks interna cachade resurser har skapats om
+Could not create internal cached resources
+Det gick inte att skapa de interna cachade resurserna
+Could not get the system external storage directory
+Det gick inte att hitta systemets externa lagring
+Could not write to:
+Det gick inte att skriva till:
+Read-only media (SDCARD)
+Skrivskyddat medium (SDCARD)
+No storage media (SDCARD)
+Inget lagringsmedium (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Så länge problemet kvarstår kan HTTrack kanske inte hämta webbplatser
+HTTrack: mirror '%s' stopped!
+HTTrack: kopian "%s" stoppades!
+Click on this notification to restart the interrupted mirror
+Tryck på denna avisering för att återuppta den avbrutna kopian
+HTTrack: could not save profile for '%s'!
+HTTrack: det gick inte att spara profilen för "%s"!
 Proxy type:
 Proxytyp:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Största storlek för WARC-segment:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Börja ett nytt WARC-segment när det aktuella passerar detta antal byte; lämna tomt eller 0 för en enda fil.
 Host aliases:
-Host aliases:
+Värdaliaser:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Andra värdnamn som betjänar samma webbplats, sammanslagna till ett, en regel per rad (t.ex. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Kopiera %s och alla värdar under den
+Ignore %s and every host below it
+Ignorera %s och alla värdar under den

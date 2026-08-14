@@ -219,8 +219,18 @@ Please visit our Website: http://www.httrack.com
    the longest registered MIME type, the Office OOXML ones reaching 73 chars */
 #define HTS_MIMETYPE_SIZE 128
 
+/* Caps on single option arguments, in bytes, exclusive like HTS_CDLMAXSIZE.
+   They bound the value, not a buffer: these option fields are dynamic Strings.
+   Named so the front ends can check against them instead of copying them. */
+#define HTS_FOOTER_MAXSIZE 254    /* -%F */
+#define HTS_LANGISO_MAXSIZE 62    /* -%l */
+#define HTS_REFERER_MAXSIZE 254   /* -%R */
+#define HTS_FILELIST_MAXSIZE 254  /* -%L */
+#define HTS_BINDHOST_MAXSIZE 254  /* -%b */
+#define HTS_FROMEMAIL_MAXSIZE 254 /* -%E */
+
 /* Copyright (C) 1998 Xavier Roche and other contributors */
-#define HTTRACK_AFF_AUTHORS "[XR&CO'2014]"
+#define HTTRACK_AFF_AUTHORS "[XR&CO]"
 /* Named fields (hts_footer_format); a "%s" anywhere would switch the template
    back to the legacy positional model, a user's own additions included. */
 #define HTS_DEFAULT_FOOTER                                                     \
