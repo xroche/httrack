@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# WebHTTrack prefills the engine's default footer, and a new project must get
+# the named fields (see HTS_DEFAULT_FOOTER on why a stray "%s" is fatal).
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "$(dirname "$0")/webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_footer.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+printf '[a fresh profile prefills the named-field footer] ..\t'
+
+# An isolated HOME: a stored ~/.httrack.ini would answer with its own footer.
+mkdir -p "${work}/websites"
+htsserver_start --home "${work}"
+reply=$(htsserver_get /server/option6.html)
+grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "option6.html: ${reply}"
+
+value=$(firstline "$(sed -n 's/.*name="footer" value="\([^"]*\)".*/\1/p' <<<"${reply}")")
+test -n "${value}" || fail "option6.html serves no footer field: ${reply}"
+case ${value} in
+*'%s'*) fail "the prefilled footer is still positional: ${value}" ;;
+esac
+grep -q '{url}.*{date}' <<<"${value}" || fail "prefilled footer: ${value}"
+
+htsserver_stop
+# A leaked server wedges the parallel harness behind a green log.
+htsserver_assert_reaped
+
+echo OK

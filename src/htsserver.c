@@ -730,8 +730,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     };
     initStrElt initStr[] = {
         {"user", HTS_DEFAULT_USER_AGENT},
-        {"footer", "<!-- Mirrored from %s%s by HTTrack Website Copier/3.x "
-                   "[XR&CO'2014], %s -->"},
+        {"footer", HTS_DEFAULT_FOOTER},
         {"url2",
          "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/*"},
         {NULL, NULL}};

@@ -221,9 +221,11 @@ Please visit our Website: http://www.httrack.com
 
 /* Copyright (C) 1998 Xavier Roche and other contributors */
 #define HTTRACK_AFF_AUTHORS "[XR&CO'2014]"
+/* Named fields (hts_footer_format); a "%s" anywhere would switch the template
+   back to the legacy positional model, a user's own additions included. */
 #define HTS_DEFAULT_FOOTER                                                     \
-  "<!-- Mirrored from %s%s by HTTrack Website Copier/" HTTRACK_AFF_VERSION     \
-  " " HTTRACK_AFF_AUTHORS ", %s -->"
+  "<!-- Mirrored from {url} by HTTrack Website Copier/" HTTRACK_AFF_VERSION    \
+  " " HTTRACK_AFF_AUTHORS ", {date} -->"
 /* Honest crawler User-Agent; no fake OS/browser to go stale. */
 #define HTS_DEFAULT_USER_AGENT                                                 \
   "Mozilla/5.0 (compatible; HTTrack/" HTTRACK_AFF_VERSION                      \
