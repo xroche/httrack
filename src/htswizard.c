@@ -317,8 +317,8 @@ static void filters_insert_at(httrackp *opt, int pos, const char *pattern) {
   assertf((*opt->filters.filptr) < opt->maxfilter);
 }
 
-void hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
-                               const char *fil, hts_boolean seeker_up) {
+int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
+                              const char *fil, hts_boolean seeker_up) {
   char BIGSTK pattern[HTS_FILTER_SLOT_SIZE];
   htsbuff f = htsbuff_array(pattern);
   int slot;
@@ -349,6 +349,7 @@ void hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
       break;
     filters_insert_at(opt, opt->wizard_filters++, pattern);
   }
+  return slot;
 }
 
 void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
@@ -389,6 +390,11 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
                     n, adr, fil);
     break;
   }
+
+  /* the question is asked only while undecided; an answer that does not forbid
+     authorizes the link */
+  if (*forbidden_url == -1)
+    *forbidden_url = 0;
 }
 
 static int hts_acceptlink_(httrackp * opt, int ptr,
@@ -865,7 +871,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
     /* en cas de question, ou lien primaire (enregistrer autorisations) */
     if (question || (ptr == 0)) {
-      const char *s;
+      const char *s = NULL; /* the front end's raw reply, NULL if unasked */
       int n = 0;
 
       // si primaire (plus bas) alors ...
@@ -919,9 +925,33 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       }
 
       hts_wizard_apply_verdict(opt, n, adr, fil, &forbidden_url, set_prio_to);
-      hts_wizard_insert_filters(opt, n, adr, fil,
-                                (opt->seeker & HTS_SEEKER_UP) != 0 ? HTS_TRUE
-                                                                   : HTS_FALSE);
+      {
+        const int inserted = hts_wizard_insert_filters(
+            opt, n, adr, fil,
+            (opt->seeker & HTS_SEEKER_UP) != 0 ? HTS_TRUE : HTS_FALSE);
+
+        /* the built-in query3 answers "" for nobody, so ask who replied */
+        if (s != NULL && HAS_CALLBACK(opt, query3)) {
+          char BIGSTK list[HTS_WIZARD_MAX_FILTERS * (HTS_FILTER_SLOT_SIZE + 1)];
+          htsbuff added = htsbuff_array(list);
+          int slot;
+
+          /* read the slots back, so the log cannot drift from what was applied */
+          for (slot = opt->wizard_filters - inserted;
+               slot < opt->wizard_filters; slot++) {
+            if (added.len != 0)
+              htsbuff_cat(&added, " ");
+            htsbuff_cat(&added, _FILTERS[slot]);
+          }
+          hts_log_print(
+              opt, LOG_NOTICE, "(wizard) answer '%s' (n=%d) for %s%s: %s%s%s",
+              s, n, adr, fil,
+              forbidden_url == 1   ? "forbidden"
+              : forbidden_url == 0 ? "allowed"
+                                   : "no verdict",
+              added.len != 0 ? ", filters: " : "", htsbuff_str(&added));
+        }
+      }
 
     }                           // test du wizard sur l'url
   }                             // fin du test wizard..

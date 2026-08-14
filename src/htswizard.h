@@ -76,19 +76,20 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
    of the wizard's own block at the low indices of opt->filters. Last match
    wins, so a later answer outranks an earlier one, while the command-line
    filters sitting above the block outrank every answer. The verdict half is
-   hts_wizard_apply_verdict(). */
-void hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
-                               const char *fil, hts_boolean seeker_up);
+   hts_wizard_apply_verdict(). Returns the number inserted, which sit at the
+   tail of the block, ending at opt->wizard_filters. */
+int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
+                              const char *fil, hts_boolean seeker_up);
 
 /* Which host-scope range answer `n` falls in: HTS_TRUE excludes the scope,
    HTS_FALSE includes it, HTS_DEFAULT for any answer outside both ranges. */
 hts_tristate hts_wizard_scope_answer(int n);
 
 /* Applies the verdict half of answer `n` for the link (adr,fil): refuses it,
-   stops the questions, or bans recursion from it. Each effect is one-way, so an
-   answer deciding none of them leaves *forbidden_url, *set_prio_to and
-   opt->wizard alone; the filter half is hts_wizard_answer_filter(), and a new
-   answer needs both. */
+   stops the questions, or bans recursion from it. It never overturns a verdict
+   already computed, but resolves an undecided (-1) link: refused, or
+   authorized. The filter half is hts_wizard_answer_filter(), and a new answer
+   needs both. */
 void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
                               const char *fil, int *forbidden_url,
                               int *set_prio_to);

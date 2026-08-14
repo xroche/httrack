@@ -1279,40 +1279,60 @@ static int st_entities(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-// -#test=footerfmt <template>: expand a -%F footer with fixed fields (drives
-// tests/01_engine-footerfmt.test). Also asserts the overflow/zero-size returns
-// the CLI cap keeps out of reach.
+// -#test=footerfmt <template>: expand a -%F footer with fixed values (drives
+// tests/01_engine-footerfmt.test). Also asserts the published field names and
+// the overflow/zero-size returns the CLI cap keeps out of reach.
 static int st_footerfmt(httrackp *opt, int argc, char **argv) {
-  static const hts_footer_field fields[] = {
-      {"addr", "host.example"},
-      {"path", "/dir/page.html"},
-      {"url", "http://host.example/dir/page.html"},
-      {"date", "DATE"},
-      {"lastmodified", "LASTMOD"},
-      {"version", "VER"},
-      {"mime", "text/html"},
-      {"charset", "utf-8"},
-      {"status", "200"},
-      {"size", "1234"},
-  };
-  const size_t nfields = sizeof(fields) / sizeof(fields[0]);
+  // Spelled out, not read back from the engine: these ten are the published
+  // contract front ends validate their templates against.
+  static const char *const names[] = {
+      "addr",    "path", "url",     "date",   "lastmodified",
+      "version", "mime", "charset", "status", "size"};
+  // Filled by id, as htsparse.c does, so the .test's expected strings pin each
+  // name to its enum slot; a positional list would not see them drift apart.
+  const char *values[HTS_FOOTER_FIELD_COUNT] = {NULL};
+  size_t i;
   char out[1024];
   char tiny[4];
 
   (void) opt;
+  values[HTS_FOOTER_ADDR] = "host.example";
+  values[HTS_FOOTER_PATH] = "/dir/page.html";
+  values[HTS_FOOTER_URL] = "http://host.example/dir/page.html";
+  values[HTS_FOOTER_DATE] = "DATE";
+  values[HTS_FOOTER_LASTMODIFIED] = "LASTMOD";
+  values[HTS_FOOTER_VERSION] = "VER";
+  values[HTS_FOOTER_MIME] = "text/html";
+  values[HTS_FOOTER_CHARSET] = "utf-8";
+  values[HTS_FOOTER_STATUS] = "200";
+  values[HTS_FOOTER_SIZE] = "1234";
+
+  for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+    assertf(hts_footer_field_ok(names[i]) == HTS_TRUE);
+  }
+  assertf(!hts_footer_field_ok(NULL));
+  assertf(!hts_footer_field_ok(""));
+  assertf(!hts_footer_field_ok("nosuchfield"));
+  // A prefix or a longer name must not match, or "{addr}" and "{addrx}" would
+  // validate alike.
+  assertf(!hts_footer_field_ok("add"));
+  assertf(!hts_footer_field_ok("addrx"));
+  // Matching is exact: the expander is case-sensitive, so a validator that
+  // accepted "{ADDR}" would green-light a template the crawl emits verbatim.
+  assertf(!hts_footer_field_ok("Addr"));
   // Overflow (named and legacy) and a zero-size buffer must return <0, never
   // truncate silently or write out of bounds.
-  assertf(hts_footer_format(tiny, sizeof(tiny), "{addr}", fields, nfields) < 0);
-  assertf(hts_footer_format(tiny, sizeof(tiny), "a %s b", fields, nfields) < 0);
-  assertf(hts_footer_format(out, 0, "", fields, nfields) < 0);
+  assertf(hts_footer_format(tiny, sizeof(tiny), "{addr}", values) < 0);
+  assertf(hts_footer_format(tiny, sizeof(tiny), "a %s b", values) < 0);
+  assertf(hts_footer_format(out, 0, "", values) < 0);
   // An empty template yields an empty, terminated string.
-  assertf(hts_footer_format(out, sizeof(out), "", fields, nfields) == 1 &&
+  assertf(hts_footer_format(out, sizeof(out), "", values) == 1 &&
           out[0] == '\0');
   if (argc < 1) {
     fprintf(stderr, "footerfmt: needs a template\n");
     return 1;
   }
-  if (hts_footer_format(out, sizeof(out), argv[0], fields, nfields) < 0) {
+  if (hts_footer_format(out, sizeof(out), argv[0], values) < 0) {
     fprintf(stderr, "footerfmt: overflow\n");
     return 1;
   }
@@ -4334,7 +4354,7 @@ static int st_wizardscopeanswer(httrackp *opt, int argc, char **argv) {
 #define PRIO_UNSET 42
 
 /* Prints what answer `n` does to the crawl; with no arguments, asserts every
-   answer, on both an allowed and an already refused link. */
+   answer, on an undecided, an allowed and an already refused link. */
 static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   const hts_wizard asked = opt->wizard;
   FILE *const projectlog = opt->log;
@@ -4342,7 +4362,7 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   FILE *log;
   int url, depth;
 
-  url = 0;
+  url = -1; /* the undecided verdict the wizard is asked about */
   depth = PRIO_UNSET;
   opt->wizard = HTS_WIZARD_ASK;
   if (argc >= 1) {
@@ -4374,7 +4394,7 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(1, 0, 1, 0, PRIO_UNSET);
   APPLIES(2, 0, 1, 0, PRIO_UNSET);
   APPLIES(3, 0, 1, 0, PRIO_UNSET);
-  /* 4 caps the recursion and decides the link neither way */
+  /* 4 caps the recursion, and takes the link like any accepting answer */
   APPLIES(4, 0, 0, 0, 1);
   APPLIES(4, 1, 1, 0, 1);
   /* an accepting answer never clears a refusal the crawl already computed */
@@ -4389,7 +4409,7 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(HTS_WIZARD_SCOPE_EXCLUDE - 1, 0, 0, 0, PRIO_UNSET);
   APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, 0, 1, 0, PRIO_UNSET);
   APPLIES(INT_MAX, 0, 1, 0, PRIO_UNSET);
-  /* an answer in no range is not taken for an accept, nor for a refusal */
+  /* an answer in no range never overturns an accept or a refusal */
   APPLIES(8, 0, 0, 0, PRIO_UNSET);
   APPLIES(8, 1, 1, 0, PRIO_UNSET);
   APPLIES(999, 0, 0, 0, PRIO_UNSET);
@@ -4397,6 +4417,21 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(-1000, 0, 0, 0, PRIO_UNSET);
   APPLIES(INT_MIN, 0, 0, 0, PRIO_UNSET);
   APPLIES(HTS_WIZARD_SCOPE_INCLUDE - 1, 0, 0, 0, PRIO_UNSET);
+  /* an answer that does not refuse leaves the link allowed, never undecided */
+  APPLIES(4, -1, 0, 0, 1);
+  APPLIES(5, -1, 0, 0, PRIO_UNSET);
+  APPLIES(6, -1, 0, 0, PRIO_UNSET);
+  APPLIES(7, -1, 0, 0, PRIO_UNSET);
+  APPLIES(50, -1, 0, 0, PRIO_UNSET);
+  APPLIES(8, -1, 0, 0, PRIO_UNSET); /* -999 is #1259's, not asserted here */
+  APPLIES(HTS_WIZARD_SCOPE_INCLUDE, -1, 0, 0, PRIO_UNSET);
+  /* and one that does refuse must still refuse it */
+  APPLIES(-1, -1, 1, 1, PRIO_UNSET);
+  APPLIES(0, -1, 1, 0, PRIO_UNSET);
+  APPLIES(1, -1, 1, 0, PRIO_UNSET);
+  APPLIES(2, -1, 1, 0, PRIO_UNSET);
+  APPLIES(3, -1, 1, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, -1, 1, 0, PRIO_UNSET);
 #undef APPLIES
 
   /* the warning is all an unknown answer does, so a known one must be silent */

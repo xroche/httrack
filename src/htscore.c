@@ -2020,8 +2020,10 @@ int httpmirror(char *url1, httrackp * opt) {
   if ((HTS_STAT.stat_files <= 0)
       && (HTS_STAT.HTS_TOTAL_RECV < 32768)      /* should be fine */
     ) {
-    hts_log_print(opt, LOG_NOTICE,
-                  "No data seems to have been transferred during this session! : restoring previous one!");
+    /* not a notice: the session is rolled back and the WARC aborted */
+    hts_log_print(opt, LOG_WARNING,
+                  "No data seems to have been transferred during this session! "
+                  ": restoring previous one!");
     /* this run replaces nothing, so its archive must not be committed */
     warc_abort_opt(opt);
     opt->state.exit_xh = 2;     /* interrupted (no connection detected) */
@@ -3417,17 +3419,17 @@ int check_sockdata(T_SOC s) {
 
 // Attente de touche
 int ask_continue(httrackp * opt) {
-  const char *s;
+  const char *s = RUN_CALLBACK1(opt, query2, opt->state.HTbuff);
+  int go = 1;
 
-  s = RUN_CALLBACK1(opt, query2, opt->state.HTbuff);
-  if (s) {
-    if (strnotempty(s)) {
-      if ((strfield2(s, "N")) || (strfield2(s, "NO")) || (strfield2(s, "NON")))
-        return 0;
-    }
-    return 1;
-  }
-  return 1;
+  if (s != NULL && strnotempty(s) &&
+      ((strfield2(s, "N")) || (strfield2(s, "NO")) || (strfield2(s, "NON"))))
+    go = 0;
+  if (HAS_CALLBACK(opt, query2)) /* nobody was asked otherwise */
+    hts_log_print(opt, LOG_NOTICE, "(wizard) answer '%s' to \"%.*s\": %s",
+                  s != NULL ? s : "", (int) strcspn(opt->state.HTbuff, "\r\n"),
+                  opt->state.HTbuff, go ? "continue" : "abort");
+  return go;
 }
 
 // nombre de digits dans un nombre

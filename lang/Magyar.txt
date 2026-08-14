@@ -946,6 +946,36 @@ Server terminated
 A kiszolgáló befejezte a kapcsolatot
 A fatal error has occurred during this mirror
 Végzetes hiba történt a tükrözés közben
+View Documentation
+Dokumentáció megtekintése
+Go To HTTrack Website
+Ugrás a HTTrack webhelyére
+Go To HTTrack Forum
+Ugrás a HTTrack fórumára
+View License
+Licenc megtekintése
+Beware: you local browser might be unable to browse files with embedded filenames
+Figyelem: a helyi böngészõ nem biztos, hogy meg tudja nyitni a beágyazott fájlneveket tartalmazó fájlokat
+Recreated HTTrack internal cached resources
+A HTTrack belsõ gyorsítótárazott erõforrásai újra létrejöttek
+Could not create internal cached resources
+A belsõ gyorsítótárazott erõforrásokat nem sikerült létrehozni
+Could not get the system external storage directory
+A rendszer külsõ tárhelye nem található
+Could not write to:
+Nem lehet írni ide:
+Read-only media (SDCARD)
+Csak olvasható adathordozó (SDCARD)
+No storage media (SDCARD)
+Nincs adathordozó (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Amíg ez a hiba fennáll, a HTTrack esetleg nem tud webhelyeket letölteni
+HTTrack: mirror '%s' stopped!
+HTTrack: a(z) "%s" tükrözés leállt!
+Click on this notification to restart the interrupted mirror
+A megszakadt tükrözés folytatásához koppintson erre az értesítésre
+HTTrack: could not save profile for '%s'!
+HTTrack: a(z) "%s" profilját nem sikerült menteni!
 Proxy type:
 Proxy típusa:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC szegmens legnagyobb mérete:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Új WARC szegmens kezdése, amint az aktuális túllépi ezt a bájtszámot; hagyja üresen vagy adjon meg 0-t egyetlen fájlhoz.
 Host aliases:
-Host aliases:
+Kiszolgálói álnevek:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Ugyanazt a webhelyet kiszolgáló további kiszolgálónevek egybeolvasztva, soronként egy szabály (pl. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+%s és minden alatta lévõ kiszolgáló tükrözése
+Ignore %s and every host below it
+%s és minden alatta lévõ kiszolgáló kihagyása

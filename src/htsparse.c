@@ -855,22 +855,23 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     // footer sits inside an HTML comment, so a value holding
                     // "-->" would otherwise close it and inject markup (#165).
                     // status/size are formatted integers and need no escaping.
-                    const hts_footer_field fields[] = {
-                        {"addr", safe_adr},
-                        {"path", safe_fil},
-                        {"url", safe_url},
-                        {"date", gmttime},
-                        {"lastmodified",
-                         html_inline_safe(r->lastmodified, safe_lastmod,
-                                          sizeof(safe_lastmod))},
-                        {"version", HTTRACK_VERSIONID},
-                        {"mime", html_inline_safe(r->contenttype, safe_ctype,
-                                                  sizeof(safe_ctype))},
-                        {"charset", html_inline_safe(r->charset, safe_charset,
-                                                     sizeof(safe_charset))},
-                        {"status", status_str},
-                        {"size", size_str},
-                    };
+                    // Zeroed first: a field added to the enum expands empty
+                    // here until this block fills it, never a stale pointer.
+                    const char *values[HTS_FOOTER_FIELD_COUNT] = {NULL};
+
+                    values[HTS_FOOTER_ADDR] = safe_adr;
+                    values[HTS_FOOTER_PATH] = safe_fil;
+                    values[HTS_FOOTER_URL] = safe_url;
+                    values[HTS_FOOTER_DATE] = gmttime;
+                    values[HTS_FOOTER_LASTMODIFIED] = html_inline_safe(
+                        r->lastmodified, safe_lastmod, sizeof(safe_lastmod));
+                    values[HTS_FOOTER_VERSION] = HTTRACK_VERSIONID;
+                    values[HTS_FOOTER_MIME] = html_inline_safe(
+                        r->contenttype, safe_ctype, sizeof(safe_ctype));
+                    values[HTS_FOOTER_CHARSET] = html_inline_safe(
+                        r->charset, safe_charset, sizeof(safe_charset));
+                    values[HTS_FOOTER_STATUS] = status_str;
+                    values[HTS_FOOTER_SIZE] = size_str;
 
                     tempo[0] = '\0';
                     strcatbuff(tempo, eol);
@@ -880,8 +881,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (hts_footer_format(
                             tempo + strlen(tempo),
                             sizeof(tempo) - strlen(tempo) - strlen(eol),
-                            StringBuff(opt->footer), fields,
-                            sizeof(fields) / sizeof(fields[0])) >= 0) {
+                            StringBuff(opt->footer), values) >= 0) {
                       strcatbuff(tempo, eol);
                       HT_ADD(tempo);
                     }
