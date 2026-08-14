@@ -4419,6 +4419,150 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
 
 #undef PRIO_UNSET
 
+/* Refills the array the wizard inserts into with `cmd`, the filters the crawl
+   started with (NULL-terminated). */
+static void wz_seed(httrackp *opt, char **filters, int *filptr,
+                    const char *const *cmd) {
+  int i;
+
+  *filptr = 0;
+  opt->wizard_filters = 0;
+  for (i = 0; cmd != NULL && cmd[i] != NULL; i++)
+    strlcpybuff(filters[(*filptr)++], cmd[i], HTS_FILTER_SLOT_SIZE);
+}
+
+/* Asserts the array holds exactly `want`, in order. */
+static void wz_holds(char **filters, int filptr, const char *const *want) {
+  int i;
+
+  for (i = 0; want[i] != NULL; i++) {
+    assertf(i < filptr);
+    assertf(strcmp(filters[i], want[i]) == 0);
+  }
+  assertf(filptr == i);
+}
+
+/* Where hts_wizard_insert_filters() puts a wizard answer. With <adr> <fil>
+   [answer...] [@ filter...], applies the answers over the command-line filters
+   listed after the "@" ("--" would be eaten by the option parser) and prints
+   the resulting array; with no argument, asserts the precedence rules. */
+static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
+  const htsfilters saved = opt->filters;
+  const int savedwizard = opt->wizard_filters;
+  const int savedmax = opt->maxfilter;
+  char **filters = NULL;
+  int filptr = 0;
+  int i;
+
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  opt->wizard_filters = 0;
+#define INSERT(n, adr, fil)                                                    \
+  hts_wizard_insert_filters(opt, (n), (adr), (fil), HTS_FALSE)
+#define HOLDS(...)                                                             \
+  do {                                                                         \
+    const char *const want[] = {__VA_ARGS__, NULL};                            \
+    wz_holds(filters, filptr, want);                                           \
+  } while (0)
+#define SEED(...)                                                              \
+  do {                                                                         \
+    const char *const cmd[] = {__VA_ARGS__, NULL};                             \
+    wz_seed(opt, filters, &filptr, cmd);                                       \
+  } while (0)
+#define RESET() wz_seed(opt, filters, &filptr, NULL)
+/* what the array as it stands decides for `url` */
+#define VERDICT(url) fa_strjoker(0, filters, filptr, (url), NULL, NULL, NULL)
+
+  if (argc >= 2) {
+    int sep = argc;
+
+    for (i = 2; i < argc; i++) {
+      if (strcmp(argv[i], "@") == 0) {
+        sep = i;
+        break;
+      }
+    }
+    for (i = sep + 1; i < argc; i++)
+      strlcpybuff(filters[filptr++], argv[i], HTS_FILTER_SLOT_SIZE);
+    for (i = 2; i < sep; i++)
+      INSERT(atoi(argv[i]), argv[0], argv[1]);
+    for (i = 0; i < filptr; i++)
+      printf("%s%s", i != 0 ? " " : "", filters[i]);
+    printf("\n");
+    goto done;
+  }
+
+  /* the correction case: "ignore this link", then "mirror the whole host" */
+  RESET();
+  INSERT(0, "h", "/dir/one.html");
+  HOLDS("-h/dir/one.html");
+  assertf(opt->wizard_filters == 1);
+  assertf(VERDICT("h/dir/one.html") == -1);
+  INSERT(6, "h", "/dir/two.html");
+  HOLDS("-h/dir/one.html", "+h/*");
+  assertf(opt->wizard_filters == 2);
+  assertf(VERDICT("h/dir/one.html") == 1);
+
+  /* reversing the answers reverses the outcome, or the block is not ordered */
+  RESET();
+  INSERT(6, "h", "/dir/two.html");
+  INSERT(0, "h", "/dir/one.html");
+  HOLDS("+h/*", "-h/dir/one.html");
+  assertf(VERDICT("h/dir/one.html") == -1);
+  assertf(VERDICT("h/dir/two.html") == 1);
+
+  /* no answer reaches above the command line */
+  SEED("-h/*.zip", "+h/keep/*");
+  INSERT(6, "h", "/dir/two.html");
+  HOLDS("+h/*", "-h/*.zip", "+h/keep/*");
+  assertf(opt->wizard_filters == 1);
+  assertf(VERDICT("h/a.zip") == -1);
+  assertf(VERDICT("h/dir/two.html") == 1);
+
+  /* the primary link records its scope first, so a later answer overrides it */
+  RESET();
+  INSERT(7, "h", "/dir/index.html");
+  INSERT(0, "h", "/dir/one.html");
+  HOLDS("+h/dir/*[file]", "-h/dir/one.html");
+  assertf(VERDICT("h/dir/one.html") == -1);
+
+  /* both halves of a host-scope answer land in the block, in emission order */
+  SEED("-*.zip");
+  INSERT(HTS_WIZARD_SCOPE_INCLUDE + 1, "www.example.co.uk", "/x.html");
+  HOLDS("+*.example.co.uk/*", "+example.co.uk/*", "-*.zip");
+  assertf(opt->wizard_filters == 2);
+
+  /* an answer that emits nothing leaves the block, and the array, alone */
+  SEED("-*.zip");
+  INSERT(4, "h", "/dir/one.html");
+  INSERT(50, "h", "/dir/one.html");
+  INSERT(3, "h", "/dir/one.html");
+  HOLDS("-*.zip");
+  assertf(opt->wizard_filters == 0);
+
+  /* answers 1, 5 and 7 emit nothing when the file part has no directory */
+  RESET();
+  INSERT(1, "h", "one.html");
+  INSERT(5, "h", "one.html");
+  INSERT(7, "h", "one.html");
+  assertf(filptr == 0 && opt->wizard_filters == 0);
+
+  printf("wizardinsert self-test OK\n");
+done:
+#undef INSERT
+#undef HOLDS
+#undef SEED
+#undef RESET
+#undef VERDICT
+  freet(filters[0]);
+  freet(filters);
+  opt->filters = saved;
+  opt->wizard_filters = savedwizard;
+  opt->maxfilter = savedmax;
+  return 0;
+}
+
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
 static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
@@ -9938,6 +10082,8 @@ static const struct selftest_entry {
      st_wizardscopeanswer},
     {"wizardverdict", "[<answer>]", "what a wizard answer applies",
      st_wizardverdict},
+    {"wizardinsert", "[<adr> <fil> [answer...] [@ filter...]]",
+     "where a wizard answer lands in the filter array", st_wizardinsert},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},

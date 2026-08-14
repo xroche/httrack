@@ -571,6 +571,9 @@ struct httrackp {
   String host_alias; /**< --host-alias: '\n'-separated "alias[,alias...]=host"
                           rules folding the hostnames of one site onto a single
                           canonical host. Tail: ABI */
+  /* Live state, not an option: copy_htsopt must leave it alone. */
+  int wizard_filters; /**< filters the wizard has inserted, held at the low
+                           indices of the array. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

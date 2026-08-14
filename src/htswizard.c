@@ -42,25 +42,6 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 /* END specific definitions */
 
-// libérer filters[0] pour insérer un élément dans filters[0]
-/* Per-slot capacity of the filters array, matching the slot stride allocated by
-   filters_init() in htscore.c (HTS_URLMAXSIZE * 2). */
-#define HTS_FILTER_SLOT_SIZE (HTS_URLMAXSIZE * 2)
-
-#define HT_INSERT_FILTERS0                                                     \
-  do {                                                                         \
-    int i;                                                                     \
-    if (*opt->filters.filptr > 0) {                                            \
-      for (i = (*opt->filters.filptr) - 1; i >= 0; i--) {                      \
-        strlcpybuff((*opt->filters.filters)[i + 1],                            \
-                    (*opt->filters.filters)[i], HTS_FILTER_SLOT_SIZE);         \
-      }                                                                        \
-    }                                                                          \
-    (*opt->filters.filters)[0][0] = '\0';                                      \
-    (*opt->filters.filptr)++;                                                  \
-    assertf((*opt->filters.filptr) < opt->maxfilter);                          \
-  } while (0)
-
 /* "embedded" */
 htspair_t hts_detect_embed[] = {
   {"img", "src"},
@@ -319,6 +300,50 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
 
   default: /* the other answers add no filter */
     break;
+  }
+}
+
+/* Inserts `pattern` at index `pos`, shifting the filters from there up a slot.
+   The caller has already ensured the array has room. */
+static void filters_insert_at(httrackp *opt, int pos, const char *pattern) {
+  char **const filters = *opt->filters.filters;
+  int i;
+
+  assertf(pos >= 0 && pos <= *opt->filters.filptr);
+  for (i = *opt->filters.filptr; i > pos; i--)
+    strlcpybuff(filters[i], filters[i - 1], HTS_FILTER_SLOT_SIZE);
+  strlcpybuff(filters[pos], pattern, HTS_FILTER_SLOT_SIZE);
+  (*opt->filters.filptr)++;
+  assertf((*opt->filters.filptr) < opt->maxfilter);
+}
+
+void hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
+                               const char *fil, hts_boolean seeker_up) {
+  char BIGSTK pattern[HTS_FILTER_SLOT_SIZE];
+  htsbuff f = htsbuff_array(pattern);
+  int slot;
+
+  /* grow first: a host-scope answer emits two filters */
+  if ((*opt->filters.filptr) + 2 >= opt->maxfilter) {
+    opt->maxfilter += HTS_FILTERSINC;
+    if (filters_init(opt->filters.filters, opt->maxfilter, HTS_FILTERSINC) ==
+        0) {
+      printf("PANIC! : Too many filters : >%d [%d]\n", *opt->filters.filptr,
+             __LINE__);
+      fflush(stdout);
+      hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)",
+                    *opt->filters.filptr);
+      hts_log_print(
+          opt, LOG_INFO,
+          "To avoid that: use #F option for more filters (example: -#F5000)");
+      assertf("too many filters - giving up" == NULL); // wild..
+    }
+  }
+  for (slot = 0; slot < HTS_WIZARD_MAX_FILTERS; slot++) {
+    hts_wizard_answer_filter(&f, slot, n, adr, fil, seeker_up);
+    if (f.len == 0)
+      break;
+    filters_insert_at(opt, opt->wizard_filters++, pattern);
   }
 }
 
@@ -889,41 +914,10 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
           n = force_mirror;
       }
 
-      /* sanity check - reallocate filters HERE (a host-scope answer emits two)
-       */
-      if ((*_FILTERS_PTR) + 2 >= opt->maxfilter) {
-        opt->maxfilter += HTS_FILTERSINC;
-        if (filters_init(&_FILTERS, opt->maxfilter, HTS_FILTERSINC) == 0) {
-          printf("PANIC! : Too many filters : >%d [%d]\n", (*_FILTERS_PTR),
-                 __LINE__);
-          fflush(stdout);
-          hts_log_print(opt, LOG_PANIC, "Too many filters, giving up..(>%d)",
-                        (*_FILTERS_PTR));
-          hts_log_print(opt, LOG_INFO,
-                        "To avoid that: use #F option for more filters (example: -#F5000)");
-          assertf("too many filters - giving up" == NULL);      // wild..
-        }
-      }
-      // here we have enough room for a new filter if necessary
-
       hts_wizard_apply_verdict(opt, n, adr, fil, &forbidden_url, set_prio_to);
-
-      /* the pattern half of the answer */
-      {
-        char BIGSTK pattern[HTS_FILTER_SLOT_SIZE];
-        htsbuff f = htsbuff_array(pattern);
-        int slot;
-
-        for (slot = 0; slot < HTS_WIZARD_MAX_FILTERS; slot++) {
-          hts_wizard_answer_filter(
-              &f, slot, n, adr, fil,
-              (opt->seeker & HTS_SEEKER_UP) != 0 ? HTS_TRUE : HTS_FALSE);
-          if (f.len == 0)
-            break;
-          HT_INSERT_FILTERS0; // insert at slot 0
-          strlcpybuff(_FILTERS[0], pattern, HTS_FILTER_SLOT_SIZE);
-        }
-      }
+      hts_wizard_insert_filters(opt, n, adr, fil,
+                                (opt->seeker & HTS_SEEKER_UP) != 0 ? HTS_TRUE
+                                                                   : HTS_FALSE);
 
     }                           // test du wizard sur l'url
   }                             // fin du test wizard..
@@ -1068,5 +1062,3 @@ int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint siz
   }
   return jok;
 }
-
-#undef HT_INSERT_FILTERS0

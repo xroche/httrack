@@ -611,6 +611,7 @@ int httpmirror(char *url1, httrackp * opt) {
   opt->filters.filters = &filters;
   //
   opt->filters.filptr = &filptr;
+  opt->wizard_filters = 0; // an opt reused for a second crawl starts empty
 
   // hash table
   opt->hash = &hash;
