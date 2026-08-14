@@ -946,6 +946,36 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+View Documentation
+Показати документацію
+Go To HTTrack Website
+Перейти на сайт HTTrack
+Go To HTTrack Forum
+Перейти на форум HTTrack
+View License
+Показати ліцензію
+Beware: you local browser might be unable to browse files with embedded filenames
+Увага: локальний браузер може не відкрити файли з вбудованими іменами файлів
+Recreated HTTrack internal cached resources
+Внутрішні кешовані ресурси HTTrack створено заново
+Could not create internal cached resources
+Не вдалося створити внутрішні кешовані ресурси
+Could not get the system external storage directory
+Не вдалося знайти зовнішнє сховище системи
+Could not write to:
+Не вдалося записати в:
+Read-only media (SDCARD)
+Носій лише для читання (SDCARD)
+No storage media (SDCARD)
+Немає носія для зберігання (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Доки цю проблему не усунуто, HTTrack може не завантажувати сайти
+HTTrack: mirror '%s' stopped!
+HTTrack: дзеркало «%s» зупинено!
+Click on this notification to restart the interrupted mirror
+Натисніть це сповіщення, щоб продовжити перерване дзеркало
+HTTrack: could not save profile for '%s'!
+HTTrack: не вдалося зберегти профіль для «%s»!
 Proxy type:
 Тип проксі:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC segment size limit:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Починати новий сегмент WARC, коли поточний перевищить цю кількість байтів; залиште порожнім або 0 для одного файлу.
 Host aliases:
-Host aliases:
+Псевдоніми хоста:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Інші імена хостів, що обслуговують цей самий сайт, зведені до одного, по одному правилу в рядку (напр. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Дзеркалювати %s і всі хости нижче
+Ignore %s and every host below it
+Ігнорувати %s і всі хости нижче

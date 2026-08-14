@@ -946,6 +946,36 @@ Server terminated
 Server beeindigd
 A fatal error has occurred during this mirror
 Een fatale fout is opgetreden tijdens deze spiegeling
+View Documentation
+Documentatie bekijken
+Go To HTTrack Website
+Ga naar de HTTrack-website
+Go To HTTrack Forum
+Ga naar het HTTrack-forum
+View License
+Licentie bekijken
+Beware: you local browser might be unable to browse files with embedded filenames
+Let op: uw lokale browser kan bestanden met ingesloten bestandsnamen mogelijk niet openen
+Recreated HTTrack internal cached resources
+Interne buffer van HTTrack opnieuw aangemaakt
+Could not create internal cached resources
+Kan de interne buffer niet aanmaken
+Could not get the system external storage directory
+Kan de externe opslag van het systeem niet vinden
+Could not write to:
+Kan niet schrijven naar:
+Read-only media (SDCARD)
+Alleen-lezen medium (SDCARD)
+No storage media (SDCARD)
+Geen opslagmedium (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Zolang dit probleem niet is opgelost, kan HTTrack mogelijk geen websites downloaden
+HTTrack: mirror '%s' stopped!
+HTTrack: spiegeling "%s" gestopt!
+Click on this notification to restart the interrupted mirror
+Tik op deze melding om de onderbroken spiegeling te hervatten
+HTTrack: could not save profile for '%s'!
+HTTrack: kan het profiel voor "%s" niet opslaan!
 Proxy type:
 Proxytype:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Maximale grootte van een WARC-segment:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Een nieuw WARC-segment beginnen zodra het huidige dit aantal bytes overschrijdt; laat leeg of 0 voor één bestand.
 Host aliases:
-Host aliases:
+Host-aliassen:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Andere hostnamen die dezelfde site aanbieden, samengevoegd tot één, één regel per lijn (bijv. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+%s en alle onderliggende hosts spiegelen
+Ignore %s and every host below it
+%s en alle onderliggende hosts uitsluiten

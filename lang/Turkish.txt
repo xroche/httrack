@@ -946,6 +946,36 @@ Server terminated
 Sunucu sonlandýrýldý
 A fatal error has occurred during this mirror
 Bu yansýlama iþlemi sýrasýnda ölümcül bir hata oluþtu
+View Documentation
+Belgeleri görüntüle
+Go To HTTrack Website
+HTTrack web sitesine git
+Go To HTTrack Forum
+HTTrack forumuna git
+View License
+Lisansý görüntüle
+Beware: you local browser might be unable to browse files with embedded filenames
+Dikkat: yerel tarayýcýnýz gömülü dosya adlarý içeren dosyalarý açamayabilir
+Recreated HTTrack internal cached resources
+HTTrack iç önbellek kaynaklarý yeniden oluþturuldu
+Could not create internal cached resources
+Ýç önbellek kaynaklarý oluþturulamadý
+Could not get the system external storage directory
+Sistemin dýþ depolama dizini bulunamadý
+Could not write to:
+Þuraya yazýlamadý:
+Read-only media (SDCARD)
+Salt okunur ortam (SDCARD)
+No storage media (SDCARD)
+Depolama ortamý yok (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Bu sorun giderilene kadar HTTrack web sitelerini indiremeyebilir
+HTTrack: mirror '%s' stopped!
+HTTrack: "%s" yansýsý durduruldu!
+Click on this notification to restart the interrupted mirror
+Yarým kalan yansýyý sürdürmek için bu bildirime dokunun
+HTTrack: could not save profile for '%s'!
+HTTrack: "%s" için profil kaydedilemedi!
 Proxy type:
 Proxy türü:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC parça boyutu sýnýrý:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Geçerli parça bu bayt sayýsýný aþtýðýnda yeni bir WARC parçasý baþlat; tek dosya için boþ býrakýn veya 0 girin.
 Host aliases:
-Host aliases:
+Sunucu takma adlarý:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Ayný siteyi sunan diðer sunucu adlarý, tek bir ada indirgenir; her satýrda bir kural (örn. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+%s ve altýndaki tüm sunucularý yansýla
+Ignore %s and every host below it
+%s ve altýndaki tüm sunucularý yoksay

@@ -946,6 +946,36 @@ Server terminated
 Serwer zakonczyl prace
 A fatal error has occurred during this mirror
 Podczas tworzenia lustra wydarzyl sie fatalny blad.
+View Documentation
+Poka¿ dokumentacjê
+Go To HTTrack Website
+PrzejdŸ do witryny HTTrack
+Go To HTTrack Forum
+PrzejdŸ do forum HTTrack
+View License
+Poka¿ licencjê
+Beware: you local browser might be unable to browse files with embedded filenames
+Uwaga: lokalna przegl¹darka mo¿e nie otworzyæ plików z osadzonymi nazwami plików
+Recreated HTTrack internal cached resources
+Wewnêtrzne zasoby podrêczne HTTrack zosta³y utworzone ponownie
+Could not create internal cached resources
+Nie mo¿na utworzyæ wewnêtrznych zasobów podrêcznych
+Could not get the system external storage directory
+Nie mo¿na odnaleŸæ zewnêtrznej pamiêci systemu
+Could not write to:
+Nie mo¿na zapisaæ do:
+Read-only media (SDCARD)
+Noœnik tylko do odczytu (SDCARD)
+No storage media (SDCARD)
+Brak noœnika pamiêci (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Dopóki ten problem nie zostanie rozwi¹zany, HTTrack mo¿e nie pobieraæ witryn
+HTTrack: mirror '%s' stopped!
+HTTrack: lustro „%s” zosta³o zatrzymane!
+Click on this notification to restart the interrupted mirror
+Dotknij tego powiadomienia, aby wznowiæ przerwane lustro
+HTTrack: could not save profile for '%s'!
+HTTrack: nie mo¿na zapisaæ profilu dla „%s”!
 Proxy type:
 Typ proxy:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Maksymalny rozmiar segmentu WARC:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Rozpocznij nowy segment WARC, gdy bie¿¹cy przekroczy tê liczbê bajtów; pozostaw puste lub 0, aby zachowaæ jeden plik.
 Host aliases:
-Host aliases:
+Aliasy hostów:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Inne nazwy hostów obs³uguj¹ce tê sam¹ witrynê, sprowadzone do jednej, jedna regu³a w wierszu (np. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Lustro %s i wszystkich hostów poni¿ej
+Ignore %s and every host below it
+Ignoruj %s i wszystkie hosty poni¿ej

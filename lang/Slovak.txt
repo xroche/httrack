@@ -946,6 +946,36 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+View Documentation
+Zobrazi dokumentáciu
+Go To HTTrack Website
+Prejs na webovú stránku HTTrack
+Go To HTTrack Forum
+Prejs na fórum HTTrack
+View License
+Zobrazi licenciu
+Beware: you local browser might be unable to browse files with embedded filenames
+Pozor: váš miestny prehliadaè nemusí otvori súbory s vloenımi názvami súborov
+Recreated HTTrack internal cached resources
+Interné zdroje vo vyrovnávacej pamäti HTTrack boli znovu vytvorené
+Could not create internal cached resources
+Interné zdroje vo vyrovnávacej pamäti sa nepodarilo vytvori
+Could not get the system external storage directory
+Externé úloisko systému sa nepodarilo nájs
+Could not write to:
+Nedá sa zapisova do:
+Read-only media (SDCARD)
+Médium len na èítanie (SDCARD)
+No storage media (SDCARD)
+iadne úloné médium (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Kım sa tento problém nevyrieši, HTTrack nemusí sahova webové stránky
+HTTrack: mirror '%s' stopped!
+HTTrack: zrkadlenie „%s” bolo zastavené!
+Click on this notification to restart the interrupted mirror
+uknutím na toto oznámenie obnovíte prerušené zrkadlenie
+HTTrack: could not save profile for '%s'!
+HTTrack: profil pre „%s” sa nepodarilo uloi!
 Proxy type:
 Typ proxy:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Najväèšia ve¾kos segmentu WARC:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Zaèa novı segment WARC, keï aktuálny prekroèí tento poèet bajtov; ponechajte prázdne alebo 0 pre jeden súbor.
 Host aliases:
-Host aliases:
+Aliasy hostite¾a:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Ïalšie názvy hostite¾ov poskytujúce tú istú lokalitu, zlúèené do jedného, jedno pravidlo na riadok (napr. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Zrkadli %s a všetkıch hostite¾ov pod òou
+Ignore %s and every host below it
+Ignorova %s a všetkıch hostite¾ov pod òou

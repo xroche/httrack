@@ -946,6 +946,36 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+View Documentation
+Prikaži dokumentacijo
+Go To HTTrack Website
+Pojdi na spletno mesto HTTrack
+Go To HTTrack Forum
+Pojdi na forum HTTrack
+View License
+Prikaži licenco
+Beware: you local browser might be unable to browse files with embedded filenames
+Pozor: krajevni brskalnik morda ne bo mogel odpreti datotek z vdelanimi imeni datotek
+Recreated HTTrack internal cached resources
+Notranji predpomnjeni viri HTTracka so bili znova ustvarjeni
+Could not create internal cached resources
+Notranjih predpomnjenih virov ni bilo mogoèe ustvariti
+Could not get the system external storage directory
+Zunanje shrambe sistema ni bilo mogoèe najti
+Could not write to:
+Ni mogoèe pisati v:
+Read-only media (SDCARD)
+Nosilec samo za branje (SDCARD)
+No storage media (SDCARD)
+Ni nosilca za shranjevanje (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Dokler ta težava ni odpravljena, HTTrack morda ne bo mogel prenašati spletnih mest
+HTTrack: mirror '%s' stopped!
+HTTrack: zrcaljenje „%s” je bilo ustavljeno!
+Click on this notification to restart the interrupted mirror
+Tapnite to obvestilo za nadaljevanje prekinjenega zrcaljenja
+HTTrack: could not save profile for '%s'!
+HTTrack: profila za „%s” ni bilo mogoèe shraniti!
 Proxy type:
 Vrsta proxyja:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Najvecja velikost segmenta WARC:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Zacni nov segment WARC, ko trenutni preseze to stevilo bajtov; pustite prazno ali 0 za eno datoteko.
 Host aliases:
-Host aliases:
+Vzdevki gostitelja:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Druga imena gostiteljev, ki strežejo isto stran, združena v eno, eno pravilo na vrstico (npr. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Zrcali %s in vse gostitelje pod njo
+Ignore %s and every host below it
+Prezri %s in vse gostitelje pod njo

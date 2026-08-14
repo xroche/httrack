@@ -946,6 +946,36 @@ Server terminated
 Серверот е прекинат
 A fatal error has occurred during this mirror
 Настана фатална грешка при овој mirror
+View Documentation
+Прикажи ја документацијата
+Go To HTTrack Website
+Оди на веб-страницата на HTTrack
+Go To HTTrack Forum
+Оди на форумот на HTTrack
+View License
+Прикажи ја лиценцата
+Beware: you local browser might be unable to browse files with embedded filenames
+Внимание: вашиот локален прелистувач можеби нема да може да отвори датотеки со вградени имиња на датотеки
+Recreated HTTrack internal cached resources
+Внатрешните кеширани ресурси на HTTrack се создадени повторно
+Could not create internal cached resources
+Внатрешните кеширани ресурси не можеа да се создадат
+Could not get the system external storage directory
+Системската надворешна меморија не можеше да се најде
+Could not write to:
+Не може да се запише во:
+Read-only media (SDCARD)
+Носач само за читање (SDCARD)
+No storage media (SDCARD)
+Нема носач за складирање (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Додека не се реши овој проблем, HTTrack можеби нема да може да презема веб-страници
+HTTrack: mirror '%s' stopped!
+HTTrack: копијата „%s“ е запрена!
+Click on this notification to restart the interrupted mirror
+Допрете го ова известување за да ја продолжите прекинатата копија
+HTTrack: could not save profile for '%s'!
+HTTrack: профилот за „%s“ не можеше да се зачува!
 Proxy type:
 Тип на прокси:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC segment size limit:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Започни нов WARC сегмент кога тековниот ќе го надмине овој број бајти; оставете празно или 0 за една датотека.
 Host aliases:
-Host aliases:
+Алијаси на хостот:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Други имиња на хостови што ја служат истата страница, споени во едно, по едно правило во ред (пр. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Копирај го %s и сите хостови под него
+Ignore %s and every host below it
+Игнорирај го %s и сите хостови под него

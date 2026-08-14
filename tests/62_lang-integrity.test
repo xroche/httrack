@@ -162,44 +162,15 @@ LC_ALL=C awk -v keys="$keys" '
 ' "$def" || fail=1
 
 # A msgid absent from a language file silently falls back to English (#862).
-# What is left waived is the Android UI, whose strings never reached lang/*.txt.
 LC_ALL=C sort -u <"$keys" >"$tmp/english.sorted"
-LC_ALL=C sort -u >"$tmp/waived" <<'UNTRANSLATED'
-Beware: you local browser might be unable to browse files with embedded filenames
-Click on this notification to restart the interrupted mirror
-Could not create internal cached resources
-Could not get the system external storage directory
-Could not write to:
-Go To HTTrack Forum
-Go To HTTrack Website
-HTTrack may not be able to download websites until this problem is fixed
-HTTrack: could not save profile for '%s'!
-HTTrack: mirror '%s' stopped!
-No storage media (SDCARD)
-Read-only media (SDCARD)
-Recreated HTTrack internal cached resources
-View Documentation
-View License
-UNTRANSLATED
-
-: >"$tmp/complete"
 for f in "$langdir"/*.txt; do
     LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$f" | LC_ALL=C sort -u >"$tmp/have"
-    LC_ALL=C comm -23 "$tmp/english.sorted" "$tmp/have" >"$tmp/absent"
-    untranslated=$(LC_ALL=C comm -23 "$tmp/absent" "$tmp/waived")
+    untranslated=$(LC_ALL=C comm -23 "$tmp/english.sorted" "$tmp/have")
     if [ -n "$untranslated" ]; then
         printf '%s\n' "$untranslated" | awk -v n="${f##*/}" '{print n ": untranslated msgid: " $0}'
         fail=1
     fi
-    # A waiver nobody needs any more has to go, or the hole quietly reopens.
-    LC_ALL=C comm -12 "$tmp/absent" "$tmp/waived" >>"$tmp/complete"
 done
-LC_ALL=C sort -u -o "$tmp/complete" "$tmp/complete"
-stale=$(LC_ALL=C comm -23 "$tmp/waived" "$tmp/complete")
-if [ -n "$stale" ]; then
-    printf '%s\n' "$stale" | awk '{print "lang: translated everywhere now, drop the waiver: " $0}'
-    fail=1
-fi
 
 # An unknown ${LANG_*} renders as nothing rather than erroring, so check that
 # every macro the templates interpolate, in any wrapper form, resolves.

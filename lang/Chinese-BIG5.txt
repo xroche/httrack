@@ -946,6 +946,36 @@ Server terminated
 伺服器已終止
 A fatal error has occurred during this mirror
 這鏡像發生了不可回復的錯誤
+View Documentation
+檢視說明文件
+Go To HTTrack Website
+前往 HTTrack 網站
+Go To HTTrack Forum
+前往 HTTrack 論壇
+View License
+檢視授權條款
+Beware: you local browser might be unable to browse files with embedded filenames
+注意：本機瀏覽器可能無法開啟檔名內嵌的檔案
+Recreated HTTrack internal cached resources
+已重新建立 HTTrack 內部快取資源
+Could not create internal cached resources
+無法建立內部快取資源
+Could not get the system external storage directory
+無法取得系統外部儲存空間目錄
+Could not write to:
+無法寫入：
+Read-only media (SDCARD)
+唯讀媒體 (SDCARD)
+No storage media (SDCARD)
+沒有儲存媒體 (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+在此問題修正前，HTTrack 可能無法下載網站
+HTTrack: mirror '%s' stopped!
+HTTrack：鏡像「%s」已停止！
+Click on this notification to restart the interrupted mirror
+點選此通知以重新啟動中斷的鏡像
+HTTrack: could not save profile for '%s'!
+HTTrack：無法儲存「%s」的設定檔！
 Proxy type:
 proxy 類型:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC 分段大小上限：
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 目前分段超過此位元組數時開始新的 WARC 分段；留空或填 0 則保持單一檔案。
 Host aliases:
-Host aliases:
+主機別名：
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+提供同一網站的其他主機名稱，合併為一個，每行一條規則（例如 www2.example.com,m.example.com=example.com）。
+Mirror %s and every host below it
+鏡像 %s 及其下所有主機
+Ignore %s and every host below it
+忽略 %s 及其下所有主機
