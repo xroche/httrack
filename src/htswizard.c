@@ -339,6 +339,10 @@ void hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
       assertf("too many filters - giving up" == NULL); // wild..
     }
   }
+  /* a counter outliving its array (an opt reused for a second crawl) would
+     index past the end */
+  if (opt->wizard_filters > *opt->filters.filptr)
+    opt->wizard_filters = *opt->filters.filptr;
   for (slot = 0; slot < HTS_WIZARD_MAX_FILTERS; slot++) {
     hts_wizard_answer_filter(&f, slot, n, adr, fil, seeker_up);
     if (f.len == 0)

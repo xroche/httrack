@@ -608,10 +608,7 @@ int httpmirror(char *url1, httrackp * opt) {
     XH_extuninit;
     return 0;
   }
-  opt->filters.filters = &filters;
-  //
-  opt->filters.filptr = &filptr;
-  opt->wizard_filters = 0; // an opt reused for a second crawl starts empty
+  filters_bind(opt, &filters, &filptr);
 
   // hash table
   opt->hash = &hash;
@@ -2423,6 +2420,12 @@ void host_ban(httrackp * opt, int ptr,
                     i);
     }
   }
+}
+
+void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
+  opt->filters.filters = ptrfilters;
+  opt->filters.filptr = filptr;
+  opt->wizard_filters = 0;
 }
 
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {

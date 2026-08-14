@@ -387,6 +387,10 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
 
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 
+/* Binds this crawl's filter array to `opt`, and empties the wizard block with
+   it: opt->wizard_filters indexes into that array and outlives no crawl. */
+void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
+
 int fspc(httrackp * opt, FILE * fp, const char *type);
 
 char *next_token(char *p, int flag);

@@ -6,8 +6,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
 
-# #1250: the array the wizard hands the matcher, fed back to the matcher. Last
-# match wins, so the block order below is the precedence.
+# #1250: last match wins, so the order below is each answer's precedence.
 
 # answering "ignore this link" and then "mirror the whole host" takes it back
 list=$(httrack -O /dev/null -#test=wizardinsert h /dir/one.html 0 6)

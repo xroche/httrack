@@ -4419,8 +4419,8 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
 
 #undef PRIO_UNSET
 
-/* Refills the array the wizard inserts into with `cmd`, the filters the crawl
-   started with (NULL-terminated). */
+/* Resets the wizard's filter array to the command-line filters `cmd`
+   (NULL-terminated). */
 static void wz_seed(httrackp *opt, char **filters, int *filptr,
                     const char *const *cmd) {
   int i;
@@ -4431,21 +4431,26 @@ static void wz_seed(httrackp *opt, char **filters, int *filptr,
     strlcpybuff(filters[(*filptr)++], cmd[i], HTS_FILTER_SLOT_SIZE);
 }
 
-/* Asserts the array holds exactly `want`, in order. */
+/* Asserts the array holds exactly `want`, in order, naming the slot that
+   differs: every scenario below aborts through here. */
 static void wz_holds(char **filters, int filptr, const char *const *want) {
   int i;
 
   for (i = 0; want[i] != NULL; i++) {
+    if (i >= filptr || strcmp(filters[i], want[i]) != 0)
+      fprintf(stderr, "filter %d: got [%s], want [%s]\n", i,
+              i < filptr ? filters[i] : "<past the end>", want[i]);
     assertf(i < filptr);
     assertf(strcmp(filters[i], want[i]) == 0);
   }
+  if (filptr != i)
+    fprintf(stderr, "filter %d: got [%s], want nothing\n", i,
+            i < filptr ? filters[i] : "<past the end>");
   assertf(filptr == i);
 }
 
-/* Where hts_wizard_insert_filters() puts a wizard answer. With <adr> <fil>
-   [answer...] [@ filter...], applies the answers over the command-line filters
-   listed after the "@" ("--" would be eaten by the option parser) and prints
-   the resulting array; with no argument, asserts the precedence rules. */
+/* Drives hts_wizard_insert_filters(): prints the array the given answers build
+   over the command-line filters, or asserts the precedence rules. */
 static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
   const htsfilters saved = opt->filters;
   const int savedwizard = opt->wizard_filters;
@@ -4458,6 +4463,10 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
   opt->filters.filters = &filters;
   opt->filters.filptr = &filptr;
   opt->wizard_filters = 0;
+/* Answers, from httrack.c's question: 0 this link, 1 this directory, 2 the
+   host, 3 the parent, 4 this page only, 5 the directory and below, 6 the host,
+   7 the directory's files, 50 nothing. seeker_up is pinned off, so answer 5
+   takes its directory branch; 264 covers the host one. */
 #define INSERT(n, adr, fil)                                                    \
   hts_wizard_insert_filters(opt, (n), (adr), (fil), HTS_FALSE)
 #define HOLDS(...)                                                             \
@@ -4483,7 +4492,8 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
         break;
       }
     }
-    for (i = sep + 1; i < argc; i++)
+    for (i = sep + 1;
+         i < argc && filptr + HTS_WIZARD_MAX_FILTERS < opt->maxfilter; i++)
       strlcpybuff(filters[filptr++], argv[i], HTS_FILTER_SLOT_SIZE);
     for (i = 2; i < sep; i++)
       INSERT(atoi(argv[i]), argv[0], argv[1]);
@@ -4492,6 +4502,24 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
     printf("\n");
     goto done;
   }
+
+  /* the block size indexes one crawl's array, so binding an array empties it */
+  {
+    char **other = NULL;
+    int otherptr = 7;
+
+    opt->wizard_filters = 3;
+    filters_bind(opt, &other, &otherptr);
+    assertf(opt->wizard_filters == 0);
+    assertf(opt->filters.filters == &other && opt->filters.filptr == &otherptr);
+    filters_bind(opt, &filters, &filptr);
+  }
+
+  /* and a counter that outlived its array still cannot index past the end */
+  SEED("-*.zip");
+  opt->wizard_filters = 99;
+  INSERT(6, "h", "/dir/two.html");
+  assertf(opt->wizard_filters <= filptr);
 
   /* the correction case: "ignore this link", then "mirror the whole host" */
   RESET();
@@ -4533,7 +4561,7 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
   HOLDS("+*.example.co.uk/*", "+example.co.uk/*", "-*.zip");
   assertf(opt->wizard_filters == 2);
 
-  /* an answer that emits nothing leaves the block, and the array, alone */
+  /* an answer that emits nothing leaves the block and the array unchanged */
   SEED("-*.zip");
   INSERT(4, "h", "/dir/one.html");
   INSERT(50, "h", "/dir/one.html");
