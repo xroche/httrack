@@ -21,12 +21,14 @@ cp "${tmpdir}/foreign/a.html" "${tmpdir}/foreign/b.html"
 local_server_start --root "${tmpdir}/foreign" --log "${tmpdir}/foreign.log"
 foreign=$SRV_PORT
 
-# two links, so an answer that only refuses this one asks a second time
+# Three links over two host names: an answer refusing only this link asks
+# again for the second, and one refusing only this domain for the third.
 mkdir -p "${tmpdir}/root/wizardeof"
 cat >"${tmpdir}/root/wizardeof/index.html" <<EOF
 <html><body>
 <a href="http://127.0.0.1:${foreign}/a.html">a</a>
 <a href="http://127.0.0.1:${foreign}/b.html">b</a>
+<a href="http://localhost:${foreign}/b.html">c</a>
 </body></html>
 EOF
 local_server_start --root "${tmpdir}/root"
