@@ -115,11 +115,8 @@ grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
 }
 
 # --- 4. a value whose first character is a quote survives the round-trip -----
-# The command line needs two leading quotes: the -O pass strips one pair in
-# place, leaving the footer "<!-- MARK -->, which the writer must escape. Left
-# raw it reopens a quote, so the reader swallows the rest of the line into the
-# footer and -r2 is lost for good. Asserted on the mirrored page, not just on
-# doit.log, so a writer/reader pair that agrees on a wrong value still fails.
+# Two leading quotes, because the -O pass strips one pair: the footer keeps a
+# leading quote, which reopens on reprise and swallows -r2 unless escaped.
 out3="$tmp/out3"
 site3="$tmp/site3"
 footer='"<!-- MARK -->'
