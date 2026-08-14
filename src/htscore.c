@@ -2022,8 +2022,10 @@ int httpmirror(char *url1, httrackp * opt) {
   if ((HTS_STAT.stat_files <= 0)
       && (HTS_STAT.HTS_TOTAL_RECV < 32768)      /* should be fine */
     ) {
-    hts_log_print(opt, LOG_NOTICE,
-                  "No data seems to have been transferred during this session! : restoring previous one!");
+    /* not a notice: the session is rolled back and the WARC aborted */
+    hts_log_print(opt, LOG_WARNING,
+                  "No data seems to have been transferred during this session! "
+                  ": restoring previous one!");
     /* this run replaces nothing, so its archive must not be committed */
     warc_abort_opt(opt);
     opt->state.exit_xh = 2;     /* interrupted (no connection detected) */
