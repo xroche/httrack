@@ -4168,6 +4168,21 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   EMITS(5, "foo.com", "page.html", HTS_FALSE, "");
   EMITS(7, "foo.com", "page.html", HTS_FALSE, "");
 
+  /* a pattern cut from a long link clips into the slot instead of aborting
+     (#1264), and what is left still names the host it came from */
+  {
+    char adr[HTS_URLMAXSIZE], fil[HTS_URLMAXSIZE];
+
+    memset(adr, 'a', sizeof(adr) - 1);
+    adr[sizeof(adr) - 1] = '\0';
+    memset(fil, 'b', sizeof(fil) - 1);
+    fil[0] = fil[sizeof(fil) - 2] = '/';
+    fil[sizeof(fil) - 1] = '\0';
+    hts_wizard_answer_filter(&f, 0, 7, adr, fil, HTS_FALSE);
+    assertf(f.len == sizeof(pattern) - 1);
+    assertf(strncmp(pattern + 1, adr, sizeof(adr) - 1) == 0);
+  }
+
   /* the answers that add no filter at all */
   EMITS(-1, "foo.com", "/x", HTS_FALSE, "");
   EMITS(3, "foo.com", "/x", HTS_FALSE, "");

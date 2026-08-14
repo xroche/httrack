@@ -64,7 +64,9 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
 /* Builds into `f` the `slot`-th filter answer `n` adds for the link (adr,fil),
    and leaves `f` empty past the last one. Only the host-scope answers emit a
    second, because their starred form misses the apex. `seeker_up` is the
-   HTS_SEEKER_UP bit of opt->seeker, read by answer 5. */
+   HTS_SEEKER_UP bit of opt->seeker, read by answer 5. A pattern too long for
+   `f` is clipped rather than aborted: only its tail is lost, so it stays
+   anchored on the link it was cut from. */
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 

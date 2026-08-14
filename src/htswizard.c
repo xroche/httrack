@@ -166,10 +166,24 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
   return HTS_TRUE;
 }
 
+/* Appends at most len bytes of s ((size_t) -1: all), clipping to the room left
+   instead of aborting: the pattern is cut from a link and can outgrow the
+   filter slot it is built into (#1264). */
+static void wizard_catn(htsbuff *f, const char *s, size_t len) {
+  const size_t room = f->cap - f->len - 1;
+
+  htsbuff_catn(f, s, len < room ? len : room);
+}
+
+static void wizard_cat(htsbuff *f, const char *s) {
+  wizard_catn(f, s, (size_t) -1);
+}
+
 /* "<sign><host>", with any user:password@ stripped. */
 static void wizard_cat_host(htsbuff *f, const char *sign, const char *adr) {
-  htsbuff_cpy(f, sign);
-  htsbuff_cat(f, jump_identification_const(adr));
+  htsbuff_cpy(f, "");
+  wizard_cat(f, sign);
+  wizard_cat(f, jump_identification_const(adr));
 }
 
 /* "<sign><host>/" then the first len characters of fil ((size_t) -1: all). */
@@ -177,8 +191,8 @@ static void wizard_cat_path(htsbuff *f, const char *sign, const char *adr,
                             const char *fil, size_t len) {
   wizard_cat_host(f, sign, adr);
   if (*fil != '/')
-    htsbuff_cat(f, "/");
-  htsbuff_catn(f, fil, len);
+    wizard_cat(f, "/");
+  wizard_catn(f, fil, len);
 }
 
 HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
@@ -251,11 +265,12 @@ static void wizard_cat_scope(htsbuff *f, const char *sign, const char *adr,
   if (slot >= HTS_WIZARD_MAX_FILTERS ||
       !hts_wizard_host_scope(adr, k, scope, sizeof(scope)))
     return;
-  htsbuff_cpy(f, sign);
+  htsbuff_cpy(f, "");
+  wizard_cat(f, sign);
   if (slot == 0)
-    htsbuff_cat(f, "*.");
-  htsbuff_cat(f, scope);
-  htsbuff_cat(f, "/*");
+    wizard_cat(f, "*.");
+  wizard_cat(f, scope);
+  wizard_cat(f, "/*");
 }
 
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
@@ -282,38 +297,38 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
     if (fil[dir] == '/') {
       /* stops before the last slash, so a doubled one collapses */
       wizard_cat_path(f, "-", adr, fil, dir);
-      if (f->buf[f->len - 1] != '/')
-        htsbuff_cat(f, "/");
-      htsbuff_cat(f, "*");
+      if (f->len == 0 || f->buf[f->len - 1] != '/')
+        wizard_cat(f, "/");
+      wizard_cat(f, "*");
     }
     break;
 
   case 2: /* the whole host */
     wizard_cat_host(f, "-", adr);
-    htsbuff_cat(f, "/*");
+    wizard_cat(f, "/*");
     break;
 
   case 5: /* this directory and below, or the whole host */
     if (!seeker_up) {
       if (fil[dir] == '/') {
         wizard_cat_path(f, "+", adr, fil, dir + 1);
-        htsbuff_cat(f, "*");
+        wizard_cat(f, "*");
       }
     } else {
       wizard_cat_host(f, "+", adr);
-      htsbuff_cat(f, "/*");
+      wizard_cat(f, "/*");
     }
     break;
 
   case 6: /* the whole host */
     wizard_cat_host(f, "+", adr);
-    htsbuff_cat(f, "/*");
+    wizard_cat(f, "/*");
     break;
 
   case 7: /* this directory, files only */
     if (fil[dir] == '/') {
       wizard_cat_path(f, "+", adr, fil, dir + 1);
-      htsbuff_cat(f, "*[file]");
+      wizard_cat(f, "*[file]");
     }
     break;
 
