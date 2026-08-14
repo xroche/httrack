@@ -946,6 +946,36 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+View Documentation
+ドキュメントの表示
+Go To HTTrack Website
+HTTrack のウェブサイトを開く
+Go To HTTrack Forum
+HTTrack のフォーラムを開く
+View License
+ライセンスの表示
+Beware: you local browser might be unable to browse files with embedded filenames
+注意: ローカルのブラウザではファイル名が埋め込まれたファイルを開けない場合があります
+Recreated HTTrack internal cached resources
+HTTrack の内部キャッシュを再作成しました
+Could not create internal cached resources
+内部キャッシュを作成できませんでした
+Could not get the system external storage directory
+システムの外部ストレージが見つかりませんでした
+Could not write to:
+次の場所に書き込めません:
+Read-only media (SDCARD)
+読み取り専用のメディア (SDCARD)
+No storage media (SDCARD)
+ストレージメディアがありません (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+この問題が解決するまで、HTTrack はサイトをダウンロードできない場合があります
+HTTrack: mirror '%s' stopped!
+HTTrack: ミラー「%s」を停止しました
+Click on this notification to restart the interrupted mirror
+中断したミラーを再開するには、この通知をタップしてください
+HTTrack: could not save profile for '%s'!
+HTTrack:「%s」のプロファイルを保存できませんでした
 Proxy type:
 プロキシの種類:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC セグメントの最大サイズ:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 現在のセグメントがこのバイト数を超えたら新しい WARC セグメントを開始します。空欄または 0 で単一ファイルのままにします。
 Host aliases:
-Host aliases:
+ホストの別名:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+同じサイトを配信する他のホスト名を 1 つにまとめます。1 行につき 1 つの規則 (例: www2.example.com,m.example.com=example.com)。
+Mirror %s and every host below it
+%s とその配下のすべてのホストをコピー（ミラー）
+Ignore %s and every host below it
+%s とその配下のすべてのホストを無視

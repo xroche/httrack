@@ -946,6 +946,36 @@ Server terminated
 Server terminat
 A fatal error has occurred during this mirror
 A survenit o eroare fatalã în timpul acestei clonãri.
+View Documentation
+Vezi documentaþia
+Go To HTTrack Website
+Mergi la site-ul HTTrack
+Go To HTTrack Forum
+Mergi la forumul HTTrack
+View License
+Vezi licenþa
+Beware: you local browser might be unable to browse files with embedded filenames
+Atenþie: navigatorul local ar putea sã nu poatã deschide fiºiere cu nume de fiºier încorporate
+Recreated HTTrack internal cached resources
+Resursele interne din cache ale HTTrack au fost recreate
+Could not create internal cached resources
+Resursele interne din cache nu au putut fi create
+Could not get the system external storage directory
+Directorul de stocare externã al sistemului nu a putut fi gãsit
+Could not write to:
+Nu se poate scrie în:
+Read-only media (SDCARD)
+Suport numai pentru citire (SDCARD)
+No storage media (SDCARD)
+Niciun suport de stocare (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Cât timp aceastã problemã persistã, HTTrack ar putea sã nu poatã descãrca site-uri
+HTTrack: mirror '%s' stopped!
+HTTrack: clona "%s" a fost opritã!
+Click on this notification to restart the interrupted mirror
+Atinge aceastã notificare pentru a relua clona întreruptã
+HTTrack: could not save profile for '%s'!
+HTTrack: profilul pentru "%s" nu a putut fi salvat!
 Proxy type:
 Tip proxy:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Dimensiunea maxima a unui segment WARC:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Incepe un nou segment WARC cand cel curent depaseste acest numar de octeti; lasati gol sau 0 pentru un singur fisier.
 Host aliases:
-Host aliases:
+Alias-uri gazdã:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Alte nume de gazdã care servesc acelaºi site, reunite într-unul singur, o regulã pe linie (ex. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Cloneazã %s ºi toate gazdele de sub el
+Ignore %s and every host below it
+Ignorã %s ºi toate gazdele de sub el

@@ -946,6 +946,36 @@ Server terminated
 Servidor desconectado
 A fatal error has occurred during this mirror
 Ha ocurrido un error fatal durante esta copia
+View Documentation
+Ver la documentación
+Go To HTTrack Website
+Ir al sitio web de HTTrack
+Go To HTTrack Forum
+Ir al foro de HTTrack
+View License
+Ver la licencia
+Beware: you local browser might be unable to browse files with embedded filenames
+Atención: puede que su navegador local no pueda abrir archivos con nombres de archivo incrustados
+Recreated HTTrack internal cached resources
+Recursos internos en caché de HTTrack recreados
+Could not create internal cached resources
+No se han podido crear los recursos internos en caché
+Could not get the system external storage directory
+No se ha podido acceder al almacenamiento externo del sistema
+Could not write to:
+No se ha podido escribir en:
+Read-only media (SDCARD)
+Soporte de solo lectura (SDCARD)
+No storage media (SDCARD)
+No hay soporte de almacenamiento (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Puede que HTTrack no pueda descargar sitios web mientras no se corrija este problema
+HTTrack: mirror '%s' stopped!
+HTTrack: ¡el volcado «%s» se ha detenido!
+Click on this notification to restart the interrupted mirror
+Pulse esta notificación para reanudar el volcado interrumpido
+HTTrack: could not save profile for '%s'!
+HTTrack: ¡no se ha podido guardar el perfil de «%s»!
 Proxy type:
 Tipo de proxy:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Tamaño máximo de segmento WARC:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Empezar un nuevo segmento WARC cuando el actual supere este número de bytes; déjelo en blanco o 0 para un solo archivo.
 Host aliases:
-Host aliases:
+Alias de host:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Otros nombres de host que sirven este mismo sitio, unificados en uno solo, una regla por línea (p. ej. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Volcar %s y todos los hosts por debajo
+Ignore %s and every host below it
+Ignorar %s y todos los hosts por debajo
