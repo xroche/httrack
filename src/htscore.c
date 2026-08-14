@@ -3421,7 +3421,7 @@ int ask_continue(httrackp * opt) {
   if (s != NULL && strnotempty(s) &&
       ((strfield2(s, "N")) || (strfield2(s, "NO")) || (strfield2(s, "NON"))))
     go = 0;
-  if (HAS_CALLBACK(opt, query2)) /* nobody was really asked otherwise */
+  if (HAS_CALLBACK(opt, query2)) /* nobody was asked otherwise */
     hts_log_print(opt, LOG_NOTICE, "(wizard) answer '%s' to \"%.*s\": %s",
                   s != NULL ? s : "", (int) strcspn(opt->state.HTbuff, "\r\n"),
                   opt->state.HTbuff, go ? "continue" : "abort");

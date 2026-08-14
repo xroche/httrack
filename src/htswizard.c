@@ -929,7 +929,8 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
             htsbuff_cat(&added, " ");
           htsbuff_cat(&added, _FILTERS[0]);
         }
-        if (s != NULL) {
+        /* the built-in query3 answers "" for nobody, so ask who replied */
+        if (s != NULL && HAS_CALLBACK(opt, query3)) {
           hts_log_print(
               opt, LOG_NOTICE, "(wizard) answer '%s' (n=%d) for %s%s: %s%s%s",
               s, n, adr, fil,

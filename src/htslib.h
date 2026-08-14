@@ -428,7 +428,7 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define CBSTRUCT(OPT) ((t_hts_htmlcheck_callbacks*) ((OPT)->callbacks_fun))
 #define GET_USERCALLBACK(OPT, NAME) ( CBSTRUCT(OPT)-> NAME .fun )
 #define GET_USERARG(OPT, NAME) ( CBSTRUCT(OPT)-> NAME .carg )
-/* True when a front end chained its own NAME callback */
+/* True when a front end registered its own NAME callback */
 #define HAS_CALLBACK(OPT, NAME)                                                \
   (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)->NAME.fun != NULL)
 #define GET_USERDEF(OPT, NAME)                                                 \
@@ -449,19 +449,6 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define RUN_CALLBACK6(OPT, NAME, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6) GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6)
 #define RUN_CALLBACK7(OPT, NAME, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7) GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7)
 #define RUN_CALLBACK8(OPT, NAME, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7, ARG8) GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7, ARG8)
-
-/*
-#define GET_CALLBACK(OPT, NAME, ARG) ( \
-  ( \
-    ( ARG ) = GET_USERDEF(OPT, NAME), \
-    ( \
- 	    (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)-> NAME .fun != NULL) \
-	    ? ( GET_USERCALLBACK(OPT, NAME ) ) \
-      : ( default_callbacks. NAME .fun ) \
-    ) \
-  ) \
-)
-*/
 
 /* UTF-8 aware FILE API */
 #ifndef HTS_DEF_FILEAPI
