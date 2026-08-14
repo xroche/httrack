@@ -73,10 +73,9 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
 /* Records the filters answer `n` leaves behind for the link (adr,fil), on top
-   of the wizard's own block at the low indices of opt->filters. Last match
-   wins, so a later answer outranks an earlier one, while the command-line
-   filters sitting above the block outrank every answer. The verdict half is
-   hts_wizard_apply_verdict(). Returns the number inserted, which sit at the
+   of the wizard's block at the low indices of opt->filters: last match wins, so
+   a later answer outranks an earlier one and the command-line filters above the
+   block outrank every answer. Returns the number inserted, which sit at the
    tail of the block, ending at opt->wizard_filters. */
 int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);

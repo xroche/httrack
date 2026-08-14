@@ -4467,7 +4467,7 @@ static void wz_seed(httrackp *opt, char **filters, int *filptr,
 }
 
 /* Asserts the array holds exactly `want`, in order, naming the slot that
-   differs: every scenario below aborts through here. */
+   differs. */
 static void wz_holds(char **filters, int filptr, const char *const *want) {
   int i;
 
@@ -4498,10 +4498,8 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
   opt->filters.filters = &filters;
   opt->filters.filptr = &filptr;
   opt->wizard_filters = 0;
-/* Answers, from httrack.c's question: 0 this link, 1 this directory, 2 the
-   host, 3 the parent, 4 this page only, 5 the directory and below, 6 the host,
-   7 the directory's files, 50 nothing. seeker_up is pinned off, so answer 5
-   takes its directory branch; 264 covers the host one. */
+  /* Answers are httrack.c's query3 codes; seeker_up is pinned off, so answer 5
+     takes its directory branch (tests/264 covers the host one). */
 #define INSERT(n, adr, fil)                                                    \
   hts_wizard_insert_filters(opt, (n), (adr), (fil), HTS_FALSE)
 #define HOLDS(...)                                                             \
@@ -4538,7 +4536,7 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
     goto done;
   }
 
-  /* the block size indexes one crawl's array, so binding an array empties it */
+  /* wizard_filters indexes one crawl's array, so binding another resets it */
   {
     char **other = NULL;
     int otherptr = 7;
@@ -4550,7 +4548,7 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
     filters_bind(opt, &filters, &filptr);
   }
 
-  /* and a counter that outlived its array still cannot index past the end */
+  /* a counter that outlived its array still cannot index past the end */
   SEED("-*.zip");
   opt->wizard_filters = 99;
   INSERT(6, "h", "/dir/two.html");
