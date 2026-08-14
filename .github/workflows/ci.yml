@@ -18,18 +18,29 @@ concurrency:
 
 jobs:
   build:
-    name: build (${{ matrix.arch }}, ${{ matrix.cc }})
+    name: build (${{ matrix.arch }}, ${{ matrix.cc }}${{ matrix.label }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
+        # cflags is spelled out everywhere: an exported empty CFLAGS reads as
+        # "set" to configure, which then drops its own -g -O2.
         include:
-          - { arch: x86-64, runner: ubuntu-24.04, cc: gcc }
-          - { arch: x86-64, runner: ubuntu-24.04, cc: clang }
-          - { arch: arm64, runner: ubuntu-24.04-arm, cc: gcc }
-          - { arch: arm64, runner: ubuntu-24.04-arm, cc: clang }
+          - { arch: x86-64, runner: ubuntu-24.04, cc: gcc, cflags: -g -O2 }
+          - { arch: x86-64, runner: ubuntu-24.04, cc: clang, cflags: -g -O2 }
+          - { arch: arm64, runner: ubuntu-24.04-arm, cc: gcc, cflags: -g -O2 }
+          - { arch: arm64, runner: ubuntu-24.04-arm, cc: clang, cflags: -g -O2 }
+          # Ubuntu builds httrack this way; no other leg here does.
+          - {
+              arch: x86-64,
+              runner: ubuntu-24.04,
+              cc: gcc,
+              label: " -O3 -flto",
+              cflags: -g -O3 -flto=auto -ffat-lto-objects,
+            }
     env:
       CC: ${{ matrix.cc }}
+      CFLAGS: ${{ matrix.cflags }}
     steps:
       - uses: actions/checkout@v7
         with:
