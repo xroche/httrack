@@ -946,6 +946,36 @@ Server terminated
 Palvelin lopetettu
 A fatal error has occurred during this mirror
 Tällä peilillä tapahtui vakava virhe
+View Documentation
+Näytä ohjeet
+Go To HTTrack Website
+Siirry HTTrackin sivustolle
+Go To HTTrack Forum
+Siirry HTTrackin foorumille
+View License
+Näytä lisenssi
+Beware: you local browser might be unable to browse files with embedded filenames
+Huomio: paikallinen selaimesi ei ehkä pysty avaamaan tiedostoja, joiden nimi on upotettu
+Recreated HTTrack internal cached resources
+HTTrackin sisäiset välimuistiresurssit luotiin uudelleen
+Could not create internal cached resources
+Sisäisiä välimuistiresursseja ei voitu luoda
+Could not get the system external storage directory
+Järjestelmän ulkoista tallennushakemistoa ei löytynyt
+Could not write to:
+Ei voi kirjoittaa kohteeseen:
+Read-only media (SDCARD)
+Vain luku -media (SDCARD)
+No storage media (SDCARD)
+Ei tallennusmediaa (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+HTTrack ei ehkä pysty lataamaan sivustoja ennen kuin tämä ongelma on korjattu
+HTTrack: mirror '%s' stopped!
+HTTrack: peilaus "%s" pysäytettiin!
+Click on this notification to restart the interrupted mirror
+Jatka keskeytynyttä peilausta napauttamalla tätä ilmoitusta
+HTTrack: could not save profile for '%s'!
+HTTrack: profiilia "%s" ei voitu tallentaa!
 Proxy type:
 Välityspalvelimen tyyppi:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC-osan enimmäiskoko:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Aloita uusi WARC-osa, kun nykyinen ylittää tämän tavumäärän; jätä tyhjäksi tai 0, jolloin tiedosto pysyy yhtenä.
 Host aliases:
-Host aliases:
+Palvelimen aliakset:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Muut samaa sivustoa palvelevat palvelinnimet yhdistettynä yhdeksi, yksi sääntö riviä kohden (esim. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Peilaa %s ja kaikki sen alla olevat palvelimet
+Ignore %s and every host below it
+Sivuuta %s ja kaikki sen alla olevat palvelimet

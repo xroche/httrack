@@ -419,6 +419,11 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     }
     break;
   }
+
+  /* the question is asked only while undecided; an answer that does not forbid
+     authorizes the link */
+  if (*forbidden_url == -1)
+    *forbidden_url = 0;
 }
 
 static int hts_acceptlink_(httrackp * opt, int ptr,
@@ -895,7 +900,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
     /* en cas de question, ou lien primaire (enregistrer autorisations) */
     if (question || (ptr == 0)) {
-      const char *s;
+      const char *s = NULL; /* the front end's raw reply, NULL if unasked */
       int n = 0;
 
       // si primaire (plus bas) alors ...
@@ -968,7 +973,10 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       /* the pattern half of the answer */
       {
         char BIGSTK pattern[HTS_FILTER_SLOT_SIZE];
+        /* the log echoes the inserted slots, so it cannot drift from them */
+        char BIGSTK list[HTS_WIZARD_MAX_FILTERS * (HTS_FILTER_SLOT_SIZE + 1)];
         htsbuff f = htsbuff_array(pattern);
+        htsbuff added = htsbuff_array(list);
         int slot;
 
         for (slot = 0; slot < HTS_WIZARD_MAX_FILTERS; slot++) {
@@ -979,6 +987,19 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
             break;
           HT_INSERT_FILTERS0; // insert at slot 0
           strlcpybuff(_FILTERS[0], pattern, HTS_FILTER_SLOT_SIZE);
+          if (added.len != 0)
+            htsbuff_cat(&added, " ");
+          htsbuff_cat(&added, _FILTERS[0]);
+        }
+        /* the built-in query3 answers "" for nobody, so ask who replied */
+        if (s != NULL && HAS_CALLBACK(opt, query3)) {
+          hts_log_print(
+              opt, LOG_NOTICE, "(wizard) answer '%s' (n=%d) for %s%s: %s%s%s",
+              s, n, adr, fil,
+              forbidden_url == 1   ? "forbidden"
+              : forbidden_url == 0 ? "allowed"
+                                   : "no verdict",
+              added.len != 0 ? ", filters: " : "", htsbuff_str(&added));
         }
       }
 

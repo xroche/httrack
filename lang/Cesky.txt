@@ -946,6 +946,36 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+View Documentation
+Zobrazit dokumentaci
+Go To HTTrack Website
+Pøejít na web HTTrack
+Go To HTTrack Forum
+Pøejít na fórum HTTrack
+View License
+Zobrazit licenci
+Beware: you local browser might be unable to browse files with embedded filenames
+Pozor: váš místní prohlížeè nemusí umìt otevøít soubory s vloženými názvy souborù
+Recreated HTTrack internal cached resources
+Interní zdroje v mezipamìti HTTrack byly znovu vytvoøeny
+Could not create internal cached resources
+Interní zdroje v mezipamìti se nepodaøilo vytvoøit
+Could not get the system external storage directory
+Nepodaøilo se najít systémové externí úložištì
+Could not write to:
+Nelze zapisovat do:
+Read-only media (SDCARD)
+Médium jen pro ètení (SDCARD)
+No storage media (SDCARD)
+Žádné úložné médium (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+Dokud nebude tento problém vyøešen, nemusí HTTrack stahovat weby
+HTTrack: mirror '%s' stopped!
+HTTrack: zrcadlení „%s“ bylo zastaveno!
+Click on this notification to restart the interrupted mirror
+Klepnutím na toto oznámení obnovíte pøerušené zrcadlení
+HTTrack: could not save profile for '%s'!
+HTTrack: profil pro „%s“ se nepodaøilo uložit!
 Proxy type:
 Typ proxy:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ Nejvìtší velikost segmentu WARC:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Zaèít nový segment WARC, jakmile aktuální pøekroèí tento poèet bajtù; ponechte prázdné nebo 0 pro jeden soubor.
 Host aliases:
-Host aliases:
+Aliasy hostitele:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Další názvy hostitelù poskytující tentýž web, slouèené do jednoho, jedno pravidlo na øádek (napø. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Zrcadlit %s a všechny hostitele pod ním
+Ignore %s and every host below it
+Ignorovat %s a všechny hostitele pod ním

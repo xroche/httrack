@@ -946,6 +946,36 @@ Server terminated
 
 A fatal error has occurred during this mirror
 
+View Documentation
+查看文档
+Go To HTTrack Website
+前往 HTTrack 网站
+Go To HTTrack Forum
+前往 HTTrack 论坛
+View License
+查看许可协议
+Beware: you local browser might be unable to browse files with embedded filenames
+注意：本地浏览器可能无法打开文件名内嵌的文件
+Recreated HTTrack internal cached resources
+已重新创建 HTTrack 内部缓存资源
+Could not create internal cached resources
+无法创建内部缓存资源
+Could not get the system external storage directory
+无法获取系统外部存储目录
+Could not write to:
+无法写入：
+Read-only media (SDCARD)
+只读介质 (SDCARD)
+No storage media (SDCARD)
+没有存储介质 (SDCARD)
+HTTrack may not be able to download websites until this problem is fixed
+在此问题修复前，HTTrack 可能无法下载网站
+HTTrack: mirror '%s' stopped!
+HTTrack：镜像“%s”已停止！
+Click on this notification to restart the interrupted mirror
+点击此通知以重新启动中断的镜像
+HTTrack: could not save profile for '%s'!
+HTTrack：无法保存“%s”的配置文件！
 Proxy type:
 代理类型:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1015,6 +1045,10 @@ WARC 分段大小上限：
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 当前分段超过该字节数时开始新的 WARC 分段；留空或填 0 则保持单个文件。
 Host aliases:
-Host aliases:
+主机别名：
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+提供同一网站的其他主机名，合并为一个，每行一条规则（例如 www2.example.com,m.example.com=example.com）。
+Mirror %s and every host below it
+镜像 %s 及其下所有主机
+Ignore %s and every host below it
+忽略 %s 及其下所有主机

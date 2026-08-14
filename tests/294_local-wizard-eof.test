@@ -1,0 +1,57 @@
+#!/bin/bash
+# #1247: with no answer to be had, the wizard's answer loop re-prompted forever.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
+
+httrack=$(command -v httrack) || ! echo "could not find httrack" >&2 || exit 1
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_1247.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+# The out-of-scope host is a second local server, so a link wrongly accepted
+# leaves a mirrored directory behind instead of failing to connect.
+mkdir -p "${tmpdir}/foreign"
+printf '<html><body>beyond</body></html>\n' >"${tmpdir}/foreign/a.html"
+cp "${tmpdir}/foreign/a.html" "${tmpdir}/foreign/b.html"
+local_server_start --root "${tmpdir}/foreign" --log "${tmpdir}/foreign.log"
+foreign=$SRV_PORT
+
+# Three links over two host names: an answer refusing only this link asks
+# again for the second, and one refusing only this domain for the third.
+mkdir -p "${tmpdir}/root/wizardeof"
+cat >"${tmpdir}/root/wizardeof/index.html" <<EOF
+<html><body>
+<a href="http://127.0.0.1:${foreign}/a.html">a</a>
+<a href="http://127.0.0.1:${foreign}/b.html">b</a>
+<a href="http://localhost:${foreign}/b.html">c</a>
+</body></html>
+EOF
+local_server_start --root "${tmpdir}/root"
+
+# crawl LABEL; the caller redirects the stdin the wizard will read from
+crawl() {
+    local label=$1 rc=0 asked
+
+    run_with_timeout 60 "$httrack" -O "${tmpdir}/$label" -W --robots=0 \
+        --retries=0 "http://127.0.0.1:${SRV_PORT}/wizardeof/index.html" \
+        >"${tmpdir}/$label.log" 2>&1 || rc=$?
+
+    test "$rc" -ne 124 || fail "$label: the wizard never returned"
+    test "$rc" -eq 0 || fail "$label: the crawl exited $rc"
+    # asked once and then stopped: refusing this one link would ask again
+    asked=$(grep -c "beyond this mirror scope" "${tmpdir}/$label.log" || true)
+    test "$asked" -eq 1 || fail "$label: asked $asked times, expected 1"
+    test -f "${tmpdir}/$label/127.0.0.1_${SRV_PORT}/wizardeof/index.html" ||
+        fail "$label: the start page was not mirrored"
+    test ! -d "${tmpdir}/$label/127.0.0.1_${foreign}" ||
+        fail "$label: the refused link was mirrored"
+}
+
+crawl eof </dev/null
+# a closed descriptor sets only ferror, where EOF sets only feof
+crawl closed <&-

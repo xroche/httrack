@@ -1045,6 +1045,10 @@ Største størrelse på WARC-segment:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Begynd et nyt WARC-segment, når det aktuelle overstiger dette antal byte; lad feltet stå tomt eller skriv 0 for én fil.
 Host aliases:
-Host aliases:
+Værtsaliasser:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
+Andre værtsnavne der betjener det samme websted, samlet til ét, én regel pr. linje (f.eks. www2.example.com,m.example.com=example.com).
+Mirror %s and every host below it
+Spejlkopiér %s og alle værter under den
+Ignore %s and every host below it
+Ignorer %s og alle værter under den
