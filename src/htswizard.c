@@ -47,18 +47,6 @@ Please visit our Website: http://www.httrack.com
    filters_init() in htscore.c (HTS_URLMAXSIZE * 2). */
 #define HTS_FILTER_SLOT_SIZE (HTS_URLMAXSIZE * 2)
 
-/* Holds "http://" + adr + "/" + fil at the maxima their own declarations allow:
-   the filter matcher reads these back, so they must never be clipped. */
-#define HTS_WIZARD_LINKSIZE                                                    \
-  (sizeof(((lien_adrfil *) NULL)->adr) + sizeof(((lien_adrfil *) NULL)->fil) + \
-   sizeof("http://") + 1)
-/* hts_testlinksize is handed lien_back's pair instead */
-HTS_STATIC_ASSERT(sizeof(((lien_back *) NULL)->url_adr) <=
-                          sizeof(((lien_adrfil *) NULL)->adr) &&
-                      sizeof(((lien_back *) NULL)->url_fil) <=
-                          sizeof(((lien_adrfil *) NULL)->fil),
-                  wizard_linksize_covers_lien_back);
-
 #define HT_INSERT_FILTERS0                                                     \
   do {                                                                         \
     int i;                                                                     \
@@ -739,8 +727,9 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
     int question = 1;           // poser une question                            
     int force_mirror = 0;       // pour mirror links
     int filters_answer = 0;     // décision prise par les filtres
-    char BIGSTK l[HTS_WIZARD_LINKSIZE];
-    char BIGSTK lfull[HTS_WIZARD_LINKSIZE];
+    /* Don't enlarge: the abort gates url_savename_addstr's append (#1269). */
+    char BIGSTK l[HTS_URLMAXSIZE * 2];
+    char BIGSTK lfull[HTS_URLMAXSIZE * 2];
 
     if (forbidden_url != -1)
       question = 0;             // pas de question, résolu
@@ -1097,8 +1086,9 @@ int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint siz
   int jok = 0;
 
   if (size >= 0) {
-    char BIGSTK l[HTS_WIZARD_LINKSIZE];
-    char BIGSTK lfull[HTS_WIZARD_LINKSIZE];
+    /* Don't enlarge: the abort gates url_savename_addstr's append (#1269). */
+    char BIGSTK l[HTS_URLMAXSIZE * 2];
+    char BIGSTK lfull[HTS_URLMAXSIZE * 2];
 
     if (size >= 0) {
       LLint sz = size;
