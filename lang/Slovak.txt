@@ -971,11 +971,11 @@ No storage media (SDCARD)
 HTTrack may not be able to download websites until this problem is fixed
 Kım sa tento problém nevyrieši, HTTrack nemusí sahova webové stránky
 HTTrack: mirror '%s' stopped!
-HTTrack: zrkadlenie „%s” bolo zastavené!
+HTTrack: zrkadlenie „%s“ bolo zastavené!
 Click on this notification to restart the interrupted mirror
 uknutím na toto oznámenie obnovíte prerušené zrkadlenie
 HTTrack: could not save profile for '%s'!
-HTTrack: profil pre „%s” sa nepodarilo uloi!
+HTTrack: profil pre „%s“ sa nepodarilo uloi!
 Proxy type:
 Typ proxy:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1049,6 +1049,6 @@ Aliasy hostite¾a:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
 Ïalšie názvy hostite¾ov poskytujúce tú istú lokalitu, zlúèené do jedného, jedno pravidlo na riadok (napr. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
-Zrkadli %s a všetkıch hostite¾ov pod òou
+Zrkadli %s a všetkıch hostite¾ov pod ním
 Ignore %s and every host below it
-Ignorova %s a všetkıch hostite¾ov pod òou
+Ignorova %s a všetkıch hostite¾ov pod ním

@@ -1049,6 +1049,6 @@ Aliasy hostitele:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
 Další názvy hostitelù poskytující tentýž web, slouèené do jednoho, jedno pravidlo na øádek (napø. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
-Zrcadlit %s a všechny hostitele pod ní
+Zrcadlit %s a všechny hostitele pod ním
 Ignore %s and every host below it
-Ignorovat %s a všechny hostitele pod ní
+Ignorovat %s a všechny hostitele pod ním

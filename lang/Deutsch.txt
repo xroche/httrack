@@ -963,7 +963,7 @@ Interne zwischengespeicherte Ressourcen konnten nicht angelegt werden
 Could not get the system external storage directory
 Der externe Systemspeicher konnte nicht ermittelt werden
 Could not write to:
-Schreiben nicht möglich nach:
+Schreiben nicht möglich in:
 Read-only media (SDCARD)
 Schreibgeschützter Datenträger (SDCARD)
 No storage media (SDCARD)

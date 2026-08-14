@@ -961,7 +961,7 @@ Interni predmemorirani resursi HTTracka ponovno su stvoreni
 Could not create internal cached resources
 Interne predmemorirane resurse nije moguæe stvoriti
 Could not get the system external storage directory
-Nije moguæe pronaæi vanjski sustav pohrane
+Nije moguæe pronaæi vanjsku pohranu sustava
 Could not write to:
 Nije moguæe pisati u:
 Read-only media (SDCARD)
@@ -1045,10 +1045,10 @@ Najveæa velièina WARC segmenta:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
 Zapoèni novi WARC segment kada trenutni prijeðe ovaj broj bajtova; ostavite prazno ili 0 za jednu datoteku.
 Host aliases:
-Nadimci poslužitelja:
+Aliasi poslužitelja:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
 Ostala imena poslužitelja koja poslužuju isto mrežno mjesto, sažeta u jedno, jedno pravilo po retku (npr. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
-Zrcali %s i sve poslužitelje ispod nje
+Zrcali %s i sve poslužitelje ispod njega
 Ignore %s and every host below it
-Zanemari %s i sve poslužitelje ispod nje
+Zanemari %s i sve poslužitelje ispod njega

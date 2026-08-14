@@ -955,7 +955,7 @@ Pojdi na forum HTTrack
 View License
 Prikaži licenco
 Beware: you local browser might be unable to browse files with embedded filenames
-Pozor: krajevni brskalnik morda ne bo mogel odpreti datotek z vdelanimi imeni datotek
+Pozor: lokalni brskalnik morda ne bo mogel odpreti datotek z vdelanimi imeni datotek
 Recreated HTTrack internal cached resources
 Notranji predpomnjeni viri HTTracka so bili znova ustvarjeni
 Could not create internal cached resources
@@ -971,11 +971,11 @@ Ni nosilca za shranjevanje (SDCARD)
 HTTrack may not be able to download websites until this problem is fixed
 Dokler ta težava ni odpravljena, HTTrack morda ne bo mogel prenašati spletnih mest
 HTTrack: mirror '%s' stopped!
-HTTrack: zrcaljenje „%s” je bilo ustavljeno!
+HTTrack: zrcaljenje „%s“ je bilo ustavljeno!
 Click on this notification to restart the interrupted mirror
 Tapnite to obvestilo za nadaljevanje prekinjenega zrcaljenja
 HTTrack: could not save profile for '%s'!
-HTTrack: profila za „%s” ni bilo mogoèe shraniti!
+HTTrack: profila za „%s“ ni bilo mogoèe shraniti!
 Proxy type:
 Vrsta proxyja:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
@@ -1049,6 +1049,6 @@ Vzdevki gostitelja:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
 Druga imena gostiteljev, ki strežejo isto stran, združena v eno, eno pravilo na vrstico (npr. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
-Zrcali %s in vse gostitelje pod njo
+Zrcali %s in vse gostitelje pod njim
 Ignore %s and every host below it
-Prezri %s in vse gostitelje pod njo
+Prezri %s in vse gostitelje pod njim

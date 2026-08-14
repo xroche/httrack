@@ -161,6 +161,17 @@ LC_ALL=C awk -v keys="$keys" '
     }
 ' "$def" || fail=1
 
+# The CLI prints the wizard's scope answers itself while the GUI reads them from
+# lang.def, so a reword on one side alone silently drifts the two apart (#1117).
+for scope in "Mirror %s and every host below it" "Ignore %s and every host below it"; do
+    for f in "$eng" "$def" "$top_srcdir/src/httrack.c"; do
+        if ! LC_ALL=C grep -qF "$scope" "$f"; then
+            echo "${f##*/}: missing the wizard scope answer \"$scope\""
+            fail=1
+        fi
+    done
+done
+
 # A msgid absent from a language file silently falls back to English (#862).
 LC_ALL=C sort -u <"$keys" >"$tmp/english.sorted"
 for f in "$langdir"/*.txt; do

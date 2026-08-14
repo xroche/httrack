@@ -963,7 +963,7 @@ Ichki kesh resurslarini yaratib bo'lmadi
 Could not get the system external storage directory
 Tizimning tashqi xotira jildini topib bo'lmadi
 Could not write to:
-Bunga yozib bo'lmadi:
+Quyidagiga yozib bo'lmadi:
 Read-only media (SDCARD)
 Faqat o'qish uchun tashuvchi (SDCARD)
 No storage media (SDCARD)
@@ -1047,7 +1047,7 @@ Joriy segment shu baytlar sonidan oshganda yangi WARC segmentini boshlash; bitta
 Host aliases:
 Xost taxalluslari:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Shu saytga xizmat qiluvchi boshqa xost nomlari, bittaga birlashtiriladi, har satrda bitta qoida (masalan www2.example.com,m.example.com=example.com).
+Shu saytga xizmat qiluvchi va bittaga birlashtiriladigan boshqa xost nomlari; har satrda bitta qoida (masalan www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
 %s va uning ostidagi barcha xostlardan nusxa olish
 Ignore %s and every host below it

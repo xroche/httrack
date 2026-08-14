@@ -973,7 +973,7 @@ HTTrack may not be able to download websites until this problem is fixed
 HTTrack: mirror '%s' stopped!
 HTTrack: зеркало «%s» остановлено!
 Click on this notification to restart the interrupted mirror
-Нажмите это уведомление, чтобы продолжить прерванное зеркало
+Нажмите на это уведомление, чтобы продолжить прерванное создание зеркала
 HTTrack: could not save profile for '%s'!
 HTTrack: не удалось сохранить профиль для «%s»!
 Proxy type:
@@ -1049,6 +1049,6 @@ Host aliases:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
 Другие имена хостов, обслуживающие этот же сайт, сведённые к одному, по одному правилу в строке (напр. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
-Сделать зеркало %s и всех хостов ниже
+Сделать зеркало %s и всех хостов под ним
 Ignore %s and every host below it
-Игнорировать %s и все хосты ниже
+Игнорировать %s и все хосты под ним

@@ -1047,7 +1047,7 @@ Geçerli parça bu bayt sayýsýný aþtýðýnda yeni bir WARC parçasý baþlat; tek dosya
 Host aliases:
 Sunucu takma adlarý:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Ayný siteyi sunan diðer sunucu adlarý, tek bir ada indirgenir; her satýrda bir kural (örn. www2.example.com,m.example.com=example.com).
+Ayný siteyi sunan ve tek bir ada indirgenen diðer sunucu adlarý; her satýrda bir kural (örn. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
 %s ve altýndaki tüm sunucularý yansýla
 Ignore %s and every host below it

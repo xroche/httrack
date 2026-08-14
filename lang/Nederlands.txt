@@ -1047,7 +1047,7 @@ Een nieuw WARC-segment beginnen zodra het huidige dit aantal bytes overschrijdt;
 Host aliases:
 Host-aliassen:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Andere hostnamen die dezelfde site aanbieden, samengevoegd tot één, één regel per lijn (bijv. www2.example.com,m.example.com=example.com).
+Andere hostnamen die dezelfde site aanbieden, samengevoegd tot één; één vermelding per regel (bijv. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
 %s en alle onderliggende hosts spiegelen
 Ignore %s and every host below it

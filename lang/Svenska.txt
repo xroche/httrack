@@ -965,9 +965,9 @@ Det gick inte att hitta systemets externa lagring
 Could not write to:
 Det gick inte att skriva till:
 Read-only media (SDCARD)
-Skrivskyddat media (SDCARD)
+Skrivskyddat medium (SDCARD)
 No storage media (SDCARD)
-Inget lagringsmedia (SDCARD)
+Inget lagringsmedium (SDCARD)
 HTTrack may not be able to download websites until this problem is fixed
 Så länge problemet kvarstår kan HTTrack kanske inte hämta webbplatser
 HTTrack: mirror '%s' stopped!

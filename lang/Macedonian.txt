@@ -1047,7 +1047,7 @@ Start a new WARC segment once the current one grows past this many bytes; leave 
 Host aliases:
 Алијаси на хостот:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Други имиња на хостови што ја служат истата страница, споени во едно, по едно правило во ред (пр. www2.example.com,m.example.com=example.com).
+Други имиња на хостови што го опслужуваат истиот сајт, споени во едно, по едно правило во ред (пр. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
 Копирај го %s и сите хостови под него
 Ignore %s and every host below it

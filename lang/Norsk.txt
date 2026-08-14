@@ -967,7 +967,7 @@ Klarte ikke å skrive til:
 Read-only media (SDCARD)
 Skrivebeskyttet medium (SDCARD)
 No storage media (SDCARD)
-Ingen lagringsmedium (SDCARD)
+Intet lagringsmedium (SDCARD)
 HTTrack may not be able to download websites until this problem is fixed
 Så lenge dette problemet varer, klarer HTTrack kanskje ikke å laste ned nettsteder
 HTTrack: mirror '%s' stopped!

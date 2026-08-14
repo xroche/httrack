@@ -679,7 +679,7 @@ Mirror site
 Mirror domain
 鏡像網域名稱
 Ignore all
-全部乎略
+全部忽略
 Wizard query
 精靈提問
 NO
