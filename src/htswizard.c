@@ -936,7 +936,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
           htsbuff added = htsbuff_array(list);
           int slot;
 
-          /* read the slots back, so the log cannot drift from what was applied */
+          /* read the slots back, so the log cannot drift from them */
           for (slot = opt->wizard_filters - inserted;
                slot < opt->wizard_filters; slot++) {
             if (added.len != 0)
