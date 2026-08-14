@@ -360,6 +360,12 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
                     n, adr, fil);
     break;
   }
+
+  /* the question is asked only while the verdict is undecided, so an answer
+     that did not forbid has authorized: -1 records the link type-unresolved,
+     under its .delayed placeholder name */
+  if (*forbidden_url == -1)
+    *forbidden_url = 0;
 }
 
 static int hts_acceptlink_(httrackp * opt, int ptr,

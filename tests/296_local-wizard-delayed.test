@@ -1,0 +1,60 @@
+#!/bin/bash
+#
+# An authorized wizard link was recorded before its type was resolved, so it
+# reached the mirror under its <base>.<id>.delayed placeholder name.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
+
+httrack=$(httrack_path)
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wizdelayed.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmpdir"
+
+# a second port is a second address to the wizard, hence a question
+mkdir -p "${tmpdir}/foreign"
+printf '<html><body>beyond</body></html>\n' >"${tmpdir}/foreign/a.html"
+local_server_start --root "${tmpdir}/foreign" --log "${tmpdir}/foreign.log"
+foreign=$SRV_PORT
+
+# the SAME link twice: the first reference records the placeholder name, the
+# second one recalls it and can no longer resolve the type
+mkdir -p "${tmpdir}/root/wizdelayed"
+cat >"${tmpdir}/root/wizdelayed/index.html" <<EOF
+<html><body>
+<a href="http://127.0.0.1:${foreign}/a.html">a</a>
+<a href="http://127.0.0.1:${foreign}/a.html">b</a>
+</body></html>
+EOF
+local_server_start --root "${tmpdir}/root"
+
+# "mirror this link", with spares: an empty answer means "ignore this link" and
+# EOF spins the prompt (#1247)
+answers="${tmpdir}/answers"
+for _ in $(seq 40); do echo 5; done >"$answers"
+
+# the redirection belongs to the engine, not to run_with_timeout: it backgrounds
+# the job, whose stdin is /dev/null wherever job control is off
+crawl() { "$httrack" "$@" <"$answers"; }
+
+rc=0
+run_with_timeout "$(crawl_deadline)" crawl --max-time="$CRAWL_MAX_TIME" \
+    -O "${tmpdir}/mirror" -W --robots=0 --retries=0 \
+    "http://127.0.0.1:${SRV_PORT}/wizdelayed/index.html" \
+    >"${tmpdir}/crawl.log" 2>&1 || rc=$?
+test "$rc" -ne 124 || fail "the crawl never returned"
+test "$rc" -eq 0 || fail "the crawl exited $rc"
+
+log="${tmpdir}/mirror/hts-log.txt"
+grep -q 'beyond this mirror scope' "${tmpdir}/crawl.log" ||
+    fail "the wizard never asked about the foreign link"
+test -f "${tmpdir}/mirror/127.0.0.1_${foreign}/a.html" ||
+    fail "the authorized link is missing from the mirror"
+left=$(find "${tmpdir}/mirror" -name '*.delayed' -print)
+test -z "$left" || fail "placeholder names left in the mirror: $left"
+! grep -q 'Duplicate entry in hts_wait_delayed' "$log" ||
+    fail "the link was recorded before its type was resolved"
+! grep -q 'probably looping, type unknown' "$log" ||
+    fail "the authorized link was dropped as looping"

@@ -4334,7 +4334,7 @@ static int st_wizardscopeanswer(httrackp *opt, int argc, char **argv) {
 #define PRIO_UNSET 42
 
 /* Prints what answer `n` does to the crawl; with no arguments, asserts every
-   answer, on both an allowed and an already refused link. */
+   answer, on an undecided, an allowed and an already refused link. */
 static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   const hts_wizard asked = opt->wizard;
   FILE *const projectlog = opt->log;
@@ -4342,7 +4342,7 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   FILE *log;
   int url, depth;
 
-  url = 0;
+  url = -1; /* the undecided verdict the wizard is asked about */
   depth = PRIO_UNSET;
   opt->wizard = HTS_WIZARD_ASK;
   if (argc >= 1) {
@@ -4374,7 +4374,7 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(1, 0, 1, 0, PRIO_UNSET);
   APPLIES(2, 0, 1, 0, PRIO_UNSET);
   APPLIES(3, 0, 1, 0, PRIO_UNSET);
-  /* 4 caps the recursion and decides the link neither way */
+  /* 4 caps the recursion, and takes the link like any accepting answer */
   APPLIES(4, 0, 0, 0, 1);
   APPLIES(4, 1, 1, 0, 1);
   /* an accepting answer never clears a refusal the crawl already computed */
@@ -4389,7 +4389,7 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(HTS_WIZARD_SCOPE_EXCLUDE - 1, 0, 0, 0, PRIO_UNSET);
   APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, 0, 1, 0, PRIO_UNSET);
   APPLIES(INT_MAX, 0, 1, 0, PRIO_UNSET);
-  /* an answer in no range is not taken for an accept, nor for a refusal */
+  /* an answer in no range overturns neither an accept nor a refusal */
   APPLIES(8, 0, 0, 0, PRIO_UNSET);
   APPLIES(8, 1, 1, 0, PRIO_UNSET);
   APPLIES(999, 0, 0, 0, PRIO_UNSET);
@@ -4397,6 +4397,18 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(-1000, 0, 0, 0, PRIO_UNSET);
   APPLIES(INT_MIN, 0, 0, 0, PRIO_UNSET);
   APPLIES(HTS_WIZARD_SCOPE_INCLUDE - 1, 0, 0, 0, PRIO_UNSET);
+  /* the state the question is asked in: an answer that did not refuse must
+     leave the link allowed, never undecided */
+  APPLIES(4, -1, 0, 0, 1);
+  APPLIES(5, -1, 0, 0, PRIO_UNSET);
+  APPLIES(6, -1, 0, 0, PRIO_UNSET);
+  APPLIES(7, -1, 0, 0, PRIO_UNSET);
+  APPLIES(50, -1, 0, 0, PRIO_UNSET);
+  APPLIES(-999, -1, 0, 0, PRIO_UNSET);
+  APPLIES(8, -1, 0, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_INCLUDE, -1, 0, 0, PRIO_UNSET);
+  APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, -1, 1, 0, PRIO_UNSET);
+  APPLIES(0, -1, 1, 0, PRIO_UNSET);
 #undef APPLIES
 
   /* the warning is all an unknown answer does, so a known one must be silent */
