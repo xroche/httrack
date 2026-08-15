@@ -1,0 +1,109 @@
+#!/bin/bash
+#
+# A jar field longer than its buffer must not abort the mirror. The line is
+# refused, with the file and the field named in the log, and the rest of the
+# jar still loads (#1277).
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cookiejar.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+site="$tmp/site"
+mkdir -p "$site"
+echo '<html>hello</html>' >"$site/index.html"
+
+pad() { printf '%*s' "$1" '' | tr ' ' "${2:-A}"; }
+
+# Netscape record, in the spelling cookie_save() writes back.
+rec() { # rec DOMAIN PATH NAME VALUE
+    printf '%s\tTRUE\t%s\tFALSE\t1999999999\t%s\t%s\n' "$1" "$2" "$3" "$4"
+}
+
+# Each destination is hit at the first byte that must not fit and at the byte
+# below it, so a > for a >= in the bound reds this. The three capacities differ
+# (domain[256], path[256], cook_name[1024]), and the message pins each one.
+jar="$tmp/jar.txt"
+{
+    rec www.example.com / GOODFIRST v1
+    rec "$(pad 2000)" / DOM2000 v
+    rec "$(pad 256)" / DOM256 v
+    rec "$(pad 255)" / DOM255 v
+    rec www.example.com "/$(pad 1999)" PATH2000 v
+    rec www.example.com "/$(pad 255)" PATH256 v
+    rec www.example.com "/$(pad 254)" PATH255 v
+    rec www.example.com / "NAME2000$(pad 1992)" v
+    rec www.example.com / "NAME1024$(pad 1016)" v
+    # fits cook_name[1024] but not cookie_add()'s own 256-byte cap, so the line
+    # is gone for a second reason, which has to be reported too
+    rec www.example.com / "JARCAP$(pad 294)" v
+    # cook_value[8192] is out of reach behind the line gate, so it is pinned
+    # from below: neither of these may be refused for its value
+    rec www.example.com / BIGVAL "$(pad 500 v)"
+    rec www.example.com / BIGVAL7900 "$(pad 7900 v)"
+    # 8049 bytes: over the line gate, under what rawlinput() reads in one go
+    rec www.example.com / LONGLINE "$(pad 8000 L)"
+    rec www.example.com / GOODLAST v2
+} >"$jar"
+
+out="$tmp/mirror"
+rc=0
+"$bin" "file://$site/index.html" -O "$out" --cookies-file "$jar" --quiet \
+    >/dev/null 2>&1 || rc=$?
+# 134 is the SIGABRT the unchecked strcpybuff produced here before the fix
+assert_eq 0 "$rc" "crawl exit status"
+
+# the jar is written back when the mirror ends, so it says what was loaded.
+# cookie_save() ends its lines with LF, which is CRLF on Windows.
+jar_out="$out/cookies.txt"
+assert_file "$jar_out" "reloaded jar"
+loaded=$(tr -d '\r' <"$jar_out")
+log=$(tr -d '\r' <"$out/hts-log.txt")
+
+# match whole lines: a clipping fix would still store the cookie name, and
+# only the rest of the line says the field was cut
+for want in "$(rec www.example.com / GOODFIRST v1)" \
+    "$(rec "$(pad 255)" / DOM255 v)" \
+    "$(rec www.example.com "/$(pad 254)" PATH255 v)" \
+    "$(rec www.example.com / BIGVAL "$(pad 500 v)")" \
+    "$(rec www.example.com / GOODLAST v2)"; do
+    grep -qxF "$want" <<<"$loaded" ||
+        fail "a line that fits did not load whole: ${want:0:40}... in $jar_out"
+done
+
+for gone in DOM2000 DOM256 PATH2000 PATH256 NAME2000 NAME1024 JARCAP \
+    BIGVAL7900 LONGLINE; do
+    ! grep -q "$gone" <<<"$loaded" ||
+        fail "$gone was stored from a line that had to be refused: $jar_out"
+done
+
+# the byte count and the maximum are asserted too: they are what says which
+# destination the field was measured against
+refusals=(
+    "domain field is 2000 bytes (maximum 255)"
+    "domain field is 256 bytes (maximum 255)"
+    "path field is 2000 bytes (maximum 255)"
+    "path field is 256 bytes (maximum 255)"
+    "name field is 2000 bytes (maximum 1023)"
+    "name field is 1024 bytes (maximum 1023)"
+)
+for want in "${refusals[@]}"; do
+    grep -qF "Cookies: ignoring a line whose $want: $jar" <<<"$log" ||
+        fail "no refusal for the $want in $out/hts-log.txt"
+done
+n=$(grep -c 'ignoring a line whose' <<<"$log" || true)
+assert_eq "${#refusals[@]}" "$n" "refused jar lines"
+
+# a 7900-byte value fits its destination, so it is the jar's cap that drops it
+! grep -q 'value field is' <<<"$log" ||
+    fail "a value the widest destination holds was refused: $out/hts-log.txt"
+for want in "the jar did not store 'JARCAP" \
+    "the jar did not store 'BIGVAL7900'" \
+    "ignoring an over-long line (8049 bytes, maximum 7999)"; do
+    grep -qF "Cookies: $want" <<<"$log" ||
+        fail "no report of [$want] in $out/hts-log.txt"
+done

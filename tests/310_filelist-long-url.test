@@ -1,0 +1,117 @@
+#!/bin/bash
+#
+# -%L: a line the user wrote is read whole or refused by name, never split.
+# binput() clips at HTS_URLMAXSIZE and returns the clipped length, so the
+# loading loop used to resume mid-URL and add the tail as a second link.
+# Offline: file:// fixtures, no server.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+limit=1024 # HTS_URLMAXSIZE: the longest line -%L accepts
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_longurl.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+echo '<html><body>one</body></html>' >"$tmp/one.html"
+echo '<html><body>two</body></html>' >"$tmp/two.html"
+echo '<html><body>three</body></html>' >"$tmp/three.html"
+
+base="file://$tmp/"
+
+# A URL of exactly $1 bytes on its own line, ending in the marker $2 so a
+# split is visible. $(...) strips the newline where a fixture wants none.
+padded_url() {
+    local want="$1" mark="$2"
+    printf '%s%s%s\n' "$base" \
+        "$(printf "%$((want - ${#base} - ${#mark}))s" '' | tr ' ' p)" "$mark"
+}
+
+# Dot segments collapse away, so the URL is long while the file it names is
+# real: this one has to survive the loop and be fetched.
+dots=$(((1000 - ${#base} - 10) / 2))
+near="$base$(printf "%${dots}s" '' | sed 's| |./|g')three.html"
+
+log=""
+mirror=""
+run() { # run LIST -> sets $log and $mirror
+    local list="$1"
+    local out
+    out="$tmp/out.$(basename "$list" .txt)"
+    rm -rf "$out"
+    mkdir -p "$out"
+    httrack -O "$out" --quiet -n "-%L" "$list" >"$out/.stdout" 2>&1 ||
+        fail "httrack failed on $list: $(cat "$out/.stdout")"
+    log="$out/hts-log.txt"
+    mirror="$out"
+}
+loghas() {
+    grep -Eq "$1" "$log" || {
+        cut -c1-200 "$log"
+        fail "expected /$1/ in $log"
+    }
+}
+lognot() {
+    if grep -Eq "$1" "$log"; then
+        cut -c1-200 "$log"
+        fail "unexpected /$1/ in $log"
+    fi
+}
+
+# Blank line 4 keeps "physical line" and "binput call" from agreeing by
+# accident, so a line number counted the wrong way shows up on line 6.
+{
+    echo "${base}one.html"
+    padded_url 1500 ENDMRK
+    echo "${base}two.html"
+    echo ""
+    padded_url "$limit" EDGEMRK
+    padded_url "$((limit + 1))" OVERMRK
+    echo "$near"
+} >"$tmp/urls.txt"
+
+run "$tmp/urls.txt"
+# Named, so a fix that drops the line silently does not pass...
+loghas "\"[^\"]*urls\.txt\", line 2: URL longer than $limit bytes, ignored"
+loghas "\"[^\"]*urls\.txt\", line 6: URL longer than $limit bytes, ignored"
+# ...and refused, so neither does one that warns and splits anyway. 4 is every
+# line but those two: the blank one adds nothing, the $limit-byte one must.
+loghas '(^|[^0-9])4 links added from'
+# The tails of the split URLs, which the engine used to crawl as hosts.
+lognot 'ENDMRK|endmrk|OVERMRK|overmrk'
+# The near-limit line reached the crawler whole: a clipped URL names no file.
+test -n "$(find "$mirror" -type f -path '*/file/*' -name three.html -print -quit)" ||
+    fail "the near-limit URL was not fetched"
+
+# A Windows-authored list: binput drops the CR, so the byte it stopped on is
+# not the '\n'. A line of exactly $limit bytes still has to load.
+{
+    padded_url "$limit" CRLFMRK
+    echo "${base}two.html"
+} | sed 's|$|\r|' >"$tmp/crlf.txt"
+run "$tmp/crlf.txt"
+loghas '(^|[^0-9])2 links added from'
+lognot 'ignored'
+
+# No trailing newline: the last line ends on the buffer's own NUL, not a '\n'.
+printf '%s' "${base}one.html" >"$tmp/noeol.txt"
+run "$tmp/noeol.txt"
+loghas '(^|[^0-9])1 links added from'
+lognot 'ignored'
+
+printf '%s' "$(padded_url 1500 EOFMRK)" >"$tmp/noeol-long.txt"
+run "$tmp/noeol-long.txt"
+loghas "\"[^\"]*noeol-long\.txt\", line 1: URL longer than $limit bytes, ignored"
+loghas '(^|[^0-9])0 links added from'
+lognot 'EOFMRK|eofmrk'
+
+# A NUL splits a line the same way, which is what a list saved as UTF-16 is
+# made of. The good line after it still loads.
+printf 'file://%s/one\0.html\nfile://%s/two.html\n' "$tmp" "$tmp" >"$tmp/nul.txt"
+run "$tmp/nul.txt"
+loghas "\"[^\"]*nul\.txt\", line 1: URL contains a NUL byte, ignored"
+loghas '(^|[^0-9])1 links added from'
+
+exit 0

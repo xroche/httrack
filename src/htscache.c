@@ -616,15 +616,30 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
             }
           } while (offset < readSizeHeader && !lineEof);
 
-          /* Previous entry */
+          /* Previous entry. cache_add() stores X-Save relative (it strips
+             path_html_utf8), so the read re-prepends the current one, which
+             may have grown since the entry was written. */
           if (previous_save_[0] != '\0') {
-            int pathLen = (int) strlen(StringBuff(opt->path_html_utf8));
+            const char *const path_html = StringBuff(opt->path_html_utf8);
+            const size_t pathLen = strlen(path_html);
+            /* an X-Save that already carries the path is taken as-is */
+            const char *const prefix =
+                (pathLen != 0 &&
+                 strncmp(previous_save_, path_html, pathLen) != 0)
+                    ? path_html
+                    : "";
+            size_t used = 0;
 
-            if (pathLen != 0 && strncmp(previous_save_, StringBuff(opt->path_html_utf8), pathLen) != 0) {       // old (<3.40) buggy format
-              sprintf(previous_save, "%s%s", StringBuff(opt->path_html_utf8),
-                      previous_save_);
-            } else {
-              strcpy(previous_save, previous_save_);
+            /* refuse the entry: a clipped name would point at a file we never
+               stored */
+            if (!slcatprintfbuff(previous_save, sizeof(previous_save), &used,
+                                 "%s%s", prefix, previous_save_)) {
+              hts_log_print(opt, LOG_WARNING,
+                            "cached filename too long once rebuilt under '%s', "
+                            "not using the cache entry: %s%s",
+                            path_html, adr, fil);
+              r.statuscode = STATUSCODE_INVALID;
+              strcpybuff(r.msg, "Cache Read Error : Filename Too Long");
             }
           }
           if (return_save != NULL) {
