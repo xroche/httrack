@@ -102,10 +102,9 @@ void standard_name(char *b, size_t bsize, const char *dot_pos,
 /* Append s to d (mapping '\' to '/'), clipped to dsize bytes including the NUL.
    Clips rather than aborts: s is a crawled link, hostile by construction. */
 void url_savename_addstr(char *d, size_t dsize, const char *s);
-/* Append sep+s to d whole, cutting d's tail (on a UTF-8 boundary) for room; a
-   no-op when it already fits, and when sep+s alone fills dsize. Carries the
-   default name and the extension the mirror is browsed by, which must survive
-   an over-long link rather than abort it (#1269) or be cut off it (#852). */
+/* Append sep+s to d whole, cutting d's tail (never inside a UTF-8 character)
+   for room, so the suffix always survives; nothing happens if it alone fills
+   dsize. */
 void url_savename_addtail(char *d, size_t dsize, const char *sep,
                           const char *s);
 /* Contested wire-vs-ext verdict that a body sniff could settle (htssniff.h). */

@@ -11,7 +11,7 @@ assert_selftest "savename-addstr self-test OK" savename-addstr
 
 # url_savename_addtail() carries the default name and the extension onto a link
 # that already fills that buffer, where strcatbuff used to abort instead.
-assert_selftest "savename-addtail self-test OK" savename-addtail
+assert_selftest "savename-addtail self-test OK, save 2048 bytes" savename-addtail
 
 httrack_bin=$(httrack_path)
 
@@ -42,16 +42,23 @@ for fil in '/*/x.html' '/dir/*.html'; do
     # Past the end, the name is cut but nothing may land behind save[].
     for pad in 1500 2030; do
         name=$(savename "$pad" "$fil" "adr=$long_host")
-        test -n "$name" || fail "$fil pad $pad: produced no name"
+        assert_match "^/dev/null/" "$name" "$fil pad $pad"
     done
 done
 
-# A link that fills the working copy of fil[] on its own: appending the default
-# name or the resolved extension to it used to abort (htsname.c, #1251 class).
-for spec in '/*/:2036' '/dir/*:2038' '/*/x:2040'; do
-    fil=${spec%%:*} pad=${spec#*:}
-    name=$(savename "$pad" "$fil")
-    test -n "$name" || fail "$fil pad $pad: produced no name"
+# A link long enough to fill the engine's working copy of it on its own: each
+# appender onto that copy must give way. Default page name, resolved extension,
+# then the whole-name rewrite a Content-Disposition asks for.
+for spec in '/*/:2036:' '/dir/*:2038:' '/*/x:2040:' \
+    "/*/x.html:2038:cdispo=attachment; filename=\"y.zip\""; do
+    fil=${spec%%:*} rest=${spec#*:}
+    pad=${rest%%:*} extra=${rest#*:}
+    if [ -n "$extra" ]; then
+        name=$(savename "$pad" "$fil" "adr=$long_host" "$extra")
+    else
+        name=$(savename "$pad" "$fil")
+    fi
+    assert_match "^/dev/null/" "$name" "$fil pad $pad"
 done
 
 # -N is the only caller that selects savename_type -1, and it always sets the

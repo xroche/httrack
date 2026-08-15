@@ -2778,19 +2778,22 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
 #define ST_SAVENAME_POISON 0x5a
 #define ST_SAVENAME_CANARY 128
 
-/* The run from `from` to `size` must still hold the poison. */
-static int st_poison_intact(const char *label, const char *buf, size_t from,
-                            size_t size) {
+/* an off-by-one terminator writes a NUL, which a zero poison could not see */
+enum { st_poison_is_not_nul = 1 / (ST_SAVENAME_POISON != 0) };
+
+/* Does the run from `from` to `size` still hold the poison? */
+static hts_boolean st_poison_intact(const char *label, const char *buf,
+                                    size_t from, size_t size) {
   size_t i;
 
   for (i = size; i > from; i--) {
     if (buf[i - 1] != (char) ST_SAVENAME_POISON) {
       fprintf(stderr, "%s: wrote %d byte(s) past the end\n", label,
               (int) (i - from));
-      return 1;
+      return HTS_FALSE;
     }
   }
-  return 0;
+  return HTS_TRUE;
 }
 
 static int st_savename(httrackp *opt, int argc, char **argv) {
@@ -2985,8 +2988,8 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
                &headers);
   if (body != NULL)
     (void) UNLINK(bodyfile);
-  if (st_poison_intact("savename: save[]", probe.canary, 0,
-                       sizeof(probe.canary)) != 0)
+  if (!st_poison_intact("savename: save[]", probe.canary, 0,
+                        sizeof(probe.canary)))
     return 1;
   printf("savename: %s\n", afs->save);
   return 0;
@@ -3041,16 +3044,16 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
               cases[k].want);
       rc = 1;
     }
-    rc |= st_poison_intact(label, buf, guard, sizeof(buf));
+    if (!st_poison_intact(label, buf, guard, sizeof(buf)))
+      rc = 1;
   }
 
-  /* The real caller's shape, at the capacities the naming path hands out. Both
-     buffers hold the whole source, so an unclipped append lands on the poison
-     rather than smashing the stack. */
+  /* Oversized buffers, so an unclipped append lands on poison rather than
+     smashing the stack. */
   for (k = 0; k < sizeof(bigcaps) / sizeof(bigcaps[0]); k++) {
     const size_t dsize = bigcaps[k];
     char BIGSTK src[HTS_URLMAXSIZE * 4];
-    char BIGSTK big[sizeof(src) + 64];
+    char BIGSTK big[sizeof(src) + ST_SAVENAME_CANARY];
     char label[64];
 
     snprintf(label, sizeof(label), "savename-addstr: long link at dsize %d",
@@ -3065,16 +3068,15 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
               (int) dsize, (int) strlen(big));
       rc = 1;
     }
-    rc |= st_poison_intact(label, big, dsize, sizeof(big));
+    if (!st_poison_intact(label, big, dsize, sizeof(big)))
+      rc = 1;
   }
 
   printf("savename-addstr self-test %s\n", rc == 0 ? "OK" : "FAILED");
   return rc;
 }
 
-/* url_savename_addtail() carries the default name and the extension onto a link
-   that may already fill the buffer: the tail arrives whole or not at all, and
-   what gives way is the middle (#1269). */
+/* What gives way to the arriving tail is the middle, never the tail (#1269). */
 static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
   static const struct {
     size_t dsize;
@@ -3095,6 +3097,11 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
       {0, "abc", "", "x", "abc"},
       /* the cut lands inside a 3-byte character and backs off it */
       {8, "a\342\202\254b", ".", "html", "a.html"},
+      {10, "a\342\202\254b", ".", "html",
+       "a\342\202\254.html"}, /* cut on a lead byte */
+      {8, "\360\237\230\200x", ".", "gz",
+       "\360\237\230\200.gz"},                    /* 4-byte kept */
+      {7, "\360\237\230\200x", ".", "gz", ".gz"}, /* 4-byte cut away whole */
   };
 
   char buf[64];
@@ -3122,13 +3129,13 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
               buf, cases[k].want);
       rc = 1;
     }
-    rc |= st_poison_intact(label, buf, guard, sizeof(buf));
+    if (!st_poison_intact(label, buf, guard, sizeof(buf)))
+      rc = 1;
   }
 
-  /* The naming path's own shape: a link filling the whole buffer still gets its
-     extension, and never more bytes than the buffer holds. */
+  /* A link filling the whole buffer still gets its extension. */
   {
-    char BIGSTK big[HTS_URLMAXSIZE * 2 + 64];
+    char BIGSTK big[HTS_URLMAXSIZE * 2 + ST_SAVENAME_CANARY];
     const size_t dsize = HTS_URLMAXSIZE * 2;
 
     memset(big, ST_SAVENAME_POISON, sizeof(big));
@@ -3142,11 +3149,15 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
               (int) strlen(big));
       rc = 1;
     }
-    rc |= st_poison_intact("savename-addtail: full buffer", big, dsize,
-                           sizeof(big));
+    if (!st_poison_intact("savename-addtail: full buffer", big, dsize,
+                          sizeof(big)))
+      rc = 1;
   }
 
-  printf("savename-addtail self-test %s\n", rc == 0 ? "OK" : "FAILED");
+  /* The .test's pads are chosen against this size; printing it reds them when
+     it moves rather than letting them quietly stop reaching the end. */
+  printf("savename-addtail self-test %s, save %d bytes\n",
+         rc == 0 ? "OK" : "FAILED", (int) (HTS_URLMAXSIZE * 2));
   return rc;
 }
 

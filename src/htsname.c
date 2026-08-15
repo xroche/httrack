@@ -47,8 +47,8 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 #include <limits.h>
 
-/* Clip to the whole buffer, not to the tail reserve below: this is the
-   intermediate name, and the shortener still has to see its extension. */
+/* Clipped to the whole buffer: the length shortener downstream still has to
+   see this name's extension to reserve it (#852). */
 #define ADD_STANDARD_PATH                                                      \
   { /* add path */                                                             \
     char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
@@ -337,19 +337,21 @@ static int resolve_extension(httrackp *opt, const sniff_src *src,
   return 0;
 }
 
+/* Largest cut of s at or below len that does not split a UTF-8 character. */
+static size_t utf8_cut(const char *s, size_t len) {
+  while (len > 0 && ((unsigned char) s[len] & 0xC0) == 0x80)
+    len--;
+  return len;
+}
+
 void url_savename_addtail(char *d, size_t dsize, const char *sep,
                           const char *s) {
   const size_t slen = strlen(sep) + strlen(s);
-  size_t dlen = strlen(d);
 
   if (slen + 1 > dsize) /* the tail alone does not fit: leave d alone */
     return;
-  if (dlen + slen + 1 > dsize) {
-    dlen = dsize - slen - 1;
-    while (dlen > 0 && ((unsigned char) d[dlen] & 0xC0) == 0x80)
-      dlen--; /* never split a UTF-8 character */
-    d[dlen] = '\0';
-  }
+  if (strlen(d) + slen + 1 > dsize)
+    d[utf8_cut(d, dsize - slen - 1)] = '\0';
   strlcatbuff(d, sep, dsize);
   strlcatbuff(d, s, dsize);
 }
@@ -1693,11 +1695,9 @@ int url_savename(lien_adrfilsave *const afs,
     // existing prepend abort, not collapsed to an empty name that would collide
     // across URLs and overrun the unbounded collision-suffix sprintf.
     if (parentBytes < cap) {
-      size_t budget = cap - parentBytes;
+      const size_t budget = cap - parentBytes;
       if (strlen(afs->save) > budget) {
-        while (budget > 0 && ((unsigned char) afs->save[budget] & 0xC0) == 0x80)
-          budget--; // back off a continuation byte, never split a char
-        afs->save[budget] = '\0';
+        afs->save[utf8_cut(afs->save, budget)] = '\0';
         cleanEndingSpaceOrDot(afs->save);
       }
     }
