@@ -13,8 +13,9 @@ assert_selftest "scantoken self-test OK" scantoken
 tmpdir="$(mktemp -d)"
 cleanup_push rm -rf "$tmpdir"
 
-# HTS_URLMAXSIZE * 2, less the sign the filter slot gains and the NUL
-maxfilter=2046
+# HTS_URLMAXSIZE * 2, less the NUL. The sign is prepended after the copy,
+# into a slot of its own, so it costs the token nothing.
+maxfilter=2047
 maxurl=2047
 
 rep() { # rep CHAR COUNT
@@ -37,14 +38,14 @@ longrule() { # longrule LENGTH FILE
     printf -- '-%s\n+*.png\n' "$(rep a "$1")" >"$2"
 }
 
-# At the bound the rule is kept, so the one that decides is the second. This is
-# also the longest rule the pre-fix engine handled without dying.
+# At the bound the rule is kept, so the one that decides is the second. The
+# pre-fix engine handled this length too, so refusing it would be a step back.
 longrule "$maxfilter" "$tmpdir/fit.txt"
 assert_eq "http://www.example.com/a.png: accepted by rule #2 (+*.png)" \
     "$(why "$tmpdir/fit.txt")" "filter of $maxfilter bytes"
 
-# One byte over, and it is gone: the numbering shifts. The two overshoots die
-# differently before the fix, on the filter slot then on the stack canary.
+# One byte over, and it is gone: the numbering shifts. 512 over is there to
+# land past the buffer, not merely past the bound.
 for over in 1 512; do
     longrule "$((maxfilter + over))" "$tmpdir/over.txt"
     assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
