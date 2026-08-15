@@ -102,8 +102,10 @@ awk 'NF >= 3 && $3 !~ /\./ { print $3 }' "$tmp/all.raw" | sort -u >"$tmp/plain"
 for suffix in lto_priv constprop isra part cold llvm; do
     awk -v s="$suffix" 'NF >= 3 && $3 ~ "\\." s "([.$]|$)" { print $3 }' "$tmp/all.raw" |
         sed -E 's/(\.[A-Za-z_][A-Za-z0-9_]*(\.[0-9]+)*)+$//' | sort -u >"$tmp/cloned"
+    # No early exit: awk quitting on the first match leaves comm writing into a
+    # closed pipe, and pipefail turns that SIGPIPE into the test's own failure.
     sym=$(comm -23 <(comm -23 "$tmp/cloned" "$tmp/plain") "$tmp/exported" |
-        awk '/^[A-Za-z_][A-Za-z0-9_]*$/ { print; exit }')
+        awk '/^[A-Za-z_][A-Za-z0-9_]*$/ && !seen { print; seen = 1 }')
     if [ -n "$sym" ]; then
         canaries+=("$sym")
     fi
