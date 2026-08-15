@@ -47,20 +47,22 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 #include <limits.h>
 
-#define ADD_STANDARD_PATH \
-    {  /* ajout nom */\
-      char BIGSTK buff[HTS_URLMAXSIZE*2];\
-      buff[0]='\0';\
-      strncatbuff(buff,start_pos,nom_pos - start_pos);\
-      url_savename_addstr(afs->save, buff);\
-    }
+/* Clipped to the whole buffer: the length shortener downstream still has to
+   see this name's extension to reserve it (#852). */
+#define ADD_STANDARD_PATH                                                      \
+  { /* add path */                                                             \
+    char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
+    buff[0] = '\0';                                                            \
+    strncatbuff(buff, start_pos, nom_pos - start_pos);                         \
+    url_savename_addstr(afs->save, sizeof(afs->save), buff);                   \
+  }
 
 #define ADD_STANDARD_NAME(shortname)                                           \
   { /* add name */                                                             \
     char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
     standard_name(buff, sizeof(buff), dot_pos, nom_pos, fil_complete,          \
                   (shortname));                                                \
-    url_savename_addstr(afs->save, buff);                                      \
+    url_savename_addstr(afs->save, sizeof(afs->save), buff);                   \
   }
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
@@ -333,6 +335,25 @@ static int resolve_extension(httrackp *opt, const sniff_src *src,
       give_mimext(ext, ext_size, contenttype))
     return 1;
   return 0;
+}
+
+/* Largest cut of s at or below len that does not split a UTF-8 character. */
+static size_t utf8_cut(const char *s, size_t len) {
+  while (len > 0 && ((unsigned char) s[len] & 0xC0) == 0x80)
+    len--;
+  return len;
+}
+
+void url_savename_addtail(char *d, size_t dsize, const char *sep,
+                          const char *s) {
+  const size_t slen = strlen(sep) + strlen(s);
+
+  if (slen + 1 > dsize) /* the tail alone does not fit: leave d alone */
+    return;
+  if (strlen(d) + slen + 1 > dsize)
+    d[utf8_cut(d, dsize - slen - 1)] = '\0';
+  strlcatbuff(d, sep, dsize);
+  strlcatbuff(d, s, dsize);
 }
 
 // Build the local save name (save) from adr/fil; renames on collision
@@ -874,12 +895,12 @@ int url_savename(lien_adrfilsave *const afs,
   if (hts_lastchar(fil) == '/') {
     if (!strfield(adr_complete, "ftp://")
       ) {
-      strcatbuff(fil, DEFAULT_HTML);    // nommer page par défaut!!
+      url_savename_addtail(fil, sizeof(fil), "", DEFAULT_HTML);
     } else {
       if (!opt->proxy.active)
-        strcatbuff(fil, DEFAULT_FTP);   // nommer page par défaut (texte)
-      else
-        strcatbuff(fil, DEFAULT_HTML);  // nommer page par défaut (à priori ici html depuis un proxy http)
+        url_savename_addtail(fil, sizeof(fil), "", DEFAULT_FTP);
+      else // through a proxy, assume html
+        url_savename_addtail(fil, sizeof(fil), "", DEFAULT_HTML);
     }
   }
   // Change the extension? e.g. php3 saved as html, cgi as html or gif/xbm
@@ -907,16 +928,16 @@ int url_savename(lien_adrfilsave *const afs,
       while((a > fil) && (*a != '.') && (*a != '/'))
         a--;
       if (*a == '.' && known_ext)
-        *a = '\0';          // cut
-      strcatbuff(fil, "."); // re-add the dot
+        *a = '\0'; // cut
+      url_savename_addtail(fil, sizeof(fil), ".", ext);
     } else {
       while((a > fil) && (*a != '/'))
         a--;
       if (*a == '/')
         a++;
       *a = '\0';
+      url_savename_addtail(fil, sizeof(fil), "", ext);
     }
-    strcatbuff(fil, ext); // append ext/name
   }
   // Rechercher premier / et dernier .
   {
@@ -1674,11 +1695,9 @@ int url_savename(lien_adrfilsave *const afs,
     // existing prepend abort, not collapsed to an empty name that would collide
     // across URLs and overrun the unbounded collision-suffix sprintf.
     if (parentBytes < cap) {
-      size_t budget = cap - parentBytes;
+      const size_t budget = cap - parentBytes;
       if (strlen(afs->save) > budget) {
-        while (budget > 0 && ((unsigned char) afs->save[budget] & 0xC0) == 0x80)
-          budget--; // back off a continuation byte, never split a char
-        afs->save[budget] = '\0';
+        afs->save[utf8_cut(afs->save, budget)] = '\0';
         cleanEndingSpaceOrDot(afs->save);
       }
     }
@@ -1856,15 +1875,13 @@ char *url_md5(char *digest, const char *fil) {
   return digest;
 }
 
-// interne à url_savename: ajoute une chaîne à une autre avec \ -> /
-void url_savename_addstr(char *d, const char *s) {
-  int i = (int) strlen(d);
+void url_savename_addstr(char *d, size_t dsize, const char *s) {
+  size_t i = strlen(d);
 
-  while(*s) {
-    if (*s == '\\')             // remplacer \ par des /
-      d[i++] = '/';
-    else
-      d[i++] = *s;
+  if (i + 1 >= dsize) /* nothing fits, and d already carries its NUL */
+    return;
+  while (*s != '\0' && i + 1 < dsize) {
+    d[i++] = *s == '\\' ? '/' : *s;
     s++;
   }
   d[i] = '\0';
