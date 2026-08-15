@@ -1,0 +1,48 @@
+#!/bin/bash
+# Issue #1286: the rule store stopped at 4 KB, so a robots.txt longer than that
+# lost its tail, and one landing on 4094 bytes lost every rule it had. Nothing
+# said so, and the "will be forbidden" note listed the rules anyway.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_1286.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+doc="${tmpdir}/doc"
+mkdir -p "${doc}/secret" "${doc}/pad00000" "${doc}/ok"
+printf '<html><body><a href="secret/page.html">s</a>\n<a href="pad00000/page.html">p</a>\n<a href="ok/page.html">o</a></body></html>\n' \
+    >"${doc}/index.html"
+for d in secret pad00000 ok; do
+    printf '<html><body>body of %s</body></html>\n' "$d" >"${doc}/${d}/page.html"
+done
+
+warn='rule\(s\) not honoured as written'
+
+# robotsblobNNNN sizes the Disallow list so the stored rules come to exactly
+# NNNN bytes, /secret/ last. A short list is the control: the same rule, and
+# the same absence of a warning, at a size no cap was ever near.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
+    --errors 0 --found 'ok/page.html' --found 'pad00000/page.html' \
+    --not-found 'secret/page.html' --log-not-found "$warn" \
+    httrack 'BASEURL/index.html' -r3 -s2 -F 'robotsblob10-agent'
+
+# 4094 bytes: the size that used to throw the whole set away, so the first rule
+# is as good a witness as the last.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
+    --errors 0 --found 'ok/page.html' \
+    --not-found 'secret/page.html' --not-found 'pad00000/page.html' \
+    --log-not-found "$warn" \
+    httrack 'BASEURL/index.html' -r3 -s2 -F 'robotsblob4094-agent'
+
+# Past the RFC 9309 floor the tail really is dropped, and that is exactly what
+# has to reach the log, naming the first rule left out.
+bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
+    --errors 0 --found 'ok/page.html' --found 'secret/page.html' \
+    --not-found 'pad00000/page.html' \
+    --log-found "$warn, starting with '/pad[0-9]+/'" \
+    httrack 'BASEURL/index.html' -r3 -s2 -F 'robotsblob516096-agent'

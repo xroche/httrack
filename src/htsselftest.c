@@ -5509,8 +5509,24 @@ static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
   char host[64];
 
   snprintf(host, sizeof(host), "h%d.example", n++);
-  robots_parse(r, host, txt, strlen(txt), NULL, 0, HTS_TRUE, NULL, 0);
+  robots_parse(NULL, r, host, txt, strlen(txt), NULL, 0, HTS_TRUE, NULL, 0);
   return checkrobots(r, host, path);
+}
+
+/* robots.txt whose stored rules come to about `blobsize` bytes, /secret/ last;
+   each "/padNNNNN/" costs 12 stored bytes (pattern plus marker and LF). */
+static char *rb_bulk(size_t blobsize) {
+  const size_t capa = blobsize * 2 + 4096;
+  char *const txt = (char *) malloct(capa);
+  size_t n, blob;
+  int i;
+
+  assertf(txt != NULL);
+  n = (size_t) snprintf(txt, capa, "User-agent: *\n");
+  for (i = 0, blob = 0; blob + 12 <= blobsize; i++, blob += 12)
+    n += (size_t) snprintf(txt + n, capa - n, "Disallow: /pad%05d/\n", i);
+  (void) snprintf(txt + n, capa - n, "Disallow: /secret/\n");
+  return txt;
 }
 
 static int st_robots(httrackp *opt, int argc, char **argv) {
@@ -5580,6 +5596,47 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
 
   /* No rules: everything is allowed. */
   assertf(rb_decide(&robots, "User-agent: *\nDisallow:\n", "/x") == 0);
+
+  /* #1286: the rule store used to stop at 4 KB, losing the tail of the file,
+     and to throw the whole set away when it landed on 4094 bytes. Rules are
+     now kept to the RFC 9309 floor, and only what passes it is left out. */
+  {
+    char *txt = rb_bulk(8192); /* past the old cap, well under the new one */
+
+    assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/secret/x") == -1);
+    freet(txt);
+
+    txt = rb_bulk(HTS_ROBOTS_MAX_TOKEN_SIZE - 1024); /* just under the cap */
+    assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/secret/x") == -1);
+    freet(txt);
+
+    /* Past it the tail is lost, which robots_parse reports through the log. */
+    txt = rb_bulk(HTS_ROBOTS_MAX_TOKEN_SIZE + 4096);
+    assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/secret/x") == 0);
+    freet(txt);
+  }
+
+  /* A rule longer than the line buffer is read as a prefix of itself. Kept for
+     a Disallow, which can then only forbid more; dropped for an Allow, which
+     would otherwise permit more than the site wrote and beat the Disallow. */
+  {
+    char BIGSTK txt[HTS_ROBOTS_LINE_SIZE * 3];
+    char BIGSTK path[HTS_ROBOTS_LINE_SIZE * 2];
+
+    memset(path, 'a', sizeof(path));
+    path[0] = '/';
+    path[HTS_ROBOTS_LINE_SIZE + 200] = '\0';
+
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: %s\n", path);
+    assertf(rb_decide(&robots, txt, path) == -1);
+
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
+             path);
+    assertf(rb_decide(&robots, txt, path) == -1);
+  }
 
   checkrobots_free(&robots);
   printf("robots self-test OK\n");
@@ -5832,7 +5889,7 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     robots_wizard rb;
 
     memset(&rb, 0, sizeof(rb));
-    robots_parse(&rb, "h.test", txt, strlen(txt), NULL, 0, HTS_TRUE, maps,
+    robots_parse(NULL, &rb, "h.test", txt, strlen(txt), NULL, 0, HTS_TRUE, maps,
                  sizeof(maps));
     assertf(strcmp(maps, "http://h.test/s1.xml\nhttps://h.test/s2.xml\n") == 0);
     assertf(checkrobots(&rb, "h.test", "/x") == -1);

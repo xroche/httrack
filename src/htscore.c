@@ -596,9 +596,9 @@ int httpmirror(char *url1, httrackp * opt) {
   cache.cached_tests = (void *) cache_tests;    /* copy of cache_tests */
 
   // robots.txt
-  strcpybuff(robots.adr, "!");  // dummy
-  robots.token[0] = '\0';
-  robots.next = NULL;           // suivant
+  robots.adr = NULL; // list head, holds no rules
+  robots.token = NULL;
+  robots.next = NULL;
   opt->robotsptr = &robots;
 
   // effacer filters
@@ -1768,7 +1768,7 @@ int httpmirror(char *url1, httrackp * opt) {
               hts_boolean keep_root = HTS_TRUE;
 #endif
 
-              robots_parse(&robots, urladr(), r.adr, r.size, infobuff,
+              robots_parse(opt, &robots, urladr(), r.adr, r.size, infobuff,
                            sizeof(infobuff), keep_root, sitemaps,
                            sizeof(sitemaps));
               if (strnotempty(infobuff)) {
