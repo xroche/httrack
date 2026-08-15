@@ -94,10 +94,10 @@ typedef enum {
   HTS_FOOTER_FIELD_COUNT
 } hts_footer_field_id;
 
-// Write the field names as "{addr} {path} ..." into dest (capacity size, NUL
-// included) and return it; aborts if they do not fit. Internal on purpose: the
-// exported surface is hts_footer_field_ok(), a predicate that cannot enumerate.
-const char *hts_footer_field_list(char *dest, size_t size);
+// Join the field names as "{addr} {path} ..." into buffer (size includes the
+// NUL, and it aborts if they do not fit) and return it. Internal on purpose:
+// hts_footer_field_ok() is the exported surface, and a predicate cannot list.
+const char *hts_footer_field_list(char *buffer, size_t size);
 
 // Expand a footer template. A "%s" in it selects the legacy positional model,
 // consuming addr, path, date and version in that order; otherwise "{name}" is

@@ -902,8 +902,8 @@ enum {
                  HTS_FOOTER_FIELD_COUNT)
 };
 
-const char *hts_footer_field_list(char *dest, size_t size) {
-  htsbuff fields = htsbuff_ptr(dest, size);
+const char *hts_footer_field_list(char *buffer, size_t size) {
+  htsbuff fields = htsbuff_ptr(buffer, size);
   size_t i;
 
   for (i = 0; i < HTS_FOOTER_FIELD_COUNT; i++) {

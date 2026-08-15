@@ -28,9 +28,8 @@ segment=${segment%%, or legacy *}
 test "${segment}" != "${help_line}" ||
     fail "cannot find the field list in: ${help_line}"
 
-# Word-split on purpose, one field per line. Rejecting a token that is not a
-# {name} is what stops a name the doc grep cannot see from dropping out of both
-# lists and leaving two equally wrong sets comparing equal.
+# Word-split on purpose, one field per line. A token that is not a {name} fails
+# here, so a name the doc grep misses cannot vanish from both lists at once.
 # shellcheck disable=SC2086
 engine=$(printf '%s\n' ${segment})
 while read -r tok; do
