@@ -2413,9 +2413,20 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* treathead's Location gate must be the capacity of the buffer htsblk.location
-   aims at, so a redirect that fits is kept and one that does not is refused
-   without touching the canary sitting right behind it. */
+static int st_location_logged = 0;
+
+static void st_location_log(httrackp *opt, int type, const char *format,
+                            va_list args) {
+  (void) opt;
+  (void) type;
+  (void) format;
+  (void) args;
+  st_location_logged++;
+}
+
+/* treathead's Location gate must match htsblk.location's buffer size: a
+   redirect that fits is kept whole, a longer one refused and reported, and
+   neither touches the canary behind the buffer. */
 static int st_location(httrackp *opt, int argc, char **argv) {
   struct {
     char loc[HTS_LOCATION_SIZE];
@@ -2424,20 +2435,24 @@ static int st_location(httrackp *opt, int argc, char **argv) {
 
   char BIGSTK line[HTS_LOCATION_SIZE + 1024];
   const char *const prefix = "http://www.example.com/";
+  const char *url, *want;
   htsblk r;
-  size_t n, urllen, i;
-  int smashed = 0;
+  size_t n, urllen, kept, i;
+  int asked, smashed = 0;
 
   (void) opt;
   if (argc < 1) {
     fprintf(stderr, "location: needs a Location URL length\n");
     return 1;
   }
-  urllen = (size_t) atoi(argv[0]);
-  if (urllen <= strlen(prefix) || urllen + 16 > sizeof(line)) {
+  /* subtract, never add: a negative argument must not wrap the range check */
+  asked = atoi(argv[0]);
+  if (asked <= (int) strlen(prefix) ||
+      (size_t) asked > sizeof(line) - sizeof("Location: ")) {
     fprintf(stderr, "location: length out of probe range\n");
     return 1;
   }
+  urllen = (size_t) asked;
 
   memset(probe.loc, 0, sizeof(probe.loc));
   memset(probe.canary, '#', sizeof(probe.canary));
@@ -2447,14 +2462,25 @@ static int st_location(httrackp *opt, int argc, char **argv) {
   n = (size_t) snprintf(line, sizeof(line), "Location: %s", prefix);
   memset(line + n, 'a', urllen - strlen(prefix));
   line[n + urllen - strlen(prefix)] = '\0';
+  url = line + n - strlen(prefix);
+
+  st_location_logged = 0;
+  hts_set_log_vprint_callback(st_location_log);
   treathead(NULL, "www.example.com", "/", &r, line);
+  hts_set_log_vprint_callback(NULL);
 
   for (i = 0; i < sizeof(probe.canary); i++) {
     if (probe.canary[i] != '#')
       smashed++;
   }
-  printf("asked=%d kept=%d canary_smashed=%d\n", (int) urllen,
-         (int) strlen(probe.loc), smashed);
+  /* bounded: an unterminated buffer reports capacity, never reads past it */
+  for (kept = 0; kept < sizeof(probe.loc) && probe.loc[kept] != '\0'; kept++)
+    ;
+  /* the wanted value comes from the contract, not from what treathead did */
+  want = urllen < HTS_LOCATION_SIZE ? url : "";
+  printf("asked=%d kept=%d value_ok=%d canary_smashed=%d logged=%d\n", asked,
+         (int) kept, strcmp(probe.loc, want) == 0, smashed,
+         st_location_logged != 0);
   return 0;
 }
 
