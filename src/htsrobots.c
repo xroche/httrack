@@ -195,8 +195,7 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
     hts_boolean cut;
 
     bptr += binput(body + bptr, line, sizeof(line) - 2);
-    /* binput stops at the limit and resumes mid-line, so what follows is the
-       tail of this record and not a record of its own. */
+    // binput stops at the limit and resumes mid-line, so a cut value is silent
     cut = (strlen(line) >= sizeof(line) - 2) ? HTS_TRUE : HTS_FALSE;
     comm = strchr(line, '#'); // strip comment
     if (comm != NULL)
@@ -253,9 +252,9 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
           if (is_disallow && !keep_root_disallow && strcmp(a, "/") == 0) {
             // dropped: site-wide disallow ignored by option
           } else {
-            /* An Allow cut short by the line buffer is a shorter prefix, so it
-               would permit more than the site wrote; a Disallow prefix can only
-               forbid more, and is kept. Neither is the rule as written. */
+            /* A cut Allow is a shorter prefix, so it would permit more than
+               the site wrote; a cut Disallow can only forbid more, so it stays.
+               Neither is the rule as written. */
             const hts_boolean kept =
                 (cut && is_allow)
                     ? HTS_FALSE
@@ -292,7 +291,7 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
 
 int checkrobots_set(robots_wizard *robots, const char *adr, const char *data) {
   while(robots) {
-    if (robots->adr != NULL && strfield2(robots->adr, adr)) { // entry exists
+    if (robots->adr != NULL && strfield2(robots->adr, adr)) {
       char *const token = strdupt(data);
 
       if (token == NULL)

@@ -5597,9 +5597,8 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
   /* No rules: everything is allowed. */
   assertf(rb_decide(&robots, "User-agent: *\nDisallow:\n", "/x") == 0);
 
-  /* #1286: the rule store used to stop at 4 KB, losing the tail of the file,
-     and to throw the whole set away when it landed on 4094 bytes. Rules are
-     now kept to the RFC 9309 floor, and only what passes it is left out. */
+  /* #1286: rules are kept to the RFC 9309 floor, where the store used to stop
+     at 4 KB and to discard the whole set when it landed on 4094 bytes. */
   {
     char *txt = rb_bulk(8192); /* past the old cap, well under the new one */
 
