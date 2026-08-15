@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# -%L: a line the user wrote is read whole or refused by name, never split.
+# binput() clips at HTS_URLMAXSIZE and returns the clipped length, so the
+# loading loop used to resume mid-URL and add the tail as a second link.
+# Offline: file:// fixtures, no server.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_longurl.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+echo '<html><body>one</body></html>' >"$tmp/one.html"
+echo '<html><body>two</body></html>' >"$tmp/two.html"
+echo '<html><body>three</body></html>' >"$tmp/three.html"
+
+base="file://$tmp/"
+out="$tmp/out"
+log="$out/hts-log.txt"
+
+# 1500 bytes, tail-marked: a split shows ENDMRK as a second link's host.
+padlen=$((1500 - ${#base} - 6))
+long="$base$(printf "%${padlen}s" '' | tr ' ' p)ENDMRK"
+# ~1000 bytes but just under the limit: dot segments collapse away, so the
+# URL is long while the file it names is a real one.
+dots=$(((1000 - ${#base} - 10) / 2))
+near="$base$(printf "%${dots}s" '' | sed 's| |./|g')three.html"
+
+{
+    echo "${base}one.html"
+    echo "$long"
+    echo "${base}two.html"
+    echo "$near"
+} >"$tmp/urls.txt"
+
+assert_eq 1500 "${#long}" "long URL length"
+test "${#near}" -gt 900 -a "${#near}" -lt 1024 || fail "near URL is ${#near} bytes"
+
+mkdir -p "$out"
+httrack -O "$out" --quiet -n "-%L" "$tmp/urls.txt" >"$tmp/stdout" 2>&1 ||
+    fail "httrack failed: $(cat "$tmp/stdout")"
+
+loghas() {
+    grep -Eqi "$1" "$log" || {
+        cut -c1-200 "$log"
+        fail "expected /$1/ in $log"
+    }
+}
+lognot() {
+    if grep -Eqi "$1" "$log"; then
+        cut -c1-200 "$log"
+        fail "unexpected /$1/ in $log"
+    fi
+}
+
+# The over-long line is refused by name, on stderr and in the log, naming the
+# list and the line: a fix that drops it silently passes the count check alone.
+loghas 'urls\.txt, line 2: URL longer than 1024 bytes, ignored'
+# ...and exactly the other three lines loaded: 4 would mean the tail still came
+# back as a link, 2 that the near-limit line was refused along with it.
+loghas '(^|[^0-9])3 links added from'
+# The tail of the split URL was fetched as a host of its own.
+lognot 'endmrk'
+
+# The near-limit line reached the crawler whole: a clipped URL names no file.
+loghas 'mirror complete.*[^0-9]3 links scanned'
+test -s "$out/file$tmp/three.html" || fail "near-limit URL was not fetched"
+test -s "$out/file$tmp/one.html" || fail "first URL was not fetched"
+test -s "$out/file$tmp/two.html" || fail "URL after the refused line was not fetched"
+
+exit 0

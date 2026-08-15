@@ -825,12 +825,39 @@ int httpmirror(char *url1, httrackp * opt) {
       if (filelist_buff != NULL) {
         size_t filelist_ptr = 0;
         int n = 0;
+        int lineno = 0;
         char BIGSTK line[HTS_URLMAXSIZE * 2];
 
         while(filelist_ptr < filelist_sz) {
-          int count =
-            binput(filelist_buff + filelist_ptr, line, HTS_URLMAXSIZE);
-          filelist_ptr += count;
+          const int count =
+              binput(filelist_buff + filelist_ptr, line, HTS_URLMAXSIZE);
+          const size_t next = filelist_ptr + (size_t) count;
+          /* Did binput stop on the line's own terminator, or clip mid-URL? The
+             buffer carries our NUL at filelist_sz, so next - 1 is in bounds. */
+          const hts_boolean whole =
+              next - 1 == filelist_sz || filelist_buff[next - 1] == '\n';
+
+          lineno++;
+          if (!whole) {
+            /* Advancing by count would feed the tail back as a second URL, and
+               a clipped URL is a different URL, so refuse the line by name. */
+            if (filelist_buff[next - 1] == '\0') {
+              hts_log_print(opt, LOG_WARNING,
+                            "%s, line %d: URL contains a NUL byte, ignored",
+                            StringBuff(opt->filelist), lineno);
+            } else {
+              hts_log_print(opt, LOG_WARNING,
+                            "%s, line %d: URL longer than %d bytes, ignored",
+                            StringBuff(opt->filelist), lineno, HTS_URLMAXSIZE);
+            }
+            while (filelist_ptr < filelist_sz &&
+                   filelist_buff[filelist_ptr] != '\n') {
+              filelist_ptr++;
+            }
+            filelist_ptr++; /* step over the '\n' */
+            continue;
+          }
+          filelist_ptr = next;
           if (count && line[0]) {
             n++;
             if (strstr(line, ":/") == NULL) {
