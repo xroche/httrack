@@ -44,13 +44,11 @@ refused 3000
 # than the tail of the one before. "over" says the cursor walked past the
 # block's end, which must never happen.
 line() { # line READSIZE BLOCK WANT
-    local got
     if [ -n "$2" ]; then
-        got=$(httrack -O /dev/null -#test=headerline "$1" "$2")
+        assert_selftest_lines "$3" headerline "$1" "$2"
     else
-        got=$(httrack -O /dev/null -#test=headerline "$1")
+        assert_selftest_lines "$3" headerline "$1"
     fi
-    assert_eq "$3" "$got" "read size $1"
 }
 
 # Default block: "X-First: 0123456789abcdefghij" is 29 bytes, then
