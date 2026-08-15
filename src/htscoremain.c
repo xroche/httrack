@@ -252,7 +252,7 @@ HTSEXT_API int hts_main2(int argc, char **argv, httrackp * opt) {
 
 static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   /* command line rebuilt from argv, config files and doit.log */
-  cmdl_argv x_cmd = {NULL, 0, 0, {NULL, 0, 0}};
+  cmdl_argv x_cmd = {NULL, NULL, 0, 0, {NULL, 0, 0}};
 
   //
   int argv_url = -1;            // ==0 : utiliser cache et doit.log
@@ -623,7 +623,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         /* Insert parameters BUT so that they can be in the same order */
         if (lastp) {
           if (strnotempty(lastp) || quoted) {
-            if (!cmdl_ins(&x_cmd, lastp, insert_after)) {
+            if (!cmdl_ins_unquoted(&x_cmd, lastp, insert_after)) {
               cmdl_free(&x_cmd);
               HTS_PANIC_PRINTF("Error, not enough memory");
               htsmain_free();
@@ -999,9 +999,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     char *com;
     int na;
 
+    /* the flags below are indexed with argv, which still aliases x_cmd */
+    assertf(argv == x_cmd.argv && argc == x_cmd.argc);
+
     for(na = 1; na < argc; na++) {
 
-      if (argv[na][0] == '"') {
+      if (argv[na][0] == '"' && !x_cmd.unquoted[na]) {
         char BIGSTK tempo[HTS_CDLMAXSIZE + 256];
 
         strcpybuff(tempo, argv[na] + 1);

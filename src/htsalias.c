@@ -588,6 +588,7 @@ const char *optalias_help(const char *token) {
    if it cannot. */
 static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
   char **slots;
+  hts_boolean *flags;
   int capacity;
 
   if (count <= cmd->capacity)
@@ -603,6 +604,12 @@ static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
   if (slots == NULL)
     return HTS_FALSE;
   cmd->argv = slots;
+  /* hts_boolean is no wider than a pointer, so this cannot wrap either */
+  flags = (hts_boolean *) realloct(cmd->unquoted,
+                                   sizeof(hts_boolean) * (size_t) capacity);
+  if (flags == NULL) /* argv stays grown; capacity does not, so it is retried */
+    return HTS_FALSE;
+  cmd->unquoted = flags;
   cmd->capacity = capacity;
   return HTS_TRUE;
 }
@@ -619,6 +626,7 @@ hts_boolean cmdl_init(cmdl_argv *cmd, int slots) {
 void cmdl_free(cmdl_argv *cmd) {
   hts_arena_free(&cmd->tokens);
   freet(cmd->argv);
+  freet(cmd->unquoted);
   memset(cmd, 0, sizeof(*cmd));
 }
 
@@ -633,10 +641,20 @@ hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
   copy = hts_arena_strdup(&cmd->tokens, token);
   if (copy == NULL)
     return HTS_FALSE;
-  for (i = cmd->argc; i > pos; i--)
+  for (i = cmd->argc; i > pos; i--) {
     cmd->argv[i] = cmd->argv[i - 1];
+    cmd->unquoted[i] = cmd->unquoted[i - 1];
+  }
   cmd->argv[pos] = copy;
+  cmd->unquoted[pos] = HTS_FALSE;
   cmd->argc++;
+  return HTS_TRUE;
+}
+
+hts_boolean cmdl_ins_unquoted(cmdl_argv *cmd, const char *token, int pos) {
+  if (!cmdl_ins(cmd, token, pos))
+    return HTS_FALSE;
+  cmd->unquoted[pos] = HTS_TRUE;
   return HTS_TRUE;
 }
 

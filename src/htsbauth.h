@@ -67,6 +67,11 @@ struct t_cookie {
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+
 /* cookies */
 int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
                const char *domain, const char *path);
@@ -74,7 +79,12 @@ int cookie_add(t_cookie *cookie, const char *cook_name, const char *cook_value,
 int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
                const char *path);
 
-int cookie_load(t_cookie *cookie, const char *path, const char *name);
+/** Load the Netscape jar <path>/<name> into cookie (plus the copied IE jars in
+    <path> on Windows). A line whose field does not fit is refused, not clipped,
+    and reported through opt, which may be NULL. Returns 0 if the jar was
+    opened, -1 otherwise. */
+int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
+                const char *name);
 
 int cookie_save(t_cookie *cookie, const char *name);
 

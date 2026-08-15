@@ -64,14 +64,6 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
 /* The longest suffix an answer appends after the link (answer 7). */
 #define HTS_WIZARD_FILTER_SUFFIX "*[file]"
 
-/* Capacity of one filters[] slot, and the stride filters_init() allocates in
-   htscore.c: change the two together. Sized for the longest pattern an answer
-   can build (sign, host, separator, path, suffix), because clipping one widens
-   it: "*[file]" cut back to "*" allows every file below, not just this one. */
-#define HTS_FILTER_SLOT_SIZE                                                   \
-  (1 + (HTS_URLMAXSIZE * 2 - 1) + 1 + (HTS_URLMAXSIZE * 2 - 1) +               \
-   sizeof(HTS_WIZARD_FILTER_SUFFIX))
-
 /* Builds into `f` the `slot`-th filter answer `n` adds for the link (adr,fil),
    and leaves `f` empty past the last one. Only the host-scope answers emit a
    second, because their starred form misses the apex. `seeker_up` is the
@@ -80,11 +72,18 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
+/* Writes into `dst` (capacity `dstsize`, NUL included) the "<host>/<path>" the
+   wizard prompt asks about. Clips rather than aborting, so the prompt can lose
+   its tail on a link longer than `dstsize`; the answer is still recorded
+   against the whole (adr,fil). */
+void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
+                           const char *fil);
 /* Records the filters answer `n` leaves behind for the link (adr,fil), on top
    of the wizard's block at the low indices of opt->filters: last match wins, so
    a later answer outranks an earlier one and the command-line filters above the
    block outrank every answer. Returns the number inserted, which sit at the
-   tail of the block, ending at opt->wizard_filters. */
+   tail of the block, ending at opt->wizard_filters; a rule too long for the
+   matcher is dropped, so that can fall short of what the answer emits. */
 int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 

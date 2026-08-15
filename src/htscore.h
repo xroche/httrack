@@ -385,11 +385,32 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
                           FILE **fp, const char *ht_buff, size_t ht_len,
                           const char *adr, const char *fil, const char *save);
 
+/* Longest suffix a rule builder appends after the path (the wizard's
+   "*[file]"), NUL included; asserted against in htswizard.c. */
+#define HTS_FILTER_SUFFIX_MAX 8
+
+/* Per-slot capacity of the filters array; filters_init() strides the slots by
+   it. Holds the longest rule any builder emits, because truncating one changes
+   what it matches. */
+#define HTS_FILTER_SLOT_SIZE                                                   \
+  (1 + (HTS_URLMAXSIZE * 2 - 1) + 1 + (HTS_URLMAXSIZE * 2 - 1) +               \
+   HTS_FILTER_SUFFIX_MAX)
+
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 
 /* Binds this crawl's filter array to `opt`, and empties the wizard block with
    it: opt->wizard_filters indexes into that array and outlives no crawl. */
 void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
+
+/* Longest rule a slot holds and the matcher still looks at. */
+#define HTS_FILTER_MAXLEN                                                      \
+  (HTS_FILTER_SLOT_SIZE - 1 < STRJOKER_MAXLEN ? HTS_FILTER_SLOT_SIZE - 1       \
+                                              : STRJOKER_MAXLEN)
+
+/* Stores `pattern` at `pos`, shifting the rules from there up a slot; the
+   caller has ensured there is room. The one door into the array: a rule past
+   HTS_FILTER_MAXLEN warns and returns HTS_FALSE, never stored dead (#1270). */
+hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);
 

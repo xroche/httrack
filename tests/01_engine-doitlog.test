@@ -159,4 +159,42 @@ grep -qF -- '-%F "\"<!-- MARK -->" -r2' "$out3/hts-cache/doit.log" || {
     exit 1
 }
 
+# --- 5. a plain argument keeps its leading quote too (#1263) -----------------
+# A filter, not an option value, so it meets the second strip pass too. Three
+# leading quotes: that pass and the -O one each eat one.
+out4="$tmp/out4"
+site4="$tmp/site4"
+mkdir -p "$site4"
+printf '<html><body><a href="foo.html">f</a></body></html>' >"$site4/index.html"
+echo '<html><body>foo</body></html>' >"$site4/foo.html"
+rc=0
+"$bin" "file://$site4/index.html" -O "$out4" --quiet -n -%v0 '"""+*foo*""' \
+    >/dev/null 2>&1 || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: initial mirror with a leading-quote filter exited $rc"
+    exit 1
+}
+grep -qF -- '"\"+*foo*"' "$out4/hts-cache/doit.log" || {
+    echo "FAIL: the filter was not recorded escaped"
+    head -1 "$out4/hts-cache/doit.log"
+    exit 1
+}
+# line 1 only: line 2 carries the generation date, which moves whenever the two
+# runs straddle a second, as they do on a slower machine.
+head -1 "$out4/hts-cache/doit.log" >"$tmp/doit4.before"
+# no arguments at all: any would be recorded too, and the point here is that
+# the command line is a fixed point of its own replay.
+rc=0
+(cd "$out4" && "$bin" >/dev/null 2>&1) || rc=$?
+test "$rc" -eq 0 || {
+    echo "FAIL: leading-quote filter reprise exited $rc (token stripped twice?)"
+    exit 1
+}
+head -1 "$out4/hts-cache/doit.log" >"$tmp/doit4.after"
+cmp -s "$tmp/doit4.before" "$tmp/doit4.after" || {
+    echo "FAIL: the reprise rewrote the command line differently"
+    diff "$tmp/doit4.before" "$tmp/doit4.after" | head -4
+    exit 1
+}
+
 exit 0

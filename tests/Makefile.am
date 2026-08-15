@@ -23,7 +23,8 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c a
 	server-root/hostalias/e.html \
 	server-root/fraglink/index.html server-root/fraglink/target.html \
 	fixtures/cache-golden/hts-cache/new.zip \
-	install-manifest.txt
+	install-manifest.txt \
+	62_lang-untranslated.counts
 
 TESTS_ENVIRONMENT =
 TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH
@@ -138,4 +139,4 @@ TEST_EXTENSIONS = .test
 # cancelled step keeps neither its log nor its artifacts, so today a hang tells
 # us nothing at all. HTTRACK_TEST_TIMEOUT overrides the budget; 0 disables it.
 TEST_LOG_COMPILER = $(BASH_SHELL) $(srcdir)/test-timeout.sh
-CLEANFILES = check-network_sh.cache
+CLEANFILES = check-network_sh.cache 62_lang-untranslated.counts.new

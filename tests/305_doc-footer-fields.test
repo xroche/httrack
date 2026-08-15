@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# Pin the -%F field lists in html/cmdguide.html and html/guide.html to the one
+# httrack --help prints. man/httrack.1 (02_manpage-regen) and the slot order
+# (01_engine-footerfmt) are covered elsewhere.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+
+command -v httrack >/dev/null 2>&1 || skip "httrack not in PATH"
+
+same_set() { # same_set <list A> <list B>: newline-separated, order-insensitive
+    diff <(sort <<<"$1") <(sort <<<"$2") >/dev/null
+}
+
+# Capture it all first, so a crash after the -%F line still fails the test.
+help=$(httrack --quiet --help 2>/dev/null) || fail "httrack --help exited $?"
+help_line=$(grep -m1 -- ' %F  footer string' <<<"${help}") ||
+    fail "--help prints no -%F line"
+
+# " ...; fields {addr} {path} ..., or legacy %s)"
+segment=${help_line#*; fields }
+segment=${segment%%, or legacy *}
+test "${segment}" != "${help_line}" ||
+    fail "cannot find the field list in: ${help_line}"
+
+# Word-split on purpose, one field per line. A token that is not a {name} fails
+# here, so a name the doc grep misses cannot vanish from both lists at once.
+# shellcheck disable=SC2086
+engine=$(printf '%s\n' ${segment})
+while read -r tok; do
+    case "${tok}" in
+    "{"?*"}") ;;
+    *) fail "'${tok}' in the -%F field list is not a {name}" ;;
+    esac
+done <<<"${engine}"
+
+# Control: the comparison must be able to say no.
+if same_set "${engine}" "${engine}
+{nosuchfield}"; then
+    fail "same_set() ignores an extra name; the checks below prove nothing"
+fi
+
+check_page() { # check_page <html file> <tag wrapping each {name}>
+    local page="$1" tag="$2" doc
+    test -r "${page}" || fail "no ${page}"
+    doc=$(grep -o "<${tag}>{[^{}<]*}</${tag}>" "${page}" |
+        sed "s,</*${tag}>,,g" | sort -u || true)
+    grep -qx '{addr}' <<<"${doc}" ||
+        fail "no <${tag}>{field}</${tag}> names parsed out of ${page}"
+    same_set "${engine}" "${doc}" || {
+        echo "${page} lists different -%F fields than the engine." >&2
+        echo "Left is --help, right is the page:" >&2
+        diff <(sort <<<"${engine}") <(sort <<<"${doc}") >&2 || true
+        fail "${page} is out of date"
+    }
+}
+
+check_page "${srcdir}/html/cmdguide.html" tt
+check_page "${srcdir}/html/guide.html" code
+
+echo "both doc pages list the engine's $(wc -l <<<"${engine}") -%F fields"
