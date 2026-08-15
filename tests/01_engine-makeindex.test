@@ -172,12 +172,15 @@ done
 # stops a text-mode rewrite flattening a copy. Reading the bytes instead would
 # answer for the checkout, and the Windows runner's disagrees with every other
 # one (#1301).
-if command -v git >/dev/null 2>&1 && git -C "$srcroot" rev-parse --git-dir >/dev/null 2>&1; then
+# ls-files, not rev-parse: distcheck unpacks the tarball inside the checkout, so
+# git answers there for paths it does not track and every pin reads unspecified.
+if command -v git >/dev/null 2>&1 &&
+    git -C "$srcroot" ls-files --error-unmatch templates >/dev/null 2>&1; then
     for file in "$templates"/*.html; do
         assert_eq crlf \
             "$(git -C "$srcroot" check-attr eol -- "templates/${file##*/}" | sed 's/.*: //')" \
             "${file##*/}: eol pin"
     done
 else
-    echo "note: not a git checkout, the templates' eol pin cannot be read"
+    echo "note: templates/ is not tracked here, so its eol pin cannot be read"
 fi
