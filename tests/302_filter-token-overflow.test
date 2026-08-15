@@ -44,8 +44,8 @@ longrule "$maxfilter" "$tmpdir/fit.txt"
 assert_eq "http://www.example.com/a.png: accepted by rule #2 (+*.png)" \
     "$(why "$tmpdir/fit.txt")" "filter of $maxfilter bytes"
 
-# One byte over, and it is gone: the numbering shifts. The two overshoots die
-# differently before the fix, on the filter slot then on the stack canary.
+# One byte over, and it is gone: the numbering shifts. 512 over is there to
+# land past the buffer, not merely past the bound.
 for over in 1 512; do
     longrule "$((maxfilter + over))" "$tmpdir/over.txt"
     assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
