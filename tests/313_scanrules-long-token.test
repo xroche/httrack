@@ -56,9 +56,9 @@ assert_eq 1 "$(counted 'Filter rule dropped')" "warnings for one dropped rule"
 assert_eq "$dropped" "$(why 3000)" "rule far past the cap"
 logged "dropped: 3001 bytes" || fail "wrong size in the warning"
 
-# A URL is dropped by its own branch, one byte short of the filter's cap. Only
-# a crawl shows it: the engine rejects a kept one downstream ("too long"), so
-# that warning is present exactly when the parse loop let it through.
+# A URL is dropped by its own branch, one byte short of the filter's cap. The
+# warning is the only sign of it: the engine caps a URL at HTS_URLMAXSIZE and
+# refuses one four times shorter, so no crawl ever sees the bound below.
 echo '<html><body>ok</body></html>' >"$tmp/ok.html"
 crawl() { # crawl URLLEN -> mirrors a primary URL of that length, plus a real one
     local url="file://$tmp/"
@@ -69,13 +69,11 @@ crawl() { # crawl URLLEN -> mirrors a primary URL of that length, plus a real on
 }
 
 crawl "$maxurl"
-logged "too long" || fail "the URL at the cap never reached the crawler"
 ! logged "URL dropped" || fail "the URL at the cap was dropped"
 crawl "$((maxurl + 1))"
 logged "URL dropped: $((maxurl + 1)) bytes is past the $maxurl-byte limit" ||
     fail "no drop warning in $log"
-! logged "too long" || fail "an over-long URL still reached the crawler"
 crawl 3000
-! logged "too long" || fail "a far over-long URL still reached the crawler"
+logged "URL dropped: 3000 bytes" || fail "wrong size in the warning"
 
 exit 0
