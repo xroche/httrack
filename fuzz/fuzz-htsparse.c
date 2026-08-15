@@ -82,8 +82,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   cache.cached_tests = coucal_new(0);
   coucal_value_is_malloc(cache.cached_tests, 1);
 
-  memset(&robots, 0, sizeof(robots));
-  strcpybuff(robots.adr, "!");
+  memset(&robots, 0, sizeof(robots)); /* list head: no host, no rules */
   opt->robotsptr = &robots;
 
   opt->maxfilter = maximum(opt->maxfilter, 128);

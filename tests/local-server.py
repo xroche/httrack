@@ -561,6 +561,30 @@ class Handler(SimpleHTTPRequestHandler):
     # ... and one whose probe fails, with a body past the 1070 bytes that
     # issue #769's over-read needed.
     ERROR_ROBOTS_UA = "errorrobots"
+    # ... and "robotsblobNNNN", which sizes the Disallow list so the engine's
+    # stored rules come to exactly NNNN bytes, /secret/ last (#1286).
+    BLOB_ROBOTS_RE = re.compile(r"robotsblob(\d+)")
+
+    def robots_blob_body(self, blobsize):
+        # One "<marker><pattern>\n" line per stored rule, so a rule costs
+        # len(pattern) + 2. tests/01_engine-robots.test pins that accounting.
+        rules = []
+        used = 0
+        room = blobsize - (len("/secret/") + 2)
+        while used + 12 <= room:
+            rules.append("/pad%05d/" % len(rules))
+            used += 12
+        # A 1- or 2-byte filler cannot be written, and a 1-char one would be the
+        # site-wide "/". Give back a pad rule until the remainder is spendable.
+        while 0 < room - used < 5 and rules:
+            rules.pop()
+            used -= 12
+        if room - used:
+            rules.append("/" + "z" * (room - used - 3))
+        rules.append("/secret/")
+        return (
+            "User-agent: *\n" + "".join("Disallow: %s\n" % r for r in rules)
+        ).encode()
 
     def route_robots(self):
         # The Sitemap: record is group-independent; only --sitemap acts on it.
@@ -573,6 +597,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             if self.command != "HEAD":
                 self.wfile.write(body)
+            return
+        blob = self.BLOB_ROBOTS_RE.search(ua)
+        if blob:
+            self.send_raw(self.robots_blob_body(int(blob.group(1))), "text/plain")
             return
         host = self.headers.get("Host")
         body = "User-agent: *\nDisallow:\n"
