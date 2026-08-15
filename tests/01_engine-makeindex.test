@@ -117,8 +117,8 @@ live_frame() { # live_frame [FILE...]
         END { print order }' "$@"
 }
 
-# <body> must open after the head closes and before the first table: the stale
-# head block hid inside a table cell, where a browser drops the start tag.
+# <body> must open after </head> and before the first table: a browser drops the
+# start tag when it lands inside a table cell instead.
 for name in index topindex; do
     assert_eq "</HEAD> <BODY> <TABLE>" \
         "$(live_frame "$templates/$name-header.html")" \
@@ -144,8 +144,7 @@ done
 assert_eq "$framed" "$(macro_body HTS_DATA_UNKNOWN_HTML | tag_order)" \
     "HTS_DATA_UNKNOWN_HTML: tag order"
 
-# A bare & is invalid markup wherever it lands. The top-index footer carried one
-# and only reached users once its own macro started being read.
+# A bare & is invalid markup wherever it lands.
 bare_amps() { # bare_amps [FILE...]
     awk '{ line = $0
             gsub(/&(amp|lt|gt|quot|apos|copy|nbsp|middot|#[0-9]+);/, "", line)

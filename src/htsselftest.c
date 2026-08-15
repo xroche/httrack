@@ -4814,7 +4814,7 @@ static void template_contract(const char *name, const char *tmpl,
 
 // hts_finish_makeindex writes the footer, emits the refresh meta only when
 // makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir,
-// argv[1] the optional templates/ whose on-disk copies get rendered too.
+// argv[1] is an optional templates/ whose on-disk footer is rendered too.
 static int st_makeindex(httrackp *opt, int argc, char **argv) {
   /* the minimal template is the control: it proves an assertion below can only
      fail on the real one because that template lost a slot */
@@ -4828,9 +4828,8 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   assertf(argc >= 1);
   snprintf(path, sizeof(path), "%s/index.html", argv[0]);
 
-  /* a format ending in a bare % must not read past its NUL; heap-allocated so a
-     sanitizer sees the bound, and the tail is poisoned because the stray NUL
-     that overrun writes would otherwise terminate the string before strcmp */
+  /* heap-allocated so a sanitizer sees an overrun, and poisoned so the stray
+     NUL one writes cannot pass for the terminator */
   {
     char *trailing = strdupt("credit %s, then a stray %");
     const char *const want = "credit X, then a stray %";
