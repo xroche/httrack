@@ -1982,3 +1982,166 @@ int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
 
   return failures;
 }
+
+/* Capacity cache_readex_new() rebuilds the save name in, so the longest name
+   that fits is one byte less. */
+#define SAVEBOUNDS_CAP (HTS_URLMAXSIZE * 2)
+/* X-Save length used here, kept under HTS_URLMAXSIZE: binput() clips the header
+   line to that, and a clipped one would test the clipping, not the rebuild. */
+#define SAVEBOUNDS_REL_LEN 1000
+#define SAVEBOUNDS_GUARD 16
+#define SAVEBOUNDS_GUARD_BYTE '\x5a'
+
+/* A path of exactly len bytes, slash-bounded like an -O directory. */
+static void savebounds_path(char *s, size_t size, size_t len) {
+  assertf(len >= 2 && len < size);
+  memset(s, 'd', len);
+  s[0] = '/';
+  s[len - 1] = '/';
+  s[len] = '\0';
+}
+
+/* Read the entry back with path_html_utf8 set to `path`. want is the save name
+   the reader must rebuild, or NULL when the rebuild cannot fit and the entry
+   must be refused. */
+static int savebounds_read(httrackp *opt, const char *path, const char *adr,
+                           const char *fil, const char *want) {
+  int failures = 0;
+  cache_back cache;
+  htsblk r;
+  char *got = malloct(SAVEBOUNDS_CAP + SAVEBOUNDS_GUARD);
+  size_t k;
+
+  /* non-zero guard: a stray NUL written one past the end is invisible against
+     a zeroed one */
+  memset(got, SAVEBOUNDS_GUARD_BYTE, SAVEBOUNDS_CAP + SAVEBOUNDS_GUARD);
+  got[0] = '\0';
+
+  StringCopy(opt->path_html_utf8, path);
+  selftest_open_for_read(&cache, opt);
+  r = cache_readex(opt, &cache, adr, fil, "", NULL, got, 1);
+  selftest_close(&cache);
+
+  if (want != NULL) {
+    if (r.statuscode != 200) {
+      fprintf(stderr,
+              "%s: html path of %d bytes: statuscode %d, expected 200 (%s)\n",
+              selftest_tag, (int) strlen(path), r.statuscode, r.msg);
+      failures++;
+    }
+    if (strcmp(got, want) != 0) {
+      fprintf(stderr,
+              "%s: html path of %d bytes: save name is %d bytes '%.48s...',"
+              " expected %d bytes '%.48s...'\n",
+              selftest_tag, (int) strlen(path), (int) strlen(got), got,
+              (int) strlen(want), want);
+      failures++;
+    }
+  } else {
+    if (r.statuscode != STATUSCODE_INVALID) {
+      fprintf(stderr,
+              "%s: html path of %d bytes: statuscode %d, expected the entry to"
+              " be refused\n",
+              selftest_tag, (int) strlen(path), r.statuscode);
+      failures++;
+    }
+    /* the point of the refusal: a clipped name would name another file */
+    if (got[0] != '\0') {
+      fprintf(stderr,
+              "%s: html path of %d bytes: refused entry still returns a %d-byte"
+              " save name '%.48s...'\n",
+              selftest_tag, (int) strlen(path), (int) strlen(got), got);
+      failures++;
+    }
+    if (r.adr != NULL) {
+      fprintf(stderr,
+              "%s: html path of %d bytes: refused entry returns a body\n",
+              selftest_tag, (int) strlen(path));
+      failures++;
+    }
+  }
+  for (k = SAVEBOUNDS_CAP; k < SAVEBOUNDS_CAP + SAVEBOUNDS_GUARD; k++) {
+    if (got[k] != SAVEBOUNDS_GUARD_BYTE) {
+      fprintf(stderr, "%s: html path of %d bytes: guard byte %d overwritten\n",
+              selftest_tag, (int) strlen(path), (int) (k - SAVEBOUNDS_CAP));
+      failures++;
+      break;
+    }
+  }
+
+  if (r.adr != NULL) {
+    freet(r.adr);
+  }
+  freet(got);
+  return failures;
+}
+
+int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
+  int failures = 0;
+  cache_back cache;
+  const char *const adr = "example.com";
+  const char *const fil = "/deep.html";
+  static const char body[] = "<html><body>deep</body></html>";
+  static char rel[SAVEBOUNDS_REL_LEN + 1];
+  /* the deeper html paths a later run may carry: one where the rebuilt name
+     ends exactly on the last byte that fits, one a single byte past it, and
+     the issue's own 1500 */
+  static char path_fit[SAVEBOUNDS_CAP], path_over[SAVEBOUNDS_CAP];
+  static char path_huge[SAVEBOUNDS_CAP];
+  char BIGSTK writepath[HTS_URLMAXSIZE * 2];
+  char BIGSTK save[HTS_URLMAXSIZE * 2];
+  /* concat() refuses a result that only just fits, and the longest expected
+     name here is exactly SAVEBOUNDS_CAP - 1 bytes */
+  char BIGSTK expected[SAVEBOUNDS_CAP + 8];
+
+  selftest_tag = "cache-savebounds";
+  selftest_setup_dir(opt, dir);
+  strcpybuff(writepath, StringBuff(opt->path_html_utf8));
+
+  memset(rel, 'p', SAVEBOUNDS_REL_LEN);
+  rel[SAVEBOUNDS_REL_LEN] = '\0';
+  memcpy(rel, "example.com/", 12);
+  memcpy(rel + SAVEBOUNDS_REL_LEN - 5, ".html", 5);
+  savebounds_path(path_fit, sizeof(path_fit),
+                  SAVEBOUNDS_CAP - 1 - SAVEBOUNDS_REL_LEN);
+  savebounds_path(path_over, sizeof(path_over),
+                  SAVEBOUNDS_CAP - SAVEBOUNDS_REL_LEN);
+  savebounds_path(path_huge, sizeof(path_huge), 1500);
+  concat(save, sizeof(save), writepath, rel);
+
+  /* store it the way a mirror does: path_prefix set, so X-Save goes to the ZIP
+     relative to the html path of this run */
+  selftest_open_for_write(&cache, opt);
+  {
+    htsblk w;
+    char locw[4];
+    char *bodycopy = strdupt(body);
+
+    hts_init_htsblk(&w);
+    w.statuscode = 200;
+    w.size = (LLint) strlen(body);
+    strcpybuff(w.msg, "OK");
+    strcpybuff(w.contenttype, "text/html");
+    strcpybuff(w.charset, "utf-8");
+    locw[0] = '\0';
+    w.location = locw;
+    w.is_write = 0;
+    w.adr = bodycopy;
+    cache_add(opt, &cache, &w, adr, fil, save, 1, writepath);
+    freet(bodycopy);
+  }
+  selftest_close(&cache);
+
+  /* same html path as the write: the stripped prefix goes back on unchanged */
+  failures += savebounds_read(opt, writepath, adr, fil, save);
+
+  /* deeper path, rebuilt name still fits to the last byte */
+  concat(expected, sizeof(expected), path_fit, rel);
+  failures += savebounds_read(opt, path_fit, adr, fil, expected);
+
+  /* one byte past: refuse and re-fetch rather than name another file */
+  failures += savebounds_read(opt, path_over, adr, fil, NULL);
+  failures += savebounds_read(opt, path_huge, adr, fil, NULL);
+
+  return failures;
+}

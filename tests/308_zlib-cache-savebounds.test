@@ -1,0 +1,27 @@
+#!/bin/bash
+#
+# Cache save-name bounds (httrack -#test=cache-savebounds <dir>): a deeper html
+# path on a later run must not overrun the name the reader rebuilds (#1278).
+
+set -eu
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+# stderr carries the expected "filename too long" warnings alongside the
+# self-test's own diagnostics: keep it out of the verdict, but not the report
+httrack -#test=cache-savebounds "$dir" >"$dir/out" 2>"$dir/err" ||
+    {
+        echo "httrack exited $? running the self-test:" >&2
+        cat "$dir/out" "$dir/err" >&2
+        exit 1
+    }
+
+out=$(tail -n1 "$dir/out")
+test "$out" = "cache-savebounds: OK" || {
+    echo "expected 'cache-savebounds: OK', got: $out" >&2
+    cat "$dir/err" >&2
+    exit 1
+}
