@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+# A too-long --assume value used to overrun every buffer it was copied into
+# (#1276). Each capacity runs on its own: pre-fix they all smash, and only the
+# first assertion to fire is ever visible.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+for capacity in 128 256 1024; do
+    assert_selftest "assumemime ok" assumemime "$capacity"
+done
+assert_selftest "assumemime ok" assumemime
+
+# an unknown capacity must fail rather than quietly exercise nothing
+if httrack -O /dev/null "-#test=assumemime" 512 >/dev/null 2>&1; then
+    fail "an unknown capacity selector was accepted"
+fi
+
+# the reported path: a value that long arriving on the command line. The
+# self-test cannot reach it, since -#test= dispatches before options are read.
+value=$(printf '%0900d' 0 | tr 0 B)
+bash "${top_srcdir:-..}/tests/local-crawl.sh" \
+    --errors 0 \
+    --log-found 'clipped to 255' \
+    httrack 'BASEURL/simple/basic.html' --assume "html=$value"
+
+exit 0

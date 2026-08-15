@@ -4698,15 +4698,15 @@ HTSEXT_API void get_httptype(httrackp *opt, char *s, const char *fil,
 }
 
 // get type of fil (php)
-// s: buffer (text/html) of capacity ssize, or NULL
-// return: 1 if known by user
-int get_userhttptype(httrackp *opt, char *s, size_t ssize, const char *fil) {
+// s: destination buffer, or NULL
+hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
+                             const char *fil) {
   if (s != NULL) {
     assertf(ssize != 0);
     if (s)
       s[0] = '\0';
     if (fil == NULL || *fil == '\0')
-      return 0;
+      return HTS_FALSE;
 #if 1
     if (StringLength(opt->mimedefs) > 0) {
 
@@ -4745,8 +4745,9 @@ int get_userhttptype(httrackp *opt, char *s, size_t ssize, const char *fil) {
 
                 i++;
                 len = strcspn(&mimedefs[i], "\n");
-                /* clip rather than abort: the value is user text, and a rule
-                   too long to hold is still worth applying (#1276) */
+                /* clip, don't abort: the consumers match whole strings far
+                   shorter than any destination, so a value long enough to be
+                   clipped already matched nothing (#1276) */
                 if (len >= ssize) {
                   hts_log_print(opt, LOG_WARNING,
                                 "--assume value for '%s' is %d bytes, clipped "
@@ -4756,7 +4757,7 @@ int get_userhttptype(httrackp *opt, char *s, size_t ssize, const char *fil) {
                 }
                 memcpy(s, &mimedefs[i], len);
                 s[len] = '\0';
-                return 1;       /* SUCCESS! */
+                return HTS_TRUE; /* SUCCESS! */
               }
             }
             /* next item in list */
@@ -4808,7 +4809,7 @@ int get_userhttptype(httrackp *opt, char *s, size_t ssize, const char *fil) {
     }
 #endif
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 // give the file extension for a mime type (e.g. "image/gif" -> "gif")

@@ -351,10 +351,11 @@ int ishtml(httrackp * opt, const char *urlfil);
 int ishtml_ext(const char *a);
 int ishttperror(int err);
 
-/* Write the user's --assume type for fil into s, of capacity ssize (NUL
-   included); a rule value too long for s is clipped, not fatal. Returns 1 if a
-   rule matched, s then being the type, possibly empty ("--assume cgi="). */
-int get_userhttptype(httrackp *opt, char *s, size_t ssize, const char *fil);
+/* Write fil's --assume type into s (capacity ssize, NUL included); too long a
+   value is clipped, not fatal. True if a rule matched, s then holding its
+   value, which "--assume cgi=" leaves empty. */
+hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
+                             const char *fil);
 int give_mimext(char *s, size_t ssize, const char *st);
 
 int may_bogus_multiple(httrackp * opt, const char *mime, const char *filename);
