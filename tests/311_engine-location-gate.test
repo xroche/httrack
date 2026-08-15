@@ -38,19 +38,55 @@ kept 2047 2047
 refused 2048
 refused 3000
 
-# A wider gate only helps if the reader stops handing it cut values. Both
-# header lines below are read at a size that is one byte short, then one byte
-# long; the line after a cut one must be the server's next header, never the
-# tail of the one before.
-line() { # line READSIZE WANT1 WANT2
+# A wider gate only helps if the reader stops handing it cut values. Each case
+# reads four lines from a header block and compares every one: a cut line must
+# be reported, and the line after it must be the server's next header rather
+# than the tail of the one before. "over" says the cursor walked past the
+# block's end, which must never happen.
+line() { # line READSIZE BLOCK WANT
     local got
-    got=$(httrack -O /dev/null -#test=headerline "$1")
-    assert_eq "$2" "$(sed -n 1p <<<"$got")" "read size $1, first line"
-    assert_eq "$3" "$(sed -n 2p <<<"$got")" "read size $1, second line"
+    if [ -n "$2" ]; then
+        got=$(httrack -O /dev/null -#test=headerline "$1" "$2")
+    else
+        got=$(httrack -O /dev/null -#test=headerline "$1")
+    fi
+    assert_eq "$3" "$got" "read size $1"
 }
 
-# "X-First: 0123456789abcdefghij" is 29 bytes, "X-Second: ok" is 12.
-line 30 'cut=0 line=X-First: 0123456789abcdefghij' 'cut=0 line=X-Second: ok'
-line 29 'cut=1 line=X-First: 0123456789abcdefghi' 'cut=0 line=X-Second: ok'
-line 13 'cut=1 line=X-First: 012' 'cut=0 line=X-Second: ok'
-line 12 'cut=1 line=X-First: 01' 'cut=1 line=X-Second: o'
+# Default block: "X-First: 0123456789abcdefghij" is 29 bytes, then
+# "X-Second: ok" at 12, then the blank line that ends the header.
+line 30 '' 'cut=0 over=0 line=X-First: 0123456789abcdefghij
+cut=0 over=0 line=X-Second: ok
+cut=0 over=0 line=
+cut=0 over=0 line='
+
+# One byte short of the first line, then far short of it: the second line
+# survives whole either way.
+line 29 '' 'cut=1 over=0 line=X-First: 0123456789abcdefghi
+cut=0 over=0 line=X-Second: ok
+cut=0 over=0 line=
+cut=0 over=0 line='
+line 13 '' 'cut=1 over=0 line=X-First: 012
+cut=0 over=0 line=X-Second: ok
+cut=0 over=0 line=
+cut=0 over=0 line='
+line 12 '' 'cut=1 over=0 line=X-First: 01
+cut=1 over=0 line=X-Second: o
+cut=0 over=0 line=
+cut=0 over=0 line='
+
+# A last line with no terminator ends at the block, not past it.
+line 8 'A: 1\nB: 22222222' 'cut=0 over=0 line=A: 1
+cut=1 over=0 line=B: 2222
+cut=0 over=0 line=
+cut=0 over=0 line='
+
+# A leading blank line is a line, and CR never survives into the value.
+line 8 '\nA: 1\n' 'cut=0 over=0 line=
+cut=0 over=0 line=A: 1
+cut=0 over=0 line=
+cut=0 over=0 line='
+line 8 'A\r: 1\n' 'cut=0 over=0 line=A: 1
+cut=0 over=0 line=
+cut=0 over=0 line=
+cut=0 over=0 line='

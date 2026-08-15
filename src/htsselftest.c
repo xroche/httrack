@@ -2414,12 +2414,15 @@ static int st_header(httrackp *opt, int argc, char **argv) {
 }
 
 /* A header line that does not fit must be reported as cut and skipped whole,
-   so the line after it is the server's next header and not its own tail. */
+   so the line after it is the server's next header and not its own tail. The
+   block defaults to two headers and the blank line; \n and \r arrive escaped,
+   since the command line filters both out. */
 static int st_headerline(httrackp *opt, int argc, char **argv) {
-  static const char block[] = "X-First: 0123456789abcdefghij\r\n"
-                              "X-Second: ok\r\n"
-                              "\r\n";
-  char line[64];
+  static const char fixture[] = "X-First: 0123456789abcdefghij\r\n"
+                                "X-Second: ok\r\n"
+                                "\r\n";
+  char block[256], line[64];
+  size_t blocklen;
   int max, ptr = 0, i;
 
   (void) opt;
@@ -2432,13 +2435,35 @@ static int st_headerline(httrackp *opt, int argc, char **argv) {
     fprintf(stderr, "headerline: read size out of probe range\n");
     return 1;
   }
-  for (i = 0; i < 3; i++) {
+  if (argc < 2) {
+    memcpy(block, fixture, sizeof(fixture));
+    blocklen = sizeof(fixture) - 1;
+  } else {
+    const char *a = argv[1];
+
+    if (strlen(a) >= sizeof(block)) {
+      fprintf(stderr, "headerline: block too long\n");
+      return 1;
+    }
+    for (blocklen = 0; *a != '\0'; a++) {
+      if (*a == '\\' && a[1] == 'n')
+        block[blocklen++] = '\n', a++;
+      else if (*a == '\\' && a[1] == 'r')
+        block[blocklen++] = '\r', a++;
+      else
+        block[blocklen++] = *a;
+    }
+    block[blocklen] = '\0';
+  }
+  /* one read past the block's lines, to show the walk stops at its end */
+  for (i = 0; i < 4; i++) {
     int adv;
     const hts_boolean cut =
-        binput_header(block + ptr, block + sizeof(block) - 1, line, max, &adv);
+        binput_header(block + ptr, block + blocklen, line, max, &adv);
 
     ptr += adv;
-    printf("cut=%d line=%s\n", cut != HTS_FALSE, line);
+    printf("cut=%d over=%d line=%s\n", cut != HTS_FALSE,
+           ptr > (int) blocklen + 1, line);
   }
   return 0;
 }

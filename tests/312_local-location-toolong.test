@@ -10,5 +10,13 @@ set -e
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --files 1 \
     --found 'longloc/index.html' \
-    --log-found 'Over-long header dropped' \
+    --log-found 'Over-long header dropped for .*/longloc/go\.php' \
     httrack 'BASEURL/longloc/index.html'
+
+# Control: the same shape with a Location the reader takes whole is followed
+# to its target, so the refusal above is the header length and not the fixture.
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --files 2 \
+    --found 'shortloc/index.html' \
+    --log-not-found 'Over-long header dropped' \
+    httrack 'BASEURL/shortloc/index.html'

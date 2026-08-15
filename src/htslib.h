@@ -335,11 +335,10 @@ HTS_INLINE void time_rfc822_local(char *s, struct tm *A);
 HTS_INLINE int sendc(htsblk * r, const char *s);
 int finput(T_SOC fd, char *s, int max);
 int binput(const char *buff, char *s, int max);
-/* Read one response-header line, from a buffer up to "end" or from a socket.
-   Both consume the whole line even when it does not fit "s", and return
-   HTS_TRUE when it did not: a truncated line carries a value the server never
-   sent, so callers drop it rather than parse it. binput_header() reports
-   through *offset how many bytes to advance over. */
+/* Read one response-header line, from a buffer up to "end" or from a socket,
+   consuming it whole even when it does not fit "s". HTS_TRUE means it was cut:
+   the value is not what the server sent, so drop it rather than parse it.
+   binput_header() reports the advance through *offset. */
 hts_boolean binput_header(const char *buff, const char *end, char *s, int max,
                           int *offset);
 hts_boolean finput_header(T_SOC fd, char *s, int max);
