@@ -2996,17 +2996,17 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
     const char *add;
     const char *want;
   } cases[] = {
-      {8, "", "a\\b", "a/b"},                   /* fits: '\' becomes '/' */
-      {8, "ab/", "cd", "ab/cd"},                /* appended after the seed */
-      {8, "", "abcdefg", "abcdefg"},            /* exact fit, NUL on the last */
-      {8, "", "abcdefgh", "abcdefg"},           /* one over */
-      {8, "", "abcdefghijklmnop", "abcdefg"},   /* far over */
+      {8, "", "a\\b", "a/b"},
+      {8, "ab/", "cd", "ab/cd"},
+      {8, "", "abcdefg", "abcdefg"}, /* exact fit, NUL on the last byte */
+      {8, "", "abcdefgh", "abcdefg"},
+      {8, "", "abcdefghijklmnop", "abcdefg"},
       {8, "ab", "\\\\\\\\\\\\\\\\", "ab/////"}, /* clip inside a '\' run */
-      {8, "abcdefg", "xy", "abcdefg"},          /* already full */
-      {1, "", "abc", ""},                       /* only the NUL fits */
+      {8, "abcdefg", "xy", "abcdefg"},
+      {1, "", "abc", ""},
       {2, "", "a\\c", "a"},
       {4, "abcdefghij", "xy", "abcdefghij"}, /* seed past dsize: left alone */
-      {0, "abc", "xy", "abc"},               /* degenerate size */
+      {0, "abc", "xy", "abc"},
   };
 
   static const size_t bigcaps[] = {64, 255, HTS_URLMAXSIZE,
@@ -3036,9 +3036,9 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
     rc |= st_addstr_canary(buf, guard, sizeof(buf), cases[k].add);
   }
 
-  /* the real caller's shape: a link far longer than the destination, over the
-     capacities the naming path hands out. Both buffers hold the whole source,
-     so an unclipped append is caught by the poison instead of smashing. */
+  /* The real caller's shape, at the capacities the naming path hands out. Both
+     buffers hold the whole source, so an unclipped append lands on the poison
+     rather than smashing the stack. */
   for (k = 0; k < sizeof(bigcaps) / sizeof(bigcaps[0]); k++) {
     const size_t dsize = bigcaps[k];
     char BIGSTK src[HTS_URLMAXSIZE * 4];

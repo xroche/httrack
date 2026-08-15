@@ -1860,11 +1860,11 @@ char *url_md5(char *digest, const char *fil) {
   return digest;
 }
 
-/* internal to url_savename: append s to d, mapping '\' to '/' */
 void url_savename_addstr(char *d, size_t dsize, const char *s) {
   size_t i = strlen(d);
 
-  /* Clip rather than abort: s comes from a crawled link (#1269). */
+  if (i + 1 >= dsize) /* nothing fits, and d already carries its NUL */
+    return;
   while (*s != '\0' && i + 1 < dsize) {
     d[i++] = *s == '\\' ? '/' : *s;
     s++;
