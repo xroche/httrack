@@ -4132,6 +4132,76 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Runs hts_scan_token() into a poisoned arena holding maxlen characters plus
+   the NUL, and reports whether anything past that moved. */
+static hts_boolean st_scantoken_run(char *src, size_t maxlen, char *arena,
+                                    size_t guard, hts_boolean *fit,
+                                    size_t *advance) {
+  char *p = src;
+  size_t i;
+
+  /* poisoned with '#', not 0, or the stray NUL of an off-by-one would read as
+     untouched */
+  memset(arena, '#', maxlen + 1 + guard);
+  *fit = hts_scan_token(&p, arena, maxlen);
+  *advance = (size_t) (p - src);
+  for (i = maxlen + 1; i < maxlen + 1 + guard; i++) {
+    if (arena[i] != '#')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* The option string is copied token by token into fixed buffers, which a token
+   longer than one of them used to walk straight past (#1271). */
+static int st_scantoken(httrackp *opt, int argc, char **argv) {
+  /* the bound the engine's filter buffer imposes, and a small one the same
+     code must honour */
+  const size_t caps[] = {8, HTS_URLMAXSIZE * 2 - 3};
+  const size_t guard = 64;
+  size_t c;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
+    const size_t maxlen = caps[c];
+    /* empty, short, and the four lengths that straddle the bound */
+    const size_t lens[] = {0,      1,          maxlen - 1,
+                           maxlen, maxlen + 1, maxlen + guard};
+    char *arena = malloct(maxlen + 1 + guard);
+    char *src = malloct(maxlen + guard + 8);
+    size_t k;
+
+    assertf(arena != NULL && src != NULL);
+    for (k = 0; k < sizeof(lens) / sizeof(lens[0]); k++) {
+      const size_t len = lens[k];
+      const size_t kept = len < maxlen ? len : maxlen;
+      hts_boolean fit;
+      size_t advance;
+
+      /* the token, the whitespace run after it, and the token to land on */
+      memset(src, 'a', len);
+      memcpy(src + len, " \tb", 4);
+      assertf(st_scantoken_run(src, maxlen, arena, guard, &fit, &advance));
+      assertf(fit == (len <= maxlen ? HTS_TRUE : HTS_FALSE));
+      assertf(strlen(arena) == kept && strspn(arena, "a") == kept);
+      assertf(advance == len + 2);
+
+      /* the same token ending the string: the cursor stops on its NUL */
+      src[len] = '\0';
+      assertf(st_scantoken_run(src, maxlen, arena, guard, &fit, &advance));
+      assertf(fit == (len <= maxlen ? HTS_TRUE : HTS_FALSE));
+      assertf(strlen(arena) == kept && strspn(arena, "a") == kept);
+      assertf(advance == len);
+    }
+    freet(arena);
+    freet(src);
+  }
+  printf("scantoken self-test OK\n");
+  return 0;
+}
+
 /* Prints the filter answer <n> emits for (adr, fil) [up] in [slot]; with no
    arguments, asserts every answer against its expected pattern (#1119). */
 static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
@@ -10208,6 +10278,9 @@ static const struct selftest_entry {
      "merged two-form filter verdict (fa_strjoker_dual)", st_filterdual},
     {"filterbounds", "", "matcher length/work caps reject hostile patterns",
      st_filterbounds},
+    {"scantoken", "",
+     "option-string token copy is bounded and reports a refusal (#1271)",
+     st_scantoken},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",

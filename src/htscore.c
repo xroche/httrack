@@ -441,6 +441,24 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
   }
 }
 
+hts_boolean hts_scan_token(char **ptr, char *dest, size_t maxlen) {
+  char *a = *ptr;
+  size_t len = 0; /* the token's real length, which may exceed maxlen */
+
+  assertf(maxlen != 0);
+  while (*a != '\0' && !isspace((unsigned char) *a)) {
+    if (len < maxlen)
+      dest[len] = *a;
+    len++;
+    a++;
+  }
+  dest[len < maxlen ? len : maxlen] = '\0';
+  while (isspace((unsigned char) *a))
+    a++;
+  *ptr = a;
+  return len <= maxlen ? HTS_TRUE : HTS_FALSE;
+}
+
 /* does it look like XML ? (SVG et al.) */
 static int look_like_xml(const char *s) {
   return strncmp(s, "<?xml", 5) == 0
@@ -650,8 +668,7 @@ int httpmirror(char *url1, httrackp * opt) {
     }
     htsbuff primarybuff = htsbuff_ptr(primary, primary_len);
 
-    while(*a) {
-      int i;
+    while (*a) {
       int joker = 0;
 
       // vérifier qu'il n'y a pas de * dans l'url
@@ -678,14 +695,13 @@ int httpmirror(char *url1, httrackp * opt) {
         }
 
         // recopier prochaine chaine (+ ou -)
-        i = 0;
-        while((*a != 0) && (!isspace((unsigned char) *a))) {
-          tempo[i++] = *a;
-          a++;
-        }
-        tempo[i++] = '\0';
-        while(isspace((unsigned char) *a)) {
-          a++;
+        /* the slot it lands in must also hold the sign, and the implicit form
+           below appends a '*' */
+        if (!hts_scan_token(&a, tempo, sizeof(tempo) - 3)) {
+          hts_log_print(opt, LOG_WARNING,
+                        "Filter rule longer than %d bytes, ignored: %c%.64s...",
+                        (int) (sizeof(tempo) - 3), type ? '+' : '-', tempo);
+          continue;
         }
 
         // sauter les + sans rien après..
@@ -723,22 +739,19 @@ int httpmirror(char *url1, httrackp * opt) {
         char BIGSTK url[HTS_URLMAXSIZE * 2];
 
         // prochaine adresse
-        i = 0;
-        while((*a != 0) && (!isspace((unsigned char) *a))) {
-          url[i++] = *a;
-          a++;
+        if (!hts_scan_token(&a, url, sizeof(url) - 1)) {
+          hts_log_print(opt, LOG_WARNING,
+                        "URL longer than %d bytes, ignored: %.64s...",
+                        (int) (sizeof(url) - 1), url);
+          continue;
         }
-        while(isspace((unsigned char) *a)) {
-          a++;
-        }
-        url[i++] = '\0';
 
         if (strstr(url, ":/") == NULL)
           htsbuff_cat(&primarybuff, "http://");
         htsbuff_cat(&primarybuff, url);
         htsbuff_cat(&primarybuff, "\n");
       }
-    }                           // while
+    } // while
 
     /* --why: print which filter rule decides for this URL, then stop */
     if (StringNotEmpty(opt->why_url)) {

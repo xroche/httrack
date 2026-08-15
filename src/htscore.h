@@ -327,6 +327,12 @@ void hts_record_init(httrackp *opt);
 
 void hts_record_free(httrackp *opt);
 
+/* Copy the whitespace-delimited token at *ptr into dest (maxlen characters plus
+   the NUL) and advance *ptr past it and the whitespace after it. HTS_FALSE when
+   the token was longer; dest holds what fit, which a filter caller must refuse
+   rather than use, a cut pattern authorizing something else. */
+hts_boolean hts_scan_token(char **ptr, char *dest, size_t maxlen);
+
 /* Run the mirror for the given start URL(s) under opt. Top-level engine entry.
  */
 int httpmirror(char *url1, httrackp * opt);
