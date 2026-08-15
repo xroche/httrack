@@ -4759,6 +4759,24 @@ static void makeindex_run(httrackp *opt, const char *path, const char *tmpl,
   buf[n] = '\0';
 }
 
+// Whole file as a NUL-terminated heap string, or NULL when it cannot be read.
+static char *makeindex_slurp(const char *path) {
+  FILE *fp = fopen(path, "rb");
+  long size;
+  char *buf;
+
+  if (fp == NULL)
+    return NULL;
+  assertf(fseek(fp, 0, SEEK_END) == 0);
+  size = ftell(fp);
+  assertf(size >= 0);
+  rewind(fp);
+  buf = malloct((size_t) size + 1);
+  buf[fread(buf, 1, (size_t) size, fp)] = '\0';
+  fclose(fp);
+  return buf;
+}
+
 // Whether `at` sits in live markup rather than inside an HTML comment.
 static hts_boolean outside_comment(const char *buf, const char *at) {
   const char *open = NULL, *close = NULL, *p;
@@ -4795,17 +4813,38 @@ static void template_contract(const char *name, const char *tmpl,
 }
 
 // hts_finish_makeindex writes the footer, emits the refresh meta only when
-// makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir.
+// makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir,
+// argv[1] the optional templates/ whose on-disk copies get rendered too.
 static int st_makeindex(httrackp *opt, int argc, char **argv) {
   /* the minimal template is the control: it proves an assertion below can only
      fail on the real one because that template lost a slot */
-  static const char *const footers[] = {"%s%s", HTS_INDEX_FOOTER};
+  const char *footers[] = {"%s%s", HTS_INDEX_FOOTER, NULL};
+  size_t nfooters = 2;
+  char *ondisk = NULL;
   char path[HTS_URLMAXSIZE];
   char BIGSTK buf[8192];
   size_t t;
 
   assertf(argc >= 1);
   snprintf(path, sizeof(path), "%s/index.html", argv[0]);
+
+  /* a format ending in a bare % must not read past its NUL; heap-allocated so a
+     sanitizer sees the bound, and the tail is poisoned because the stray NUL
+     that overrun writes would otherwise terminate the string before strcmp */
+  {
+    char *trailing = strdupt("credit %s, then a stray %");
+    const char *const want = "credit X, then a stray %";
+    char out[64];
+    size_t i;
+
+    memset(out, 'Z', sizeof(out));
+    assertf(hts_template_format_str(out, sizeof(out), trailing, "X", NULL) >=
+            0);
+    assertf(strcmp(out, want) == 0);
+    for (i = strlen(want) + 1; i < sizeof(out); i++)
+      assertf(out[i] == 'Z');
+    freet(trailing);
+  }
 
   template_contract("HTS_INDEX_HEADER", HTS_INDEX_HEADER, 1);
   template_contract("HTS_INDEX_BODY", HTS_INDEX_BODY, 2);
@@ -4823,7 +4862,18 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
     assertf(strstr(verbatim, "%%") == NULL);
   }
 
-  for (t = 0; t < sizeof(footers) / sizeof(footers[0]); t++) {
+  /* the shipped copy, so the same scenarios run through the file a real install
+     reads and not only through the fallback macro */
+  if (argc >= 2) {
+    char tmpl[HTS_URLMAXSIZE];
+
+    snprintf(tmpl, sizeof(tmpl), "%s/index-footer.html", argv[1]);
+    ondisk = makeindex_slurp(tmpl);
+    assertf(ondisk != NULL);
+    footers[nfooters++] = ondisk;
+  }
+
+  for (t = 0; t < nfooters; t++) {
     const char *const footer = footers[t];
 
     /* single first link: footer + a refresh meta carrying the escaped URL */
@@ -4865,6 +4915,7 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
     assertf(strstr(buf, "Refresh") == NULL);
   }
 
+  freet(ondisk);
   UNLINK(path);
   printf("makeindex self-test OK\n");
   return 0;

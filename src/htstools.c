@@ -830,6 +830,10 @@ static int hts_template_formatv(hts_template_format_buf *buf,
       if (c == '%') {
         const unsigned char cFormat = format[++i];
         switch(cFormat) {
+        case '\0': /* trailing lone %: step back so the loop stops on the NUL */
+          FPUTC('%');
+          i--;
+          break;
         case '%':
           FPUTC('%');
           break;
