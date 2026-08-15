@@ -564,17 +564,10 @@ class Handler(SimpleHTTPRequestHandler):
     # ... and "robotsblobNNNN", which sizes the Disallow list so the engine's
     # stored rules come to exactly NNNN bytes, /secret/ last (#1286).
     BLOB_ROBOTS_RE = re.compile(r"robotsblob(\d+)")
-    _blob_robots = {}
 
-    @classmethod
-    def robots_blob_body(cls, blobsize):
-        """Disallow list stored as exactly blobsize bytes, /secret/ rule last.
-
-        The engine keeps one "<marker><pattern>\\n" line per rule, so a rule
-        costs len(pattern) + 2.
-        """
-        if blobsize in cls._blob_robots:
-            return cls._blob_robots[blobsize]
+    def robots_blob_body(self, blobsize):
+        # One "<marker><pattern>\n" line per stored rule, so a rule costs
+        # len(pattern) + 2. tests/01_engine-robots.test pins that accounting.
         rules = []
         used = 0
         room = blobsize - (len("/secret/") + 2)
@@ -589,11 +582,9 @@ class Handler(SimpleHTTPRequestHandler):
         if room - used:
             rules.append("/" + "z" * (room - used - 3))
         rules.append("/secret/")
-        body = (
+        return (
             "User-agent: *\n" + "".join("Disallow: %s\n" % r for r in rules)
         ).encode()
-        cls._blob_robots[blobsize] = body
-        return body
 
     def route_robots(self):
         # The Sitemap: record is group-independent; only --sitemap acts on it.

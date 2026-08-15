@@ -5513,8 +5513,13 @@ static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
   return checkrobots(r, host, path);
 }
 
-/* robots.txt whose stored rules come to about `blobsize` bytes, /secret/ last;
-   each "/padNNNNN/" costs 12 stored bytes (pattern plus marker and LF). */
+/* The rule store must reach the RFC 9309 §2.5 floor, whatever the macro says.
+ */
+enum { rb_rfc9309_floor = 1 / (HTS_ROBOTS_MAX_TOKEN_SIZE >= 500 * 1024) };
+
+/* robots.txt filling about `blobsize` stored bytes with "/padNNNNN/" rules
+   (12 each: pattern plus marker and LF), then the two rules a caller asserts
+   on: an Allow re-opening /pad00000/open/, and a final Disallow. */
 static char *rb_bulk(size_t blobsize) {
   const size_t capa = blobsize * 2 + 4096;
   char *const txt = (char *) malloct(capa);
@@ -5523,8 +5528,13 @@ static char *rb_bulk(size_t blobsize) {
 
   assertf(txt != NULL);
   n = (size_t) snprintf(txt, capa, "User-agent: *\n");
-  for (i = 0, blob = 0; blob + 12 <= blobsize; i++, blob += 12)
+  for (i = 0, blob = 0; blob + 12 <= blobsize; i++, blob += 12) {
+    assertf(i < 100000); // past that "/padNNNNNN/" costs 13, not 12
     n += (size_t) snprintf(txt + n, capa - n, "Disallow: /pad%05d/\n", i);
+    assertf(n < capa);
+  }
+  n += (size_t) snprintf(txt + n, capa - n, "Allow: /pad00000/open/\n");
+  assertf(n < capa);
   (void) snprintf(txt + n, capa - n, "Disallow: /secret/\n");
   return txt;
 }
@@ -5597,25 +5607,41 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
   /* No rules: everything is allowed. */
   assertf(rb_decide(&robots, "User-agent: *\nDisallow:\n", "/x") == 0);
 
-  /* #1286: rules are kept to the RFC 9309 floor, where the store used to stop
-     at 4 KB and to discard the whole set when it landed on 4094 bytes. */
+  /* #1286: rules survive to the RFC 9309 floor. Past the old 4 KB store, just
+     under the floor, and past it, where only the tail is left out. */
   {
     char *txt = rb_bulk(8192); /* past the old cap, well under the new one */
 
     assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/pad00000/open/x") == 0); /* Allow wins */
     assertf(rb_decide(&robots, txt, "/secret/x") == -1);
     freet(txt);
 
     txt = rb_bulk(HTS_ROBOTS_MAX_TOKEN_SIZE - 1024); /* just under the cap */
     assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/pad00000/open/x") == 0);
     assertf(rb_decide(&robots, txt, "/secret/x") == -1);
     freet(txt);
 
     /* Past it the tail is lost, which robots_parse reports through the log. */
     txt = rb_bulk(HTS_ROBOTS_MAX_TOKEN_SIZE + 4096);
     assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/pad00000/open/x") == -1);
     assertf(rb_decide(&robots, txt, "/secret/x") == 0);
     freet(txt);
+  }
+
+  /* A rule costs marker + pattern + LF, the accounting tests/309 computes. */
+  {
+    const char *const txt = "User-agent: *\nDisallow: /pad00000/\n";
+    robots_wizard rb;
+
+    memset(&rb, 0, sizeof(rb));
+    robots_parse(NULL, &rb, "h.test", txt, strlen(txt), NULL, 0, HTS_TRUE, NULL,
+                 0);
+    assertf(rb.next != NULL && rb.next->token != NULL);
+    assertf(strlen(rb.next->token) == strlen("/pad00000/") + 2);
+    checkrobots_free(&rb);
   }
 
   /* A rule longer than the line buffer is read as a prefix of itself. Kept for
@@ -5632,6 +5658,19 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: %s\n", path);
     assertf(rb_decide(&robots, txt, path) == -1);
 
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
+             path);
+    assertf(rb_decide(&robots, txt, path) == -1);
+
+    /* The longest line the buffer holds whole is not cut, so this Allow wins;
+       one byte more is cut, and the Disallow it would have beaten stands. */
+    path[HTS_ROBOTS_LINE_SIZE - 2 - strlen("Allow: ")] = '\0';
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
+             path);
+    assertf(rb_decide(&robots, txt, path) == 0);
+
+    path[HTS_ROBOTS_LINE_SIZE - 2 - strlen("Allow: ")] = 'a';
+    path[HTS_ROBOTS_LINE_SIZE - 1 - strlen("Allow: ")] = '\0';
     snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
              path);
     assertf(rb_decide(&robots, txt, path) == -1);

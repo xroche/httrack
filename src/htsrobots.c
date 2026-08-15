@@ -88,7 +88,7 @@ static hts_boolean robots_pattern_match(const char *pattern, const char *path) {
 }
 
 /* fil="": is a rule set already recorded for this host? */
-int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
+int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
   while(robots) {
     if (robots->adr != NULL && strfield2(robots->adr, adr)) {
       if (fil[0]) {
@@ -153,9 +153,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
   int ndropped = 0;
   char BIGSTK line[HTS_ROBOTS_LINE_SIZE];
   char dropped[128]; // first rule we could not honour, for the log
-  String blob;
+  String blob = STRING_EMPTY;
 
-  StringInit(blob);
   dropped[0] = '\0';
   if (info != NULL && infosize > 0)
     info[0] = '\0';
@@ -170,18 +169,22 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
     hts_boolean cut;
 
     bptr += binput(body + bptr, line, sizeof(line) - 2);
-    // binput stops at the limit and resumes mid-line, so a cut value is silent
-    cut = (strlen(line) >= sizeof(line) - 2) ? HTS_TRUE : HTS_FALSE;
+    /* binput consumed body[bptr-1] and resumes mid-record when the buffer runs
+       out, so a record read whole is the one ending on its own newline. */
+    cut = (bptr - 1 < bodysize && body[bptr - 1] != '\n' &&
+           body[bptr - 1] != '\0')
+              ? HTS_TRUE
+              : HTS_FALSE;
     comm = strchr(line, '#'); // strip comment
-    if (comm != NULL)
+    if (comm != NULL) {
       *comm = '\0';
+      cut = HTS_FALSE; // the comment ended the value inside the buffer
+    }
     llen = (int) strlen(line); // strip trailing spaces
     while (llen > 0 && is_realspace(line[llen - 1])) {
       line[llen - 1] = '\0';
       llen--;
     }
-    if (llen < (int) sizeof(line) - 2)
-      cut = HTS_FALSE; // a comment or a space ended the value before the limit
     if (sitemaps != NULL && strfield(line, "sitemap:")) {
       // group-independent record (RFC 9309): collected whatever the group
       char *a = line + 8;
@@ -225,9 +228,8 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
           if (is_disallow && !keep_root_disallow && strcmp(a, "/") == 0) {
             // dropped: site-wide disallow ignored by option
           } else {
-            /* A cut Allow is a shorter prefix, so it would permit more than
-               the site wrote; a cut Disallow can only forbid more, so it stays.
-               Neither is the rule as written. */
+            /* A cut Allow would permit more than the site wrote, so it goes;
+               a cut Disallow can only forbid more, so it stays. */
             const hts_boolean kept =
                 (cut && is_allow)
                     ? HTS_FALSE

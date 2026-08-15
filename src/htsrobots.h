@@ -46,7 +46,7 @@ typedef struct httrackp httrackp;
 #endif
 
 /* Rule blob ceiling. RFC 9309 §2.5 asks crawlers to honour at least the first
-   500 kiB of a robots.txt, and the blob only ever holds part of that file. */
+   500 KiB of a robots.txt, and the blob only ever holds part of that file. */
 #define HTS_ROBOTS_MAX_TOKEN_SIZE (500 * 1024)
 
 /* Longest robots.txt line read; a stored rule is marker + pattern + LF. */
@@ -61,8 +61,9 @@ struct robots_wizard {
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 /* -1 if `fil` disallowed for `adr` (RFC 9309); empty: -1 if rules exist. */
-int checkrobots(robots_wizard * robots, const char *adr, const char *fil);
-/* Release every node's strings and the chain below `robots`, head excepted. */
+int checkrobots(const robots_wizard *robots, const char *adr, const char *fil);
+/* Free every node's strings, plus every node below `robots` but not `robots`.
+ */
 void checkrobots_free(robots_wizard * robots);
 /* Store `data` as the rule blob of `adr`, adding the host if new. -1 on
    success, 0 if the allocation failed. */
