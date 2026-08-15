@@ -9230,7 +9230,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
 
   ck.max_len = (int) sizeof(ck.data);
   ck.data[0] = '\0';
-  assertf(cookie_load(&ck, fpath, "cookies.txt") == 0);
+  assertf(cookie_load(NULL, &ck, fpath, "cookies.txt") == 0);
   assertf(strstr(ck.data, "JARCOOK") != NULL); /* jar read on a long path */
 #ifdef _WIN32
   /* the IE scan merged the cookie and unlinked the consumed file */

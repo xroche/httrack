@@ -535,11 +535,11 @@ int httpmirror(char *url1, httrackp * opt) {
     cookie.max_len = 30000;     // max len
     strcpybuff(cookie.data, "");
     // Load the mirror's cookies.txt, then the one in the current directory
-    cookie_load(opt->cookie, StringBuff(opt->path_log), "cookies.txt");
-    cookie_load(opt->cookie, "", "cookies.txt");
+    cookie_load(opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
+    cookie_load(opt, opt->cookie, "", "cookies.txt");
     // A user-supplied cookie file is merged last so it wins on conflicts
     if (strnotempty(StringBuff(opt->cookies_file)))
-      cookie_load(opt->cookie, "", StringBuff(opt->cookies_file));
+      cookie_load(opt, opt->cookie, "", StringBuff(opt->cookies_file));
   } else
     opt->cookie = NULL;
 
