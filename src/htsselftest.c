@@ -4635,10 +4635,62 @@ static int st_hashkey_bounds(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The pattern answer n owes (adr, fil): a second implementation of the builder,
+   with no bound of its own, to compare it against. */
+static void wizardfilter_want(htsbuff *w, int n, const char *adr,
+                              const char *fil, hts_boolean up) {
+  htsbuff_cpy(w, n <= 2 ? "-" : "+");
+  htsbuff_cat(w, adr);
+  if (n == 2 || n == 6 || (n == 5 && up)) {
+    htsbuff_cat(w, "/*");
+    return;
+  }
+  if (*fil != '/')
+    htsbuff_cat(w, "/");
+  htsbuff_cat(w, fil);
+  if (n == 1 || n == 5)
+    htsbuff_cat(w, "*");
+  else if (n == 7)
+    htsbuff_cat(w, HTS_WIZARD_FILTER_SUFFIX);
+}
+
+/* A link of the given lengths: adr all 'a', fil a directory of 'b' ending on a
+   slash for answers 1, 5 and 7 to anchor on, led by one when `slash`. */
+static void wizardfilter_link(char *adr, size_t adrlen, char *fil,
+                              size_t fillen, hts_boolean slash) {
+  memset(adr, 'a', adrlen);
+  adr[adrlen] = '\0';
+  memset(fil, 'b', fillen);
+  fil[0] = slash ? '/' : 'b';
+  fil[fillen - 1] = '/';
+  fil[fillen] = '\0';
+}
+
+/* Asserts every answer that emits a filter for (adr, fil) emits exactly what
+   wizardfilter_want() owes, and returns the longest pattern seen. */
+static size_t wizardfilter_emits(htsbuff *f, char *expect, const char *adr,
+                                 const char *fil) {
+  static const int answers[] = {0, 1, 2, 5, 6, 7};
+  size_t i, up, longest = 0;
+
+  for (i = 0; i < sizeof(answers) / sizeof(answers[0]); i++) {
+    for (up = 0; up < 2; up++) {
+      const hts_boolean seek = up != 0 ? HTS_TRUE : HTS_FALSE;
+      htsbuff w = htsbuff_ptr(expect, HTS_FILTER_SLOT_SIZE);
+
+      wizardfilter_want(&w, answers[i], adr, fil, seek);
+      hts_wizard_answer_filter(f, 0, answers[i], adr, fil, seek);
+      assertf(strcmp(f->buf, expect) == 0);
+      longest = f->len > longest ? f->len : longest;
+    }
+  }
+  return longest;
+}
+
 /* Prints the filter answer <n> emits for (adr, fil) [up] in [slot]; with no
    arguments, asserts every answer against its expected pattern (#1119). */
 static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
-  char pattern[HTS_URLMAXSIZE * 2];
+  char pattern[HTS_FILTER_SLOT_SIZE];
   htsbuff f = htsbuff_array(pattern);
 
   (void) opt;
@@ -4694,6 +4746,33 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   EMITS(1, "foo.com", "page.html", HTS_FALSE, "");
   EMITS(5, "foo.com", "page.html", HTS_FALSE, "");
   EMITS(7, "foo.com", "page.html", HTS_FALSE, "");
+
+  /* A long link must emit the same pattern a short one does, byte for byte:
+     clipping it would widen the rule (a cut "*[file]" becomes "*"), and the
+     lengths come from the wire. Sweeps the old 2048-byte slot, then the real
+     worst case, both link buffers full. */
+  {
+    const size_t urlmax = HTS_URLMAXSIZE * 2 - 1; /* the engine's adr and fil */
+    char *adr = malloct(urlmax + 1);
+    char *fil = malloct(urlmax + 1);
+    char *expect = malloct(HTS_FILTER_SLOT_SIZE);
+    size_t total;
+
+    for (total = 2040; total <= 2048; total++) {
+      const size_t adrlen = total / 2, fillen = total - 1 - adrlen;
+
+      wizardfilter_link(adr, adrlen, fil, fillen, HTS_TRUE);
+      wizardfilter_emits(&f, expect, adr, fil);
+    }
+    /* the real maximum: both buffers full, and no leading slash on fil to
+       spare the separator. It fills the slot exactly, NUL included */
+    wizardfilter_link(adr, urlmax, fil, urlmax, HTS_FALSE);
+    assertf(wizardfilter_emits(&f, expect, adr, fil) ==
+            HTS_FILTER_SLOT_SIZE - 1);
+    freet(adr);
+    freet(fil);
+    freet(expect);
+  }
 
   /* the answers that add no filter at all */
   EMITS(-1, "foo.com", "/x", HTS_FALSE, "");
