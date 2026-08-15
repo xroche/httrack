@@ -36,8 +36,10 @@ echo "marker: the wedged test started"
 sleep 300
 EOF
 
-# Time the guard to its DUMP announcement, not to the driver's exit: the dump that
-# follows runs for minutes on an emulated host, and that is not what is under test.
+# $fired is the guard's own reading of when its deadline tripped, taken from the
+# progress log: a poll can miss a dump short enough to fall between two of them,
+# which is how #1242 reddened a run whose guard had done its job. The poll only
+# still answers whether the line was visible while the driver ran.
 rc=0
 fired=
 marked=
@@ -53,9 +55,9 @@ run_wedged() { # run_wedged <budget> [VAR=VAL...]
         bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
-        # Read with the shell: a fork per poll would blur the latency being measured.
-        if read -r line <"$tmp/progress" 2>/dev/null && test "$line" = "DUMP 90_wedged.test"; then
-            fired=$((SECONDS - start))
+        # Read with the shell: a fork per poll would slow the loop it drives.
+        if read -r line <"$tmp/progress" 2>/dev/null &&
+            test "${line#DUMP 90_wedged.test }" != "$line"; then
             marked=1
             break
         fi
@@ -63,22 +65,14 @@ run_wedged() { # run_wedged <budget> [VAR=VAL...]
     done
     wait "$pid" || rc=$?
     total=$((SECONDS - start))
-    if test -z "$fired"; then
-        # Missed between two polls: the whole run then bounds the latency from above.
-        fired=$total
-        echo "note: the announcement fell between two polls; ${total}s bounds its latency"
-    fi
+    fired=$(sed -n 's/^DUMP 90_wedged\.test \([0-9][0-9]*\)$/\1/p' "$tmp/progress")
+    # Announced when the dump starts, which runs for minutes: a suite watchdog
+    # reading that log would take the silence for a wedge and kill the step.
+    test -n "$fired" ||
+        fail "the dump went unannounced: $(cat "$tmp/progress" 2>&1)"
 }
 
-# Retried once for a measured latency; a dump short enough to fall between two
-# polls is a race, not a regression (#1242).
 run_wedged 5
-test -n "$marked" || run_wedged 5
-
-# Announced when the dump starts, which runs for minutes: a suite watchdog
-# reading that log would take the silence for a wedge and kill the step.
-grep -qx 'DUMP 90_wedged.test' "$tmp/progress" ||
-    fail "the dump was not announced: $(cat "$tmp/progress" 2>&1)"
 
 test "$rc" -eq 124 || fail "wedged test reported $rc, want 124"
 # Never before the budget, or a slow-but-healthy test would be killed too.
