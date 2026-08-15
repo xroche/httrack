@@ -455,22 +455,20 @@ void help_catchurl(const char *dest_path) {
     printf("Unable to create a temporary proxy (no remaining port)\n");
 }
 
-// "{addr} {path} ..." for the -%F help line, from the engine's own table, so
-// the ten names have one owner (htstools.c) rather than a copy per surface.
-static void footer_field_list(char *dest, size_t size) {
-  size_t i, len = 0;
+// "{addr} {path} ..." for the -%F help line, read from the engine's own table
+// so the ten names keep their single owner in htstools.c.
+static const char *footer_field_list(char *dest, size_t size) {
+  htsbuff fields = htsbuff_ptr(dest, size);
+  hts_footer_field_id id;
 
-  dest[0] = '\0';
-  for (i = 0; i < HTS_FOOTER_FIELD_COUNT; i++) {
-    const int n =
-        snprintf(dest + len, size - len, "%s{%s}", len != 0 ? " " : "",
-                 hts_footer_field_name((hts_footer_field_id) i));
-    if (n < 0 || (size_t) n >= size - len) {
-      dest[len] = '\0'; // drop a half-written name rather than show it
-      break;
-    }
-    len += (size_t) n;
+  for (id = 0; id < HTS_FOOTER_FIELD_COUNT; id++) {
+    if (id != 0)
+      htsbuff_catc(&fields, ' ');
+    htsbuff_catc(&fields, '{');
+    htsbuff_cat(&fields, hts_footer_field_name(id));
+    htsbuff_catc(&fields, '}');
   }
+  return htsbuff_str(&fields);
 }
 
 // mini-aide  (h: help)
@@ -627,11 +625,10 @@ void help(const char *app, int more) {
     ("  F  user-agent field sent in HTTP headers (-F \"user-agent name\")");
   infomsg(" %R  default referer field sent in HTTP headers");
   infomsg(" %E  from email address sent in HTTP headers");
-  footer_field_list(fields, sizeof(fields));
   snprintf(info, sizeof(info),
            " %%F  footer string in Html code (-%%F \"Mirrored from {url} on "
            "{date}\"; fields %s, or legacy %%s)",
-           fields);
+           footer_field_list(fields, sizeof(fields)));
   infomsg(info);
   infomsg(" %l  preferred language (-%l \"fr, en, jp, *\"");
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\"");

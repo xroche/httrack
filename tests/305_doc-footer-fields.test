@@ -1,19 +1,13 @@
 #!/bin/bash
 #
-# The -%F field names have one owner, footer_field_names[] in htstools.c, and
-# --help now prints them from it. man/httrack.1 is generated from --help and
-# 02_manpage-regen guards that; html/cmdguide.html is a hand-written copy, so
-# pin it to the binary's list in both directions.
+# Pin the -%F field lists in html/cmdguide.html and html/guide.html to the one
+# httrack --help prints. man/httrack.1 is generated from --help, and
+# 02_manpage-regen covers it. Slot order is pinned by 01_engine-footerfmt.
 
 set -euo pipefail
 
 srcdir="${abs_top_srcdir:?not run under make check}"
-guide="${srcdir}/html/cmdguide.html"
 
-test -r "${guide}" || {
-    echo "FAIL: no ${guide}" >&2
-    exit 1
-}
 command -v httrack >/dev/null 2>&1 || {
     echo "httrack not in PATH; skipping" >&2
     exit 77
@@ -23,37 +17,68 @@ same_set() { # same_set <list A> <list B>: newline-separated, order-insensitive
     diff <(sort <<<"$1") <(sort <<<"$2") >/dev/null
 }
 
-help_line=$(httrack --quiet --help 2>/dev/null | grep -m1 -- ' %F  footer string' || true)
-test -n "${help_line}" || {
+# A crash after the line is printed must not read as a pass, so take the whole
+# output first and match it from a here-string.
+help=$(httrack --quiet --help 2>/dev/null) || {
+    echo "FAIL: httrack --help exited $?" >&2
+    exit 1
+}
+help_line=$(grep -m1 -- ' %F  footer string' <<<"${help}") || {
     echo "FAIL: --help prints no -%F line" >&2
     exit 1
 }
 
-# " ...; fields {addr} {path} ..., or legacy %s)" -> one {name} per line.
-engine=$(sed -n 's/.*; fields \(.*\), or legacy .*/\1/p' <<<"${help_line}" |
-    tr ' ' '\n' | grep '^{[a-z]*}$' || true)
-doc=$(grep -o '<tt>{[a-z]*}</tt>' "${guide}" | sed 's,</*tt>,,g' | sort -u || true)
+# " ...; fields {addr} {path} ..., or legacy %s)"
+segment=${help_line#*; fields }
+segment=${segment%%, or legacy *}
+test "${segment}" != "${help_line}" || {
+    echo "FAIL: cannot find the field list in: ${help_line}" >&2
+    exit 1
+}
 
-# Controls: neither list may be silently empty, and the comparison must say no.
-grep -qx '{addr}' <<<"${engine}" || {
-    echo "FAIL: no field names parsed out of the -%F help line: ${help_line}" >&2
-    exit 1
-}
-grep -qx '{addr}' <<<"${doc}" || {
-    echo "FAIL: no <tt>{field}</tt> names parsed out of ${guide}" >&2
-    exit 1
-}
+# Deliberate word splitting: one field per line. Every token has to be a
+# {name}, or a name the doc regex cannot see would drop out of both lists and
+# the comparison below would hold on two equally wrong sets.
+# shellcheck disable=SC2086
+engine=$(printf '%s\n' ${segment})
+while read -r tok; do
+    case "${tok}" in
+    "{"?*"}") ;;
+    *)
+        echo "FAIL: '${tok}' in the -%F field list is not a {name}" >&2
+        exit 1
+        ;;
+    esac
+done <<<"${engine}"
+
+# Control: the comparison must be able to say no.
 if same_set "${engine}" "${engine}
 {nosuchfield}"; then
-    echo "FAIL: same_set() ignores an extra name; the check below proves nothing" >&2
+    echo "FAIL: same_set() ignores an extra name; the checks below prove nothing" >&2
     exit 1
 fi
 
-same_set "${engine}" "${doc}" || {
-    echo "FAIL: html/cmdguide.html lists different -%F fields than the engine." >&2
-    echo "Left is --help, right is cmdguide.html:" >&2
-    diff <(sort <<<"${engine}") <(sort <<<"${doc}") >&2 || true
-    exit 1
+check_page() { # check_page <html file> <tag wrapping each {name}>
+    local page="$1" tag="$2" doc
+    test -r "${page}" || {
+        echo "FAIL: no ${page}" >&2
+        return 1
+    }
+    doc=$(grep -o "<${tag}>{[^{}<]*}</${tag}>" "${page}" |
+        sed "s,</*${tag}>,,g" | sort -u || true)
+    grep -qx '{addr}' <<<"${doc}" || {
+        echo "FAIL: no <${tag}>{field}</${tag}> names parsed out of ${page}" >&2
+        return 1
+    }
+    same_set "${engine}" "${doc}" || {
+        echo "FAIL: ${page} lists different -%F fields than the engine." >&2
+        echo "Left is --help, right is the page:" >&2
+        diff <(sort <<<"${engine}") <(sort <<<"${doc}") >&2 || true
+        return 1
+    }
 }
 
-echo "cmdguide.html lists the engine's $(wc -l <<<"${engine}") -%F fields"
+check_page "${srcdir}/html/cmdguide.html" tt
+check_page "${srcdir}/html/guide.html" code
+
+echo "both doc pages list the engine's $(wc -l <<<"${engine}") -%F fields"
