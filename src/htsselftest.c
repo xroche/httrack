@@ -4772,7 +4772,9 @@ static char *makeindex_slurp(const char *path) {
   assertf(size >= 0);
   rewind(fp);
   buf = malloct((size_t) size + 1);
-  buf[fread(buf, 1, (size_t) size, fp)] = '\0';
+  /* a read error would otherwise render a silently truncated template */
+  assertf(fread(buf, 1, (size_t) size, fp) == (size_t) size);
+  buf[size] = '\0';
   fclose(fp);
   return buf;
 }

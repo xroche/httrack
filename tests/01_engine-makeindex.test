@@ -85,7 +85,7 @@ done
 
 # Where a tag sits, with HTML comments stripped so a commented-out one does not
 # count: "</head> <body> <table>" for a well-framed header.
-live_frame() { # live_frame [FILE...]
+live_frame() { # live_frame FILE
     awk '{
             line = $0
             out = ""
@@ -147,7 +147,7 @@ assert_eq "$framed" "$(macro_body HTS_DATA_UNKNOWN_HTML | tag_order)" \
 # A bare & is invalid markup wherever it lands.
 bare_amps() { # bare_amps [FILE...]
     awk '{ line = $0
-            gsub(/&(amp|lt|gt|quot|apos|copy|nbsp|middot|#[0-9]+);/, "", line)
+            gsub(/&([A-Za-z][A-Za-z0-9]*|#[Xx]?[0-9A-Fa-f]+);/, "", line)
             n += gsub(/&/, "&", line) }
         END { print n + 0 }' "$@"
 }
