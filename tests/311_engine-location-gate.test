@@ -37,3 +37,20 @@ kept 2047 2047
 # than a truncated URL, which would be a valid-looking wrong target.
 refused 2048
 refused 3000
+
+# A wider gate only helps if the reader stops handing it cut values. Both
+# header lines below are read at a size that is one byte short, then one byte
+# long; the line after a cut one must be the server's next header, never the
+# tail of the one before.
+line() { # line READSIZE WANT1 WANT2
+    local got
+    got=$(httrack -O /dev/null -#test=headerline "$1")
+    assert_eq "$2" "$(sed -n 1p <<<"$got")" "read size $1, first line"
+    assert_eq "$3" "$(sed -n 2p <<<"$got")" "read size $1, second line"
+}
+
+# "X-First: 0123456789abcdefghij" is 29 bytes, "X-Second: ok" is 12.
+line 30 'cut=0 line=X-First: 0123456789abcdefghij' 'cut=0 line=X-Second: ok'
+line 29 'cut=1 line=X-First: 0123456789abcdefghi' 'cut=0 line=X-Second: ok'
+line 13 'cut=1 line=X-First: 012' 'cut=0 line=X-Second: ok'
+line 12 'cut=1 line=X-First: 01' 'cut=1 line=X-Second: o'

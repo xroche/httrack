@@ -2413,6 +2413,36 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* A header line that does not fit must be reported as cut and skipped whole,
+   so the line after it is the server's next header and not its own tail. */
+static int st_headerline(httrackp *opt, int argc, char **argv) {
+  static const char block[] = "X-First: 0123456789abcdefghij\r\n"
+                              "X-Second: ok\r\n"
+                              "\r\n";
+  char line[64];
+  int max, ptr = 0, i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "headerline: needs a read size\n");
+    return 1;
+  }
+  max = atoi(argv[0]);
+  if (max < 2 || (size_t) max > sizeof(line)) {
+    fprintf(stderr, "headerline: read size out of probe range\n");
+    return 1;
+  }
+  for (i = 0; i < 3; i++) {
+    int adv;
+    const hts_boolean cut =
+        binput_header(block + ptr, block + sizeof(block) - 1, line, max, &adv);
+
+    ptr += adv;
+    printf("cut=%d line=%s\n", cut != HTS_FALSE, line);
+  }
+  return 0;
+}
+
 static int st_location_logged = 0;
 
 static void st_location_log(httrackp *opt, int type, const char *format,
@@ -10377,6 +10407,9 @@ static const struct selftest_entry {
      st_headerlong},
     {"location", "<url-length>", "Location gate matches the buffer it protects",
      st_location},
+    {"headerline", "<read-size>",
+     "a header line that does not fit is reported and skipped whole",
+     st_headerline},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
     {"xfread-limit", "", "in-memory receive buffer size bound",

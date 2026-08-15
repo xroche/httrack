@@ -3931,6 +3931,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                   ) {
                   char rcvd[2048];
                   int ptr = 0;
+                  int adv = 0;
                   int noFreebuff = 0;
 
 #if BDEBUG==1
@@ -3943,10 +3944,16 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // ----------------------------------------
                     // traiter en-tête!
                     // status-line à récupérer
-                    ptr += binput(back[i].r.adr + ptr, rcvd, 2000);
+                    binput_header(back[i].r.adr + ptr,
+                                  back[i].r.adr + back[i].r.size, rcvd, 2000,
+                                  &adv);
+                    ptr += adv;
                     if (strnotempty(rcvd) == 0) {
                       /* Bogus CRLF, OR recycled connection and trailing chunk CRLF */
-                      ptr += binput(back[i].r.adr + ptr, rcvd, 2000);
+                      binput_header(back[i].r.adr + ptr,
+                                    back[i].r.adr + back[i].r.size, rcvd, 2000,
+                                    &adv);
+                      ptr += adv;
                     }
                     // traiter status-line
                     treatfirstline(&back[i].r, rcvd);
@@ -3968,7 +3975,19 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     }
                     // header // ** !attention! HTTP/0.9 non supporté
                     do {
-                      ptr += binput(back[i].r.adr + ptr, rcvd, 2000);
+                      const hts_boolean cut = binput_header(
+                          back[i].r.adr + ptr, back[i].r.adr + back[i].r.size,
+                          rcvd, 2000, &adv);
+
+                      ptr += adv;
+                      if (cut) {
+                        /* not what the server sent: parsing it would follow a
+                           truncated Location, or read its tail as headers */
+                        hts_log_print(opt, LOG_WARNING,
+                                      "Over-long header dropped for %s%s",
+                                      back[i].url_adr, back[i].url_fil);
+                        continue;
+                      }
 #if HDEBUG
                       printf("(buffer)>%s\n", rcvd);
 #endif
