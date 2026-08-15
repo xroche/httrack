@@ -441,22 +441,22 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
   }
 }
 
-hts_boolean hts_scan_token(char **ptr, char *dest, size_t maxlen) {
+hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize) {
   char *a = *ptr;
-  size_t len = 0; /* the token's real length, which may exceed maxlen */
+  size_t len = 0; /* the token's real length, which may exceed the room */
 
-  assertf(maxlen != 0);
+  assertf(destsize != 0);
   while (*a != '\0' && !isspace((unsigned char) *a)) {
-    if (len < maxlen)
+    if (len < destsize - 1)
       dest[len] = *a;
     len++;
     a++;
   }
-  dest[len < maxlen ? len : maxlen] = '\0';
+  dest[len < destsize ? len : destsize - 1] = '\0';
   while (isspace((unsigned char) *a))
     a++;
   *ptr = a;
-  return len <= maxlen ? HTS_TRUE : HTS_FALSE;
+  return len < destsize ? HTS_TRUE : HTS_FALSE;
 }
 
 /* does it look like XML ? (SVG et al.) */
@@ -648,14 +648,20 @@ int httpmirror(char *url1, httrackp * opt) {
   // copier adresse(s) dans liste des adresses
   {
     char *a = url1;
+    const size_t url_len = strlen(url1);
     const LLint list_sz = StringNotEmpty(opt->filelist)
                               ? fsize_utf8(StringBuff(opt->filelist))
                               : 0;
-    /* two bytes reserved per list byte; -1 makes an undoublable size refused */
+    /* a one-byte token is emitted as "http://a\n", so the reserve is five
+       bytes per input byte, not two; -1 refuses a size it would overflow */
     const LLint list_room =
-        list_sz > 0 ? (list_sz <= INT64_MAX / 2 ? list_sz * 2 : -1) : 0;
-    const size_t primary_len =
-        llint_grow_size_t(8192 + strlen(url1) * 2, list_room, 0);
+        list_sz > 0 ? (list_sz <= INT64_MAX / 5 ? list_sz * 5 : -1) : 0;
+    const size_t url_room = url_len <= (((size_t) -2) - 8192) / 5
+                                ? 8192 + url_len * 5
+                                : (size_t) -1;
+    const size_t primary_len = url_room != (size_t) -1
+                                   ? llint_grow_size_t(url_room, list_room, 0)
+                                   : (size_t) -1;
 
     // création de la première page, qui contient les liens de base à scanner
     // c'est plus propre et plus logique que d'entrer à la main les liens dans la pile
@@ -695,12 +701,17 @@ int httpmirror(char *url1, httrackp * opt) {
         }
 
         // recopier prochaine chaine (+ ou -)
-        /* the slot it lands in must also hold the sign, and the implicit form
-           below appends a '*' */
-        if (!hts_scan_token(&a, tempo, sizeof(tempo) - 3)) {
+        /* the slot it lands in must hold the sign too, and the implicit form
+           below gains a trailing '*' */
+        const size_t room = sizeof(tempo) - (plus == 0 && type == 1 ? 2 : 1);
+
+        if (!hts_scan_token(&a, tempo, room)) {
+          /* on the console too: the user who typed it may have no log open */
+          printf("Filter rule longer than %d bytes, ignored: %c%.64s...\n",
+                 (int) (room - 1), type ? '+' : '-', tempo);
           hts_log_print(opt, LOG_WARNING,
                         "Filter rule longer than %d bytes, ignored: %c%.64s...",
-                        (int) (sizeof(tempo) - 3), type ? '+' : '-', tempo);
+                        (int) (room - 1), type ? '+' : '-', tempo);
           continue;
         }
 
@@ -739,7 +750,9 @@ int httpmirror(char *url1, httrackp * opt) {
         char BIGSTK url[HTS_URLMAXSIZE * 2];
 
         // prochaine adresse
-        if (!hts_scan_token(&a, url, sizeof(url) - 1)) {
+        if (!hts_scan_token(&a, url, sizeof(url))) {
+          printf("URL longer than %d bytes, ignored: %.64s...\n",
+                 (int) (sizeof(url) - 1), url);
           hts_log_print(opt, LOG_WARNING,
                         "URL longer than %d bytes, ignored: %.64s...",
                         (int) (sizeof(url) - 1), url);
