@@ -294,8 +294,8 @@ LC_ALL=C awk -v pin="$pin" '
         exit(bad > 0 ? 3 : 0)
     }
 ' "$tmp/counts" || rc=$?
-# A mismatch says so with 3, because awk's own error status is 1 on gawk and 2 on
-# mawk; reading either as a mismatch would hide a broken check.
+# A mismatch says so with 3, because awk's own error status varies by
+# implementation; reading any of them as a mismatch would hide a broken check.
 if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then
     echo "the untranslated-count comparison itself failed"
     exit 1
