@@ -337,6 +337,23 @@ static int resolve_extension(httrackp *opt, const sniff_src *src,
   return 0;
 }
 
+void url_savename_addtail(char *d, size_t dsize, const char *sep,
+                          const char *s) {
+  const size_t slen = strlen(sep) + strlen(s);
+  size_t dlen = strlen(d);
+
+  if (slen + 1 > dsize) /* the tail alone does not fit: leave d alone */
+    return;
+  if (dlen + slen + 1 > dsize) {
+    dlen = dsize - slen - 1;
+    while (dlen > 0 && ((unsigned char) d[dlen] & 0xC0) == 0x80)
+      dlen--; /* never split a UTF-8 character */
+    d[dlen] = '\0';
+  }
+  strlcatbuff(d, sep, dsize);
+  strlcatbuff(d, s, dsize);
+}
+
 // Build the local save name (save) from adr/fil; renames on collision
 // (e.g. INDEX.HTML vs index.html).
 int url_savename(lien_adrfilsave *const afs,
@@ -876,12 +893,12 @@ int url_savename(lien_adrfilsave *const afs,
   if (hts_lastchar(fil) == '/') {
     if (!strfield(adr_complete, "ftp://")
       ) {
-      strcatbuff(fil, DEFAULT_HTML);    // nommer page par défaut!!
+      url_savename_addtail(fil, sizeof(fil), "", DEFAULT_HTML);
     } else {
       if (!opt->proxy.active)
-        strcatbuff(fil, DEFAULT_FTP);   // nommer page par défaut (texte)
-      else
-        strcatbuff(fil, DEFAULT_HTML);  // nommer page par défaut (à priori ici html depuis un proxy http)
+        url_savename_addtail(fil, sizeof(fil), "", DEFAULT_FTP);
+      else // through a proxy, assume html
+        url_savename_addtail(fil, sizeof(fil), "", DEFAULT_HTML);
     }
   }
   // Change the extension? e.g. php3 saved as html, cgi as html or gif/xbm
@@ -909,16 +926,16 @@ int url_savename(lien_adrfilsave *const afs,
       while((a > fil) && (*a != '.') && (*a != '/'))
         a--;
       if (*a == '.' && known_ext)
-        *a = '\0';          // cut
-      strcatbuff(fil, "."); // re-add the dot
+        *a = '\0'; // cut
+      url_savename_addtail(fil, sizeof(fil), ".", ext);
     } else {
       while((a > fil) && (*a != '/'))
         a--;
       if (*a == '/')
         a++;
       *a = '\0';
+      url_savename_addtail(fil, sizeof(fil), "", ext);
     }
-    strcatbuff(fil, ext); // append ext/name
   }
   // Rechercher premier / et dernier .
   {

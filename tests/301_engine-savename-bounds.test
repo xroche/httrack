@@ -9,6 +9,10 @@ set -euo pipefail
 # wrote past the buffer (#1269).
 assert_selftest "savename-addstr self-test OK" savename-addstr
 
+# url_savename_addtail() carries the default name and the extension onto a link
+# that already fills that buffer, where strcatbuff used to abort instead.
+assert_selftest "savename-addtail self-test OK" savename-addtail
+
 httrack_bin=$(httrack_path)
 
 # Emits the save name. -#test=savename poisons the bytes behind save[] and exits
@@ -41,3 +45,19 @@ for fil in '/*/x.html' '/dir/*.html'; do
         test -n "$name" || fail "$fil pad $pad: produced no name"
     done
 done
+
+# A link that fills the working copy of fil[] on its own: appending the default
+# name or the resolved extension to it used to abort (htsname.c, #1251 class).
+for spec in '/*/:2036' '/dir/*:2038' '/*/x:2040'; do
+    fil=${spec%%:*} pad=${spec#*:}
+    name=$(savename "$pad" "$fil")
+    test -n "$name" || fail "$fil pad $pad: produced no name"
+done
+
+# -N is the only caller that selects savename_type -1, and it always sets the
+# template; the knob must refuse the state the engine can never be in.
+out=$("$httrack_bin" -O /dev/null -#test=savename /x.html text/html type=-1 2>&1) &&
+    fail "type=-1 without a template was accepted: $out"
+assert_match "needs a userdef" "$out" "type=-1 guard"
+name=$(savename 900 '/*/x.html' 'userdef=%h%p/%n%q.%t')
+assert_match '[.]html$' "$name" "userdef naming"

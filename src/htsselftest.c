@@ -2856,10 +2856,19 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       cached = a + 7;
     else if (strncmp(a, "filpad=", 7) == 0)
       filpad = atoi(a + 7);
-    else if (strncmp(a, "prior=", 6) != 0) {
+    else if (strncmp(a, "userdef=", 8) == 0) { /* -N, which selects type -1 */
+      StringCopy(opt->savename_userdef, a + 8);
+      opt->savename_type = -1;
+    } else if (strncmp(a, "prior=", 6) != 0) {
       fprintf(stderr, "savename: unknown arg '%s'\n", a);
       return 1;
     }
+  }
+  /* -N is the only thing that selects type -1, and it always sets the template
+     the naming path then walks; without one url_savename reads a NULL. */
+  if (opt->savename_type == -1 && StringLength(opt->savename_userdef) == 0) {
+    fprintf(stderr, "savename: type=-1 needs a userdef= template\n");
+    return 1;
   }
   memset(&probe, 0, sizeof(probe));
   memset(probe.canary, ST_SAVENAME_POISON, sizeof(probe.canary));
@@ -3060,6 +3069,84 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
   }
 
   printf("savename-addstr self-test %s\n", rc == 0 ? "OK" : "FAILED");
+  return rc;
+}
+
+/* url_savename_addtail() carries the default name and the extension onto a link
+   that may already fill the buffer: the tail arrives whole or not at all, and
+   what gives way is the middle (#1269). */
+static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    size_t dsize;
+    const char *seed;
+    const char *sep;
+    const char *add;
+    const char *want;
+  } cases[] = {
+      {16, "/a/", "", "index.html", "/a/index.html"}, /* room to spare */
+      {16, "/aaaaa/", "", "index.html", "/aaaaindex.html"},
+      {8, "/ab/", ".", "gz", "/ab/.gz"},  /* exact fit, no byte given up */
+      {8, "/abc/", ".", "gz", "/abc.gz"}, /* one byte of middle gives way */
+      {8, "abcdefg", "", "xy", "abcdexy"},
+      {8, "abcdefg", ".", "html", "ab.html"}, /* the tail arrives whole */
+      {8, "", ".", "html", ".html"},
+      {6, "abc", ".", "html", ".html"}, /* the middle can give way entirely */
+      {5, "abc", ".", "html", "abc"},   /* tail alone fills dsize: no-op */
+      {0, "abc", "", "x", "abc"},
+      /* the cut lands inside a 3-byte character and backs off it */
+      {8, "a\342\202\254b", ".", "html", "a.html"},
+  };
+
+  char buf[64];
+  size_t k;
+  int rc = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    const size_t seedlen = strlen(cases[k].seed);
+    const size_t guard =
+        cases[k].dsize > seedlen + 1 ? cases[k].dsize : seedlen + 1;
+    char label[64];
+
+    snprintf(label, sizeof(label), "savename-addtail: '%s%s' at dsize %d",
+             cases[k].sep, cases[k].add, (int) cases[k].dsize);
+    memset(buf, ST_SAVENAME_POISON, sizeof(buf));
+    memcpy(buf, cases[k].seed, seedlen + 1);
+    url_savename_addtail(buf, cases[k].dsize, cases[k].sep, cases[k].add);
+    if (strcmp(buf, cases[k].want) != 0) {
+      fprintf(stderr,
+              "savename-addtail: '%s' + '%s%s' (%d) -> '%s' want '%s'\n",
+              cases[k].seed, cases[k].sep, cases[k].add, (int) cases[k].dsize,
+              buf, cases[k].want);
+      rc = 1;
+    }
+    rc |= st_poison_intact(label, buf, guard, sizeof(buf));
+  }
+
+  /* The naming path's own shape: a link filling the whole buffer still gets its
+     extension, and never more bytes than the buffer holds. */
+  {
+    char BIGSTK big[HTS_URLMAXSIZE * 2 + 64];
+    const size_t dsize = HTS_URLMAXSIZE * 2;
+
+    memset(big, ST_SAVENAME_POISON, sizeof(big));
+    memset(big, 'a', dsize - 1);
+    big[dsize - 1] = '\0';
+    url_savename_addtail(big, dsize, ".", "html");
+    if (strlen(big) != dsize - 1 ||
+        strcmp(big + dsize - 1 - strlen(".html"), ".html") != 0) {
+      fprintf(stderr,
+              "savename-addtail: full buffer kept %d byte(s), no .html\n",
+              (int) strlen(big));
+      rc = 1;
+    }
+    rc |= st_poison_intact("savename-addtail: full buffer", big, dsize,
+                           sizeof(big));
+  }
+
+  printf("savename-addtail self-test %s\n", rc == 0 ? "OK" : "FAILED");
   return rc;
 }
 
@@ -10452,6 +10539,9 @@ static const struct selftest_entry {
     {"savename-addstr", "",
      "save-name append clips to the destination size (#1269)",
      st_savename_addstr},
+    {"savename-addtail", "",
+     "default name and extension arrive whole on a full buffer (#1269)",
+     st_savename_addtail},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
     {"escape-control", "[hex:..|string]",
