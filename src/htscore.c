@@ -831,33 +831,37 @@ int httpmirror(char *url1, httrackp * opt) {
         while(filelist_ptr < filelist_sz) {
           const int count =
               binput(filelist_buff + filelist_ptr, line, HTS_URLMAXSIZE);
-          const size_t next = filelist_ptr + (size_t) count;
-          /* Did binput stop on the line's own terminator, or clip mid-URL? The
-             buffer carries our NUL at filelist_sz, so next - 1 is in bounds. */
-          const hts_boolean whole =
-              next - 1 == filelist_sz || filelist_buff[next - 1] == '\n';
+          /* Where binput stopped, past any CR it dropped: a clipped line stops
+             on a URL byte. Our NUL at filelist_sz keeps the walk in bounds. */
+          size_t term = filelist_ptr + (size_t) count - 1;
+          hts_boolean whole;
 
+          while (term < filelist_sz && filelist_buff[term] == '\r') {
+            term++;
+          }
+          whole = term == filelist_sz || filelist_buff[term] == '\n';
           lineno++;
           if (!whole) {
-            /* Advancing by count would feed the tail back as a second URL, and
-               a clipped URL is a different URL, so refuse the line by name. */
-            if (filelist_buff[next - 1] == '\0') {
+            /* Resuming where binput stopped would feed the tail back as a
+               second URL, and a clipped URL is a different URL. */
+            if (filelist_buff[term] == '\0') {
               hts_log_print(opt, LOG_WARNING,
-                            "%s, line %d: URL contains a NUL byte, ignored",
+                            "\"%s\", line %d: URL contains a NUL byte, ignored",
                             StringBuff(opt->filelist), lineno);
             } else {
-              hts_log_print(opt, LOG_WARNING,
-                            "%s, line %d: URL longer than %d bytes, ignored",
-                            StringBuff(opt->filelist), lineno, HTS_URLMAXSIZE);
+              hts_log_print(
+                  opt, LOG_WARNING,
+                  "\"%s\", line %d: URL longer than %d bytes, ignored",
+                  StringBuff(opt->filelist), lineno, HTS_URLMAXSIZE);
             }
             while (filelist_ptr < filelist_sz &&
                    filelist_buff[filelist_ptr] != '\n') {
               filelist_ptr++;
             }
-            filelist_ptr++; /* step over the '\n' */
+            filelist_ptr++;
             continue;
           }
-          filelist_ptr = next;
+          filelist_ptr = term + 1;
           if (count && line[0]) {
             n++;
             if (strstr(line, ":/") == NULL) {
