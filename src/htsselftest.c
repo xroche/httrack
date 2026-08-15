@@ -3009,8 +3009,8 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
       {0, "abc", "xy", "abc"},
   };
 
-  static const size_t bigcaps[] = {64, 255, HTS_URLMAXSIZE,
-                                   HTS_URLMAXSIZE * 2 - 64};
+  /* last entry is the naming path's own destination, sizeof(afs->save) */
+  static const size_t bigcaps[] = {64, 255, HTS_URLMAXSIZE, HTS_URLMAXSIZE * 2};
   char buf[64];
   size_t k;
   int rc = 0;
