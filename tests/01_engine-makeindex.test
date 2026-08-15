@@ -168,8 +168,16 @@ for macro in HTS_INDEX_HEADER HTS_INDEX_BODY HTS_INDEX_FOOTER \
     assert_eq 0 "$(macro_body "$macro" | bare_amps)" "$macro: unescaped &"
 done
 
-# Both copies are CRLF; a text-mode rewrite of one flattens it silently.
-for file in "$templates"/*.html; do
-    assert_eq 0 "$(awk '!/\r$/ { bad++ } END { print bad + 0 }' "$file")" \
-        "${file##*/}: lines not ending in CRLF"
-done
+# The eol pin, not the bytes on disk: git renormalizes on checkin, so it is what
+# stops a text-mode rewrite flattening a copy. Reading the bytes instead would
+# answer for the checkout, and the Windows runner's disagrees with every other
+# one (#1301).
+if command -v git >/dev/null 2>&1 && git -C "$srcroot" rev-parse --git-dir >/dev/null 2>&1; then
+    for file in "$templates"/*.html; do
+        assert_eq crlf \
+            "$(git -C "$srcroot" check-attr eol -- "templates/${file##*/}" | sed 's/.*: //')" \
+            "${file##*/}: eol pin"
+    done
+else
+    echo "note: not a git checkout, the templates' eol pin cannot be read"
+fi
