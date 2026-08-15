@@ -359,7 +359,7 @@ regen:
   "\tdo not share these files/folders if you want these information to remain private"LF
 
 /* Written verbatim, not through hts_template_format: no %s, no doubled %. */
-#define HTS_DATA_UNKNOWN_HTML "<html>"LF\
+#define HTS_DATA_UNKNOWN_HTML \
   "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">"LF\
   ""LF\
   "<head>"LF\

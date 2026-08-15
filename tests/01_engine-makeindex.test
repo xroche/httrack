@@ -35,14 +35,25 @@ macro_body() { # macro_body MACRO
     ' "$indextmpl"
 }
 
-# Occurrences of an ERE, matched against the upper-cased text of FILE... or stdin.
-count() { # count ERE [FILE...]
-    local pat=$1
-    shift
-    awk -v pat="$pat" '
-        { line = toupper($0); n += gsub(pat, "&", line) }
-        END { print n + 0 }
-    ' "$@"
+# %s slots as hts_template_formatv counts them: %% is an escaped percent, so it
+# consumes the s of a following %%s and yields no slot.
+slot_count() { # slot_count [FILE...]
+    awk '{ line = $0; gsub(/%%/, "", line); n += gsub(/%s/, "&", line) }
+        END { print n + 0 }' "$@"
+}
+
+# The html/head/body tags in the order they are emitted, one line, tags upper-cased.
+tag_order() { # tag_order [FILE...]
+    awk '{
+            line = toupper($0)
+            while (match(line, /<\/?(HTML|HEAD|BODY)[ >]/)) {
+                tag = substr(line, RSTART, RLENGTH)
+                sub(/[ >]$/, ">", tag)
+                out = out (out == "" ? "" : " ") tag
+                line = substr(line, RSTART + RLENGTH)
+            }
+        }
+        END { print out }' "$@"
 }
 
 # A slot only one copy has is an argument silently dropped from the index.
@@ -56,26 +67,29 @@ for pair in \
     "topindex-footer.html HTS_TOPINDEX_FOOTER"; do
     file=${pair%% *}
     macro=${pair##* }
-    assert_eq "$(count '%S' "$templates/$file")" \
-        "$(macro_body "$macro" | count '%S')" "$file vs $macro: %s slots"
+    assert_eq "$(slot_count "$templates/$file")" \
+        "$(macro_body "$macro" | slot_count)" "$file vs $macro: %s slots"
 done
 
-# Header and footer together frame one document, so each tag appears once: the
-# stale duplicate head block and the missing <body> were both a count of 2 or 0.
+# Header and footer together frame one document. Counting the tags cannot see a
+# <body> opened in the wrong place, which is how the stale head block hid.
+framed="<HTML> <HEAD> </HEAD> <BODY> </BODY> </HTML>"
 for pair in \
     "index HTS_INDEX_HEADER HTS_INDEX_FOOTER" \
     "topindex HTS_TOPINDEX_HEADER HTS_TOPINDEX_FOOTER"; do
     read -r name header footer <<<"$pair"
-    for tag in '<HEAD>' '</HEAD>' '<BODY>' '</BODY>'; do
-        assert_eq 1 \
-            "$(count "$tag" "$templates/$name-header.html" "$templates/$name-footer.html")" \
-            "templates/$name: $tag"
-        assert_eq 1 "$({
-            macro_body "$header"
-            macro_body "$footer"
-        } | count "$tag")" "$header + $footer: $tag"
-    done
+    assert_eq "$framed" \
+        "$(tag_order "$templates/$name-header.html" "$templates/$name-footer.html")" \
+        "templates/$name-{header,footer}: tag order"
+    assert_eq "$framed" "$({
+        macro_body "$header"
+        macro_body "$footer"
+    } | tag_order)" "$header + $footer: tag order"
 done
+
+# Same frame for the page written when a link was never fetched.
+assert_eq "$framed" "$(macro_body HTS_DATA_UNKNOWN_HTML | tag_order)" \
+    "HTS_DATA_UNKNOWN_HTML: tag order"
 
 # Both copies are CRLF; a text-mode rewrite of one flattens it silently.
 for file in "$templates"/*.html; do

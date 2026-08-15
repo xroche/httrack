@@ -4741,7 +4741,6 @@ static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-// Run hts_finish_makeindex once and read back what it wrote.
 static void makeindex_run(httrackp *opt, const char *path, const char *tmpl,
                           int links, const char *firstlink, char *buf,
                           size_t size) {
@@ -4760,8 +4759,19 @@ static void makeindex_run(httrackp *opt, const char *path, const char *tmpl,
   buf[n] = '\0';
 }
 
-// %-contract of a built-in template: the slots its caller fills, and no other
-// escape than %% (the drift that left width="100%%%" in the top index).
+// Whether `at` sits in live markup rather than inside an HTML comment.
+static hts_boolean outside_comment(const char *buf, const char *at) {
+  const char *open = NULL, *close = NULL, *p;
+
+  for (p = buf; (p = strstr(p, "<!--")) != NULL && p < at; p += 4)
+    open = p;
+  for (p = buf; (p = strstr(p, "-->")) != NULL && p < at; p += 3)
+    close = p;
+  return open == NULL || (close != NULL && close > open) ? HTS_TRUE : HTS_FALSE;
+}
+
+// %-contract of a built-in template: the slots its caller fills, and no escape
+// besides %%.
 static void template_contract(const char *name, const char *tmpl,
                               size_t slots) {
   size_t i, n;
@@ -4819,9 +4829,18 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
     /* single first link: footer + a refresh meta carrying the escaped URL */
     makeindex_run(opt, path, footer, 1, "http://example.com/a b", buf,
                   sizeof(buf));
-    assertf(strstr(buf, "Mirror and index made by HTTrack") != NULL);
-    assertf(strstr(buf, "Refresh") != NULL);
-    assertf(strstr(buf, "example.com") != NULL);
+    {
+      const char *const credit = strstr(buf, "<!-- Mirror and index made by");
+      const char *const meta = strstr(buf, "<meta HTTP-EQUIV=\"Refresh\"");
+
+      assertf(credit != NULL);
+      assertf(meta != NULL);
+      assertf(strstr(meta, "example.com") != NULL);
+      /* the slots are positional: credit first, and a redirect the browser
+         never sees is no redirect */
+      assertf(credit < meta);
+      assertf(outside_comment(buf, meta));
+    }
 
     /* a first link whose escaped form overruns the old flat 1024-byte tempo:
        the redirect must carry the whole URL, not a clipped prefix */
@@ -5016,8 +5035,11 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   buf[n] = '\0';
   assertf(strstr(buf, projUTF8) != NULL);
   assertf(strstr(buf, catUTF8) != NULL);
-  /* binpath is "", so this used the compiled-in templates: they must be the
-     top-index ones ("???" is the formatter running out of arguments) */
+  /* the marker proves binpath "" found no templates/ to read, so the rest of
+     this checks the compiled-in copies and not a stray on-disk set */
+  assertf(strstr(buf, "Template file not found") != NULL);
+  /* they must be the top-index copies ("???" is the formatter running out of
+     arguments) */
   assertf(strstr(buf, "locally available projects") != NULL);
   assertf(strstr(buf, "/index.html\">") != NULL);
   assertf(strstr(buf, "???") == NULL);
