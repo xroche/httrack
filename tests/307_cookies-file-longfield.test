@@ -92,7 +92,7 @@ refusals=(
     "name field is 1024 bytes (maximum 1023)"
 )
 for want in "${refusals[@]}"; do
-    grep -qF "cookie file $jar: ignoring a line whose $want" <<<"$log" ||
+    grep -qF "Cookies: ignoring a line whose $want: $jar" <<<"$log" ||
         fail "no refusal for the $want in $out/hts-log.txt"
 done
 n=$(grep -c 'ignoring a line whose' <<<"$log" || true)
@@ -101,9 +101,9 @@ assert_eq "${#refusals[@]}" "$n" "refused jar lines"
 # a 7900-byte value fits its destination, so it is the jar's cap that drops it
 ! grep -q 'value field is' <<<"$log" ||
     fail "a value the widest destination holds was refused: $out/hts-log.txt"
-for want in "the jar did not store the cookie 'JARCAP" \
-    "the jar did not store the cookie 'BIGVAL7900'" \
+for want in "the jar did not store 'JARCAP" \
+    "the jar did not store 'BIGVAL7900'" \
     "ignoring an over-long line (8049 bytes, maximum 7999)"; do
-    grep -qF "cookie file $jar: $want" <<<"$log" ||
+    grep -qF "Cookies: $want" <<<"$log" ||
         fail "no report of [$want] in $out/hts-log.txt"
 done

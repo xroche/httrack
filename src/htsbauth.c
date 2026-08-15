@@ -213,9 +213,9 @@ static hts_boolean cookie_load_field(httrackp *opt, char *dst, size_t dst_size,
 
   if (len >= dst_size) {
     hts_log_print(opt, LOG_WARNING,
-                  "cookie file %s: ignoring a line whose %s field is %d bytes "
-                  "(maximum %d)",
-                  file, field_name, (int) len, (int) dst_size - 1);
+                  "Cookies: ignoring a line whose %s field is %d bytes "
+                  "(maximum %d): %s",
+                  field_name, (int) len, (int) dst_size - 1, file);
     return HTS_FALSE;
   }
   strlcpybuff(dst, value, dst_size);
@@ -336,17 +336,16 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                 if (cookie_add(cookie, cook_name, cook_value, domain, path) !=
                     0) {
                   hts_log_print(opt, LOG_WARNING,
-                                "cookie file %s: the jar did not store the "
-                                "cookie '%.64s'",
-                                file, cook_name);
+                                "Cookies: the jar did not store '%.64s': %s",
+                                cook_name, file);
                 }
               }
             }
           } else {
             hts_log_print(opt, LOG_WARNING,
-                          "cookie file %s: ignoring an over-long line "
-                          "(%d bytes, maximum %d)",
-                          file, (int) strlen(line), (int) line_max - 1);
+                          "Cookies: ignoring an over-long line "
+                          "(%d bytes, maximum %d): %s",
+                          (int) strlen(line), (int) line_max - 1, file);
           }
         }
       }
