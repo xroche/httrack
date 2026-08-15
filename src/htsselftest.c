@@ -5397,6 +5397,57 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
 
 #undef POISON
 
+/* #1271: copy_token() bounds the mirror parser's token copies. Prints the two
+ * caps the parser applies, so a test does not hand-copy them. */
+static int st_copytoken(httrackp *opt, int argc, char **argv) {
+  /* GUARD is non-zero and never written, so an off-by-one terminator shows up
+     where a zeroed canary could not */
+#define GUARD 'G'
+#define CAP 8
+
+  struct {
+    char dest[CAP];
+    char guard[4];
+  } buf;
+
+  char input[64];
+  char *cursor;
+  size_t len, g;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+/* copy one token out of `text`, over a poisoned destination */
+#define TAKE(label, text)                                                      \
+  do {                                                                         \
+    memset(&buf, GUARD, sizeof(buf));                                          \
+    strcpybuff(input, (text));                                                 \
+    cursor = input;                                                            \
+    len = copy_token(&cursor, buf.dest, sizeof(buf.dest));                     \
+    for (g = 0; g < sizeof(buf.guard); g++)                                    \
+      assertf(buf.guard[g] == GUARD);                                          \
+    printf("%s: len=%d dest=[%s] rest=[%s]\n", (label), (int) len, buf.dest,   \
+           cursor);                                                            \
+  } while (0)
+
+  TAKE("empty", "");
+  TAKE("blank", "  ");
+  TAKE("one", "a b");
+  TAKE("fits", "abcdefg x");      /* CAP - 1, the longest that fits */
+  TAKE("one past", "abcdefgh x"); /* the last byte is lost, so it is dropped */
+  TAKE("far past", "abcdefghijkl x");
+  TAKE("mixed space", "a \t\r\n b");
+#undef TAKE
+
+  /* what the parser lets through, for the crawl test that drives it */
+  printf("filter cap=%d url cap=%d\n", (int) HTS_FILTER_MAXLEN - 1,
+         (int) (HTS_URLMAXSIZE * 2) - 1);
+  printf("copytoken self-test OK\n");
+  return 0;
+#undef CAP
+#undef GUARD
+}
+
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
 static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
@@ -10992,6 +11043,8 @@ static const struct selftest_entry {
      st_filterbounds},
     {"filtercap", "", "an over-long filter rule is refused, not stored dead",
      st_filtercap},
+    {"copytoken", "", "bounded token copy behind the mirror parser (#1271)",
+     st_copytoken},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",

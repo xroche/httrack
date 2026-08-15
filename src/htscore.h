@@ -416,6 +416,12 @@ int fspc(httrackp * opt, FILE * fp, const char *type);
 
 char *next_token(char *p, int flag);
 
+/* Copies the whitespace-delimited token at *cursor into dest (size bytes, NUL
+   included) and leaves *cursor on the next one. Returns the token's full
+   length, past `size` when it did not fit: the caller drops such a token, since
+   a clipped URL or filter means something else. */
+size_t copy_token(char **cursor, char *dest, size_t size);
+
 /* Like fil_normalized(), but first drops query keys in STRIP (comma-separated,
    "*" = all); STRIP NULL/empty behaves exactly like fil_normalized(). */
 char *fil_normalized_filtered(const char *source, char *dest,

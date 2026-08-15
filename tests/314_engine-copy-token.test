@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# #1271: copy_token() is the bound behind the mirror parser's token copies. It
+# reports the token's FULL length, so a caller can drop one that did not fit;
+# reporting the clipped length instead would read as a token that fit.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+out=$(httrack -O /dev/null -#test=copytoken)
+
+has() { grep -q "^$1\$" <<<"$out" || fail "$1: $out"; }
+
+has 'empty: len=0 dest=\[\] rest=\[\]'
+has 'blank: len=0 dest=\[\] rest=\[\]'
+# the cursor lands on the next token, whatever the run of space between them
+has 'one: len=1 dest=\[a\] rest=\[b\]'
+has 'mixed space: len=1 dest=\[a\] rest=\[b\]'
+# 7 bytes is the last that fits an 8-byte destination
+has 'fits: len=7 dest=\[abcdefg\] rest=\[x\]'
+# past it the copy clips, and only the returned length still says so
+has 'one past: len=8 dest=\[abcdefg\] rest=\[x\]'
+has 'far past: len=12 dest=\[abcdefg\] rest=\[x\]'
+has 'copytoken self-test OK'

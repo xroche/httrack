@@ -449,15 +449,11 @@ static int look_like_xml(const char *s) {
     ;
 }
 
-/* Copies the next whitespace-delimited token of *ptr into dest (capacity size)
-   and leaves *ptr on the one after it. Returns the token's full length, so a
-   caller drops one that did not fit instead of acting on a clip: a clipped URL
-   or filter is a different one. */
-static size_t copy_token(char **ptr, char *dest, size_t size) {
-  char *a = *ptr;
+size_t copy_token(char **cursor, char *dest, size_t size) {
+  char *a = *cursor;
   size_t len = 0;
 
-  assertf(size != 0);
+  assertf(cursor != NULL && dest != NULL && size != 0);
   while (*a != 0 && !isspace((unsigned char) *a)) {
     if (len < size - 1)
       dest[len] = *a;
@@ -467,7 +463,7 @@ static size_t copy_token(char **ptr, char *dest, size_t size) {
   dest[len < size ? len : size - 1] = '\0';
   while (isspace((unsigned char) *a))
     a++;
-  *ptr = a;
+  *cursor = a;
   return len;
 }
 
@@ -681,7 +677,7 @@ int httpmirror(char *url1, httrackp * opt) {
         joker = 1;
 
       if (joker) { // joker ou filters
-        /* room for the longest rule the array takes, plus the implicit "*" */
+        /* the longest rule a slot holds, plus the "*" a bare pattern gets */
         char BIGSTK tempo[HTS_FILTER_MAXLEN + 2];
         size_t len;
         int type;
@@ -701,11 +697,14 @@ int httpmirror(char *url1, httrackp * opt) {
 
         // recopier prochaine chaine (+ ou -)
         len = copy_token(&a, tempo, sizeof(tempo));
-        if (len > HTS_FILTER_MAXLEN) {
+        /* the rule is the sign and the token, and filters_insert takes it
+           whole, so bound the token one byte short of the slot's own cap */
+        if (len > HTS_FILTER_MAXLEN - 1) {
           hts_log_print(opt, LOG_WARNING,
                         "Filter rule dropped: %d bytes is past the %d-byte "
-                        "limit, so it could never match",
-                        (int) len, (int) HTS_FILTER_MAXLEN);
+                        "limit, so it could never match: %c%s",
+                        (int) (len + 1), (int) HTS_FILTER_MAXLEN,
+                        type ? '+' : '-', tempo);
           continue;
         }
 
@@ -746,12 +745,14 @@ int httpmirror(char *url1, httrackp * opt) {
 
       } else { // adresse normale
         char BIGSTK url[HTS_URLMAXSIZE * 2];
+        size_t len;
 
         // prochaine adresse
-        if (copy_token(&a, url, sizeof(url)) >= sizeof(url)) {
+        len = copy_token(&a, url, sizeof(url));
+        if (len > sizeof(url) - 1) {
           hts_log_print(opt, LOG_WARNING,
-                        "URL dropped: longer than the %d-byte limit",
-                        (int) (sizeof(url) - 1));
+                        "URL dropped: %d bytes is past the %d-byte limit: %s",
+                        (int) len, (int) (sizeof(url) - 1), url);
           continue;
         }
 

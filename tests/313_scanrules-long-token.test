@@ -1,61 +1,77 @@
 #!/bin/bash
 #
-# #1271: -%S reads a rules file straight into the command-line string with no
-# per-token cap, so the parser's own copy loops are the only bound there is.
-# Offline: --why decides without crawling, so no server.
+# #1271: -%S loads a rules file into the command line with no per-token limit,
+# so the parse loop's own bound is the only one. Offline: file:// and --why.
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "$(dirname "$0")/testlib.sh"
 
-maxlen=2048 # HTS_FILTER_MAXLEN, the longest rule a slot holds
-urlmax=2047 # HTS_URLMAXSIZE * 2 - 1, the longest URL token the loop copies
+# The caps the parser applies, straight from the engine rather than copied.
+caps=$(httrack -O /dev/null -#test=copytoken |
+    sed -n 's/^filter cap=\([0-9]*\) url cap=\([0-9]*\)$/\1 \2/p')
+read -r maxtoken maxurl <<<"$caps"
+test -n "${maxurl:-}" || fail "no caps in the copytoken self-test: $caps"
+maxrule=$((maxtoken + 1)) # the token plus its + or - sign
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_longtok.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
-pad() { printf "%$1s" '' | tr ' ' a; }
-
 out="$tmp/out"
-log="$out/hts-log.txt" # why() runs in a subshell, so nothing it sets survives
+log="$out/hts-log.txt" # the run helpers are subshells, so nothing they set lives
 
-why() { # why FILE -> the --why verdict, leaving its run behind in $log
+pad() { printf "%$1s" '' | tr ' ' a; }
+logged() { grep -aq "$1" "$log"; }
+fresh() {
     rm -rf "$out"
     mkdir -p "$out"
-    httrack -O "$out" -q "-%S" "$1" --why http://www.example.com/x.zip \
+}
+
+# -*.zip goes second, so the ordinal in the verdict says whether the long rule
+# took a slot: dropping it moves -*.zip from #2 to #1.
+why() { # why TOKENLEN -> the --why verdict on a rule of that token length
+    fresh
+    printf -- '-%s\n-*.zip\n' "$(pad "$1")" >"$tmp/rules.txt"
+    httrack -O "$out" -q "-%S" "$tmp/rules.txt" --why http://www.example.com/x.zip \
         http://www.example.com/ 2>&1 |
         grep -aoE 'rejected by rule #[0-9]+ \([^)]*\)|no filter rule'
 }
 
-logged() { grep -aq "$1" "$log"; }
+kept="rejected by rule #2 (-*.zip)"
+dropped="rejected by rule #1 (-*.zip)"
 
-# -*.zip goes second, so the ordinal in the verdict says whether the long rule
-# took a slot: dropping it moves -*.zip from #2 to #1.
-rules() { # rules LEN -- a rule of LEN bytes, sign included
-    printf -- '-*%s\n-*.zip\n' "$(pad $(($1 - 2)))" >"$tmp/rules.txt"
-    why "$tmp/rules.txt"
-}
-
-assert_eq "rejected by rule #2 (-*.zip)" "$(rules $maxlen)" "rule at the cap"
+assert_eq "$kept" "$(why "$maxtoken")" "rule at the cap"
 ! logged "Filter rule dropped" || fail "the rule at the cap was dropped"
-assert_eq "rejected by rule #1 (-*.zip)" "$(rules $((maxlen + 1)))" "one past"
+assert_eq "$dropped" "$(why "$((maxtoken + 1))")" "rule one past the cap"
+# The count names the whole rule, as filters_insert's own refusal does, so the
+# two doors cannot report the same rule as two different sizes.
+logged "dropped: $((maxrule + 1)) bytes is past the $maxrule-byte limit" ||
+    fail "wrong size in the warning: $(grep -a dropped "$log")"
 # 3000 bytes at a 2050-byte buffer: the write ASan caught pre-fix.
-assert_eq "rejected by rule #1 (-*.zip)" "$(rules 3000)" "far past the cap"
-logged "Filter rule dropped" || fail "no drop warning in $log"
+assert_eq "$dropped" "$(why 3000)" "rule far past the cap"
+logged "dropped: 3001 bytes" || fail "wrong size in the warning"
 
-# The URL branch copies into a buffer of its own, one byte narrower.
-urls() { # urls LEN -- a primary URL of LEN bytes
-    local u=http://www.example.com/
+# A URL is dropped by its own branch, one byte short of the filter's cap. Only
+# a crawl shows it: the engine rejects a kept one downstream ("too long"), so
+# that warning is present exactly when the parse loop let it through.
+echo '<html><body>ok</body></html>' >"$tmp/ok.html"
+crawl() { # crawl URLLEN -> mirrors a primary URL of that length, plus a real one
+    local url="file://$tmp/"
 
-    printf '%s%s\n-*.zip\n' "$u" "$(pad $(($1 - ${#u})))" >"$tmp/urls.txt"
-    why "$tmp/urls.txt"
+    fresh
+    printf '%s%s\n' "$url" "$(pad $(($1 - ${#url})))" >"$tmp/urls.txt"
+    httrack -O "$out" -q "-%S" "$tmp/urls.txt" "file://$tmp/ok.html" >/dev/null 2>&1
 }
 
-assert_eq "rejected by rule #1 (-*.zip)" "$(urls $urlmax)" "URL at the cap"
+crawl "$maxurl"
+logged "too long" || fail "the URL at the cap never reached the crawler"
 ! logged "URL dropped" || fail "the URL at the cap was dropped"
-assert_eq "rejected by rule #1 (-*.zip)" "$(urls $((urlmax + 1)))" "URL one past"
-logged "URL dropped" || fail "no drop warning in $log"
-assert_eq "rejected by rule #1 (-*.zip)" "$(urls 3000)" "URL far past the cap"
+crawl "$((maxurl + 1))"
+logged "URL dropped: $((maxurl + 1)) bytes is past the $maxurl-byte limit" ||
+    fail "no drop warning in $log"
+! logged "too long" || fail "an over-long URL still reached the crawler"
+crawl 3000
+! logged "too long" || fail "a far over-long URL still reached the crawler"
 
 exit 0
