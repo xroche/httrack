@@ -203,9 +203,8 @@ char *cookie_nextfield(char *a) {
   return a;
 }
 
-/* Copy Netscape-jar field <param> of <line> into dst (capacity dst_size), or
-   refuse the line and say so. Clipping is not an option here: a shortened
-   domain or path silently changes the hosts and paths the cookie is sent to. */
+/* Copy Netscape-jar field <param> into dst, or refuse the line and say so: a
+   shortened domain or path would silently change where the cookie is sent. */
 static hts_boolean cookie_load_field(httrackp *opt, char *dst, size_t dst_size,
                                      char *buffer, const char *line, int param,
                                      const char *field_name, const char *file) {
@@ -304,17 +303,18 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
 
   // then cookies.txt
   {
-    // aliases catbuff, which nothing below rewrites
+    // file points into catbuff; nothing below writes catbuff again
     const char *const file = fconcat(catbuff, sizeof(catbuff), fpath, name);
     FILE *fp = FOPEN(file, "rb");
 
     if (fp) {
       char BIGSTK line[8192];
+      const size_t line_max = 8000;
 
       while((!feof(fp)) && (((int) strlen(cookie->data)) < cookie->max_len)) {
         rawlinput(fp, line, 8100);
         if (strnotempty(line)) {
-          if (strlen(line) < 8000) {
+          if (strlen(line) < line_max) {
             if (line[0] != '#') {
               char domain[256];             // cookie domain (.netscape.com)
               char path[256];               // path (/)
@@ -332,14 +332,21 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
                                     line, 5, "name", file) &&
                   cookie_load_field(opt, cook_value, sizeof(cook_value), buffer,
                                     line, 6, "value", file)) {
-                cookie_add(cookie, cook_name, cook_value, domain, path);
+                // the jar caps a field tighter still, and a full one refuses
+                if (cookie_add(cookie, cook_name, cook_value, domain, path) !=
+                    0) {
+                  hts_log_print(opt, LOG_WARNING,
+                                "cookie file %s: the jar did not store the "
+                                "cookie '%.64s'",
+                                file, cook_name);
+                }
               }
             }
           } else {
             hts_log_print(opt, LOG_WARNING,
                           "cookie file %s: ignoring an over-long line "
-                          "(%d bytes)",
-                          file, (int) strlen(line));
+                          "(%d bytes, maximum %d)",
+                          file, (int) strlen(line), (int) line_max - 1);
           }
         }
       }

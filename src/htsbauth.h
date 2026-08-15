@@ -81,8 +81,8 @@ int cookie_del(t_cookie *cookie, const char *cook_name, const char *domain,
 
 /** Load the Netscape jar <path>/<name> into cookie (plus the copied IE jars in
     <path> on Windows). A line whose field does not fit is refused, not clipped,
-    and reported through opt (which may be NULL: only the log callback runs).
-    Returns 0 if the jar was opened, -1 otherwise. */
+    and reported through opt, which may be NULL. Returns 0 if the jar was
+    opened, -1 otherwise. */
 int cookie_load(httrackp *opt, t_cookie *cookie, const char *path,
                 const char *name);
 
