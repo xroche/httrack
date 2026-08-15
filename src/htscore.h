@@ -385,6 +385,10 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
                           FILE **fp, const char *ht_buff, size_t ht_len,
                           const char *adr, const char *fil, const char *save);
 
+/* Per-slot capacity of the filters array; filters_init() strides the slots by
+   it. */
+#define HTS_FILTER_SLOT_SIZE (HTS_URLMAXSIZE * 2)
+
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 
 /* Binds this crawl's filter array to `opt`, and empties the wizard block with
@@ -396,10 +400,9 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
   (HTS_FILTER_SLOT_SIZE - 1 < STRJOKER_MAXLEN ? HTS_FILTER_SLOT_SIZE - 1       \
                                               : STRJOKER_MAXLEN)
 
-/* Stores `pattern` at `pos` in this crawl's filter array, shifting the rules
-   from there up a slot; the caller has ensured there is room. The single door
-   into the array: a rule past HTS_FILTER_MAXLEN is refused with a warning and
-   HTS_FALSE, never stored as one that could not fire (#1270). */
+/* Stores `pattern` at `pos`, shifting the rules from there up a slot; the
+   caller has ensured there is room. The one door into the array: a rule past
+   HTS_FILTER_MAXLEN warns and returns HTS_FALSE, never stored dead (#1270). */
 hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
 
 int fspc(httrackp * opt, FILE * fp, const char *type);

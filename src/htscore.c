@@ -2436,6 +2436,13 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
   opt->wizard_filters = 0;
 }
 
+/* A rule the array takes is one strjoker() reads and one a slot holds, whatever
+   the two caps become; a hardcoded limit would silently stop being either. */
+enum {
+  hts_filter_maxlen_matches = 1 / (HTS_FILTER_MAXLEN <= STRJOKER_MAXLEN),
+  hts_filter_maxlen_fits = 1 / (HTS_FILTER_MAXLEN < HTS_FILTER_SLOT_SIZE)
+};
+
 hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern) {
   char **const filters = *opt->filters.filters;
   const size_t len = strlen(pattern);
@@ -2444,8 +2451,8 @@ hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern) {
   assertf(pos >= 0 && pos <= *opt->filters.filptr);
   if (len > HTS_FILTER_MAXLEN) {
     hts_log_print(opt, LOG_WARNING,
-                  "Filter rule dropped: %d bytes, past the %d the matcher "
-                  "reads, so it could never match: %s",
+                  "Filter rule dropped: %d bytes is past the %d-byte limit, so "
+                  "it could never match: %s",
                   (int) len, (int) HTS_FILTER_MAXLEN, pattern);
     return HTS_FALSE;
   }
@@ -2469,16 +2476,13 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
   }
   if (filters) {
     if (filters[0] == NULL) {
-      filters[0] =
-        (char *) malloct(sizeof(char) * (filter_max + 2) *
-                         (HTS_URLMAXSIZE * 2));
+      filters[0] = (char *) malloct(sizeof(char) * (filter_max + 2) *
+                                    HTS_FILTER_SLOT_SIZE);
       memset(filters[0], 0,
-             sizeof(char) * (filter_max + 2) * (HTS_URLMAXSIZE * 2));
+             sizeof(char) * (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
     } else {
-      filters[0] =
-        (char *) realloct(filters[0],
-                          sizeof(char) * (filter_max +
-                                          2) * (HTS_URLMAXSIZE * 2));
+      filters[0] = (char *) realloct(
+          filters[0], sizeof(char) * (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
     }
     if (filters[0] == NULL) {
       freet(filters);
@@ -2494,7 +2498,7 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
     else
       from = filter_max - filterinc;
     for(i = 0; i <= filter_max; i++) {  // PLUS UN (sécurité)
-      filters[i] = filters[0] + i * (HTS_URLMAXSIZE * 2);
+      filters[i] = filters[0] + i * HTS_FILTER_SLOT_SIZE;
     }
     for(i = from; i <= filter_max; i++) {       // PLUS UN (sécurité)
       filters[i][0] = '\0';     // clear

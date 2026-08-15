@@ -57,10 +57,6 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
                                hts_boolean filters_decided,
                                hts_boolean filters_refused);
 
-/* Per-slot capacity of the filters array, matching the slot stride allocated by
-   filters_init() in htscore.c (HTS_URLMAXSIZE * 2). */
-#define HTS_FILTER_SLOT_SIZE (HTS_URLMAXSIZE * 2)
-
 /* Most filters one wizard answer can add. Slots must stay contiguous: the
    caller stops at the first empty one. */
 #define HTS_WIZARD_MAX_FILTERS 2

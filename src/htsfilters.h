@@ -39,10 +39,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsbase.h"
 
-/* Longest pattern or subject strjoker() looks at; past it a hostile pattern
-   recurses O(len) deep or runs O(n^2*stars). Real filters and URLs fit, and a
-   longer pattern can never match, so whatever builds one has to refuse it
-   rather than store a rule that silently never fires (#1270). */
+/* Longest pattern or subject strjoker() reads; past it a hostile pattern
+   recurses O(len) deep or runs O(n^2*stars). Real filters and URLs fit, so a
+   longer rule could only be stored dead (#1270). */
 #define STRJOKER_MAXLEN (HTS_URLMAXSIZE * 2)
 
 int fa_strjoker(int type, char **filters, int nfil, const char *nom, LLint * size,

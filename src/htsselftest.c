@@ -4642,7 +4642,7 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
 
   /* the correction case: "ignore this link", then "mirror the whole host" */
   RESET();
-  INSERT(0, "h", "/dir/one.html");
+  assertf(INSERT(0, "h", "/dir/one.html") == 1);
   HOLDS("-h/dir/one.html");
   assertf(opt->wizard_filters == 1);
   assertf(VERDICT("h/dir/one.html") == -1);
@@ -4674,17 +4674,19 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
   HOLDS("+h/dir/*[file]", "-h/dir/one.html");
   assertf(VERDICT("h/dir/one.html") == -1);
 
-  /* both halves of a host-scope answer land in the block, in emission order */
+  /* both halves of a host-scope answer land in the block, in emission order.
+     The count returned is what the caller slices the block by, so assert it. */
   SEED("-*.zip");
-  INSERT(HTS_WIZARD_SCOPE_INCLUDE + 1, "www.example.co.uk", "/x.html");
+  assertf(INSERT(HTS_WIZARD_SCOPE_INCLUDE + 1, "www.example.co.uk",
+                 "/x.html") == 2);
   HOLDS("+*.example.co.uk/*", "+example.co.uk/*", "-*.zip");
   assertf(opt->wizard_filters == 2);
 
   /* an answer that emits nothing leaves the block and the array unchanged */
   SEED("-*.zip");
-  INSERT(4, "h", "/dir/one.html");
-  INSERT(50, "h", "/dir/one.html");
-  INSERT(3, "h", "/dir/one.html");
+  assertf(INSERT(4, "h", "/dir/one.html") == 0);
+  assertf(INSERT(50, "h", "/dir/one.html") == 0);
+  assertf(INSERT(3, "h", "/dir/one.html") == 0);
   HOLDS("-*.zip");
   assertf(opt->wizard_filters == 0);
 
@@ -4710,11 +4712,7 @@ done:
   return 0;
 }
 
-/* Non-zero, so a stray write into the slot above shows up (a '\0' there would
-   not). */
-#define POISON "-poison/*"
-
-/* #1270: filters_insert() refuses a rule the matcher would never look at, and
+/* #1270: filters_insert() refuses a rule the matcher would never read, and
    says so, instead of storing one that can never fire. */
 static int st_filtercap(httrackp *opt, int argc, char **argv) {
   const htsfilters saved = opt->filters;
@@ -4725,7 +4723,7 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
   char BIGSTK overcap[HTS_FILTER_MAXLEN + 2]; /* the same, one byte too long */
   char BIGSTK toolong[STRJOKER_MAXLEN + 3];   /* and one the matcher skips */
   char BIGSTK subject[HTS_FILTER_MAXLEN];     /* a URL all three would match */
-  char line[HTS_URLMAXSIZE];
+  char BIGSTK line[STRJOKER_MAXLEN + 256]; /* room for a warning quoting one */
   char **filters = NULL;
   int filptr = 0;
   int taken, verdict, warned;
@@ -4750,8 +4748,6 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
   assertf(strlen(overcap) == HTS_FILTER_MAXLEN + 1);
   assertf(strlen(toolong) > STRJOKER_MAXLEN);
   assertf(strlen(subject) <= STRJOKER_MAXLEN); /* else none could match */
-  /* why the array has a cap at all: past this one the matcher does not look at
-     the pattern, so the rule could only sit there dead */
   assertf(strjoker(subject, toolong + 1, NULL, NULL) == NULL);
 
   assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
@@ -4759,11 +4755,13 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
   opt->filters.filptr = &filptr;
   opt->wizard_filters = 0;
   opt->debug = LOG_NOTICE;
-/* offer `pattern` to the array: whether it was taken, what the array then
-   decides for `subject`, and whether the refusal was told */
+/* non-zero, so a stray write into the slot above the last rule shows up */
+#define POISON "-poison/*"
+/* offer `pattern` to the array, and report what it did with it */
 #define TRY(label, pattern)                                                    \
   do {                                                                         \
     FILE *const log = tmpfile();                                               \
+    char want[64];                                                             \
     assertf(log != NULL);                                                      \
     opt->log = log;                                                            \
     taken = filters_insert(opt, filptr, (pattern));                            \
@@ -4771,15 +4769,16 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
     rewind(log);                                                               \
     if (fgets(line, (int) sizeof(line), log) == NULL)                          \
       line[0] = '\0';                                                          \
-    warned = strstr(line, "could never match") != NULL;                        \
+    /* the reason, this rule's own length, and the rule itself */              \
+    snprintf(want, sizeof(want), "%d bytes", (int) strlen(pattern));           \
+    warned = strstr(line, "could never match") != NULL &&                      \
+             strstr(line, want) != NULL && strstr(line, (pattern)) != NULL;    \
     assertf(line[0] == '\0' || warned); /* nothing else may be logged */       \
     fclose(log);                                                               \
     printf("%s: stored=%d rules=%d verdict=%d warned=%d\n", (label),           \
            taken != 0, filptr, verdict, warned);                               \
   } while (0)
-/* refused, and the array left as it was: neither the count, nor the verdict
-   (last match wins, so a stored rule would forbid what the first one allows),
-   nor the slot above. A warning alone would still leave a dead rule behind. */
+/* a refusal leaves the count, the verdict and the slot above it untouched */
 #define REFUSED()                                                              \
   do {                                                                         \
     assertf(!taken && filptr == 1 && verdict == 1 && warned);                  \
@@ -4787,12 +4786,14 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
     assertf(strcmp(filters[1], POISON) == 0);                                  \
   } while (0)
 
-  /* a rule at the cap is stored, silently, and still matches: refusing one
-     byte early would be a regression nobody would notice */
+  /* a rule at the cap is stored, silently, and still matches; refusing one byte
+     early would be silent too */
   TRY("at the cap", atcap);
   assertf(taken && filptr == 1 && verdict == 1 && !warned);
   assertf(strcmp(filters[0], atcap) == 0);
 
+  /* last match wins, so a stored overcap rule would forbid what the first
+     allows: the verdict below is what proves it is really absent */
   strlcpybuff(filters[1], POISON, HTS_FILTER_SLOT_SIZE);
   TRY("one past the cap", overcap);
   REFUSED();
@@ -4801,6 +4802,7 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
 
 #undef REFUSED
 #undef TRY
+#undef POISON
   opt->log = projectlog;
   opt->debug = saveddebug;
   freet(filters[0]);
