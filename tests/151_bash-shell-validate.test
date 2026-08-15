@@ -202,7 +202,9 @@ test "$rc" -eq 77 || fail "a slow but writing configure with 6s of budget report
 rc=$(probe 92 6 bash -c 'sleep 987 & wait')
 test "$rc" -eq 1 || fail "a silent configure with a child of its own reported $rc, want 1"
 sleep 1
-! ps_snapshot | grep -q '[s]leep 987' || fail "the killed run left its child running"
+# Not through a pipe: grep -q would leave ps_snapshot writing into a closed one,
+# and pipefail would then read the leaked child as an absent one.
+! grep -q '[s]leep 987' <<<"$(ps_snapshot)" || fail "the killed run left its child running"
 # The pacer must not fire before the case is judged: run() returns with the verdict
 # still unread, and a skip there would bury a configure that answered wrongly. Through
 # the real run(), since a stub cannot see a pacer left inside the one it replaced.
