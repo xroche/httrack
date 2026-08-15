@@ -358,6 +358,7 @@ regen:
   "\tsuch as username/password authentication for websites mirrored in this project"LF\
   "\tdo not share these files/folders if you want these information to remain private"LF
 
+/* Written verbatim, not through hts_template_format: no %s, no doubled %. */
 #define HTS_DATA_UNKNOWN_HTML "<html>"LF\
   "<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"en\">"LF\
   ""LF\
@@ -366,7 +367,6 @@ regen:
   "	<meta name=\"description\" content=\"HTTrack is an easy-to-use website mirror utility. It allows you to download a World Wide website from the Internet to a local directory,building recursively all structures, getting html, images, and other files from the server to your computer. Links are rebuiltrelatively so that you can freely browse to the local site (works with any browser). You can mirror several sites together so that you can jump from one toanother. You can, also, update an existing mirror site, or resume an interrupted download. The robot is fully configurable, with an integrated help\" />"LF\
   "	<meta name=\"keywords\" content=\"httrack, HTTRACK, HTTrack, winhttrack, WINHTTRACK, WinHTTrack, offline browser, web mirror utility, aspirateur web, surf offline, web capture, www mirror utility, browse offline, local  site builder, website mirroring, aspirateur www, internet grabber, capture de site web, internet tool, hors connexion, unix, dos, windows 95, windows 98, solaris, ibm580, AIX 4.0, HTS, HTGet, web aspirator, web aspirateur, libre, GPL, GNU, free software\" />"LF\
   "	<title>Page not retrieved! - HTTrack Website Copier</title>"LF\
-  "  %s"LF\
   "	<style type=\"text/css\">"LF\
   "	<!--"LF\
   ""LF\
@@ -440,18 +440,18 @@ regen:
   "</head>"LF\
   ""LF\
   "<body>"LF\
-  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">"LF\
+  "<table width=\"76%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">"LF\
   "	<tr>"LF\
   "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>"LF\
   "	</tr>"LF\
   "</table>"LF\
-  "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" class=\"tableWidth\">"LF\
+  "<table width=\"76%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"0\" class=\"tableWidth\">"LF\
   "<tr class=\"blak\">"LF\
   "<td>"LF\
-  "	<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"1\" cellpadding=\"0\">"LF\
+  "	<table width=\"100%\" border=\"0\" align=\"center\" cellspacing=\"1\" cellpadding=\"0\">"LF\
   "	<tr>"LF\
   "	<td colspan=\"6\"> "LF\
-  "		<table width=\"100%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"10\">"LF\
+  "		<table width=\"100%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"10\">"LF\
   "		<tr> "LF\
   "		<td id=\"pageContent\"> "LF\
   "<!-- ==================== End prologue ==================== -->"LF\
@@ -481,7 +481,7 @@ regen:
   "</tr>"LF\
   "</table>"LF\
   ""LF\
-  "<table width=\"76%%\" height=\"100%%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
+  "<table width=\"76%\" height=\"100%\" border=\"0\" align=\"center\" valign=\"bottom\" cellspacing=\"0\" cellpadding=\"0\">"LF\
   "	<tr>"LF\
   "	<td id=\"footer\"><small>&copy; 1998 Xavier Roche & other contributors - Web Design: Leto Kauler.</small></td>"LF\
   "	</tr>"LF\

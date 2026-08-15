@@ -4804,7 +4804,14 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   template_contract("HTS_TOPINDEX_HEADER", HTS_TOPINDEX_HEADER, 1);
   template_contract("HTS_TOPINDEX_BODY", HTS_TOPINDEX_BODY, 2);
   template_contract("HTS_TOPINDEX_FOOTER", HTS_TOPINDEX_FOOTER, 1);
-  template_contract("HTS_DATA_UNKNOWN_HTML", HTS_DATA_UNKNOWN_HTML, 1);
+  /* htsparse.c writes this one as an fprintf argument, so a % reaches
+     external.html as typed: a %s prints unfilled and a %% prints doubled */
+  {
+    const char *const verbatim = HTS_DATA_UNKNOWN_HTML;
+
+    assertf(strstr(verbatim, "%s") == NULL);
+    assertf(strstr(verbatim, "%%") == NULL);
+  }
 
   for (t = 0; t < sizeof(footers) / sizeof(footers[0]); t++) {
     const char *const footer = footers[t];
@@ -5009,6 +5016,11 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   buf[n] = '\0';
   assertf(strstr(buf, projUTF8) != NULL);
   assertf(strstr(buf, catUTF8) != NULL);
+  /* binpath is "", so this used the compiled-in templates: they must be the
+     top-index ones ("???" is the formatter running out of arguments) */
+  assertf(strstr(buf, "locally available projects") != NULL);
+  assertf(strstr(buf, "/index.html\">") != NULL);
+  assertf(strstr(buf, "???") == NULL);
 
   /* raw unlink/rmdir: UNLINK is utf-8 on Windows, these paths aren't */
   unlink(path);
