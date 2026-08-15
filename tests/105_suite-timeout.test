@@ -36,8 +36,10 @@ echo "marker: the wedged test started"
 sleep 300
 EOF
 
-# Time the guard to its DUMP announcement, not to the driver's exit: the dump that
-# follows runs for minutes on an emulated host, and that is not what is under test.
+# $fired is the guard's own reading of when its deadline tripped, taken from the
+# progress log: a poll can miss a dump short enough to fall between two of them,
+# which is how #1242 reddened a run whose guard had done its job. The poll only
+# still answers whether the line was visible while the driver ran.
 rc=0
 fired=
 marked=
@@ -53,9 +55,9 @@ run_wedged() { # run_wedged <budget> [VAR=VAL...]
         bash "$driver" "$tmp/90_wedged.test" >"$out" 2>&1 &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
-        # Read with the shell: a fork per poll would blur the latency being measured.
-        if read -r line <"$tmp/progress" 2>/dev/null && test "$line" = "DUMP 90_wedged.test"; then
-            fired=$((SECONDS - start))
+        # Read with the shell: a fork per poll would slow the loop it drives.
+        if read -r line <"$tmp/progress" 2>/dev/null &&
+            test "${line#DUMP 90_wedged.test }" != "$line"; then
             marked=1
             break
         fi
@@ -63,21 +65,14 @@ run_wedged() { # run_wedged <budget> [VAR=VAL...]
     done
     wait "$pid" || rc=$?
     total=$((SECONDS - start))
-    # Missed between two polls: the whole run then bounds the latency from above.
-    test -n "$fired" || fired=$total
+    fired=$(sed -n 's/^DUMP 90_wedged\.test \([0-9][0-9]*\)$/\1/p' "$tmp/progress")
+    # Announced when the dump starts, which runs for minutes: a suite watchdog
+    # reading that log would take the silence for a wedge and kill the step.
+    test -n "$fired" ||
+        fail "the dump went unannounced: $(cat "$tmp/progress" 2>&1)"
 }
 
-# Retried once, because a dump short enough to fall between two polls is a race, not a
-# regression; announcing after the dump loses both attempts.
 run_wedged 5
-test -n "$marked" || run_wedged 5
-test -n "$marked" ||
-    fail "the announcement was never seen while the guard ran, so its latency is unknown"
-
-# Announced when the dump starts, which runs for minutes: a suite watchdog
-# reading that log would take the silence for a wedge and kill the step.
-grep -qx 'DUMP 90_wedged.test' "$tmp/progress" ||
-    fail "the dump was not announced: $(cat "$tmp/progress" 2>&1)"
 
 test "$rc" -eq 124 || fail "wedged test reported $rc, want 124"
 # Never before the budget, or a slow-but-healthy test would be killed too.
@@ -93,11 +88,18 @@ grep -q "own process tree" "$out" || fail "no process list in the diagnostics"
 # Announced BEFORE the dump, not merely at some point during it: the watchdog reading
 # that log takes the silence of a dump for a wedge. Only a slow dump tells the two
 # orderings apart, and the dump's own ps is what this makes slow.
-if ! is_windows; then
-    printf '#!/bin/sh\nsleep 3\nexec %s "$@"\n' "$(command -v ps)" >"$shim/ps"
+realps=$(command -v ps) || realps= # the emulated buildds ship without one
+if is_windows || test -z "$realps"; then
+    echo "note: no slow ps to build here, the announcement ordering is not measured"
+else
+    rm -f "$tmp/ps-used"
+    printf '#!/bin/sh\n: >"%s"\nsleep 3\nexec %s "$@"\n' "$tmp/ps-used" "$realps" >"$shim/ps"
     chmod +x "$shim/ps"
     run_wedged 5 "PATH=$shim:$PATH"
     rm -f "$shim/ps" # before the starve shim shares this directory
+    # Proved, not assumed: a dump whose PATH search skipped the shim ran the real
+    # ps, and the fast dump that follows reads as a late announcement below.
+    test -e "$tmp/ps-used" || fail "the dump never ran the slow ps shim"
     test "$rc" -eq 124 || fail "the guard reported $rc under a slow dump, want 124"
     test -n "$marked" || fail "no announcement under a slow dump"
     test "$((total - fired))" -ge 2 ||
