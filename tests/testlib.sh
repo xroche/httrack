@@ -625,13 +625,28 @@ reap_bounded() {
 # macOS and its signals can't reap httrack.exe on Windows. We poll and kill_tree.
 # All three deadlines below compare strictly: $SECONDS is floored, so a reading of
 # the budget can be a fraction under it, and firing early kills healthy work.
+# One option, ahead of the deadline:
+#   --stdin FILE   read FILE, or nothing at all with the word "closed". A
+#                  redirect on the caller does not reach here: where job control
+#                  is off, bash gives a background job /dev/null (#1258). The
+#                  redirect stays on the job, so the target is still our direct
+#                  child and kill_tree keeps signalling it rather than a wrapper.
 run_with_timeout() {
+    local stdin=''
+    if test "${1:-}" = --stdin; then
+        stdin=$2
+        shift 2
+    fi
     local secs=$1
     shift
     local had_m=
     case "$-" in *m*) had_m=1 ;; esac
     is_windows || set -m # own process group, so kill_tree can signal the group
-    "$@" &
+    case $stdin in
+    '') "$@" & ;;
+    closed) "$@" <&- & ;;
+    *) "$@" <"$stdin" & ;;
+    esac
     local pid=$!
     test -n "$had_m" || is_windows || set +m
     # Read while the job is certainly alive: by kill time /proc/<pid>/winpid is gone.

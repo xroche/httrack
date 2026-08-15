@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# #1250: last match wins, so the order below is each answer's precedence.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# answering "ignore this link" and then "mirror the whole host" takes it back
+list=$(httrack -O /dev/null -#test=wizardinsert h /dir/one.html 0 6)
+test "$list" = "-h/dir/one.html +h/*" || fail "answer order: got [$list]"
+# shellcheck disable=SC2086 # the array is one filter per word, by construction
+assert_selftest "verdict=allowed rule=1" filterdual http://h/dir/one.html h/dir/one.html $list
+
+# the reverse order still refuses, so the block is ordered rather than sorted
+list=$(httrack -O /dev/null -#test=wizardinsert h /dir/one.html 6 0)
+test "$list" = "+h/* -h/dir/one.html" || fail "reverse order: got [$list]"
+# shellcheck disable=SC2086
+assert_selftest "verdict=forbidden rule=1" filterdual http://h/dir/one.html h/dir/one.html $list
+
+# a standing command-line rule is not revoked by "mirror the whole host"
+list=$(httrack -O /dev/null -#test=wizardinsert h /dir/one.html 6 @ "-h/*.zip")
+test "$list" = "+h/* -h/*.zip" || fail "command line: got [$list]"
+# shellcheck disable=SC2086
+assert_selftest "verdict=forbidden rule=1" filterdual http://h/a.zip h/a.zip $list
+
+assert_selftest "wizardinsert self-test OK" wizardinsert

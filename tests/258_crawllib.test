@@ -206,6 +206,35 @@ local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "$url"
 assert_eq "crawl-said-this" "$(cat "${tmpdir}/crawl.log")" "--log truncates per crawl"
 ok "--log takes the crawl output, one crawl at a time"
 
+## --stdin feeds the engine, which a redirect on the call cannot be trusted to do
+# Three outcomes on one line, so a closed descriptor is told apart from the empty
+# read /dev/null gives.
+# Written straight out, never through $(cat): with fd 0 closed a command
+# substitution takes the free slot 0 for its pipe and the read blocks forever.
+cat >"${shim}/httrack" <<'SH'
+#!/bin/bash
+printf 'stdin=['
+# uutils cat does not fail on a closed fd, so ask the shell; the subshell keeps
+# an exec redirection error from taking bash 3.2 down with it
+if (exec 3<&0) 2>/dev/null; then cat 2>/dev/null; else printf closed; fi
+printf ']\n'
+SH
+chmod +x "${shim}/httrack"
+
+printf answer >"${tmpdir}/answers"
+# Against a call redirected elsewhere: --stdin is on the engine, so it wins.
+local_crawl --stdin "${tmpdir}/answers" --log "${tmpdir}/crawl.log" \
+    -O /dev/null "$url" </dev/null
+assert_eq "stdin=[answer]" "$(cat "${tmpdir}/crawl.log")" "--stdin FILE"
+local_crawl --stdin closed --log "${tmpdir}/crawl.log" \
+    -O /dev/null "$url" <"${tmpdir}/answers"
+assert_eq "stdin=[closed]" "$(cat "${tmpdir}/crawl.log")" "--stdin closed"
+# Without the option the engine still has a descriptor, whatever the platform
+# gives a background job.
+local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "$url" </dev/null
+assert_eq "stdin=[]" "$(cat "${tmpdir}/crawl.log")" "the default stdin"
+ok "--stdin hands the engine a file, or no descriptor at all"
+
 ## The watchdog reds a crawl that never ends, from a subject: it ends the test
 cat >"${shim}/httrack" <<'SH'
 #!/bin/bash

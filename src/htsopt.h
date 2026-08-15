@@ -568,9 +568,12 @@ struct httrackp {
      growing it would shift every httrackp field declared after it. */
   void *sitemap_state; /**< hts_sitemap_state*, or NULL. Tail: ABI */
   void *singlefile_state; /**< hts_singlefile_state*, or NULL. Tail: ABI */
-  String host_alias; /**< --host-alias: '\n'-separated "alias[,alias...]=host"
-                          rules folding the hostnames of one site onto a single
-                          canonical host. Tail: ABI */
+  String host_alias;  /**< --host-alias: '\n'-separated "alias[,alias...]=host"
+                           rules folding the hostnames of one site onto a single
+                           canonical host. Tail: ABI */
+  int wizard_filters; /**< count of filters the wizard has inserted, held at the
+                           low indices of the array. Live state, so copy_htsopt
+                           must leave it alone. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */
