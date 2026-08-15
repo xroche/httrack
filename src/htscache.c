@@ -96,7 +96,8 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
               if (coucal_read
                   (cache->cached_tests,
                    concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), url_adr, url_fil), NULL) == 0) {
-                char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+                /* a full-capacity location plus the status-code line */
+                char BIGSTK tempo[HTS_LOCATION_SIZE + 32];
 
                 sprintf(tempo, "%d", (int) r->statuscode);
                 if (r->location != NULL && r->location[0] != '\0') {
@@ -512,7 +513,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                                const char *adr, const char *fil,
                                const char *target_save, char *location,
                                char *return_save, int readonly) {
-  char BIGSTK location_default[HTS_URLMAXSIZE * 2];
+  char BIGSTK location_default[HTS_LOCATION_SIZE];
   char BIGSTK buff[CACHE_KEY_SIZE];
   char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
   char BIGSTK previous_save_[HTS_URLMAXSIZE * 2];
@@ -576,7 +577,9 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
              NULL, 0, NULL, 0, headerBuff, sizeof(headerBuff) - 2) == Z_OK ) */
         {
           int offset = 0;
-          char BIGSTK line[HTS_URLMAXSIZE + 2];
+          /* the longest stored line is "Location: " plus a full-capacity URL;
+             a shorter buffer truncates it into a valid-looking wrong target */
+          char BIGSTK line[HTS_LOCATION_SIZE + 32];
           int lineEof = 0;
 
           /*readSizeHeader = (int) strlen(headerBuff); */
@@ -606,9 +609,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
               ZIP_READFIELD_STRING(line, value, "Last-Modified", r.lastmodified,
                                    sizeof(r.lastmodified));
               ZIP_READFIELD_STRING(line, value, "Etag", r.etag, sizeof(r.etag));
-              // r.location is a char* pointing into a HTS_URLMAXSIZE*2 buffer
               ZIP_READFIELD_STRING(line, value, "Location", r.location,
-                                   HTS_URLMAXSIZE * 2);
+                                   HTS_LOCATION_SIZE);
               ZIP_READFIELD_STRING(line, value, "Content-Disposition", r.cdispo,
                                    sizeof(r.cdispo));
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,

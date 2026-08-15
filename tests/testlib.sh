@@ -56,6 +56,19 @@ assert_selftest() { # assert_selftest WANT NAME [ARGS...]
     test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
 }
 
+# assert_selftest for output spanning several lines: Windows stdout is text
+# mode, so every interior newline arrives as CRLF and a byte-exact compare
+# rejects it. Only the CR before a newline goes, or a test asserting the engine
+# drops an interior CR would pass whatever the engine did.
+assert_selftest_lines() { # assert_selftest_lines WANT NAME [ARGS...]
+    local want=$1 name=$2 got rc=0
+    shift 2
+    got=$(httrack -O /dev/null "-#test=$name" "$@") || rc=$?
+    test "$rc" -eq 0 || fail "-#test=$name $*: exited $rc, output: $got"
+    got=$(printf '%s\n' "$got" | sed $'s/\r$//')
+    test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
+}
+
 # Absolute path to httrack, since make check's relative ../src breaks once a test
 # cd's away. assert_selftest runs the bare name, so a test that cd's calls this.
 httrack_path() {

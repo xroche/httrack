@@ -1081,7 +1081,7 @@ int httpmirror(char *url1, httrackp * opt) {
     int store_errpage = 0;      // c'est une erreur mais on enregistre le html
     int is_binary = 0;          // is a binary file
     int is_loaded_from_file = 0;        // has been loaded from a file (implies is_write=1)
-    char BIGSTK loc[HTS_URLMAXSIZE * 2];        // adresse de relocation
+    char BIGSTK loc[HTS_LOCATION_SIZE]; // redirect target
 
     // Ici on charge le fichier (html, gif..) en mémoire
     // Les HTMLs sont traités (si leur priorité est suffisante)

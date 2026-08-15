@@ -800,9 +800,10 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
         // Réception de la status line et de l'en-tête (norme RFC1945)
 
         // status-line à récupérer
-        finput(soc, rcvd, 1024);
+        finput_header(soc, rcvd, 1024);
+        // some buggy servers send a leading \n (RFC)
         if (strnotempty(rcvd) == 0)
-          finput(soc, rcvd, 1024);      // "certains serveurs buggés envoient un \n au début" (RFC)
+          finput_header(soc, rcvd, 1024);
 
         // traiter status-line
         treatfirstline(retour, rcvd);
@@ -815,12 +816,15 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
 
         // header // ** !attention! HTTP/0.9 non supporté
         do {
-          finput(soc, rcvd, 1024);
+          const hts_boolean cut = finput_header(soc, rcvd, 1024);
+
 #if HDEBUG
           printf(">%s\n", rcvd);
 #endif
-          if (strnotempty(rcvd))
-            treathead(NULL, NULL, NULL, retour, rcvd);  // traiter
+          if (cut)
+            hts_log_print(NULL, LOG_WARNING, "Over-long header dropped");
+          else if (strnotempty(rcvd))
+            treathead(NULL, NULL, NULL, retour, rcvd);
 
         } while(strnotempty(rcvd));
 
@@ -1546,12 +1550,16 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     if (retour) {
       if (retour->location) {
         while(is_realspace(*(rcvd + p)))
-          p++;                  // sauter espaces
-        if ((int) strlen(rcvd + p) < HTS_URLMAXSIZE) // not too long?
-          /* location aliases location_buffer[HTS_URLMAXSIZE * 2] */
-          strlcpybuff(retour->location, rcvd + p, HTS_URLMAXSIZE * 2);
-        else                    // erreur.. ignorer
+          p++; // skip spaces
+        if (strlen(rcvd + p) < HTS_LOCATION_SIZE)
+          strlcpybuff(retour->location, rcvd + p, HTS_LOCATION_SIZE);
+        else {
+          /* no opt here, so this only reaches a registered log callback */
+          hts_log_print(NULL, LOG_WARNING,
+                        "Location header too long (%d bytes), redirect ignored",
+                        (int) strlen(rcvd + p));
           retour->location[0] = '\0';
+        }
       }
     }
   } else if (((p = strfield(rcvd, "Set-Cookie:")) != 0) &&
@@ -2067,6 +2075,7 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
     if (e == 1) {
       if (adr != NULL) {
         int ptr = 0;
+        int adv = 0;
         char rcvd[1100];
 
         // note: en gros recopie du traitement de back_wait()
@@ -2075,9 +2084,15 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
         // ----------------------------------------
         // traiter en-tête!
         // status-line à récupérer
-        ptr += binput(retour.adr + ptr, rcvd, 1024);
-        if (strnotempty(rcvd) == 0)
-          ptr += binput(retour.adr + ptr, rcvd, 1024);  // "certains serveurs buggés envoient un \n au début" (RFC)
+        binput_header(retour.adr + ptr, retour.adr + retour.size, rcvd, 1024,
+                      &adv);
+        ptr += adv;
+        // some buggy servers send a leading \n (RFC)
+        if (strnotempty(rcvd) == 0) {
+          binput_header(retour.adr + ptr, retour.adr + retour.size, rcvd, 1024,
+                        &adv);
+          ptr += adv;
+        }
 
         // traiter status-line
         treatfirstline(&retour, rcvd);
@@ -2090,12 +2105,17 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
 
         // header // ** !attention! HTTP/0.9 non supporté
         do {
-          ptr += binput(retour.adr + ptr, rcvd, 1024);
+          const hts_boolean cut = binput_header(
+              retour.adr + ptr, retour.adr + retour.size, rcvd, 1024, &adv);
+
+          ptr += adv;
 #if HDEBUG
           printf("(buffer)>%s\n", rcvd);
 #endif
-          if (strnotempty(rcvd))
-            treathead(NULL, NULL, NULL, &retour, rcvd); // traiter
+          if (cut)
+            hts_log_print(NULL, LOG_WARNING, "Over-long header dropped");
+          else if (strnotempty(rcvd))
+            treathead(NULL, NULL, NULL, &retour, rcvd);
 
         } while(strnotempty(rcvd));
         // ----------------------------------------                    
@@ -3058,6 +3078,48 @@ int binput(const char *buff, char *s, int max) {
 
   // then return the supplemental jump offset
   return count + 1;
+}
+
+hts_boolean binput_header(const char *buff, const char *end, char *s, int max,
+                          int *offset) {
+  hts_boolean cut = HTS_FALSE;
+  const char *p;
+  int j = 0;
+
+  *offset = 0;
+  s[0] = '\0';
+  if (buff == NULL || buff >= end)
+    return HTS_FALSE;
+  for (p = buff; p < end && *p != '\0' && *p != '\n'; p++) {
+    if (*p == '\r')
+      continue;
+    if (j < max - 1)
+      s[j++] = *p;
+    else
+      cut = HTS_TRUE; /* keep walking: the tail must not become more headers */
+  }
+  s[j] = '\0';
+  *offset = (int) (p - buff) + 1; /* binput's convention: step over the \n */
+  return cut;
+}
+
+hts_boolean finput_header(T_SOC fd, char *s, int max) {
+  hts_boolean cut = HTS_FALSE;
+  int j = 0;
+  char c;
+
+  for (;;) {
+    if (read((int) fd, &c, 1) <= 0 || c == 10)
+      break;
+    if (c == 13)
+      continue;
+    if (j < max - 1)
+      s[j++] = c;
+    else
+      cut = HTS_TRUE; /* keep draining: the tail must not become more headers */
+  }
+  s[j] = '\0';
+  return cut;
 }
 
 // Lecture d'une ligne (peut être unicode à priori)

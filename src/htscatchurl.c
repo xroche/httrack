@@ -193,7 +193,7 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
           // adresse du lien
           if (ident_url_absolute(url, &af) >= 0) {
             // Traitement des en-têtes
-            char BIGSTK loc[HTS_URLMAXSIZE * 2];
+            char BIGSTK loc[HTS_LOCATION_SIZE];
             htsblk blkretour;
 
             hts_init_htsblk(&blkretour);

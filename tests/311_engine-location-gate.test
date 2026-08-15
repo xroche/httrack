@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# The Location gate must equal htsblk.location's buffer (HTS_LOCATION_SIZE,
+# 2048). Each case reports the length asked, the length kept, whether the value
+# matches what the contract says to keep, and whether the 64-byte canary behind
+# the buffer survived. Cache side: 01_zlib-cache.test.
+kept() { # kept URLLEN KEPTLEN
+    assert_selftest \
+        "asked=$1 kept=$2 value_ok=1 canary_smashed=0 logged=0" location "$1"
+}
+
+# Refused lengths must say so rather than drop the redirect mutely.
+refused() { # refused URLLEN
+    assert_selftest \
+        "asked=$1 kept=0 value_ok=1 canary_smashed=0 logged=1" location "$1"
+}
+
+# Well inside the old gate, and the last length it allowed.
+kept 500 500
+kept 1023 1023
+
+# The old gate refused these; they fit the buffer with room to spare.
+kept 1024 1024
+kept 1500 1500
+
+# The last length that fits, terminator included.
+kept 2046 2046
+kept 2047 2047
+
+# Past the buffer: still refused, and refusing leaves the value empty rather
+# than a truncated URL, which would be a valid-looking wrong target.
+refused 2048
+refused 3000
+
+# A wider gate only helps if the reader stops handing it cut values. Each case
+# reads four lines from a header block and compares every one: a cut line must
+# be reported, and the line after it must be the server's next header rather
+# than the tail of the one before. "over" says the cursor walked past the
+# block's end, which must never happen.
+line() { # line READSIZE BLOCK WANT
+    if [ -n "$2" ]; then
+        assert_selftest_lines "$3" headerline "$1" "$2"
+    else
+        assert_selftest_lines "$3" headerline "$1"
+    fi
+}
+
+# Default block: "X-First: 0123456789abcdefghij" is 29 bytes, then
+# "X-Second: ok" at 12, then the blank line that ends the header.
+line 30 '' 'cut=0 over=0 line=X-First: 0123456789abcdefghij
+cut=0 over=0 line=X-Second: ok
+cut=0 over=0 line=
+cut=0 over=0 line='
+
+# One byte short of the first line, then far short of it: the second line
+# survives whole either way.
+line 29 '' 'cut=1 over=0 line=X-First: 0123456789abcdefghi
+cut=0 over=0 line=X-Second: ok
+cut=0 over=0 line=
+cut=0 over=0 line='
+line 13 '' 'cut=1 over=0 line=X-First: 012
+cut=0 over=0 line=X-Second: ok
+cut=0 over=0 line=
+cut=0 over=0 line='
+line 12 '' 'cut=1 over=0 line=X-First: 01
+cut=1 over=0 line=X-Second: o
+cut=0 over=0 line=
+cut=0 over=0 line='
+
+# A last line with no terminator ends at the block, not past it.
+line 8 'A: 1\nB: 22222222' 'cut=0 over=0 line=A: 1
+cut=1 over=0 line=B: 2222
+cut=0 over=0 line=
+cut=0 over=0 line='
+
+# A leading blank line is a line, and CR never survives into the value.
+line 8 '\nA: 1\n' 'cut=0 over=0 line=
+cut=0 over=0 line=A: 1
+cut=0 over=0 line=
+cut=0 over=0 line='
+line 8 'A\r: 1\n' 'cut=0 over=0 line=A: 1
+cut=0 over=0 line=
+cut=0 over=0 line=
+cut=0 over=0 line='

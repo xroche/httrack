@@ -1975,6 +1975,39 @@ class Handler(SimpleHTTPRequestHandler):
     def route_redir_target(self):
         self.send_raw(b"<html><body>redirect target</body></html>\n", "text/html")
 
+    # A Location past the header-line read buffer (#1291): the engine only ever
+    # sees a cut value, so it must drop the header rather than follow a target
+    # this server never named.
+    def route_longloc_index(self):
+        self.send_html('\t<a href="go.php">go</a>')
+
+    def route_longloc_go(self):
+        # absolute: a relative target is capped at HTS_URLMAXSIZE by
+        # ident_url_relatif long before the gate under test sees it
+        base = "http://127.0.0.1:%d/longloc/" % self.server.server_address[1]
+        self.send_response(302, "Found")
+        self.send_header("Location", base + "target.html?q=" + "a" * 2400)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_longloc_target(self):
+        self.send_raw(b"<html><body>long-location target</body></html>\n", "text/html")
+
+    # same shape with a Location the reader takes whole: the control proving
+    # the fixture only refuses because the header outran the read
+    def route_shortloc_index(self):
+        self.send_html('\t<a href="go.php">go</a>')
+
+    def route_shortloc_go(self):
+        base = "http://127.0.0.1:%d/shortloc/" % self.server.server_address[1]
+        self.send_response(302, "Found")
+        self.send_header("Location", base + "target.html?q=" + "a" * 40)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_shortloc_target(self):
+        self.send_raw(b"<html><body>short-location target</body></html>\n", "text/html")
+
     # --- /mini304/: tiny fully-cacheable site (an update gets only 304s) ---
     def route_mini304_index(self):
         self.big_send(
@@ -2762,6 +2795,12 @@ class Handler(SimpleHTTPRequestHandler):
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
+        "/longloc/index.html": route_longloc_index,
+        "/longloc/go.php": route_longloc_go,
+        "/longloc/target.html": route_longloc_target,
+        "/shortloc/index.html": route_shortloc_index,
+        "/shortloc/go.php": route_shortloc_go,
+        "/shortloc/target.html": route_shortloc_target,
         "/bakname/index.html": route_bakname_index,
         "/bakname/a.bin": route_bakname_main,
         "/bakname/hts-tmp/a.bin.bak": route_bakname_sibling,

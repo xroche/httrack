@@ -218,6 +218,9 @@ Please visit our Website: http://www.httrack.com
 /* MIME-type buffer contract (htsblk.contenttype/charset/contentencoding); holds
    the longest registered MIME type, the Office OOXML ones reaching 73 chars */
 #define HTS_MIMETYPE_SIZE 128
+/* Capacity behind the htsblk.location pointer; the Location header is gated
+   against this, not against HTS_URLMAXSIZE */
+#define HTS_LOCATION_SIZE (HTS_URLMAXSIZE * 2)
 
 /* Caps on single option arguments, in bytes, exclusive like HTS_CDLMAXSIZE.
    They bound the value, not a buffer: these option fields are dynamic Strings.

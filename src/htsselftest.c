@@ -2542,6 +2542,132 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* A header line that does not fit must be reported as cut and skipped whole,
+   so the line after it is the server's next header and not its own tail. The
+   block defaults to two headers and the blank line; \n and \r arrive escaped,
+   since the command line filters both out. */
+static int st_headerline(httrackp *opt, int argc, char **argv) {
+  static const char fixture[] = "X-First: 0123456789abcdefghij\r\n"
+                                "X-Second: ok\r\n"
+                                "\r\n";
+  char block[256], line[64];
+  size_t blocklen;
+  int max, ptr = 0, i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "headerline: needs a read size\n");
+    return 1;
+  }
+  max = atoi(argv[0]);
+  if (max < 2 || (size_t) max > sizeof(line)) {
+    fprintf(stderr, "headerline: read size out of probe range\n");
+    return 1;
+  }
+  if (argc < 2) {
+    memcpy(block, fixture, sizeof(fixture));
+    blocklen = sizeof(fixture) - 1;
+  } else {
+    const char *a = argv[1];
+
+    if (strlen(a) >= sizeof(block)) {
+      fprintf(stderr, "headerline: block too long\n");
+      return 1;
+    }
+    for (blocklen = 0; *a != '\0'; a++) {
+      if (*a == '\\' && a[1] == 'n')
+        block[blocklen++] = '\n', a++;
+      else if (*a == '\\' && a[1] == 'r')
+        block[blocklen++] = '\r', a++;
+      else
+        block[blocklen++] = *a;
+    }
+    block[blocklen] = '\0';
+  }
+  /* one read past the block's lines, to show the walk stops at its end */
+  for (i = 0; i < 4; i++) {
+    int adv;
+    const hts_boolean cut =
+        binput_header(block + ptr, block + blocklen, line, max, &adv);
+
+    ptr += adv;
+    printf("cut=%d over=%d line=%s\n", cut != HTS_FALSE,
+           ptr > (int) blocklen + 1, line);
+  }
+  return 0;
+}
+
+static int st_location_logged = 0;
+
+static void st_location_log(httrackp *opt, int type, const char *format,
+                            va_list args) {
+  (void) opt;
+  (void) type;
+  (void) format;
+  (void) args;
+  st_location_logged++;
+}
+
+/* treathead's Location gate must match htsblk.location's buffer size: a
+   redirect that fits is kept whole, a longer one refused and reported, and
+   neither touches the canary behind the buffer. */
+static int st_location(httrackp *opt, int argc, char **argv) {
+  struct {
+    char loc[HTS_LOCATION_SIZE];
+    char canary[64];
+  } probe;
+
+  char BIGSTK line[HTS_LOCATION_SIZE + 1024];
+  const char *const prefix = "http://www.example.com/";
+  const char *url, *want;
+  htsblk r;
+  size_t n, urllen, kept, i;
+  int asked, smashed = 0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "location: needs a Location URL length\n");
+    return 1;
+  }
+  /* subtract, never add: a negative argument must not wrap the range check */
+  asked = atoi(argv[0]);
+  if (asked <= (int) strlen(prefix) ||
+      (size_t) asked > sizeof(line) - sizeof("Location: ")) {
+    fprintf(stderr, "location: length out of probe range\n");
+    return 1;
+  }
+  urllen = (size_t) asked;
+
+  memset(probe.loc, 0, sizeof(probe.loc));
+  memset(probe.canary, '#', sizeof(probe.canary));
+  memset(&r, 0, sizeof(r));
+  r.location = probe.loc;
+
+  n = (size_t) snprintf(line, sizeof(line), "Location: %s", prefix);
+  memset(line + n, 'a', urllen - strlen(prefix));
+  line[n + urllen - strlen(prefix)] = '\0';
+  url = line + n - strlen(prefix);
+
+  st_location_logged = 0;
+  hts_set_log_vprint_callback(st_location_log);
+  treathead(NULL, "www.example.com", "/", &r, line);
+  hts_set_log_vprint_callback(NULL);
+
+  for (i = 0; i < sizeof(probe.canary); i++) {
+    if (probe.canary[i] != '#')
+      smashed++;
+  }
+  /* bounded: an unterminated buffer reports capacity, never reads past it */
+  for (kept = 0; kept < sizeof(probe.loc) && probe.loc[kept] != '\0'; kept++)
+    ;
+  /* the wanted value comes from the contract, not from what treathead did */
+  want = urllen < HTS_LOCATION_SIZE ? url : "";
+  printf("asked=%d kept=%d value_ok=%d canary_smashed=%d logged=%d\n", asked,
+         (int) kept, strcmp(probe.loc, want) == 0, smashed,
+         st_location_logged != 0);
+  return 0;
+}
+
 /* An over-long header value must not overflow treathead's tempo[1100]. */
 static int st_headerlong(httrackp *opt, int argc, char **argv) {
   htsblk r;
@@ -10885,6 +11011,11 @@ static const struct selftest_entry {
     {"headerlong", "[header-name:]",
      "over-long header value must not overflow the parse scratch",
      st_headerlong},
+    {"location", "<url-length>", "Location gate matches the buffer it protects",
+     st_location},
+    {"headerline", "<read-size>",
+     "a header line that does not fit is reported and skipped whole",
+     st_headerline},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
     {"xfread-limit", "", "in-memory receive buffer size bound",
