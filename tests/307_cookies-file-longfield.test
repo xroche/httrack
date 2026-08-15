@@ -1,0 +1,76 @@
+#!/bin/bash
+#
+# A cookies.txt field longer than the buffer it is copied into costs that line
+# alone: the mirror does not abort, nothing of the line is stored, the refusal
+# names the file and the field, and the rest of the jar still loads (#1277).
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+bin=$(httrack_path)
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cookiejar.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+site="$tmp/site"
+mkdir -p "$site"
+echo '<html>hello</html>' >"$site/index.html"
+
+# 2000 bytes overruns domain[256], path[256] and cook_name[1024] alike, so one
+# jar exercises all three capacities the loader copies into.
+big=$(printf '%*s' 2000 '' | tr ' ' A)
+# cook_value[8192] cannot be overrun through the 8000-byte line gate, so its
+# bound is probed from the other side: a value far wider than the other three
+# destinations must still load, unclipped.
+val=$(printf '%*s' 500 '' | tr ' ' v)
+
+# The Netscape record, in the very spelling cookie_save() writes back.
+rec() { # rec DOMAIN PATH NAME VALUE
+    printf '%s\tTRUE\t%s\tFALSE\t1999999999\t%s\t%s\n' "$1" "$2" "$3" "$4"
+}
+
+jar="$tmp/jar.txt"
+{
+    rec www.example.com / GOODFIRST v1
+    rec "$big.example.com" / LONGDOM v
+    rec www.example.com "/$big" LONGPATH v
+    rec www.example.com / "LONGNAME$big" v
+    rec www.example.com / BIGVAL "$val"
+    rec www.example.com / GOODLAST v2
+} >"$jar"
+
+out="$tmp/mirror"
+rc=0
+"$bin" "file://$site/index.html" -O "$out" --cookies-file "$jar" --quiet \
+    >/dev/null 2>&1 || rc=$?
+# 134 was the abort the unchecked strcpybuff took on the first over-long field
+assert_eq 0 "$rc" "crawl exit status"
+
+# the jar is written back when the mirror ends, so it says what was loaded
+jar_out="$out/cookies.txt"
+assert_file "$jar_out" "reloaded jar"
+loaded=$(cat "$jar_out")
+
+# whole-line matches, so a fix that clipped a field instead of refusing the line
+# is red here rather than passing on the cookie name alone
+grep -qxF "$(rec www.example.com / GOODFIRST v1)" <<<"$loaded" ||
+    fail "the first jar line did not load: $jar_out"
+grep -qxF "$(rec www.example.com / GOODLAST v2)" <<<"$loaded" ||
+    fail "a refused line stopped the rest of the jar loading: $jar_out"
+grep -qxF "$(rec www.example.com / BIGVAL "$val")" <<<"$loaded" ||
+    fail "a value the widest destination holds was refused or clipped: $jar_out"
+
+for gone in LONGDOM LONGPATH LONGNAME; do
+    ! grep -q "$gone" <<<"$loaded" ||
+        fail "$gone was stored from an over-long line: $jar_out"
+done
+
+log=$(cat "$out/hts-log.txt")
+for field in domain path name; do
+    grep -qF "cookie file $jar: ignoring a line whose $field field is" \
+        <<<"$log" ||
+        fail "the refused $field field is not reported in $out/hts-log.txt"
+done
+n=$(grep -c 'ignoring a line whose' <<<"$log" || true)
+assert_eq 3 "$n" "refused jar lines"

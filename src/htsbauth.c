@@ -203,8 +203,29 @@ char *cookie_nextfield(char *a) {
   return a;
 }
 
+/* Copy Netscape-jar field <param> of <line> into dst (capacity dst_size), or
+   refuse the line and say so. Clipping is not an option here: a shortened
+   domain or path silently changes the hosts and paths the cookie is sent to. */
+static hts_boolean cookie_load_field(httrackp *opt, char *dst, size_t dst_size,
+                                     char *buffer, const char *line, int param,
+                                     const char *field_name, const char *file) {
+  const char *const value = cookie_get(buffer, line, param);
+  const size_t len = strlen(value);
+
+  if (len >= dst_size) {
+    hts_log_print(opt, LOG_WARNING,
+                  "cookie file %s: ignoring a line whose %s field is %d bytes "
+                  "(maximum %d)",
+                  file, field_name, (int) len, (int) dst_size - 1);
+    return HTS_FALSE;
+  }
+  strlcpybuff(dst, value, dst_size);
+  return HTS_TRUE;
+}
+
 // Read cookies.txt (+ copied IE cookies *@*.txt on Windows); !=0 on error.
-int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
+int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
+                const char *name) {
   char catbuff[CATBUFF_SIZE];
   char buffer[8192];
 
@@ -281,9 +302,11 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
   }
 #endif
 
-  // Ensuite, cookies.txt
+  // then cookies.txt
   {
-    FILE *fp = FOPEN(fconcat(catbuff, sizeof(catbuff), fpath, name), "rb");
+    // aliases catbuff, which nothing below rewrites
+    const char *const file = fconcat(catbuff, sizeof(catbuff), fpath, name);
+    FILE *fp = FOPEN(file, "rb");
 
     if (fp) {
       char BIGSTK line[8192];
@@ -293,20 +316,30 @@ int cookie_load(t_cookie * cookie, const char *fpath, const char *name) {
         if (strnotempty(line)) {
           if (strlen(line) < 8000) {
             if (line[0] != '#') {
-              char domain[256]; // domaine cookie (.netscape.com)
-              char path[256];   // chemin (/)
-              char cook_name[1024];     // nom cookie (MYCOOK)
-              char BIGSTK cook_value[8192];     // valeur (ID=toto,S=1234)
+              char domain[256];             // cookie domain (.netscape.com)
+              char path[256];               // path (/)
+              char cook_name[1024];         // cookie name (MYCOOK)
+              char BIGSTK cook_value[8192]; // value (ID=toto,S=1234)
 
-              strcpybuff(domain, cookie_get(buffer, line, 0));  // host
-              strcpybuff(path, cookie_get(buffer, line, 2));    // path
-              strcpybuff(cook_name, cookie_get(buffer, line, 5));       // name
-              strcpybuff(cook_value, cookie_get(buffer, line, 6));      // value
 #if DEBUG_COOK
               printf("%s\n", line);
 #endif
-              cookie_add(cookie, cook_name, cook_value, domain, path);
+              if (cookie_load_field(opt, domain, sizeof(domain), buffer, line,
+                                    0, "domain", file) &&
+                  cookie_load_field(opt, path, sizeof(path), buffer, line, 2,
+                                    "path", file) &&
+                  cookie_load_field(opt, cook_name, sizeof(cook_name), buffer,
+                                    line, 5, "name", file) &&
+                  cookie_load_field(opt, cook_value, sizeof(cook_value), buffer,
+                                    line, 6, "value", file)) {
+                cookie_add(cookie, cook_name, cook_value, domain, path);
+              }
             }
+          } else {
+            hts_log_print(opt, LOG_WARNING,
+                          "cookie file %s: ignoring an over-long line "
+                          "(%d bytes)",
+                          file, (int) strlen(line));
           }
         }
       }
