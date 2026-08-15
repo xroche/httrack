@@ -6,3 +6,7 @@
 # bash die on $'\r' on every line of them.
 *.test text eol=lf
 *.sh text eol=lf
+
+# templates/*.html are CRLF and carry no git attribute; -text stops any
+# checkout or commit from converting them, without renormalizing the blobs.
+templates/*.html -text

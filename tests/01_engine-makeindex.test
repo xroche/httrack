@@ -11,3 +11,74 @@ dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
 assert_selftest "makeindex self-test OK" makeindex "$dir" run
+
+# The rest guards templates/ against the compiled-in copy that takes over when
+# the data directory is missing: the two had drifted apart (#1244).
+templates="${abs_top_srcdir:?}/templates"
+indextmpl="$abs_top_srcdir/src/hts-indextmpl.h"
+
+# The body of one hts-indextmpl.h macro, on stdout.
+macro_body() { # macro_body MACRO
+    awk -v macro="$1" '
+        !inmacro {
+            if ($0 == "#define " macro " \\") inmacro = 1
+            next
+        }
+        { print; found = 1 }
+        $0 !~ /\\$/ { exit }
+        END {
+            if (!found) {
+                print "no such macro: " macro > "/dev/stderr"
+                exit 1
+            }
+        }
+    ' "$indextmpl"
+}
+
+# Occurrences of an ERE, matched against the upper-cased text of FILE... or stdin.
+count() { # count ERE [FILE...]
+    local pat=$1
+    shift
+    awk -v pat="$pat" '
+        { line = toupper($0); n += gsub(pat, "&", line) }
+        END { print n + 0 }
+    ' "$@"
+}
+
+# A slot only one copy has is an argument silently dropped from the index.
+for pair in \
+    "index-header.html HTS_INDEX_HEADER" \
+    "index-body.html HTS_INDEX_BODY" \
+    "index-footer.html HTS_INDEX_FOOTER" \
+    "topindex-header.html HTS_TOPINDEX_HEADER" \
+    "topindex-body.html HTS_TOPINDEX_BODY" \
+    "topindex-bodycat.html HTS_INDEX_BODYCAT" \
+    "topindex-footer.html HTS_TOPINDEX_FOOTER"; do
+    file=${pair%% *}
+    macro=${pair##* }
+    assert_eq "$(count '%S' "$templates/$file")" \
+        "$(macro_body "$macro" | count '%S')" "$file vs $macro: %s slots"
+done
+
+# Header and footer together frame one document, so each tag appears once: the
+# stale duplicate head block and the missing <body> were both a count of 2 or 0.
+for pair in \
+    "index HTS_INDEX_HEADER HTS_INDEX_FOOTER" \
+    "topindex HTS_TOPINDEX_HEADER HTS_TOPINDEX_FOOTER"; do
+    read -r name header footer <<<"$pair"
+    for tag in '<HEAD>' '</HEAD>' '<BODY>' '</BODY>'; do
+        assert_eq 1 \
+            "$(count "$tag" "$templates/$name-header.html" "$templates/$name-footer.html")" \
+            "templates/$name: $tag"
+        assert_eq 1 "$({
+            macro_body "$header"
+            macro_body "$footer"
+        } | count "$tag")" "$header + $footer: $tag"
+    done
+done
+
+# Both copies are CRLF; a text-mode rewrite of one flattens it silently.
+for file in "$templates"/*.html; do
+    assert_eq 0 "$(awk '!/\r$/ { bad++ } END { print bad + 0 }' "$file")" \
+        "${file##*/}: lines not ending in CRLF"
+done

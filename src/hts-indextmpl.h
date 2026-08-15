@@ -124,6 +124,7 @@ regen:
   ""LF\
   "</head>"LF\
   ""LF\
+  "<body>"LF\
   "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">"LF\
   "	<tr>"LF\
   "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>"LF\
@@ -164,6 +165,7 @@ regen:
   "		</TH>"LF
 
 /* %s = INFO */
+/* %s = REDIRECT */
 #define HTS_INDEX_FOOTER \
   "<!-- Note: Template file not found, using internal one -->"LF\
   "	</TABLE>"LF\
@@ -175,6 +177,7 @@ regen:
   "	</H6>"LF\
   "	%s"LF\
   "	<!-- Thanks for using HTTrack Website Copier! -->"LF\
+  "	%s"LF\
   ""LF\
   "<!-- ==================== Start epilogue ==================== -->"LF\
   "		</td>"LF\
@@ -284,6 +287,7 @@ regen:
   ""LF\
   "</head>"LF\
   ""LF\
+  "<body>"LF\
   "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">"LF\
   "	<tr>"LF\
   "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>"LF\
@@ -302,7 +306,7 @@ regen:
   ""LF\
   ""LF\
   "<h1 ALIGN=Center>Index of locally available projects:</H1>"LF\
-  "  <table border=\"0\" width=\"100%%%\" cellspacing=\"1\" cellpadding=\"0\">"LF
+  "  <table border=\"0\" width=\"100%%\" cellspacing=\"1\" cellpadding=\"0\">"LF
 
 /* %s = URL */
 /* %s = TITLE */
@@ -435,6 +439,7 @@ regen:
   ""LF\
   "</head>"LF\
   ""LF\
+  "<body>"LF\
   "<table width=\"76%%\" border=\"0\" align=\"center\" cellspacing=\"0\" cellpadding=\"3\" class=\"tableWidth\">"LF\
   "	<tr>"LF\
   "	<td id=\"subTitle\">HTTrack Website Copier - Open Source offline browser</td>"LF\
