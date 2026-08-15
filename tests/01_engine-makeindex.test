@@ -73,13 +73,13 @@ for pair in \
     "index-footer.html HTS_INDEX_FOOTER" \
     "topindex-header.html HTS_TOPINDEX_HEADER" \
     "topindex-body.html HTS_TOPINDEX_BODY" \
-    "topindex-bodycat.html HTS_INDEX_BODYCAT" \
+    "topindex-bodycat.html HTS_TOPINDEX_BODYCAT" \
     "topindex-footer.html HTS_TOPINDEX_FOOTER"; do
     file=${pair%% *}
     macro=${pair##* }
     assert_eq "$(slot_count "$templates/$file")" \
         "$(macro_body "$macro" | slot_count)" "$file vs $macro: %s slots"
-    # the macros get this from template_contract; the disk copies get it here
+    # the macros get this from makeindex_template_contract; disk copies get it here
     assert_eq 0 "$(stray_escapes "$templates/$file")" "$file: stray % escape"
 done
 
@@ -119,10 +119,15 @@ live_frame() { # live_frame FILE
 
 # <body> must open after </head> and before the first table: a browser drops the
 # start tag when it lands inside a table cell instead.
-for name in index topindex; do
-    assert_eq "</HEAD> <BODY> <TABLE>" \
-        "$(live_frame "$templates/$name-header.html")" \
-        "templates/$name-header.html: <body> placement"
+for pair in \
+    "index-header.html HTS_INDEX_HEADER" \
+    "topindex-header.html HTS_TOPINDEX_HEADER"; do
+    file=${pair%% *}
+    macro=${pair##* }
+    assert_eq "</HEAD> <BODY> <TABLE>" "$(live_frame "$templates/$file")" \
+        "templates/$file: <body> placement"
+    assert_eq "</HEAD> <BODY> <TABLE>" "$(macro_body "$macro" | live_frame)" \
+        "$macro: <body> placement"
 done
 
 # Header and footer together frame one document.
@@ -153,8 +158,8 @@ bare_amps() { # bare_amps [FILE...]
 }
 
 assert_eq 0 "$(bare_amps "$templates"/*.html)" "templates: unescaped &"
-for macro in HTS_INDEX_HEADER HTS_INDEX_BODY HTS_INDEX_BODYCAT HTS_INDEX_FOOTER \
-    HTS_TOPINDEX_HEADER HTS_TOPINDEX_BODY HTS_TOPINDEX_FOOTER \
+for macro in HTS_INDEX_HEADER HTS_INDEX_BODY HTS_INDEX_FOOTER \
+    HTS_TOPINDEX_HEADER HTS_TOPINDEX_BODY HTS_TOPINDEX_BODYCAT HTS_TOPINDEX_FOOTER \
     HTS_DATA_UNKNOWN_HTML; do
     assert_eq 0 "$(macro_body "$macro" | bare_amps)" "$macro: unescaped &"
 done

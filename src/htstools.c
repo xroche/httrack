@@ -830,7 +830,7 @@ static int hts_template_formatv(hts_template_format_buf *buf,
       if (c == '%') {
         const unsigned char cFormat = format[++i];
         switch(cFormat) {
-        case '\0': /* trailing lone %: step back so the loop stops on the NUL */
+        case '\0': /* trailing %: back up, or the loop reads past the NUL */
           FPUTC('%');
           i--;
           break;
@@ -1012,9 +1012,9 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
   toptemplate_body = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
                                          "templates/topindex-body.html"),
                                  HTS_TOPINDEX_BODY);
-  toptemplate_bodycat =
-    readfile_or(fconcat(catbuff, sizeof(catbuff), binpath, "templates/topindex-bodycat.html"),
-                HTS_INDEX_BODYCAT);
+  toptemplate_bodycat = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
+                                            "templates/topindex-bodycat.html"),
+                                    HTS_TOPINDEX_BODYCAT);
   toptemplate_footer = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
                                            "templates/topindex-footer.html"),
                                    HTS_TOPINDEX_FOOTER);

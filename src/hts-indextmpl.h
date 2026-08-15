@@ -157,13 +157,6 @@ regen:
   "			</TD>"LF\
   "		</TR>"LF
 
-#define HTS_INDEX_BODYCAT \
-  "<!-- Note: Template file not found, using internal one -->"LF\
-  "		<TH>"LF\
-  "		<BR/>"LF\
-  "			%s"LF\
-  "		</TH>"LF
-
 /* %s = INFO */
 /* %s = REDIRECT */
 #define HTS_INDEX_FOOTER \
@@ -317,6 +310,13 @@ regen:
   "                    &middot; <A HREF=\"%s/index.html\">%s</A>"LF\
   "   		  </TD>"LF\
   "		</TR>"LF
+
+#define HTS_TOPINDEX_BODYCAT \
+  "<!-- Note: Template file not found, using internal one -->"LF\
+  "		<TH>"LF\
+  "		<BR/>"LF\
+  "			%s"LF\
+  "		</TH>"LF
 
 /* %s = INFO */
 #define HTS_TOPINDEX_FOOTER \

@@ -5223,7 +5223,7 @@ static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-static void makeindex_run(httrackp *opt, const char *path, const char *tmpl,
+static void makeindex_run(httrackp *opt, const char *path, const char *footer,
                           int links, const char *firstlink, char *buf,
                           size_t size) {
   FILE *fp = fopen(path, "wb");
@@ -5231,7 +5231,7 @@ static void makeindex_run(httrackp *opt, const char *path, const char *tmpl,
   size_t n;
 
   assertf(fp != NULL);
-  hts_finish_makeindex(opt, &done, &fp, links, firstlink, tmpl, "", "");
+  hts_finish_makeindex(opt, &done, &fp, links, firstlink, footer, "", "");
   assertf(fp == NULL); /* the function closed and cleared it */
   assertf(done != 0);
   fp = fopen(path, "rb");
@@ -5262,7 +5262,7 @@ static char *makeindex_slurp(const char *path) {
 }
 
 // Whether `at` sits in live markup rather than inside an HTML comment.
-static hts_boolean outside_comment(const char *buf, const char *at) {
+static hts_boolean makeindex_outside_comment(const char *buf, const char *at) {
   const char *open = NULL, *close = NULL, *p;
 
   for (p = buf; (p = strstr(p, "<!--")) != NULL && p < at; p += 4)
@@ -5274,8 +5274,8 @@ static hts_boolean outside_comment(const char *buf, const char *at) {
 
 // %-contract of a built-in template: the slots its caller fills, and no escape
 // besides %%.
-static void template_contract(const char *name, const char *tmpl,
-                              size_t slots) {
+static void makeindex_template_contract(const char *name, const char *tmpl,
+                                        size_t slots) {
   size_t i, n;
 
   for (i = 0, n = 0; tmpl[i] != '\0'; i++) {
@@ -5303,7 +5303,7 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
   /* the minimal template is the control: it proves an assertion below can only
      fail on the real one because that template lost a slot */
   const char *footers[] = {"%s%s", HTS_INDEX_FOOTER, NULL};
-  size_t nfooters = 2;
+  size_t nfooters = sizeof(footers) / sizeof(*footers) - 1;
   char *ondisk = NULL;
   char path[HTS_URLMAXSIZE];
   char BIGSTK buf[8192];
@@ -5329,13 +5329,13 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
     freet(trailing);
   }
 
-  template_contract("HTS_INDEX_HEADER", HTS_INDEX_HEADER, 1);
-  template_contract("HTS_INDEX_BODY", HTS_INDEX_BODY, 2);
-  template_contract("HTS_INDEX_BODYCAT", HTS_INDEX_BODYCAT, 1);
-  template_contract("HTS_INDEX_FOOTER", HTS_INDEX_FOOTER, 2);
-  template_contract("HTS_TOPINDEX_HEADER", HTS_TOPINDEX_HEADER, 1);
-  template_contract("HTS_TOPINDEX_BODY", HTS_TOPINDEX_BODY, 2);
-  template_contract("HTS_TOPINDEX_FOOTER", HTS_TOPINDEX_FOOTER, 1);
+  makeindex_template_contract("HTS_INDEX_HEADER", HTS_INDEX_HEADER, 1);
+  makeindex_template_contract("HTS_INDEX_BODY", HTS_INDEX_BODY, 2);
+  makeindex_template_contract("HTS_TOPINDEX_BODYCAT", HTS_TOPINDEX_BODYCAT, 1);
+  makeindex_template_contract("HTS_INDEX_FOOTER", HTS_INDEX_FOOTER, 2);
+  makeindex_template_contract("HTS_TOPINDEX_HEADER", HTS_TOPINDEX_HEADER, 1);
+  makeindex_template_contract("HTS_TOPINDEX_BODY", HTS_TOPINDEX_BODY, 2);
+  makeindex_template_contract("HTS_TOPINDEX_FOOTER", HTS_TOPINDEX_FOOTER, 1);
   /* htsparse.c writes this one as an fprintf argument, so a % reaches
      external.html as typed: a %s prints unfilled and a %% prints doubled */
   {
@@ -5372,7 +5372,8 @@ static int st_makeindex(httrackp *opt, int argc, char **argv) {
       /* the slots are positional: credit first, and a redirect the browser
          never sees is no redirect */
       assertf(credit < meta);
-      assertf(outside_comment(buf, meta));
+      assertf(makeindex_outside_comment(buf, credit));
+      assertf(makeindex_outside_comment(buf, meta));
     }
 
     /* a first link whose escaped form overruns the old flat 1024-byte tempo:
