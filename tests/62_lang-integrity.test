@@ -72,8 +72,6 @@ c1=$(printf '\302[\200-\237]')
 # A single-byte charset maps all 256 byte values, so the iconv decode above
 # can never fail on it and cannot see a value left as raw UTF-8; a whole line
 # that itself decodes as valid multi-byte UTF-8 is that leak.
-# Scoped to single-byte charsets: BIG5, gb2312 and shift-jis are multi-byte, so
-# the premise fails and their genuine text matches this shape constantly.
 # Under 8 bytes a line can be valid UTF-8 by chance (Ukrainian.txt:686 is a
 # 2-byte word that is), so short mixed-encoding lines go undetected.
 # Raw bytes in an awk ERE, not grep -P: BSD grep has no -P. NUL is left out of
@@ -99,16 +97,24 @@ charset_declared_matches_bytes() {
         echo "${f##*/}: $n lines decode to C1 controls under $cs; the bytes are a Windows codepage"
         return 1
     fi
+    # BIG5, gb2312 and shift-jis reach here too: iconv passes a raw UTF-8 leak of
+    # accented Latin letters, whose bytes are valid singles in all three. Their own
+    # text tops out at 4 non-ASCII bytes per UTF-8-shaped line, so gate on that
+    # count rather than on the charset family, and ask for more than 4.
     case "$(printf '%s' "$cs" | LC_ALL=C tr '[:upper:]' '[:lower:]')" in
-    iso-8859-* | windows-125*)
-        ln=$(LC_ALL=C awk -v u="$utf8_full_line" -v h="$high_byte" \
-            'length($0) >= 8 && $0 ~ h && $0 ~ u { print NR; exit }' "$f")
-        if [ -n "$ln" ]; then
-            echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
-            return 1
-        fi
-        ;;
+    # Nothing to tell apart once UTF-8 is what the file claims to be.
+    utf-8 | utf8) return 0 ;;
+    iso-8859-* | windows-125*) minhigh=1 ;;
+    *) minhigh=8 ;;
     esac
+    ln=$(LC_ALL=C awk -v u="$utf8_full_line" -v h="$high_byte" -v m="$minhigh" \
+        '{ s = $0; nhigh = gsub(h, "", s) }
+         length($0) >= 8 && nhigh >= m && $0 ~ u { print NR; exit }' "$f")
+    if [ -n "$ln" ]; then
+        echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
+        return 1
+    fi
+    return 0
 }
 
 if ! command -v iconv >/dev/null 2>&1; then
@@ -118,10 +124,16 @@ else
     # No CR: BSD sed writes a literal r, and the extractor strips CR anyway.
     LC_ALL=C sed '10s/.*/UTF-8/' "$langdir/Francais.txt" >"$tmp/undecodable.txt"
     LC_ALL=C sed '10s/.*/ISO-8859-2/' "$langdir/Croatian.txt" >"$tmp/c1.txt"
-    # A value line left as raw UTF-8 under a declared single-byte charset.
-    LC_ALL=C awk -v repl="$(printf 'Une fuite UTF-8 : caf\xc3\xa9, na\xc3\xafve, t\xc3\xa9l\xc3\xa9phone')" \
+    # A value line left as raw UTF-8, under a declared single-byte charset and then
+    # under gb2312, the multi-byte one whose own text comes closest to that shape.
+    # Its 8 non-ASCII bytes are what pin minhigh from above; the tree pins it from
+    # below, so widening either past the other is caught here.
+    leak=$(printf 'Une fuite UTF-8 : caf\xc3\xa9, na\xc3\xafve, t\xc3\xa9l\xc3\xa9phone')
+    LC_ALL=C awk -v repl="$leak" \
         'NR == 20 { print repl; next } { print }' "$langdir/Francais.txt" >"$tmp/utf8mix.txt"
-    for probe in undecodable c1 utf8mix; do
+    LC_ALL=C awk -v repl="$leak" \
+        'NR == 20 { print repl; next } { print }' "$langdir/Chinese-Simplified.txt" >"$tmp/utf8mixmb.txt"
+    for probe in undecodable c1 utf8mix utf8mixmb; do
         if charset_declared_matches_bytes "$tmp/$probe.txt" >/dev/null; then
             echo "the charset check passed a deliberately mislabelled file ($probe)"
             exit 1
@@ -173,15 +185,127 @@ for scope in "Mirror %s and every host below it" "Ignore %s and every host below
 done
 
 # A msgid absent from a language file silently falls back to English (#862).
-LC_ALL=C sort -u <"$keys" >"$tmp/english.sorted"
+# Multisets, not sets: a catalog repeating a msgid more often than English.txt
+# does keeps the set equal while one of the values it pairs goes unreachable.
+# English.txt repeats 27 msgids of its own, and those cancel out on both sides.
+LC_ALL=C sort <"$keys" >"$tmp/english.sorted"
 for f in "$langdir"/*.txt; do
-    LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$f" | LC_ALL=C sort -u >"$tmp/have"
+    LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$f" | LC_ALL=C sort >"$tmp/have"
     untranslated=$(LC_ALL=C comm -23 "$tmp/english.sorted" "$tmp/have")
     if [ -n "$untranslated" ]; then
         printf '%s\n' "$untranslated" | awk -v n="${f##*/}" '{print n ": untranslated msgid: " $0}'
         fail=1
     fi
+    repeated=$(LC_ALL=C comm -13 "$tmp/english.sorted" "$tmp/have")
+    if [ -n "$repeated" ]; then
+        printf '%s\n' "$repeated" | awk -v n="${f##*/}" '{print n ": msgid occurs more often than in English.txt: " $0}'
+        fail=1
+    fi
 done
+
+# A value copied verbatim from its msgid, or left empty, passes every check above
+# while the string is still English on screen (#1260). A handful are legitimate,
+# so the per-catalog counts are pinned and have to match exactly.
+pin="$testdir/62_lang-untranslated.counts"
+[ -f "$pin" ] || {
+    echo "cannot find $pin"
+    exit 1
+}
+
+# Surrounding blanks are stripped before comparing: a value of one space, or a
+# msgid copied with a trailing one, is as untranslated as the bare shapes.
+count_untranslated() {
+    # Two anchored sub()s, not one alternation gsub: BSD awk restarts gsub after
+    # each match, where the leading-blank anchor can fire again mid-line.
+    LC_ALL=C awk -v name="$2" '
+        function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
+        { sub(/\r$/, "") }
+        NR % 2 == 1 { key = trim($0); next }
+        { value = trim($0) }
+        value == "" { empty++ }
+        value != "" && value == key { same++ }
+        END { printf "%-25s %-9d %d\n", name, same + 0, empty + 0 }
+    ' "$1"
+}
+
+# Catalogs pinned at zero would also match a counter that never leaves it, so
+# count a fixture carrying one of each shape before trusting the real ones.
+printf 'Cancel\nCancel\nClose\nClose \nOK\n \nSave\nEnregistrer\n' >"$tmp/probe.txt"
+got=$(count_untranslated "$tmp/probe.txt" probe.txt)
+want=$(printf '%-25s %-9d %d\n' probe.txt 2 1)
+if [ "$got" != "$want" ]; then
+    echo "the untranslated counter miscounts a known fixture: got [$got] want [$want]"
+    exit 1
+fi
+
+: >"$tmp/counts"
+for f in "$langdir"/*.txt; do
+    # English.txt is the msgid side of every pair, identical by construction.
+    [ "$f" != "$eng" ] || continue
+    count_untranslated "$f" "${f##*/}" >>"$tmp/counts"
+done
+LC_ALL=C sort -o "$tmp/counts" "$tmp/counts"
+
+rc=0
+LC_ALL=C awk -v pin="$pin" '
+    function report(name, got, want, kind,   what) {
+        what = "lower the pin here"
+        if (got > want)
+            what = "translate it rather than raise the pin"
+        printf "%s: %d %s, pinned at %d: %s\n", name, got, kind, want, what
+        bad++
+    }
+    BEGIN {
+        while ((getline line < pin) > 0) {
+            sub(/\r$/, "", line)
+            if (line ~ /^[ \t]*(#|$)/)
+                continue
+            # A second row for the same catalog would otherwise just win, so the
+            # numbers a bad merge left behind have to be rejected, not applied.
+            if (split(line, a, /[ \t]+/) != 3 || a[2] !~ /^[0-9]+$/ ||
+                a[3] !~ /^[0-9]+$/ || a[1] in pinned) {
+                printf "%s: malformed pin line: %s\n", pin, line
+                bad++
+                continue
+            }
+            same[a[1]] = a[2]
+            empty[a[1]] = a[3]
+            pinned[a[1]] = 1
+        }
+    }
+    {
+        seen[$1] = 1
+        if (!($1 in pinned)) {
+            printf "%s: no pinned untranslated counts; add them\n", $1
+            bad++
+            next
+        }
+        if ($2 != same[$1])
+            report($1, $2, same[$1], "values identical to their English msgid")
+        if ($3 != empty[$1])
+            report($1, $3, empty[$1], "empty values")
+    }
+    END {
+        for (f in pinned)
+            if (!(f in seen)) {
+                printf "%s: pinned but no such catalog\n", f
+                bad++
+            }
+        exit(bad > 0 ? 3 : 0)
+    }
+' "$tmp/counts" || rc=$?
+# A mismatch says so with 3, because awk's own error status varies by
+# implementation; reading any of them as a mismatch would hide a broken check.
+if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then
+    echo "the untranslated-count comparison itself failed"
+    exit 1
+elif [ "$rc" -ne 0 ]; then
+    new=$PWD/62_lang-untranslated.counts.new
+    LC_ALL=C awk '/^[ \t]*#/ || /^[ \t]*$/' "$pin" >"$new"
+    cat "$tmp/counts" >>"$new"
+    echo "once the counts are right for the right reason: cp $new $pin"
+    fail=1
+fi
 
 # An unknown ${LANG_*} renders as nothing rather than erroring, so check that
 # every macro the templates interpolate, in any wrapper form, resolves.
