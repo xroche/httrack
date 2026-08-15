@@ -696,11 +696,15 @@ int httpmirror(char *url1, httrackp * opt) {
             }
           }
           {
-            htsbuff fb = htsbuff_ptr(filters[filptr], HTS_URLMAXSIZE * 2);
+            /* wider than a slot, so an over-long rule reaches the length check
+               rather than aborting here */
+            char BIGSTK rule[HTS_FILTER_SLOT_SIZE + 2];
+            htsbuff fb = htsbuff_array(rule);
+
             htsbuff_cpy(&fb, type ? "+" : "-");
             htsbuff_cat(&fb, tempo);
+            filters_insert(opt, filptr, rule); /* bumps filptr when stored */
           }
-          filptr++;
 
           /* sanity check */
           if (filptr + 1 >= opt->maxfilter) {
@@ -2346,11 +2350,13 @@ void host_ban(httrackp * opt, int ptr,
   // interdire host
   assertf((*_FILTERS_PTR) < opt->maxfilter);
   if (*_FILTERS_PTR < opt->maxfilter) {
-    htsbuff fb = htsbuff_ptr(_FILTERS[*_FILTERS_PTR], HTS_URLMAXSIZE * 2);
+    char BIGSTK rule[HTS_FILTER_SLOT_SIZE + 4];
+    htsbuff fb = htsbuff_array(rule);
+
     htsbuff_cpy(&fb, "-");
     htsbuff_cat(&fb, host);
     htsbuff_cat(&fb, "/*"); // forbid host/*
-    (*_FILTERS_PTR)++;
+    filters_insert(opt, *_FILTERS_PTR, rule);
   }
   // oups
   if (strlen(host) <= 1) {      // euhh?? longueur <= 1
@@ -2428,6 +2434,27 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
   opt->filters.filters = ptrfilters;
   opt->filters.filptr = filptr;
   opt->wizard_filters = 0;
+}
+
+hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern) {
+  char **const filters = *opt->filters.filters;
+  const size_t len = strlen(pattern);
+  int i;
+
+  assertf(pos >= 0 && pos <= *opt->filters.filptr);
+  if (len > HTS_FILTER_MAXLEN) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Filter rule dropped: %d bytes, past the %d the matcher "
+                  "reads, so it could never match: %s",
+                  (int) len, (int) HTS_FILTER_MAXLEN, pattern);
+    return HTS_FALSE;
+  }
+  for (i = *opt->filters.filptr; i > pos; i--)
+    strlcpybuff(filters[i], filters[i - 1], HTS_FILTER_SLOT_SIZE);
+  strlcpybuff(filters[pos], pattern, HTS_FILTER_SLOT_SIZE);
+  (*opt->filters.filptr)++;
+  assertf((*opt->filters.filptr) < opt->maxfilter);
+  return HTS_TRUE;
 }
 
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {

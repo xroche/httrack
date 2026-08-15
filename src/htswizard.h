@@ -82,7 +82,8 @@ void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
    of the wizard's block at the low indices of opt->filters: last match wins, so
    a later answer outranks an earlier one and the command-line filters above the
    block outrank every answer. Returns the number inserted, which sit at the
-   tail of the block, ending at opt->wizard_filters. */
+   tail of the block, ending at opt->wizard_filters; a rule too long for the
+   matcher is dropped, so that can fall short of what the answer emits. */
 int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 

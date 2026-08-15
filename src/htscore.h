@@ -391,6 +391,17 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
    it: opt->wizard_filters indexes into that array and outlives no crawl. */
 void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr);
 
+/* Longest rule a slot holds and the matcher still looks at. */
+#define HTS_FILTER_MAXLEN                                                      \
+  (HTS_FILTER_SLOT_SIZE - 1 < STRJOKER_MAXLEN ? HTS_FILTER_SLOT_SIZE - 1       \
+                                              : STRJOKER_MAXLEN)
+
+/* Stores `pattern` at `pos` in this crawl's filter array, shifting the rules
+   from there up a slot; the caller has ensured there is room. The single door
+   into the array: a rule past HTS_FILTER_MAXLEN is refused with a warning and
+   HTS_FALSE, never stored as one that could not fire (#1270). */
+hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern);
+
 int fspc(httrackp * opt, FILE * fp, const char *type);
 
 char *next_token(char *p, int flag);

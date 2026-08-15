@@ -331,25 +331,11 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
   }
 }
 
-/* Inserts `pattern` at index `pos`, shifting the filters from there up a slot.
-   The caller has already ensured the array has room. */
-static void filters_insert_at(httrackp *opt, int pos, const char *pattern) {
-  char **const filters = *opt->filters.filters;
-  int i;
-
-  assertf(pos >= 0 && pos <= *opt->filters.filptr);
-  for (i = *opt->filters.filptr; i > pos; i--)
-    strlcpybuff(filters[i], filters[i - 1], HTS_FILTER_SLOT_SIZE);
-  strlcpybuff(filters[pos], pattern, HTS_FILTER_SLOT_SIZE);
-  (*opt->filters.filptr)++;
-  assertf((*opt->filters.filptr) < opt->maxfilter);
-}
-
 int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up) {
   char BIGSTK pattern[HTS_FILTER_SLOT_SIZE];
   htsbuff f = htsbuff_array(pattern);
-  int slot;
+  int slot, inserted = 0;
 
   /* grow first: a host-scope answer emits two filters */
   if ((*opt->filters.filptr) + 2 >= opt->maxfilter) {
@@ -375,9 +361,14 @@ int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
     hts_wizard_answer_filter(&f, slot, n, adr, fil, seeker_up);
     if (f.len == 0)
       break;
-    filters_insert_at(opt, opt->wizard_filters++, pattern);
+    /* a refused rule must not advance the block, or the caller reads back the
+       neighbour's filter as this answer's */
+    if (filters_insert(opt, opt->wizard_filters, pattern)) {
+      opt->wizard_filters++;
+      inserted++;
+    }
   }
-  return slot;
+  return inserted;
 }
 
 void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
