@@ -441,6 +441,24 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
   }
 }
 
+hts_boolean hts_scan_token(char **ptr, char *dest, size_t destsize) {
+  char *a = *ptr;
+  size_t len = 0; /* the token's real length, which may exceed the room */
+
+  assertf(destsize != 0);
+  while (*a != '\0' && !isspace((unsigned char) *a)) {
+    if (len < destsize - 1)
+      dest[len] = *a;
+    len++;
+    a++;
+  }
+  dest[len < destsize ? len : destsize - 1] = '\0';
+  while (isspace((unsigned char) *a))
+    a++;
+  *ptr = a;
+  return len < destsize ? HTS_TRUE : HTS_FALSE;
+}
+
 /* does it look like XML ? (SVG et al.) */
 static int look_like_xml(const char *s) {
   return strncmp(s, "<?xml", 5) == 0
@@ -629,14 +647,20 @@ int httpmirror(char *url1, httrackp * opt) {
   // copier adresse(s) dans liste des adresses
   {
     char *a = url1;
+    const size_t url_len = strlen(url1);
     const LLint list_sz = StringNotEmpty(opt->filelist)
                               ? fsize_utf8(StringBuff(opt->filelist))
                               : 0;
-    /* two bytes reserved per list byte; -1 makes an undoublable size refused */
+    /* a one-byte token is emitted as "http://a\n", so the reserve is five
+       bytes per input byte, not two; -1 refuses a size it would overflow */
     const LLint list_room =
-        list_sz > 0 ? (list_sz <= INT64_MAX / 2 ? list_sz * 2 : -1) : 0;
-    const size_t primary_len =
-        llint_grow_size_t(8192 + strlen(url1) * 2, list_room, 0);
+        list_sz > 0 ? (list_sz <= INT64_MAX / 5 ? list_sz * 5 : -1) : 0;
+    const size_t url_room = url_len <= (((size_t) -2) - 8192) / 5
+                                ? 8192 + url_len * 5
+                                : (size_t) -1;
+    const size_t primary_len = url_room != (size_t) -1
+                                   ? llint_grow_size_t(url_room, list_room, 0)
+                                   : (size_t) -1;
 
     // création de la première page, qui contient les liens de base à scanner
     // c'est plus propre et plus logique que d'entrer à la main les liens dans la pile
@@ -649,8 +673,7 @@ int httpmirror(char *url1, httrackp * opt) {
     }
     htsbuff primarybuff = htsbuff_ptr(primary, primary_len);
 
-    while(*a) {
-      int i;
+    while (*a) {
       int joker = 0;
 
       // vérifier qu'il n'y a pas de * dans l'url
@@ -677,14 +700,18 @@ int httpmirror(char *url1, httrackp * opt) {
         }
 
         // recopier prochaine chaine (+ ou -)
-        i = 0;
-        while((*a != 0) && (!isspace((unsigned char) *a))) {
-          tempo[i++] = *a;
-          a++;
-        }
-        tempo[i++] = '\0';
-        while(isspace((unsigned char) *a)) {
-          a++;
+        /* the slot it lands in must hold the sign too, and the implicit form
+           below gains a trailing '*' */
+        const size_t room = sizeof(tempo) - (plus == 0 && type == 1 ? 2 : 1);
+
+        if (!hts_scan_token(&a, tempo, room)) {
+          /* on the console too: the user who typed it may have no log open */
+          printf("Filter rule longer than %d bytes, ignored: %c%.64s...\n",
+                 (int) (room - 1), type ? '+' : '-', tempo);
+          hts_log_print(opt, LOG_WARNING,
+                        "Filter rule longer than %d bytes, ignored: %c%.64s...",
+                        (int) (room - 1), type ? '+' : '-', tempo);
+          continue;
         }
 
         // sauter les + sans rien après..
@@ -726,22 +753,21 @@ int httpmirror(char *url1, httrackp * opt) {
         char BIGSTK url[HTS_URLMAXSIZE * 2];
 
         // prochaine adresse
-        i = 0;
-        while((*a != 0) && (!isspace((unsigned char) *a))) {
-          url[i++] = *a;
-          a++;
+        if (!hts_scan_token(&a, url, sizeof(url))) {
+          printf("URL longer than %d bytes, ignored: %.64s...\n",
+                 (int) (sizeof(url) - 1), url);
+          hts_log_print(opt, LOG_WARNING,
+                        "URL longer than %d bytes, ignored: %.64s...",
+                        (int) (sizeof(url) - 1), url);
+          continue;
         }
-        while(isspace((unsigned char) *a)) {
-          a++;
-        }
-        url[i++] = '\0';
 
         if (strstr(url, ":/") == NULL)
           htsbuff_cat(&primarybuff, "http://");
         htsbuff_cat(&primarybuff, url);
         htsbuff_cat(&primarybuff, "\n");
       }
-    }                           // while
+    } // while
 
     /* --why: print which filter rule decides for this URL, then stop */
     if (StringNotEmpty(opt->why_url)) {

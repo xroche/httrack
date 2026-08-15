@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/crawllib.sh
+. "$(dirname "$0")/crawllib.sh"
+
+# A filter or a URL longer than the buffer it is copied into must be named and
+# dropped, never truncated into a rule that authorizes something else (#1271).
+
+assert_selftest "scantoken self-test OK" scantoken
+
+tmpdir="$(mktemp -d)"
+cleanup_push rm -rf "$tmpdir"
+
+# HTS_URLMAXSIZE * 2, less the sign the filter slot gains and the NUL
+maxfilter=2046
+maxurl=2047
+
+rep() { # rep CHAR COUNT
+    local pad
+    pad=$(printf '%*s' "$2" '')
+    printf '%s' "${pad// /$1}"
+}
+
+# Runs --why over a rules file and returns the verdict line alone.
+why() { # why RULE-FILE
+    local out
+    out="$(httrack -O "$tmpdir/p" -q --why http://www.example.com/a.png \
+        -%S "$1" http://www.example.com/)" ||
+        fail "httrack exited $? on $(basename "$1")"
+    grep -E 'accepted|rejected|no filter|unable' <<<"$out"
+}
+
+# An over-long rule, then the one that decides.
+longrule() { # longrule LENGTH FILE
+    printf -- '-%s\n+*.png\n' "$(rep a "$1")" >"$2"
+}
+
+# At the bound the rule is kept, so the one that decides is the second. This is
+# also the longest rule the pre-fix engine handled without dying.
+longrule "$maxfilter" "$tmpdir/fit.txt"
+assert_eq "http://www.example.com/a.png: accepted by rule #2 (+*.png)" \
+    "$(why "$tmpdir/fit.txt")" "filter of $maxfilter bytes"
+
+# One byte over, and it is gone: the numbering shifts. The two overshoots die
+# differently before the fix, on the filter slot then on the stack canary.
+for over in 1 512; do
+    longrule "$((maxfilter + over))" "$tmpdir/over.txt"
+    assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
+        "$(why "$tmpdir/over.txt")" "filter of $((maxfilter + over)) bytes"
+    assert_match "Filter rule longer than $maxfilter bytes, ignored: -aaa" \
+        "$(cat "$tmpdir/p/hts-log.txt")" "refusal named in the log"
+done
+
+# Every seed costs "http://" and a newline on top of its own bytes, so the list
+# they are gathered into has to be budgeted per token: 5000 one-byte seeds used
+# to overrun it and abort on the append.
+{
+    for ((i = 0; i < 5000; i++)); do printf 'a\n'; done
+    echo '+*.png'
+} >"$tmpdir/many.txt"
+assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
+    "$(why "$tmpdir/many.txt")" "5000 one-byte seeds"
+
+# The URL token beside it is copied by the same code and bounded on its own.
+printf 'http://www.example.com/%s\n+*.png\n' "$(rep a $((maxurl - 22)))" \
+    >"$tmpdir/longurl.txt"
+assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
+    "$(why "$tmpdir/longurl.txt")" "URL of $((maxurl + 1)) bytes"
+assert_match "URL longer than $maxurl bytes, ignored: http://www.example.com/aaa" \
+    "$(cat "$tmpdir/p/hts-log.txt")" "refusal named in the log"
+
+# That line is written before the seed is dropped, so it cannot tell a refusal
+# from a truncation. Crawl for real and count what the refusal cost: a seed the
+# engine kept goes on to fail on a save path it cannot build, six warnings and
+# an error further on.
+find_python >/dev/null || skip "python3 not found"
+doc="$tmpdir/doc"
+mkdir -p "$doc"
+echo '<html><body>seed</body></html>' >"$doc/index.html"
+local_server_start --root "$doc"
+
+# Through -%S, since every argv entry is already capped at HTS_CDLMAXSIZE.
+long="$BASEURL/$(rep a $((maxurl + 1 - ${#BASEURL} - 1)))"
+assert_eq "$((maxurl + 1))" "${#long}" "seed one byte past the URL buffer"
+printf '%s\n' "$long" >"$tmpdir/seed.txt"
+local_crawl --log "$tmpdir/crawl.log" -O "$tmpdir/m" --quiet --robots=0 \
+    --retries=0 -%S "$tmpdir/seed.txt" "$BASEURL/index.html" ||
+    fail "crawl exited $?"
+assert_file "$tmpdir/m/127.0.0.1_$SRV_PORT/index.html" "the seed that fits"
+log="$(cat "$tmpdir/m/hts-log.txt")"
+assert_match "URL longer than $maxurl bytes, ignored: $BASEURL/aaa" "$log" \
+    "refusal named in the log"
+assert_eq 1 "$(grep -cE 'Warning:|Error:' <<<"$log")" \
+    "messages the refused seed cost"
