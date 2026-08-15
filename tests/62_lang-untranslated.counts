@@ -1,10 +1,7 @@
-# Untranslated values per lang/*.txt catalog: those copied verbatim from their
-# English msgid, then those left empty. Both pass 62_lang-integrity's join check
-# while the string stays English on screen (#1260), and a handful are legitimate
-# ("OK", "URLs"), so the test pins the counts and demands an exact match:
-# translate the new string rather than raise a number, and lower a number in the
-# change that translates one. English.txt is the msgid side of every pair, so it
-# is not listed.
+# Per-catalog counts: values identical to their English msgid, then empty ones.
+# 62_lang-integrity.test wants an exact match, so translate a string rather than
+# raise a count, and lower a count in the change that translates one.
+# English.txt is the msgid side of every pair, so it is not listed.
 #
 # catalog                 identical empty
 Bulgarian.txt             3         3

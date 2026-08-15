@@ -99,9 +99,11 @@ charset_declared_matches_bytes() {
     fi
     # BIG5, gb2312 and shift-jis reach here too: iconv passes a raw UTF-8 leak of
     # accented Latin letters, whose bytes are valid singles in all three. Their own
-    # text hits the UTF-8 shape only in short runs, so ask for more non-ASCII bytes
-    # than any of it carries (4, in Chinese-Simplified.txt:316).
+    # text tops out at 4 non-ASCII bytes per UTF-8-shaped line, so gate on that
+    # count rather than on the charset family, and ask for more than 4.
     case "$(printf '%s' "$cs" | LC_ALL=C tr '[:upper:]' '[:lower:]')" in
+    # Nothing to tell apart once UTF-8 is what the file claims to be.
+    utf-8 | utf8) return 0 ;;
     iso-8859-* | windows-125*) minhigh=1 ;;
     *) minhigh=8 ;;
     esac
@@ -122,13 +124,15 @@ else
     # No CR: BSD sed writes a literal r, and the extractor strips CR anyway.
     LC_ALL=C sed '10s/.*/UTF-8/' "$langdir/Francais.txt" >"$tmp/undecodable.txt"
     LC_ALL=C sed '10s/.*/ISO-8859-2/' "$langdir/Croatian.txt" >"$tmp/c1.txt"
-    # A value line left as raw UTF-8, under a declared single-byte charset and
-    # then under a multi-byte one, which iconv on its own cannot reject.
-    leak=$(printf 'Une fuite UTF-8 : caf\xc3\xa9, na\xc3\xafve, t\xc3\xa9l\xc3\xa9phone, pr\xc3\xa9c\xc3\xa9d\xc3\xa9')
+    # A value line left as raw UTF-8, under a declared single-byte charset and then
+    # under gb2312, the multi-byte one whose own text comes closest to that shape.
+    # Its 8 non-ASCII bytes are what pin minhigh from above; the tree pins it from
+    # below, so widening either past the other is caught here.
+    leak=$(printf 'Une fuite UTF-8 : caf\xc3\xa9, na\xc3\xafve, t\xc3\xa9l\xc3\xa9phone')
     LC_ALL=C awk -v repl="$leak" \
         'NR == 20 { print repl; next } { print }' "$langdir/Francais.txt" >"$tmp/utf8mix.txt"
     LC_ALL=C awk -v repl="$leak" \
-        'NR == 20 { print repl; next } { print }' "$langdir/Japanese.txt" >"$tmp/utf8mixmb.txt"
+        'NR == 20 { print repl; next } { print }' "$langdir/Chinese-Simplified.txt" >"$tmp/utf8mixmb.txt"
     for probe in undecodable c1 utf8mix utf8mixmb; do
         if charset_declared_matches_bytes "$tmp/$probe.txt" >/dev/null; then
             echo "the charset check passed a deliberately mislabelled file ($probe)"
@@ -181,9 +185,9 @@ for scope in "Mirror %s and every host below it" "Ignore %s and every host below
 done
 
 # A msgid absent from a language file silently falls back to English (#862).
-# Multisets, not sets: a msgid appearing twice keeps the set equal while the
-# engine reaches only one of its two values. English.txt repeats 27 msgids of its
-# own, so the legitimate duplicates cancel out on both sides.
+# Multisets, not sets: a catalog repeating a msgid more often than English.txt
+# does keeps the set equal while one of the values it pairs goes unreachable.
+# English.txt repeats 27 msgids of its own, and those cancel out on both sides.
 LC_ALL=C sort <"$keys" >"$tmp/english.sorted"
 for f in "$langdir"/*.txt; do
     LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$f" | LC_ALL=C sort >"$tmp/have"
@@ -207,24 +211,22 @@ pin="$testdir/62_lang-untranslated.counts"
     echo "cannot find $pin"
     exit 1
 }
-ncounted=0
 : >"$tmp/counts"
 for f in "$langdir"/*.txt; do
     # English.txt is the msgid side of every pair, identical by construction.
     [ "$f" != "$eng" ] || continue
-    ncounted=$((ncounted + 1))
+    # Surrounding blanks are stripped before comparing: a value of one space, or a
+    # msgid copied with a trailing one, is as untranslated as the bare shapes.
     LC_ALL=C awk -v name="${f##*/}" '
+        function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
         { sub(/\r$/, "") }
-        NR % 2 == 1 { key = $0; next }
-        $0 == "" { empty++ }
-        $0 != "" && $0 == key { same++ }
+        NR % 2 == 1 { key = trim($0); next }
+        { value = trim($0) }
+        value == "" { empty++ }
+        value != "" && value == key { same++ }
         END { printf "%-25s %-9d %d\n", name, same + 0, empty + 0 }
     ' "$f" >>"$tmp/counts"
 done
-if [ "$ncounted" -ne $((nfiles - 1)) ]; then
-    echo "untranslated counts cover $ncounted of the $((nfiles - 1)) catalogs"
-    exit 1
-fi
 LC_ALL=C sort -o "$tmp/counts" "$tmp/counts"
 
 rc=0
@@ -240,7 +242,10 @@ LC_ALL=C awk -v pin="$pin" '
         while ((getline line < pin) > 0) {
             if (line ~ /^[ \t]*(#|$)/)
                 continue
-            if (split(line, a, /[ \t]+/) != 3) {
+            # A second row for the same catalog would otherwise just win, so the
+            # numbers a bad merge left behind have to be rejected, not applied.
+            if (split(line, a, /[ \t]+/) != 3 || a[2] !~ /^[0-9]+$/ ||
+                a[3] !~ /^[0-9]+$/ || a[1] in pinned) {
                 printf "%s: malformed pin line: %s\n", pin, line
                 bad++
                 continue
@@ -271,7 +276,7 @@ LC_ALL=C awk -v pin="$pin" '
         exit(bad > 0)
     }
 ' "$tmp/counts" || rc=$?
-# awk exits 2 on its own errors and 1 on a mismatch; conflating them is vacuity.
+# awk exits 2 on its own errors, 1 on a mismatch; treating them alike hides a broken check.
 if [ "$rc" -gt 1 ]; then
     echo "the untranslated-count comparison itself failed"
     exit 1
