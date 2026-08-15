@@ -4175,6 +4175,10 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   /* the link and directory answers */
   EMITS(0, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/page.html");
   EMITS(0, "foo.com", "index.html", HTS_FALSE, "-foo.com/index.html");
+  /* #1251: an answer we could not read records that same default, separator
+     included */
+  EMITS(-999, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/page.html");
+  EMITS(-999, "foo.com", "index.html", HTS_FALSE, "-foo.com/index.html");
   EMITS(1, "foo.com", "/dir/page.html", HTS_FALSE, "-foo.com/dir/*");
   EMITS(1, "foo.com", "/page.html", HTS_FALSE, "-foo.com/*");
   EMITS(5, "foo.com", "/dir/page.html", HTS_FALSE, "+foo.com/dir/*");
@@ -4218,9 +4222,19 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
              "+*.foo.com:8080/*");
   EMITS_SLOT(1, SCOPE_IN, "user:pass@www.foo.com", "/x", HTS_FALSE,
              "+www.foo.com/*");
-  /* past the last scope, and slot 2, emit nothing */
-  EMITS_SLOT(0, SCOPE_IN + 2, "www.foo.com", "/x", HTS_FALSE, "");
+  /* #1251: a host with no domain below takes the answer on the host itself */
+  EMITS_SLOT(0, SCOPE_IN + 2, "www.foo.com", "/x", HTS_FALSE, "+www.foo.com/*");
+  EMITS_SLOT(1, SCOPE_IN + 2, "www.foo.com", "/x", HTS_FALSE, "");
+  EMITS_SLOT(0, SCOPE_IN, "127.0.0.1:8080", "/x", HTS_FALSE,
+             "+127.0.0.1:8080/*");
+  EMITS_SLOT(0, SCOPE_IN, "user:pass@127.0.0.1", "/x", HTS_FALSE,
+             "+127.0.0.1/*");
+  EMITS_SLOT(1, SCOPE_IN, "127.0.0.1:8080", "/x", HTS_FALSE, "");
+  EMITS_SLOT(0, SCOPE_EX, "localhost", "/x", HTS_FALSE, "-localhost/*");
+  EMITS_SLOT(0, SCOPE_EX, "[::1]", "/x", HTS_FALSE, "-[::1]/*");
+  /* slot 2 is past the pair either way */
   EMITS_SLOT(2, SCOPE_IN, "www.foo.com", "/x", HTS_FALSE, "");
+  EMITS_SLOT(2, SCOPE_IN, "127.0.0.1", "/x", HTS_FALSE, "");
 
   /* what the pair must and must not catch */
   EMITS_SLOT(0, SCOPE_IN + 1, "www.example.co.uk", "/x", HTS_FALSE,
@@ -4402,8 +4416,10 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(6, 1, 1, 0, PRIO_UNSET);
   APPLIES(7, 1, 1, 0, PRIO_UNSET);
   APPLIES(50, 1, 1, 0, PRIO_UNSET);
-  APPLIES(-999, 1, 1, 0, PRIO_UNSET);
   APPLIES(6, 0, 0, 0, PRIO_UNSET);
+  /* #1251: an answer we could not read refuses, like the empty one */
+  APPLIES(-999, 0, 1, 0, PRIO_UNSET);
+  APPLIES(-999, 1, 1, 0, PRIO_UNSET);
   /* both ends of each scope range: include allows, exclude forbids */
   APPLIES(HTS_WIZARD_SCOPE_INCLUDE, 0, 0, 0, PRIO_UNSET);
   APPLIES(HTS_WIZARD_SCOPE_EXCLUDE - 1, 0, 0, 0, PRIO_UNSET);
@@ -4434,17 +4450,33 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
   APPLIES(HTS_WIZARD_SCOPE_EXCLUDE, -1, 1, 0, PRIO_UNSET);
 #undef APPLIES
 
-  /* the warning is all an unknown answer does, so a known one must be silent */
-  log = tmpfile();
-  assertf(log != NULL);
-  opt->log = log;
-  hts_wizard_apply_verdict(opt, 6, "foo.com", "/a/b.html", &url, &depth);
-  hts_wizard_apply_verdict(opt, 8, "foo.com", "/a/b.html", &url, &depth);
-  rewind(log);
-  assertf(fgets(line, (int) sizeof(line), log) != NULL);
-  assertf(strstr(line, "unknown answer 8") != NULL);
-  assertf(fgets(line, (int) sizeof(line), log) == NULL);
-  fclose(log);
+/* the one log line answer `n` leaves for `adr`, "" for none */
+#define WARNS(n, adr, expect)                                                  \
+  do {                                                                         \
+    log = tmpfile();                                                           \
+    assertf(log != NULL);                                                      \
+    opt->log = log;                                                            \
+    url = 0;                                                                   \
+    depth = PRIO_UNSET;                                                        \
+    hts_wizard_apply_verdict(opt, (n), (adr), "/a/b.html", &url, &depth);      \
+    rewind(log);                                                               \
+    if (fgets(line, (int) sizeof(line), log) == NULL)                          \
+      line[0] = '\0';                                                          \
+    /* the wanted text, an empty log where there is none, nothing after it */  \
+    assertf(strstr(line, (expect)) != NULL &&                                  \
+            ((expect)[0] != '\0') == (line[0] != '\0') &&                      \
+            fgets(line, (int) sizeof(line), log) == NULL);                     \
+    fclose(log);                                                               \
+  } while (0)
+  /* an answer the engine can honour in full says nothing */
+  WARNS(6, "foo.com", "");
+  WARNS(8, "foo.com", "unknown answer 8");
+  WARNS(HTS_WIZARD_SCOPE_INCLUDE, "www.foo.com", "");
+  /* #1251: the answers the engine cannot honour as asked */
+  WARNS(-999, "foo.com", "could not read your answer");
+  WARNS(HTS_WIZARD_SCOPE_INCLUDE, "127.0.0.1", "has no domain above it");
+  WARNS(HTS_WIZARD_SCOPE_EXCLUDE + 5, "www.foo.com", "has no domain above it");
+#undef WARNS
 
   opt->log = projectlog;
   opt->wizard = asked;
@@ -4453,6 +4485,60 @@ static int st_wizardverdict(httrackp *opt, int argc, char **argv) {
 }
 
 #undef PRIO_UNSET
+
+/* Prints the prompt the wizard asks about <adr> <fil>; with no argument,
+   asserts it. */
+static int st_wizardprompt(httrackp *opt, int argc, char **argv) {
+  char prompt[HTS_URLMAXSIZE * 2];
+  char adr[HTS_URLMAXSIZE], fil[HTS_URLMAXSIZE * 2];
+
+  (void) opt;
+  if (argc >= 2) {
+    hts_wizard_prompt_url(prompt, sizeof(prompt), argv[0], argv[1]);
+    printf("%s\n", prompt);
+    return 0;
+  }
+#define ASKS(adr_, fil_, expect)                                               \
+  do {                                                                         \
+    hts_wizard_prompt_url(prompt, sizeof(prompt), (adr_), (fil_));             \
+    assertf(strcmp(prompt, (expect)) == 0);                                    \
+  } while (0)
+  ASKS("foo.com", "/dir/page.html", "foo.com/dir/page.html");
+  ASKS("foo.com:8080", "/", "foo.com:8080/");
+  ASKS("user:pass@foo.com", "/x", "user:pass@foo.com/x");
+  /* the separator, for the slash-less forms the parser does not emit today */
+  ASKS("foo.com", "index.html", "foo.com/index.html");
+  ASKS("foo.com", "", "foo.com/");
+#undef ASKS
+
+  /* #1251: a link too long for the prompt is clipped, not fatal, and what is
+     left still names the host it came from */
+  memset(adr, 'a', sizeof(adr) - 1);
+  adr[sizeof(adr) - 1] = '\0';
+  memset(fil, 'b', sizeof(fil) - 1);
+  fil[sizeof(fil) - 1] = '\0';
+  fil[0] = '/';
+  hts_wizard_prompt_url(prompt, sizeof(prompt), adr, fil);
+  assertf(strlen(prompt) == sizeof(prompt) - 1);
+  assertf(strncmp(prompt, adr, sizeof(adr) - 1) == 0);
+  assertf(prompt[sizeof(adr) - 1] == '/');
+  /* and again with the separator to insert, which eats one more byte */
+  fil[0] = 'b';
+  hts_wizard_prompt_url(prompt, sizeof(prompt), adr, fil);
+  assertf(strlen(prompt) == sizeof(prompt) - 1);
+  assertf(strncmp(prompt, adr, sizeof(adr) - 1) == 0);
+  assertf(prompt[sizeof(adr) - 1] == '/');
+  assertf(prompt[sizeof(adr)] == 'b');
+  /* a host alone long enough to fill it leaves no room for either */
+  memset(fil, 'b', sizeof(fil) - 1);
+  fil[0] = '/';
+  hts_wizard_prompt_url(prompt, sizeof(prompt), fil, fil);
+  assertf(strlen(prompt) == sizeof(prompt) - 1);
+  assertf(strncmp(prompt, fil, sizeof(prompt) - 1) == 0);
+
+  printf("wizardprompt self-test OK\n");
+  return 0;
+}
 
 /* Resets the wizard's filter array to the command-line filters `cmd`
    (NULL-terminated). */
@@ -10143,6 +10229,8 @@ static const struct selftest_entry {
      st_wizardscopeanswer},
     {"wizardverdict", "[<answer>]", "what a wizard answer applies",
      st_wizardverdict},
+    {"wizardprompt", "[<adr> <fil>]", "URL the wizard prompt asks about",
+     st_wizardprompt},
     {"wizardinsert", "[<adr> <fil> [answer...] [@ filter...]]",
      "where a wizard answer lands in the filter array", st_wizardinsert},
     {"mime", "<filename>", "MIME type for a filename", st_mime},

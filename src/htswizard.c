@@ -162,6 +162,19 @@ static void wizard_cat_path(htsbuff *f, const char *sign, const char *adr,
   htsbuff_catn(f, fil, len);
 }
 
+void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
+                           const char *fil) {
+  if (dst == NULL || dstsize == 0)
+    return;
+  /* clipped, never aborting: adr and fil are cut from a crawled link and
+     together outgrow any prompt buffer */
+  dst[0] = '\0';
+  strlncatbuff(dst, adr, dstsize, dstsize - 1);
+  if (*fil != '/')
+    strlncatbuff(dst, "/", dstsize, dstsize - 1 - strlen(dst));
+  strlncatbuff(dst, fil, dstsize, dstsize - 1 - strlen(dst));
+}
+
 HTSEXT_API hts_boolean hts_wizard_host_scope(const char *question, int k,
                                              char *dst, size_t dstsize) {
   const char *host, *port, *slash, *end, *scope;
@@ -220,18 +233,32 @@ hts_tristate hts_wizard_scope_answer(int n) {
   return HTS_DEFAULT;
 }
 
+/* The domain a scope answer names, or HTS_FALSE for a host that has none. */
+static hts_boolean wizard_answer_scope(const char *adr, int n, char *dst,
+                                       size_t dstsize) {
+  const int k =
+      n - (hts_wizard_scope_answer(n) == HTS_TRUE ? HTS_WIZARD_SCOPE_EXCLUDE
+                                                  : HTS_WIZARD_SCOPE_INCLUDE);
+
+  return hts_wizard_host_scope(adr, k, dst, dstsize);
+}
+
 /* The subdomain form of the scope in slot 0, its apex in slot 1: the starred
    one does not match the apex, so a whole-domain answer needs both. */
 static void wizard_cat_scope(htsbuff *f, const char *sign, const char *adr,
                              int n, int slot) {
   char scope[HTS_URLMAXSIZE];
-  const int k =
-      n - (hts_wizard_scope_answer(n) == HTS_TRUE ? HTS_WIZARD_SCOPE_EXCLUDE
-                                                  : HTS_WIZARD_SCOPE_INCLUDE);
 
-  if (slot >= HTS_WIZARD_MAX_FILTERS ||
-      !hts_wizard_host_scope(adr, k, scope, sizeof(scope)))
+  if (slot >= HTS_WIZARD_MAX_FILTERS)
     return;
+  /* no domain lives below this host, so the host itself is the widest scope */
+  if (!wizard_answer_scope(adr, n, scope, sizeof(scope))) {
+    if (slot == 0) {
+      wizard_cat_host(f, sign, adr);
+      htsbuff_cat(f, "/*");
+    }
+    return;
+  }
   htsbuff_cpy(f, sign);
   if (slot == 0)
     htsbuff_cat(f, "*.");
@@ -255,7 +282,8 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
   if (slot != 0) /* every other answer emits a single filter */
     return;
   switch (n) {
-  case 0: /* this link only */
+  case 0:    /* this link only */
+  case -999: /* an unreadable answer falls back to that same default */
     wizard_cat_path(f, "-", adr, fil, (size_t) -1);
     break;
 
@@ -373,21 +401,40 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     *set_prio_to = 0 + 1; /* recursion level 0 */
     break;
 
-  case 5:    /* this directory and below, or the whole host */
-  case 6:    /* the whole host */
-  case 7:    /* this directory, files only */
-  case 50:   /* nothing to do */
   case -999: /* the "!" answer, and anything the front end could not parse */
+    *forbidden_url = 1;
+    hts_log_print(opt, LOG_WARNING,
+                  "(wizard) could not read your answer at %s%s: link refused, "
+                  "and the refusal recorded",
+                  adr, fil);
     break;
 
-  default: /* a scope answer forbids like 2 or allows like 6 */
-    if (hts_wizard_scope_answer(n) == HTS_TRUE)
-      *forbidden_url = 1;
-    else if (hts_wizard_scope_answer(n) == HTS_DEFAULT)
+  case 5:  /* this directory and below, or the whole host */
+  case 6:  /* the whole host */
+  case 7:  /* this directory, files only */
+  case 50: /* nothing to do */
+    break;
+
+  default: /* a scope answer forbids like 2 or allows like 6; anything else is
+              unknown */
+    if (hts_wizard_scope_answer(n) == HTS_DEFAULT) {
       hts_log_print(opt, LOG_WARNING,
                     "(wizard) unknown answer %d at %s%s, keeping the computed "
                     "verdict",
                     n, adr, fil);
+      break;
+    }
+    if (hts_wizard_scope_answer(n) == HTS_TRUE)
+      *forbidden_url = 1;
+    {
+      char scope[HTS_URLMAXSIZE];
+
+      if (!wizard_answer_scope(adr, n, scope, sizeof(scope)))
+        hts_log_print(opt, LOG_WARNING,
+                      "(wizard) %s has no domain above it, answer %d applied "
+                      "to the whole host",
+                      adr, n);
+    }
     break;
   }
 
@@ -710,6 +757,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
     int question = 1;           // poser une question                            
     int force_mirror = 0;       // pour mirror links
     int filters_answer = 0;     // décision prise par les filtres
+    /* Don't enlarge: the abort gates url_savename_addstr's append (#1269). */
     char BIGSTK l[HTS_URLMAXSIZE * 2];
     char BIGSTK lfull[HTS_URLMAXSIZE * 2];
 
@@ -878,9 +926,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       if ((ptr != 0) && (force_mirror == 0)) {
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];
 
-        tempo[0] = '\0';
-        strcatbuff(tempo, adr);
-        strcatbuff(tempo, fil);
+        hts_wizard_prompt_url(tempo, sizeof(tempo), adr, fil);
         s = RUN_CALLBACK1(opt, query3, tempo);
         if (strnotempty(s) == 0)        // entrée
           n = 0;
@@ -1047,6 +1093,7 @@ int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint siz
   int jok = 0;
 
   if (size >= 0) {
+    /* Don't enlarge: the abort gates url_savename_addstr's append (#1269). */
     char BIGSTK l[HTS_URLMAXSIZE * 2];
     char BIGSTK lfull[HTS_URLMAXSIZE * 2];
 

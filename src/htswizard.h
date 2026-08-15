@@ -72,6 +72,12 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
+/* Writes into `dst` (capacity `dstsize`, NUL included) the "<host>/<path>" the
+   wizard prompt asks about. Clips rather than aborting, so the prompt can lose
+   its tail on a link longer than `dstsize`; the answer is still recorded
+   against the whole (adr,fil). */
+void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
+                           const char *fil);
 /* Records the filters answer `n` leaves behind for the link (adr,fil), on top
    of the wizard's block at the low indices of opt->filters: last match wins, so
    a later answer outranks an earlier one and the command-line filters above the
