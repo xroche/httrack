@@ -677,7 +677,7 @@ int httpmirror(char *url1, httrackp * opt) {
         joker = 1;
 
       if (joker) { // joker ou filters
-        /* the longest rule a slot holds, plus the "*" a bare pattern gets */
+        /* the longest rule a slot holds, plus the "*" appended below */
         char BIGSTK tempo[HTS_FILTER_MAXLEN + 2];
         size_t len;
         int type;
