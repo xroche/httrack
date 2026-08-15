@@ -75,9 +75,9 @@ int cache_header_bounds_selftest(httrackp *opt, const char *dir);
    abort nor alias two keys. Returns the failed-check count. */
 int cache_url_bounds_selftest(httrackp *opt, const char *dir);
 
-/* X-Save is stored relative to path_html_utf8, so a later run with a deeper one
-   rebuilds a longer name: it must fit or the entry be refused, never clipped
-   into a name pointing at another file (#1278). Failed-check count. */
+/* X-Save is stored relative to path_html_utf8; a name rebuilt under a deeper
+   path must fit or the entry be refused, never clipped into a name pointing at
+   another file (#1278). Returns the failed-check count. */
 int cache_savename_bounds_selftest(httrackp *opt, const char *dir);
 
 /* Inject read-side corruption (zip byte surgery: bad size, header, deflate)

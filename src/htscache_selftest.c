@@ -1983,37 +1983,36 @@ int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
   return failures;
 }
 
-/* Capacity cache_readex_new() rebuilds the save name in, so the longest name
-   that fits is one byte less. */
+/* Buffer the reader rebuilds the save name into, so the longest name that fits
+   is one byte less. */
 #define SAVEBOUNDS_CAP (HTS_URLMAXSIZE * 2)
-/* X-Save length used here, kept under HTS_URLMAXSIZE: binput() clips the header
-   line to that, and a clipped one would test the clipping, not the rebuild. */
+/* X-Save length used here. binput() clips the whole header line at
+   HTS_URLMAXSIZE, and "X-Save: " plus CRLF eat into it. */
 #define SAVEBOUNDS_REL_LEN 1000
 #define SAVEBOUNDS_GUARD 16
 #define SAVEBOUNDS_GUARD_BYTE '\x5a'
 
 /* A path of exactly len bytes, slash-bounded like an -O directory. */
 static void savebounds_path(char *s, size_t size, size_t len) {
-  assertf(len >= 2 && len < size);
-  memset(s, 'd', len);
-  s[0] = '/';
-  s[len - 1] = '/';
-  s[len] = '\0';
+  assertf(len >= 2);
+  fill_str(s, size, len, 'd');
+  s[0] = s[len - 1] = '/';
 }
 
-/* Read the entry back with path_html_utf8 set to `path`. want is the save name
-   the reader must rebuild, or NULL when the rebuild cannot fit and the entry
-   must be refused. */
-static int savebounds_read(httrackp *opt, const char *path, const char *adr,
-                           const char *fil, const char *want) {
+/* Read the entry back with path_html_utf8 set to `path`, and check what the
+   reader rebuilt. want/body are the save name and body it must return, or NULL
+   for an entry whose rebuilt name cannot fit and must be refused. */
+static int savebounds_expect(httrackp *opt, const char *path, const char *adr,
+                             const char *fil, const char *want,
+                             const char *body) {
   int failures = 0;
   cache_back cache;
   htsblk r;
   char *got = malloct(SAVEBOUNDS_CAP + SAVEBOUNDS_GUARD);
   size_t k;
 
-  /* non-zero guard: a stray NUL written one past the end is invisible against
-     a zeroed one */
+  /* guard past the capacity the reader is handed, poisoned non-zero so a stray
+     NUL shows up too */
   memset(got, SAVEBOUNDS_GUARD_BYTE, SAVEBOUNDS_CAP + SAVEBOUNDS_GUARD);
   got[0] = '\0';
 
@@ -2035,6 +2034,12 @@ static int savebounds_read(httrackp *opt, const char *path, const char *adr,
               " expected %d bytes '%.48s...'\n",
               selftest_tag, (int) strlen(path), (int) strlen(got), got,
               (int) strlen(want), want);
+      failures++;
+    }
+    if (r.adr == NULL || (size_t) r.size != strlen(body) ||
+        memcmp(r.adr, body, strlen(body)) != 0) {
+      fprintf(stderr, "%s: html path of %d bytes: body mismatch\n",
+              selftest_tag, (int) strlen(path));
       failures++;
     }
   } else {
@@ -2076,20 +2081,56 @@ static int savebounds_read(httrackp *opt, const char *path, const char *adr,
   return failures;
 }
 
+/* The rebuilt name cannot fit under `path`: the entry must come back refused,
+   with neither a save name nor a body. */
+static int savebounds_expect_refused(httrackp *opt, const char *path,
+                                     const char *adr, const char *fil) {
+  return savebounds_expect(opt, path, adr, fil, NULL, NULL);
+}
+
+/* Store one entry, with path_prefix as a mirror passes it: non-NULL strips the
+   html path off X-Save, NULL leaves the name absolute (the pre-3.40 shape). */
+static void savebounds_store(httrackp *opt, cache_back *cache, const char *adr,
+                             const char *fil, const char *save,
+                             const char *path_prefix, const char *body) {
+  htsblk w;
+  char locw[4];
+  char *bodycopy = strdupt(body);
+
+  hts_init_htsblk(&w);
+  w.statuscode = 200;
+  w.size = (LLint) strlen(body);
+  strcpybuff(w.msg, "OK");
+  strcpybuff(w.contenttype, "text/html");
+  strcpybuff(w.charset, "utf-8");
+  locw[0] = '\0';
+  w.location = locw;
+  w.is_write = 0;
+  w.adr = bodycopy;
+  cache_add(opt, cache, &w, adr, fil, save, 1, path_prefix);
+  freet(bodycopy);
+}
+
 int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
   int failures = 0;
   cache_back cache;
+  static const char rel_head[] = "example.com/";
+  static const char rel_tail[] = ".html";
   const char *const adr = "example.com";
   const char *const fil = "/deep.html";
+  /* second entry, stored with an absolute X-Save: exercises the branch that
+     copies the stored name verbatim instead of prepending */
+  const char *const flat_fil = "/flat.html";
   static const char body[] = "<html><body>deep</body></html>";
+  static const char flat_body[] = "<html><body>flat</body></html>";
   static char rel[SAVEBOUNDS_REL_LEN + 1];
-  /* the deeper html paths a later run may carry: one where the rebuilt name
-     ends exactly on the last byte that fits, one a single byte past it, and
-     the issue's own 1500 */
+  /* the rebuilt name ends on the last byte that fits, then one byte past it */
   static char path_fit[SAVEBOUNDS_CAP], path_over[SAVEBOUNDS_CAP];
+  /* the html path the issue reported against */
   static char path_huge[SAVEBOUNDS_CAP];
   char BIGSTK writepath[HTS_URLMAXSIZE * 2];
   char BIGSTK save[HTS_URLMAXSIZE * 2];
+  char BIGSTK flat_save[HTS_URLMAXSIZE * 2];
   /* concat() refuses a result that only just fits, and the longest expected
      name here is exactly SAVEBOUNDS_CAP - 1 bytes */
   char BIGSTK expected[SAVEBOUNDS_CAP + 8];
@@ -2100,48 +2141,35 @@ int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
 
   memset(rel, 'p', SAVEBOUNDS_REL_LEN);
   rel[SAVEBOUNDS_REL_LEN] = '\0';
-  memcpy(rel, "example.com/", 12);
-  memcpy(rel + SAVEBOUNDS_REL_LEN - 5, ".html", 5);
+  memcpy(rel, rel_head, sizeof(rel_head) - 1);
+  memcpy(rel + SAVEBOUNDS_REL_LEN - (sizeof(rel_tail) - 1), rel_tail,
+         sizeof(rel_tail) - 1);
   savebounds_path(path_fit, sizeof(path_fit),
                   SAVEBOUNDS_CAP - 1 - SAVEBOUNDS_REL_LEN);
   savebounds_path(path_over, sizeof(path_over),
                   SAVEBOUNDS_CAP - SAVEBOUNDS_REL_LEN);
   savebounds_path(path_huge, sizeof(path_huge), 1500);
   concat(save, sizeof(save), writepath, rel);
+  concat(flat_save, sizeof(flat_save), writepath, "example.com/flat.html");
 
-  /* store it the way a mirror does: path_prefix set, so X-Save goes to the ZIP
-     relative to the html path of this run */
   selftest_open_for_write(&cache, opt);
-  {
-    htsblk w;
-    char locw[4];
-    char *bodycopy = strdupt(body);
-
-    hts_init_htsblk(&w);
-    w.statuscode = 200;
-    w.size = (LLint) strlen(body);
-    strcpybuff(w.msg, "OK");
-    strcpybuff(w.contenttype, "text/html");
-    strcpybuff(w.charset, "utf-8");
-    locw[0] = '\0';
-    w.location = locw;
-    w.is_write = 0;
-    w.adr = bodycopy;
-    cache_add(opt, &cache, &w, adr, fil, save, 1, writepath);
-    freet(bodycopy);
-  }
+  savebounds_store(opt, &cache, adr, fil, save, writepath, body);
+  savebounds_store(opt, &cache, adr, flat_fil, flat_save, NULL, flat_body);
   selftest_close(&cache);
 
   /* same html path as the write: the stripped prefix goes back on unchanged */
-  failures += savebounds_read(opt, writepath, adr, fil, save);
+  failures += savebounds_expect(opt, writepath, adr, fil, save, body);
+  /* an absolute stored name is used as-is, not prefixed a second time */
+  failures +=
+      savebounds_expect(opt, writepath, adr, flat_fil, flat_save, flat_body);
 
   /* deeper path, rebuilt name still fits to the last byte */
   concat(expected, sizeof(expected), path_fit, rel);
-  failures += savebounds_read(opt, path_fit, adr, fil, expected);
+  failures += savebounds_expect(opt, path_fit, adr, fil, expected, body);
 
   /* one byte past: refuse and re-fetch rather than name another file */
-  failures += savebounds_read(opt, path_over, adr, fil, NULL);
-  failures += savebounds_read(opt, path_huge, adr, fil, NULL);
+  failures += savebounds_expect_refused(opt, path_over, adr, fil);
+  failures += savebounds_expect_refused(opt, path_huge, adr, fil);
 
   return failures;
 }

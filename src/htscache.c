@@ -630,8 +630,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                     : "";
             size_t used = 0;
 
-            /* a clipped name is a different file: refuse the entry rather than
-               hand the file layer a name that is not the one we stored */
+            /* refuse the entry: a clipped name would point at a file we never
+               stored */
             if (!slcatprintfbuff(previous_save, sizeof(previous_save), &used,
                                  "%s%s", prefix, previous_save_)) {
               hts_log_print(opt, LOG_WARNING,
