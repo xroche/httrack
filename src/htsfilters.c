@@ -121,11 +121,8 @@ int fa_strjoker_dual(int type, char **filters, int nfil, const char *nom1,
   return use1 ? jok1 : jok2;
 }
 
-/* Real filters/URLs fit HTS_URLMAXSIZE*2; past it a hostile pattern recurses
-   O(len) deep or runs O(n^2*stars). Cap length, recursion depth and steps
-   (work): the length cap alone still allows ~2000 frames, ~900KB of stack,
-   which overflows the 1MB a Windows thread gets (#574). */
-#define STRJOKER_MAXLEN (HTS_URLMAXSIZE * 2)
+/* STRJOKER_MAXLEN alone still allows ~2000 frames, ~900KB of stack, which
+   overflows the 1MB a Windows thread gets (#574). */
 #define STRJOKER_MAXDEPTH 256u
 #define STRJOKER_MAXSTEPS 2000000u
 

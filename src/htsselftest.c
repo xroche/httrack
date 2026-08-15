@@ -4642,7 +4642,7 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
 
   /* the correction case: "ignore this link", then "mirror the whole host" */
   RESET();
-  INSERT(0, "h", "/dir/one.html");
+  assertf(INSERT(0, "h", "/dir/one.html") == 1);
   HOLDS("-h/dir/one.html");
   assertf(opt->wizard_filters == 1);
   assertf(VERDICT("h/dir/one.html") == -1);
@@ -4674,17 +4674,19 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
   HOLDS("+h/dir/*[file]", "-h/dir/one.html");
   assertf(VERDICT("h/dir/one.html") == -1);
 
-  /* both halves of a host-scope answer land in the block, in emission order */
+  /* both halves of a host-scope answer land in the block, in emission order.
+     The count returned is what the caller slices the block by, so assert it. */
   SEED("-*.zip");
-  INSERT(HTS_WIZARD_SCOPE_INCLUDE + 1, "www.example.co.uk", "/x.html");
+  assertf(INSERT(HTS_WIZARD_SCOPE_INCLUDE + 1, "www.example.co.uk",
+                 "/x.html") == 2);
   HOLDS("+*.example.co.uk/*", "+example.co.uk/*", "-*.zip");
   assertf(opt->wizard_filters == 2);
 
   /* an answer that emits nothing leaves the block and the array unchanged */
   SEED("-*.zip");
-  INSERT(4, "h", "/dir/one.html");
-  INSERT(50, "h", "/dir/one.html");
-  INSERT(3, "h", "/dir/one.html");
+  assertf(INSERT(4, "h", "/dir/one.html") == 0);
+  assertf(INSERT(50, "h", "/dir/one.html") == 0);
+  assertf(INSERT(3, "h", "/dir/one.html") == 0);
   HOLDS("-*.zip");
   assertf(opt->wizard_filters == 0);
 
@@ -4709,6 +4711,109 @@ done:
   opt->maxfilter = savedmax;
   return 0;
 }
+
+/* #1270: filters_insert() refuses a rule the matcher would never read, and
+   says so, instead of storing one that can never fire. */
+static int st_filtercap(httrackp *opt, int argc, char **argv) {
+  const htsfilters saved = opt->filters;
+  const int savedwizard = opt->wizard_filters;
+  const int saveddebug = opt->debug;
+  FILE *const projectlog = opt->log;
+  char BIGSTK atcap[HTS_FILTER_MAXLEN + 1];   /* "+a..a*", the longest rule */
+  char BIGSTK overcap[HTS_FILTER_MAXLEN + 2]; /* the same, one byte too long */
+  char BIGSTK toolong[STRJOKER_MAXLEN + 3];   /* and one the matcher skips */
+  char BIGSTK subject[HTS_FILTER_MAXLEN];     /* a URL all three would match */
+  char BIGSTK line[STRJOKER_MAXLEN + 256]; /* room for a warning quoting one */
+  char **filters = NULL;
+  int filptr = 0;
+  int taken, verdict, warned;
+
+  (void) argc;
+  (void) argv;
+  memset(atcap, 'a', sizeof(atcap) - 1);
+  atcap[0] = '+';
+  atcap[sizeof(atcap) - 2] = '*';
+  atcap[sizeof(atcap) - 1] = '\0';
+  memset(overcap, 'a', sizeof(overcap) - 1);
+  overcap[0] = '-';
+  overcap[sizeof(overcap) - 2] = '*';
+  overcap[sizeof(overcap) - 1] = '\0';
+  memset(toolong, 'a', sizeof(toolong) - 1);
+  toolong[0] = '-';
+  toolong[sizeof(toolong) - 2] = '*';
+  toolong[sizeof(toolong) - 1] = '\0';
+  memset(subject, 'a', sizeof(subject) - 1);
+  subject[sizeof(subject) - 1] = '\0';
+  assertf(strlen(atcap) == HTS_FILTER_MAXLEN);
+  assertf(strlen(overcap) == HTS_FILTER_MAXLEN + 1);
+  assertf(strlen(toolong) > STRJOKER_MAXLEN);
+  assertf(strlen(subject) <= STRJOKER_MAXLEN); /* else none could match */
+  assertf(strjoker(subject, toolong + 1, NULL, NULL) == NULL);
+
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  opt->wizard_filters = 0;
+  opt->debug = LOG_NOTICE;
+/* non-zero, so a stray write into the slot above the last rule shows up */
+#define POISON "-poison/*"
+/* offer `pattern` to the array, and report what it did with it */
+#define TRY(label, pattern)                                                    \
+  do {                                                                         \
+    FILE *const log = tmpfile();                                               \
+    char want[64];                                                             \
+    assertf(log != NULL);                                                      \
+    opt->log = log;                                                            \
+    taken = filters_insert(opt, filptr, (pattern));                            \
+    verdict = fa_strjoker(0, filters, filptr, subject, NULL, NULL, NULL);      \
+    rewind(log);                                                               \
+    if (fgets(line, (int) sizeof(line), log) == NULL)                          \
+      line[0] = '\0';                                                          \
+    /* the reason, this rule's own length, and the rule itself */              \
+    snprintf(want, sizeof(want), "%d bytes", (int) strlen(pattern));           \
+    warned = strstr(line, "could never match") != NULL &&                      \
+             strstr(line, want) != NULL && strstr(line, (pattern)) != NULL;    \
+    assertf(line[0] == '\0' || warned); /* nothing else may be logged */       \
+    fclose(log);                                                               \
+    printf("%s: stored=%d rules=%d verdict=%d warned=%d\n", (label),           \
+           taken != 0, filptr, verdict, warned);                               \
+  } while (0)
+/* a refusal leaves the count, the verdict and the slot above it untouched */
+#define REFUSED()                                                              \
+  do {                                                                         \
+    assertf(!taken && filptr == 1 && verdict == 1 && warned);                  \
+    assertf(strcmp(filters[0], atcap) == 0);                                   \
+    assertf(strcmp(filters[1], POISON) == 0);                                  \
+  } while (0)
+
+  /* a rule at the cap is stored, silently, and still matches; refusing one byte
+     early would be silent too */
+  TRY("at the cap", atcap);
+  assertf(taken && filptr == 1 && verdict == 1 && !warned);
+  assertf(strcmp(filters[0], atcap) == 0);
+
+  /* last match wins, so a stored overcap rule would forbid what the first
+     allows: the verdict below is what proves it is really absent */
+  strlcpybuff(filters[1], POISON, HTS_FILTER_SLOT_SIZE);
+  TRY("one past the cap", overcap);
+  REFUSED();
+  TRY("past the matcher", toolong);
+  REFUSED();
+
+#undef REFUSED
+#undef TRY
+#undef POISON
+  opt->log = projectlog;
+  opt->debug = saveddebug;
+  freet(filters[0]);
+  freet(filters);
+  opt->filters = saved;
+  opt->wizard_filters = savedwizard;
+  printf("filtercap self-test OK\n");
+  return 0;
+}
+
+#undef POISON
 
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
@@ -10208,6 +10313,8 @@ static const struct selftest_entry {
      "merged two-form filter verdict (fa_strjoker_dual)", st_filterdual},
     {"filterbounds", "", "matcher length/work caps reject hostile patterns",
      st_filterbounds},
+    {"filtercap", "", "an over-long filter rule is refused, not stored dead",
+     st_filtercap},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",

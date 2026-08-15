@@ -57,10 +57,6 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
                                hts_boolean filters_decided,
                                hts_boolean filters_refused);
 
-/* Per-slot capacity of the filters array, matching the slot stride allocated by
-   filters_init() in htscore.c (HTS_URLMAXSIZE * 2). */
-#define HTS_FILTER_SLOT_SIZE (HTS_URLMAXSIZE * 2)
-
 /* Most filters one wizard answer can add. Slots must stay contiguous: the
    caller stops at the first empty one. */
 #define HTS_WIZARD_MAX_FILTERS 2
@@ -82,7 +78,8 @@ void hts_wizard_prompt_url(char *dst, size_t dstsize, const char *adr,
    of the wizard's block at the low indices of opt->filters: last match wins, so
    a later answer outranks an earlier one and the command-line filters above the
    block outrank every answer. Returns the number inserted, which sit at the
-   tail of the block, ending at opt->wizard_filters. */
+   tail of the block, ending at opt->wizard_filters; a rule too long for the
+   matcher is dropped, so that can fall short of what the answer emits. */
 int hts_wizard_insert_filters(httrackp *opt, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
