@@ -10,15 +10,19 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-templates="${abs_top_srcdir:?}/templates"
+# $testdir/.. as the fallback: the Windows suite runs the scripts without
+# automake, so it exports none of its directory variables.
+srcroot=$(cd "${abs_top_srcdir:-$testdir/..}" && pwd)
+templates="$srcroot/templates"
 
 # The second argument replays every scenario through the shipped file as well,
 # so the on-disk copy is rendered and not only compared textually below.
-assert_selftest "makeindex self-test OK" makeindex "$dir" "$templates" run
+assert_selftest "makeindex self-test OK" makeindex "$dir" \
+    "$(nativepath "$templates")" run
 
 # The rest guards templates/ against the compiled-in copy that takes over when
 # the data directory is missing: the two had drifted apart (#1244).
-indextmpl="$abs_top_srcdir/src/hts-indextmpl.h"
+indextmpl="$srcroot/src/hts-indextmpl.h"
 
 # The body of one hts-indextmpl.h macro, on stdout.
 macro_body() { # macro_body MACRO
