@@ -131,39 +131,16 @@ int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
   return 0;
 }
 
-/* Rule blob under construction: grown to what the site wrote, up to the cap. */
-typedef struct {
-  char *data;
-  size_t len;
-  size_t capa;
-} robots_blob;
-
-/* Append "<marker><pattern>\n"; HTS_FALSE when the cap or the heap says no. */
-static hts_boolean robots_blob_add(robots_blob *blob, char marker,
-                                   const char *pat) {
+/* Append "<marker><pattern>\n" to the rule blob; HTS_FALSE past the cap. */
+static hts_boolean robots_rule_add(String *blob, char marker, const char *pat) {
   const size_t patlen = strlen(pat);
-  const size_t need = patlen + 2; // marker + '\n'
 
-  // overflow-safe: len <= HTS_ROBOTS_MAX_TOKEN_SIZE
-  if (need > HTS_ROBOTS_MAX_TOKEN_SIZE - blob->len)
+  // overflow-safe: the blob never passes the cap
+  if (patlen + 2 > HTS_ROBOTS_MAX_TOKEN_SIZE - StringLength(*blob))
     return HTS_FALSE;
-  if (need + 1 > blob->capa - blob->len) {
-    size_t capa = blob->capa != 0 ? blob->capa : 512;
-    char *data;
-
-    while (need + 1 > capa - blob->len)
-      capa *= 2;
-    data = (char *) realloct(blob->data, capa);
-    if (data == NULL)
-      return HTS_FALSE;
-    blob->data = data;
-    blob->capa = capa;
-  }
-  blob->data[blob->len++] = marker;
-  memcpy(blob->data + blob->len, pat, patlen);
-  blob->len += patlen;
-  blob->data[blob->len++] = '\n';
-  blob->data[blob->len] = '\0';
+  StringMemcat(*blob, &marker, 1);
+  StringMemcat(*blob, pat, patlen);
+  StringMemcat(*blob, "\n", 1);
   return HTS_TRUE;
 }
 
@@ -176,11 +153,9 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
   int ndropped = 0;
   char BIGSTK line[HTS_ROBOTS_LINE_SIZE];
   char dropped[128]; // first rule we could not honour, for the log
-  robots_blob blob;
+  String blob;
 
-  blob.data = NULL;
-  blob.len = 0;
-  blob.capa = 0;
+  StringInit(blob);
   dropped[0] = '\0';
   if (info != NULL && infosize > 0)
     info[0] = '\0';
@@ -229,9 +204,7 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
           record = 1; // generic group applies to us
       } else if (strfield(a, "httrack") || strfield(a, "winhttrack") ||
                  strfield(a, "webhttrack")) {
-        blob.len = 0; // explicit group: restart capture
-        if (blob.data != NULL)
-          blob.data[0] = '\0';
+        StringClear(blob); // explicit group: restart capture
         ndropped = 0;
         dropped[0] = '\0';
         if (info != NULL && infosize > 0)
@@ -258,7 +231,7 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
             const hts_boolean kept =
                 (cut && is_allow)
                     ? HTS_FALSE
-                    : robots_blob_add(&blob, is_allow ? 'A' : 'D', a);
+                    : robots_rule_add(&blob, is_allow ? 'A' : 'D', a);
 
             if (!kept || cut) {
               if (ndropped++ == 0) {
@@ -284,9 +257,9 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
                   "starting with '%s' (rules kept up to %d bytes, lines to %d)",
                   adr, ndropped, dropped, (int) HTS_ROBOTS_MAX_TOKEN_SIZE,
                   (int) HTS_ROBOTS_LINE_SIZE);
-  if (blob.len != 0)
-    checkrobots_set(robots, adr, blob.data);
-  freet(blob.data);
+  if (StringNotEmpty(blob))
+    checkrobots_set(robots, adr, StringBuff(blob));
+  StringFree(blob);
 }
 
 int checkrobots_set(robots_wizard *robots, const char *adr, const char *data) {
