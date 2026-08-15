@@ -23,6 +23,7 @@ log="$out/hts-log.txt" # the run helpers are subshells, so nothing they set live
 
 pad() { printf "%$1s" '' | tr ' ' a; }
 logged() { grep -aq "$1" "$log"; }
+counted() { grep -ac "$1" "$log" || true; }
 fresh() {
     rm -rf "$out"
     mkdir -p "$out"
@@ -48,6 +49,9 @@ assert_eq "$dropped" "$(why "$((maxtoken + 1))")" "rule one past the cap"
 # two doors cannot report the same rule as two different sizes.
 logged "dropped: $((maxrule + 1)) bytes is past the $maxrule-byte limit" ||
     fail "wrong size in the warning: $(grep -a dropped "$log")"
+# Once, so a rule that is warned about and then offered to the array anyway,
+# which refuses it and warns again, does not read the same as one refused here.
+assert_eq 1 "$(counted 'Filter rule dropped')" "warnings for one dropped rule"
 # 3000 bytes at a 2050-byte buffer: the write ASan caught pre-fix.
 assert_eq "$dropped" "$(why 3000)" "rule far past the cap"
 logged "dropped: 3001 bytes" || fail "wrong size in the warning"
