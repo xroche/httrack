@@ -700,9 +700,9 @@ int httpmirror(char *url1, httrackp * opt) {
         }
 
         // recopier prochaine chaine (+ ou -)
-        /* the slot it lands in must hold the sign too, and the implicit form
-           below gains a trailing '*' */
-        const size_t room = sizeof(tempo) - (plus == 0 && type == 1 ? 2 : 1);
+        /* the sign is prepended into `rule` below, not held here; only the
+           implicit form's trailing '*' has to be left room for */
+        const size_t room = sizeof(tempo) - (plus == 0 && type == 1 ? 1 : 0);
 
         if (!hts_scan_token(&a, tempo, room)) {
           /* on the console too: the user who typed it may have no log open */
