@@ -558,7 +558,7 @@ int url_savename(lien_adrfilsave *const afs,
         char BIGSTK mime[1024];
 
         mime[0] = ext[0] = '\0';
-        get_userhttptype(opt, mime, fil);
+        get_userhttptype(opt, mime, sizeof(mime), fil);
         if (strnotempty(mime)) {
           if (give_mimext(ext, sizeof(ext), mime)) {
             ext_chg = 1;
@@ -605,7 +605,7 @@ int url_savename(lien_adrfilsave *const afs,
             char BIGSTK mime[1024];
 
             mime[0] = ext[0] = '\0';
-            get_userhttptype(opt, mime, fil);
+            get_userhttptype(opt, mime, sizeof(mime), fil);
             if (strnotempty(mime)) {
               if (give_mimext(ext, sizeof(ext), mime)) {
                 ext_chg = 1;
