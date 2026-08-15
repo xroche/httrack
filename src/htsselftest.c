@@ -2413,6 +2413,51 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* treathead's Location gate must be the capacity of the buffer htsblk.location
+   aims at, so a redirect that fits is kept and one that does not is refused
+   without touching the canary sitting right behind it. */
+static int st_location(httrackp *opt, int argc, char **argv) {
+  struct {
+    char loc[HTS_LOCATION_SIZE];
+    char canary[64];
+  } probe;
+
+  char BIGSTK line[HTS_LOCATION_SIZE + 1024];
+  const char *const prefix = "http://www.example.com/";
+  htsblk r;
+  size_t n, urllen, i;
+  int smashed = 0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "location: needs a Location URL length\n");
+    return 1;
+  }
+  urllen = (size_t) atoi(argv[0]);
+  if (urllen <= strlen(prefix) || urllen + 16 > sizeof(line)) {
+    fprintf(stderr, "location: length out of probe range\n");
+    return 1;
+  }
+
+  memset(probe.loc, 0, sizeof(probe.loc));
+  memset(probe.canary, '#', sizeof(probe.canary));
+  memset(&r, 0, sizeof(r));
+  r.location = probe.loc;
+
+  n = (size_t) snprintf(line, sizeof(line), "Location: %s", prefix);
+  memset(line + n, 'a', urllen - strlen(prefix));
+  line[n + urllen - strlen(prefix)] = '\0';
+  treathead(NULL, "www.example.com", "/", &r, line);
+
+  for (i = 0; i < sizeof(probe.canary); i++) {
+    if (probe.canary[i] != '#')
+      smashed++;
+  }
+  printf("asked=%d kept=%d canary_smashed=%d\n", (int) urllen,
+         (int) strlen(probe.loc), smashed);
+  return 0;
+}
+
 /* An over-long header value must not overflow treathead's tempo[1100]. */
 static int st_headerlong(httrackp *opt, int argc, char **argv) {
   htsblk r;
@@ -10304,6 +10349,8 @@ static const struct selftest_entry {
     {"headerlong", "[header-name:]",
      "over-long header value must not overflow the parse scratch",
      st_headerlong},
+    {"location", "<url-length>", "Location gate matches the buffer it protects",
+     st_location},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
     {"xfread-limit", "", "in-memory receive buffer size bound",

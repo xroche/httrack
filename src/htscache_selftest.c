@@ -703,12 +703,10 @@ int cache_selftests(httrackp *opt, const char *dir) {
   int i;
 
   /* near-limit field values. The etag stresses htsblk.etag[256]; the location
-     stresses a long redirect URL. Each cached header line is read back through
-     a HTS_URLMAXSIZE-sized parse buffer ("<field>: <value>\r\n"), so the
-     round-trippable value is shorter than HTS_URLMAXSIZE: 1000 stays safely
-     under that real limit. */
+     stresses a redirect URL at the full HTS_LOCATION_SIZE contract, which the
+     header-line parse buffer has to be wide enough to read back whole. */
   static char etag_long[251];
-  static char location_long[1001];
+  static char location_long[HTS_LOCATION_SIZE];
 
   /* a body with embedded NUL and high bytes, to prove binary safety */
   static const char binary_body[] = {

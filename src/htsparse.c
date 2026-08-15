@@ -4452,7 +4452,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
       memcpy(r, &(back[b].r), sizeof(htsblk));
       r->location = stre->loc_; // ne PAS copier location!! adresse, pas de buffer
       if (back[b].r.location)
-        strlcpybuff(r->location, back[b].r.location, HTS_URLMAXSIZE * 2);
+        strlcpybuff(r->location, back[b].r.location, HTS_LOCATION_SIZE);
       back[b].r.adr = NULL;     // ne pas faire de desalloc ensuite
 
       // libérer emplacement backing

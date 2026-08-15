@@ -1546,12 +1546,16 @@ void treathead(t_cookie * cookie, const char *adr, const char *fil, htsblk * ret
     if (retour) {
       if (retour->location) {
         while(is_realspace(*(rcvd + p)))
-          p++;                  // sauter espaces
-        if ((int) strlen(rcvd + p) < HTS_URLMAXSIZE) // not too long?
-          /* location aliases location_buffer[HTS_URLMAXSIZE * 2] */
-          strlcpybuff(retour->location, rcvd + p, HTS_URLMAXSIZE * 2);
-        else                    // erreur.. ignorer
+          p++; // skip spaces
+        if (strlen(rcvd + p) < HTS_LOCATION_SIZE)
+          strlcpybuff(retour->location, rcvd + p, HTS_LOCATION_SIZE);
+        else {
+          /* no opt here, so this only reaches a registered log callback */
+          hts_log_print(NULL, LOG_WARNING,
+                        "Location header too long (%d bytes), redirect ignored",
+                        (int) strlen(rcvd + p));
           retour->location[0] = '\0';
+        }
       }
     }
   } else if (((p = strfield(rcvd, "Set-Cookie:")) != 0) &&

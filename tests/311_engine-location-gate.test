@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# The Location gate must be the capacity of the buffer htsblk.location aims at
+# (HTS_LOCATION_SIZE, 2048), not half of it. Each case reports the length asked
+# for, the length kept, and whether the 64-byte non-zero canary behind that
+# buffer survived: a fix that simply dropped the bound smashes it at 2048.
+# The cache side of the same contract rides 01_zlib-cache.test, whose fixture
+# stores a redirect whose Location is at full capacity.
+loc() { # loc URLLEN KEPT
+    assert_selftest "asked=$1 kept=$2 canary_smashed=0" location "$1"
+}
+
+# Well inside the old gate, and the last length it allowed.
+loc 500 500
+loc 1023 1023
+
+# The old gate refused these; they fit the buffer with room to spare.
+loc 1024 1024
+loc 1500 1500
+
+# The last length that fits, terminator included.
+loc 2046 2046
+loc 2047 2047
+
+# Past the buffer: still refused, and refusing leaves the value empty rather
+# than a truncated URL, which would be a valid-looking wrong target.
+loc 2048 0
+loc 3000 0
