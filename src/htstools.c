@@ -902,8 +902,18 @@ enum {
                  HTS_FOOTER_FIELD_COUNT)
 };
 
-const char *hts_footer_field_name(hts_footer_field_id id) {
-  return (size_t) id < HTS_FOOTER_FIELD_COUNT ? footer_field_names[id] : NULL;
+const char *hts_footer_field_list(char *dest, size_t size) {
+  htsbuff fields = htsbuff_ptr(dest, size);
+  size_t i;
+
+  for (i = 0; i < HTS_FOOTER_FIELD_COUNT; i++) {
+    if (i != 0)
+      htsbuff_catc(&fields, ' ');
+    htsbuff_catc(&fields, '{');
+    htsbuff_cat(&fields, footer_field_names[i]);
+    htsbuff_catc(&fields, '}');
+  }
+  return htsbuff_str(&fields);
 }
 
 HTSEXT_API hts_boolean hts_footer_field_ok(const char *name) {

@@ -1,80 +1,63 @@
 #!/bin/bash
 #
 # Pin the -%F field lists in html/cmdguide.html and html/guide.html to the one
-# httrack --help prints. man/httrack.1 is generated from --help, and
-# 02_manpage-regen covers it. Slot order is pinned by 01_engine-footerfmt.
+# httrack --help prints. man/httrack.1 (02_manpage-regen) and the slot order
+# (01_engine-footerfmt) are covered elsewhere.
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
 srcdir="${abs_top_srcdir:?not run under make check}"
 
-command -v httrack >/dev/null 2>&1 || {
-    echo "httrack not in PATH; skipping" >&2
-    exit 77
-}
+command -v httrack >/dev/null 2>&1 || skip "httrack not in PATH"
 
 same_set() { # same_set <list A> <list B>: newline-separated, order-insensitive
     diff <(sort <<<"$1") <(sort <<<"$2") >/dev/null
 }
 
-# A crash after the line is printed must not read as a pass, so take the whole
-# output first and match it from a here-string.
-help=$(httrack --quiet --help 2>/dev/null) || {
-    echo "FAIL: httrack --help exited $?" >&2
-    exit 1
-}
-help_line=$(grep -m1 -- ' %F  footer string' <<<"${help}") || {
-    echo "FAIL: --help prints no -%F line" >&2
-    exit 1
-}
+# Capture it all first, so a crash after the -%F line still fails the test.
+help=$(httrack --quiet --help 2>/dev/null) || fail "httrack --help exited $?"
+help_line=$(grep -m1 -- ' %F  footer string' <<<"${help}") ||
+    fail "--help prints no -%F line"
 
 # " ...; fields {addr} {path} ..., or legacy %s)"
 segment=${help_line#*; fields }
 segment=${segment%%, or legacy *}
-test "${segment}" != "${help_line}" || {
-    echo "FAIL: cannot find the field list in: ${help_line}" >&2
-    exit 1
-}
+test "${segment}" != "${help_line}" ||
+    fail "cannot find the field list in: ${help_line}"
 
-# Deliberate word splitting: one field per line. Every token has to be a
-# {name}, or a name the doc regex cannot see would drop out of both lists and
-# the comparison below would hold on two equally wrong sets.
+# Word-split on purpose, one field per line. Rejecting a token that is not a
+# {name} is what stops a name the doc grep cannot see from dropping out of both
+# lists and leaving two equally wrong sets comparing equal.
 # shellcheck disable=SC2086
 engine=$(printf '%s\n' ${segment})
 while read -r tok; do
     case "${tok}" in
     "{"?*"}") ;;
-    *)
-        echo "FAIL: '${tok}' in the -%F field list is not a {name}" >&2
-        exit 1
-        ;;
+    *) fail "'${tok}' in the -%F field list is not a {name}" ;;
     esac
 done <<<"${engine}"
 
 # Control: the comparison must be able to say no.
 if same_set "${engine}" "${engine}
 {nosuchfield}"; then
-    echo "FAIL: same_set() ignores an extra name; the checks below prove nothing" >&2
-    exit 1
+    fail "same_set() ignores an extra name; the checks below prove nothing"
 fi
 
 check_page() { # check_page <html file> <tag wrapping each {name}>
     local page="$1" tag="$2" doc
-    test -r "${page}" || {
-        echo "FAIL: no ${page}" >&2
-        return 1
-    }
+    test -r "${page}" || fail "no ${page}"
     doc=$(grep -o "<${tag}>{[^{}<]*}</${tag}>" "${page}" |
         sed "s,</*${tag}>,,g" | sort -u || true)
-    grep -qx '{addr}' <<<"${doc}" || {
-        echo "FAIL: no <${tag}>{field}</${tag}> names parsed out of ${page}" >&2
-        return 1
-    }
+    grep -qx '{addr}' <<<"${doc}" ||
+        fail "no <${tag}>{field}</${tag}> names parsed out of ${page}"
     same_set "${engine}" "${doc}" || {
-        echo "FAIL: ${page} lists different -%F fields than the engine." >&2
+        echo "${page} lists different -%F fields than the engine." >&2
         echo "Left is --help, right is the page:" >&2
         diff <(sort <<<"${engine}") <(sort <<<"${doc}") >&2 || true
-        return 1
+        fail "${page} is out of date"
     }
 }
 

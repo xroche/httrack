@@ -455,22 +455,6 @@ void help_catchurl(const char *dest_path) {
     printf("Unable to create a temporary proxy (no remaining port)\n");
 }
 
-// "{addr} {path} ..." for the -%F help line, read from the engine's own table
-// so the ten names keep their single owner in htstools.c.
-static const char *footer_field_list(char *dest, size_t size) {
-  htsbuff fields = htsbuff_ptr(dest, size);
-  hts_footer_field_id id;
-
-  for (id = 0; id < HTS_FOOTER_FIELD_COUNT; id++) {
-    if (id != 0)
-      htsbuff_catc(&fields, ' ');
-    htsbuff_catc(&fields, '{');
-    htsbuff_cat(&fields, hts_footer_field_name(id));
-    htsbuff_catc(&fields, '}');
-  }
-  return htsbuff_str(&fields);
-}
-
 // mini-aide  (h: help)
 //           y
 void help(const char *app, int more) {
@@ -628,7 +612,7 @@ void help(const char *app, int more) {
   snprintf(info, sizeof(info),
            " %%F  footer string in Html code (-%%F \"Mirrored from {url} on "
            "{date}\"; fields %s, or legacy %%s)",
-           footer_field_list(fields, sizeof(fields)));
+           hts_footer_field_list(fields, sizeof(fields)));
   infomsg(info);
   infomsg(" %l  preferred language (-%l \"fr, en, jp, *\"");
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\"");
