@@ -6,3 +6,6 @@
 # bash die on $'\r' on every line of them.
 *.test text eol=lf
 *.sh text eol=lf
+
+# The count pin is parsed field by field; a CRLF checkout makes every line malformed.
+tests/*.counts text eol=lf

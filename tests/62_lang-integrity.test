@@ -203,29 +203,46 @@ for f in "$langdir"/*.txt; do
     fi
 done
 
-# A value copied verbatim from its msgid, or left empty, satisfies every check
-# above while the string is still English on screen (#1260). A handful are
-# legitimate, so the per-catalog counts are pinned and have to match exactly.
+# A value copied verbatim from its msgid, or left empty, passes every check above
+# while the string is still English on screen (#1260). A handful are legitimate,
+# so the per-catalog counts are pinned and have to match exactly.
 pin="$testdir/62_lang-untranslated.counts"
 [ -f "$pin" ] || {
     echo "cannot find $pin"
     exit 1
 }
-: >"$tmp/counts"
-for f in "$langdir"/*.txt; do
-    # English.txt is the msgid side of every pair, identical by construction.
-    [ "$f" != "$eng" ] || continue
-    # Surrounding blanks are stripped before comparing: a value of one space, or a
-    # msgid copied with a trailing one, is as untranslated as the bare shapes.
-    LC_ALL=C awk -v name="${f##*/}" '
-        function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+
+# Surrounding blanks are stripped before comparing: a value of one space, or a
+# msgid copied with a trailing one, is as untranslated as the bare shapes.
+count_untranslated() {
+    # Two anchored sub()s, not one alternation gsub: BSD awk restarts gsub after
+    # each match, where the leading-blank anchor can fire again mid-line.
+    LC_ALL=C awk -v name="$2" '
+        function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
         { sub(/\r$/, "") }
         NR % 2 == 1 { key = trim($0); next }
         { value = trim($0) }
         value == "" { empty++ }
         value != "" && value == key { same++ }
         END { printf "%-25s %-9d %d\n", name, same + 0, empty + 0 }
-    ' "$f" >>"$tmp/counts"
+    ' "$1"
+}
+
+# Catalogs pinned at zero would also match a counter that never leaves it, so
+# count a fixture carrying one of each shape before trusting the real ones.
+printf 'Cancel\nCancel\nClose\nClose \nOK\n \nSave\nEnregistrer\n' >"$tmp/probe.txt"
+got=$(count_untranslated "$tmp/probe.txt" probe.txt)
+want=$(printf '%-25s %-9d %d\n' probe.txt 2 1)
+if [ "$got" != "$want" ]; then
+    echo "the untranslated counter miscounts a known fixture: got [$got] want [$want]"
+    exit 1
+fi
+
+: >"$tmp/counts"
+for f in "$langdir"/*.txt; do
+    # English.txt is the msgid side of every pair, identical by construction.
+    [ "$f" != "$eng" ] || continue
+    count_untranslated "$f" "${f##*/}" >>"$tmp/counts"
 done
 LC_ALL=C sort -o "$tmp/counts" "$tmp/counts"
 
@@ -240,6 +257,7 @@ LC_ALL=C awk -v pin="$pin" '
     }
     BEGIN {
         while ((getline line < pin) > 0) {
+            sub(/\r$/, "", line)
             if (line ~ /^[ \t]*(#|$)/)
                 continue
             # A second row for the same catalog would otherwise just win, so the
@@ -273,11 +291,12 @@ LC_ALL=C awk -v pin="$pin" '
                 printf "%s: pinned but no such catalog\n", f
                 bad++
             }
-        exit(bad > 0)
+        exit(bad > 0 ? 3 : 0)
     }
 ' "$tmp/counts" || rc=$?
-# awk exits 2 on its own errors, 1 on a mismatch; treating them alike hides a broken check.
-if [ "$rc" -gt 1 ]; then
+# A mismatch says so with 3, because awk's own error status is 1 on gawk and 2 on
+# mawk; reading either as a mismatch would hide a broken check.
+if [ "$rc" -ne 0 ] && [ "$rc" -ne 3 ]; then
     echo "the untranslated-count comparison itself failed"
     exit 1
 elif [ "$rc" -ne 0 ]; then

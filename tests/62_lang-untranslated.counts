@@ -1,7 +1,7 @@
 # Per-catalog counts: values identical to their English msgid, then empty ones.
+# English.txt is not listed: it is the msgid side of every pair.
 # 62_lang-integrity.test wants an exact match, so translate a string rather than
-# raise a count, and lower a count in the change that translates one.
-# English.txt is the msgid side of every pair, so it is not listed.
+# raise a count.
 #
 # catalog                 identical empty
 Bulgarian.txt             3         3
