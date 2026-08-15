@@ -1,0 +1,38 @@
+# Untranslated values per lang/*.txt catalog: those copied verbatim from their
+# English msgid, then those left empty. Both pass 62_lang-integrity's join check
+# while the string stays English on screen (#1260), and a handful are legitimate
+# ("OK", "URLs"), so the test pins the counts and demands an exact match:
+# translate the new string rather than raise a number, and lower a number in the
+# change that translates one. English.txt is the msgid side of every pair, so it
+# is not listed.
+#
+# catalog                 identical empty
+Bulgarian.txt             3         3
+Castellano.txt            7         0
+Cesky.txt                 3         23
+Chinese-BIG5.txt          1         4
+Chinese-Simplified.txt    0         23
+Croatian.txt              5         0
+Dansk.txt                 10        0
+Deutsch.txt               9         4
+Eesti.txt                 7         18
+Finnish.txt               2         0
+Francais.txt              5         0
+Greek.txt                 5         0
+Italiano.txt              13        1
+Japanese.txt              3         23
+Macedonian.txt            3         6
+Magyar.txt                4         4
+Nederlands.txt            17        4
+Norsk.txt                 5         21
+Polski.txt                6         0
+Portugues-Brasil.txt      4         0
+Portugues.txt             4         26
+Romanian.txt              4         5
+Russian.txt               5         0
+Slovak.txt                6         18
+Slovenian.txt             7         25
+Svenska.txt               9         23
+Turkish.txt               1         0
+Ukrainian.txt             0         21
+Uzbek.txt                 8         0
