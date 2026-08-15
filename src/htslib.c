@@ -3317,7 +3317,7 @@ int ishtml(httrackp * opt, const char *fil) {
   if ((a = strchr(fil_noquery, '?')) != NULL) {
     *a = '\0';
   }
-  if (get_userhttptype(opt, mime, fil_noquery)) {
+  if (get_userhttptype(opt, mime, sizeof(mime), fil_noquery)) {
     if (is_html_mime_type(mime)) {
       return 1;
     } else {
@@ -4651,7 +4651,7 @@ HTSEXT_API hts_boolean get_httptype_sized(httrackp *opt, char *s, size_t ssize,
   // userdef overrides get_httptype (a rule with an empty value, e.g. "--assume
   // cgi=", matches but writes nothing: report it as "no type" like the old
   // code, whose callers tested strnotempty(s))
-  if (get_userhttptype(opt, s, fil)) {
+  if (get_userhttptype(opt, s, ssize, fil)) {
     return s[0] != '\0';
   }
   // regular tests
@@ -4698,14 +4698,15 @@ HTSEXT_API void get_httptype(httrackp *opt, char *s, const char *fil,
 }
 
 // get type of fil (php)
-// s: buffer (text/html) or NULL
-// return: 1 if known by user
-int get_userhttptype(httrackp * opt, char *s, const char *fil) {
+// s: destination buffer, or NULL
+hts_boolean get_userhttptype(httrackp *opt, char *s, size_t ssize,
+                             const char *fil) {
   if (s != NULL) {
+    assertf(ssize != 0);
     if (s)
       s[0] = '\0';
     if (fil == NULL || *fil == '\0')
-      return 0;
+      return HTS_FALSE;
 #if 1
     if (StringLength(opt->mimedefs) > 0) {
 
@@ -4734,22 +4735,29 @@ int get_userhttptype(httrackp * opt, char *s, const char *fil) {
                 && mimedefs[i] == segment[i]    /* same item */
                 ; i++) ;
             /* success */
-            if ((mimedefs[i] == '=' || mimedefs[i] == ' ')
-                && segment[i] == '\0') {
-              int i2;
-
+            if ((mimedefs[i] == '=' || mimedefs[i] == ' ') &&
+                segment[i] == '\0') {
               while(mimedefs[i] != 0 && mimedefs[i] != '\n'
                     && mimedefs[i] != '=')
                 i++;
               if (mimedefs[i] == '=') {
+                size_t len;
+
                 i++;
-                for(i2 = 0;
-                    mimedefs[i + i2] != '\n' && mimedefs[i + i2] != '\0';
-                    i2++) {
-                  s[i2] = mimedefs[i + i2];
+                len = strcspn(&mimedefs[i], "\n");
+                /* clip, don't abort: the consumers match whole strings far
+                   shorter than any destination, so a value long enough to be
+                   clipped already matched nothing (#1276) */
+                if (len >= ssize) {
+                  hts_log_print(opt, LOG_WARNING,
+                                "--assume value for '%s' is %d bytes, clipped "
+                                "to %d",
+                                fil, (int) len, (int) (ssize - 1));
+                  len = ssize - 1;
                 }
-                s[i2] = '\0';
-                return 1;       /* SUCCESS! */
+                memcpy(s, &mimedefs[i], len);
+                s[len] = '\0';
+                return HTS_TRUE; /* SUCCESS! */
               }
             }
             /* next item in list */
@@ -4801,7 +4809,7 @@ int get_userhttptype(httrackp * opt, char *s, const char *fil) {
     }
 #endif
   }
-  return 0;
+  return HTS_FALSE;
 }
 
 // give the file extension for a mime type (e.g. "image/gif" -> "gif")
@@ -4883,7 +4891,7 @@ HTSEXT_API int is_userknowntype(httrackp * opt, const char *fil) {
   if (!strnotempty(fil))
     return 0;
   mime[0] = '\0';
-  get_userhttptype(opt, mime, fil);
+  get_userhttptype(opt, mime, sizeof(mime), fil);
   if (!strnotempty(mime))
     return 0;
   else if (is_html_mime_type(mime))

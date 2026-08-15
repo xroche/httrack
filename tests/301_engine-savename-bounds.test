@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# url_savename_addstr() appends a crawled link to afs->save; with no size cap it
+# wrote past the buffer (#1269).
+assert_selftest "savename-addstr self-test OK" savename-addstr
+
+# url_savename_addtail() carries the default name and the extension onto a link
+# that already fills that buffer, where strcatbuff used to abort instead.
+assert_selftest "savename-addtail self-test OK, save 2048 bytes" savename-addtail
+
+httrack_bin=$(httrack_path)
+
+# Emits the save name. -#test=savename poisons the bytes behind save[] and exits
+# non-zero if the naming path touched them, so a breach fails here. filpad=N
+# expands '*' into N bytes, past what argv can carry (HTS_CDLMAXSIZE).
+savename() { # savename PAD FIL [ARGS...]
+    local pad=$1 fil=$2 out
+    shift 2
+    out=$("$httrack_bin" -O /dev/null -#test=savename "$fil" text/html \
+        "filpad=$pad" "$@" 2>&1) || fail "$fil pad $pad: exited non-zero: $out"
+    printf '%s\n' "${out#savename: }"
+}
+
+# A 1000-byte host plus these pads puts the intermediate name either side of the
+# 2048-byte buffer end: 1908, 1997 and 2038 bytes fit, 2508 and 3038 do not.
+long_host=$(printf '%01000d' 0 | tr '0' h)
+for fil in '/*/x.html' '/dir/*.html'; do
+    # Whatever fits must keep every byte, extension included. Clipping the
+    # intermediate early costs the name the .html the shortener would have kept.
+    for pad in 900 990 1030; do
+        name=$(savename "$pad" "$fil" "adr=$long_host")
+        case $name in
+        *.html) ;;
+        *) fail "$fil pad $pad: lost its extension: ${name: -40}" ;;
+        esac
+    done
+    # Past the end, the name is cut but nothing may land behind save[].
+    for pad in 1500 2030; do
+        name=$(savename "$pad" "$fil" "adr=$long_host")
+        assert_match "^/dev/null/" "$name" "$fil pad $pad"
+    done
+done
+
+# A link long enough to fill the engine's working copy of it on its own: each
+# appender onto that copy must give way. Default page name, resolved extension,
+# then the whole-name rewrite a Content-Disposition asks for.
+for spec in '/*/:2036:' '/dir/*:2038:' '/*/x:2040:' \
+    "/*/x.html:2038:cdispo=attachment; filename=\"y.zip\""; do
+    fil=${spec%%:*} rest=${spec#*:}
+    pad=${rest%%:*} extra=${rest#*:}
+    if [ -n "$extra" ]; then
+        name=$(savename "$pad" "$fil" "adr=$long_host" "$extra")
+    else
+        name=$(savename "$pad" "$fil")
+    fi
+    assert_match "^/dev/null/" "$name" "$fil pad $pad"
+done
+
+# -N is the only caller that selects savename_type -1, and it always sets the
+# template; the knob must refuse the state the engine can never be in.
+out=$("$httrack_bin" -O /dev/null -#test=savename /x.html text/html type=-1 2>&1) &&
+    fail "type=-1 without a template was accepted: $out"
+assert_match "needs a userdef" "$out" "type=-1 guard"
+name=$(savename 900 '/*/x.html' 'userdef=%h%p/%n%q.%t')
+assert_match '[.]html$' "$name" "userdef naming"

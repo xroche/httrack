@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscoremain.h"
 #include "htscatchurl.h"
 #include "htslib.h"
+#include "htstools.h"
 #include "htsalias.h"
 #include "htsmodules.h"
 #ifdef _WIN32
@@ -458,6 +459,7 @@ void help_catchurl(const char *dest_path) {
 //           y
 void help(const char *app, int more) {
   char info[2048];
+  char fields[256];
 
   infomsg("");
   if (more)
@@ -607,10 +609,11 @@ void help(const char *app, int more) {
     ("  F  user-agent field sent in HTTP headers (-F \"user-agent name\")");
   infomsg(" %R  default referer field sent in HTTP headers");
   infomsg(" %E  from email address sent in HTTP headers");
-  infomsg(
-      " %F  footer string in Html code (-%F \"Mirrored from {url} on "
-      "{date}\"; fields {addr} {path} {url} {date} {lastmodified} {version} "
-      "{mime} {charset} {status} {size}, or legacy %s)");
+  snprintf(info, sizeof(info),
+           " %%F  footer string in Html code (-%%F \"Mirrored from {url} on "
+           "{date}\"; fields %s, or legacy %%s)",
+           hts_footer_field_list(fields, sizeof(fields)));
+  infomsg(info);
   infomsg(" %l  preferred language (-%l \"fr, en, jp, *\"");
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\"");
   infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"");

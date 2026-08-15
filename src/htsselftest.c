@@ -78,6 +78,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <ctype.h>
 #include <errno.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1105,6 +1106,134 @@ static int st_mime(httrackp *opt, int argc, char **argv) {
   } else {
     printf("%s is of an unknown MIME type\n", argv[0]);
   }
+  return 0;
+}
+
+/* Wider than the longest test value, so a byte written past any destination
+   still lands in the canary rather than beyond it. */
+enum { ST_ASSUME_CANARY = 1200 };
+
+/* Build "\ncgi=<value_len bytes of 'B'>\n" into opt->mimedefs. */
+static void st_assume_rule(httrackp *opt, size_t value_len) {
+  size_t i;
+
+  StringCopy(opt->mimedefs, "\ncgi=");
+  for (i = 0; i < value_len; i++)
+    StringAddchar(opt->mimedefs, 'B');
+  StringCat(opt->mimedefs, "\n");
+}
+
+static unsigned st_assume_clips; /* clip warnings the callback has seen */
+
+static void st_assume_log(httrackp *opt, int type, const char *format,
+                          va_list args) {
+  (void) opt;
+  (void) format;
+  (void) args;
+  if ((type & 0xff) == LOG_WARNING)
+    st_assume_clips++;
+}
+
+/* An empty selector runs every destination. */
+static hts_boolean st_assume_wants(const char *only, const char *capacity) {
+  return *only == '\0' || strcmp(only, capacity) == 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+/* An --assume value is clipped to the buffer it lands in, and the clip is
+   reported rather than fatal (#1276). Each value overshoots a different subset
+   of the three destinations, so one shared bound cannot pass them all. */
+static int st_assumemime(httrackp *opt, int argc, char **argv) {
+  static const size_t values[] = {200, 300, 1100};
+  /* pre-fix every destination smashes and only the first assertion to fire is
+     visible, so each is selectable by its capacity */
+  const char *const only = argc >= 1 ? argv[0] : "";
+  const int save_debug = opt->debug;
+  char canary[ST_ASSUME_CANARY];
+  size_t v;
+
+  if (!st_assume_wants(only, "128") && !st_assume_wants(only, "256") &&
+      !st_assume_wants(only, "1024")) {
+    fprintf(stderr, "assumemime: want one of 128, 256, 1024\n");
+    return 1;
+  }
+  memset(canary, '#', sizeof(canary));
+  /* the callback runs above the level filter, so the warnings can be counted
+     while the log itself stays quiet and stdout carries one line */
+  opt->debug = LOG_ERROR;
+  hts_set_log_vprint_callback(st_assume_log);
+
+  for (v = 0; v < sizeof(values) / sizeof(values[0]); v++) {
+    const size_t len = values[v];
+
+    st_assume_rule(opt, len);
+
+    /* ishtml()'s mime[256] */
+    if (st_assume_wants(only, "256")) {
+      struct {
+        char dst[256];
+        char canary[ST_ASSUME_CANARY];
+      } s;
+
+      memset(&s, '#', sizeof(s));
+      st_assume_clips = 0;
+      assertf(get_userhttptype(opt, s.dst, sizeof(s.dst), "/x.cgi"));
+      assertf(strlen(s.dst) == (len < sizeof(s.dst) ? len : sizeof(s.dst) - 1));
+      assertf(memcmp(s.canary, canary, sizeof(s.canary)) == 0);
+      assertf(st_assume_clips == (len < sizeof(s.dst) ? 0u : 1u));
+      /* the frame ishtml() owns, which is where #1276 was reported */
+      assertf(ishtml(opt, "/x.cgi") == 0);
+    }
+
+    /* url_savename()'s mime[1024] */
+    if (st_assume_wants(only, "1024")) {
+      struct {
+        char dst[1024];
+        char canary[ST_ASSUME_CANARY];
+      } l;
+
+      memset(&l, '#', sizeof(l));
+      st_assume_clips = 0;
+      assertf(get_userhttptype(opt, l.dst, sizeof(l.dst), "/x.cgi"));
+      assertf(strlen(l.dst) == (len < sizeof(l.dst) ? len : sizeof(l.dst) - 1));
+      assertf(memcmp(l.canary, canary, sizeof(l.canary)) == 0);
+      assertf(st_assume_clips == (len < sizeof(l.dst) ? 0u : 1u));
+    }
+
+    /* htsblk.contenttype[128]: charset and contentencoding follow it in the
+       same struct, so an overrun stays intra-object and neither ASan nor
+       _FORTIFY_SOURCE reports it */
+    if (st_assume_wants(only, "128")) {
+      htsblk r;
+
+      memset(&r, '#', sizeof(r));
+      r.contenttype[0] = '\0';
+      st_assume_clips = 0;
+      assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                                 "/x.cgi", 0));
+      assertf(strlen(r.contenttype) == sizeof(r.contenttype) - 1);
+      assertf(memcmp(r.charset, canary, sizeof(r.charset)) == 0);
+      assertf(memcmp(r.contentencoding, canary, sizeof(r.contentencoding)) ==
+              0);
+      assertf(st_assume_clips == 1);
+    }
+  }
+
+  /* control: a value every destination holds is written whole, unclipped and
+     unreported, and still reaches ishtml() as the type it names */
+  StringCopy(opt->mimedefs, "\ncgi=text/html\n");
+  {
+    char mime[256];
+
+    st_assume_clips = 0;
+    assertf(get_userhttptype(opt, mime, sizeof(mime), "/x.cgi"));
+    assertf(strcmp(mime, "text/html") == 0);
+    assertf(st_assume_clips == 0);
+    assertf(ishtml(opt, "/x.cgi") == 1);
+  }
+
+  hts_set_log_vprint_callback(NULL);
+  opt->debug = save_debug;
+  printf("assumemime ok\n");
   return 0;
 }
 
@@ -2772,8 +2901,43 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
   return rc;
 }
 
+/* save[] is the last member of lien_adrfilsave, so a poisoned run right behind
+   it catches whatever the naming path appends past its end (#1269). */
+#define ST_SAVENAME_POISON 0x5a
+#define ST_SAVENAME_CANARY 128
+
+/* an off-by-one terminator writes a NUL, which a zero poison could not see */
+enum { st_poison_is_not_nul = 1 / (ST_SAVENAME_POISON != 0) };
+
+/* Does the run from `from` to `size` still hold the poison? */
+static hts_boolean st_poison_intact(const char *label, const char *buf,
+                                    size_t from, size_t size) {
+  size_t i;
+
+  for (i = size; i > from; i--) {
+    if (buf[i - 1] != (char) ST_SAVENAME_POISON) {
+      fprintf(stderr, "%s: wrote %d byte(s) past the end\n", label,
+              (int) (i - from));
+      return HTS_FALSE;
+    }
+  }
+  return HTS_TRUE;
+}
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
-  lien_adrfilsave afs;
+  struct {
+    lien_adrfilsave afs;
+    char canary[ST_SAVENAME_CANARY];
+  } probe;
+
+  /* the canary is only behind save[] if the struct has no trailing padding */
+  enum {
+    st_savename_packed =
+        1 / (offsetof(lien_adrfilsave, save) + sizeof(probe.afs.save) ==
+             sizeof(lien_adrfilsave))
+  };
+
+  lien_adrfilsave *const afs = &probe.afs;
   cache_back cache;
   struct_back *sback;
   hash_struct hash;
@@ -2784,6 +2948,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   const char *cached = NULL;
   const char *bodyfile = "st-savename-body.tmp";
   int statuscode = HTTP_OK, status = 0;
+  int filpad = 0;
   int i;
 
   if (argc < 2) {
@@ -2820,14 +2985,45 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       body = a + 5;
     else if (strncmp(a, "cached=", 7) == 0)
       cached = a + 7;
-    else if (strncmp(a, "prior=", 6) != 0) {
+    else if (strncmp(a, "filpad=", 7) == 0)
+      filpad = atoi(a + 7);
+    else if (strncmp(a, "userdef=", 8) == 0) { /* -N, which selects type -1 */
+      StringCopy(opt->savename_userdef, a + 8);
+      opt->savename_type = -1;
+    } else if (strncmp(a, "prior=", 6) != 0) {
       fprintf(stderr, "savename: unknown arg '%s'\n", a);
       return 1;
     }
   }
-  memset(&afs, 0, sizeof(afs));
-  strcpybuff(afs.af.adr, adr);
-  strcpybuff(afs.af.fil, argv[0]);
+  /* -N is the only thing that selects type -1, and it always sets the template
+     the naming path then walks; without one url_savename reads a NULL. */
+  if (opt->savename_type == -1 && StringLength(opt->savename_userdef) == 0) {
+    fprintf(stderr, "savename: type=-1 needs a userdef= template\n");
+    return 1;
+  }
+  memset(&probe, 0, sizeof(probe));
+  memset(probe.canary, ST_SAVENAME_POISON, sizeof(probe.canary));
+  strcpybuff(afs->af.adr, adr);
+  if (filpad > 0) {
+    /* '*' stands for filpad bytes: a link longer than argv can carry, argv
+       being capped at HTS_CDLMAXSIZE (htscoremain.c) */
+    const char *const star = strchr(argv[0], '*');
+    char BIGSTK pad[HTS_URLMAXSIZE * 2];
+
+    /* refuse rather than let the harness itself abort in strcatbuff */
+    if (star == NULL ||
+        (size_t) filpad + strlen(argv[0]) >= sizeof(afs->af.fil)) {
+      fprintf(stderr, "savename: filpad needs a '*' in the fil, and room\n");
+      return 1;
+    }
+    memset(pad, 'a', (size_t) filpad);
+    pad[filpad] = '\0';
+    strncatbuff(afs->af.fil, argv[0], star - argv[0]);
+    strcatbuff(afs->af.fil, pad);
+    strcatbuff(afs->af.fil, star + 1);
+  } else {
+    strcpybuff(afs->af.fil, argv[0]);
+  }
 
   memset(&cache, 0, sizeof(cache));
   if (cached != NULL) { /* cached=<content-type>|<save name> */
@@ -2902,7 +3098,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   strcpybuff(headers.r.contenttype, argv[1]);
   if (cdispo != NULL)
     strcpybuff(headers.r.cdispo, cdispo);
-  strcpybuff(headers.url_fil, argv[0]);
+  strcpybuff(headers.url_fil, afs->af.fil);
   if (body != NULL) { /* leading body bytes, read via url_sav */
     char BIGSTK data[1024];
     const size_t n = st_decode_body(body, data, sizeof(data));
@@ -2916,12 +3112,181 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     strcpybuff(headers.url_sav, bodyfile);
   }
 
-  url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
+  url_savename(afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
                &headers);
   if (body != NULL)
     (void) UNLINK(bodyfile);
-  printf("savename: %s\n", afs.save);
+  if (!st_poison_intact("savename: save[]", probe.canary, 0,
+                        sizeof(probe.canary)))
+    return 1;
+  printf("savename: %s\n", afs->save);
   return 0;
+}
+
+/* url_savename_addstr() takes attacker-controlled link text and must clip to
+   the destination size it is handed, at every capacity (#1269). */
+static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    size_t dsize;
+    const char *seed;
+    const char *add;
+    const char *want;
+  } cases[] = {
+      {8, "", "a\\b", "a/b"},
+      {8, "ab/", "cd", "ab/cd"},
+      {8, "", "abcdefg", "abcdefg"}, /* exact fit, NUL on the last byte */
+      {8, "", "abcdefgh", "abcdefg"},
+      {8, "", "abcdefghijklmnop", "abcdefg"},
+      {8, "ab", "\\\\\\\\\\\\\\\\", "ab/////"}, /* clip inside a '\' run */
+      {8, "abcdefg", "xy", "abcdefg"},
+      {1, "", "abc", ""},
+      {2, "", "a\\c", "a"},
+      {4, "abcdefghij", "xy", "abcdefghij"}, /* seed past dsize: left alone */
+      {0, "abc", "xy", "abc"},
+  };
+
+  /* last entry is the naming path's own destination, sizeof(afs->save) */
+  static const size_t bigcaps[] = {64, 255, HTS_URLMAXSIZE, HTS_URLMAXSIZE * 2};
+  char buf[64];
+  size_t k;
+  int rc = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    const size_t seedlen = strlen(cases[k].seed);
+    /* the appender may write up to dsize, and never past a longer seed */
+    const size_t guard =
+        cases[k].dsize > seedlen + 1 ? cases[k].dsize : seedlen + 1;
+    char label[64];
+
+    snprintf(label, sizeof(label), "savename-addstr: '%s' at dsize %d",
+             cases[k].add, (int) cases[k].dsize);
+    memset(buf, ST_SAVENAME_POISON, sizeof(buf));
+    memcpy(buf, cases[k].seed, seedlen + 1);
+    url_savename_addstr(buf, cases[k].dsize, cases[k].add);
+    if (strcmp(buf, cases[k].want) != 0) {
+      fprintf(stderr, "savename-addstr: '%s' + '%s' (%d) -> '%s' want '%s'\n",
+              cases[k].seed, cases[k].add, (int) cases[k].dsize, buf,
+              cases[k].want);
+      rc = 1;
+    }
+    if (!st_poison_intact(label, buf, guard, sizeof(buf)))
+      rc = 1;
+  }
+
+  /* Oversized buffers, so an unclipped append lands on poison rather than
+     smashing the stack. */
+  for (k = 0; k < sizeof(bigcaps) / sizeof(bigcaps[0]); k++) {
+    const size_t dsize = bigcaps[k];
+    char BIGSTK src[HTS_URLMAXSIZE * 4];
+    char BIGSTK big[sizeof(src) + ST_SAVENAME_CANARY];
+    char label[64];
+
+    snprintf(label, sizeof(label), "savename-addstr: long link at dsize %d",
+             (int) dsize);
+    memset(big, ST_SAVENAME_POISON, sizeof(big));
+    big[0] = '\0';
+    memset(src, 'a', sizeof(src) - 1);
+    src[sizeof(src) - 1] = '\0';
+    url_savename_addstr(big, dsize, src);
+    if (strlen(big) != dsize - 1) {
+      fprintf(stderr, "savename-addstr: dsize %d filled %d byte(s)\n",
+              (int) dsize, (int) strlen(big));
+      rc = 1;
+    }
+    if (!st_poison_intact(label, big, dsize, sizeof(big)))
+      rc = 1;
+  }
+
+  printf("savename-addstr self-test %s\n", rc == 0 ? "OK" : "FAILED");
+  return rc;
+}
+
+/* What gives way to the arriving tail is the middle, never the tail (#1269). */
+static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    size_t dsize;
+    const char *seed;
+    const char *sep;
+    const char *add;
+    const char *want;
+  } cases[] = {
+      {16, "/a/", "", "index.html", "/a/index.html"}, /* room to spare */
+      {16, "/aaaaa/", "", "index.html", "/aaaaindex.html"},
+      {8, "/ab/", ".", "gz", "/ab/.gz"},  /* exact fit, no byte given up */
+      {8, "/abc/", ".", "gz", "/abc.gz"}, /* one byte of middle gives way */
+      {8, "abcdefg", "", "xy", "abcdexy"},
+      {8, "abcdefg", ".", "html", "ab.html"}, /* the tail arrives whole */
+      {8, "", ".", "html", ".html"},
+      {6, "abc", ".", "html", ".html"}, /* the middle can give way entirely */
+      {5, "abc", ".", "html", "abc"},   /* tail alone fills dsize: no-op */
+      {0, "abc", "", "x", "abc"},
+      /* the cut lands inside a 3-byte character and backs off it */
+      {8, "a\342\202\254b", ".", "html", "a.html"},
+      {10, "a\342\202\254b", ".", "html",
+       "a\342\202\254.html"}, /* cut on a lead byte */
+      {8, "\360\237\230\200x", ".", "gz",
+       "\360\237\230\200.gz"},                    /* 4-byte kept */
+      {7, "\360\237\230\200x", ".", "gz", ".gz"}, /* 4-byte cut away whole */
+  };
+
+  char buf[64];
+  size_t k;
+  int rc = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    const size_t seedlen = strlen(cases[k].seed);
+    const size_t guard =
+        cases[k].dsize > seedlen + 1 ? cases[k].dsize : seedlen + 1;
+    char label[64];
+
+    snprintf(label, sizeof(label), "savename-addtail: '%s%s' at dsize %d",
+             cases[k].sep, cases[k].add, (int) cases[k].dsize);
+    memset(buf, ST_SAVENAME_POISON, sizeof(buf));
+    memcpy(buf, cases[k].seed, seedlen + 1);
+    url_savename_addtail(buf, cases[k].dsize, cases[k].sep, cases[k].add);
+    if (strcmp(buf, cases[k].want) != 0) {
+      fprintf(stderr,
+              "savename-addtail: '%s' + '%s%s' (%d) -> '%s' want '%s'\n",
+              cases[k].seed, cases[k].sep, cases[k].add, (int) cases[k].dsize,
+              buf, cases[k].want);
+      rc = 1;
+    }
+    if (!st_poison_intact(label, buf, guard, sizeof(buf)))
+      rc = 1;
+  }
+
+  /* A link filling the whole buffer still gets its extension. */
+  {
+    char BIGSTK big[HTS_URLMAXSIZE * 2 + ST_SAVENAME_CANARY];
+    const size_t dsize = HTS_URLMAXSIZE * 2;
+
+    memset(big, ST_SAVENAME_POISON, sizeof(big));
+    memset(big, 'a', dsize - 1);
+    big[dsize - 1] = '\0';
+    url_savename_addtail(big, dsize, ".", "html");
+    if (strlen(big) != dsize - 1 ||
+        strcmp(big + dsize - 1 - strlen(".html"), ".html") != 0) {
+      fprintf(stderr,
+              "savename-addtail: full buffer kept %d byte(s), no .html\n",
+              (int) strlen(big));
+      rc = 1;
+    }
+    if (!st_poison_intact("savename-addtail: full buffer", big, dsize,
+                          sizeof(big)))
+      rc = 1;
+  }
+
+  /* The .test's pads are chosen against this size; printing it reds them when
+     it moves rather than letting them quietly stop reaching the end. */
+  printf("savename-addtail self-test %s, save %d bytes\n",
+         rc == 0 ? "OK" : "FAILED", (int) (HTS_URLMAXSIZE * 2));
+  return rc;
 }
 
 static char st_log_callback_seen[256];
@@ -3184,6 +3549,18 @@ static int st_cache_urlbounds(httrackp *opt, int argc, char **argv) {
   }
   err = cache_url_bounds_selftest(opt, argv[0]);
   printf("cache-urlbounds: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_cache_savebounds(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  if (argc < 1) {
+    fprintf(stderr, "cache-savebounds: needs a directory\n");
+    return 1;
+  }
+  err = cache_savename_bounds_selftest(opt, argv[0]);
+  printf("cache-savebounds: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -4642,7 +5019,7 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
 
   /* the correction case: "ignore this link", then "mirror the whole host" */
   RESET();
-  INSERT(0, "h", "/dir/one.html");
+  assertf(INSERT(0, "h", "/dir/one.html") == 1);
   HOLDS("-h/dir/one.html");
   assertf(opt->wizard_filters == 1);
   assertf(VERDICT("h/dir/one.html") == -1);
@@ -4674,17 +5051,19 @@ static int st_wizardinsert(httrackp *opt, int argc, char **argv) {
   HOLDS("+h/dir/*[file]", "-h/dir/one.html");
   assertf(VERDICT("h/dir/one.html") == -1);
 
-  /* both halves of a host-scope answer land in the block, in emission order */
+  /* both halves of a host-scope answer land in the block, in emission order.
+     The count returned is what the caller slices the block by, so assert it. */
   SEED("-*.zip");
-  INSERT(HTS_WIZARD_SCOPE_INCLUDE + 1, "www.example.co.uk", "/x.html");
+  assertf(INSERT(HTS_WIZARD_SCOPE_INCLUDE + 1, "www.example.co.uk",
+                 "/x.html") == 2);
   HOLDS("+*.example.co.uk/*", "+example.co.uk/*", "-*.zip");
   assertf(opt->wizard_filters == 2);
 
   /* an answer that emits nothing leaves the block and the array unchanged */
   SEED("-*.zip");
-  INSERT(4, "h", "/dir/one.html");
-  INSERT(50, "h", "/dir/one.html");
-  INSERT(3, "h", "/dir/one.html");
+  assertf(INSERT(4, "h", "/dir/one.html") == 0);
+  assertf(INSERT(50, "h", "/dir/one.html") == 0);
+  assertf(INSERT(3, "h", "/dir/one.html") == 0);
   HOLDS("-*.zip");
   assertf(opt->wizard_filters == 0);
 
@@ -4709,6 +5088,109 @@ done:
   opt->maxfilter = savedmax;
   return 0;
 }
+
+/* #1270: filters_insert() refuses a rule the matcher would never read, and
+   says so, instead of storing one that can never fire. */
+static int st_filtercap(httrackp *opt, int argc, char **argv) {
+  const htsfilters saved = opt->filters;
+  const int savedwizard = opt->wizard_filters;
+  const int saveddebug = opt->debug;
+  FILE *const projectlog = opt->log;
+  char BIGSTK atcap[HTS_FILTER_MAXLEN + 1];   /* "+a..a*", the longest rule */
+  char BIGSTK overcap[HTS_FILTER_MAXLEN + 2]; /* the same, one byte too long */
+  char BIGSTK toolong[STRJOKER_MAXLEN + 3];   /* and one the matcher skips */
+  char BIGSTK subject[HTS_FILTER_MAXLEN];     /* a URL all three would match */
+  char BIGSTK line[STRJOKER_MAXLEN + 256]; /* room for a warning quoting one */
+  char **filters = NULL;
+  int filptr = 0;
+  int taken, verdict, warned;
+
+  (void) argc;
+  (void) argv;
+  memset(atcap, 'a', sizeof(atcap) - 1);
+  atcap[0] = '+';
+  atcap[sizeof(atcap) - 2] = '*';
+  atcap[sizeof(atcap) - 1] = '\0';
+  memset(overcap, 'a', sizeof(overcap) - 1);
+  overcap[0] = '-';
+  overcap[sizeof(overcap) - 2] = '*';
+  overcap[sizeof(overcap) - 1] = '\0';
+  memset(toolong, 'a', sizeof(toolong) - 1);
+  toolong[0] = '-';
+  toolong[sizeof(toolong) - 2] = '*';
+  toolong[sizeof(toolong) - 1] = '\0';
+  memset(subject, 'a', sizeof(subject) - 1);
+  subject[sizeof(subject) - 1] = '\0';
+  assertf(strlen(atcap) == HTS_FILTER_MAXLEN);
+  assertf(strlen(overcap) == HTS_FILTER_MAXLEN + 1);
+  assertf(strlen(toolong) > STRJOKER_MAXLEN);
+  assertf(strlen(subject) <= STRJOKER_MAXLEN); /* else none could match */
+  assertf(strjoker(subject, toolong + 1, NULL, NULL) == NULL);
+
+  assertf(filters_init(&filters, opt->maxfilter, 0) != 0);
+  opt->filters.filters = &filters;
+  opt->filters.filptr = &filptr;
+  opt->wizard_filters = 0;
+  opt->debug = LOG_NOTICE;
+/* non-zero, so a stray write into the slot above the last rule shows up */
+#define POISON "-poison/*"
+/* offer `pattern` to the array, and report what it did with it */
+#define TRY(label, pattern)                                                    \
+  do {                                                                         \
+    FILE *const log = tmpfile();                                               \
+    char want[64];                                                             \
+    assertf(log != NULL);                                                      \
+    opt->log = log;                                                            \
+    taken = filters_insert(opt, filptr, (pattern));                            \
+    verdict = fa_strjoker(0, filters, filptr, subject, NULL, NULL, NULL);      \
+    rewind(log);                                                               \
+    if (fgets(line, (int) sizeof(line), log) == NULL)                          \
+      line[0] = '\0';                                                          \
+    /* the reason, this rule's own length, and the rule itself */              \
+    snprintf(want, sizeof(want), "%d bytes", (int) strlen(pattern));           \
+    warned = strstr(line, "could never match") != NULL &&                      \
+             strstr(line, want) != NULL && strstr(line, (pattern)) != NULL;    \
+    assertf(line[0] == '\0' || warned); /* nothing else may be logged */       \
+    fclose(log);                                                               \
+    printf("%s: stored=%d rules=%d verdict=%d warned=%d\n", (label),           \
+           taken != 0, filptr, verdict, warned);                               \
+  } while (0)
+/* a refusal leaves the count, the verdict and the slot above it untouched */
+#define REFUSED()                                                              \
+  do {                                                                         \
+    assertf(!taken && filptr == 1 && verdict == 1 && warned);                  \
+    assertf(strcmp(filters[0], atcap) == 0);                                   \
+    assertf(strcmp(filters[1], POISON) == 0);                                  \
+  } while (0)
+
+  /* a rule at the cap is stored, silently, and still matches; refusing one byte
+     early would be silent too */
+  TRY("at the cap", atcap);
+  assertf(taken && filptr == 1 && verdict == 1 && !warned);
+  assertf(strcmp(filters[0], atcap) == 0);
+
+  /* last match wins, so a stored overcap rule would forbid what the first
+     allows: the verdict below is what proves it is really absent */
+  strlcpybuff(filters[1], POISON, HTS_FILTER_SLOT_SIZE);
+  TRY("one past the cap", overcap);
+  REFUSED();
+  TRY("past the matcher", toolong);
+  REFUSED();
+
+#undef REFUSED
+#undef TRY
+#undef POISON
+  opt->log = projectlog;
+  opt->debug = saveddebug;
+  freet(filters[0]);
+  freet(filters);
+  opt->filters = saved;
+  opt->wizard_filters = savedwizard;
+  printf("filtercap self-test OK\n");
+  return 0;
+}
+
+#undef POISON
 
 /* #159: hts_redirect_same_savefile decides whether a redirect is a same-file
  * alias. */
@@ -9099,7 +9581,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
 
   ck.max_len = (int) sizeof(ck.data);
   ck.data[0] = '\0';
-  assertf(cookie_load(&ck, fpath, "cookies.txt") == 0);
+  assertf(cookie_load(NULL, &ck, fpath, "cookies.txt") == 0);
   assertf(strstr(ck.data, "JARCOOK") != NULL); /* jar read on a long path */
 #ifdef _WIN32
   /* the IE scan merged the cookie and unlinked the consumed file */
@@ -10322,6 +10804,8 @@ static const struct selftest_entry {
      "merged two-form filter verdict (fa_strjoker_dual)", st_filterdual},
     {"filterbounds", "", "matcher length/work caps reject hostile patterns",
      st_filterbounds},
+    {"filtercap", "", "an over-long filter rule is refused, not stored dead",
+     st_filtercap},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",
@@ -10348,6 +10832,8 @@ static const struct selftest_entry {
     {"wizardinsert", "[<adr> <fil> [answer...] [@ filter...]]",
      "where a wizard answer lands in the filter array", st_wizardinsert},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
+    {"assumemime", "[128|256|1024]",
+     "--assume value clipped to each MIME destination", st_assumemime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",
@@ -10424,6 +10910,12 @@ static const struct selftest_entry {
      st_xfread_limit},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
+    {"savename-addstr", "",
+     "save-name append clips to the destination size (#1269)",
+     st_savename_addstr},
+    {"savename-addtail", "",
+     "default name and extension arrive whole on a full buffer (#1269)",
+     st_savename_addtail},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
     {"escape-control", "[hex:..|string]",
@@ -10455,6 +10947,9 @@ static const struct selftest_entry {
     {"cache-urlbounds", "<dir>",
      "cache store and lookup at max-length URLs must not abort or alias",
      st_cache_urlbounds},
+    {"cache-savebounds", "<dir>",
+     "cached save name rebuilt under a deeper html path must fit or be refused",
+     st_cache_savebounds},
     {"zip-repair-shift", "<dir>",
      "cache zip-repair header read must not overflow a signed shift",
      st_zip_repair_shift},

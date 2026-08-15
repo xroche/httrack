@@ -7,6 +7,9 @@
 *.test text eol=lf
 *.sh text eol=lf
 
+# The count pin is parsed field by field; a CRLF checkout makes every line malformed.
+tests/*.counts text eol=lf
+
 # The index templates are CRLF too, and nothing checks them either: pinned so a
 # text-mode rewrite cannot flatten one silently.
 templates/*.html text eol=crlf

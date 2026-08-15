@@ -535,11 +535,11 @@ int httpmirror(char *url1, httrackp * opt) {
     cookie.max_len = 30000;     // max len
     strcpybuff(cookie.data, "");
     // Load the mirror's cookies.txt, then the one in the current directory
-    cookie_load(opt->cookie, StringBuff(opt->path_log), "cookies.txt");
-    cookie_load(opt->cookie, "", "cookies.txt");
+    cookie_load(opt, opt->cookie, StringBuff(opt->path_log), "cookies.txt");
+    cookie_load(opt, opt->cookie, "", "cookies.txt");
     // A user-supplied cookie file is merged last so it wins on conflicts
     if (strnotempty(StringBuff(opt->cookies_file)))
-      cookie_load(opt->cookie, "", StringBuff(opt->cookies_file));
+      cookie_load(opt, opt->cookie, "", StringBuff(opt->cookies_file));
   } else
     opt->cookie = NULL;
 
@@ -696,11 +696,15 @@ int httpmirror(char *url1, httrackp * opt) {
             }
           }
           {
-            htsbuff fb = htsbuff_ptr(filters[filptr], HTS_URLMAXSIZE * 2);
+            /* wider than a slot, so an over-long rule reaches the length check
+               rather than aborting here */
+            char BIGSTK rule[HTS_FILTER_SLOT_SIZE + 2];
+            htsbuff fb = htsbuff_array(rule);
+
             htsbuff_cpy(&fb, type ? "+" : "-");
             htsbuff_cat(&fb, tempo);
+            filters_insert(opt, filptr, rule); /* bumps filptr when stored */
           }
-          filptr++;
 
           /* sanity check */
           if (filptr + 1 >= opt->maxfilter) {
@@ -825,12 +829,43 @@ int httpmirror(char *url1, httrackp * opt) {
       if (filelist_buff != NULL) {
         size_t filelist_ptr = 0;
         int n = 0;
+        int lineno = 0;
         char BIGSTK line[HTS_URLMAXSIZE * 2];
 
         while(filelist_ptr < filelist_sz) {
-          int count =
-            binput(filelist_buff + filelist_ptr, line, HTS_URLMAXSIZE);
-          filelist_ptr += count;
+          const int count =
+              binput(filelist_buff + filelist_ptr, line, HTS_URLMAXSIZE);
+          /* Where binput stopped, past any CR it dropped: a clipped line stops
+             on a URL byte. Our NUL at filelist_sz keeps the walk in bounds. */
+          size_t term = filelist_ptr + (size_t) count - 1;
+          hts_boolean whole;
+
+          while (term < filelist_sz && filelist_buff[term] == '\r') {
+            term++;
+          }
+          whole = term == filelist_sz || filelist_buff[term] == '\n';
+          lineno++;
+          if (!whole) {
+            /* Resuming where binput stopped would feed the tail back as a
+               second URL, and a clipped URL is a different URL. */
+            if (filelist_buff[term] == '\0') {
+              hts_log_print(opt, LOG_WARNING,
+                            "\"%s\", line %d: URL contains a NUL byte, ignored",
+                            StringBuff(opt->filelist), lineno);
+            } else {
+              hts_log_print(
+                  opt, LOG_WARNING,
+                  "\"%s\", line %d: URL longer than %d bytes, ignored",
+                  StringBuff(opt->filelist), lineno, HTS_URLMAXSIZE);
+            }
+            while (filelist_ptr < filelist_sz &&
+                   filelist_buff[filelist_ptr] != '\n') {
+              filelist_ptr++;
+            }
+            filelist_ptr++;
+            continue;
+          }
+          filelist_ptr = term + 1;
           if (count && line[0]) {
             n++;
             if (strstr(line, ":/") == NULL) {
@@ -2346,11 +2381,13 @@ void host_ban(httrackp * opt, int ptr,
   // interdire host
   assertf((*_FILTERS_PTR) < opt->maxfilter);
   if (*_FILTERS_PTR < opt->maxfilter) {
-    htsbuff fb = htsbuff_ptr(_FILTERS[*_FILTERS_PTR], HTS_URLMAXSIZE * 2);
+    char BIGSTK rule[HTS_FILTER_SLOT_SIZE + 4];
+    htsbuff fb = htsbuff_array(rule);
+
     htsbuff_cpy(&fb, "-");
     htsbuff_cat(&fb, host);
     htsbuff_cat(&fb, "/*"); // forbid host/*
-    (*_FILTERS_PTR)++;
+    filters_insert(opt, *_FILTERS_PTR, rule);
   }
   // oups
   if (strlen(host) <= 1) {      // euhh?? longueur <= 1
@@ -2430,6 +2467,34 @@ void filters_bind(httrackp *opt, char ***ptrfilters, int *filptr) {
   opt->wizard_filters = 0;
 }
 
+/* A rule the array takes is one strjoker() reads and one a slot holds, whatever
+   the two caps become; a hardcoded limit would silently stop being either. */
+enum {
+  hts_filter_maxlen_matches = 1 / (HTS_FILTER_MAXLEN <= STRJOKER_MAXLEN),
+  hts_filter_maxlen_fits = 1 / (HTS_FILTER_MAXLEN < HTS_FILTER_SLOT_SIZE)
+};
+
+hts_boolean filters_insert(httrackp *opt, int pos, const char *pattern) {
+  char **const filters = *opt->filters.filters;
+  const size_t len = strlen(pattern);
+  int i;
+
+  assertf(pos >= 0 && pos <= *opt->filters.filptr);
+  if (len > HTS_FILTER_MAXLEN) {
+    hts_log_print(opt, LOG_WARNING,
+                  "Filter rule dropped: %d bytes is past the %d-byte limit, so "
+                  "it could never match: %s",
+                  (int) len, (int) HTS_FILTER_MAXLEN, pattern);
+    return HTS_FALSE;
+  }
+  for (i = *opt->filters.filptr; i > pos; i--)
+    strlcpybuff(filters[i], filters[i - 1], HTS_FILTER_SLOT_SIZE);
+  strlcpybuff(filters[pos], pattern, HTS_FILTER_SLOT_SIZE);
+  (*opt->filters.filptr)++;
+  assertf((*opt->filters.filptr) < opt->maxfilter);
+  return HTS_TRUE;
+}
+
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
   char **filters = *ptrfilters;
   int filter_max = maximum(maxfilter, 128);
@@ -2442,16 +2507,13 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
   }
   if (filters) {
     if (filters[0] == NULL) {
-      filters[0] =
-        (char *) malloct(sizeof(char) * (filter_max + 2) *
-                         (HTS_URLMAXSIZE * 2));
+      filters[0] = (char *) malloct(sizeof(char) * (filter_max + 2) *
+                                    HTS_FILTER_SLOT_SIZE);
       memset(filters[0], 0,
-             sizeof(char) * (filter_max + 2) * (HTS_URLMAXSIZE * 2));
+             sizeof(char) * (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
     } else {
-      filters[0] =
-        (char *) realloct(filters[0],
-                          sizeof(char) * (filter_max +
-                                          2) * (HTS_URLMAXSIZE * 2));
+      filters[0] = (char *) realloct(
+          filters[0], sizeof(char) * (filter_max + 2) * HTS_FILTER_SLOT_SIZE);
     }
     if (filters[0] == NULL) {
       freet(filters);
@@ -2467,7 +2529,7 @@ int filters_init(char ***ptrfilters, int maxfilter, int filterinc) {
     else
       from = filter_max - filterinc;
     for(i = 0; i <= filter_max; i++) {  // PLUS UN (sécurité)
-      filters[i] = filters[0] + i * (HTS_URLMAXSIZE * 2);
+      filters[i] = filters[0] + i * HTS_FILTER_SLOT_SIZE;
     }
     for(i = from; i <= filter_max; i++) {       // PLUS UN (sécurité)
       filters[i][0] = '\0';     // clear
