@@ -1108,6 +1108,81 @@ static int st_mime(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* ishtml()'s mime[256], with a tail poisoned non-zero: a guard compared
+   against '\0' could not see the terminator an off-by-one writes. */
+struct st_guarded_mime {
+  char dst[256];
+  char guard[16];
+};
+
+/* Build "\ncgi=<n bytes of 'B'>\n" into opt->mimedefs. */
+static void st_assume_rule(httrackp *opt, size_t n) {
+  size_t i;
+
+  StringCopy(opt->mimedefs, "\ncgi=");
+  for (i = 0; i < n; i++)
+    StringAddchar(opt->mimedefs, 'B');
+  StringCat(opt->mimedefs, "\n");
+}
+
+/* An --assume value is clipped to the destination it is copied into (#1276).
+   The 200-byte value fits mime[256] but not contenttype[128], so a single
+   one-size bound fails here as loudly as no bound at all. */
+static int st_assumemime(httrackp *opt, int argc, char **argv) {
+  static const size_t values[] = {200, 300};
+  /* both destinations smash pre-fix, and only the first assertion to fire is
+     ever seen, so each is separately selectable */
+  const char *only = argc >= 1 ? argv[0] : "";
+  const int want_big = strcmp(only, "small") != 0;
+  const int want_small = strcmp(only, "big") != 0;
+  size_t v;
+
+  for (v = 0; v < sizeof(values) / sizeof(values[0]); v++) {
+    const size_t len = values[v];
+    struct st_guarded_mime big;
+    htsblk r;
+    size_t i;
+
+    st_assume_rule(opt, len);
+
+    if (want_big) {
+      memset(&big, 'Z', sizeof(big));
+      assertf(get_userhttptype(opt, big.dst, sizeof(big.dst), "/x.cgi") == 1);
+      assertf(strlen(big.dst) ==
+              (len < sizeof(big.dst) ? len : sizeof(big.dst) - 1));
+      for (i = 0; i < sizeof(big.guard); i++)
+        assertf(big.guard[i] == 'Z');
+      /* and the reported path itself, which owns that buffer */
+      assertf(ishtml(opt, "/x.cgi") == 0);
+    }
+
+    /* htsblk.contenttype[128]: charset and contentencoding follow it in the
+       same struct, so an overrun stays intra-object and neither ASan nor
+       _FORTIFY_SOURCE reports it. They are the canary. */
+    if (want_small) {
+      memset(&r, 'Z', sizeof(r));
+      r.contenttype[0] = '\0';
+      assertf(get_httptype_sized(opt, r.contenttype, sizeof(r.contenttype),
+                                 "/x.cgi", 0) == 1);
+      assertf(strlen(r.contenttype) == sizeof(r.contenttype) - 1);
+      for (i = 0; i < sizeof(r.charset); i++)
+        assertf(r.charset[i] == 'Z');
+      for (i = 0; i < sizeof(r.contentencoding); i++)
+        assertf(r.contentencoding[i] == 'Z');
+    }
+  }
+  /* a value that fits every destination is still written whole */
+  st_assume_rule(opt, 9);
+  {
+    char mime[256];
+
+    assertf(get_userhttptype(opt, mime, sizeof(mime), "/x.cgi") == 1);
+    assertf(strlen(mime) == 9);
+  }
+  printf("assumemime ok\n");
+  return 0;
+}
+
 static size_t st_decode_body(const char *arg, char *buf, size_t size);
 
 static int st_charset(httrackp *opt, int argc, char **argv) {
@@ -10234,6 +10309,8 @@ static const struct selftest_entry {
     {"wizardinsert", "[<adr> <fil> [answer...] [@ filter...]]",
      "where a wizard answer lands in the filter array", st_wizardinsert},
     {"mime", "<filename>", "MIME type for a filename", st_mime},
+    {"assumemime", "[big|small]",
+     "--assume value clipped to each MIME destination", st_assumemime},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",
