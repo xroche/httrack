@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# #1271: -%S reads a rules file straight into the command-line string with no
+# per-token cap, so the parser's own copy loops are the only bound there is.
+# Offline: --why decides without crawling, so no server.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+maxlen=2048 # HTS_FILTER_MAXLEN, the longest rule a slot holds
+urlmax=2047 # HTS_URLMAXSIZE * 2 - 1, the longest URL token the loop copies
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_longtok.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+pad() { printf "%$1s" '' | tr ' ' a; }
+
+out="$tmp/out"
+log="$out/hts-log.txt" # why() runs in a subshell, so nothing it sets survives
+
+why() { # why FILE -> the --why verdict, leaving its run behind in $log
+    rm -rf "$out"
+    mkdir -p "$out"
+    httrack -O "$out" -q "-%S" "$1" --why http://www.example.com/x.zip \
+        http://www.example.com/ 2>&1 |
+        grep -aoE 'rejected by rule #[0-9]+ \([^)]*\)|no filter rule'
+}
+
+logged() { grep -aq "$1" "$log"; }
+
+# -*.zip goes second, so the ordinal in the verdict says whether the long rule
+# took a slot: dropping it moves -*.zip from #2 to #1.
+rules() { # rules LEN -- a rule of LEN bytes, sign included
+    printf -- '-*%s\n-*.zip\n' "$(pad $(($1 - 2)))" >"$tmp/rules.txt"
+    why "$tmp/rules.txt"
+}
+
+assert_eq "rejected by rule #2 (-*.zip)" "$(rules $maxlen)" "rule at the cap"
+! logged "Filter rule dropped" || fail "the rule at the cap was dropped"
+assert_eq "rejected by rule #1 (-*.zip)" "$(rules $((maxlen + 1)))" "one past"
+# 3000 bytes at a 2050-byte buffer: the write ASan caught pre-fix.
+assert_eq "rejected by rule #1 (-*.zip)" "$(rules 3000)" "far past the cap"
+logged "Filter rule dropped" || fail "no drop warning in $log"
+
+# The URL branch copies into a buffer of its own, one byte narrower.
+urls() { # urls LEN -- a primary URL of LEN bytes
+    local u=http://www.example.com/
+
+    printf '%s%s\n-*.zip\n' "$u" "$(pad $(($1 - ${#u})))" >"$tmp/urls.txt"
+    why "$tmp/urls.txt"
+}
+
+assert_eq "rejected by rule #1 (-*.zip)" "$(urls $urlmax)" "URL at the cap"
+! logged "URL dropped" || fail "the URL at the cap was dropped"
+assert_eq "rejected by rule #1 (-*.zip)" "$(urls $((urlmax + 1)))" "URL one past"
+logged "URL dropped" || fail "no drop warning in $log"
+assert_eq "rejected by rule #1 (-*.zip)" "$(urls 3000)" "URL far past the cap"
+
+exit 0

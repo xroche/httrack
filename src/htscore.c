@@ -449,6 +449,28 @@ static int look_like_xml(const char *s) {
     ;
 }
 
+/* Copies the next whitespace-delimited token of *ptr into dest (capacity size)
+   and leaves *ptr on the one after it. Returns the token's full length, so a
+   caller drops one that did not fit instead of acting on a clip: a clipped URL
+   or filter is a different one. */
+static size_t copy_token(char **ptr, char *dest, size_t size) {
+  char *a = *ptr;
+  size_t len = 0;
+
+  assertf(size != 0);
+  while (*a != 0 && !isspace((unsigned char) *a)) {
+    if (len < size - 1)
+      dest[len] = *a;
+    len++;
+    a++;
+  }
+  dest[len < size ? len : size - 1] = '\0';
+  while (isspace((unsigned char) *a))
+    a++;
+  *ptr = a;
+  return len;
+}
+
 // Début de httpmirror, robot
 // url1 peut être multiple
 int httpmirror(char *url1, httrackp * opt) {
@@ -649,8 +671,7 @@ int httpmirror(char *url1, httrackp * opt) {
     }
     htsbuff primarybuff = htsbuff_ptr(primary, primary_len);
 
-    while(*a) {
-      int i;
+    while (*a) {
       int joker = 0;
 
       // vérifier qu'il n'y a pas de * dans l'url
@@ -660,7 +681,9 @@ int httpmirror(char *url1, httrackp * opt) {
         joker = 1;
 
       if (joker) { // joker ou filters
-        char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+        /* room for the longest rule the array takes, plus the implicit "*" */
+        char BIGSTK tempo[HTS_FILTER_MAXLEN + 2];
+        size_t len;
         int type;
         int plus = 0;
 
@@ -677,14 +700,13 @@ int httpmirror(char *url1, httrackp * opt) {
         }
 
         // recopier prochaine chaine (+ ou -)
-        i = 0;
-        while((*a != 0) && (!isspace((unsigned char) *a))) {
-          tempo[i++] = *a;
-          a++;
-        }
-        tempo[i++] = '\0';
-        while(isspace((unsigned char) *a)) {
-          a++;
+        len = copy_token(&a, tempo, sizeof(tempo));
+        if (len > HTS_FILTER_MAXLEN) {
+          hts_log_print(opt, LOG_WARNING,
+                        "Filter rule dropped: %d bytes is past the %d-byte "
+                        "limit, so it could never match",
+                        (int) len, (int) HTS_FILTER_MAXLEN);
+          continue;
         }
 
         // sauter les + sans rien après..
@@ -726,22 +748,19 @@ int httpmirror(char *url1, httrackp * opt) {
         char BIGSTK url[HTS_URLMAXSIZE * 2];
 
         // prochaine adresse
-        i = 0;
-        while((*a != 0) && (!isspace((unsigned char) *a))) {
-          url[i++] = *a;
-          a++;
+        if (copy_token(&a, url, sizeof(url)) >= sizeof(url)) {
+          hts_log_print(opt, LOG_WARNING,
+                        "URL dropped: longer than the %d-byte limit",
+                        (int) (sizeof(url) - 1));
+          continue;
         }
-        while(isspace((unsigned char) *a)) {
-          a++;
-        }
-        url[i++] = '\0';
 
         if (strstr(url, ":/") == NULL)
           htsbuff_cat(&primarybuff, "http://");
         htsbuff_cat(&primarybuff, url);
         htsbuff_cat(&primarybuff, "\n");
       }
-    }                           // while
+    } // while
 
     /* --why: print which filter rule decides for this URL, then stop */
     if (StringNotEmpty(opt->why_url)) {
