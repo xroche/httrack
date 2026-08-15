@@ -37,6 +37,9 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htswizard.h"
 
+HTS_STATIC_ASSERT(sizeof(HTS_WIZARD_FILTER_SUFFIX) <= HTS_FILTER_SUFFIX_MAX,
+                  wizard_suffix_fits_filter_slot);
+
 /* specific definitions */
 #include "htsbase.h"
 #include <ctype.h>
@@ -273,6 +276,8 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
   while (fil[dir] != '/' && dir > 0)
     dir--;
 
+  /* a clipped pattern would be a wider rule than the answer asked for */
+  assertf(f->cap >= HTS_FILTER_SLOT_SIZE);
   htsbuff_cpy(f, "");
   if (hts_wizard_scope_answer(n) != HTS_DEFAULT) {
     wizard_cat_scope(f, hts_wizard_scope_answer(n) == HTS_TRUE ? "-" : "+", adr,
@@ -322,7 +327,7 @@ void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
   case 7: /* this directory, files only */
     if (fil[dir] == '/') {
       wizard_cat_path(f, "+", adr, fil, dir + 1);
-      htsbuff_cat(f, "*[file]");
+      htsbuff_cat(f, HTS_WIZARD_FILTER_SUFFIX);
     }
     break;
 

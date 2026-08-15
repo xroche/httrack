@@ -391,9 +391,16 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
                           FILE **fp, const char *ht_buff, size_t ht_len,
                           const char *adr, const char *fil, const char *save);
 
+/* Longest suffix a rule builder appends after the path (the wizard's
+   "*[file]"), NUL included; asserted against in htswizard.c. */
+#define HTS_FILTER_SUFFIX_MAX 8
+
 /* Per-slot capacity of the filters array; filters_init() strides the slots by
-   it. */
-#define HTS_FILTER_SLOT_SIZE (HTS_URLMAXSIZE * 2)
+   it. Holds the longest rule any builder emits, because truncating one changes
+   what it matches. */
+#define HTS_FILTER_SLOT_SIZE                                                   \
+  (1 + (HTS_URLMAXSIZE * 2 - 1) + 1 + (HTS_URLMAXSIZE * 2 - 1) +               \
+   HTS_FILTER_SUFFIX_MAX)
 
 int filters_init(char ***ptrfilters, int maxfilter, int filterinc);
 

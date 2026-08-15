@@ -87,15 +87,15 @@ static hts_boolean robots_pattern_match(const char *pattern, const char *path) {
   return (p == pend) ? HTS_TRUE : HTS_FALSE;
 }
 
-// fil="" : vérifier si règle déja enregistrée
-int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
+/* fil="": is a rule set already recorded for this host? */
+int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
   while(robots) {
-    if (strfield2(robots->adr, adr)) {
+    if (robots->adr != NULL && strfield2(robots->adr, adr)) {
       if (fil[0]) {
         /* RFC 9309: longest pattern wins, Allow beats Disallow on ties. */
         int ptr = 0;
-        char line[HTS_ROBOTS_TOKEN_SIZE];
-        size_t toklen = strlen(robots->token);
+        char line[HTS_ROBOTS_LINE_SIZE + 2];
+        size_t toklen = robots->token != NULL ? strlen(robots->token) : 0;
         size_t best_len = 0;
         hts_boolean matched = HTS_FALSE;
         hts_boolean best_allow = HTS_FALSE;
@@ -131,30 +131,31 @@ int checkrobots(robots_wizard * robots, const char *adr, const char *fil) {
   return 0;
 }
 
-/* Append "<marker><pattern>\n" to the bounded rule blob if it fits. */
-static void robots_blob_add(char *blob, size_t blobsize, char marker,
-                            const char *pat) {
-  const size_t used = strlen(blob);
-  const size_t need = strlen(pat) + 2; // marker + '\n'
+/* Append "<marker><pattern>\n" to the rule blob; HTS_FALSE past the cap. */
+static hts_boolean robots_rule_add(String *blob, char marker, const char *pat) {
+  const size_t patlen = strlen(pat);
 
-  if (need < blobsize - used) { // overflow-safe: used <= blobsize-1
-    blob[used] = marker;
-    blob[used + 1] = '\0';
-    strlcatbuff(blob, pat, blobsize);
-    strlcatbuff(blob, "\n", blobsize);
-  }
+  // overflow-safe: the blob never passes the cap
+  if (patlen + 2 > HTS_ROBOTS_MAX_TOKEN_SIZE - StringLength(*blob))
+    return HTS_FALSE;
+  StringMemcat(*blob, &marker, 1);
+  StringMemcat(*blob, pat, patlen);
+  StringMemcat(*blob, "\n", 1);
+  return HTS_TRUE;
 }
 
-void robots_parse(robots_wizard *robots, const char *adr, const char *body,
-                  size_t bodysize, char *info, size_t infosize,
-                  hts_boolean keep_root_disallow, char *sitemaps,
-                  size_t sitemapsize) {
+void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
+                  const char *body, size_t bodysize, char *info,
+                  size_t infosize, hts_boolean keep_root_disallow,
+                  char *sitemaps, size_t sitemapsize) {
   size_t bptr = 0;
   int record = 0;
-  char BIGSTK line[1024];
-  char BIGSTK blob[HTS_ROBOTS_TOKEN_SIZE];
+  int ndropped = 0;
+  char BIGSTK line[HTS_ROBOTS_LINE_SIZE];
+  char dropped[128]; // first rule we could not honour, for the log
+  String blob = STRING_EMPTY;
 
-  blob[0] = '\0';
+  dropped[0] = '\0';
   if (info != NULL && infosize > 0)
     info[0] = '\0';
   if (sitemaps != NULL && sitemapsize > 0)
@@ -165,11 +166,20 @@ void robots_parse(robots_wizard *robots, const char *adr, const char *body,
   while (bptr < bodysize) {
     char *comm;
     int llen;
+    hts_boolean cut;
 
     bptr += binput(body + bptr, line, sizeof(line) - 2);
+    /* binput consumed body[bptr-1] and resumes mid-record when the buffer runs
+       out, so a record read whole is the one ending on its own newline. */
+    cut = (bptr - 1 < bodysize && body[bptr - 1] != '\n' &&
+           body[bptr - 1] != '\0')
+              ? HTS_TRUE
+              : HTS_FALSE;
     comm = strchr(line, '#'); // strip comment
-    if (comm != NULL)
+    if (comm != NULL) {
       *comm = '\0';
+      cut = HTS_FALSE; // the comment ended the value inside the buffer
+    }
     llen = (int) strlen(line); // strip trailing spaces
     while (llen > 0 && is_realspace(line[llen - 1])) {
       line[llen - 1] = '\0';
@@ -182,7 +192,7 @@ void robots_parse(robots_wizard *robots, const char *adr, const char *body,
       while (is_realspace(*a))
         a++;
       /* A line at the buffer limit was truncated: a half URL is not one. */
-      if (strnotempty(a) && strlen(line) < sizeof(line) - 3 &&
+      if (strnotempty(a) && !cut &&
           strlen(a) + 2 < sitemapsize - strlen(sitemaps)) {
         strlcatbuff(sitemaps, a, sitemapsize);
         strlcatbuff(sitemaps, "\n", sitemapsize);
@@ -197,7 +207,9 @@ void robots_parse(robots_wizard *robots, const char *adr, const char *body,
           record = 1; // generic group applies to us
       } else if (strfield(a, "httrack") || strfield(a, "winhttrack") ||
                  strfield(a, "webhttrack")) {
-        blob[0] = '\0'; // explicit group: restart capture
+        StringClear(blob); // explicit group: restart capture
+        ndropped = 0;
+        dropped[0] = '\0';
         if (info != NULL && infosize > 0)
           info[0] = '\0';
         record = 2; // locked to the httrack group
@@ -216,8 +228,21 @@ void robots_parse(robots_wizard *robots, const char *adr, const char *body,
           if (is_disallow && !keep_root_disallow && strcmp(a, "/") == 0) {
             // dropped: site-wide disallow ignored by option
           } else {
-            robots_blob_add(blob, sizeof(blob), is_allow ? 'A' : 'D', a);
-            if (is_disallow && info != NULL &&
+            /* A cut Allow would permit more than the site wrote, so it goes;
+               a cut Disallow can only forbid more, so it stays. */
+            const hts_boolean kept =
+                (cut && is_allow)
+                    ? HTS_FALSE
+                    : robots_rule_add(&blob, is_allow ? 'A' : 'D', a);
+
+            if (!kept || cut) {
+              if (ndropped++ == 0) {
+                dropped[0] = '\0'; // clip, never abort: this is remote data
+                strlncatbuff(dropped, a, sizeof(dropped), sizeof(dropped) - 1);
+              }
+            }
+            /* info reports what we honour, not what we read. */
+            if (kept && is_disallow && info != NULL &&
                 strlen(a) + 2 < infosize - strlen(info)) {
               if (strnotempty(info))
                 strlcatbuff(info, ", ", infosize);
@@ -228,36 +253,48 @@ void robots_parse(robots_wizard *robots, const char *adr, const char *body,
       }
     }
   }
-  if (strnotempty(blob))
-    checkrobots_set(robots, adr, blob);
+  if (ndropped != 0)
+    hts_log_print(opt, LOG_WARNING,
+                  "robots.txt for %s: %d rule(s) not honoured as written, "
+                  "starting with '%s' (rules kept up to %d bytes, lines to %d)",
+                  adr, ndropped, dropped, (int) HTS_ROBOTS_MAX_TOKEN_SIZE,
+                  (int) HTS_ROBOTS_LINE_SIZE);
+  if (StringNotEmpty(blob))
+    checkrobots_set(robots, adr, StringBuff(blob));
+  StringFree(blob);
 }
 
-int checkrobots_set(robots_wizard * robots, const char *adr, const char *data) {
-  if (((int) strlen(adr)) >= sizeof(robots->adr) - 2)
-    return 0;
-  if (((int) strlen(data)) >= sizeof(robots->token) - 2)
-    return 0;
+int checkrobots_set(robots_wizard *robots, const char *adr, const char *data) {
   while(robots) {
-    if (strfield2(robots->adr, adr)) {  // entrée existe
-      strcpybuff(robots->token, data);
+    if (robots->adr != NULL && strfield2(robots->adr, adr)) {
+      char *const token = strdupt(data);
+
+      if (token == NULL)
+        return 0;
+      freet(robots->token);
+      robots->token = token;
 #if DEBUG_ROBOTS
       printf("robots.txt: set %s to %s\n", adr, data);
 #endif
       return -1;
     } else if (!robots->next) {
-      robots->next = (robots_wizard *) calloct(1, sizeof(robots_wizard));
-      if (robots->next) {
-        robots->next->next = NULL;
-        strcpybuff(robots->next->adr, adr);
-        strcpybuff(robots->next->token, data);
-#if DEBUG_ROBOTS
-        printf("robots.txt: new set %s to %s\n", adr, data);
-#endif
+      robots_wizard *node = (robots_wizard *) calloct(1, sizeof(robots_wizard));
+
+      if (node == NULL)
+        return 0;
+      node->adr = strdupt(adr);
+      node->token = strdupt(data);
+      if (node->adr == NULL || node->token == NULL) {
+        freet(node->adr);
+        freet(node->token);
+        freet(node);
+        return 0;
       }
+      robots->next = node;
 #if DEBUG_ROBOTS
-      else
-        printf("malloc error!!\n");
+      printf("robots.txt: new set %s to %s\n", adr, data);
 #endif
+      return -1;
     }
     robots = robots->next;
   }
@@ -269,6 +306,8 @@ void checkrobots_free(robots_wizard * robots) {
     freet(robots->next);
     robots->next = NULL;
   }
+  freet(robots->adr);
+  freet(robots->token);
 }
 
 // -- robots --

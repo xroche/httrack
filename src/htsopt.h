@@ -673,7 +673,7 @@ struct htsblk {
   char contenttype[HTS_MIMETYPE_SIZE];     // content-type (e.g. "text/html")
   char charset[HTS_MIMETYPE_SIZE];         // charset (e.g. "iso-8859-1")
   char contentencoding[HTS_MIMETYPE_SIZE]; // content-encoding (e.g. "gzip")
-  char *location;    /**< resolved Location target, if any */
+  char *location;    /**< resolved Location target, HTS_LOCATION_SIZE bytes */
   LLint totalsize;   /**< total size to download (-1=unknown) */
   short int is_file; /**< 1 if a file descriptor rather than a socket */
   T_SOC soc;         /**< socket id */
@@ -751,8 +751,7 @@ struct lien_back {
   char url_sav[HTS_URLMAXSIZE * 2];     /**< local save name (with any path) */
   char referer_adr[HTS_URLMAXSIZE * 2]; /**< referer page host/address */
   char referer_fil[HTS_URLMAXSIZE * 2]; /**< referer page file */
-  char
-      location_buffer[HTS_URLMAXSIZE * 2]; /**< Location on a move (302, ...) */
+  char location_buffer[HTS_LOCATION_SIZE]; /**< Location on a move (302, ...) */
   char *tmpfile; /**< temporary save name (compressed) */
   char tmpfile_buffer[HTS_URLMAXSIZE * 2]; /**< storage for tmpfile */
   char send_too[1024];    /**< data to send together with the header */

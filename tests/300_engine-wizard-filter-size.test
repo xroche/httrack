@@ -1,0 +1,30 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "$(dirname "$0")/testlib.sh"
+
+# #1264/#1266: the pattern is cut from the link the question is about, so a long
+# enough one used to outgrow the filter slot. It must neither abort the run nor
+# clip: a clipped pattern is a wider rule than the one the answer asked for.
+
+# each CLI argument stays under HTS_CDLMAXSIZE, so the length comes from both
+adr=$(printf 'a%.0s' $(seq 1 1023))
+
+# 1 + len(adr) + len(fil), sweeping the 2048 bytes the slot used to hold
+for total in $(seq 2040 2047); do
+    fil=/$(printf 'b%.0s' $(seq 1 $((total - ${#adr} - 3))))/
+    test $((1 + ${#adr} + ${#fil})) -eq "$total" || fail "bad length for $total"
+    assert_selftest "-$adr$fil" wizardfilter 0 "$adr" "$fil"
+    assert_selftest "-$adr$fil*" wizardfilter 1 "$adr" "$fil"
+    assert_selftest "-$adr/*" wizardfilter 2 "$adr" "$fil"
+    assert_selftest "+$adr$fil*" wizardfilter 5 "$adr" "$fil"
+    assert_selftest "+$adr/*" wizardfilter 6 "$adr" "$fil"
+    assert_selftest "+$adr$fil*[file]" wizardfilter 7 "$adr" "$fil"
+done
+
+# a command line cannot express the rest of the sweep, up to both link buffers
+# full; the self-test carries it
+assert_selftest "wizardfilter self-test OK" wizardfilter

@@ -145,7 +145,11 @@ cleanup_push purge_tmpdir
 
 # Line 2 echoes the engine's command line, so a path named after a searched word
 # would answer for the crawl (#1220). The banner stays: audits match its URL.
-log_body() { awk 'NR == 2 && /^\(/ { next } { print }' "${logroot}/hts-log.txt"; }
+# A missing log would make every --log-not-found pass on an empty file.
+log_body() {
+    test -s "${logroot}/hts-log.txt" || die "no crawl log at ${logroot}/hts-log.txt"
+    awk 'NR == 2 && /^\(/ { next } { print }' "${logroot}/hts-log.txt"
+}
 
 # python3 is required; mirror check-network.sh's skip-with-77 convention. Found
 # here, not in local_server_start, so a host without it skips before any setup.

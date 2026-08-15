@@ -561,6 +561,30 @@ class Handler(SimpleHTTPRequestHandler):
     # ... and one whose probe fails, with a body past the 1070 bytes that
     # issue #769's over-read needed.
     ERROR_ROBOTS_UA = "errorrobots"
+    # ... and "robotsblobNNNN", which sizes the Disallow list so the engine's
+    # stored rules come to exactly NNNN bytes, /secret/ last (#1286).
+    BLOB_ROBOTS_RE = re.compile(r"robotsblob(\d+)")
+
+    def robots_blob_body(self, blobsize):
+        # One "<marker><pattern>\n" line per stored rule, so a rule costs
+        # len(pattern) + 2. tests/01_engine-robots.test pins that accounting.
+        rules = []
+        used = 0
+        room = blobsize - (len("/secret/") + 2)
+        while used + 12 <= room:
+            rules.append("/pad%05d/" % len(rules))
+            used += 12
+        # A 1- or 2-byte filler cannot be written, and a 1-char one would be the
+        # site-wide "/". Give back a pad rule until the remainder is spendable.
+        while 0 < room - used < 5 and rules:
+            rules.pop()
+            used -= 12
+        if room - used:
+            rules.append("/" + "z" * (room - used - 3))
+        rules.append("/secret/")
+        return (
+            "User-agent: *\n" + "".join("Disallow: %s\n" % r for r in rules)
+        ).encode()
 
     def route_robots(self):
         # The Sitemap: record is group-independent; only --sitemap acts on it.
@@ -573,6 +597,10 @@ class Handler(SimpleHTTPRequestHandler):
             self.end_headers()
             if self.command != "HEAD":
                 self.wfile.write(body)
+            return
+        blob = self.BLOB_ROBOTS_RE.search(ua)
+        if blob:
+            self.send_raw(self.robots_blob_body(int(blob.group(1))), "text/plain")
             return
         host = self.headers.get("Host")
         body = "User-agent: *\nDisallow:\n"
@@ -1947,6 +1975,39 @@ class Handler(SimpleHTTPRequestHandler):
     def route_redir_target(self):
         self.send_raw(b"<html><body>redirect target</body></html>\n", "text/html")
 
+    # A Location past the header-line read buffer (#1291): the engine only ever
+    # sees a cut value, so it must drop the header rather than follow a target
+    # this server never named.
+    def route_longloc_index(self):
+        self.send_html('\t<a href="go.php">go</a>')
+
+    def route_longloc_go(self):
+        # absolute: a relative target is capped at HTS_URLMAXSIZE by
+        # ident_url_relatif long before the gate under test sees it
+        base = "http://127.0.0.1:%d/longloc/" % self.server.server_address[1]
+        self.send_response(302, "Found")
+        self.send_header("Location", base + "target.html?q=" + "a" * 2400)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_longloc_target(self):
+        self.send_raw(b"<html><body>long-location target</body></html>\n", "text/html")
+
+    # same shape with a Location the reader takes whole: the control proving
+    # the fixture only refuses because the header outran the read
+    def route_shortloc_index(self):
+        self.send_html('\t<a href="go.php">go</a>')
+
+    def route_shortloc_go(self):
+        base = "http://127.0.0.1:%d/shortloc/" % self.server.server_address[1]
+        self.send_response(302, "Found")
+        self.send_header("Location", base + "target.html?q=" + "a" * 40)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def route_shortloc_target(self):
+        self.send_raw(b"<html><body>short-location target</body></html>\n", "text/html")
+
     # --- /mini304/: tiny fully-cacheable site (an update gets only 304s) ---
     def route_mini304_index(self):
         self.big_send(
@@ -2734,6 +2795,12 @@ class Handler(SimpleHTTPRequestHandler):
         "/redir/index.html": route_redir_index,
         "/redir/go.php": route_redir_go,
         "/redir/target.html": route_redir_target,
+        "/longloc/index.html": route_longloc_index,
+        "/longloc/go.php": route_longloc_go,
+        "/longloc/target.html": route_longloc_target,
+        "/shortloc/index.html": route_shortloc_index,
+        "/shortloc/go.php": route_shortloc_go,
+        "/shortloc/target.html": route_shortloc_target,
         "/bakname/index.html": route_bakname_index,
         "/bakname/a.bin": route_bakname_main,
         "/bakname/hts-tmp/a.bin.bak": route_bakname_sibling,

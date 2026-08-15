@@ -40,28 +40,43 @@ Please visit our Website: http://www.httrack.com
 typedef struct robots_wizard robots_wizard;
 #endif
 
-/* Per-host blob: one rule per line, first byte 'A'/'D' then path pattern. */
-#define HTS_ROBOTS_TOKEN_SIZE 4096
+#ifndef HTS_DEF_FWSTRUCT_httrackp
+#define HTS_DEF_FWSTRUCT_httrackp
+typedef struct httrackp httrackp;
+#endif
+
+/* Rule blob ceiling. RFC 9309 §2.5 asks crawlers to honour at least the first
+   500 KiB of a robots.txt, and the blob only ever holds part of that file. */
+#define HTS_ROBOTS_MAX_TOKEN_SIZE (500 * 1024)
+
+/* Longest robots.txt line read; a stored rule is marker + pattern + LF. */
+#define HTS_ROBOTS_LINE_SIZE 1024
 
 struct robots_wizard {
-  char adr[128];
-  char token[HTS_ROBOTS_TOKEN_SIZE];
+  char *adr;   /* host; NULL on the list head, which holds no rules */
+  char *token; /* per-host blob, one rule per line: 'A'/'D' then the pattern */
   struct robots_wizard *next;
 };
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 /* -1 if `fil` disallowed for `adr` (RFC 9309); empty: -1 if rules exist. */
-int checkrobots(robots_wizard * robots, const char *adr, const char *fil);
+int checkrobots(const robots_wizard *robots, const char *adr, const char *fil);
+/* Free every node's strings, plus every node below `robots` but not `robots`.
+ */
 void checkrobots_free(robots_wizard * robots);
+/* Store `data` as the rule blob of `adr`, adding the host if new. -1 on
+   success, 0 if the allocation failed. */
 int checkrobots_set(robots_wizard * robots, const char *adr, const char *data);
 /* Parse robots.txt `body` for `adr`, storing the HTTrack group's rules; `info`
-   gets a disallow summary, `keep_root_disallow` FALSE drops "Disallow: /", and
-   `sitemaps` (optional) collects the Sitemap: URLs, one per line. */
-void robots_parse(robots_wizard *robots, const char *adr, const char *body,
-                  size_t bodysize, char *info, size_t infosize,
-                  hts_boolean keep_root_disallow, char *sitemaps,
-                  size_t sitemapsize);
+   gets a summary of the disallows actually kept, `keep_root_disallow` FALSE
+   drops "Disallow: /", and `sitemaps` (optional) collects the Sitemap: URLs,
+   one per line. Anything the parser has to leave out is logged through `opt`,
+   which may be NULL. */
+void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
+                  const char *body, size_t bodysize, char *info,
+                  size_t infosize, hts_boolean keep_root_disallow,
+                  char *sitemaps, size_t sitemapsize);
 #endif
 
 #endif

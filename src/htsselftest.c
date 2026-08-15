@@ -2542,6 +2542,132 @@ static int st_header(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* A header line that does not fit must be reported as cut and skipped whole,
+   so the line after it is the server's next header and not its own tail. The
+   block defaults to two headers and the blank line; \n and \r arrive escaped,
+   since the command line filters both out. */
+static int st_headerline(httrackp *opt, int argc, char **argv) {
+  static const char fixture[] = "X-First: 0123456789abcdefghij\r\n"
+                                "X-Second: ok\r\n"
+                                "\r\n";
+  char block[256], line[64];
+  size_t blocklen;
+  int max, ptr = 0, i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "headerline: needs a read size\n");
+    return 1;
+  }
+  max = atoi(argv[0]);
+  if (max < 2 || (size_t) max > sizeof(line)) {
+    fprintf(stderr, "headerline: read size out of probe range\n");
+    return 1;
+  }
+  if (argc < 2) {
+    memcpy(block, fixture, sizeof(fixture));
+    blocklen = sizeof(fixture) - 1;
+  } else {
+    const char *a = argv[1];
+
+    if (strlen(a) >= sizeof(block)) {
+      fprintf(stderr, "headerline: block too long\n");
+      return 1;
+    }
+    for (blocklen = 0; *a != '\0'; a++) {
+      if (*a == '\\' && a[1] == 'n')
+        block[blocklen++] = '\n', a++;
+      else if (*a == '\\' && a[1] == 'r')
+        block[blocklen++] = '\r', a++;
+      else
+        block[blocklen++] = *a;
+    }
+    block[blocklen] = '\0';
+  }
+  /* one read past the block's lines, to show the walk stops at its end */
+  for (i = 0; i < 4; i++) {
+    int adv;
+    const hts_boolean cut =
+        binput_header(block + ptr, block + blocklen, line, max, &adv);
+
+    ptr += adv;
+    printf("cut=%d over=%d line=%s\n", cut != HTS_FALSE,
+           ptr > (int) blocklen + 1, line);
+  }
+  return 0;
+}
+
+static int st_location_logged = 0;
+
+static void st_location_log(httrackp *opt, int type, const char *format,
+                            va_list args) {
+  (void) opt;
+  (void) type;
+  (void) format;
+  (void) args;
+  st_location_logged++;
+}
+
+/* treathead's Location gate must match htsblk.location's buffer size: a
+   redirect that fits is kept whole, a longer one refused and reported, and
+   neither touches the canary behind the buffer. */
+static int st_location(httrackp *opt, int argc, char **argv) {
+  struct {
+    char loc[HTS_LOCATION_SIZE];
+    char canary[64];
+  } probe;
+
+  char BIGSTK line[HTS_LOCATION_SIZE + 1024];
+  const char *const prefix = "http://www.example.com/";
+  const char *url, *want;
+  htsblk r;
+  size_t n, urllen, kept, i;
+  int asked, smashed = 0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "location: needs a Location URL length\n");
+    return 1;
+  }
+  /* subtract, never add: a negative argument must not wrap the range check */
+  asked = atoi(argv[0]);
+  if (asked <= (int) strlen(prefix) ||
+      (size_t) asked > sizeof(line) - sizeof("Location: ")) {
+    fprintf(stderr, "location: length out of probe range\n");
+    return 1;
+  }
+  urllen = (size_t) asked;
+
+  memset(probe.loc, 0, sizeof(probe.loc));
+  memset(probe.canary, '#', sizeof(probe.canary));
+  memset(&r, 0, sizeof(r));
+  r.location = probe.loc;
+
+  n = (size_t) snprintf(line, sizeof(line), "Location: %s", prefix);
+  memset(line + n, 'a', urllen - strlen(prefix));
+  line[n + urllen - strlen(prefix)] = '\0';
+  url = line + n - strlen(prefix);
+
+  st_location_logged = 0;
+  hts_set_log_vprint_callback(st_location_log);
+  treathead(NULL, "www.example.com", "/", &r, line);
+  hts_set_log_vprint_callback(NULL);
+
+  for (i = 0; i < sizeof(probe.canary); i++) {
+    if (probe.canary[i] != '#')
+      smashed++;
+  }
+  /* bounded: an unterminated buffer reports capacity, never reads past it */
+  for (kept = 0; kept < sizeof(probe.loc) && probe.loc[kept] != '\0'; kept++)
+    ;
+  /* the wanted value comes from the contract, not from what treathead did */
+  want = urllen < HTS_LOCATION_SIZE ? url : "";
+  printf("asked=%d kept=%d value_ok=%d canary_smashed=%d logged=%d\n", asked,
+         (int) kept, strcmp(probe.loc, want) == 0, smashed,
+         st_location_logged != 0);
+  return 0;
+}
+
 /* An over-long header value must not overflow treathead's tempo[1100]. */
 static int st_headerlong(httrackp *opt, int argc, char **argv) {
   htsblk r;
@@ -4580,10 +4706,62 @@ static int st_scantoken(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The pattern answer n owes (adr, fil): a second implementation of the builder,
+   with no bound of its own, to compare it against. */
+static void wizardfilter_want(htsbuff *w, int n, const char *adr,
+                              const char *fil, hts_boolean up) {
+  htsbuff_cpy(w, n <= 2 ? "-" : "+");
+  htsbuff_cat(w, adr);
+  if (n == 2 || n == 6 || (n == 5 && up)) {
+    htsbuff_cat(w, "/*");
+    return;
+  }
+  if (*fil != '/')
+    htsbuff_cat(w, "/");
+  htsbuff_cat(w, fil);
+  if (n == 1 || n == 5)
+    htsbuff_cat(w, "*");
+  else if (n == 7)
+    htsbuff_cat(w, HTS_WIZARD_FILTER_SUFFIX);
+}
+
+/* A link of the given lengths: adr all 'a', fil a directory of 'b' ending on a
+   slash for answers 1, 5 and 7 to anchor on, led by one when `slash`. */
+static void wizardfilter_link(char *adr, size_t adrlen, char *fil,
+                              size_t fillen, hts_boolean slash) {
+  memset(adr, 'a', adrlen);
+  adr[adrlen] = '\0';
+  memset(fil, 'b', fillen);
+  fil[0] = slash ? '/' : 'b';
+  fil[fillen - 1] = '/';
+  fil[fillen] = '\0';
+}
+
+/* Asserts every answer that emits a filter for (adr, fil) emits exactly what
+   wizardfilter_want() owes, and returns the longest pattern seen. */
+static size_t wizardfilter_emits(htsbuff *f, char *expect, const char *adr,
+                                 const char *fil) {
+  static const int answers[] = {0, 1, 2, 5, 6, 7};
+  size_t i, up, longest = 0;
+
+  for (i = 0; i < sizeof(answers) / sizeof(answers[0]); i++) {
+    for (up = 0; up < 2; up++) {
+      const hts_boolean seek = up != 0 ? HTS_TRUE : HTS_FALSE;
+      htsbuff w = htsbuff_ptr(expect, HTS_FILTER_SLOT_SIZE);
+
+      wizardfilter_want(&w, answers[i], adr, fil, seek);
+      hts_wizard_answer_filter(f, 0, answers[i], adr, fil, seek);
+      assertf(strcmp(f->buf, expect) == 0);
+      longest = f->len > longest ? f->len : longest;
+    }
+  }
+  return longest;
+}
+
 /* Prints the filter answer <n> emits for (adr, fil) [up] in [slot]; with no
    arguments, asserts every answer against its expected pattern (#1119). */
 static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
-  char pattern[HTS_URLMAXSIZE * 2];
+  char pattern[HTS_FILTER_SLOT_SIZE];
   htsbuff f = htsbuff_array(pattern);
 
   (void) opt;
@@ -4639,6 +4817,33 @@ static int st_wizardfilter(httrackp *opt, int argc, char **argv) {
   EMITS(1, "foo.com", "page.html", HTS_FALSE, "");
   EMITS(5, "foo.com", "page.html", HTS_FALSE, "");
   EMITS(7, "foo.com", "page.html", HTS_FALSE, "");
+
+  /* A long link must emit the same pattern a short one does, byte for byte:
+     clipping it would widen the rule (a cut "*[file]" becomes "*"), and the
+     lengths come from the wire. Sweeps the old 2048-byte slot, then the real
+     worst case, both link buffers full. */
+  {
+    const size_t urlmax = HTS_URLMAXSIZE * 2 - 1; /* the engine's adr and fil */
+    char *adr = malloct(urlmax + 1);
+    char *fil = malloct(urlmax + 1);
+    char *expect = malloct(HTS_FILTER_SLOT_SIZE);
+    size_t total;
+
+    for (total = 2040; total <= 2048; total++) {
+      const size_t adrlen = total / 2, fillen = total - 1 - adrlen;
+
+      wizardfilter_link(adr, adrlen, fil, fillen, HTS_TRUE);
+      wizardfilter_emits(&f, expect, adr, fil);
+    }
+    /* the real maximum: both buffers full, and no leading slash on fil to
+       spare the separator. It fills the slot exactly, NUL included */
+    wizardfilter_link(adr, urlmax, fil, urlmax, HTS_FALSE);
+    assertf(wizardfilter_emits(&f, expect, adr, fil) ==
+            HTS_FILTER_SLOT_SIZE - 1);
+    freet(adr);
+    freet(fil);
+    freet(expect);
+  }
 
   /* the answers that add no filter at all */
   EMITS(-1, "foo.com", "/x", HTS_FALSE, "");
@@ -6062,8 +6267,34 @@ static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
   char host[64];
 
   snprintf(host, sizeof(host), "h%d.example", n++);
-  robots_parse(r, host, txt, strlen(txt), NULL, 0, HTS_TRUE, NULL, 0);
+  robots_parse(NULL, r, host, txt, strlen(txt), NULL, 0, HTS_TRUE, NULL, 0);
   return checkrobots(r, host, path);
+}
+
+/* The rule store must reach the RFC 9309 §2.5 floor, whatever the macro says.
+ */
+enum { rb_rfc9309_floor = 1 / (HTS_ROBOTS_MAX_TOKEN_SIZE >= 500 * 1024) };
+
+/* robots.txt filling about `blobsize` stored bytes with "/padNNNNN/" rules
+   (12 each: pattern plus marker and LF), then the two rules a caller asserts
+   on: an Allow re-opening /pad00000/open/, and a final Disallow. */
+static char *rb_bulk(size_t blobsize) {
+  const size_t capa = blobsize * 2 + 4096;
+  char *const txt = (char *) malloct(capa);
+  size_t n, blob;
+  int i;
+
+  assertf(txt != NULL);
+  n = (size_t) snprintf(txt, capa, "User-agent: *\n");
+  for (i = 0, blob = 0; blob + 12 <= blobsize; i++, blob += 12) {
+    assertf(i < 100000); // past that "/padNNNNNN/" costs 13, not 12
+    n += (size_t) snprintf(txt + n, capa - n, "Disallow: /pad%05d/\n", i);
+    assertf(n < capa);
+  }
+  n += (size_t) snprintf(txt + n, capa - n, "Allow: /pad00000/open/\n");
+  assertf(n < capa);
+  (void) snprintf(txt + n, capa - n, "Disallow: /secret/\n");
+  return txt;
 }
 
 static int st_robots(httrackp *opt, int argc, char **argv) {
@@ -6133,6 +6364,75 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
 
   /* No rules: everything is allowed. */
   assertf(rb_decide(&robots, "User-agent: *\nDisallow:\n", "/x") == 0);
+
+  /* #1286: rules survive to the RFC 9309 floor. Past the old 4 KB store, just
+     under the floor, and past it, where only the tail is left out. */
+  {
+    char *txt = rb_bulk(8192); /* past the old cap, well under the new one */
+
+    assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/pad00000/open/x") == 0); /* Allow wins */
+    assertf(rb_decide(&robots, txt, "/secret/x") == -1);
+    freet(txt);
+
+    txt = rb_bulk(HTS_ROBOTS_MAX_TOKEN_SIZE - 1024); /* just under the cap */
+    assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/pad00000/open/x") == 0);
+    assertf(rb_decide(&robots, txt, "/secret/x") == -1);
+    freet(txt);
+
+    /* Past it the tail is lost, which robots_parse reports through the log. */
+    txt = rb_bulk(HTS_ROBOTS_MAX_TOKEN_SIZE + 4096);
+    assertf(rb_decide(&robots, txt, "/pad00000/x") == -1);
+    assertf(rb_decide(&robots, txt, "/pad00000/open/x") == -1);
+    assertf(rb_decide(&robots, txt, "/secret/x") == 0);
+    freet(txt);
+  }
+
+  /* A rule costs marker + pattern + LF, the accounting tests/309 computes. */
+  {
+    const char *const txt = "User-agent: *\nDisallow: /pad00000/\n";
+    robots_wizard rb;
+
+    memset(&rb, 0, sizeof(rb));
+    robots_parse(NULL, &rb, "h.test", txt, strlen(txt), NULL, 0, HTS_TRUE, NULL,
+                 0);
+    assertf(rb.next != NULL && rb.next->token != NULL);
+    assertf(strlen(rb.next->token) == strlen("/pad00000/") + 2);
+    checkrobots_free(&rb);
+  }
+
+  /* A rule longer than the line buffer is read as a prefix of itself. Kept for
+     a Disallow, which can then only forbid more; dropped for an Allow, which
+     would otherwise permit more than the site wrote and beat the Disallow. */
+  {
+    char BIGSTK txt[HTS_ROBOTS_LINE_SIZE * 3];
+    char BIGSTK path[HTS_ROBOTS_LINE_SIZE * 2];
+
+    memset(path, 'a', sizeof(path));
+    path[0] = '/';
+    path[HTS_ROBOTS_LINE_SIZE + 200] = '\0';
+
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: %s\n", path);
+    assertf(rb_decide(&robots, txt, path) == -1);
+
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
+             path);
+    assertf(rb_decide(&robots, txt, path) == -1);
+
+    /* The longest line the buffer holds whole is not cut, so this Allow wins;
+       one byte more is cut, and the Disallow it would have beaten stands. */
+    path[HTS_ROBOTS_LINE_SIZE - 2 - strlen("Allow: ")] = '\0';
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
+             path);
+    assertf(rb_decide(&robots, txt, path) == 0);
+
+    path[HTS_ROBOTS_LINE_SIZE - 2 - strlen("Allow: ")] = 'a';
+    path[HTS_ROBOTS_LINE_SIZE - 1 - strlen("Allow: ")] = '\0';
+    snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
+             path);
+    assertf(rb_decide(&robots, txt, path) == -1);
+  }
 
   checkrobots_free(&robots);
   printf("robots self-test OK\n");
@@ -6385,7 +6685,7 @@ static int st_sitemap(httrackp *opt, int argc, char **argv) {
     robots_wizard rb;
 
     memset(&rb, 0, sizeof(rb));
-    robots_parse(&rb, "h.test", txt, strlen(txt), NULL, 0, HTS_TRUE, maps,
+    robots_parse(NULL, &rb, "h.test", txt, strlen(txt), NULL, 0, HTS_TRUE, maps,
                  sizeof(maps));
     assertf(strcmp(maps, "http://h.test/s1.xml\nhttps://h.test/s2.xml\n") == 0);
     assertf(checkrobots(&rb, "h.test", "/x") == -1);
@@ -10864,6 +11164,11 @@ static const struct selftest_entry {
     {"headerlong", "[header-name:]",
      "over-long header value must not overflow the parse scratch",
      st_headerlong},
+    {"location", "<url-length>", "Location gate matches the buffer it protects",
+     st_location},
+    {"headerline", "<read-size>",
+     "a header line that does not fit is reported and skipped whole",
+     st_headerline},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
     {"xfread-limit", "", "in-memory receive buffer size bound",

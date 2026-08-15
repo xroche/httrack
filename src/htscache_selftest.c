@@ -100,7 +100,7 @@ static void store_entry(httrackp *opt, cache_back *cache, const char *adr,
                         const char *etag, const char *location,
                         const char *cdispo, const char *body, size_t body_len) {
   htsblk r;
-  char locbuf[HTS_URLMAXSIZE * 2];
+  char locbuf[HTS_LOCATION_SIZE];
   char *bodycopy = NULL;
 
   hts_init_htsblk(&r);
@@ -136,7 +136,7 @@ static int check_entry(httrackp *opt, cache_back *cache, const char *adr,
                        const char *location, const char *cdispo,
                        const char *body, size_t body_len) {
   int fail = 0;
-  char *locbuf = malloct(HTS_URLMAXSIZE * 2);
+  char *locbuf = malloct(HTS_LOCATION_SIZE);
   htsblk r;
 
   locbuf[0] = '\0';
@@ -277,7 +277,7 @@ static int disk_fallback_selftest(httrackp *opt) {
 
   /* read it back: takes the X-In-Cache: 0 disk-fallback branch */
   selftest_open_for_read(&cache, opt);
-  locbuf = malloct(HTS_URLMAXSIZE * 2);
+  locbuf = malloct(HTS_LOCATION_SIZE);
   locbuf[0] = '\0';
   r = cache_readex(opt, &cache, adr, fil, "", locbuf, NULL, 1);
   if (r.statuscode != 200) {
@@ -697,18 +697,65 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
   return fail;
 }
 
+/* cache_mayadd()'s shortcut for a 3xx with no save name records "<code>\n<url>"
+   in cached_tests so the same URL is not re-tested. Its scratch must hold a
+   location at the full contract; too small and the mirror aborts on a long
+   redirect rather than storing it. */
+static int fast_header_selftest(httrackp *opt, const char *location) {
+  const char *const adr = "example.com";
+  const char *const fil = "/moved-fast";
+  cache_back cache;
+  htsblk r;
+  char *locbuf = malloct(HTS_LOCATION_SIZE);
+  char *want = malloct(HTS_LOCATION_SIZE + 32);
+  intptr_t stored = 0;
+  int fail = 0;
+
+  selftest_open_for_write(&cache, opt);
+  cache.cached_tests = coucal_new(0);
+  assertf(cache.cached_tests != NULL);
+  coucal_value_is_malloc(cache.cached_tests, 1);
+
+  hts_init_htsblk(&r);
+  r.statuscode = 301;
+  r.size = 0;
+  strcpybuff(r.msg, "Moved Permanently");
+  strcpybuff(r.contenttype, "text/html");
+  strlcpybuff(locbuf, location, HTS_LOCATION_SIZE);
+  r.location = locbuf;
+  r.is_write = 0;
+  cache_mayadd(opt, &cache, &r, adr, fil, NULL);
+
+  snprintf(want, HTS_LOCATION_SIZE + 32, "%d\n%s", (int) r.statuscode,
+           location);
+  if (!coucal_read(cache.cached_tests,
+                   concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), adr, fil),
+                   &stored)) {
+    fprintf(stderr, "%s: fast-header: nothing recorded for %s%s\n",
+            selftest_tag, adr, fil);
+    fail++;
+  } else if (strcmp((const char *) stored, want) != 0) {
+    fprintf(stderr, "%s: fast-header: recorded %d bytes, expected %d\n",
+            selftest_tag, (int) strlen((const char *) stored),
+            (int) strlen(want));
+    fail++;
+  }
+
+  selftest_close(&cache);
+  freet(locbuf);
+  freet(want);
+  return fail;
+}
+
 int cache_selftests(httrackp *opt, const char *dir) {
   int failures = 0;
   cache_back cache;
   int i;
 
-  /* near-limit field values. The etag stresses htsblk.etag[256]; the location
-     stresses a long redirect URL. Each cached header line is read back through
-     a HTS_URLMAXSIZE-sized parse buffer ("<field>: <value>\r\n"), so the
-     round-trippable value is shorter than HTS_URLMAXSIZE: 1000 stays safely
-     under that real limit. */
+  /* near-limit field values: the etag stresses htsblk.etag[256], the location
+     a redirect URL at the full HTS_LOCATION_SIZE contract */
   static char etag_long[251];
-  static char location_long[1001];
+  static char location_long[HTS_LOCATION_SIZE];
 
   /* a body with embedded NUL and high bytes, to prove binary safety */
   static const char binary_body[] = {
@@ -868,6 +915,9 @@ int cache_selftests(httrackp *opt, const char *dir) {
 
   /* pass 6: the broken-transfer reference fallback */
   failures += broken_ref_selftest(opt);
+
+  /* pass 7: the save-less 3xx shortcut, whose scratch holds code + location */
+  failures += fast_header_selftest(opt, location_long);
 
   for (i = 0; i < large_count; i++) {
     freet(large_body[i]);
@@ -1691,7 +1741,7 @@ int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
   cache_back cache;
   /* every htsblk field at the cap its declaration allows */
   static char msg[80], ctype[HTS_MIMETYPE_SIZE], charset[HTS_MIMETYPE_SIZE];
-  static char etag[256], cdispo[256], location[HTS_URLMAXSIZE * 2];
+  static char etag[256], cdispo[256], location[HTS_LOCATION_SIZE];
   /* url_adr/url_fil/save are all lien_back-sized, so the three alone reach
      6 KB, past the header block the writer builds them in */
   static char big_adr[HTS_URLMAXSIZE * 2], big_fil[HTS_URLMAXSIZE * 2];
@@ -1791,7 +1841,7 @@ int cache_header_bounds_selftest(httrackp *opt, const char *dir) {
 
   selftest_open_for_read(&cache, opt);
   {
-    char *locbuf = malloct(HTS_URLMAXSIZE * 2);
+    char *locbuf = malloct(HTS_LOCATION_SIZE);
     htsblk r;
 
     locbuf[0] = '\0';

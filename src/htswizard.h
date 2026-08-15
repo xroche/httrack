@@ -61,10 +61,14 @@ hts_boolean hts_robots_forbids(httrackp *opt, const char *adr, const char *fil,
    caller stops at the first empty one. */
 #define HTS_WIZARD_MAX_FILTERS 2
 
+/* The longest suffix an answer appends after the link (answer 7). */
+#define HTS_WIZARD_FILTER_SUFFIX "*[file]"
+
 /* Builds into `f` the `slot`-th filter answer `n` adds for the link (adr,fil),
    and leaves `f` empty past the last one. Only the host-scope answers emit a
    second, because their starred form misses the apex. `seeker_up` is the
-   HTS_SEEKER_UP bit of opt->seeker, read by answer 5. */
+   HTS_SEEKER_UP bit of opt->seeker, read by answer 5. `f` must have a full
+   HTS_FILTER_SLOT_SIZE of capacity, so no pattern is ever truncated. */
 void hts_wizard_answer_filter(htsbuff *f, int slot, int n, const char *adr,
                               const char *fil, hts_boolean seeker_up);
 
