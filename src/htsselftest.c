@@ -2778,6 +2778,21 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
 #define ST_SAVENAME_POISON 0x5a
 #define ST_SAVENAME_CANARY 128
 
+/* The run from `from` to `size` must still hold the poison. */
+static int st_poison_intact(const char *label, const char *buf, size_t from,
+                            size_t size) {
+  size_t i;
+
+  for (i = size; i > from; i--) {
+    if (buf[i - 1] != (char) ST_SAVENAME_POISON) {
+      fprintf(stderr, "%s: wrote %d byte(s) past the end\n", label,
+              (int) (i - from));
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
   struct {
     lien_adrfilsave afs;
@@ -2961,29 +2976,10 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
                &headers);
   if (body != NULL)
     (void) UNLINK(bodyfile);
-  for (i = (int) sizeof(probe.canary); i > 0; i--) {
-    if (probe.canary[i - 1] != (char) ST_SAVENAME_POISON) {
-      fprintf(stderr, "savename: wrote %d byte(s) past save[%d]\n", i,
-              (int) sizeof(afs->save));
-      return 1;
-    }
-  }
+  if (st_poison_intact("savename: save[]", probe.canary, 0,
+                       sizeof(probe.canary)) != 0)
+    return 1;
   printf("savename: %s\n", afs->save);
-  return 0;
-}
-
-/* Every byte the appender leaves alone must still hold the poison. */
-static int st_addstr_canary(const char *buf, size_t from, size_t size,
-                            const char *what) {
-  size_t i;
-
-  for (i = size; i > from; i--) {
-    if (buf[i - 1] != (char) ST_SAVENAME_POISON) {
-      fprintf(stderr, "savename-addstr: %s wrote %d byte(s) past [%d]\n", what,
-              (int) (i - from), (int) from);
-      return 1;
-    }
-  }
   return 0;
 }
 
@@ -3020,10 +3016,13 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
   (void) argv;
   for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
     const size_t seedlen = strlen(cases[k].seed);
-    /* the appender may write up to dsize, and re-terminate a longer seed */
+    /* the appender may write up to dsize, and never past a longer seed */
     const size_t guard =
         cases[k].dsize > seedlen + 1 ? cases[k].dsize : seedlen + 1;
+    char label[64];
 
+    snprintf(label, sizeof(label), "savename-addstr: '%s' at dsize %d",
+             cases[k].add, (int) cases[k].dsize);
     memset(buf, ST_SAVENAME_POISON, sizeof(buf));
     memcpy(buf, cases[k].seed, seedlen + 1);
     url_savename_addstr(buf, cases[k].dsize, cases[k].add);
@@ -3033,7 +3032,7 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
               cases[k].want);
       rc = 1;
     }
-    rc |= st_addstr_canary(buf, guard, sizeof(buf), cases[k].add);
+    rc |= st_poison_intact(label, buf, guard, sizeof(buf));
   }
 
   /* The real caller's shape, at the capacities the naming path hands out. Both
@@ -3043,7 +3042,10 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
     const size_t dsize = bigcaps[k];
     char BIGSTK src[HTS_URLMAXSIZE * 4];
     char BIGSTK big[sizeof(src) + 64];
+    char label[64];
 
+    snprintf(label, sizeof(label), "savename-addstr: long link at dsize %d",
+             (int) dsize);
     memset(big, ST_SAVENAME_POISON, sizeof(big));
     big[0] = '\0';
     memset(src, 'a', sizeof(src) - 1);
@@ -3054,7 +3056,7 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
               (int) dsize, (int) strlen(big));
       rc = 1;
     }
-    rc |= st_addstr_canary(big, dsize, sizeof(big), "long link");
+    rc |= st_poison_intact(label, big, dsize, sizeof(big));
   }
 
   printf("savename-addstr self-test %s\n", rc == 0 ? "OK" : "FAILED");
