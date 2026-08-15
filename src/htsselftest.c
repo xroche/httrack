@@ -78,6 +78,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <ctype.h>
 #include <errno.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -2772,8 +2773,25 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
   return rc;
 }
 
+/* save[] is the last member of lien_adrfilsave, so a poisoned run right behind
+   it catches whatever the naming path appends past its end (#1269). */
+#define ST_SAVENAME_POISON 0x5a
+#define ST_SAVENAME_CANARY 128
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
-  lien_adrfilsave afs;
+  struct {
+    lien_adrfilsave afs;
+    char canary[ST_SAVENAME_CANARY];
+  } probe;
+
+  /* the canary is only behind save[] if the struct has no trailing padding */
+  enum {
+    st_savename_packed =
+        1 / (offsetof(lien_adrfilsave, save) + sizeof(probe.afs.save) ==
+             sizeof(lien_adrfilsave))
+  };
+
+  lien_adrfilsave *const afs = &probe.afs;
   cache_back cache;
   struct_back *sback;
   hash_struct hash;
@@ -2784,6 +2802,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   const char *cached = NULL;
   const char *bodyfile = "st-savename-body.tmp";
   int statuscode = HTTP_OK, status = 0;
+  int filpad = 0;
   int i;
 
   if (argc < 2) {
@@ -2820,14 +2839,36 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       body = a + 5;
     else if (strncmp(a, "cached=", 7) == 0)
       cached = a + 7;
+    else if (strncmp(a, "filpad=", 7) == 0)
+      filpad = atoi(a + 7);
     else if (strncmp(a, "prior=", 6) != 0) {
       fprintf(stderr, "savename: unknown arg '%s'\n", a);
       return 1;
     }
   }
-  memset(&afs, 0, sizeof(afs));
-  strcpybuff(afs.af.adr, adr);
-  strcpybuff(afs.af.fil, argv[0]);
+  memset(&probe, 0, sizeof(probe));
+  memset(probe.canary, ST_SAVENAME_POISON, sizeof(probe.canary));
+  strcpybuff(afs->af.adr, adr);
+  if (filpad > 0) {
+    /* '*' stands for filpad bytes: a link longer than argv can carry, argv
+       being capped at HTS_CDLMAXSIZE (htscoremain.c) */
+    const char *const star = strchr(argv[0], '*');
+    char BIGSTK pad[HTS_URLMAXSIZE * 2];
+
+    /* refuse rather than let the harness itself abort in strcatbuff */
+    if (star == NULL ||
+        (size_t) filpad + strlen(argv[0]) >= sizeof(afs->af.fil)) {
+      fprintf(stderr, "savename: filpad needs a '*' in the fil, and room\n");
+      return 1;
+    }
+    memset(pad, 'a', (size_t) filpad);
+    pad[filpad] = '\0';
+    strncatbuff(afs->af.fil, argv[0], star - argv[0]);
+    strcatbuff(afs->af.fil, pad);
+    strcatbuff(afs->af.fil, star + 1);
+  } else {
+    strcpybuff(afs->af.fil, argv[0]);
+  }
 
   memset(&cache, 0, sizeof(cache));
   if (cached != NULL) { /* cached=<content-type>|<save name> */
@@ -2902,7 +2943,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   strcpybuff(headers.r.contenttype, argv[1]);
   if (cdispo != NULL)
     strcpybuff(headers.r.cdispo, cdispo);
-  strcpybuff(headers.url_fil, argv[0]);
+  strcpybuff(headers.url_fil, afs->af.fil);
   if (body != NULL) { /* leading body bytes, read via url_sav */
     char BIGSTK data[1024];
     const size_t n = st_decode_body(body, data, sizeof(data));
@@ -2916,12 +2957,108 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     strcpybuff(headers.url_sav, bodyfile);
   }
 
-  url_savename(&afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
+  url_savename(afs, NULL, NULL, NULL, opt, sback, &cache, &hash, 0, 0,
                &headers);
   if (body != NULL)
     (void) UNLINK(bodyfile);
-  printf("savename: %s\n", afs.save);
+  for (i = (int) sizeof(probe.canary); i > 0; i--) {
+    if (probe.canary[i - 1] != (char) ST_SAVENAME_POISON) {
+      fprintf(stderr, "savename: wrote %d byte(s) past save[%d]\n", i,
+              (int) sizeof(afs->save));
+      return 1;
+    }
+  }
+  printf("savename: %s\n", afs->save);
   return 0;
+}
+
+/* Every byte the appender leaves alone must still hold the poison. */
+static int st_addstr_canary(const char *buf, size_t from, size_t size,
+                            const char *what) {
+  size_t i;
+
+  for (i = size; i > from; i--) {
+    if (buf[i - 1] != (char) ST_SAVENAME_POISON) {
+      fprintf(stderr, "savename-addstr: %s wrote %d byte(s) past [%d]\n", what,
+              (int) (i - from), (int) from);
+      return 1;
+    }
+  }
+  return 0;
+}
+
+/* url_savename_addstr() takes attacker-controlled link text and must clip to
+   the destination size it is handed, at every capacity (#1269). */
+static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    size_t dsize;
+    const char *seed;
+    const char *add;
+    const char *want;
+  } cases[] = {
+      {8, "", "a\\b", "a/b"},                   /* fits: '\' becomes '/' */
+      {8, "ab/", "cd", "ab/cd"},                /* appended after the seed */
+      {8, "", "abcdefg", "abcdefg"},            /* exact fit, NUL on the last */
+      {8, "", "abcdefgh", "abcdefg"},           /* one over */
+      {8, "", "abcdefghijklmnop", "abcdefg"},   /* far over */
+      {8, "ab", "\\\\\\\\\\\\\\\\", "ab/////"}, /* clip inside a '\' run */
+      {8, "abcdefg", "xy", "abcdefg"},          /* already full */
+      {1, "", "abc", ""},                       /* only the NUL fits */
+      {2, "", "a\\c", "a"},
+      {4, "abcdefghij", "xy", "abcdefghij"}, /* seed past dsize: left alone */
+      {0, "abc", "xy", "abc"},               /* degenerate size */
+  };
+
+  static const size_t bigcaps[] = {64, 255, HTS_URLMAXSIZE,
+                                   HTS_URLMAXSIZE * 2 - 64};
+  char buf[64];
+  size_t k;
+  int rc = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+    const size_t seedlen = strlen(cases[k].seed);
+    /* the appender may write up to dsize, and re-terminate a longer seed */
+    const size_t guard =
+        cases[k].dsize > seedlen + 1 ? cases[k].dsize : seedlen + 1;
+
+    memset(buf, ST_SAVENAME_POISON, sizeof(buf));
+    memcpy(buf, cases[k].seed, seedlen + 1);
+    url_savename_addstr(buf, cases[k].dsize, cases[k].add);
+    if (strcmp(buf, cases[k].want) != 0) {
+      fprintf(stderr, "savename-addstr: '%s' + '%s' (%d) -> '%s' want '%s'\n",
+              cases[k].seed, cases[k].add, (int) cases[k].dsize, buf,
+              cases[k].want);
+      rc = 1;
+    }
+    rc |= st_addstr_canary(buf, guard, sizeof(buf), cases[k].add);
+  }
+
+  /* the real caller's shape: a link far longer than the destination, over the
+     capacities the naming path hands out. Both buffers hold the whole source,
+     so an unclipped append is caught by the poison instead of smashing. */
+  for (k = 0; k < sizeof(bigcaps) / sizeof(bigcaps[0]); k++) {
+    const size_t dsize = bigcaps[k];
+    char BIGSTK src[HTS_URLMAXSIZE * 4];
+    char BIGSTK big[sizeof(src) + 64];
+
+    memset(big, ST_SAVENAME_POISON, sizeof(big));
+    big[0] = '\0';
+    memset(src, 'a', sizeof(src) - 1);
+    src[sizeof(src) - 1] = '\0';
+    url_savename_addstr(big, dsize, src);
+    if (strlen(big) != dsize - 1) {
+      fprintf(stderr, "savename-addstr: dsize %d filled %d byte(s)\n",
+              (int) dsize, (int) strlen(big));
+      rc = 1;
+    }
+    rc |= st_addstr_canary(big, dsize, sizeof(big), "long link");
+  }
+
+  printf("savename-addstr self-test %s\n", rc == 0 ? "OK" : "FAILED");
+  return rc;
 }
 
 static char st_log_callback_seen[256];
@@ -10310,6 +10447,9 @@ static const struct selftest_entry {
      st_xfread_limit},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
+    {"savename-addstr", "",
+     "save-name append clips to the destination size (#1269)",
+     st_savename_addstr},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
     {"escape-control", "[hex:..|string]",

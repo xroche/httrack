@@ -47,20 +47,26 @@ Please visit our Website: http://www.httrack.com
 #include <ctype.h>
 #include <limits.h>
 
-#define ADD_STANDARD_PATH \
-    {  /* ajout nom */\
-      char BIGSTK buff[HTS_URLMAXSIZE*2];\
-      buff[0]='\0';\
-      strncatbuff(buff,start_pos,nom_pos - start_pos);\
-      url_savename_addstr(afs->save, buff);\
-    }
+/* Tail room kept free in afs->save for the collision suffix, ".delayed" and the
+   NUL: those are appended later by helpers that abort() instead of clipping. */
+#define HTS_PATH_TAIL_RESERVE 64
+
+#define ADD_STANDARD_PATH                                                      \
+  { /* add path */                                                             \
+    char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
+    buff[0] = '\0';                                                            \
+    strncatbuff(buff, start_pos, nom_pos - start_pos);                         \
+    url_savename_addstr(afs->save, sizeof(afs->save) - HTS_PATH_TAIL_RESERVE,  \
+                        buff);                                                 \
+  }
 
 #define ADD_STANDARD_NAME(shortname)                                           \
   { /* add name */                                                             \
     char BIGSTK buff[HTS_URLMAXSIZE * 2];                                      \
     standard_name(buff, sizeof(buff), dot_pos, nom_pos, fil_complete,          \
                   (shortname));                                                \
-    url_savename_addstr(afs->save, buff);                                      \
+    url_savename_addstr(afs->save, sizeof(afs->save) - HTS_PATH_TAIL_RESERVE,  \
+                        buff);                                                 \
   }
 
 /* Avoid stupid DOS system folders/file such as 'nul' */
@@ -1517,7 +1523,6 @@ int url_savename(lien_adrfilsave *const afs,
   // Cap the save path: the final parent+name is copied into a fixed buffer that
   // aborts() on overflow (htssafe.h), so clamp every ceiling to fit it.
 #define HTS_SAVE_BUFSIZE (HTS_URLMAXSIZE * 2) /* sizeof(afs->save) */
-#define HTS_PATH_TAIL_RESERVE 64 /* collision suffix + ".delayed" + NUL */
 #ifdef _WIN32
   // MAX_PATH minus 8.3 headroom (MSDN) minus the ".delayed" marker; raising it
   // needs the engine to "\\?\"-prefix its paths, which is separate work.
@@ -1689,7 +1694,6 @@ int url_savename(lien_adrfilsave *const afs,
 #undef MAX_EXT_LEN
 #undef MAX_SEG_LEN
 #undef HTS_MAX_PATH_LEN
-#undef HTS_PATH_TAIL_RESERVE
 #undef HTS_SAVE_BUFSIZE
 #ifndef _WIN32
 #undef HTS_PATH_MAX_
@@ -1856,15 +1860,13 @@ char *url_md5(char *digest, const char *fil) {
   return digest;
 }
 
-// interne à url_savename: ajoute une chaîne à une autre avec \ -> /
-void url_savename_addstr(char *d, const char *s) {
-  int i = (int) strlen(d);
+/* internal to url_savename: append s to d, mapping '\' to '/' */
+void url_savename_addstr(char *d, size_t dsize, const char *s) {
+  size_t i = strlen(d);
 
-  while(*s) {
-    if (*s == '\\')             // remplacer \ par des /
-      d[i++] = '/';
-    else
-      d[i++] = *s;
+  /* Clip rather than abort: s comes from a crawled link (#1269). */
+  while (*s != '\0' && i + 1 < dsize) {
+    d[i++] = *s == '\\' ? '/' : *s;
     s++;
   }
   d[i] = '\0';
