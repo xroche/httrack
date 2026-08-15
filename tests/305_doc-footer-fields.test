@@ -1,0 +1,59 @@
+#!/bin/bash
+#
+# The -%F field names have one owner, footer_field_names[] in htstools.c, and
+# --help now prints them from it. man/httrack.1 is generated from --help and
+# 02_manpage-regen guards that; html/cmdguide.html is a hand-written copy, so
+# pin it to the binary's list in both directions.
+
+set -euo pipefail
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+guide="${srcdir}/html/cmdguide.html"
+
+test -r "${guide}" || {
+    echo "FAIL: no ${guide}" >&2
+    exit 1
+}
+command -v httrack >/dev/null 2>&1 || {
+    echo "httrack not in PATH; skipping" >&2
+    exit 77
+}
+
+same_set() { # same_set <list A> <list B>: newline-separated, order-insensitive
+    diff <(sort <<<"$1") <(sort <<<"$2") >/dev/null
+}
+
+help_line=$(httrack --quiet --help 2>/dev/null | grep -m1 -- ' %F  footer string' || true)
+test -n "${help_line}" || {
+    echo "FAIL: --help prints no -%F line" >&2
+    exit 1
+}
+
+# " ...; fields {addr} {path} ..., or legacy %s)" -> one {name} per line.
+engine=$(sed -n 's/.*; fields \(.*\), or legacy .*/\1/p' <<<"${help_line}" |
+    tr ' ' '\n' | grep '^{[a-z]*}$' || true)
+doc=$(grep -o '<tt>{[a-z]*}</tt>' "${guide}" | sed 's,</*tt>,,g' | sort -u || true)
+
+# Controls: neither list may be silently empty, and the comparison must say no.
+grep -qx '{addr}' <<<"${engine}" || {
+    echo "FAIL: no field names parsed out of the -%F help line: ${help_line}" >&2
+    exit 1
+}
+grep -qx '{addr}' <<<"${doc}" || {
+    echo "FAIL: no <tt>{field}</tt> names parsed out of ${guide}" >&2
+    exit 1
+}
+if same_set "${engine}" "${engine}
+{nosuchfield}"; then
+    echo "FAIL: same_set() ignores an extra name; the check below proves nothing" >&2
+    exit 1
+fi
+
+same_set "${engine}" "${doc}" || {
+    echo "FAIL: html/cmdguide.html lists different -%F fields than the engine." >&2
+    echo "Left is --help, right is cmdguide.html:" >&2
+    diff <(sort <<<"${engine}") <(sort <<<"${doc}") >&2 || true
+    exit 1
+}
+
+echo "cmdguide.html lists the engine's $(wc -l <<<"${engine}") -%F fields"

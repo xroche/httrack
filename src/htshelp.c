@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscoremain.h"
 #include "htscatchurl.h"
 #include "htslib.h"
+#include "htstools.h"
 #include "htsalias.h"
 #include "htsmodules.h"
 #ifdef _WIN32
@@ -454,10 +455,29 @@ void help_catchurl(const char *dest_path) {
     printf("Unable to create a temporary proxy (no remaining port)\n");
 }
 
+// "{addr} {path} ..." for the -%F help line, from the engine's own table, so
+// the ten names have one owner (htstools.c) rather than a copy per surface.
+static void footer_field_list(char *dest, size_t size) {
+  size_t i, len = 0;
+
+  dest[0] = '\0';
+  for (i = 0; i < HTS_FOOTER_FIELD_COUNT; i++) {
+    const int n =
+        snprintf(dest + len, size - len, "%s{%s}", len != 0 ? " " : "",
+                 hts_footer_field_name((hts_footer_field_id) i));
+    if (n < 0 || (size_t) n >= size - len) {
+      dest[len] = '\0'; // drop a half-written name rather than show it
+      break;
+    }
+    len += (size_t) n;
+  }
+}
+
 // mini-aide  (h: help)
 //           y
 void help(const char *app, int more) {
   char info[2048];
+  char fields[256];
 
   infomsg("");
   if (more)
@@ -607,10 +627,12 @@ void help(const char *app, int more) {
     ("  F  user-agent field sent in HTTP headers (-F \"user-agent name\")");
   infomsg(" %R  default referer field sent in HTTP headers");
   infomsg(" %E  from email address sent in HTTP headers");
-  infomsg(
-      " %F  footer string in Html code (-%F \"Mirrored from {url} on "
-      "{date}\"; fields {addr} {path} {url} {date} {lastmodified} {version} "
-      "{mime} {charset} {status} {size}, or legacy %s)");
+  footer_field_list(fields, sizeof(fields));
+  snprintf(info, sizeof(info),
+           " %%F  footer string in Html code (-%%F \"Mirrored from {url} on "
+           "{date}\"; fields %s, or legacy %%s)",
+           fields);
+  infomsg(info);
   infomsg(" %l  preferred language (-%l \"fr, en, jp, *\"");
   infomsg(" %a  accepted formats (-%a \"text/html,image/png;q=0.9,*/*;q=0.1\"");
   infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"");
