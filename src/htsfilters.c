@@ -363,11 +363,11 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
               }
               if (ndigits != 0) {
                 if (size == NULL || *size < 0)
-                  return NULL; // taille inconnue: test impossible
+                  return NULL; // size unknown: no test possible
                 if (size_flag)
-                  *size_flag = 1; /* a joué */
+                  *size_flag = 1; // a size test played
                 if (op == '<' ? (*size >= lsize) : (*size <= lsize))
-                  return NULL; // hors bornes
+                  return NULL; // out of bounds
                 nbounds++;
                 slimit = lsize;
               }
@@ -390,8 +390,8 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
             if ((joker[i] == ',') || (joker[i] == ';'))
               i++;
           }
-          // every bound held: the clause matches here and, as with a single
-          // one, whatever follows ']' is not matched
+          // every bound held: match here and skip what follows ']', as a
+          // single bound already did
           if (nbounds != 0 && size != NULL) {
             *size = slimit;
             return chaine;

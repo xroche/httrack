@@ -213,7 +213,7 @@ bracket forms match narrower sets. The full table, with size and mime rules, is 
   <tr><td><tt>*[a,b,c]</tt></td><td>a run of characters from the set</td><td><tt>*[a,b,c].txt</tt></td></tr>
   <tr><td><tt>*[a-z]</tt></td><td>a run of characters from the range, lowercase only</td><td><tt>img*[0-9].gif</tt></td></tr>
   <tr><td><tt>*[\x]</tt></td><td>the literal character x (escapes <tt>* [ ] \</tt>)</td><td><tt>*[\*]</tt> matches a real <tt>*</tt></td></tr>
-  <tr><td><tt>*[&lt;NN]</tt>, <tt>*[&gt;NN]</tt></td><td>file size in KB below / above NN; both bounds in one clause are an "and"</td><td><tt>-*.gif*[&lt;5]</tt> skips GIFs under 5&nbsp;KB, <tt>+*.gif*[&gt;1&lt;80]</tt> keeps the 1&ndash;80&nbsp;KB ones</td></tr>
+  <tr><td><tt>*[&lt;NN]</tt>, <tt>*[&gt;NN]</tt>, <tt>*[&gt;MM&lt;NN]</tt></td><td>file size in KB below / above NN; two bounds in one clause combine with "and"</td><td><tt>-*.gif*[&lt;5]</tt> skips GIFs under 5&nbsp;KB, <tt>+*.gif*[&gt;1&lt;80]</tt> keeps the 1&ndash;80&nbsp;KB ones</td></tr>
   <tr><td><tt>*[]</tt></td><td>end anchor: nothing may follow</td><td><tt>*.html*[]</tt> rejects <tt>i.html?p=1</tt></td></tr>
 </table>
 

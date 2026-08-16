@@ -43,17 +43,27 @@ fsize 'verdict=allowed size_flag=1' 100 a.gif '-*' '+*[>1]'
 fsize 'verdict=allowed size_flag=1' 0 a.gif '+*' '-*[>1<80]'
 fsize 'verdict=forbidden size_flag=1' 40 a.gif '+*' '-*[>1<80]'
 
+# Every bound counts, not just the first two, and two in the same direction stay
+# a conjunction instead of the last one winning.
+fsize 'verdict=forbidden size_flag=1' 20 a.gif '-*' '+*[>1<80>30]'
+fsize 'verdict=allowed size_flag=1' 50 a.gif '-*' '+*[>1<80>30]'
+fsize 'verdict=allowed size_flag=1' 30 a.gif '-*' '+*[<40<80]'
+fsize 'verdict=forbidden size_flag=1' 60 a.gif '-*' '+*[<40<80]'
+
 # A window nothing can satisfy is taken as written and simply never matches.
 fsize 'verdict=forbidden size_flag=1' 0 a.gif '-*' '+*[>80<1]'
 fsize 'verdict=forbidden size_flag=1' 40 a.gif '-*' '+*[>80<1]'
 fsize 'verdict=forbidden size_flag=1' 100 a.gif '-*' '+*[>80<1]'
 
-# A rule off -%S is hostile input: a bound with no digits is no size test at all
-# (the characters fall through to the class), and a number longer than an int
-# must not overflow the parse. Neither aborts.
-fsize 'verdict=forbidden size_flag=0' 5 a.gif '-*' '+*[<]'
+# A rule off -%S is hostile input, so a malformed clause must not abort. A bound
+# with no digits is no size test: the operator is dropped and only what follows
+# it joins the class. And a number longer than an int must not overflow.
+fsize 'verdict=forbidden size_flag=0' 5 '<' '-*' '+*[<]'  # '<' is not a member
+fsize 'verdict=allowed size_flag=0' 5 abc '-*' '+*[<abc]' # but its tail is
+fsize 'verdict=forbidden size_flag=0' 5 '<abc' '-*' '+*[<abc]'
 fsize 'verdict=allowed size_flag=1' 5 a.gif '-*' '+*[<80>]'
 fsize 'verdict=allowed size_flag=1' 5 a.gif '-*' '+*[>1<]'
 fsize 'verdict=allowed size_flag=1' 5 a.gif '-*' '+*[<99999999999999999999]'
+fsize 'verdict=forbidden size_flag=1' 5 a.gif '-*' '+*[>99999999999999999999]'
 
 selftest_run_queued
