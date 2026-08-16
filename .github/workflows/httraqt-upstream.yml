@@ -1,0 +1,88 @@
+# The HTTraQt canary builds a SHA of our own mirror so a third-party push cannot
+# red our PRs. Nothing then notices when SourceForge moves; this does.
+name: HTTraQt upstream watch
+
+# Never on push or pull_request: reacting to upstream inside a PR check is the
+# side door the pin exists to close.
+on:
+  schedule:
+    - cron: "53 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: httraqt-upstream
+
+jobs:
+  watch:
+    name: compare upstream against the pinned revision
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # Reports "unreachable" rather than failing when SourceForge does not
+      # answer: an outage there is not news about HTTraQt.
+      - name: Compare SourceForge master against HTTRAQT_REF
+        id: check
+        run: sh tools/httraqt-upstream-check.sh
+
+      - name: Warn on the run summary when the host did not answer
+        if: steps.check.outputs.status == 'unreachable'
+        run: echo "::warning::SourceForge did not answer; upstream unchecked this week"
+
+      - name: Open or update the drift issue
+        if: steps.check.outputs.status == 'moved' || steps.check.outputs.status == 'gone'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PINNED: ${{ steps.check.outputs.pinned }}
+          UPSTREAM: ${{ steps.check.outputs.upstream }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LABEL: httraqt-upstream
+        run: |
+          set -euo pipefail
+          # Invisible in the rendered issue, and what the next run greps to stay quiet.
+          marker="<!-- httraqt-upstream: upstream=$UPSTREAM -->"
+          {
+            if [ "$UPSTREAM" = none ]; then
+              echo "SourceForge answers, but HTTraQt has no \`refs/heads/master\` any more: renamed, or the project moved."
+            else
+              echo "Upstream HTTraQt master is now \`$UPSTREAM\`. The canary job builds \`$PINNED\`, unchanged since 2023."
+            fi
+            echo
+            echo "\`HTTRAQT_REF\` in \`.github/workflows/httraqt.yml\` points at \`xroche/httraqt-ci-mirror\`, so nobody outside the project can fail our checks. Catching up stays a deliberate act: mirror the new upstream commits, see what the canary makes of them, then move the pin."
+            echo
+            echo "Found by [the weekly upstream watch]($RUN_URL)."
+            echo "$marker"
+          } >"$RUNNER_TEMP/body.md"
+
+          gh label create "$LABEL" --color d4c5f9 \
+            --description "HTTraQt upstream moved past the pinned canary revision" || true
+
+          # Labelled, not searched: the search index lags minutes behind a fresh
+          # issue, which is exactly the window a weekly retry would duplicate in.
+          mapfile -t known < <(gh issue list --state all --label "$LABEL" --limit 20 --json number --jq '.[].number')
+          for n in "${known[@]}"; do
+            seen=$(gh issue view "$n" --json body,comments --jq '.body, (.comments[].body)')
+            if grep -qF "$marker" <<<"$seen"; then
+              echo "already reported on issue #$n"
+              exit 0
+            fi
+          done
+
+          open=$(gh issue list --state open --label "$LABEL" --limit 20 --json number --jq 'first(.[].number) // empty')
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --label "$LABEL" \
+              --title "HTTraQt upstream no longer matches the pinned canary revision" \
+              --body-file "$RUNNER_TEMP/body.md"
+          fi
