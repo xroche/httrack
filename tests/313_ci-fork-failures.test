@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# ci-windows-suite.sh's MSYS fork-failure counter (#1273). It only ever runs on
+# the Windows leg, where a miscount is invisible: the lines it counts exist
+# nowhere but that console log.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}testlib.sh"
+
+# Before the driver is sourced: with these set, anything it starts posts a commit
+# status on whatever the surrounding shell was last looking at.
+unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
+# shellcheck source=tests/ci-windows-suite.sh
+. "$testdir/ci-windows-suite.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_forkcount.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+GITHUB_STEP_SUMMARY=$tmp/summary
+export GITHUB_STEP_SUMMARY
+: >"$GITHUB_STEP_SUMMARY"
+
+# The lines as the runtime and bash write them, from the run in #1273. A retry
+# and a give-up differ only by the "retry:" the retry carries, so a counter that
+# matched the message alone would report every retry as a command that never ran.
+cat >"$tmp/console.log" <<'EOF'
+PASS 244_local-tty-output.test
+1 [main] bash 1728 dofork: child -1 - forked process 3984 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+./ci-windows-suite.sh: fork: retry: Resource temporarily unavailable
+1000626 [main] bash 1728 dofork: child -1 - forked process 6308 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+./ci-windows-suite.sh: fork: retry: Resource temporarily unavailable
+./ci-windows-suite.sh: fork: Resource temporarily unavailable
+ran=257 pass=234 fail=0 skip=23
+EOF
+
+rc=0
+out=$(ci_report_fork_failures "$tmp/console.log") || rc=$?
+test "$rc" -eq 0 || fail "counting a struggling leg exited $rc"
+grep -q '::warning title=MSYS fork failures::' <<<"$out" ||
+    fail "fork failures raised no annotation: $out"
+grep -q '2 child(ren) died at DLL init, 2 retry wait(s), 1 fork(s) given up' <<<"$out" ||
+    fail "wrong counts: $out"
+grep -q 'MSYS forks: 2 died, 2 retried, 1 given up' "$GITHUB_STEP_SUMMARY" ||
+    fail "the step summary lost the count: $(<"$GITHUB_STEP_SUMMARY")"
+
+# A healthy leg still says so: a silent step and a broken counter read alike.
+: >"$GITHUB_STEP_SUMMARY"
+grep -v 'fork' "$tmp/console.log" >"$tmp/clean.log"
+out=$(ci_report_fork_failures "$tmp/clean.log") || fail "counting a clean leg failed"
+grep -q 'no MSYS fork failure' <<<"$out" || fail "a clean leg said: $out"
+! grep -q '::warning' <<<"$out" || fail "a clean leg raised an annotation: $out"
+grep -q 'MSYS forks: 0 died, 0 retried, 0 given up' "$GITHUB_STEP_SUMMARY" ||
+    fail "a clean leg wrote no count: $(<"$GITHUB_STEP_SUMMARY")"
+
+# The suite step can die before writing one, and the counter runs if:always().
+out=$(ci_report_fork_failures "$tmp/absent.log") || fail "a missing log failed the step"
+grep -q 'not counted' <<<"$out" || fail "a missing log said: $out"
+
+echo "MSYS fork-failure counting OK"

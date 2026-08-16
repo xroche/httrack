@@ -21,6 +21,35 @@ ci_annotate() {
     printf '\n::%s title=%s::%s\n' "$level" "$title" "$msg"
 }
 
+# Count the MSYS fork-emulation failures in the console log $1. Nothing counted
+# them, so a leg that struggled read exactly like one that never did (#1273).
+ci_report_fork_failures() {
+    local log=$1 died retried gaveup
+    test -r "$log" || {
+        echo "no console log at $log: MSYS fork failures not counted"
+        return 0
+    }
+    # The runtime's own line, one per child that died at DLL init (0xC0000142).
+    died=$(grep -c 'dofork: child' "$log" || true)
+    retried=$(grep -c 'fork: retry:' "$log" || true)
+    # bash's message once the retries are spent: the only one meaning a command
+    # never ran, which reds whatever test was in flight.
+    gaveup=$(grep -c 'fork: Resource temporarily unavailable' "$log" || true)
+    test -z "${GITHUB_STEP_SUMMARY:-}" ||
+        printf 'MSYS forks: %s died, %s retried, %s given up\n' \
+            "$died" "$retried" "$gaveup" >>"$GITHUB_STEP_SUMMARY"
+    if test $((died + retried + gaveup)) -eq 0; then
+        echo "no MSYS fork failure in $log"
+        return 0
+    fi
+    ci_annotate warning "MSYS fork failures" "$(
+        printf '%s child(ren) died at DLL init, %s retry wait(s), %s fork(s) given up\n' \
+            "$died" "$retried" "$gaveup"
+        grep -m 3 -e 'dofork: child' -e 'fork: retry:' \
+            -e 'fork: Resource temporarily unavailable' "$log" || true
+    )"
+}
+
 # End a wedged suite before its runner dies: a step that fails on its own terms
 # keeps its log, a lost runner keeps nothing, annotations included (#795). Quiet
 # for $1s, then names the test in flight from $3 every $2s; kills $5 once $3 has
