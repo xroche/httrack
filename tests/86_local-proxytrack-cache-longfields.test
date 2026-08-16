@@ -103,3 +103,61 @@ A 54
 C 63
 M 400
 EOF
+
+# --- ZIP reader, per-line bound ---------------------------------------------
+# A line the reader's buffer cannot hold used to be parsed as its prefix: a
+# Location became a valid-looking wrong target, an X-Save named a file that is
+# not the one recorded. The buffer now holds every line HTTrack can write, and
+# a longer one is dropped whole (#1294).
+"$python" - "$dir" <<'EOF'
+import os, sys, zipfile
+
+body = b"hello world"
+
+
+def craft(path, name, meta):
+    zi = zipfile.ZipInfo("example.com/%s.html" % name)
+    zi.compress_type = zipfile.ZIP_STORED
+    zi.extra = meta.encode()
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr(zi, body)
+
+
+common = (
+    "X-StatusCode: 200\r\n"
+    "X-StatusMessage: ok\r\n"
+    "X-Size: %d\r\n"
+    "Content-Type: text/html\r\n"
+    "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n" % len(body)
+)
+for name, n in (("mid", 1400), ("big", 3000)):
+    craft(
+        os.path.join(sys.argv[1], "line-%s.zip" % name),
+        name,
+        "X-In-Cache: 1\r\n" + common + "Location: http://example.com/%s\r\n" % ("Q" * n),
+    )
+# body on disk, so the entry stands or falls on the name X-Save carries
+craft(
+    os.path.join(sys.argv[1], "line-save.zip"),
+    "save",
+    "X-In-Cache: 0\r\n" + common + "X-Save: %s.html\r\n" % ("Z" * 3000),
+)
+EOF
+
+for name in mid big save; do
+    proxytrack --convert "$dir/line-$name.arc" "$dir/line-$name.zip" >/dev/null 2>&1 ||
+        fail "proxytrack died reading the $name line-bound zip"
+done
+
+# 1400 is past the old 1024-byte line bound and inside what the writer can emit
+got=$(runlen "$dir/line-mid.arc" Q)
+test "${got:-0}" = 1400 || fail "a 1400-byte Location came back at ${got:-0} bytes"
+got=$(runlen "$dir/line-big.arc" Q)
+test "${got:-0}" = 0 || fail "an unholdable Location left a ${got}-byte prefix behind"
+
+# an X-Save nobody could have written is no name at all, and refusing the entry
+# beats opening whatever file its prefix happens to hit
+got=$(runlen "$dir/line-save.arc" Z)
+test "${got:-0}" = 0 || fail "an unholdable X-Save left a ${got}-byte prefix behind"
+grep -qa 'Cached file name is invalid' "$dir/line-save.arc" ||
+    fail "an entry with no usable X-Save was not refused"
