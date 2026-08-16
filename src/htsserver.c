@@ -507,6 +507,40 @@ static hts_boolean cat_html_escaped(String *dst, char c) {
   return HTS_TRUE;
 }
 
+/* Append the UTF-8 sequence at *s as a numeric character reference, which names
+   a code point and so survives whatever charset the page declares, and step *s
+   onto its last byte. HTS_FALSE if *s does not start a valid sequence. */
+static hts_boolean cat_html_ncr(String *dst, const char **s) {
+  const unsigned char *const p = (const unsigned char *) *s;
+  unsigned int uc;
+  int extra, i;
+  char tmp[16];
+
+  if (p[0] >= 0xc2 && p[0] <= 0xdf) {
+    uc = p[0] & 0x1f;
+    extra = 1;
+  } else if ((p[0] & 0xf0) == 0xe0) {
+    uc = p[0] & 0x0f;
+    extra = 2;
+  } else if (p[0] >= 0xf0 && p[0] <= 0xf4) {
+    uc = p[0] & 0x07;
+    extra = 3;
+  } else {
+    return HTS_FALSE;
+  }
+  /* A NUL fails this before the next byte is looked at, so a truncated
+     sequence at the end of the string cannot read past it. */
+  for (i = 1; i <= extra; i++) {
+    if ((p[i] & 0xc0) != 0x80)
+      return HTS_FALSE;
+    uc = (uc << 6) | (p[i] & 0x3f);
+  }
+  snprintf(tmp, sizeof(tmp), "&#%u;", uc);
+  StringCat(*dst, tmp);
+  *s += extra;
+  return HTS_TRUE;
+}
+
 /* Same, for a double-quoted attribute: the quote included, which
    cat_html_escaped() leaves raw for the single-quoted tooltips. */
 static hts_boolean cat_attr_escaped_char(String *dst, char c) {
@@ -1336,6 +1370,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     hts_boolean unquoted = HTS_FALSE;
                     /* value comes from the template, not from the settings */
                     hts_boolean literal = HTS_FALSE;
+                    /* value is UTF-8 and the page charset is not */
+                    hts_boolean ncr = HTS_FALSE;
                     char datebuff[16];
 
                     name[0] = '\0';
@@ -1642,6 +1678,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         line2[0] = '\0';
                         LANG_LIST(path, line2, sizeof(line2));
                         assertf(strlen(langstr) < sizeof(line2) - 2);
+                        ncr = HTS_TRUE;
                       } else {
                         langstr = LANGSEL(name);
                         if (langstr == NULL || *langstr == '\0') {
@@ -1764,6 +1801,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                               StringClear(tmpbuff);
                               break;
                             default:
+                              if (ncr && cat_html_ncr(&tmpbuff, &fstr)) {
+                                break;
+                              }
                               /* format -2 writes its value into the option's
                                  value="" as well, so the quote must go too */
                               if (!(format == -2
@@ -2086,12 +2126,38 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
     hashname = LANGINTKEY(name);
   }
 
-  /* Get only language name */
+  /* Read the key named in limit_to out of the selected catalog; lang.def holds
+     only the catalog's file name, which the language menu showed instead
+     (#116). */
   if (limit_to) {
-    if (hashname)
-      strlcpybuff(limit_to, hashname, limit_size);
-    else
-      strlcpybuff(limit_to, "???", limit_size);
+    char wanted[256];
+
+    strlcpybuff(wanted, limit_to, sizeof(wanted));
+    /* Fallback, so a caller looping until empty still stops at the end of the
+       list rather than on a catalog missing the key. */
+    strlcpybuff(limit_to, hashname != NULL ? hashname : "", limit_size);
+    if (limit_to[0] != '\0') {
+      char lbasename[1024];
+      FILE *fp;
+
+      snprintf(lbasename, sizeof(lbasename), "lang/%s.txt", hashname);
+      fp = fopen(fconcat(catbuff, sizeof(catbuff), path, lbasename), "rb");
+      if (fp != NULL) {
+        char extkey[8192];
+        char value[8192];
+        hts_boolean found = HTS_FALSE;
+
+        while (!found && !feof(fp)) {
+          linput_cpp(fp, extkey, 8000);
+          linput_cpp(fp, value, 8000);
+          if (strcmp(extkey, wanted) == 0) {
+            strlcpybuff(limit_to, value, limit_size);
+            found = HTS_TRUE;
+          }
+        }
+        fclose(fp);
+      }
+    }
     return 0;
   }
 
@@ -2298,9 +2364,18 @@ static int LANG_LIST(const char *path, char *buffer, size_t buffer_size) {
     strlcpybuff(lang_str, "LANGUAGE_NAME", sizeof(lang_str));
     htslang_load(lang_str, sizeof(lang_str), path);
     if (strlen(lang_str) > 0) {
+      char charset[64];
+      char *utf8;
+
+      /* Every catalog names itself in its own charset and the menu carries all
+         of them at once, so the list leaves here in UTF-8. */
+      strlcpybuff(charset, "LANGUAGE_CHARSET", sizeof(charset));
+      htslang_load(charset, sizeof(charset), path);
+      utf8 = hts_convertStringToUTF8(lang_str, strlen(lang_str), charset);
       if (buffer[0])
         strlcatbuff(buffer, "\n", buffer_size);
-      strlcatbuff(buffer, lang_str, buffer_size);
+      strlcatbuff(buffer, utf8 != NULL ? utf8 : lang_str, buffer_size);
+      freet(utf8);
     }
     i++;
   } while(strlen(lang_str) > 0);

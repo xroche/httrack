@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Turkish
+Türkçe
 LANGUAGE_FILE
 Turkish
 LANGUAGE_ISO

@@ -27,7 +27,8 @@ serve() { # $1 = tag, $2.. = extra htsserver args
     htsserver_start --home "${work}/h${tag}" --log "${work}/srv${tag}.log" "$@"
 }
 
-# Indexes and labels come from lang.indexes and lang.def, not from observed output.
+# Indexes come from lang.indexes and labels from each catalog's LANGUAGE_NAME,
+# entity-escaped by the menu emitter, not from observed output.
 # The heading word is that language's own greeting, so it proves which language
 # the body was rendered in.
 check() { # $1 = lang index, $2 = expected label, $3 = word in the page heading
@@ -61,7 +62,7 @@ PY
 
 # 1 is the boundary the loop cannot reach; 2 and 4 prove it tracks the input.
 check 1 English Welcome
-check 2 Francais Bienvenue
+check 2 'Fran&#231;ais' Bienvenue
 check 4 Deutsch Willkommen
 
 # With no language set the menu falls back to its first entry, which must be the

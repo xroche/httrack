@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Uzbek Latin
+O’zbekcha
 LANGUAGE_FILE
 Uzbek
 LANGUAGE_ISO

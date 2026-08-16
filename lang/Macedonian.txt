@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Macedonian
+Македонски
 LANGUAGE_FILE
 Macedonian
 LANGUAGE_ISO

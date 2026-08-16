@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Japanese
+“ú–{Œê
 LANGUAGE_FILE
 Japanese
 LANGUAGE_ISO

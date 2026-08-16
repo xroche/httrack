@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Bulgarian
+Български
 LANGUAGE_FILE
 Bulgarian
 LANGUAGE_ISO

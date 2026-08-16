@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Chinese-Simplified
+¼òÌåÖÐÎÄ
 LANGUAGE_FILE
 Chinese-Simplified
 LANGUAGE_ISO

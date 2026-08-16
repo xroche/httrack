@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Ukrainian
+Українська
 LANGUAGE_FILE
 Ukrainian
 LANGUAGE_ISO

@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Chinese-BIG5
+¡c≈È§§§Â
 LANGUAGE_FILE
 Chinese-BIG5
 LANGUAGE_ISO

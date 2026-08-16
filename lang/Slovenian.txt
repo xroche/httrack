@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Slovenian
+Slovenšèina
 LANGUAGE_FILE
 Slovenian
 LANGUAGE_ISO
