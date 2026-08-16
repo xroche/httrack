@@ -13,8 +13,8 @@ assert_selftest "scantoken self-test OK" scantoken
 tmpdir="$(mktemp -d)"
 cleanup_push rm -rf "$tmpdir"
 
-# Token caps, both less the NUL: a rule loses one more byte to the sign the
-# engine prepends after the copy, so its own cap is 2048. 317 pins that one.
+# Token caps: a seed is bounded by its own buffer less the NUL, a rule by
+# HTS_FILTER_MAXLEN less the sign prepended after the copy. 317 pins the rule's.
 maxfilter=2047
 maxurl=2047
 

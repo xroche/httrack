@@ -11,16 +11,12 @@ set -euo pipefail
 # From the engine, so a cap that moves moves the boundaries probed below.
 caps=$(httrack -O /dev/null -#test=filtercap) || fail "filtercap self-test failed"
 limits=$(grep '^filtercap: ' <<<"$caps") || fail "no limits line in: $caps"
-read -r _ rulecap matcher slot argvcap <<<"$limits"
+read -r _ rulecap argvcap <<<"$limits"
 rulecap=${rulecap#rule=}
-matcher=${matcher#matcher=}
-slot=${slot#slot=}
 argvcap=${argvcap#argv=}
 
-# A stored rule is one the matcher reads and a slot holds. The matcher is the
-# tighter of the two today, so it governs.
-test "$rulecap" -le "$matcher" || fail "cap $rulecap outreaches the matcher $matcher"
-test "$slot" -gt "$rulecap" || fail "slot $slot does not outsize the cap $rulecap"
+# The matcher and the slot are already tied to the cap at compile time
+# (hts_filter_maxlen_matches/_fits in htscore.c); argv is the one that is not.
 test "$argvcap" -le "$rulecap" || fail "argv $argvcap outreaches the cap $rulecap"
 
 tmpdir="$(mktemp -d)"
@@ -73,10 +69,14 @@ seed() { # seed LENGTH
         "seed of $1 bytes"
     seedwarned=$(grep -c 'URL longer than' "$tmpdir/p/hts-log.txt" || true)
 }
-seed $((rulecap + 512))
-assert_eq 1 "$seedwarned" "a seed past every bound"
+# Deliberately not derived from the rule cap: a seed sized off the wrong bound
+# reds this on a cap move with no engine bug behind it.
+probe=65536
+seed "$probe"
+assert_eq 1 "$seedwarned" "a seed of $probe bytes"
 seedcap=$(sed -n 's/.*URL longer than \([0-9]*\) bytes.*/\1/p' "$tmpdir/p/hts-log.txt")
 test -n "$seedcap" || fail "the seed refusal did not name its own cap"
+test "$seedcap" -lt "$probe" || fail "the $probe-byte probe did not clear $seedcap"
 
 # Two bounds, not one shared: a rule spends a byte on its sign, so the length
 # the parser keeps as a rule is one it drops as a URL.
