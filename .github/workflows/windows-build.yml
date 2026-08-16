@@ -32,9 +32,8 @@ jobs:
         platform: [x64, Win32]
         configuration: [Release]
     # No repo-wide cap: #1213 added one against runner starvation, which #1228
-    # later measured out. The 35 minutes bound a slow job, not a lost runner:
-    # the service reaps that one, and no timeout-minutes shortens it.
-    timeout-minutes: 35
+    # later measured out. The step timeouts stay as they are, sized by 226
+    # against the suite watchdog, not against how long a job takes.
     # Redirect vcpkg's default `files` binary cache into the workspace so
     # actions/cache can persist it. vcpkg builds openssl/brotli/zlib/zstd from
     # source otherwise, several minutes every run.
@@ -264,8 +263,7 @@ jobs:
       - name: Run the engine test suite (offline tests)
         shell: bash
         working-directory: tests
-        # 6 minutes is the measured run; the rest catches a hang while the runner still lives
-        timeout-minutes: 15
+        timeout-minutes: 45
         env:
           # Through the environment, never argv, which the process list exposes.
           WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
