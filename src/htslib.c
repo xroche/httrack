@@ -800,10 +800,10 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
         // Réception de la status line et de l'en-tête (norme RFC1945)
 
         // status-line à récupérer
-        finput_header(soc, rcvd, 1024);
+        finput_line(soc, rcvd, 1024);
         // some buggy servers send a leading \n (RFC)
         if (strnotempty(rcvd) == 0)
-          finput_header(soc, rcvd, 1024);
+          finput_line(soc, rcvd, 1024);
 
         // traiter status-line
         treatfirstline(retour, rcvd);
@@ -816,7 +816,7 @@ T_SOC http_xfopen(httrackp *opt, int mode, int treat, int waitconnect,
 
         // header // ** !attention! HTTP/0.9 non supporté
         do {
-          const hts_boolean cut = finput_header(soc, rcvd, 1024);
+          const hts_boolean cut = finput_line(soc, rcvd, 1024);
 
 #if HDEBUG
           printf(">%s\n", rcvd);
@@ -2084,13 +2084,13 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
         // ----------------------------------------
         // traiter en-tête!
         // status-line à récupérer
-        binput_header(retour.adr + ptr, retour.adr + retour.size, rcvd, 1024,
-                      &adv);
+        binput_line(retour.adr + ptr, retour.adr + retour.size, rcvd, 1024,
+                    &adv);
         ptr += adv;
         // some buggy servers send a leading \n (RFC)
         if (strnotempty(rcvd) == 0) {
-          binput_header(retour.adr + ptr, retour.adr + retour.size, rcvd, 1024,
-                        &adv);
+          binput_line(retour.adr + ptr, retour.adr + retour.size, rcvd, 1024,
+                      &adv);
           ptr += adv;
         }
 
@@ -2105,7 +2105,7 @@ htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
 
         // header // ** !attention! HTTP/0.9 non supporté
         do {
-          const hts_boolean cut = binput_header(
+          const hts_boolean cut = binput_line(
               retour.adr + ptr, retour.adr + retour.size, rcvd, 1024, &adv);
 
           ptr += adv;
@@ -3061,15 +3061,15 @@ int finput(T_SOC fd, char *s, int max) {
   return j;
 }
 
-// Like linput, but in memory (optimized)
+// Like linput, but in memory (optimized). A line too long for `s` is clipped
+// but consumed whole: resuming inside it reads its tail back as another line.
 int binput(const char *buff, char *s, int max) {
   int count = 0;
   int destCount = 0;
 
   // Note: \0 will return 1
-  while(destCount < max && buff != NULL && buff[count] != '\0'
-        && buff[count] != '\n') {
-    if (buff[count] != '\r') {
+  while (buff != NULL && buff[count] != '\0' && buff[count] != '\n') {
+    if (buff[count] != '\r' && destCount < max) {
       s[destCount++] = buff[count];
     }
     count++;
@@ -3080,8 +3080,8 @@ int binput(const char *buff, char *s, int max) {
   return count + 1;
 }
 
-hts_boolean binput_header(const char *buff, const char *end, char *s, int max,
-                          int *offset) {
+hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
+                        int *offset) {
   hts_boolean cut = HTS_FALSE;
   const char *p;
   int j = 0;
@@ -3103,7 +3103,7 @@ hts_boolean binput_header(const char *buff, const char *end, char *s, int max,
   return cut;
 }
 
-hts_boolean finput_header(T_SOC fd, char *s, int max) {
+hts_boolean finput_line(T_SOC fd, char *s, int max) {
   hts_boolean cut = HTS_FALSE;
   int j = 0;
   char c;

@@ -172,9 +172,8 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
       char protocol[256];
 
       line[0] = protocol[0] = '\0';
-      //
-      socinput(soc, line, 1000);
-      if (strnotempty(line)) {
+      // a clipped request-line names a URL the browser did not ask for
+      if (!socinput(soc, line, 1000) && strnotempty(line)) {
         /* widths bound the caller buffers: method[32], url[HTS_URLMAXSIZE*2],
            protocol[256] */
         if (sscanf(line, "%31s %2047s %255s", method, url, protocol) == 3) {
@@ -201,7 +200,10 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
             // Lire en têtes restants
             sprintf(data, "%s %s %s\r\n", method, af.fil, protocol);
             while(strnotempty(line)) {
-              socinput(soc, line, 1000);
+              /* a header we could not read whole is not the one the browser
+                 sent: replaying a prefix of it is worse than dropping it */
+              if (socinput(soc, line, 1000))
+                continue;
               treathead(NULL, NULL, NULL, &blkretour, line);    // traiter
               strlcatbuff(data, line, CATCH_URL_DATA_SIZE);
               strlcatbuff(data, "\r\n", CATCH_URL_DATA_SIZE);
@@ -227,7 +229,7 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
             retour = 1;
           }
         }
-      }                         // sinon erreur
+      } // sinon erreur
     }
   }
   if (soc != INVALID_SOCKET) {
@@ -243,8 +245,9 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
   return retour;
 }
 
-// Lecture de ligne sur socket
-void socinput(T_SOC soc, char *s, int max) {
+// Read one line off a socket; HTS_TRUE if it did not fit "s".
+hts_boolean socinput(T_SOC soc, char *s, int max) {
+  hts_boolean cut = HTS_FALSE;
   int c;
   int j = 0;
 
@@ -263,11 +266,15 @@ void socinput(T_SOC soc, char *s, int max) {
       case 12:
         break;                  // sauter ces caractères
       default:
-        s[j++] = (char) c;
+        if (j < max - 1)
+          s[j++] = (char) c;
+        else
+          cut = HTS_TRUE; // keep draining: the tail is not a new line
         break;
       }
     } else
       c = EOF;
-  } while((c != -1) && (c != EOF) && (j < (max - 1)));
-  s[j++] = '\0';
+  } while ((c != -1) && (c != EOF));
+  s[j] = '\0';
+  return cut;
 }

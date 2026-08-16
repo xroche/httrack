@@ -101,7 +101,11 @@ int checkrobots(const robots_wizard *robots, const char *adr, const char *fil) {
         hts_boolean best_allow = HTS_FALSE;
 
         while (ptr < (int) toklen) {
-          ptr += binput(robots->token + ptr, line, sizeof(line) - 1);
+          int adv;
+
+          (void) binput_line(robots->token + ptr, robots->token + toklen, line,
+                             sizeof(line), &adv);
+          ptr += adv;
           if (line[0] != 'A' && line[0] != 'D')
             continue;
           {
@@ -166,15 +170,12 @@ void robots_parse(httrackp *opt, robots_wizard *robots, const char *adr,
   while (bptr < bodysize) {
     char *comm;
     int llen;
+    int adv;
     hts_boolean cut;
 
-    bptr += binput(body + bptr, line, sizeof(line) - 2);
-    /* binput consumed body[bptr-1] and resumes mid-record when the buffer runs
-       out, so a record read whole is the one ending on its own newline. */
-    cut = (bptr - 1 < bodysize && body[bptr - 1] != '\n' &&
-           body[bptr - 1] != '\0')
-              ? HTS_TRUE
-              : HTS_FALSE;
+    cut =
+        binput_line(body + bptr, body + bodysize, line, sizeof(line) - 1, &adv);
+    bptr += (size_t) adv;
     comm = strchr(line, '#'); // strip comment
     if (comm != NULL) {
       *comm = '\0';

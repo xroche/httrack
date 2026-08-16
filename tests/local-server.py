@@ -564,6 +564,24 @@ class Handler(SimpleHTTPRequestHandler):
     # ... and "robotsblobNNNN", which sizes the Disallow list so the engine's
     # stored rules come to exactly NNNN bytes, /secret/ last (#1286).
     BLOB_ROBOTS_RE = re.compile(r"robotsblob(\d+)")
+    # ... and one whose last Disallow outruns the reader's line buffer, its own
+    # tail spelling an Allow that re-opens what the line above forbids (#1294).
+    # The reader used to resume TAIL_RESUME bytes into the line, so that tail
+    # came back as a rule of its own.
+    TAIL_ROBOTS_UA = "tailrobots"
+    # ... the same Allow written as a line of its own: the control saying the
+    # rule is one the engine acts on, so a refusal is the tail going unread.
+    TAIL_ONLINE_UA = "tailonline"
+    TAIL_RESUME = 1023  # HTS_ROBOTS_LINE_SIZE - 1
+
+    def tail_robots_body(self, own_line):
+        phantom = "Allow: /secret/"
+        head = "User-agent: *\nDisallow: /secret/\n"
+        if own_line:
+            return (head + phantom + "\n").encode()
+        rule = "Disallow: "
+        rule += "a" * (self.TAIL_RESUME - len(rule))
+        return (head + rule + phantom + "\n").encode()
 
     def robots_blob_body(self, blobsize):
         # One "<marker><pattern>\n" line per stored rule, so a rule costs
@@ -601,6 +619,11 @@ class Handler(SimpleHTTPRequestHandler):
         blob = self.BLOB_ROBOTS_RE.search(ua)
         if blob:
             self.send_raw(self.robots_blob_body(int(blob.group(1))), "text/plain")
+            return
+        if self.TAIL_ROBOTS_UA in ua or self.TAIL_ONLINE_UA in ua:
+            self.send_raw(
+                self.tail_robots_body(self.TAIL_ONLINE_UA in ua), "text/plain"
+            )
             return
         host = self.headers.get("Host")
         body = "User-agent: *\nDisallow:\n"

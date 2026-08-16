@@ -2588,11 +2588,64 @@ static int st_headerline(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < 4; i++) {
     int adv;
     const hts_boolean cut =
-        binput_header(block + ptr, block + blocklen, line, max, &adv);
+        binput_line(block + ptr, block + blocklen, line, max, &adv);
 
     ptr += adv;
     printf("cut=%d over=%d line=%s\n", cut != HTS_FALSE,
            ptr > (int) blocklen + 1, line);
+  }
+  return 0;
+}
+
+/* binput() clips a line it cannot hold but must consume it whole: the advance
+   it reports is what the cache, robots and list parsers resume on, and inside
+   the line the tail reads back as a record of its own (#1294). */
+static int st_binputline(httrackp *opt, int argc, char **argv) {
+  static const char fixture[] = "Disallow: 0123456789abcdefghij\n"
+                                "Allow: /open/\n";
+  char block[256], line[64];
+  size_t blocklen;
+  int max, ptr = 0, i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "binputline: needs a read size\n");
+    return 1;
+  }
+  max = atoi(argv[0]);
+  if (max < 1 || (size_t) max >= sizeof(line)) {
+    fprintf(stderr, "binputline: read size out of probe range\n");
+    return 1;
+  }
+  if (argc < 2) {
+    memcpy(block, fixture, sizeof(fixture));
+    blocklen = sizeof(fixture) - 1;
+  } else {
+    const char *a = argv[1];
+
+    if (strlen(a) >= sizeof(block)) {
+      fprintf(stderr, "binputline: block too long\n");
+      return 1;
+    }
+    for (blocklen = 0; *a != '\0'; a++) {
+      if (*a == '\\' && a[1] == 'n')
+        block[blocklen++] = '\n', a++;
+      else if (*a == '\\' && a[1] == 'r')
+        block[blocklen++] = '\r', a++;
+      else
+        block[blocklen++] = *a;
+    }
+    block[blocklen] = '\0';
+  }
+  /* one read past the block, to show the walk stops on its terminating NUL */
+  for (i = 0; i < 3; i++) {
+    const int adv = binput(block + ptr, line, max);
+
+    printf("adv=%d over=%d line=%s\n", adv, ptr + adv > (int) blocklen + 1,
+           line);
+    ptr += adv;
+    if (ptr > (int) blocklen)
+      ptr = (int) blocklen;
   }
   return 0;
 }
@@ -6547,6 +6600,32 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     snprintf(txt, sizeof(txt), "User-agent: *\nDisallow: /a\nAllow: %s\n",
              path);
     assertf(rb_decide(&robots, txt, path) == -1);
+  }
+
+  /* #1294: the reader used to resume inside a line it could not hold, so an
+     over-long Disallow handed back its own tail as a second rule. Here the
+     tail is an Allow re-opening what the line above forbids. */
+  {
+    /* where the old read resumed: it kept HTS_ROBOTS_LINE_SIZE - 2 bytes and
+       stepped one past them */
+    const size_t resume = HTS_ROBOTS_LINE_SIZE - 1;
+    char BIGSTK txt[HTS_ROBOTS_LINE_SIZE * 3];
+    size_t head = (size_t) snprintf(
+        txt, sizeof(txt), "User-agent: *\nDisallow: /open/\nDisallow: ");
+    const size_t line = head - strlen("Disallow: ");
+
+    memset(txt + head, 'a', line + resume - head);
+    head = line + resume;
+    head +=
+        (size_t) snprintf(txt + head, sizeof(txt) - head, "Allow: /open/\n");
+    assertf(head < sizeof(txt));
+    assertf(rb_decide(&robots, txt, "/open/x") == -1);
+
+    /* control: that same text on a line of its own is a rule we do honour, so
+       the refusal above is the tail never being read and not a dead pattern */
+    assertf(rb_decide(&robots,
+                      "User-agent: *\nDisallow: /open/\nAllow: /open/\n",
+                      "/open/x") == 0);
   }
 
   checkrobots_free(&robots);
@@ -11452,6 +11531,8 @@ static const struct selftest_entry {
     {"headerline", "<read-size>",
      "a header line that does not fit is reported and skipped whole",
      st_headerline},
+    {"binputline", "<read-size> [block]",
+     "binput() consumes a clipped line whole (#1294)", st_binputline},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
     {"xfread-limit", "", "in-memory receive buffer size bound",

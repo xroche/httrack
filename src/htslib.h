@@ -335,13 +335,13 @@ HTS_INLINE void time_rfc822_local(char *s, struct tm *A);
 HTS_INLINE int sendc(htsblk * r, const char *s);
 int finput(T_SOC fd, char *s, int max);
 int binput(const char *buff, char *s, int max);
-/* Read one response-header line, from a buffer up to "end" or from a socket,
-   consuming it whole even when it does not fit "s". HTS_TRUE means it was cut:
-   the value is not what the server sent, so drop it rather than parse it.
-   binput_header() reports the advance through *offset. */
-hts_boolean binput_header(const char *buff, const char *end, char *s, int max,
-                          int *offset);
-hts_boolean finput_header(T_SOC fd, char *s, int max);
+/* Read one line, from a buffer up to "end" or from a socket, consuming it whole
+   even when it does not fit "s". HTS_TRUE means it was cut: the value is not
+   what was written, so drop it rather than parse a prefix of it.
+   binput_line() reports the advance through *offset. */
+hts_boolean binput_line(const char *buff, const char *end, char *s, int max,
+                        int *offset);
+hts_boolean finput_line(T_SOC fd, char *s, int max);
 int linput(FILE * fp, char *s, int max);
 int linputsoc(T_SOC soc, char *s, int max);
 int linputsoc_t(T_SOC soc, char *s, int max, int timeout);

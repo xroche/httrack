@@ -268,8 +268,9 @@ static int binput(char *buff, char *s, int max) {
   int count = 0;
   int destCount = 0;
 
-  while(destCount < max && buff[count] != '\0' && buff[count] != '\n') {
-    if (buff[count] != '\r') {
+  /* consumed whole: resuming inside a clipped line reads its tail as a field */
+  while (buff[count] != '\0' && buff[count] != '\n') {
+    if (buff[count] != '\r' && destCount < max) {
       s[destCount++] = buff[count];
     }
     count++;
