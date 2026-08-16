@@ -47,34 +47,111 @@ assert_selftest 'a b does match a b' filter 'a b' 'a	b'
 selftest_queue 'a	b does NOT match a b' filter 'a b' 'a	b'
 selftest_run_queued
 
-# A case's exit code rides the framing, not the process status: a failing case
-# (filter with no pattern) must not hide the passing one after it.
+# Each mode needs a want it REJECTS, or a compare that degenerated into "always
+# true" would pass this file having proved nothing. Runs in a subshell, whose
+# queue and failure do not escape.
+rejects() { # rejects LABEL QUEUE-CALL...
+    local label=$1
+    shift
+    ("$@" && selftest_run_queued) >/dev/null 2>&1 &&
+        fail "$label: a wrong want was accepted"
+    return 0
+}
+
+# tail mode: only 01_engine-savename.test uses it, and only for save names.
+selftest_queue_tail '/x.html' savename '/x.php' 'text/html'
+selftest_run_queued
+rejects 'tail' selftest_queue_tail '/no-such-name' savename '/x.php' 'text/html'
+# A suffix, never a substring: '/x.ht' sits inside the name it must not match.
+rejects 'tail matching mid-name' selftest_queue_tail '/x.ht' savename '/x.php' 'text/html'
+
+# lines mode: only 311_engine-location-gate.test uses it, and there only for
+# multi-line output.
+selftest_queue_lines "a.gif is 'image/gif'
+and its local type is '.gif'" mime a.gif
+selftest_run_queued
+rejects 'lines' selftest_queue_lines 'a.gif is only one line' mime a.gif
+
+# The CR half of lines mode is what Windows needs and no runner off it produces,
+# so drive it from a case that emits a CRLF whatever the platform.
+selftest_queue_lines 'A
+B' charset iso-8859-1 hex:410d0a42
+# ...and exact mode must NOT strip it, or the two modes are one.
+selftest_queue "A${SELFTEST_CR}
+B" charset iso-8859-1 hex:410d0a42
+selftest_run_queued
+rejects 'lines keeping a CR' selftest_queue_lines "A${SELFTEST_CR}
+B" charset iso-8859-1 hex:410d0a42
+# A CR on the last line goes through a different branch than an interior one.
+selftest_queue_lines 'A' charset iso-8859-1 hex:410d
+selftest_queue "A${SELFTEST_CR}" charset iso-8859-1 hex:410d
+selftest_run_queued
+
+# A self-test that printed the framing byte itself would pair every later case
+# with the wrong want; the records left over are what give it away.
+rejects 'a case that emits the record separator' \
+    selftest_queue 'A' charset iso-8859-1 hex:411e301e43
+
+# A case that exits non-zero fails even when its output is what was wanted.
+rejects 'a case that exits non-zero' selftest_queue '' filter
+
+# An unknown mode must not fall through to the exact compare, which would accept
+# every case a typo'd selftest_queue_lines was meant to compare leniently.
+rejects 'an unknown compare mode' \
+    selftest_queue_mode bogus 'z does NOT match y' filter y z
+
+# A case's exit code rides the framing, not the process status, and does so
+# wherever the case sits: a failing one (filter with no pattern) must neither
+# hide the case after it nor be the only position that reports honestly.
 script=$(mktemp)
 cleanup_push rm -f "$script"
-printf '%s\0' 0 filter 1 mime 'a.gif' >"$script"
+printf '%s\0' 1 mime 'a.gif' 0 filter 1 mime 'a.html' >"$script"
 rc=0
 out=$(httrack -O /dev/null -#test=batch <"$script" 2>/dev/null) || rc=$?
 assert_eq 0 "$rc" "batch status over a failing case"
 assert_match "${SELFTEST_RS}1${SELFTEST_RS}" "$out" "the failing case's exit code"
-assert_match "a.gif is 'image/gif'" "$out" "the case after the failing one"
+assert_match "a.html is 'text/html'" "$out" "the case after the failing one"
 
-# A truncated script is refused rather than half-run.
-printf '%s\0' 2 filter '*' >"$script"
-rc=0
-httrack -O /dev/null -#test=batch <"$script" >/dev/null 2>&1 || rc=$?
-assert_eq 1 "$rc" "status on a script missing an argument"
+# Malformed scripts are refused rather than half-run. A header that is not a
+# number would otherwise read as zero args and swallow the next case's fields.
+refuses() { # refuses LABEL FIELD...
+    local label=$1
+    shift
+    printf '%s\0' "$@" >"$script"
+    rc=0
+    httrack -O /dev/null -#test=batch <"$script" >/dev/null 2>&1 || rc=$?
+    assert_eq 1 "$rc" "status on $label"
+}
+refuses 'a script missing an argument' 2 filter '*'
+refuses 'a non-numeric argument count' x filter '*' y
+refuses 'an argument count past the cap' 4096 filter '*'
+refuses 'a negative argument count' -1 filter
 
 # Queued cases assert nothing until the flush, so a file that forgets it passes
 # on any engine output. The EXIT trap cannot say so (#773 keeps teardown out of
-# the verdict), so the check is static.
-scanned=0
-undrained=
-for f in "$top_srcdir"/tests/*.test; do
-    test -r "$f" || continue
-    scanned=$((scanned + 1))
-    grep -q 'selftest_queue' "$f" || continue
-    grep -q 'selftest_run_queued' "$f" || undrained="$undrained $f"
-done
+# the verdict), hence a static check.
+# Sets SCANNED and UNDRAINED rather than printing them: a command substitution
+# would run the whole scan in a subshell and lose both counts.
+undrained_in() { # undrained_in DIR
+    local f
+    SCANNED=0
+    UNDRAINED=
+    for f in "$1"/*.test; do
+        test -r "$f" || continue
+        SCANNED=$((SCANNED + 1))
+        grep -q 'selftest_queue' "$f" || continue
+        grep -q 'selftest_run_queued' "$f" || UNDRAINED="$UNDRAINED $f"
+    done
+}
+
+# Teeth first: a check that scans nothing reports every tree clean.
+fixture=$(mktemp -d)
+cleanup_push rm -rf "$fixture"
+printf 'selftest_queue x filter y z\n' >"$fixture/900_forgot.test"
+undrained_in "$fixture"
+test -n "$UNDRAINED" || fail "the drain check passed a file that never flushes"
+
+undrained_in "$top_srcdir/tests"
 # An unexpanded glob would report no offender having read nothing.
-test "$scanned" -ge 50 || fail "scanned $scanned tests in $top_srcdir/tests, want the whole suite"
-test -z "$undrained" || fail "queued self-tests that never run:$undrained"
+test "$SCANNED" -ge 50 || fail "scanned $SCANNED tests in $top_srcdir/tests, want the whole suite"
+test -z "$UNDRAINED" || fail "queued self-tests that never run:$UNDRAINED"

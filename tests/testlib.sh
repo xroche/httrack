@@ -74,14 +74,17 @@ assert_selftest_lines() { # assert_selftest_lines WANT NAME [ARGS...]
     test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
 }
 
-# Batched form of the two asserts above: selftest_queue records a case,
+# Batched form of the two asserts above: selftest_queue records a case, and
 # selftest_run_queued runs a whole file's cases in ONE httrack (-#test=batch in
-# htsselftest.c), which the Windows legs care about most (#795). Same contract,
-# except a mismatch surfaces at the flush, named. A case whose output later shell
-# logic reads, or that means to exercise an argv rewrite, stays on assert_selftest.
+# htsselftest.c), which the Windows legs pay dearly for otherwise (#795).
+# Same contract, except a mismatch surfaces at the flush, named. A case whose
+# output later shell logic reads, or that exercises one of htsmain()'s argv
+# rewrites, stays on assert_selftest.
 SELFTEST_RS=$(printf '\036')
 SELFTEST_CR=$(printf '\r')
 SELFTEST_SCRIPT=${SELFTEST_SCRIPT:-}
+# Where the file started, to catch a cd that leaves HTTRACK_PATH unresolvable.
+TESTLIB_PWD=${TESTLIB_PWD:-$PWD}
 # Self-preserving, as CLEANUP_ARGV below and for the same reason. ARGV holds
 # <argc> <name> <args...> per case, which is the engine's own script format.
 SELFTEST_ARGV=(${SELFTEST_ARGV[@]+"${SELFTEST_ARGV[@]}"})
@@ -107,6 +110,7 @@ selftest_queue_tail() { # selftest_queue_tail WANT NAME [ARGS...]
 selftest_queue_mode() { # selftest_queue_mode exact|lines|tail WANT NAME [ARGS...]
     local mode=$1 want=$2 name=$3
     shift 3
+    case $mode in exact | lines | tail) ;; *) fail "unknown selftest mode $mode" ;; esac
     SELFTEST_WANT+=("$want")
     SELFTEST_MODE+=("$mode")
     SELFTEST_LABEL+=("-#test=$name $*")
@@ -126,8 +130,10 @@ selftest_run_queued() {
     test "$n" -gt 0 || return 0
     printf '%s\0' "${SELFTEST_ARGV[@]}" >"$SELFTEST_SCRIPT" ||
         fail "cannot write $SELFTEST_SCRIPT"
-    # By path, not by name: a file that cd'd away can no longer reach make
-    # check's relative ../src, and it resolved this before it moved.
+    # By path, not by name: make check's ../src is relative, so resolving it from
+    # anywhere else finds an installed httrack and grades the wrong binary.
+    test -n "$HTTRACK_PATH" || test "$PWD" = "$TESTLIB_PWD" ||
+        fail "this test cd'd out of $TESTLIB_PWD: assign HTTRACK_PATH=\$(httrack_path) before it moves"
     test -n "$HTTRACK_PATH" || httrack_path >/dev/null
     out=$("$HTTRACK_PATH" -O /dev/null -#test=batch <"$SELFTEST_SCRIPT") || rc=$?
     rm -f "$SELFTEST_SCRIPT"
@@ -161,6 +167,9 @@ selftest_run_queued() {
             test "$got" = "$want" || fail "${SELFTEST_LABEL[i]}: expected [$want], got [$got]"
         fi
     done
+    # The count must close exactly: a case the engine ran and nobody asserted,
+    # or a self-test that printed the framing byte itself, both land here.
+    test -z "$rest" || fail "-#test=batch: output past the $n queued cases: $out"
     SELFTEST_ARGV=()
     SELFTEST_WANT=()
     SELFTEST_MODE=()

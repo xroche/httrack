@@ -11154,7 +11154,7 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
 }
 
 /* ------------------------------------------------------------ */
-/* Batch runner: many self-tests in one process (see st_batch).  */
+/* Batch runner: many self-tests in one process.                */
 /* ------------------------------------------------------------ */
 
 /* Framing byte between a case's output and its exit code, and between cases.
@@ -11190,13 +11190,34 @@ static char *st_batch_slurp(size_t *size) {
       capa *= 2;
     }
     n = fread(&buff[len], 1, capa - len - 1, stdin);
-    if (n == 0)
+    if (n == 0) {
+      /* Else a read error reads as EOF, and the tail of the script is dropped
+         as silently as if it had never been written. */
+      if (ferror(stdin)) {
+        freet(buff);
+        return NULL;
+      }
       break;
+    }
     len += n;
   }
   buff[len] = '\0';
   *size = len;
   return buff;
+}
+
+/* Case argument count, or -1 if the field is not one: atoi() would read a name
+   as zero and swallow the next case's fields. */
+static int st_batch_nargs(const char *field) {
+  char *tail;
+  long n;
+
+  errno = 0;
+  n = strtol(field, &tail, 10);
+  if (field[0] == '\0' || *tail != '\0' || errno != 0 || n < 0 ||
+      n > ST_BATCH_MAXARGS)
+    return -1;
+  return (int) n;
 }
 
 /* Next NUL-separated field, or NULL past the end of the script. */
@@ -11209,17 +11230,18 @@ static char *st_batch_field(char **pos, const char *end) {
   return field;
 }
 
-/* A fresh option set per case, or a handler's writes to opt would reach the
-   next case, which they could not when each case was its own process. It
-   carries what htsmain() derives before the dispatch out of the harness's own
-   -O and the tty probe; 314_engine-selftest-batch.test pins that against a
-   direct run. */
+/* A fresh option set per case: a handler's writes to opt must not reach the
+   next one, as they never could across separate processes. It carries the seven
+   fields htsmain() derives before the dispatch, out of the harness's own -O,
+   the data directory and the tty probe; everything else is hts_create_opt's
+   default on both routes, since the harness passes nothing else. */
 static httrackp *st_batch_opt(const httrackp *from) {
   httrackp *const opt = hts_create_opt();
 
   StringCopy(opt->path_html, StringBuff(from->path_html));
   StringCopy(opt->path_html_utf8, StringBuff(from->path_html_utf8));
   StringCopy(opt->path_log, StringBuff(from->path_log));
+  StringCopy(opt->path_bin, StringBuff(from->path_bin));
   opt->dir_topindex = from->dir_topindex;
   opt->quiet = from->quiet;
   opt->verbosedisplay = from->verbosedisplay;
@@ -11227,15 +11249,12 @@ static httrackp *st_batch_opt(const httrackp *from) {
 }
 
 /* Run a script of self-tests in one process, so a test file costs one fork
-   rather than one per assertion (a fork is expensive under MSYS, #795). The
-   script is NUL-separated fields repeating <argc> <name> <arg>*, and comes in
-   on stdin rather than argv, where the engine would parse a case's `-*` as one
-   of its own filters. Each case prints its output, then RS, its exit code and
-   RS again, which is what testlib.sh's selftest_run_queued splits on.
-
-   Args therefore arrive verbatim, where an argv first goes through htsmain()'s
-   rewrites (CR/LF/TAB to a space, "(none)" emptied, quotes dropped, aliases
-   expanded); a case meaning to exercise one of those stays one per process. */
+   rather than one per assertion (#1305). Cases must not travel in argv, where
+   the engine would parse a `-*` as one of its own filters and rewrite the rest;
+   stdin keeps them off it and out of htsmain()'s reach, so they arrive
+   verbatim. The script is NUL-separated fields repeating <argc> <name> <arg>*,
+   and each case prints its output, then RS, its exit code and RS again, which
+   is what testlib.sh's selftest_run_queued splits on. */
 static int st_batch(httrackp *opt, int argc, char **argv) {
   char *buff, *pos;
   const char *end;
@@ -11253,12 +11272,12 @@ static int st_batch(httrackp *opt, int argc, char **argv) {
   pos = buff;
   end = &buff[len];
   while (!err && (field = st_batch_field(&pos, end)) != NULL) {
-    const int nargs = atoi(field);
+    const int nargs = st_batch_nargs(field);
     char *const name = st_batch_field(&pos, end);
     char **args;
     int i, code;
 
-    if (nargs < 0 || nargs > ST_BATCH_MAXARGS || name == NULL) {
+    if (nargs < 0 || name == NULL) {
       fprintf(stderr, "batch: malformed case header\n");
       err = 1;
       break;
