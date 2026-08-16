@@ -31,10 +31,11 @@ ci_report_fork_failures() {
     }
     # Split on CR first: the console carries stdout and stderr merged, so two
     # messages can share a physical line and a line count would see one. bash
-    # retries on EAGAIN alone, so a give-up can carry any strerror, and the awk
-    # `next` is what keeps a retry from being counted as one.
+    # retries on EAGAIN alone, so a give-up can carry any strerror; each `next`
+    # keeps one message out of a second class.
     read -r died retried gaveup <<<"$(tr '\r' '\n' <"$log" | awk '
-        /fork: child -1|child_info_fork::abort/ { died++ }
+        /fork: child -1|child_info_fork::abort|sync_with_child:/ { died++; next }
+        /reserve memory for parent stack/ { died++; next }
         /fork: retry:/ { retried++; next }
         /: fork: / { gaveup++ }
         END { print died + 0, retried + 0, gaveup + 0 }')"
@@ -49,8 +50,8 @@ ci_report_fork_failures() {
         printf '%s child(ren) died at DLL init, %s retry wait(s), %s fork(s) given up\n' \
             "$died" "$retried" "$gaveup"
         # -a: one NUL in the log would otherwise cost every sample line.
-        tr '\r' '\n' <"$log" | grep -am 3 -e 'fork: child -1' \
-            -e 'child_info_fork::abort' -e ': fork: ' || true
+        tr '\r' '\n' <"$log" | grep -am 3 -e 'fork: child -1' -e 'sync_with_child:' \
+            -e 'child_info_fork::abort' -e 'reserve memory' -e ': fork: ' || true
     )"
 }
 
