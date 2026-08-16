@@ -156,12 +156,18 @@ selftest_run_queued() {
             fail "-#test=batch: framing lost at case $((i + 1)) of $n, output: $out"
             ;;
         esac
-        # What a command substitution would have dropped around a lone case.
-        while test "${got%"$TESTLIB_NL"}" != "$got"; do got=${got%"$TESTLIB_NL"}; done
-        if test "${SELFTEST_MODE[i]}" = lines; then
+        # What a command substitution drops around a lone case. The CR goes
+        # with it: Windows stdout is text mode, so every case ends CRLF there
+        # and MSYS strips the pair. Interior ones are lines mode's business.
+        while :; do
+            case $got in
+            *"$TESTLIB_NL") got=${got%"$TESTLIB_NL"} ;;
+            *"$SELFTEST_CR") got=${got%"$SELFTEST_CR"} ;;
+            *) break ;;
+            esac
+        done
+        test "${SELFTEST_MODE[i]}" != lines ||
             got=${got//"$SELFTEST_CR$TESTLIB_NL"/"$TESTLIB_NL"}
-            got=${got%"$SELFTEST_CR"}
-        fi
         want=${SELFTEST_WANT[i]}
         test "$rc" -eq 0 || fail "${SELFTEST_LABEL[i]}: exited $rc, output: $got"
         # Case patterns, where the quoted want stays literal even when the name

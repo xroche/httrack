@@ -7,25 +7,12 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-httrack_bin=$(httrack_path)
-
-scratch=$(mktemp -d)
-cleanup_push rm -rf "$scratch"
-cd "$scratch"
-
-tail_is() {
-    local fil="$1" want="$2"
+# The separator is not normalised: 01_engine-savename.test exact-compares whole
+# save paths on the Windows leg, so the engine spells them with '/' there too.
+tail_is() { # tail_is FIL WANT [ARGS...]
+    local fil=$1 want=$2
     shift 2
-    local out
-    out="$("$httrack_bin" -O "$scratch/out" -#test=savename "$fil" \
-        application/octet-stream "$@" | sed -n 's/^savename: //p')"
-    case "${out//\\//}" in
-    */"$want") ;;
-    *)
-        echo "FAIL: '$fil' $* -> '$out' (want tail '$want')"
-        exit 1
-        ;;
-    esac
+    selftest_queue_tail "/$want" savename "$fil" application/octet-stream "$@"
 }
 
 # A trailing space: cleanEndingSpaceOrDot() strips it again after the check.
@@ -61,3 +48,5 @@ tail_is '/d/a.bin' 'nul.example.com/d/a.bin' adr=nul.example.com
 tail_is '/d/a.bin' 'hts-cache.example.com/d/a.bin' adr=hts-cache.example.com
 # But a trailing run still resolves back to the bare name.
 tail_is '/a.bin' 'hts-tmp_/a.bin' adr='hts-tmp.'
+
+selftest_run_queued
