@@ -1949,12 +1949,12 @@ are in reverse priority order.  Here's an example:
 
     <table BORDER="1" CELLPADDING="2">
     <tr><td>
-    <b>+*.gif -image*.gif</b>
+    <b>+*.gif -*image*.gif</b>
     </td><td>
     Will accept all gif files BUT image1.gif,imageblue.gif,imagery.gif and so on
     </tr>
     <tr><td>
-    <b>-image*.gif +*.gif</b>
+    <b>-*image*.gif +*.gif</b>
     </td><td>
     Will accept all gif files, because the second pattern is prioritary (because it is defined AFTER the first one)
     </tr>
@@ -1969,11 +1969,11 @@ are in reverse priority order.  Here's an example:
       </tr>
       <tr>
         <td><b>*[file] or *[name]</b></td>
-        <td>any filename or name, e.g. not /,? and ; characters</td>
+        <td>a run of any characters, stopping at / or ?</td>
       </tr>
       <tr>
         <td><b>*[path]</b></td>
-        <td>any path (and filename), e.g. not ? and ; characters</td>
+        <td>a run of any characters, stopping at ? (/ is allowed)</td>
       </tr>
       <tr>
         <td><b>*[a,z,e,r,t,y]</b></td>
@@ -1981,7 +1981,7 @@ are in reverse priority order.  Here's an example:
       </tr>
       <tr>
         <td><b>*[a-z]</b></td>
-        <td>any letters</td>
+        <td>any lowercase letters from a to z (a range, and case-sensitive)</td>
       </tr>
       <tr>
         <td><b>*[0-9,a,z,e,r,t,y]</b></td>
@@ -2016,7 +2016,7 @@ generated automatically using the interface)
       </tr>
       <tr>
         <td><b>+*.com/*</b></td>
-        <td>This will accept all links that contains .com in them</td>
+        <td>This will accept links where .com is followed by a /, so a .com host but also a path such as www.example.org/dir.com/page</td>
       </tr>
       <tr>
         <td><b>-*cgi-bin* </b></td>
@@ -2024,7 +2024,7 @@ generated automatically using the interface)
       </tr>
       <tr>
         <td><b>+*.com/*[path].zip </b></td>
-        <td>This will accept all zip files in .com addresses</td>
+        <td>This will accept zip files on addresses starting with www. and containing .com/</td>
       </tr>
       <tr>
         <td><b>-*example*/*.tar*</b></td>
