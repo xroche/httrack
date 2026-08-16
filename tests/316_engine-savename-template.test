@@ -66,12 +66,13 @@ selftest_queue \
 
 # A %[param] value is crawled text as well, copied into a 256-byte token with
 # no bound at all. This one reaches the third token past it, which holds the
-# suffix, so the suffix arrives only if the value stayed inside its own. Both
-# ends are asserted: the shortener cuts this name's middle on Windows.
+# suffix, so the extension arrives only if the value stayed inside its own.
+# Both ends are asserted, and neither reaches far: this name is a single
+# segment, which Windows cuts to 48 bytes, the closing ')' with it.
 value=$(printf '%0600d' 0 | tr '0' v)
-selftest_queue_head "savename: /dev/null/($(printf '%0150d' 0 | tr '0' v)" \
+selftest_queue_head "savename: /dev/null/($(printf '%040d' 0 | tr '0' v)" \
     savename "/p?q=$value" text/html "adr=$host" 'userdef=%[q:(:).x]'
-selftest_queue_tail ').x' savename \
+selftest_queue_tail '.x' savename \
     "/p?q=$value" text/html "adr=$host" 'userdef=%[q:(:).x]'
 
 # A template with no directory part at all: the shortener wrote its separator
