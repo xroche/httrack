@@ -293,7 +293,11 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
       </tr>
       <tr>
         <td nowrap><tt>*[&lt;NN&gt;MM]</tt></td>
-        <td>only the first bound is read, so this behaves as <tt>*[&lt;NN]</tt>: give each bound a rule of its own</td>
+        <td>the file size must be smaller than NN KB <b>and</b> greater than MM KB. The two bounds may
+        come in either order, and a comma between them is optional: <tt>*[&gt;MM&lt;NN]</tt> and
+        <tt>*[&gt;MM,&lt;NN]</tt> say the same thing. A window nothing can satisfy, such as
+        <tt>*[&gt;80&lt;1]</tt>, is accepted and never matches
+        <br>(note: this may cause broken files during the download)</td>
       </tr>
     </table>
 
@@ -317,6 +321,10 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
         <td nowrap><tt>+*[&lt;80]</tt></td>
         <td>the file will be accepted if its size is smaller than 80 KB; a larger one is left to the
         other rules, since an accepting rule refuses nothing</td>
+      </tr>
+      <tr>
+        <td nowrap><tt>+*[&lt;80&gt;1]</tt></td>
+        <td>the file will be accepted if its size is smaller than 80 KB <b>and</b> greater than 1 KB</td>
       </tr>
     </table>
 

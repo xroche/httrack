@@ -39,7 +39,8 @@ Please visit our Website: http://www.httrack.com
 // *[A-Z,a-z,0-9,/,?]     match letters, nums, / and ?
 // *[A-Z,a-z,0-9,/,?]
 
-// *[>10,<100].gif        match all gif files larger than 10KB and smaller than 100KB
+// *.gif*[>10,<100]       match all gif >10KB and <100KB; a size clause ends
+//                        the rule, so what follows ']' is not matched
 // *[file,>10,<100].gif   FORBIDDEN: you must not mix size test and pattern test
 
 #include "htsfilters.h"
@@ -336,6 +337,8 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
           cut = 1;              // caractère supplémentaire interdit
         } else {
           int len = (int) strlen(joker);
+          int nbounds = 0;  // size bounds read so far, all satisfied
+          LLint slimit = 0; // last of them, reported back as the limit
 
           while((joker[i] != RIGHT) && (joker[i]) && (i < len)) {
             // '\' escapes the next char as a literal member, e.g. *[\[\]]
@@ -343,33 +346,30 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
               i++;
               pass[(int) (unsigned char) joker[i]] = 1;
               i++;
-            } else if ((joker[i] == '<') || (joker[i] == '>')) { // *[<10]
-              int lsize = 0;
-              int lverdict;
+            } else if ((joker[i] == '<') ||
+                       (joker[i] == '>')) { // *[<10], *[>1<80]
+              const char op = joker[i];
+              LLint lsize = 0;
+              int ndigits = 0;
 
+              // hand-rolled, not sscanf("%d"): a rule off -%S may carry more
+              // digits than an int holds, which is undefined there
               i++;
-              if (sscanf(joker + i, "%d", &lsize) == 1) {
-                if (size) {
-                  if (*size >= 0) {
-                    if (size_flag)
-                      *size_flag = 1;   /* a joué */
-                    if (joker[i - 1] == '<')
-                      lverdict = (*size < lsize);
-                    else
-                      lverdict = (*size > lsize);
-                    if (!lverdict) {
-                      return NULL;      // ne correspond pas
-                    } else {
-                      *size = lsize;
-                      return chaine;    // ok
-                    }
-                  } else
-                    return NULL;        // ne correspond pas
-                } else
-                  return NULL;  // ne correspond pas (test impossible)
-                // jump
-                while(isdigit((unsigned char) joker[i]))
-                  i++;
+              while (isdigit((unsigned char) joker[i])) {
+                if (lsize < 1000000000)
+                  lsize = lsize * 10 + (joker[i] - '0');
+                i++;
+                ndigits++;
+              }
+              if (ndigits != 0) {
+                if (size == NULL || *size < 0)
+                  return NULL; // taille inconnue: test impossible
+                if (size_flag)
+                  *size_flag = 1; /* a joué */
+                if (op == '<' ? (*size >= lsize) : (*size <= lsize))
+                  return NULL; // hors bornes
+                nbounds++;
+                slimit = lsize;
               }
             } else if (joker[i + 1] == '-' && joker[i + 2] != '\0') {
               // range *[A-Z]; the '\0' guard rejects a truncated *[a- (else
@@ -389,6 +389,12 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
             }
             if ((joker[i] == ',') || (joker[i] == ';'))
               i++;
+          }
+          // every bound held: the clause matches here and, as with a single
+          // one, whatever follows ']' is not matched
+          if (nbounds != 0 && size != NULL) {
+            *size = slimit;
+            return chaine;
           }
         }
       }
