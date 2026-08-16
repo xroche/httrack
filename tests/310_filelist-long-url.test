@@ -1,8 +1,6 @@
 #!/bin/bash
 #
 # -%L: a line the user wrote is read whole or refused by name, never split.
-# binput() clips at HTS_URLMAXSIZE and returns the clipped length, so the
-# loading loop used to resume mid-URL and add the tail as a second link.
 # Offline: file:// fixtures, no server.
 
 set -euo pipefail

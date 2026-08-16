@@ -47,21 +47,18 @@ got=$(items "$dir/first-1024.ndx")
 test "$got" = 2 || fail "URLs differing on the 1024 bound gave $got keys, expected 2"
 
 # The header field is read through the same helper, bounded at 256. One byte
-# past that bound must leave the entry walk where a header that fits leaves it.
-# The reader used to resume inside the over-long line, so the walk began one
-# line earlier and read an extra entry out of the same bytes (#1294).
+# past that bound must land the entry walk where a header that fits lands it:
+# resuming inside the over-long line began the walk a line early and read a
+# fourth entry out of these same bytes (#1294).
 for at in 1 256 257 258; do
     {
         pad "$at" C
         printf '\na/1\nx\n1\nb/2\ny\n2\nc/3\nz\n3\n'
     } >"$dir/header-$at.ndx"
 done
-want=$(items "$dir/header-1.ndx")
-test "$want" -gt 0 || fail "control: a header that fits gave no keys"
-for at in 256 257 258; do
+for at in 1 256 257 258; do
     got=$(items "$dir/header-$at.ndx")
-    test "$got" = "$want" ||
-        fail "header of $at bytes gave $got keys, expected $want"
+    test "$got" = 2 || fail "header of $at bytes gave $got keys, expected 2"
 done
 
 # Second half, bounded at 2048 - 10 - 1: it fills that bound with the index

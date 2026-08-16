@@ -200,8 +200,8 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
             // Lire en têtes restants
             sprintf(data, "%s %s %s\r\n", method, af.fil, protocol);
             while(strnotempty(line)) {
-              /* a header we could not read whole is not the one the browser
-                 sent: replaying a prefix of it is worse than dropping it */
+              /* a clipped header is not the one the browser sent: dropping it
+                 beats replaying a prefix */
               if (socinput(soc, line, 1000))
                 continue;
               treathead(NULL, NULL, NULL, &blkretour, line);    // traiter
@@ -211,8 +211,11 @@ HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
             // CR/LF final de l'en tête inutile car déja placé via la ligne vide
             // juste au dessus
             if (blkretour.totalsize > 0) {
-              int len = (int) min(blkretour.totalsize, 32000);
               int pos = (int) strlen(data);
+              /* the headers already took part of data[], so bound the body by
+                 the room they left rather than by a constant */
+              int len = (int) min(blkretour.totalsize,
+                                  (LLint) (CATCH_URL_DATA_SIZE - 1 - pos));
 
               // Copier le reste (post éventuel)
               while((len > 0)

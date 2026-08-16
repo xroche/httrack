@@ -2597,9 +2597,8 @@ static int st_headerline(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* binput() clips a line it cannot hold but must consume it whole: the advance
-   it reports is what the cache, robots and list parsers resume on, and inside
-   the line the tail reads back as a record of its own (#1294). */
+/* #1294: binput()'s advance must reach the next line even when it clipped the
+   value, since the cache, robots and list parsers resume on it. */
 static int st_binputline(httrackp *opt, int argc, char **argv) {
   static const char fixture[] = "Disallow: 0123456789abcdefghij\n"
                                 "Allow: /open/\n";
@@ -2641,8 +2640,7 @@ static int st_binputline(httrackp *opt, int argc, char **argv) {
   for (i = 0; i < 3; i++) {
     const int adv = binput(block + ptr, line, max);
 
-    printf("adv=%d over=%d line=%s\n", adv, ptr + adv > (int) blocklen + 1,
-           line);
+    printf("adv=%d line=%s\n", adv, line);
     ptr += adv;
     if (ptr > (int) blocklen)
       ptr = (int) blocklen;
@@ -6602,12 +6600,9 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
     assertf(rb_decide(&robots, txt, path) == -1);
   }
 
-  /* #1294: the reader used to resume inside a line it could not hold, so an
-     over-long Disallow handed back its own tail as a second rule. Here the
-     tail is an Allow re-opening what the line above forbids. */
+  /* #1294: an over-long Disallow must not hand its own tail back as a rule. */
   {
-    /* where the old read resumed: it kept HTS_ROBOTS_LINE_SIZE - 2 bytes and
-       stepped one past them */
+    /* one past the HTS_ROBOTS_LINE_SIZE - 2 bytes the old read kept */
     const size_t resume = HTS_ROBOTS_LINE_SIZE - 1;
     char BIGSTK txt[HTS_ROBOTS_LINE_SIZE * 3];
     size_t head = (size_t) snprintf(
@@ -6616,10 +6611,13 @@ static int st_robots(httrackp *opt, int argc, char **argv) {
 
     memset(txt + head, 'a', line + resume - head);
     head = line + resume;
-    head +=
-        (size_t) snprintf(txt + head, sizeof(txt) - head, "Allow: /open/\n");
+    head += (size_t) snprintf(txt + head, sizeof(txt) - head,
+                              "Allow: /open/\nDisallow: /next/\n");
     assertf(head < sizeof(txt));
     assertf(rb_decide(&robots, txt, "/open/x") == -1);
+    /* the line after the cut one is still a rule: consuming it whole must not
+       become discarding the rest of the file */
+    assertf(rb_decide(&robots, txt, "/next/x") == -1);
 
     /* control: that same text on a line of its own is a rule we do honour, so
        the refusal above is the tail never being read and not a dead pattern */

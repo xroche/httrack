@@ -566,17 +566,17 @@ class Handler(SimpleHTTPRequestHandler):
     BLOB_ROBOTS_RE = re.compile(r"robotsblob(\d+)")
     # ... and one whose last Disallow outruns the reader's line buffer, its own
     # tail spelling an Allow that re-opens what the line above forbids (#1294).
-    # The reader used to resume TAIL_RESUME bytes into the line, so that tail
-    # came back as a rule of its own.
     TAIL_ROBOTS_UA = "tailrobots"
     # ... the same Allow written as a line of its own: the control saying the
     # rule is one the engine acts on, so a refusal is the tail going unread.
     TAIL_ONLINE_UA = "tailonline"
-    TAIL_RESUME = 1023  # HTS_ROBOTS_LINE_SIZE - 1
+    TAIL_RESUME = 1023  # where the old reader resumed: HTS_ROBOTS_LINE_SIZE - 1
 
     def tail_robots_body(self, own_line):
         phantom = "Allow: /secret/"
-        head = "User-agent: *\nDisallow: /secret/\n"
+        # /hidden/ is refused by both bodies, so a leg that mirrors it never
+        # read this robots.txt at all
+        head = "User-agent: *\nDisallow: /hidden/\nDisallow: /secret/\n"
         if own_line:
             return (head + phantom + "\n").encode()
         rule = "Disallow: "

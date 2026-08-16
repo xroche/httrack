@@ -2036,8 +2036,7 @@ int cache_url_bounds_selftest(httrackp *opt, const char *dir) {
 /* Buffer the reader rebuilds the save name into, so the longest name that fits
    is one byte less. */
 #define SAVEBOUNDS_CAP (HTS_URLMAXSIZE * 2)
-/* X-Save length used here. binput() clips the whole header line at
-   HTS_URLMAXSIZE, and "X-Save: " plus CRLF eat into it. */
+/* X-Save length used here, well inside the header line the reader can hold. */
 #define SAVEBOUNDS_REL_LEN 1000
 #define SAVEBOUNDS_GUARD 16
 #define SAVEBOUNDS_GUARD_BYTE '\x5a'

@@ -3035,32 +3035,6 @@ int sendc(htsblk * r, const char *s) {
   return (n == ssz) ? n : -1;
 }
 
-// Remplace read
-int finput(T_SOC fd, char *s, int max) {
-  char c;
-  int j = 0;
-
-  do {
-    if (read((int) fd, &c, 1) <= 0) {
-      c = 0;
-    }
-    if (c != 0) {
-      switch (c) {
-      case 10:
-        c = 0;
-        break;
-      case 13:
-        break;                  // sauter ces caractères
-      default:
-        s[j++] = c;
-        break;
-      }
-    }
-  } while ((c != 0) && (j < max - 1));
-  s[j] = '\0';
-  return j;
-}
-
 // Like linput, but in memory (optimized). A line too long for `s` is clipped
 // but consumed whole: resuming inside it reads its tail back as another line.
 int binput(const char *buff, char *s, int max) {

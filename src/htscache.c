@@ -587,8 +587,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
           do {
             char *value;
             int adv;
-            /* longer than any line we write: a prefix of a foreign or damaged
-               entry would parse as a valid-looking wrong value */
+            /* no line we write is this long, so a cut one is foreign or
+               damaged and its prefix would parse as a wrong value */
             const hts_boolean cut =
                 binput_line(headerBuff + offset, headerBuff + readSizeHeader,
                             line, sizeof(line) - 1, &adv);

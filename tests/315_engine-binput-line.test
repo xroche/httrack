@@ -1,15 +1,12 @@
 #!/bin/bash
-# Issue #1294: the line readers clipped a line they could not hold and left the
-# caller's cursor inside it, so the unread tail came back as a record of its
-# own. Here it spells a robots.txt Allow re-opening what the line above forbids.
-set -eu
+# Issue #1294: a clipped line's unread tail must not resurface as another record.
+set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
 
-# binput() clips a line the destination cannot hold, but the advance it reports
-# must reach the next line all the same: the cache, robots and list parsers all
-# resume on it. "adv" is that advance, "over" says the walk left the block.
+# "adv" is binput()'s advance, which must reach the next line even when the
+# value was clipped: the cache, robots and list parsers all resume on it.
 walk() { # walk READSIZE [BLOCK] WANT
     if [ "$#" -eq 3 ]; then
         selftest_queue_lines "$3" binputline "$1" "$2"
@@ -21,32 +18,34 @@ walk() { # walk READSIZE [BLOCK] WANT
 # Default block: "Disallow: 0123456789abcdefghij" is 30 bytes, then
 # "Allow: /open/" at 13. The advance is the line plus its newline whatever the
 # read size, and the second line read is always the second line written.
-walk 31 'adv=31 over=0 line=Disallow: 0123456789abcdefghij
-adv=14 over=0 line=Allow: /open/
-adv=1 over=0 line='
-walk 12 'adv=31 over=0 line=Disallow: 01
-adv=14 over=0 line=Allow: /open
-adv=1 over=0 line='
-walk 1 'adv=31 over=0 line=D
-adv=14 over=0 line=A
-adv=1 over=0 line='
+walk 31 'adv=31 line=Disallow: 0123456789abcdefghij
+adv=14 line=Allow: /open/
+adv=1 line='
+walk 12 'adv=31 line=Disallow: 01
+adv=14 line=Allow: /open
+adv=1 line='
+walk 1 'adv=31 line=D
+adv=14 line=A
+adv=1 line='
 
 # A last line with no terminator stops on the block's own NUL, one byte past
 # the last character and no further.
-walk 8 'AAAAAAAAAAAA\nBBB' 'adv=13 over=0 line=AAAAAAAA
-adv=4 over=0 line=BBB
-adv=1 over=0 line='
+walk 8 'AAAAAAAAAAAA\nBBB' 'adv=13 line=AAAAAAAA
+adv=4 line=BBB
+adv=1 line='
 
 # CR is dropped from the value but still counts towards the advance, so a CRLF
-# record ends where the next one starts.
-walk 8 'A\r: 1\r\nB: 2\r\n' 'adv=7 over=0 line=A: 1
-adv=6 over=0 line=B: 2
-adv=1 over=0 line='
+# record ends where the next one starts. A clipped value drops it too.
+walk 8 'A\r: 1\r\nB: 2\r\n' 'adv=7 line=A: 1
+adv=6 line=B: 2
+adv=1 line='
+walk 3 'A\rBCDEF\r\nGHI\r\n' 'adv=9 line=ABC
+adv=5 line=GHI
+adv=1 line='
 
 selftest_run_queued
 
-# End to end: /secret/ is forbidden by a rule the site wrote, and the site's
-# last Disallow is long enough to outrun the reader. Its tail spells
+# End to end: the site's last Disallow outruns the reader and its tail spells
 # "Allow: /secret/", which the engine must never see as a rule.
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_1294.XXXXXX") || exit 1
 cleanup() {
@@ -55,19 +54,23 @@ cleanup() {
 cleanup_push cleanup
 
 doc="${tmpdir}/doc"
-mkdir -p "${doc}/secret" "${doc}/ok"
-printf '<html><body><a href="secret/page.html">s</a>\n<a href="ok/page.html">o</a></body></html>\n' \
+mkdir -p "${doc}/secret" "${doc}/hidden" "${doc}/ok"
+printf '<html><body><a href="secret/page.html">s</a>\n<a href="hidden/page.html">h</a>\n<a href="ok/page.html">o</a></body></html>\n' \
     >"${doc}/index.html"
-for d in secret ok; do
+for d in secret hidden ok; do
     printf '<html><body>body of %s</body></html>\n' "$d" >"${doc}/${d}/page.html"
 done
 
+# /hidden/ is disallowed on an ordinary line in both bodies, so mirroring it
+# would mean this robots.txt was never read and neither leg proves anything.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
-    --errors 0 --found 'ok/page.html' --not-found 'secret/page.html' \
+    --errors 0 --found 'ok/page.html' --not-found 'hidden/page.html' \
+    --not-found 'secret/page.html' \
     httrack 'BASEURL/index.html' -r3 -s2 -F 'tailrobots-agent'
 
 # Control: that same Allow on a line of its own is honoured, so the refusal
 # above is the tail going unread and not a rule the engine ignores anyway.
 bash "$top_srcdir/tests/local-crawl.sh" --root "$(nativepath "$doc")" \
-    --errors 0 --found 'ok/page.html' --found 'secret/page.html' \
+    --errors 0 --found 'ok/page.html' --not-found 'hidden/page.html' \
+    --found 'secret/page.html' \
     httrack 'BASEURL/index.html' -r3 -s2 -F 'tailonline-agent'
