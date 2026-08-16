@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 
 if test "${V6_SUPPORT:-}" == "no"; then
     echo "no IPv6 support (resolver override compiled out), skipping"
@@ -33,7 +33,7 @@ local_server_start --env LOCAL_SERVER_VERBOSE=1 --root "$root" --bind 127.0.0.1
 # Not on macOS, which drops the SYN on a held port where Linux resets it, so the
 # crawl would time out instead of failing to connect and stop testing the bypass.
 # That leaves the #1218 race here on macOS alone, as it was everywhere before.
-if test "$(uname -s)" = Darwin; then
+if test "$HTS_OS" = Darwin; then
     deadproxy=$(freeport)
 else
     hold_port

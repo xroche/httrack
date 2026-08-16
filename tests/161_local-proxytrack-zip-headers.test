@@ -8,7 +8,7 @@
 set -eu
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
@@ -48,5 +48,5 @@ done
 proxytrack --convert "$dir/back.arc" "$dir/out.zip" >"$dir/log" 2>&1 ||
     fail "proxytrack died reading its own new.zip"
 grep -q '(1 items added)' "$dir/log" ||
-    fail "the new.zip did not load back: $(cat "$dir/log")"
+    fail "the new.zip did not load back: $(<"$dir/log")"
 grep -qF "$BODY" "$dir/back.arc" || fail "body did not survive the round trip"

@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 if test "${HTTPS_SUPPORT:-}" == "no"; then
     echo "no https support compiled, skipping"

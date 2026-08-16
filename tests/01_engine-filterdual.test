@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # fa_strjoker_dual: merged verdict on the two URL forms the engine tests;
 # the match latest in the filter list wins, an unknown verdict defers.

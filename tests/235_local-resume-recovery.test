@@ -5,7 +5,7 @@ set -e
 set -u
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 server=$(nativepath "${testdir}/local-server.py")
 
 python=$(find_python) || skip "python3 not found"
@@ -179,7 +179,7 @@ echo "OK (1 free restart, budget intact)"
 # Windows refuses to unlink a file it still holds open, so the partial outlives
 # the restart. LD_PRELOAD is the only way to reach that from POSIX, and the
 # interposer needs /proc to tell an open handle from a closed one.
-if [ "$(uname -s)" != "Linux" ] || [ ! -d /proc/self/fd ]; then
+if [ "$HTS_OS" != "Linux" ] || [ ! -d /proc/self/fd ]; then
     echo "resume-recovery: unlink interposition needs Linux + /proc, skipping the last leg"
     exit 0
 fi

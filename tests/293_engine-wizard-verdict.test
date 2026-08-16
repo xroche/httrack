@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # The verdict half of a wizard answer, driven without the interactive callback.
 # Both start from the undecided verdict the question is asked in.

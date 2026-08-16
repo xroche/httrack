@@ -8,7 +8,7 @@ set -euo pipefail
 export LC_ALL=C
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 dir=$(mktemp -d)
 cleanup() { rm -rf "$dir"; }

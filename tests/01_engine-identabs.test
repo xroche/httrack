@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # A 2047-byte hostless "?"-URL used to overflow fil[] by one byte and abort in
 # strncat_safe_; the guard now returns -1 while valid URLs still parse.

@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
 command -v httrack >/dev/null || {
@@ -50,7 +50,7 @@ crawl() {
 
 # --- a plain login goes out unchanged ----------------------------------------
 crawl "bob:secret" || fail "the plain-login crawl never finished"
-sent=$(cat "$cmds")
+sent=$(<"$cmds")
 grep -qxF "USER bob" <<<"$sent" || fail "no USER bob on the wire: ${sent}"
 grep -qxF "PASS secret" <<<"$sent" || fail "no PASS secret on the wire: ${sent}"
 cmp -s "${out}/127.0.0.1_${port}/f.txt" "${root}/f.txt" ||
@@ -62,7 +62,7 @@ ok "bob:secret reaches the server verbatim, and mirrors"
 user=$(rep a 255)
 pass=$(rep b 255)
 crawl "${user}:${pass}" || fail "the 255-byte login crawl never finished"
-sent=$(cat "$cmds")
+sent=$(<"$cmds")
 grep -qxF "USER ${user}" <<<"$sent" ||
     fail "the wire user is not the 255 bytes the URL named: $(grep -a '^USER' <<<"$sent")"
 grep -qxF "PASS ${pass}" <<<"$sent" ||
@@ -74,8 +74,8 @@ ok "a 255-byte user and password reach the server unclipped"
 for u in "$(rep a 256):pw" "$(rep a 256)"; do
     crawl "$u" || fail "the over-long crawl never finished"
     grep -aq "FTP user name or password too long" "${out}/hts-log.txt" ||
-        fail "over-long userinfo was not refused: $(cat "${out}/hts-log.txt")"
-    sent=$(cat "$cmds")
+        fail "over-long userinfo was not refused: $(<"${out}/hts-log.txt")"
+    sent=$(<"$cmds")
     test -z "$sent" || fail "the engine logged in under a clipped name: ${sent}"
 done
 ok "an over-long name is refused before anything reaches the control channel"

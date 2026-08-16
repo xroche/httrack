@@ -4,7 +4,7 @@
 set -eu
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 driver=$(nativepath "${testdir}/pty-resize.py")
 
 skip_on_windows "no pty on Windows"

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 : "${abs_top_builddir:?not run under make check}"
 bindir="${CONFIGURED_BINDIR:?not run under make check}"
@@ -28,7 +28,7 @@ test -r "${bin}" || fail "no httrack in ${stage}${bindir}"
 
 # Chosen by platform, not by whatever is installed: an ELF reader handed a
 # Mach-O prints no rpath instead of failing, which reads as "no rpath at all".
-case "$(uname -s)" in
+case "$HTS_OS" in
 Darwin) candidates="otool" ;;
 *) candidates="readelf objdump" ;;
 esac

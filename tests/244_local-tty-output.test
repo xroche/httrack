@@ -6,7 +6,7 @@
 set -eu
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 
 python=$(find_python) || skip "python3 not found"
 

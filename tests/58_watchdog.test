@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_wd.XXXXXX")
 # A colon-free root for the PATH shim below: MSYS hands out a drive-letter TMPDIR

@@ -21,6 +21,40 @@ ci_annotate() {
     printf '\n::%s title=%s::%s\n' "$level" "$title" "$msg"
 }
 
+# Count the MSYS fork-emulation failures in the console log $1. Nothing counted
+# them, so a leg that struggled read exactly like one that never did (#1273).
+ci_report_fork_failures() {
+    local log=$1 died retried gaveup
+    test -r "$log" || {
+        echo "no console log at $log: MSYS fork failures not counted"
+        return 0
+    }
+    # Split on CR first: the console carries stdout and stderr merged, so two
+    # messages can share a physical line and a line count would see one. bash
+    # retries on EAGAIN alone, so a give-up can carry any strerror; each `next`
+    # keeps one message out of a second class.
+    read -r died retried gaveup <<<"$(tr '\r' '\n' <"$log" | awk '
+        /fork: child -1|child_info_fork::abort|sync_with_child:/ { died++; next }
+        /reserve memory for parent stack/ { died++; next }
+        /fork: retry:/ { retried++; next }
+        /: fork: / { gaveup++ }
+        END { print died + 0, retried + 0, gaveup + 0 }')"
+    test -z "${GITHUB_STEP_SUMMARY:-}" ||
+        printf 'MSYS forks: %s died, %s retried, %s given up\n' \
+            "$died" "$retried" "$gaveup" >>"$GITHUB_STEP_SUMMARY"
+    if test $((died + retried + gaveup)) -eq 0; then
+        echo "no MSYS fork failure in $log"
+        return 0
+    fi
+    ci_annotate warning "MSYS fork failures" "$(
+        printf '%s child(ren) died at DLL init, %s retry wait(s), %s fork(s) given up\n' \
+            "$died" "$retried" "$gaveup"
+        # -a: one NUL in the log would otherwise cost every sample line.
+        tr '\r' '\n' <"$log" | grep -am 3 -e 'fork: child -1' -e 'sync_with_child:' \
+            -e 'child_info_fork::abort' -e 'reserve memory' -e ': fork: ' || true
+    )"
+}
+
 # End a wedged suite before its runner dies: a step that fails on its own terms
 # keeps its log, a lost runner keeps nothing, annotations included (#795). Quiet
 # for $1s, then names the test in flight from $3 every $2s; kills $5 once $3 has

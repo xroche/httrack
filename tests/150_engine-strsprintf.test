@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Resolve httrack before any cd: PATH may carry a build-relative entry.
 bin=$(command -v httrack) || {

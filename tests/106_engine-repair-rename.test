@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 tmpdir=$(mktemp -d) # honors the Windows-shaped TMPDIR the MSYS suite exports
 cleanup() { rm -rf "$tmpdir"; }
@@ -66,7 +66,7 @@ test "$(wc -c <"${proj}/hts-cache/new.zip")" -eq 28 || {
 }
 echo "OK"
 
-if [ "$(uname -s)" != "Linux" ]; then
+if [ "$HTS_OS" != "Linux" ]; then
     echo "repair-rename: LD_PRELOAD interposition is Linux-only here, skipping"
     exit 0
 fi

@@ -12,7 +12,7 @@ unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
 export WATCHDOG_CONTEXT='226_watchdog-native (never posted)'
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
 wdscript="$testdir/ci-windows-watchdog.ps1"
@@ -182,6 +182,7 @@ else
     # Parsed, not grepped: every key below has to be read from the block that
     # owns it, and an ordinary reformatting of the workflow must not move it.
     cat >"$tmp/wf.py" <<'PY'
+import re
 import sys
 
 import yaml
@@ -192,14 +193,30 @@ def steps_of(wf):
 def checkouts(wf):
     return [s for s in steps_of(wf) if str(s.get("uses", "")).startswith("actions/checkout")]
 
+# Runs it under any spelling, but not the step that only sources it for a helper:
+# a matcher pinned to one invocation would pass a second job that drives a suite.
+SUITE_RUN = re.compile(r"(?<![.\w])bash\s+\S*ci-windows-suite\.sh")
+
+def runs_suite(s):
+    return bool(SUITE_RUN.search(str(s.get("run", ""))))
+
+# One control per spelling, or the audit below is worth only what it can see.
+for _run, _want in [("bash ./ci-windows-suite.sh $dir", True),
+                    ('bash "$GITHUB_WORKSPACE/tests/ci-windows-suite.sh" $dir', True),
+                    ("bash ci-windows-suite.sh $dir", True),
+                    (". ./ci-windows-suite.sh\nci_report_fork_failures x.log", False),
+                    ("source ./ci-windows-suite.sh", False)]:
+    if runs_suite({"run": _run}) is not _want:
+        sys.exit("the suite-step matcher is wrong for: %r" % _run)
+
 def suite_steps(wf):
-    return [s for s in steps_of(wf) if "ci-windows-suite.sh" in str(s.get("run", ""))]
+    return [s for s in steps_of(wf) if runs_suite(s)]
 
 def suite_jobs(wf):
     return [
         j
         for j in (wf.get("jobs") or {}).values()
-        if any("ci-windows-suite.sh" in str(s.get("run", "")) for s in (j.get("steps") or []))
+        if any(runs_suite(s) for s in (j.get("steps") or []))
     ]
 
 # A job-level block replaces the workflow's outright, so one naming only contents
@@ -411,7 +428,7 @@ sink_start() {
     # Where the teardown can find it: sink_start runs in a subshell of its own.
     echo "$sinkpid" >"$sinkpidfile"
     port=$(discover_server_port "$sinklog" "$sinkpid") ||
-        fail "the status sink never bound a port: $(cat "$sinklog")"
+        fail "the status sink never bound a port: $(<"$sinklog")"
 }
 sink_stop() {
     stop_server "$sinkpid"
@@ -444,7 +461,7 @@ cadence_leg() {
     run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
         -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 4 >"$legout" 2>&1 || {
         sink_stop
-        echo "the loop exited nonzero: $(cat "$legout")"
+        echo "the loop exited nonzero: $(<"$legout")"
         return 1
     }
     sink_stop
@@ -454,7 +471,7 @@ cadence_leg() {
         return 1
     }
     grep -q '36_local-bigcrawl.test' "$posts" || {
-        echo "the posted status does not name the test in flight: $(cat "$posts")"
+        echo "the posted status does not name the test in flight: $(<"$posts")"
         return 1
     }
     case $(posted_pairs) in
@@ -489,7 +506,7 @@ staticness_leg() {
     done
     wait "$legpid" || {
         sink_stop
-        echo "the loop exited nonzero: $(cat "$legout")"
+        echo "the loop exited nonzero: $(<"$legout")"
         return 1
     }
     sink_stop
@@ -517,7 +534,7 @@ throttle_leg() {
     run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
         -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 8 >"$legout" 2>&1 || {
         sink_stop
-        echo "the loop exited nonzero: $(cat "$legout")"
+        echo "the loop exited nonzero: $(<"$legout")"
         return 1
     }
     sink_stop
@@ -540,7 +557,7 @@ backoff_leg() {
     run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
         -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 8 >"$legout" 2>&1 || {
         sink_stop
-        echo "the loop exited nonzero: $(cat "$legout")"
+        echo "the loop exited nonzero: $(<"$legout")"
         return 1
     }
     sink_stop
@@ -559,7 +576,7 @@ backoff_leg() {
     # Every attempt here is refused, so each one after the first must say how many
     # went missing: x= is what separates a stopped box from a network that healed.
     grep -q ' x=[1-9]' "$posts" || {
-        echo "no posted status counted the failures before it: $(cat "$posts")"
+        echo "no posted status counted the failures before it: $(<"$posts")"
         return 1
     }
 }

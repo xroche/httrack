@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # hts_finish_makeindex writes the footer and gates the refresh meta on a single
 # first link (guards the macro->function extraction).

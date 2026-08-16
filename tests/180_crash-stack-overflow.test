@@ -7,11 +7,11 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 ulimit -c 0 # a deliberate crash must not litter the box with cores
 
-case "$(uname -s)" in
+case "$HTS_OS" in
 Linux) traced=1 ;;
 MINGW* | MSYS* | CYGWIN*)
     echo "no sigaltstack on Windows, skipping" >&2

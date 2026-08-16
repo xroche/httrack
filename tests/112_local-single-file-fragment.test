@@ -4,7 +4,7 @@
 set -e
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 
 python=$(find_python) || skip "python3 not found"
 
@@ -73,7 +73,7 @@ if m is None:
 open(sys.argv[2], "wb").write(base64.b64decode(m.group(1)))
 PY
 grep -Eq "url\\(data:image/svg\\+xml;base64,${b64}#icon-css\\)" "${tmpdir}/got.css" ||
-    fail "url() lost its fragment: $(cat "${tmpdir}/got.css")"
+    fail "url() lost its fragment: $(<"${tmpdir}/got.css")"
 # Over the cap, so it stays a link, rebased onto the page's directory: it still
 # names the sprite sheet, so it still needs the selector.
 grep -q 'url(big.svg#icon-big)' "${tmpdir}/got.css" ||

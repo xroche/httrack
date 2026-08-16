@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
 command -v httrack >/dev/null || {
@@ -49,7 +49,7 @@ elapsed=$((SECONDS - start))
 
 log="${out}/hts-log.txt"
 # Confirms the transfer had started; otherwise the wait under test never runs.
-sent=$(cat "$cmds")
+sent=$(<"$cmds")
 grep -q '^RETR ' <<<"$sent" ||
     fail "the transfer never started, so nothing was in flight: ${sent}"
 ok "the crawl was inside the body transfer when the cap hit"

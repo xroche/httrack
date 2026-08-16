@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Unset means no automake run (the Windows job runs the scripts directly), so
 # there is no install rule to drive.
@@ -15,7 +15,7 @@ bindir="${CONFIGURED_BINDIR:?not run under make check}"
 libdir="${CONFIGURED_LIBDIR:?not run under make check}"
 libdir=${libdir%/}
 
-test "$(uname -s)" = Darwin || skip "no Mach-O install commands to read here"
+test "$HTS_OS" = Darwin || skip "no Mach-O install commands to read here"
 command -v otool >/dev/null 2>&1 || skip "no otool"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/rpathid.XXXXXX") || {

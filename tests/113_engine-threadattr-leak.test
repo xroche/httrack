@@ -7,9 +7,9 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
-if [ "$(uname -s)" != "Linux" ]; then
+if [ "$HTS_OS" != "Linux" ]; then
     echo "threadattr: LD_PRELOAD interposition is Linux-only here, skipping"
     exit 0
 fi

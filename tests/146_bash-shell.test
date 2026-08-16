@@ -8,7 +8,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 sh=${BASH_SHELL:-}
 test -n "$sh" || {

@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # IDNA / punycode encode (-#test=idna-encode) and decode (-#test=idna-decode). This code has a CVE history,
 # so the edge cases below cover passthrough, round-trips, and malformed input.

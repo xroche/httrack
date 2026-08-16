@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Local save-name resolution (url_savename via -#test=savename <fil> <content-type> [key=value ...]).
 # name() asserts on the basename, full() on the whole path; prior= registers an
@@ -159,7 +159,7 @@ name $'/evil\rname\t.php' 'text/html' 'evil name .html'
 # #133: oversized names are capped only on Windows, where the name takes the
 # same 48-char clamp as a directory segment and keeps its extension across the
 # cut (#852); elsewhere the platform PATH_MAX leaves a 300-char name whole.
-case "$(uname -s 2>/dev/null)" in
+case "$HTS_OS" in
 MINGW* | MSYS* | CYGWIN*)
     name "/$(printf 'a%.0s' {1..300}).php" 'text/html' "$(printf 'a%.0s' {1..43}).html"
     ;;

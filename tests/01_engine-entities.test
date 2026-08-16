@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # HTML entity unescaping (hts_unescapeEntitiesWithCharset).
 # -#test=entities <string> prints the string with entities decoded (UTF-8 output).

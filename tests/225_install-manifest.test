@@ -7,13 +7,13 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 : "${abs_top_builddir:?not run under make check}"
 manifest="${abs_top_srcdir:?not run under make check}/tests/install-manifest.txt"
 
 # macOS names the library .dylib, and Windows has no distro packaging to protect.
-test "$(uname -s)" = Linux || skip "install layout is pinned on Linux only"
+test "$HTS_OS" = Linux || skip "install layout is pinned on Linux only"
 test -r "${manifest}" || fail "no ${manifest}"
 
 # The docs are dropped below, so a docdir holding datadir would drop the pinned

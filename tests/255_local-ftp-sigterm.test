@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
 skip_on_windows "MSYS cannot signal a native httrack.exe"
@@ -101,7 +101,7 @@ ok "SIGTERM ended the crawl in $((SECONDS - started))s"
 # Leaving the wait is only half of it: the exit has to walk out through the
 # normal end of the mirror. Bailing to the error path, or skipping the link as
 # though it were done, also ends the wait and loses the mirror instead.
-reply=$(cat "${tmpdir}/log")
+reply=$(<"${tmpdir}/log")
 grep -q 'Exit requested to engine' <<<"$reply" ||
     fail "SIGTERM did not reach the engine: ${reply}"
 grep -q 'Thanks for using HTTrack' <<<"$reply" ||
@@ -110,7 +110,7 @@ test -s "${out}/hts-cache/new.zip" ||
     fail "the cache was not committed: $(find "$out" -type f)"
 test -s "$partial" ||
     fail "the received prefix was dropped: $(find "$out" -type f)"
-log=$(cat "${out}/hts-log.txt")
+log=$(<"${out}/hts-log.txt")
 # Only the outer loop's own exit_xh branch writes this. Returning the caller's
 # error code leaves the wait just as well, and jumps straight to cleanup with a
 # cache holding nothing.
@@ -134,7 +134,7 @@ done
 started=$SECONDS
 kill -TERM "$crawlpid"
 await_exit 60 "the terminated saturated crawl"
-reply=$(cat "${tmpdir}/log")
+reply=$(<"${tmpdir}/log")
 grep -q 'Thanks for using HTTrack' <<<"$reply" ||
     fail "the saturated exit skipped teardown: ${reply}"
 ok "SIGTERM ended a crawl with no free socket in $((SECONDS - started))s"
@@ -150,7 +150,7 @@ await_exit 120 "the interrupted crawl"
 # sig_leave's own line: without it the transfer completing says nothing, since
 # a signal that never arrived leaves a crawl that was going to finish anyway.
 grep -q 'Finishing pending transfers' "${tmpdir}/log" ||
-    fail "the ^C never reached sig_leave: $(cat "${tmpdir}/log")"
+    fail "the ^C never reached sig_leave: $(<"${tmpdir}/log")"
 cmp -s "${out}/127.0.0.1_${port}/f.bin" "${root}/f.bin" ||
     fail "^C cut the transfer short; mirror holds $(find "$out" -type f)"
 ok "a single ^C let the in-flight transfer complete"

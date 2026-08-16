@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 ulimit -c 0 # a deliberate abort must not litter the box with cores
 

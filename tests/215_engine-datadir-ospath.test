@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Unset means this is not an automake run (the Windows job runs the scripts
 # directly), so there is no unwrapped binary to copy.

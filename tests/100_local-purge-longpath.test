@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # python3 is required; mirror check-network.sh's skip-with-77 convention.
 python=$(find_python) || skip "python3 not found"
@@ -48,7 +48,7 @@ test "$pathmax" -ge $((need + ${#work} + 128)) || skip "PATH_MAX $pathmax too sm
 
 # Same on Win32, where MAX_PATH clamps the save path; getconf answers for the
 # MSYS emulation, not the Win32 API httrack calls, so it cannot see this.
-case "$(uname -s)" in
+case "$HTS_OS" in
 MINGW* | MSYS* | CYGWIN*)
     echo "Win32 MAX_PATH cannot hold a $need-byte save path; skipping" >&2
     exit 77

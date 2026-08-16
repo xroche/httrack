@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
 command -v httrack >/dev/null || {
@@ -98,7 +98,7 @@ ok "a 20s timeout waits ${long}s: the wait tracks the value, not a constant"
 start=$SECONDS
 crawl stall 5 60 "ftp://127.0.0.1:${liveport}/stall.bin"
 stalled=$((SECONDS - start))
-sent=$(cat "$cmds")
+sent=$(<"$cmds")
 grep -q '^RETR ' <<<"$sent" || fail "the body transfer never started: ${sent}"
 logged stall 'Time out (5)'
 test "$stalled" -lt 40 ||

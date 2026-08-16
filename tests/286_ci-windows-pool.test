@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Before the driver is sourced: with these set, anything it starts posts a commit
 # status on whatever the surrounding shell was last looking at.
@@ -78,7 +78,7 @@ run_suite() { # run_suite <dir> <jobs>
     ) >"$tmp/out" 2>&1 || rc=$?
     spent=$((SECONDS - began))
     test "$rc" -eq 1 ||
-        fail "the stub suite exited $rc, want 1 from the pass floor: $(cat "$tmp/out")"
+        fail "the stub suite exited $rc, want 1 from the pass floor: $(<"$tmp/out")"
 }
 
 assert_tally() {

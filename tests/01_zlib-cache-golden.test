@@ -14,7 +14,7 @@
 
 set -eu
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 : "${top_srcdir:=..}"
 fixture="$top_srcdir/tests/fixtures/cache-golden"

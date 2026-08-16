@@ -14,7 +14,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 if [ -z "${abs_top_builddir:-}" ]; then
     echo "abs_top_builddir unset, no automake environment, skipping" >&2

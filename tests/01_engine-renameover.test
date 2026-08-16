@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Drives -#test=renameover: hts_rename_over() must replace an existing dst, and
 # must leave dst alone when the rename failed for a reason moving dst aside
@@ -12,7 +12,7 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-case "$(uname -s)" in
+case "$HTS_OS" in
 MINGW* | MSYS_NT*) want=fallback ;; # native rename() refuses an existing target
 *) want=clobber ;;
 esac
@@ -22,7 +22,7 @@ assert_match "renameover: OK" "$out"
 assert_match "renameover: regime $want" "$out"
 assert_match "renameover: restore back" "$out"
 
-if [ "$(uname -s)" != "Linux" ]; then
+if [ "$HTS_OS" != "Linux" ]; then
     echo "renameover: LD_PRELOAD interposition is Linux-only here, skipping"
     exit 0
 fi

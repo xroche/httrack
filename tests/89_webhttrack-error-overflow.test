@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/webhttracklib.sh
-. "$(dirname "$0")/webhttracklib.sh"
+. "${0%"${0##*/}"}./webhttracklib.sh"
 
 htsserver_require
 
@@ -64,7 +64,7 @@ save() {
 path=$(padpath "${base}/nodir" 1098)
 save "${path}" x p >/dev/null
 htsserver_alive ||
-    fail "an over-long project path crashed the server: $(cat "${HTS_LOG}")"
+    fail "an over-long project path crashed the server: $(<"${HTS_LOG}")"
 check_clipped "Unable to create the directory structure in " "${path}/p"
 
 # A creatable project path whose hts-cache is not a directory, so the init file
@@ -73,7 +73,7 @@ path=$(padpath "${base}/isdir" 993)
 mkdir -p "${path}/p"
 ln -s /dev/null "${path}/p/hts-cache"
 save "${path}" x p >/dev/null
-htsserver_alive || fail "an unwritable init file crashed the server: $(cat "${HTS_LOG}")"
+htsserver_alive || fail "an unwritable init file crashed the server: $(<"${HTS_LOG}")"
 check_clipped "Unable to create the init file " "${path}/p"
 
 # The init file opens, then the write fails: the profile is past both stdio's
@@ -85,7 +85,7 @@ profile=${profile}${profile}${profile}${profile}
 profile=${profile}${profile}${profile}${profile}
 test "${#profile}" -eq 16384 || fail "built a ${#profile}-byte profile, want 16384"
 save "${path}" "${profile}" p >/dev/null
-htsserver_alive || fail "a short init file write crashed the server: $(cat "${HTS_LOG}")"
+htsserver_alive || fail "a short init file write crashed the server: $(<"${HTS_LOG}")"
 written=$(wc -c <"${path}/p/hts-cache/winprofile.ini" | tr -d ' ')
 test "${written}" -lt "${#profile}" ||
     fail "the file-size limit did not stop the write (${written} bytes landed)"

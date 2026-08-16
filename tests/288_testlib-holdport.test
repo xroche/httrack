@@ -9,9 +9,9 @@ set -euo pipefail
 
 # crawllib, for the listening server the dial probe is controlled against.
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 # shellcheck source=tests/webhttracklib.sh
-. "$(dirname "$0")/webhttracklib.sh"
+. "${0%"${0##*/}"}./webhttracklib.sh"
 
 real_python=$(find_python) || skip "python3 missing"
 python=$real_python # hold_port reads it from here
@@ -100,6 +100,6 @@ cleanup_push cat "$tmpdir/retry.err"
 htsserver_start --log "$tmpdir/hts.log" 2>"$tmpdir/retry.err"
 test ! -f "$tmpdir/steal" || fail "htsserver_start never drew the stolen port"
 test "$HTS_PORT" != "$taken" || fail "htsserver_start served the taken port"
-assert_match "did not get port $taken, retrying" "$(cat "$tmpdir/retry.err")" "the retry notice"
+assert_match "did not get port $taken, retrying" "$(<"$tmpdir/retry.err")" "the retry notice"
 htsserver_cleanup
 ok "a stolen draw is redrawn, loudly, and the server comes up on port $HTS_PORT"

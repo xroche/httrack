@@ -7,9 +7,9 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 # shellcheck source=tests/proclib.sh
-. "$(dirname "$0")/proclib.sh"
+. "${0%"${0##*/}"}./proclib.sh"
 
 sh=${BASH_SHELL:-}
 test -n "$sh" || {
@@ -118,7 +118,7 @@ run() { # run <label> <env argument>...
         fi
     done
     wait "$pid" || status=$?
-    log=$(cat "$rundir/log")
+    log=$(<"$rundir/log")
     took=$((SECONDS - began))
     echo "run $n ($label): exit $status"
 }
@@ -192,7 +192,7 @@ probe() { # probe <run number> <seconds of budget left> <command>...
 # A wedge must fail even with the budget gone, or #922 comes back as a skip.
 rc=$(probe 90 6 sleep 999)
 test "$rc" -eq 1 || fail "a silent configure with 6s of budget reported $rc, want 1"
-grep -q 'wrote nothing' "$tmp/probe.log" || fail "the hang was not named: $(cat "$tmp/probe.log")"
+grep -q 'wrote nothing' "$tmp/probe.log" || fail "the hang was not named: $(<"$tmp/probe.log")"
 # Slow but talking is the emulated buildd, and a skip there beats the harness kill.
 rc=$(probe 91 6 bash -c 'while :; do echo tick; sleep 1; done')
 test "$rc" -eq 77 || fail "a slow but writing configure with 6s of budget reported $rc, want 77"

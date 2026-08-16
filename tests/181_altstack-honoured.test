@@ -7,11 +7,11 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 ulimit -c 0 # a deliberate crash must not litter the box with cores
 
-if [ "$(uname -s)" != "Linux" ]; then
+if [ "$HTS_OS" != "Linux" ]; then
     echo "LD_PRELOAD interposition is Linux-only here, skipping" >&2
     exit 77
 fi

@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 missing"
 command -v curl >/dev/null 2>&1 || skip "curl missing"

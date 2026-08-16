@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # #1264/#1266: the pattern is cut from the link the question is about, so a long
 # enough one used to outgrow the filter slot. It must neither abort the run nor

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/webhttracklib.sh
-. "$(dirname "$0")/webhttracklib.sh"
+. "${0%"${0##*/}"}./webhttracklib.sh"
 
 htsserver_require
 
@@ -60,7 +60,7 @@ body="sid=${sid}&command=httrack&command_do=save&winprofile=x"
 body="${body}&path=${base}&projname=proj&projpath=${base}/proj/"
 htsserver_post "${body}" >/dev/null
 test -f "${base}/proj/hts-cache/winprofile.ini" ||
-    fail "the project was not registered: $(cat "${HTS_LOG}")"
+    fail "the project was not registered: $(<"${HTS_LOG}")"
 fetch /website/hts-log.txt 200
 grep -q LOGMARKER <<<"${reply}" ||
     fail "the registered project's mirror is not served"
@@ -99,9 +99,9 @@ test "$((${#fspath} + 1 + ${#longurl}))" -gt 1024 ||
     fail "the composed path (${#fspath} + ${#longurl}) would not overflow"
 htsserver_post "sid=${sid}&command=httrack&command_do=save&winprofile=x&path=${longpath}&projname=proj" >/dev/null
 test -f "${fspath}/hts-cache/winprofile.ini" ||
-    fail "the long-path project was not registered: $(cat "${HTS_LOG}")"
+    fail "the long-path project was not registered: $(<"${HTS_LOG}")"
 htsserver_get "/website/${longurl}" >/dev/null 2>&1 || true
-htsserver_alive || fail "an over-long project path crashed the server: $(cat "${HTS_LOG}")"
+htsserver_alive || fail "an over-long project path crashed the server: $(<"${HTS_LOG}")"
 # Not just alive: still answering.
 fetch /server/index.html 200
 

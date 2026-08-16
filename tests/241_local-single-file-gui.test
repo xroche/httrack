@@ -4,7 +4,7 @@
 set -e
 
 # shellcheck source=tests/webhttracklib.sh
-. "$(dirname "$0")/webhttracklib.sh"
+. "${0%"${0##*/}"}./webhttracklib.sh"
 
 # The Windows job builds httrack.exe only and reaches this file through its
 # *_local-*.test glob, so report a skip there rather than a pass.

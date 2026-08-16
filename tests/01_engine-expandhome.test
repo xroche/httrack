@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # ~ expansion for the -O base path (expand_home). $HOME is pinned so the cases
 # cannot depend on the caller's, but MSYS rewrites it into a Windows path

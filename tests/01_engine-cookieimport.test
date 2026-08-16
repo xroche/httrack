@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Drives -#test=cookieimport: load a cookie jar (and, on Windows, copied IE
 # cookies *@*.txt) from a long, non-ASCII folder through the UTF-8/long-path

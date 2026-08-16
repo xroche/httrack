@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Unset means no automake run (the Windows job runs the scripts directly), so
 # there is no install rule to drive.

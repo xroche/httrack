@@ -10,7 +10,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 
 find_python >/dev/null || skip "python3 not found"
 
@@ -168,7 +168,7 @@ has '--max-time=120' "local_crawl dropped its default --max-time"
 assert_eq "--max-time=120
 -O
 /dev/null
-$url" "$(cat "$argv")" "the caller's arguments reach httrack, in order, after the cap"
+$url" "$(<"$argv")" "the caller's arguments reach httrack, in order, after the cap"
 ok "local_crawl adds a --max-time backstop ahead of the caller's arguments"
 
 # A caller's own cap wins: with two of them the engine takes one of the pair,
@@ -200,10 +200,10 @@ echo "crawl-said-this"
 SH
 chmod +x "${shim}/httrack"
 local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "$url"
-assert_eq "crawl-said-this" "$(cat "${tmpdir}/crawl.log")" "--log took stdout"
+assert_eq "crawl-said-this" "$(<"${tmpdir}/crawl.log")" "--log took stdout"
 # Truncated, not appended: every call site it replaced used a plain > redirect.
 local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "$url"
-assert_eq "crawl-said-this" "$(cat "${tmpdir}/crawl.log")" "--log truncates per crawl"
+assert_eq "crawl-said-this" "$(<"${tmpdir}/crawl.log")" "--log truncates per crawl"
 ok "--log takes the crawl output, one crawl at a time"
 
 ## --stdin feeds the engine, which a redirect on the call cannot be trusted to do
@@ -225,14 +225,14 @@ printf answer >"${tmpdir}/answers"
 # Against a call redirected elsewhere: --stdin is on the engine, so it wins.
 local_crawl --stdin "${tmpdir}/answers" --log "${tmpdir}/crawl.log" \
     -O /dev/null "$url" </dev/null
-assert_eq "stdin=[answer]" "$(cat "${tmpdir}/crawl.log")" "--stdin FILE"
+assert_eq "stdin=[answer]" "$(<"${tmpdir}/crawl.log")" "--stdin FILE"
 local_crawl --stdin closed --log "${tmpdir}/crawl.log" \
     -O /dev/null "$url" <"${tmpdir}/answers"
-assert_eq "stdin=[closed]" "$(cat "${tmpdir}/crawl.log")" "--stdin closed"
+assert_eq "stdin=[closed]" "$(<"${tmpdir}/crawl.log")" "--stdin closed"
 # Without the option the engine still has a descriptor, whatever the platform
 # gives a background job.
 local_crawl --log "${tmpdir}/crawl.log" -O /dev/null "$url" </dev/null
-assert_eq "stdin=[]" "$(cat "${tmpdir}/crawl.log")" "the default stdin"
+assert_eq "stdin=[]" "$(<"${tmpdir}/crawl.log")" "the default stdin"
 ok "--stdin hands the engine a file, or no descriptor at all"
 
 ## The watchdog reds a crawl that never ends, from a subject: it ends the test
