@@ -170,10 +170,16 @@ german greek hebrew hindi hungarian icelandic indonesian irish italian japanese 
 korean latvian lithuanian macedonian malay norwegian persian polish portuguese
 romanian russian serbian simplified slovak slovene slovenian spanish swedish thai
 traditional turkish ukrainian urdu uzbek vietnamese welsh"
+# BSD awk rejects a newline inside a -v value, so the list travels on one line.
+exonyms=$(printf '%s' "$exonyms" | tr '\n' ' ')
 
 name_is_endonym() {
     f=$1
-    LC_ALL=C iconv -f "$(field "$f" LANGUAGE_CHARSET)" -t UTF-8 "$f" >"$tmp/u8" || return 1
+    cs=$(field "$f" LANGUAGE_CHARSET)
+    if ! LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/u8"; then
+        echo "${f##*/}: iconv cannot read $cs"
+        return 1
+    fi
     LC_ALL=C awk -v name="$(field "$tmp/u8" LANGUAGE_NAME)" -v iso="$(field "$f" LANGUAGE_ISO)" \
         -v wid="$(field "$tmp/u8" LANGUAGE_WINDOWSID)" -v exonyms="$exonyms" -v n="${f##*/}" \
         -v exempt="$own_name_is_english" '
