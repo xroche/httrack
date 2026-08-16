@@ -6,6 +6,11 @@ on:
   push:
     tags: ["[0-9]*"]
   workflow_dispatch:
+    inputs:
+      label:
+        description: "Name the DMG for a product channel (e.g. 3.50-beta-5) instead of the engine version"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -100,15 +105,19 @@ jobs:
           NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
           NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+          # Through the environment, never interpolated into this script.
+          DMG_LABEL: ${{ inputs.label }}
         run: |
           set -euo pipefail
           key="$RUNNER_TEMP/notary.p8"
           trap 'rm -f "$key"' EXIT HUP INT TERM
           printf '%s' "$NOTARY_KEY" | openssl base64 -d -A -out "$key"
+          set --
+          [ -z "${DMG_LABEL:-}" ] || set -- --label "$DMG_LABEL"
           bash tools/macos-release.sh --app "$RUNNER_TEMP/HTTrack.app" \
             --identity "$SIGN_IDENTITY" --out "$RUNNER_TEMP" \
             --notary-key "$key" --notary-key-id "$NOTARY_KEY_ID" \
-            --notary-issuer "$NOTARY_ISSUER_ID"
+            --notary-issuer "$NOTARY_ISSUER_ID" "$@"
 
       # The DMG round-trip is the one thing that can strip the stapled ticket, so assess
       # the copy that came out of it rather than the app the signing step still holds.

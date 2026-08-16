@@ -7,7 +7,7 @@ set -eu
 . "$(dirname "$0")/macos-bundle.sh"
 
 usage() {
-    echo "usage: $0 --app DIR --identity ID [--out DIR]" >&2
+    echo "usage: $0 --app DIR --identity ID [--out DIR] [--label NAME]" >&2
     echo "       [--notary-key FILE --notary-key-id ID --notary-issuer ID | --skip-notarize]" >&2
     exit 2
 }
@@ -20,6 +20,7 @@ fail() {
 app=""
 identity=""
 out=""
+label=""
 notary_key=""
 notary_key_id=""
 notary_issuer=""
@@ -36,6 +37,10 @@ while [ $# -gt 0 ]; do
         ;;
     --out)
         out="${2:?}"
+        shift 2
+        ;;
+    --label)
+        label="${2:?}"
         shift 2
         ;;
     --notary-key)
@@ -139,6 +144,14 @@ fi
 version=$(plist_value "$app/Contents/Info.plist" CFBundleShortVersionString)
 test -n "$version" || fail "no CFBundleShortVersionString in $app/Contents/Info.plist"
 
+# --label names the download for a product channel (a 3.50 beta) whose number is not the
+# engine's. It renames the DMG only: the bundle keeps the version its payload reports, so
+# macos-app.sh's plist-vs-binary guard still holds.
+case "$label" in
+*[!A-Za-z0-9._-]*) fail "--label $label is not usable in a filename" ;;
+esac
+name=${label:-$version}
+
 # The filename is what a user reads before downloading, so name the arch (#1083).
 # An arch counts only if every Mach-O carries it: one thin dylib and the app is not universal.
 arch=$(while IFS= read -r _bin; do lipo -archs "$_bin" | tr ' ' '\n'; done <"$mach" |
@@ -149,14 +162,14 @@ case "$arch" in
 *-*) arch=universal ;;
 esac
 
-dmg="$out/HTTrack-$version-macos-$arch.dmg"
+dmg="$out/HTTrack-$name-macos-$arch.dmg"
 stage=$(mktemp -d)
 trap 'rm -f "$mach" "$nlog"; rm -rf "$stage"' EXIT
 # ditto, not cp: it carries a bundle's metadata across intact.
 ditto "$app" "$stage/$(basename "$app")"
 ln -s /Applications "$stage/Applications"
 rm -f "$dmg"
-hdiutil create -volname "HTTrack $version" -srcfolder "$stage" -fs HFS+ -format UDZO "$dmg"
+hdiutil create -volname "HTTrack $name" -srcfolder "$stage" -fs HFS+ -format UDZO "$dmg"
 sign "$dmg"
 
 if [ "$skip_notarize" -eq 0 ]; then
