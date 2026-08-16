@@ -27,8 +27,8 @@ if [ -z "$version" ] || [ -z "$versionid" ]; then
 fi
 
 # The same version, as version.rc states it.
-fileversion=$(sed -n 's/^[[:space:]]*FILEVERSION[[:space:]][[:space:]]*\(.*\)$/\1/p' "$rc" | tr -d ' \r')
-productversion=$(sed -n 's/^[[:space:]]*PRODUCTVERSION[[:space:]][[:space:]]*\(.*\)$/\1/p' "$rc" | tr -d ' \r')
+fileversion=$(sed -n 's/^[[:space:]]*FILEVERSION[[:space:]][[:space:]]*\(.*\)$/\1/p' "$rc" | tr -d ' ')
+productversion=$(sed -n 's/^[[:space:]]*PRODUCTVERSION[[:space:]][[:space:]]*\(.*\)$/\1/p' "$rc" | tr -d ' ')
 rc_fileversion=$(sed -n 's/.*VALUE "FileVersion",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
 rc_productversion=$(sed -n 's/.*VALUE "ProductVersion",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
 rc_productname=$(sed -n 's/.*VALUE "ProductName",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
@@ -65,6 +65,34 @@ check "version.rc ProductVersion" "$version" "$rc_productversion"
 
 # Signing pins the product name too.
 check "version.rc ProductName" "HTTrack Website Copier" "$rc_productname"
+
+# ls-files both drives the loop and guards the pin: distcheck unpacks the tarball
+# inside the checkout, where git answers for untracked paths and every pin reads
+# unspecified.
+if command -v git >/dev/null 2>&1 &&
+    git -C "$top" ls-files --error-unmatch src/version.rc >/dev/null 2>&1; then
+    tracked=yes
+    rc_files=$(git -C "$top" ls-files '*.rc')
+else
+    tracked=no
+    rc_files=$(cd "$top" && printf '%s\n' src/*.rc)
+    echo "note: the .rc files are not tracked here, so their eol pin cannot be read"
+fi
+while read -r f; do
+    crs=$(awk '{ n += gsub(/\r/, "") } END { print n + 0 }' "$top/$f")
+    [ "$crs" = 0 ] || {
+        echo "$f carries $crs CR byte(s)"
+        fail=1
+    }
+    [ "$tracked" = yes ] || continue
+    # text too: -text eol=lf still reads back lf, and stores whatever it is given.
+    attrs=$(git -C "$top" check-attr text eol -- "$f")
+    pin="$(sed -n 's/.*: text: //p' <<<"$attrs")/$(sed -n 's/.*: eol: //p' <<<"$attrs")"
+    [ "$pin" = set/lf ] || {
+        echo "$f is pinned text/eol=$pin, not set/lf"
+        fail=1
+    }
+done <<<"$rc_files"
 
 check "the configure.ac AC_INIT version" "$versionid" "$ac_version"
 check "the newest metainfo release" "$versionid" "$(echo "$releases" | head -n 1)"
