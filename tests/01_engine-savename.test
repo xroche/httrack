@@ -144,8 +144,12 @@ full '/../../etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.htm
 full '/%2e%2e/%2e%2e/etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.html'
 full '/x.php' 'application/pdf' '/dev/null/www.example.com///evil.exe' 'cdispo=../../evil.exe'
 # Not queued: those spaces are htsmain()'s rewrite of the CR and TAB, which only
-# an argv goes through.
-out=$("$HTTRACK_PATH" -O /dev/null -#test=savename $'/evil\rname\t.php' 'text/html')
+# an argv goes through. Assigned first, since MSYS drops the CR from a $'..' that
+# sits inside the command substitution; asserted, so a shell that drops it here
+# too says so rather than leaving the TAB to carry the case alone.
+fil=$'/evil\rname\t.php'
+assert_eq 15 "${#fil}" 'the shell kept both control bytes'
+out=$("$HTTRACK_PATH" -O /dev/null -#test=savename "$fil" 'text/html')
 assert_eq 'evil name .html' "${out##*/}" 'control bytes in a fil'
 
 # #133: oversized names are capped only on Windows, where the name takes the
