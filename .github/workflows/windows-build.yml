@@ -31,11 +31,9 @@ jobs:
       matrix:
         platform: [x64, Win32]
         configuration: [Release]
-    # Windows runs from other branches starve this one's runner (#1213), so cap
-    # them repo-wide at one per platform. queue: max: the default cancels a waiter.
-    concurrency:
-      group: windows-build-${{ matrix.platform }}
-      queue: max
+    # No repo-wide cap: #1213 added one against runner starvation, which #1228
+    # later measured out. The step timeouts stay as they are, sized by 226
+    # against the suite watchdog, not against how long a job takes.
     # Redirect vcpkg's default `files` binary cache into the workspace so
     # actions/cache can persist it. vcpkg builds openssl/brotli/zlib/zstd from
     # source otherwise, several minutes every run.
