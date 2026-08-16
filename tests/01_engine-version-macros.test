@@ -82,6 +82,12 @@ while read -r f; do
     crs=$(awk '{ n += gsub(/\r/, "") } END { print n + 0 }' "$top/$f")
     [ "$crs" = 0 ] || {
         echo "$f carries $crs CR byte(s)"
+        # An LF blob under a CRLF file means the checkout predates the eol=lf
+        # pin, which git does not apply to files it already wrote.
+        if [ "$tracked" = yes ] && [ "$(git -C "$top" cat-file blob "HEAD:$f" |
+            awk '{ n += gsub(/\r/, "") } END { print n + 0 }')" = 0 ]; then
+            echo "  its blob is LF: run 'git add --renormalize .' in $top"
+        fi
         fail=1
     }
     [ "$tracked" = yes ] || continue
