@@ -1,0 +1,164 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# -#test=batch must be indistinguishable from one process per case: same bytes,
+# same exit code, and nothing carried from one case to the next. Each case below
+# is run on its own first, and that output is what the batch is asserted against.
+
+# <argc> <name> <args...>, the engine's own script format.
+# Every option-writing case is followed by one that omits the option and would
+# answer differently if the write had survived into it.
+cases=(
+    3 savename '/verylongfilename.php' 'text/html' n83=1
+    2 savename '/verylongfilename.php' 'text/html'
+    3 savename '/dir/page.php' 'text/html' 'userdef=%h/%n.%t'
+    2 savename '/dir/page.php' 'text/html'
+    1 mime 'a.gif'
+    1 mime 'a.html'
+    0 urlhack
+    0 stripquery
+)
+
+i=0
+queued=0
+while test "$i" -lt "${#cases[@]}"; do
+    argc=${cases[i]}
+    name=${cases[i + 1]}
+    args=(${cases[@]+"${cases[@]:i+2:argc}"})
+    i=$((i + 2 + argc))
+    rc=0
+    want=$(httrack -O /dev/null "-#test=$name" ${args[@]+"${args[@]}"}) || rc=$?
+    test "$rc" -eq 0 || fail "-#test=$name: exited $rc on its own, output: $want"
+    selftest_queue "$want" "$name" ${args[@]+"${args[@]}"}
+    queued=$((queued + 1))
+done
+# A mis-parsed list would queue nothing and leave every compare below vacuous.
+assert_eq 8 "$queued" "cases read out of the list"
+selftest_run_queued
+
+# Where the two routes part: a queued arg reaches the handler as written, an
+# argv has had its CR, LF and TAB squashed to a space by htsmain() first.
+assert_selftest 'a b does match a b' filter 'a b' 'a	b'
+selftest_queue 'a	b does NOT match a b' filter 'a b' 'a	b'
+selftest_run_queued
+
+# Each mode needs a want it REJECTS, or a compare that degenerated into "always
+# true" would pass this file having proved nothing. Runs in a subshell, whose
+# queue and failure do not escape.
+rejects() { # rejects LABEL QUEUE-CALL...
+    local label=$1
+    shift
+    ("$@" && selftest_run_queued) >/dev/null 2>&1 &&
+        fail "$label: a wrong want was accepted"
+    return 0
+}
+
+# tail and head: one end of a save name, where the other end is a path the
+# caller has no reason to spell out.
+selftest_queue_tail '/x.html' savename '/x.php' 'text/html'
+selftest_queue_head 'savename: /dev/null/' savename '/x.php' 'text/html'
+selftest_run_queued
+rejects 'tail' selftest_queue_tail '/no-such-name' savename '/x.php' 'text/html'
+rejects 'head' selftest_queue_head 'savename: /nowhere/' savename '/x.php' 'text/html'
+# One end, never a substring: each want below sits inside the output it must not
+# match, one short of the end it anchors to.
+rejects 'tail matching mid-name' selftest_queue_tail '/x.ht' savename '/x.php' 'text/html'
+rejects 'head matching mid-output' selftest_queue_head 'avename: /dev/null/' \
+    savename '/x.php' 'text/html'
+# An empty want anchors to nothing and would match whatever the engine printed.
+rejects 'an empty tail want' selftest_queue_tail '' savename '/x.php' 'text/html'
+rejects 'an empty head want' selftest_queue_head '' savename '/x.php' 'text/html'
+
+# lines mode: only 311_engine-location-gate.test uses it, and there only for
+# multi-line output.
+selftest_queue_lines "a.gif is 'image/gif'
+and its local type is '.gif'" mime a.gif
+selftest_run_queued
+rejects 'lines' selftest_queue_lines 'a.gif is only one line' mime a.gif
+
+# The CR half of lines mode needs an interior CRLF, which off Windows only a
+# case that emits one can give. On Windows text mode doubles that injected CR,
+# so there the coverage comes from 311 and mime, whose CRLFs are text mode's own.
+if ! is_windows; then
+    selftest_queue_lines 'A
+B' charset iso-8859-1 hex:410d0a42
+    # A CR on the last line takes the trailing-strip branch, not that one.
+    selftest_queue_lines 'A' charset iso-8859-1 hex:410d
+    selftest_run_queued
+    rejects 'lines keeping a CR' selftest_queue_lines "A${SELFTEST_CR}
+B" charset iso-8859-1 hex:410d0a42
+fi
+
+# A self-test that printed the framing byte itself would pair every later case
+# with the wrong want; the records left over are what give it away.
+rejects 'a case that emits the record separator' \
+    selftest_queue 'A' charset iso-8859-1 hex:411e301e43
+
+# A case that exits non-zero fails even when its output is what was wanted.
+rejects 'a case that exits non-zero' selftest_queue '' filter
+
+# An unknown mode must not fall through to the exact compare, which would accept
+# every case a typo'd selftest_queue_lines was meant to compare leniently.
+rejects 'an unknown compare mode' \
+    selftest_queue_mode bogus 'z does NOT match y' filter y z
+
+# A case's exit code rides the framing, not the process status, and does so
+# wherever the case sits: a failing one (filter with no pattern) must neither
+# hide the case after it nor be the only position that reports honestly.
+script=$(mktemp)
+cleanup_push rm -f "$script"
+printf '%s\0' 1 mime 'a.gif' 0 filter 1 mime 'a.html' >"$script"
+rc=0
+out=$(httrack -O /dev/null -#test=batch <"$script" 2>/dev/null) || rc=$?
+assert_eq 0 "$rc" "batch status over a failing case"
+assert_match "${SELFTEST_RS}1${SELFTEST_RS}" "$out" "the failing case's exit code"
+assert_match "a.html is 'text/html'" "$out" "the case after the failing one"
+
+# Malformed scripts are refused rather than half-run. A header that is not a
+# number would otherwise read as zero args and swallow the next case's fields.
+refuses() { # refuses LABEL FIELD...
+    local label=$1
+    shift
+    printf '%s\0' "$@" >"$script"
+    rc=0
+    httrack -O /dev/null -#test=batch <"$script" >/dev/null 2>&1 || rc=$?
+    assert_eq 1 "$rc" "status on $label"
+}
+refuses 'a script missing an argument' 2 filter '*'
+refuses 'a non-numeric argument count' x filter '*' y
+refuses 'an argument count past the cap' 4096 filter '*'
+refuses 'a negative argument count' -1 filter
+
+# Queued cases assert nothing until the flush, so a file that forgets it passes
+# on any engine output. The EXIT trap cannot say so (#773 keeps teardown out of
+# the verdict), hence a static check.
+# Sets SCANNED and UNDRAINED rather than printing them: a command substitution
+# would run the whole scan in a subshell and lose both counts.
+undrained_in() { # undrained_in DIR
+    local f
+    SCANNED=0
+    UNDRAINED=
+    for f in "$1"/*.test; do
+        test -r "$f" || continue
+        SCANNED=$((SCANNED + 1))
+        grep -q 'selftest_queue' "$f" || continue
+        grep -q 'selftest_run_queued' "$f" || UNDRAINED="$UNDRAINED $f"
+    done
+}
+
+# Teeth first: a check that scans nothing reports every tree clean.
+fixture=$(mktemp -d)
+cleanup_push rm -rf "$fixture"
+printf 'selftest_queue x filter y z\n' >"$fixture/900_forgot.test"
+undrained_in "$fixture"
+test -n "$UNDRAINED" || fail "the drain check passed a file that never flushes"
+
+undrained_in "$top_srcdir/tests"
+# An unexpanded glob would report no offender having read nothing.
+test "$SCANNED" -ge 50 || fail "scanned $SCANNED tests in $top_srcdir/tests, want the whole suite"
+test -z "$UNDRAINED" || fail "queued self-tests that never run:$UNDRAINED"

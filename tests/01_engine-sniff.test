@@ -3,17 +3,13 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
 # MIME magic consistency (-#test=sniff <content-type> <hex:..|text>), the
 # tie-break behind htsname's wire-vs-extension naming.
 
-chk() {
-    local mime="$1" body="$2" want="$3"
-    out="$(httrack -#test=sniff "$mime" "$body" | sed -n 's/^sniff: //p')"
-    test "$out" == "$want" || {
-        echo "FAIL: '$mime' '$body' -> '$out' (want '$want')"
-        exit 1
-    }
-}
+chk() { selftest_queue "sniff: $3" sniff "$1" "$2"; }
 
 yes='known=1 consistent=1'
 no='known=1 consistent=0'
@@ -86,3 +82,5 @@ chk text/xml '<?xml version="1.0"?>' "$yes"
 chk text/css 'body { }' "$unk"
 chk text/plain 'hello' "$unk"
 chk application/x-javascript 'var x;' "$unk"
+
+selftest_run_queued

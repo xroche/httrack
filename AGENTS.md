@@ -112,6 +112,12 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 - Behavior change → add a test. Fast path: a hidden `httrack -#test=NAME` engine
   self-test (registry in `htsselftest.c`; `-#test` lists them) driven by a
   `tests/NN_*.test`, over a slow crawl.
+- A list of self-test assertions goes through `selftest_queue` +
+  `selftest_run_queued`, which run the file's cases in one engine instead of one
+  per assertion. Queued args reach the handler verbatim, so a case exercising an
+  argv rewrite (CR/LF/TAB to a space, `(none)`, quote stripping, alias
+  expansion), or one whose output later shell logic reads, keeps
+  `assert_selftest`.
 
 ## Review your change adversarially (strongly suggested)
 Before pushing, and when reviewing others, don't skim for bugs:

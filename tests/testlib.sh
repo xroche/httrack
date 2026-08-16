@@ -61,27 +61,152 @@ assert_selftest() { # assert_selftest WANT NAME [ARGS...]
     test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
 }
 
-# assert_selftest for output spanning several lines: Windows stdout is text
-# mode, so every interior newline arrives as CRLF and a byte-exact compare
-# rejects it. Only the CR before a newline goes, or a test asserting the engine
-# drops an interior CR would pass whatever the engine did.
-assert_selftest_lines() { # assert_selftest_lines WANT NAME [ARGS...]
-    local want=$1 name=$2 got rc=0
-    shift 2
-    got=$(httrack -O /dev/null "-#test=$name" "$@") || rc=$?
-    test "$rc" -eq 0 || fail "-#test=$name $*: exited $rc, output: $got"
-    got=$(printf '%s\n' "$got" | sed $'s/\r$//')
-    test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
+# Batched form of the assert above: selftest_queue records a case, and
+# selftest_run_queued runs a whole file's cases in ONE httrack (-#test=batch in
+# htsselftest.c), which the Windows legs pay dearly for otherwise (#795).
+# Same contract, except a mismatch surfaces at the flush, named. A case whose
+# output later shell logic reads, or that exercises one of htsmain()'s argv
+# rewrites, stays on assert_selftest.
+SELFTEST_RS=$(printf '\036')
+SELFTEST_CR=$(printf '\r')
+SELFTEST_SCRIPT=${SELFTEST_SCRIPT:-}
+# Where the file started, to catch a cd that leaves HTTRACK_PATH unresolvable.
+TESTLIB_PWD=${TESTLIB_PWD:-$PWD}
+# Self-preserving, as CLEANUP_ARGV below and for the same reason. ARGV holds
+# <argc> <name> <args...> per case, which is the engine's own script format.
+SELFTEST_ARGV=(${SELFTEST_ARGV[@]+"${SELFTEST_ARGV[@]}"})
+SELFTEST_WANT=(${SELFTEST_WANT[@]+"${SELFTEST_WANT[@]}"})
+SELFTEST_MODE=(${SELFTEST_MODE[@]+"${SELFTEST_MODE[@]}"})
+SELFTEST_LABEL=(${SELFTEST_LABEL[@]+"${SELFTEST_LABEL[@]}"})
+
+selftest_queue() { # selftest_queue WANT NAME [ARGS...]
+    selftest_queue_mode exact "$@"
+}
+
+# selftest_queue for output spanning several lines: Windows stdout is text mode,
+# so every interior newline arrives as CRLF and a byte-exact compare rejects it.
+# Only the CR before a newline goes, or a test asserting the engine drops an
+# interior CR would pass whatever the engine did.
+selftest_queue_lines() { # selftest_queue_lines WANT NAME [ARGS...]
+    selftest_queue_mode lines "$@"
+}
+
+# selftest_queue asserting one end of the output rather than all of it, for a
+# name whose other end the caller has no reason to spell out. Both WANTs are
+# literal and carry their own boundary ("/name", not "name").
+selftest_queue_tail() { # selftest_queue_tail WANT NAME [ARGS...]
+    selftest_queue_mode tail "$@"
+}
+
+selftest_queue_head() { # selftest_queue_head WANT NAME [ARGS...]
+    selftest_queue_mode head "$@"
+}
+
+selftest_queue_mode() { # selftest_queue_mode exact|lines|tail|head WANT NAME [ARGS...]
+    local mode=$1 want=$2 name=$3
+    shift 3
+    case $mode in
+    exact | lines) ;;
+    # An empty want is a prefix and a suffix of everything, so it would assert
+    # nothing at all.
+    head | tail) test -n "$want" || fail "a $mode want must not be empty" ;;
+    *) fail "unknown selftest mode $mode" ;;
+    esac
+    SELFTEST_WANT+=("$want")
+    SELFTEST_MODE+=("$mode")
+    SELFTEST_LABEL+=("-#test=$name $*")
+    SELFTEST_ARGV+=("$#" "$name" ${1+"$@"})
+    test "${#SELFTEST_WANT[@]}" -ne 1 || {
+        SELFTEST_SCRIPT=${TMPDIR:-/tmp}/httrack-selftest-batch.$$
+        cleanup_push rm -f "$SELFTEST_SCRIPT"
+    }
+}
+
+# Run every queued case and assert each. The script goes through a file, not a
+# pipe: printf is a builtin, so this costs no fork of its own. Args travel on
+# stdin because the engine parses argv before it reaches the self-test dispatch,
+# and would take a case's '-*' for one of its own filters.
+selftest_run_queued() {
+    local n=${#SELFTEST_WANT[@]} out rest got want rc=0 i
+    test "$n" -gt 0 || return 0
+    printf '%s\0' "${SELFTEST_ARGV[@]}" >"$SELFTEST_SCRIPT" ||
+        fail "cannot write $SELFTEST_SCRIPT"
+    # By path, not by name: make check's ../src is relative, so resolving it from
+    # anywhere else finds an installed httrack and grades the wrong binary.
+    test -n "$HTTRACK_PATH" || test "$PWD" = "$TESTLIB_PWD" ||
+        fail "this test cd'd out of $TESTLIB_PWD: assign HTTRACK_PATH=\$(httrack_path) before it moves"
+    test -n "$HTTRACK_PATH" || httrack_path >/dev/null
+    out=$("$HTTRACK_PATH" -O /dev/null -#test=batch <"$SELFTEST_SCRIPT") || rc=$?
+    rm -f "$SELFTEST_SCRIPT"
+    test "$rc" -eq 0 || fail "-#test=batch: exited $rc over $n cases, output: $out"
+    rest=$out
+    for ((i = 0; i < n; i++)); do
+        got=${rest%%"$SELFTEST_RS"*}
+        rest=${rest#*"$SELFTEST_RS"}
+        rc=${rest%%"$SELFTEST_RS"*}
+        rest=${rest#*"$SELFTEST_RS"}
+        case $rc in '' | *[!0-9]*)
+            fail "-#test=batch: framing lost at case $((i + 1)) of $n, output: $out"
+            ;;
+        esac
+        # The whole trailing run, which is what a command substitution drops
+        # around a lone case. The CR goes with it: Windows stdout is text mode,
+        # so every case ends CRLF there and MSYS eats the pair. Stripping the
+        # run rather than one terminator keeps the two platforms saying the
+        # same thing. Interior CRs are lines mode's business.
+        while :; do
+            case $got in
+            *"$TESTLIB_NL") got=${got%"$TESTLIB_NL"} ;;
+            *"$SELFTEST_CR") got=${got%"$SELFTEST_CR"} ;;
+            *) break ;;
+            esac
+        done
+        test "${SELFTEST_MODE[i]}" != lines ||
+            got=${got//"$SELFTEST_CR$TESTLIB_NL"/"$TESTLIB_NL"}
+        want=${SELFTEST_WANT[i]}
+        test "$rc" -eq 0 || fail "${SELFTEST_LABEL[i]}: exited $rc, output: $got"
+        # Case patterns, where the quoted want stays literal even when the name
+        # it pins carries a '*' or a '['.
+        case ${SELFTEST_MODE[i]} in
+        tail)
+            case $got in
+            *"$want") ;;
+            *) fail "${SELFTEST_LABEL[i]}: expected an output ending [$want], got [$got]" ;;
+            esac
+            ;;
+        head)
+            case $got in
+            "$want"*) ;;
+            *) fail "${SELFTEST_LABEL[i]}: expected an output starting [$want], got [$got]" ;;
+            esac
+            ;;
+        *) test "$got" = "$want" || fail "${SELFTEST_LABEL[i]}: expected [$want], got [$got]" ;;
+        esac
+    done
+    # The count must close exactly: a case the engine ran and nobody asserted,
+    # or a self-test that printed the framing byte itself, both land here.
+    test -z "$rest" || fail "-#test=batch: output past the $n queued cases: $out"
+    SELFTEST_ARGV=()
+    SELFTEST_WANT=()
+    SELFTEST_MODE=()
+    SELFTEST_LABEL=()
 }
 
 # Absolute path to httrack, since make check's relative ../src breaks once a test
 # cd's away. assert_selftest runs the bare name, so a test that cd's calls this.
+# Memoized in HTTRACK_PATH, which selftest_run_queued runs too: a test that cd's
+# and queues must assign it (HTTRACK_PATH=$(httrack_path)) before it moves, the
+# memo a bare $(httrack_path) writes dying with its subshell.
+HTTRACK_PATH=${HTTRACK_PATH:-}
 httrack_path() {
     local p dir
-    p=$(command -v httrack) || fail "no httrack in PATH"
-    # Assigned, so a failed cd is named here instead of yielding a bare /httrack.
-    dir=$(cd "$(dirname "$p")" && pwd) || fail "cannot reach $(dirname "$p")"
-    printf '%s\n' "$dir/$(basename "$p")"
+    if test -z "$HTTRACK_PATH"; then
+        p=$(command -v httrack) || fail "no httrack in PATH"
+        # Assigned, so a failed cd is named here instead of a bare /httrack.
+        dir=$(cd "$(dirname "$p")" && pwd) || fail "cannot reach $(dirname "$p")"
+        HTTRACK_PATH=$dir/$(basename "$p")
+    fi
+    printf '%s\n' "$HTTRACK_PATH"
 }
 
 # A literal, not $'..': Apple's bash 3.2 loses quote state on that inside a

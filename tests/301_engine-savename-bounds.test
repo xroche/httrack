@@ -7,23 +7,28 @@ set -euo pipefail
 
 # url_savename_addstr() appends a crawled link to afs->save; with no size cap it
 # wrote past the buffer (#1269).
-assert_selftest "savename-addstr self-test OK" savename-addstr
+selftest_queue "savename-addstr self-test OK" savename-addstr
 
 # url_savename_addtail() carries the default name and the extension onto a link
 # that already fills that buffer, where strcatbuff used to abort instead.
-assert_selftest "savename-addtail self-test OK, save 2048 bytes" savename-addtail
+selftest_queue "savename-addtail self-test OK, save 2048 bytes" savename-addtail
 
 httrack_bin=$(httrack_path)
 
-# Emits the save name. -#test=savename poisons the bytes behind save[] and exits
-# non-zero if the naming path touched them, so a breach fails here. filpad=N
+# -#test=savename poisons the bytes behind save[] and exits non-zero if the
+# naming path touched them, so a breach reds the case whatever it names. filpad=N
 # expands '*' into N bytes, past what argv can carry (HTS_CDLMAXSIZE).
-savename() { # savename PAD FIL [ARGS...]
-    local pad=$1 fil=$2 out
+# The two properties the cases below assert, one per helper:
+keeps_ext() { # keeps_ext PAD FIL [ARGS...]
+    local pad=$1 fil=$2
     shift 2
-    out=$("$httrack_bin" -O /dev/null -#test=savename "$fil" text/html \
-        "filpad=$pad" "$@" 2>&1) || fail "$fil pad $pad: exited non-zero: $out"
-    printf '%s\n' "${out#savename: }"
+    selftest_queue_tail '.html' savename "$fil" text/html "filpad=$pad" "$@"
+}
+stays_rooted() { # stays_rooted PAD FIL [ARGS...]
+    local pad=$1 fil=$2
+    shift 2
+    selftest_queue_head 'savename: /dev/null/' savename "$fil" text/html \
+        "filpad=$pad" "$@"
 }
 
 # A 1000-byte host plus these pads puts the intermediate name either side of the
@@ -33,16 +38,11 @@ for fil in '/*/x.html' '/dir/*.html'; do
     # Whatever fits must keep every byte, extension included. Clipping the
     # intermediate early costs the name the .html the shortener would have kept.
     for pad in 900 990 1030; do
-        name=$(savename "$pad" "$fil" "adr=$long_host")
-        case $name in
-        *.html) ;;
-        *) fail "$fil pad $pad: lost its extension: ${name: -40}" ;;
-        esac
+        keeps_ext "$pad" "$fil" "adr=$long_host"
     done
     # Past the end, the name is cut but nothing may land behind save[].
     for pad in 1500 2030; do
-        name=$(savename "$pad" "$fil" "adr=$long_host")
-        assert_match "^/dev/null/" "$name" "$fil pad $pad"
+        stays_rooted "$pad" "$fil" "adr=$long_host"
     done
 done
 
@@ -54,11 +54,10 @@ for spec in '/*/:2036:' '/dir/*:2038:' '/*/x:2040:' \
     fil=${spec%%:*} rest=${spec#*:}
     pad=${rest%%:*} extra=${rest#*:}
     if [ -n "$extra" ]; then
-        name=$(savename "$pad" "$fil" "adr=$long_host" "$extra")
+        stays_rooted "$pad" "$fil" "adr=$long_host" "$extra"
     else
-        name=$(savename "$pad" "$fil")
+        stays_rooted "$pad" "$fil"
     fi
-    assert_match "^/dev/null/" "$name" "$fil pad $pad"
 done
 
 # -N is the only caller that selects savename_type -1, and it always sets the
@@ -66,5 +65,6 @@ done
 out=$("$httrack_bin" -O /dev/null -#test=savename /x.html text/html type=-1 2>&1) &&
     fail "type=-1 without a template was accepted: $out"
 assert_match "needs a userdef" "$out" "type=-1 guard"
-name=$(savename 900 '/*/x.html' 'userdef=%h%p/%n%q.%t')
-assert_match '[.]html$' "$name" "userdef naming"
+keeps_ext 900 '/*/x.html' 'userdef=%h%p/%n%q.%t'
+
+selftest_run_queued

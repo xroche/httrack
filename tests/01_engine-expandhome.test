@@ -16,7 +16,7 @@ set -euo pipefail
 ask() {
     HOME=HTSHOME httrack -O /dev/null -#test=expandhome "$1"
 }
-exp() { assert_eq "expanded=$2" "$(ask "$1")" "expandhome '$1'"; }
+exp() { selftest_queue "expanded=$2" expandhome "$1"; }
 
 home=$(ask '~')
 home=${home#expanded=}
@@ -52,3 +52,5 @@ if test "$home" = HTSHOME; then
     long=$(printf '%04096d' 0 | tr '0' 'A')
     assert_eq "expanded=~/foo" "$(HOME="$long" httrack -O /dev/null -#test=expandhome '~/foo')" 'over-long HOME'
 fi
+
+HOME=HTSHOME selftest_run_queued

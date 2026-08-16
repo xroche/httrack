@@ -3,18 +3,17 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
 # Content-Range parse (treathead via -#test=crange). Hostile values must clamp
 # to 0, and the crange +/- 1 arithmetic must not sign-overflow (UBSan aborts on
 # the pre-fix binary at the INT64_MIN cases).
 
 cr() {
-    local want="$1"
+    local want=$1
     shift
-    out="$(httrack -O /dev/null -#test=crange "$@")"
-    test "$out" == "$want" || {
-        echo "FAIL: $* -> '$out' (want '$want')"
-        exit 1
-    }
+    selftest_queue "$want" crange "$@"
 }
 
 # Normal range and the '*/N' fallback both parse through unchanged.
@@ -32,3 +31,5 @@ cr 'crange_start=0 crange_end=0 crange=0' 'Content-Range: bytes -5-10/20'
 # INT64_MAX is non-negative: it passes through, the parse must not mangle it.
 cr 'crange_start=0 crange_end=9223372036854775807 crange=9223372036854775807' \
     'Content-Range: bytes 0-9223372036854775807/9223372036854775807'
+
+selftest_run_queued

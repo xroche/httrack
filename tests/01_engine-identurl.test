@@ -10,7 +10,7 @@ set -euo pipefail
 # it. -#test=identurl <url> [pad] prints "adr=.. fil=.." or "error"; pad appends
 # N 'a's, reaching lengths a CLI arg can't.
 
-split() { assert_selftest "$2" identurl "$1"; }
+split() { selftest_queue "$2" identurl "$1"; }
 
 split 'http://www.example.com/a/b/../c.html' 'adr=www.example.com fil=/a/c.html'
 split 'ftp://ftp.example.com/pub/file.txt' 'adr=ftp://ftp.example.com fil=/pub/file.txt'
@@ -21,6 +21,8 @@ split 'file://' 'adr=file:// fil=//'
 
 # a root-relative path is copied whole into fil[HTS_URLMAXSIZE*2], so a URL at
 # the buffer size is the tightest overflow; it must be rejected, not abort.
-split_pad() { assert_selftest "$3" identurl "$1" "$2"; }
+split_pad() { selftest_queue "$3" identurl "$1" "$2"; }
 split_pad '/' 2047 'error' # 1 + 2047 = 2048 = HTS_URLMAXSIZE*2
 split_pad 'http://h/' 3000 'error'
+
+selftest_run_queued

@@ -9,11 +9,11 @@ set -euo pipefail
 # wildcard filter engine (strjoker), the core of +/- include/exclude rules.
 # -#test=filter <filter> <string> prints "<string> does match <filter>" or "... does NOT match ...".
 
-match() { assert_selftest "$2 does match $1" filter "$1" "$2"; }
-nomatch() { assert_selftest "$2 does NOT match $1" filter "$1" "$2"; }
+match() { selftest_queue "$2 does match $1" filter "$1" "$2"; }
+nomatch() { selftest_queue "$2 does NOT match $1" filter "$1" "$2"; }
 # single-arg call means an empty subject (unreachable as a CLI arg); '*(' used
 # to force max=1 and over-read past it.
-nomatch_empty() { assert_selftest " does NOT match $1" filter "$1"; }
+nomatch_empty() { selftest_queue " does NOT match $1" filter "$1"; }
 
 # bare star matches everything
 match '*' 'anything/at/all'
@@ -107,7 +107,7 @@ nomatch '*.html*[]' 'page.html?x=1' # *[] forbids the trailing query
 fsize() {
     local want=$1
     shift
-    assert_selftest "$want" filtersize "$@"
+    selftest_queue "$want" filtersize "$@"
 }
 fsize 'verdict=allowed size_flag=0' -1 foo.jpg -* '+*.jpg' '-*.jpg*[<10]'   # scan time: keep
 fsize 'verdict=forbidden size_flag=1' 5 foo.jpg -* '+*.jpg' '-*.jpg*[<10]'  # <10KB: cancel
@@ -163,7 +163,7 @@ fsize 'verdict=unknown size_flag=1' 5 foo.jpg '-*.jpg*[>10]'
 fmime() {
     local want=$1
     shift
-    assert_selftest "verdict=$want" filtermime "$@"
+    selftest_queue "verdict=$want" filtermime "$@"
 }
 fmime allowed 'image/png' '+mime:image/*'
 fmime unknown 'text/html' '+mime:image/*'
@@ -174,7 +174,7 @@ fsize 'verdict=unknown size_flag=0' -1 'image/png' '+mime:image/*' # and vice ve
 
 # memoized vs no-memo differential over seeded random patterns and subjects,
 # matching and non-matching (the self-test asserts both polarities occurred)
-assert_selftest "filtermemo: 20000 cases OK" filtermemo
+selftest_queue "filtermemo: 20000 cases OK" filtermemo
 
 # star-heavy non-match must stay polynomial (#501); 400 chars also exercises
 # the heap-allocated memo. timeout (where available) turns a hang into a FAIL.
@@ -200,3 +200,5 @@ if (ulimit -s 512 && httrack --version >/dev/null 2>&1); then
     out=$(ulimit -s 512 && with_timeout httrack -O /dev/null -#test=filterbounds)
     assert_eq "filterbounds: OK" "$out" "filterbounds on a 512K stack"
 fi
+
+selftest_run_queued

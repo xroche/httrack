@@ -17,14 +17,16 @@ adr=$(printf 'a%.0s' $(seq 1 1023))
 for total in $(seq 2040 2047); do
     fil=/$(printf 'b%.0s' $(seq 1 $((total - ${#adr} - 3))))/
     test $((1 + ${#adr} + ${#fil})) -eq "$total" || fail "bad length for $total"
-    assert_selftest "-$adr$fil" wizardfilter 0 "$adr" "$fil"
-    assert_selftest "-$adr$fil*" wizardfilter 1 "$adr" "$fil"
-    assert_selftest "-$adr/*" wizardfilter 2 "$adr" "$fil"
-    assert_selftest "+$adr$fil*" wizardfilter 5 "$adr" "$fil"
-    assert_selftest "+$adr/*" wizardfilter 6 "$adr" "$fil"
-    assert_selftest "+$adr$fil*[file]" wizardfilter 7 "$adr" "$fil"
+    selftest_queue "-$adr$fil" wizardfilter 0 "$adr" "$fil"
+    selftest_queue "-$adr$fil*" wizardfilter 1 "$adr" "$fil"
+    selftest_queue "-$adr/*" wizardfilter 2 "$adr" "$fil"
+    selftest_queue "+$adr$fil*" wizardfilter 5 "$adr" "$fil"
+    selftest_queue "+$adr/*" wizardfilter 6 "$adr" "$fil"
+    selftest_queue "+$adr$fil*[file]" wizardfilter 7 "$adr" "$fil"
 done
 
 # a command line cannot express the rest of the sweep, up to both link buffers
 # full; the self-test carries it
-assert_selftest "wizardfilter self-test OK" wizardfilter
+selftest_queue "wizardfilter self-test OK" wizardfilter
+
+selftest_run_queued

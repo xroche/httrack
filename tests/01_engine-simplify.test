@@ -7,7 +7,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 # path simplify engine (fil_simplifie): collapses ./ and ../ segments.
-simp() { assert_selftest "simplified=$2" simplify "$1"; }
+simp() { selftest_queue "simplified=$2" simplify "$1"; }
 
 simp './foo/bar/' 'foo/bar/'
 simp './foo/bar' 'foo/bar'
@@ -41,3 +41,5 @@ simp '/' '/'
 
 simp 'a/b/..' 'a/'              # trailing bare '..'
 simp 'a/../b?x=../y' 'b?x=../y' # '?' freezes simplification
+
+selftest_run_queued

@@ -8,7 +8,7 @@ set -euo pipefail
 
 # HTML entity unescaping (hts_unescapeEntitiesWithCharset).
 # -#test=entities <string> prints the string with entities decoded (UTF-8 output).
-ent() { assert_selftest "$2" entities "$1"; }
+ent() { selftest_queue "$2" entities "$1"; }
 # crash probe: malformed input must exit cleanly, not abort.
 runs() {
     httrack -O /dev/null -#test=entities "$1" >/dev/null 2>&1 || fail "entities '$1' exited non-zero"
@@ -65,3 +65,5 @@ runs '&#9999999999;'
 # original compound case. NOTE: the space after '&foo;' is the &nbsp; known bug
 # above (U+00A0 -> 0x20), not a real space in the source.
 ent '&foo;&nbsp;th&eacute;&amp;caf&#xe9;&#e9;&#x3082;&#12398;&#x306e;&#x3051;&#x59eb;' '&foo; thé&café&#e9;もののけ姫'
+
+selftest_run_queued
