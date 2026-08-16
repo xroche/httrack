@@ -676,32 +676,31 @@ int httpmirror(char *url1, httrackp * opt) {
     while (*a) {
       int joker = 0;
 
-      // vérifier qu'il n'y a pas de * dans l'url
+      // only a leading + or - makes a token a filter rule; anything else is a
+      // URL
       if (*a == '+')
         joker = 1;
       else if (*a == '-')
         joker = 1;
 
-      if (joker) { // joker ou filters
+      if (joker) { // a filter rule
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];
         int type;
         int plus = 0;
 
-        // noter joker (dans b)
-        if (*a == '+') {        // champ +
+        if (*a == '+') { // the accept field
           type = 1;
           plus = 1;
           a++;
-        } else if (*a == '-') { // champ forbidden[]
+        } else if (*a == '-') { // the forbidden[] field
           type = 0;
           a++;
-        } else {                // champ + avec joker sans doute
+        } else { // dead: joker is set only for '+' or '-'
           type = 1;
         }
 
-        // recopier prochaine chaine (+ ou -)
-        /* the sign is prepended into `rule` below, not held here; only the
-           implicit form's trailing '*' has to be left room for */
+        /* the sign is prepended into `rule` below, not held here; the spare
+           byte is the dead branch's trailing '*' */
         const size_t room = sizeof(tempo) - (plus == 0 && type == 1 ? 1 : 0);
 
         if (!hts_scan_token(&a, tempo, room)) {
@@ -714,11 +713,11 @@ int httpmirror(char *url1, httrackp * opt) {
           continue;
         }
 
-        // sauter les + sans rien après..
+        // skip a sign with nothing after it
         if (strnotempty(tempo)) {
-          if ((plus == 0) && (type == 1)) {     // implicite: *www.edf.fr par exemple
+          if ((plus == 0) && (type == 1)) {
             if (hts_lastchar(tempo) != '*') {
-              strcatbuff(tempo, "*");   // ajouter un *
+              strcatbuff(tempo, "*");
             }
           }
           {
@@ -749,7 +748,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
         }
 
-      } else { // adresse normale
+      } else { // a plain URL
         char BIGSTK url[HTS_URLMAXSIZE * 2];
 
         // prochaine adresse

@@ -69,8 +69,8 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     starts links, the default mode is to mirror these links - i.e. if one of your start page is
     www.example.com/test/index.html, all links starting with www.example.com/test/ will be
     accepted. But links directly in www.example.com/.. will not be accepted, however, because
-    they are in a higher structure. This prevent HTTrack from mirroring the whole site. (All
-    files in structure levels equal or lower than the primary links will be retrieved.)<br>
+    they are in a higher structure. This prevent HTTrack from mirroring the whole site. (A sibling
+    such as www.example.com/other/ is refused too, being no lower than the start page.)<br>
     </i>
     <br>
     <b>But</b> you may want to download files that are not directly in the subfolders, or on the 
@@ -106,7 +106,7 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     including gif files inside this domain and outside (external images), but not take to large images, 
     or too small ones (thumbnails)<br>
     Excluding gif images smaller than 5KB and images larger than 100KB is therefore a good option;
-    +www.example.com +*.gif -*.gif*[<5] -*.gif*[>100] 
+    +www.example.com/* +*.gif -*.gif*[<5] -*.gif*[>100] 
     
     <br>
     
@@ -154,12 +154,12 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     <br>
     <table BORDER="1" CELLPADDING="2">
     <tr><td nowrap>
-    <tt>+*.gif -image*.gif</tt>
+    <tt>+*.gif -*image*.gif</tt>
     </td><td>
     Will accept all gif files BUT image1.gif,imageblue.gif,imagery.gif and so on
     </tr>
     <tr><td nowrap>
-    <tt>-image*.gif +*.gif</tt>
+    <tt>-*image*.gif +*.gif</tt>
     </td><td>
     Will accept all gif files, because the second pattern is prioritary (because it is defined AFTER the first one)
     </tr>
@@ -172,7 +172,8 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     We saw that patterns are composed of letters and wildcards (<b><tt>*</tt></b>), as in */image*.gif
 
     <p align="JUSTIFY"><br>
-    Special wild cards can be used for specific characters: (*[..])</p>
+    Special wild cards can be used for specific characters: (*[..]). Each of these matches a
+    run of characters, and the run may be empty; <tt>*(..)</tt> matches exactly one.</p>
     <table BORDER="1" CELLPADDING="2">
       <tr>
         <td nowrap><tt>*</tt></td>
@@ -180,11 +181,11 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
       </tr>
       <tr>
         <td nowrap><tt>*[file] or *[name]</tt></td>
-        <td>any filename or name, e.g. not /,? and ; characters</td>
+        <td>a run of any characters, stopping at / or ?</td>
       </tr>
       <tr>
         <td nowrap><tt>*[path]</tt></td>
-        <td>any path (and filename), e.g. not ? and ; characters</td>
+        <td>a run of any characters, stopping at ? (/ is allowed)</td>
       </tr>
       <tr>
         <td nowrap><tt>*[a,z,e,r,t,y]</tt></td>
@@ -192,7 +193,7 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
       </tr>
       <tr>
         <td nowrap><tt>*[a-z]</tt></td>
-        <td>any letters</td>
+        <td>any lowercase letters from a to z (a range, and case-sensitive)</td>
       </tr>
       <tr>
         <td nowrap><tt>*[0-9,a,z,e,r,t,y]</tt></td>
@@ -218,16 +219,20 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
 
 
     <p align="JUSTIFY"><br>
-    Here are some examples of filters: (that can be generated automatically using the
-    interface)</p>
+    Here are some example patterns (they can also be generated automatically using the
+    interface). A pattern becomes a scan rule only once you prefix it with <tt>+</tt> to
+    accept or <tt>-</tt> to refuse. On its own it is not a filter: HTTrack reads it as one
+    more URL to crawl.</p>
     <table BORDER="1" CELLPADDING="2">
       <tr>
         <td nowrap><tt>www.thisweb.com* </tt></td>
-        <td>This will refuse/accept this web site (all links located in it will be rejected)</td>
+        <td>This will refuse/accept this web site, and any longer hostname too, such as
+        www.thisweb.com.example.org; use www.thisweb.com/* to pin it to the site itself</td>
       </tr>
       <tr>
         <td nowrap><tt>*.com/*</tt></td>
-        <td>This will refuse/accept all links that contains .com in them</td>
+        <td>This will refuse/accept links where .com is followed by a /, so a .com host but also a path
+        such as www.example.org/dir.com/page; a host given with a port is missed</td>
       </tr>
       <tr>
         <td nowrap><tt>*cgi-bin* </tt></td>
@@ -235,11 +240,13 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
       </tr>
       <tr>
         <td nowrap><tt>www.*[path].com/*[path].zip </tt></td>
-        <td>This will refuse/accept all zip files in .com addresses</td>
+        <td>This will refuse/accept all zip files on addresses starting with www. and containing .com/,
+        so not a .com host spelled without the www.</td>
       </tr>
       <tr>
         <td nowrap><tt>*example*/*.tar*</tt></td>
-        <td>This will refuse/accept all tar (or tar.gz etc.) files in hosts containing example</td>
+        <td>This will refuse/accept all tar (or tar.gz etc.) files whose URL contains example before some
+        /, in the host or in any directory of the path</td>
       </tr>
       <tr>
         <td nowrap><tt>*/*somepage*</tt></td>
@@ -286,8 +293,7 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
       </tr>
       <tr>
         <td nowrap><tt>*[&lt;NN&gt;MM]</tt></td>
-        <td>the file size must be smaller than NN KB and greater than MM KB
-        <br>(note: this may cause broken files during the download)</td>
+        <td>only the first bound is read, so this behaves as <tt>*[&lt;NN]</tt>: give each bound a rule of its own</td>
       </tr>
     </table>
 
@@ -305,11 +311,12 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
       </tr>
       <tr>
         <td nowrap><tt>-*[&lt;10] -*[&gt;50]</tt></td>
-        <td>the file will be forbidden if if its size is smaller than 10 KB <b>or</b> greater than 50 KB</td>
+        <td>the file will be forbidden if its size is smaller than 10 KB <b>or</b> greater than 50 KB</td>
       </tr>
       <tr>
-        <td nowrap><tt>+*[&lt;80&gt;1]</tt></td>
-        <td>the file will be accepted if if its size is smaller than 80 KB <b>and</b> greater than 1 KB</td>
+        <td nowrap><tt>+*[&lt;80]</tt></td>
+        <td>the file will be accepted if its size is smaller than 80 KB; a larger one is left to the
+        other rules, since an accepting rule refuses nothing</td>
       </tr>
     </table>
 
@@ -323,7 +330,7 @@ See also: The <a href="faq.html#VF1">FAQ</a><br>
     type is compared against scan rules defined by the user.<br><br>
     A scan rule has a higher priority if it is declared later - hierarchy is important<br>
 
-    Note: scan rules based on MIME types can <b>NOT</b> be mixed with regular URL patterns or size patterns within the same rule, but you can use both of them in distinct ones<br>
+    Note: scan rules based on MIME types can <b>NOT</b> be mixed with regular URL patterns or size patterns within the same rule, but you can use both of them in distinct ones. HTTrack does not refuse such a rule, it simply never matches<br>
 
     <p align="JUSTIFY"><br>
     Here are some examples of filters: (that can be generated automatically using the

@@ -173,7 +173,7 @@ most scope problems once you understand them. A filter is a rule that accepts
   <li><b>Last match wins.</b> Rules are applied in order and the last one that
   matches a URL decides its fate. Order your rules from general to specific.</li>
   <li><b>Wildcards.</b> <tt>*</tt> matches any run of characters;
-  <tt>*[a-z]</tt>, <tt>*[0-9]</tt> and similar classes match sets. So
+  <tt>*[a-z]</tt>, <tt>*[0-9]</tt> and similar classes match a run of characters from a set, and the run may be empty. So
   <tt>+*.pdf</tt> means "any URL ending in .pdf".</li>
   <li><b>Whitelisting.</b> To keep one site and nothing else, deny everything then
   re-admit the host: <tt>"-*" "+example.com/*"</tt>. A lone <tt>+</tt> rule only
@@ -210,8 +210,8 @@ bracket forms match narrower sets. The full table, with size and mime rules, is 
   <tr><td><tt>*[file]</tt>, <tt>*[name]</tt></td><td>one path segment (any char but <tt>/</tt> and <tt>?</tt>)</td><td><tt>example.com/*[file]/</tt> &mdash; a directory-index page</td></tr>
   <tr><td><tt>*[path]</tt></td><td>a path, slashes allowed (any char but <tt>?</tt>)</td><td><tt>example.com/*[path].zip</tt></td></tr>
   <tr><td><tt>*[param]</tt></td><td>an optional query string</td><td><tt>page.html*[param]</tt> matches with or without <tt>?...</tt></td></tr>
-  <tr><td><tt>*[a,b,c]</tt></td><td>any one character in the set</td><td><tt>*[a,b,c].txt</tt></td></tr>
-  <tr><td><tt>*[a-z]</tt></td><td>any one character in the range</td><td><tt>img*[0-9].gif</tt></td></tr>
+  <tr><td><tt>*[a,b,c]</tt></td><td>a run of characters from the set</td><td><tt>*[a,b,c].txt</tt></td></tr>
+  <tr><td><tt>*[a-z]</tt></td><td>a run of characters from the range, lowercase only</td><td><tt>img*[0-9].gif</tt></td></tr>
   <tr><td><tt>*[\x]</tt></td><td>the literal character x (escapes <tt>* [ ] \</tt>)</td><td><tt>*[\*]</tt> matches a real <tt>*</tt></td></tr>
   <tr><td><tt>*[&lt;NN]</tt>, <tt>*[&gt;NN]</tt></td><td>file size in KB below / above NN</td><td><tt>-*.gif*[&lt;5]</tt> skips GIFs under 5&nbsp;KB</td></tr>
   <tr><td><tt>*[]</tt></td><td>end anchor: nothing may follow</td><td><tt>*.html*[]</tt> rejects <tt>i.html?p=1</tt></td></tr>
