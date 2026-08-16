@@ -168,18 +168,18 @@ for macro in HTS_INDEX_HEADER HTS_INDEX_BODY HTS_INDEX_FOOTER \
     assert_eq 0 "$(macro_body "$macro" | bare_amps)" "$macro: unescaped &"
 done
 
-# The eol pin, not the bytes on disk: git renormalizes on checkin, so it is what
-# stops a text-mode rewrite flattening a copy. Reading the bytes instead would
-# answer for the checkout, and the Windows runner's disagrees with every other
-# one (#1301).
-# ls-files, not rev-parse: distcheck unpacks the tarball inside the checkout, so
-# git answers there for paths it does not track and every pin reads unspecified.
+# The pin, not the bytes: it is what keeps a Windows checkout from putting CRs
+# in a file the engine pastes into the index verbatim. ls-files first, because
+# distcheck unpacks the tarball inside the checkout, where git answers for paths
+# it does not track and every pin reads unspecified.
 if command -v git >/dev/null 2>&1 &&
     git -C "$srcroot" ls-files --error-unmatch templates >/dev/null 2>&1; then
     for file in "$templates"/*.html; do
-        assert_eq crlf \
+        assert_eq lf \
             "$(git -C "$srcroot" check-attr eol -- "templates/${file##*/}" | sed 's/.*: //')" \
             "${file##*/}: eol pin"
+        assert_eq 0 "$(awk '/\r$/ { bad++ } END { print bad + 0 }' "$file")" \
+            "${file##*/}: lines ending in CRLF"
     done
 else
     echo "note: templates/ is not tracked here, so its eol pin cannot be read"

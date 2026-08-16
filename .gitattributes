@@ -10,6 +10,6 @@
 # The count pin is parsed field by field; a CRLF checkout makes every line malformed.
 tests/*.counts text eol=lf
 
-# The index templates are CRLF too, and nothing checks them either: pinned so a
-# text-mode rewrite cannot flatten one silently.
-templates/*.html text eol=crlf
+# The engine pastes these into the generated index verbatim; LF so a Windows
+# checkout cannot put CRs there and so the compiled-in copies match on POSIX.
+templates/*.html text eol=lf
