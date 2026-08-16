@@ -616,10 +616,8 @@ static void cat_cmdline_arglist(String *output, const char *value,
   }
 }
 
-/* Append one <select> entry. A hidden id emits nothing, and the entries around
-   it keep their own ids: the value is a shared setting (winprofile.ini's
-   CurrentAction), so a front end that drops a mode must not renumber the rest.
- */
+/* Append one <select> entry, unless its id is the hidden one. Ids are stored as
+   winprofile.ini's CurrentAction, so hiding one must not renumber the rest. */
 static void cat_list_option(String *output, const char *label, int id,
                             int listDefault, int listHidden) {
   char tag[48];
@@ -1351,7 +1349,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     int p;
                     int format = 0;
                     int listDefault = 0;
-                    int listHidden = 0;
+                    int listHidden = 0; /* ids start at 1, so 0 hides none */
                     hts_boolean unquoted = HTS_FALSE;
                     /* value comes from the template, not from the settings */
                     hts_boolean literal = HTS_FALSE;

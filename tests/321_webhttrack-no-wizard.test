@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# WebHTTrack has no page that can answer a wizard question, so it must not offer
-# the mode (#1237) -- on any of its surfaces, and without renumbering the action
-# ids it shares with WinHTTrack through winprofile.ini.
+# WebHTTrack has no page that can answer a wizard question, so no surface may
+# offer the mode (#1237). The surviving action ids must keep their values.
 
 set -euo pipefail
 
@@ -76,8 +75,8 @@ def options():
                       block.group(0))
 
 
-# The catalog is the join key of 30-odd translations and WinHTTrack's own combo,
-# so the entry must still be there: dropping it is a different, worse fix.
+# The catalog is the join key for the translations and for WinHTTrack's own
+# combo, so the entry must still be there.
 listdef = re.search(r"^LISTDEF_10\r?\n([^\r\n]*)", read("lang.def"), re.M)
 if listdef is None:
     sys.exit("no LISTDEF_10 in lang.def")
@@ -86,9 +85,8 @@ check(len(entries) == 7, "lang.def still lists %d actions" % len(entries))
 check(entries[1] == "Download web site(s) + questions",
       "the wizard entry is still the catalog's second action")
 
-# The action the wizard entry occupies, and what each id must put on the command
-# line. Ids come from the catalog order, not from what the server happened to
-# emit; 2 is what a WinHTTrack profile may still carry.
+# WIZARD is the catalog index of the hidden entry; COMMAND is the flag each id
+# must emit. Ids come from the catalog order, not from what the server emitted.
 WIZARD = 2
 COMMAND = {1: "--mirror", 2: "--mirror", 3: "--get", 4: "--mirrorlinks",
            5: "--testlinks", 6: "--continue", 7: "--update"}
