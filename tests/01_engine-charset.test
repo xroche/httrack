@@ -8,7 +8,7 @@ set -euo pipefail
 
 # charset -> UTF-8 conversion (hts_convertStringToUTF8).
 # -#test=charset <charset> <string> prints the string re-decoded from <charset> as UTF-8.
-conv() { assert_selftest "$3" charset "$1" "$2"; }
+conv() { selftest_queue "$3" charset "$1" "$2"; }
 # crash probe: malformed input must exit cleanly, not abort.
 runs() {
     httrack -O /dev/null -#test=charset "$1" "$2" >/dev/null 2>&1 || fail "charset '$1' '$2' exited non-zero"
@@ -40,7 +40,7 @@ runs 'utf-8' 'hex:c3'
 
 # hts_getCharsetFromMeta: <meta> charset extraction, HTML5 and legacy forms.
 # -#test=metacharset <html> prints the charset, or "(none)".
-meta() { assert_selftest "$2" metacharset "$1"; }
+meta() { selftest_queue "$2" metacharset "$1"; }
 
 # HTML5 form, quoting/spacing flavors
 meta '<meta charset="utf-8">' 'utf-8'
@@ -82,7 +82,7 @@ meta '<meta ' '(none)'
 meta '<meta' '(none)'
 
 # hts_isStringUTF8: valid-UTF-8 probe (guards the #180 link conversion).
-utf8() { assert_selftest "$2" isutf8 "$1"; }
+utf8() { selftest_queue "$2" isutf8 "$1"; }
 utf8 'plain' '1'
 utf8 'café' '1'
 utf8 '统计' '1'
@@ -94,3 +94,5 @@ utf8 'hex:c0af' '0'       # overlong (latin-1 "À¯" must stay convertible)
 utf8 'hex:eda080' '0'     # UTF-16 surrogate
 utf8 'hex:f4908080' '0'   # above U+10FFFF
 utf8 'hex:f888808080' '0' # legacy 5-byte form
+
+selftest_run_queued

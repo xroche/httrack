@@ -11154,6 +11154,153 @@ static int st_strsprintf(httrackp *opt, int argc, char **argv) {
 }
 
 /* ------------------------------------------------------------ */
+/* Batch runner: many self-tests in one process (see st_batch).  */
+/* ------------------------------------------------------------ */
+
+/* Framing byte between a case's output and its exit code, and between cases.
+   Out of the ASCII control block, which no self-test prints. */
+#define ST_BATCH_RS "\036"
+
+/* Per case, so a bad length field cannot make us walk off the script. */
+#define ST_BATCH_MAXARGS 1024
+
+/* Read stdin to EOF, NUL-terminated; *size excludes that terminator. */
+static char *st_batch_slurp(size_t *size) {
+  size_t capa = 65536, len = 0;
+  char *buff = malloct(capa);
+
+  if (buff == NULL)
+    return NULL;
+  for (;;) {
+    size_t n;
+
+    if (len + 1 >= capa) {
+      char *grown;
+
+      if (capa > (size_t) -1 / 2) {
+        freet(buff);
+        return NULL;
+      }
+      grown = realloct(buff, capa * 2);
+      if (grown == NULL) {
+        freet(buff);
+        return NULL;
+      }
+      buff = grown;
+      capa *= 2;
+    }
+    n = fread(&buff[len], 1, capa - len - 1, stdin);
+    if (n == 0)
+      break;
+    len += n;
+  }
+  buff[len] = '\0';
+  *size = len;
+  return buff;
+}
+
+/* Next NUL-separated field, or NULL past the end of the script. */
+static char *st_batch_field(char **pos, const char *end) {
+  char *const field = *pos;
+
+  if (field >= end)
+    return NULL;
+  *pos = field + strlen(field) + 1;
+  return field;
+}
+
+/* A fresh option set per case, or a handler's writes to opt would reach the
+   next case, which they could not when each case was its own process. It
+   carries what htsmain() derives before the dispatch out of the harness's own
+   -O and the tty probe; 314_engine-selftest-batch.test pins that against a
+   direct run. */
+static httrackp *st_batch_opt(const httrackp *from) {
+  httrackp *const opt = hts_create_opt();
+
+  StringCopy(opt->path_html, StringBuff(from->path_html));
+  StringCopy(opt->path_html_utf8, StringBuff(from->path_html_utf8));
+  StringCopy(opt->path_log, StringBuff(from->path_log));
+  opt->dir_topindex = from->dir_topindex;
+  opt->quiet = from->quiet;
+  opt->verbosedisplay = from->verbosedisplay;
+  return opt;
+}
+
+/* Run a script of self-tests in one process, so a test file costs one fork
+   rather than one per assertion (a fork is expensive under MSYS, #795). The
+   script is NUL-separated fields repeating <argc> <name> <arg>*, and comes in
+   on stdin rather than argv, where the engine would parse a case's `-*` as one
+   of its own filters. Each case prints its output, then RS, its exit code and
+   RS again, which is what testlib.sh's selftest_run_queued splits on.
+
+   Args therefore arrive verbatim, where an argv first goes through htsmain()'s
+   rewrites (CR/LF/TAB to a space, "(none)" emptied, quotes dropped, aliases
+   expanded); a case meaning to exercise one of those stays one per process. */
+static int st_batch(httrackp *opt, int argc, char **argv) {
+  char *buff, *pos;
+  const char *end;
+  char *field;
+  size_t len = 0;
+  int err = 0;
+
+  (void) argc;
+  (void) argv;
+  buff = st_batch_slurp(&len);
+  if (buff == NULL) {
+    fprintf(stderr, "batch: could not read the script on stdin\n");
+    return 1;
+  }
+  pos = buff;
+  end = &buff[len];
+  while (!err && (field = st_batch_field(&pos, end)) != NULL) {
+    const int nargs = atoi(field);
+    char *const name = st_batch_field(&pos, end);
+    char **args;
+    int i, code;
+
+    if (nargs < 0 || nargs > ST_BATCH_MAXARGS || name == NULL) {
+      fprintf(stderr, "batch: malformed case header\n");
+      err = 1;
+      break;
+    }
+    args = calloct((size_t) nargs + 1, sizeof(char *));
+    if (args == NULL) {
+      fprintf(stderr, "batch: not enough memory\n");
+      err = 1;
+      break;
+    }
+    for (i = 0; i < nargs; i++) {
+      args[i] = st_batch_field(&pos, end);
+      if (args[i] == NULL) {
+        fprintf(stderr, "batch: case '%s' is missing arguments\n", name);
+        err = 1;
+        break;
+      }
+    }
+    if (err) {
+      freet(args);
+      break;
+    }
+    /* Nesting would re-read a stdin already at EOF and silently run nothing. */
+    if (strcmp(name, "batch") == 0) {
+      fprintf(stderr, "batch: cannot nest\n");
+      code = 1;
+    } else {
+      httrackp *const copt = st_batch_opt(opt);
+
+      code = hts_selftest(copt, name, nargs, args);
+      hts_free_opt(copt);
+    }
+    freet(args);
+    fflush(stdout);
+    printf(ST_BATCH_RS "%d" ST_BATCH_RS, code);
+    fflush(stdout);
+  }
+  freet(buff);
+  return err;
+}
+
+/* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
 
@@ -11163,6 +11310,8 @@ static const struct selftest_entry {
   const char *desc;
   int (*fn)(httrackp *opt, int argc, char **argv);
 } selftests[] = {
+    {"batch", "", "run a NUL-separated script of self-tests read from stdin",
+     st_batch},
     {"filter", "<pattern> <string>", "match a string against a wildcard filter",
      st_filter},
     {"filtersize", "<size> <string> <filter>...",

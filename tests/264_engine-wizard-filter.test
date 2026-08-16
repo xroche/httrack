@@ -10,15 +10,17 @@ set -euo pipefail
 # one back through the matcher that decides whether a link is authorized.
 
 # 2 forbids the host, 5 (allowed to go up) and 6 authorize it
-assert_selftest "-foo.com/*" wizardfilter 2 foo.com /a/b.html
-assert_selftest "+foo.com/*" wizardfilter 5 foo.com /a/b.html 1
-assert_selftest "+foo.com/*" wizardfilter 6 foo.com /a/b.html
+selftest_queue "-foo.com/*" wizardfilter 2 foo.com /a/b.html
+selftest_queue "+foo.com/*" wizardfilter 5 foo.com /a/b.html 1
+selftest_queue "+foo.com/*" wizardfilter 6 foo.com /a/b.html
 
 pattern=$(httrack -O /dev/null -#test=wizardfilter 6 foo.com /a/b.html)
 pattern=${pattern#+}
-assert_selftest "foo.com/b.html does match $pattern" filter "$pattern" foo.com/b.html
-assert_selftest "foo.com/ does match $pattern" filter "$pattern" foo.com/
-assert_selftest "foo.com.evil.org/x does NOT match $pattern" filter "$pattern" foo.com.evil.org/x
+selftest_queue "foo.com/b.html does match $pattern" filter "$pattern" foo.com/b.html
+selftest_queue "foo.com/ does match $pattern" filter "$pattern" foo.com/
+selftest_queue "foo.com.evil.org/x does NOT match $pattern" filter "$pattern" foo.com.evil.org/x
 
 # answers 0, 1, 5 (no up), 7, the ones adding nothing, credentials and port
-assert_selftest "wizardfilter self-test OK" wizardfilter
+selftest_queue "wizardfilter self-test OK" wizardfilter
+
+selftest_run_queued

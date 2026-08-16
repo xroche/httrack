@@ -9,35 +9,24 @@ set -euo pipefail
 # name() asserts on the basename, full() on the whole path; prior= registers an
 # already-crawled link whose sav is rooted under the -O path (/dev/null here).
 
-httrack_bin=$(httrack_path)
+# Before the cd below: selftest_run_queued runs this engine too.
+HTTRACK_PATH=$(httrack_path)
 
 # scratch dir: body= and cached= write temp files (st-savename-body.tmp, hts-cache/)
 scratch=$(mktemp -d)
 cleanup_push rm -rf "$scratch"
 cd "$scratch"
 
-run() {
-    "$httrack_bin" -O /dev/null -#test=savename "$@" | sed -n 's/^savename: //p'
-}
-
 name() {
-    local fil="$1" ctype="$2" want="$3"
+    local fil=$1 ctype=$2 want=$3
     shift 3
-    out="$(run "$fil" "$ctype" "$@")"
-    test "${out##*/}" == "$want" || {
-        echo "FAIL: '$fil' '$ctype' $* -> '$out' (want '$want')"
-        exit 1
-    }
+    selftest_queue_tail "/$want" savename "$fil" "$ctype" "$@"
 }
 
 full() {
-    local fil="$1" ctype="$2" want="$3"
+    local fil=$1 ctype=$2 want=$3
     shift 3
-    out="$(run "$fil" "$ctype" "$@")"
-    test "$out" == "$want" || {
-        echo "FAIL: '$fil' '$ctype' $* -> '$out' (want '$want')"
-        exit 1
-    }
+    selftest_queue "savename: $want" savename "$fil" "$ctype" "$@"
 }
 
 # #115: an unknown trailing ".token" is part of the name, keep it and append the type.
@@ -154,7 +143,10 @@ full '/page.php?id=3&sid=42' 'text/html' '/dev/null/www.example.com/page475b.htm
 full '/../../etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.html'
 full '/%2e%2e/%2e%2e/etc/passwd' 'text/html' '/dev/null/www.example.com///etc/passwd.html'
 full '/x.php' 'application/pdf' '/dev/null/www.example.com///evil.exe' 'cdispo=../../evil.exe'
-name $'/evil\rname\t.php' 'text/html' 'evil name .html'
+# Not queued: those spaces are htsmain()'s rewrite of the CR and TAB, which only
+# an argv goes through.
+out=$("$HTTRACK_PATH" -O /dev/null -#test=savename $'/evil\rname\t.php' 'text/html')
+assert_eq 'evil name .html' "${out##*/}" 'control bytes in a fil'
 
 # #133: oversized names are capped only on Windows, where the name takes the
 # same 48-char clamp as a directory segment and keeps its extension across the
@@ -184,3 +176,5 @@ full '/HTS-TMP/a.bin' 'application/octet-stream' \
 # Control: the DOS device names this reuses must still be escaped.
 full '/nul/x.bin' 'application/octet-stream' \
     '/dev/null/www.example.com/nul_/x.bin'
+
+selftest_run_queued

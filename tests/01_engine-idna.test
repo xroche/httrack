@@ -9,8 +9,8 @@ set -euo pipefail
 # IDNA / punycode encode (-#test=idna-encode) and decode (-#test=idna-decode). This code has a CVE history,
 # so the edge cases below cover passthrough, round-trips, and malformed input.
 
-enc() { assert_selftest "$2" idna-encode "$1"; }
-dec() { assert_selftest "$2" idna-decode "$1"; }
+enc() { selftest_queue "$2" idna-encode "$1"; }
+dec() { selftest_queue "$2" idna-decode "$1"; }
 # a malformed encode input must be rejected (empty output), not encoded or leaked.
 enc_bad() {
     assert_eq "" "$(httrack -O /dev/null -#test=idna-encode "$1" 2>/dev/null)" "idna-encode '$1'"
@@ -47,3 +47,5 @@ dec 'xn--already-encoded.com' 'ǮalǭǮreaǭǫdy.com'
 # cannot survive a Windows command line (it round-trips through UTF-16 to valid
 # U+FFFD, which then encodes fine instead of being rejected).
 enc_bad 'hex:62c3bc636865762ee4be8be5ad62c3bc636865706c65'
+
+selftest_run_queued

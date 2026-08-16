@@ -27,11 +27,9 @@ for c in "${cases[@]}"; do
     rest=${c#*:}
     len=${rest%%:*}
     out=${rest#*:}
-    got=$(httrack "-#test=escape-control" "hex:$in") ||
-        fail "hex:$in exited non-zero"
-    test "$got" = "escape-control: len=$len out=hex:$out" ||
-        fail "hex:$in: expected len=$len out=hex:$out, got: $got"
+    selftest_queue "escape-control: len=$len out=hex:$out" escape-control "hex:$in"
 done
+selftest_run_queued
 
 # The in-binary table also checks the bytes past the NUL, which printing cannot show.
 got=$(httrack "-#test=escape-control") || fail "self-test exited non-zero"

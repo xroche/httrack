@@ -12,7 +12,7 @@ set -euo pipefail
 # The front end enumerates by looping until the engine stops answering. Strip
 # the CRs: MSYS hands the engine a text-mode stdout and $(...) eats only the
 # trailing newline, so an assertion spanning several lines keeps the interior
-# ones. Every other assert_selftest here compares a single line and cannot see
+# ones. Every other selftest_queue here compares a single line and cannot see
 # this.
 want="0 download.example.co.uk
 1 example.co.uk
@@ -21,8 +21,8 @@ got=$(httrack -O /dev/null -#test=wizardscope download.example.co.uk/x | tr -d '
 test "$got" = "$want" || fail "wizardscope enumeration: got [$got]"
 
 # widening stops before a bare TLD, and an IP literal offers nothing at all
-assert_selftest "0 example.com" wizardscope example.com/x
-assert_selftest "" wizardscope 192.168.1.1/x
+selftest_queue "0 example.com" wizardscope example.com/x
+selftest_queue "" wizardscope 192.168.1.1/x
 
 # answer 1000+1 is "example.co.uk and every host below it": two filters, since
 # the starred one misses the apex
@@ -32,19 +32,21 @@ test "$sub" = "+*.example.co.uk/*" || fail "subdomain filter: got [$sub]"
 test "$apex" = "+example.co.uk/*" || fail "apex filter: got [$apex]"
 
 for host in www.example.co.uk a.b.example.co.uk; do
-    assert_selftest "$host/x does match ${sub#+}" filter "${sub#+}" "$host/x"
+    selftest_queue "$host/x does match ${sub#+}" filter "${sub#+}" "$host/x"
 done
-assert_selftest "example.co.uk/x does NOT match ${sub#+}" filter "${sub#+}" example.co.uk/x
-assert_selftest "example.co.uk/x does match ${apex#+}" filter "${apex#+}" example.co.uk/x
+selftest_queue "example.co.uk/x does NOT match ${sub#+}" filter "${sub#+}" example.co.uk/x
+selftest_queue "example.co.uk/x does match ${apex#+}" filter "${apex#+}" example.co.uk/x
 
 # neither half may leak past the domain boundary
 for bad in notexample.co.uk/x example.co.uk.evil.com/x; do
-    assert_selftest "$bad does NOT match ${sub#+}" filter "${sub#+}" "$bad"
-    assert_selftest "$bad does NOT match ${apex#+}" filter "${apex#+}" "$bad"
+    selftest_queue "$bad does NOT match ${sub#+}" filter "${sub#+}" "$bad"
+    selftest_queue "$bad does NOT match ${apex#+}" filter "${apex#+}" "$bad"
 done
 
 # the exclude range emits the same pair negated
-assert_selftest "-*.example.co.uk/*" wizardfilter 2001 www.example.co.uk /x
+selftest_queue "-*.example.co.uk/*" wizardfilter 2001 www.example.co.uk /x
 
-assert_selftest "wizardscope self-test OK" wizardscope
-assert_selftest "wizardfilter self-test OK" wizardfilter
+selftest_queue "wizardscope self-test OK" wizardscope
+selftest_queue "wizardfilter self-test OK" wizardfilter
+
+selftest_run_queued

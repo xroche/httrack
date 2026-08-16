@@ -31,11 +31,13 @@ hdr 'contenttype= cdispo=evil.pdf' \
 
 # An over-long header value must not overflow the parse scratch (ASan aborts
 # here on the pre-fix binary).
-assert_selftest 'contenttype_len=32 contentencoding_len=0' headerlong 'Content-Type:'
-assert_selftest 'contenttype_len=0 contentencoding_len=0' headerlong 'Content-Encoding:'
+selftest_queue 'contenttype_len=32 contentencoding_len=0' headerlong 'Content-Type:'
+selftest_queue 'contenttype_len=0 contentencoding_len=0' headerlong 'Content-Encoding:'
 
 # An empty Content-Encoding yields no token: leave it empty, don't read the
 # uninitialized scratch (MSan aborts here on the pre-fix binary).
 enc() { httrack -O /dev/null -#test=header "$1" | grep '^contentencoding='; }
 assert_eq 'contentencoding=' "$(enc 'Content-Encoding:')"
 assert_eq 'contentencoding=gzip' "$(enc 'Content-Encoding: gzip')"
+
+selftest_run_queued

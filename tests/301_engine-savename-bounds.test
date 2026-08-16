@@ -7,11 +7,11 @@ set -euo pipefail
 
 # url_savename_addstr() appends a crawled link to afs->save; with no size cap it
 # wrote past the buffer (#1269).
-assert_selftest "savename-addstr self-test OK" savename-addstr
+selftest_queue "savename-addstr self-test OK" savename-addstr
 
 # url_savename_addtail() carries the default name and the extension onto a link
 # that already fills that buffer, where strcatbuff used to abort instead.
-assert_selftest "savename-addtail self-test OK, save 2048 bytes" savename-addtail
+selftest_queue "savename-addtail self-test OK, save 2048 bytes" savename-addtail
 
 httrack_bin=$(httrack_path)
 
@@ -68,3 +68,5 @@ out=$("$httrack_bin" -O /dev/null -#test=savename /x.html text/html type=-1 2>&1
 assert_match "needs a userdef" "$out" "type=-1 guard"
 name=$(savename 900 '/*/x.html' 'userdef=%h%p/%n%q.%t')
 assert_match '[.]html$' "$name" "userdef naming"
+
+selftest_run_queued

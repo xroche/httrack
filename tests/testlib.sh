@@ -74,14 +74,114 @@ assert_selftest_lines() { # assert_selftest_lines WANT NAME [ARGS...]
     test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
 }
 
+# Batched form of the two asserts above: selftest_queue records a case,
+# selftest_run_queued runs a whole file's cases in ONE httrack (-#test=batch in
+# htsselftest.c), which the Windows legs care about most (#795). Same contract,
+# except a mismatch surfaces at the flush, named. A case whose output later shell
+# logic reads, or that means to exercise an argv rewrite, stays on assert_selftest.
+SELFTEST_RS=$(printf '\036')
+SELFTEST_CR=$(printf '\r')
+SELFTEST_SCRIPT=${SELFTEST_SCRIPT:-}
+# Self-preserving, as CLEANUP_ARGV below and for the same reason. ARGV holds
+# <argc> <name> <args...> per case, which is the engine's own script format.
+SELFTEST_ARGV=(${SELFTEST_ARGV[@]+"${SELFTEST_ARGV[@]}"})
+SELFTEST_WANT=(${SELFTEST_WANT[@]+"${SELFTEST_WANT[@]}"})
+SELFTEST_MODE=(${SELFTEST_MODE[@]+"${SELFTEST_MODE[@]}"})
+SELFTEST_LABEL=(${SELFTEST_LABEL[@]+"${SELFTEST_LABEL[@]}"})
+
+selftest_queue() { # selftest_queue WANT NAME [ARGS...]
+    selftest_queue_mode exact "$@"
+}
+
+# selftest_queue for output spanning several lines (see assert_selftest_lines).
+selftest_queue_lines() { # selftest_queue_lines WANT NAME [ARGS...]
+    selftest_queue_mode lines "$@"
+}
+
+# selftest_queue asserting only the tail, for a save name under a directory the
+# caller need not spell out. WANT is literal and carries its own boundary.
+selftest_queue_tail() { # selftest_queue_tail WANT NAME [ARGS...]
+    selftest_queue_mode tail "$@"
+}
+
+selftest_queue_mode() { # selftest_queue_mode exact|lines|tail WANT NAME [ARGS...]
+    local mode=$1 want=$2 name=$3
+    shift 3
+    SELFTEST_WANT+=("$want")
+    SELFTEST_MODE+=("$mode")
+    SELFTEST_LABEL+=("-#test=$name $*")
+    SELFTEST_ARGV+=("$#" "$name" ${1+"$@"})
+    test "${#SELFTEST_WANT[@]}" -ne 1 || {
+        SELFTEST_SCRIPT=${TMPDIR:-/tmp}/httrack-selftest-batch.$$
+        cleanup_push rm -f "$SELFTEST_SCRIPT"
+    }
+}
+
+# Run every queued case and assert each. The script goes through a file, not a
+# pipe: printf is a builtin, so this costs no fork of its own. Args travel on
+# stdin because the engine parses argv before it reaches the self-test dispatch,
+# and would take a case's '-*' for one of its own filters.
+selftest_run_queued() {
+    local n=${#SELFTEST_WANT[@]} out rest got want rc=0 i
+    test "$n" -gt 0 || return 0
+    printf '%s\0' "${SELFTEST_ARGV[@]}" >"$SELFTEST_SCRIPT" ||
+        fail "cannot write $SELFTEST_SCRIPT"
+    # By path, not by name: a file that cd'd away can no longer reach make
+    # check's relative ../src, and it resolved this before it moved.
+    test -n "$HTTRACK_PATH" || httrack_path >/dev/null
+    out=$("$HTTRACK_PATH" -O /dev/null -#test=batch <"$SELFTEST_SCRIPT") || rc=$?
+    rm -f "$SELFTEST_SCRIPT"
+    test "$rc" -eq 0 || fail "-#test=batch: exited $rc over $n cases, output: $out"
+    rest=$out
+    for ((i = 0; i < n; i++)); do
+        got=${rest%%"$SELFTEST_RS"*}
+        rest=${rest#*"$SELFTEST_RS"}
+        rc=${rest%%"$SELFTEST_RS"*}
+        rest=${rest#*"$SELFTEST_RS"}
+        case $rc in '' | *[!0-9]*)
+            fail "-#test=batch: framing lost at case $((i + 1)) of $n, output: $out"
+            ;;
+        esac
+        # What a command substitution would have dropped around a lone case.
+        while test "${got%"$TESTLIB_NL"}" != "$got"; do got=${got%"$TESTLIB_NL"}; done
+        if test "${SELFTEST_MODE[i]}" = lines; then
+            got=${got//"$SELFTEST_CR$TESTLIB_NL"/"$TESTLIB_NL"}
+            got=${got%"$SELFTEST_CR"}
+        fi
+        want=${SELFTEST_WANT[i]}
+        test "$rc" -eq 0 || fail "${SELFTEST_LABEL[i]}: exited $rc, output: $got"
+        if test "${SELFTEST_MODE[i]}" = tail; then
+            # A case pattern, where the quoted want stays literal even if the
+            # name it pins carries a '*' or a '['.
+            case $got in
+            *"$want") ;;
+            *) fail "${SELFTEST_LABEL[i]}: expected an output ending [$want], got [$got]" ;;
+            esac
+        else
+            test "$got" = "$want" || fail "${SELFTEST_LABEL[i]}: expected [$want], got [$got]"
+        fi
+    done
+    SELFTEST_ARGV=()
+    SELFTEST_WANT=()
+    SELFTEST_MODE=()
+    SELFTEST_LABEL=()
+}
+
 # Absolute path to httrack, since make check's relative ../src breaks once a test
 # cd's away. assert_selftest runs the bare name, so a test that cd's calls this.
+# Memoized in HTTRACK_PATH, which selftest_run_queued runs too: a test that cd's
+# and queues must assign it (HTTRACK_PATH=$(httrack_path)) before it moves, the
+# memo a bare $(httrack_path) writes dying with its subshell.
+HTTRACK_PATH=${HTTRACK_PATH:-}
 httrack_path() {
     local p dir
-    p=$(command -v httrack) || fail "no httrack in PATH"
-    # Assigned, so a failed cd is named here instead of yielding a bare /httrack.
-    dir=$(cd "$(dirname "$p")" && pwd) || fail "cannot reach $(dirname "$p")"
-    printf '%s\n' "$dir/$(basename "$p")"
+    if test -z "$HTTRACK_PATH"; then
+        p=$(command -v httrack) || fail "no httrack in PATH"
+        # Assigned, so a failed cd is named here instead of a bare /httrack.
+        dir=$(cd "$(dirname "$p")" && pwd) || fail "cannot reach $(dirname "$p")"
+        HTTRACK_PATH=$dir/$(basename "$p")
+    fi
+    printf '%s\n' "$HTTRACK_PATH"
 }
 
 # A literal, not $'..': Apple's bash 3.2 loses quote state on that inside a

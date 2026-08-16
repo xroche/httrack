@@ -5,27 +5,14 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
 # relative path from <curr>'s directory to <link>
-rel() {
-    local got
-    got=$(httrack -O /dev/null -#test=relative "$1" "$2")
-    test "$got" == "relative=$3" ||
-        {
-            echo "FAIL rel($1, $2): got '$got' want 'relative=$3'"
-            exit 1
-        }
-}
+rel() { selftest_queue "relative=$3" relative "$1" "$2"; }
 
 # resolve <link> against origin <adr>/<fil> -> adr=.. fil=..
-ident() {
-    local got
-    got=$(httrack -O /dev/null -#test=resolve "$1" "$2" "$3")
-    test "$got" == "$4" ||
-        {
-            echo "FAIL ident($1, $2, $3): got '$got' want '$4'"
-            exit 1
-        }
-}
+ident() { selftest_queue "$4" resolve "$1" "$2" "$3"; }
 
 ### lienrelatif
 
@@ -65,4 +52,4 @@ ident 'file://srv/share/../x' 'www.foo.com' '/p.html' 'adr=file:// fil=//srv/x'
 ident 'mailto:foo@bar.com' 'www.foo.com' '/p.html' 'error=-1' # unsupported scheme
 ident 'javascript:void(0)' 'www.foo.com' '/p.html' 'error=-1'
 
-echo "OK"
+selftest_run_queued

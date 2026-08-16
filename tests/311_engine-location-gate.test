@@ -11,13 +11,13 @@ set -euo pipefail
 # matches what the contract says to keep, and whether the 64-byte canary behind
 # the buffer survived. Cache side: 01_zlib-cache.test.
 kept() { # kept URLLEN KEPTLEN
-    assert_selftest \
+    selftest_queue \
         "asked=$1 kept=$2 value_ok=1 canary_smashed=0 logged=0" location "$1"
 }
 
 # Refused lengths must say so rather than drop the redirect mutely.
 refused() { # refused URLLEN
-    assert_selftest \
+    selftest_queue \
         "asked=$1 kept=0 value_ok=1 canary_smashed=0 logged=1" location "$1"
 }
 
@@ -45,9 +45,9 @@ refused 3000
 # block's end, which must never happen.
 line() { # line READSIZE BLOCK WANT
     if [ -n "$2" ]; then
-        assert_selftest_lines "$3" headerline "$1" "$2"
+        selftest_queue_lines "$3" headerline "$1" "$2"
     else
-        assert_selftest_lines "$3" headerline "$1"
+        selftest_queue_lines "$3" headerline "$1"
     fi
 }
 
@@ -88,3 +88,5 @@ line 8 'A\r: 1\n' 'cut=0 over=0 line=A: 1
 cut=0 over=0 line=
 cut=0 over=0 line=
 cut=0 over=0 line='
+
+selftest_run_queued

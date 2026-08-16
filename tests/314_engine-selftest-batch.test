@@ -1,0 +1,80 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# -#test=batch must be indistinguishable from one process per case: same bytes,
+# same exit code, and nothing carried from one case to the next. Each case below
+# is run on its own first, and that output is what the batch is asserted against.
+
+# <argc> <name> <args...>, the engine's own script format.
+# Every option-writing case is followed by one that omits the option and would
+# answer differently if the write had survived into it.
+cases=(
+    3 savename '/verylongfilename.php' 'text/html' n83=1
+    2 savename '/verylongfilename.php' 'text/html'
+    3 savename '/dir/page.php' 'text/html' 'userdef=%h/%n.%t'
+    2 savename '/dir/page.php' 'text/html'
+    1 mime 'a.gif'
+    1 mime 'a.html'
+    0 urlhack
+    0 stripquery
+)
+
+i=0
+queued=0
+while test "$i" -lt "${#cases[@]}"; do
+    argc=${cases[i]}
+    name=${cases[i + 1]}
+    args=(${cases[@]+"${cases[@]:i+2:argc}"})
+    i=$((i + 2 + argc))
+    rc=0
+    want=$(httrack -O /dev/null "-#test=$name" ${args[@]+"${args[@]}"}) || rc=$?
+    test "$rc" -eq 0 || fail "-#test=$name: exited $rc on its own, output: $want"
+    selftest_queue "$want" "$name" ${args[@]+"${args[@]}"}
+    queued=$((queued + 1))
+done
+# A mis-parsed list would queue nothing and leave every compare below vacuous.
+assert_eq 8 "$queued" "cases read out of the list"
+selftest_run_queued
+
+# Where the two routes part: a queued arg reaches the handler as written, an
+# argv has had its CR, LF and TAB squashed to a space by htsmain() first.
+assert_selftest 'a b does match a b' filter 'a b' 'a	b'
+selftest_queue 'a	b does NOT match a b' filter 'a b' 'a	b'
+selftest_run_queued
+
+# A case's exit code rides the framing, not the process status: a failing case
+# (filter with no pattern) must not hide the passing one after it.
+script=$(mktemp)
+cleanup_push rm -f "$script"
+printf '%s\0' 0 filter 1 mime 'a.gif' >"$script"
+rc=0
+out=$(httrack -O /dev/null -#test=batch <"$script" 2>/dev/null) || rc=$?
+assert_eq 0 "$rc" "batch status over a failing case"
+assert_match "${SELFTEST_RS}1${SELFTEST_RS}" "$out" "the failing case's exit code"
+assert_match "a.gif is 'image/gif'" "$out" "the case after the failing one"
+
+# A truncated script is refused rather than half-run.
+printf '%s\0' 2 filter '*' >"$script"
+rc=0
+httrack -O /dev/null -#test=batch <"$script" >/dev/null 2>&1 || rc=$?
+assert_eq 1 "$rc" "status on a script missing an argument"
+
+# Queued cases assert nothing until the flush, so a file that forgets it passes
+# on any engine output. The EXIT trap cannot say so (#773 keeps teardown out of
+# the verdict), so the check is static.
+scanned=0
+undrained=
+for f in "$top_srcdir"/tests/*.test; do
+    test -r "$f" || continue
+    scanned=$((scanned + 1))
+    grep -q 'selftest_queue' "$f" || continue
+    grep -q 'selftest_run_queued' "$f" || undrained="$undrained $f"
+done
+# An unexpanded glob would report no offender having read nothing.
+test "$scanned" -ge 50 || fail "scanned $scanned tests in $top_srcdir/tests, want the whole suite"
+test -z "$undrained" || fail "queued self-tests that never run:$undrained"

@@ -3,15 +3,12 @@
 
 set -euo pipefail
 
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
 # -%F footer expansion (hts_footer_format via -#test=footerfmt). The expected
 # strings below also pin each field name to its engine enum slot.
-ftr() {
-    out="$(httrack -O /dev/null -#test=footerfmt "$1")"
-    test "$out" == "$2" || {
-        echo "FAIL: '$1' -> '$out' (want '$2')"
-        exit 1
-    }
-}
+ftr() { selftest_queue "$2" footerfmt "$1"; }
 
 # Legacy positional model: a template with %s keeps the historic addr/path/date
 # order byte-for-byte (backward compatibility).
@@ -40,3 +37,5 @@ ftr '{addr} %s' '{addr} host.example'
 ftr '{url}' 'http://host.example/dir/page.html'
 ftr 'src {lastmodified}, got {date}' 'src LASTMOD, got DATE'
 ftr '{mime}; {charset}; {status}; {size}' 'text/html; utf-8; 200; 1234'
+
+selftest_run_queued
