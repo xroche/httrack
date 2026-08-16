@@ -1,0 +1,97 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# url_savename()'s savename_type -1 branch is the one -N '<template>' selects.
+# It builds the name out of a crawled link, and used to abort the whole mirror
+# once that link outgrew save[] (#1295). filpad=N expands the '*' in the path
+# into N bytes, past what argv can carry. -#test=savename poisons the bytes
+# behind save[] and exits non-zero if the naming path reached them.
+
+# 40 bytes, so the host survives the downstream shortener as one whole segment
+# on every platform: its per-segment ceiling is 48 on Windows. Every name
+# asserted whole below also stays under its per-path ceiling, 236 on Windows.
+host=$(printf '%040d' 0 | tr '0' h)
+long_host=$(printf '%01000d' 0 | tr '0' h)
+
+# The two properties an over-long link must leave intact.
+leads_with() { # leads_with HEAD PAD ADR TEMPLATE
+    selftest_queue_head "savename: /dev/null/$1" savename '/dir/*.html' \
+        text/html "filpad=$2" "adr=$3" "userdef=$4"
+}
+ends_with_name_and_ext() { # ends_with_name_and_ext PAD ADR TEMPLATE
+    selftest_queue_tail 'aaaaaaaa.html' savename '/dir/*.html' text/html \
+        "filpad=$1" "adr=$2" "userdef=$3"
+}
+
+# Everything fits: the template's own output, byte for byte.
+name=$(printf '%0100d' 0 | tr '0' a)
+selftest_queue "savename: /dev/null/$host/dir/$name.html" savename \
+    '/dir/*.html' text/html filpad=100 "adr=$host" 'userdef=%h%p/%n.%t'
+
+# Past the end of save[] the link gives up its own bytes, not the template's:
+# the host, the path and the separator still lead the name, and the link's own
+# bytes and its extension still end it. The pads build 2050 and 2080 bytes
+# against a 2048-byte buffer; the 1000-byte host overruns it before the name
+# starts, so there only its first bytes can be named.
+for pad in 2000 2030; do
+    leads_with "$host/dir/" "$pad" "$host" '%h%p/%n.%t'
+    ends_with_name_and_ext "$pad" "$host" '%h%p/%n.%t'
+    leads_with 'hhhhhhhh' "$pad" "$long_host" '%h%p/%n.%t'
+    ends_with_name_and_ext "$pad" "$long_host" '%h%p/%n.%t'
+done
+
+# %M digests host+path in a buffer of its own that held neither at full length.
+# The digest is md5(host || path) over 3040 bytes, pinned: a clipped input, or
+# one truncated at any of the sizes that buffer has had, changes it.
+selftest_queue \
+    'savename: /dev/null/24e5e7d2008a5614c524ebbb8add35bd.html' savename \
+    '/dir/*.html' text/html filpad=2030 "adr=$long_host" 'userdef=%M.%t'
+
+# The 8.3 forms cut the same over-long link down to their own ceilings.
+selftest_queue "savename: /dev/null/$host/DIR/aaaaaaaa.htm" savename \
+    '/dir/*.html' text/html filpad=2030 "adr=$host" 'userdef=%sh%sp/%sn.%st'
+
+# The rest of the tokens, on a link short enough to assert whole.
+selftest_queue "savename: /dev/null/http/$host/dir/page.html" savename \
+    '/dir/page.html' text/html "adr=$host" 'userdef=%r/%H%p/%N'
+selftest_queue "savename: /dev/null/$host/page8803.html" savename \
+    '/dir/page.html?id=7' text/html "adr=$host" 'userdef=%h/%n%q.%t'
+selftest_queue \
+    "savename: /dev/null/$host/page8803cb530daebc650716593bdaf77b8a.html" \
+    savename '/dir/page.html?id=7' text/html "adr=$host" 'userdef=%h/%n%Q.%t'
+
+# A %[param] value is crawled text as well, copied into a 256-byte token with
+# no bound at all. This one reaches the third token past it, which holds the
+# suffix, so the extension arrives only if the value stayed inside its own.
+# Both ends are asserted, and neither reaches far: this name is a single
+# segment, which Windows cuts to 48 bytes, the closing ')' with it.
+value=$(printf '%0600d' 0 | tr '0' v)
+selftest_queue_head "savename: /dev/null/($(printf '%040d' 0 | tr '0' v)" \
+    savename "/p?q=$value" text/html "adr=$host" 'userdef=%[q:(:).x]'
+selftest_queue_tail '.x' savename \
+    "/p?q=$value" text/html "adr=$host" 'userdef=%[q:(:).x]'
+
+# A template with no directory part at all: the shortener wrote its separator
+# ahead of the copy that follows it and smeared the name's first byte over the
+# whole thing, extension included.
+leads_with 'aaaaaaaa' 2030 "$host" '%n.%t'
+ends_with_name_and_ext 2030 "$host" '%n.%t'
+
+# A '%' ending the template read past its end, and a token longer than the 256
+# bytes it is parsed into overran that buffer.
+selftest_queue "savename: /dev/null/$host/page.html" savename \
+    '/dir/page.html' text/html "adr=$host" 'userdef=%h/%n.%t%'
+big_token=$(printf '%0300d' 0 | tr '0' z)
+selftest_queue "savename: /dev/null/$host/none/page.html" savename \
+    '/dir/page.html' text/html "adr=$host" "userdef=%h/%[$big_token:(:):e:none]/%n.%t"
+
+selftest_run_queued
+
+# A sixth %[..] token never terminated. Left out of the batch: a spin here must
+# name its own case rather than wedge the file on the suite's wall-clock guard.
+assert_selftest "savename: /dev/null/$host/e/page.html" savename \
+    '/dir/page.html' text/html "adr=$host" 'userdef=%h/%[a:b:c:d:e:f:g]/%n.%t'

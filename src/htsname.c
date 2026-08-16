@@ -356,6 +356,48 @@ void url_savename_addtail(char *d, size_t dsize, const char *sep,
   strlcatbuff(d, s, dsize);
 }
 
+/* Append at most n characters of s, clipped to dsize. */
+static void tmpl_catn(char *d, size_t dsize, const char *s, size_t n) {
+  size_t i = strlen(d);
+
+  if (i + 1 >= dsize) /* nothing fits, and d already carries its NUL */
+    return;
+  for (; *s != '\0' && n != 0 && i + 1 < dsize; n--)
+    d[i++] = *s++;
+  d[i] = '\0';
+}
+
+static void tmpl_catc(char *d, size_t dsize, char c) {
+  char s[2];
+
+  s[0] = c;
+  s[1] = '\0';
+  tmpl_catn(d, dsize, s, 1);
+}
+
+/* Appends building a savename_type -1 name from a crawled link, which is as
+   long as the server likes: they clip, never abort (#1295). URL text loses
+   its own tail (TMPL_CAT). The template's separators, extension and digest
+   collect in tmpltail, then go in through url_savename_addtail(), which cuts
+   the middle instead. One run, or ".html" would cut away its own dot. */
+#define TMPL_FLUSH()                                                           \
+  do {                                                                         \
+    if (tmpltail[0] != '\0') {                                                 \
+      url_savename_addtail(afs->save, sizeof(afs->save), "", tmpltail);        \
+      tmpltail[0] = '\0';                                                      \
+    }                                                                          \
+  } while (0)
+#define TMPL_CATN(S, N)                                                        \
+  do {                                                                         \
+    TMPL_FLUSH();                                                              \
+    tmpl_catn(afs->save, sizeof(afs->save), (S), (size_t) (N));                \
+  } while (0)
+#define TMPL_CAT(S) TMPL_CATN((S), (size_t) -1)
+#define TMPL_TAILN(S, N)                                                       \
+  tmpl_catn(tmpltail, sizeof(tmpltail), (S), (size_t) (N))
+#define TMPL_TAIL(S) TMPL_TAILN((S), (size_t) -1)
+#define TMPL_TAILC(C) tmpl_catc(tmpltail, sizeof(tmpltail), (C))
+
 // Build the local save name (save) from adr/fil; renames on collision
 // (e.g. INDEX.HTML vs index.html).
 int url_savename(lien_adrfilsave *const afs,
@@ -962,7 +1004,7 @@ int url_savename(lien_adrfilsave *const afs,
   // ajouter nom du site éventuellement en premier
   if (opt->savename_type == -1) {       // utiliser savename_userdef! (%h%p/%n%q.%t)
     const char *a = StringBuff(opt->savename_userdef);
-    htsbuff sb = htsbuff_array(afs->save);
+    char BIGSTK tmpltail[HTS_URLMAXSIZE * 2];
 
     /*char *nom_pos=NULL,*dot_pos=NULL;  // Position nom et point */
     char tok;
@@ -983,7 +1025,9 @@ int url_savename(lien_adrfilsave *const afs,
      */
 
     // build the name
-    while ((*a) && (sb.len < HTS_URLMAXSIZE)) { // parse, but not too long
+    tmpltail[0] = '\0';
+    /* parse to the end, or the extension the appends protect never arrives */
+    while (*a != '\0') {
       if (*a == '%') {
         int short_ver = 0;
 
@@ -992,6 +1036,8 @@ int url_savename(lien_adrfilsave *const afs,
           short_ver = 1;
           a++;
         }
+        if (*a == '\0') /* a '%' or '%s' ending the template */
+          break;
         switch (tok = *a++) {
         case '[':              // %[param:prefix_if_not_empty:suffix_if_not_empty:empty_replacement:notfound_replacement]
           if (strchr(a, ']')) {
@@ -1003,16 +1049,16 @@ int url_savename(lien_adrfilsave *const afs,
               name[pos][0] = '\0';
             }
             pos = 0;
+            /* one byte spare in each token for the '=' name[0] gets below */
             while(*a != '\0' && *a != ']') {
-              if (pos < 5) {
-                if (*a == ':') {        // next token
-                  c = name[++pos];
-                  a++;
-                } else {
-                  *c++ = *a++;
-                  *c = '\0';
-                }
+              if (*a == ':') { // next token; past the fifth they are dropped
+                c = pos + 1 < 5 ? name[++pos] : NULL;
+              } else if (c != NULL &&
+                         (size_t) (c - name[pos]) + 2 < sizeof(name[pos])) {
+                *c++ = *a;
+                *c = '\0';
               }
+              a++;
             }
             if (*a == ']') {
               a++;
@@ -1028,99 +1074,100 @@ int url_savename(lien_adrfilsave *const afs,
               }
               if (cp) {
                 c = cp + strlen(name[0]);       /* jumps "param=" */
-                htsbuff_cat(&sb, name[1]);      /* prefix */
+                TMPL_TAIL(name[1]);             /* prefix */
                 if (*c != '\0' && *c != '&') {
                   char *d = name[0];
 
-                  /* */
-                  while(*c != '\0' && *c != '&') {
+                  /* crawled query text: clip it into the token buffer */
+                  while (*c != '\0' && *c != '&' &&
+                         d + 1 < name[0] + sizeof(name[0])) {
                     *d++ = *c++;
                   }
                   *d = '\0';
                   d = unescape_http(catbuff, sizeof(catbuff), name[0]);
                   if (d && *d) {
-                    htsbuff_cat(&sb, d); /* value */
+                    TMPL_CAT(d); /* value */
                   } else {
-                    htsbuff_cat(&sb, name[3]); /* empty replacement if any */
+                    TMPL_TAIL(name[3]); /* empty replacement if any */
                   }
                 } else {
-                  htsbuff_cat(&sb, name[3]); /* empty replacement if any */
+                  TMPL_TAIL(name[3]); /* empty replacement if any */
                 }
-                htsbuff_cat(&sb, name[2]); /* suffix */
+                TMPL_TAIL(name[2]); /* suffix */
               } else {
-                htsbuff_cat(&sb, name[4]); /* not found replacement if any */
+                TMPL_TAIL(name[4]); /* not found replacement if any */
               }
             } else {
-              htsbuff_cat(&sb, name[4]); /* not found replacement if any */
+              TMPL_TAIL(name[4]); /* not found replacement if any */
             }
           }
           break;
         case '%':
-          htsbuff_catc(&sb, '%');
+          TMPL_TAILC('%');
           break;
         case 'n': // name without extension
           if (dot_pos) {
             if (!short_ver)
-              htsbuff_catn(&sb, nom_pos, (int) (dot_pos - nom_pos));
+              TMPL_CATN(nom_pos, (int) (dot_pos - nom_pos));
             else
-              htsbuff_catn(&sb, nom_pos, min((int) (dot_pos - nom_pos), 8));
+              TMPL_CATN(nom_pos, min((int) (dot_pos - nom_pos), 8));
           } else {
             if (!short_ver)
-              htsbuff_cat(&sb, nom_pos);
+              TMPL_CAT(nom_pos);
             else
-              htsbuff_catn(&sb, nom_pos, 8);
+              TMPL_CATN(nom_pos, 8);
           }
           break;
         case 'N': // name with extension
           if (dot_pos) {
             if (!short_ver)
-              htsbuff_catn(&sb, nom_pos, (int) (dot_pos - nom_pos));
+              TMPL_CATN(nom_pos, (int) (dot_pos - nom_pos));
             else
-              htsbuff_catn(&sb, nom_pos, min((int) (dot_pos - nom_pos), 8));
+              TMPL_CATN(nom_pos, min((int) (dot_pos - nom_pos), 8));
           } else {
             if (!short_ver)
-              htsbuff_cat(&sb, nom_pos);
+              TMPL_CAT(nom_pos);
             else
-              htsbuff_catn(&sb, nom_pos, 8);
+              TMPL_CATN(nom_pos, 8);
           }
-          htsbuff_catc(&sb, '.');
+          TMPL_TAILC('.');
           if (dot_pos) {
             if (!short_ver)
-              htsbuff_cat(&sb, dot_pos + 1);
+              TMPL_TAIL(dot_pos + 1);
             else
-              htsbuff_catn(&sb, dot_pos + 1, 3);
+              TMPL_TAILN(dot_pos + 1, 3);
           } else {
             if (!short_ver)
-              htsbuff_cat(&sb, DEFAULT_EXT + 1); // skip the leading dot
+              TMPL_TAIL(DEFAULT_EXT + 1); // skip the leading dot
             else
-              htsbuff_cat(&sb, DEFAULT_EXT_SHORT + 1); // skip the leading dot
+              TMPL_TAIL(DEFAULT_EXT_SHORT + 1); // skip the leading dot
           }
           break;
         case 't': // extension
           if (dot_pos) {
             if (!short_ver)
-              htsbuff_cat(&sb, dot_pos + 1);
+              TMPL_TAIL(dot_pos + 1);
             else
-              htsbuff_catn(&sb, dot_pos + 1, 3);
+              TMPL_TAILN(dot_pos + 1, 3);
           } else {
             if (!short_ver)
-              htsbuff_cat(&sb, DEFAULT_EXT + 1); // skip the leading dot
+              TMPL_TAIL(DEFAULT_EXT + 1); // skip the leading dot
             else
-              htsbuff_cat(&sb, DEFAULT_EXT_SHORT + 1); // skip the leading dot
+              TMPL_TAIL(DEFAULT_EXT_SHORT + 1); // skip the leading dot
           }
           break;
         case 'p': // path without trailing /
           if (nom_pos !=
               fil + 1) { // skip when the path is empty (e.g. /index.html)
             if (!short_ver) {
-              htsbuff_catn(&sb, fil, (int) (nom_pos - fil) - 1);
+              TMPL_CATN(fil, (int) (nom_pos - fil) - 1);
             } else {
               char BIGSTK pth[HTS_URLMAXSIZE * 2], n83[HTS_URLMAXSIZE * 2];
 
               pth[0] = n83[0] = '\0';
               strncatbuff(pth, fil, (int) (nom_pos - fil) - 1);
               long_to_83(opt->savename_83, n83, sizeof(n83), pth);
-              htsbuff_cat(&sb, n83);
+              TMPL_CAT(n83);
             }
           }
           break;
@@ -1131,9 +1178,9 @@ int url_savename(lien_adrfilsave *const afs,
 
             /* Copy address */
             if (!short_ver)
-              htsbuff_cat(&sb, final_adr);
+              TMPL_CAT(final_adr);
             else
-              htsbuff_cat(&sb, final_adr);
+              TMPL_CAT(final_adr);
 
             /* release */
             RELEASE_ADR();
@@ -1142,26 +1189,27 @@ int url_savename(lien_adrfilsave *const afs,
         case 'H': // host, raw (old mode)
           if (protocol == PROTOCOL_FILE) {
             if (!short_ver)
-              htsbuff_cat(&sb, "localhost");
+              TMPL_CAT("localhost");
             else
-              htsbuff_cat(&sb, "local");
+              TMPL_CAT("local");
           } else {
             if (!short_ver)
-              htsbuff_cat(&sb, print_adr);
+              TMPL_CAT(print_adr);
             else
-              htsbuff_catn(&sb, print_adr, 8);
+              TMPL_CATN(print_adr, 8);
           }
           break;
         case 'M': /* host/address?query MD5 (128-bits) */
         {
           char digest[32 + 2];
-          char BIGSTK buff[HTS_URLMAXSIZE * 2];
+          /* sized for both sources, and clipped so a longer one cannot abort */
+          char BIGSTK buff[sizeof(afs->af.adr) + sizeof(afs->af.fil)];
 
           digest[0] = buff[0] = '\0';
-          strcpybuff(buff, adr);
-          strcatbuff(buff, fil_complete);
+          tmpl_catn(buff, sizeof(buff), adr, (size_t) -1);
+          tmpl_catn(buff, sizeof(buff), fil_complete, (size_t) -1);
           domd5mem(buff, strlen(buff), digest, 1);
-          htsbuff_cat(&sb, digest);
+          TMPL_TAIL(digest);
         } break;
         case 'Q':
         case 'q': /* query MD5 (128-bits/16-bits)
@@ -1169,11 +1217,11 @@ int url_savename(lien_adrfilsave *const afs,
         {
           char md5[32 + 2];
 
-          htsbuff_catn(&sb, url_md5(md5, fil_complete), (tok == 'Q') ? 32 : 4);
+          TMPL_TAILN(url_md5(md5, fil_complete), (tok == 'Q') ? 32 : 4);
         } break;
         case 'r':
         case 'R':              // protocol
-          htsbuff_cat(&sb, protocol_str[protocol]);
+          TMPL_TAIL(protocol_str[protocol]);
           break;
 
           /* Patch by Juan Fco Rodriguez to get the full query string */
@@ -1182,15 +1230,16 @@ int url_savename(lien_adrfilsave *const afs,
             char *d = strchr(fil_complete, '?');
 
             if (d != NULL) {
-              htsbuff_cat(&sb, d);
+              TMPL_CAT(d);
             }
           }
           break;
 
         }
       } else
-        htsbuff_catc(&sb, *a++);
+        TMPL_TAILC(*a++);
     }
+    TMPL_FLUSH();
     //
     // predefined types
     //
@@ -1615,8 +1664,10 @@ int url_savename(lien_adrfilsave *const afs,
           }
       }
 
-      // last segment
-      wsave[j++] = '/';
+      // last segment. Skip the separator when the name has no directory part:
+      // the copy below would run ahead of its own source and overwrite it.
+      if (lastSeg > 0)
+        wsave[j++] = '/';
 #define MAX_UTF8_SEQ_CHARS 4
       {
         // #623: the ".delayed" placeholder marker sits at the tail; cutting
