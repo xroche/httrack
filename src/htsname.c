@@ -360,6 +360,8 @@ void url_savename_addtail(char *d, size_t dsize, const char *sep,
 static void tmpl_catn(char *d, size_t dsize, const char *s, size_t n) {
   size_t i = strlen(d);
 
+  if (i + 1 >= dsize) /* nothing fits, and d already carries its NUL */
+    return;
   for (; *s != '\0' && n != 0 && i + 1 < dsize; n--)
     d[i++] = *s++;
   d[i] = '\0';
@@ -373,11 +375,11 @@ static void tmpl_catc(char *d, size_t dsize, char c) {
   tmpl_catn(d, dsize, s, 1);
 }
 
-/* Appends building a savename_type -1 name out of a crawled link, as long as
-   the server likes: they clip, never abort (#1295). URL text gives up its own
-   tail (TMPL_CAT); the separators, extension and digest the template asks for
-   collect in tmpltail and go in through url_savename_addtail(), which pushes
-   the middle out instead. One run, or ".html" would cut away its own dot. */
+/* Appends building a savename_type -1 name from a crawled link, which is as
+   long as the server likes: they clip, never abort (#1295). URL text loses
+   its own tail (TMPL_CAT). The template's separators, extension and digest
+   collect in tmpltail, then go in through url_savename_addtail(), which cuts
+   the middle instead. One run, or ".html" would cut away its own dot. */
 #define TMPL_FLUSH()                                                           \
   do {                                                                         \
     if (tmpltail[0] != '\0') {                                                 \
@@ -1024,7 +1026,7 @@ int url_savename(lien_adrfilsave *const afs,
 
     // build the name
     tmpltail[0] = '\0';
-    /* walked whole: stopping short would drop the extension the appends keep */
+    /* parse to the end, or the extension the appends protect never arrives */
     while (*a != '\0') {
       if (*a == '%') {
         int short_ver = 0;
@@ -1047,7 +1049,7 @@ int url_savename(lien_adrfilsave *const afs,
               name[pos][0] = '\0';
             }
             pos = 0;
-            /* one byte spare in each token for the '=' appended below */
+            /* one byte spare in each token for the '=' name[0] gets below */
             while(*a != '\0' && *a != ']') {
               if (*a == ':') { // next token; past the fifth they are dropped
                 c = pos + 1 < 5 ? name[++pos] : NULL;
@@ -1076,8 +1078,9 @@ int url_savename(lien_adrfilsave *const afs,
                 if (*c != '\0' && *c != '&') {
                   char *d = name[0];
 
-                  /* */
-                  while(*c != '\0' && *c != '&') {
+                  /* crawled query text: clip it into the token buffer */
+                  while (*c != '\0' && *c != '&' &&
+                         d + 1 < name[0] + sizeof(name[0])) {
                     *d++ = *c++;
                   }
                   *d = '\0';
@@ -1661,8 +1664,8 @@ int url_savename(lien_adrfilsave *const afs,
           }
       }
 
-      // last segment; no separator when there is no directory part, or the copy
-      // below runs ahead of its own source and smears wsave[0] over the name.
+      // last segment. Skip the separator when there is no directory part: the
+      // copy below would run ahead of its own source and overwrite wsave[0].
       if (j > 0)
         wsave[j++] = '/';
 #define MAX_UTF8_SEQ_CHARS 4
