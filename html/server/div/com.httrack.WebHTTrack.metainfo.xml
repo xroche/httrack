@@ -53,6 +53,18 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.49.22" date="2026-08-16">
+      <description>
+        <ul>
+          <li>When the mirror asks whether to follow a link, you can now answer for a whole domain instead of that one address</li>
+          <li>Your answer is applied to the rest of the mirror and written to the log, instead of deciding a single link</li>
+          <li>The footer added to mirrored pages takes named fields, so a custom one keeps working when the list grows</li>
+          <li>A long address, a long filter, a large cookies file or a large robots.txt no longer stops the mirror</li>
+          <li>A redirection to a long address is followed instead of being refused</li>
+          <li>Every language now has the text added since 3.49, and WebHTTrack quits when its window is closed</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.21" date="2026-08-12">
       <description>
         <ul>

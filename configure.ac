@@ -1,6 +1,6 @@
 AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.49.21], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
+AC_INIT([httrack], [3.49.22], [roche+packaging@httrack.com], [httrack], [http://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -29,6 +29,9 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
+# 3:15:0: revision-only bump. httrackp gained a tail field (wizard_filters) and two
+# exports arrived (hts_footer_field_ok, hts_wizard_host_scope); HTS_LOCATION_SIZE only
+# names lien_back.location_buffer's existing size, it does not change it.
 # 3:14:0: revision-only bump. httrackp gained a tail field (host_alias) and #1202
 # added an export (hts_host_alias_rule_ok); no layout moved, nothing went away.
 # 3:13:0: revision-only bump. htsstrings.h's StringRoomTotal grew saturation in
@@ -46,7 +49,7 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed
 # headers, so a libhttrack4 rename isn't worth it.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
-VERSION_INFO="3:14:0"
+VERSION_INFO="3:15:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 

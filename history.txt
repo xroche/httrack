@@ -4,6 +4,27 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-22
++ New: an interactive wizard question can be answered for a whole domain rather than for the one exact host it asked about; a front end enumerates the scopes on offer through the newly exported hts_wizard_host_scope() (#1117)
++ New: the -%F footer template takes named fields ("{url}", "{date}") in place of positional "%s", so a custom footer keeps working as the list grows; hts_footer_field_ok() exports the engine's own field list, which the help text and the guide are now generated from (#1240, #1256)
++ New: the per-option argument caps are macros in htsglobal.h (HTS_FOOTER_MAXSIZE and friends), so a front end can check a value against the engine's limit instead of copying it (#1262)
++ Fixed: a wizard answer decided a single link and vanished; it now becomes a filter that outranks the rules preceding it, applies for the rest of the mirror, and is written to hts-log.txt (#1249, #1250, #1251)
++ Fixed: a link the wizard authorized was mirrored under its ".delayed" placeholder name (#1254)
++ Fixed: the interactive wizard spun forever once stdin reached EOF (#1247)
++ Fixed: the wizard silently truncated the filter it built for a long host (#1264)
++ Fixed: several buffer overflows on long values read off the wire or the command line: --assume (#1276), a cookies.txt field (#1284), a filter or URL token in the option parser (#1271), the save name the cache rebuilds under a deeper -O (#1278), a crawled link just past the naming cap (#1269), and a -%F footer that exactly filled the page buffer (#1241)
++ Fixed: a filter rule longer than the matcher's cap was stored and never matched anything, while a rule that exactly fitted was refused by one byte (#1270, #1299)
++ Fixed: a redirect between 1 KB and 2 KB was refused by a gate half the size of the buffer holding it (#1291)
++ Fixed: a robots.txt whose rules ran past 4 KB was dropped without a word (#1286)
++ Fixed: a URL longer than 1024 bytes in a -%L list was split into two links (#1289)
++ Fixed: doit.log wrote a leading quote raw and swallowed the options after it, and stripped a quoted argument twice on the way back in (#1263)
++ Fixed: the credit tag in every mirrored page was dated 2014 (#1243)
++ Fixed: the index templates and their compiled-in copies had drifted apart, so the built-in fallback wrote a different page (#1244)
++ Fixed: an abandoned WebHTTrack server never stopped, holding the macOS application open (#1236)
++ Fixed: the filter documentation described a matcher the engine does not implement (#1302)
++ Changed: every language catalog carries the strings added since 3.49, and a value left in English no longer passes the integrity test (#1255, #1260)
++ Changed: multiple internal hardening, test and build improvements
+
 3.49-21
 + New: --host-alias (-%C) folds the several hostnames of one site onto a single canonical host, so a site that answers under more than one hostname is fetched once instead of once per name (#16)
 + New: the WebHTTrack wizard can set the host-alias rules and the guide documents them for every front end; a malformed rule is refused where it can still be corrected, through a newly exported hts_host_alias_rule_ok() (#1161, #1172, #1192)
