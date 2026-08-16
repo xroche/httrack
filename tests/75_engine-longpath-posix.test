@@ -21,7 +21,7 @@ deep="/a/$(printf 'b%.0s' {1..100})/c/$(printf 'd%.0s' {1..100})"
 out="$("$httrack_bin" -O /dev/null -#test=savename "$deep/$seg.html" text/html |
     sed -n 's/^savename: //p')"
 
-case "$(uname -s 2>/dev/null)" in
+case "$HTS_OS" in
 MINGW* | MSYS* | CYGWIN*)
     # Windows still caps at MAX_PATH: the distinctive tail is cut
     case "$out" in

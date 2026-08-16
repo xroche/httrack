@@ -19,7 +19,7 @@ if test "${V6_SUPPORT:-}" == "no"; then
 fi
 # The fixture needs a second loopback IP (dead 127.0.0.2 + live 127.0.0.1) for
 # the fallback to have a target; GNU/Hurd has only 127.0.0.1, so skip there.
-case "$(uname -s)" in
+case "$HTS_OS" in
 GNU | GNU/*)
     echo "GNU/Hurd: single loopback IP, connect-fallback fixture unbuildable, skipping"
     exit 77

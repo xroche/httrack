@@ -12,7 +12,7 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-case "$(uname -s)" in
+case "$HTS_OS" in
 MINGW* | MSYS_NT*) want=fallback ;; # native rename() refuses an existing target
 *) want=clobber ;;
 esac
@@ -22,7 +22,7 @@ assert_match "renameover: OK" "$out"
 assert_match "renameover: regime $want" "$out"
 assert_match "renameover: restore back" "$out"
 
-if [ "$(uname -s)" != "Linux" ]; then
+if [ "$HTS_OS" != "Linux" ]; then
     echo "renameover: LD_PRELOAD interposition is Linux-only here, skipping"
     exit 0
 fi

@@ -22,7 +22,7 @@ cd "$scratch"
 hexseg=$(printf 'a1b2c3d4e5f60718%.0s' {1..8}) # 128 hex chars
 
 # engine ceiling is the Windows MAX_PATH on Windows, the save buffer elsewhere
-case "$(uname -s 2>/dev/null)" in
+case "$HTS_OS" in
 MINGW* | MSYS* | CYGWIN*)
     ceil=236
     outdir=/dev/null

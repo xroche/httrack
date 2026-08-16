@@ -41,7 +41,7 @@ shared=$(find "${staged_libdir}" -maxdepth 1 \( -name 'libhttrack.so*' -o -name 
 
 # Without the @rpath id there is nothing an rpath can answer: the dylib keeps an
 # absolute install name, and only the real libdir resolves.
-[ "$(uname -s)" != Darwin ] || [ "${ORIGIN_RPATH:-no}" = yes ] ||
+[ "$HTS_OS" != Darwin ] || [ "${ORIGIN_RPATH:-no}" = yes ] ||
     skip "configure did not enable a binary-relative rpath in this build"
 
 export PKG_CONFIG_PATH=${staged_libdir}/pkgconfig

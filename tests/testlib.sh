@@ -11,6 +11,11 @@ testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # own value, so the default only serves a hand-run and the Windows suite.
 : "${top_srcdir:=..}"
 
+# uname -s once per process tree, since every skip gate and every crawl asks for
+# it and each one is a fork the MSYS runtime emulates (#1273).
+: "${HTS_OS:=$(uname -s 2>/dev/null || echo unknown)}"
+export HTS_OS
+
 fail() {
     echo "FAIL: $*" >&2
     exit 1
@@ -219,13 +224,13 @@ declared_header_count() {
     declared_headers | awk 'END { print NR + 0 }'
 }
 
-IS_WINDOWS=
 is_windows() {
-    if test -z "$IS_WINDOWS"; then
-        case "$(uname -s)" in
+    if test -z "${IS_WINDOWS:-}"; then
+        case "$HTS_OS" in
         MINGW* | MSYS* | CYGWIN*) IS_WINDOWS=yes ;;
         *) IS_WINDOWS=no ;;
         esac
+        export IS_WINDOWS
     fi
     test "$IS_WINDOWS" = yes
 }
