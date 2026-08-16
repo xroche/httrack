@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# A size clause carries two bounds (#1303): *[<80>1], *[>1<80] and *[>1,<80] all
+# mean "over 1 KB and under 80 KB". The parser used to return on the first
+# number, so the second bound was dead.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# -#test=filtersize <size in KB> <string> <filter...>; a negative size means the
+# size is not known yet (scan time).
+fsize() {
+    local want=$1
+    shift
+    selftest_queue "$want" filtersize "$@"
+}
+
+# Both bounds apply, in either order and with or without the comma, and both are
+# strict.
+for rule in '+*[<80>1]' '+*[>1<80]' '+*[>1,<80]'; do
+    fsize 'verdict=forbidden size_flag=1' 0 a.gif '-*' "$rule"
+    fsize 'verdict=forbidden size_flag=1' 1 a.gif '-*' "$rule"
+    fsize 'verdict=allowed size_flag=1' 2 a.gif '-*' "$rule"
+    fsize 'verdict=allowed size_flag=1' 79 a.gif '-*' "$rule"
+    fsize 'verdict=forbidden size_flag=1' 80 a.gif '-*' "$rule"
+    fsize 'verdict=forbidden size_flag=1' 100 a.gif '-*' "$rule"
+    # neither bound may fire while the size is unknown
+    fsize 'verdict=forbidden size_flag=0' -1 a.gif '-*' "$rule"
+done
+
+# Controls: a lone bound still means what it always did, so the reds above are
+# the second bound and not a shifted comparison.
+fsize 'verdict=allowed size_flag=1' 0 a.gif '-*' '+*[<80]'
+fsize 'verdict=allowed size_flag=1' 79 a.gif '-*' '+*[<80]'
+fsize 'verdict=forbidden size_flag=1' 80 a.gif '-*' '+*[<80]'
+fsize 'verdict=forbidden size_flag=1' 1 a.gif '-*' '+*[>1]'
+fsize 'verdict=allowed size_flag=1' 2 a.gif '-*' '+*[>1]'
+fsize 'verdict=allowed size_flag=1' 100 a.gif '-*' '+*[>1]'
+
+# An exclusion reads both bounds too.
+fsize 'verdict=allowed size_flag=1' 0 a.gif '+*' '-*[>1<80]'
+fsize 'verdict=forbidden size_flag=1' 40 a.gif '+*' '-*[>1<80]'
+
+# Every bound counts, not just the first two, and two in the same direction stay
+# a conjunction instead of the last one winning.
+fsize 'verdict=forbidden size_flag=1' 20 a.gif '-*' '+*[>1<80>30]'
+fsize 'verdict=allowed size_flag=1' 50 a.gif '-*' '+*[>1<80>30]'
+fsize 'verdict=allowed size_flag=1' 30 a.gif '-*' '+*[<40<80]'
+fsize 'verdict=forbidden size_flag=1' 60 a.gif '-*' '+*[<40<80]'
+
+# A window nothing can satisfy is taken as written and simply never matches.
+fsize 'verdict=forbidden size_flag=1' 0 a.gif '-*' '+*[>80<1]'
+fsize 'verdict=forbidden size_flag=1' 40 a.gif '-*' '+*[>80<1]'
+fsize 'verdict=forbidden size_flag=1' 100 a.gif '-*' '+*[>80<1]'
+
+# A rule off -%S is hostile input, so a malformed clause must not abort. A bound
+# with no digits is no size test: the operator is dropped and only what follows
+# it joins the class. And a number longer than an int must not overflow.
+fsize 'verdict=forbidden size_flag=0' 5 '<' '-*' '+*[<]'  # '<' is not a member
+fsize 'verdict=allowed size_flag=0' 5 abc '-*' '+*[<abc]' # but its tail is
+fsize 'verdict=forbidden size_flag=0' 5 '<abc' '-*' '+*[<abc]'
+fsize 'verdict=allowed size_flag=1' 5 a.gif '-*' '+*[<80>]'
+fsize 'verdict=allowed size_flag=1' 5 a.gif '-*' '+*[>1<]'
+fsize 'verdict=allowed size_flag=1' 5 a.gif '-*' '+*[<99999999999999999999]'
+fsize 'verdict=forbidden size_flag=1' 5 a.gif '-*' '+*[>99999999999999999999]'
+
+selftest_run_queued
