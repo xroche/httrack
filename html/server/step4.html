@@ -115,12 +115,13 @@ ${do:end-if}
 ${/* Real commands and ini file generated below */}
 
 <!-- engine commandline; ztest so a cleared default-on option still emits its disabling flag -->
+<!-- slot 2 is --mirror, not --mirror-wizard: a WinHTTrack profile can still carry that action and no page here can answer the questions (#1237) -->
 ${do:output-mode:html}
 <textarea name="command" cols="50" rows="4" style="visibility:hidden">
 httrack \
 	--quiet \
 	--build-top-index \
-	${test:todo:--mirror:--mirror:--mirror-wizard:--get:--mirrorlinks:--testlinks:--continue:--update}
+	${test:todo:--mirror:--mirror:--mirror:--get:--mirrorlinks:--testlinks:--continue:--update}
 	${unquoted:urls}
 	${test:filelist:-%L "}${arg:filelist}${test:filelist:"}
 	--path "${arg:path}/${arg:projname}" 

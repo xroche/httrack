@@ -120,7 +120,8 @@ ${do:end-if}
 		<select name="todo"
 			title='${html:LANG_G9}' onMouseOver="info('${js:LANG_G9}'); return true" onMouseOut="info('&nbsp;'); return true"		
 		>
-		${listid:todo:LISTDEF_10}
+		${/* entry 2 is the wizard, unanswerable here (#1237); the ids around it keep their values, shared with WinHTTrack through winprofile.ini */}
+		${listid:todo:LISTDEF_10:2}
 		</select>
 
 	</td></tr>

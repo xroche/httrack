@@ -616,6 +616,24 @@ static void cat_cmdline_arglist(String *output, const char *value,
   }
 }
 
+/* Append one <select> entry. A hidden id emits nothing, and the entries around
+   it keep their own ids: the value is a shared setting (winprofile.ini's
+   CurrentAction), so a front end that drops a mode must not renumber the rest.
+ */
+static void cat_list_option(String *output, const char *label, int id,
+                            int listDefault, int listHidden) {
+  char tag[48];
+
+  if (id == listHidden) {
+    return;
+  }
+  snprintf(tag, sizeof(tag), "<option value=%d%s>", id,
+           id == listDefault ? " selected" : "");
+  StringCat(*output, tag);
+  StringCat(*output, label);
+  StringCat(*output, "</option>\r\n");
+}
+
 /* step4.html writes these keys as ${ztest:<var>:0:1}; a cleared checkbox is
    empty in session state, so only they need the 0-to-empty inverse here. */
 static const char *const ini_checkbox_keys[] = {
@@ -1333,6 +1351,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     int p;
                     int format = 0;
                     int listDefault = 0;
+                    int listHidden = 0;
                     hts_boolean unquoted = HTS_FALSE;
                     /* value comes from the template, not from the settings */
                     hts_boolean literal = HTS_FALSE;
@@ -1632,6 +1651,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           name += n2 + 1;
                         }
                       }
+                      /* ${listid:<var>:<key>:<id>}: <id> is an entry this front
+                         end cannot serve and must not offer. */
+                      pos2 = strrchr(name, ':');
+                      if (pos2 != NULL && pos2[1] != '\0' &&
+                          strspn(pos2 + 1, "0123456789") == strlen(pos2 + 1)) {
+                        listHidden = atoi(pos2 + 1);
+                        *pos2 = '\0';
+                      }
                     } else if ((p = strfield(name, "checked:"))) {
                       name += p;
                       format = 3;
@@ -1725,13 +1752,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                           const char *fstr = langstr;
 
                           StringClear(tmpbuff);
-                          if (format == 2) {
-                            /* Check the default here too: the loop only opens
-                             * ids 2 and up. */
-                            StringCat(output, listDefault == 1
-                                                  ? "<option value=1 selected>"
-                                                  : "<option value=1>");
-                          } else if (format == -2) {
+                          if (format == -2) {
                             StringCat(output, "<option value=\"");
                           }
                           while(*fstr) {
@@ -1749,17 +1770,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                                 StringCat(output, "</option>\r\n");
                                 StringCat(output, "<option value=\"");
                               } else {
-                                char tmp[32];
-
-                                sprintf(tmp, "%d", ++id);
-                                StringCat(output, StringBuff(tmpbuff));
-                                StringCat(output, "</option>\r\n");
-                                StringCat(output, "<option value=");
-                                StringCat(output, tmp);
-                                if (listDefault == id) {
-                                  StringCat(output, " selected");
-                                }
-                                StringCat(output, ">");
+                                cat_list_option(&output, StringBuff(tmpbuff),
+                                                id++, listDefault, listHidden);
                               }
                               StringClear(tmpbuff);
                               break;
@@ -1776,8 +1788,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                             fstr++;
                           }
                           if (format == 2) {
-                            StringCat(output, StringBuff(tmpbuff));
-                            StringCat(output, "</option>");
+                            cat_list_option(&output, StringBuff(tmpbuff), id,
+                                            listDefault, listHidden);
                           } else if (format == -2) {
                             StringCat(output, StringBuff(tmpbuff));
                             StringCat(output, "\">");
