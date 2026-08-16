@@ -1664,9 +1664,9 @@ int url_savename(lien_adrfilsave *const afs,
           }
       }
 
-      // last segment. Skip the separator when there is no directory part: the
-      // copy below would run ahead of its own source and overwrite wsave[0].
-      if (j > 0)
+      // last segment. Skip the separator when the name has no directory part:
+      // the copy below would run ahead of its own source and overwrite it.
+      if (lastSeg > 0)
         wsave[j++] = '/';
 #define MAX_UTF8_SEQ_CHARS 4
       {
