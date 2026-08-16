@@ -64,6 +64,10 @@ while [ $# -gt 0 ]; do
 done
 test -n "$app" || usage
 test -n "$identity" || usage
+# Checked here, not at the DMG: a typo must not cost a notarization submission first.
+case "$label" in
+*[!A-Za-z0-9._-]*) fail "--label $label is not usable in a filename" ;;
+esac
 test -d "$app" || fail "no bundle at $app -- run make macos-app first"
 app=$(cd "$app" && pwd -P)
 out=${out:-$(dirname "$app")}
@@ -143,13 +147,7 @@ fi
 
 version=$(plist_value "$app/Contents/Info.plist" CFBundleShortVersionString)
 test -n "$version" || fail "no CFBundleShortVersionString in $app/Contents/Info.plist"
-
-# --label names the download for a product channel (a 3.50 beta) whose number is not the
-# engine's. It renames the DMG only: the bundle keeps the version its payload reports, so
-# macos-app.sh's plist-vs-binary guard still holds.
-case "$label" in
-*[!A-Za-z0-9._-]*) fail "--label $label is not usable in a filename" ;;
-esac
+# --label renames the download for a product channel; the bundle keeps its own version.
 name=${label:-$version}
 
 # The filename is what a user reads before downloading, so name the arch (#1083).

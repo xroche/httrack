@@ -153,9 +153,10 @@ jobs:
           path: ${{ runner.temp }}/HTTrack-*.dmg
           if-no-files-found: error
 
-      # Releases are cut by hand, so a tag can land before one exists.
+      # Releases are cut by hand, so a tag can land before one exists. A labelled build is
+      # never one of them: ref_type is 'tag' for a dispatch on a tag as much as for a push.
       - name: Attach the DMG to the release
-        if: github.ref_type == 'tag'
+        if: github.ref_type == 'tag' && !inputs.label
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -457,6 +457,19 @@ jobs:
           set -euo pipefail
           bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
             --identity - --skip-notarize
+          ls "$RUNNER_TEMP/moved"/HTTrack-*-macos-*.dmg >/dev/null
+
+      # --label names the download for a product channel. The bundle inside keeps the
+      # engine's version, which the step above already asserted against the binary.
+      - name: Pack again under a channel label
+        run: |
+          set -euo pipefail
+          bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
+            --identity - --skip-notarize --label 3.50-beta-0
+          ls "$RUNNER_TEMP/moved"/HTTrack-3.50-beta-0-macos-*.dmg >/dev/null
+          # Refused before anything is signed, so a typo costs a second, not a submission.
+          ! bash tools/macos-release.sh --app "$RUNNER_TEMP/moved/HTTrack.app" \
+            --identity - --skip-notarize --label 'a b/c'
 
   # Portability/hardening: 32-bit (i386) build on the x86-64 runner via multilib
   # -- no extra hardware. Exercises the 32-bit size_t/pointer ABI, where size
