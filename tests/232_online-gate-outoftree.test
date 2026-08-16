@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # 226 asks this of every test naming the Windows suite driver, as the sweep's
 # allowlist below does.

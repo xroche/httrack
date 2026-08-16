@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # #1117: the self-test asserts the scopes and the patterns; this feeds the pair
 # a scope answer emits back through the matcher that authorizes a link.

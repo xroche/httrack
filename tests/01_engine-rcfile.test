@@ -14,7 +14,7 @@
 # status is inspected by hand).
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Resolve httrack to an absolute path before we cd: PATH may hold a build-relative
 # entry that would not resolve from the temp directory.

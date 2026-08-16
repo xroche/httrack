@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # brotli/zstd decode, unknown codings, and the decoded-size budget.
 dir=$(mktemp -d)

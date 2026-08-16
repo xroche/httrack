@@ -10,7 +10,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
-. "${0%"${0##*/}"}crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 
 find_python >/dev/null || skip "python3 not found"
 

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/webhttracklib.sh
-. "${0%"${0##*/}"}webhttracklib.sh"
+. "${0%"${0##*/}"}./webhttracklib.sh"
 
 htsserver_require
 distdir=${HTS_DISTDIR}

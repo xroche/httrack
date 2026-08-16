@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # url_savename_addstr() appends a crawled link to afs->save; with no size cap it
 # wrote past the buffer (#1269).

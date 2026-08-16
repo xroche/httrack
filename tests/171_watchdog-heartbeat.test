@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Before the driver is sourced: with these set, anything it starts posts a commit
 # status on whatever the surrounding shell was last looking at.

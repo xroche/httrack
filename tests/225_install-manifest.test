@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 : "${abs_top_builddir:?not run under make check}"
 manifest="${abs_top_srcdir:?not run under make check}/tests/install-manifest.txt"

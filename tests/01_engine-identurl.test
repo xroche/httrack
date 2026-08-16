@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # ident_url_absolute splits a raw URL into (adr, fil), the first parser to touch
 # it. -#test=identurl <url> [pad] prints "adr=.. fil=.." or "error"; pad appends

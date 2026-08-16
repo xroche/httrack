@@ -6,7 +6,7 @@
 set -eu
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Bare -#test lists known tests (printed to stderr).
 list=$(httrack -#test 2>&1)

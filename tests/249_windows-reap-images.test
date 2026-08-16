@@ -7,9 +7,9 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 # shellcheck source=tests/proclib.sh
-. "${0%"${0##*/}"}proclib.sh"
+. "${0%"${0##*/}"}./proclib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_reapimg.XXXXXX")
 cleanup_push rm -rf "$tmp"

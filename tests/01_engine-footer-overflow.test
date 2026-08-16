@@ -6,7 +6,7 @@
 
 set -eu
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # The overflow needs a path longer than Windows MAX_PATH (260), so both the
 # source tree and the mirror output blow past it there; run on POSIX only. The

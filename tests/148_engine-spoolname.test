@@ -5,7 +5,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/spoolname.XXXXXX") || {
     echo "no tmpdir" >&2

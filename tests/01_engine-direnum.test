@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Drives -#test=direnum: enumerate a long+non-ASCII directory through the
 # opendir/readdir wrappers, checking each child round-trips as UTF-8 (#133,#630).

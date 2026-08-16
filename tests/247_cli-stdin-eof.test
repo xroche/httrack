@@ -7,7 +7,7 @@
 set -eu
 
 # shellcheck source=tests/crawllib.sh
-. "${0%"${0##*/}"}crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 ttyrun=$(nativepath "${testdir}/ttyrun.py")
 
 skip_on_windows "no pty on Windows"

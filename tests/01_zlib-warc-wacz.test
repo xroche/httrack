@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # --wacz packaging over synthetic transactions: the WACZ unzips in-process to
 # the fixed layout, every entry is ZIP STORE, each datapackage sha256 recomputes

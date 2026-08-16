@@ -6,7 +6,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"

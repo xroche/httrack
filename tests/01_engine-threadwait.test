@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_threadwait_st.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmpdir"

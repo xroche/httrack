@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Drives -#test=longpath: a >MAX_PATH round trip exercising hts_pathToUCS2's
 # \\?\ prefixing on Windows (#133); a positive control on POSIX.

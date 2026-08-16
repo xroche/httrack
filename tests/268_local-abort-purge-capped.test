@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
-. "${0%"${0##*/}"}crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 
 command -v httrack >/dev/null || fail "could not find httrack"
 

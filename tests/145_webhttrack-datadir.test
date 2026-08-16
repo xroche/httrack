@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 script="${abs_top_builddir:?not run under make check}/src/webhttrack"
 datadir="${CONFIGURED_DATADIR:?not run under make check}"

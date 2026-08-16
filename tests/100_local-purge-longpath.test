@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # python3 is required; mirror check-network.sh's skip-with-77 convention.
 python=$(find_python) || skip "python3 not found"

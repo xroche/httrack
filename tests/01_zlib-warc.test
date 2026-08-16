@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # WARC/1.1 writer self-test: framing, Content-Length, gzip members, round-trip,
 # revisit dedup, plus v1.1 WARC-Truncated, ftp resource records, and

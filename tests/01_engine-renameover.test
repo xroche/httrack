@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Drives -#test=renameover: hts_rename_over() must replace an existing dst, and
 # must leave dst alone when the rename failed for a reason moving dst aside

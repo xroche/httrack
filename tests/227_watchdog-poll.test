@@ -7,7 +7,7 @@
 set -eu
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_poll.XXXXXX") || exit 1
 # A colon-free root for the PATH shim below: MSYS hands out a drive-letter TMPDIR

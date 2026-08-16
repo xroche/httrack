@@ -6,7 +6,7 @@
 set -eu
 
 # shellcheck source=tests/crawllib.sh
-. "${0%"${0##*/}"}crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 root=$(nativepath "${testdir}/server-root")
 
 httrack=$(command -v httrack) || ! echo "could not find httrack" >&2 || exit 1

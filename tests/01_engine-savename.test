@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Local save-name resolution (url_savename via -#test=savename <fil> <content-type> [key=value ...]).
 # name() asserts on the basename, full() on the whole path; prior= registers an

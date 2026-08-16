@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # The Location gate must equal htsblk.location's buffer (HTS_LOCATION_SIZE,
 # 2048). Each case reports the length asked, the length kept, whether the value

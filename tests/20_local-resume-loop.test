@@ -4,7 +4,7 @@
 set -u
 
 # shellcheck source=tests/crawllib.sh
-. "${0%"${0##*/}"}crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 root=$(nativepath "${testdir}/server-root")
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_206.XXXXXX") || exit 1

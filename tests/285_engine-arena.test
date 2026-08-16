@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # htsarena.h, the pool the link records and the rebuilt command line hold raw
 # pointers into (driven by 'httrack -#test=arena'). It keeps every address it

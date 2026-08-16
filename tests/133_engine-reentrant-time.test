@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # A non-UTC zone, so a helper that reached for gmtime instead of localtime (or
 # vice-versa) gives a different answer: CI runners are UTC, where they agree.

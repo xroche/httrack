@@ -10,7 +10,7 @@ set -euo pipefail
 
 # run_with_timeout: timeout(1) is absent on macOS, and the listen servers block.
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_portsib.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"

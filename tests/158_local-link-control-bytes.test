@@ -7,7 +7,7 @@
 set -eu
 
 # shellcheck source=tests/crawllib.sh
-. "${0%"${0##*/}"}crawllib.sh"
+. "${0%"${0##*/}"}./crawllib.sh"
 
 # The fixtures carry the raw bytes the requests decode back to, which NTFS
 # refuses.
