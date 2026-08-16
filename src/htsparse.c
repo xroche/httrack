@@ -4064,8 +4064,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
 
         former.adr[0] = former.fil[0] = '\0';
 
-        // calculer lien et éventuellement modifier addresse/fichier
-        r_sv = url_savename(&add, &former, NULL, NULL, opt, sback, cache, hash,
+        // resolve the link, possibly rewriting address/file
+        r_sv = url_savename(&add, NULL, NULL, NULL, opt, sback, cache, hash,
                             ptr, numero_passe, NULL);
         /* No headers were passed, so the name may still be a placeholder: the
            parser resolves it before recording, and so must we (#1253). */
@@ -4074,14 +4074,15 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
               hts_wait_delayed(str, &add, NULL, NULL, &former, &forbidden_url);
         }
         if (r_sv != -1) {
-          if (forbidden_url == 1) {
-            hts_log_print(
-                opt, LOG_NOTICE,
-                "Link %s%s not added after user request: type refused",
-                add.af.adr, add.af.fil);
+          /* A refused type, or a stop that left the placeholder: recording
+             that name is the bug. */
+          if (forbidden_url == 1 || IS_DELAYED_EXT(add.save)) {
+            hts_log_print(opt, LOG_NOTICE,
+                          "Link %s%s not added after user request", add.af.adr,
+                          add.af.fil);
           } else if (hash_read(hash, add.save, NULL, HASH_STRUCT_FILENAME) <
-                     0) { // n'existe pas déja
-            // enregistrer lien
+                     0) { // no existing record
+            // record the link
             if (hts_record_link(opt, add.af.adr, add.af.fil, add.save,
                                 former.adr, former.fil, NULL)) {
               heap_top()->testmode = 0;    // mode test?
@@ -4095,7 +4096,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
               hts_log_print(opt, LOG_INFO, "Link added by user: %s%s", add.af.adr,
                             add.af.fil);
               //
-            } else { // oups erreur, plus de mémoire!!
+            } else { // out of memory
               hts_addurl_free(addurl);
               XH_uninit;        // désallocation mémoire & buffers
               return;

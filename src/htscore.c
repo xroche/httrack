@@ -3704,14 +3704,21 @@ void hts_addurl_free(char **url) {
   }
 }
 
+/* Install url and return what it replaced (locked) */
+static char **hts_addurl_swap_(httrackp *opt, char **url) {
+  char **const old = opt->state._hts_addurl;
+
+  opt->state._hts_addurl = url;
+  return old;
+}
+
 char **hts_addurl_take(httrackp *opt) {
-  char **url;
+  char **old;
 
   hts_mutexlock(&opt->state.lock);
-  url = opt->state._hts_addurl;
-  opt->state._hts_addurl = NULL;
+  old = hts_addurl_swap_(opt, NULL);
   hts_mutexrelease(&opt->state.lock);
-  return url;
+  return old;
 }
 
 /* Deep copy: the caller's array is typically a stack local, and the engine
@@ -3719,7 +3726,7 @@ char **hts_addurl_take(httrackp *opt) {
 HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
   char **copy = NULL;
 
-  if (url != NULL && *url != NULL) {
+  if (url != NULL) {
     size_t n, i;
 
     for (n = 0; url[n] != NULL; n++)
@@ -3733,10 +3740,14 @@ HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
     }
   }
   if (copy != NULL) {
-    hts_addurl_free(hts_addurl_take(opt));
+    char **old;
+
+    /* One critical section: two racing callers must not both read NULL and
+       then both install, which leaks the loser's list. */
     hts_mutexlock(&opt->state.lock);
-    opt->state._hts_addurl = copy;
+    old = hts_addurl_swap_(opt, copy);
     hts_mutexrelease(&opt->state.lock);
+    hts_addurl_free(old);
   }
   return (copy != NULL);
 }
