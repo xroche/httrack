@@ -333,8 +333,8 @@ HTS_INLINE void time_rfc822(char *s, struct tm *A);
 HTS_INLINE void time_rfc822_local(char *s, struct tm *A);
 
 HTS_INLINE int sendc(htsblk * r, const char *s);
-/* Returns the advance to the next line, NUL included. Unlike binput_line(),
-   "max" excludes the terminator: "s" must hold max + 1 bytes. */
+/* Returns the advance past the line's terminator. Unlike binput_line(), "max"
+   excludes the NUL: "s" must hold max + 1 bytes. */
 int binput(const char *buff, char *s, int max);
 /* Read one line, from a buffer up to "end" or from a socket, consuming it whole
    even when it does not fit "s". HTS_TRUE means it was cut: the value is not
