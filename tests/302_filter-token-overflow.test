@@ -13,8 +13,8 @@ assert_selftest "scantoken self-test OK" scantoken
 tmpdir="$(mktemp -d)"
 cleanup_push rm -rf "$tmpdir"
 
-# HTS_URLMAXSIZE * 2, less the NUL. The sign is prepended after the copy, so a
-# rule's own cap is one higher than the token's; 317 pins the two together.
+# Token caps, both less the NUL: a rule loses one more byte to the sign the
+# engine prepends after the copy, so its own cap is 2048. 317 pins that one.
 maxfilter=2047
 maxurl=2047
 

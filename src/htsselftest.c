@@ -5462,8 +5462,8 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
   freet(filters);
   opt->filters = saved;
   opt->wizard_filters = savedwizard;
-  /* every cap a rule meets, so a test places its boundaries from the engine
-     rather than hardcoding numbers that drift from it (#1288) */
+  /* the caps a rule meets, so a test reads them instead of hardcoding a number
+     that drifts from the engine (#1288) */
   printf("filtercap: rule=%d matcher=%d slot=%d argv=%d\n",
          (int) HTS_FILTER_MAXLEN, (int) STRJOKER_MAXLEN,
          (int) HTS_FILTER_SLOT_SIZE, (int) HTS_CDLMAXSIZE);

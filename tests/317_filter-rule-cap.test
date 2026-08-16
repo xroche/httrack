@@ -17,8 +17,8 @@ matcher=${matcher#matcher=}
 slot=${slot#slot=}
 argvcap=${argvcap#argv=}
 
-# A stored rule is one the matcher reads and a slot holds; the matcher is the
-# lower of the two today, so it is what governs.
+# A stored rule is one the matcher reads and a slot holds. The matcher is the
+# tighter of the two today, so it governs.
 test "$rulecap" -le "$matcher" || fail "cap $rulecap outreaches the matcher $matcher"
 test "$slot" -gt "$rulecap" || fail "slot $slot does not outsize the cap $rulecap"
 test "$argvcap" -le "$rulecap" || fail "argv $argvcap outreaches the cap $rulecap"
@@ -78,8 +78,8 @@ assert_eq 1 "$seedwarned" "a seed past every bound"
 seedcap=$(sed -n 's/.*URL longer than \([0-9]*\) bytes.*/\1/p' "$tmpdir/p/hts-log.txt")
 test -n "$seedcap" || fail "the seed refusal did not name its own cap"
 
-# Two bounds, not one shared: the sign a rule spends costs the seed a byte, so
-# the length the parser keeps as a rule is one it drops as a URL.
+# Two bounds, not one shared: a rule spends a byte on its sign, so the length
+# the parser keeps as a rule is one it drops as a URL.
 test "$seedcap" -ne "$rulecap" || fail "seed and rule share the cap $rulecap"
 seed "$seedcap"
 assert_eq 0 "$seedwarned" "seed at its own cap"
