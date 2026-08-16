@@ -120,7 +120,8 @@ ${do:end-if}
 		<select name="todo"
 			title='${html:LANG_G9}' onMouseOver="info('${js:LANG_G9}'); return true" onMouseOut="info('&nbsp;'); return true"		
 		>
-		${listid:todo:LISTDEF_10}
+		${/* entry 2 is the wizard, unanswerable here (#1237); hidden rather than dropped so the ids around it keep their stored values */}
+		${listid:todo:LISTDEF_10:2}
 		</select>
 
 	</td></tr>

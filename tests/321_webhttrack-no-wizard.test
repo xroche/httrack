@@ -1,0 +1,135 @@
+#!/bin/bash
+#
+# WebHTTrack has no page that can answer a wizard question, so no surface may
+# offer the mode (#1237). The surviving action ids must keep their values.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_wizard.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" "${distdir}" <<'PY' || fail "the wizard mode is still offered (see above)"
+import os, re, sys, urllib.parse, urllib.request
+
+url, srcdir = sys.argv[1].rstrip("/"), sys.argv[2]
+rc = 0
+
+
+def check(ok, what):
+    global rc
+    print(("ok: " if ok else "FAIL: ") + what)
+    if not ok:
+        rc = 1
+
+
+def read(*path):
+    return open(os.path.join(srcdir, *path), "rb").read().decode("latin-1")
+
+
+def get(path):
+    # The UI is served ISO-8859-1, so decode, do not assume UTF-8.
+    return urllib.request.urlopen(url + path, timeout=20).read().decode("latin-1")
+
+
+sid = re.search(r'name="sid" value="([0-9a-f]+)"', get("/server/index.html"))
+if sid is None:
+    sys.exit("no session id in server/index.html")
+sid = sid.group(1)
+
+
+def post(fields, page="step4.html"):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
+                    [("sid", sid)] + fields)
+    req = urllib.request.Request(url + "/server/" + page,
+                                 data=body.encode("latin-1"), method="POST")
+    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+
+
+def textarea(page, name):
+    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
+    if m is None:
+        sys.exit("no %s textarea in the rendered step4.html" % name)
+    return m.group(1)
+
+
+def options():
+    page = get("/server/step3.html")
+    block = re.search(r'<select name="todo".*?</select>', page, re.S)
+    if block is None:
+        sys.exit("no action <select> in the rendered step3.html")
+    return re.findall(r"<option value=(\d+)( selected)?>([^<]*)</option>",
+                      block.group(0))
+
+
+# The catalog is the join key for the translations and for WinHTTrack's own
+# combo, so the entry must still be there.
+listdef = re.search(r"^LISTDEF_10\r?\n([^\r\n]*)", read("lang.def"), re.M)
+if listdef is None:
+    sys.exit("no LISTDEF_10 in lang.def")
+entries = listdef.group(1).split("\\n")
+check(len(entries) == 7, "lang.def still lists %d actions" % len(entries))
+check(entries[1] == "Download web site(s) + questions",
+      "the wizard entry is still the catalog's second action")
+
+# WIZARD is the catalog index of the hidden entry; COMMAND is the flag each id
+# must emit. Ids come from the catalog order, not from what the server emitted.
+WIZARD = 2
+COMMAND = {1: "--mirror", 2: "--mirror", 3: "--get", 4: "--mirrorlinks",
+           5: "--testlinks", 6: "--continue", 7: "--update"}
+
+opts = [int(i) for i, _, _ in options()]
+check(opts == [i for i in sorted(COMMAND) if i != WIZARD],
+      "the menu offers ids %r" % (opts,))
+labels = [label for _, _, label in options()]
+check(not [l for l in labels if "questions" in l],
+      "no entry advertises questions (%r)" % (labels,))
+
+# Renumbering the survivors would keep the menu wizard-free and still break
+# every stored CurrentAction, so pin id to flag rather than just the count.
+for todo, flag in sorted(COMMAND.items()):
+    cmd = textarea(post([("todo", str(todo))]), "command").split()
+    check(flag in cmd, "action %d runs %s" % (todo, flag))
+    check("--mirror-wizard" not in cmd, "action %d does not run the wizard" % todo)
+    selected = [i for i, sel, _ in options() if sel]
+    check(selected == ([] if todo == WIZARD else [str(todo)]),
+          "action %d draws %r as the current one" % (todo, selected))
+
+# ...and the slot table itself must not hold the flag, for the ids above and for
+# the default the engine takes when the action is unset.
+todo = re.search(r"\$\{test:todo:[^}]*\}", read("html", "server", "step4.html"))
+if todo is None:
+    sys.exit("no action slot table in html/server/step4.html")
+check("--mirror-wizard" not in todo.group(0),
+      "no action slot maps to the wizard (%s)" % todo.group(0))
+
+# The guide describes the same menu; it must not promise the mode to WebHTTrack.
+guide = read("html", "guide.html")
+opt = re.search(r'<div class="opt" data-for="([^"]*)">\s*<div class="opt-head">'
+                r'<span class="opt-name">Download web site\(s\) \+ questions</span>',
+                guide)
+if opt is None:
+    sys.exit("no wizard action block in html/guide.html")
+check("web" not in opt.group(1).split(), "guide.html shows it to %r only"
+      % (opt.group(1),))
+
+sys.exit(rc)
+PY
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "PASS"
