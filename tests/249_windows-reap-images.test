@@ -35,7 +35,7 @@ done
 # engine and the python fixture server behind it.
 : >"$tmp/killed"
 kill_tree 4242
-test ! -s "$tmp/killed" || fail "kill_tree swept the host unasked: $(cat "$tmp/killed")"
+test ! -s "$tmp/killed" || fail "kill_tree swept the host unasked: $(<"$tmp/killed")"
 
 # The opt-in a runner with one test in flight sets.
 : >"$tmp/killed"
@@ -61,7 +61,7 @@ done
 win_pid() { echo 9999; }
 : >"$tmp/killed"
 HTTRACK_EXCLUSIVE_HOST=1 kill_tree 99 4242
-got=$(cat "$tmp/killed")
+got=$(<"$tmp/killed")
 test "$got" = '/F /T /PID 4242' || fail "kill_tree with a pre-resolved winpid ran: $got"
 
 # With a winpid it is one tree kill and nothing by name, or a parallel sibling's
@@ -69,24 +69,24 @@ test "$got" = '/F /T /PID 4242' || fail "kill_tree with a pre-resolved winpid ra
 win_pid() { echo 4242; }
 : >"$tmp/killed"
 kill_tree 99
-test "$(cat "$tmp/killed")" = '/F /T /PID 4242' || fail "kill_tree with a winpid ran: $(cat "$tmp/killed")"
+test "$(<"$tmp/killed")" = '/F /T /PID 4242' || fail "kill_tree with a winpid ran: $(<"$tmp/killed")"
 win_pid() { :; }
 
 # The image read while the target was alive: a freed winpid can already be a
 # stranger's, and /T would take its children too (#1228).
 : >"$tmp/killed"
 kill_tree 99 4242 PROXYTRACK.EXE
-test "$(cat "$tmp/killed")" = '/F /T /PID 4242' ||
-    fail "a verified tree kill did not run: $(cat "$tmp/killed")"
+test "$(<"$tmp/killed")" = '/F /T /PID 4242' ||
+    fail "a verified tree kill did not run: $(<"$tmp/killed")"
 : >"$tmp/killed"
 out=$(kill_tree 99 4242 python.exe)
-test ! -s "$tmp/killed" || fail "pid 4242 was killed as a python.exe: $(cat "$tmp/killed")"
+test ! -s "$tmp/killed" || fail "pid 4242 was killed as a python.exe: $(<"$tmp/killed")"
 grep -q '::warning::pid 4242 no longer runs python.exe' <<<"$out" ||
     fail "the skipped kill was not reported: $out"
 # Gone from the table entirely, which is what a freed winpid usually looks like.
 : >"$tmp/killed"
 kill_tree 99 4343 proxytrack.exe >/dev/null
-test ! -s "$tmp/killed" || fail "a pid tasklist does not list was killed: $(cat "$tmp/killed")"
+test ! -s "$tmp/killed" || fail "a pid tasklist does not list was killed: $(<"$tmp/killed")"
 # A stranger's pid leaves the caller with no target, so the serial runner's last
 # resort still applies: skipping it too would leave the engines running.
 : >"$tmp/killed"
@@ -107,8 +107,8 @@ reap_bounded() { :; }
 stop_server 99
 got=$(tr '\n' ' ' <"$tmp/order")
 test "$got" = 'capture 99 kill 99 ' || fail "stop_server did not capture before signalling: $got"
-test "$(cat "$tmp/killed")" = '/F /T /PID 4242' ||
-    fail "stop_server did not tree-kill what it captured: $(cat "$tmp/killed")"
+test "$(<"$tmp/killed")" = '/F /T /PID 4242' ||
+    fail "stop_server did not tree-kill what it captured: $(<"$tmp/killed")"
 unset -f kill win_capture reap_bounded
 
 : >"$tmp/killed"
@@ -132,7 +132,7 @@ tasklist() {
 : >"$tmp/killed"
 out=$(reap_leftover_processes 99_probe.test)
 test -z "$out" || fail "an unrelated process was reported as a leak: $out"
-test ! -s "$tmp/killed" || fail "an unrelated process was reaped: $(cat "$tmp/killed")"
+test ! -s "$tmp/killed" || fail "an unrelated process was reaped: $(<"$tmp/killed")"
 
 # The same list drives the wedge report, which names python too so a leaked
 # fixture server is still visible to a reader.

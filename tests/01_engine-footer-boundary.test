@@ -42,7 +42,7 @@ crawl() { # crawl FOOTER [LABEL], leaving the mirrored page in $body
     local found
     found=$(find "$mir/file" -name index.html 2>/dev/null || true)
     test -n "$found" || fail "page not mirrored; the footer path never ran"
-    body=$(cat "$found")
+    body=$(<"$found")
 }
 
 # Which line the footer lands on follows the page's own newlines, so find it by

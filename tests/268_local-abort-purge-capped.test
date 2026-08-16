@@ -44,7 +44,7 @@ local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" --timeout=0 \
     --max-time=2 "${BASEURL}/abortpurge/index.html" || rc=$?
 test "$rc" -ne 124 || fail "the capped crawl overran its deadline"
 
-log=$(cat "${out}/hts-log.txt")
+log=$(<"${out}/hts-log.txt")
 grep -q 'giving up' <<<"$log" || fail "the time cap never fired: ${log}"
 # Fewer links than pass 1 saw is what says some were dropped; without it this
 # passes on a mirror that simply finished.

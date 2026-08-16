@@ -182,15 +182,15 @@ grep -q 'trace line 0$' <<<"$out" && fail "the report is not bounded to a tail"
 
 # This launches the watchdog the way the real driver does, not through a test
 # sourcing the helper, proving it starts and holds a token nothing else sees.
-grep -q '^watchdog ready$' watchdog.log || fail "no watchdog was launched: $(cat watchdog.log)"
+grep -q '^watchdog ready$' watchdog.log || fail "no watchdog was launched: $(<watchdog.log)"
 test -r "$tmp/childtoken" || fail "the test that reads its environment did not run"
 grep -qx 'TOKEN=' "$tmp/childtoken" ||
-    fail "a test inherited the status token: $(cat "$tmp/childtoken")"
+    fail "a test inherited the status token: $(<"$tmp/childtoken")"
 grep -qx 'TOKEN=s3cr3t' "$wdargv" ||
-    fail "the watchdog was launched without its token: $(cat "$wdargv")"
+    fail "the watchdog was launched without its token: $(<"$wdargv")"
 test -s "$tmp/cygpathtoken" || fail "the cygpath stub never ran"
 grep -q 'TOKEN=s3cr3t' "$tmp/cygpathtoken" &&
-    fail "the driver forked a child before scrubbing its token: $(cat "$tmp/cygpathtoken")"
+    fail "the driver forked a child before scrubbing its token: $(<"$tmp/cygpathtoken")"
 # An orphan runs out its own deadline, re-posting a frozen tail past the step (#795).
 reporter_stopped || fail "the driver exited leaving its reporter running"
 # Positive control for the gate below: with every category matched it stays silent.
@@ -248,7 +248,7 @@ wedge_leg() (
     ci_suite_heartbeat 0 1 "$prog" 0 "$victim" >"$tmp/wedge.out" 2>&1 &
     wait "$!"
     grep -q '::error title=suite watchdog::' "$tmp/wedge.out" ||
-        fail "the wedge branch was never reached: $(cat "$tmp/wedge.out")"
+        fail "the wedge branch was never reached: $(<"$tmp/wedge.out")"
     reporter_stopped || fail "the wedge kill orphaned the reporter"
 )
 # Held back: bash announces every job it reaps from a signal, which reads as a
@@ -266,7 +266,7 @@ fd_kill=$tmp/fd-killed
 # Seconds between the producer's own kill and the reader seeing EOF.
 eof_latency() {
     "$1" 2>>"$tmp/fd.err" | cat >"$tmp/fd.out"
-    echo $(($(date +%s) - $(cat "$fd_kill")))
+    echo $(($(date +%s) - $(<"$fd_kill")))
 }
 
 # What the driver's EXIT trap does: signal the heartbeat shell mid-tick and let go.

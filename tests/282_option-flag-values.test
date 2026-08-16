@@ -54,7 +54,7 @@ refused() { # refused WANTED-MESSAGE ARG...
     crawl "$@"
     { test "${RC}" -ne 0 && test "${RC}" -ne 134; } || fail "$* not refused (exit ${RC})"
     grep -q "${want}" "${tmp}/out/.log" ||
-        fail "$* refused without saying why: $(cat "${tmp}/out/.log")"
+        fail "$* refused without saying why: $(<"${tmp}/out/.log")"
 }
 
 refused 'does not take the value' --index=2

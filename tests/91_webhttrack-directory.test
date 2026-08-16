@@ -56,7 +56,7 @@ body="sid=${sid}&command=httrack&command_do=save&winprofile=x"
 body="${body}&path=${base}&projname=proj"
 htsserver_post "${body}" >/dev/null || fail "the save request did not answer"
 test -f "${base}/proj/hts-cache/winprofile.ini" ||
-    fail "the project was not registered: $(cat "${HTS_LOG}")"
+    fail "the project was not registered: $(<"${HTS_LOG}")"
 
 # Positive control: every assertion below would pass on a server serving nothing.
 served() {
@@ -81,7 +81,7 @@ for path in "${refuse[@]}"; do
 done
 
 # The accept loop is single-threaded: one spin denies every later request.
-htsserver_alive || fail "the server died: $(cat "${HTS_LOG}")"
+htsserver_alive || fail "the server died: $(<"${HTS_LOG}")"
 served /website/probe.txt "the server stopped answering after a directory request"
 
 # This fopen() is reached before any guard, so its read loop must stop on ferror().
@@ -93,7 +93,7 @@ case "${reply}" in
 *) fail "loading a project did not redirect: $(firstline "${reply}")" ;;
 esac
 
-htsserver_alive || fail "the server died: $(cat "${HTS_LOG}")"
+htsserver_alive || fail "the server died: $(<"${HTS_LOG}")"
 served /website/probe.txt "the server stopped answering after a project load"
 
 echo "PASS"

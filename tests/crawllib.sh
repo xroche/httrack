@@ -95,7 +95,7 @@ local_server_start() {
     cleanup_push local_server_reap "$((${#SRV_PIDS[@]} - 1))"
 
     SRV_PORT=$(discover_server_port "$SRV_LOG" "$SRV_PID") ||
-        fail "local-server did not come up: $(cat "$SRV_LOG")"
+        fail "local-server did not come up: $(<"$SRV_LOG")"
     # shellcheck disable=SC2034 # set here for the caller, not used here
     BASEURL="${scheme}://127.0.0.1:${SRV_PORT}"
 }

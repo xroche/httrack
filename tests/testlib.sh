@@ -374,7 +374,7 @@ time.sleep(900)  # bounded, so a SIGKILLed test cannot pin the port for the run
     cleanup_push rm -f "$log"
     cleanup_push stop_server "$HELD_PID"
     HELD_PORT=$(discover_server_port "$log" "$HELD_PID") ||
-        fail "the $proto port holder did not come up: $(cat "$log")"
+        fail "the $proto port holder did not come up: $(<"$log")"
 }
 
 PT_LISTENING="HTTP Proxy installed on"
@@ -388,12 +388,12 @@ proxytrack_bound() { # proxytrack_bound LOG PID
     until grep -qE "$PT_LISTENING|$BIND_LOST" "$log"; do
         # An exit flushes the log, so re-read it rather than calling this dead.
         kill -0 "$pid" 2>/dev/null || break
-        test "$waited" -lt 50 || fail "proxytrack never announced its listen port: $(cat "$log")"
+        test "$waited" -lt 50 || fail "proxytrack never announced its listen port: $(<"$log")"
         sleep 0.1
         waited=$((waited + 1))
     done
     grep -q "$PT_LISTENING" "$log" && return 0
-    grep -qE "$BIND_LOST" "$log" || fail "proxytrack exited before listening: $(cat "$log")"
+    grep -qE "$BIND_LOST" "$log" || fail "proxytrack exited before listening: $(<"$log")"
     return 1
 }
 
@@ -417,7 +417,7 @@ start_proxytrack() { # start_proxytrack LOGBASE LAUNCH
         # Loud, so an intermittent bind regression cannot hide behind the retry.
         echo "proxytrack did not get port $proxyport, retrying" >&2
     done
-    fail "proxytrack bound none of 3 port pairs: $(cat "$ptlog")"
+    fail "proxytrack bound none of 3 port pairs: $(<"$ptlog")"
 }
 
 # Echo the port local-server.py announces on $1 (its log), $2 being its pid, or

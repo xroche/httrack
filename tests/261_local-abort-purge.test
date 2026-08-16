@@ -85,7 +85,7 @@ urls_of "${names[@]}"
 run_with_timeout 300 httrack "${urls[@]}" -O "$out" "${common[@]}" \
     --timeout=20 --max-time=120 >"${tmpdir}/log2" 2>&1
 grep -aq 'mirror complete in' "${out}/hts-log.txt" ||
-    fail "pass 2 did not run to completion: $(cat "${out}/hts-log.txt")"
+    fail "pass 2 did not run to completion: $(<"${out}/hts-log.txt")"
 test ! -f "${out}/${host}/f.bin" ||
     fail "a completed crawl no longer purges the file it dropped"
 ok "a completed crawl still purges"
@@ -117,7 +117,7 @@ wait_bounded "$crawlpid" 120 || rc=$?
 crawlpid=
 test "$rc" -ne 124 || fail "the terminated crawl was still running 120s later"
 
-log=$(cat "${out}/hts-log.txt")
+log=$(<"${out}/hts-log.txt")
 # The exit has to land in the outer loop's own branch, the one that falls
 # through to the purge. A bailout jumps past it and proves nothing.
 grep -q 'Exit requested by shell or user' <<<"$log" ||

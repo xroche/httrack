@@ -133,14 +133,14 @@ htsserver_start() {
         test -z "${HTS_URL}" || break
         # Only a lost bind is worth redrawing; anything else is a regression.
         grep -qE "${BIND_LOST}" "${HTS_LOG}" ||
-            fail "htsserver did not come up: $(cat "${HTS_LOG}")"
+            fail "htsserver did not come up: $(<"${HTS_LOG}")"
         test -z "${port}" ||
-            fail "htsserver could not bind port ${port}: $(cat "${HTS_LOG}")"
+            fail "htsserver could not bind port ${port}: $(<"${HTS_LOG}")"
         stop_server "${HTS_BGPID}"
         # Loud, so an intermittent bind regression cannot hide behind the retry.
         echo "htsserver did not get port ${HTS_PORT}, retrying" >&2
     done
-    test -n "${HTS_URL}" || fail "htsserver bound none of 3 ports: $(cat "${HTS_LOG}")"
+    test -n "${HTS_URL}" || fail "htsserver bound none of 3 ports: $(<"${HTS_LOG}")"
     test -z "${HTS_PID}" || HTS_SRV_PIDS+=("${HTS_PID}")
 }
 

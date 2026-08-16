@@ -101,19 +101,19 @@ ok "an unheld port binds and a held one does not"
 ## the port handed back is the one drawn on a socket of that protocol
 port=$(spied tcp) || fail "freeport tcp failed"
 bindable tcp "$port" || fail "the tcp port $port does not bind as tcp"
-drew SOCK_STREAM "$port" || fail "freeport tcp drew $port elsewhere: $(cat "$typelog")"
+drew SOCK_STREAM "$port" || fail "freeport tcp drew $port elsewhere: $(<"$typelog")"
 ! grep -q SOCK_DGRAM "$typelog" || fail "freeport tcp opened a udp socket"
 
 port=$(spied udp) || fail "freeport udp failed"
 bindable udp "$port" || fail "the udp port $port does not bind as udp"
-drew SOCK_DGRAM "$port" || fail "freeport udp drew $port elsewhere: $(cat "$typelog")"
+drew SOCK_DGRAM "$port" || fail "freeport udp drew $port elsewhere: $(<"$typelog")"
 ! grep -q SOCK_STREAM "$typelog" || fail "freeport udp opened a tcp socket"
 ok "each protocol is probed in its own"
 
 ## a mixed pair, the shape start_proxytrack asks for, in that order
 read -r tcpport udpport <<<"$(spied tcp udp)"
-drew SOCK_STREAM "$tcpport" || fail "the first port is not the tcp one: $(cat "$typelog")"
-drew SOCK_DGRAM "$udpport" || fail "the second port is not the udp one: $(cat "$typelog")"
+drew SOCK_STREAM "$tcpport" || fail "the first port is not the tcp one: $(<"$typelog")"
+drew SOCK_DGRAM "$udpport" || fail "the second port is not the udp one: $(<"$typelog")"
 bindable tcp "$tcpport" || fail "the tcp port $tcpport does not bind as tcp"
 bindable udp "$udpport" || fail "the udp port $udpport does not bind as udp"
 ok "a tcp/udp pair comes back in the order start_proxytrack reads"
@@ -142,10 +142,10 @@ command -v proxytrack >/dev/null || skip "no proxytrack in PATH"
 proxytrack_fails() { # proxytrack_fails HTTP_ADDR ICP_ADDR: echoes its error line
     local log="$tmpdir/pt.log" rc=0
     run_with_timeout 20 proxytrack "$1" "$2" >"$log" 2>&1 || rc=$?
-    test "$rc" -ne 124 || fail "proxytrack never exited on $1 $2: $(cat "$log")"
-    test "$rc" -ne 0 || fail "proxytrack started on $1 $2: $(cat "$log")"
+    test "$rc" -ne 124 || fail "proxytrack never exited on $1 $2: $(<"$log")"
+    test "$rc" -ne 0 || fail "proxytrack started on $1 $2: $(<"$log")"
     grep '^Unable to initialize a temporary server' "$log" ||
-        fail "proxytrack failed without the harness's banner: $(cat "$log")"
+        fail "proxytrack failed without the harness's banner: $(<"$log")"
 }
 
 # Both destinations get one, or the message could name one protocol for either

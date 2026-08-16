@@ -43,7 +43,7 @@ run() { # run LIST -> sets $log and $mirror
     rm -rf "$out"
     mkdir -p "$out"
     httrack -O "$out" --quiet -n "-%L" "$list" >"$out/.stdout" 2>&1 ||
-        fail "httrack failed on $list: $(cat "$out/.stdout")"
+        fail "httrack failed on $list: $(<"$out/.stdout")"
     log="$out/hts-log.txt"
     mirror="$out"
 }

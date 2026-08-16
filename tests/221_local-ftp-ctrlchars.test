@@ -55,7 +55,7 @@ grep -aq 'Invalid control character in FTP URL' "${out}/hts-log.txt" ||
     fail "no refusal in the log: $(grep -a 'Error' "${out}/hts-log.txt" || true)"
 ok "the injected URL is refused in $((SECONDS - start))s"
 
-sent=$(cat "$cmds")
+sent=$(<"$cmds")
 test -z "$sent" || fail "the engine still talked to the server: ${sent}"
 ok "nothing reached the control channel"
 

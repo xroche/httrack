@@ -80,7 +80,7 @@ test "$started" -lt 8 ||
     fail "all eight bodies were already fetched before the first signal"
 
 ! grep -q 'Receive Error' "${out}/hts-log.txt" ||
-    fail "a benign signal was reported as a socket error: $(cat "${out}/hts-log.txt")"
+    fail "a benign signal was reported as a socket error: $(<"${out}/hts-log.txt")"
 # And what the retry queue makes of it afterwards is not the engine's choice to
 # make: the bodies have to arrive whole.
 mirror="${out}/127.0.0.1_${SRV_PORT}/dcancel"
@@ -116,10 +116,10 @@ elapsed=$((SECONDS - started))
 test "$elapsed" -lt "$STOP_CEILING" ||
     fail "^C took ${elapsed}s to end a stalled transfer"
 grep -q 'Finishing pending transfers' "$log" ||
-    fail "the ^C never reached sig_leave: $(cat "$log")"
+    fail "the ^C never reached sig_leave: $(<"$log")"
 grep -q 'Thanks for using HTTrack' "$log" ||
-    fail "the stop skipped teardown: $(cat "$log")"
-htslog=$(cat "${out}/hts-log.txt")
+    fail "the stop skipped teardown: $(<"$log")"
+htslog=$(<"${out}/hts-log.txt")
 grep -q 'stopped by user' <<<"$htslog" ||
     fail "the abort was not reported as the user's stop: ${htslog}"
 # The fabricated error is the bug: a stop reported as a socket failure is what

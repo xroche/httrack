@@ -43,10 +43,10 @@ cleanup_push
 cleanup_push note "pushed  second 'quoted'"
 EOF
 rc=$(subject)
-test "$rc" -eq 0 || fail "the subject exited $rc: $(cat "$tmpdir/out")"
+test "$rc" -eq 0 || fail "the subject exited $rc: $(<"$tmpdir/out")"
 want="pushed  second 'quoted'
 pushed first"
-test "$(cat "$tmpdir/log")" = "$want" || fail "wrong teardown order: $(cat "$tmpdir/log")"
+test "$(<"$tmpdir/log")" = "$want" || fail "wrong teardown order: $(<"$tmpdir/log")"
 ok "cleanups run last-pushed-first with their arguments intact"
 
 ## a failing teardown does not become the test's verdict (#773)
@@ -61,7 +61,7 @@ rc=$(subject)
 test "$rc" -eq 0 || fail "a failing cleanup left status $rc"
 want="above the failure
 below the failure"
-test "$(cat "$tmpdir/log")" = "$want" || fail "the drain stopped at the failure: $(cat "$tmpdir/log")"
+test "$(<"$tmpdir/log")" = "$want" || fail "the drain stopped at the failure: $(<"$tmpdir/log")"
 ok "a failing cleanup neither aborts the drain nor reds the test"
 
 # And the real status still reaches automake.
@@ -107,7 +107,7 @@ EOF
     rc=$(subject)
     test "$rc" -eq 1 ||
         bad="$bad [SIG${sig} left status $rc after $((SECONDS - start))s, not the trap's exit 1]"
-    test "$(cat "$tmpdir/log")" = drained ||
+    test "$(<"$tmpdir/log")" = drained ||
         bad="$bad [SIG${sig} drained the stack $(wc -l <"$tmpdir/log") times]"
 done
 test -z "$bad" || fail "signal teardown:$bad"
@@ -122,9 +122,9 @@ cleanup_push note 'registered before the second source'
 . ${testdir}/testlib.sh
 EOF
 rc=$(subject)
-test "$rc" -eq 0 || fail "the subject exited $rc: $(cat "$tmpdir/out")"
-test "$(cat "$tmpdir/log")" = 'registered before the second source' ||
-    fail "re-sourcing dropped the stack: $(cat "$tmpdir/log")"
+test "$rc" -eq 0 || fail "the subject exited $rc: $(<"$tmpdir/out")"
+test "$(<"$tmpdir/log")" = 'registered before the second source' ||
+    fail "re-sourcing dropped the stack: $(<"$tmpdir/log")"
 ok "re-sourcing the library keeps a stack already built"
 
 ## nothing pushed, no trap
@@ -137,6 +137,6 @@ cleanup_push note 'pushed'
 test -n "$(trap -p EXIT)" || note 'cleanup_push installed no EXIT trap'
 EOF
 rc=$(subject)
-test "$rc" -eq 0 || fail "the subject exited $rc: $(cat "$tmpdir/out")"
-test "$(cat "$tmpdir/log")" = pushed || fail "unexpected EXIT trap state: $(cat "$tmpdir/log")"
+test "$rc" -eq 0 || fail "the subject exited $rc: $(<"$tmpdir/out")"
+test "$(<"$tmpdir/log")" = pushed || fail "unexpected EXIT trap state: $(<"$tmpdir/log")"
 ok "the traps arrive with the first cleanup_push, not with the source line"

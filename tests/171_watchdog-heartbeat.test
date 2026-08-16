@@ -91,7 +91,7 @@ ci_suite_heartbeat 720 360 "$progress" 900 4242 >"$tmp/out" 2>&1
 # a suite still reporting, later means the 30s clamp is gone, or the check rides
 # the 360s annotation cadence, or the clock is being accumulated rather than read.
 killed=$(sed -n 's/^KILL 4242 at \([0-9]*\)$/\1/p' "$tmp/out")
-wrote=$(cat "$tmp/lastwrite")
+wrote=$(<"$tmp/lastwrite")
 test -n "$killed" || fail "a suite that stopped reporting was never killed"
 test "$killed" -ge $((wrote + 900)) ||
     fail "killed at $killed, only $((killed - wrote))s after the last progress line at $wrote"
@@ -125,7 +125,7 @@ grep -q "in flight: RUN ${wrote}s%25a%25b.test at ${wrote}s" "$tmp/out" ||
     fail "annotation does not name the escaped test in flight: $(head -3 "$tmp/out")"
 grep -q "$(printf '\r')" "$tmp/out" && fail "a CR reached the annotation, truncating it"
 grep -q '98_earlier' "$tmp/out" && fail "annotation names the first test, not the one in flight"
-grep -qx '0 named' "$tmp/strayargs" || fail "process list not host-wide: $(cat "$tmp/strayargs")"
+grep -qx '0 named' "$tmp/strayargs" || fail "process list not host-wide: $(<"$tmp/strayargs")"
 
 # Joined with %0A and bounded to eight, and no separator left dangling: the
 # runner reads to end of line, so a trailing one is a visible empty tail.
@@ -169,7 +169,7 @@ test -n "$killed" || fail "a suite still reporting outlived its wall-clock cap"
 test "$killed" -ge 5480 || fail "capped at $killed, inside the 480s cap"
 test "$killed" -le 5600 || fail "capped at $killed, want 5480 within a tick"
 grep -q '480s cap reached' "$tmp/capped" || fail "the cap kill was announced as something else"
-test "$(cat "$tmp/lastwrite")" -ge 5480 || fail "the log stopped moving: nothing here needed the cap"
+test "$(<"$tmp/lastwrite")" -ge 5480 || fail "the log stopped moving: nothing here needed the cap"
 
 # taskkill is a grandchild of its own target, so a leaves-first /T would reap the
 # watchdog before the root (#953): kill_tree here never returns, and the stubs

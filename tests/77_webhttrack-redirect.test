@@ -93,6 +93,6 @@ fi
 # were accepted the server would listen instead of exiting.
 run_with_timeout 15 htsserver "${HTS_DISTDIR}/" --bind "" >"${bindlog}" 2>&1 || true
 grep -q -- "--bind needs an address" "${bindlog}" ||
-    fail "empty --bind not refused: $(cat "${bindlog}")"
+    fail "empty --bind not refused: $(<"${bindlog}")"
 
 echo "PASS"

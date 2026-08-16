@@ -221,7 +221,7 @@ kill -0 "${crawl_pid}" 2>/dev/null ||
     fail "the crawling server quit, taking its mirror with it"
 # A crawl that never started would leave the veto unexercised, and the survival
 # above would prove nothing.
-test -d "${work}/crawl/hts-cache" || fail "no mirror ever started: $(cat "${clog}")"
+test -d "${work}/crawl/hts-cache" || fail "no mirror ever started: $(<"${clog}")"
 
 died_within "${crawl_pid}" $((timeout * 3)) ||
     fail "the server never left once its mirror had finished"
@@ -236,7 +236,7 @@ test "${#sid}" -eq 32 || fail "no session id to quit with"
     --path /server/exit.html --field "sid=${sid}" --field command=quit >/dev/null
 died_within "${quit_pid}" "${grace}" || fail "Quit did not stop the server"
 ! grep -q 'Unable to create the server' "${HTS_LOG}" ||
-    fail "a clean quit reported a server it could not create: $(cat "${HTS_LOG}")"
+    fail "a clean quit reported a server it could not create: $(<"${HTS_LOG}")"
 
 htsserver_stop
 htsserver_assert_reaped

@@ -78,7 +78,7 @@ run_suite() { # run_suite <dir> <jobs>
     ) >"$tmp/out" 2>&1 || rc=$?
     spent=$((SECONDS - began))
     test "$rc" -eq 1 ||
-        fail "the stub suite exited $rc, want 1 from the pass floor: $(cat "$tmp/out")"
+        fail "the stub suite exited $rc, want 1 from the pass floor: $(<"$tmp/out")"
 }
 
 assert_tally() {

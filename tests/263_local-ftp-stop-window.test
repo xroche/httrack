@@ -85,12 +85,12 @@ await_exit() {
 # is the other half, and it is the same either way the run was ended.
 assert_outcome() {
     local reply htslog
-    reply=$(cat "${tmpdir}/log")
+    reply=$(<"${tmpdir}/log")
     grep -q 'Thanks for using HTTrack' <<<"$reply" ||
         fail "$1 skipped teardown: ${reply}"
     test -s "$partial" ||
         fail "$1 dropped the received prefix: $(find "$out" -type f)"
-    htslog=$(cat "${out}/hts-log.txt")
+    htslog=$(<"${out}/hts-log.txt")
     # The worker's own wait is what has to expire, not some outer bound: only
     # that wait writes this line, with the timeout it was given.
     grep -q "Time out (${TIMEOUT})" <<<"$htslog" ||
@@ -105,7 +105,7 @@ kill -INT "$crawlpid"
 await_exit 60 "the interrupted crawl"
 stopped=$((SECONDS - started))
 grep -q 'Finishing pending transfers' "${tmpdir}/log" ||
-    fail "the ^C never reached sig_leave: $(cat "${tmpdir}/log")"
+    fail "the ^C never reached sig_leave: $(<"${tmpdir}/log")"
 assert_outcome "the interrupted crawl"
 # Upper bound: the second window is gone. Lower bound: the first one is not,
 # so a stop must not cut a transfer's wait short the way #1107 did.

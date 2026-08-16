@@ -86,7 +86,7 @@ charset_declared_matches_bytes() {
         return 1
     fi
     if ! LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/utf8" 2>"$tmp/err"; then
-        echo "${f##*/}: bytes do not decode as the declared $cs: $(cat "$tmp/err")"
+        echo "${f##*/}: bytes do not decode as the declared $cs: $(<"$tmp/err")"
         return 1
     fi
     # No legacy 8-bit charset puts text at U+0080..U+009F, so a C1 there means

@@ -44,7 +44,7 @@ htsserver_client --path /step4.html --field "sid=${sid}" --field command=httrack
     --field command_do=save --field winprofile=x \
     --field "path=${work}" --field projname=proj >/dev/null
 test -f "${work}/proj/hts-cache/winprofile.ini" ||
-    fail "profile save did not create the project: $(cat "${HTS_LOG}")"
+    fail "profile save did not create the project: $(<"${HTS_LOG}")"
 mkdir -p "$(dirname "${mirror}")"
 # shellcheck disable=SC2016 # the directives are the payload, not shell expansions
 printf 'Hostile mirrored page.\nsid=${_sid} copy=${sid}\ntrailing backslash: \\\n' \
@@ -61,7 +61,7 @@ grep -qF '${sid}' "${body}" || fail "\${sid} did not survive verbatim"
 cmp -s "${mirror}" "${body}" || fail "mirrored file not served byte for byte"
 # The mirror stays browsable: verbatim must not mean served as a download.
 grep -qi '^Content-type: text/html' "${hdr}" ||
-    fail "mirrored page lost its text/html type: $(cat "${hdr}")"
+    fail "mirrored page lost its text/html type: $(<"${hdr}")"
 
 # The other direction: while a crawl runs, every .html request is overridden to
 # the GUI's own refresh page, so a /website/ URL stops naming mirrored content.
