@@ -19,9 +19,7 @@ maxfilter=2047
 maxurl=2047
 
 rep() { # rep CHAR COUNT
-    local pad
-    pad=$(printf '%*s' "$2" '')
-    printf '%s' "${pad// /$1}"
+    printf "%${2}s" '' | tr ' ' "$1"
 }
 
 # Runs --why over a rules file and returns the verdict line alone.
