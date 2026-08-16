@@ -266,7 +266,7 @@ int PT_RemoveIndex(PT_Indexes index, int indexId) {
 
 /* Reads one line into "s" (at most "max" chars plus its NUL) and returns the
    advance. *cut, when asked for, says the line did not fit. */
-static int binput(char *buff, char *s, int max, hts_boolean * cut) {
+static int binput(char *buff, char *s, int max, hts_boolean *cut) {
   int count = 0;
   int destCount = 0;
 
@@ -1640,7 +1640,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
                 const size_t used = strlen(line);
 
                 a += binput(a, line + used, (int) (sizeof(line) - used - 1),
-                          NULL);
+                            NULL);
               }
               /* read position */
               a += binput(a, linepos, 200, NULL);
