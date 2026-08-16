@@ -507,13 +507,14 @@ static hts_boolean cat_html_escaped(String *dst, char c) {
   return HTS_TRUE;
 }
 
-/* Append the UTF-8 sequence at *s as a numeric character reference, which names
-   a code point and so survives whatever charset the page declares, and step *s
-   onto its last byte. HTS_FALSE if *s does not start a valid sequence. */
-static hts_boolean cat_html_ncr(String *dst, const char **s) {
-  const unsigned char *const p = (const unsigned char *) *s;
+/* Append the UTF-8 character at s as a numeric character reference, which names
+   a code point and survives any page charset, and return its length in bytes.
+   Zero if s does not start a valid character. (hts_readUTF8() decodes the same
+   thing, but is not HTSEXT_API, so this binary cannot link it.) */
+static size_t cat_html_ncr(String *dst, const char *s) {
+  const unsigned char *const p = (const unsigned char *) s;
   unsigned int uc;
-  int extra, i;
+  size_t extra, i;
   char tmp[16];
 
   if (p[0] >= 0xc2 && p[0] <= 0xdf) {
@@ -526,19 +527,21 @@ static hts_boolean cat_html_ncr(String *dst, const char **s) {
     uc = p[0] & 0x07;
     extra = 3;
   } else {
-    return HTS_FALSE;
+    return 0;
   }
-  /* A NUL fails this before the next byte is looked at, so a truncated
-     sequence at the end of the string cannot read past it. */
+  /* A NUL fails this before the next byte is read, so a sequence truncated at
+     the end of the string cannot run past it. */
   for (i = 1; i <= extra; i++) {
     if ((p[i] & 0xc0) != 0x80)
-      return HTS_FALSE;
+      return 0;
     uc = (uc << 6) | (p[i] & 0x3f);
   }
+  /* Overlong and surrogate forms name nothing a browser will render. */
+  if (uc < 0x80 || (uc >= 0xd800 && uc <= 0xdfff))
+    return 0;
   snprintf(tmp, sizeof(tmp), "&#%u;", uc);
   StringCat(*dst, tmp);
-  *s += extra;
-  return HTS_TRUE;
+  return extra + 1;
 }
 
 /* Same, for a double-quoted attribute: the quote included, which
@@ -1370,8 +1373,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     hts_boolean unquoted = HTS_FALSE;
                     /* value comes from the template, not from the settings */
                     hts_boolean literal = HTS_FALSE;
-                    /* value is UTF-8 and the page charset is not */
-                    hts_boolean ncr = HTS_FALSE;
+                    /* value is UTF-8, so emit it as character references */
+                    hts_boolean needs_ncr = HTS_FALSE;
                     char datebuff[16];
 
                     name[0] = '\0';
@@ -1678,7 +1681,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                         line2[0] = '\0';
                         LANG_LIST(path, line2, sizeof(line2));
                         assertf(strlen(langstr) < sizeof(line2) - 2);
-                        ncr = HTS_TRUE;
+                        needs_ncr = HTS_TRUE;
                       } else {
                         langstr = LANGSEL(name);
                         if (langstr == NULL || *langstr == '\0') {
@@ -1759,6 +1762,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                       default:
                         if (*langstr) {
                           int id = 1;
+                          size_t used;
                           const char *fstr = langstr;
 
                           StringClear(tmpbuff);
@@ -1801,7 +1805,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                               StringClear(tmpbuff);
                               break;
                             default:
-                              if (ncr && cat_html_ncr(&tmpbuff, &fstr)) {
+                              if (needs_ncr &&
+                                  (used = cat_html_ncr(&tmpbuff, fstr)) != 0) {
+                                /* the loop's own fstr++ takes the last byte */
+                                fstr += used - 1;
                                 break;
                               }
                               /* format -2 writes its value into the option's
@@ -2126,16 +2133,19 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
     hashname = LANGINTKEY(name);
   }
 
-  /* Read the key named in limit_to out of the selected catalog; lang.def holds
-     only the catalog's file name, which the language menu showed instead
-     (#116). */
+  /* Read the key named in limit_to from the selected catalog, not lang.def's
+     file name for it. Both come off disk, so every copy clips: the safe_
+     helpers abort, and a long line in a catalog must not kill the server. */
   if (limit_to) {
     char wanted[256];
 
-    strlcpybuff(wanted, limit_to, sizeof(wanted));
-    /* Fallback, so a caller looping until empty still stops at the end of the
-       list rather than on a catalog missing the key. */
-    strlcpybuff(limit_to, hashname != NULL ? hashname : "", limit_size);
+    wanted[0] = '\0';
+    strlncatbuff(wanted, limit_to, sizeof(wanted), sizeof(wanted) - 1);
+    limit_to[0] = '\0';
+    /* Fallback: an empty result ends a caller's loop, so a catalog missing the
+       key must not look like the end of the list. */
+    if (hashname != NULL)
+      strlncatbuff(limit_to, hashname, limit_size, limit_size - 1);
     if (limit_to[0] != '\0') {
       char lbasename[1024];
       FILE *fp;
@@ -2150,8 +2160,9 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
         while (!found && !feof(fp)) {
           linput_cpp(fp, extkey, 8000);
           linput_cpp(fp, value, 8000);
-          if (strcmp(extkey, wanted) == 0) {
-            strlcpybuff(limit_to, value, limit_size);
+          if (strcmp(extkey, wanted) == 0 && value[0] != '\0') {
+            limit_to[0] = '\0';
+            strlncatbuff(limit_to, value, limit_size, limit_size - 1);
             found = HTS_TRUE;
           }
         }
@@ -2367,8 +2378,8 @@ static int LANG_LIST(const char *path, char *buffer, size_t buffer_size) {
       char charset[64];
       char *utf8;
 
-      /* Every catalog names itself in its own charset and the menu carries all
-         of them at once, so the list leaves here in UTF-8. */
+      /* Convert to UTF-8: each catalog names itself in its own charset, and
+         the menu carries all of them at once. */
       strlcpybuff(charset, "LANGUAGE_CHARSET", sizeof(charset));
       htslang_load(charset, sizeof(charset), path);
       utf8 = hts_convertStringToUTF8(lang_str, strlen(lang_str), charset);

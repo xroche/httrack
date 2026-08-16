@@ -1,10 +1,8 @@
 #!/bin/bash
 #
-# The language menu carries all thirty catalogs at once while the page is served
-# in the charset of the language in force, so a name written in the catalog's own
-# charset renders as mojibake for everyone else. Each has to leave as an ASCII
-# character reference, and the menu must therefore be the same bytes whatever
-# language the page is in (#116).
+# Every catalog names itself in its own charset, but the menu shows them together
+# on a page served in one of those charsets. So each name has to leave as an ASCII
+# character reference, and the menu must read the same under any charset (#116).
 
 set -euo pipefail
 
@@ -52,30 +50,30 @@ if [ "$(<"${work}/menu-en.charset")" = "$(<"${work}/menu-ru.charset")" ]; then
     fail "both pages are $(<"${work}/menu-en.charset"); pick two languages that differ"
 fi
 
-"${HTS_PYTHON}" - "${distdir}/lang" "${work}/menu-en" "${work}/menu-ru" <<'PY' || fail "wrong menu (see above)"
-import glob, os, re, sys
+"${HTS_PYTHON}" - "${distdir}" "${work}/menu-en" "${work}/menu-ru" <<'PY' || fail "wrong menu (see above)"
+import os, re, sys
 
-langdir, first, second = sys.argv[1:4]
-OPTION = rb"<option value=\d+(?: selected)?>([^<]*)</option>"
+distdir, first, second = sys.argv[1:4]
+OPTION = rb"<option value=(\d+)(?: selected)?>([^<]*)</option>"
 
 
-def labels(path):
+def options(path):
     blob = open(path, "rb").read()
     high = [b for b in blob if b > 0x7F]
     if high:
         sys.exit("%s: %d non-ASCII bytes in the menu: %r" % (path, len(high), high[:8]))
-    return [m.group(1).decode("ascii") for m in re.finditer(OPTION, blob)]
+    return [(int(m.group(1)), m.group(2).decode("ascii")) for m in re.finditer(OPTION, blob)]
 
 
-got = labels(first)
-if got != labels(second):
-    sys.exit("the menu names differ between an English and a Russian page")
+got = options(first)
+if got != options(second):
+    sys.exit("the menu differs between an English and a Russian page")
 
 
 def field(blob, key):
     m = re.search(rb"(?m)^" + key + rb"\r?$", blob)
     if not m:
-        return None
+        sys.exit("no %s" % key.decode("ascii"))
     return blob[m.end() + 1 :].split(b"\n", 1)[0].rstrip(b"\r")
 
 
@@ -93,18 +91,24 @@ def reference(name):
     return out
 
 
-want = set()
-for path in sorted(glob.glob(os.path.join(langdir, "*.txt"))):
-    blob = open(path, "rb").read()
+# lang.def numbers the catalogs and names their files; option N must carry the
+# name inside file N, so a menu that lists them all but shuffled still fails.
+defs = open(os.path.join(distdir, "lang.def"), "rb").read().split(b"\n")
+defs = [line.rstrip(b"\r").decode("ascii", "replace") for line in defs]
+want = []
+for i in range(0, len(defs) - 1, 2):
+    m = re.fullmatch(r"LANGUAGE_(\d+)", defs[i + 1])
+    if not m:
+        continue
+    blob = open(os.path.join(distdir, "lang", defs[i] + ".txt"), "rb").read()
     charset = field(blob, b"LANGUAGE_CHARSET").decode("ascii")
-    want.add(reference(field(blob, b"LANGUAGE_NAME").decode(charset)))
+    want.append((int(m.group(1)), reference(field(blob, b"LANGUAGE_NAME").decode(charset))))
 
-# An unexpanded menu would satisfy the set comparison below vacuously.
-if len(got) != len(want):
-    sys.exit("%d options for %d catalogs: %r" % (len(got), len(want), got))
-if set(got) != want:
-    sys.exit("menu %r does not name the catalogs: missing %r, unexpected %r"
-             % (got, sorted(want - set(got)), sorted(set(got) - want)))
+# A truncated lang.def parse would make the comparison below vacuous.
+if len(want) < 25:
+    sys.exit("only %d catalogs parsed from lang.def" % len(want))
+if got != want:
+    sys.exit("menu %r does not match the catalogs %r" % (got, want))
 PY
 
 echo "PASS"

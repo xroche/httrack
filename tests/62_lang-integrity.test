@@ -158,26 +158,30 @@ else
     fi
 fi
 
-# The language menu lists every catalog side by side, so a LANGUAGE_NAME left in
-# English reads as a defect among the endonyms (#116). Two oracles rather than a
-# copy of the current values: the name may repeat neither a word of the catalog's
-# own English LANGUAGE_WINDOWSID nor a common English language name.
-exonyms="albanian arabic basque belarusian bulgarian catalan chinese croatian czech
-danish dutch english estonian finnish flemish french galician georgian german greek
-hebrew hindi hungarian icelandic indonesian irish italian japanese korean latvian
-lithuanian macedonian malay norwegian persian polish portuguese romanian russian
-serbian simplified slovak slovene slovenian spanish swedish thai traditional turkish
-ukrainian uzbek vietnamese welsh"
+# LANGUAGE_NAME must be the endonym, not English: the menu shows every catalog
+# together (#116). Two oracles rather than a copy of the current values, so the
+# name may repeat neither a word of the catalog's own English LANGUAGE_WINDOWSID
+# nor a common English language name. A language whose endonym really is the
+# English word joins own_name_is_english below.
+own_name_is_english="en"
+exonyms="afrikaans albanian arabic basque belarusian bulgarian catalan chinese croatian czech
+danish dutch english estonian farsi filipino finnish flemish french galician georgian
+german greek hebrew hindi hungarian icelandic indonesian irish italian japanese kazakh
+korean latvian lithuanian macedonian malay norwegian persian polish portuguese
+romanian russian serbian simplified slovak slovene slovenian spanish swedish thai
+traditional turkish ukrainian urdu uzbek vietnamese welsh"
 
 name_is_endonym() {
     f=$1
     LC_ALL=C iconv -f "$(field "$f" LANGUAGE_CHARSET)" -t UTF-8 "$f" >"$tmp/u8" || return 1
     LC_ALL=C awk -v name="$(field "$tmp/u8" LANGUAGE_NAME)" -v iso="$(field "$f" LANGUAGE_ISO)" \
-        -v wid="$(field "$tmp/u8" LANGUAGE_WINDOWSID)" -v exonyms="$exonyms" -v n="${f##*/}" '
+        -v wid="$(field "$tmp/u8" LANGUAGE_WINDOWSID)" -v exonyms="$exonyms" -v n="${f##*/}" \
+        -v exempt="$own_name_is_english" '
         BEGIN {
-            # English is its own endonym.
-            if (iso == "en")
-                exit 0
+            split(exempt, x, /[ \t\n]+/)
+            for (i in x)
+                if (x[i] == iso)
+                    exit 0
             split(exonyms, e, /[ \t\n]+/)
             for (i in e)
                 bad_word[e[i]] = 1
@@ -199,14 +203,19 @@ if ! command -v iconv >/dev/null 2>&1; then
     echo "iconv not found; endonym check skipped" >&2
 else
     # One control per oracle: an English name its own catalog does not name, then
-    # a word its LANGUAGE_WINDOWSID does but the list above does not.
+    # a word its LANGUAGE_WINDOWSID does but the list above does not. Match the
+    # complaint, not the status: an unreadable fixture also returns non-zero.
     LC_ALL=C sed '2s/.*/Swedish/' "$langdir/Dansk.txt" >"$tmp/exonym.txt"
     LC_ALL=C sed '2s/.*/Nynorsk/' "$langdir/Norsk.txt" >"$tmp/wid.txt"
     for probe in exonym wid; do
-        if name_is_endonym "$tmp/$probe.txt" >/dev/null; then
-            echo "the endonym check passed a deliberately English name ($probe)"
+        said=$(name_is_endonym "$tmp/$probe.txt" || true)
+        case $said in
+        *"is the English name"*) ;;
+        *)
+            echo "the endonym check passed a deliberately English name ($probe): [$said]"
             exit 1
-        fi
+            ;;
+        esac
     done
     for f in "$langdir"/*.txt; do
         name_is_endonym "$f" || fail=1
