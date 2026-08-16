@@ -687,19 +687,17 @@ int httpmirror(char *url1, httrackp * opt) {
         int type;
         int plus = 0;
 
-        // noter joker (dans b)
-        if (*a == '+') {        // champ +
+        if (*a == '+') { // the accept field
           type = 1;
           plus = 1;
           a++;
-        } else if (*a == '-') { // champ forbidden[]
+        } else if (*a == '-') { // the forbidden[] field
           type = 0;
           a++;
-        } else {                // champ + avec joker sans doute
+        } else { // dead: joker is set only for '+' or '-' (#1297)
           type = 1;
         }
 
-        // recopier prochaine chaine (+ ou -)
         /* the sign is prepended into `rule` below, not held here; only the
            implicit form's trailing '*' has to be left room for */
         const size_t room = sizeof(tempo) - (plus == 0 && type == 1 ? 1 : 0);
@@ -714,11 +712,12 @@ int httpmirror(char *url1, httrackp * opt) {
           continue;
         }
 
-        // sauter les + sans rien après..
+        // skip a sign with nothing after it
         if (strnotempty(tempo)) {
-          if ((plus == 0) && (type == 1)) {     // implicite: *www.edf.fr par exemple
+          /* only the dead arm above reaches this, so nothing appends the '*' */
+          if ((plus == 0) && (type == 1)) {
             if (hts_lastchar(tempo) != '*') {
-              strcatbuff(tempo, "*");   // ajouter un *
+              strcatbuff(tempo, "*");
             }
           }
           {
