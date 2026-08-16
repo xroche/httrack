@@ -70,6 +70,9 @@ rejects 'head' selftest_queue_head 'savename: /nowhere/' savename '/x.php' 'text
 rejects 'tail matching mid-name' selftest_queue_tail '/x.ht' savename '/x.php' 'text/html'
 rejects 'head matching mid-output' selftest_queue_head 'avename: /dev/null/' \
     savename '/x.php' 'text/html'
+# An empty want anchors to nothing and would match whatever the engine printed.
+rejects 'an empty tail want' selftest_queue_tail '' savename '/x.php' 'text/html'
+rejects 'an empty head want' selftest_queue_head '' savename '/x.php' 'text/html'
 
 # lines mode: only 311_engine-location-gate.test uses it, and there only for
 # multi-line output.

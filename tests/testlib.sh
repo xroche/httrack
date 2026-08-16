@@ -61,20 +61,7 @@ assert_selftest() { # assert_selftest WANT NAME [ARGS...]
     test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
 }
 
-# assert_selftest for output spanning several lines: Windows stdout is text
-# mode, so every interior newline arrives as CRLF and a byte-exact compare
-# rejects it. Only the CR before a newline goes, or a test asserting the engine
-# drops an interior CR would pass whatever the engine did.
-assert_selftest_lines() { # assert_selftest_lines WANT NAME [ARGS...]
-    local want=$1 name=$2 got rc=0
-    shift 2
-    got=$(httrack -O /dev/null "-#test=$name" "$@") || rc=$?
-    test "$rc" -eq 0 || fail "-#test=$name $*: exited $rc, output: $got"
-    got=$(printf '%s\n' "$got" | sed $'s/\r$//')
-    test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
-}
-
-# Batched form of the two asserts above: selftest_queue records a case, and
+# Batched form of the assert above: selftest_queue records a case, and
 # selftest_run_queued runs a whole file's cases in ONE httrack (-#test=batch in
 # htsselftest.c), which the Windows legs pay dearly for otherwise (#795).
 # Same contract, except a mismatch surfaces at the flush, named. A case whose
@@ -96,7 +83,10 @@ selftest_queue() { # selftest_queue WANT NAME [ARGS...]
     selftest_queue_mode exact "$@"
 }
 
-# selftest_queue for output spanning several lines (see assert_selftest_lines).
+# selftest_queue for output spanning several lines: Windows stdout is text mode,
+# so every interior newline arrives as CRLF and a byte-exact compare rejects it.
+# Only the CR before a newline goes, or a test asserting the engine drops an
+# interior CR would pass whatever the engine did.
 selftest_queue_lines() { # selftest_queue_lines WANT NAME [ARGS...]
     selftest_queue_mode lines "$@"
 }
@@ -112,11 +102,14 @@ selftest_queue_head() { # selftest_queue_head WANT NAME [ARGS...]
     selftest_queue_mode head "$@"
 }
 
-selftest_queue_mode() { # selftest_queue_mode exact|lines|tail WANT NAME [ARGS...]
+selftest_queue_mode() { # selftest_queue_mode exact|lines|tail|head WANT NAME [ARGS...]
     local mode=$1 want=$2 name=$3
     shift 3
     case $mode in
-    exact | lines | tail | head) ;;
+    exact | lines) ;;
+    # An empty want is a prefix and a suffix of everything, so it would assert
+    # nothing at all.
+    head | tail) test -n "$want" || fail "a $mode want must not be empty" ;;
     *) fail "unknown selftest mode $mode" ;;
     esac
     SELFTEST_WANT+=("$want")
@@ -156,9 +149,11 @@ selftest_run_queued() {
             fail "-#test=batch: framing lost at case $((i + 1)) of $n, output: $out"
             ;;
         esac
-        # What a command substitution drops around a lone case. The CR goes
-        # with it: Windows stdout is text mode, so every case ends CRLF there
-        # and MSYS strips the pair. Interior ones are lines mode's business.
+        # The whole trailing run, which is what a command substitution drops
+        # around a lone case. The CR goes with it: Windows stdout is text mode,
+        # so every case ends CRLF there and MSYS eats the pair. Stripping the
+        # run rather than one terminator keeps the two platforms saying the
+        # same thing. Interior CRs are lines mode's business.
         while :; do
             case $got in
             *"$TESTLIB_NL") got=${got%"$TESTLIB_NL"} ;;
