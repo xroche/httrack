@@ -13,15 +13,13 @@ assert_selftest "scantoken self-test OK" scantoken
 tmpdir="$(mktemp -d)"
 cleanup_push rm -rf "$tmpdir"
 
-# HTS_URLMAXSIZE * 2, less the NUL. The sign is prepended after the copy,
-# into a slot of its own, so it costs the token nothing.
+# Token caps: a seed is bounded by its own buffer less the NUL, a rule by
+# HTS_FILTER_MAXLEN less the sign prepended after the copy. 317 pins the rule's.
 maxfilter=2047
 maxurl=2047
 
 rep() { # rep CHAR COUNT
-    local pad
-    pad=$(printf '%*s' "$2" '')
-    printf '%s' "${pad// /$1}"
+    printf "%${2}s" '' | tr ' ' "$1"
 }
 
 # Runs --why over a rules file and returns the verdict line alone.
@@ -50,7 +48,7 @@ for over in 1 512; do
     longrule "$((maxfilter + over))" "$tmpdir/over.txt"
     assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
         "$(why "$tmpdir/over.txt")" "filter of $((maxfilter + over)) bytes"
-    assert_match "Filter rule longer than $maxfilter bytes, ignored: -aaa" \
+    assert_match "Filter rule longer than $((maxfilter + 1)) bytes, ignored: -aaa" \
         "$(<"$tmpdir/p/hts-log.txt")" "refusal named in the log"
 done
 

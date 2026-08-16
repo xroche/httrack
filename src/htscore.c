@@ -684,7 +684,9 @@ int httpmirror(char *url1, httrackp * opt) {
         joker = 1;
 
       if (joker) { // a filter rule
-        char BIGSTK tempo[HTS_URLMAXSIZE * 2];
+        /* sized off the rule cap, so the parser refuses exactly what the array
+           and the matcher would (#1288) */
+        char BIGSTK tempo[HTS_FILTER_MAXLEN + 1];
         int type;
         int plus = 0;
 
@@ -699,17 +701,17 @@ int httpmirror(char *url1, httrackp * opt) {
           type = 1;
         }
 
-        /* the sign is prepended into `rule` below, not held here; the spare
-           byte is the dead branch's trailing '*' */
-        const size_t room = sizeof(tempo) - (plus == 0 && type == 1 ? 1 : 0);
+        /* one under the cap: the sign is prepended into `rule` below, and the
+           spare byte is the dead branch's trailing '*' */
+        const size_t room = sizeof(tempo) - 1;
 
         if (!hts_scan_token(&a, tempo, room)) {
           /* on the console too: the user who typed it may have no log open */
           printf("Filter rule longer than %d bytes, ignored: %c%.64s...\n",
-                 (int) (room - 1), type ? '+' : '-', tempo);
+                 (int) HTS_FILTER_MAXLEN, type ? '+' : '-', tempo);
           hts_log_print(opt, LOG_WARNING,
                         "Filter rule longer than %d bytes, ignored: %c%.64s...",
-                        (int) (room - 1), type ? '+' : '-', tempo);
+                        (int) HTS_FILTER_MAXLEN, type ? '+' : '-', tempo);
           continue;
         }
 
@@ -721,9 +723,8 @@ int httpmirror(char *url1, httrackp * opt) {
             }
           }
           {
-            /* wider than a slot, so an over-long rule reaches the length check
-               rather than aborting here */
-            char BIGSTK rule[HTS_FILTER_SLOT_SIZE + 2];
+            /* the sign, whatever tempo holds, and the NUL */
+            char BIGSTK rule[sizeof(tempo) + 1];
             htsbuff fb = htsbuff_array(rule);
 
             htsbuff_cpy(&fb, type ? "+" : "-");

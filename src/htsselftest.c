@@ -5513,6 +5513,10 @@ static int st_filtercap(httrackp *opt, int argc, char **argv) {
   freet(filters);
   opt->filters = saved;
   opt->wizard_filters = savedwizard;
+  /* the two independent caps a rule meets, so a test reads them instead of
+     hardcoding a number that drifts from the engine (#1288) */
+  printf("filtercap: rule=%d argv=%d\n", (int) HTS_FILTER_MAXLEN,
+         (int) HTS_CDLMAXSIZE);
   printf("filtercap self-test OK\n");
   return 0;
 }
