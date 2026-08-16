@@ -676,13 +676,14 @@ int httpmirror(char *url1, httrackp * opt) {
     while (*a) {
       int joker = 0;
 
-      // vérifier qu'il n'y a pas de * dans l'url
+      // only a leading + or - makes a token a filter rule; anything else is a
+      // URL
       if (*a == '+')
         joker = 1;
       else if (*a == '-')
         joker = 1;
 
-      if (joker) { // joker ou filters
+      if (joker) { // a filter rule
         char BIGSTK tempo[HTS_URLMAXSIZE * 2];
         int type;
         int plus = 0;
@@ -694,12 +695,12 @@ int httpmirror(char *url1, httrackp * opt) {
         } else if (*a == '-') { // the forbidden[] field
           type = 0;
           a++;
-        } else { // dead: joker is set only for '+' or '-' (#1297)
+        } else { // dead: joker is set only for '+' or '-'
           type = 1;
         }
 
-        /* the sign is prepended into `rule` below, not held here; only the
-           implicit form's trailing '*' has to be left room for */
+        /* the sign is prepended into `rule` below, not held here; the spare
+           byte is the dead branch's trailing '*' */
         const size_t room = sizeof(tempo) - (plus == 0 && type == 1 ? 1 : 0);
 
         if (!hts_scan_token(&a, tempo, room)) {
@@ -714,7 +715,6 @@ int httpmirror(char *url1, httrackp * opt) {
 
         // skip a sign with nothing after it
         if (strnotempty(tempo)) {
-          /* only the dead arm above reaches this, so nothing appends the '*' */
           if ((plus == 0) && (type == 1)) {
             if (hts_lastchar(tempo) != '*') {
               strcatbuff(tempo, "*");
@@ -748,7 +748,7 @@ int httpmirror(char *url1, httrackp * opt) {
 
         }
 
-      } else { // adresse normale
+      } else { // a plain URL
         char BIGSTK url[HTS_URLMAXSIZE * 2];
 
         // prochaine adresse
