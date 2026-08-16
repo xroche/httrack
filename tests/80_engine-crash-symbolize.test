@@ -4,7 +4,7 @@
 set -eu
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 skip_on_windows "no backtrace() on Windows"
 command -v httrack >/dev/null || {

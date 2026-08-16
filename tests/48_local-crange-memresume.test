@@ -7,7 +7,7 @@
 set -u
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}crawllib.sh"
 
 # The resume needs a graceful pass-1 interrupt to leave a temp-ref, and MSYS
 # cannot deliver a signal to a native exe.

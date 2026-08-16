@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # Cache-index (.ndx) parse must stay inside the buffer on a corrupt length
 # prefix (ASan aborts here on the pre-fix binary; the OK check gates the

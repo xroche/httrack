@@ -9,7 +9,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
 sweep="$testdir/install-headers-sweep.sh"

@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # #623: url_savename shortens an over-ceiling path by cutting the tail of the
 # last segment, where the mandatory ".<id>.delayed" placeholder lives. A cut

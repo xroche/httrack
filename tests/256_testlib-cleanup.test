@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cleanup.XXXXXX")
 # Hand-written, not cleanup_push: this test must not lose its own teardown to

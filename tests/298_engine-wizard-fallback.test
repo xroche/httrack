@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # #1251: an answer the engine cannot honour as asked must still record a rule
 # and say so, or it decides one link and the next one asks all over again.

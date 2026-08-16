@@ -6,7 +6,7 @@
 
 set -eu
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 gen="$top_srcdir/man/makeman.sh"
 committed="$top_srcdir/man/httrack.1"

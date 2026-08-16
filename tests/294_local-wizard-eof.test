@@ -3,7 +3,7 @@
 set -eu
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}crawllib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_1247.XXXXXX") || exit 1
 cleanup() {

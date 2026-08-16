@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # Update-run naming from a real cache entry (-#test=savename cached=<ctype>|<save>).
 # Named 01_zlib-*: the cache writer needs zlib, which the MSan job can't run.

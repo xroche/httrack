@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # MIME type guessing from extension (get_httptype / give_mimext).
 # -#test=mime <path> prints "<path> is '<mime>'" then "and its local type is '.<ext>'".

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 : "${abs_top_builddir:?not run under make check}"
 bindir="${CONFIGURED_BINDIR:?not run under make check}"

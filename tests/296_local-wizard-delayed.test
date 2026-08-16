@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}crawllib.sh"
 
 # "mirror this link"
 WIZARD_MIRROR=5

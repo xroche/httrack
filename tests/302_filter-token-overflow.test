@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}crawllib.sh"
 
 # A filter or a URL longer than the buffer it is copied into must be named and
 # dropped, never truncated into a rule that authorizes something else (#1271).

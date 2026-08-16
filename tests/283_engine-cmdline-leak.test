@@ -8,7 +8,7 @@
 set -eu
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 probe=$(ASAN_OPTIONS=help=1 httrack -O /dev/null --version 2>&1 || true)
 case "$probe" in

@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}crawllib.sh"
 
 if test "${V6_SUPPORT:-}" == "no"; then
     echo "no IPv6 support (resolver override compiled out), skipping"

@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 find_python >/dev/null || skip "python3 not found"
 command -v httrack >/dev/null || skip "no httrack in PATH"

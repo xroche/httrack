@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # Response header-line parsing (treathead via -#test=header <raw-line> ...).
 # Isolates the wire layer from url_savename, which strips traversal on its own.

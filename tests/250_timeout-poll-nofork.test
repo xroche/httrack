@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_nofork.XXXXXX")
 cleanup_push rm -rf "$tmp"

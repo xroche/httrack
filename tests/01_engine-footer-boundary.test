@@ -6,7 +6,7 @@
 
 set -eu
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # The emitter's buffer, 1024 + 2 * HTS_URLMAXSIZE. The sweep window is derived
 # from it; a wrong value makes the crossing check below fail loudly.

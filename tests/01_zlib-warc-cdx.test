@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # --warc-cdx CDXJ index over synthetic transactions: sorted, one line per
 # response/revisit/resource, each offset/length inflates to the right member.

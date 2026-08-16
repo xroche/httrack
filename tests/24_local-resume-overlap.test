@@ -8,7 +8,7 @@
 set -eu
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}crawllib.sh"
 root=$(nativepath "${testdir}/server-root")
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_198.XXXXXX") || exit 1

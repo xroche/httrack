@@ -8,7 +8,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 tmpdir=$(mktemp -d) # honors the Windows-shaped TMPDIR the MSYS suite exports
 cleanup() { rm -rf "$tmpdir"; }

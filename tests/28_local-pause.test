@@ -8,7 +8,7 @@
 set -e
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # python3 runs the local server (mirror local-crawl.sh); skip when absent, else
 # run() swallows its exit-77 and the serverless 0s/0s crawl looks like a fail.

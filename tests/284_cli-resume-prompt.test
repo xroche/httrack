@@ -8,8 +8,8 @@
 set -eu
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
-ttyrun=$(nativepath "$(dirname "$0")/ttyrun.py")
+. "${0%"${0##*/}"}testlib.sh"
+ttyrun=$(nativepath "${0%"${0##*/}"}ttyrun.py")
 
 skip_on_windows "no pty on Windows"
 python=$(find_python) || skip "python3 not found"

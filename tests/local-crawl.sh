@@ -53,7 +53,7 @@
 set -u
 
 # shellcheck source=tests/crawllib.sh
-. "$(dirname "$0")/crawllib.sh"
+. "${0%"${0##*/}"}crawllib.sh"
 root="${LOCAL_SERVER_ROOT:-${testdir}/server-root}"
 
 tlsargs=()

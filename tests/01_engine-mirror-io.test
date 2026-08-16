@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # Drives -#test=mirrorio: rounds a file through a path that is both long
 # (>MAX_PATH) and non-ASCII, exercising the mirror I/O wrappers the engine's

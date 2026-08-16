@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # #1119: the self-test asserts the emitted patterns, this feeds the host-wide
 # one back through the matcher that decides whether a link is authorized.

@@ -5,7 +5,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # answering "ignore this link" and then "mirror the whole host" takes it back
 list=$(httrack -O /dev/null -#test=wizardinsert h /dir/one.html 0 6)

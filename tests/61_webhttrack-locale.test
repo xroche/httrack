@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 distdir=$(cd "${testdir}/.." && pwd)
 # The .in, not the generated script: only SRCHDISTPATH differs, and this stays in srcdir.

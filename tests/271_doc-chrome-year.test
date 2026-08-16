@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 srcdir="${abs_top_srcdir:?not run under make check}"
 chrome_src="${srcdir}/tools/doc-chrome.py"

@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # path simplify engine (fil_simplifie): collapses ./ and ../ segments.
 simp() { assert_selftest "simplified=$2" simplify "$1"; }

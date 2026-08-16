@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # #133: the save-path ceiling used to be the Windows MAX_PATH (236 usable) on
 # every platform, needlessly hashing long names on Linux/macOS/Android. Off

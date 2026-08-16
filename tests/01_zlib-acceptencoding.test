@@ -3,7 +3,7 @@
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
-. "$(dirname "$0")/testlib.sh"
+. "${0%"${0##*/}"}testlib.sh"
 
 # Accept-Encoding (#450): advertise gzip+deflate; decode gzip/zlib/raw-deflate.
 dir=$(mktemp -d)
