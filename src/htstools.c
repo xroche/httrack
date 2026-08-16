@@ -830,6 +830,10 @@ static int hts_template_formatv(hts_template_format_buf *buf,
       if (c == '%') {
         const unsigned char cFormat = format[++i];
         switch(cFormat) {
+        case '\0': /* trailing %: back up, or the loop reads past the NUL */
+          FPUTC('%');
+          i--;
+          break;
         case '%':
           FPUTC('%');
           break;
@@ -1002,18 +1006,18 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
   char catbuff[CATBUFF_SIZE];
 
   // et templates html
-  toptemplate_header =
-    readfile_or(fconcat(catbuff, sizeof(catbuff), binpath, "templates/topindex-header.html"),
-                HTS_INDEX_HEADER);
-  toptemplate_body =
-    readfile_or(fconcat(catbuff, sizeof(catbuff), binpath, "templates/topindex-body.html"),
-                HTS_INDEX_BODY);
-  toptemplate_bodycat =
-    readfile_or(fconcat(catbuff, sizeof(catbuff), binpath, "templates/topindex-bodycat.html"),
-                HTS_INDEX_BODYCAT);
-  toptemplate_footer =
-    readfile_or(fconcat(catbuff, sizeof(catbuff), binpath, "templates/topindex-footer.html"),
-                HTS_INDEX_FOOTER);
+  toptemplate_header = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
+                                           "templates/topindex-header.html"),
+                                   HTS_TOPINDEX_HEADER);
+  toptemplate_body = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
+                                         "templates/topindex-body.html"),
+                                 HTS_TOPINDEX_BODY);
+  toptemplate_bodycat = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
+                                            "templates/topindex-bodycat.html"),
+                                    HTS_TOPINDEX_BODYCAT);
+  toptemplate_footer = readfile_or(fconcat(catbuff, sizeof(catbuff), binpath,
+                                           "templates/topindex-footer.html"),
+                                   HTS_TOPINDEX_FOOTER);
 
   if (toptemplate_header && toptemplate_body && toptemplate_footer
       && toptemplate_bodycat) {

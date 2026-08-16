@@ -10,4 +10,177 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-assert_selftest "makeindex self-test OK" makeindex "$dir" run
+# $testdir/.. as the fallback: the Windows suite runs the scripts without
+# automake, so it exports none of its directory variables.
+srcroot=$(cd "${abs_top_srcdir:-$testdir/..}" && pwd)
+templates="$srcroot/templates"
+
+# The second argument replays every scenario through the shipped file as well,
+# so the on-disk copy is rendered and not only compared textually below.
+assert_selftest "makeindex self-test OK" makeindex "$dir" \
+    "$(nativepath "$templates")" run
+
+# The rest guards templates/ against the compiled-in copy that takes over when
+# the data directory is missing: the two had drifted apart (#1244).
+indextmpl="$srcroot/src/hts-indextmpl.h"
+
+# The body of one hts-indextmpl.h macro, on stdout.
+macro_body() { # macro_body MACRO
+    awk -v macro="$1" '
+        !inmacro {
+            if ($0 == "#define " macro " \\") inmacro = 1
+            next
+        }
+        { print; found = 1 }
+        $0 !~ /\\$/ { exit }
+        END {
+            if (!found) {
+                print "no such macro: " macro > "/dev/stderr"
+                exit 1
+            }
+        }
+    ' "$indextmpl"
+}
+
+# %s slots as hts_template_formatv counts them: %% is an escaped percent, so it
+# consumes the s of a following %%s and yields no slot.
+slot_count() { # slot_count [FILE...]
+    awk '{ line = $0; gsub(/%%/, "", line); n += gsub(/%s/, "&", line) }
+        END { print n + 0 }' "$@"
+}
+
+# % escapes the formatter would pass through as typed: anything but %s or %%.
+stray_escapes() { # stray_escapes [FILE...]
+    awk '{ line = $0; gsub(/%%/, "", line)
+            n += gsub(/%[^s]/, "&", line) + gsub(/%$/, "&", line) }
+        END { print n + 0 }' "$@"
+}
+
+# The html/head/body tags in the order they are emitted, one line, tags upper-cased.
+tag_order() { # tag_order [FILE...]
+    awk '{
+            line = toupper($0)
+            while (match(line, /<\/?(HTML|HEAD|BODY)[ >]/)) {
+                tag = substr(line, RSTART, RLENGTH)
+                sub(/[ >]$/, ">", tag)
+                out = out (out == "" ? "" : " ") tag
+                line = substr(line, RSTART + RLENGTH)
+            }
+        }
+        END { print out }' "$@"
+}
+
+# A slot only one copy has is an argument silently dropped from the index.
+for pair in \
+    "index-header.html HTS_INDEX_HEADER" \
+    "index-body.html HTS_INDEX_BODY" \
+    "index-footer.html HTS_INDEX_FOOTER" \
+    "topindex-header.html HTS_TOPINDEX_HEADER" \
+    "topindex-body.html HTS_TOPINDEX_BODY" \
+    "topindex-bodycat.html HTS_TOPINDEX_BODYCAT" \
+    "topindex-footer.html HTS_TOPINDEX_FOOTER"; do
+    file=${pair%% *}
+    macro=${pair##* }
+    assert_eq "$(slot_count "$templates/$file")" \
+        "$(macro_body "$macro" | slot_count)" "$file vs $macro: %s slots"
+    # the macros get this from makeindex_template_contract; disk copies get it here
+    assert_eq 0 "$(stray_escapes "$templates/$file")" "$file: stray % escape"
+done
+
+# Where a tag sits, with HTML comments stripped so a commented-out one does not
+# count: "</head> <body> <table>" for a well-framed header.
+live_frame() { # live_frame FILE
+    awk '{
+            line = $0
+            out = ""
+            while (length(line)) {
+                if (incomment) {
+                    p = index(line, "-->")
+                    if (p == 0) break
+                    line = substr(line, p + 3)
+                    incomment = 0
+                } else {
+                    p = index(line, "<!--")
+                    if (p == 0) { out = out line; break }
+                    out = out substr(line, 1, p - 1)
+                    line = substr(line, p + 4)
+                    incomment = 1
+                }
+            }
+            out = toupper(out)
+            while (match(out, /<\/?(HEAD|BODY|TABLE)[ >]/)) {
+                tag = substr(out, RSTART, RLENGTH)
+                sub(/[ >]$/, ">", tag)
+                if (tag ~ /^(<\/HEAD>|<BODY>|<TABLE>)$/ && !(tag in seen)) {
+                    seen[tag] = 1
+                    order = order (order == "" ? "" : " ") tag
+                }
+                out = substr(out, RSTART + RLENGTH)
+            }
+        }
+        END { print order }' "$@"
+}
+
+# <body> must open after </head> and before the first table: a browser drops the
+# start tag when it lands inside a table cell instead.
+for pair in \
+    "index-header.html HTS_INDEX_HEADER" \
+    "topindex-header.html HTS_TOPINDEX_HEADER"; do
+    file=${pair%% *}
+    macro=${pair##* }
+    assert_eq "</HEAD> <BODY> <TABLE>" "$(live_frame "$templates/$file")" \
+        "templates/$file: <body> placement"
+    assert_eq "</HEAD> <BODY> <TABLE>" "$(macro_body "$macro" | live_frame)" \
+        "$macro: <body> placement"
+done
+
+# Header and footer together frame one document.
+framed="<HTML> <HEAD> </HEAD> <BODY> </BODY> </HTML>"
+for pair in \
+    "index HTS_INDEX_HEADER HTS_INDEX_FOOTER" \
+    "topindex HTS_TOPINDEX_HEADER HTS_TOPINDEX_FOOTER"; do
+    read -r name header footer <<<"$pair"
+    assert_eq "$framed" \
+        "$(tag_order "$templates/$name-header.html" "$templates/$name-footer.html")" \
+        "templates/$name-{header,footer}: tag order"
+    assert_eq "$framed" "$({
+        macro_body "$header"
+        macro_body "$footer"
+    } | tag_order)" "$header + $footer: tag order"
+done
+
+# Same frame for the page written when a link was never fetched.
+assert_eq "$framed" "$(macro_body HTS_DATA_UNKNOWN_HTML | tag_order)" \
+    "HTS_DATA_UNKNOWN_HTML: tag order"
+
+# A bare & is invalid markup wherever it lands.
+bare_amps() { # bare_amps [FILE...]
+    awk '{ line = $0
+            gsub(/&([A-Za-z][A-Za-z0-9]*|#[Xx]?[0-9A-Fa-f]+);/, "", line)
+            n += gsub(/&/, "&", line) }
+        END { print n + 0 }' "$@"
+}
+
+assert_eq 0 "$(bare_amps "$templates"/*.html)" "templates: unescaped &"
+for macro in HTS_INDEX_HEADER HTS_INDEX_BODY HTS_INDEX_FOOTER \
+    HTS_TOPINDEX_HEADER HTS_TOPINDEX_BODY HTS_TOPINDEX_BODYCAT HTS_TOPINDEX_FOOTER \
+    HTS_DATA_UNKNOWN_HTML; do
+    assert_eq 0 "$(macro_body "$macro" | bare_amps)" "$macro: unescaped &"
+done
+
+# The pin, not the bytes: it is what keeps a Windows checkout from putting CRs
+# in a file the engine pastes into the index verbatim. ls-files first, because
+# distcheck unpacks the tarball inside the checkout, where git answers for paths
+# it does not track and every pin reads unspecified.
+if command -v git >/dev/null 2>&1 &&
+    git -C "$srcroot" ls-files --error-unmatch templates >/dev/null 2>&1; then
+    for file in "$templates"/*.html; do
+        assert_eq lf \
+            "$(git -C "$srcroot" check-attr eol -- "templates/${file##*/}" | sed 's/.*: //')" \
+            "${file##*/}: eol pin"
+        assert_eq 0 "$(awk '/\r$/ { bad++ } END { print bad + 0 }' "$file")" \
+            "${file##*/}: lines ending in CRLF"
+    done
+else
+    echo "note: templates/ is not tracked here, so its eol pin cannot be read"
+fi

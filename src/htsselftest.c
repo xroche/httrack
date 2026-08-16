@@ -5499,76 +5499,183 @@ static int st_redirect_samefile(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-// hts_finish_makeindex writes the footer, emits the refresh meta only when
-// makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir.
-static int st_makeindex(httrackp *opt, int argc, char **argv) {
-  char path[HTS_URLMAXSIZE];
-  char buf[4096];
-  FILE *fp;
+static void makeindex_run(httrackp *opt, const char *path, const char *footer,
+                          int links, const char *firstlink, char *buf,
+                          size_t size) {
+  FILE *fp = fopen(path, "wb");
+  int done = 0;
   size_t n;
-  int done;
 
-  assertf(argc >= 1);
-  snprintf(path, sizeof(path), "%s/index.html", argv[0]);
-
-  /* single first link: footer + a refresh meta carrying the escaped URL */
-  done = 0;
-  fp = fopen(path, "wb");
   assertf(fp != NULL);
-  hts_finish_makeindex(opt, &done, &fp, 1, "http://example.com/a b", "%s%s", "",
-                       "");
+  hts_finish_makeindex(opt, &done, &fp, links, firstlink, footer, "", "");
   assertf(fp == NULL); /* the function closed and cleared it */
   assertf(done != 0);
   fp = fopen(path, "rb");
   assertf(fp != NULL);
-  n = fread(buf, 1, sizeof(buf) - 1, fp);
+  n = fread(buf, 1, size - 1, fp);
   fclose(fp);
   buf[n] = '\0';
-  assertf(strstr(buf, "Mirror and index made by HTTrack") != NULL);
-  assertf(strstr(buf, "Refresh") != NULL);
-  assertf(strstr(buf, "example.com") != NULL);
+}
 
-  /* a first link whose escaped form overruns the old flat 1024-byte tempo: the
-     redirect must carry the whole URL, not a clipped prefix */
+// Whole file as a NUL-terminated heap string, or NULL when it cannot be read.
+static char *makeindex_slurp(const char *path) {
+  FILE *fp = fopen(path, "rb");
+  long size;
+  char *buf;
+
+  if (fp == NULL)
+    return NULL;
+  assertf(fseek(fp, 0, SEEK_END) == 0);
+  size = ftell(fp);
+  assertf(size >= 0);
+  rewind(fp);
+  buf = malloct((size_t) size + 1);
+  /* a read error would otherwise render a silently truncated template */
+  assertf(fread(buf, 1, (size_t) size, fp) == (size_t) size);
+  buf[size] = '\0';
+  fclose(fp);
+  return buf;
+}
+
+// Whether `at` sits in live markup rather than inside an HTML comment.
+static hts_boolean makeindex_outside_comment(const char *buf, const char *at) {
+  const char *open = NULL, *close = NULL, *p;
+
+  for (p = buf; (p = strstr(p, "<!--")) != NULL && p < at; p += 4)
+    open = p;
+  for (p = buf; (p = strstr(p, "-->")) != NULL && p < at; p += 3)
+    close = p;
+  return open == NULL || (close != NULL && close > open) ? HTS_TRUE : HTS_FALSE;
+}
+
+// %-contract of a built-in template: the slots its caller fills, and no escape
+// besides %%.
+static void makeindex_template_contract(const char *name, const char *tmpl,
+                                        size_t slots) {
+  size_t i, n;
+
+  for (i = 0, n = 0; tmpl[i] != '\0'; i++) {
+    if (tmpl[i] != '%')
+      continue;
+    if (tmpl[i + 1] == 's')
+      n++;
+    else if (tmpl[i + 1] != '%') {
+      fprintf(stderr, "%s: stray %%%c escape\n", name, tmpl[i + 1]);
+      assertf(!"built-in template carries an escape that is neither %s nor %%");
+    }
+    i++;
+  }
+  if (n != slots) {
+    fprintf(stderr, "%s: %d %%s slots, expected %d\n", name, (int) n,
+            (int) slots);
+    assertf(!"built-in template slot count drifted from its caller");
+  }
+}
+
+// hts_finish_makeindex writes the footer, emits the refresh meta only when
+// makeindex_links==1, and clears *fp / sets *done. argv[0] is a writable dir,
+// argv[1] is an optional templates/ whose on-disk footer is rendered too.
+static int st_makeindex(httrackp *opt, int argc, char **argv) {
+  /* the minimal template is the control: it proves an assertion below can only
+     fail on the real one because that template lost a slot */
+  const char *footers[] = {"%s%s", HTS_INDEX_FOOTER, NULL};
+  size_t nfooters = sizeof(footers) / sizeof(*footers) - 1;
+  char *ondisk = NULL;
+  char path[HTS_URLMAXSIZE];
+  char BIGSTK buf[8192];
+  size_t t;
+
+  assertf(argc >= 1);
+  snprintf(path, sizeof(path), "%s/index.html", argv[0]);
+
+  /* heap-allocated so a sanitizer sees an overrun, and poisoned so the stray
+     NUL one writes cannot pass for the terminator */
   {
-    char BIGSTK link[HTS_URLMAXSIZE * 2];
-    char *p = link;
+    char *trailing = strdupt("credit %s, then a stray %");
+    const char *const want = "credit X, then a stray %";
+    char out[64];
+    size_t i;
 
-    strcpybuff(link, "http://example.com/");
-    p += strlen(link);
-    memset(p, 'a', 1200);
-    p += 1200;
-    strcpy(p, "/end.html");
-
-    done = 0;
-    fp = fopen(path, "wb");
-    assertf(fp != NULL);
-    hts_finish_makeindex(opt, &done, &fp, 1, link, "%s%s", "", "");
-    assertf(fp == NULL);
-    fp = fopen(path, "rb");
-    assertf(fp != NULL);
-    n = fread(buf, 1, sizeof(buf) - 1, fp);
-    fclose(fp);
-    buf[n] = '\0';
-    /* the closing quote proves the URL was not clipped mid-way */
-    assertf(strstr(buf, "/end.html\">") != NULL);
+    memset(out, 'Z', sizeof(out));
+    assertf(hts_template_format_str(out, sizeof(out), trailing, "X", NULL) >=
+            0);
+    assertf(strcmp(out, want) == 0);
+    for (i = strlen(want) + 1; i < sizeof(out); i++)
+      assertf(out[i] == 'Z');
+    freet(trailing);
   }
 
-  /* no single link: footer only, no refresh meta */
-  done = 0;
-  fp = fopen(path, "wb");
-  assertf(fp != NULL);
-  hts_finish_makeindex(opt, &done, &fp, 0, NULL, "%s%s", "", "");
-  assertf(fp == NULL);
-  assertf(done != 0);
-  fp = fopen(path, "rb");
-  assertf(fp != NULL);
-  n = fread(buf, 1, sizeof(buf) - 1, fp);
-  fclose(fp);
-  buf[n] = '\0';
-  assertf(strstr(buf, "Mirror and index made by HTTrack") != NULL);
-  assertf(strstr(buf, "Refresh") == NULL);
+  makeindex_template_contract("HTS_INDEX_HEADER", HTS_INDEX_HEADER, 1);
+  makeindex_template_contract("HTS_INDEX_BODY", HTS_INDEX_BODY, 2);
+  makeindex_template_contract("HTS_TOPINDEX_BODYCAT", HTS_TOPINDEX_BODYCAT, 1);
+  makeindex_template_contract("HTS_INDEX_FOOTER", HTS_INDEX_FOOTER, 2);
+  makeindex_template_contract("HTS_TOPINDEX_HEADER", HTS_TOPINDEX_HEADER, 1);
+  makeindex_template_contract("HTS_TOPINDEX_BODY", HTS_TOPINDEX_BODY, 2);
+  makeindex_template_contract("HTS_TOPINDEX_FOOTER", HTS_TOPINDEX_FOOTER, 1);
+  /* htsparse.c writes this one as an fprintf argument, so a % reaches
+     external.html as typed: a %s prints unfilled and a %% prints doubled */
+  {
+    const char *const verbatim = HTS_DATA_UNKNOWN_HTML;
 
+    assertf(strstr(verbatim, "%s") == NULL);
+    assertf(strstr(verbatim, "%%") == NULL);
+  }
+
+  /* the shipped copy, so the same scenarios run through the file a real install
+     reads and not only through the fallback macro */
+  if (argc >= 2) {
+    char tmpl[HTS_URLMAXSIZE];
+
+    snprintf(tmpl, sizeof(tmpl), "%s/index-footer.html", argv[1]);
+    ondisk = makeindex_slurp(tmpl);
+    assertf(ondisk != NULL);
+    footers[nfooters++] = ondisk;
+  }
+
+  for (t = 0; t < nfooters; t++) {
+    const char *const footer = footers[t];
+
+    /* single first link: footer + a refresh meta carrying the escaped URL */
+    makeindex_run(opt, path, footer, 1, "http://example.com/a b", buf,
+                  sizeof(buf));
+    {
+      const char *const credit = strstr(buf, "<!-- Mirror and index made by");
+      const char *const meta = strstr(buf, "<meta HTTP-EQUIV=\"Refresh\"");
+
+      assertf(credit != NULL);
+      assertf(meta != NULL);
+      assertf(strstr(meta, "example.com") != NULL);
+      /* the slots are positional: credit first, and a redirect the browser
+         never sees is no redirect */
+      assertf(credit < meta);
+      assertf(makeindex_outside_comment(buf, credit));
+      assertf(makeindex_outside_comment(buf, meta));
+    }
+
+    /* a first link whose escaped form overruns the old flat 1024-byte tempo:
+       the redirect must carry the whole URL, not a clipped prefix */
+    {
+      char BIGSTK link[HTS_URLMAXSIZE * 2];
+      char *p = link;
+
+      strcpybuff(link, "http://example.com/");
+      p += strlen(link);
+      memset(p, 'a', 1200);
+      p += 1200;
+      strcpy(p, "/end.html");
+
+      makeindex_run(opt, path, footer, 1, link, buf, sizeof(buf));
+      /* the closing quote proves the URL was not clipped mid-way */
+      assertf(strstr(buf, "/end.html\">") != NULL);
+    }
+
+    /* no single link: footer only, no refresh meta */
+    makeindex_run(opt, path, footer, 0, NULL, buf, sizeof(buf));
+    assertf(strstr(buf, "Mirror and index made by HTTrack") != NULL);
+    assertf(strstr(buf, "Refresh") == NULL);
+  }
+
+  freet(ondisk);
   UNLINK(path);
   printf("makeindex self-test OK\n");
   return 0;
@@ -5739,6 +5846,14 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   buf[n] = '\0';
   assertf(strstr(buf, projUTF8) != NULL);
   assertf(strstr(buf, catUTF8) != NULL);
+  /* the marker proves binpath "" found no templates/ to read, so the rest of
+     this checks the compiled-in copies and not a stray on-disk set */
+  assertf(strstr(buf, "Template file not found") != NULL);
+  /* they must be the top-index copies ("???" is the formatter running out of
+     arguments) */
+  assertf(strstr(buf, "locally available projects") != NULL);
+  assertf(strstr(buf, "/index.html\">") != NULL);
+  assertf(strstr(buf, "???") == NULL);
 
   /* raw unlink/rmdir: UNLINK is utf-8 on Windows, these paths aren't */
   unlink(path);
