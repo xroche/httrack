@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Greek
+Ελληνικά
 LANGUAGE_FILE
 Greek
 LANGUAGE_ISO

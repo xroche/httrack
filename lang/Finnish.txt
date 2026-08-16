@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Finnish
+Suomi
 LANGUAGE_FILE
 Finnish
 LANGUAGE_ISO

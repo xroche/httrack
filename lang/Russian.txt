@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Russian
+Русский
 LANGUAGE_FILE
 Russian
 LANGUAGE_ISO

@@ -1,0 +1,114 @@
+#!/bin/bash
+#
+# Every catalog names itself in its own charset, but the menu shows them together
+# on a page served in one of those charsets. So each name has to leave as an ASCII
+# character reference, and the menu must read the same under any charset (#116).
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+distdir=${HTS_DISTDIR}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_langnames.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+# Leaves the URL in ${HTS_URL}; never call it from a $(...), or the pids it
+# records would stay in the subshell and every server would keep running.
+serve() { # $1 = language index
+    mkdir -p "${work}/h$1"
+    htsserver_start --home "${work}/h$1" --log "${work}/srv$1.log" lang "$1"
+}
+
+menu() { # $1 = language index, $2 = file for the <select> block, plus .charset
+    serve "$1"
+    "${HTS_PYTHON}" - "${HTS_URL}" "$2" <<'PY' || fail "no language menu in the page"
+import re, sys, urllib.request
+
+raw = urllib.request.urlopen(sys.argv[1], timeout=20).read()
+block = re.search(rb'<select name="lang".*?</select>', raw, re.S)
+charset = re.search(rb'charset=([^"]*)"', raw)
+if not block or not charset:
+    sys.exit("no language <select> or no declared charset in the page")
+open(sys.argv[2], "wb").write(block.group(0))
+open(sys.argv[2] + ".charset", "wb").write(charset.group(1))
+PY
+}
+
+printf '[the language menu names every catalog, in every page charset] ..\t'
+# 1 is English, 8 Russian. Their charsets have to differ, or identical menu bytes
+# below would prove nothing about surviving the one the page is served in.
+menu 1 "${work}/menu-en"
+menu 8 "${work}/menu-ru"
+if [ "$(<"${work}/menu-en.charset")" = "$(<"${work}/menu-ru.charset")" ]; then
+    fail "both pages are $(<"${work}/menu-en.charset"); pick two languages that differ"
+fi
+
+"${HTS_PYTHON}" - "${distdir}" "${work}/menu-en" "${work}/menu-ru" <<'PY' || fail "wrong menu (see above)"
+import os, re, sys
+
+distdir, first, second = sys.argv[1:4]
+OPTION = rb"<option value=(\d+)(?: selected)?>([^<]*)</option>"
+
+
+def options(path):
+    blob = open(path, "rb").read()
+    high = [b for b in blob if b > 0x7F]
+    if high:
+        sys.exit("%s: %d non-ASCII bytes in the menu: %r" % (path, len(high), high[:8]))
+    return [(int(m.group(1)), m.group(2).decode("ascii")) for m in re.finditer(OPTION, blob)]
+
+
+got = options(first)
+if got != options(second):
+    sys.exit("the menu differs between an English and a Russian page")
+
+
+def field(blob, key):
+    m = re.search(rb"(?m)^" + key + rb"\r?$", blob)
+    if not m:
+        sys.exit("no %s" % key.decode("ascii"))
+    return blob[m.end() + 1 :].split(b"\n", 1)[0].rstrip(b"\r")
+
+
+def reference(name):
+    # What the emitter owes us: ASCII kept, HTML specials escaped, the rest named
+    # by code point so the page charset cannot reach it.
+    out = ""
+    for c in name:
+        if c in "&<>'":
+            out += {"&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;"}[c]
+        elif ord(c) < 0x80:
+            out += c
+        else:
+            out += "&#%d;" % ord(c)
+    return out
+
+
+# lang.def numbers the catalogs and names their files; option N must carry the
+# name inside file N, so a menu that lists them all but shuffled still fails.
+defs = open(os.path.join(distdir, "lang.def"), "rb").read().split(b"\n")
+defs = [line.rstrip(b"\r").decode("ascii", "replace") for line in defs]
+want = []
+for i in range(0, len(defs) - 1, 2):
+    m = re.fullmatch(r"LANGUAGE_(\d+)", defs[i + 1])
+    if not m:
+        continue
+    blob = open(os.path.join(distdir, "lang", defs[i] + ".txt"), "rb").read()
+    charset = field(blob, b"LANGUAGE_CHARSET").decode("ascii")
+    want.append((int(m.group(1)), reference(field(blob, b"LANGUAGE_NAME").decode(charset))))
+
+# A truncated lang.def parse would make the comparison below vacuous.
+if len(want) < 25:
+    sys.exit("only %d catalogs parsed from lang.def" % len(want))
+if got != want:
+    sys.exit("menu %r does not match the catalogs %r" % (got, want))
+PY
+
+echo "PASS"

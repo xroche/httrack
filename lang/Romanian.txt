@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Romanian
+Românã
 LANGUAGE_FILE
 Romanian
 LANGUAGE_ISO

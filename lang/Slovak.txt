@@ -1,5 +1,5 @@
 LANGUAGE_NAME
-Slovak
+Slovenèina
 LANGUAGE_FILE
 Slovak
 LANGUAGE_ISO
