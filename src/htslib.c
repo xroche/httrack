@@ -6643,6 +6643,9 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
       coucal_delete(&root); // frees records via hts_cache_value_free
     }
 
+    /* URLs a front end queued but the engine never got to inject */
+    hts_addurl_free(hts_addurl_take(opt));
+
     /* Cancel chain */
     if (opt->state.cancel != NULL) {
       htsoptstatecancel *cancel;

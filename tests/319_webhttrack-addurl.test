@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+# A URL injected mid-crawl through WebHTTrack's add-url must land with a
+# resolved name, parsed and cached, not under a ".delayed" placeholder (#1253).
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_addurl.XXXXXX") || fail "no tmpdir"
+csrv=
+cleanup() {
+    htsserver_cleanup
+    test -z "${csrv}" || kill -9 "${csrv}" 2>/dev/null || true
+    wait "${csrv}" 2>/dev/null || true # absorb bash's async "Killed" notice
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+export HOME="${work}" # no ~/.httrack.ini of the developer's in the store
+
+mkdir -p "${work}/docroot/added"
+printf '<html><body><a href="child.html">child</a></body></html>\n' \
+    >"${work}/docroot/added/page.html"
+# The child links back, so the injected URL is also reached the ordinary way:
+# that second reference is what a placeholder record sends looping.
+printf '<html><body><a href="page.html">back</a></body></html>\n' \
+    >"${work}/docroot/added/child.html"
+
+clog="${work}/content.log"
+"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}/docroot" \
+    >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
+
+htsserver_start
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
+
+# p0.bin trickles for a minute, so the crawl is still running when the URL is
+# injected; it takes one socket and leaves the rest free for the injected one.
+out="${work}/crawl"
+htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" \
+    --field projname=crawl --field winprofile=x --field command_do=start \
+    --field "command=httrack --robots=0 http://127.0.0.1:${cport}/trickle/p0.bin +* -O ${out}" \
+    >/dev/null
+
+log="${out}/hts-log.txt"
+site="${out}/127.0.0.1_${cport}/added"
+start=$SECONDS
+while test ! -f "${log}"; do
+    test "$((SECONDS - start))" -lt 60 || fail "the crawl never started"
+    poll_wait 0.2
+done
+
+htsserver_client --path /step4.html --field "sid=${sid}" \
+    --field "command=add-url=http://127.0.0.1:${cport}/added/page.html" \
+    >/dev/null
+
+# child.html is only reachable by parsing the injected page.
+start=$SECONDS
+while test ! -f "${site}/child.html"; do
+    htsserver_alive || fail "htsserver died: $(tail -n 20 "${log}" 2>/dev/null)"
+    test "$((SECONDS - start))" -lt 120 ||
+        fail "the added URL was not fetched and parsed: $(ls -R "${out}")"
+    poll_wait 0.2
+done
+
+htsserver_client --path /step4.html --field "sid=${sid}" --field command=cancel \
+    >/dev/null
+start=$SECONDS
+while test -f "${out}/hts-in_progress.lock"; do
+    test "$((SECONDS - start))" -lt 120 || fail "the crawl did not end"
+    poll_wait 0.2
+done
+
+# The name, not just the content: a placeholder ships the file unusable.
+assert_file "${site}/page.html" "the added URL kept a placeholder name"
+left=$(find "${site}" -name '*.delayed')
+test -z "${left}" || fail "a delayed placeholder survived: ${left}"
+
+# A rename alone is not the fix: a record still holding the placeholder makes
+# every later reference to it spin in the type waiter and get dropped.
+! grep -q "Duplicate entry in hts_wait_delayed" "${log}" ||
+    fail "the added link's own record collided in the type waiter"
+! grep -q "probably looping, type unknown" "${log}" ||
+    fail "the added link was dropped as looping"
+
+# Cached, under the resolved name: the cache index carries both.
+cached=$(grep "/added/page.html" "${out}/hts-cache/new.txt" || true)
+test -n "${cached}" || fail "the added URL was never cached"
+case ${cached} in
+*"${site}/page.html"*) ;;
+*) fail "the cache recorded another name: ${cached}" ;;
+esac
+
+echo "PASS"

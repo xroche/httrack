@@ -341,9 +341,9 @@ HTSEXT_API int hts_is_exiting(httrackp *opt);
 /*HTSEXT_API int hts_setopt(httrackp* opt); DEPRECATED ; see copy_htsopt() */
 
 /** Queue extra start URLs to inject into a running mirror. @p url is a
-    caller-owned, NULL-terminated array of strings; the engine stores the
-   pointer without copying, so the array and its strings must stay valid until
-   the engine consumes them. @return nonzero if a list is now set. */
+    caller-owned, NULL-terminated array of strings, deep-copied here, so the
+   caller may release it as soon as this returns. Any list still pending is
+   replaced. @return nonzero if a list is now set. */
 HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url);
 
 /** Clear any pending add-URL list set by hts_addurl(). Always returns 0. */

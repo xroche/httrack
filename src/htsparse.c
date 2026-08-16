@@ -4044,25 +4044,46 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
   // end of pause/lock files
 
   // changement dans les préférences
-  if (opt->state._hts_addurl) {
+  {
+    char **const addurl = hts_addurl_take(opt);
+    char **next;
     lien_adrfilsave add;
 
-    while(*opt->state._hts_addurl) {
+    for (next = addurl; next != NULL && *next != NULL; next++) {
       char BIGSTK add_url[HTS_URLMAXSIZE * 2];
 
       add.af.adr[0] = add.af.fil[0] = add_url[0] = '\0';
-      if (!link_has_authority(*opt->state._hts_addurl))
+      if (!link_has_authority(*next))
         strcpybuff(add_url, "http://"); // ajouter http://
-      strcatbuff(add_url, *opt->state._hts_addurl);
+      strcatbuff(add_url, *next);
       if (ident_url_absolute(add_url, &add.af) >= 0) {
         // ----Ajout----
+        lien_adrfil former;
+        int forbidden_url = 0;
+        int r_sv;
+
+        former.adr[0] = former.fil[0] = '\0';
 
         // calculer lien et éventuellement modifier addresse/fichier
-        if (url_savename
-            (&add, NULL, NULL, NULL, opt, sback, cache, hash, ptr, numero_passe, NULL) != -1) {
-          if (hash_read(hash, add.save, NULL, HASH_STRUCT_FILENAME) < 0) { // n'existe pas déja
+        r_sv = url_savename(&add, &former, NULL, NULL, opt, sback, cache, hash,
+                            ptr, numero_passe, NULL);
+        /* No headers were passed, so the name may still be a placeholder: the
+           parser resolves it before recording, and so must we (#1253). */
+        if (r_sv != -1 && IS_DELAYED_EXT(add.save)) {
+          r_sv =
+              hts_wait_delayed(str, &add, NULL, NULL, &former, &forbidden_url);
+        }
+        if (r_sv != -1) {
+          if (forbidden_url == 1) {
+            hts_log_print(
+                opt, LOG_NOTICE,
+                "Link %s%s not added after user request: type refused",
+                add.af.adr, add.af.fil);
+          } else if (hash_read(hash, add.save, NULL, HASH_STRUCT_FILENAME) <
+                     0) { // n'existe pas déja
             // enregistrer lien
-            if (hts_record_link(opt, add.af.adr, add.af.fil, add.save, "", "", NULL)) {
+            if (hts_record_link(opt, add.af.adr, add.af.fil, add.save,
+                                former.adr, former.fil, NULL)) {
               heap_top()->testmode = 0;    // mode test?
               heap_top()->link_import = 0; // mode normal
               heap_top()->depth = opt->depth;
@@ -4074,7 +4095,8 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
               hts_log_print(opt, LOG_INFO, "Link added by user: %s%s", add.af.adr,
                             add.af.fil);
               //
-            } else {            // oups erreur, plus de mémoire!!
+            } else { // oups erreur, plus de mémoire!!
+              hts_addurl_free(addurl);
               XH_uninit;        // désallocation mémoire & buffers
               return;
             }
@@ -4083,16 +4105,14 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
                           "Existing link %s%s not added after user request",
                           add.af.adr, add.af.fil);
           }
-
         }
       } else {
         hts_log_print(opt, LOG_ERROR, "Error during URL decoding for %s",
                       add_url);
       }
       // ----Fin Ajout----
-      opt->state._hts_addurl++; // suivante
     }
-    opt->state._hts_addurl = NULL;      // libérer _hts_addurl
+    hts_addurl_free(addurl);
   }
   // si une pause a été demandée
   if (opt->state._hts_setpause
