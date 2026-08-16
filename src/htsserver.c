@@ -2146,7 +2146,9 @@ static int htslang_load(char *limit_to, size_t limit_size, const char *path) {
        key must not look like the end of the list. */
     if (hashname != NULL)
       strlncatbuff(limit_to, hashname, limit_size, limit_size - 1);
-    if (limit_to[0] != '\0') {
+    /* lang.def names a bare basename; a separator in it would leave lang/. */
+    if (limit_to[0] != '\0' && strpbrk(hashname, "/\\") == NULL &&
+        strstr(hashname, "..") == NULL) {
       char lbasename[1024];
       FILE *fp;
 
