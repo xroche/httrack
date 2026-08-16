@@ -1,3 +1,20 @@
+httrack (3.49.22-1) unstable; urgency=medium
+
+  * New upstream release: the interactive wizard can be answered for a whole
+    domain and its answer now holds for the rest of the mirror, the mirrored
+    page footer takes named fields, and a series of buffer overflows on long
+    values read off the network or the command line are fixed; full list in
+    history.txt.
+  * Move webhttrack's browser dependency to Recommends: the autoremoval
+    gatherer reads only the first alternative of a disjunction and never
+    looks at Recommends, so chromium's RC bugs put the whole httrack source
+    on its removal clock.  Apt installs Recommends by default, and the
+    package also ships htsserver, which serves the same interface to a
+    browser elsewhere.
+  * Drop skip-emulated-host-test-failures.patch, applied upstream.
+
+ -- Xavier Roche <xavier@debian.org>  Sun, 16 Aug 2026 11:29:20 +0200
+
 httrack (3.49.21-2) unstable; urgency=medium
 
   * Fix the FTBFS on hppa: three suite tests measured the build host rather
