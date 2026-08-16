@@ -12,6 +12,10 @@ httrack (3.49.22-1) unstable; urgency=medium
     package also ships htsserver, which serves the same interface to a
     browser elsewhere.
   * Drop skip-emulated-host-test-failures.patch, applied upstream.
+  * Fix the FTBFS on an LTO build, which broke 3.49.21-2 on four Ubuntu
+    architectures: the installed-header symbol test matched header
+    identifiers against symbol names that GCC had renamed, and emptied its
+    own candidate list.  It now strips the clone suffixes first.
 
  -- Xavier Roche <xavier@debian.org>  Sun, 16 Aug 2026 11:29:20 +0200
 

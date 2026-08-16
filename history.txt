@@ -19,7 +19,7 @@ This file lists all changes and fixes that have been made for HTTrack
 + Fixed: a URL longer than 1024 bytes in a -%L list was split into two links (#1289)
 + Fixed: doit.log wrote a leading quote raw and swallowed the options after it, and stripped a quoted argument twice on the way back in (#1263)
 + Fixed: the credit tag in every mirrored page was dated 2014 (#1243)
-+ Fixed: the index templates and their compiled-in copies had drifted apart, so the built-in fallback wrote a different page (#1244, #1301)
++ Fixed: the index templates and their compiled-in copies had drifted apart, so the built-in fallback wrote a different page (#1244)
 + Fixed: an abandoned WebHTTrack server never stopped, holding the macOS application open (#1236)
 + Fixed: the filter documentation described a matcher the engine does not implement (#1302)
 + Changed: every language catalog carries the strings added since 3.49, and a value left in English no longer passes the integrity test (#1255, #1260)
