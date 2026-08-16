@@ -586,13 +586,18 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
           headerBuff[readSizeHeader] = '\0';
           do {
             char *value;
+            int adv;
+            /* no line we write is this long, so a cut one is foreign or
+               damaged and its prefix would parse as a wrong value */
+            const hts_boolean cut =
+                binput_line(headerBuff + offset, headerBuff + readSizeHeader,
+                            line, sizeof(line) - 1, &adv);
 
-            line[0] = '\0';
-            offset += binput(headerBuff + offset, line, sizeof(line) - 2);
+            offset += adv;
             if (line[0] == '\0') {
               lineEof = 1;
             }
-            value = strchr(line, ':');
+            value = cut ? NULL : strchr(line, ':');
             if (value != NULL) {
               *value++ = '\0';
               if (*value == ' ' || *value == '\t')
@@ -1196,9 +1201,12 @@ void cache_init(cache_back * cache, httrackp * opt) {
 
                     while(*a && maxLine-- > 0) {        // parse only few first lines
                       char BIGSTK line[1024];
+                      int adv;
 
-                      line[0] = '\0';
-                      a += binput(a, line, sizeof(line) - 2);
+                      /* the budget must count lines, not halves of one */
+                      (void) binput_line(a, comment + readSizeHeader, line,
+                                         sizeof(line) - 1, &adv);
+                      a += adv;
                       if (strfield(line, "X-In-Cache:")) {
                         if (strfield2(line, "X-In-Cache: 1")) {
                           dataincache = 1;

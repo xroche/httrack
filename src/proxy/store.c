@@ -264,13 +264,23 @@ int PT_RemoveIndex(PT_Indexes index, int indexId) {
   return 0;
 }
 
-static int binput(char *buff, char *s, int max) {
+/* Reads one line into "s" (at most "max" chars plus its NUL) and returns the
+   advance. *cut, when asked for, says the line did not fit. */
+static int binput(char *buff, char *s, int max, hts_boolean *cut) {
   int count = 0;
   int destCount = 0;
 
-  while(destCount < max && buff[count] != '\0' && buff[count] != '\n') {
+  if (cut != NULL) {
+    *cut = HTS_FALSE;
+  }
+  /* consumed whole: resuming inside a clipped line reads its tail as a field */
+  while (buff[count] != '\0' && buff[count] != '\n') {
     if (buff[count] != '\r') {
-      s[destCount++] = buff[count];
+      if (destCount < max) {
+        s[destCount++] = buff[count];
+      } else if (cut != NULL) {
+        *cut = HTS_TRUE;
+      }
     }
     count++;
   }
@@ -994,7 +1004,7 @@ int PT_LoadCache__New(PT_Index index_, const char *filename) {
                     char line[1024];
 
                     line[0] = '\0';
-                    a += binput(a, line, sizeof(line) - 2);
+                    a += binput(a, line, sizeof(line) - 2, NULL);
                     if (strncmp(line, "X-In-Cache:", 11) == 0) {
                       if (strcmp(line, "X-In-Cache: 1") == 0) {
                         dataincache = 1;
@@ -1098,19 +1108,24 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
              unzGetLocalExtrafield(index->zFile, headerBuff,
                                    sizeof(headerBuff) - 2)) > 0) {
           int offset = 0;
-          char line[HTS_URLMAXSIZE + 2];
+          /* the longest stored line is "Location: " plus a full-capacity URL;
+             a shorter buffer truncates it into a valid-looking wrong target */
+          char BIGSTK line[HTS_LOCATION_SIZE + 32];
           int lineEof = 0;
 
           headerBuff[readSizeHeader] = '\0';
           do {
             char *value;
+            hts_boolean cut;
 
             line[0] = '\0';
-            offset += binput(headerBuff + offset, line, sizeof(line) - 2);
+            offset += binput(headerBuff + offset, line, sizeof(line) - 2, &cut);
             if (line[0] == '\0') {
               lineEof = 1;
             }
-            value = strchr(line, ':');
+            /* no line HTTrack writes is this long, so a cut one is foreign or
+               damaged and its prefix would parse as a wrong value */
+            value = cut ? NULL : strchr(line, ':');
             if (value != NULL) {
               *value++ = '\0';
               if (*value == ' ' || *value == '\t')
@@ -1438,7 +1453,7 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   int off;
   char buff[256 + 4];
 
-  off = binput(adr, buff, 256);
+  off = binput(adr, buff, 256, NULL);
   /* no length-prefixed value follows a field the terminating NUL stopped */
   if (adr[off] == '\0') {
     s[0] = '\0';
@@ -1617,17 +1632,18 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
             if (a) {
               a++;
               /* read "host/file" */
-              a += binput(a, line, HTS_URLMAXSIZE);
+              a += binput(a, line, HTS_URLMAXSIZE, NULL);
               {
                 /* binput writes its NUL at s[max], so the second field must be
                    bounded by what is left of line[], not by the same constant
                  */
                 const size_t used = strlen(line);
 
-                a += binput(a, line + used, (int) (sizeof(line) - used - 1));
+                a += binput(a, line + used, (int) (sizeof(line) - used - 1),
+                            NULL);
               }
               /* read position */
-              a += binput(a, linepos, 200);
+              a += binput(a, linepos, 200, NULL);
               /* an unparseable field must not carry the previous entry's
                  offset over, nor read the stack on the first one */
               if (sscanf(linepos, "%d", &pos) != 1)

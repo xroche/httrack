@@ -857,40 +857,39 @@ int httpmirror(char *url1, httrackp * opt) {
         char BIGSTK line[HTS_URLMAXSIZE * 2];
 
         while(filelist_ptr < filelist_sz) {
-          const int count =
-              binput(filelist_buff + filelist_ptr, line, HTS_URLMAXSIZE);
-          /* Where binput stopped, past any CR it dropped: a clipped line stops
-             on a URL byte. Our NUL at filelist_sz keeps the walk in bounds. */
-          size_t term = filelist_ptr + (size_t) count - 1;
-          hts_boolean whole;
+          int adv;
+          const hts_boolean cut = binput_line(filelist_buff + filelist_ptr,
+                                              filelist_buff + filelist_sz, line,
+                                              HTS_URLMAXSIZE + 1, &adv);
+          /* the byte it stopped on, past any CR it dropped */
+          const size_t term = filelist_ptr + (size_t) adv - 1;
+          /* an embedded NUL ends the read too, and half a URL is not one */
+          const hts_boolean nul =
+              term < filelist_sz && filelist_buff[term] == '\0';
 
-          while (term < filelist_sz && filelist_buff[term] == '\r') {
-            term++;
-          }
-          whole = term == filelist_sz || filelist_buff[term] == '\n';
           lineno++;
-          if (!whole) {
-            /* Resuming where binput stopped would feed the tail back as a
-               second URL, and a clipped URL is a different URL. */
-            if (filelist_buff[term] == '\0') {
+          filelist_ptr = term + 1;
+          if (cut || nul) {
+            /* a clipped URL is a different URL, so name the line and drop it */
+            if (nul) {
               hts_log_print(opt, LOG_WARNING,
                             "\"%s\", line %d: URL contains a NUL byte, ignored",
                             StringBuff(opt->filelist), lineno);
+              /* a NUL is not a line end: drop the rest of the line ourselves */
+              while (filelist_ptr < filelist_sz &&
+                     filelist_buff[filelist_ptr] != '\n') {
+                filelist_ptr++;
+              }
+              filelist_ptr++;
             } else {
               hts_log_print(
                   opt, LOG_WARNING,
                   "\"%s\", line %d: URL longer than %d bytes, ignored",
                   StringBuff(opt->filelist), lineno, HTS_URLMAXSIZE);
             }
-            while (filelist_ptr < filelist_sz &&
-                   filelist_buff[filelist_ptr] != '\n') {
-              filelist_ptr++;
-            }
-            filelist_ptr++;
             continue;
           }
-          filelist_ptr = term + 1;
-          if (count && line[0]) {
+          if (line[0]) {
             n++;
             if (strstr(line, ":/") == NULL) {
               htsbuff_cat(&primarybuff, "http://");

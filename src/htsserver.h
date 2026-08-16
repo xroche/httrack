@@ -42,7 +42,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsstrings.h"
 
 // Fonctions
-void socinput(T_SOC soc, char *s, int max);
+/* Read one line off a socket; HTS_TRUE if it did not fit "s". */
+hts_boolean socinput(T_SOC soc, char *s, int max);
 /* Listen on bindAddr, or every interface if NULL/empty; adr (>= 258 bytes) gets
    the address to advertise. INVALID_SOCKET on error. */
 T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort,

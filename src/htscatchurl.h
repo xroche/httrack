@@ -44,7 +44,8 @@ Please visit our Website: http://www.httrack.com
 #define CATCH_URL_DATA_SIZE 32768
 
 // Fonctions
-void socinput(T_SOC soc, char *s, int max);
+/* Read one line off a socket; HTS_TRUE if it did not fit "s". */
+hts_boolean socinput(T_SOC soc, char *s, int max);
 
 #define CATCH_RESPONSE \
   "HTTP/1.0 200 OK\r\n"\

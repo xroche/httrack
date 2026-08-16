@@ -3944,15 +3944,15 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // ----------------------------------------
                     // traiter en-tête!
                     // status-line à récupérer
-                    binput_header(back[i].r.adr + ptr,
-                                  back[i].r.adr + back[i].r.size, rcvd, 2000,
-                                  &adv);
+                    binput_line(back[i].r.adr + ptr,
+                                back[i].r.adr + back[i].r.size, rcvd, 2000,
+                                &adv);
                     ptr += adv;
                     if (strnotempty(rcvd) == 0) {
                       /* Bogus CRLF, OR recycled connection and trailing chunk CRLF */
-                      binput_header(back[i].r.adr + ptr,
-                                    back[i].r.adr + back[i].r.size, rcvd, 2000,
-                                    &adv);
+                      binput_line(back[i].r.adr + ptr,
+                                  back[i].r.adr + back[i].r.size, rcvd, 2000,
+                                  &adv);
                       ptr += adv;
                     }
                     // traiter status-line
@@ -3975,7 +3975,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     }
                     // header // ** !attention! HTTP/0.9 non supporté
                     do {
-                      const hts_boolean cut = binput_header(
+                      const hts_boolean cut = binput_line(
                           back[i].r.adr + ptr, back[i].r.adr + back[i].r.size,
                           rcvd, 2000, &adv);
 
