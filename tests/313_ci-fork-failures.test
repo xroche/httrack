@@ -7,7 +7,7 @@
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 # Before the driver is sourced: with these set, anything it starts posts a commit
 # status on whatever the surrounding shell was last looking at.
@@ -22,9 +22,8 @@ GITHUB_STEP_SUMMARY=$tmp/summary
 export GITHUB_STEP_SUMMARY
 : >"$GITHUB_STEP_SUMMARY"
 
-# The lines as the runtime and bash write them, from the run in #1273. A retry
-# and a give-up differ only by the "retry:" the retry carries, so a counter that
-# matched the message alone would report every retry as a command that never ran.
+# Real lines from the #1273 run, not invented. A retry and a give-up differ only
+# by the "retry:", so matching the message alone would count every retry as one.
 cat >"$tmp/console.log" <<'EOF'
 PASS 244_local-tty-output.test
 1 [main] bash 1728 dofork: child -1 - forked process 3984 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
@@ -35,15 +34,46 @@ PASS 244_local-tty-output.test
 ran=257 pass=234 fail=0 skip=23
 EOF
 
-rc=0
-out=$(ci_report_fork_failures "$tmp/console.log") || rc=$?
-test "$rc" -eq 0 || fail "counting a struggling leg exited $rc"
-grep -q '::warning title=MSYS fork failures::' <<<"$out" ||
-    fail "fork failures raised no annotation: $out"
-grep -q '2 child(ren) died at DLL init, 2 retry wait(s), 1 fork(s) given up' <<<"$out" ||
-    fail "wrong counts: $out"
-grep -q 'MSYS forks: 2 died, 2 retried, 1 given up' "$GITHUB_STEP_SUMMARY" ||
-    fail "the step summary lost the count: $(<"$GITHUB_STEP_SUMMARY")"
+# Every leg asserts the annotation as well as the summary: a counter that tallies
+# right and annotates nothing leaves the step as silent as the one this replaces.
+assert_counts() { # assert_counts LOG WANT-DIED WANT-RETRIED WANT-GAVEUP LABEL
+    local log=$1 want="$2 child(ren) died at DLL init, $3 retry wait(s), $4 fork(s) given up"
+    local label=$5 out rc=0
+    : >"$GITHUB_STEP_SUMMARY"
+    out=$(ci_report_fork_failures "$log") || rc=$?
+    test "$rc" -eq 0 || fail "$label: exited $rc"
+    grep -q '::warning title=MSYS fork failures::' <<<"$out" ||
+        fail "$label: no annotation: $out"
+    grep -q "$want" <<<"$out" || fail "$label: wanted [$want], got: $out"
+    grep -q "MSYS forks: $2 died, $3 retried, $4 given up" "$GITHUB_STEP_SUMMARY" ||
+        fail "$label: step summary says $(<"$GITHUB_STEP_SUMMARY")"
+}
+
+assert_counts "$tmp/console.log" 2 2 1 "the #1273 leg"
+
+# A retry storm that never gave up is the shape the issue reports, so a gate that
+# only fires on a give-up would call this leg healthy.
+cat >"$tmp/retries.log" <<'EOF'
+1 [main] bash 1728 dofork: child -1 - forked process 3984 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+./ci-windows-suite.sh: fork: retry: Resource temporarily unavailable
+EOF
+assert_counts "$tmp/retries.log" 1 1 0 "retries with no give-up"
+
+# bash retries on EAGAIN alone, so any other strerror arrives as a give-up with no
+# retry before it; the cygwin spellings carry no "do" and no errno at all.
+cat >"$tmp/variants.log" <<'EOF'
+./x.test: fork: Cannot allocate memory
+2 [main] sh 900 fork: child -1 - forked process 12 died unexpectedly, retry 0, exit code 0xC0000142, errno 11
+3 [main] sh 900 child_info_fork::abort: address space needed by cygz.dll is already occupied
+EOF
+assert_counts "$tmp/variants.log" 2 0 1 "the non-EAGAIN and cygwin spellings"
+
+# Two messages on one physical line: the console is stdout and stderr merged, and
+# a bare line count would report one. The decoy pins the marker, not "errno 11",
+# which the engine's own diagnostics also carry.
+printf 'PASS 1.test\r1 [main] bash 1 dofork: child -1 - forked process 2 died unexpectedly, errno 11\r2 [main] bash 1 dofork: child -1 - forked process 3 died unexpectedly, errno 11\nrmdir failed, errno 11\n' \
+    >"$tmp/crjoined.log"
+assert_counts "$tmp/crjoined.log" 2 0 0 "two messages joined by a CR"
 
 # A healthy leg still says so: a silent step and a broken counter read alike.
 : >"$GITHUB_STEP_SUMMARY"
@@ -54,7 +84,7 @@ grep -q 'no MSYS fork failure' <<<"$out" || fail "a clean leg said: $out"
 grep -q 'MSYS forks: 0 died, 0 retried, 0 given up' "$GITHUB_STEP_SUMMARY" ||
     fail "a clean leg wrote no count: $(<"$GITHUB_STEP_SUMMARY")"
 
-# The suite step can die before writing one, and the counter runs if:always().
+# The suite step can die before writing a log; the counter step still runs.
 out=$(ci_report_fork_failures "$tmp/absent.log") || fail "a missing log failed the step"
 grep -q 'not counted' <<<"$out" || fail "a missing log said: $out"
 

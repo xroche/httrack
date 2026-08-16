@@ -1,12 +1,13 @@
 #!/bin/bash
 #
-# The assert_* helpers the engine self-test tier rests on, exercised from a
-# subject process, since a firing assertion would exit this script too.
+# The assert_* helpers the engine self-test tier rests on, plus the HTS_OS cache
+# the skip gates read, exercised from a subject process: a firing assertion would
+# exit this script too.
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_asserts.XXXXXX")
 cleanup_push rm -rf "$tmpdir"
@@ -96,3 +97,18 @@ cd /
 "$p" --version >/dev/null'
 fires 'PATH= httrack_path' 'no httrack in PATH'
 ok "httrack_path returns an absolute path that still runs from elsewhere"
+
+## HTS_OS. Exported, so a child reads the value instead of forking for it, which
+# makes that value what every platform skip gate now decides on.
+# shellcheck disable=SC2016 # a subject is shell source, expanded by the subject
+holds 'test "$HTS_OS" = "$(uname -s)"'
+# shellcheck disable=SC2016
+holds 'test "$(bash -c "printf %s \"\$HTS_OS\"")" = "$(uname -s)"'
+# shellcheck disable=SC2016
+printf 'set -euo pipefail\n. "%s/testlib.sh"\nprintf %%s "$HTS_OS"\n' "$testdir" >"$tmpdir/os.sh"
+for pre in "-u HTS_OS" "HTS_OS="; do
+    # shellcheck disable=SC2086 # the split is what makes it env's argument
+    got=$(env $pre bash "$tmpdir/os.sh")
+    test "$got" = "$(uname -s)" || fail "HTS_OS under [env $pre] resolved to [$got]"
+done
+ok "HTS_OS resolves to uname -s, unset or inherited empty"

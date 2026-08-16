@@ -29,12 +29,15 @@ ci_report_fork_failures() {
         echo "no console log at $log: MSYS fork failures not counted"
         return 0
     }
-    # The runtime's own line, one per child that died at DLL init (0xC0000142).
-    died=$(grep -c 'dofork: child' "$log" || true)
-    retried=$(grep -c 'fork: retry:' "$log" || true)
-    # bash's message once the retries are spent: the only one meaning a command
-    # never ran, which reds whatever test was in flight.
-    gaveup=$(grep -c 'fork: Resource temporarily unavailable' "$log" || true)
+    # Split on CR first: the console carries stdout and stderr merged, so two
+    # messages can share a physical line and a line count would see one. bash
+    # retries on EAGAIN alone, so a give-up can carry any strerror, and the awk
+    # `next` is what keeps a retry from being counted as one.
+    read -r died retried gaveup <<<"$(tr '\r' '\n' <"$log" | awk '
+        /fork: child -1|child_info_fork::abort/ { died++ }
+        /fork: retry:/ { retried++; next }
+        /: fork: / { gaveup++ }
+        END { print died + 0, retried + 0, gaveup + 0 }')"
     test -z "${GITHUB_STEP_SUMMARY:-}" ||
         printf 'MSYS forks: %s died, %s retried, %s given up\n' \
             "$died" "$retried" "$gaveup" >>"$GITHUB_STEP_SUMMARY"
@@ -45,8 +48,9 @@ ci_report_fork_failures() {
     ci_annotate warning "MSYS fork failures" "$(
         printf '%s child(ren) died at DLL init, %s retry wait(s), %s fork(s) given up\n' \
             "$died" "$retried" "$gaveup"
-        grep -m 3 -e 'dofork: child' -e 'fork: retry:' \
-            -e 'fork: Resource temporarily unavailable' "$log" || true
+        # -a: one NUL in the log would otherwise cost every sample line.
+        tr '\r' '\n' <"$log" | grep -am 3 -e 'fork: child -1' \
+            -e 'child_info_fork::abort' -e ': fork: ' || true
     )"
 }
 

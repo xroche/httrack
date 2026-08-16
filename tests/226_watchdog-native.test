@@ -12,7 +12,7 @@ unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
 export WATCHDOG_CONTEXT='226_watchdog-native (never posted)'
 
 # shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}testlib.sh"
+. "${0%"${0##*/}"}./testlib.sh"
 
 top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
 wdscript="$testdir/ci-windows-watchdog.ps1"
@@ -182,6 +182,7 @@ else
     # Parsed, not grepped: every key below has to be read from the block that
     # owns it, and an ordinary reformatting of the workflow must not move it.
     cat >"$tmp/wf.py" <<'PY'
+import re
 import sys
 
 import yaml
@@ -192,9 +193,21 @@ def steps_of(wf):
 def checkouts(wf):
     return [s for s in steps_of(wf) if str(s.get("uses", "")).startswith("actions/checkout")]
 
-# Runs it, not merely names it: another step sources the driver for a helper.
+# Runs it under any spelling, but not the step that only sources it for a helper:
+# a matcher pinned to one invocation would pass a second job that drives a suite.
+SUITE_RUN = re.compile(r"(?<![.\w])bash\s+\S*ci-windows-suite\.sh")
+
 def runs_suite(s):
-    return "bash ./ci-windows-suite.sh" in str(s.get("run", ""))
+    return bool(SUITE_RUN.search(str(s.get("run", ""))))
+
+# One control per spelling, or the audit below is worth only what it can see.
+for _run, _want in [("bash ./ci-windows-suite.sh $dir", True),
+                    ('bash "$GITHUB_WORKSPACE/tests/ci-windows-suite.sh" $dir', True),
+                    ("bash ci-windows-suite.sh $dir", True),
+                    (". ./ci-windows-suite.sh\nci_report_fork_failures x.log", False),
+                    ("source ./ci-windows-suite.sh", False)]:
+    if runs_suite({"run": _run}) is not _want:
+        sys.exit("the suite-step matcher is wrong for: %r" % _run)
 
 def suite_steps(wf):
     return [s for s in steps_of(wf) if runs_suite(s)]

@@ -282,8 +282,8 @@ jobs:
             "$(cygpath -u "$GITHUB_WORKSPACE")/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
             2>&1 | tee suite-console.log
 
-      # Its own step: the suite's may have been killed by its watchdog, which is
-      # exactly when the count is worth having.
+      # Its own step: the watchdog can kill the suite's step before it counts,
+      # which is exactly when the count is worth having.
       - name: Count the MSYS fork failures
         if: always()
         shell: bash

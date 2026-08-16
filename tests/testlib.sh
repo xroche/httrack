@@ -11,8 +11,8 @@ testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # own value, so the default only serves a hand-run and the Windows suite.
 : "${top_srcdir:=..}"
 
-# uname -s once per process tree, since every skip gate and every crawl asks for
-# it and each one is a fork the MSYS runtime emulates (#1273).
+# Cache uname -s once: every skip gate and every crawl asks for it, and each
+# call is a fork the MSYS runtime emulates (#1273).
 : "${HTS_OS:=$(uname -s 2>/dev/null || echo unknown)}"
 export HTS_OS
 
