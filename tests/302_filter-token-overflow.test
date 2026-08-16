@@ -13,8 +13,8 @@ assert_selftest "scantoken self-test OK" scantoken
 tmpdir="$(mktemp -d)"
 cleanup_push rm -rf "$tmpdir"
 
-# HTS_URLMAXSIZE * 2, less the NUL. The sign is prepended after the copy,
-# into a slot of its own, so it costs the token nothing.
+# HTS_URLMAXSIZE * 2, less the NUL. The sign is prepended after the copy, so a
+# rule's own cap is one higher than the token's; 317 pins the two together.
 maxfilter=2047
 maxurl=2047
 
@@ -50,7 +50,7 @@ for over in 1 512; do
     longrule "$((maxfilter + over))" "$tmpdir/over.txt"
     assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
         "$(why "$tmpdir/over.txt")" "filter of $((maxfilter + over)) bytes"
-    assert_match "Filter rule longer than $maxfilter bytes, ignored: -aaa" \
+    assert_match "Filter rule longer than $((maxfilter + 1)) bytes, ignored: -aaa" \
         "$(<"$tmpdir/p/hts-log.txt")" "refusal named in the log"
 done
 

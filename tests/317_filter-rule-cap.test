@@ -1,0 +1,108 @@
+#!/bin/bash
+#
+# #1288: a filter rule meets one cap, and the parser must refuse at the length
+# the array and the matcher stop at. The seed and argv keep their own bounds.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# From the engine, so a cap that moves moves the boundaries probed below.
+caps=$(httrack -O /dev/null -#test=filtercap) || fail "filtercap self-test failed"
+limits=$(grep '^filtercap: ' <<<"$caps") || fail "no limits line in: $caps"
+read -r _ rulecap matcher slot argvcap <<<"$limits"
+rulecap=${rulecap#rule=}
+matcher=${matcher#matcher=}
+slot=${slot#slot=}
+argvcap=${argvcap#argv=}
+
+# A stored rule is one the matcher reads and a slot holds; the matcher is the
+# lower of the two today, so it is what governs.
+test "$rulecap" -le "$matcher" || fail "cap $rulecap outreaches the matcher $matcher"
+test "$slot" -gt "$rulecap" || fail "slot $slot does not outsize the cap $rulecap"
+test "$argvcap" -le "$rulecap" || fail "argv $argvcap outreaches the cap $rulecap"
+
+tmpdir="$(mktemp -d)"
+cleanup_push rm -rf "$tmpdir"
+
+URL=http://www.example.com/a.png
+
+rep() { # rep CHAR COUNT
+    local pad
+    pad=$(printf '%*s' "$2" '')
+    printf '%s' "${pad// /$1}"
+}
+
+# A rule of LENGTH bytes, sign included, that $URL does not match.
+mkrule() { # mkrule LENGTH
+    printf -- '-www.example.com/%s*' "$(rep a $(($1 - 18)))"
+}
+
+# Runs --why over a rules file and returns the verdict line alone.
+why() { # why RULE-FILE
+    local out
+    rm -rf "$tmpdir/p"
+    out="$(httrack -O "$tmpdir/p" -q --why "$URL" -%S "$1" http://www.example.com/)" ||
+        fail "httrack exited $? on $(basename "$1")"
+    grep -E 'accepted|rejected|no filter|unable' <<<"$out"
+}
+
+# At the cap the rule is kept, so the one that decides is the second.
+for len in $((rulecap - 1)) "$rulecap"; do
+    printf -- '%s\n+*.png\n' "$(mkrule "$len")" >"$tmpdir/r.txt"
+    assert_eq "$URL: accepted by rule #2 (+*.png)" "$(why "$tmpdir/r.txt")" \
+        "rule of $len bytes"
+done
+
+# One byte over: the numbering shifts, and the refusal must name the cap the
+# array enforces, or a rule falls between the two.
+printf -- '%s\n+*.png\n' "$(mkrule $((rulecap + 1)))" >"$tmpdir/r.txt"
+assert_eq "$URL: accepted by rule #1 (+*.png)" "$(why "$tmpdir/r.txt")" \
+    "rule of $((rulecap + 1)) bytes"
+assert_match "Filter rule longer than $rulecap bytes, ignored: -www" \
+    "$(<"$tmpdir/p/hts-log.txt")" "the refusal names the array's cap"
+
+# The seed beside it is copied by the same loop and bounded on its own; take
+# that bound from the engine too, not from the rule's.
+seedwarned=0
+seed() { # seed LENGTH
+    printf -- 'http://www.example.com/%s\n+*.png\n' "$(rep a $(($1 - 23)))" \
+        >"$tmpdir/u.txt"
+    assert_eq "$URL: accepted by rule #1 (+*.png)" "$(why "$tmpdir/u.txt")" \
+        "seed of $1 bytes"
+    seedwarned=$(grep -c 'URL longer than' "$tmpdir/p/hts-log.txt" || true)
+}
+seed $((rulecap + 512))
+assert_eq 1 "$seedwarned" "a seed past every bound"
+seedcap=$(sed -n 's/.*URL longer than \([0-9]*\) bytes.*/\1/p' "$tmpdir/p/hts-log.txt")
+test -n "$seedcap" || fail "the seed refusal did not name its own cap"
+
+# Two bounds, not one shared: the sign a rule spends costs the seed a byte, so
+# the length the parser keeps as a rule is one it drops as a URL.
+test "$seedcap" -ne "$rulecap" || fail "seed and rule share the cap $rulecap"
+seed "$seedcap"
+assert_eq 0 "$seedwarned" "seed at its own cap"
+seed $((seedcap + 1))
+assert_eq 1 "$seedwarned" "seed one byte over"
+
+# On the command line argv is what a rule meets first, so the lengths above are
+# out of reach there whatever the filter cap becomes.
+cli_rc=0
+cli_out=""
+cli() { # cli RULE
+    rm -rf "$tmpdir/p"
+    cli_rc=0
+    cli_out="$(httrack -O "$tmpdir/p" -q --why "$URL" "$1" '+*.png' \
+        http://www.example.com/ 2>&1)" || cli_rc=$?
+}
+
+cli "$(mkrule $((argvcap - 1)))"
+assert_eq 0 "$cli_rc" "rule of $((argvcap - 1)) bytes on the command line"
+assert_match 'accepted by rule #2' "$cli_out" "kept"
+
+for len in "$argvcap" "$rulecap"; do
+    cli "$(mkrule "$len")"
+    test "$cli_rc" -ne 0 || fail "argv took a $len-byte rule: $cli_out"
+    assert_match 'argument too long' "$cli_out" "argv refuses $len bytes"
+done
