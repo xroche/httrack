@@ -31,11 +31,10 @@ jobs:
       matrix:
         platform: [x64, Win32]
         configuration: [Release]
-    # Windows runs from other branches starve this one's runner (#1213), so cap
-    # them repo-wide at one per platform. queue: max: the default cancels a waiter.
-    concurrency:
-      group: windows-build-${{ matrix.platform }}
-      queue: max
+    # No repo-wide cap since #1213's 45-minute wedges: the suite runs parallel
+    # now and the step below is capped at 15, so queueing cost more than the
+    # overlap it prevented (a 9-minute job waited 51 behind other PRs).
+    timeout-minutes: 30
     # Redirect vcpkg's default `files` binary cache into the workspace so
     # actions/cache can persist it. vcpkg builds openssl/brotli/zlib/zstd from
     # source otherwise, several minutes every run.
@@ -265,7 +264,8 @@ jobs:
       - name: Run the engine test suite (offline tests)
         shell: bash
         working-directory: tests
-        timeout-minutes: 45
+        # 6 minutes is the measured run; the rest is headroom for a wedge to die in
+        timeout-minutes: 15
         env:
           # Through the environment, never argv, which the process list exposes.
           WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
