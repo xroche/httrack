@@ -23,6 +23,8 @@ concurrency:
 env:
   # Unofficial mirror of the SourceForge tree, so no PR depends on a third-party host.
   HTTRAQT_REPO: https://github.com/xroche/httraqt-ci-mirror.git
+  # httraqt-upstream.yml reads this line for the bare SHA it compares SourceForge
+  # against, and reds if it stops looking like one. Quote it and the watch is lost.
   HTTRAQT_REF: a1175565c61ab9afd7bda2dc96ed1182c2d44ec3  # 1.4.11 + cmake patch, upstream HEAD since 2023-01-06
   PREFIX: /usr/local
 
