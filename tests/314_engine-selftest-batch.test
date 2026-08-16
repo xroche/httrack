@@ -58,12 +58,18 @@ rejects() { # rejects LABEL QUEUE-CALL...
     return 0
 }
 
-# tail mode: only 01_engine-savename.test uses it, and only for save names.
+# tail and head: one end of a save name, where the other end is a path the
+# caller has no reason to spell out.
 selftest_queue_tail '/x.html' savename '/x.php' 'text/html'
+selftest_queue_head 'savename: /dev/null/' savename '/x.php' 'text/html'
 selftest_run_queued
 rejects 'tail' selftest_queue_tail '/no-such-name' savename '/x.php' 'text/html'
-# A suffix, never a substring: '/x.ht' sits inside the name it must not match.
+rejects 'head' selftest_queue_head 'savename: /nowhere/' savename '/x.php' 'text/html'
+# One end, never a substring: each want below sits inside the output it must not
+# match, one short of the end it anchors to.
 rejects 'tail matching mid-name' selftest_queue_tail '/x.ht' savename '/x.php' 'text/html'
+rejects 'head matching mid-output' selftest_queue_head 'avename: /dev/null/' \
+    savename '/x.php' 'text/html'
 
 # lines mode: only 311_engine-location-gate.test uses it, and there only for
 # multi-line output.

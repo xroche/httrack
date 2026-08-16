@@ -6,30 +6,29 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# MIME type guessing from extension (get_httptype / give_mimext).
-# -#test=mime <path> prints "<path> is '<mime>'" then "and its local type is '.<ext>'".
-
-# firstline, not a pipe into head: head would SIGPIPE the engine, and pipefail
-# then reds the test for the wrong reason.
-mime() {
-    assert_eq "$1 is '$2'" "$(firstline "$(httrack -O /dev/null -#test=mime "$1")")"
+# MIME type guessing from extension (get_httptype / give_mimext), and the local
+# extension that type maps back to. The third argument is that round trip, which
+# is not always the extension asked for: give_mimext answers from the type, so
+# the two spellings of HTML both come back .html.
+mime() { # mime PATH MIME LOCAL-EXT
+    selftest_queue_lines "$1 is '$2'
+and its local type is '$3'" mime "$1"
 }
-unknown() {
-    assert_eq "$1 is of an unknown MIME type" \
-        "$(firstline "$(httrack -O /dev/null -#test=mime "$1")")"
-}
+unknown() { selftest_queue "$1 is of an unknown MIME type" mime "$1"; }
 
-mime '/a/b.html' 'text/html'
-mime '/a/b.htm' 'text/html'
-mime '/x.css' 'text/css'
-mime '/x.js' 'application/x-javascript'
-mime '/x.png' 'image/png'
-mime '/x.jpg' 'image/jpeg'
-mime '/x.gif' 'image/gif'
-mime '/x.txt' 'text/plain'
-mime '/x.xml' 'application/xml'
-mime '/x.pdf' 'application/pdf'
+mime '/a/b.html' 'text/html' '.html'
+mime '/a/b.htm' 'text/html' '.html'
+mime '/x.css' 'text/css' '.css'
+mime '/x.js' 'application/x-javascript' '.js'
+mime '/x.png' 'image/png' '.png'
+mime '/x.jpg' 'image/jpeg' '.jpg'
+mime '/x.gif' 'image/gif' '.gif'
+mime '/x.txt' 'text/plain' '.txt'
+mime '/x.xml' 'application/xml' '.xml'
+mime '/x.pdf' 'application/pdf' '.pdf'
 
-# no extension, or one not in the table
+# no extension, or one not in the table: no second line to answer with
 unknown '/noext'
 unknown '/x.unknownext'
+
+selftest_run_queued

@@ -101,16 +101,24 @@ selftest_queue_lines() { # selftest_queue_lines WANT NAME [ARGS...]
     selftest_queue_mode lines "$@"
 }
 
-# selftest_queue asserting only the tail, for a save name under a directory the
-# caller need not spell out. WANT is literal and carries its own boundary.
+# selftest_queue asserting one end of the output rather than all of it, for a
+# name whose other end the caller has no reason to spell out. Both WANTs are
+# literal and carry their own boundary ("/name", not "name").
 selftest_queue_tail() { # selftest_queue_tail WANT NAME [ARGS...]
     selftest_queue_mode tail "$@"
+}
+
+selftest_queue_head() { # selftest_queue_head WANT NAME [ARGS...]
+    selftest_queue_mode head "$@"
 }
 
 selftest_queue_mode() { # selftest_queue_mode exact|lines|tail WANT NAME [ARGS...]
     local mode=$1 want=$2 name=$3
     shift 3
-    case $mode in exact | lines | tail) ;; *) fail "unknown selftest mode $mode" ;; esac
+    case $mode in
+    exact | lines | tail | head) ;;
+    *) fail "unknown selftest mode $mode" ;;
+    esac
     SELFTEST_WANT+=("$want")
     SELFTEST_MODE+=("$mode")
     SELFTEST_LABEL+=("-#test=$name $*")
@@ -156,16 +164,23 @@ selftest_run_queued() {
         fi
         want=${SELFTEST_WANT[i]}
         test "$rc" -eq 0 || fail "${SELFTEST_LABEL[i]}: exited $rc, output: $got"
-        if test "${SELFTEST_MODE[i]}" = tail; then
-            # A case pattern, where the quoted want stays literal even if the
-            # name it pins carries a '*' or a '['.
+        # Case patterns, where the quoted want stays literal even when the name
+        # it pins carries a '*' or a '['.
+        case ${SELFTEST_MODE[i]} in
+        tail)
             case $got in
             *"$want") ;;
             *) fail "${SELFTEST_LABEL[i]}: expected an output ending [$want], got [$got]" ;;
             esac
-        else
-            test "$got" = "$want" || fail "${SELFTEST_LABEL[i]}: expected [$want], got [$got]"
-        fi
+            ;;
+        head)
+            case $got in
+            "$want"*) ;;
+            *) fail "${SELFTEST_LABEL[i]}: expected an output starting [$want], got [$got]" ;;
+            esac
+            ;;
+        *) test "$got" = "$want" || fail "${SELFTEST_LABEL[i]}: expected [$want], got [$got]" ;;
+        esac
     done
     # The count must close exactly: a case the engine ran and nobody asserted,
     # or a self-test that printed the framing byte itself, both land here.
