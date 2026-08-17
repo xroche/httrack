@@ -43,6 +43,8 @@ Android spells three keys that already had WinHTTrack names differently: `ProxyP
 
 `Dos` is the one key that is not a number, a checkbox or a list. WinHTTrack packs two independent boxes into it, `m_dos | (m_iso9660 << 1)`, and reads them back with `& 1` and `& 2`, so it alone can write 3. The other two lose it in different places. WebHTTrack has no "both" entry, so it shows 3 as DOS names and drops the ISO bit on re-save; Android decodes only an exact `1`, so 2 and 3 arrive as neither. `Dos=0` is neither box and so means long names, not DOS names, which is why a front end that cannot show 3 must fall back on 1: storing 0 turns the setting into its opposite on the next reopen. Both bits set means DOS names on every side, since that is the precedence WinHTTrack applies when it builds `-L`.
 
+**A `default_state` of `none` means do not substitute one.** `MaxRate` and `Sockets` are the two, and the distinction is not tidiness: a reader that fills in 100000 for an absent `MaxRate` passes `-A100000` where the front ends pass nothing at all, and the two mirror differently as soon as the engine's own default moves or `bypass_limits` applies. httrack-windows dropped its reader default in #105 for that reason, since a substituted value cannot be told from a chosen one once it reaches a file. The old profiles carrying a literal `MaxRate=25000` nobody chose are the same lesson from the far end.
+
 `CurrentPath1` and `CurrentPath2` have no writer at all. WinHTTrack reads them
 live; its own write sites are commented out and neither other front end produces
 them. A front end that starts writing either will be consumed there, and the
