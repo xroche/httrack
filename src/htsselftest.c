@@ -5845,8 +5845,7 @@ static int st_pathbin(httrackp *opt, int argc, char **argv) {
 
 // hts_buildtopindex() writes a system-charset name into a charset=utf-8 doc: on
 // Windows the gifs land in a mangled twin dir (#217) and a listed name renders
-// as mojibake (#216). Both must come out utf-8, and the live index must never
-// be visible half-written (#1329). argv[0] is writable.
+// as mojibake (#216). Both must come out utf-8. argv[0] is writable.
 static int st_topindex(httrackp *opt, int argc, char **argv) {
   char topdir[HTS_URLMAXSIZE];
   char path[HTS_URLMAXSIZE + 32];
@@ -5913,9 +5912,8 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
 
 #ifndef _WIN32
   /* #1329: a rebuild replaces the index instead of rewriting it, so a reader
-     holding the old one open reads it whole and unchanged — never the truncated
-     middle of the new one. A second project makes the two differ. Windows
-     refuses to rename over an open target, so the probe is POSIX-only. */
+     holding the old one open still reads it whole. Windows refuses to rename
+     over an open target, so this probe is POSIX-only. */
   {
     FILE *const held = fopen(path, "rb");
 
@@ -5931,10 +5929,11 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
     n = fread(buf, 1, sizeof(buf) - 1, held);
     fclose(held);
     buf[n] = '\0';
+    assertf(n < sizeof(buf) - 1); /* a clipped read fakes an absence */
     assertf(strstr(buf, projUTF8) != NULL);
     assertf(strstr(buf, "mocha") == NULL);
 
-    /* and the rebuild did land */
+    /* and the rebuild landed whole, footer included */
     snprintf(path, sizeof(path), "%s/index.html", topdir);
     fp = fopen(path, "rb");
     assertf(fp != NULL);
@@ -5942,6 +5941,7 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
     fclose(fp);
     buf[n] = '\0';
     assertf(strstr(buf, "mocha") != NULL);
+    assertf(strstr(buf, "Thanks for using HTTrack") != NULL);
 
     snprintf(path, sizeof(path), "%s/mocha/index.html", topdir);
     unlink(path);
@@ -5950,12 +5950,24 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   }
 #endif
   /* the temporary is gone either way */
-  snprintf(path, sizeof(path), "%s/index.html.tmp", topdir);
+  snprintf(path, sizeof(path), "%s/index.tmp", topdir);
   assertf(!fexist(path));
 
   /* raw unlink/rmdir: UNLINK is utf-8 on Windows, these paths aren't */
   snprintf(path, sizeof(path), "%s/index.html", topdir);
   unlink(path);
+
+#ifndef _WIN32
+  /* a directory in the way fails the move (EISDIR, not the EEXIST fallback):
+     the rebuild reports failure and leaves neither a temporary nor a stub */
+  assertf(mkdir(path, 0755) == 0);
+  assertf(hts_buildtopindex(opt, topdir, "") == 0);
+  snprintf(path, sizeof(path), "%s/index.tmp", topdir);
+  assertf(!fexist(path));
+  snprintf(path, sizeof(path), "%s/index.html", topdir);
+  assertf(rmdir(path) == 0);
+#endif
+
   snprintf(path, sizeof(path), "%s/backblue.gif", topdir);
   unlink(path);
   snprintf(path, sizeof(path), "%s/fade.gif", topdir);

@@ -10,4 +10,8 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-assert_selftest "topindex self-test OK" topindex "$dir" run
+# Not assert_selftest: the #1329 leg that fails the move logs a warning, so the
+# output is more than the marker.
+got=$(httrack -O /dev/null -#test=topindex "$dir" run) || fail "topindex: exited $?"
+assert_match "topindex self-test OK" "$got"
+is_windows || assert_match "could not rebuild the top index" "$got"
