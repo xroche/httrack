@@ -1,0 +1,127 @@
+#!/bin/bash
+#
+# The key table is the contract three front ends assert against, so a row that
+# goes missing or stops matching this repo's own mapping has to be a red here
+# rather than a surprise in someone else's suite.
+
+set -e
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+TSV="${distdir}/winprofile-keys.tsv"
+HDR="${distdir}/src/winprofile-keys.h"
+GEN="${distdir}/tools/gen-winprofile-keys.py"
+
+# A missing file is a hard failure, never a skip: a consumer that decides for
+# itself whether to run is the vacuous pass this whole file exists to prevent.
+for f in "${TSV}" "${HDR}" "${GEN}"; do
+    test -r "${f}" || fail "missing ${f}"
+done
+
+py=$(find_python) || skip "python3 not found"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/winprofile_table.XXXXXX") || fail "no tmpdir"
+cleanup() { rm -rf "${work}"; }
+cleanup_push cleanup
+
+printf '[the header matches the table] ..\t'
+# Generated, never hand-edited, and never parsed back the other way: a reader
+# that scrapes C is the failure mode this file replaces.
+"${py}" "${GEN}" "${TSV}" "${work}/regen.h" >/dev/null ||
+    fail "the generator rejected ${TSV}"
+diff -u "${HDR}" "${work}/regen.h" ||
+    fail "src/winprofile-keys.h is stale; re-run tools/gen-winprofile-keys.py"
+echo OK
+
+printf '[every row is well formed] ..\t'
+rows=$(
+    "${py}" - "${TSV}" <<'PY'
+import sys
+cols = 11
+n = 0
+for i, line in enumerate(open(sys.argv[1], encoding="ascii"), 1):
+    line = line.rstrip("\n")
+    if not line or line.startswith("#"):
+        continue
+    # split with no limit loss: a trailing empty cell is still a cell
+    f = line.split("\t")
+    if len(f) != cols:
+        sys.exit("line %d: %d columns, want %d" % (i, len(f), cols))
+    # A row with no default answers for itself only by pointing at the row that
+    # does; otherwise the blank is an omission wearing the same face.
+    if not f[7] and not f[10]:
+        sys.exit("line %d: %s has no default_state and no legacy_of"
+                 % (i, f[0]))
+    n += 1
+print(n)
+PY
+) || fail "malformed table (see above)"
+test "${rows}" -ge 100 || fail "only ${rows} rows: the table shrank"
+echo "OK (${rows} rows)"
+
+printf '[this repo matches its own rows] ..\t'
+"${py}" - "${TSV}" "${distdir}" <<'PY' || fail "see above"
+import re
+import sys
+
+tsv, root = sys.argv[1], sys.argv[2]
+
+rows = {}
+for line in open(tsv, encoding="ascii"):
+    line = line.rstrip("\n")
+    if line and not line.startswith("#"):
+        f = line.split("\t")
+        rows[f[0]] = dict(zip(
+            ["key", "owners", "scope", "kind", "flag_on", "flag_off",
+             "composed_with", "default_state", "default_value", "empty_means",
+             "legacy_of"], f))
+
+
+def read(p):
+    return open("%s/%s" % (root, p), encoding="latin-1").read()
+
+
+step4 = read("html/server/step4.html")
+m = re.search(r'<textarea name="winprofile".*?>(.*?)</textarea>', step4, re.S)
+written = set(re.findall(r"^([A-Za-z][A-Za-z0-9_]*)=", m.group(1), re.M))
+claimed = set(k for k, r in rows.items() if "web" in r["owners"].split(","))
+
+# Both directions. A row nobody writes is as wrong as a key with no row, and
+# only the pair catches a rename on one side.
+missing = written - claimed
+extra = claimed - written
+if missing:
+    sys.exit("step4.html writes %s, not marked web in the table"
+             % sorted(missing))
+if extra:
+    sys.exit("the table marks %s as written here, step4.html does not"
+             % sorted(extra))
+
+# The kinds this repo can speak for, from the two tables htsserver keeps.
+srv = read("src/htsserver.c")
+
+
+def names(sym):
+    m = re.search(r"%s\[\] = \{(.*?)\n\};" % sym, srv, re.S)
+    return set(re.findall(r'"([^"]+)"', m.group(1)))
+
+
+checked = 0
+for key in names("ini_list_keys"):
+    if not rows[key]["kind"].startswith("list"):
+        sys.exit("%s is in ini_list_keys, table says kind=%s"
+                 % (key, rows[key]["kind"]))
+    checked += 1
+for key in names("ini_checkbox_keys"):
+    if rows[key]["kind"] != "checkbox":
+        sys.exit("%s is in ini_checkbox_keys, table says kind=%s"
+                 % (key, rows[key]["kind"]))
+    checked += 1
+# Counted where the check is, not at the end of a loop: an increment that
+# outlives its comparison counts rows again under another name.
+print("OK (%d keys, %d kinds)" % (len(claimed), checked))
+PY
