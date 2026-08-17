@@ -146,7 +146,7 @@ ${do:end-if}${do:output-mode:html}
 	${test:nopurge:--purge-old=1:--purge-old=0}
 \
 	${ztest:cache:--cache=0:}
-	${test:filter::--priority=0:--priority=1:--priority=2:--priority=7}
+	${test:filter::--priority=0:--priority=1:--priority=2:--priority=3:--priority=7}
 	${test:travel::--stay-on-same-dir:--can-go-down:--can-go-up:--can-go-up-and-down}
 	${test:travel2::--stay-on-same-address:--stay-on-same-domain:--stay-on-same-tld:--go-everywhere}
 	${test:travel3::--keep-links=0:--keep-links:--keep-links=3:--keep-links=4}
@@ -213,6 +213,8 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 <!-- winprofile.ini -->
 ${do:output-mode:inifile}
 <textarea name="winprofile" cols="50" rows="4" style="visibility:hidden">
+${/* 1: the list ids below are stored 0-based, as WinHTTrack writes them. */}
+ProfileFormat=1
 CurrentUrl=${urls}
 Category=${projcateg}
 CurrentAction=${todo}
@@ -240,7 +242,7 @@ NoQueryStrings=${ztest:hidequery:0:1}
 NoPurgeOldFiles=${ztest:nopurge:0:1}
 Cookies=${ztest:cookies:0:1}
 CookiesFile=${cookiesfile}
-CheckType=${ztest:checktype:0:1:2}
+CheckType=${checktype}
 ParseJava=${ztest:parsejava:0:1}
 HTTP10=${ztest:http10:0:1}
 TolerantRequests=${ztest:toler:0:1}

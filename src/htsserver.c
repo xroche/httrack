@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsnet.h"
 #include "htslib.h"
 #include "htscharset.h"
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -653,8 +654,8 @@ static void cat_cmdline_arglist(String *output, const char *value,
   }
 }
 
-/* Append one <select> entry, unless its id is the hidden one. Ids are stored as
-   winprofile.ini's CurrentAction, so hiding one must not renumber the rest. */
+/* Append one <select> entry, unless its id is the hidden one. Ids reach
+   winprofile.ini one lower, so hiding one must not renumber the rest. */
 static void cat_list_option(String *output, const char *label, int id,
                             int listDefault, int listHidden) {
   char tag[48];
@@ -690,7 +691,6 @@ static const char *const ini_checkbox_keys[] = {
     "NoQueryStrings",
     "NoPurgeOldFiles",
     "Cookies",
-    "CheckType",
     "ParseJava",
     "HTTP10",
     "TolerantRequests",
@@ -713,15 +713,90 @@ static const char *const ini_checkbox_keys[] = {
     NULL,
 };
 
-/* A stored 0 means "unchecked" for these keys, not the number zero. */
-static hts_boolean ini_key_is_checkbox(const char *key) {
+/* These hold a ${listid:} id, numbered from 1; winprofile.ini stores the
+   0-based combo index WinHTTrack writes instead. A file with no ProfileFormat
+   key is WinHTTrack's own, so it is read that way too (#1314). */
+static const char *const ini_list_keys[] = {
+    "CurrentAction", "Build",     "PrimaryScan",     "Travel",  "GlobalTravel",
+    "RewriteLinks",  "CheckType", "FollowRobotsTxt", "LogType", NULL,
+};
+
+static hts_boolean ini_key_in(const char *const *keys, const char *key) {
   size_t i;
 
-  for (i = 0; ini_checkbox_keys[i] != NULL; i++) {
-    if (strcmp(key, ini_checkbox_keys[i]) == 0)
+  for (i = 0; keys[i] != NULL; i++) {
+    if (strcmp(key, keys[i]) == 0)
       return HTS_TRUE;
   }
   return HTS_FALSE;
+}
+
+/* A stored 0 means "unchecked" for these keys, not the number zero. */
+static hts_boolean ini_key_is_checkbox(const char *key) {
+  return ini_key_in(ini_checkbox_keys, key);
+}
+
+static hts_boolean ini_key_is_list(const char *key) {
+  return ini_key_in(ini_list_keys, key);
+}
+
+/* The first LEN bytes of VALUE shifted by DELTA, or -1 to leave it alone. An
+   empty, hand-edited or out-of-range id means whatever the reader makes of it.
+   So does 0, which already reads as the first entry on both sides. */
+static int ini_list_shift(const char *value, size_t len, int delta) {
+  char digits[16];
+  char *end;
+  long id;
+
+  if (len == 0 || len >= sizeof(digits))
+    return -1;
+  memcpy(digits, value, len);
+  digits[len] = '\0';
+  id = strtol(digits, &end, 10);
+  if (*end != '\0' || id < 0 || id > INT_MAX - 1)
+    return -1;
+  return (int) id + delta;
+}
+
+/* Copy INI to OUT with the ids of ini_list_keys shifted by DELTA, so what
+   reaches the file is the 0-based index WinHTTrack reads (#1314). */
+static void ini_rebase_lists(const char *ini, int delta, String *out) {
+  const char *line;
+
+  StringClear(*out);
+  for (line = ini; *line != '\0';) {
+    const char *const nl = strchr(line, '\n');
+    const size_t len = nl != NULL ? (size_t) (nl - line) + 1 : strlen(line);
+    const char *const eq = (const char *) memchr(line, '=', len);
+    char key[64];
+    char shifted[16];
+    size_t klen = 0;
+    size_t vlen = 0;
+    int id = -1;
+
+    if (eq != NULL) {
+      klen = (size_t) (eq - line);
+      vlen = len - klen - 1;
+      /* Trim the CRLF a textarea posts, which the file keeps. */
+      while (vlen != 0 && (eq[vlen] == '\r' || eq[vlen] == '\n'))
+        vlen--;
+      if (klen < sizeof(key)) {
+        memcpy(key, line, klen);
+        key[klen] = '\0';
+        if (ini_key_is_list(key))
+          id = ini_list_shift(eq + 1, vlen, delta);
+      }
+    }
+    if (id >= 0) {
+      snprintf(shifted, sizeof(shifted), "%d", id);
+      StringMemcat(*out, line, klen + 1);
+      StringCat(*out, shifted);
+      StringMemcat(*out, eq + 1 + vlen, len - klen - 1 - vlen);
+    } else {
+      StringMemcat(*out, line, len);
+    }
+    line += len;
+  }
 }
 
 /* gmtime accepts the whole int range, where a footer can show four digits and
@@ -741,6 +816,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   String tmpbuff = STRING_EMPTY;
   String tmpbuff2 = STRING_EMPTY;
   String fspath = STRING_EMPTY;
+  String profile = STRING_EMPTY;
   /* Project directory this server set up; the only root /website/ serves from,
      and deliberately not cleared between requests. */
   String website = STRING_EMPTY;
@@ -1070,6 +1146,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
               pos = strchr(line, '=');
               if (pos) {
                 String escline = STRING_EMPTY;
+                char listid[16];
 
                 *pos++ = '\0';
                 /* Only a checkbox: elsewhere zero is the user's value, and
@@ -1077,6 +1154,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 if (pos[0] == '0' && pos[1] == '\0' &&
                     ini_key_is_checkbox(line))
                   *pos = '\0';
+                if (ini_key_is_list(line)) {
+                  const int id = ini_list_shift(pos, strlen(pos), 1);
+
+                  if (id >= 0) {
+                    snprintf(listid, sizeof(listid), "%d", id);
+                    pos = listid;
+                  }
+                }
                 /* A key in the file overwrites the default even when it is
                    empty, and an acquired NULL reads back as absent (#1186). */
                 StringClear(escline);
@@ -1190,9 +1275,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     StringCat(tmpbuff, "winprofile.ini");
                     fp = fopen(StringBuff(tmpbuff), "wb");
                     if (fp != NULL) {
-                      int count = (int) strlen((char *) adrw);
+                      int count;
 
-                      if ((int) fwrite((void *) adrw, 1, count, fp) == count) {
+                      /* The ids leave 0-based, matching how WinHTTrack stores
+                         them and this server reads them back (#1314). */
+                      ini_rebase_lists((char *) adrw, -1, &profile);
+                      count = (int) StringLength(profile);
+                      if ((int) fwrite(StringBuff(profile), 1, count, fp) ==
+                          count) {
 
                         /* Wipe the doit.log file, useless here (all options are replicated) and
                            even a bit annoying (duplicate/ghost options)
@@ -2005,6 +2095,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   StringFree(tmpbuff);
   StringFree(tmpbuff2);
   StringFree(fspath);
+  StringFree(profile);
   StringFree(website);
 
   if (buffer)
