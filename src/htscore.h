@@ -307,6 +307,13 @@ HTS_STATIC int cache_readable(cache_back * cache) {
 
 char *hts_cancel_file_pop(httrackp * opt);
 
+/* Detach the pending hts_addurl() list and give the caller ownership; NULL
+   when none is pending. Free it with hts_addurl_free(). */
+char **hts_addurl_take(httrackp *opt);
+
+/* Free a list taken with hts_addurl_take(), strings included. */
+void hts_addurl_free(char **url);
+
 #endif
 
 /* Record a link on the heap. All strings are copied (caller keeps ownership).

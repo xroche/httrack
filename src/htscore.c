@@ -3692,15 +3692,69 @@ HTSEXT_API hts_boolean hts_has_stopped(httrackp *opt) {
   return ended;
 }
 
-// ajout d'URL
-HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
-  if (url)
-    opt->state._hts_addurl = url;
-  return (opt->state._hts_addurl != NULL);
+// URLs injected into a running mirror
+void hts_addurl_free(char **url) {
+  if (url != NULL) {
+    size_t i;
+
+    for (i = 0; url[i] != NULL; i++) {
+      freet(url[i]);
+    }
+    freet(url);
+  }
 }
+
+/* Install url and return what it replaced (locked) */
+static char **hts_addurl_swap_(httrackp *opt, char **url) {
+  char **const old = opt->state._hts_addurl;
+
+  opt->state._hts_addurl = url;
+  return old;
+}
+
+char **hts_addurl_take(httrackp *opt) {
+  char **old;
+
+  hts_mutexlock(&opt->state.lock);
+  old = hts_addurl_swap_(opt, NULL);
+  hts_mutexrelease(&opt->state.lock);
+  return old;
+}
+
+/* Deep copy: the caller's array is typically a stack local, and the engine
+   thread reads the list long after the call returns. */
+HTSEXT_API hts_boolean hts_addurl(httrackp *opt, char **url) {
+  char **copy = NULL;
+
+  if (url != NULL) {
+    size_t n, i;
+
+    for (n = 0; url[n] != NULL; n++)
+      ;
+    copy = (char **) calloct(n + 1, sizeof(char *));
+    for (i = 0; copy != NULL && i < n; i++) {
+      if ((copy[i] = strdupt(url[i])) == NULL) {
+        hts_addurl_free(copy);
+        copy = NULL;
+      }
+    }
+  }
+  if (copy != NULL) {
+    char **old;
+
+    /* One critical section: two racing callers must not both read NULL and
+       then both install, which leaks the loser's list. */
+    hts_mutexlock(&opt->state.lock);
+    old = hts_addurl_swap_(opt, copy);
+    hts_mutexrelease(&opt->state.lock);
+    hts_addurl_free(old);
+  }
+  return (copy != NULL);
+}
+
 HTSEXT_API hts_boolean hts_resetaddurl(httrackp *opt) {
-  opt->state._hts_addurl = NULL;
-  return (opt->state._hts_addurl != NULL);
+  hts_addurl_free(hts_addurl_take(opt));
+  return HTS_FALSE;
 }
 
 // copier nouveaux paramètres si besoin
