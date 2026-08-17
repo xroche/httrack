@@ -1,4 +1,5 @@
-/* Generated from winprofile-keys.tsv by tools/gen-winprofile-keys.py. Do not edit. */
+/* Generated from winprofile-keys.tsv by tools/gen-winprofile-keys.py.
+ * Do not edit. */
 #ifndef WINPROFILE_KEYS_H
 #define WINPROFILE_KEYS_H
 
@@ -18,6 +19,7 @@ typedef struct {
 
 #define WINPROFILE_KEY_COUNT 106
 
+/* clang-format off */
 static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"AcceptLanguage", "win,droid", "setting", "string", "", "", "", "unresolved", "", "absent", ""},
   {"Build", "win,web,droid", "setting", "list:0:15", "", "", "BuildString", "agreed", "0", "", ""},
@@ -126,5 +128,6 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"ProxyProtocol", "", "setting", "string", "", "", "", "", "", "", "ProxyType"},
   {"Iso9660", "", "read_only", "checkbox", "", "", "", "none", "", "", "Dos"},
 };
+/* clang-format on */
 
 #endif

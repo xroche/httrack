@@ -87,7 +87,8 @@ def cstr(s):
 
 def emit(rows, tsv, out):
     w = out.write
-    w("/* Generated from %s by tools/gen-winprofile-keys.py. Do not edit. */\n" % tsv)
+    w("/* Generated from %s by tools/gen-winprofile-keys.py.\n" % tsv)
+    w(" * Do not edit. */\n")
     w("#ifndef WINPROFILE_KEYS_H\n#define WINPROFILE_KEYS_H\n\n")
     w("typedef struct {\n")
     for c in COLUMNS:
@@ -97,10 +98,13 @@ def emit(rows, tsv, out):
     # hand: a table that shrinks silently is the failure this whole file exists
     # to prevent.
     w("#define WINPROFILE_KEY_COUNT %d\n\n" % len(rows))
+    # One row per line beats whatever a formatter would do with 11 fields, and
+    # a reflowed table is unreadable against the TSV it mirrors.
+    w("/* clang-format off */\n")
     w("static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {\n")
     for r in rows:
         w("  {%s},\n" % ", ".join(cstr(r[c]) for c in COLUMNS))
-    w("};\n\n#endif\n")
+    w("};\n/* clang-format on */\n\n#endif\n")
 
 
 def main():

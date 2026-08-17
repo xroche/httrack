@@ -141,8 +141,8 @@ def block(text, name):
 
 
 def same(got, want, what):
-    """1 if they match, else the run dies. The count is a consequence of the
-    check, so deleting the check deletes the count."""
+    """1 if they match, else the run dies. Deleting a call deletes its count,
+    so coverage cannot be dropped without the total falling."""
     if got != want:
         sys.exit("%s: this repo says %r, the table says %r" % (what, got, want))
     return 1
@@ -195,6 +195,12 @@ pages = "".join(read("html/server/%s" % f) for f in
                  "option9.html"))
 listvar = dict(re.findall(r"\$\{listid:([a-z0-9_]+):(LISTDEF_\d+)", pages))
 
+COMPOSED = {"Build", "BuildString", "ProxyType", "Proxy", "Port"}
+if set(k for k, r in rows.items() if r["composed_with"]) != COMPOSED:
+    sys.exit("composed_with is set on %s, expected %s"
+             % (sorted(k for k, r in rows.items() if r["composed_with"]),
+                sorted(COMPOSED)))
+
 checked = skipped = 0
 for key in sorted(claimed):
     r, kind, var = rows[key], rows[key]["kind"], wvar.get(key, "")
@@ -209,7 +215,14 @@ for key in sorted(claimed):
     elif key in checkbox:
         checked += same(kind, "checkbox", "%s kind" % key)
 
-    if r["default_state"] != "agreed":
+    # Whether this repo has an opinion, decided here rather than read from the
+    # table: a row that says unresolved where a default is derivable would
+    # otherwise switch its own check off.
+    derivable = var in init_int or var in init_on or key in checkbox
+    if derivable and r["default_state"] != "agreed":
+        sys.exit("%s: this repo defaults it, the table says %s"
+                 % (key, r["default_state"] or "nothing"))
+    if not derivable:
         skipped += 1
     elif var in init_int:
         n = int(init_int[var])
@@ -217,10 +230,8 @@ for key in sorted(claimed):
                         "%s default" % key)
     elif var in init_on:
         checked += same("1", r["default_value"], "%s default" % key)
-    elif key in checkbox:
-        checked += same("0", r["default_value"], "%s default" % key)
     else:
-        skipped += 1
+        checked += same("0", r["default_value"], "%s default" % key)
 
     # Only an on/off setting has an on/off pair: a list emits through a ladder
     # the table deliberately does not carry.
