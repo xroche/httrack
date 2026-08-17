@@ -20,7 +20,9 @@ for pair in "Proxy:prox" "Port:portprox" "ProxyType:proxytype"; do
     key=${pair%:*} var=${pair#*:}
     grep -q "do:copy:${key}:${var}}" "${distdir}/html/server/step2.html" ||
         fail "step2.html does not restore ${key} into ${var}"
-    grep -q "^${key}=[\$]{[a-z]*:*${var}[:}]" "${distdir}/html/server/step4.html" ||
+    # Any directive prefix must end in a colon, or [a-z]* swallows one variable
+    # name into another and Proxy=${portprox} passes as Proxy/prox.
+    grep -q "^${key}=[\$]{\([a-z]*:\)*${var}[:}]" "${distdir}/html/server/step4.html" ||
         fail "step4.html does not save ${var} as ${key}"
     grep -q "name=\"${var}\"" "${distdir}/html/server/option10.html" ||
         fail "option10.html draws no ${var} field"
@@ -43,7 +45,13 @@ cleanup_push cleanup
 
 HOST=proxy.example.net
 PORT=3128
+# Both assertions below compare against these; empty would have them comparing
+# nothing to nothing while the bindings stayed dead.
+test -n "${HOST}" || fail "the probe host is empty"
+test -n "${PORT}" || fail "the probe port is empty"
 
+# Kept although the leg below covers its mutants: the bug had two user-visible
+# halves, and a regression report that names only one reads as covering one.
 printf '[a typed proxy reaches the file] ..\t'
 htsserver_start --home "${work}"
 
