@@ -172,6 +172,13 @@ listk, checkbox = names("ini_list_keys"), names("ini_checkbox_keys")
 init_int = dict(re.findall(r'\{"([a-z0-9_]+)", (\d+)\}', srv))
 m = re.search(r"initOn\[\] = \{(.*?)NULL\}", srv, re.S)
 init_on = set(re.findall(r'"([A-Za-z0-9_]+)"', m.group(1))) if m else set()
+m = re.search(r"initStrElt initStr\[\] = \{(.*?)\{NULL", srv, re.S)
+init_str = dict(re.findall(r'\{"([a-z0-9_]+)",\s*(HTS_DEFAULT_[A-Z_]+|"[^"]*")',
+                           m.group(1))) if m else {}
+# Both desktop front ends read Footer with this macro, so its expansion is the
+# value rather than anyone's literal.
+FOOTER = ("<!-- Mirrored from {url} by HTTrack Website Copier/3.x [XR&CO], "
+          "{date} -->")
 
 # key -> the variable step4 writes it from, and the flags that variable emits
 wvar, emit = {}, {}
@@ -232,6 +239,14 @@ for key in sorted(claimed):
         checked += same("1", r["default_value"], "%s default" % key)
     else:
         checked += same("0", r["default_value"], "%s default" % key)
+
+    # A string default this repo states, checked by nothing until now, which is
+    # how Footer sat as a disagreement it was never part of.
+    if r["default_state"] == "agreed" and var in init_str and var not in init_on:
+        want = init_str[var]
+        want = FOOTER if want == "HTS_DEFAULT_FOOTER" else want.strip('"')
+        if not want.startswith("HTS_DEFAULT_"):
+            checked += same(want, r["default_value"], "%s default" % key)
 
     # Only an on/off setting has an on/off pair: a list emits through a ladder
     # the table deliberately does not carry.
