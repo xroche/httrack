@@ -117,7 +117,11 @@ mkdir -p "$bin"
 printf '#!/bin/sh\nprintf "%%s\\n" "$@" >%s/argv.part\nmv %s/argv.part %s/argv\necho "watchdog ready"\n' \
     "$posixtmp" "$posixtmp" "$posixtmp" >"$bin/argvstub"
 printf '#!/bin/sh\nexit 127\n' >"$bin/deadstub"
-chmod +x "$bin/argvstub" "$bin/deadstub"
+# Held until the poll releases it, so its death lands after the poll's read.
+# shellcheck disable=SC2016 # $n is the stub's own, expanded when it runs
+printf '#!/bin/sh\nn=0\nwhile test ! -e race-go && test "$n" -lt 100; do sleep 0.1; n=$((n + 1)); done\necho "watchdog ready"\n' \
+    >"$bin/racestub"
+chmod +x "$bin/argvstub" "$bin/deadstub" "$bin/racestub"
 usestub() { cp "$bin/$1" "$bin/pwsh" && cp "$bin/$1" "$bin/powershell.exe"; }
 usestub argvstub
 
@@ -147,6 +151,30 @@ if test -x "$bin/pwsh"; then
         ci_start_native_watchdog "$posixtmp/progress.log" || rc=$?
         test "$rc" -ne 0 || fail "an interpreter exiting 127 was reported as launched"
         test -z "$ci_watchdog_pid" || fail "a failed launch left pid $ci_watchdog_pid behind"
+
+        # #1321's window, forced: the poll's own first read releases the stub
+        # and reports a miss only once it has spoken and exited.
+        usestub racestub
+        ci_watchdog_pid=''
+        greps=0
+        # shellcheck disable=SC2317 # the driver's own greps are what call it
+        grep() {
+            local n=0
+            greps=$((greps + 1))
+            test "$greps" -eq 1 || {
+                command grep "$@"
+                return $?
+            }
+            : >race-go
+            while test "$n" -lt 100 && kill -0 "$ci_watchdog_pid" 2>/dev/null; do
+                sleep 0.1
+                n=$((n + 1))
+            done
+            return 1
+        }
+        ci_start_native_watchdog "$posixtmp/progress.log" ||
+            fail "a watchdog that spoke and exited before the poll looked again was reported as never launched"
+        unset -f grep
     )
     for _ in $(seq 1 100); do
         test -r "$posixtmp/argv" && break

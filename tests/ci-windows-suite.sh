@@ -99,6 +99,9 @@ ci_start_native_watchdog() {
         sleep 1
         waited=$((waited + 1))
     done
+    # A child that spoke and exited between the read above and the liveness check
+    # that ended the poll did launch (#1321).
+    grep -q '^watchdog ready$' watchdog.log && return 0
     kill_pid "$ci_watchdog_pid"
     ci_watchdog_pid=''
     return 1
