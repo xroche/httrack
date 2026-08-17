@@ -17,8 +17,8 @@ printf '[the list table matches the templates] ..\t'
 # Every ${listid:} variable that step4.html also writes to winprofile.ini. lang
 # is the one that does not, so it drops out on its own.
 written=$(
-    for var in $(sed -n 's/.*[$]{listid:\([a-z0-9_]*\):.*/\1/p' \
-        "${distdir}"/html/server/*.html | sort -u); do
+    sed -n 's/.*[$]{listid:\([a-z0-9_]*\):.*/\1/p' "${distdir}"/html/server/*.html |
+        sort -u | while read -r var; do
         sed -n "s/^\([A-Za-z]*\)=[\$]{${var}}\$/\1/p" \
             "${distdir}/html/server/step4.html"
     done | sort -u
