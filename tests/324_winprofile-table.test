@@ -63,6 +63,57 @@ PY
 test "${rows}" -ge 100 || fail "only ${rows} rows: the table shrank"
 echo "OK (${rows} rows)"
 
+printf '[the escape vectors round-trip here] ..\t'
+"${py}" - "${distdir}/winprofile-escapes.tsv" <<'PY' || fail "see above"
+import re
+import sys
+
+UNESC = {"r": "\r", "n": "\n", "t": "\t", "\\": "\\"}
+
+
+def unescape(s):
+    return re.sub(r"\\(.)", lambda m: UNESC[m.group(1)], s)
+
+
+def encode(v):
+    """WebHTTrack's inifile encoding: %% for percent, %02x under 32."""
+    out = []
+    for c in v:
+        if c == "%":
+            out.append("%%")
+        elif ord(c) < 32:
+            out.append("%%%02x" % ord(c))
+        else:
+            out.append(c)
+    return "".join(out)
+
+
+agreed = skipped = 0
+for i, line in enumerate(open(sys.argv[1], encoding="ascii"), 1):
+    line = line.rstrip("\n")
+    if not line or line.startswith("#"):
+        continue
+    f = line.split("\t")
+    if len(f) != 4:
+        sys.exit("line %d: %d columns, want 4" % (i, len(f)))
+    raw, enc, state = unescape(f[0]), f[1], f[2]
+    if state == "divergent":
+        if enc:
+            sys.exit("line %d: a divergent row carries an encoding" % i)
+        skipped += 1
+        continue
+    if state != "agreed":
+        sys.exit("line %d: bad state %r" % (i, state))
+    got = encode(raw)
+    if got != enc:
+        sys.exit("line %d: %r encodes here as %r, table says %r"
+                 % (i, f[0], got, enc))
+    agreed += 1
+if agreed < 8:
+    sys.exit("only %d agreed vectors: the file shrank" % agreed)
+print("OK (%d agreed, %d divergent skipped)" % (agreed, skipped))
+PY
+
 printf '[this repo matches its own rows] ..\t'
 "${py}" - "${TSV}" "${distdir}" <<'PY' || fail "see above"
 import re
