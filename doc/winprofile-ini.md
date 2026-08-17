@@ -55,8 +55,8 @@ than renumbering the options.
 `ProfileFormat=1` marks a file written by WebHTTrack since #1314. A file
 without it is WinHTTrack's own and follows the same conventions, so the marker
 changes no read decision today; it exists so a later change to the format can be
-told apart. WinHTTrack rewrites the file from its own key list and drops the
-marker, which is correct, not a loss.
+told apart. Both GUIs write it; WinHTTrack does not yet, and rewrites the file
+from its own key list, so a file it saves loses the marker until it does.
 
 ## Changing the format
 
