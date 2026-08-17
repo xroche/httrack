@@ -69,6 +69,12 @@ ci_report_fork_failures() {
 hb_time=0
 hb_now() { hb_time=$SECONDS; }
 
+# Seconds the launch below waits for the marker. Overridable for the unit test.
+ci_watchdog_wait=${ci_watchdog_wait:-30}
+
+# True once the launched interpreter has announced itself.
+ci_watchdog_spoke() { grep -q '^watchdog ready$' watchdog.log; }
+
 # Start the off-box telemetry over the progress log $1, setting ci_watchdog_pid;
 # return 1 with no PowerShell available. Forks nothing and kills nothing, so it
 # reports where the heartbeat below cannot (#795).
@@ -93,12 +99,14 @@ ci_start_native_watchdog() {
         >>watchdog.log 2>&1 &
     ci_watchdog_pid=$!
     # $! comes from the fork, not the exec: wait for it to actually speak.
-    while test "$waited" -lt 30; do
-        grep -q '^watchdog ready$' watchdog.log && return 0
+    while test "$waited" -lt "$ci_watchdog_wait"; do
+        ci_watchdog_spoke && return 0
         kill -0 "$ci_watchdog_pid" 2>/dev/null || break
         sleep 1
         waited=$((waited + 1))
     done
+    # A child that spoke and exited mid-poll still launched (#1321).
+    ci_watchdog_spoke && return 0
     kill_pid "$ci_watchdog_pid"
     ci_watchdog_pid=''
     return 1
