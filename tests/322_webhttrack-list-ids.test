@@ -47,6 +47,10 @@ mkdir -p "${work}/proj/hts-cache"
 cat >"${work}/proj/hts-cache/winprofile.ini" <<'EOF'
 CurrentUrl=http://example.com/
 Depth=3
+Near=1
+Test=0
+ParseAll=0
+Dos=3
 CurrentAction=6
 Build=2
 PrimaryScan=1
@@ -59,6 +63,17 @@ LogType=2
 EOF
 # The save below overwrites it, and the round trip is judged against this.
 cp "${work}/proj/hts-cache/winprofile.ini" "${work}/seeded.ini"
+
+# A second pattern, its "on" key disjoint from the first. One boolean triple
+# cannot pin a permutation of the three: whichever two keys share a value are
+# interchangeable, so exactly one swap stays invisible until a second load.
+mkdir -p "${work}/proj2/hts-cache"
+cat >"${work}/proj2/hts-cache/winprofile.ini" <<'EOF'
+CurrentUrl=http://example.org/
+Near=0
+Test=1
+ParseAll=0
+EOF
 
 printf '[a new project saves the ids WinHTTrack defaults to] ..\t'
 htsserver_start --home "${work}"
@@ -124,7 +139,9 @@ if fresh.get("ProfileFormat") != "1":
     sys.exit("a saved profile carries no format marker: %r" % fresh)
 for key, want in [("Build", "0"), ("PrimaryScan", "3"), ("Travel", "1"),
                   ("GlobalTravel", "0"), ("RewriteLinks", "0"),
-                  ("CheckType", "1"), ("FollowRobotsTxt", "2")]:
+                  ("CheckType", "1"), ("FollowRobotsTxt", "2"),
+                  ("Near", "0"), ("Test", "0"), ("ParseAll", "1"),
+                  ("Log", "1"), ("UseHTTPProxyForFTP", "1")]:
     if fresh.get(key) != want:
         sys.exit("a new project saves %s=%r, WinHTTrack defaults it to %s"
                  % (key, fresh.get(key), want))
@@ -192,12 +209,26 @@ def save(sid, projname):
     return keys_of("%s/%s/hts-cache/winprofile.ini" % (work, projname))
 
 
+def only_flag(command, want):
+    """WANT is on the command line and the other two boxes' flags are not."""
+    boxes = ["--near", "--test", "--extended-parsing"]
+    for flag in boxes:
+        if (flag in command.split()) != (flag == want):
+            sys.exit("%s: expected %s alone out of %s\n%s"
+                     % (flag, want, boxes, command))
+
+
+def load(sid, projname):
+    return post("step2.html", [("sid", sid), ("path", work),
+                               ("loadprojname", projname)])
+
+
 def selected(page, name):
     """The id the <select> NAME renders as selected, or None."""
     m = re.search(r'<select name="%s".*?</select>' % name, page, re.S)
     if m is None:
         sys.exit("no %s select in the rendered page" % name)
-    ids = re.findall(r"<option value=(\d+) selected>", m.group(0))
+    ids = re.findall(r'<option value="?(\d+)"? selected>', m.group(0))
     return ids[0] if len(ids) == 1 else None
 
 
@@ -210,8 +241,13 @@ for pick, flag in [("4", "--priority=3"), ("5", "--priority=7")]:
     if flag not in command.split():
         sys.exit("scan rule %s emits no %s\n%s" % (pick, flag, command))
 
-loaded = post("step2.html", [("sid", sid), ("path", work),
-                             ("loadprojname", "proj")])
+# Ahead of the project the rest of the leg uses: two loads in a row are fine,
+# where a load after a save is not.
+if "http://example.org/" not in load(sid, "proj2"):
+    sys.exit("step2.html did not load the second project")
+only_flag(textarea(get("step4.html?sid=" + sid), "command"), "--test")
+
+loaded = load(sid, "proj")
 if "http://example.com/" not in loaded:
     sys.exit("step2.html did not load the project\n%s" % loaded[:400])
 
@@ -236,10 +272,17 @@ for page, name, stored in [("step3.html", "todo", 6),
 command = textarea(get("step4.html?sid=" + sid), "command")
 for flag in ["--update", "-N2", "--priority=1", "--can-go-up-and-down",
              "--stay-on-same-tld", "--keep-links=3", "--robots=0",
-             "--debug-log", "--depth=3"]:
+             "--debug-log", "--depth=3", "--near", "--long-names=0"]:
     if flag not in command.split():
         sys.exit("%s missing from the reloaded command line\n%s"
                  % (flag, command))
+only_flag(command, "--near")
+
+# Dos=3 is WinHTTrack's alone, and its select has no entry for it. Showing the
+# blank one would re-save as 0, which reads there as long names, losing the DOS
+# names this very command line just asked for.
+if selected(get("option2.html?sid=" + sid), "dos") != "1":
+    sys.exit("a stored Dos=3 does not show as DOS names alone")
 
 # Saving it back must reproduce what was seeded, Depth included: an asymmetric
 # shift walks a project one option further on every reopen.
