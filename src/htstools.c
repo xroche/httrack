@@ -995,6 +995,25 @@ int hts_footer_format(char *buffer, size_t size, const char *footer,
   return 1;
 }
 
+/* Move the finished tmp onto the live index. Both paths are the system charset,
+   RENAME is utf-8 on Windows. */
+static hts_boolean topindex_commit(httrackp *opt, const char *tmp,
+                                   const char *dst) {
+#ifdef _WIN32
+  char *tmp_utf8 = hts_convertStringSystemToUTF8(tmp, strlen(tmp));
+  char *dst_utf8 = hts_convertStringSystemToUTF8(dst, strlen(dst));
+  const hts_boolean moved =
+      hts_rename_over(opt, tmp_utf8 != NULL ? tmp_utf8 : tmp,
+                      dst_utf8 != NULL ? dst_utf8 : dst);
+
+  freet(tmp_utf8);
+  freet(dst_utf8);
+  return moved;
+#else
+  return hts_rename_over(opt, tmp, dst);
+#endif
+}
+
 /* Note: NOT utf-8 */
 HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
                                  const char *binpath) {
@@ -1021,11 +1040,19 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
 
   if (toptemplate_header && toptemplate_body && toptemplate_footer
       && toptemplate_bodycat) {
+    char BIGSTK dst[CATBUFF_SIZE], tmp[CATBUFF_SIZE];
 
     strcpybuff(rpath, path);
     hts_striplastchar(rpath, '/');
 
-    fpo = fopen(fconcat(catbuff, sizeof(catbuff), rpath, "/index.html"), "wb");
+    /* Build aside and rename over: a reader of the live index gets the previous
+       file or the new one, never the truncated middle (#1329). */
+    if (!slprintfbuff(dst, sizeof(dst), "%s/index.html", rpath) ||
+        !slprintfbuff(tmp, sizeof(tmp), "%s.tmp", dst)) {
+      fpo = NULL;
+    } else {
+      fpo = fopen(fconv(catbuff, sizeof(catbuff), tmp), "wb");
+    }
     if (fpo) {
       find_handle h;
 
@@ -1183,8 +1210,20 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
               "<!-- Mirror and index made by HTTrack Website Copier/"
               HTTRACK_VERSION " " HTTRACK_AFF_AUTHORS " -->", /* EOF */ NULL);
 
-      fclose(fpo);
+      {
+        const hts_boolean written = ferror(fpo) == 0 ? HTS_TRUE : HTS_FALSE;
+        const hts_boolean flushed = fclose(fpo) == 0 ? HTS_TRUE : HTS_FALSE;
 
+        /* A short write must not reach the index either: it would look as
+           complete as a good one. */
+        if (!written || !flushed || !topindex_commit(opt, tmp, dst)) {
+          hts_log_print(opt, LOG_WARNING | LOG_ERRNO,
+                        "could not rebuild the top index %s", dst);
+          /* raw unlink: UNLINK is utf-8 on Windows, this path is not */
+          (void) unlink(fconv(catbuff, sizeof(catbuff), tmp));
+          retval = 0;
+        }
+      }
     }
 
   }
