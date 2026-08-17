@@ -41,7 +41,7 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"Dos", "win,web,droid", "setting", "bitmask", "", "", "", "agreed", "0", "", ""},
   {"ExtDepth", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"FollowRobotsTxt", "win,web,droid", "setting", "list:0:3", "", "", "", "agreed", "2", "", ""},
-  {"Footer", "win,web,droid", "setting", "string", "", "", "", "unresolved", "", "literal", ""},
+  {"Footer", "win,web,droid", "setting", "string", "", "", "", "agreed", "<!-- Mirrored from {url} by HTTrack Website Copier/3.x [XR&CO], {date} -->", "literal", ""},
   {"GlobalTravel", "win,web,droid", "setting", "list:0:4", "", "", "", "agreed", "0", "", ""},
   {"HTMLFirst", "win,web,droid", "setting", "checkbox", "--priority=7", "", "", "agreed", "0", "", ""},
   {"HTTP10", "win,web,droid", "setting", "checkbox", "--http-10", "", "", "agreed", "0", "", ""},
