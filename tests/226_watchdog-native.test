@@ -167,13 +167,20 @@ if test -x "$bin/pwsh"; then
         ci_start_native_watchdog "$posixtmp/progress.log" || rc=$?
         ci_watchdog_wait=$savedwait
         test -r mute.pid || fail "the silent watchdog never ran"
-        # Its status, not its absence: a stub left to end on its own is gone by
-        # the time any liveness probe runs, and reads as killed.
-        waitrc=0
-        wait "$(cat mute.pid)" 2>/dev/null || waitrc=$?
+        mutepid=$(cat mute.pid)
+        # Off the job table, or its death is announced over the suite's log.
+        disown "$mutepid" 2>/dev/null || true
         test "$rc" -ne 0 || fail "a watchdog that never spoke was reported as launched"
         test -z "$ci_watchdog_pid" || fail "a timed-out launch left pid $ci_watchdog_pid behind"
-        test "$waitrc" -gt 128 || fail "a timed-out launch let the watchdog end on its own"
+        # Its own sleep outlasts this window many times over, so gone here means
+        # killed. Not the wait status: Windows ends it with taskkill, which MSYS
+        # reports as an ordinary exit.
+        for _ in $(seq 1 50); do
+            kill -0 "$mutepid" 2>/dev/null || break
+            sleep 0.1
+        done
+        kill -0 "$mutepid" 2>/dev/null &&
+            fail "a timed-out launch left the watchdog $mutepid running"
 
         # #1321's window, forced: the poll's first read releases the stub and
         # reports a miss only once it has died, marker already in the log.
