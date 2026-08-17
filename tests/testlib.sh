@@ -11,15 +11,18 @@ testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # own value, so the default only serves a hand-run and the Windows suite.
 : "${top_srcdir:=..}"
 
-# Cache uname -s once: every skip gate and every crawl asks for it, and each
-# call is a fork the MSYS runtime emulates (#1273).
-: "${HTS_OS:=$(uname -s 2>/dev/null || echo unknown)}"
-export HTS_OS
-
 fail() {
     echo "FAIL: $*" >&2
     exit 1
 }
+
+# Cache uname -s once: every skip gate asks for it, and each call is a fork the
+# MSYS runtime emulates (#1273). Fatal when it says nothing, never guessed: the
+# guess read as not-Windows, so a test excluded there ran on a Windows runner.
+: "${HTS_OS:=$(uname -s 2>/dev/null)}"
+export HTS_OS
+test -n "$HTS_OS" ||
+    fail "uname -s said nothing, so no platform gate can be trusted; export HTS_OS to override"
 
 # 77 is automake's "skipped", not a failure.
 skip() {
@@ -100,6 +103,14 @@ selftest_queue_tail() { # selftest_queue_tail WANT NAME [ARGS...]
 
 selftest_queue_head() { # selftest_queue_head WANT NAME [ARGS...]
     selftest_queue_mode head "$@"
+}
+
+# Queue a -#test=filtersize case (nothing to do with -#test=fsize): a negative
+# SIZE means the size is not known yet, as at scan time.
+fsize() { # fsize WANT SIZE STRING [FILTER...]
+    local want=$1
+    shift
+    selftest_queue "$want" filtersize "$@"
 }
 
 selftest_queue_mode() { # selftest_queue_mode exact|lines|tail|head WANT NAME [ARGS...]

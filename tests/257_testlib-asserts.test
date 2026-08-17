@@ -112,3 +112,42 @@ for pre in "-u HTS_OS" "HTS_OS="; do
     test "$got" = "$(uname -s)" || fail "HTS_OS under [env $pre] resolved to [$got]"
 done
 ok "HTS_OS resolves to uname -s, unset or inherited empty"
+
+## A uname -s that says nothing is fatal: the guess it replaced read as
+# not-Windows, so a test excluded from Windows ran there and the leg still greened.
+mkdir "$tmpdir/shim"
+printf '#!/bin/sh\nexit 0\n' >"$tmpdir/shim/uname"
+chmod +x "$tmpdir/shim/uname"
+# shellcheck disable=SC2016
+printf 'set -euo pipefail\n. "%s/testlib.sh"\nif is_windows; then printf yes; else printf no; fi\n' \
+    "$testdir" >"$tmpdir/win.sh"
+rc=0
+out=$(env -u HTS_OS -u IS_WINDOWS PATH="$tmpdir/shim:$PATH" bash "$tmpdir/win.sh" 2>&1) || rc=$?
+test "$rc" -eq 1 || fail "a silent uname -s exited $rc, not 1: $out"
+case "$out" in
+*"uname -s said nothing"*) ;;
+*) fail "a silent uname -s failed without naming the cause: $out" ;;
+esac
+ok "a uname -s that says nothing fails the run instead of guessing not-Windows"
+
+# The way out for a runner whose uname is broken, so the guard cannot cost it the suite.
+while read -r os want; do
+    got=$(env -u IS_WINDOWS HTS_OS="$os" PATH="$tmpdir/shim:$PATH" bash "$tmpdir/win.sh")
+    test "$got" = "$want" || fail "HTS_OS=$os made is_windows [$got], want [$want]"
+done <<'EOF'
+MINGW64_NT-10.0 yes
+MSYS_NT-10.0 yes
+CYGWIN_NT-10.0 yes
+Linux no
+Darwin no
+EOF
+ok "an explicit HTS_OS still classifies, with uname unreadable"
+
+# Unshimmed: a guard that fires only on the broken path is half a guard.
+case "$(uname -s)" in
+MINGW* | MSYS* | CYGWIN*) want=yes ;;
+*) want=no ;;
+esac
+got=$(env -u IS_WINDOWS bash "$tmpdir/win.sh")
+test "$got" = "$want" || fail "is_windows on this host is [$got], want [$want]"
+ok "is_windows agrees with the host's own uname -s ($want)"
