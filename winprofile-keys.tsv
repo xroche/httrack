@@ -1,103 +1,112 @@
-# winprofile.ini key table. See doc/winprofile-ini.md for the format and
-# httrack-works/winprofile-table/DESIGN.md for why each column exists.
+# winprofile.ini key table. Format: doc/winprofile-ini.md. Rationale for each
+# column: httrack-works/winprofile-table/DESIGN.md.
 #
-# DRAFT. The web column is derived from this repo's own templates and
-# htsserver.c. owners is web-only and scope is blank throughout: those are the
-# httrack-windows and httrack-android halves, and guessing them would rebuild by
-# hand the thing this file abolishes.
+# DRAFT. owners and scope are a three-way census taken from all three front
+# ends; the remaining columns are derived from this repo's sources only and the
+# other two have not checked them yet.
 #
 # ASCII only. No value may contain a tab.
+#
 # key	owners	scope	kind	flag_on	flag_off	composed_with	default_state	default_value	empty_means
-Build	web		list:0:15			BuildString	agreed	0	
-BuildString	web		string			Build			
-Cache	web		checkbox		--cache=0		agreed	1	
-Category	web		string						
-Changes	web		checkbox	--changes					
-CheckType	web		list:0:3				agreed	1	
-Cookies	web		checkbox		--cookies=0		agreed	1	
-CookiesFile	web		string						
-CurrentAction	web		list:0:7						
-CurrentURLList	web		string						
-CurrentUrl	web		string						
-Depth	web		string						
-Dos	web		bitmask						
-ExtDepth	web		string						
-FollowRobotsTxt	web		list:0:3				agreed	2	
-Footer	web		string						
-GlobalTravel	web		list:0:4				agreed	0	
-HTMLFirst	web		checkbox	--priority=7					
-HTTP10	web		checkbox	--http-10					
-HostAlias	web		string						
-Index	web		checkbox		--index=0		agreed	1	
-KeepAlive	web		checkbox	--keep-alive			agreed	1	
-KeepQueryOrder	web		checkbox	--keep-query-order					
-KeepSlashes	web		checkbox	--keep-double-slashes					
-KeepWww	web		checkbox	--keep-www-prefix					
-Log	web		checkbox	--single-log			agreed	1	
-LogType	web		list:0:3						
-MIMEDefsExt1	web		string						
-MIMEDefsExt2	web		string						
-MIMEDefsExt3	web		string						
-MIMEDefsExt4	web		string						
-MIMEDefsExt5	web		string						
-MIMEDefsExt6	web		string						
-MIMEDefsExt7	web		string						
-MIMEDefsExt8	web		string						
-MIMEDefsMime1	web		string						
-MIMEDefsMime2	web		string						
-MIMEDefsMime3	web		string						
-MIMEDefsMime4	web		string						
-MIMEDefsMime5	web		string						
-MIMEDefsMime6	web		string						
-MIMEDefsMime7	web		string						
-MIMEDefsMime8	web		string						
-MaxAll	web		string						
-MaxConn	web		string						
-MaxHtml	web		string						
-MaxLinks	web		string						
-MaxOther	web		string						
-MaxRate	web		number				agreed	100000	
-MaxTime	web		string						
-MaxWait	web		string						
-Near	web		checkbox	--near					
-NoErrorPages	web		checkbox	--generate-errors=0	--generate-errors				
-NoExternalPages	web		checkbox	--replace-external					
-NoPurgeOldFiles	web		checkbox	--purge-old=0	--purge-old=1				
-NoPwdInPages	web		checkbox	--disable-passwords					
-NoQueryStrings	web		checkbox	--include-query-string=0	--include-query-string=1				
-NoRecatch	web		checkbox	--do-not-recatch					
-ParseAll	web		checkbox	--extended-parsing			agreed	1	
-ParseJava	web		checkbox		--parse-java=0		agreed	1	
-PauseFiles	web		string						
-Port	web		string			ProxyType,Proxy			
-PrimaryScan	web		list:0:5				agreed	3	
-ProfileFormat	web		string						
-Proxy	web		string			ProxyType,Port			
-ProxyType	web		checkbox	socks5		Proxy,Port			
-RateOut	web		string						
-RemoveRateout	web		checkbox	--host-control=2					
-RemoveTimeout	web		checkbox	--host-control=1					
-Retry	web		string						
-RewriteLinks	web		list:0:4				agreed	0	
-SingleFile	web		checkbox	--single-file					
-SingleFileMaxSize	web		string						
-Sitemap	web		checkbox	--sitemap					
-SitemapUrl	web		string						
-Sockets	web		number				agreed	4	
-StoreAllInCache	web		checkbox	--store-all-in-cache					
-StripQuery	web		string						
-Test	web		checkbox	--test					
-TimeOut	web		string						
-TolerantRequests	web		checkbox	--tolerant					
-Travel	web		list:0:4				agreed	1	
-URLHack	web		checkbox	--urlhack	--urlhack=0		agreed	1	
-UpdateHack	web		checkbox	--updatehack			agreed	1	
-UseHTTPProxyForFTP	web		checkbox	--httpproxy-ftp	--httpproxy-ftp=0		agreed	1	
-UserID	web		string						
-Wacz	web		checkbox	--wacz					
-Warc	web		checkbox	--warc					
-WarcCdx	web		checkbox	--warc-cdx					
-WarcFile	web		string						
-WarcMaxSize	web		string						
-WildCardFilters	web		string						
-WordIndex	web		checkbox	--search-index	--search-index=0				
+AcceptLanguage	win,droid	setting	string						
+Build	win,web,droid	setting	checkbox						
+BuildString	win,web,droid	setting	string			Build			
+Cache	win,web,droid	setting	checkbox		--cache=0		agreed	1	
+Category	win,web,droid	setting	string						
+Changes	win,web,droid	setting	checkbox	--changes					
+CheckType	win,web,droid	setting	list:0:3				agreed	1	
+Cookies	win,web,droid	setting	checkbox		--cookies=0		agreed	1	
+CookiesFile	win,web,droid	setting	string						
+CurrentAction	win,web,droid	project	list:0:7						
+CurrentPath1		read_only	string						
+CurrentPath2		read_only	string						
+CurrentURLList	win,web	project	string						
+CurrentUrl	win,web,droid	project	string						
+Debugging	droid	setting	string						
+DefaultReferer	win,droid	setting	string						
+Depth	win,web,droid	setting	string						
+Dos	win,web,droid	setting	bitmask						
+ExtDepth	win,web,droid	setting	string						
+FollowRobotsTxt	win,web,droid	setting	list:0:3				agreed	2	
+Footer	win,web,droid	setting	string						
+GlobalTravel	win,web,droid	setting	list:0:4				agreed	0	
+HTMLFirst	win,web,droid	setting	checkbox	--priority=7					
+HTTP10	win,web,droid	setting	checkbox	--http-10					
+HostAlias	win,web,droid	setting	string						
+Index	win,web,droid	setting	checkbox		--index=0		agreed	1	
+KeepAlive	win,web,droid	setting	checkbox	--keep-alive			agreed	1	
+KeepQueryOrder	win,web,droid	setting	checkbox	--keep-query-order					
+KeepSlashes	win,web,droid	setting	checkbox	--keep-double-slashes					
+KeepWww	win,web,droid	setting	checkbox	--keep-www-prefix					
+Log	win,web,droid	setting	checkbox	--single-log			agreed	1	
+LogType	win,web,droid	setting	list:0:3						
+MIMEDefsExt1	win,web,droid	setting	string						
+MIMEDefsExt2	win,web,droid	setting	string						
+MIMEDefsExt3	win,web,droid	setting	string						
+MIMEDefsExt4	win,web,droid	setting	string						
+MIMEDefsExt5	win,web,droid	setting	string						
+MIMEDefsExt6	win,web,droid	setting	string						
+MIMEDefsExt7	win,web,droid	setting	string						
+MIMEDefsExt8	win,web,droid	setting	string						
+MIMEDefsMime1	win,web,droid	setting	string						
+MIMEDefsMime2	win,web,droid	setting	string						
+MIMEDefsMime3	win,web,droid	setting	string						
+MIMEDefsMime4	win,web,droid	setting	string						
+MIMEDefsMime5	win,web,droid	setting	string						
+MIMEDefsMime6	win,web,droid	setting	string						
+MIMEDefsMime7	win,web,droid	setting	string						
+MIMEDefsMime8	win,web,droid	setting	string						
+MailIndex	win,droid	setting	checkbox						
+MaxAll	win,web,droid	setting	string						
+MaxConn	win,web,droid	setting	string						
+MaxHtml	win,web,droid	setting	string						
+MaxLinks	win,web,droid	setting	string						
+MaxOther	win,web,droid	setting	string						
+MaxRate	win,web,droid	setting	number				agreed	100000	
+MaxTime	win,web,droid	setting	string						
+MaxWait	win,web	setting	string						
+Near	win,web,droid	setting	checkbox	--near					
+NoErrorPages	win,web,droid	setting	checkbox	--generate-errors=0	--generate-errors				
+NoExternalPages	win,web,droid	setting	checkbox	--replace-external					
+NoPurgeOldFiles	win,web,droid	setting	checkbox	--purge-old=0	--purge-old=1				
+NoPwdInPages	win,web,droid	setting	checkbox	--disable-passwords					
+NoQueryStrings	win,web,droid	setting	checkbox	--include-query-string=0	--include-query-string=1				
+NoRecatch	win,web,droid	setting	checkbox	--do-not-recatch					
+OtherHeaders	win,droid	setting	string						
+ParseAll	win,web,droid	setting	checkbox	--extended-parsing			agreed	1	
+ParseJava	win,web,droid	setting	checkbox		--parse-java=0		agreed	1	
+Pause	droid	setting	string						
+PauseFiles	win,web	setting	string						
+Port	win,web,droid	setting	string			ProxyType,Proxy			
+PrimaryScan	win,web,droid	setting	list:0:5				agreed	3	
+ProfileFormat	win,web	write_only	string						
+ProjectName	droid	setting	string						
+Proxy	win,web,droid	setting	string			ProxyType,Port			
+ProxyType	win,web,droid	setting	checkbox	socks5		Proxy,Port			
+RateOut	win,web,droid	setting	string						
+RemoveRateout	win,web,droid	setting	checkbox	--host-control=2					
+RemoveTimeout	win,web,droid	setting	checkbox	--host-control=1					
+Retry	win,web,droid	setting	string						
+RewriteLinks	win,web,droid	setting	list:0:4				agreed	0	
+SingleFile	win,web,droid	setting	checkbox	--single-file					
+SingleFileMaxSize	win,web,droid	setting	string						
+Sitemap	win,web,droid	setting	checkbox	--sitemap					
+SitemapUrl	win,web,droid	setting	string						
+Sockets	win,web,droid	setting	number				agreed	4	
+StoreAllInCache	win,web,droid	setting	checkbox	--store-all-in-cache					
+StripQuery	win,web,droid	setting	string						
+Test	win,web,droid	setting	checkbox	--test					
+TimeOut	win,web,droid	setting	string						
+TolerantRequests	win,web,droid	setting	checkbox	--tolerant					
+Travel	win,web,droid	setting	list:0:4				agreed	1	
+URLHack	win,web,droid	setting	checkbox	--urlhack	--urlhack=0		agreed	1	
+UpdateHack	win,web,droid	setting	checkbox	--updatehack			agreed	1	
+UseHTTPProxyForFTP	win,web,droid	setting	checkbox	--httpproxy-ftp	--httpproxy-ftp=0		agreed	1	
+UserID	win,web,droid	setting	string						
+Wacz	win,web	setting	checkbox	--wacz					
+Warc	win,web,droid	setting	checkbox	--warc					
+WarcCdx	win,web	setting	checkbox	--warc-cdx					
+WarcFile	web,droid	setting	string						
+WarcMaxSize	web	setting	string						
+WildCardFilters	win,web,droid	setting	string						
+WordIndex	win,web,droid	setting	checkbox	--search-index	--search-index=0				
