@@ -118,58 +118,124 @@ import sys
 
 tsv, root = sys.argv[1], sys.argv[2]
 
+COLS = ["key", "owners", "scope", "kind", "flag_on", "flag_off",
+        "composed_with", "default_state", "default_value", "empty_means",
+        "legacy_of"]
 rows = {}
 for line in open(tsv, encoding="ascii"):
     line = line.rstrip("\n")
     if line and not line.startswith("#"):
         f = line.split("\t")
-        rows[f[0]] = dict(zip(
-            ["key", "owners", "scope", "kind", "flag_on", "flag_off",
-             "composed_with", "default_state", "default_value", "empty_means",
-             "legacy_of"], f))
+        rows[f[0]] = dict(zip(COLS, f))
 
 
 def read(p):
     return open("%s/%s" % (root, p), encoding="latin-1").read()
 
 
+def block(text, name):
+    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, text, re.S)
+    if m is None:
+        sys.exit("no %s textarea in step4.html" % name)
+    return m.group(1)
+
+
+def same(got, want, what):
+    """1 if they match, else the run dies. The count is a consequence of the
+    check, so deleting the check deletes the count."""
+    if got != want:
+        sys.exit("%s: this repo says %r, the table says %r" % (what, got, want))
+    return 1
+
+
 step4 = read("html/server/step4.html")
-m = re.search(r'<textarea name="winprofile".*?>(.*?)</textarea>', step4, re.S)
-written = set(re.findall(r"^([A-Za-z][A-Za-z0-9_]*)=", m.group(1), re.M))
+written = set(re.findall(r"^([A-Za-z][A-Za-z0-9_]*)=", block(step4, "winprofile"),
+                         re.M))
 claimed = set(k for k, r in rows.items() if "web" in r["owners"].split(","))
-
-# Both directions. A row nobody writes is as wrong as a key with no row, and
-# only the pair catches a rename on one side.
-missing = written - claimed
-extra = claimed - written
-if missing:
-    sys.exit("step4.html writes %s, not marked web in the table"
-             % sorted(missing))
-if extra:
+if written - claimed:
+    sys.exit("step4.html writes %s, not marked web" % sorted(written - claimed))
+if claimed - written:
     sys.exit("the table marks %s as written here, step4.html does not"
-             % sorted(extra))
+             % sorted(claimed - written))
 
-# The kinds this repo can speak for, from the two tables htsserver keeps.
 srv = read("src/htsserver.c")
 
 
 def names(sym):
     m = re.search(r"%s\[\] = \{(.*?)\n\};" % sym, srv, re.S)
+    if m is None:
+        sys.exit("no %s[] in htsserver.c" % sym)
     return set(re.findall(r'"([^"]+)"', m.group(1)))
 
 
-checked = 0
-for key in names("ini_list_keys"):
-    if not rows[key]["kind"].startswith("list"):
-        sys.exit("%s is in ini_list_keys, table says kind=%s"
-                 % (key, rows[key]["kind"]))
-    checked += 1
-for key in names("ini_checkbox_keys"):
-    if rows[key]["kind"] != "checkbox":
-        sys.exit("%s is in ini_checkbox_keys, table says kind=%s"
-                 % (key, rows[key]["kind"]))
-    checked += 1
-# Counted where the check is, not at the end of a loop: an increment that
-# outlives its comparison counts rows again under another name.
-print("OK (%d keys, %d kinds)" % (len(claimed), checked))
+listk, checkbox = names("ini_list_keys"), names("ini_checkbox_keys")
+init_int = dict(re.findall(r'\{"([a-z0-9_]+)", (\d+)\}', srv))
+m = re.search(r"initOn\[\] = \{(.*?)NULL\}", srv, re.S)
+init_on = set(re.findall(r'"([A-Za-z0-9_]+)"', m.group(1))) if m else set()
+
+# key -> the variable step4 writes it from, and the flags that variable emits
+wvar, emit = {}, {}
+for line in block(step4, "winprofile").split("\n"):
+    m = re.match(r"^([A-Za-z][A-Za-z0-9_]*)=(.*)$", line.strip("\r"))
+    if m:
+        v = re.match(r"^\$\{(?:z?test:)?([a-z0-9_]+)[:}]", m.group(2))
+        if v:
+            wvar[m.group(1)] = v.group(1)
+for m in re.finditer(r"\$\{z?test:([a-z0-9_]+):([^}]*)\}", block(step4, "command")):
+    emit.setdefault(m.group(1), []).append(m.group(2))
+
+# LISTDEF cardinality, so a list row's count is checkable rather than decorative
+lang = read("lang.def").split("\n")
+listdef = {}
+for i, l in enumerate(lang):
+    if re.match(r"^LISTDEF_\d+$", l):
+        listdef[l] = lang[i + 1].count("\\n") + 1
+pages = "".join(read("html/server/%s" % f) for f in
+                ("step3.html", "option2.html", "option3.html", "option8.html",
+                 "option9.html"))
+listvar = dict(re.findall(r"\$\{listid:([a-z0-9_]+):(LISTDEF_\d+)", pages))
+
+checked = skipped = 0
+for key in sorted(claimed):
+    r, kind, var = rows[key], rows[key]["kind"], wvar.get(key, "")
+
+    if key in listk:
+        n = listdef.get(listvar.get(var, ""), 0)
+        # The base is the whole of #1323: on disk it is 0, whatever the
+        # templates number internally.
+        checked += same(kind, "list:0:%d" % n, "%s kind" % key)
+    elif key == "Dos":
+        checked += same(kind, "bitmask", "Dos kind")
+    elif key in checkbox:
+        checked += same(kind, "checkbox", "%s kind" % key)
+
+    if r["default_state"] != "agreed":
+        skipped += 1
+    elif var in init_int:
+        n = int(init_int[var])
+        checked += same(str(n - 1 if key in listk else n), r["default_value"],
+                        "%s default" % key)
+    elif var in init_on:
+        checked += same("1", r["default_value"], "%s default" % key)
+    elif key in checkbox:
+        checked += same("0", r["default_value"], "%s default" % key)
+    else:
+        skipped += 1
+
+    # Only an on/off setting has an on/off pair: a list emits through a ladder
+    # the table deliberately does not carry.
+    if kind != "checkbox" or r["composed_with"] or len(emit.get(var, [])) != 1:
+        continue
+    slots = emit[var][0].split(":")
+    on = slots[0] if len(slots) == 1 else slots[1]
+    off = "" if len(slots) == 1 else slots[0]
+    checked += same(on, r["flag_on"], "%s flag_on" % key)
+    checked += same(off, r["flag_off"], "%s flag_off" % key)
+
+if len(claimed) < 90:
+    sys.exit("only %d rows claim web: the table shrank" % len(claimed))
+if checked < 150:
+    sys.exit("only %d checks ran: the assertions stopped reaching the rows"
+             % checked)
+print("OK (%d rows, %d checks, %d skipped)" % (len(claimed), checked, skipped))
 PY

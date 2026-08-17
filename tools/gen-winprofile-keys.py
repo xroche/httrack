@@ -6,6 +6,7 @@ Parsing the header back would put us where three hand-kept copies already put
 us, so generation only ever runs this way round.
 """
 import argparse
+import re
 import sys
 
 COLUMNS = [
@@ -21,6 +22,7 @@ COLUMNS = [
     "empty_means",
     "legacy_of",
 ]
+KIND = re.compile(r"^(string|number|checkbox|bitmask|list:\d+:\d+)$")
 SCOPES = {"setting", "project", "write_only", "read_only"}
 STATES = {"agreed", "none", "derived", "unresolved", ""}
 EMPTY = {"absent", "literal", "unresolved", ""}
@@ -29,9 +31,16 @@ EMPTY = {"absent", "literal", "unresolved", ""}
 def parse(path):
     """Rows of the TSV, or exit naming the first row that is malformed."""
     rows, seen = [], set()
-    with open(path, encoding="ascii") as fp:
-        for n, line in enumerate(fp, 1):
-            line = line.rstrip("\n")
+    # Bytes, not text: a stray non-ASCII byte must name its line rather than
+    # arrive as a decode traceback.
+    with open(path, "rb") as fp:
+        for n, raw in enumerate(fp, 1):
+            bad = [b for b in raw.rstrip(b"\n") if not 0x20 <= b <= 0x7E and b != 0x09]
+            if bad:
+                sys.exit(
+                    "%s:%d: byte 0x%02x is outside printable ASCII" % (path, n, bad[0])
+                )
+            line = raw.decode("ascii").rstrip("\n")
             if not line or line.startswith("#"):
                 continue
             # Never split(-1)-less: a trailing empty cell must stay a cell.
@@ -39,6 +48,13 @@ def parse(path):
             if len(f) != len(COLUMNS):
                 sys.exit("%s:%d: %d columns, want %d" % (path, n, len(f), len(COLUMNS)))
             row = dict(zip(COLUMNS, f))
+            if not row["key"]:
+                sys.exit("%s:%d: empty key" % (path, n))
+            stripped = [c for c in COLUMNS if row[c] != row[c].strip()]
+            if stripped:
+                sys.exit("%s:%d: %s is padded with whitespace" % (path, n, stripped[0]))
+            if not KIND.match(row["kind"]):
+                sys.exit("%s:%d: bad kind %r" % (path, n, row["kind"]))
             if row["key"] in seen:
                 sys.exit("%s:%d: duplicate key %s" % (path, n, row["key"]))
             if row["scope"] not in SCOPES:
@@ -53,6 +69,15 @@ def parse(path):
             rows.append(row)
     if not rows:
         sys.exit("%s: no rows" % path)
+    # A pointer at a key that is not here is a row nobody can follow.
+    for r in rows:
+        for col in ("composed_with", "legacy_of"):
+            for ref in filter(None, r[col].split(",")):
+                if ref not in seen:
+                    sys.exit(
+                        "%s: %s.%s names %s, which has no row"
+                        % (path, r["key"], col, ref)
+                    )
     return rows
 
 

@@ -16,12 +16,12 @@ typedef struct {
   const char *legacy_of;
 } winprofile_key_t;
 
-#define WINPROFILE_KEY_COUNT 105
+#define WINPROFILE_KEY_COUNT 106
 
 static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
-  {"AcceptLanguage", "win,droid", "setting", "string", "", "", "", "derived", "", "absent", ""},
+  {"AcceptLanguage", "win,droid", "setting", "string", "", "", "", "unresolved", "", "absent", ""},
   {"Build", "win,web,droid", "setting", "list:0:15", "", "", "BuildString", "agreed", "0", "", ""},
-  {"BuildString", "win,web,droid", "setting", "string", "", "", "Build", "agreed", "%h%p/%n%q.%t", "literal", ""},
+  {"BuildString", "win,web,droid", "setting", "string", "", "", "Build", "unresolved", "", "literal", ""},
   {"Cache", "win,web,droid", "setting", "checkbox", "", "--cache=0", "", "agreed", "1", "", ""},
   {"Category", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"Changes", "win,web,droid", "setting", "checkbox", "--changes", "", "", "agreed", "0", "", ""},
@@ -39,7 +39,7 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"Dos", "win,web,droid", "setting", "bitmask", "", "", "", "agreed", "0", "", ""},
   {"ExtDepth", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"FollowRobotsTxt", "win,web,droid", "setting", "list:0:3", "", "", "", "agreed", "2", "", ""},
-  {"Footer", "win,web,droid", "setting", "string", "", "", "", "agreed", "HTS_DEFAULT_FOOTER", "literal", ""},
+  {"Footer", "win,web,droid", "setting", "string", "", "", "", "unresolved", "", "literal", ""},
   {"GlobalTravel", "win,web,droid", "setting", "list:0:4", "", "", "", "agreed", "0", "", ""},
   {"HTMLFirst", "win,web,droid", "setting", "checkbox", "--priority=7", "", "", "agreed", "0", "", ""},
   {"HTTP10", "win,web,droid", "setting", "checkbox", "--http-10", "", "", "agreed", "0", "", ""},
@@ -86,11 +86,11 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"OtherHeaders", "win,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"ParseAll", "win,web,droid", "setting", "checkbox", "--extended-parsing", "", "", "agreed", "1", "", ""},
   {"ParseJava", "win,web,droid", "setting", "checkbox", "", "--parse-java=0", "", "agreed", "1", "", ""},
-  {"Pause", "droid", "setting", "string", "", "", "", "none", "", "", "PauseFiles"},
+  {"Pause", "droid", "setting", "string", "", "", "", "none", "", "", ""},
   {"PauseFiles", "win,web", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"Port", "win,web,droid", "setting", "string", "", "", "ProxyType,Proxy", "agreed", "", "absent", ""},
   {"PrimaryScan", "win,web,droid", "setting", "list:0:5", "", "", "", "agreed", "3", "", ""},
-  {"ProfileFormat", "win,web", "write_only", "string", "", "", "", "agreed", "", "absent", ""},
+  {"ProfileFormat", "win,web", "write_only", "string", "", "", "", "none", "", "absent", ""},
   {"ProjectName", "droid", "setting", "string", "", "", "", "none", "", "", ""},
   {"Proxy", "win,web,droid", "setting", "string", "", "", "ProxyType,Port", "agreed", "", "absent", ""},
   {"ProxyType", "win,web,droid", "setting", "checkbox", "socks5", "", "Proxy,Port", "agreed", "0", "", ""},
@@ -113,17 +113,18 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"URLHack", "win,web,droid", "setting", "checkbox", "--urlhack", "--urlhack=0", "", "agreed", "1", "", ""},
   {"UpdateHack", "win,web,droid", "setting", "checkbox", "--updatehack", "", "", "agreed", "1", "", ""},
   {"UseHTTPProxyForFTP", "win,web,droid", "setting", "checkbox", "--httpproxy-ftp", "--httpproxy-ftp=0", "", "agreed", "1", "", ""},
-  {"UserID", "win,web,droid", "setting", "string", "", "", "", "agreed", "Mozilla/5.0 (compatible; HTTrack; +https://www.httrack.com/)", "literal", ""},
+  {"UserID", "win,web,droid", "setting", "string", "", "", "", "unresolved", "", "literal", ""},
   {"Wacz", "win,web", "setting", "checkbox", "--wacz", "", "", "agreed", "0", "", ""},
   {"Warc", "win,web,droid", "setting", "checkbox", "--warc", "", "", "agreed", "0", "", ""},
   {"WarcCdx", "win,web", "setting", "checkbox", "--warc-cdx", "", "", "agreed", "0", "", ""},
   {"WarcFile", "web,droid", "setting", "string", "", "", "", "none", "", "", ""},
   {"WarcMaxSize", "web", "setting", "string", "", "", "", "none", "", "", ""},
-  {"WildCardFilters", "win,web,droid", "setting", "string", "", "", "", "agreed", "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar", "literal", ""},
+  {"WildCardFilters", "win,web,droid", "setting", "string", "", "", "", "unresolved", "", "literal", ""},
   {"WordIndex", "win,web,droid", "setting", "checkbox", "--search-index", "--search-index=0", "", "agreed", "0", "", ""},
   {"KeepDoubleSlashes", "", "setting", "string", "", "", "", "", "", "", "KeepSlashes"},
   {"KeepWwwPrefix", "", "setting", "string", "", "", "", "", "", "", "KeepWww"},
   {"ProxyProtocol", "", "setting", "string", "", "", "", "", "", "", "ProxyType"},
+  {"Iso9660", "", "read_only", "checkbox", "", "", "", "none", "", "", "Dos"},
 };
 
 #endif
