@@ -279,6 +279,14 @@ for flag in ["--update", "-N2", "--priority=1", "--can-go-up-and-down",
                  % (flag, command))
 only_flag(command, "--near")
 
+# Dos=3 is WinHTTrack's alone, and its select has no entry for it. Showing the
+# blank one would re-save as 0, which reads there as long names, losing the DOS
+# names this very command line just asked for.
+dos = get("option2.html?sid=" + sid)
+if '<option value="1" selected>' not in dos:
+    sys.exit("a stored Dos=3 does not show as DOS names\n%s"
+             % re.findall(r"<option value=\"\d+\"[^>]*>", dos))
+
 # Saving it back must reproduce what was seeded, Depth included: an asymmetric
 # shift walks a project one option further on every reopen.
 back = save(sid, "proj")
