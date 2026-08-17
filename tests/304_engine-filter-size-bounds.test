@@ -9,14 +9,6 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# -#test=filtersize <size in KB> <string> <filter...>; a negative size means the
-# size is not known yet (scan time).
-fsize() {
-    local want=$1
-    shift
-    selftest_queue "$want" filtersize "$@"
-}
-
 # Both bounds apply, in either order and with or without the comma, and both are
 # strict.
 for rule in '+*[<80>1]' '+*[>1<80]' '+*[>1,<80]'; do
