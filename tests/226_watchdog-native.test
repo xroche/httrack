@@ -117,11 +117,15 @@ mkdir -p "$bin"
 printf '#!/bin/sh\nprintf "%%s\\n" "$@" >%s/argv.part\nmv %s/argv.part %s/argv\necho "watchdog ready"\n' \
     "$posixtmp" "$posixtmp" "$posixtmp" >"$bin/argvstub"
 printf '#!/bin/sh\nexit 127\n' >"$bin/deadstub"
-# Held until the poll releases it, so its death lands after the poll's read.
+# Held until the poll releases it, so its death lands after the poll's read. It
+# stays silent on the timeout, which fails the leg rather than passing it blind.
 # shellcheck disable=SC2016 # $n is the stub's own, expanded when it runs
-printf '#!/bin/sh\nn=0\nwhile test ! -e race-go && test "$n" -lt 100; do sleep 0.1; n=$((n + 1)); done\necho "watchdog ready"\n' \
+printf '#!/bin/sh\nn=0\nwhile test ! -e race-go && test "$n" -lt 100; do sleep 0.1; n=$((n + 1)); done\ntest -e race-go && echo "watchdog ready"\n' \
     >"$bin/racestub"
-chmod +x "$bin/argvstub" "$bin/deadstub" "$bin/racestub"
+# execs, so the pid it records stays the one the driver holds.
+# shellcheck disable=SC2016 # $$ is the stub's own, expanded when it runs
+printf '#!/bin/sh\necho $$ >mute.pid\nexec sleep 60\n' >"$bin/mutestub"
+chmod +x "$bin/argvstub" "$bin/deadstub" "$bin/racestub" "$bin/mutestub"
 usestub() { cp "$bin/$1" "$bin/pwsh" && cp "$bin/$1" "$bin/powershell.exe"; }
 usestub argvstub
 
@@ -152,17 +156,38 @@ if test -x "$bin/pwsh"; then
         test "$rc" -ne 0 || fail "an interpreter exiting 127 was reported as launched"
         test -z "$ci_watchdog_pid" || fail "a failed launch left pid $ci_watchdog_pid behind"
 
-        # #1321's window, forced: the poll's own first read releases the stub
-        # and reports a miss only once it has spoken and exited.
+        # A silent one has to be killed and unnamed, or the heartbeat inherits a
+        # watchdog it cannot see.
+        rm -f mute.pid
+        usestub mutestub
+        ci_watchdog_pid='dangling'
+        savedwait=$ci_watchdog_wait
+        ci_watchdog_wait=1
+        rc=0
+        ci_start_native_watchdog "$posixtmp/progress.log" || rc=$?
+        ci_watchdog_wait=$savedwait
+        test -r mute.pid || fail "the silent watchdog never ran"
+        # Its status, not its absence: a stub left to end on its own is gone by
+        # the time any liveness probe runs, and reads as killed.
+        waitrc=0
+        wait "$(cat mute.pid)" 2>/dev/null || waitrc=$?
+        test "$rc" -ne 0 || fail "a watchdog that never spoke was reported as launched"
+        test -z "$ci_watchdog_pid" || fail "a timed-out launch left pid $ci_watchdog_pid behind"
+        test "$waitrc" -gt 128 || fail "a timed-out launch let the watchdog end on its own"
+
+        # #1321's window, forced: the poll's first read releases the stub and
+        # reports a miss only once it has died, marker already in the log.
+        rm -f race-go
         usestub racestub
         ci_watchdog_pid=''
-        greps=0
-        # shellcheck disable=SC2317 # the driver's own greps are what call it
-        grep() {
+        reads=0
+        raced=''
+        # shellcheck disable=SC2317 # the poll is what calls it
+        ci_watchdog_spoke() {
             local n=0
-            greps=$((greps + 1))
-            test "$greps" -eq 1 || {
-                command grep "$@"
+            reads=$((reads + 1))
+            test "$reads" -eq 1 || {
+                grep -q '^watchdog ready$' watchdog.log
                 return $?
             }
             : >race-go
@@ -170,11 +195,14 @@ if test -x "$bin/pwsh"; then
                 sleep 0.1
                 n=$((n + 1))
             done
+            # Reported, not assumed: a stub still alive here leaves the poll on
+            # its ordinary path, where the leg proves nothing.
+            kill -0 "$ci_watchdog_pid" 2>/dev/null || raced=1
             return 1
         }
         ci_start_native_watchdog "$posixtmp/progress.log" ||
             fail "a watchdog that spoke and exited before the poll looked again was reported as never launched"
-        unset -f grep
+        test -n "$raced" || fail "the window never opened: the stub outlived the poll's first read"
     )
     for _ in $(seq 1 100); do
         test -r "$posixtmp/argv" && break
