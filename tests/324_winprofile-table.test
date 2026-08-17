@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The key table is the contract three front ends assert against, so a row that
-# goes missing or stops matching this repo's own mapping has to be a red here
-# rather than a surprise in someone else's suite.
+# Three front ends assert against this table, so a row that goes missing or
+# stops matching this repo has to red here, not in someone else's suite.
 
 set -e
 
@@ -16,8 +15,7 @@ TSV="${distdir}/winprofile-keys.tsv"
 HDR="${distdir}/src/winprofile-keys.h"
 GEN="${distdir}/tools/gen-winprofile-keys.py"
 
-# A missing file is a hard failure, never a skip: a consumer that decides for
-# itself whether to run is the vacuous pass this whole file exists to prevent.
+# Missing is fatal, never a skip: a check that opts itself out proves nothing.
 for f in "${TSV}" "${HDR}" "${GEN}"; do
     test -r "${f}" || fail "missing ${f}"
 done
@@ -51,8 +49,7 @@ for i, line in enumerate(open(sys.argv[1], encoding="ascii"), 1):
     f = line.split("\t")
     if len(f) != cols:
         sys.exit("line %d: %d columns, want %d" % (i, len(f), cols))
-    # A row with no default answers for itself only by pointing at the row that
-    # does; otherwise the blank is an omission wearing the same face.
+    # A blank default is only meaningful on a row that points at another.
     if not f[7] and not f[10]:
         sys.exit("line %d: %s has no default_state and no legacy_of"
                  % (i, f[0]))

@@ -8,9 +8,19 @@ us, so generation only ever runs this way round.
 import argparse
 import sys
 
-COLUMNS = ["key", "owners", "scope", "kind", "flag_on", "flag_off",
-           "composed_with", "default_state", "default_value", "empty_means",
-           "legacy_of"]
+COLUMNS = [
+    "key",
+    "owners",
+    "scope",
+    "kind",
+    "flag_on",
+    "flag_off",
+    "composed_with",
+    "default_state",
+    "default_value",
+    "empty_means",
+    "legacy_of",
+]
 SCOPES = {"setting", "project", "write_only", "read_only"}
 STATES = {"agreed", "none", "derived", "unresolved", ""}
 EMPTY = {"absent", "literal", "unresolved", ""}
@@ -27,19 +37,18 @@ def parse(path):
             # Never split(-1)-less: a trailing empty cell must stay a cell.
             f = line.split("\t")
             if len(f) != len(COLUMNS):
-                sys.exit("%s:%d: %d columns, want %d"
-                         % (path, n, len(f), len(COLUMNS)))
+                sys.exit("%s:%d: %d columns, want %d" % (path, n, len(f), len(COLUMNS)))
             row = dict(zip(COLUMNS, f))
             if row["key"] in seen:
                 sys.exit("%s:%d: duplicate key %s" % (path, n, row["key"]))
             if row["scope"] not in SCOPES:
                 sys.exit("%s:%d: bad scope %r" % (path, n, row["scope"]))
             if row["default_state"] not in STATES:
-                sys.exit("%s:%d: bad default_state %r"
-                         % (path, n, row["default_state"]))
+                sys.exit(
+                    "%s:%d: bad default_state %r" % (path, n, row["default_state"])
+                )
             if row["empty_means"] not in EMPTY:
-                sys.exit("%s:%d: bad empty_means %r"
-                         % (path, n, row["empty_means"]))
+                sys.exit("%s:%d: bad empty_means %r" % (path, n, row["empty_means"]))
             seen.add(row["key"])
             rows.append(row)
     if not rows:
@@ -53,8 +62,7 @@ def cstr(s):
 
 def emit(rows, tsv, out):
     w = out.write
-    w("/* Generated from %s by tools/gen-winprofile-keys.py. Do not edit. */\n"
-      % tsv)
+    w("/* Generated from %s by tools/gen-winprofile-keys.py. Do not edit. */\n" % tsv)
     w("#ifndef WINPROFILE_KEYS_H\n#define WINPROFILE_KEYS_H\n\n")
     w("typedef struct {\n")
     for c in COLUMNS:

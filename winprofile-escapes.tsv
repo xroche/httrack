@@ -1,19 +1,15 @@
-# winprofile.ini escape vectors. See doc/winprofile-ini.md for the codecs and
-# httrack-works/winprofile-table/DESIGN.md for why this is data rather than a
-# callable function: no front end can call another's codec from its unit tests.
+# winprofile.ini escape vectors. The codecs are described in
+# doc/winprofile-ini.md. Data rather than a callable function because no front
+# end can call another's codec from its unit tests.
 #
-# Columns: raw, encoded, state, note.
-#
-# raw uses \r \n \t \\ for those four bytes and is otherwise literal ASCII. The
-# file is ASCII only: winprofile.ini declares no charset, the three front ends
-# do not agree on one, and a non-ASCII vector passes in one place and mangles in
-# another with nothing here to show the difference.
+# raw spells those four bytes \r \n \t \\ and is otherwise literal ASCII.
+# ASCII only: winprofile.ini declares no charset and the three front ends do not
+# agree on one, so a non-ASCII vector passes in one place and mangles in another.
 #
 # state=agreed: all three encode raw to encoded and decode it back. Assert both
 # directions.
-# state=divergent: they do not agree, encoded is empty, and the note says how.
-# A consumer SKIPS these and COUNTS the skip; a silent pass would make the
-# marker a way to hide cases from the test meant to catch them.
+# state=divergent: they disagree, encoded is empty, the note says how.
+# A consumer SKIPS these and COUNTS the skip, or the marker hides cases.
 #
 # raw	encoded	state	note
 		agreed	empty value round-trips

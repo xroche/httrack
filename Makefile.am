@@ -9,7 +9,9 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/macos-app.sh tools/macos-bundle.sh tools/macos-release.sh \
 		tools/httrack-launcher.c \
 		tools/Info.plist.in tools/HTTrack.icns \
-		bootstrap build.sh doc/winprofile-ini.md
+		bootstrap build.sh doc/winprofile-ini.md \
+		winprofile-keys.tsv winprofile-escapes.tsv \
+		tools/gen-winprofile-keys.py
 
 # Build the signed Debian packages from a clean source export. Pass the signing
 # key and other options through DEB_FLAGS, e.g.:
