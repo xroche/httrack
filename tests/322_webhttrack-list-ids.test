@@ -63,6 +63,17 @@ EOF
 # The save below overwrites it, and the round trip is judged against this.
 cp "${work}/proj/hts-cache/winprofile.ini" "${work}/seeded.ini"
 
+# A second pattern, its "on" key disjoint from the first. One boolean triple
+# cannot pin a permutation of the three: whichever two keys share a value are
+# interchangeable, so exactly one swap stays invisible until a second load.
+mkdir -p "${work}/proj2/hts-cache"
+cat >"${work}/proj2/hts-cache/winprofile.ini" <<'EOF'
+CurrentUrl=http://example.org/
+Near=0
+Test=1
+ParseAll=0
+EOF
+
 printf '[a new project saves the ids WinHTTrack defaults to] ..\t'
 htsserver_start --home "${work}"
 
@@ -197,6 +208,21 @@ def save(sid, projname):
     return keys_of("%s/%s/hts-cache/winprofile.ini" % (work, projname))
 
 
+def only_flag(command, want):
+    """WANT is on the command line and the other two boxes' flags are not."""
+    boxes = ["--near", "--test", "--extended-parsing"]
+    for flag in boxes:
+        if (flag in command.split()) != (flag == want):
+            sys.exit("%s: expected %s alone out of %s\n%s"
+                     % (flag, want, boxes, command))
+
+
+def load(projname):
+    page = post("step2.html", [("sid", sid), ("path", work),
+                               ("loadprojname", projname)])
+    return page
+
+
 def selected(page, name):
     """The id the <select> NAME renders as selected, or None."""
     m = re.search(r'<select name="%s".*?</select>' % name, page, re.S)
@@ -215,8 +241,13 @@ for pick, flag in [("4", "--priority=3"), ("5", "--priority=7")]:
     if flag not in command.split():
         sys.exit("scan rule %s emits no %s\n%s" % (pick, flag, command))
 
-loaded = post("step2.html", [("sid", sid), ("path", work),
-                             ("loadprojname", "proj")])
+# Ahead of the project the rest of the leg uses: two loads in a row are fine,
+# where a load after a save is not.
+if "http://example.org/" not in load("proj2"):
+    sys.exit("step2.html did not load the second project")
+only_flag(textarea(get("step4.html?sid=" + sid), "command"), "--test")
+
+loaded = load("proj")
 if "http://example.com/" not in loaded:
     sys.exit("step2.html did not load the project\n%s" % loaded[:400])
 
@@ -245,11 +276,7 @@ for flag in ["--update", "-N2", "--priority=1", "--can-go-up-and-down",
     if flag not in command.split():
         sys.exit("%s missing from the reloaded command line\n%s"
                  % (flag, command))
-# Near, Test and ParseAll each named the next one's checkbox, so a profile
-# holding one of the three arrived as another (#1314).
-for flag in ["--test", "--extended-parsing"]:
-    if flag in command.split():
-        sys.exit("%s came from a profile that has it off\n%s" % (flag, command))
+only_flag(command, "--near")
 
 # Saving it back must reproduce what was seeded, Depth included: an asymmetric
 # shift walks a project one option further on every reopen.

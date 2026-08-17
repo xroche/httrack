@@ -13,7 +13,7 @@ Neither GUI needs the file to run a mirror: the command line the wizard builds i
 
 `key=value`, one per line, CRLF, no `[section]` header despite the extension. The first `=` separates; later ones belong to the value. Lines are capped at 8192 bytes by WebHTTrack and 32000 by WinHTTrack; Android caps nothing.
 
-Neither GUI writes the other's full key set, so a missing key is the normal case rather than an edge: a WebHTTrack save drops `MailIndex`, `AcceptLanguage`, `OtherHeaders` and `DefaultReferer`, and WinHTTrack drops `HostAlias`, `WarcFile` and `WarcMaxSize`. **A reader that does not find a key falls back to its own default, which is often not "off" or "zero"**: WinHTTrack defaults `ParseAll`, `Cache`, `Index`, `Log`, `KeepAlive`, `Cookies`, `CheckType` and `Travel` to 1, `FollowRobotsTxt` to 2 and `PrimaryScan` to 3 (`Shell.cpp:2929-3011`). Omission happens inside one GUI too: WinHTTrack skips a list key when its combo has no selection (`GetCurSel() != CB_ERR`). Write a key whenever you have a value for it.
+Neither GUI writes the other's full key set, so a missing key is the normal case rather than an edge: a WebHTTrack save drops `MailIndex`, `AcceptLanguage`, `OtherHeaders` and `DefaultReferer`, and WinHTTrack drops `WarcFile` and `WarcMaxSize`. **A reader that does not find a key falls back to its own default, which is often not "off" or "zero"**: WinHTTrack defaults `ParseAll`, `Cache`, `Index`, `Log`, `KeepAlive`, `Cookies`, `CheckType` and `Travel` to 1, `FollowRobotsTxt` to 2 and `PrimaryScan` to 3 (the `MyGetProfileInt` defaults in `Read_profile`). Omission happens inside one GUI too: WinHTTrack skips a list key when its combo has no selection (`GetCurSel() != CB_ERR`). Write a key whenever you have a value for it.
 
 Two more divergences, both older than this document:
 
@@ -38,7 +38,7 @@ That last clause is load-bearing: a WinHTTrack older than httrack-windows#124 sa
 
 Three checkbox keys were rotated in WebHTTrack until #1324: it filed the "test all links" box under `Near`, the "catch all URLs" box under `Test`, and the "get non-HTML files near a link" box under `ParseAll`. WinHTTrack's names match their meanings on all three, and Android's table agrees with it key for key, so WebHTTrack was the lone outlier. Files WebHTTrack saved before that fix carry the rotation and nothing marks them, so those three settings come back shuffled once.
 
-Android spells three keys that already had WinHTTrack names differently: `ProxyProtocol` for `ProxyType`, `KeepWwwPrefix` for `KeepWww`, `KeepDoubleSlashes` for `KeepSlashes` (`OptionsMapper.java:96-137`). The values agree, so only the name keeps those settings from crossing. `KeepQueryOrder`, added in the same batch, uses the shared name.
+Android spells three keys that already had WinHTTrack names differently: `ProxyProtocol` for `ProxyType`, `KeepWwwPrefix` for `KeepWww`, `KeepDoubleSlashes` for `KeepSlashes` (its field-to-key tables). The values agree, so only the name keeps those settings from crossing. `KeepQueryOrder`, added in the same batch, uses the shared name.
 
 `ProxyType` is a tenth 0-based combo index (`0` HTTP, `1` SOCKS5, `2` HTTP CONNECT), written by both GUIs and deliberately **outside** `ini_list_keys[]`: WebHTTrack's proxy page already reads `0` as its own first entry, so the two agree and a shift would break them. Adding an entry to that list in one GUI alone is #1314 over again.
 
@@ -46,6 +46,6 @@ Android spells three keys that already had WinHTTrack names differently: `ProxyP
 
 ## Changing the format
 
-httrack-windows asserts the lossy decode in its own self-test, so converging the two escape sets means moving that expectation in the same breath. A new key needs the same value on both sides or it is worse than no key. Adding one to WebHTTrack alone is fine and common (`HostAlias`, `WarcFile`); adding one whose *meaning* differs between the GUIs is what #1314 was.
+httrack-windows asserts the lossy decode in its own self-test, so converging the two escape sets means moving that expectation in the same breath. A new key needs the same value on both sides or it is worse than no key. Adding one to WebHTTrack alone is fine and common (`WarcFile`, `WarcMaxSize`); adding one whose *meaning* differs between the GUIs is what #1314 was.
 
 `tests/322_webhttrack-list-ids.test` and `tests/274_wizard-profile-load.test` hold the two tables in `src/htsserver.c` against the keys `step4.html` writes. Nothing checks either against `Shell.cpp`, so a change to WinHTTrack's side still has to be read across by hand.
