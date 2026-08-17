@@ -137,7 +137,7 @@ ${/* end-if clears the output mode rather than restoring it, so re-arm it */}
 ${do:end-if}${do:output-mode:html}
 	${test:build:-N0:-N0:-N1:-N2:-N3:-N4:-N5:-N100:-N101:-N102:-N103:-N104:-N105:-N99:-N199:}
 \
-	${ztest:dos::--long-names=0:--long-names=2}
+	${ztest:dos::--long-names=0:--long-names=2:--long-names=0}
 	${test:robots:--robots=0:--robots=0:--robots=1:--robots=2}
 	${test:errpage:--generate-errors:--generate-errors=0}
 	${test:external:--replace-external}

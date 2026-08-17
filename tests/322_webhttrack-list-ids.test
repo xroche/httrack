@@ -50,6 +50,7 @@ Depth=3
 Near=1
 Test=0
 ParseAll=0
+Dos=3
 CurrentAction=6
 Build=2
 PrimaryScan=1
@@ -272,7 +273,7 @@ for page, name, stored in [("step3.html", "todo", 6),
 command = textarea(get("step4.html?sid=" + sid), "command")
 for flag in ["--update", "-N2", "--priority=1", "--can-go-up-and-down",
              "--stay-on-same-tld", "--keep-links=3", "--robots=0",
-             "--debug-log", "--depth=3", "--near"]:
+             "--debug-log", "--depth=3", "--near", "--long-names=0"]:
     if flag not in command.split():
         sys.exit("%s missing from the reloaded command line\n%s"
                  % (flag, command))

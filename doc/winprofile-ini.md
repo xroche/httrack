@@ -31,6 +31,7 @@ Four kinds of value, and the kind decides how `0` reads:
 | String | verbatim, escaped as above | `CurrentUrl`, `Category`, `UserID`, `Footer`, the `MIMEDefs*` pairs. `Depth`, `MaxRate` and `Sockets` are numbers written as strings, so empty is legal and means unset |
 | Checkbox | `1` on, explicit `0` off | Listed in `ini_checkbox_keys[]` in `src/htsserver.c` |
 | List | the **0-based** index of the entry, in `LISTDEF_N` order (`lang.def`) | Listed in `ini_list_keys[]` |
+| Bitmask | `Dos` only: bit 0 DOS 8.3 names, bit 1 ISO 9660 | In neither table. See below |
 
 The list keys are `CurrentAction`, `Build`, `PrimaryScan`, `Travel`, `GlobalTravel`, `RewriteLinks`, `CheckType`, `FollowRobotsTxt` and `LogType`. WinHTTrack stores the combo box's `GetCurSel()`, which is where 0-based comes from. WebHTTrack numbers the same `<select>` from 1, because id 0 is how its templates spell "no value". It shifts by one at the file boundary rather than renumbering the options, and leaves a value alone that is not a plain number.
 
@@ -39,6 +40,8 @@ That last clause is load-bearing: a WinHTTrack older than httrack-windows#124 sa
 Three checkbox keys were rotated in WebHTTrack until #1324: it filed the "test all links" box under `Near`, the "catch all URLs" box under `Test`, and the "get non-HTML files near a link" box under `ParseAll`. WinHTTrack's names match their meanings on all three, and Android's table agrees with it key for key, so WebHTTrack was the lone outlier. Files WebHTTrack saved before that fix carry the rotation and nothing marks them, so those three settings come back shuffled once.
 
 Android spells three keys that already had WinHTTrack names differently: `ProxyProtocol` for `ProxyType`, `KeepWwwPrefix` for `KeepWww`, `KeepDoubleSlashes` for `KeepSlashes` (its field-to-key tables). The values agree, so only the name keeps those settings from crossing. `KeepQueryOrder`, added in the same batch, uses the shared name.
+
+`Dos` is the one key that is not a number, a checkbox or a list. WinHTTrack packs two independent boxes into it, `m_dos | (m_iso9660 << 1)`, and reads them back with `& 1` and `& 2`, so it alone can write 3. The other two lose it in different places: WebHTTrack offers the setting as a three-way select, which has no "both" entry to put it in, while Android holds the two halves fine and decodes only an exact `1`, so 2 and 3 both arrive as neither. Emission is not the problem on any side. Both bits set means DOS names on every side, since that is the precedence WinHTTrack applies when it builds `-L`.
 
 `ProxyType` is a tenth 0-based combo index (`0` HTTP, `1` SOCKS5, `2` HTTP CONNECT), written by both GUIs and deliberately **outside** `ini_list_keys[]`: WebHTTrack's proxy page already reads `0` as its own first entry, so the two agree and a shift would break them. Adding an entry to that list in one GUI alone is #1314 over again.
 
