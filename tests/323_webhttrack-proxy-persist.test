@@ -1,0 +1,204 @@
+#!/bin/bash
+#
+# The proxy a user types must reach winprofile.ini and come back. Its keys were
+# bound to variables no page renders, so the box was never saved and a stored
+# one never restored, while the file kept whatever a desktop GUI last wrote.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+distdir=${top_srcdir:-$(cd "${testdir}/.." && pwd)}
+distdir=$(cd "${distdir}" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+# Ahead of htsserver_require, which skips where python3 is absent: pure text.
+printf '[the proxy keys name the rendered fields] ..\t'
+# The keys are worth nothing unless they carry the variables option10.html
+# actually draws, which is the whole of the bug.
+for pair in "Proxy:prox" "Port:portprox" "ProxyType:proxytype"; do
+    key=${pair%:*} var=${pair#*:}
+    grep -q "do:copy:${key}:${var}}" "${distdir}/html/server/step2.html" ||
+        fail "step2.html does not restore ${key} into ${var}"
+    # Any directive prefix must end in a colon, or [a-z]* swallows one variable
+    # name into another and Proxy=${portprox} passes as Proxy/prox.
+    grep -q "^${key}=[\$]{\([a-z]*:\)*${var}[:}]" "${distdir}/html/server/step4.html" ||
+        fail "step4.html does not save ${var} as ${key}"
+    grep -q "name=\"${var}\"" "${distdir}/html/server/option10.html" ||
+        fail "option10.html draws no ${var} field"
+done
+# One write each: two Proxy= lines disagreed about which variable they carried.
+for key in Proxy Port ProxyType; do
+    n=$(grep -c "^${key}=" "${distdir}/html/server/step4.html")
+    test "${n}" -eq 1 || fail "step4.html writes ${key} ${n} times"
+done
+echo OK
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_proxy.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+HOST=proxy.example.net
+PORT=3128
+# Both assertions below compare against these; empty would have them comparing
+# nothing to nothing while the bindings stayed dead.
+test -n "${HOST}" || fail "the probe host is empty"
+test -n "${PORT}" || fail "the probe port is empty"
+
+# Kept although the leg below covers its mutants: the bug had two user-visible
+# halves, and a regression report that names only one reads as covering one.
+printf '[a typed proxy reaches the file] ..\t'
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" "${work}" "${HOST}" "${PORT}" <<'PY' || fail "see above"
+import re
+import sys
+import urllib.parse
+import urllib.request
+
+url, work, host, port = (sys.argv[1].rstrip("/"), sys.argv[2],
+                         sys.argv[3], sys.argv[4])
+
+
+def get(page):
+    return urllib.request.urlopen(url + "/server/" + page,
+                                  timeout=20).read().decode("latin-1")
+
+
+def post(page, fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
+    req = urllib.request.Request(url + "/server/" + page,
+                                 data=body.encode("latin-1"), method="POST")
+    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+
+
+def textarea(page, name):
+    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page,
+                  re.S)
+    if m is None:
+        sys.exit("no %s textarea in the rendered page" % name)
+    # As a browser posts it: the newline right after the tag is not content.
+    return m.group(1).lstrip("\r\n")
+
+
+m = re.search(r'name="sid" value="([0-9a-f]+)"', get("index.html"))
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1)
+
+# Fill the proxy pane the way the wizard does, then press Save.
+post("option10.html", [("sid", sid), ("prox", host), ("portprox", port),
+                       ("proxytype", "2")])
+step4 = get("step4.html?sid=" + sid)
+post("step4.html", [("sid", sid), ("path", work), ("projname", "typed"),
+                    ("command", textarea(step4, "command")),
+                    ("command_do", "save"),
+                    ("winprofile", textarea(step4, "winprofile"))])
+
+with open(work + "/typed/hts-cache/winprofile.ini") as fp:
+    saved = dict(line.strip().split("=", 1) for line in fp if "=" in line)
+for key, want in [("Proxy", host), ("Port", port), ("ProxyType", "2")]:
+    if saved.get(key) != want:
+        sys.exit("the saved profile has %s=%r, typed %r"
+                 % (key, saved.get(key), want))
+PY
+
+echo OK
+
+# A second server: the save above ended that session.
+htsserver_stop
+printf '[a stored proxy comes back to the field and the command line] ..\t'
+
+mkdir -p "${work}/proj/hts-cache"
+# What WinHTTrack and the Android app write: the same three keys.
+cat >"${work}/proj/hts-cache/winprofile.ini" <<EOF
+CurrentUrl=http://example.com/
+Proxy=${HOST}
+Port=${PORT}
+ProxyType=1
+EOF
+cp "${work}/proj/hts-cache/winprofile.ini" "${work}/seeded.ini"
+
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" "${work}" "${HOST}" "${PORT}" <<'PY' || fail "see above"
+import re
+import sys
+import urllib.parse
+import urllib.request
+
+url, work, host, port = (sys.argv[1].rstrip("/"), sys.argv[2],
+                         sys.argv[3], sys.argv[4])
+
+
+def get(page):
+    return urllib.request.urlopen(url + "/server/" + page,
+                                  timeout=20).read().decode("latin-1")
+
+
+def post(page, fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
+    req = urllib.request.Request(url + "/server/" + page,
+                                 data=body.encode("latin-1"), method="POST")
+    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+
+
+def textarea(page, name):
+    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page,
+                  re.S)
+    if m is None:
+        sys.exit("no %s textarea in the rendered page" % name)
+    return m.group(1).lstrip("\r\n")
+
+
+def field(page, name):
+    m = re.search(r'<input name="%s" value="([^"]*)"' % name, page)
+    return m.group(1) if m else None
+
+
+m = re.search(r'name="sid" value="([0-9a-f]+)"', get("index.html"))
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1)
+
+loaded = post("step2.html", [("sid", sid), ("path", work),
+                             ("loadprojname", "proj")])
+if "http://example.com/" not in loaded:
+    sys.exit("step2.html did not load the project")
+
+# The box the user looks at.
+page = get("option10.html?sid=" + sid)
+for name, want in [("prox", host), ("portprox", port)]:
+    if field(page, name) != want:
+        sys.exit("option10.html shows %s=%r, the profile holds %r"
+                 % (name, field(page, name), want))
+
+# ProxyType 1 is SOCKS5 on every front end, so the scheme has to survive too.
+command = get("step4.html?sid=" + sid)
+want = '--proxy "socks5://%s:%s"' % (host, port)
+if want not in textarea(command, "command"):
+    sys.exit("the reloaded command line lacks %s\n%s"
+             % (want, textarea(command, "command")))
+
+# Saving it back must reproduce the file: a binding that renders but never
+# stores looks identical up to here.
+post("step4.html", [("sid", sid), ("path", work), ("projname", "proj"),
+                    ("command", textarea(command, "command")),
+                    ("command_do", "save"),
+                    ("winprofile", textarea(command, "winprofile"))])
+with open(work + "/proj/hts-cache/winprofile.ini") as fp:
+    back = dict(line.strip().split("=", 1) for line in fp if "=" in line)
+with open(work + "/seeded.ini") as fp:
+    for line in fp:
+        key, _, value = line.strip().partition("=")
+        if key and back.get(key) != value:
+            sys.exit("%s round-trips as %r, was %r"
+                     % (key, back.get(key), value))
+PY
+
+echo OK
