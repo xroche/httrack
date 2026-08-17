@@ -33,14 +33,14 @@ Four kinds of value, and the kind decides how `0` reads:
 
 The list keys are `CurrentAction`, `Build`, `PrimaryScan`, `Travel`, `GlobalTravel`, `RewriteLinks`, `CheckType`, `FollowRobotsTxt` and `LogType`. WinHTTrack stores the combo box's `GetCurSel()`, which is where 0-based comes from. WebHTTrack numbers the same `<select>` from 1, because id 0 is how its templates spell "no value". It shifts by one at the file boundary rather than renumbering the options, and leaves a value alone that is not a plain number.
 
-That last clause is load-bearing today: WinHTTrack's main save path writes `CheckType`, `FollowRobotsTxt` and `LogType` with `GetDlgItemText`, so those three carry the combo's displayed **text**, not its index, while its own reader takes them with `atoi` (`Shell.cpp:2730, 2788, 2811`). Reported to httrack-windows; until it is settled, a reader has to tolerate both spellings for those three.
+That last clause is load-bearing: a WinHTTrack older than httrack-windows#124 saved `CheckType`, `FollowRobotsTxt` and `LogType` with `GetDlgItemText`, so those keys carry the combo's displayed **text** rather than its index (and `Cookies` and `StoreAllInCache` the control's caption). Its own reader took them with `atoi`, so such a file silently reopened on the reader's default. Those files exist, so a reader still has to tolerate both spellings.
 
 `ProxyType` is a tenth 0-based combo index (`0` HTTP, `1` SOCKS5, `2` HTTP CONNECT), written by both GUIs and deliberately **outside** `ini_list_keys[]`: WebHTTrack's proxy page already reads `0` as its own first entry, so the two agree and a shift would break them. Adding an entry to that list in one GUI alone is #1314 over again.
 
-`ProfileFormat=1` marks the current conventions. A file without it is WinHTTrack's own and follows the same ones, so the marker changes no read decision today; it exists so a later format change can be recognized. Both GUIs write it; WinHTTrack does not yet, and rewrites the file from its own key list, so a file it saves loses the marker until it does.
+`ProfileFormat=1` marks the current conventions. Both GUIs stamp it write-only; neither reads it back. A file without it follows the same conventions, so nothing depends on its presence: it exists only so a later format change can be recognized.
 
 ## Changing the format
 
-A new key needs the same value on both sides or it is worse than no key. Adding one to WebHTTrack alone is fine and common (`HostAlias`, `WarcFile`); adding one whose *meaning* differs between the GUIs is what #1314 was.
+httrack-windows asserts the lossy decode in its own self-test, so converging the two escape sets means moving that expectation in the same breath. A new key needs the same value on both sides or it is worse than no key. Adding one to WebHTTrack alone is fine and common (`HostAlias`, `WarcFile`); adding one whose *meaning* differs between the GUIs is what #1314 was.
 
 `tests/322_webhttrack-list-ids.test` and `tests/274_wizard-profile-load.test` hold the two tables in `src/htsserver.c` against the keys `step4.html` writes. Nothing checks either against `Shell.cpp`, so a change to WinHTTrack's side still has to be read across by hand.
