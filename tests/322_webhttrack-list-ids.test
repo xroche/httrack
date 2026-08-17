@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# winprofile.ini stores a <select> as the 0-based combo index WinHTTrack writes,
-# where the templates number the same list from 1 (#1314). Nothing else holds
-# the two conventions apart, and getting it wrong shifts a saved project by one
-# option in whichever GUI reopens it.
+# winprofile.ini stores a <select> as WinHTTrack's 0-based combo index; the
+# templates number the same list from 1 (#1314). Nothing else holds the two
+# conventions apart, and a wrong shift moves a project by one option.
 
 set -euo pipefail
 
@@ -133,8 +132,8 @@ PY
 
 echo OK
 
-# A second wizard: one server loads one project, and the leg above already
-# spent this one on a save.
+# A second server: a save sets commandEnd, and the session then renders its
+# terminal page rather than a loaded project.
 htsserver_stop
 printf '[a 0-based profile reads back one option up] ..\t'
 htsserver_start --home "${work}"

@@ -713,9 +713,9 @@ static const char *const ini_checkbox_keys[] = {
     NULL,
 };
 
-/* These hold a ${listid:} id, which starts at 1 where winprofile.ini stores the
-   0-based combo index WinHTTrack writes. A file with no ProfileFormat key is
-   WinHTTrack's own, so it is read that way too (#1314). */
+/* These hold a ${listid:} id, numbered from 1; winprofile.ini stores the
+   0-based combo index WinHTTrack writes instead. A file with no ProfileFormat
+   key is WinHTTrack's own, so it is read that way too (#1314). */
 static const char *const ini_list_keys[] = {
     "CurrentAction", "Build",     "PrimaryScan",     "Travel",  "GlobalTravel",
     "RewriteLinks",  "CheckType", "FollowRobotsTxt", "LogType", NULL,
@@ -740,9 +740,9 @@ static hts_boolean ini_key_is_list(const char *key) {
   return ini_key_in(ini_list_keys, key);
 }
 
-/* The first LEN bytes of VALUE shifted by DELTA, or -1 to leave it alone: an
-   empty, hand-edited or out-of-range id means whatever the reader makes of it,
-   and 0 already reads as the first entry on both sides. */
+/* The first LEN bytes of VALUE shifted by DELTA, or -1 to leave it alone. An
+   empty, hand-edited or out-of-range id means whatever the reader makes of it.
+   So does 0, which already reads as the first entry on both sides. */
 static int ini_list_shift(const char *value, size_t len, int delta) {
   char digits[16];
   char *end;
@@ -777,7 +777,7 @@ static void ini_rebase_lists(const char *ini, int delta, String *out) {
     if (eq != NULL) {
       klen = (size_t) (eq - line);
       vlen = len - klen - 1;
-      /* Off the value: a textarea posts CRLF, and the file keeps it. */
+      /* Trim the CRLF a textarea posts, which the file keeps. */
       while (vlen != 0 && (eq[vlen] == '\r' || eq[vlen] == '\n'))
         vlen--;
       if (klen < sizeof(key)) {
@@ -1277,8 +1277,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                     if (fp != NULL) {
                       int count;
 
-                      /* The ids leave 0-based, the way WinHTTrack stores them
-                         and the way this server reads them back (#1314). */
+                      /* The ids leave 0-based, matching how WinHTTrack stores
+                         them and this server reads them back (#1314). */
                       ini_rebase_lists((char *) adrw, -1, &profile);
                       count = (int) StringLength(profile);
                       if ((int) fwrite(StringBuff(profile), 1, count, fp) ==
