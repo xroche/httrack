@@ -47,6 +47,23 @@ Android spells three keys that already had WinHTTrack names differently: `ProxyP
 
 `ProfileFormat=1` marks the current conventions. Nothing reads it yet, so its presence changes no behaviour. It is there so a later format change can be told apart, which needs every writer to stamp it first.
 
+## The machine-readable form
+
+`winprofile-keys.tsv` at the repository root states every key as data: which
+front ends write it, its scope and kind, the engine options it produces, its
+default, what a present-but-empty value means, and the key it is an old spelling
+of. `winprofile-escapes.tsv` does the same for the codec, carrying the vectors
+all three encode identically and marking the cases where they diverge.
+
+`tools/gen-winprofile-keys.py` turns the table into `src/winprofile-keys.h`, and
+`tests/324_winprofile-table.test` regenerates that header, diffs it, and checks
+this repository's own templates and tables against the rows. Generation only
+runs that way round: parsing the header back is how three hand-kept copies
+drifted in the first place.
+
+Read a row rather than trusting prose here, and where the two disagree the table
+is the one with a test.
+
 ## Changing the format
 
 httrack-windows asserts the lossy decode in its own self-test, so converging the two escape sets means moving that expectation in the same breath. A new key needs the same value on both sides or it is worse than no key. Adding one to WebHTTrack alone is fine and common (`WarcFile`, `WarcMaxSize`); adding one whose *meaning* differs between the GUIs is what #1314 was.

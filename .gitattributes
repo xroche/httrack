@@ -12,3 +12,6 @@ tests/*.counts text eol=lf
 # The engine pastes these into the generated index verbatim; LF so a Windows
 # checkout cannot put CRs there and so the compiled-in copies match on POSIX.
 templates/*.html text eol=lf
+
+# Tab-separated data: the generator rejects a stray CR by design.
+*.tsv text eol=lf

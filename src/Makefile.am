@@ -97,6 +97,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsstrings.h htsarrays.h htsarena.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
+	winprofile-keys.h \
 	md5.h coucal/murmurhash3.h \
 	minizip/crypt.h minizip/ioapi.h minizip/mztools.h minizip/unzip.h minizip/zip.h
 libhttrack_la_LIBADD = $(THREADS_LIBS) $(ZLIB_LIBS) $(BROTLI_LIBS) $(ZSTD_LIBS) $(OPENSSL_LIBS) $(DL_LIBS) $(SOCKET_LIBS) $(ICONV_LIBS)
