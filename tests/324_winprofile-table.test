@@ -53,6 +53,12 @@ for i, line in enumerate(open(sys.argv[1], encoding="ascii"), 1):
     if not f[7] and not f[10]:
         sys.exit("line %d: %s has no default_state and no legacy_of"
                  % (i, f[0]))
+    # The generator owns the value's domain. Its presence is what it cannot
+    # judge: whether empty differs from absent is a fact about the other front
+    # ends' readers, and a value-bearing kind has to state one either way.
+    if not f[9] and f[3].split(":")[0] in ("string", "number") \
+            and not f[10] and f[7] != "none":
+        sys.exit("line %d: %s states no empty_means" % (i, f[0]))
     n += 1
 print(n)
 PY
@@ -177,9 +183,8 @@ init_str = dict(re.findall(
     r'\{"([a-z0-9_]+)",\s*(HTS_DEFAULT_[A-Z_]+|"(?:[^"\\]|\\.)*")',
     m.group(1))) if m else {}
 def expand(name):
-    """A HTS_DEFAULT_* macro's value, built from htsglobal.h rather than
-    copied: a third hand-kept copy of a string is the thing this table is for
-    abolishing, and one here would pin the row against the test."""
+    """A HTS_DEFAULT_* macro's value, read from htsglobal.h rather than copied:
+    a copy here would pin the row against this test instead of the macro."""
     hdr = read("src/htsglobal.h")
     m = re.search(r"#\s*define\s+%s((?:[^\n]*\\\n)*[^\n]*)" % name, hdr)
     if m is None:
@@ -250,8 +255,17 @@ for key in sorted(claimed):
     # Rows where Xavier's ruling took WinHTTrack's answer over this repo's, so
     # the table says none while htsserver still ships a default it should lose.
     RULED = {"MaxRate", "Sockets"}
+    ruled = key in RULED
+    if ruled:
+        # Assert the divergence rather than skipping it: a bare exemption keeps
+        # passing once the seed goes and the row should have become agreed.
+        if var not in init_int:
+            sys.exit("%s: no seed left, so the row is no longer a divergence "
+                     "and belongs out of RULED" % key)
+        checked += same("none", r["default_state"], "%s default_state" % key)
+        checked += same("", r["default_value"], "%s default_value" % key)
     derivable = (var in init_int or var in init_on or key in checkbox) \
-        and key not in RULED
+        and not ruled
     if derivable and r["default_state"] != "agreed":
         sys.exit("%s: this repo defaults it, the table says %s"
                  % (key, r["default_state"] or "nothing"))

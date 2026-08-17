@@ -715,9 +715,9 @@ static const char *const ini_checkbox_keys[] = {
 
 /* These hold a ${listid:} id, numbered from 1; winprofile.ini stores the
    0-based combo index WinHTTrack writes instead. A file with no ProfileFormat
-   key is WinHTTrack's own, so it is read that way too (#1314). Membership means
-   "needs that shift", not "is a list": ProxyType is a list whose ordinal
-   already agrees, so adding it here would break it. */
+   key is WinHTTrack's own, so it is read that way too (#1314). The name says
+   list; what membership marks is that shift, and ProxyType's ordinal already
+   agrees, so it stays out. */
 static const char *const ini_list_keys[] = {
     "CurrentAction", "Build",     "PrimaryScan",     "Travel",  "GlobalTravel",
     "RewriteLinks",  "CheckType", "FollowRobotsTxt", "LogType", NULL,

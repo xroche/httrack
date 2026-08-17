@@ -43,19 +43,11 @@ Android spells three keys that already had WinHTTrack names differently: `ProxyP
 
 `Dos` is the one key that is not a number, a checkbox or a list. WinHTTrack packs two independent boxes into it, `m_dos | (m_iso9660 << 1)`, and reads them back with `& 1` and `& 2`, so it alone can write 3. The other two lose it in different places. WebHTTrack has no "both" entry, so it shows 3 as DOS names and drops the ISO bit on re-save; Android decodes only an exact `1`, so 2 and 3 arrive as neither. `Dos=0` is neither box and so means long names, not DOS names, which is why a front end that cannot show 3 must fall back on 1: storing 0 turns the setting into its opposite on the next reopen. Both bits set means DOS names on every side, since that is the precedence WinHTTrack applies when it builds `-L`.
 
-**A `default_state` of `none` means do not substitute one.** `MaxRate` and `Sockets` are the two, and the distinction is not tidiness: a reader that fills in 100000 for an absent `MaxRate` passes `-A100000` where the front ends pass nothing at all, and the two mirror differently as soon as the engine's own default moves or `bypass_limits` applies. httrack-windows dropped its reader default in #105 for that reason, since a substituted value cannot be told from a chosen one once it reaches a file. The old profiles carrying a literal `MaxRate=25000` nobody chose are the same lesson from the far end.
+A `default_state` of `none` means do not substitute one. `MaxRate` and `Sockets` are the two: a reader that fills in 100000 for an absent `MaxRate` passes `-A100000` where the front ends pass nothing at all, and the two mirror differently as soon as the engine's own default moves or `bypass_limits` applies. httrack-windows dropped its reader default in #105 for that reason, since a substituted value cannot be told from a chosen one once it reaches a file. The old profiles carrying a literal `MaxRate=25000` nobody chose are the same lesson from the far end. Both cells describe the target rather than WebHTTrack today: `initInt` still seeds `maxrate` and `connexion` (`src/htsserver.c`), so here an absent key still yields `--max-rate=100000` where an empty one yields no flag at all, and the two coincide only once those seeds go. `tests/324_winprofile-table.test` asserts the seeds so the rows are corrected when they do.
 
-`CurrentPath1` and `CurrentPath2` have no writer at all. WinHTTrack reads them
-live; its own write sites are commented out and neither other front end produces
-them. A front end that starts writing either will be consumed there, and the
-`owners` column cannot say so, since it names writers.
+`CurrentPath1` and `CurrentPath2` have no writer at all. WinHTTrack reads them live; its own write sites are commented out and neither other front end produces them. A front end that starts writing either will be consumed there, and the `owners` column cannot say so, since it names writers.
 
-**A consumer's own candidate list needs the counted-skip rule as much as the
-table does.** httrack-windows's first sweep of `kind` against its MFC bindings
-reported zero mismatches across 90 keys, which read as a clean pass. The list had
-silently dropped every key with no binding on an options page, and there was
-exactly one such key: `ProxyType`, the defect. Counting the skips turned a
-vacuous pass into the finding.
+A consumer checking its own bindings against this table has to count what its candidate list skipped. A sweep reporting no mismatches over a list that silently dropped the keys it could not bind proves nothing, and that is how `ProxyType` survived one: it was the only key with no options page to bind it.
 
 `ProxyType` is a tenth 0-based combo index (`0` HTTP, `1` SOCKS5, `2` HTTP CONNECT), written by all three and deliberately **outside** `ini_list_keys[]`: WebHTTrack's proxy page already reads `0` as its own first entry, so the two agree and a shift would break them. It sits in `ini_checkbox_keys[]` only for the 0-to-empty coercion, which does not make it boolean: a reader treating it as one normalises a CONNECT tunnel into a plain HTTP proxy. Adding an entry to that list in one GUI alone is #1314 over again.
 
