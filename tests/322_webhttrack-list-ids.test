@@ -218,10 +218,9 @@ def only_flag(command, want):
                      % (flag, want, boxes, command))
 
 
-def load(projname):
-    page = post("step2.html", [("sid", sid), ("path", work),
+def load(sid, projname):
+    return post("step2.html", [("sid", sid), ("path", work),
                                ("loadprojname", projname)])
-    return page
 
 
 def selected(page, name):
@@ -229,7 +228,7 @@ def selected(page, name):
     m = re.search(r'<select name="%s".*?</select>' % name, page, re.S)
     if m is None:
         sys.exit("no %s select in the rendered page" % name)
-    ids = re.findall(r"<option value=(\d+) selected>", m.group(0))
+    ids = re.findall(r'<option value="?(\d+)"? selected>', m.group(0))
     return ids[0] if len(ids) == 1 else None
 
 
@@ -244,11 +243,11 @@ for pick, flag in [("4", "--priority=3"), ("5", "--priority=7")]:
 
 # Ahead of the project the rest of the leg uses: two loads in a row are fine,
 # where a load after a save is not.
-if "http://example.org/" not in load("proj2"):
+if "http://example.org/" not in load(sid, "proj2"):
     sys.exit("step2.html did not load the second project")
 only_flag(textarea(get("step4.html?sid=" + sid), "command"), "--test")
 
-loaded = load("proj")
+loaded = load(sid, "proj")
 if "http://example.com/" not in loaded:
     sys.exit("step2.html did not load the project\n%s" % loaded[:400])
 
@@ -282,10 +281,8 @@ only_flag(command, "--near")
 # Dos=3 is WinHTTrack's alone, and its select has no entry for it. Showing the
 # blank one would re-save as 0, which reads there as long names, losing the DOS
 # names this very command line just asked for.
-dos = get("option2.html?sid=" + sid)
-if '<option value="1" selected>' not in dos:
-    sys.exit("a stored Dos=3 does not show as DOS names\n%s"
-             % re.findall(r"<option value=\"\d+\"[^>]*>", dos))
+if selected(get("option2.html?sid=" + sid), "dos") != "1":
+    sys.exit("a stored Dos=3 does not show as DOS names alone")
 
 # Saving it back must reproduce what was seeded, Depth included: an asymmetric
 # shift walks a project one option further on every reopen.
