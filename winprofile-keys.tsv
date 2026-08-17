@@ -7,7 +7,7 @@
 # ASCII only. No value may contain a tab.
 #
 # key	owners	scope	kind	flag_on	flag_off	composed_with	default_state	default_value	empty_means	legacy_of
-AcceptLanguage	win,droid	setting	string				unresolved		absent	
+AcceptLanguage	win,droid	setting	string				unresolved		literal	
 Build	win,web,droid	setting	list:0:15			BuildString	agreed	0		
 BuildString	win,web,droid	setting	string			Build	unresolved		literal	
 Cache	win,web,droid	setting	checkbox		--cache=0		agreed	1		
@@ -61,7 +61,7 @@ MaxConn	win,web,droid	setting	string				agreed		absent
 MaxHtml	win,web,droid	setting	string				agreed		absent	
 MaxLinks	win,web,droid	setting	string				agreed		absent	
 MaxOther	win,web,droid	setting	string				agreed		absent	
-MaxRate	win,web,droid	setting	number				agreed	100000		
+MaxRate	win,web,droid	setting	number				none		absent	
 MaxTime	win,web,droid	setting	string				agreed		absent	
 MaxWait	win,web	setting	string				agreed		absent	
 Near	win,web,droid	setting	checkbox	--near			agreed	0		
@@ -78,10 +78,10 @@ Pause	droid	setting	string				none
 PauseFiles	win,web	setting	string				agreed		absent	
 Port	win,web,droid	setting	string			ProxyType,Proxy	agreed		absent	
 PrimaryScan	win,web,droid	setting	list:0:5				agreed	3		
-ProfileFormat	win,web	write_only	string				none		absent	
+ProfileFormat	win,web	write_only	number				none		absent	
 ProjectName	droid	setting	string				none			
 Proxy	win,web,droid	setting	string			ProxyType,Port	agreed		absent	
-ProxyType	win,web,droid	setting	checkbox	socks5		Proxy,Port	agreed	0		
+ProxyType	win,web,droid	setting	list:0:3	socks5		Proxy,Port	agreed	0	absent	
 RateOut	win,web,droid	setting	string				agreed		absent	
 RemoveRateout	win,web,droid	setting	checkbox	--host-control=2			agreed	0		
 RemoveTimeout	win,web,droid	setting	checkbox	--host-control=1			agreed	0		
@@ -91,7 +91,7 @@ SingleFile	win,web,droid	setting	checkbox	--single-file			agreed	0
 SingleFileMaxSize	win,web,droid	setting	string				agreed		absent	
 Sitemap	win,web,droid	setting	checkbox	--sitemap			agreed	0		
 SitemapUrl	win,web,droid	setting	string				agreed		absent	
-Sockets	win,web,droid	setting	number				agreed	4		
+Sockets	win,web,droid	setting	number				none		absent	
 StoreAllInCache	win,web,droid	setting	checkbox	--store-all-in-cache			agreed	0		
 StripQuery	win,web,droid	setting	string				agreed		absent	
 Test	win,web,droid	setting	checkbox	--test			agreed	0		
