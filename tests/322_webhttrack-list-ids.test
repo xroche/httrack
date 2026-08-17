@@ -47,6 +47,9 @@ mkdir -p "${work}/proj/hts-cache"
 cat >"${work}/proj/hts-cache/winprofile.ini" <<'EOF'
 CurrentUrl=http://example.com/
 Depth=3
+Near=1
+Test=0
+ParseAll=0
 CurrentAction=6
 Build=2
 PrimaryScan=1
@@ -124,7 +127,9 @@ if fresh.get("ProfileFormat") != "1":
     sys.exit("a saved profile carries no format marker: %r" % fresh)
 for key, want in [("Build", "0"), ("PrimaryScan", "3"), ("Travel", "1"),
                   ("GlobalTravel", "0"), ("RewriteLinks", "0"),
-                  ("CheckType", "1"), ("FollowRobotsTxt", "2")]:
+                  ("CheckType", "1"), ("FollowRobotsTxt", "2"),
+                  ("Near", "0"), ("Test", "0"), ("ParseAll", "1"),
+                  ("Log", "1"), ("UseHTTPProxyForFTP", "1")]:
     if fresh.get(key) != want:
         sys.exit("a new project saves %s=%r, WinHTTrack defaults it to %s"
                  % (key, fresh.get(key), want))
@@ -236,10 +241,15 @@ for page, name, stored in [("step3.html", "todo", 6),
 command = textarea(get("step4.html?sid=" + sid), "command")
 for flag in ["--update", "-N2", "--priority=1", "--can-go-up-and-down",
              "--stay-on-same-tld", "--keep-links=3", "--robots=0",
-             "--debug-log", "--depth=3"]:
+             "--debug-log", "--depth=3", "--near"]:
     if flag not in command.split():
         sys.exit("%s missing from the reloaded command line\n%s"
                  % (flag, command))
+# Near, Test and ParseAll each named the next one's checkbox, so a profile
+# holding one of the three arrived as another (#1314).
+for flag in ["--test", "--extended-parsing"]:
+    if flag in command.split():
+        sys.exit("%s came from a profile that has it off\n%s" % (flag, command))
 
 # Saving it back must reproduce what was seeded, Depth included: an asymmetric
 # shift walks a project one option further on every reopen.

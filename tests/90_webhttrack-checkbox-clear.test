@@ -91,9 +91,11 @@ def checked(page, name):
 # What each state puts on the command line (None: nothing) and its profile key.
 BOXES = [
     # field           profile key           set                          cleared
-    ("parseall", "ParseAll", "--near", None),
-    ("link", "Near", "--test", None),
-    ("testall", "Test", "--extended-parsing", None),
+    # The key is named for the flag, not for the field: the three field names
+    # sit one box out of step with their labels (#1324).
+    ("parseall", "Near", "--near", None),
+    ("link", "Test", "--test", None),
+    ("testall", "ParseAll", "--extended-parsing", None),
     # htmlfirst emits --priority=7, which the scan-priority list also emits.
     ("htmlfirst", "HTMLFirst", None, None),
     ("errpage", "NoErrorPages", "--generate-errors=0", None),
