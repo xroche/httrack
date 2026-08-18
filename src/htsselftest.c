@@ -5910,8 +5910,64 @@ static int st_topindex(httrackp *opt, int argc, char **argv) {
   assertf(strstr(buf, "/index.html\">") != NULL);
   assertf(strstr(buf, "???") == NULL);
 
+#ifndef _WIN32
+  /* #1329: a rebuild replaces the index instead of rewriting it, so a reader
+     holding the old one open still reads it whole. Windows refuses to rename
+     over an open target, so this probe is POSIX-only. */
+  {
+    FILE *const held = fopen(path, "rb");
+
+    assertf(held != NULL);
+    snprintf(path, sizeof(path), "%s/mocha/", topdir);
+    assertf(structcheck(path) == 0);
+    snprintf(path, sizeof(path), "%s/mocha/index.html", topdir);
+    fp = fopen(path, "wb");
+    assertf(fp != NULL);
+    fclose(fp);
+    assertf(hts_buildtopindex(opt, topdir, "") != 0);
+
+    n = fread(buf, 1, sizeof(buf) - 1, held);
+    fclose(held);
+    buf[n] = '\0';
+    assertf(n < sizeof(buf) - 1); /* a clipped read fakes an absence */
+    assertf(strstr(buf, projUTF8) != NULL);
+    assertf(strstr(buf, "mocha") == NULL);
+
+    /* and the rebuild landed whole, footer included */
+    snprintf(path, sizeof(path), "%s/index.html", topdir);
+    fp = fopen(path, "rb");
+    assertf(fp != NULL);
+    n = fread(buf, 1, sizeof(buf) - 1, fp);
+    fclose(fp);
+    buf[n] = '\0';
+    assertf(strstr(buf, "mocha") != NULL);
+    assertf(strstr(buf, "Thanks for using HTTrack") != NULL);
+
+    snprintf(path, sizeof(path), "%s/mocha/index.html", topdir);
+    unlink(path);
+    snprintf(path, sizeof(path), "%s/mocha", topdir);
+    rmdir(path);
+  }
+#endif
+  /* the temporary is gone either way */
+  snprintf(path, sizeof(path), "%s/index.tmp", topdir);
+  assertf(!fexist(path));
+
   /* raw unlink/rmdir: UNLINK is utf-8 on Windows, these paths aren't */
+  snprintf(path, sizeof(path), "%s/index.html", topdir);
   unlink(path);
+
+#ifndef _WIN32
+  /* a directory in the way fails the move (EISDIR, not the EEXIST fallback):
+     the rebuild reports failure and leaves neither a temporary nor a stub */
+  assertf(mkdir(path, 0755) == 0);
+  assertf(hts_buildtopindex(opt, topdir, "") == 0);
+  snprintf(path, sizeof(path), "%s/index.tmp", topdir);
+  assertf(!fexist(path));
+  snprintf(path, sizeof(path), "%s/index.html", topdir);
+  assertf(rmdir(path) == 0);
+#endif
+
   snprintf(path, sizeof(path), "%s/backblue.gif", topdir);
   unlink(path);
   snprintf(path, sizeof(path), "%s/fade.gif", topdir);
