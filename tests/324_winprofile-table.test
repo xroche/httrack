@@ -179,9 +179,27 @@ init_int = dict(re.findall(r'\{"([a-z0-9_]+)", (\d+)\}', srv))
 m = re.search(r"initOn\[\] = \{(.*?)NULL\}", srv, re.S)
 init_on = set(re.findall(r'"([A-Za-z0-9_]+)"', m.group(1))) if m else set()
 m = re.search(r"initStrElt initStr\[\] = \{(.*?)\{NULL", srv, re.S)
-init_str = dict(re.findall(
-    r'\{"([a-z0-9_]+)",\s*(HTS_DEFAULT_[A-Z_]+|"(?:[^"\\]|\\.)*")',
-    m.group(1))) if m else {}
+FRAG = r'(?:HTS_DEFAULT_[A-Z_]+|"(?:[^"\\]|\\.)*")'
+init_str = dict(re.findall(r'\{"([a-z0-9_]+)",\s*(%s(?:\s*%s)*)' % (FRAG, FRAG),
+                           m.group(1))) if m else {}
+# A seed this parser cannot read would drop out of the dict and take its row's
+# check with it, silently.
+unread = set(re.findall(r'\{"([a-z0-9_]+)",', m.group(1) if m else "")) - set(init_str)
+if unread:
+    sys.exit("initStr: cannot read %s" % sorted(unread))
+def literal(text, skip=None):
+    """The value of a C string expression: adjacent fragments joined and any
+    HTS_DEFAULT_* macro expanded. Stopping at the first fragment would
+    under-read a seed the formatter wrapped."""
+    out = []
+    for tok in re.finditer(r'"((?:[^"\\]|\\.)*)"|([A-Z][A-Z0-9_]+)', text):
+        if tok.group(1) is not None:
+            out.append(tok.group(1).encode().decode("unicode_escape"))
+        elif tok.group(2) != skip:
+            out.append(expand(tok.group(2)))
+    return "".join(out)
+
+
 def expand(name):
     """A HTS_DEFAULT_* macro's value, read from htsglobal.h rather than copied:
     a copy here would pin the row against this test instead of the macro."""
@@ -189,16 +207,10 @@ def expand(name):
     m = re.search(r"#\s*define\s+%s((?:[^\n]*\\\n)*[^\n]*)" % name, hdr)
     if m is None:
         sys.exit("no %s in htsglobal.h" % name)
-    out = []
-    for tok in re.finditer(r'"((?:[^"\\]|\\.)*)"|([A-Z][A-Z0-9_]+)',
-                           m.group(1)):
-        if tok.group(1) is not None:
-            out.append(tok.group(1).encode().decode("unicode_escape"))
-        elif tok.group(2) != name:
-            out.append(expand(tok.group(2)))
+    out = literal(m.group(1), skip=name)
     if not out:
         sys.exit("%s expanded to nothing" % name)
-    return "".join(out)
+    return out
 
 # key -> the variable step4 writes it from, and the flags that variable emits
 wvar, emit = {}, {}
@@ -283,14 +295,8 @@ for key in sorted(claimed):
     # A string default this repo states, checked by nothing until now, which is
     # how Footer sat as a disagreement it was never part of.
     if r["default_state"] == "agreed" and var in init_str and var not in init_on:
-        raw = init_str[var]
-        if raw.startswith("HTS_DEFAULT_"):
-            want = expand(raw)
-        elif raw.startswith('"') and raw.endswith('"'):
-            want = raw[1:-1].encode().decode("unicode_escape")
-        else:
-            sys.exit("%s: cannot read %r out of initStr" % (key, raw))
-        checked += same(want, r["default_value"], "%s default" % key)
+        checked += same(literal(init_str[var]), r["default_value"],
+                        "%s default" % key)
 
     # Only an on/off setting has an on/off pair: a list emits through a ladder
     # the table deliberately does not carry.
