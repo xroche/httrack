@@ -88,8 +88,7 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"OtherHeaders", "win,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"ParseAll", "win,web,droid", "setting", "checkbox", "--extended-parsing", "", "", "agreed", "1", "", ""},
   {"ParseJava", "win,web,droid", "setting", "checkbox", "", "--parse-java=0", "", "agreed", "1", "", ""},
-  {"Pause", "droid", "setting", "string", "", "", "", "none", "", "", ""},
-  {"PauseFiles", "win,web", "setting", "string", "", "", "", "agreed", "", "absent", ""},
+  {"PauseFiles", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"Port", "win,web,droid", "setting", "string", "", "", "ProxyType,Proxy", "agreed", "", "absent", ""},
   {"PrimaryScan", "win,web,droid", "setting", "list:0:5", "", "", "", "agreed", "3", "", ""},
   {"ProfileFormat", "win,web", "write_only", "number", "", "", "", "none", "", "absent", ""},
@@ -125,6 +124,7 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"WordIndex", "win,web,droid", "setting", "checkbox", "--search-index", "--search-index=0", "", "agreed", "0", "", ""},
   {"KeepDoubleSlashes", "", "setting", "string", "", "", "", "", "", "", "KeepSlashes"},
   {"KeepWwwPrefix", "", "setting", "string", "", "", "", "", "", "", "KeepWww"},
+  {"Pause", "", "setting", "string", "", "", "", "", "", "", "PauseFiles"},
   {"ProxyProtocol", "", "setting", "string", "", "", "", "", "", "", "ProxyType"},
   {"Iso9660", "", "read_only", "checkbox", "", "", "", "none", "", "", "Dos"},
 };
