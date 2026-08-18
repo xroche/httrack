@@ -7,7 +7,7 @@
 # ASCII only. No value may contain a tab.
 #
 # key	owners	scope	kind	flag_on	flag_off	composed_with	default_state	default_value	empty_means	legacy_of
-AcceptLanguage	win,droid	setting	string				unresolved		literal	
+AcceptLanguage	win,droid	setting	string				derived		literal	
 Build	win,web,droid	setting	list:0:15			BuildString	agreed	0		
 BuildString	win,web,droid	setting	string			Build	unresolved		literal	
 Cache	win,web,droid	setting	checkbox		--cache=0		agreed	1		

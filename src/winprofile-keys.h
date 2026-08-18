@@ -21,7 +21,7 @@ typedef struct {
 
 /* clang-format off */
 static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
-  {"AcceptLanguage", "win,droid", "setting", "string", "", "", "", "unresolved", "", "literal", ""},
+  {"AcceptLanguage", "win,droid", "setting", "string", "", "", "", "derived", "", "literal", ""},
   {"Build", "win,web,droid", "setting", "list:0:15", "", "", "BuildString", "agreed", "0", "", ""},
   {"BuildString", "win,web,droid", "setting", "string", "", "", "Build", "unresolved", "", "literal", ""},
   {"Cache", "win,web,droid", "setting", "checkbox", "", "--cache=0", "", "agreed", "1", "", ""},

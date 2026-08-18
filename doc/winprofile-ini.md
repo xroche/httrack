@@ -61,6 +61,8 @@ default, what a present-but-empty value means, and the key it is an old spelling
 of. `winprofile-escapes.tsv` does the same for the codec, carrying the vectors
 all three encode identically and marking the cases where they diverge.
 
+A `default_state` of `derived` means the value is computed at run time, so no fixed default can be stated. `AcceptLanguage` is the one row: Android builds it from the device locale. A consumer must count a `derived` row as a skip, the same as an `unresolved` one, rather than pass it silently.
+
 `tools/gen-winprofile-keys.py` turns the table into `src/winprofile-keys.h`, and
 `tests/324_winprofile-table.test` regenerates that header, diffs it, and checks
 this repository's own templates and tables against the rows. Generation only
