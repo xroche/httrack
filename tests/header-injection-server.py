@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Raw-socket probe for 159_local-header-injection.
+"""Raw-socket probe for 159_local-header-injection and 326_engine-header-dedup.
 
 Speaks HTTP off the socket so a split header line stays visible; serves an
 origin-form site and an http-proxy absolute-URI one on the same port.
 
 Appends "=== REQUEST ===\\n<bytes>\\n" per request to the log named on argv, and
-prints "PORT <n>" once listening.
+writes each request verbatim to <log>.<n> as well, so a consumer grading line
+endings never has to split the log with a tool that may translate them. Prints
+"PORT <n>" once listening.
 """
 
 import os
@@ -59,7 +61,7 @@ def body_for(request, port):
     return page("leaf")
 
 
-def handle(conn, port, logf, lock):
+def handle(conn, port, logf, lock, seq):
     conn.settimeout(10)
     data = b""
     try:
@@ -72,8 +74,11 @@ def handle(conn, port, logf, lock):
         pass
     if data:
         with lock:
+            seq[0] += 1
             logf.write(b"=== REQUEST ===\n" + data + b"\n")
             logf.flush()
+            with open("%s.%d" % (sys.argv[1], seq[0]), "wb") as reqf:
+                reqf.write(data)
         body = body_for(data, port)
         try:
             conn.sendall(
@@ -91,12 +96,13 @@ def handle(conn, port, logf, lock):
 def main():
     srv, port = bind_ephemeral()
     lock = threading.Lock()
+    seq = [0]
     with open(sys.argv[1], "wb") as logf:
         print("PORT %d" % port, flush=True)
         while True:
             conn, _ = srv.accept()
             threading.Thread(
-                target=handle, args=(conn, port, logf, lock), daemon=True
+                target=handle, args=(conn, port, logf, lock, seq), daemon=True
             ).start()
 
 
