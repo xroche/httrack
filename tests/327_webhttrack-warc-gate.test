@@ -75,19 +75,24 @@ def companion(page):
     return m.group(1)
 
 
-# Nothing headless can see a greyed control, and nothing here runs the click
-# handlers, so assert the wiring exists as well as the states it starts from.
+# A headless check cannot see a greyed control or run the click handlers, so this asserts the wiring directly.
 page = get("/server/option9.html?sid=" + sid)
 for want in ("function warc_gate()", "function wacz_click()",
-             "box('warccdx').disabled = off", "box('warc').checked = true"):
+             "var off = !box('warc').checked", "box('warccdx').disabled = off",
+             "box('warc').checked = true", 'onLoad="do_load();"'):
     check(want in page, "option9.html carries %r" % want)
-# On load too: a profile with WARC clear and CDXJ set must open greyed.
+# A profile with WARC clear and CDXJ set must open greyed on load too.
 check(re.search(r"function do_load\(\)[^}]*warc_gate\(\);", page) is not None,
       "do_load() sets the initial state")
-check("wacz_click()" in tag(page, "wacz"), "the WACZ box calls wacz_click()")
-check("warc_gate()" in tag(page, "warc"), "the WARC box calls warc_gate()")
+for name, handler in (("warc", "warc_gate"), ("wacz", "wacz_click")):
+    check('onClick="%s()' % handler in tag(page, name),
+          "the %s box calls %s() on click" % (name, handler))
+# box() builds each id by hand, so it has to be the one the tag carries.
+for name in ("warc", "warccdx", "wacz"):
+    check('id="%s_box"' % name in tag(page, name),
+          "the %s box carries id=\"%s_box\"" % (name, name))
 
-# Both edges: greying on a tick alone would pass a handler that never re-greys.
+# Both rendered states; the re-grey on untick is warc_gate()'s, and never runs here.
 for warc, greyed in (("", True), ("on", False), ("", True)):
     post([("warc", warc), ("warccdx", "on")])
     page = get("/server/option9.html?sid=" + sid)
@@ -102,10 +107,12 @@ for warc, greyed in (("", True), ("on", False), ("", True)):
           "%s: the companion holds %r" % (label, "1" if greyed else ""))
 
 # What a browser posts from that greyed page: the two companions, no box.
-rendered = post([("warc", ""), ("warccdx", ""), ("warccdx", "1")])
+rendered = post([("warc", ""), ("warccdx", ""), ("warccdx", companion(page))])
 check("WarcCdx=1" in textarea(rendered, "winprofile").splitlines(),
       "a greyed CDXJ box keeps its stored value")
-check("--warc-cdx" not in textarea(rendered, "command").split(),
+cmd = textarea(rendered, "command").split()
+# --user-agent is unconditional: an empty textarea holds no flag either.
+check("--user-agent" in cmd and "--warc-cdx" not in cmd,
       "a greyed CDXJ box emits no flag")
 
 # Ungreyed, the box decides again: the companion is empty and the box posts.
