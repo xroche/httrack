@@ -176,15 +176,24 @@ def names(sym):
 
 listk, checkbox = names("ini_list_keys"), names("ini_checkbox_keys")
 init_int = dict(re.findall(r'\{"([a-z0-9_]+)", (\d+)\}', srv))
-m = re.search(r"initOn\[\] = \{(.*?)NULL\}", srv, re.S)
-init_on = set(re.findall(r'"([A-Za-z0-9_]+)"', m.group(1))) if m else set()
-m = re.search(r"initStrElt initStr\[\] = \{(.*?)\{NULL", srv, re.S)
+# A seed table this parser cannot find takes every check that reads it, so a
+# renamed array must red here rather than emptying the dict.
+def srv_block(pattern):
+    m = re.search(pattern, srv, re.S)
+    if m is None:
+        sys.exit("htsserver.c: no match for %s" % pattern)
+    return m.group(1)
+
+
+init_on = set(re.findall(r'"([A-Za-z0-9_]+)"',
+                         srv_block(r"initOn\[\] = \{(.*?)NULL\}")))
+seeds = srv_block(r"initStrElt initStr\[\] = \{(.*?)\{NULL")
 FRAG = r'(?:HTS_DEFAULT_[A-Z_]+|"(?:[^"\\]|\\.)*")'
-init_str = dict(re.findall(r'\{"([a-z0-9_]+)",\s*(%s(?:\s*%s)*)' % (FRAG, FRAG),
-                           m.group(1))) if m else {}
-# A seed this parser cannot read would drop out of the dict and take its row's
-# check with it, silently.
-unread = set(re.findall(r'\{"([a-z0-9_]+)",', m.group(1) if m else "")) - set(init_str)
+NAME = r'\{\s*"([a-z0-9_]+)"\s*,'
+init_str = dict(re.findall(r'%s\s*(%s(?:\s*%s)*)' % (NAME, FRAG, FRAG), seeds))
+# A seed this parser cannot read drops silently out of init_str, so its row's
+# check would never run.
+unread = set(re.findall(NAME, seeds)) - set(init_str)
 if unread:
     sys.exit("initStr: cannot read %s" % sorted(unread))
 def literal(text, skip=None):

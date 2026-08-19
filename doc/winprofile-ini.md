@@ -61,7 +61,17 @@ default, what a present-but-empty value means, and the key it is an old spelling
 of. `winprofile-escapes.tsv` does the same for the codec, carrying the vectors
 all three encode identically and marking the cases where they diverge.
 
-A `default_state` of `derived` means the value is computed at run time, so no fixed default can be stated. `AcceptLanguage` is the one row: Android builds it from the device locale. A consumer must count a `derived` row as a skip, the same as an `unresolved` one, rather than pass it silently.
+A `default_state` of `derived` means the value is computed at run time, so no
+fixed default can be stated. Two rows have one: `AcceptLanguage`, built from the
+device locale, and `UserID`, which carries the engine's own version. A consumer
+must count a `derived` row as a skip, the same as an `unresolved` one, rather
+than pass it silently.
+
+`BuildString` and `WildCardFilters` describe the target rather than every front
+end today, the way `MaxRate` and `Sockets` do. Both take WinHTTrack's value
+under the rule that its keys are the source of truth; WebHTTrack adopted the
+filter list here, and HTTrack for Android has yet to add the `+*.jpeg` its own
+copy is missing. A consumer's test reds until it converges, which is the point.
 
 `tools/gen-winprofile-keys.py` turns the table into `src/winprofile-keys.h`, and
 `tests/324_winprofile-table.test` regenerates that header, diffs it, and checks

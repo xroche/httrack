@@ -115,7 +115,7 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"URLHack", "win,web,droid", "setting", "checkbox", "--urlhack", "--urlhack=0", "", "agreed", "1", "", ""},
   {"UpdateHack", "win,web,droid", "setting", "checkbox", "--updatehack", "", "", "agreed", "1", "", ""},
   {"UseHTTPProxyForFTP", "win,web,droid", "setting", "checkbox", "--httpproxy-ftp", "--httpproxy-ftp=0", "", "agreed", "1", "", ""},
-  {"UserID", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "literal", ""},
+  {"UserID", "win,web,droid", "setting", "string", "", "", "", "derived", "", "literal", ""},
   {"Wacz", "win,web", "setting", "checkbox", "--wacz", "", "", "agreed", "0", "", ""},
   {"Warc", "win,web,droid", "setting", "checkbox", "--warc", "", "", "agreed", "0", "", ""},
   {"WarcCdx", "win,web", "setting", "checkbox", "--warc-cdx", "", "", "agreed", "0", "", ""},

@@ -859,7 +859,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
       {NULL, 0}
     };
-    initStrElt initStr[] = {{"footer", HTS_DEFAULT_FOOTER},
+    initStrElt initStr[] = {{"user", HTS_DEFAULT_USER_AGENT},
+                            {"footer", HTS_DEFAULT_FOOTER},
                             {"url2",
                              "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js "
                              "-ad.doubleclick.net/* -mime:application/foobar"},
