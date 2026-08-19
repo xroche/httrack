@@ -2757,6 +2757,40 @@ static int st_headerfield(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* What the custom header block appends to a request already carrying <request>
+   (#1340). CR and LF come back escaped, so a case stays one line. */
+static int st_headerdedup(httrackp *opt, int argc, char **argv) {
+  const size_t capacity = 16384;
+  char *req, *headers;
+  const char *appended;
+  size_t i;
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "headerdedup: needs a request and a header block\n");
+    return 1;
+  }
+  req = malloct(capacity);
+  req[0] = '\0';
+  strlncatbuff(req, argv[0], capacity, capacity / 2);
+  appended = req + strlen(req);
+  /* exact-size copy so a sanitizer traps an over-read of the block */
+  headers = strdupt(argv[1]);
+  http_append_custom_headers(req, capacity, headers);
+  for (i = 0; appended[i] != '\0'; i++) {
+    if (appended[i] == '\r')
+      printf("\\r");
+    else if (appended[i] == '\n')
+      printf("\\n");
+    else
+      putchar(appended[i]);
+  }
+  printf("\n");
+  freet(headers);
+  freet(req);
+  return 0;
+}
+
 /* http_xfread1 must refuse an in-memory buffer whose size would exceed a 32-bit
    index (hostile Content-Length or endless stream) rather than allocate it.
    The guard returns before any socket read, so no real connection is needed. */
@@ -11603,6 +11637,9 @@ static const struct selftest_entry {
     {"headerfield", "<headers> <field>",
      "is <field> already present in the custom request-header block",
      st_headerfield},
+    {"headerdedup", "<request> <headers>",
+     "what the custom header block adds to a request that has some (#1340)",
+     st_headerdedup},
     {"headerlong", "[header-name:]",
      "over-long header value must not overflow the parse scratch",
      st_headerlong},

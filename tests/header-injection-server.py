@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Raw-socket probe for 159_local-header-injection and 326_engine-header-dedup.
+"""Raw-socket probe for the header-injection and header-dedup tests.
 
 Speaks HTTP off the socket so a split header line stays visible; serves an
 origin-form site and an http-proxy absolute-URI one on the same port.
@@ -55,6 +55,9 @@ def body_for(request, port):
         return root_page(port)
     if b"/x" in line:
         return POISON_PAGE
+    # one hop, so the second request of a crawl carries a Referer (328)
+    if b"/hop.html" in line:
+        return page('<a href="/plain.html">plain</a>')
     # the proxied pages link onward too, so a poisoned *host* becomes a referer
     if b"/p.html" in line:
         return page('<a href="/deep2.html">deep</a>')
