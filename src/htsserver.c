@@ -764,8 +764,8 @@ static const char *ini_value_of(const char *name) {
              : "";
 }
 
-/* Publish each gated value as <value>_eff, empty unless its gate is on. The
-   same test ${test:} makes, so a flag and its gate cannot disagree. */
+/* Publish each gated value as <value>_eff, empty unless its gate is on. Empty
+   is off for ${test:} too, so a flag and its gate cannot disagree. */
 static void ini_publish_gated_values(void) {
   size_t i;
 

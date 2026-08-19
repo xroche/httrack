@@ -269,7 +269,7 @@ for cap in notanumber 12abc 0 99999999999999999999; do
         echo "FAIL: --single-file-max-size $cap was accepted"
         exit 1
     }
-    grep -q 'single-file-max-size' "${tmpdir}/log4" || {
+    grep -q 'positive size' "${tmpdir}/log4" || {
         echo "FAIL: --single-file-max-size $cap was refused without saying so"
         cat "${tmpdir}/log4"
         exit 1

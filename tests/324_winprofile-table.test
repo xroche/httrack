@@ -35,6 +35,28 @@ diff -u "${HDR}" "${work}/regen.h" ||
     fail "src/winprofile-keys.h is stale; re-run tools/gen-winprofile-keys.py"
 echo OK
 
+printf '[a one-sided composed_with is rejected] ..\t'
+# Without a control, a symmetry check that never fires passes identically.
+"${py}" - "${TSV}" "${work}/broken.tsv" <<'PY' || fail "see above"
+import sys
+
+src, dst = sys.argv[1], sys.argv[2]
+out, cut = [], False
+for line in open(src, encoding="ascii"):
+    f = line.rstrip("\n").split("\t")
+    if not line.startswith("#") and len(f) == 11 and f[6] and not cut:
+        f[6], cut = "", True
+        line = "\t".join(f) + "\n"
+    out.append(line)
+if not cut:
+    sys.exit("no row carries composed_with, so this control proves nothing")
+open(dst, "w", encoding="ascii").writelines(out)
+PY
+if "${py}" "${GEN}" "${work}/broken.tsv" "${work}/broken.h" >/dev/null 2>&1; then
+    fail "the generator accepted a one-sided composed_with edge"
+fi
+echo OK
+
 printf '[every row is well formed] ..\t'
 rows=$(
     "${py}" - "${TSV}" <<'PY'
@@ -222,11 +244,17 @@ def expand(name):
     return out
 
 # value variable -> the checkbox variable gating it, so a value typed under a
-# cleared box reaches no flag (WinHTTrack gates the same way, at argv time)
-gates = dict(re.findall(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"\}',
-                        srv_block(r"ini_gated_values\[\] = \{(.*?)\{NULL")))
-if not gates:
-    sys.exit("htsserver.c: ini_gated_values[] holds no pair this parser can read")
+# cleared box reaches no flag
+body = srv_block(r"ini_gated_values\[\] = \{(.*?)\{NULL")
+pairs = re.findall(r'\{\s*"([a-z0-9_]+)"\s*,\s*"([a-z0-9_]+)"\s*\}', body)
+gates = dict(pairs)
+# A row this parser cannot read drops out in silence, taking its checks with it.
+if len(pairs) != body.count("{"):
+    sys.exit("ini_gated_values[]: read %d of its %d rows"
+             % (len(pairs), body.count("{")))
+# A repeated value takes the last row's gate and drops the others in silence.
+if len(gates) != len(pairs):
+    sys.exit("ini_gated_values[] gates a value twice: %s" % sorted(p[0] for p in pairs))
 
 # key -> the variable step4 writes it from, and the flags that variable emits
 wvar, emit = {}, {}
@@ -258,6 +286,10 @@ for value, gate in sorted(gates.items()):
     if value not in key_of or gate not in key_of:
         sys.exit("no winprofile key writes %s"
                  % (value if value not in key_of else gate))
+for m in re.finditer(r"\$\{(?:z?test|arg|unquoted):([a-z0-9_]+)_eff[:}]", cmd):
+    if m.group(1) not in gates:
+        sys.exit("the command block reads %s_eff, which htsserver.c never publishes"
+                 % m.group(1))
 
 # LISTDEF cardinality, so a list row's count is checkable rather than decorative
 lang = read("lang.def").split("\n")

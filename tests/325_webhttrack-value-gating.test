@@ -50,32 +50,47 @@ def step4(fields):
     return out
 
 
-# checkbox, its value field, what is typed there, the flag it produces, and the
-# profile key that must keep the value either way
+# checkbox, the flag the checkbox itself emits, its value field, what is typed
+# there, the flag that produces, and the profile key that keeps the value either
+# way
 CASES = [
-    ("sitemap", "sitemapurl", "http://example.com/sitemap.xml",
+    ("sitemap", "--sitemap", "sitemapurl", "http://example.com/sitemap.xml",
      '--sitemap-url "http://example.com/sitemap.xml"', "SitemapUrl"),
-    ("warc", "warcfile", "mycrawl", '--warc-file "mycrawl"', "WarcFile"),
-    ("warc", "warcmaxsize", "4096", "--warc-max-size=4096", "WarcMaxSize"),
-    ("singlefile", "singlefilemax", "5000", "--single-file-max-size=5000",
-     "SingleFileMaxSize"),
+    ("warc", "--warc", "warcfile", "mycrawl", '--warc-file "mycrawl"',
+     "WarcFile"),
+    ("warc", "--warc", "warcmaxsize", "4096", "--warc-max-size=4096",
+     "WarcMaxSize"),
+    ("singlefile", "--single-file", "singlefilemax", "5000",
+     "--single-file-max-size=5000", "SingleFileMaxSize"),
 ]
 
-for gate, field, value, flag, key in CASES:
-    # Session state outlives a request, so the never-posted case runs first; a
-    # cleared box after that is the empty field option9.html's hidden input posts.
-    for state in (None, "on", ""):
+for gate, gateflag, field, value, flag, key in CASES:
+    # Session state outlives a request, so the never-posted case runs first.
+    # A cleared box then posts an empty field, as option9.html's hidden input does.
+    # "1" is what a loaded profile and htsserver's own seeds write; "on" is what
+    # a browser posts.
+    for state in (None, "on", "1", ""):
         fields = [("sid", sid), (field, value)]
         if state is not None:
             fields.insert(1, (gate, state))
         got = step4(fields)
         lines = set(l.strip() for l in got["command"].split("\n"))
-        if (flag in lines) != (state == "on"):
-            sys.exit("%s=%r: %r is %sin the command line\n%s"
-                     % (gate, state, flag, "" if flag in lines else "not ",
-                        got["command"]))
+        on = state in ("on", "1")
+        for want, got_flag in ((on, flag), (on, gateflag)):
+            if (got_flag in lines) != want:
+                sys.exit("%s=%r: %r is %sin the command line\n%s"
+                         % (gate, state, got_flag,
+                            "" if got_flag in lines else "not ", got["command"]))
         ini = got["winprofile"].replace("\r\n", "\n")
         if "\n%s=%s\n" % (key, value) not in ini:
             sys.exit("%s=%r: the profile lost %s\n%s" % (gate, state, key, ini))
+
+# A request can write any session variable, so the derived one is rebuilt on
+# every render rather than trusted.
+got = step4([("sid", sid), ("warc", ""), ("warcfile", "mycrawl"),
+             ("warcfile_eff", "spoofed")])
+if "--warc-file" in got["command"]:
+    sys.exit("a posted warcfile_eff reached the command line\n%s"
+             % got["command"])
 PY
 echo OK

@@ -64,16 +64,26 @@ all three encode identically and marking the cases where they diverge.
 `composed_with` names the other keys a row is read with, in either of two
 senses. One is a value split across keys that mean nothing apart: `Proxy`,
 `Port` and `ProxyType` are one proxy, and `Build` picks a layout of which
-`BuildString` is the custom case. The other is a gate, where the checkbox
-decides whether its value reaches the command line at all
-(`ini_gated_values[]` in `src/htsserver.c`): `Warc` gates `WarcFile` and
-`WarcMaxSize`, `Sitemap` gates `SitemapUrl`, `SingleFile` gates
-`SingleFileMaxSize`. A cleared box keeps the typed value in the file and emits
-no flag, so reopening the project finds the field as the user left it. The
-engine has no such gate of its own, since it turns WARC on from a non-empty
-`warc_file`, which is why a front end that skips the check mirrors differently
-from the other two. The relation is symmetric, and the generator rejects an
-edge only one end names.
+`BuildString` is the custom case. The other is a gate: the checkbox is
+necessary for its value to reach the command line (`ini_gated_values[]` in
+`src/htsserver.c`). `Warc` gates `WarcFile` and `WarcMaxSize`, `Sitemap` gates
+`SitemapUrl`, `SingleFile` gates `SingleFileMaxSize`. A cleared box keeps the
+typed value in the file and emits no flag, so reopening the project finds the
+field as the user left it. The engine has no such gate: it turns WARC on from
+a non-empty `warc_file`. A front end that skips the check mirrors differently
+from the other two. The relation is symmetric, and
+`tools/gen-winprofile-keys.py` rejects an edge only one end names.
+
+Necessary is not sufficient, and the column says nothing about which flags
+appear together. A ticked box does not oblige a front end to emit the value:
+HTTrack for Android drops a non-numeric `SingleFileMaxSize` even with the box
+set, because the engine refuses a size it cannot scan. `Sitemap` also composes
+differently from the other two, since `htscore.c` ORs `opt->sitemap` with
+`sitemap_url`: WinHTTrack emits `--sitemap-url` instead of `--sitemap` where
+WebHTTrack and Android emit both. Read the column as a gate and nothing more.
+WinHTTrack reads neither `WarcFile` nor `WarcMaxSize`, so a custom archive
+name survives a round trip through it on disk while a mirror run from it
+writes an auto-named archive.
 
 A `default_state` of `derived` means the value is computed at run time, so no
 fixed default can be stated. Two rows have one: `AcceptLanguage`, built from the
