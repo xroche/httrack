@@ -66,7 +66,7 @@ cleanup() {
 }
 cleanup_push cleanup
 
-# Every header the engine writes for itself, in emission order.
+# Every header the engine writes for itself.
 engine_fields="Host From User-Agent Accept Accept-Language Accept-Encoding Authorization"
 
 count_lines() { # count_lines RE FILE
@@ -85,10 +85,16 @@ probe() { # probe TAG [extra httrack args...]
     run_with_timeout 90 httrack "http://user:pass@127.0.0.1:$port/plain.html" \
         -O "$tmpdir/$tag.mirror" -c1 --robots=0 --retries=0 --quiet -%v0 \
         -F EngineUA/1.0 -%E tester@example.test "$@" >>"$tmpdir/log" 2>&1 || rc=$?
-    test "$rc" -ne 124 || fail "$tag: the crawl hit the deadline"
+    test "$rc" -eq 0 || fail "$tag: the crawl exited $rc"
     nreq=$((nreq + 1))
     assert_eq "$nreq" "$(count_lines '^=== REQUEST ===$' "$wire")" "$tag: requests logged"
     awk -v n="$nreq" '/^=== REQUEST ===$/ { c++; next } c == n' "$wire" >"$tmpdir/$tag.req"
+    # a request the server had to time out on is logged truncated, and would
+    # otherwise pass every assertion below
+    assert_eq ' \r \n \n' "$(tail -n 2 "$tmpdir/$tag.req" | od -An -c | tr -s ' ')" \
+        "$tag: the blank line closing the header block"
+    assert_eq 1 "$(count_lines "^[^$CR]*\$" "$tmpdir/$tag.req")" \
+        "$tag: lines not ending in CR"
 }
 
 # Every engine header is written, and written once.
@@ -104,12 +110,13 @@ assert_value() { # assert_value TAG FIELD VALUE
 }
 
 # The rest of the request is byte-identical to the one no box produced: RE names
-# the only lines allowed to differ.
+# the only lines allowed to differ. Compared as files, since a command
+# substitution would eat a lost trailing newline on both sides alike.
 assert_same_but() { # assert_same_but TAG RE
-    local want got
-    want=$(grep -Ev "$2" "$tmpdir/plain.req" | tr -d '\r')
-    got=$(grep -Ev "$2" "$tmpdir/$1.req" | tr -d '\r')
-    assert_eq "$want" "$got" "$1: the request outside $2"
+    local base=$tmpdir/$1.base got=$tmpdir/$1.got
+    grep -Ev "$2" "$tmpdir/plain.req" >"$base" || true
+    grep -Ev "$2" "$tmpdir/$1.req" >"$got" || true
+    diff "$base" "$got" || fail "$1: the request outside $2 differs from the box-free one"
 }
 
 "$python" "$server" "$wire" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
@@ -150,3 +157,12 @@ assert_value boxrest From box@example.test
 assert_value boxrest Accept-Language xx
 assert_value boxrest Authorization 'Basic Ym94'
 assert_same_but boxrest '^(From|Accept-Language|Authorization):'
+
+# A malformed box line leaves the engine's own in place: a server drops
+# "User-Agent : x", so suppressing ours would send no usable name at all.
+probe boxbadws -%X 'User-Agent : x'
+assert_all_once boxbadws
+assert_value boxbadws User-Agent EngineUA/1.0
+assert_eq 1 "$(count_lines '^User-Agent :' "$tmpdir/boxbadws.req")" \
+    'boxbadws: the malformed line'
+assert_same_but boxbadws '^User-Agent'
