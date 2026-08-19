@@ -90,9 +90,11 @@ probe() { # probe TAG [extra httrack args...]
     assert_eq "$nreq" "$(count_lines '^=== REQUEST ===$' "$wire")" "$tag: requests logged"
     awk -v n="$nreq" '/^=== REQUEST ===$/ { c++; next } c == n' "$wire" >"$tmpdir/$tag.req"
     # a request the server had to time out on is logged truncated, and would
-    # otherwise pass every assertion below
-    assert_eq ' \r \n \n' "$(tail -n 2 "$tmpdir/$tag.req" | od -An -c | tr -s ' ')" \
-        "$tag: the blank line closing the header block"
+    # otherwise pass every assertion below. Hex with every space squeezed out:
+    # od's column padding differs between GNU and BSD.
+    assert_eq 0d0a0d0a0a \
+        "$(tail -c 5 "$tmpdir/$tag.req" | od -An -t x1 | tr -d '[:space:]')" \
+        "$tag: the CRLF CRLF ending the request, then the fixture's own newline"
     assert_eq 1 "$(count_lines "^[^$CR]*\$" "$tmpdir/$tag.req")" \
         "$tag: lines not ending in CR"
 }
