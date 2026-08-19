@@ -221,6 +221,13 @@ def expand(name):
         sys.exit("%s expanded to nothing" % name)
     return out
 
+# value variable -> the checkbox variable gating it, so a value typed under a
+# cleared box reaches no flag (WinHTTrack gates the same way, at argv time)
+gates = dict(re.findall(r'\{"([a-z0-9_]+)",\s*"([a-z0-9_]+)"\}',
+                        srv_block(r"ini_gated_values\[\] = \{(.*?)\{NULL")))
+if not gates:
+    sys.exit("htsserver.c: ini_gated_values[] holds no pair this parser can read")
+
 # key -> the variable step4 writes it from, and the flags that variable emits
 wvar, emit = {}, {}
 for line in block(step4, "winprofile").split("\n"):
@@ -229,8 +236,28 @@ for line in block(step4, "winprofile").split("\n"):
         v = re.match(r"^\$\{(?:z?test:)?([a-z0-9_]+)[:}]", m.group(2))
         if v:
             wvar[m.group(1)] = v.group(1)
-for m in re.finditer(r"\$\{z?test:([a-z0-9_]+):([^}]*)\}", block(step4, "command")):
-    emit.setdefault(m.group(1), []).append(m.group(2))
+cmd = block(step4, "command")
+for m in re.finditer(r"\$\{z?test:([a-z0-9_]+):([^}]*)\}", cmd):
+    var = m.group(1)
+    # A gated value is emitted as <var>_eff; without the fold every check that
+    # reads emit would silently stop running for it.
+    if var.endswith("_eff") and var[:-4] in gates:
+        var = var[:-4]
+    emit.setdefault(var, []).append(m.group(2))
+
+key_of = {v: k for k, v in wvar.items()}
+for value, gate in sorted(gates.items()):
+    if re.search(r"\$\{(?:z?test|arg|unquoted):%s[:}]" % value, cmd):
+        sys.exit("the command block still reads %s ungated" % value)
+    if not re.search(r"\$\{(?:z?test|arg|unquoted):%s_eff[:}]" % value, cmd):
+        sys.exit("the command block does not read %s_eff" % value)
+    # The stored value is what the profile keeps, gate or no gate.
+    if not re.search(r"^[A-Za-z0-9_]+=\$\{%s\}$" % value,
+                     block(step4, "winprofile"), re.M):
+        sys.exit("the winprofile block no longer writes %s" % value)
+    if value not in key_of or gate not in key_of:
+        sys.exit("no winprofile key writes %s"
+                 % (value if value not in key_of else gate))
 
 # LISTDEF cardinality, so a list row's count is checkable rather than decorative
 lang = read("lang.def").split("\n")
@@ -243,13 +270,22 @@ pages = "".join(read("html/server/%s" % f) for f in
                  "option9.html"))
 listvar = dict(re.findall(r"\$\{listid:([a-z0-9_]+):(LISTDEF_\d+)", pages))
 
-COMPOSED = {"Build", "BuildString", "ProxyType", "Proxy", "Port"}
+COMPOSED = {"Build", "BuildString", "ProxyType", "Proxy", "Port",
+            "Sitemap", "SitemapUrl", "SingleFile", "SingleFileMaxSize",
+            "Warc", "WarcFile", "WarcMaxSize"}
 if set(k for k, r in rows.items() if r["composed_with"]) != COMPOSED:
     sys.exit("composed_with is set on %s, expected %s"
              % (sorted(k for k, r in rows.items() if r["composed_with"]),
                 sorted(COMPOSED)))
 
 checked = skipped = 0
+for value, gate in sorted(gates.items()):
+    vk, gk = key_of[value], key_of[gate]
+    checked += same(True, gk in rows[vk]["composed_with"].split(","),
+                    "%s composed_with %s" % (vk, gk))
+    checked += same(True, vk in rows[gk]["composed_with"].split(","),
+                    "%s composed_with %s" % (gk, vk))
+
 for key in sorted(claimed):
     r, kind, var = rows[key], rows[key]["kind"], wvar.get(key, "")
 
@@ -309,7 +345,7 @@ for key in sorted(claimed):
 
     # Only an on/off setting has an on/off pair: a list emits through a ladder
     # the table deliberately does not carry.
-    if kind != "checkbox" or r["composed_with"] or len(emit.get(var, [])) != 1:
+    if kind != "checkbox" or len(emit.get(var, [])) != 1:
         continue
     slots = emit[var][0].split(":")
     on = slots[0] if len(slots) == 1 else slots[1]

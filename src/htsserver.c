@@ -742,6 +742,44 @@ static hts_boolean ini_key_is_list(const char *key) {
   return ini_key_in(ini_list_keys, key);
 }
 
+/* A value typed under a cleared checkbox: step4.html's command block reads
+   these as <value>_eff, so the flag goes and the stored value stays. */
+static const struct {
+  const char *value;
+  const char *gate;
+} ini_gated_values[] = {
+    {"sitemapurl", "sitemap"},
+    {"warcfile", "warc"},
+    {"warcmaxsize", "warc"},
+    {"singlefilemax", "singlefile"},
+    {NULL, NULL},
+};
+
+/* The session value NAME holds, or "" when it is unset. */
+static const char *ini_value_of(const char *name) {
+  intptr_t adr = 0;
+
+  return coucal_readptr(NewLangList, name, &adr) && adr != 0
+             ? (const char *) adr
+             : "";
+}
+
+/* Publish each gated value as <value>_eff, empty unless its gate is on. The
+   same test ${test:} makes, so a flag and its gate cannot disagree. */
+static void ini_publish_gated_values(void) {
+  size_t i;
+
+  for (i = 0; ini_gated_values[i].value != NULL; i++) {
+    const hts_boolean on = *ini_value_of(ini_gated_values[i].gate) != '\0';
+    char name[64];
+
+    snprintf(name, sizeof(name), "%s_eff", ini_gated_values[i].value);
+    coucal_write(
+        NewLangList, name,
+        (intptr_t) strdup(on ? ini_value_of(ini_gated_values[i].value) : ""));
+  }
+}
+
 /* The first LEN bytes of VALUE shifted by DELTA, or -1 to leave it alone. An
    empty, hand-edited or out-of-range id means whatever the reader makes of it.
    So does 0, which already reads as the first entry on both sides. */
@@ -1453,6 +1491,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                  crawled site the session id that authenticates commands */
               int outputmode = 0;
 
+              ini_publish_gated_values();
               StringMemcat(headers, ok, sizeof(ok) - 1);
               while (!feof(fp) && !ferror(fp)) {
                 char *str = line;

@@ -250,7 +250,7 @@ echo OK
 
 printf '[-%%Z0 and a bad cap] ..\t'
 # -%Z0 turns it back off, so the page must come out exactly as the crawl left
-# it; a non-numeric cap is rejected and the built-in default used instead.
+# it; a cap that is not a positive number refuses the run.
 off="${tmpdir}/off"
 mkdir "$off"
 local_crawl --log "${tmpdir}/log3" -O "$off" "${opts[@]}" -%Z0 "${BASEURL}/index.html"
@@ -261,11 +261,22 @@ if grep -q 'base64,' "$offpage"; then
 fi
 bad="${tmpdir}/bad"
 mkdir "$bad"
-local_crawl --log "${tmpdir}/log4" -O "$bad" "${opts[@]}" --single-file-max-size notanumber "${BASEURL}/index.html"
-badpage="${bad}/127.0.0.1_${SRV_PORT}/index.html"
-# The default cap is 10 MB, so everything here inlines, big.svg included.
-grep -q 'data:image/svg+xml;base64,' "$badpage" || {
-    echo "FAIL: a rejected cap did not fall back to the default"
+for cap in notanumber 12abc 0 99999999999999999999; do
+    rc=0
+    local_crawl --log "${tmpdir}/log4" -O "$bad" "${opts[@]}" \
+        --single-file-max-size "$cap" "${BASEURL}/index.html" || rc=$?
+    test "$rc" -ne 0 || {
+        echo "FAIL: --single-file-max-size $cap was accepted"
+        exit 1
+    }
+    grep -q 'single-file-max-size' "${tmpdir}/log4" || {
+        echo "FAIL: --single-file-max-size $cap was refused without saying so"
+        cat "${tmpdir}/log4"
+        exit 1
+    }
+done
+test ! -e "${bad}/127.0.0.1_${SRV_PORT}/index.html" || {
+    echo "FAIL: a rejected cap still crawled"
     exit 1
 }
 echo OK

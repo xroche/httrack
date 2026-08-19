@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# A value typed under a cleared checkbox must reach no flag, and must survive in
+# winprofile.ini: WinHTTrack gates at argv time and keeps the field.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_gating.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+printf '[a cleared box gates its value] ..\t'
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "the value gates are not wired (see above)"
+import re
+import sys
+import urllib.parse
+import urllib.request
+
+url = sys.argv[1].rstrip("/")
+form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1).decode()
+
+
+def step4(fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
+    req = urllib.request.Request(url + "/server/step4.html",
+                                 data=body.encode("latin-1"), method="POST")
+    page = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+    out = {}
+    for name in ("command", "winprofile"):
+        m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name,
+                      page, re.S)
+        if m is None:
+            sys.exit("no %s textarea in the rendered step4.html" % name)
+        out[name] = m.group(1)
+    return out
+
+
+# checkbox, its value field, what is typed there, the flag it produces, and the
+# profile key that must keep the value either way
+CASES = [
+    ("sitemap", "sitemapurl", "http://example.com/sitemap.xml",
+     '--sitemap-url "http://example.com/sitemap.xml"', "SitemapUrl"),
+    ("warc", "warcfile", "mycrawl", '--warc-file "mycrawl"', "WarcFile"),
+    ("warc", "warcmaxsize", "4096", "--warc-max-size=4096", "WarcMaxSize"),
+    ("singlefile", "singlefilemax", "5000", "--single-file-max-size=5000",
+     "SingleFileMaxSize"),
+]
+
+for gate, field, value, flag, key in CASES:
+    # Session state outlives a request, so the never-posted case runs first; a
+    # cleared box after that is the empty field option9.html's hidden input posts.
+    for state in (None, "on", ""):
+        fields = [("sid", sid), (field, value)]
+        if state is not None:
+            fields.insert(1, (gate, state))
+        got = step4(fields)
+        lines = set(l.strip() for l in got["command"].split("\n"))
+        if (flag in lines) != (state == "on"):
+            sys.exit("%s=%r: %r is %sin the command line\n%s"
+                     % (gate, state, flag, "" if flag in lines else "not ",
+                        got["command"]))
+        ini = got["winprofile"].replace("\r\n", "\n")
+        if "\n%s=%s\n" % (key, value) not in ini:
+            sys.exit("%s=%r: the profile lost %s\n%s" % (gate, state, key, ini))
+PY
+echo OK

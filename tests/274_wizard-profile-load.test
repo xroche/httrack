@@ -56,10 +56,12 @@ Index=0
 Cache=0
 URLHack=0
 Warc=0
+WarcFile=keepme
 Wacz=1
 NoExternalPages=0
 HostAlias=a=b%0D%0A%09c=d
 Footer=x%%y
+Sitemap=1
 SitemapUrl=http://example.com/s.xml%
 ProxyType=0
 EOF
@@ -154,6 +156,10 @@ if maxrate is None or maxrate.group(1) != "0":
 reject("--warc")
 reject("--replace-external")
 want("--wacz")
+# A cleared box gates its value out of the command line and keeps it on disk.
+reject('--warc-file "keepme"')
+if ini.get("WarcFile") != "keepme":
+    sys.exit("the cleared box lost WarcFile: %r" % ini.get("WarcFile"))
 option9 = get("option9.html?sid=" + sid)
 for box, ticked in [("warc", False), ("wacz", True)]:
     tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="%s"[^>]*>' % box,

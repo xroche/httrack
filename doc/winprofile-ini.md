@@ -61,6 +61,20 @@ default, what a present-but-empty value means, and the key it is an old spelling
 of. `winprofile-escapes.tsv` does the same for the codec, carrying the vectors
 all three encode identically and marking the cases where they diverge.
 
+`composed_with` names the other keys a row is read with, in either of two
+senses. One is a value split across keys that mean nothing apart: `Proxy`,
+`Port` and `ProxyType` are one proxy, and `Build` picks a layout of which
+`BuildString` is the custom case. The other is a gate, where the checkbox
+decides whether its value reaches the command line at all
+(`ini_gated_values[]` in `src/htsserver.c`): `Warc` gates `WarcFile` and
+`WarcMaxSize`, `Sitemap` gates `SitemapUrl`, `SingleFile` gates
+`SingleFileMaxSize`. A cleared box keeps the typed value in the file and emits
+no flag, so reopening the project finds the field as the user left it. The
+engine has no such gate of its own, since it turns WARC on from a non-empty
+`warc_file`, which is why a front end that skips the check mirrors differently
+from the other two. The relation is symmetric, and the generator rejects an
+edge only one end names.
+
 A `default_state` of `derived` means the value is computed at run time, so no
 fixed default can be stated. Two rows have one: `AcceptLanguage`, built from the
 device locale, and `UserID`, which carries the engine's own version. A consumer

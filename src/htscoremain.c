@@ -1998,15 +1998,20 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     return -1;
                   }
                   na++;
-                  { // reject non-numeric/negative/overflow; keep the default
+                  { // a typo must not enable single-file on the default cap
                     char *end;
                     LLint v;
 
                     errno = 0;
                     v = strtoll(argv[na], &end, 10);
-                    if (isdigit((unsigned char) argv[na][0]) && *end == '\0' &&
-                        errno != ERANGE && v > 0)
-                      opt->single_file_max_size = v;
+                    if (!isdigit((unsigned char) argv[na][0]) || *end != '\0' ||
+                        errno == ERANGE || v <= 0) {
+                      HTS_PANIC_PRINTF(
+                          "Option single-file-max-size needs a positive size");
+                      htsmain_free();
+                      return -1;
+                    }
+                    opt->single_file_max_size = v;
                   }
                   opt->single_file = HTS_TRUE;
                 } else {
