@@ -748,12 +748,14 @@ static const struct {
   const char *value;
   const char *gate;
 } ini_gated_values[] = {
+    /* clang-format off */
     {"sitemapurl", "sitemap"},
     {"warcfile", "warc"},
     {"warcmaxsize", "warc"},
     {"warccdx", "warc"},
     {"singlefilemax", "singlefile"},
     {NULL, NULL},
+    /* clang-format on */
 };
 
 /* The session value NAME holds, or "" when it is unset. */

@@ -62,8 +62,8 @@ of. `winprofile-escapes.tsv` does the same for the codec, carrying the vectors
 all three encode identically and marking the cases where they diverge.
 
 `composed_with` names the other keys a row is read with, in either of two
-senses. One is a value split across keys that mean nothing apart: `Proxy`,
-`Port` and `ProxyType` are one proxy, and `Build` picks a layout of which
+senses. One is a value split across keys that mean nothing apart. `Proxy`,
+`Port` and `ProxyType` are one proxy. `Build` picks a layout of which
 `BuildString` is the custom case. The other is a gate: the checkbox is
 necessary for its value to reach the command line (`ini_gated_values[]` in
 `src/htsserver.c`). `Warc` gates `WarcFile`, `WarcMaxSize` and `WarcCdx`,
@@ -73,11 +73,11 @@ the project finds the field as the user left it. The relation is symmetric,
 and `tools/gen-winprofile-keys.py` rejects an edge only one end names.
 
 `Wacz` is deliberately not in that group, though WinHTTrack gates it. `--wacz`
-fills in an automatic archive name of its own, so it needs no `Warc`, and the
+fills in an automatic archive name of its own. It needs no `Warc`, and the
 tooltip on the box says it implies the WARC archive. WinHTTrack can gate it
-because its dialog nests the box under WARC; WebHTTrack and Android list the
-three as siblings, where the same rule would drop a flag with nothing on
-screen to explain it. `WarcCdx` is in the group because `--warc-cdx` only
+because its dialog nests the box under WARC. WebHTTrack and Android list the
+three as siblings, where the same rule drops a flag with nothing on screen to
+explain it. `WarcCdx` is in the group because `--warc-cdx` only
 indexes an archive it cannot name.
 
 Necessary is not sufficient, and the column says nothing about which flags

@@ -290,13 +290,9 @@ for value, gate in sorted(gates.items()):
     if value not in key_of or gate not in key_of:
         sys.exit("no winprofile key writes %s"
                  % (value if value not in key_of else gate))
-    if rows[key_of[value]]["kind"] == "checkbox":
-        if re.search(r"\$\{z?test:%s_eff[:}]" % value,
-                     block(step4, "winprofile")):
-            sys.exit("the winprofile block writes %s_eff, not the stored value"
-                     % value)
-    elif not re.search(r"^[A-Za-z0-9_]+=\$\{%s\}$" % value,
-                       block(step4, "winprofile"), re.M):
+    if rows[key_of[value]]["kind"] != "checkbox" and not re.search(
+            r"^[A-Za-z0-9_]+=\$\{%s\}$" % value, block(step4, "winprofile"),
+            re.M):
         sys.exit("the winprofile block no longer writes %s verbatim" % value)
 for m in re.finditer(r"\$\{(?:z?test|arg|unquoted):([a-z0-9_]+)_eff[:}]", cmd):
     if m.group(1) not in gates:

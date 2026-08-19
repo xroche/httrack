@@ -98,11 +98,18 @@ for box, flag, key in (("warccdx", "--warc-cdx", "WarcCdx"),):
         if "\n%s=1\n" % key not in ini:
             sys.exit("warc=%r: the profile lost %s\n%s" % (warc, key, ini))
 
-# Wacz is not gated: --wacz names an archive itself, and the box says so.
-for warc in ("on", ""):
-    got = step4([("sid", sid), ("warc", warc), ("wacz", "on")])
-    if "--wacz" not in set(l.strip() for l in got["command"].split("\n")):
-        sys.exit("warc=%r: --wacz was gated out\n%s" % (warc, got["command"]))
+# Wacz is not gated: --wacz names an archive itself, and the box says so. Its
+# own box still decides, which is the half a one-sided probe would miss.
+for warc, wacz in (("on", "on"), ("", "on"), ("", "")):
+    got = step4([("sid", sid), ("warc", warc), ("wacz", wacz)])
+    lines = set(l.strip() for l in got["command"].split("\n"))
+    if ("--wacz" in lines) != (wacz == "on"):
+        sys.exit("warc=%r wacz=%r: --wacz is %sin the command line\n%s"
+                 % (warc, wacz, "" if "--wacz" in lines else "not ",
+                    got["command"]))
+    ini = got["winprofile"].replace("\r\n", "\n")
+    if "\nWacz=%s\n" % ("1" if wacz else "0") not in ini:
+        sys.exit("warc=%r wacz=%r: the profile lost Wacz\n%s" % (warc, wacz, ini))
 
 # A request can write any session variable, so the derived one is rebuilt on
 # every render rather than trusted.

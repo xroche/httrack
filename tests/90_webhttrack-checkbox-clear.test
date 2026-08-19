@@ -139,7 +139,8 @@ for field, key, when_set, when_clear in BOXES:
                                           ("", when_clear, when_set, "0")):
         # Every gate is posted either way: session state outlives a request, so
         # a box left set here would gate a later row without the table saying so.
-        fields = [(g, "on" if GATED_BY.get(field) == g else "") for g in GATES]
+        fields = [(g, "on" if GATED_BY.get(field) == g else "")
+                  for g in GATES if g != field]
         fields.append((field, value))
         rendered = post(fields)
         cmd = textarea(rendered, "command").split()
