@@ -28,7 +28,7 @@ htsserver_client --field "sid=${sid}" \
     --field 'user=Moz" -V "touch /tmp/pwn' --field 'footer=a\b"c' \
     --field 'path=/tmp/p' --field 'projname=plain proj' \
     --field 'urls=http://x/a"b' --field 'url2=+*.png"</textarea>' \
-    --field 'sitemapurl=http://x/s.xml"b' >/dev/null
+    --field 'sitemap=1' --field 'sitemapurl=http://x/s.xml"b' >/dev/null
 cmdline=$(htsserver_get /server/step4.html |
     sed -n '/<textarea name="command"/,/<\/textarea>/p')
 
@@ -73,6 +73,7 @@ grep -qF -- '+*.png%22</textarea>' <<<"${cmdline}" &&
     fail "the filter field still closes the textarea: ${cmdline}"
 
 # The sitemap url is quoted like the user-agent, so it takes the same escape.
+# Its box is ticked: a cleared one gates the value out.
 grep -qF -- '--sitemap-url "http://x/s.xml\"b"' <<<"${cmdline}" ||
     fail "the quote in the sitemap url was not escaped: ${cmdline}"
 

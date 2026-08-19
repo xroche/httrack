@@ -1,0 +1,122 @@
+#!/bin/bash
+#
+# A value typed under a cleared checkbox must reach no flag, and must survive in
+# winprofile.ini: WinHTTrack gates at argv time and keeps the field.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_gating.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+printf '[a cleared box gates its value] ..\t'
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "the value gates are not wired (see above)"
+import re
+import sys
+import urllib.parse
+import urllib.request
+
+url = sys.argv[1].rstrip("/")
+form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1).decode()
+
+
+def step4(fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
+    req = urllib.request.Request(url + "/server/step4.html",
+                                 data=body.encode("latin-1"), method="POST")
+    page = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+    out = {}
+    for name in ("command", "winprofile"):
+        m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name,
+                      page, re.S)
+        if m is None:
+            sys.exit("no %s textarea in the rendered step4.html" % name)
+        out[name] = m.group(1)
+    return out
+
+
+# checkbox, the flag the checkbox itself emits, its value field, what is typed
+# there, the flag that produces, and the profile key that keeps the value either
+# way
+CASES = [
+    ("sitemap", "--sitemap", "sitemapurl", "http://example.com/sitemap.xml",
+     '--sitemap-url "http://example.com/sitemap.xml"', "SitemapUrl"),
+    ("warc", "--warc", "warcfile", "mycrawl", '--warc-file "mycrawl"',
+     "WarcFile"),
+    ("warc", "--warc", "warcmaxsize", "4096", "--warc-max-size=4096",
+     "WarcMaxSize"),
+    ("singlefile", "--single-file", "singlefilemax", "5000",
+     "--single-file-max-size=5000", "SingleFileMaxSize"),
+]
+
+for gate, gateflag, field, value, flag, key in CASES:
+    # Session state outlives a request, so the never-posted case runs first.
+    # A cleared box then posts an empty field, as option9.html's hidden input does.
+    # "1" is what a loaded profile and htsserver's own seeds write; "on" is what
+    # a browser posts.
+    for state in (None, "on", "1", ""):
+        fields = [("sid", sid), (field, value)]
+        if state is not None:
+            fields.insert(1, (gate, state))
+        got = step4(fields)
+        lines = set(l.strip() for l in got["command"].split("\n"))
+        on = state in ("on", "1")
+        for want, got_flag in ((on, flag), (on, gateflag)):
+            if (got_flag in lines) != want:
+                sys.exit("%s=%r: %r is %sin the command line\n%s"
+                         % (gate, state, got_flag,
+                            "" if got_flag in lines else "not ", got["command"]))
+        ini = got["winprofile"].replace("\r\n", "\n")
+        if "\n%s=%s\n" % (key, value) not in ini:
+            sys.exit("%s=%r: the profile lost %s\n%s" % (gate, state, key, ini))
+
+# --warc-cdx indexes an archive it cannot name, so the Warc box gates it.
+for box, flag, key in (("warccdx", "--warc-cdx", "WarcCdx"),):
+    for warc in ("on", ""):
+        got = step4([("sid", sid), ("warc", warc), (box, "on")])
+        lines = set(l.strip() for l in got["command"].split("\n"))
+        if (flag in lines) != (warc == "on"):
+            sys.exit("warc=%r: %r is %sin the command line\n%s"
+                     % (warc, flag, "" if flag in lines else "not ",
+                        got["command"]))
+        ini = got["winprofile"].replace("\r\n", "\n")
+        if "\n%s=1\n" % key not in ini:
+            sys.exit("warc=%r: the profile lost %s\n%s" % (warc, key, ini))
+
+# Wacz is not gated: --wacz names an archive itself, and the box says so. Its
+# own box still decides, which is the half a one-sided probe would miss.
+for warc, wacz in (("on", "on"), ("", "on"), ("", "")):
+    got = step4([("sid", sid), ("warc", warc), ("wacz", wacz)])
+    lines = set(l.strip() for l in got["command"].split("\n"))
+    if ("--wacz" in lines) != (wacz == "on"):
+        sys.exit("warc=%r wacz=%r: --wacz is %sin the command line\n%s"
+                 % (warc, wacz, "" if "--wacz" in lines else "not ",
+                    got["command"]))
+    ini = got["winprofile"].replace("\r\n", "\n")
+    if "\nWacz=%s\n" % ("1" if wacz else "0") not in ini:
+        sys.exit("warc=%r wacz=%r: the profile lost Wacz\n%s" % (warc, wacz, ini))
+
+# A request can write any session variable, so the derived one is rebuilt on
+# every render rather than trusted.
+got = step4([("sid", sid), ("warc", ""), ("warcfile", "mycrawl"),
+             ("warcfile_eff", "spoofed")])
+if "--warc-file" in got["command"]:
+    sys.exit("a posted warcfile_eff reached the command line\n%s"
+             % got["command"])
+PY
+echo OK

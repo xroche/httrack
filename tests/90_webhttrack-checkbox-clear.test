@@ -129,10 +129,20 @@ BOXES = [
     ("singlefile", "SingleFile", "--single-file", None),
 ]
 
+# Gated boxes (ini_gated_values[] in htsserver.c): each needs its gate set, or
+# its own state decides nothing.
+GATED_BY = {"warccdx": "warc"}
+GATES = sorted(set(GATED_BY.values()))
+
 for field, key, when_set, when_clear in BOXES:
     for value, want, unwanted, stored in (("on", when_set, when_clear, "1"),
                                           ("", when_clear, when_set, "0")):
-        rendered = post([(field, value)])
+        # Every gate is posted either way: session state outlives a request, so
+        # a box left set here would gate a later row without the table saying so.
+        fields = [(g, "on" if GATED_BY.get(field) == g else "")
+                  for g in GATES if g != field]
+        fields.append((field, value))
+        rendered = post(fields)
         cmd = textarea(rendered, "command").split()
         label = "%s %s" % (field, "set" if value else "cleared")
         if want:

@@ -192,15 +192,15 @@ ${/* -m<n> resets the html limit, so the bare form must precede the -m,<n> one *
 	${test:http10:--http-10}
 	${test:cache2:--store-all-in-cache}
 	${test:sitemap:--sitemap}
-	${test:sitemapurl:--sitemap-url "}${arg:sitemapurl}${test:sitemapurl:"}
+	${test:sitemapurl_eff:--sitemap-url "}${arg:sitemapurl_eff}${test:sitemapurl_eff:"}
 	${test:warc:--warc}
-	${test:warcfile:--warc-file "}${arg:warcfile}${test:warcfile:"}
-	${test:warcmaxsize:--warc-max-size=}${unquoted:warcmaxsize}
-	${test:warccdx:--warc-cdx}
+	${test:warcfile_eff:--warc-file "}${arg:warcfile_eff}${test:warcfile_eff:"}
+	${test:warcmaxsize_eff:--warc-max-size=}${unquoted:warcmaxsize_eff}
+	${test:warccdx_eff:--warc-cdx}
 	${test:wacz:--wacz}
 	${test:changes:--changes}
 	${test:singlefile:--single-file}
-	${test:singlefilemax:--single-file-max-size=}${unquoted:singlefilemax}
+	${test:singlefilemax_eff:--single-file-max-size=}${unquoted:singlefilemax_eff}
 	${test:norecatch:--do-not-recatch}
 	${test:logf:--single-log}
 	${test:logtype:::--extra-log:--debug-log}

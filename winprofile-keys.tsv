@@ -86,10 +86,10 @@ RemoveRateout	win,web,droid	setting	checkbox	--host-control=2			agreed	0
 RemoveTimeout	win,web,droid	setting	checkbox	--host-control=1			agreed	0		
 Retry	win,web,droid	setting	string				agreed		absent	
 RewriteLinks	win,web,droid	setting	list:0:4				agreed	0		
-SingleFile	win,web,droid	setting	checkbox	--single-file			agreed	0		
-SingleFileMaxSize	win,web,droid	setting	string				agreed		absent	
-Sitemap	win,web,droid	setting	checkbox	--sitemap			agreed	0		
-SitemapUrl	win,web,droid	setting	string				agreed		absent	
+SingleFile	win,web,droid	setting	checkbox	--single-file		SingleFileMaxSize	agreed	0		
+SingleFileMaxSize	win,web,droid	setting	string			SingleFile	agreed		absent	
+Sitemap	win,web,droid	setting	checkbox	--sitemap		SitemapUrl	agreed	0		
+SitemapUrl	win,web,droid	setting	string			Sitemap	agreed		absent	
 Sockets	win,web,droid	setting	number				none		absent	
 StoreAllInCache	win,web,droid	setting	checkbox	--store-all-in-cache			agreed	0		
 StripQuery	win,web,droid	setting	string				agreed		absent	
@@ -102,10 +102,10 @@ UpdateHack	win,web,droid	setting	checkbox	--updatehack			agreed	1
 UseHTTPProxyForFTP	win,web,droid	setting	checkbox	--httpproxy-ftp	--httpproxy-ftp=0		agreed	1		
 UserID	win,web,droid	setting	string				derived		literal	
 Wacz	win,web	setting	checkbox	--wacz			agreed	0		
-Warc	win,web,droid	setting	checkbox	--warc			agreed	0		
-WarcCdx	win,web	setting	checkbox	--warc-cdx			agreed	0		
-WarcFile	web,droid	setting	string				none			
-WarcMaxSize	web	setting	string				none			
+Warc	win,web,droid	setting	checkbox	--warc		WarcFile,WarcMaxSize,WarcCdx	agreed	0		
+WarcCdx	win,web	setting	checkbox	--warc-cdx		Warc	agreed	0		
+WarcFile	web,droid	setting	string			Warc	none			
+WarcMaxSize	web	setting	string			Warc	none			
 WildCardFilters	win,web,droid	setting	string				agreed	+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar	literal	
 WordIndex	win,web,droid	setting	checkbox	--search-index	--search-index=0		agreed	0		
 

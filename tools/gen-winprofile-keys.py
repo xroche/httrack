@@ -78,6 +78,18 @@ def parse(path):
                         "%s: %s.%s names %s, which has no row"
                         % (path, r["key"], col, ref)
                     )
+    # composed_with is a relation, so a consumer reaching either row must find
+    # the other: a one-sided edge is invisible from the side that matters.
+    by_key = {r["key"]: r for r in rows}
+    for r in rows:
+        for ref in filter(None, r["composed_with"].split(",")):
+            if ref == r["key"]:
+                sys.exit("%s: %s.composed_with names itself" % (path, r["key"]))
+            if r["key"] not in by_key[ref]["composed_with"].split(","):
+                sys.exit(
+                    "%s: %s.composed_with names %s, which does not name it back"
+                    % (path, r["key"], ref)
+                )
     return rows
 
 
