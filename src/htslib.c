@@ -920,6 +920,32 @@ int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
   return append_cookie_header(&bstr, cookie, domain, path);
 }
 
+/* Is field present as a header field name in the raw custom-header block? */
+hts_boolean http_headers_have_field(const char *headers, const char *field) {
+  const char *line;
+
+  if (headers == NULL || field == NULL || *field == '\0')
+    return HTS_FALSE;
+  /* anchored, so a folded line or a name inside a value cannot match */
+  for (line = headers; *line != '\0';) {
+    const int n = strfield(line, field);
+
+    if (n != 0) {
+      const char *p = line + n;
+
+      while (*p == ' ' || *p == '\t')
+        p++;
+      if (*p == ':')
+        return HTS_TRUE;
+    }
+    while (*line != '\0' && *line != '\n' && *line != '\r')
+      line++;
+    while (*line == '\n' || *line == '\r')
+      line++;
+  }
+  return HTS_FALSE;
+}
+
 // envoi d'une requète
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                   const char *xsend, const char *adr, const char *fil,
@@ -1120,35 +1146,43 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     {
       const char *real_adr = jump_identification_const(adr);
 
+      /* a field typed into the extra-headers box wins: the engine skips its
+         own line rather than send it twice (#1337) */
+      const char *const custom = retour->req.headers;
+
       // Mandatory per RFC2616
-      if (!direct_url) {        // pas ftp:// par exemple
+      if (!direct_url &&
+          !http_headers_have_field(custom, "Host")) { // not ftp:// and friends
         print_buffer(&bstr, "Host: %s" H_CRLF,
                      escape_check_url_addr(real_adr, esc, sizeof(esc)));
       }
 
       // HTTP field: from
-      if (strnotempty(retour->req.from)) {        // HTTP from
+      if (strnotempty(retour->req.from) &&
+          !http_headers_have_field(custom, "From")) { // HTTP from
         print_buffer(&bstr, "From: %s" H_CRLF, retour->req.from);
       }
 
-      // Présence d'un user-agent?
-      if (retour->req.user_agent_send
-          && strnotempty(retour->req.user_agent)) {
+      if (retour->req.user_agent_send && strnotempty(retour->req.user_agent) &&
+          !http_headers_have_field(custom, "User-Agent")) {
         print_buffer(&bstr, "User-Agent: %s" H_CRLF, retour->req.user_agent);
       }
 
       // Accept
-      if (strnotempty(retour->req.accept)) {
+      if (strnotempty(retour->req.accept) &&
+          !http_headers_have_field(custom, "Accept")) {
         print_buffer(&bstr, "Accept: %s" H_CRLF, retour->req.accept);
       }
 
       // Accept-language
-      if (strnotempty(retour->req.lang_iso)) {
+      if (strnotempty(retour->req.lang_iso) &&
+          !http_headers_have_field(custom, "Accept-Language")) {
         print_buffer(&bstr, "Accept-Language: %s"H_CRLF, retour->req.lang_iso);
       }
 
       // Compression accepted ?
-      if (retour->req.http11) {
+      if (retour->req.http11 &&
+          !http_headers_have_field(custom, "Accept-Encoding")) {
         hts_boolean compressible =
             (!retour->req.range_used && !retour->req.nocompression);
         hts_boolean secure = HTS_FALSE;
@@ -1185,7 +1219,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         } else if ((a = bauth_check(cookie, real_adr, fil)))
           strcpybuff(autorisation, a);
         /* On a une autorisation a donner?  */
-        if (strnotempty(autorisation)) {
+        if (strnotempty(autorisation) &&
+            !http_headers_have_field(custom, "Authorization")) {
           print_buffer(&bstr, "Authorization: Basic %s"H_CRLF, autorisation);
         }
       }

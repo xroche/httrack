@@ -1,0 +1,102 @@
+#!/bin/bash
+#
+# A field typed into the extra-headers box (-%X) replaces the engine's own line
+# instead of adding a second one (#1337). The predicate first, then the wire.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+CRLF=$'\r\n'
+TAB=$'\t'
+
+hf() { # hf present|absent BLOCK FIELD
+    selftest_queue "$1" headerfield "$2" "$3"
+}
+
+hf present "User-Agent: mine$CRLF" User-Agent
+hf present "user-agent: mine$CRLF" User-Agent
+hf present "USER-AGENT: mine$CRLF" user-agent
+# whitespace may sit between the name and its colon
+hf present "User-Agent : mine$CRLF" User-Agent
+hf present "User-Agent$TAB: mine$CRLF" User-Agent
+# a name counts at the start of a line only, and a folded line starts nothing
+hf absent "X-Note: User-Agent: no$CRLF" User-Agent
+hf absent " User-Agent: folded$CRLF" User-Agent
+hf absent "X-Note: v$CRLF${TAB}User-Agent: folded$CRLF" User-Agent
+hf present "X-Note: v${CRLF}User-Agent: mine$CRLF" User-Agent
+# no colon, no field
+hf absent "User-Agent$CRLF" User-Agent
+hf absent "User-Agentfoo: v$CRLF" User-Agent
+hf absent "" User-Agent
+# a name that is a prefix of another must not answer for it, either way round
+hf absent "Accept-Encoding: identity$CRLF" Accept
+hf absent "Accept: */*$CRLF" Accept-Encoding
+hf present "Accept: */*${CRLF}Accept-Encoding: identity$CRLF" Accept
+hf present "Accept: */*${CRLF}Accept-Encoding: identity$CRLF" Accept-Encoding
+
+selftest_run_queued
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
+tmpdir=$(mktemp -d)
+serverpid=
+wire=
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+count_lines() { # count_lines RE FILE
+    grep -c "$1" "$2" || true
+}
+
+value_of() { # value_of FIELD FILE
+    sed -n "s/^$1: //p" "$2" | tr -d '\r'
+}
+
+# One crawl of a leaf page against a wire-logging server, leaving its request
+# bytes in $wire.
+probe() { # probe TAG [extra httrack args...]
+    local tag=$1 port rc=0
+    shift
+    wire=$tmpdir/$tag.wire
+    "$python" "$server" "$wire" >"$tmpdir/$tag.out" 2>"$tmpdir/$tag.err" &
+    serverpid=$!
+    port=$(discover_server_port "$tmpdir/$tag.out" "$serverpid") || exit 1
+    run_with_timeout 90 httrack "http://127.0.0.1:$port/plain.html" \
+        -O "$tmpdir/$tag.mirror" -c1 --robots=0 --retries=0 --quiet -%v0 \
+        -F EngineUA/1.0 "$@" >>"$tmpdir/log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || fail "$tag: the crawl hit the deadline"
+    stop_server "$serverpid"
+    serverpid=
+    assert_eq 1 "$(count_lines '^=== REQUEST ===$' "$wire")" "$tag: requests sent"
+}
+
+# An empty box leaves the request as it was.
+probe plain
+assert_eq 1 "$(count_lines '^User-Agent:' "$wire")" 'plain: User-Agent lines'
+assert_eq EngineUA/1.0 "$(value_of User-Agent "$wire")" 'plain: User-Agent'
+for field in Host Accept Accept-Language Accept-Encoding; do
+    assert_eq 1 "$(count_lines "^$field:" "$wire")" "plain: $field lines"
+done
+
+probe boxua -%X 'User-Agent: BoxUA/9'
+assert_eq 1 "$(count_lines '^User-Agent:' "$wire")" 'boxua: User-Agent lines'
+assert_eq BoxUA/9 "$(value_of User-Agent "$wire")" 'boxua: User-Agent'
+assert_eq 1 "$(count_lines '^Accept:' "$wire")" 'boxua: Accept lines'
+
+probe boxenc -%X 'Accept-Encoding: identity'
+assert_eq 1 "$(count_lines '^Accept-Encoding:' "$wire")" 'boxenc: Accept-Encoding lines'
+assert_eq identity "$(value_of Accept-Encoding "$wire")" 'boxenc: Accept-Encoding'
+assert_eq 1 "$(count_lines '^Accept:' "$wire")" 'boxenc: Accept lines'
+assert_eq 1 "$(count_lines '^User-Agent:' "$wire")" 'boxenc: User-Agent lines'
+
+probe boxaccept -%X 'Accept: text/plain'
+assert_eq 1 "$(count_lines '^Accept:' "$wire")" 'boxaccept: Accept lines'
+assert_eq text/plain "$(value_of Accept "$wire")" 'boxaccept: Accept'
+assert_eq 1 "$(count_lines '^Accept-Encoding:' "$wire")" 'boxaccept: Accept-Encoding lines'

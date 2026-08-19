@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Raw-socket probe for 159_local-header-injection.
+"""Raw-socket probe for 159_local-header-injection and 326_engine-header-dedup.
 
 Speaks HTTP off the socket so a split header line stays visible; serves an
 origin-form site and an http-proxy absolute-URI one on the same port.

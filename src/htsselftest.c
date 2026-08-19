@@ -2738,6 +2738,25 @@ static int st_headerlong(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Does the custom request-header block already carry <field>? (#1337) */
+static int st_headerfield(httrackp *opt, int argc, char **argv) {
+  char *headers, *field;
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "headerfield: needs a header block and a field name\n");
+    return 1;
+  }
+  /* exact-size heap copies so a sanitizer traps an over-read */
+  headers = strdupt(argv[0]);
+  field = strdupt(argv[1]);
+  printf("%s\n",
+         http_headers_have_field(headers, field) ? "present" : "absent");
+  freet(headers);
+  freet(field);
+  return 0;
+}
+
 /* http_xfread1 must refuse an in-memory buffer whose size would exceed a 32-bit
    index (hostile Content-Length or endless stream) rather than allocate it.
    The guard returns before any socket read, so no real connection is needed. */
@@ -11581,6 +11600,9 @@ static const struct selftest_entry {
      st_stripport},
     {"header", "<raw-header-line> ...", "response header-line parsing",
      st_header},
+    {"headerfield", "<headers> <field>",
+     "is <field> already present in the custom request-header block",
+     st_headerfield},
     {"headerlong", "[header-name:]",
      "over-long header value must not overflow the parse scratch",
      st_headerlong},
