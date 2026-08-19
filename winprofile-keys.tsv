@@ -101,8 +101,8 @@ URLHack	win,web,droid	setting	checkbox	--urlhack	--urlhack=0		agreed	1
 UpdateHack	win,web,droid	setting	checkbox	--updatehack			agreed	1		
 UseHTTPProxyForFTP	win,web,droid	setting	checkbox	--httpproxy-ftp	--httpproxy-ftp=0		agreed	1		
 UserID	win,web,droid	setting	string				derived		literal	
-Wacz	win,web	setting	checkbox	--wacz		Warc	agreed	0		
-Warc	win,web,droid	setting	checkbox	--warc		WarcFile,WarcMaxSize,WarcCdx,Wacz	agreed	0		
+Wacz	win,web	setting	checkbox	--wacz			agreed	0		
+Warc	win,web,droid	setting	checkbox	--warc		WarcFile,WarcMaxSize,WarcCdx	agreed	0		
 WarcCdx	win,web	setting	checkbox	--warc-cdx		Warc	agreed	0		
 WarcFile	web,droid	setting	string			Warc	none			
 WarcMaxSize	web	setting	string			Warc	none			

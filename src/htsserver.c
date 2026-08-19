@@ -752,7 +752,6 @@ static const struct {
     {"warcfile", "warc"},
     {"warcmaxsize", "warc"},
     {"warccdx", "warc"},
-    {"wacz", "warc"},
     {"singlefilemax", "singlefile"},
     {NULL, NULL},
 };

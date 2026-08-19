@@ -257,8 +257,8 @@ if len(gates) != len(pairs):
     sys.exit("ini_gated_values[] gates a value twice: %s" % sorted(p[0] for p in pairs))
 # Pinned, not a floor: a gate dropped from the C table and the template together
 # is otherwise a green tree with two checks fewer.
-if len(gates) != 6:
-    sys.exit("ini_gated_values[] holds %d pairs, expected 6: %s"
+if len(gates) != 5:
+    sys.exit("ini_gated_values[] holds %d pairs, expected 5: %s"
              % (len(gates), sorted(gates)))
 
 # key -> the variable step4 writes it from, and the flags that variable emits
@@ -316,7 +316,7 @@ listvar = dict(re.findall(r"\$\{listid:([a-z0-9_]+):(LISTDEF_\d+)", pages))
 
 COMPOSED = {"Build", "BuildString", "ProxyType", "Proxy", "Port",
             "Sitemap", "SitemapUrl", "SingleFile", "SingleFileMaxSize",
-            "Warc", "WarcFile", "WarcMaxSize", "WarcCdx", "Wacz"}
+            "Warc", "WarcFile", "WarcMaxSize", "WarcCdx"}
 if set(k for k, r in rows.items() if r["composed_with"]) != COMPOSED:
     sys.exit("composed_with is set on %s, expected %s"
              % (sorted(k for k, r in rows.items() if r["composed_with"]),

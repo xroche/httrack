@@ -131,7 +131,7 @@ BOXES = [
 
 # Gated boxes (ini_gated_values[] in htsserver.c): each needs its gate set, or
 # its own state decides nothing.
-GATED_BY = {"warccdx": "warc", "wacz": "warc"}
+GATED_BY = {"warccdx": "warc"}
 GATES = sorted(set(GATED_BY.values()))
 
 for field, key, when_set, when_clear in BOXES:

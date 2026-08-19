@@ -66,15 +66,19 @@ senses. One is a value split across keys that mean nothing apart: `Proxy`,
 `Port` and `ProxyType` are one proxy, and `Build` picks a layout of which
 `BuildString` is the custom case. The other is a gate: the checkbox is
 necessary for its value to reach the command line (`ini_gated_values[]` in
-`src/htsserver.c`). `Warc` gates `WarcFile`, `WarcMaxSize`, `WarcCdx` and
-`Wacz`, `Sitemap` gates `SitemapUrl`, `SingleFile` gates `SingleFileMaxSize`.
-The two WARC sub-options are gated because neither names an archive on its
-own, and `--wacz` turns WARC on by itself by filling in an automatic name. A
+`src/htsserver.c`). `Warc` gates `WarcFile`, `WarcMaxSize` and `WarcCdx`,
+`Sitemap` gates `SitemapUrl`, `SingleFile` gates `SingleFileMaxSize`. A
 cleared box keeps the typed value in the file and emits no flag, so reopening
-the project finds the field as the user left it. The engine has no such gate:
-it turns WARC on from a non-empty `warc_file`. A front end that skips the
-check mirrors differently from the other two. The relation is symmetric, and
-`tools/gen-winprofile-keys.py` rejects an edge only one end names.
+the project finds the field as the user left it. The relation is symmetric,
+and `tools/gen-winprofile-keys.py` rejects an edge only one end names.
+
+`Wacz` is deliberately not in that group, though WinHTTrack gates it. `--wacz`
+fills in an automatic archive name of its own, so it needs no `Warc`, and the
+tooltip on the box says it implies the WARC archive. WinHTTrack can gate it
+because its dialog nests the box under WARC; WebHTTrack and Android list the
+three as siblings, where the same rule would drop a flag with nothing on
+screen to explain it. `WarcCdx` is in the group because `--warc-cdx` only
+indexes an archive it cannot name.
 
 Necessary is not sufficient, and the column says nothing about which flags
 appear together. A ticked box does not oblige a front end to emit the value:
@@ -83,8 +87,8 @@ set, because the engine refuses a size it cannot scan. `Sitemap` also composes
 differently from the other two, since `htscore.c` ORs `opt->sitemap` with
 `sitemap_url`: WinHTTrack emits `--sitemap-url` instead of `--sitemap` where
 WebHTTrack and Android emit both. Read the column as a gate and nothing more.
-WinHTTrack reads neither `WarcFile` nor `WarcMaxSize`, so a custom archive
-name survives a round trip through it on disk while a mirror run from it
+WinHTTrack reads neither `WarcFile` nor `WarcMaxSize`. A custom archive name
+therefore survives a round trip through it on disk, while a mirror run from it
 writes an auto-named archive.
 
 A `default_state` of `derived` means the value is computed at run time, so no

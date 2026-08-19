@@ -85,10 +85,8 @@ for gate, gateflag, field, value, flag, key in CASES:
         if "\n%s=%s\n" % (key, value) not in ini:
             sys.exit("%s=%r: the profile lost %s\n%s" % (gate, state, key, ini))
 
-# A sub-option of the WARC group. Neither names an archive on its own, so the
-# Warc box gates both, as WinHTTrack's argv block does.
-for box, flag, key in (("warccdx", "--warc-cdx", "WarcCdx"),
-                       ("wacz", "--wacz", "Wacz")):
+# --warc-cdx indexes an archive it cannot name, so the Warc box gates it.
+for box, flag, key in (("warccdx", "--warc-cdx", "WarcCdx"),):
     for warc in ("on", ""):
         got = step4([("sid", sid), ("warc", warc), (box, "on")])
         lines = set(l.strip() for l in got["command"].split("\n"))
@@ -99,6 +97,12 @@ for box, flag, key in (("warccdx", "--warc-cdx", "WarcCdx"),
         ini = got["winprofile"].replace("\r\n", "\n")
         if "\n%s=1\n" % key not in ini:
             sys.exit("warc=%r: the profile lost %s\n%s" % (warc, key, ini))
+
+# Wacz is not gated: --wacz names an archive itself, and the box says so.
+for warc in ("on", ""):
+    got = step4([("sid", sid), ("warc", warc), ("wacz", "on")])
+    if "--wacz" not in set(l.strip() for l in got["command"].split("\n")):
+        sys.exit("warc=%r: --wacz was gated out\n%s" % (warc, got["command"]))
 
 # A request can write any session variable, so the derived one is rebuilt on
 # every render rather than trusted.

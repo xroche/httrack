@@ -58,7 +58,6 @@ URLHack=0
 Warc=0
 WarcFile=keepme
 Wacz=1
-Changes=1
 NoExternalPages=0
 HostAlias=a=b%0D%0A%09c=d
 Footer=x%%y
@@ -153,14 +152,13 @@ if maxrate is None or maxrate.group(1) != "0":
              % (maxrate and maxrate.group(1)))
 
 # A checkbox field: the writer spells "cleared" as 0, so it must not come back
-# as a flag. Changes is the control, on the same page and the same shape.
+# as a flag. Wacz is the control, on the same page and the same shape, and it
+# is ungated: --wacz names its own archive.
 reject("--warc")
 reject("--replace-external")
-want("--changes")
-# A cleared box gates its group out of the command line and keeps it on disk:
-# the filename, and Wacz, whose own box is ticked.
+want("--wacz")
+# A cleared box gates its value out of the command line and keeps it on disk.
 reject('--warc-file "keepme"')
-reject("--wacz")
 if ini.get("WarcFile") != "keepme":
     sys.exit("the cleared box lost WarcFile: %r" % ini.get("WarcFile"))
 option9 = get("option9.html?sid=" + sid)
