@@ -255,6 +255,11 @@ if len(pairs) != body.count("{"):
 # A repeated value takes the last row's gate and drops the others in silence.
 if len(gates) != len(pairs):
     sys.exit("ini_gated_values[] gates a value twice: %s" % sorted(p[0] for p in pairs))
+# Pinned, not a floor: a gate dropped from the C table and the template together
+# is otherwise a green tree with two checks fewer.
+if len(gates) != 6:
+    sys.exit("ini_gated_values[] holds %d pairs, expected 6: %s"
+             % (len(gates), sorted(gates)))
 
 # key -> the variable step4 writes it from, and the flags that variable emits
 wvar, emit = {}, {}
@@ -279,16 +284,20 @@ for value, gate in sorted(gates.items()):
         sys.exit("the command block still reads %s ungated" % value)
     if not re.search(r"\$\{(?:z?test|arg|unquoted):%s_eff[:}]" % value, cmd):
         sys.exit("the command block does not read %s_eff" % value)
-    # The stored value is what the profile keeps, gate or no gate. key_of is
-    # built from the winprofile block, so a hit there is that proof, whether the
-    # key is written bare or through ${ztest:}.
-    if re.search(r"\$\{(?:z?test:)?%s_eff[:}]" % value,
-                 block(step4, "winprofile")):
-        sys.exit("the winprofile block writes %s_eff, not the stored value"
-                 % value)
+    # The stored value is what the profile keeps, gate or no gate. A checkbox
+    # goes through ${ztest:}; anything else must reach the file verbatim, so a
+    # row that started storing 1/0 instead of the typed value is a regression.
     if value not in key_of or gate not in key_of:
         sys.exit("no winprofile key writes %s"
                  % (value if value not in key_of else gate))
+    if rows[key_of[value]]["kind"] == "checkbox":
+        if re.search(r"\$\{z?test:%s_eff[:}]" % value,
+                     block(step4, "winprofile")):
+            sys.exit("the winprofile block writes %s_eff, not the stored value"
+                     % value)
+    elif not re.search(r"^[A-Za-z0-9_]+=\$\{%s\}$" % value,
+                       block(step4, "winprofile"), re.M):
+        sys.exit("the winprofile block no longer writes %s verbatim" % value)
 for m in re.finditer(r"\$\{(?:z?test|arg|unquoted):([a-z0-9_]+)_eff[:}]", cmd):
     if m.group(1) not in gates:
         sys.exit("the command block reads %s_eff, which htsserver.c never publishes"
