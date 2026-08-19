@@ -8,6 +8,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+CR=$'\r'
+LF=$'\n'
 CRLF=$'\r\n'
 TAB=$'\t'
 
@@ -18,23 +20,35 @@ hf() { # hf present|absent BLOCK FIELD
 hf present "User-Agent: mine$CRLF" User-Agent
 hf present "user-agent: mine$CRLF" User-Agent
 hf present "USER-AGENT: mine$CRLF" user-agent
-# whitespace may sit between the name and its colon
-hf present "User-Agent : mine$CRLF" User-Agent
-hf present "User-Agent$TAB: mine$CRLF" User-Agent
+# RFC 7230 forbids a space before the colon, and a server drops such a line:
+# honouring it here would leave the request with no User-Agent at all
+hf absent "User-Agent : mine$CRLF" User-Agent
+hf absent "User-Agent$TAB: mine$CRLF" User-Agent
 # a name counts at the start of a line only, and a folded line starts nothing
 hf absent "X-Note: User-Agent: no$CRLF" User-Agent
 hf absent " User-Agent: folded$CRLF" User-Agent
 hf absent "X-Note: v$CRLF${TAB}User-Agent: folded$CRLF" User-Agent
 hf present "X-Note: v${CRLF}User-Agent: mine$CRLF" User-Agent
-# no colon, no field
+# neither a prefix nor a suffix of another name answers for it
 hf absent "User-Agent$CRLF" User-Agent
 hf absent "User-Agentfoo: v$CRLF" User-Agent
-hf absent "" User-Agent
-# a name that is a prefix of another must not answer for it, either way round
+hf absent "X-Real-User-Agent: v$CRLF" User-Agent
 hf absent "Accept-Encoding: identity$CRLF" Accept
 hf absent "Accept: */*$CRLF" Accept-Encoding
 hf present "Accept: */*${CRLF}Accept-Encoding: identity$CRLF" Accept
 hf present "Accept: */*${CRLF}Accept-Encoding: identity$CRLF" Accept-Encoding
+# an embedder fills opt->headers itself, so neither a final terminator nor CRLF
+# endings are guaranteed
+hf present "User-Agent: mine" User-Agent
+hf present "X-Note: v${LF}User-Agent: mine$LF" User-Agent
+hf present "X-Note: v${CR}User-Agent: mine$CR" User-Agent
+# the tree spells a field name with its colon as often as without
+hf present "User-Agent: mine$CRLF" "User-Agent:"
+hf absent "X-Note: v$CRLF" "User-Agent:"
+# an empty name matches nothing, rather than every line opening with a colon
+hf absent ":oops$CRLF" ""
+hf absent ":oops$CRLF" ":"
+hf absent "" User-Agent
 
 selftest_run_queued
 
@@ -43,13 +57,17 @@ python=$(find_python) || skip "python3 missing"
 server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
 tmpdir=$(mktemp -d)
 serverpid=
-wire=
+wire=$tmpdir/wire
+nreq=0
 
 cleanup() {
     stop_server "$serverpid"
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
+
+# Every header the engine writes for itself, in emission order.
+engine_fields="Host From User-Agent Accept Accept-Language Accept-Encoding Authorization"
 
 count_lines() { # count_lines RE FILE
     grep -c "$1" "$2" || true
@@ -59,44 +77,76 @@ value_of() { # value_of FIELD FILE
     sed -n "s/^$1: //p" "$2" | tr -d '\r'
 }
 
-# One crawl of a leaf page against a wire-logging server, leaving its request
-# bytes in $wire.
+# One crawl of a leaf page, leaving its request bytes in $tmpdir/TAG.req. The
+# credentials and -%E are what make the engine write From and Authorization.
 probe() { # probe TAG [extra httrack args...]
-    local tag=$1 port rc=0
+    local tag=$1 rc=0
     shift
-    wire=$tmpdir/$tag.wire
-    "$python" "$server" "$wire" >"$tmpdir/$tag.out" 2>"$tmpdir/$tag.err" &
-    serverpid=$!
-    port=$(discover_server_port "$tmpdir/$tag.out" "$serverpid") || exit 1
-    run_with_timeout 90 httrack "http://127.0.0.1:$port/plain.html" \
+    run_with_timeout 90 httrack "http://user:pass@127.0.0.1:$port/plain.html" \
         -O "$tmpdir/$tag.mirror" -c1 --robots=0 --retries=0 --quiet -%v0 \
-        -F EngineUA/1.0 "$@" >>"$tmpdir/log" 2>&1 || rc=$?
+        -F EngineUA/1.0 -%E tester@example.test "$@" >>"$tmpdir/log" 2>&1 || rc=$?
     test "$rc" -ne 124 || fail "$tag: the crawl hit the deadline"
-    stop_server "$serverpid"
-    serverpid=
-    assert_eq 1 "$(count_lines '^=== REQUEST ===$' "$wire")" "$tag: requests sent"
+    nreq=$((nreq + 1))
+    assert_eq "$nreq" "$(count_lines '^=== REQUEST ===$' "$wire")" "$tag: requests logged"
+    awk -v n="$nreq" '/^=== REQUEST ===$/ { c++; next } c == n' "$wire" >"$tmpdir/$tag.req"
 }
+
+# Every engine header is written, and written once.
+assert_all_once() { # assert_all_once TAG
+    local field
+    for field in $engine_fields; do
+        assert_eq 1 "$(count_lines "^$field:" "$tmpdir/$1.req")" "$1: $field lines"
+    done
+}
+
+assert_value() { # assert_value TAG FIELD VALUE
+    assert_eq "$3" "$(value_of "$2" "$tmpdir/$1.req")" "$1: $2"
+}
+
+# The rest of the request is byte-identical to the one no box produced: RE names
+# the only lines allowed to differ.
+assert_same_but() { # assert_same_but TAG RE
+    local want got
+    want=$(grep -Ev "$2" "$tmpdir/plain.req" | tr -d '\r')
+    got=$(grep -Ev "$2" "$tmpdir/$1.req" | tr -d '\r')
+    assert_eq "$want" "$got" "$1: the request outside $2"
+}
+
+"$python" "$server" "$wire" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
 
 # An empty box leaves the request as it was.
 probe plain
-assert_eq 1 "$(count_lines '^User-Agent:' "$wire")" 'plain: User-Agent lines'
-assert_eq EngineUA/1.0 "$(value_of User-Agent "$wire")" 'plain: User-Agent'
-for field in Host Accept Accept-Language Accept-Encoding; do
-    assert_eq 1 "$(count_lines "^$field:" "$wire")" "plain: $field lines"
-done
+assert_all_once plain
+assert_value plain User-Agent EngineUA/1.0
+assert_value plain From tester@example.test
 
 probe boxua -%X 'User-Agent: BoxUA/9'
-assert_eq 1 "$(count_lines '^User-Agent:' "$wire")" 'boxua: User-Agent lines'
-assert_eq BoxUA/9 "$(value_of User-Agent "$wire")" 'boxua: User-Agent'
-assert_eq 1 "$(count_lines '^Accept:' "$wire")" 'boxua: Accept lines'
+assert_all_once boxua
+assert_value boxua User-Agent BoxUA/9
+assert_same_but boxua '^User-Agent:'
 
+# Accept-Encoding in the box must not silence Accept, nor the reverse.
 probe boxenc -%X 'Accept-Encoding: identity'
-assert_eq 1 "$(count_lines '^Accept-Encoding:' "$wire")" 'boxenc: Accept-Encoding lines'
-assert_eq identity "$(value_of Accept-Encoding "$wire")" 'boxenc: Accept-Encoding'
-assert_eq 1 "$(count_lines '^Accept:' "$wire")" 'boxenc: Accept lines'
-assert_eq 1 "$(count_lines '^User-Agent:' "$wire")" 'boxenc: User-Agent lines'
+assert_all_once boxenc
+assert_value boxenc Accept-Encoding identity
+assert_same_but boxenc '^Accept-Encoding:'
 
 probe boxaccept -%X 'Accept: text/plain'
-assert_eq 1 "$(count_lines '^Accept:' "$wire")" 'boxaccept: Accept lines'
-assert_eq text/plain "$(value_of Accept "$wire")" 'boxaccept: Accept'
-assert_eq 1 "$(count_lines '^Accept-Encoding:' "$wire")" 'boxaccept: Accept-Encoding lines'
+assert_all_once boxaccept
+assert_value boxaccept Accept text/plain
+assert_same_but boxaccept '^Accept:'
+
+probe boxhost -%X 'Host: box.example'
+assert_all_once boxhost
+assert_value boxhost Host box.example
+assert_same_but boxhost '^Host:'
+
+probe boxrest -%X 'From: box@example.test' -%X 'Accept-Language: xx' \
+    -%X 'Authorization: Basic Ym94'
+assert_all_once boxrest
+assert_value boxrest From box@example.test
+assert_value boxrest Accept-Language xx
+assert_value boxrest Authorization 'Basic Ym94'
+assert_same_but boxrest '^(From|Accept-Language|Authorization):'

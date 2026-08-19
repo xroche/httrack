@@ -920,24 +920,28 @@ int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
   return append_cookie_header(&bstr, cookie, domain, path);
 }
 
-/* Is field present as a header field name in the raw custom-header block? */
-hts_boolean http_headers_have_field(const char *headers, const char *field) {
+hts_boolean http_headers_have_field(const char *headers,
+                                    const char *field_name) {
+  size_t len;
   const char *line;
 
-  if (headers == NULL || field == NULL || *field == '\0')
+  if (headers == NULL || field_name == NULL)
+    return HTS_FALSE;
+  len = strlen(field_name);
+  if (len != 0 && field_name[len - 1] == ':') /* the tree spells it both ways */
+    len--;
+  if (len == 0)
     return HTS_FALSE;
   /* anchored, so a folded line or a name inside a value cannot match */
   for (line = headers; *line != '\0';) {
-    const int n = strfield(line, field);
+    size_t i = 0;
 
-    if (n != 0) {
-      const char *p = line + n;
-
-      while (*p == ' ' || *p == '\t')
-        p++;
-      if (*p == ':')
-        return HTS_TRUE;
-    }
+    while (i < len && streql(line[i], field_name[i]))
+      i++;
+    /* RFC 7230 forbids a space before the colon: tolerating one would drop our
+       line for a malformed one the server then ignores */
+    if (i == len && line[len] == ':')
+      return HTS_TRUE;
     while (*line != '\0' && *line != '\n' && *line != '\r')
       line++;
     while (*line == '\n' || *line == '\r')
@@ -1146,13 +1150,12 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     {
       const char *real_adr = jump_identification_const(adr);
 
-      /* a field typed into the extra-headers box wins: the engine skips its
-         own line rather than send it twice (#1337) */
+      /* the extra-headers box wins: skip the engine's own line (#1337) */
       const char *const custom = retour->req.headers;
 
       // Mandatory per RFC2616
       if (!direct_url &&
-          !http_headers_have_field(custom, "Host")) { // not ftp:// and friends
+          !http_headers_have_field(custom, "Host")) { // not ftp:// for example
         print_buffer(&bstr, "Host: %s" H_CRLF,
                      escape_check_url_addr(real_adr, esc, sizeof(esc)));
       }
@@ -1218,7 +1221,6 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
           }
         } else if ((a = bauth_check(cookie, real_adr, fil)))
           strcpybuff(autorisation, a);
-        /* On a une autorisation a donner?  */
         if (strnotempty(autorisation) &&
             !http_headers_have_field(custom, "Authorization")) {
           print_buffer(&bstr, "Authorization: Basic %s"H_CRLF, autorisation);

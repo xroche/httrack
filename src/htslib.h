@@ -214,10 +214,10 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend
 int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
                        char *dst, size_t dst_size);
 
-/* True if the raw CRLF-separated custom request-header block carries a line
-   whose field name is `field`: case-insensitive, at a line start only (a folded
-   continuation line never starts one). Either argument may be NULL. */
-hts_boolean http_headers_have_field(const char *headers, const char *field);
+/* True if the raw CRLF-separated custom request-header block starts a line with
+   `field_name`, given without the trailing colon (which is tolerated). */
+hts_boolean http_headers_have_field(const char *headers,
+                                    const char *field_name);
 
 /* Switch soc between blocking and non-blocking mode; false on failure, with
    errno (WSAGetLastError() on Windows) set. */
