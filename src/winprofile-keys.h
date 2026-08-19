@@ -21,9 +21,9 @@ typedef struct {
 
 /* clang-format off */
 static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
-  {"AcceptLanguage", "win,droid", "setting", "string", "", "", "", "unresolved", "", "literal", ""},
+  {"AcceptLanguage", "win,droid", "setting", "string", "", "", "", "derived", "", "literal", ""},
   {"Build", "win,web,droid", "setting", "list:0:15", "", "", "BuildString", "agreed", "0", "", ""},
-  {"BuildString", "win,web,droid", "setting", "string", "", "", "Build", "unresolved", "", "literal", ""},
+  {"BuildString", "win,web,droid", "setting", "string", "", "", "Build", "agreed", "%h%p/%n%q.%t", "literal", ""},
   {"Cache", "win,web,droid", "setting", "checkbox", "", "--cache=0", "", "agreed", "1", "", ""},
   {"Category", "win,web,droid", "setting", "string", "", "", "", "agreed", "", "absent", ""},
   {"Changes", "win,web,droid", "setting", "checkbox", "--changes", "", "", "agreed", "0", "", ""},
@@ -114,13 +114,13 @@ static const winprofile_key_t winprofile_keys[WINPROFILE_KEY_COUNT] = {
   {"URLHack", "win,web,droid", "setting", "checkbox", "--urlhack", "--urlhack=0", "", "agreed", "1", "", ""},
   {"UpdateHack", "win,web,droid", "setting", "checkbox", "--updatehack", "", "", "agreed", "1", "", ""},
   {"UseHTTPProxyForFTP", "win,web,droid", "setting", "checkbox", "--httpproxy-ftp", "--httpproxy-ftp=0", "", "agreed", "1", "", ""},
-  {"UserID", "win,web,droid", "setting", "string", "", "", "", "unresolved", "", "literal", ""},
+  {"UserID", "win,web,droid", "setting", "string", "", "", "", "derived", "", "literal", ""},
   {"Wacz", "win,web", "setting", "checkbox", "--wacz", "", "", "agreed", "0", "", ""},
   {"Warc", "win,web,droid", "setting", "checkbox", "--warc", "", "", "agreed", "0", "", ""},
   {"WarcCdx", "win,web", "setting", "checkbox", "--warc-cdx", "", "", "agreed", "0", "", ""},
   {"WarcFile", "web,droid", "setting", "string", "", "", "", "none", "", "", ""},
   {"WarcMaxSize", "web", "setting", "string", "", "", "", "none", "", "", ""},
-  {"WildCardFilters", "win,web,droid", "setting", "string", "", "", "", "unresolved", "", "literal", ""},
+  {"WildCardFilters", "win,web,droid", "setting", "string", "", "", "", "agreed", "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/* -mime:application/foobar", "literal", ""},
   {"WordIndex", "win,web,droid", "setting", "checkbox", "--search-index", "--search-index=0", "", "agreed", "0", "", ""},
   {"KeepDoubleSlashes", "", "setting", "string", "", "", "", "", "", "", "KeepSlashes"},
   {"KeepWwwPrefix", "", "setting", "string", "", "", "", "", "", "", "KeepWww"},

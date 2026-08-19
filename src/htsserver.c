@@ -859,12 +859,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
       {NULL, 0}
     };
-    initStrElt initStr[] = {
-        {"user", HTS_DEFAULT_USER_AGENT},
-        {"footer", HTS_DEFAULT_FOOTER},
-        {"url2",
-         "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js -ad.doubleclick.net/*"},
-        {NULL, NULL}};
+    initStrElt initStr[] = {{"user", HTS_DEFAULT_USER_AGENT},
+                            {"footer", HTS_DEFAULT_FOOTER},
+                            {"url2",
+                             "+*.png +*.gif +*.jpg +*.jpeg +*.css +*.js "
+                             "-ad.doubleclick.net/* -mime:application/foobar"},
+                            {NULL, NULL}};
     int i = 0;
 
     for(i = 0; initInt[i].name; i++) {
