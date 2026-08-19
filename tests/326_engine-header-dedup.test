@@ -73,6 +73,10 @@ count_lines() { # count_lines RE FILE
     grep -c "$1" "$2" || true
 }
 
+count_bytes() { # count_bytes BYTE FILE
+    tr -dc "$1" <"$2" | wc -c | tr -d '[:space:]'
+}
+
 value_of() { # value_of FIELD FILE
     sed -n "s/^$1: //p" "$2" | tr -d '\r'
 }
@@ -88,15 +92,17 @@ probe() { # probe TAG [extra httrack args...]
     test "$rc" -eq 0 || fail "$tag: the crawl exited $rc"
     nreq=$((nreq + 1))
     assert_eq "$nreq" "$(count_lines '^=== REQUEST ===$' "$wire")" "$tag: requests logged"
-    awk -v n="$nreq" '/^=== REQUEST ===$/ { c++; next } c == n' "$wire" >"$tmpdir/$tag.req"
-    # a request the server had to time out on is logged truncated, and would
-    # otherwise pass every assertion below. Hex with every space squeezed out:
-    # od's column padding differs between GNU and BSD.
-    assert_eq 0d0a0d0a0a \
-        "$(tail -c 5 "$tmpdir/$tag.req" | od -An -t x1 | tr -d '[:space:]')" \
-        "$tag: the CRLF CRLF ending the request, then the fixture's own newline"
-    assert_eq 1 "$(count_lines "^[^$CR]*\$" "$tmpdir/$tag.req")" \
-        "$tag: lines not ending in CR"
+    # the server's own byte-for-byte copy, never the log split by a text tool
+    cp "$wire.$nreq" "$tmpdir/$tag.req"
+    # the last header line's CRLF and the blank CRLF that closes the block; the
+    # fixture appends nothing to a per-request file. Hex with all whitespace
+    # dropped, since od's column padding differs between GNU and BSD.
+    assert_eq 0d0a0d0a \
+        "$(tail -c 4 "$tmpdir/$tag.req" | od -An -t x1 | tr -d '[:space:]')" \
+        "$tag: the CRLF CRLF ending the request"
+    # so every LF in between is the LF of a CRLF pair
+    assert_eq "$(count_bytes "$CR" "$tmpdir/$tag.req")" \
+        "$(count_bytes "$LF" "$tmpdir/$tag.req")" "$tag: CR count against LF count"
 }
 
 # Every engine header is written, and written once.
