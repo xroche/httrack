@@ -279,10 +279,13 @@ for value, gate in sorted(gates.items()):
         sys.exit("the command block still reads %s ungated" % value)
     if not re.search(r"\$\{(?:z?test|arg|unquoted):%s_eff[:}]" % value, cmd):
         sys.exit("the command block does not read %s_eff" % value)
-    # The stored value is what the profile keeps, gate or no gate.
-    if not re.search(r"^[A-Za-z0-9_]+=\$\{%s\}$" % value,
-                     block(step4, "winprofile"), re.M):
-        sys.exit("the winprofile block no longer writes %s" % value)
+    # The stored value is what the profile keeps, gate or no gate. key_of is
+    # built from the winprofile block, so a hit there is that proof, whether the
+    # key is written bare or through ${ztest:}.
+    if re.search(r"\$\{(?:z?test:)?%s_eff[:}]" % value,
+                 block(step4, "winprofile")):
+        sys.exit("the winprofile block writes %s_eff, not the stored value"
+                 % value)
     if value not in key_of or gate not in key_of:
         sys.exit("no winprofile key writes %s"
                  % (value if value not in key_of else gate))
@@ -304,7 +307,7 @@ listvar = dict(re.findall(r"\$\{listid:([a-z0-9_]+):(LISTDEF_\d+)", pages))
 
 COMPOSED = {"Build", "BuildString", "ProxyType", "Proxy", "Port",
             "Sitemap", "SitemapUrl", "SingleFile", "SingleFileMaxSize",
-            "Warc", "WarcFile", "WarcMaxSize"}
+            "Warc", "WarcFile", "WarcMaxSize", "WarcCdx", "Wacz"}
 if set(k for k, r in rows.items() if r["composed_with"]) != COMPOSED:
     sys.exit("composed_with is set on %s, expected %s"
              % (sorted(k for k, r in rows.items() if r["composed_with"]),

@@ -129,10 +129,17 @@ BOXES = [
     ("singlefile", "SingleFile", "--single-file", None),
 ]
 
+# Gated boxes (ini_gated_values[] in htsserver.c): each needs its gate set, or
+# its own state decides nothing.
+GATED_BY = {"warccdx": "warc", "wacz": "warc"}
+
 for field, key, when_set, when_clear in BOXES:
     for value, want, unwanted, stored in (("on", when_set, when_clear, "1"),
                                           ("", when_clear, when_set, "0")):
-        rendered = post([(field, value)])
+        fields = [(field, value)]
+        if field in GATED_BY:
+            fields.insert(0, (GATED_BY[field], "on"))
+        rendered = post(fields)
         cmd = textarea(rendered, "command").split()
         label = "%s %s" % (field, "set" if value else "cleared")
         if want:

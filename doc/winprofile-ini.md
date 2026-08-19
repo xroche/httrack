@@ -66,12 +66,14 @@ senses. One is a value split across keys that mean nothing apart: `Proxy`,
 `Port` and `ProxyType` are one proxy, and `Build` picks a layout of which
 `BuildString` is the custom case. The other is a gate: the checkbox is
 necessary for its value to reach the command line (`ini_gated_values[]` in
-`src/htsserver.c`). `Warc` gates `WarcFile` and `WarcMaxSize`, `Sitemap` gates
-`SitemapUrl`, `SingleFile` gates `SingleFileMaxSize`. A cleared box keeps the
-typed value in the file and emits no flag, so reopening the project finds the
-field as the user left it. The engine has no such gate: it turns WARC on from
-a non-empty `warc_file`. A front end that skips the check mirrors differently
-from the other two. The relation is symmetric, and
+`src/htsserver.c`). `Warc` gates `WarcFile`, `WarcMaxSize`, `WarcCdx` and
+`Wacz`, `Sitemap` gates `SitemapUrl`, `SingleFile` gates `SingleFileMaxSize`.
+The two WARC sub-options are gated because neither names an archive on its
+own, and `--wacz` turns WARC on by itself by filling in an automatic name. A
+cleared box keeps the typed value in the file and emits no flag, so reopening
+the project finds the field as the user left it. The engine has no such gate:
+it turns WARC on from a non-empty `warc_file`. A front end that skips the
+check mirrors differently from the other two. The relation is symmetric, and
 `tools/gen-winprofile-keys.py` rejects an edge only one end names.
 
 Necessary is not sufficient, and the column says nothing about which flags

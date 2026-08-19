@@ -85,6 +85,21 @@ for gate, gateflag, field, value, flag, key in CASES:
         if "\n%s=%s\n" % (key, value) not in ini:
             sys.exit("%s=%r: the profile lost %s\n%s" % (gate, state, key, ini))
 
+# A sub-option of the WARC group. Neither names an archive on its own, so the
+# Warc box gates both, as WinHTTrack's argv block does.
+for box, flag, key in (("warccdx", "--warc-cdx", "WarcCdx"),
+                       ("wacz", "--wacz", "Wacz")):
+    for warc in ("on", ""):
+        got = step4([("sid", sid), ("warc", warc), (box, "on")])
+        lines = set(l.strip() for l in got["command"].split("\n"))
+        if (flag in lines) != (warc == "on"):
+            sys.exit("warc=%r: %r is %sin the command line\n%s"
+                     % (warc, flag, "" if flag in lines else "not ",
+                        got["command"]))
+        ini = got["winprofile"].replace("\r\n", "\n")
+        if "\n%s=1\n" % key not in ini:
+            sys.exit("warc=%r: the profile lost %s\n%s" % (warc, key, ini))
+
 # A request can write any session variable, so the derived one is rebuilt on
 # every render rather than trusted.
 got = step4([("sid", sid), ("warc", ""), ("warcfile", "mycrawl"),

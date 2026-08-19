@@ -751,6 +751,8 @@ static const struct {
     {"sitemapurl", "sitemap"},
     {"warcfile", "warc"},
     {"warcmaxsize", "warc"},
+    {"warccdx", "warc"},
+    {"wacz", "warc"},
     {"singlefilemax", "singlefile"},
     {NULL, NULL},
 };
