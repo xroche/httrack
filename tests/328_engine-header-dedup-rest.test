@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# The extra-headers box (-%X) against the six headers #1337 left out: the box
-# wins for Proxy-Authorization, Referer and Cookie, the engine wins for
-# Content-length, Connection and the conditional lines it sends inside xsend
-# (#1340). The walk on its own first, then the wire.
+# The six headers #1337 left out: the box wins for Proxy-Authorization, Referer
+# and Cookie, the engine for Content-length, Connection and xsend's own (#1340).
 
 set -euo pipefail
 
@@ -15,9 +13,14 @@ LF=$'\n'
 CRLF=$'\r\n'
 TAB=$'\t'
 
-# What the box appends to a request already carrying REQ, with CR and LF escaped.
+# -v, or od folds a run of identical lines into a "*" and the bytes are lost
+tohex() { printf '%s' "$1" | od -An -v -t x1 | tr -d '[:space:]'; }
+
+# What the box appends to a request already carrying REQ, with CR and LF escaped
+# in the answer. Both arguments travel as hex: Windows reads the batch script in
+# text mode, which would turn every CRLF in them into a bare LF.
 hd() { # hd WANT REQ BLOCK
-    selftest_queue "$1" headerdedup "$2" "$3"
+    selftest_queue "$1" headerdedup "hex:$(tohex "$2")" "hex:$(tohex "$3")"
 }
 
 req="GET /plain.html HTTP/1.1${CRLF}Connection: close${CRLF}Host: h${CRLF}"
@@ -36,6 +39,9 @@ hd 'X-B: 2\r\n' "$req" "Connection: x$CRLF${TAB}folded${CRLF}X-B: 2$CRLF"
 hd '' "$req" "Connection: x${CRLF} one${CRLF}${TAB}two$CRLF"
 # a kept line keeps its own
 hd 'X-A: 1\r\n more\r\n' "$req" "X-A: 1$CRLF more$CRLF"
+# a block opening on a folded line has no field to be judged against, and went
+# out before the walk existed
+hd ' orphan\r\nX-A: 1\r\n' "$req" " orphan${CRLF}X-A: 1$CRLF"
 # the box may repeat a field of its own: only the engine's lines are probed
 hd 'X-A: 1\r\nX-A: 2\r\n' "$req" "X-A: 1${CRLF}X-A: 2$CRLF"
 # nothing a name can be read from is left alone, and the next line is judged
@@ -212,6 +218,7 @@ assert_same nokeep boxconn
 
 # the undocumented >post: tag, whose length must keep describing the body
 probe post 1 "$base?>post:" -%X 'Content-Length: 99'
+assert_eq POST "$(sed -n '1s/ .*//p' "$tmpdir/post.req")" 'post: the method'
 assert_eq 1 "$(count_lines '^[Cc]ontent-[Ll]ength:' "$tmpdir/post.req")" \
     'post: Content-length lines'
 assert_value post Content-length 0

@@ -1171,7 +1171,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
            || (strncmp(adr, "https://", 8) ==
                0) /* or referer AND addresses are https */
            ) &&
-          !http_headers_have_field(custom, "Referer")) { // PAS file://
+          !http_headers_have_field(custom, "Referer")) { // not file://
         /* one escape per piece, so neither can outgrow its own source buffer */
         print_buffer(
             &bstr, "Referer: http://%s",
