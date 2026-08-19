@@ -1,0 +1,134 @@
+#!/bin/bash
+#
+# --warc-cdx follows the WARC box, --wacz never does: it only turns WARC on.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_warcgate.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+printf '[the CDXJ box follows the WARC box] ..\t'
+htsserver_start --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "the WARC gate is broken (see above)"
+import re, sys, urllib.parse, urllib.request
+
+url = sys.argv[1].rstrip("/")
+rc = 0
+
+
+def check(ok, what):
+    global rc
+    print(("ok: " if ok else "FAIL: ") + what)
+    if not ok:
+        rc = 1
+
+
+def get(path):
+    # The UI is served ISO-8859-1, so decode, do not assume UTF-8.
+    return urllib.request.urlopen(url + path, timeout=20).read().decode("latin-1")
+
+
+m = re.search(r'name="sid" value="([0-9a-f]+)"', get("/server/index.html"))
+if m is None:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1)
+
+
+def post(fields):
+    body = "&".join("%s=%s" % (k, urllib.parse.quote(v))
+                    for k, v in [("sid", sid)] + fields)
+    req = urllib.request.Request(url + "/server/step4.html",
+                                 data=body.encode("latin-1"), method="POST")
+    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+
+
+def textarea(page, name):
+    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
+    if m is None:
+        sys.exit("no %s textarea in the rendered step4.html" % name)
+    return m.group(1)
+
+
+def tag(page, name):
+    m = re.search(r'<input type="checkbox" name="%s"[^>]*>' % name, page)
+    if m is None:
+        sys.exit("no %s checkbox in the rendered option9.html" % name)
+    return m.group(0)
+
+
+def companion(page):
+    m = re.search(r'<input type="hidden" name="warccdx" value="([^"]*)"'
+                  r' id="warccdx_keep">', page)
+    if m is None:
+        sys.exit("no warccdx companion in the rendered option9.html")
+    return m.group(1)
+
+
+# A headless check cannot see a greyed control or run the click handlers, so this asserts the wiring directly.
+page = get("/server/option9.html?sid=" + sid)
+for want in ("function warc_gate()", "function wacz_click()",
+             "var off = !box('warc').checked", "box('warccdx').disabled = off",
+             "box('warc').checked = true", 'onLoad="do_load();"'):
+    check(want in page, "option9.html carries %r" % want)
+# A profile with WARC clear and CDXJ set must open greyed on load too.
+check(re.search(r"function do_load\(\)[^}]*warc_gate\(\);", page) is not None,
+      "do_load() sets the initial state")
+for name, handler in (("warc", "warc_gate"), ("wacz", "wacz_click")):
+    check('onClick="%s()' % handler in tag(page, name),
+          "the %s box calls %s() on click" % (name, handler))
+# box() builds each id by hand, so it has to be the one the tag carries.
+for name in ("warc", "warccdx", "wacz"):
+    check('id="%s_box"' % name in tag(page, name),
+          "the %s box carries id=\"%s_box\"" % (name, name))
+
+# Both rendered states; the re-grey on untick is warc_gate()'s, and never runs here.
+for warc, greyed in (("", True), ("on", False), ("", True)):
+    post([("warc", warc), ("warccdx", "on")])
+    page = get("/server/option9.html?sid=" + sid)
+    label = "WARC %s" % ("set" if warc else "clear")
+    check((" disabled" in tag(page, "warccdx")) == greyed,
+          "%s: the CDXJ box is %s" % (label, "greyed" if greyed else "available"))
+    check("disabled" not in tag(page, "wacz"),
+          "%s: the WACZ box stays available" % label)
+    check("checked" in tag(page, "warccdx"),
+          "%s: the CDXJ box is still drawn ticked" % label)
+    check(companion(page) == ("1" if greyed else ""),
+          "%s: the companion holds %r" % (label, "1" if greyed else ""))
+
+# What a browser posts from that greyed page: the two companions, no box.
+rendered = post([("warc", ""), ("warccdx", ""), ("warccdx", companion(page))])
+check("WarcCdx=1" in textarea(rendered, "winprofile").splitlines(),
+      "a greyed CDXJ box keeps its stored value")
+cmd = textarea(rendered, "command").split()
+# --user-agent is unconditional: an empty textarea holds no flag either.
+check("--user-agent" in cmd and "--warc-cdx" not in cmd,
+      "a greyed CDXJ box emits no flag")
+
+# Ungreyed, the box decides again: the companion is empty and the box posts.
+rendered = post([("warc", "on"), ("warccdx", ""), ("warccdx", "")])
+check("WarcCdx=0" in textarea(rendered, "winprofile").splitlines(),
+      "an unticked CDXJ box clears the stored value")
+rendered = post([("warc", "on"), ("warccdx", ""), ("warccdx", ""),
+                 ("warccdx", "on")])
+check("--warc-cdx" in textarea(rendered, "command").split(),
+      "a ticked CDXJ box under a set WARC box emits the flag")
+
+sys.exit(rc)
+PY
+echo OK
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "PASS"

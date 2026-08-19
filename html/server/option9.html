@@ -13,6 +13,7 @@
 <!--
 function do_load() {
 	window.status=' ';
+	warc_gate();
 ${do:if-not-empty:closeme}
 	window.close();
 ${do:end-if}
@@ -22,6 +23,24 @@ function do_unload() {
 }
 function info(str) {
 	window.status = str;
+}
+function box(name) {
+	return document.getElementById(name + '_box');
+}
+/* --warc-cdx indexes an archive it cannot name, so it follows the WARC box. */
+function warc_gate() {
+	var off = !box('warc').checked;
+	box('warccdx').disabled = off;
+	/* a disabled box posts nothing, so its companion carries the state */
+	document.getElementById('warccdx_keep').value =
+		off && box('warccdx').checked ? '1' : '';
+}
+/* --wacz names its own archive, so it is never gated; it only turns WARC on. */
+function wacz_click() {
+	if (box('wacz').checked) {
+		box('warc').checked = true;
+	}
+	warc_gate();
 }
 // -->
 </script>
@@ -113,7 +132,7 @@ ${do:end-if}
 > ${LANG_I61}
 <br><br>
 
-<input type="checkbox" name="warc" ${checked:warc}
+<input type="checkbox" name="warc" ${checked:warc} id="warc_box" onClick="warc_gate(); return true"
 			title='${html:LANG_WARCTIP}' onMouseOver="info('${js:LANG_WARCTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
 > ${LANG_WARC}
 <br><br>
@@ -130,12 +149,14 @@ ${LANG_WARCMAXSIZE}
 >
 <br><br>
 
-<input type="checkbox" name="warccdx" ${checked:warccdx}
+<!-- a greyed box posts nothing, so keep what it holds -->
+<input type="hidden" name="warccdx" value="${do:if-empty:warc}${ztest:warccdx::1}${do:end-if}" id="warccdx_keep">
+<input type="checkbox" name="warccdx" ${checked:warccdx} id="warccdx_box"${do:if-empty:warc} disabled${do:end-if}
 			title='${html:LANG_WARCCDXTIP}' onMouseOver="info('${js:LANG_WARCCDXTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
 > ${LANG_WARCCDX}
 <br><br>
 
-<input type="checkbox" name="wacz" ${checked:wacz}
+<input type="checkbox" name="wacz" ${checked:wacz} id="wacz_box" onClick="wacz_click(); return true"
 			title='${html:LANG_WACZTIP}' onMouseOver="info('${js:LANG_WACZTIP}'); return true" onMouseOut="info('&nbsp;'); return true"
 > ${LANG_WACZ}
 <br><br>
