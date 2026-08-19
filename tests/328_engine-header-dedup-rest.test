@@ -231,12 +231,21 @@ assert_same_but plain range '^Range:'
 
 # --- a dropped line takes its continuations with it --------------------------
 
-probe fold 1 "$base" -%k0 -%X 'Connection: keep-alive' -%X ' X-Injected: yes'
-assert_eq 0 "$(count_lines 'X-Injected' "$tmpdir/fold.req")" 'fold: the folded line'
-assert_value fold Connection close
-assert_same nokeep fold
-
-probe keptfold 1 "$base" -%X 'X-Fold: a' -%X ' b'
+# The control for the drop probe below, and the probe for whether argv here
+# carries the leading space at all: a box line the shell unfolded on the way in
+# would leave that probe asserting the absence of a header nobody folded.
+probe keptfold 1 "$base" -%X 'X-Fold: a' -%X ' zzfold'
 assert_eq 'Connection Host From User-Agent Accept Accept-Language Accept-Encoding X-Fold' \
     "$(fields_of "$tmpdir/keptfold.req")" 'keptfold: the field order'
-assert_eq 1 "$(count_lines "^ b$CR\$" "$tmpdir/keptfold.req")" 'keptfold: the folded line'
+
+if test "$(count_lines '^ zzfold' "$tmpdir/keptfold.req")" -eq 1; then
+    probe fold 1 "$base" -%k0 -%X 'Connection: keep-alive' -%X ' X-Injected: yes'
+    assert_eq 0 "$(count_lines 'X-Injected' "$tmpdir/fold.req")" 'fold: the folded line'
+    assert_value fold Connection close
+    assert_same nokeep fold
+else
+    # the hex cases above still fold, since the batch script is not argv
+    unfolded=$(count_lines zzfold "$tmpdir/keptfold.req")
+    echo "328: argv here drops the space that folds a line ($unfolded flat)," >&2
+    echo "328: so the fold runs through -#test=headerdedup only" >&2
+fi
