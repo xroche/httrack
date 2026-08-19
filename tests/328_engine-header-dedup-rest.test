@@ -1,0 +1,251 @@
+#!/bin/bash
+#
+# The six headers #1337 left out: the box wins for Proxy-Authorization, Referer
+# and Cookie, the engine for Content-length, Connection and xsend's own (#1340).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+CR=$'\r'
+LF=$'\n'
+CRLF=$'\r\n'
+TAB=$'\t'
+
+# -v, or od folds a run of identical lines into a "*" and the bytes are lost
+tohex() { printf '%s' "$1" | od -An -v -t x1 | tr -d '[:space:]'; }
+
+# What the box appends to a request already carrying REQ, with CR and LF escaped
+# in the answer. Both arguments travel as hex: Windows reads the batch script in
+# text mode, which would turn every CRLF in them into a bare LF.
+hd() { # hd WANT REQ BLOCK
+    selftest_queue "$1" headerdedup "hex:$(tohex "$2")" "hex:$(tohex "$3")"
+}
+
+req="GET /plain.html HTTP/1.1${CRLF}Connection: close${CRLF}Host: h${CRLF}"
+
+# A field the request lacks goes out untouched; one it carries does not.
+hd '' "$req" ''
+hd 'X-A: 1\r\n' "$req" "X-A: 1$CRLF"
+hd '' "$req" "Connection: keep-alive$CRLF"
+hd 'X-A: 1\r\n' "$req" "Connection: keep-alive${CRLF}X-A: 1$CRLF"
+# field names are case-insensitive, and the engine spells this one "length"
+hd '' "GET /p HTTP/1.1${CRLF}Content-length: 0$CRLF" "Content-Length: 99$CRLF"
+# a dropped line takes its folded continuations with it: kept, they would
+# attach to whichever header precedes them in the request
+hd 'X-B: 2\r\n' "$req" "Connection: keep-alive$CRLF X-Injected: yes${CRLF}X-B: 2$CRLF"
+hd 'X-B: 2\r\n' "$req" "Connection: x$CRLF${TAB}folded${CRLF}X-B: 2$CRLF"
+hd '' "$req" "Connection: x${CRLF} one${CRLF}${TAB}two$CRLF"
+# a kept line keeps its own
+hd 'X-A: 1\r\n more\r\n' "$req" "X-A: 1$CRLF more$CRLF"
+# a block opening on a folded line has no field to be judged against, and went
+# out before the walk existed
+hd ' orphan\r\nX-A: 1\r\n' "$req" " orphan${CRLF}X-A: 1$CRLF"
+# the box may repeat a field of its own: only the engine's lines are probed
+hd 'X-A: 1\r\nX-A: 2\r\n' "$req" "X-A: 1${CRLF}X-A: 2$CRLF"
+# nothing a name can be read from is left alone, and the next line is judged
+# on its own
+hd 'garbage\r\n' "$req" "garbage${CRLF}Connection: x$CRLF"
+hd 'garbage\r\n' "$req" "Connection: x${CRLF}garbage$CRLF"
+hd ':oops\r\n' "$req" ":oops$CRLF"
+hd 'Connection : x\r\n' "$req" "Connection : x$CRLF"
+hd '\r\nX-A: 1\r\n' "$req" "${CRLF}X-A: 1$CRLF"
+# the request line answers for no field name
+hd 'GET: 1\r\n' "GET /x HTTP/1.1$CRLF" "GET: 1$CRLF"
+# an embedder fills opt->headers itself, so neither a final terminator nor CRLF
+# endings are guaranteed
+hd 'X-A: 1' "$req" 'X-A: 1'
+hd '' "$req" 'Connection: x'
+hd 'X-A: 1\n' "$req" "Connection: x${LF}X-A: 1$LF"
+hd 'X-A: 1\r' "$req" "Connection: x${CR}X-A: 1$CR"
+# the resume and conditional lines ride in the opaque xsend blob, which the walk
+# reads back off the request rather than unpacking
+hd '' "GET /x HTTP/1.1${CRLF}Range: bytes=100-$CRLF" "Range: bytes=0-1$CRLF"
+hd 'Range: bytes=0-1\r\n' "$req" "Range: bytes=0-1$CRLF"
+hd '' "GET /x HTTP/1.1${CRLF}If-None-Match: \"e\"${CRLF}If-Modified-Since: Mon$CRLF" \
+    "If-None-Match: \"box\"${CRLF}If-Modified-Since: Tue$CRLF"
+# a name too long for the probe's scratch is kept, and no header the engine
+# writes is anywhere near that long
+long=$(printf 'X%.0s' {1..200})
+hd "$long: 1\r\n" "$req" "$long: 1$CRLF"
+hd "$long: 1\r\n" "$req" "Connection: x${CRLF}$long: 1$CRLF"
+
+selftest_run_queued
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
+tmpdir=$(mktemp -d)
+serverpid=
+wire=$tmpdir/wire
+nreq=0
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+count_lines() { # count_lines RE FILE
+    grep -c "$1" "$2" || true
+}
+
+count_bytes() { # count_bytes BYTE FILE
+    tr -dc "$1" <"$2" | wc -c | tr -d '[:space:]'
+}
+
+value_of() { # value_of FIELD FILE
+    sed -n "s/^$1: //p" "$2" | tr -d '\r'
+}
+
+# The field names of a request, in order. A folded line starts with a space and
+# so names nothing, which is what makes a grafted continuation visible here.
+fields_of() { # fields_of FILE
+    sed -n 's/^\([A-Za-z0-9-]*\):.*/\1/p' "$1" | tr '\n' ' ' | sed 's/ *$//'
+}
+
+# One crawl, leaving each of its COUNT requests in $tmpdir/TAG.<n>.req and the
+# last of them in $tmpdir/TAG.req.
+probe() { # probe TAG COUNT URL [extra httrack args...]
+    local tag=$1 count=$2 url=$3 rc=0 i
+    shift 3
+    run_with_timeout 90 httrack "$url" -O "$tmpdir/$tag.mirror" -c1 --robots=0 \
+        --retries=0 --quiet -%v0 -F EngineUA/1.0 -%E tester@example.test "$@" \
+        >>"$tmpdir/log" 2>&1 || rc=$?
+    test "$rc" -eq 0 || fail "$tag: the crawl exited $rc"
+    assert_eq "$((nreq + count))" "$(count_lines '^=== REQUEST ===$' "$wire")" \
+        "$tag: requests logged"
+    for ((i = 1; i <= count; i++)); do
+        # the server's own byte-for-byte copy, never the log split by a text tool
+        cp "$wire.$((nreq + i))" "$tmpdir/$tag.$i.req"
+    done
+    nreq=$((nreq + count))
+    cp "$tmpdir/$tag.$count.req" "$tmpdir/$tag.req"
+    # the last header line's CRLF and the blank CRLF that closes the block; the
+    # fixture appends nothing to a per-request file. Hex with all whitespace
+    # dropped, since od's column padding differs between GNU and BSD.
+    assert_eq 0d0a0d0a \
+        "$(tail -c 4 "$tmpdir/$tag.req" | od -An -t x1 | tr -d '[:space:]')" \
+        "$tag: the CRLF CRLF ending the request"
+    # so every LF in between is the LF of a CRLF pair
+    assert_eq "$(count_bytes "$CR" "$tmpdir/$tag.req")" \
+        "$(count_bytes "$LF" "$tmpdir/$tag.req")" "$tag: CR count against LF count"
+}
+
+assert_once() { # assert_once TAG FIELD
+    assert_eq 1 "$(count_lines "^$2:" "$tmpdir/$1.req")" "$1: $2 lines"
+}
+
+assert_value() { # assert_value TAG FIELD VALUE
+    assert_eq "$3" "$(value_of "$2" "$tmpdir/$1.req")" "$1: $2"
+}
+
+assert_same() { # assert_same BASE TAG
+    diff "$tmpdir/$1.req" "$tmpdir/$2.req" ||
+        fail "$2: the request differs from $1's"
+}
+
+# The rest of the request is byte-identical to BASE's: RE names the only lines
+# allowed to differ. Compared as files, since a command substitution would eat a
+# lost trailing newline on both sides alike.
+assert_same_but() { # assert_same_but BASE TAG RE
+    local base=$tmpdir/$2.base got=$tmpdir/$2.got
+    grep -Ev "$3" "$tmpdir/$1.req" >"$base" || true
+    grep -Ev "$3" "$tmpdir/$2.req" >"$got" || true
+    diff "$base" "$got" || fail "$2: the request outside $3 differs from $1's"
+}
+
+"$python" "$server" "$wire" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
+
+base=http://127.0.0.1:$port/plain.html
+
+# An empty box leaves the request as the engine writes it, in that order.
+probe plain 1 "$base"
+assert_eq 'Connection Host From User-Agent Accept Accept-Language Accept-Encoding' \
+    "$(fields_of "$tmpdir/plain.req")" 'plain: the engine block'
+assert_value plain Connection keep-alive
+
+# --- the box wins ------------------------------------------------------------
+
+probe referer 1 "$base" -%R http://engine.example/
+assert_value referer Referer http://engine.example/
+probe boxreferer 1 "$base" -%R http://engine.example/ -%X 'Referer: http://box.example/'
+assert_once boxreferer Referer
+assert_value boxreferer Referer http://box.example/
+assert_same_but plain boxreferer '^Referer:'
+
+# the other Referer site: a page reached by a link refers to the page that
+# linked to it
+probe hop 2 "http://127.0.0.1:$port/hop.html"
+assert_value hop Referer "http://127.0.0.1:$port/hop.html"
+probe boxhop 2 "http://127.0.0.1:$port/hop.html" -%X 'Referer: http://box.example/'
+assert_once boxhop Referer
+assert_value boxhop Referer http://box.example/
+assert_same_but hop boxhop '^Referer:'
+
+jar=$tmpdir/cookies.txt
+printf '127.0.0.1:%s\tTRUE\t/\tFALSE\t1999999999\tsession\topensesame\n' \
+    "$port" >"$jar"
+probe cookie 1 "$base" --cookies-file "$jar"
+assert_value cookie Cookie session=opensesame
+probe boxcookie 1 "$base" --cookies-file "$jar" -%X 'Cookie: box=1'
+assert_once boxcookie Cookie
+assert_value boxcookie Cookie box=1
+assert_same_but cookie boxcookie '^Cookie:'
+
+# base64("user:pass"), per RFC 7617
+probe proxy 1 http://plain.example/leaf.html -P "user:pass@127.0.0.1:$port" '+*'
+assert_value proxy Proxy-Authorization 'Basic dXNlcjpwYXNz'
+probe boxproxy 1 http://plain.example/leaf.html -P "user:pass@127.0.0.1:$port" '+*' \
+    -%X 'Proxy-Authorization: Basic Ym94'
+assert_once boxproxy Proxy-Authorization
+assert_value boxproxy Proxy-Authorization 'Basic Ym94'
+assert_same_but proxy boxproxy '^Proxy-Authorization:'
+
+# --- the engine wins ---------------------------------------------------------
+
+# -%k0 makes the engine write "close": the box asking for the opposite must not
+# leave an intermediary two contradictory hop-by-hop instructions
+probe nokeep 1 "$base" -%k0
+assert_value nokeep Connection close
+probe boxconn 1 "$base" -%k0 -%X 'Connection: keep-alive'
+assert_once boxconn Connection
+assert_value boxconn Connection close
+assert_same nokeep boxconn
+
+# the undocumented >post: tag, whose length must keep describing the body
+probe post 1 "$base?>post:" -%X 'Content-Length: 99'
+assert_eq POST "$(sed -n '1s/ .*//p' "$tmpdir/post.req")" 'post: the method'
+assert_eq 1 "$(count_lines '^[Cc]ontent-[Ll]ength:' "$tmpdir/post.req")" \
+    'post: Content-length lines'
+assert_value post Content-length 0
+
+# nothing is resuming here, so a typed Range is the only one and goes out
+probe range 1 "$base" -%X 'Range: bytes=0-1'
+assert_once range Range
+assert_value range Range bytes=0-1
+assert_same_but plain range '^Range:'
+
+# --- a dropped line takes its continuations with it --------------------------
+
+# The control for the drop probe below, and the probe for whether argv here
+# carries the leading space at all: a box line the shell unfolded on the way in
+# would leave that probe asserting the absence of a header nobody folded.
+probe keptfold 1 "$base" -%X 'X-Fold: a' -%X ' zzfold'
+assert_eq 'Connection Host From User-Agent Accept Accept-Language Accept-Encoding X-Fold' \
+    "$(fields_of "$tmpdir/keptfold.req")" 'keptfold: the field order'
+
+if test "$(count_lines '^ zzfold' "$tmpdir/keptfold.req")" -eq 1; then
+    probe fold 1 "$base" -%k0 -%X 'Connection: keep-alive' -%X ' X-Injected: yes'
+    assert_eq 0 "$(count_lines 'X-Injected' "$tmpdir/fold.req")" 'fold: the folded line'
+    assert_value fold Connection close
+    assert_same nokeep fold
+else
+    # the hex cases above still fold, since the batch script is not argv
+    unfolded=$(count_lines zzfold "$tmpdir/keptfold.req")
+    echo "328: argv here drops the space that folds a line ($unfolded flat)," >&2
+    echo "328: so the fold runs through -#test=headerdedup only" >&2
+fi

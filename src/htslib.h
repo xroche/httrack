@@ -219,6 +219,11 @@ int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
 hts_boolean http_headers_have_field(const char *headers,
                                     const char *field_name);
 
+/* Append the custom header block to dst (capacity dst_size), dropping any line
+   whose field dst carries plus its folded continuations. Aborts on overflow. */
+void http_append_custom_headers(char *dst, size_t dst_size,
+                                const char *headers);
+
 /* Switch soc between blocking and non-blocking mode; false on failure, with
    errno (WSAGetLastError() on Windows) set. */
 hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking);

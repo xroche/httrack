@@ -2858,6 +2858,50 @@ static size_t st_decode_body(const char *arg, char *buf, size_t size) {
   return n;
 }
 
+/* What the custom header block appends to a request already carrying <request>
+   (#1340). CR and LF come back escaped, so a case stays one line. */
+static int st_headerdedup(httrackp *opt, int argc, char **argv) {
+  const size_t half = 8192;
+  char *req, *tmp, *headers;
+  const char *appended;
+  size_t i, reqlen, blocklen;
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "headerdedup: needs a request and a header block\n");
+    return 1;
+  }
+  req = malloct(2 * half);
+  tmp = malloct(half);
+  reqlen = st_decode_body(argv[0], req, half);
+  blocklen = st_decode_body(argv[1], tmp, half);
+  /* st_decode_body clips, and a clipped case grades an input nobody wrote */
+  if (reqlen + 1 >= half || blocklen + 1 >= half) {
+    fprintf(stderr, "headerdedup: argument longer than %d bytes\n",
+            (int) half - 2);
+    freet(tmp);
+    freet(req);
+    return 1;
+  }
+  appended = req + reqlen;
+  /* exact-size copy so a sanitizer traps an over-read of the block */
+  headers = strdupt(tmp);
+  freet(tmp);
+  http_append_custom_headers(req, 2 * half, headers);
+  for (i = 0; appended[i] != '\0'; i++) {
+    if (appended[i] == '\r')
+      printf("\\r");
+    else if (appended[i] == '\n')
+      printf("\\n");
+    else
+      putchar(appended[i]);
+  }
+  printf("\n");
+  freet(headers);
+  freet(req);
+  return 0;
+}
+
 static int st_sniff(httrackp *opt, int argc, char **argv) {
   char BIGSTK body[1024];
   size_t n;
@@ -11603,6 +11647,9 @@ static const struct selftest_entry {
     {"headerfield", "<headers> <field>",
      "is <field> already present in the custom request-header block",
      st_headerfield},
+    {"headerdedup", "<request> <headers>",
+     "what the custom header block adds to a request that has some (#1340)",
+     st_headerdedup},
     {"headerlong", "[header-name:]",
      "over-long header value must not overflow the parse scratch",
      st_headerlong},

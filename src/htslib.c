@@ -950,6 +950,60 @@ hts_boolean http_headers_have_field(const char *headers,
   return HTS_FALSE;
 }
 
+/* Dropping a line drops its folded continuations too: kept, that value would
+   attach to whichever header precedes it in the request. */
+static void append_custom_headers(buff_struct *bstr, const char *headers) {
+  const size_t base = bstr->pos;
+  hts_boolean keep = HTS_TRUE;
+  const char *line;
+
+  for (line = headers; *line != '\0';) {
+    const char *eol = line;
+    const char *next;
+
+    while (*eol != '\0' && *eol != '\r' && *eol != '\n')
+      eol++;
+    next = eol;
+    if (next[0] == '\r' && next[1] == '\n')
+      next += 2;
+    else if (*next != '\0')
+      next++;
+
+    if (*line != ' ' && *line != '\t') { /* not a folded continuation */
+      const char *colon = line;
+      char field[128];
+
+      keep = HTS_TRUE;
+      while (colon < eol && *colon != ':')
+        colon++;
+      if (colon > line && colon < eol &&
+          (size_t) (colon - line) < sizeof(field)) {
+        const size_t len = (size_t) (colon - line);
+        const char cut = bstr->buffer[base];
+
+        memcpy(field, line, len);
+        field[len] = '\0';
+        /* only what the engine wrote, so the box may repeat its own fields */
+        bstr->buffer[base] = '\0';
+        keep = !http_headers_have_field(bstr->buffer, field);
+        bstr->buffer[base] = cut;
+      }
+    }
+    if (keep)
+      print_buffer(bstr, "%.*s", (int) (next - line), line);
+    line = next;
+  }
+}
+
+void http_append_custom_headers(char *dst, size_t dst_size,
+                                const char *headers) {
+  buff_struct bstr = {dst, dst_size, 0};
+
+  assertf(dst != NULL && dst_size > 0);
+  bstr.pos = strlen(dst);
+  append_custom_headers(&bstr, headers);
+}
+
 // envoi d'une requète
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
                   const char *xsend, const char *adr, const char *fil,
@@ -960,6 +1014,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
   int direct_url = 0;           // ne pas analyser l'url (exemple: ftp://)
   const char *search_tag = NULL;
+
+  /* the extra-headers box wins: skip the engine's own line (#1337, #1340) */
+  const char *const custom = retour->req.headers;
 
   /* adr and the referer come off the network and can carry raw CR/LF; capped
      at their own source buffers, so the worst case emitted does not grow. */
@@ -1084,7 +1141,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         !hts_proxy_is_socks(retour->req.proxy.name) &&
         !hts_proxy_is_connect(retour->req.proxy.name) &&
         strncmp(adr, "https://", 8) != 0) {
-      if (link_has_authorization(retour->req.proxy.name)) {     // et hop, authentification proxy!
+      if (link_has_authorization(retour->req.proxy.name) &&
+          !http_headers_have_field(custom, "Proxy-Authorization")) {
         const char *a = jump_identification_const(retour->req.proxy.name);
         const char *astart = jump_protocol_const(retour->req.proxy.name);
         char autorisation[1100];
@@ -1107,12 +1165,13 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
     if (referer_adr != NULL && referer_fil != NULL && strnotempty(referer_adr)
         && strnotempty(referer_fil)
       ) {                       // non vide
-      if ((strcmp(referer_adr, "file://") != 0)
-          && (                  /* no https referer to http urls */
-               (strncmp(referer_adr, "https://", 8) != 0)       /* referer is not https */
-               ||(strncmp(adr, "https://", 8) == 0)     /* or referer AND addresses are https */
-          )
-        ) {                     // PAS file://
+      if ((strcmp(referer_adr, "file://") != 0) &&
+          (/* no https referer to http urls */
+           (strncmp(referer_adr, "https://", 8) != 0) /* referer is not https */
+           || (strncmp(adr, "https://", 8) ==
+               0) /* or referer AND addresses are https */
+           ) &&
+          !http_headers_have_field(custom, "Referer")) { // not file://
         /* one escape per piece, so neither can outgrow its own source buffer */
         print_buffer(
             &bstr, "Referer: http://%s",
@@ -1123,7 +1182,8 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
       }
     }
     // HTTP field: referer
-    else if (strnotempty(retour->req.referer)) {
+    else if (strnotempty(retour->req.referer) &&
+             !http_headers_have_field(custom, "Referer")) {
       print_buffer(&bstr, "Referer: %s"H_CRLF, retour->req.referer);
     }
     // POST?
@@ -1137,7 +1197,7 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
       }
     }
     // send stored cookies matching this host/path
-    if (cookie) {
+    if (cookie != NULL && !http_headers_have_field(custom, "Cookie")) {
       append_cookie_header(&bstr, cookie, jump_identification_const(adr), fil);
     }
     // gérer le keep-alive (garder socket)
@@ -1149,9 +1209,6 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
     {
       const char *real_adr = jump_identification_const(adr);
-
-      /* the extra-headers box wins: skip the engine's own line (#1337) */
-      const char *const custom = retour->req.headers;
 
       // Mandatory per RFC2616
       if (!direct_url &&
@@ -1228,9 +1285,9 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
       }
     }
 
-    // Custom header(s)
-    if (strnotempty(retour->req.headers)) {
-      print_buffer(&bstr, "%s", retour->req.headers);
+    // Custom header(s), minus the fields the request already carries
+    if (strnotempty(custom)) {
+      append_custom_headers(&bstr, custom);
     }
 
     // CRLF de fin d'en tête
