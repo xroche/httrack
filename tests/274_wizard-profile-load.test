@@ -69,40 +69,25 @@ EOF
 printf '[reloading a project reads its winprofile.ini] ..\t'
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
+htsserver_python - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
 import re
 import sys
-import urllib.parse
-import urllib.request
 
-url, work = sys.argv[1].rstrip("/"), sys.argv[2]
+from webtestlib import Session, textarea
 
-
-def get(page):
-    return urllib.request.urlopen(url + "/server/" + page,
-                                  timeout=20).read().decode("latin-1")
-
-
-m = re.search(r'name="sid" value="([0-9a-f]+)"', get("index.html"))
-if not m:
-    sys.exit("no session id in server/index.html")
-sid = m.group(1)
+s, work = Session(sys.argv[1]), sys.argv[2]
+sid = s.sid
 
 # Control, before anything is loaded: a fresh session ticks the cache box, so
 # the assertions below measure the profile rather than an absent default.
 tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="cache"[^>]*>',
-                 get("option3.html?sid=" + sid))
+                 s.get("option3.html?sid=" + sid))
 if len(tag) != 1 or "checked" not in tag[0]:
     sys.exit("a new project does not default to caching: %r" % tag)
 
 # The only request that opens the file: a GET of an option page renders the
 # session the server already holds and never touches the disk.
-body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
-                [("sid", sid), ("path", work), ("loadprojname", "proj")])
-loaded = urllib.request.urlopen(
-    urllib.request.Request(url + "/server/step2.html",
-                           data=body.encode("latin-1"), method="POST"),
-    timeout=20).read().decode("latin-1")
+loaded = s.post("step2.html", [("path", work), ("loadprojname", "proj")])
 if "http://example.com/" not in loaded:
     sys.exit("step2.html did not load the project\n%s" % loaded[:400])
 # The category dropdown comes from a second, independent reader in htstools.c
@@ -112,15 +97,7 @@ if '<option value="c%">' not in loaded:
              % re.findall(r"<option[^>]*>[^<]*</option>", loaded))
 
 
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page,
-                  re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered page" % name)
-    return m.group(1)
-
-
-step4 = get("step4.html?sid=" + sid)
+step4 = s.get("step4.html?sid=" + sid)
 flags = [line.strip() for line in textarea(step4, "command").split("\n")]
 ini = dict(line.split("=", 1) for line in textarea(step4, "winprofile")
            .replace("\r\n", "\n").split("\n") if "=" in line)
@@ -146,7 +123,7 @@ want("--depth=3")
 if ini.get("MaxRate") != "0" or ini.get("MaxTime") != "0":
     sys.exit("saving the reloaded project loses the zeros: %r" % ini)
 maxrate = re.search(r'name="maxrate" value="([^"]*)"',
-                    get("option5.html?sid=" + sid))
+                    s.get("option5.html?sid=" + sid))
 if maxrate is None or maxrate.group(1) != "0":
     sys.exit("option5.html shows %r in the rate box"
              % (maxrate and maxrate.group(1)))
@@ -161,7 +138,7 @@ want("--wacz")
 reject('--warc-file "keepme"')
 if ini.get("WarcFile") != "keepme":
     sys.exit("the cleared box lost WarcFile: %r" % ini.get("WarcFile"))
-option9 = get("option9.html?sid=" + sid)
+option9 = s.get("option9.html?sid=" + sid)
 for box, ticked in [("warc", False), ("wacz", True)]:
     tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="%s"[^>]*>' % box,
                      option9)
@@ -186,7 +163,7 @@ want("--cookies=0")
 want("--index=0")
 want("--cache=0")
 want("--urlhack=0")
-option4 = get("option4.html?sid=" + sid)
+option4 = s.get("option4.html?sid=" + sid)
 tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="ka"[^>]*>', option4)
 if len(tag) != 1 or "checked" in tag[0]:
     sys.exit("the keep-alive box came back %r" % tag)
@@ -199,13 +176,13 @@ if "Sockets" not in ini or ini["Sockets"] != "4":
 # value; only a fresh session may take it.
 for page in ["step2.html?sid=" + sid, "option3.html?sid=" + sid]:
     tag = re.findall(r'<input[^>]*type="checkbox"[^>]*name="cache"[^>]*>',
-                     get(page))
+                     s.get(page))
     if tag and "checked" in tag[0]:
         sys.exit("the cache box came back ticked after %s" % page)
 
 # One separator, whatever the run: unescapeini() folds an encoded CR LF TAB
 # into a single break, and the rules box must show exactly that.
-alias = textarea(get("option8.html?sid=" + sid), "hostalias")
+alias = textarea(s.get("option8.html?sid=" + sid), "hostalias")
 if alias != "a=b\rc=d":
     sys.exit("the rules box holds %r, wanted one separator" % alias)
 want('--host-alias "a=b"')
@@ -219,11 +196,7 @@ if ini.get("Footer") != "x%%y":
 # The form body decodes through unescapehttp() rather than unescapeini(), and
 # only a raw % reaches it: urlencoding one would defeat the probe.
 want('--sitemap-url "http://example.com/s.xml%"')
-posted = urllib.request.urlopen(
-    urllib.request.Request(url + "/server/step4.html",
-                           data=("sid=%s&cookiesfile=z%%&x=1"
-                                 % sid).encode("latin-1"),
-                           method="POST"), timeout=20).read().decode("latin-1")
+posted = s.post_raw("step4.html", "sid=%s&cookiesfile=z%%&x=1" % s.sid)
 if '--cookies-file "z%"' not in textarea(posted, "command"):
     sys.exit("a posted trailing %% did not come back verbatim\n%s"
              % textarea(posted, "command"))
@@ -232,12 +205,7 @@ if '--cookies-file "z%"' not in textarea(posted, "command"):
 # ProxyType 0 is the HTTP entry, so it prefixes no scheme. The proxy box itself
 # is session state, so fill it before reading the flag.
 def proxy_flag(fields):
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
-                    [("sid", sid)] + fields)
-    page = urllib.request.urlopen(
-        urllib.request.Request(url + "/server/step4.html",
-                               data=body.encode("latin-1"), method="POST"),
-        timeout=20).read().decode("latin-1")
+    page = s.post("step4.html", fields)
     got = [line.strip() for line in textarea(page, "command").split("\n")
            if line.strip().startswith("--proxy ")]
     if len(got) != 1:

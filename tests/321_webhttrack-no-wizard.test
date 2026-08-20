@@ -22,10 +22,12 @@ cleanup_push cleanup
 
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" "${distdir}" <<'PY' || fail "the wizard mode is still offered (see above)"
-import os, re, sys, urllib.parse, urllib.request
+htsserver_python - "${HTS_URL}" "${distdir}" <<'PY' || fail "the wizard mode is still offered (see above)"
+import os, re, sys
 
-url, srcdir = sys.argv[1].rstrip("/"), sys.argv[2]
+from webtestlib import Session, textarea
+
+s, srcdir = Session(sys.argv[1]), sys.argv[2]
 rc = 0
 
 
@@ -40,34 +42,8 @@ def read(*path):
     return open(os.path.join(srcdir, *path), "rb").read().decode("latin-1")
 
 
-def get(path):
-    # The UI is served ISO-8859-1, so decode, do not assume UTF-8.
-    return urllib.request.urlopen(url + path, timeout=20).read().decode("latin-1")
-
-
-sid = re.search(r'name="sid" value="([0-9a-f]+)"', get("/server/index.html"))
-if sid is None:
-    sys.exit("no session id in server/index.html")
-sid = sid.group(1)
-
-
-def post(fields, page="step4.html"):
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
-                    [("sid", sid)] + fields)
-    req = urllib.request.Request(url + "/server/" + page,
-                                 data=body.encode("latin-1"), method="POST")
-    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-
-
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered step4.html" % name)
-    return m.group(1)
-
-
 def options():
-    page = get("/server/step3.html")
+    page = s.get("step3.html")
     block = re.search(r'<select name="todo".*?</select>', page, re.S)
     if block is None:
         sys.exit("no action <select> in the rendered step3.html")
@@ -101,7 +77,7 @@ check(not [l for l in labels if "questions" in l],
 # Renumbering the survivors would keep the menu wizard-free and still break
 # every stored CurrentAction, so pin id to flag rather than just the count.
 for todo, flag in sorted(COMMAND.items()):
-    cmd = textarea(post([("todo", str(todo))]), "command").split()
+    cmd = textarea(s.post("step4.html", [("todo", str(todo))]), "command").split()
     check(flag in cmd, "action %d runs %s" % (todo, flag))
     check("--mirror-wizard" not in cmd, "action %d does not run the wizard" % todo)
     selected = [i for i, sel, _ in options() if sel]

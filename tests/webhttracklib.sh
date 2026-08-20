@@ -189,6 +189,12 @@ htsserver_client() {
     "${HTS_PYTHON}" "${HTS_TESTDIR}/httpclient.py" --port "${HTS_PORT}" "$@"
 }
 
+# Python with tests/ importable: "python -" puts no script directory on
+# sys.path, so a heredoc cannot import webtestlib without this.
+htsserver_python() {
+    PYTHONPATH="${HTS_TESTDIR}${PYTHONPATH:+:$PYTHONPATH}" "${HTS_PYTHON}" "$@"
+}
+
 # The reply to a GET of $1, status line and headers included.
 htsserver_get() { htsserver_client --path "$1"; }
 

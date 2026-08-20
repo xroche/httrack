@@ -20,31 +20,13 @@ cleanup_push cleanup
 htsserver_start --home "${work}"
 
 # Audit what step4.html renders back; without command_do nothing is launched.
-"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "wizard rendered the wrong options (see above)"
-import re, sys, urllib.parse, urllib.request
+htsserver_python - "${HTS_URL}" <<'PY' || fail "wizard rendered the wrong options (see above)"
+import sys
 
-url = sys.argv[1]
+from webtestlib import Session, textarea
+
+s = Session(sys.argv[1])
 html, other, site = "111111", "222222", "333333"
-
-
-def post(fields):
-    # The body is refused without the session id the server puts in each form.
-    form = urllib.request.urlopen(url + "server/index.html", timeout=20).read()
-    m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
-    if not m:
-        raise SystemExit("no session id in server/index.html")
-    fields = [("sid", m.group(1).decode())] + fields
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
-    req = urllib.request.Request(url + "server/step4.html",
-                                 data=body.encode("latin-1"), method="POST")
-    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-
-
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered step4.html" % name)
-    return m.group(1)
 
 
 def want(ok, msg, ctx):
@@ -52,8 +34,8 @@ def want(ok, msg, ctx):
         sys.exit("%s\nrendered:%s" % (msg, ctx))
 
 
-page = post([("maxhtml", html), ("othermax", other), ("sizemax", site),
-             ("dos", "2")])
+page = s.post("step4.html", [("maxhtml", html), ("othermax", other),
+                             ("sizemax", site), ("dos", "2")])
 cmd = textarea(page, "command")
 want("--max-size=" + site in cmd, "site cap not emitted as --max-size", cmd)
 want("--max-files=" + site not in cmd, "site cap still an --max-files", cmd)
@@ -76,15 +58,15 @@ want("\nMaxAll=" + site + "\n" in ini, "MaxAll not written from sizemax", ini)
 
 # A bare --max-files= (an unguarded empty field) parses as -m with no digits,
 # silently clearing the html cap.
-page = post([("maxhtml", ""), ("othermax", ""), ("sizemax", ""), ("dos", "2")])
+page = s.post("step4.html", [("maxhtml", ""), ("othermax", ""), ("sizemax", ""),
+                             ("dos", "2")])
 cmd = textarea(page, "command")
 want("--max-rate=" in cmd, "empty size fields rendered no command line", cmd)
 want("--max-files" not in cmd and "--max-size" not in cmd,
      "empty size fields still rendered a size option", cmd)
 
 # A mistyped ${LANG_OK] key renders the OK button's label empty.
-opts = urllib.request.urlopen(url + "server/option2b.html",
-                              timeout=20).read().decode("latin-1")
+opts = s.get("option2b.html")
 want("LANG_OK" not in opts, "unexpanded LANG_OK in option2b.html", "")
 want('<input type="submit" value="OK"' in opts, "no OK label in option2b.html",
      "")

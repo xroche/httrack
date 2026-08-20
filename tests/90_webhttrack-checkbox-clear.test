@@ -22,10 +22,12 @@ cleanup_push cleanup
 
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" "${distdir}" <<'PY' || fail "checkbox clearing is broken (see above)"
-import glob, os, re, sys, urllib.parse, urllib.request
+htsserver_python - "${HTS_URL}" "${distdir}" <<'PY' || fail "checkbox clearing is broken (see above)"
+import glob, os, re, sys
 
-url, srcdir = sys.argv[1].rstrip("/"), sys.argv[2]
+from webtestlib import Session, checked, textarea
+
+s, srcdir = Session(sys.argv[1]), sys.argv[2]
 rc = 0
 
 
@@ -54,39 +56,6 @@ for path in sorted(glob.glob(os.path.join(srcdir, "html", "server", "option*.htm
               % (os.path.basename(path), m.group(1)))
 # Control: a regex that stopped matching would leave nothing to assert on.
 check(boxes >= 25, "the option pages were scanned (%d checkboxes)" % boxes)
-
-sid = None
-
-
-def get(path):
-    # The UI is served ISO-8859-1, so decode, do not assume UTF-8.
-    return urllib.request.urlopen(url + path, timeout=20).read().decode("latin-1")
-
-
-def post(fields):
-    global sid
-    if sid is None:
-        m = re.search(r'name="sid" value="([0-9a-f]+)"', get("/server/index.html"))
-        if m is None:
-            sys.exit("no session id in server/index.html")
-        sid = m.group(1)
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
-                    [("sid", sid)] + fields)
-    req = urllib.request.Request(url + "/server/step4.html",
-                                 data=body.encode("latin-1"), method="POST")
-    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-
-
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered step4.html" % name)
-    return m.group(1)
-
-
-def checked(page, name):
-    return re.search(r'name="%s"[ \t]*checked' % name, get("/server/" + page)) is not None
-
 
 # What each state puts on the command line (None: nothing) and its profile key.
 BOXES = [
@@ -142,7 +111,7 @@ for field, key, when_set, when_clear in BOXES:
         fields = [(g, "on" if GATED_BY.get(field) == g else "")
                   for g in GATES if g != field]
         fields.append((field, value))
-        rendered = post(fields)
+        rendered = s.post("step4.html", fields)
         cmd = textarea(rendered, "command").split()
         label = "%s %s" % (field, "set" if value else "cleared")
         if want:
@@ -153,19 +122,23 @@ for field, key, when_set, when_clear in BOXES:
             # The Windows GUI reads the same option out of the profile.
             check("%s=%s" % (key, stored) in textarea(rendered, "winprofile").splitlines(),
                   "%s writes %s=%s" % (label, key, stored))
-        check(checked(page_of[field], field) == bool(value),
+        check(checked(s.get(page_of[field]), field) == bool(value),
               "%s draws %s box" % (label, "a ticked" if value else "an empty"))
 missing = sorted(set(page_of) - set(b[0] for b in BOXES))
 check(not missing, "every checkbox is exercised (missing %s)" % missing)
 
 # A browser posts the companion and the ticked box under one name, so the fix
 # rests on the body loop keeping the last value; both orders pin that down.
-cmd = textarea(post([("cookies", ""), ("cookies", "on")]), "command").split()
+cmd = textarea(s.post("step4.html", [("cookies", ""), ("cookies", "on")]),
+               "command").split()
 check("--cookies=0" not in cmd, "cookies=&cookies=on keeps cookies set")
-check(checked("option8.html", "cookies"), "cookies=&cookies=on draws a ticked box")
-cmd = textarea(post([("cookies", "on"), ("cookies", "")]), "command").split()
+check(checked(s.get("option8.html"), "cookies"),
+      "cookies=&cookies=on draws a ticked box")
+cmd = textarea(s.post("step4.html", [("cookies", "on"), ("cookies", "")]),
+               "command").split()
 check("--cookies=0" in cmd, "cookies=on&cookies= clears cookies")
-check(not checked("option8.html", "cookies"), "cookies=on&cookies= draws an empty box")
+check(not checked(s.get("option8.html"), "cookies"),
+      "cookies=on&cookies= draws an empty box")
 
 sys.exit(rc)
 PY

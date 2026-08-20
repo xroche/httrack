@@ -28,46 +28,25 @@ cleanup_push cleanup
 printf '[webhttrack emits --host-alias] ..\t'
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" "${work}/emitted" <<'PY' || fail "the Host aliases field is not wired (see above)"
-import re, shlex, sys, urllib.parse, urllib.request
+htsserver_python - "${HTS_URL}" "${work}/emitted" <<'PY' || fail "the Host aliases field is not wired (see above)"
+import shlex, sys
 
-url, emitted = sys.argv[1].rstrip("/"), sys.argv[2]
+from webtestlib import Session, textarea
+
+s, emitted = Session(sys.argv[1]), sys.argv[2]
 # two rules, because one flag carries one rule: a browser posts the textarea
 # lines CRLF-separated
 RULES = ["www2.example.com,m.example.com=example.com",
          "legacy.example.org=https://example.org"]
 RULE = "\r\n".join(RULES)
 
-form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
-m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
-if not m:
-    sys.exit("no session id in server/index.html")
-sid = m.group(1).decode()
-
 # An unknown ${LANG_*} renders empty, so assert the label text, not its absence.
-page = urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
-                              timeout=20).read().decode("latin-1")
+page = s.get("option8.html?sid=" + s.sid)
 for want in ('name="hostalias"', "Host aliases:"):
     if want not in page:
         sys.exit("option8.html does not render %r" % want)
 
-
-def post(fields):
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
-                    [("sid", sid)] + fields)
-    req = urllib.request.Request(url + "/server/step4.html",
-                                 data=body.encode("latin-1"), method="POST")
-    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-
-
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered step4.html" % name)
-    return m.group(1)
-
-
-page = post([("hostalias", RULE)])
+page = s.post("step4.html", [("hostalias", RULE)])
 cmd = textarea(page, "command")
 # Whole lines: each rule carries the separators the argv splitter reads, and
 # one flag per rule is what the engine accumulates.
@@ -85,9 +64,7 @@ if not ini or not all(rule in ini[0] for rule in RULES):
 
 # Reopening the page must show both rules back, one per line: a name the state
 # never writes renders an empty box and the project loses them on every reload.
-back = textarea(urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
-                                       timeout=20).read().decode("latin-1"),
-                "hostalias")
+back = textarea(s.get("option8.html?sid=" + s.sid), "hostalias")
 for rule in RULES:
     if rule not in back:
         sys.exit("option8.html does not render %r back\n%s" % (rule, back))
@@ -96,7 +73,7 @@ def emitted_rules(value):
     """The rules the template emits for a box holding VALUE."""
     flag = '--host-alias "'
     return [line.strip()[len(flag):-1]
-            for line in textarea(post([("hostalias", value)]),
+            for line in textarea(s.post("step4.html", [("hostalias", value)]),
                                  "command").split("\n")
             if flag in line]
 
