@@ -582,6 +582,31 @@ start_proxytrack() { # start_proxytrack LOGBASE LAUNCH
 # the line. A full minute of wall clock: a cold Python start under a parallel
 # `make check -jN` lags well past a second, 5s had macos-15 missing it on 15 tests,
 # and the count-of-ticks loop this replaced self-extended under load instead.
+# Start ftp-server.py, setting FTP_PORT, FTP_PID and FTP_LOG. --root is resolved
+# for the host; every later argument reaches the server verbatim. Stdin off the
+# terminal: run_with_timeout toggles job control, and a background job that
+# touches the tty is stopped with SIGTTIN.
+ftp_server_start() { # ftp_server_start [--root DIR] [SERVER-ARGS...]
+    local root=''
+    if test "${1:-}" = --root; then
+        root=$2
+        shift 2
+    fi
+    test -n "${FTP_PYTHON:-}" || FTP_PYTHON=$(find_python) || skip "python3 not found"
+    # Numbered, so a test starting a second server does not truncate the first's
+    # log and with it the port it announced. No --log option: ftp-server.py has
+    # one of its own, and two meanings for one name is how 233 nearly broke.
+    FTP_N=$((${FTP_N:-0} + 1))
+    FTP_LOG="${tmpdir:?no tmpdir set before ftp_server_start}/ftp-server.${FTP_N}.out"
+    : >"$FTP_LOG"
+    "$FTP_PYTHON" "$(nativepath "${testdir}/ftp-server.py")" \
+        ${root:+--root "$(nativepath "$root")"} "$@" >"$FTP_LOG" 2>&1 </dev/null &
+    FTP_PID=$!
+    cleanup_push stop_server "$FTP_PID"
+    FTP_PORT=$(discover_server_port "$FTP_LOG" "$FTP_PID") ||
+        fail "ftp-server did not come up: $(<"$FTP_LOG")"
+}
+
 discover_server_port() {
     local log=$1 pid=$2 line start=$SECONDS
     while :; do

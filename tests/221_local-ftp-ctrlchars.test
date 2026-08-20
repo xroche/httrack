@@ -10,17 +10,10 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-python=$(find_python) || skip "python3 not found"
 require_httrack
 
-server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
-serverpid=
-cleanup() {
-    stop_server "$serverpid"
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
@@ -30,11 +23,7 @@ printf 'body\n' >"${root}/f.txt"
 printf 'secret\n' >"${root}/x.txt"
 printf 'listed\n' >"${root}/d -la/inside.txt"
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" \
-    --log "$(nativepath "$cmds")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+ftp_server_start --root "$root" --log "$(nativepath "$cmds")"
 
 # 60s is the wedge detector: a dropped command leaves the engine on a 300s read.
 crawl() {
@@ -45,7 +34,7 @@ crawl() {
 # --- the injected command line ----------------------------------------------
 : >"$cmds"
 start=$SECONDS
-crawl "ftp://127.0.0.1:${port}/f%0d%0aDELE%20x.txt" >"${tmpdir}/log1" 2>&1 ||
+crawl "ftp://127.0.0.1:${FTP_PORT}/f%0d%0aDELE%20x.txt" >"${tmpdir}/log1" 2>&1 ||
     fail "the run did not finish in $((SECONDS - start))s"
 grep -aq 'Invalid control character in FTP URL' "${out}/hts-log.txt" ||
     fail "no refusal in the log: $(grep -a 'Error' "${out}/hts-log.txt" || true)"
@@ -57,12 +46,12 @@ ok "nothing reached the control channel"
 
 # --- a space in a listing argument ------------------------------------------
 : >"$cmds"
-crawl "ftp://127.0.0.1:${port}/d%20-la/" >"${tmpdir}/log2" 2>&1 ||
+crawl "ftp://127.0.0.1:${FTP_PORT}/d%20-la/" >"${tmpdir}/log2" 2>&1 ||
     fail "the listing crawl never finished"
 listcmd=$(grep -a '^LIST ' "$cmds" || true)
 test "$listcmd" = 'LIST -A "/d -la/"' ||
     fail "the listing path is not one quoted token: [${listcmd}]"
-grep -aq inside.txt "${out}/127.0.0.1_${port}/d -la/index.txt" ||
+grep -aq inside.txt "${out}/127.0.0.1_${FTP_PORT}/d -la/index.txt" ||
     fail "the quoted listing brought nothing back; mirror holds $(find "$out" \
         -type f -not -path '*hts-cache*')"
 ok "the listing path goes out as a single token, and still lists"
