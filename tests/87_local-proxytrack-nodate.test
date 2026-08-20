@@ -5,6 +5,8 @@
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
 
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
@@ -25,13 +27,9 @@ run_case() {
         printf 'Content-Length: 5\r\n\r\n'
     } >"$dir/hdr"
     printf 'hello' >"$dir/body"
-    alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
     {
-        printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
-        printf '2 0 test\n'
-        printf '\n\n'
-        printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
-        cat "$dir/hdr" "$dir/body"
+        arc_filedesc
+        arc_record http://example.com/p.html text/html 200 "$dir/hdr" "$dir/body"
     } >"$dir/in.arc"
 
     proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 || fail "proxytrack crashed on $what"

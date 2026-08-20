@@ -8,6 +8,8 @@ set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
 
 python=$(find_python) || skip "python3 missing"
 command -v curl >/dev/null 2>&1 || skip "curl missing"
@@ -22,18 +24,13 @@ cleanup_push cleanup
 
 printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
 printf 'hello' >"$dir/body"
-alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
 {
-    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
-    printf '2 0 test\n'
-    printf '\n\n'
-    printf 'http://example.com/page.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
-    cat "$dir/hdr" "$dir/body"
+    arc_filedesc
+    arc_record http://example.com/page.html text/html 200 "$dir/hdr" "$dir/body"
     # a record begins on the newline following the previous one's data
     printf '\n'
     # gives the Depth: 1 listing below a child directory as well as a child file
-    printf 'http://example.com/sub/deep.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
-    cat "$dir/hdr" "$dir/body"
+    arc_record http://example.com/sub/deep.html text/html 200 "$dir/hdr" "$dir/body"
 } >"$dir/in.arc"
 
 launch_proxytrack() {
