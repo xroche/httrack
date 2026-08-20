@@ -310,8 +310,8 @@ repeat_chars() { # repeat_chars COUNT [CHAR]
 }
 
 # grep -c counts matching LINES, not matches: two hits on one line count once.
-# It also returns 0, not a failing status, when nothing matches. -a on all of
-# these: a log that picks up one NUL byte otherwise counts nothing, silently.
+# It also returns 0, not a failing status, when nothing matches. -a throughout,
+# inert for GNU grep here but not for one that skips a file it reads as binary.
 count_matching_lines() { # count_matching_lines PATTERN [FILE]
     grep -ac "$@" || true
 }
