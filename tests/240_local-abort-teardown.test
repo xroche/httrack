@@ -15,10 +15,7 @@ cleanup_push cleanup
 
 local_server_start
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 
 out="${tmpdir}/crawl"
 mkdir "$out"
@@ -30,10 +27,7 @@ common=(--quiet --disable-security-limits --robots=0 --timeout=30 --changes
 expect() {
     printf '[%s] ..\t' "$1"
     shift
-    "$@" || {
-        echo "FAIL"
-        exit 1
-    }
+    "$@" || fail "FAIL"
     echo "OK"
 }
 no_tmp() { test -z "$(find "$out" -maxdepth 1 -name '*.tmp' -print -quit)"; }
@@ -41,16 +35,10 @@ unpoisoned() { ! grep -qa "$poison" "$1"; }
 
 # --- pass 1: a complete crawl, to have something an abort could destroy ------
 local_crawl --log "${tmpdir}/log1" "${common[@]}" -O "$out" "${BASEURL}/changes/index.html"
-test -s "$report" || {
-    echo "FAIL: pass 1 wrote no ${report}"
-    exit 1
-}
+test -s "$report" || fail "pass 1 wrote no ${report}"
 cp "$report" "${tmpdir}/report1.json"
 for f in "${out}/warc-out.warc.gz" "${out}/warc-out.cdx"; do
-    test -s "$f" || {
-        echo "FAIL: pass 1 produced no $f"
-        exit 1
-    }
+    test -s "$f" || fail "pass 1 produced no $f"
     printf '%s\n' "$poison" >"$f"
 done
 

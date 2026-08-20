@@ -38,7 +38,7 @@ printf '<svg xmlns="http://www.w3.org/2000/svg"><g id="icon-foo"/></svg>\n' \
 # --- server -----------------------------------------------------------------
 local_server_start --root "$doc"
 
-which httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 # --- crawl ------------------------------------------------------------------
 # The cap sits between sprite.svg and big.svg, so one inlines and one is left

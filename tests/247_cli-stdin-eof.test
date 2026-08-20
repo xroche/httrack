@@ -21,10 +21,7 @@ cleanup_push cleanup
 
 local_server_start
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 
 # Trickled pages: the crawl has to outlive several passes of the loop that polls
 # stdin, or a display that toggles has no time to show it.

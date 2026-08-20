@@ -9,7 +9,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 ! is_windows || ! echo "MSYS cannot signal a native httrack.exe; skipping" >&2 ||
     exit 77
 
@@ -20,8 +20,6 @@ cleanup() {
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
-
-ok() { echo "OK: $*"; }
 
 # Above a truncated $SECONDS and a loaded runner's scheduling, below the
 # shortest kernel connect timeout an unfixed engine would wait out.

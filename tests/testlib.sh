@@ -309,6 +309,18 @@ repeat_chars() { # repeat_chars COUNT [CHAR]
     printf '%*s' "$1" '' | tr ' ' "${2:-a}"
 }
 
+# A passing step, on stdout: the failures go to stderr through fail().
+ok() { echo "OK: $*"; }
+
+# Size of file $1 in bytes. wc pads its count on the BSDs.
+size_of() { wc -c <"$1" | tr -d '[:space:]'; }
+
+# The engine must be on PATH. `which` is not POSIX and lies under MSYS, and a
+# test that needs the engine has nothing to say without it.
+require_httrack() {
+    command -v httrack >/dev/null || fail "could not find httrack"
+}
+
 # Longest surviving run of char $2 in file $1, or 0: the length a field was
 # clipped to, read back out of a binary artifact.
 runlen() {

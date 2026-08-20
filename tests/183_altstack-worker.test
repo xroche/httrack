@@ -20,7 +20,7 @@ MINGW* | MSYS* | CYGWIN*)
 # gated on Linux + execinfo.h (USES_BACKTRACE in htsbacktrace.c).
 *) traced=0 ;;
 esac
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 # Dies from a caught fault, running the report to its end. The handler finishes
 # in abort(), so the shell sees SIGABRT (134); 139 is the kernel killing us.

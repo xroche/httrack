@@ -13,8 +13,6 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_cleanup.XXXXXX")
 # the bug it is looking for.
 trap 'set +e; rm -rf "$tmpdir"' EXIT
 
-ok() { echo "OK: $*"; }
-
 # Runs the written subject and reports its status. It has to be its own process,
 # since the traps under test are the shell's.
 subject() {

@@ -9,7 +9,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpmax.XXXXXX")
@@ -35,8 +35,6 @@ serverlog="${tmpdir}/server.out"
     --log "$(nativepath "$cmds")" >"$serverlog" 2>&1 &
 serverpid=$!
 port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-
-ok() { echo "OK: $*"; }
 
 start=$SECONDS
 run_with_timeout 90 httrack "ftp://127.0.0.1:${port}/f.bin" -O "$out" --quiet \

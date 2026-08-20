@@ -16,8 +16,6 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_freeport.XXXXXX")
 cleanup_push rm -rf "$tmpdir"
 typelog="$tmpdir/socktypes"
 
-ok() { echo "OK: $*"; }
-
 bindable() { # bindable PROTO PORT
     "$real_python" -c 'import socket, sys
 kinds = {"tcp": socket.SOCK_STREAM, "udp": socket.SOCK_DGRAM}

@@ -14,7 +14,7 @@ if [ "$HTS_OS" != "Linux" ]; then
     echo "the symbolizer spawn is Linux-only, skipping" >&2
     exit 77
 fi
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 # A wedged httrack still catches SIGTERM and only sets a flag, hence -s KILL.
 command -v timeout >/dev/null || fail "no timeout(1): a hang would never end here"
 

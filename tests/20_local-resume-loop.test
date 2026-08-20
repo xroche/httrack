@@ -19,10 +19,7 @@ cleanup_push cleanup
 counter="${tmpdir}/blobcount"
 local_server_start --env RESUME_COUNTER="$counter" --root "$root"
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 out="${tmpdir}/crawl"
 mkdir "$out"
 common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0)
@@ -43,10 +40,7 @@ sleep 0.5
 kill -TERM "$crawlpid" 2>/dev/null
 wait "$crawlpid" 2>/dev/null
 crawlpid=
-test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
-    echo "FAIL: no temp-ref survived pass 1; cannot drive #206"
-    exit 1
-}
+test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || fail "no temp-ref survived pass 1; cannot drive #206"
 echo "OK (temp-ref present)"
 before=$(wc -c <"$counter" 2>/dev/null || echo 0)
 

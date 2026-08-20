@@ -9,13 +9,11 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpdead.XXXXXX")
 cleanup() { rm -rf "$tmpdir"; }
 cleanup_push cleanup
-
-ok() { echo "OK: $*"; }
 
 timeout=2
 # Above --timeout plus its two retries (3 x 2s) and a truncated $SECONDS, below

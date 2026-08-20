@@ -11,7 +11,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
@@ -62,8 +62,6 @@ fail() {
     test ! -f "$report" || cat "$report" >&2
     exit 1
 }
-ok() { echo "OK: $*"; }
-size_of() { wc -c <"$1" | tr -d '[:space:]'; }
 # Files listed under a report bucket, one "file:size" per line.
 listed() {
     "$python" - "$report" "$1" <<'EOF' | tr -d '\r'

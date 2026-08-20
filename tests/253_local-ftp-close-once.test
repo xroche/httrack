@@ -28,7 +28,7 @@ for lib in "${CLOSETRACK_LIB:-}" "${FTPCANCEL_LIB:-}"; do
 done
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpclose.XXXXXX")
@@ -40,8 +40,6 @@ cleanup() {
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
-
-ok() { echo "OK: $*"; }
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"

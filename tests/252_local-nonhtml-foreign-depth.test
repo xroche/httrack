@@ -48,7 +48,7 @@ cat >"${tmpdir}/aroot/assets.html" <<EOF
 </body></html>
 EOF
 
-which httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 crawl() { # crawl <label> <start path> [httrack args...]
     local label=$1 start=$2

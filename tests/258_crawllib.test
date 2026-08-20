@@ -17,8 +17,6 @@ find_python >/dev/null || skip "python3 not found"
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_crawllib.XXXXXX")
 cleanup_push rm -rf "$tmpdir"
 
-ok() { echo "OK: $*"; }
-
 rc=0 out=
 run_subject() {
     printf 'set -euo pipefail\n. "%s/crawllib.sh"\ntmpdir=%s\n%s\n' \

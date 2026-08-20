@@ -10,8 +10,6 @@ set -euo pipefail
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_tlspem.XXXXXX")
 cleanup_push rm -rf "$tmpdir"
 
-ok() { echo "OK: $*"; }
-
 make_tls_pem "$tmpdir"
 
 # The shipped pair verbatim, key first, and not a fixture minted per run (#1099).

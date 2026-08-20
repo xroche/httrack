@@ -23,10 +23,7 @@ cleanup_push cleanup
 
 local_server_start
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 out="${tmpdir}/crawl"
 mkdir "$out"
 common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=1 -c1)
@@ -45,10 +42,7 @@ sleep 0.3
 kill -TERM "$crawlpid" 2>/dev/null
 wait "$crawlpid" 2>/dev/null
 crawlpid=
-test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
-    echo "FAIL: no temp-ref survived pass 1; cannot drive the resume"
-    exit 1
-}
+test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || fail "no temp-ref survived pass 1; cannot drive the resume"
 echo "OK (temp-ref present)"
 
 # --- pass 2: --continue -> resume -> hostile INT64_MAX Content-Range ----------
@@ -67,13 +61,7 @@ blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)
 full=6008 # len(CRANGE206_BODY) = len("CR206DAT") + 6000
 
 printf '[file recovered whole] ..\t'
-test -s "$blob" || {
-    echo "FAIL: blob.bin missing after the hostile 206"
-    exit 1
-}
+test -s "$blob" || fail "blob.bin missing after the hostile 206"
 got=$(wc -c <"$blob")
-test "$got" -eq "$full" || {
-    echo "FAIL: blob.bin is ${got} bytes, expected ${full}"
-    exit 1
-}
+test "$got" -eq "$full" || fail "blob.bin is ${got} bytes, expected ${full}"
 echo "OK (${got} bytes)"

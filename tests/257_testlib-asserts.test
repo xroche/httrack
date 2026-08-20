@@ -12,8 +12,6 @@ set -euo pipefail
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_asserts.XXXXXX")
 cleanup_push rm -rf "$tmpdir"
 
-ok() { echo "OK: $*"; }
-
 rc=0 out=
 run_subject() {
     printf 'set -euo pipefail\n. "%s/testlib.sh"\n%s\n' "$testdir" "$1" >"$tmpdir/subject.sh"

@@ -11,7 +11,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
@@ -28,8 +28,6 @@ mode="${tmpdir}/mode"
 cmds="${tmpdir}/cmds"
 mkdir -p "$root" "$out"
 
-ok() { echo "OK: $*"; }
-size_of() { wc -c <"$1" | tr -d '[:space:]'; }
 # hts-log.txt is rewritten per pass, so this only ever sees the pass just run.
 no_errors() {
     local errors

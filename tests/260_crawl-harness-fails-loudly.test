@@ -20,8 +20,6 @@ run() { # run ARGS...
     out=$(bash "$crawl" "$@" 2>&1) || rc=$?
 }
 
-ok() { echo "OK: $*"; }
-
 # Floor: the same crawl unmutated has to pass, or the failures below could be
 # coming from a broken fixture rather than from what they mean to exercise.
 run --errors 0 httrack "$url"

@@ -11,7 +11,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
@@ -25,9 +25,6 @@ cleanup_push cleanup
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
 mkdir -p "$root" "$out"
-
-ok() { echo "OK: $*"; }
-size_of() { wc -c <"$1" | tr -d '[:space:]'; }
 
 # Distinct bodies and lengths, so a mirror that mixed two of them up cannot
 # compare equal.

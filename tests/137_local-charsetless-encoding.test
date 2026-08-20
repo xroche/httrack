@@ -18,10 +18,7 @@ cleanup_push cleanup
 mkdir "${tmpdir}/docroot"
 local_server_start --root "${tmpdir}/docroot"
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 
 # One crawl per variant: the generated top index carries the seed page's title.
 for variant in u8 l1 declared gb2312 l1decl; do

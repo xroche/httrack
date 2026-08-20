@@ -25,10 +25,7 @@ cleanup_push cleanup
 
 local_server_start
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 
 # Read from the server's own definitions: two routes happening to share a body
 # length must not let one leg assert the other's. Bodies come back as a length.
@@ -62,10 +59,7 @@ interrupt_pass1() { # interrupt_pass1 <out> <route> <extra httrack args...>
     kill -TERM "$crawlpid" 2>/dev/null
     wait "$crawlpid" 2>/dev/null || true
     crawlpid=
-    test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
-        echo "FAIL: no temp-ref survived pass 1; cannot drive the resume"
-        exit 1
-    }
+    test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || fail "no temp-ref survived pass 1; cannot drive the resume"
 }
 
 blob_size() { # blob_size <out>
@@ -93,25 +87,13 @@ rc=0
 run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
     --robots=0 --timeout=30 -c1 --retries=0 --continue \
     "${BASEURL}/resume206/index.html" >"${out}.log2" 2>&1 || rc=$?
-test "$rc" -ne 124 || {
-    echo "FAIL: the crawl never terminated"
-    exit 1
-}
+test "$rc" -ne 124 || fail "the crawl never terminated"
 log="${out}/hts-log.txt"
 # Without these the recovery could not have been exercised at all.
-grep -q 'Unusable partial-content range' <"$log" || {
-    echo "FAIL: the resume was never rejected; the test proved nothing"
-    exit 1
-}
-grep -q 'Restarting whole file' <"$log" || {
-    echo "FAIL: the restart did not run outside the retry budget"
-    exit 1
-}
+grep -q 'Unusable partial-content range' <"$log" || fail "the resume was never rejected; the test proved nothing"
+grep -q 'Restarting whole file' <"$log" || fail "the restart did not run outside the retry budget"
 got=$(blob_size "$out")
-test "$got" -eq "$resume_full" || {
-    echo "FAIL: blob.bin is ${got} bytes, expected ${resume_full}"
-    exit 1
-}
+test "$got" -eq "$resume_full" || fail "blob.bin is ${got} bytes, expected ${resume_full}"
 echo "OK (${got} bytes)"
 
 # --- the latch bounds an always-unusable server ------------------------------
@@ -126,19 +108,10 @@ rc=0
 run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
     --robots=0 --timeout=30 -c1 --retries=0 --continue \
     "${BASEURL}/resume206loop/index.html" >"${out}.log2" 2>&1 || rc=$?
-test "$rc" -ne 124 || {
-    echo "FAIL: the crawl never terminated; the restart is unbounded"
-    exit 1
-}
-grep -q 'Unusable partial-content range' <"${out}/hts-log.txt" || {
-    echo "FAIL: the resume was never rejected; the latch was not exercised"
-    exit 1
-}
+test "$rc" -ne 124 || fail "the crawl never terminated; the restart is unbounded"
+grep -q 'Unusable partial-content range' <"${out}/hts-log.txt" || fail "the resume was never rejected; the latch was not exercised"
 restarts=$(grep -c 'Restarting whole file' <"${out}/hts-log.txt" || true)
-test "$restarts" -eq 1 || {
-    echo "FAIL: ${restarts} free restarts, expected exactly 1 (latch)"
-    exit 1
-}
+test "$restarts" -eq 1 || fail "${restarts} free restarts, expected exactly 1 (latch)"
 echo "OK (1 free restart, then bounded)"
 
 # --- the latch rides a re-record, and the budget survives the restart --------
@@ -153,26 +126,14 @@ rc=0
 run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
     --robots=0 --timeout=30 -c1 --retries=1 \
     "${BASEURL}/alias206/index.html" >"${out}.log1" 2>&1 || rc=$?
-test "$rc" -ne 124 || {
-    echo "FAIL: the crawl never terminated; the alias hop reset the latch"
-    exit 1
-}
+test "$rc" -ne 124 || fail "the crawl never terminated; the alias hop reset the latch"
 log="${out}/hts-log.txt"
 # Without the hop the alternation was never driven and the rest proves nothing.
-grep -q 'Warning moved treated' <"$log" || {
-    echo "FAIL: no alias hop; the re-record path was never reached"
-    exit 1
-}
+grep -q 'Warning moved treated' <"$log" || fail "no alias hop; the re-record path was never reached"
 restarts=$(grep -c 'Restarting whole file' <"$log" || true)
-test "$restarts" -eq 1 || {
-    echo "FAIL: ${restarts} free restarts across the alias hops, expected 1"
-    exit 1
-}
+test "$restarts" -eq 1 || fail "${restarts} free restarts across the alias hops, expected 1"
 retries=$(grep -c 'Retry after error' <"$log" || true)
-test "$retries" -eq 1 || {
-    echo "FAIL: ${retries} retries, expected 1; the free restart spent the budget"
-    exit 1
-}
+test "$retries" -eq 1 || fail "${retries} retries, expected 1; the free restart spent the budget"
 echo "OK (1 free restart, budget intact)"
 
 # --- #581: the refetch must not depend on the removal succeeding -------------
@@ -213,24 +174,12 @@ run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
     --robots=0 --timeout=30 -c1 --retries=1 --continue \
     "${BASEURL}/crange206mem/index.html" >"${out}.log2" 2>&1 || rc=$?
 unset LD_PRELOAD
-test "$rc" -ne 124 || {
-    echo "FAIL: the crawl never terminated"
-    exit 1
-}
+test "$rc" -ne 124 || fail "the crawl never terminated"
 # The shim silently matching nothing would make this leg a copy of test 48.
 seen=$(wc -l <"$attempts")
-test "$seen" -ge 1 || {
-    echo "FAIL: the interposer saw no unlink of the partial; it never fired"
-    exit 1
-}
+test "$seen" -ge 1 || fail "the interposer saw no unlink of the partial; it never fired"
 held=$(grep -c '^open ' <"$attempts" || true)
-test "$held" -eq 0 || {
-    echo "FAIL: ${held} of ${seen} unlink(s) came while the handle was open"
-    exit 1
-}
+test "$held" -eq 0 || fail "${held} of ${seen} unlink(s) came while the handle was open"
 got=$(blob_size "$out")
-test "$got" -eq "$crange_full" || {
-    echo "FAIL: blob.bin is ${got} bytes, expected ${crange_full} (refetch lost)"
-    exit 1
-}
+test "$got" -eq "$crange_full" || fail "blob.bin is ${got} bytes, expected ${crange_full} (refetch lost)"
 echo "OK (${got} bytes, ${seen} unlink(s), none on an open handle)"

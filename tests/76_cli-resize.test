@@ -18,10 +18,7 @@ cleanup_push cleanup
 
 local_server_start
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 
 # Trickled pages under a long path: the display keeps animating while the pty is
 # resized under it, and the URL is truncated at 80 columns but not at 200.
