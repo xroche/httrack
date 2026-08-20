@@ -601,14 +601,14 @@ while test "$i" -lt "${#audit[@]}"; do
     --errors)
         i=$((i + 1))
         assert_equals "checking errors" "${audit[$i]}" \
-            "$(grep -iEc "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt")"
+            "$(count_matching_lines -iE "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt")"
         ;;
     --errors-content)
         i=$((i + 1))
-        total=$(grep -icE "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt")
+        total=$(count_matching_lines -iE "^[0-9:]*[[:space:]]Error:" "${logroot}/hts-log.txt")
         # transient network failures (statuscode -2..-6) flake on busy loopback;
         # the code parens are followed by " at link" or " after N retries at link"
-        transient=$(grep -cE '\(-[2-6]\) (at link|after )' "${logroot}/hts-log.txt" || true)
+        transient=$(count_matching_lines -E '\(-[2-6]\) (at link|after )' "${logroot}/hts-log.txt")
         assert_equals "checking content errors" "${audit[$i]}" "$((total - transient))"
         ;;
     --files)
