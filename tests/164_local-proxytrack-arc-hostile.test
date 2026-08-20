@@ -8,18 +8,14 @@ set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
 
 export LC_ALL=C
 
 dir=$(mktemp -d)
 cleanup() { rm -rf "$dir"; }
 cleanup_push cleanup
-
-arc_header() {
-    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
-    printf '2 0 test\n'
-    printf '\n\n'
-}
 
 convert() {
     proxytrack --convert "$2" "$1" 2>"$dir/log" >/dev/null ||
@@ -47,7 +43,7 @@ check_record_length() {
 # body is never fetched and the declared Content-Length is all that is left.
 printf 'HTTP/1.1 - Broken\r\nContent-Type: text/html\r\nContent-Length: 10\r\n\r\n' >"$dir/hdr"
 {
-    arc_header
+    arc_filedesc
     printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html -1 - - 0 t.arc %d\n' \
         "$(($(wc -c <"$dir/hdr") + 10))"
     cat "$dir/hdr"
@@ -69,7 +65,7 @@ fi
 # A length no archive this size can hold: refused, not allocated. The reader
 # used to malloc it and report whatever the short read left behind.
 {
-    arc_header
+    arc_filedesc
     printf 'http://example.com/q.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc 2000000000\n'
     printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\nHI'
 } >"$dir/huge.arc"
@@ -84,12 +80,10 @@ test "$status" = 'HTTP/1.0 -1 Cache Read Error : Truncated Data' ||
 # that refuses everything.
 body=BODYMARKER
 printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' "${#body}" >"$dir/hdr2"
+printf '%s' "$body" >"$dir/body2"
 {
-    arc_header
-    printf 'http://example.com/r.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' \
-        "$(($(wc -c <"$dir/hdr2") + ${#body}))"
-    cat "$dir/hdr2"
-    printf '%s' "$body"
+    arc_filedesc
+    arc_record http://example.com/r.html text/html 200 "$dir/hdr2" "$dir/body2"
 } >"$dir/good.arc"
 
 convert "$dir/good.arc" "$dir/d.arc"

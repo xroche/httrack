@@ -8,6 +8,8 @@ export LC_ALL=C
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
 
 dir=$(mktemp -d)
 cleanup() { rm -rf "$dir"; }
@@ -46,14 +48,9 @@ build_arc() {
         printf '\r\n'
     } >"$dir/hdr"
     printf '%s' "$BODY" >"$dir/body"
-    local alen
-    alen=$(($(wc -c <"$dir/hdr") + ${#BODY}))
     {
-        printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
-        printf '2 0 test\n'
-        printf '\n\n'
-        printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
-        cat "$dir/hdr" "$dir/body"
+        arc_filedesc
+        arc_record http://example.com/p.html text/html 200 "$dir/hdr" "$dir/body"
     } >"$dir/in.arc"
 }
 

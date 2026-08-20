@@ -6,6 +6,8 @@ set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
 
 export LC_ALL=C
 
@@ -16,17 +18,13 @@ cleanup_push cleanup
 BODY=BODYMARKER
 printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nLast-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\nContent-Length: %d\r\n\r\n' "${#BODY}" >"$dir/hdr"
 printf '%s' "$BODY" >"$dir/body"
-alen=$(($(wc -c <"$dir/hdr") + ${#BODY}))
 
-# $1 output, $2 the filedesc length: 9 stops at the "2 0" line, 10 swallows the
-# blank line closing the version block the way the writer used to. Same bytes.
+# $1 output, $2 the declared filedesc length: 9, or the 10 the writer used to
+# emit. Same bytes either way.
 build_arc() {
     {
-        printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc %d\n' "$2"
-        printf '2 0 test\n'
-        printf '\n\n'
-        printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc %d\n' "$alen"
-        cat "$dir/hdr" "$dir/body"
+        arc_filedesc "$2"
+        arc_record http://example.com/p.html text/html 200 "$dir/hdr" "$dir/body"
     } >"$1"
 }
 
