@@ -28,10 +28,7 @@ if [ -r "${builtin}/templates/index-header.html" ]; then
     skip "the compiled-in data directory ${builtin} answers before the executable's tree"
 fi
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/ospath.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/ospath.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 # Two installed-looking trees, each with the templates file path_bin is read

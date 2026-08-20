@@ -11,10 +11,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || {
-    echo "could not find httrack" >&2
-    exit 1
-}
+command -v httrack >/dev/null || fail "could not find httrack"
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")

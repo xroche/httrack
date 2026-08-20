@@ -26,10 +26,7 @@ committed_clean=$(mktemp) || exit 1
 generated_clean=$(mktemp) || exit 1
 cleanup_push rm -f "$tmp" "$committed_clean" "$generated_clean"
 
-README="$top_srcdir/README" bash "$gen" httrack >"$tmp" 2>/dev/null || {
-    echo "makeman.sh failed" >&2
-    exit 1
-}
+README="$top_srcdir/README" bash "$gen" httrack >"$tmp" 2>/dev/null || fail "makeman.sh failed"
 
 # Ignore the two intentionally date-dependent lines (page date, copyright year).
 # Temp files, not process substitution, so this works under a POSIX /bin/sh.

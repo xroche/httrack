@@ -7,10 +7,7 @@ set -eu
 . "${0%"${0##*/}"}./testlib.sh"
 
 skip_on_windows "no backtrace() on Windows"
-command -v httrack >/dev/null || {
-    echo "could not find httrack" >&2
-    exit 1
-}
+command -v httrack >/dev/null || fail "could not find httrack"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_symbolize.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmpdir"
@@ -24,10 +21,7 @@ rawframe='(+0x[0-9a-f][0-9a-f]*)'
 # The strsafe selftest aborts on purpose, which lands in sig_fatal.
 rc=0
 run_with_timeout 60 httrack -#test=strsafe overflow "$overflow" >"$out" 2>&1 || rc=$?
-test "$rc" -ne 124 || {
-    echo "the crash handler did not finish within the deadline" >&2
-    exit 1
-}
+test "$rc" -ne 124 || fail "the crash handler did not finish within the deadline"
 
 grep -q '^Caught signal ' "$out" || {
     echo "no 'Caught signal' line:" >&2
@@ -86,10 +80,7 @@ export HTTRACK_NO_SYMBOLIZE=1
 rc=0
 run_with_timeout 60 httrack -#test=strsafe overflow "$overflow" >"$raw" 2>&1 || rc=$?
 unset HTTRACK_NO_SYMBOLIZE
-test "$rc" -ne 124 || {
-    echo "the opt-out run did not finish within the deadline" >&2
-    exit 1
-}
+test "$rc" -ne 124 || fail "the opt-out run did not finish within the deadline"
 grep -q "$rawframe" "$raw" || {
     echo "the opt-out lost the raw trace:" >&2
     cat "$raw" >&2

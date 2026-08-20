@@ -18,10 +18,7 @@ libdir=${libdir%/}
 test "$HTS_OS" = Darwin || skip "no Mach-O install commands to read here"
 command -v otool >/dev/null 2>&1 || skip "no otool"
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/rpathid.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/rpathid.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 stage=${work}/stage

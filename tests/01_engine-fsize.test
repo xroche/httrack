@@ -19,7 +19,4 @@ echo "$out"
 [ "$rc" = 0 ] || exit "$rc"
 
 want="fsize: width=8,8 size=5368709120,5368709120 psize=5368709120 absent=-1"
-test "$out" == "$want" || {
-    echo "FAIL: unexpected size report (want '$want')"
-    exit 1
-}
+test "$out" == "$want" || fail "unexpected size report (want '$want')"

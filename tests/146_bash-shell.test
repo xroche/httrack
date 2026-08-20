@@ -11,20 +11,11 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 sh=${BASH_SHELL:-}
-test -n "$sh" || {
-    echo "BASH_SHELL is empty; tests/Makefile.am must export the configured value" >&2
-    exit 1
-}
-test -x "$sh" || {
-    echo "BASH_SHELL=$sh is not an executable file" >&2
-    exit 1
-}
+test -n "$sh" || fail "BASH_SHELL is empty; tests/Makefile.am must export the configured value"
+test -x "$sh" || fail "BASH_SHELL=$sh is not an executable file"
 
 version=$("$sh" -c 'echo "${BASH_VERSION:-}"')
-test -n "$version" || {
-    echo "BASH_SHELL=$sh sets no BASH_VERSION, so it is not a bash" >&2
-    exit 1
-}
+test -n "$version" || fail "BASH_SHELL=$sh sets no BASH_VERSION, so it is not a bash"
 
 # sh-mode bash sets BASH_VERSION too, so the version alone proves nothing.
 opts=$("$sh" -c 'echo ":${SHELLOPTS:-}:"')
@@ -36,27 +27,15 @@ case "$opts" in
 esac
 
 # The test helpers use process substitution, which macOS's bash-3.2-as-sh rejects.
-out=$("$sh" -c 'cat <(echo procsub)' 2>&1) || {
-    echo "BASH_SHELL=$sh cannot run a process substitution: $out" >&2
-    exit 1
-}
-test "$out" = procsub || {
-    echo "expected 'procsub' from BASH_SHELL=$sh, got: $out" >&2
-    exit 1
-}
+out=$("$sh" -c 'cat <(echo procsub)' 2>&1) || fail "BASH_SHELL=$sh cannot run a process substitution: $out"
+test "$out" = procsub || fail "expected 'procsub' from BASH_SHELL=$sh, got: $out"
 
 # Whatever configure picks, an absolute BASH_SHELL from the user must win over the search.
 configure="${abs_top_srcdir:-}/configure"
-test -r "$configure" || {
-    echo "no configure script at $configure; tests/Makefile.am must export abs_top_srcdir" >&2
-    exit 1
-}
+test -r "$configure" || fail "no configure script at $configure; tests/Makefile.am must export abs_top_srcdir"
 
 help=$(bash "$configure" --help)
-grep -q '^  *BASH_SHELL ' <<<"$help" || {
-    echo "configure --help does not advertise BASH_SHELL (AC_ARG_VAR missing)" >&2
-    exit 1
-}
+grep -q '^  *BASH_SHELL ' <<<"$help" || fail "configure --help does not advertise BASH_SHELL (AC_ARG_VAR missing)"
 
 tmp=$(mktemp -d)
 cleanup_push rm -rf "$tmp"

@@ -18,10 +18,7 @@ name() {
     local fil="$1" ctype="$2" want="$3"
     shift 3
     out="$("$httrack_bin" -O /dev/null -#test=savename "$fil" "$ctype" "$@" | sed -n 's/^savename: //p')"
-    test "${out##*/}" == "$want" || {
-        echo "FAIL: '$fil' '$ctype' $* -> '$out' (want '$want')"
-        exit 1
-    }
+    test "${out##*/}" == "$want" || fail "'$fil' '$ctype' $* -> '$out' (want '$want')"
 }
 
 # No live bytes: the recorded save name (X-Save) reproduces the previous

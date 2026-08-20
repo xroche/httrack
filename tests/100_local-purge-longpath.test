@@ -72,10 +72,7 @@ cd "$work/proj" # no -O: opt->path_html stays empty
 "$httrack_bin" "http://127.0.0.1:$port/" -q -%v0 -s0 -r3 >"$work/crawl1.log" 2>&1 || true
 
 lst=$work/proj/hts-cache/new.lst
-test -f "$lst" || {
-    echo "pass 1 produced no new.lst" >&2
-    exit 1
-}
+test -f "$lst" || fail "pass 1 produced no new.lst"
 # Arms the test: without a line of exactly 1000 bytes linput() never splits and
 # the purge never sees a one-byte tail.
 awk 'length == 1000 { found = 1 } END { exit !found }' "$lst" || {
@@ -89,7 +86,4 @@ awk 'length == 1000 { found = 1 } END { exit !found }' "$lst" || {
 # Pass 2 renames new.lst to old.lst and runs it through the purge loop.
 "$httrack_bin" "http://127.0.0.1:$port/" -q -%v0 -s0 -r3 >"$work/crawl2.log" 2>&1
 
-test -s "$work/proj/$prefix$urlpath" || {
-    echo "the mirrored leaf did not survive the purge" >&2
-    exit 1
-}
+test -s "$work/proj/$prefix$urlpath" || fail "the mirrored leaf did not survive the purge"

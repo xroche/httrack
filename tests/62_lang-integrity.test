@@ -14,10 +14,7 @@ langdir="$top_srcdir/lang"
 def="$top_srcdir/lang.def"
 eng="$langdir/English.txt"
 for f in "$eng" "$def"; do
-    [ -f "$f" ] || {
-        echo "cannot find $f"
-        exit 1
-    }
+    [ -f "$f" ] || fail "cannot find $f"
 done
 
 tmp=$(mktemp -d)
@@ -284,10 +281,7 @@ done
 # while the string is still English on screen (#1260). A handful are legitimate,
 # so the per-catalog counts are pinned and have to match exactly.
 pin="$testdir/62_lang-untranslated.counts"
-[ -f "$pin" ] || {
-    echo "cannot find $pin"
-    exit 1
-}
+[ -f "$pin" ] || fail "cannot find $pin"
 
 # Surrounding blanks are stripped before comparing: a value of one space, or a
 # msgid copied with a trailing one, is as untranslated as the bare shapes.

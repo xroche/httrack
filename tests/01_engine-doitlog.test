@@ -40,10 +40,7 @@ errors() { grep -ciE '^[0-9:]*[[:space:]]Error:' "$out/hts-log.txt" || true; }
 # multi-token command line for cmdl_ins to re-insert one token at a time.
 rc=0
 "$bin" "$url" -O "$out" --quiet -n -%v0 -r3 >/dev/null 2>&1 || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: initial mirror exited $rc"
-    exit 1
-}
+test "$rc" -eq 0 || fail "initial mirror exited $rc"
 assert_file "$out/hts-cache/doit.log" "the initial mirror wrote no doit.log"
 
 # --- 1. no-url reprise re-mirrors cleanly -----------------------------------
@@ -51,20 +48,14 @@ assert_file "$out/hts-cache/doit.log" "the initial mirror wrote no doit.log"
 # recorded arguments (cmdl_ins). -O selects the mirror; argv carries no url.
 rc=0
 "$bin" -O "$out" --quiet >/dev/null 2>&1 || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: doit.log reprise exited $rc"
-    exit 1
-}
+test "$rc" -eq 0 || fail "doit.log reprise exited $rc"
 test "$(errors)" = 0 || {
     echo "FAIL: doit.log reprise reported errors (a token may have been corrupted)"
     grep -iE 'Error:' "$out/hts-log.txt" | head -3
     exit 1
 }
 for suffix in a.html sub/b.html; do
-    test -n "$(find "$out" -path "*/$suffix" -print -quit)" || {
-        echo "FAIL: $suffix missing after the no-url reprise"
-        exit 1
-    }
+    test -n "$(find "$out" -path "*/$suffix" -print -quit)" || fail "$suffix missing after the no-url reprise"
 done
 
 # --- 2. the reprise re-crawls through the inserted url -----------------------
@@ -72,14 +63,8 @@ sleep 1
 echo 'NEWCONTENT' >"$site/a.html"
 rc=0
 "$bin" -O "$out" --quiet >/dev/null 2>&1 || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: second reprise exited $rc"
-    exit 1
-}
-grep -q NEWCONTENT "$(find "$out" -path '*/a.html' -print -quit)" || {
-    echo "FAIL: reprise did not pick up the changed source (inserted url not re-crawled)"
-    exit 1
-}
+test "$rc" -eq 0 || fail "second reprise exited $rc"
+grep -q NEWCONTENT "$(find "$out" -path '*/a.html' -print -quit)" || fail "reprise did not pick up the changed source (inserted url not re-crawled)"
 
 # --- 3. an empty quoted arg survives the doit.log round-trip (#106) ----------
 # -%F "" (empty footer) records an empty "" token in doit.log; -r2 follows it so
@@ -89,10 +74,7 @@ grep -q NEWCONTENT "$(find "$out" -path '*/a.html' -print -quit)" || {
 out2="$tmp/out2"
 rc=0
 "$bin" "$url" -O "$out2" --quiet -n -%v0 -%F "" -r2 >/dev/null 2>&1 || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: initial mirror with empty footer exited $rc"
-    exit 1
-}
+test "$rc" -eq 0 || fail "initial mirror with empty footer exited $rc"
 # precondition: the writer put the empty token on disk for the reader to reload.
 grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
     echo "FAIL: empty footer not recorded as -%F \"\" -r2 in doit.log"
@@ -104,10 +86,7 @@ grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
 # kept it (a drop/swallow would panic above or rewrite -%F without the "").
 rc=0
 "$bin" -O "$out2" --quiet >/dev/null 2>&1 || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: empty-footer reprise exited $rc (empty token dropped from doit.log?)"
-    exit 1
-}
+test "$rc" -eq 0 || fail "empty-footer reprise exited $rc (empty token dropped from doit.log?)"
 grep -q ' -%F "" -r2' "$out2/hts-cache/doit.log" || {
     echo "FAIL: empty footer did not survive the doit.log reload round-trip"
     grep -- '-%F' "$out2/hts-cache/doit.log" || true
@@ -127,25 +106,13 @@ echo '<html><body>aaa</body></html>' >"$site3/a.html"
 rc=0
 "$bin" "file://$site3/index.html" -O "$out3" --quiet -n -%v0 \
     -%F "\"$footer\"" -r2 >/dev/null 2>&1 || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: initial mirror with a leading-quote footer exited $rc"
-    exit 1
-}
+test "$rc" -eq 0 || fail "initial mirror with a leading-quote footer exited $rc"
 page=$(find "$out3" -path '*/site3/index.html' -print -quit)
-test -n "$page" || {
-    echo "FAIL: mirrored page missing after the leading-quote mirror"
-    exit 1
-}
-grep -qF "$footer" "$page" || {
-    echo "FAIL: run 1 did not inject the footer verbatim"
-    exit 1
-}
+test -n "$page" || fail "mirrored page missing after the leading-quote mirror"
+grep -qF "$footer" "$page" || fail "run 1 did not inject the footer verbatim"
 rc=0
 "$bin" -O "$out3" --quiet >/dev/null 2>&1 || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: leading-quote reprise exited $rc"
-    exit 1
-}
+test "$rc" -eq 0 || fail "leading-quote reprise exited $rc"
 grep -qF "$footer" "$page" || {
     echo "FAIL: the footer changed across the reprise (leading quote written raw?)"
     grep -o '<!--[^>]*MARK[^>]*-->' "$page" | head -1
@@ -170,10 +137,7 @@ echo '<html><body>foo</body></html>' >"$site4/foo.html"
 rc=0
 "$bin" "file://$site4/index.html" -O "$out4" --quiet -n -%v0 '"""+*foo*""' \
     >/dev/null 2>&1 || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: initial mirror with a leading-quote filter exited $rc"
-    exit 1
-}
+test "$rc" -eq 0 || fail "initial mirror with a leading-quote filter exited $rc"
 grep -qF -- '"\"+*foo*"' "$out4/hts-cache/doit.log" || {
     echo "FAIL: the filter was not recorded escaped"
     head -1 "$out4/hts-cache/doit.log"
@@ -186,10 +150,7 @@ head -1 "$out4/hts-cache/doit.log" >"$tmp/doit4.before"
 # the command line is a fixed point of its own replay.
 rc=0
 (cd "$out4" && "$bin" >/dev/null 2>&1) || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: leading-quote filter reprise exited $rc (token stripped twice?)"
-    exit 1
-}
+test "$rc" -eq 0 || fail "leading-quote filter reprise exited $rc (token stripped twice?)"
 head -1 "$out4/hts-cache/doit.log" >"$tmp/doit4.after"
 cmp -s "$tmp/doit4.before" "$tmp/doit4.after" || {
     echo "FAIL: the reprise rewrote the command line differently"

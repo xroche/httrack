@@ -15,10 +15,7 @@ chrome_src="${srcdir}/tools/doc-chrome.py"
 command -v python3 >/dev/null 2>&1 || skip "no python3"
 test -r "${chrome_src}" || skip "no ${chrome_src}"
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/docyear.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/docyear.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 # doc-chrome.py finds html/ relative to its own path, so it needs both trees.

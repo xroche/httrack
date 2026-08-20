@@ -12,10 +12,7 @@ set -eu
 . "$(dirname "$0")/proclib.sh"
 
 driver="${testdir}/test-timeout.sh"
-test -r "$driver" || {
-    echo "no test-timeout.sh next to $0" >&2
-    exit 1
-}
+test -r "$driver" || fail "no test-timeout.sh next to $0"
 
 fail() {
     echo "FAIL: $*" >&2

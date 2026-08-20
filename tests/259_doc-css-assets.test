@@ -12,10 +12,7 @@ set -euo pipefail
 srcdir="${abs_top_srcdir:?not run under make check}"
 builddir="${abs_top_builddir:?not run under make check}"
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/docassets.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/docassets.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 make -C "${builddir}/html" install DESTDIR="${work}/inst" >"${work}/log" 2>&1 ||

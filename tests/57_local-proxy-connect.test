@@ -132,10 +132,7 @@ echo "OK: absolute-URI form (no connect://) rejected by the CONNECT-only proxy"
 : >"$ok/proxy.log"
 : >"$ok/origin-headers.log"
 run_crawl "$ok/out2" "connect://user:secret@127.0.0.1:${proxy_port}" "$origin_port"
-grep -rq "ORIGIN-PAGE-564" "$ok/out2" || {
-    echo "FAIL: origin page not downloaded through the authenticated proxy" >&2
-    exit 1
-}
+grep -rq "ORIGIN-PAGE-564" "$ok/out2" || fail "origin page not downloaded through the authenticated proxy"
 got=$(awk '/^AUTH Basic /{print $3}' "$ok/proxy.log" | head -1)
 # base64("user:secret"); compared literally to stay portable (no base64 -d)
 test "$got" == "dXNlcjpzZWNyZXQ=" || {
@@ -155,10 +152,7 @@ flood="$tmpdir/flood"
 start_server "$flood" flood
 rc=0
 run_crawl "$flood/out" "connect://127.0.0.1:${proxy_port}" "$origin_port" || rc=$?
-test "$rc" -ne "$HANG_RC" || {
-    echo "FAIL: crawl hung on a flooding proxy (bounded read missing)" >&2
-    exit 1
-}
+test "$rc" -ne "$HANG_RC" || fail "crawl hung on a flooding proxy (bounded read missing)"
 grep -rq "ORIGIN-PAGE-564" "$flood/out" 2>/dev/null && {
     echo "FAIL: flooding proxy unexpectedly served the page" >&2
     exit 1

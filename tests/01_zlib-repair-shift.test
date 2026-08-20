@@ -15,7 +15,4 @@ cleanup_push rm -rf "$dir"
 
 out=$(httrack -#test=zip-repair-shift "$dir")
 
-grep -qx "zip-repair-shift: OK (recovered 1 entry)" <<<"$out" || {
-    echo "expected 'zip-repair-shift: OK (recovered 1 entry)', got: $out" >&2
-    exit 1
-}
+grep -qx "zip-repair-shift: OK (recovered 1 entry)" <<<"$out" || fail "expected 'zip-repair-shift: OK (recovered 1 entry)', got: $out"

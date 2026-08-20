@@ -63,10 +63,7 @@ grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
 # Count what came back: a clipped path answers 207 too. The run appears in
 # the href and again in the displayname.
 got=$({ grep -o '&amp;' <<<"$resp" || true; } | wc -l)
-test "$got" -eq 1800 || {
-    echo "FAIL: 900 ampersands went in, $got came back escaped, wanted 1800"
-    exit 1
-}
+test "$got" -eq 1800 || fail "900 ampersands went in, $got came back escaped, wanted 1800"
 
 # Unescaped, so the bound is shown to be on the written length, not on '&'.
 plain=$("$python" -c "print('a' * 900)" | tr -d '\r')
@@ -75,10 +72,7 @@ resp=$(propfind "$plain") || {
     cat "$ptlog"
     exit 1
 }
-grep -q "<href>/webdav/x/$plain</href>" <<<"$resp" || {
-    echo "FAIL: a 900-byte path did not come back whole"
-    exit 1
-}
+grep -q "<href>/webdav/x/$plain</href>" <<<"$resp" || fail "a 900-byte path did not come back whole"
 
 # Depth: 1 is the only route into the enumeration branch, which builds each
 # item URL from the prefix and the child name. A child directory is enumerated

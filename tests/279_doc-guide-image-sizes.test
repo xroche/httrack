@@ -20,10 +20,7 @@ test -r "${checker}" || fail "no ${checker}"
 "${python}" "${checker}" "${srcdir}/html" ||
     fail "guide.html's declared image sizes are out of sync with html/img/"
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/guideimg.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/guideimg.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 pristine="${work}/pristine"

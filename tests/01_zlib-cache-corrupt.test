@@ -15,7 +15,4 @@ cleanup_push rm -rf "$dir"
 # stdout; the verdict is the last line
 out=$(httrack -#test=cache-corrupt "$dir" 2>/dev/null | tail -n1)
 
-test "$out" = "cache-corrupt: OK" || {
-    echo "expected 'cache-corrupt: OK', got: $out" >&2
-    exit 1
-}
+test "$out" = "cache-corrupt: OK" || fail "expected 'cache-corrupt: OK', got: $out"

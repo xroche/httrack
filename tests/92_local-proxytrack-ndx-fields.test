@@ -27,7 +27,4 @@ with open(sys.argv[1], "w") as f:
 EOF
 : >"$dir/foo.dat" # the reader only proceeds when the sibling .dat opens
 
-proxytrack --convert "$dir/out.arc" "$dir/foo.ndx" >/dev/null 2>&1 || {
-    echo "FAIL: proxytrack crashed on an .ndx with two full-length URL fields" >&2
-    exit 1
-}
+proxytrack --convert "$dir/out.arc" "$dir/foo.ndx" >/dev/null 2>&1 || fail "proxytrack crashed on an .ndx with two full-length URL fields"

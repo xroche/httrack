@@ -10,10 +10,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 # Resolve httrack before any cd: PATH may carry a build-relative entry.
-bin=$(command -v httrack) || {
-    echo "FAIL: httrack not found on PATH" >&2
-    exit 1
-}
+bin=$(command -v httrack) || fail "httrack not found on PATH"
 
 out=$("$bin" -#test=strsprintf) || fail "httrack -#test=strsprintf exited non-zero: $out"
 test "$out" = "strsprintf self-test: OK" || fail "expected 'strsprintf self-test: OK', got: $out"
