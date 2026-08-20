@@ -78,41 +78,12 @@ EOF
 printf '[a new project saves the ids WinHTTrack defaults to] ..\t'
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
-import re
+htsserver_python - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
 import sys
-import urllib.parse
-import urllib.request
 
-url, work = sys.argv[1].rstrip("/"), sys.argv[2]
+from webtestlib import Session, textarea
 
-
-def get(page):
-    return urllib.request.urlopen(url + "/server/" + page,
-                                  timeout=20).read().decode("latin-1")
-
-
-def post(page, fields):
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
-    req = urllib.request.Request(url + "/server/" + page,
-                                 data=body.encode("latin-1"), method="POST")
-    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-
-
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page,
-                  re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered page" % name)
-    # As a browser posts it: the newline right after the tag is not content.
-    return m.group(1).lstrip("\r\n")
-
-
-def sid_of():
-    m = re.search(r'name="sid" value="([0-9a-f]+)"', get("index.html"))
-    if not m:
-        sys.exit("no session id in server/index.html")
-    return m.group(1)
+s, work = Session(sys.argv[1]), sys.argv[2]
 
 
 def keys_of(path):
@@ -121,20 +92,19 @@ def keys_of(path):
                     for line in fp if "=" in line)
 
 
-def save(sid, projname):
+def save(projname):
     """Write the project's winprofile.ini the way the Save button does."""
-    step4 = get("step4.html?sid=" + sid)
-    post("step4.html", [("sid", sid), ("path", work),
-                        ("projname", projname),
-                        ("command", textarea(step4, "command")),
-                        ("command_do", "save"),
-                        ("winprofile", textarea(step4, "winprofile"))])
+    step4 = s.get("step4.html?sid=" + s.sid)
+    s.post("step4.html", [("path", work), ("projname", projname),
+                          ("command", textarea(step4, "command")),
+                          ("command_do", "save"),
+                          ("winprofile", textarea(step4, "winprofile"))])
     return keys_of("%s/%s/hts-cache/winprofile.ini" % (work, projname))
 
 
 # Those numbers are what the ids mean on disk: MyGetProfileInt(..., <default>)
 # in WinHTTrack/Shell.cpp reads exactly them out of a file it never wrote.
-fresh = save(sid_of(), "fresh")
+fresh = save("fresh")
 if fresh.get("ProfileFormat") != "1":
     sys.exit("a saved profile carries no format marker: %r" % fresh)
 for key, want in [("Build", "0"), ("PrimaryScan", "3"), ("Travel", "1"),
@@ -155,41 +125,13 @@ htsserver_stop
 printf '[a 0-based profile reads back one option up] ..\t'
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
+htsserver_python - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
 import re
 import sys
-import urllib.parse
-import urllib.request
 
-url, work = sys.argv[1].rstrip("/"), sys.argv[2]
+from webtestlib import Session, textarea
 
-
-def get(page):
-    return urllib.request.urlopen(url + "/server/" + page,
-                                  timeout=20).read().decode("latin-1")
-
-
-def post(page, fields):
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
-    req = urllib.request.Request(url + "/server/" + page,
-                                 data=body.encode("latin-1"), method="POST")
-    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-
-
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page,
-                  re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered page" % name)
-    # As a browser posts it: the newline right after the tag is not content.
-    return m.group(1).lstrip("\r\n")
-
-
-def sid_of():
-    m = re.search(r'name="sid" value="([0-9a-f]+)"', get("index.html"))
-    if not m:
-        sys.exit("no session id in server/index.html")
-    return m.group(1)
+s, work = Session(sys.argv[1]), sys.argv[2]
 
 
 def keys_of(path):
@@ -198,14 +140,13 @@ def keys_of(path):
                     for line in fp if "=" in line)
 
 
-def save(sid, projname):
+def save(projname):
     """Write the project's winprofile.ini the way the Save button does."""
-    step4 = get("step4.html?sid=" + sid)
-    post("step4.html", [("sid", sid), ("path", work),
-                        ("projname", projname),
-                        ("command", textarea(step4, "command")),
-                        ("command_do", "save"),
-                        ("winprofile", textarea(step4, "winprofile"))])
+    step4 = s.get("step4.html?sid=" + s.sid)
+    s.post("step4.html", [("path", work), ("projname", projname),
+                          ("command", textarea(step4, "command")),
+                          ("command_do", "save"),
+                          ("winprofile", textarea(step4, "winprofile"))])
     return keys_of("%s/%s/hts-cache/winprofile.ini" % (work, projname))
 
 
@@ -218,9 +159,8 @@ def only_flag(command, want):
                      % (flag, want, boxes, command))
 
 
-def load(sid, projname):
-    return post("step2.html", [("sid", sid), ("path", work),
-                               ("loadprojname", projname)])
+def load(projname):
+    return s.post("step2.html", [("path", work), ("loadprojname", projname)])
 
 
 def selected(page, name):
@@ -232,22 +172,21 @@ def selected(page, name):
     return ids[0] if len(ids) == 1 else None
 
 
-sid = sid_of()
+sid = s.sid
 # LISTDEF_4's five entries against a flag list that had four: the default one
 # emitted p7, and the last one nothing. p3/p7 per man/httrack.1.
 for pick, flag in [("4", "--priority=3"), ("5", "--priority=7")]:
-    command = textarea(post("step4.html", [("sid", sid), ("filter", pick)]),
-                       "command")
+    command = textarea(s.post("step4.html", [("filter", pick)]), "command")
     if flag not in command.split():
         sys.exit("scan rule %s emits no %s\n%s" % (pick, flag, command))
 
 # Ahead of the project the rest of the leg uses: two loads in a row are fine,
 # where a load after a save is not.
-if "http://example.org/" not in load(sid, "proj2"):
+if "http://example.org/" not in load("proj2"):
     sys.exit("step2.html did not load the second project")
-only_flag(textarea(get("step4.html?sid=" + sid), "command"), "--test")
+only_flag(textarea(s.get("step4.html?sid=" + sid), "command"), "--test")
 
-loaded = load(sid, "proj")
+loaded = load("proj")
 if "http://example.com/" not in loaded:
     sys.exit("step2.html did not load the project\n%s" % loaded[:400])
 
@@ -262,14 +201,14 @@ for page, name, stored in [("step3.html", "todo", 6),
                            ("option8.html", "checktype", 0),
                            ("option8.html", "robots", 0),
                            ("option9.html", "logtype", 2)]:
-    got = selected(get("%s?sid=%s" % (page, sid)), name)
+    got = selected(s.get("%s?sid=%s" % (page, sid)), name)
     if got != str(stored + 1):
         sys.exit("%s selects %r for a stored %d, expected %d"
                  % (name, got, stored, stored + 1))
 
 # What each id means, read off LISTDEF_N in lang.def, so a table that renumbers
 # the options is not read as a fix. Depth is the control: not a list key.
-command = textarea(get("step4.html?sid=" + sid), "command")
+command = textarea(s.get("step4.html?sid=" + sid), "command")
 for flag in ["--update", "-N2", "--priority=1", "--can-go-up-and-down",
              "--stay-on-same-tld", "--keep-links=3", "--robots=0",
              "--debug-log", "--depth=3", "--near", "--long-names=0"]:
@@ -281,12 +220,12 @@ only_flag(command, "--near")
 # Dos=3 is WinHTTrack's alone, and its select has no entry for it. Showing the
 # blank one would re-save as 0, which reads there as long names, losing the DOS
 # names this very command line just asked for.
-if selected(get("option2.html?sid=" + sid), "dos") != "1":
+if selected(s.get("option2.html?sid=" + sid), "dos") != "1":
     sys.exit("a stored Dos=3 does not show as DOS names alone")
 
 # Saving it back must reproduce what was seeded, Depth included: an asymmetric
 # shift walks a project one option further on every reopen.
-back = save(sid, "proj")
+back = save("proj")
 for key, want in keys_of(work + "/seeded.ini").items():
     if back.get(key) != want:
         sys.exit("%s round-trips as %r, was %r" % (key, back.get(key), want))

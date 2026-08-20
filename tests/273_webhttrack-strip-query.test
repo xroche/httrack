@@ -28,47 +28,26 @@ cleanup_push cleanup
 printf '[webhttrack emits one --strip-query per rule] ..\t'
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" "${work}/emitted" <<'PY' || fail "the Strip query keys field is not wired (see above)"
-import re, shlex, sys, urllib.parse, urllib.request
+htsserver_python - "${HTS_URL}" "${work}/emitted" <<'PY' || fail "the Strip query keys field is not wired (see above)"
+import shlex, sys
 
-url, emitted = sys.argv[1].rstrip("/"), sys.argv[2]
+from webtestlib import Session, textarea
+
+s, emitted = Session(sys.argv[1]), sys.argv[2]
 # Scoped rules, because the engine applies the last one matching an address: a
 # browser posts the textarea lines CRLF-separated.
 RULES = ["shop.example.com/*=sid,utm_source",
          "www.example.org/*=ref"]
 RULE = "\r\n".join(RULES)
 
-form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
-m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
-if not m:
-    sys.exit("no session id in server/index.html")
-sid = m.group(1).decode()
-
 # The tag, because a single-line input renders the name too; the label text,
 # because an unknown ${LANG_*} renders empty.
-page = urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
-                              timeout=20).read().decode("latin-1")
+page = s.get("option8.html?sid=" + s.sid)
 for want in ('<textarea name="stripquery"', "Strip query keys:"):
     if want not in page:
         sys.exit("option8.html does not render %r" % want)
 
-
-def post(fields):
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in
-                    [("sid", sid)] + fields)
-    req = urllib.request.Request(url + "/server/step4.html",
-                                 data=body.encode("latin-1"), method="POST")
-    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-
-
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page, re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered step4.html" % name)
-    return m.group(1)
-
-
-page = post([("stripquery", RULE)])
+page = s.post("step4.html", [("stripquery", RULE)])
 cmd = textarea(page, "command")
 lines = [l.strip() for l in cmd.split("\n")]
 for rule in RULES:
@@ -86,17 +65,14 @@ if ini != [want]:
 # Reopening the page must show the rules back on their own lines: a name the
 # session state never writes renders an empty box, and rules run together come
 # back as one.
-back = textarea(urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
-                                       timeout=20).read().decode("latin-1"),
-                "stripquery")
+back = textarea(s.get("option8.html?sid=" + s.sid), "stripquery")
 if [l.strip() for l in back.split("\n") if l.strip()] != RULES:
     sys.exit("option8.html renders %r back, wanted the two rules" % back)
 
 # A '<' comes back as an entity: raw, it would close the box early and put the
 # rest of the page inside a rule.
-post([("stripquery", "a<b=sid")])
-page = urllib.request.urlopen(url + "/server/option8.html?sid=" + sid,
-                              timeout=20).read().decode("latin-1")
+s.post("step4.html", [("stripquery", "a<b=sid")])
+page = s.get("option8.html?sid=" + s.sid)
 if "a&lt;b=sid" not in page:
     sys.exit("option8.html does not escape a rule holding '<'")
 
@@ -104,7 +80,7 @@ if "a&lt;b=sid" not in page:
 def emitted_rules(value):
     flag = '--strip-query "'
     return [line.strip()[len(flag):-1]
-            for line in textarea(post([("stripquery", value)]),
+            for line in textarea(s.post("step4.html", [("stripquery", value)]),
                                  "command").split("\n")
             if flag in line]
 

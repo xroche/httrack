@@ -55,50 +55,22 @@ test -n "${PORT}" || fail "the probe port is empty"
 printf '[a typed proxy reaches the file] ..\t'
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" "${work}" "${HOST}" "${PORT}" <<'PY' || fail "see above"
-import re
+htsserver_python - "${HTS_URL}" "${work}" "${HOST}" "${PORT}" <<'PY' || fail "see above"
 import sys
-import urllib.parse
-import urllib.request
 
-url, work, host, port = (sys.argv[1].rstrip("/"), sys.argv[2],
-                         sys.argv[3], sys.argv[4])
+from webtestlib import Session, textarea
 
-
-def get(page):
-    return urllib.request.urlopen(url + "/server/" + page,
-                                  timeout=20).read().decode("latin-1")
-
-
-def post(page, fields):
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
-    req = urllib.request.Request(url + "/server/" + page,
-                                 data=body.encode("latin-1"), method="POST")
-    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-
-
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page,
-                  re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered page" % name)
-    # As a browser posts it: the newline right after the tag is not content.
-    return m.group(1).lstrip("\r\n")
-
-
-m = re.search(r'name="sid" value="([0-9a-f]+)"', get("index.html"))
-if not m:
-    sys.exit("no session id in server/index.html")
-sid = m.group(1)
+s, work, host, port = (Session(sys.argv[1]), sys.argv[2],
+                       sys.argv[3], sys.argv[4])
 
 # Fill the proxy pane the way the wizard does, then press Save.
-post("option10.html", [("sid", sid), ("prox", host), ("portprox", port),
-                       ("proxytype", "2")])
-step4 = get("step4.html?sid=" + sid)
-post("step4.html", [("sid", sid), ("path", work), ("projname", "typed"),
-                    ("command", textarea(step4, "command")),
-                    ("command_do", "save"),
-                    ("winprofile", textarea(step4, "winprofile"))])
+s.post("option10.html", [("prox", host), ("portprox", port),
+                         ("proxytype", "2")])
+step4 = s.get("step4.html?sid=" + s.sid)
+s.post("step4.html", [("path", work), ("projname", "typed"),
+                      ("command", textarea(step4, "command")),
+                      ("command_do", "save"),
+                      ("winprofile", textarea(step4, "winprofile"))])
 
 with open(work + "/typed/hts-cache/winprofile.ini") as fp:
     saved = dict(line.strip().split("=", 1) for line in fp if "=" in line)
@@ -126,60 +98,27 @@ cp "${work}/proj/hts-cache/winprofile.ini" "${work}/seeded.ini"
 
 htsserver_start --home "${work}"
 
-"${HTS_PYTHON}" - "${HTS_URL}" "${work}" "${HOST}" "${PORT}" <<'PY' || fail "see above"
-import re
+htsserver_python - "${HTS_URL}" "${work}" "${HOST}" "${PORT}" <<'PY' || fail "see above"
 import sys
-import urllib.parse
-import urllib.request
 
-url, work, host, port = (sys.argv[1].rstrip("/"), sys.argv[2],
-                         sys.argv[3], sys.argv[4])
+from webtestlib import Session, field, textarea
 
+s, work, host, port = (Session(sys.argv[1]), sys.argv[2],
+                       sys.argv[3], sys.argv[4])
 
-def get(page):
-    return urllib.request.urlopen(url + "/server/" + page,
-                                  timeout=20).read().decode("latin-1")
-
-
-def post(page, fields):
-    body = "&".join("%s=%s" % (k, urllib.parse.quote(v)) for k, v in fields)
-    req = urllib.request.Request(url + "/server/" + page,
-                                 data=body.encode("latin-1"), method="POST")
-    return urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-
-
-def textarea(page, name):
-    m = re.search(r'<textarea name="%s".*?>(.*?)</textarea>' % name, page,
-                  re.S)
-    if m is None:
-        sys.exit("no %s textarea in the rendered page" % name)
-    return m.group(1).lstrip("\r\n")
-
-
-def field(page, name):
-    m = re.search(r'<input name="%s" value="([^"]*)"' % name, page)
-    return m.group(1) if m else None
-
-
-m = re.search(r'name="sid" value="([0-9a-f]+)"', get("index.html"))
-if not m:
-    sys.exit("no session id in server/index.html")
-sid = m.group(1)
-
-loaded = post("step2.html", [("sid", sid), ("path", work),
-                             ("loadprojname", "proj")])
+loaded = s.post("step2.html", [("path", work), ("loadprojname", "proj")])
 if "http://example.com/" not in loaded:
     sys.exit("step2.html did not load the project")
 
 # The box the user looks at.
-page = get("option10.html?sid=" + sid)
+page = s.get("option10.html?sid=" + s.sid)
 for name, want in [("prox", host), ("portprox", port)]:
     if field(page, name) != want:
         sys.exit("option10.html shows %s=%r, the profile holds %r"
                  % (name, field(page, name), want))
 
 # ProxyType 1 is SOCKS5 on every front end, so the scheme has to survive too.
-command = get("step4.html?sid=" + sid)
+command = s.get("step4.html?sid=" + s.sid)
 want = '--proxy "socks5://%s:%s"' % (host, port)
 if want not in textarea(command, "command"):
     sys.exit("the reloaded command line lacks %s\n%s"
@@ -187,10 +126,10 @@ if want not in textarea(command, "command"):
 
 # Saving it back must reproduce the file: a binding that renders but never
 # stores looks identical up to here.
-post("step4.html", [("sid", sid), ("path", work), ("projname", "proj"),
-                    ("command", textarea(command, "command")),
-                    ("command_do", "save"),
-                    ("winprofile", textarea(command, "winprofile"))])
+s.post("step4.html", [("path", work), ("projname", "proj"),
+                      ("command", textarea(command, "command")),
+                      ("command_do", "save"),
+                      ("winprofile", textarea(command, "winprofile"))])
 with open(work + "/proj/hts-cache/winprofile.ini") as fp:
     back = dict(line.strip().split("=", 1) for line in fp if "=" in line)
 with open(work + "/seeded.ini") as fp:
