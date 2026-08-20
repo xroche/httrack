@@ -72,7 +72,6 @@ htsserver_start --home "${work}"
 htsserver_python - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
 import re
 import sys
-import urllib.request
 
 from webtestlib import Session, textarea
 
@@ -197,11 +196,7 @@ if ini.get("Footer") != "x%%y":
 # The form body decodes through unescapehttp() rather than unescapeini(), and
 # only a raw % reaches it: urlencoding one would defeat the probe.
 want('--sitemap-url "http://example.com/s.xml%"')
-posted = urllib.request.urlopen(
-    urllib.request.Request(s.url + "/server/step4.html",
-                           data=("sid=%s&cookiesfile=z%%&x=1"
-                                 % sid).encode("latin-1"),
-                           method="POST"), timeout=20).read().decode("latin-1")
+posted = s.post_raw("step4.html", "sid=%s&cookiesfile=z%%&x=1" % s.sid)
 if '--cookies-file "z%"' not in textarea(posted, "command"):
     sys.exit("a posted trailing %% did not come back verbatim\n%s"
              % textarea(posted, "command"))
