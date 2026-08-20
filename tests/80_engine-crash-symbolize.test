@@ -7,7 +7,7 @@ set -eu
 . "${0%"${0##*/}"}./testlib.sh"
 
 skip_on_windows "no backtrace() on Windows"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_symbolize.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmpdir"

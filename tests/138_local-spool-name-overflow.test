@@ -17,10 +17,7 @@ cleanup_push cleanup
 
 local_server_start
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 
 rc=0
 local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
@@ -31,15 +28,9 @@ test "$rc" -eq 0 || {
 }
 
 enginelog="${tmpdir}/out/hts-log.txt"
-test -r "$enginelog" || {
-    echo "no engine log at $enginelog"
-    exit 1
-}
+test -r "$enginelog" || fail "no engine log at $enginelog"
 moved=$(grep -c 'slots ready moved to background' "$enginelog" || true)
-test "$moved" -gt 0 || {
-    echo "no slot was ever spooled, so the name was never built"
-    exit 1
-}
+test "$moved" -gt 0 || fail "no slot was ever spooled, so the name was never built"
 serr=$(grep -c 'serialize error' "$enginelog" || true)
 test "$serr" -eq 0 || {
     echo "the spool refused to write:"

@@ -24,10 +24,7 @@ counter="${tmpdir}/hits"
 resumed="${tmpdir}/resumed" # gets a byte when the server serves a resume 206
 local_server_start --env OVERLAP_COUNTER="$counter" --env OVERLAP_RESUMED="$resumed" --root "$root"
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 out="${tmpdir}/crawl"
 common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
 refdir="${out}/hts-cache/ref"
@@ -45,10 +42,7 @@ sleep 0.5
 kill -TERM "$crawlpid" 2>/dev/null || true
 wait "$crawlpid" 2>/dev/null || true
 crawlpid=
-test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
-    echo "FAIL: no temp-ref survived pass 1; cannot drive the resume"
-    exit 1
-}
+test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || fail "no temp-ref survived pass 1; cannot drive the resume"
 echo "OK (temp-ref present)"
 
 # pass 2: --continue -> resume Range -> 206 that starts 8 bytes early.

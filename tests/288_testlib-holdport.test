@@ -19,8 +19,6 @@ python=$real_python # hold_port reads it from here
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_holdport.XXXXXX")
 cleanup_push rm -rf "$tmpdir"
 
-ok() { echo "OK: $*"; }
-
 # Exit 0 if PORT is still free in PROTO, non-zero if something holds it.
 bindable() { # bindable PROTO PORT
     "$real_python" -c 'import socket, sys

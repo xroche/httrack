@@ -15,7 +15,7 @@ if [ "$HTS_OS" != "Linux" ]; then
     echo "LD_PRELOAD interposition is Linux-only here, skipping" >&2
     exit 77
 fi
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 # A --disable-shared build has nothing to preload; anything else missing is a
 # build problem, not a skip, or the legs below would pass vacuously.
 [ -r "${ALTSTACKPROBE_LA:-}" ] || fail "${ALTSTACKPROBE_LA:-\$ALTSTACKPROBE_LA} was not built"

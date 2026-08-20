@@ -11,7 +11,7 @@ set -euo pipefail
 
 python=$(find_python) || skip "python3 not found"
 skip_on_windows "MSYS cannot signal a native httrack.exe"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpterm.XXXXXX")
@@ -23,8 +23,6 @@ cleanup() {
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
-
-ok() { echo "OK: $*"; }
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"

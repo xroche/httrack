@@ -82,9 +82,6 @@ grep -iqE "^[0-9:]*[[:space:]]Error:" "$log2" || {
     cat "$log2"
     exit 1
 }
-test ! -f "$out2/alldead_${SRV_PORT}/simple/basic.html" || {
-    echo "FAIL: file downloaded despite every address failing"
-    exit 1
-}
+test ! -f "$out2/alldead_${SRV_PORT}/simple/basic.html" || fail "file downloaded despite every address failing"
 
 echo "OK: connect fallback succeeds, and exhausting all addresses errors out"

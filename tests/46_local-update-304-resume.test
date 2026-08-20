@@ -21,10 +21,7 @@ counter="${tmpdir}/reqcount"
 mark="${tmpdir}/got304"
 local_server_start --env RESUME304_COUNTER="$counter" --env RESUME304_MARK="$mark" --root "$root"
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 out="${tmpdir}/crawl"
 mkdir "$out"
 common=(-O "$out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=1 -c1)
@@ -43,10 +40,7 @@ sleep 0.5
 kill -TERM "$crawlpid" 2>/dev/null
 wait "$crawlpid" 2>/dev/null
 crawlpid=
-test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || {
-    echo "FAIL: no temp-ref survived pass 1; cannot drive C7"
-    exit 1
-}
+test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || fail "no temp-ref survived pass 1; cannot drive C7"
 echo "OK (temp-ref present)"
 before=$(wc -c <"$counter" 2>/dev/null || echo 0)
 
@@ -59,15 +53,9 @@ blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)
 full=8200 # len(RESUME304_BODY) = len("C7DATA--") + 8192
 
 printf '[file recovered whole] ..\t'
-test -s "$blob" || {
-    echo "FAIL: blob.bin missing after the 304 resume (partial dropped, not refetched)"
-    exit 1
-}
+test -s "$blob" || fail "blob.bin missing after the 304 resume (partial dropped, not refetched)"
 got=$(wc -c <"$blob")
-test "$got" -eq "$full" || {
-    echo "FAIL: blob.bin is ${got} bytes, expected ${full} (partial finalized as complete)"
-    exit 1
-}
+test "$got" -eq "$full" || fail "blob.bin is ${got} bytes, expected ${full} (partial finalized as complete)"
 echo "OK (${got} bytes)"
 
 # Pass 2 must issue at least two requests: the resume (Range -> 304) and the
@@ -75,17 +63,11 @@ echo "OK (${got} bytes)"
 after=$(wc -c <"$counter" 2>/dev/null || echo 0)
 hits=$((after - before))
 printf '[resume then refetch] ..\t'
-test "$hits" -ge 2 || {
-    echo "FAIL: only ${hits} pass-2 request(s); the 304 was trusted, no refetch"
-    exit 1
-}
+test "$hits" -ge 2 || fail "only ${hits} pass-2 request(s); the 304 was trusted, no refetch"
 echo "OK (${hits} requests)"
 
 # The recovery must go through the resume path: a Range request that drew the
 # bogus 304 (a fresh re-crawl sends no Range, so this marker stays empty).
 printf '[resume Range drew a 304] ..\t'
-test -s "$mark" || {
-    echo "FAIL: no Range request got a 304; the resume path was not exercised"
-    exit 1
-}
+test -s "$mark" || fail "no Range request got a 304; the resume path was not exercised"
 echo "OK"

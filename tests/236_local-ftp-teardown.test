@@ -9,7 +9,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
@@ -19,9 +19,6 @@ cleanup() {
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
-
-ok() { echo "OK: $*"; }
-size_of() { wc -c <"$1" | tr -d '[:space:]'; }
 
 errlog="${tmpdir}/httrack.err"
 # A sanitized build reports the use-after-free and still exits 1, so the status

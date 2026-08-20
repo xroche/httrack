@@ -11,7 +11,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./crawllib.sh"
 
 skip_on_windows "MSYS cannot signal a native httrack.exe"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_sigrecv.XXXXXX")
 crawlpid=
@@ -20,8 +20,6 @@ cleanup() {
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
-
-ok() { echo "OK: $*"; }
 
 # Verbose, so a request line in the server log says a body is in flight.
 local_server_start --env LOCAL_SERVER_VERBOSE=1

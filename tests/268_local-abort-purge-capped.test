@@ -10,13 +10,11 @@ set -euo pipefail
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
 
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_capped.XXXXXX")
 cleanup() { rm -rf "$tmpdir"; }
 cleanup_push cleanup
-
-ok() { echo "OK: $*"; }
 
 out="${tmpdir}/crawl"
 mkdir -p "$out"

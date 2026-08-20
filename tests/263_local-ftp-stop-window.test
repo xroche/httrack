@@ -12,7 +12,7 @@ set -euo pipefail
 
 python=$(find_python) || skip "python3 not found"
 skip_on_windows "MSYS cannot signal a native httrack.exe"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 # Long enough that a second window stands well clear of the measuring noise,
 # short enough to keep the test under half a minute.
@@ -28,8 +28,6 @@ cleanup() {
     rm -rf "$tmpdir"
 }
 cleanup_push cleanup
-
-ok() { echo "OK: $*"; }
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"

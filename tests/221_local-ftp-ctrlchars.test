@@ -11,7 +11,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
@@ -36,7 +36,6 @@ serverlog="${tmpdir}/server.out"
 serverpid=$!
 port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 
-ok() { echo "OK: $*"; }
 # 60s is the wedge detector: a dropped command leaves the engine on a 300s read.
 crawl() {
     run_with_timeout 60 httrack "$1" -O "$out" --quiet --disable-security-limits \

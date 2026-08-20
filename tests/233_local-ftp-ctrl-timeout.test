@@ -9,7 +9,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || fail "could not find httrack"
+require_httrack
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftptmo.XXXXXX")
@@ -45,8 +45,6 @@ livelog="${tmpdir}/live.out"
     --log "$(nativepath "$cmds")" >"$livelog" 2>&1 &
 livepid=$!
 liveport=$(discover_server_port "$livelog" "$livepid") || exit 1
-
-ok() { echo "OK: $*"; }
 
 # No --max-time anywhere below, so --timeout is the only thing that can end a run.
 crawl() {

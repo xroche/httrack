@@ -17,10 +17,7 @@ cleanup_push cleanup
 
 local_server_start
 
-which httrack >/dev/null || {
-    echo "could not find httrack"
-    exit 1
-}
+require_httrack
 out="${tmpdir}/crawl"
 mkdir "$out"
 report="${out}/hts-changes.json"
@@ -71,10 +68,7 @@ digest() { cksum <"$1" | tr -d '[:space:]'; }
 
 # --- pass 1: nothing to compare against --------------------------------------
 local_crawl --log "${tmpdir}/log1" "${common[@]}" -O "$out" --purge-old=0 "${BASEURL}/changes/index.html"
-test -s "$report" || {
-    echo "FAIL: pass 1 wrote no ${report}"
-    exit 1
-}
+test -s "$report" || fail "pass 1 wrote no ${report}"
 expect "pass 1 declares a first crawl" "true" "$(field first_crawl)"
 # Every mirrored file: index, stable.html, moved.html, stable.bin, moved.bin,
 # doomed.html, redirtarget.html, flaky.bin, coded.bin, codedstable.bin,
@@ -83,10 +77,7 @@ expect "pass 1 counts 13 new" "13" "$(field new)"
 expect "pass 1 counts 0 changed" "0" "$(field changed)"
 expect "pass 1 counts 0 gone" "0" "$(field gone)"
 expect_counts_match "pass 1 counts match its lists"
-grep -aq "first crawl" "${out}/hts-log.txt" || {
-    echo "FAIL: pass 1 log carries no first-crawl summary"
-    exit 1
-}
+grep -aq "first crawl" "${out}/hts-log.txt" || fail "pass 1 log carries no first-crawl summary"
 
 host="127.0.0.1_$SRV_PORT"
 resetdigest=$(digest "${out}/${host}/changes/reset.bin")
@@ -136,10 +127,7 @@ dupes=$( (
     listed unchanged
     listed gone
 ) | sort | uniq -d)
-test -z "$dupes" || {
-    echo "FAIL: listed in more than one bucket: ${dupes}"
-    exit 1
-}
+test -z "$dupes" || fail "listed in more than one bucket: ${dupes}"
 echo "OK"
 
 # The log summary is the report, rendered: it must not drift from the counts.
@@ -154,10 +142,7 @@ echo "OK"
 
 expect "the report says nothing was purged" "false" "$(field purged)"
 printf '[reporting gone did not delete it] ..\t'
-test -f "${out}/${host}/changes/doomed.html" || {
-    echo "FAIL: doomed.html was deleted with --purge-old=0"
-    exit 1
-}
+test -f "${out}/${host}/changes/doomed.html" || fail "doomed.html was deleted with --purge-old=0"
 echo "OK"
 expect "a failed transfer keeps its bytes" "$resetdigest" \
     "$(digest "${out}/${host}/changes/reset.bin")"
@@ -168,10 +153,7 @@ expect "the report says files were purged" "true" "$(field purged)"
 expect "gone is the page that only pass 2 linked" \
     "${host}/changes/transient.html" "$(listed gone | sort)"
 printf '[a purged file is off disk] ..\t'
-test ! -f "${out}/${host}/changes/transient.html" || {
-    echo "FAIL: transient.html survived --purge-old"
-    exit 1
-}
+test ! -f "${out}/${host}/changes/transient.html" || fail "transient.html survived --purge-old"
 echo "OK"
 
 # --- cache off: the report degrades, it does not lie -------------------------
