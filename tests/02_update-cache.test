@@ -28,7 +28,7 @@ echo '<p>bbb</p>' >"$site/sub/b.html"
 url="file://$site/index.html"
 
 # count Error: lines in the log
-errors() { count_matching_lines -iE '^[0-9:]*[[:space:]]Error:' "$out/hts-log.txt"; }
+errors() { count_log_errors "$out/hts-log.txt"; }
 
 # 1. fresh mirror writes the cache
 httrack "$url" -O "$out" -q -%v0 -r3 >/dev/null 2>&1

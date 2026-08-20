@@ -128,7 +128,7 @@ grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
 # PROPFIND is logged 403 without ever reaching the traces. It is logged after
 # them, so waiting on it also fences the drainer's copy.
 waited=0
-until test "$(count_matching_lines -i ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' "$ptlog")" -ge 3; do
+until test "$(count_matching_lines_nocase ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' "$ptlog")" -ge 3; do
     test "$waited" -lt 50 || {
         echo "FAIL: fewer than three PROPFINDs were answered 207, so the checks below prove nothing"
         cat "$ptlog"
