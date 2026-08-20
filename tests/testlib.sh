@@ -315,8 +315,7 @@ ok() { echo "OK: $*"; }
 # Size of file $1 in bytes. wc pads its count on the BSDs.
 size_of() { wc -c <"$1" | tr -d '[:space:]'; }
 
-# The engine must be on PATH. `which` is not POSIX and lies under MSYS, and a
-# test that needs the engine has nothing to say without it.
+# `which` is not POSIX and lies under MSYS; use `command -v`.
 require_httrack() {
     command -v httrack >/dev/null || fail "could not find httrack"
 }

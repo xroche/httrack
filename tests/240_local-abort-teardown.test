@@ -25,9 +25,10 @@ common=(--quiet --disable-security-limits --robots=0 --timeout=30 --changes
     --purge-old=0 --warc-file warc-out --warc-cdx)
 
 expect() {
-    printf '[%s] ..\t' "$1"
+    local what="$1"
+    printf '[%s] ..\t' "$what"
     shift
-    "$@" || fail "FAIL"
+    "$@" || fail "$what"
     echo "OK"
 }
 no_tmp() { test -z "$(find "$out" -maxdepth 1 -name '*.tmp' -print -quit)"; }
