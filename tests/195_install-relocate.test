@@ -13,10 +13,7 @@ bindir="${CONFIGURED_BINDIR:?not run under make check}"
 libdir="${CONFIGURED_LIBDIR:?not run under make check}"
 libdir=${libdir%/}
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/relocate.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/relocate.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 stage=${work}/stage

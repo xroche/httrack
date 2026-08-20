@@ -13,7 +13,4 @@ cleanup_push rm -rf "$dir"
 
 out=$(httrack -#test=reconcile "$dir")
 
-test "$out" = "cache-reconcile: OK" || {
-    echo "expected 'cache-reconcile: OK', got: $out" >&2
-    exit 1
-}
+test "$out" = "cache-reconcile: OK" || fail "expected 'cache-reconcile: OK', got: $out"

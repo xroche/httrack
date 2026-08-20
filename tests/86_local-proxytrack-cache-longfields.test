@@ -31,22 +31,13 @@ alen=$(($(wc -c <"$dir/hdr") + $(wc -c <"$dir/body")))
     cat "$dir/hdr" "$dir/body"
 } >"$dir/in.arc"
 
-proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 || {
-    echo "FAIL: proxytrack crashed reading an ARC with over-long headers" >&2
-    exit 1
-}
-test -s "$dir/out.arc" || {
-    echo "FAIL: ARC entry dropped instead of clipped" >&2
-    exit 1
-}
+proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 || fail "proxytrack crashed reading an ARC with over-long headers"
+test -s "$dir/out.arc" || fail "ARC entry dropped instead of clipped"
 # Only contenttype survives into the ARC output; the over-long Etag and
 # Content-Disposition above are still load-bearing, since bounding just one
 # field leaves the others smashing the element (the run above would crash).
 got=$(runlen "$dir/out.arc" A)
-test "${got:-0}" = 54 || {
-    echo "FAIL: ARC content-type clipped to ${got:-0}, expected 54" >&2
-    exit 1
-}
+test "${got:-0}" = 54 || fail "ARC content-type clipped to ${got:-0}, expected 54"
 
 # --- ZIP reader (ZIP_READFIELD_STRING) --------------------------------------
 python=$(find_python) || {
@@ -80,22 +71,13 @@ with zipfile.ZipFile(sys.argv[1], "w") as z:
     z.writestr(zi, body)
 EOF
 
-proxytrack --convert "$dir/out2.arc" "$dir/in.zip" >/dev/null 2>&1 || {
-    echo "FAIL: proxytrack crashed reading a zip cache with over-long headers" >&2
-    exit 1
-}
-test -s "$dir/out2.arc" || {
-    echo "FAIL: zip entry dropped instead of clipped" >&2
-    exit 1
-}
+proxytrack --convert "$dir/out2.arc" "$dir/in.zip" >/dev/null 2>&1 || fail "proxytrack crashed reading a zip cache with over-long headers"
+test -s "$dir/out2.arc" || fail "zip entry dropped instead of clipped"
 # three destinations, two capacities: msg[1024] keeps all 400 M's where a
 # one-size-fits-all clip would cut it to 63 like the others
 while read -r ch want; do
     got=$(runlen "$dir/out2.arc" "$ch")
-    test "${got:-0}" = "$want" || {
-        echo "FAIL: zip field '$ch' clipped to ${got:-0}, expected $want" >&2
-        exit 1
-    }
+    test "${got:-0}" = "$want" || fail "zip field '$ch' clipped to ${got:-0}, expected $want"
 done <<'EOF'
 A 54
 C 63

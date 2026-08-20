@@ -37,7 +37,4 @@ out=$(httrack -#test=cache-golden "$dir")
 # Match the exact success line: the read must have found and verified every
 # entry, not merely failed to enter the mode (a renamed/removed test prints the
 # registry to stderr, which also exits non-zero but never prints this).
-test "$out" = "cache-golden: OK" || {
-    echo "expected 'cache-golden: OK', got: $out" >&2
-    exit 1
-}
+test "$out" = "cache-golden: OK" || fail "expected 'cache-golden: OK', got: $out"

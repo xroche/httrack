@@ -34,14 +34,8 @@ start_probe() {
 crawl() {
     local rc=0
     run_with_timeout 90 httrack "$@" >>"$tmpdir/log" 2>&1 || rc=$?
-    test "$rc" -ne 124 || {
-        echo "crawl hit the deadline" >&2
-        exit 1
-    }
-    test "$rc" -le 128 || {
-        echo "crawl ended abnormally ($rc)" >&2
-        exit 1
-    }
+    test "$rc" -ne 124 || fail "crawl hit the deadline"
+    test "$rc" -le 128 || fail "crawl ended abnormally ($rc)"
 }
 
 # 1. Referer: the poisoned page links onward, so its own URL is the referer of

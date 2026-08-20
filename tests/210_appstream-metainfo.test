@@ -34,25 +34,16 @@ test ${#tools[@]} -gt 0 || {
 
 # html/Makefile.am installs these by glob; a second one must not ship unchecked.
 metainfos=("${srcdir}"/html/server/div/*.metainfo.xml)
-test -f "${metainfos[0]}" || {
-    echo "FAIL: no metainfo under ${srcdir}/html/server/div" >&2
-    exit 1
-}
+test -f "${metainfos[0]}" || fail "no metainfo under ${srcdir}/html/server/div"
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/appstream.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/appstream.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 for metainfo in "${metainfos[@]}"; do
     # Positive control: a validator that never fails would pass the check below.
     sed '/<id>/d' "${metainfo}" >"${work}/noid.xml"
     for tool in "${tools[@]}"; do
-        validate "${tool}" "${metainfo}" || {
-            echo "FAIL: ${metainfo##*/} does not validate under ${tool}" >&2
-            exit 1
-        }
+        validate "${tool}" "${metainfo}" || fail "${metainfo##*/} does not validate under ${tool}"
         if validate "${tool}" "${work}/noid.xml" >"${work}/noid.log" 2>&1; then
             echo "FAIL: ${tool} validated a metainfo with no <id>; it proves nothing" >&2
             exit 1

@@ -25,10 +25,7 @@ out=$(httrack -#test=cache "$dir")
 # Match the exact success line, so the test cannot pass for an unrelated reason
 # (e.g. the cache test being gone, which prints the registry to stderr but
 # never prints this line).
-test "$out" = "cache-selftest: OK" || {
-    echo "expected 'cache-selftest: OK', got: $out" >&2
-    exit 1
-}
+test "$out" = "cache-selftest: OK" || fail "expected 'cache-selftest: OK', got: $out"
 
 # The self-test must have actually produced a ZIP cache on disk.
 assert_file "$dir/hts-cache/new.zip" "the self-test wrote no ZIP cache"
@@ -41,7 +38,4 @@ assert_file "$dir/hts-cache/new.zip" "the self-test wrote no ZIP cache"
 # which is all a ceiling check needs.
 ceiling=$((4 * 1024)) # KiB
 kbytes=$(du -sk "$dir/hts-cache" | cut -f1)
-test "$kbytes" -le "$ceiling" || {
-    echo "cache footprint ${kbytes} KiB exceeds ${ceiling} KiB ceiling" >&2
-    exit 1
-}
+test "$kbytes" -le "$ceiling" || fail "cache footprint ${kbytes} KiB exceeds ${ceiling} KiB ceiling"

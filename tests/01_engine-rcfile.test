@@ -18,10 +18,7 @@ set -euo pipefail
 
 # Resolve httrack to an absolute path before we cd: PATH may hold a build-relative
 # entry that would not resolve from the temp directory.
-bin=$(command -v httrack) || {
-    echo "FAIL: httrack not found on PATH"
-    exit 1
-}
+bin=$(command -v httrack) || fail "httrack not found on PATH"
 case "$bin" in
 /*) ;;
 *) bin="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")" ;;
@@ -53,10 +50,7 @@ printf 'user-agent=%s\n' "$marker" | write_rc "$d1"
 rc=0
 (cd "$d1" && "$bin" "file://$d1/index.html" --quiet -n >.log 2>&1) || rc=$?
 
-test "$rc" -eq 0 || {
-    echo "FAIL: rc-file crawl exited $rc"
-    exit 1
-}
+test "$rc" -eq 0 || fail "rc-file crawl exited $rc"
 assert_file "$d1/hts-cache/doit.log" "no doit.log, so the rc file was not processed"
 # A truncated copy would cut the token; require the full -F value.
 grep -q -- "-F $marker" "$d1/hts-cache/doit.log" || {
@@ -98,15 +92,9 @@ assert_file "$d2/hts-cache/doit.log" "no doit.log, so the rc file was not proces
 # is the command line, so the prose below it cannot answer for a token.
 short=$(sed -n '1p' "$d2/hts-cache/doit.log" | tr ' ' '\n' |
     awk -v n="${#val}" '/^a+$/ && length($0) != n {c++} END {print c + 0}')
-test "$short" -eq 0 || {
-    echo "FAIL: $short user-agent value(s) reached doit.log clipped"
-    exit 1
-}
+test "$short" -eq 0 || fail "$short user-agent value(s) reached doit.log clipped"
 for marker in "$first" "$last"; do
-    grep -q -- "-F $marker" "$d2/hts-cache/doit.log" || {
-        echo "FAIL: $marker never reached the rebuilt command line"
-        exit 1
-    }
+    grep -q -- "-F $marker" "$d2/hts-cache/doit.log" || fail "$marker never reached the rebuilt command line"
 done
 
 exit 0

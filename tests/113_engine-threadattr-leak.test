@@ -56,8 +56,5 @@ test "${sabotaged:-0}" -ge 1 || {
     cat "$dir/out" >&2
     exit 1
 }
-test "${undestroyed:-1}" -eq 0 || {
-    echo "threadattr: $undestroyed of $sabotaged attributes objects survived a refused pthread_create()" >&2
-    exit 1
-}
+test "${undestroyed:-1}" -eq 0 || fail "threadattr: $undestroyed of $sabotaged attributes objects survived a refused pthread_create()"
 echo "OK: a refused pthread_create() destroys the attributes object ($sabotaged refused)"

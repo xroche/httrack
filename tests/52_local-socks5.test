@@ -194,10 +194,7 @@ ref="$tmpdir/refuse"
 start_server "$ref" refuse
 rc=0
 run_crawl "$ref/out" "https://${host}:${tls_port}/" "socks5://127.0.0.1:${socks_port}" || rc=$?
-test "$rc" -ne "$HANG_RC" || {
-    echo "FAIL: crawl hung on a refusing socks proxy" >&2
-    exit 1
-}
+test "$rc" -ne "$HANG_RC" || fail "crawl hung on a refusing socks proxy"
 grep -rq "ORIGIN-PAGE-563" "$ref/out" 2>/dev/null && {
     echo "FAIL: refusing proxy unexpectedly served the page" >&2
     exit 1
@@ -209,10 +206,7 @@ trunc="$tmpdir/trunc"
 start_server "$trunc" truncate
 rc=0
 run_crawl "$trunc/out" "https://${host}:${tls_port}/" "socks5://127.0.0.1:${socks_port}" || rc=$?
-test "$rc" -ne "$HANG_RC" || {
-    echo "FAIL: crawl hung on a truncated socks reply (bounded read missing)" >&2
-    exit 1
-}
+test "$rc" -ne "$HANG_RC" || fail "crawl hung on a truncated socks reply (bounded read missing)"
 grep -rq "ORIGIN-PAGE-563" "$trunc/out" 2>/dev/null && {
     echo "FAIL: truncated-reply proxy unexpectedly served the page" >&2
     exit 1

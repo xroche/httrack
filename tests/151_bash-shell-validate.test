@@ -12,16 +12,10 @@ set -euo pipefail
 . "${0%"${0##*/}"}./proclib.sh"
 
 sh=${BASH_SHELL:-}
-test -n "$sh" || {
-    echo "BASH_SHELL is empty; tests/Makefile.am must export the configured value" >&2
-    exit 1
-}
+test -n "$sh" || fail "BASH_SHELL is empty; tests/Makefile.am must export the configured value"
 
 configure="${abs_top_srcdir:-}/configure"
-test -r "$configure" || {
-    echo "no configure script at $configure; tests/Makefile.am must export abs_top_srcdir" >&2
-    exit 1
-}
+test -r "$configure" || fail "no configure script at $configure; tests/Makefile.am must export abs_top_srcdir"
 
 tmp=$(mktemp -d)
 cleanup() {
@@ -133,10 +127,7 @@ reject() { # reject <label> <expected message> <env argument>...
     local label=$1 want=$2
     shift 2
     run "$label" "$@"
-    test "$status" -ne 0 || {
-        echo "configure accepted $label" >&2
-        exit 1
-    }
+    test "$status" -ne 0 || fail "configure accepted $label"
     grep -q "$want" <<<"$log" || {
         echo "$label rejected without '$want':" >&2
         tail -5 <<<"$log" >&2
@@ -156,10 +147,7 @@ accept() {
         exit 1
     }
     got=$(sed -n 's/^BASH_SHELL = //p' "$rundir/Makefile")
-    test -n "$got" || {
-        echo "$label configured, but the Makefile carries no BASH_SHELL" >&2
-        exit 1
-    }
+    test -n "$got" || fail "$label configured, but the Makefile carries no BASH_SHELL"
     if test -n "$path" && test "$got" != "$path"; then
         echo "$label reached the Makefile as $got" >&2
         exit 1

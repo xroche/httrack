@@ -24,17 +24,11 @@ if grep -q "^dlname=''" "$CLOSETRACK_LA"; then
     exit 0
 fi
 for lib in "${CLOSETRACK_LIB:-}" "${FTPCANCEL_LIB:-}"; do
-    test -r "$lib" || {
-        echo "close-once: ${lib:-an interposer} was not built" >&2
-        exit 1
-    }
+    test -r "$lib" || fail "close-once: ${lib:-an interposer} was not built"
 done
 
 python=$(find_python) || skip "python3 not found"
-command -v httrack >/dev/null || {
-    echo "could not find httrack" >&2
-    exit 1
-}
+command -v httrack >/dev/null || fail "could not find httrack"
 
 server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpclose.XXXXXX")

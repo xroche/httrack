@@ -26,10 +26,7 @@ case "${CONFIGURED_DATADIR:?not run under make check}" in
     ;;
 esac
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/manifest.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/manifest.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 stage=${work}/stage

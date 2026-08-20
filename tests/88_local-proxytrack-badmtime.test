@@ -43,23 +43,14 @@ if int(os.stat(sys.argv[1]).st_mtime) < huge:
     sys.exit(77)  # filesystem clamped it, nothing to test
 EOF
 test "$rc" -eq 0 || {
-    test "$rc" -eq 77 || {
-        echo "FAIL: could not build the cache (python exit $rc)" >&2
-        exit 1
-    }
+    test "$rc" -eq 77 || fail "could not build the cache (python exit $rc)"
     echo "filesystem will not hold an out-of-range mtime; skipping" >&2
     exit 77
 }
 
-proxytrack --convert "$dir/out.arc" "$dir/in.zip" >/dev/null 2>&1 || {
-    echo "FAIL: proxytrack failed on a cache with an out-of-range mtime" >&2
-    exit 1
-}
+proxytrack --convert "$dir/out.arc" "$dir/in.zip" >/dev/null 2>&1 || fail "proxytrack failed on a cache with an out-of-range mtime"
 
 # field 3 of the filedesc line is YYYYMMDDhhmmss; the epoch stands in for
 # "unknown", and 14 digits with a real day is the point (00 is what broke)
 date=$(head -n1 "$dir/out.arc" | awk '{ print $3 }')
-test "$date" = 19700101000000 || {
-    echo "FAIL: filedesc date is '$date', expected 19700101000000" >&2
-    exit 1
-}
+test "$date" = 19700101000000 || fail "filedesc date is '$date', expected 19700101000000"

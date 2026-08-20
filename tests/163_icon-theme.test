@@ -12,10 +12,7 @@ srcdir="${abs_top_srcdir:?not run under make check}"
 builddir="${abs_top_builddir:?not run under make check}"
 div="${srcdir}/html/server/div"
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/icontheme.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/icontheme.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 # IHDR width and height, and a signature check so a non-PNG cannot answer.

@@ -20,7 +20,4 @@ fi
 
 # The temporaries live in ~hts-tmp and the last user removes it.
 leftovers=$(find "$dir" -mindepth 1 | head -5)
-test -z "$leftovers" || {
-    echo "FAIL: leftover temporaries: $leftovers" >&2
-    exit 1
-}
+test -z "$leftovers" || fail "leftover temporaries: $leftovers"

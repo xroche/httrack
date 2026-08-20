@@ -82,10 +82,7 @@ request_log() { # log
 wait_drained() { # log
     local waited=0
     until test -e "$1.done"; do
-        test "$waited" -lt 100 || {
-            echo "FAIL: the pty drainer never finished copying the output"
-            exit 1
-        }
+        test "$waited" -lt 100 || fail "the pty drainer never finished copying the output"
         sleep 0.1
         waited=$((waited + 1))
     done

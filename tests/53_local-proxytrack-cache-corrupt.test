@@ -17,7 +17,4 @@ cleanup_push rm -rf "$dir"
 } >"$dir/foo.ndx"
 : >"$dir/foo.dat" # cache_brstr runs only when the sibling .dat opens
 
-proxytrack --convert "$dir/out.arc" "$dir/foo.ndx" >/dev/null 2>&1 || {
-    echo "FAIL: proxytrack crashed/errored on a corrupt cache index"
-    exit 1
-}
+proxytrack --convert "$dir/out.arc" "$dir/foo.ndx" >/dev/null 2>&1 || fail "proxytrack crashed/errored on a corrupt cache index"

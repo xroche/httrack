@@ -34,10 +34,7 @@ run_case() {
         cat "$dir/hdr" "$dir/body"
     } >"$dir/in.arc"
 
-    proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 || {
-        echo "FAIL: proxytrack crashed on $what" >&2
-        exit 1
-    }
+    proxytrack --convert "$dir/out.arc" "$dir/in.arc" >/dev/null 2>&1 || fail "proxytrack crashed on $what"
     grep -aq "^http://example.com/p.html 0.0.0.0 ${wantdate} " "$dir/out.arc" || {
         echo "FAIL: $what: expected archive date ${wantdate}, got:" >&2
         grep -a '^http://example.com/' "$dir/out.arc" >&2 || echo "(entry dropped)" >&2

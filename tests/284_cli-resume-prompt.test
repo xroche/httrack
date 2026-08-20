@@ -45,10 +45,7 @@ seed "$tmp/plain" --footer 'zzzmarker'
 out=$(ask "$tmp/plain")
 assert_match 'OK to (Continue|Update) httrack ' "$out" "no resume offer"
 assert_match 'zzzmarker' "$out" "the offer dropped the options"
-! grep -qF -- "$bin" <<<"$out" || {
-    echo "FAIL: the offer still quotes the program path"
-    exit 1
-}
+! grep -qF -- "$bin" <<<"$out" || fail "the offer still quotes the program path"
 echo OK
 
 # Teeth for the clip: doit.log replays up to 8000 bytes, so a command line built
@@ -63,8 +60,5 @@ out=$(ask "$tmp/long")
 assert_match 'OK to (Continue|Update) httrack .*\.\.\.\?' "$out" \
     "a command line past the buffer was not clipped"
 # htssafe names the file it aborts in; the offer must not be one of them.
-! grep -qE 'overflow while copying' <<<"$out" || {
-    echo "FAIL: the offer aborted on the bounds check instead of clipping"
-    exit 1
-}
+! grep -qE 'overflow while copying' <<<"$out" || fail "the offer aborted on the bounds check instead of clipping"
 echo OK

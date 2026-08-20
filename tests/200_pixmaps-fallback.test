@@ -12,10 +12,7 @@ srcdir="${abs_top_srcdir:?not run under make check}"
 builddir="${abs_top_builddir:?not run under make check}"
 div="${srcdir}/html/server/div"
 
-work=$(mktemp -d "${TMPDIR:-/tmp}/pixmaps.XXXXXX") || {
-    echo "no tmpdir" >&2
-    exit 1
-}
+work=$(mktemp -d "${TMPDIR:-/tmp}/pixmaps.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 # Geometry from the first string literal, with a header check so a text file
