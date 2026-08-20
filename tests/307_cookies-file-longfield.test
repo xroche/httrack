@@ -17,8 +17,6 @@ site="$tmp/site"
 mkdir -p "$site"
 echo '<html>hello</html>' >"$site/index.html"
 
-pad() { printf '%*s' "$1" '' | tr ' ' "${2:-A}"; }
-
 # Netscape record, in the spelling cookie_save() writes back.
 rec() { # rec DOMAIN PATH NAME VALUE
     printf '%s\tTRUE\t%s\tFALSE\t1999999999\t%s\t%s\n' "$1" "$2" "$3" "$4"
@@ -30,23 +28,23 @@ rec() { # rec DOMAIN PATH NAME VALUE
 jar="$tmp/jar.txt"
 {
     rec www.example.com / GOODFIRST v1
-    rec "$(pad 2000)" / DOM2000 v
-    rec "$(pad 256)" / DOM256 v
-    rec "$(pad 255)" / DOM255 v
-    rec www.example.com "/$(pad 1999)" PATH2000 v
-    rec www.example.com "/$(pad 255)" PATH256 v
-    rec www.example.com "/$(pad 254)" PATH255 v
-    rec www.example.com / "NAME2000$(pad 1992)" v
-    rec www.example.com / "NAME1024$(pad 1016)" v
+    rec "$(repeat_chars 2000 A)" / DOM2000 v
+    rec "$(repeat_chars 256 A)" / DOM256 v
+    rec "$(repeat_chars 255 A)" / DOM255 v
+    rec www.example.com "/$(repeat_chars 1999 A)" PATH2000 v
+    rec www.example.com "/$(repeat_chars 255 A)" PATH256 v
+    rec www.example.com "/$(repeat_chars 254 A)" PATH255 v
+    rec www.example.com / "NAME2000$(repeat_chars 1992 A)" v
+    rec www.example.com / "NAME1024$(repeat_chars 1016 A)" v
     # fits cook_name[1024] but not cookie_add()'s own 256-byte cap, so the line
     # is gone for a second reason, which has to be reported too
-    rec www.example.com / "JARCAP$(pad 294)" v
+    rec www.example.com / "JARCAP$(repeat_chars 294 A)" v
     # cook_value[8192] is out of reach behind the line gate, so it is pinned
     # from below: neither of these may be refused for its value
-    rec www.example.com / BIGVAL "$(pad 500 v)"
-    rec www.example.com / BIGVAL7900 "$(pad 7900 v)"
+    rec www.example.com / BIGVAL "$(repeat_chars 500 v)"
+    rec www.example.com / BIGVAL7900 "$(repeat_chars 7900 v)"
     # 8049 bytes: over the line gate, under what rawlinput() reads in one go
-    rec www.example.com / LONGLINE "$(pad 8000 L)"
+    rec www.example.com / LONGLINE "$(repeat_chars 8000 L)"
     rec www.example.com / GOODLAST v2
 } >"$jar"
 
@@ -67,9 +65,9 @@ log=$(tr -d '\r' <"$out/hts-log.txt")
 # match whole lines: a clipping fix would still store the cookie name, and
 # only the rest of the line says the field was cut
 for want in "$(rec www.example.com / GOODFIRST v1)" \
-    "$(rec "$(pad 255)" / DOM255 v)" \
-    "$(rec www.example.com "/$(pad 254)" PATH255 v)" \
-    "$(rec www.example.com / BIGVAL "$(pad 500 v)")" \
+    "$(rec "$(repeat_chars 255 A)" / DOM255 v)" \
+    "$(rec www.example.com "/$(repeat_chars 254 A)" PATH255 v)" \
+    "$(rec www.example.com / BIGVAL "$(repeat_chars 500 v)")" \
     "$(rec www.example.com / GOODLAST v2)"; do
     grep -qxF "$want" <<<"$loaded" ||
         fail "a line that fits did not load whole: ${want:0:40}... in $jar_out"

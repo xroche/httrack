@@ -300,9 +300,12 @@ make_tls_pem() {
     }
 }
 
-# COUNT copies of CHAR, the over-long strings the bounds tests feed. Built with
-# printf and tr: ${v// /c} is quadratic on the bash 3.2 macOS runners.
+# The over-long strings the bounds tests feed. printf and tr, because
+# ${v// /c} is quadratic on the bash 3.2 macOS runners.
 repeat_chars() { # repeat_chars COUNT [CHAR]
+    # A negative width left-justifies instead of erroring, so a computed
+    # COUNT that goes negative would pad silently.
+    case $1 in '' | *[!0-9]*) fail "repeat_chars: COUNT is not a number: $1" ;; esac
     printf '%*s' "$1" '' | tr ' ' "${2:-a}"
 }
 

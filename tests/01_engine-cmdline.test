@@ -18,10 +18,6 @@ cleanup_push rm -rf "$tmp"
 echo '<html><body>hello</body></html>' >"$tmp/index.html"
 
 # a string of N repeated 'A' characters
-nchars() {
-    printf 'A%.0s' $(seq 1 "$1")
-}
-
 # crawl the local fixture with the given extra args; leaves the exit status in RC
 run() {
     local out="$1"
@@ -65,7 +61,7 @@ continued() {
 
 # a value past the old 126/256 caps but within the cap is accepted, on both the
 # short and long form of each option
-long=$(nchars 900)
+long=$(repeat_chars 900 A)
 run "$tmp/ua-s" -F "$long"
 accepted "$tmp/ua-s" "#152: long -F user-agent rejected or crashed"
 run "$tmp/ua-l" --user-agent "$long"
@@ -77,12 +73,12 @@ accepted "$tmp/hd-l" "#152: long --headers rejected or crashed"
 
 # a value just under the cap (>1000) must not overflow the long-form alias
 # scratch buffer (the param[] copy in optalias_check)
-run "$tmp/ua-n" --user-agent "$(nchars 1010)"
+run "$tmp/ua-n" --user-agent "$(repeat_chars 1010 A)"
 accepted "$tmp/ua-n" "#152: near-cap --user-agent overflowed the param[] buffer"
 
 # a value over the cap is refused cleanly (graceful error, not a SIGABRT), on
 # both forms
-over=$(nchars 1100)
+over=$(repeat_chars 1100 A)
 run "$tmp/ov-s" -F "$over"
 refused "#152: over-cap -F not refused cleanly"
 run "$tmp/ov-l" --user-agent "$over"
@@ -100,7 +96,7 @@ run_only "$tmp/q-lone" '"'
 refused "lone-quote argument not refused cleanly"
 # A dangling quote on an argument at the cap must not overflow the "Missing
 # quote in %s" panic buffer: the prefix plus a 1023-byte argument overran it.
-run_only "$tmp/q-long" "\"$(nchars 1022)"
+run_only "$tmp/q-long" "\"$(repeat_chars 1022 A)"
 refused "near-cap dangling-quote argument overflowed the panic buffer"
 
 # --pause (#185): valid MIN[:MAX] accepted; malformed, reversed, over-range and

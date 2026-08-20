@@ -17,9 +17,7 @@ cleanup_push cleanup
 HDRMAX=8192
 BODY=BODYMARKER
 
-pad() { printf "%${1}s" '' | tr ' ' "$2"; }
-
-P1000=$(pad 1000 P)
+P1000=$(repeat_chars 1000 P)
 
 # Header lines contributing exactly $1 bytes to the entry's stored headers: the
 # reader rebuilds each as "name: value\r\n", and its line buffer holds 2048.
@@ -99,7 +97,7 @@ grep -q 'clipped to' "$dir/log" ||
 # Three sources at once, each with its own limit: the reason phrase is cut at
 # msg[1024], the shorter location not at all, the passthrough takes what is
 # left. One all-fields bound gets at least one of them wrong.
-build_arc "$(pad 1200 M)" "http://example.com/$(pad 1500 L)" 5000
+build_arc "$(repeat_chars 1200 M)" "http://example.com/$(repeat_chars 1500 L)" 5000
 convert_check "long reason, location and headers"
 got=$(runlen "$dir/out.arc" M)
 test "${got:-0}" = 1023 || fail "reason phrase kept ${got:-0} bytes, expected 1023"

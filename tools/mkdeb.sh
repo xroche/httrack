@@ -188,8 +188,8 @@ main() {
     else
         # Refresh build system and man page, then build the tarball. We build
         # here only because regen-man needs the compiled binaries; the test
-        # suite is not run in this pass. debuild (below) runs the full suite
-        # once, online tests enabled, so a check here would just repeat it.
+        # suite is not run in this pass. debuild (below) runs it once, so a
+        # check here would just repeat it.
         info "regenerating build system and man page"
         (
             cd "$export_dir"
