@@ -38,7 +38,7 @@ crash_report() {
 # Frames the raw trace printed. A runaway recursion fills backtrace()'s buffer;
 # an ordinary fault is a dozen deep. Measured: 256 against 11.
 frame_count() {
-    grep -cE '\[0x[0-9a-f]+\]$' <<<"$1" || true
+    count_matching_lines_regexp '\[0x[0-9a-f]+\]$' <<<"$1"
 }
 
 # Control: an ordinary fault was already reported before the fix, so a build or

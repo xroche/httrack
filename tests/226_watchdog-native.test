@@ -528,7 +528,7 @@ cadence_leg() {
         return 1
     }
     sink_stop
-    n=$(grep -c . "$posts" || true)
+    n=$(count_matching_lines . "$posts")
     test "$n" -eq 1 || {
         echo "$n API calls at a 100s cadence over 4s, want 1"
         return 1
@@ -601,8 +601,8 @@ throttle_leg() {
         return 1
     }
     sink_stop
-    calls=$(grep -c . "$posts" || true)
-    lines=$(grep -c 't=[0-9]*s q=' "$legout" || true)
+    calls=$(count_matching_lines . "$posts")
+    lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
     test "$lines" -ge 3 || {
         echo "$lines due ticks over 8s at a 1s interval: too few to judge a throttle"
         return 1
@@ -624,8 +624,8 @@ backoff_leg() {
         return 1
     }
     sink_stop
-    calls=$(grep -c . "$posts" || true)
-    lines=$(grep -c 't=[0-9]*s q=' "$legout" || true)
+    calls=$(count_matching_lines . "$posts")
+    lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
     test "$calls" -ge 2 || {
         echo "a rejecting API was called $calls times: the loop stopped trying"
         return 1
@@ -651,7 +651,7 @@ fullstdout_leg() {
     run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
         -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 5 >/dev/full 2>&1 || true
     sink_stop
-    n=$(grep -c . "$posts" || true)
+    n=$(count_matching_lines . "$posts")
     test "$n" -ge 2 || {
         echo "$n posts with a full stdout: a failed log write took the loop with it"
         return 1
@@ -719,7 +719,7 @@ for psrun in "${psruns[@]}"; do
         -ProgressLog "$(nativepath "$tmp/progress.log")" \
         -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 5) ||
         fail "the $psrun slow-cadence loop exited nonzero: $out"
-    slow=$(grep -c 't=[0-9]*s q=' <<<"$out" || true)
+    slow=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
     test "$slow" -eq 1 || fail "$slow status lines at a 100s cadence over 5s, want 1: $out"
 
     began=$SECONDS
@@ -730,7 +730,7 @@ for psrun in "${psruns[@]}"; do
     spent=$((SECONDS - began))
     test "$spent" -ge 4 || fail "a 5s watchdog returned after ${spent}s: MaxSeconds is not seconds"
     test "$spent" -le 20 || fail "a 5s watchdog ran ${spent}s: it does not stop on its own"
-    fast=$(grep -c 't=[0-9]*s q=' <<<"$out" || true)
+    fast=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
     # Against the slow leg, not a floor: a probe tick is not instant.
     test "$fast" -gt "$slow" || fail "$fast status lines at 1s against $slow at 100s: $out"
     grep -q '36_local-bigcrawl.test' <<<"$out" || fail "the status does not name the test in flight: $out"

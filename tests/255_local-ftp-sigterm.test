@@ -116,7 +116,7 @@ ok "the exit unwound through teardown, keeping the mirror"
 # in the wait for a free socket, which the leg above never enters.
 start_crawl "a.bin b.bin c.bin" --timeout=0 --max-time=0 -c2
 deadline=$((SECONDS + 60))
-until test "$(grep -ac '^RETR ' "$cmds" 2>/dev/null || true)" -ge 2; do
+until test "$(count_matching_lines '^RETR ' "$cmds" 2>/dev/null)" -ge 2; do
     test "$SECONDS" -lt "$deadline" || fail "the crawl never filled both sockets"
     poll_wait 1
 done

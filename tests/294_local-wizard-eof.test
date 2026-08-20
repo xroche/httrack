@@ -41,7 +41,7 @@ crawl() {
 
     test "$rc" -eq 0 || fail "$label: the crawl exited $rc"
     # asked once and then stopped: refusing this one link would ask again
-    asked=$(grep -c "beyond this mirror scope" "${tmpdir}/$label.log" || true)
+    asked=$(count_matching_lines "beyond this mirror scope" "${tmpdir}/$label.log")
     test "$asked" -eq 1 || fail "$label: asked $asked times, expected 1"
     test -f "${tmpdir}/$label/127.0.0.1_${SRV_PORT}/wizardeof/index.html" ||
         fail "$label: the start page was not mirrored"

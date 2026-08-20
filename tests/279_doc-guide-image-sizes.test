@@ -122,7 +122,7 @@ if grep -q 'src="img/' "${guide}"; then
 fi
 expect_fail 'want at least' "an img-less guide"
 out=$("${python}" "${checker}" "${work}/html" 2>&1 >/dev/null) || true
-nbad=$(grep -c '^FAIL:' <<<"${out}" || true)
+nbad=$(count_matching_lines '^FAIL:' <<<"${out}")
 test "${nbad}" -eq 1 || fail "the floor is not the only arm firing: ${out}"
 
 echo "guide images: geometry, existence and orphans all checked, each arm proven"

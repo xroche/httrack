@@ -133,7 +133,7 @@ ftp_port() {
     rm -rf "$out"
     run_with_timeout 30 httrack "ftp://127.0.0.1:$1/x" -O "$out" --quiet -n \
         >/dev/null 2>&1 || true
-    grep -c "Invalid port: $1" "$out/hts-log.txt" 2>/dev/null || true
+    count_matching_lines "Invalid port: $1" "$out/hts-log.txt" 2>/dev/null
 }
 
 # 65616 truncated to 80 and really did connect there

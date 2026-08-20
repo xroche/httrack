@@ -63,7 +63,7 @@ seed() { # seed LENGTH
         >"$tmpdir/u.txt"
     assert_eq "$URL: accepted by rule #1 (+*.png)" "$(why "$tmpdir/u.txt")" \
         "seed of $1 bytes"
-    seedwarned=$(grep -c 'URL longer than' "$tmpdir/p/hts-log.txt" || true)
+    seedwarned=$(count_matching_lines 'URL longer than' "$tmpdir/p/hts-log.txt")
 }
 # Deliberately not derived from the rule cap: a seed sized off the wrong bound
 # reds this on a cap move with no engine bug behind it.

@@ -309,6 +309,27 @@ repeat_chars() { # repeat_chars COUNT [CHAR]
     printf '%*s' "$1" '' | tr ' ' "${2:-a}"
 }
 
+# grep -c counts matching LINES, not matches: two hits on one line count once.
+# It also returns 0, not a failing status, when nothing matches. -a throughout,
+# inert for GNU grep here but not for one that skips a file it reads as binary.
+count_matching_lines() { # count_matching_lines PATTERN [FILE]
+    grep -ac "$@" || true
+}
+
+count_matching_lines_nocase() { # count_matching_lines_nocase PATTERN [FILE]
+    grep -aci "$@" || true
+}
+
+count_matching_lines_regexp() { # count_matching_lines_regexp ERE [FILE]
+    grep -acE "$@" || true
+}
+
+# The engine's error lines in a crawl log. One spelling of the pattern, which
+# six call sites used to carry.
+count_log_errors() { # count_log_errors LOGFILE
+    grep -aciE '^[0-9:]*[[:space:]]Error:' "$1" || true
+}
+
 # A passing step, on stdout: the failures go to stderr through fail().
 ok() { echo "OK: $*"; }
 

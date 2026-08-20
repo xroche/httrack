@@ -88,7 +88,7 @@ cleanup() {
 cleanup_push cleanup
 
 count_lines() { # count_lines RE FILE
-    grep -c "$1" "$2" || true
+    count_matching_lines "$1" "$2"
 }
 
 count_bytes() { # count_bytes BYTE FILE

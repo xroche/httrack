@@ -109,7 +109,7 @@ resp=$(curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
     cat "$quietlog"
     exit 1
 }
-served=$(grep -c '^HTTP/1\.[01] 207 ' <<<"$resp" || true)
+served=$(count_matching_lines '^HTTP/1\.[01] 207 ' <<<"$resp")
 test "$served" -eq 2 || {
     echo "FAIL: expected two 207 Multi-Status replies, got $served"
     printf '%s\n' "$resp"
@@ -117,7 +117,7 @@ test "$served" -eq 2 || {
 }
 # The collection and its entry, then that entry and its default document. An
 # empty listing builds no table and would make the check below vacuous.
-listed=$(grep -c '<response ' <<<"$resp" || true)
+listed=$(count_matching_lines '<response ' <<<"$resp")
 test "$listed" -eq 4 || {
     echo "FAIL: the two listings enumerated $listed entries, wanted 4"
     printf '%s\n' "$resp"

@@ -117,7 +117,7 @@ test "$wide" -ge 6 || fail "at most $wide tests in flight at once, want the 6 wo
 
 # The traced re-run of the failing test runs outside test-timeout.sh, so it is the
 # one leg whose TMPDIR the driver itself decides.
-records=$(grep -c . "$share/tmpdirs" || true)
+records=$(count_matching_lines . "$share/tmpdirs")
 test "$records" -eq 13 ||
     fail "$records tests reported a TMPDIR, want 13 (twelve plus the traced re-run)"
 stray=$(strays)

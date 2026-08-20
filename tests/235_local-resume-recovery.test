@@ -110,7 +110,7 @@ run_with_timeout 120 httrack -O "$out" --quiet --disable-security-limits \
     "${BASEURL}/resume206loop/index.html" >"${out}.log2" 2>&1 || rc=$?
 test "$rc" -ne 124 || fail "the crawl never terminated; the restart is unbounded"
 grep -q 'Unusable partial-content range' <"${out}/hts-log.txt" || fail "the resume was never rejected; the latch was not exercised"
-restarts=$(grep -c 'Restarting whole file' <"${out}/hts-log.txt" || true)
+restarts=$(count_matching_lines 'Restarting whole file' <"${out}/hts-log.txt")
 test "$restarts" -eq 1 || fail "${restarts} free restarts, expected exactly 1 (latch)"
 echo "OK (1 free restart, then bounded)"
 
@@ -130,9 +130,9 @@ test "$rc" -ne 124 || fail "the crawl never terminated; the alias hop reset the 
 log="${out}/hts-log.txt"
 # Without the hop the alternation was never driven and the rest proves nothing.
 grep -q 'Warning moved treated' <"$log" || fail "no alias hop; the re-record path was never reached"
-restarts=$(grep -c 'Restarting whole file' <"$log" || true)
+restarts=$(count_matching_lines 'Restarting whole file' <"$log")
 test "$restarts" -eq 1 || fail "${restarts} free restarts across the alias hops, expected 1"
-retries=$(grep -c 'Retry after error' <"$log" || true)
+retries=$(count_matching_lines 'Retry after error' <"$log")
 test "$retries" -eq 1 || fail "${retries} retries, expected 1; the free restart spent the budget"
 echo "OK (1 free restart, budget intact)"
 
@@ -178,7 +178,7 @@ test "$rc" -ne 124 || fail "the crawl never terminated"
 # The shim silently matching nothing would make this leg a copy of test 48.
 seen=$(wc -l <"$attempts")
 test "$seen" -ge 1 || fail "the interposer saw no unlink of the partial; it never fired"
-held=$(grep -c '^open ' <"$attempts" || true)
+held=$(count_matching_lines '^open ' <"$attempts")
 test "$held" -eq 0 || fail "${held} of ${seen} unlink(s) came while the handle was open"
 got=$(blob_size "$out")
 test "$got" -eq "$crange_full" || fail "blob.bin is ${got} bytes, expected ${crange_full} (refetch lost)"

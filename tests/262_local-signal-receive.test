@@ -49,14 +49,14 @@ await_exit() {
 # Wait until the server has logged $2 requests matching $1.
 await_requests() {
     local pattern=$1 count=$2 deadline=$((SECONDS + 60))
-    until test "$(grep -ac "$pattern" "$SRV_LOG" || true)" -ge "$count"; do
+    until test "$(count_matching_lines "$pattern" "$SRV_LOG")" -ge "$count"; do
         test "$SECONDS" -lt "$deadline" || fail "the crawl never fetched $pattern"
         poll_wait 1
     done
 }
 
 # How many of the eight bodies the server has been asked for so far.
-bodies_requested() { grep -ac 'GET /dcancel/p' "$SRV_LOG" || true; }
+bodies_requested() { count_matching_lines 'GET /dcancel/p' "$SRV_LOG"; }
 
 # --- a benign signal must cost nothing ---------------------------------------
 # SIGCHLD is caught (sig_ignore) and asks for nothing: the one shape of signal
