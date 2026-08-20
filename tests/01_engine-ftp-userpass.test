@@ -10,15 +10,12 @@ set -euo pipefail
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpuser.XXXXXX") || exit 1
 cleanup_push rm -rf "${tmpdir}"
-trap 'exit 1' HUP INT QUIT TERM
 
 out=$(httrack -O "${tmpdir}/st" "-#test=ftp-userpass" run 2>&1) ||
     fail "self-test exited non-zero: ${out}"
 grep -q "ftp-userpass self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
 
 # The reachable half: a URL carries the userinfo straight into user[256]/pass[256].
-rep() { awk -v n="$1" 'BEGIN { while (i++ < n) printf "a" }'; }
-
 probe() {
     rm -rf "${tmpdir}/mir"
     httrack "ftp://$1@127.0.0.1:1/f.txt" -O "${tmpdir}/mir" -q >/dev/null 2>&1 ||
@@ -27,14 +24,14 @@ probe() {
 }
 
 # The bare name has no ':' to bound it, only the '@', and is the worse branch.
-for u in "$(rep 256):pw" "u:$(rep 256)" "$(rep 256)"; do
+for u in "$(repeat_chars 256):pw" "u:$(repeat_chars 256)" "$(repeat_chars 256)"; do
     log=$(probe "${u}")
     grep -q "FTP user name or password too long" <<<"${log}" ||
         fail "over-long userinfo was not refused: ${log}"
 done
 
 # 255 still fits, and a plain login is the outsider a widened gate would refuse.
-for u in "$(rep 255):pw" "u:$(rep 255)" "$(rep 255)" "bob:secret"; do
+for u in "$(repeat_chars 255):pw" "u:$(repeat_chars 255)" "$(repeat_chars 255)" "bob:secret"; do
     log=$(probe "${u}")
     grep -q "Unable to connect to the server" <<<"${log}" ||
         fail "userinfo that fits did not reach the connect: ${log}"

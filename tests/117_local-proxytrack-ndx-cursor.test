@@ -12,8 +12,6 @@ dir=$(mktemp -d)
 cleanup() { rm -rf "$dir"; }
 cleanup_push cleanup
 
-pad() { printf "%${1}s" '' | tr ' ' "$2"; }
-
 hdr() { printf 'CACHE-1.4\nWed, 01 Jan 2025 00:00:00 GMT\n'; }
 
 # Number of cache keys proxytrack built from index $1.
@@ -37,8 +35,8 @@ items() {
 for at in 1023 1024; do
     {
         hdr
-        printf '%sA\n\n10\n' "$(pad "$at" h)"
-        printf '%sB\n\n20\n' "$(pad "$at" h)"
+        printf '%sA\n\n10\n' "$(repeat_chars "$at" h)"
+        printf '%sB\n\n20\n' "$(repeat_chars "$at" h)"
     } >"$dir/first-$at.ndx"
 done
 got=$(items "$dir/first-1023.ndx")
@@ -52,7 +50,7 @@ test "$got" = 2 || fail "URLs differing on the 1024 bound gave $got keys, expect
 # fourth entry out of these same bytes (#1294).
 for at in 1 256 257 258; do
     {
-        pad "$at" C
+        repeat_chars "$at" C
         printf '\na/1\nx\n1\nb/2\ny\n2\nc/3\nz\n3\n'
     } >"$dir/header-$at.ndx"
 done
@@ -65,8 +63,8 @@ done
 # ending right there, so the byte stepped over is the terminating NUL.
 {
     hdr
-    printf '%s\n' "$(pad 10 h)"
-    pad 2037 f
+    printf '%s\n' "$(repeat_chars 10 h)"
+    repeat_chars 2037 f
 } >"$dir/second.ndx"
 got=$(items "$dir/second.ndx")
 test "$got" = 1 || fail "second half at its bound gave $got keys, expected 1"
@@ -75,7 +73,7 @@ test "$got" = 1 || fail "second half at its bound gave $got keys, expected 1"
 {
     hdr
     printf 'h/1\nx\n'
-    pad 200 9
+    repeat_chars 200 9
 } >"$dir/position.ndx"
 got=$(items "$dir/position.ndx")
 test "$got" = 1 || fail "position field at its bound gave $got keys, expected 1"
@@ -84,7 +82,7 @@ test "$got" = 1 || fail "position field at its bound gave $got keys, expected 1"
 # newline stops on the same terminating NUL.
 {
     printf '0\nSKIP\n'
-    pad 1023 h
+    repeat_chars 1023 h
 } >"$dir/short.ndx"
 got=$(items "$dir/short.ndx")
 test "$got" = 1 || fail "index ending mid-field gave $got keys, expected 1"
@@ -92,7 +90,7 @@ test "$got" = 1 || fail "index ending mid-field gave $got keys, expected 1"
 # The reported reproducer: both halves full, and the walk reaches the last line.
 {
     hdr
-    printf '%s\n%s\n0\n' "$(pad 1024 h)" "$(pad 1024 f)"
+    printf '%s\n%s\n0\n' "$(repeat_chars 1024 h)" "$(repeat_chars 1024 f)"
 } >"$dir/tail.ndx"
 got=$(items "$dir/tail.ndx")
 test "$got" = 1 || fail "index ending on a full-length entry gave $got keys, expected 1"

@@ -10,16 +10,14 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-pad() { printf "%${1}s" '' | tr ' ' "$2"; }
-
 # --- ARC reader (HTTP_READFIELD_STRING), no python needed -------------------
 # Each header overshoots its own destination, so a per-field clip is the only
 # way to get every expected length right at once.
 {
     printf 'HTTP/1.1 200 OK\r\n'
-    printf 'Content-Type: text/html%s\r\n' "$(pad 400 A)"
-    printf 'Etag: %s\r\n' "$(pad 400 E)"
-    printf 'Content-Disposition: %s\r\n' "$(pad 400 D)"
+    printf 'Content-Type: text/html%s\r\n' "$(repeat_chars 400 A)"
+    printf 'Etag: %s\r\n' "$(repeat_chars 400 E)"
+    printf 'Content-Disposition: %s\r\n' "$(repeat_chars 400 D)"
     printf 'Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n'
     printf 'Content-Length: 5\r\n\r\n'
 } >"$dir/hdr"

@@ -26,13 +26,9 @@ URL=http://www.example.com/a.png
 
 # Not ${pad// /$1}: bash 3.2, still macOS's /bin/bash, is quadratic there and
 # spent the whole 600s budget on the 64 KB seed probe below.
-rep() { # rep CHAR COUNT
-    printf "%${2}s" '' | tr ' ' "$1"
-}
-
 # A rule of LENGTH bytes, sign included, that $URL does not match.
 mkrule() { # mkrule LENGTH
-    printf -- '-www.example.com/%s*' "$(rep a $(($1 - 18)))"
+    printf -- '-www.example.com/%s*' "$(repeat_chars $(($1 - 18)) a)"
 }
 
 # Runs --why over a rules file and returns the verdict line alone.
@@ -63,7 +59,7 @@ assert_match "Filter rule longer than $rulecap bytes, ignored: -www" \
 # that bound from the engine too, not from the rule's.
 seedwarned=0
 seed() { # seed LENGTH
-    printf -- 'http://www.example.com/%s\n+*.png\n' "$(rep a $(($1 - 23)))" \
+    printf -- 'http://www.example.com/%s\n+*.png\n' "$(repeat_chars $(($1 - 23)) a)" \
         >"$tmpdir/u.txt"
     assert_eq "$URL: accepted by rule #1 (+*.png)" "$(why "$tmpdir/u.txt")" \
         "seed of $1 bytes"

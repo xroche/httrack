@@ -24,7 +24,7 @@ base="file://$tmp/"
 padded_url() {
     local want="$1" mark="$2"
     printf '%s%s%s\n' "$base" \
-        "$(printf "%$((want - ${#base} - ${#mark}))s" '' | tr ' ' p)" "$mark"
+        "$(repeat_chars $((want - ${#base} - ${#mark})) p)" "$mark"
 }
 
 # Dot segments collapse away, so the URL is long while the file it names is

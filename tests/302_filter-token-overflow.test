@@ -18,10 +18,6 @@ cleanup_push rm -rf "$tmpdir"
 maxfilter=2047
 maxurl=2047
 
-rep() { # rep CHAR COUNT
-    printf "%${2}s" '' | tr ' ' "$1"
-}
-
 # Runs --why over a rules file and returns the verdict line alone.
 why() { # why RULE-FILE
     local out
@@ -33,7 +29,7 @@ why() { # why RULE-FILE
 
 # An over-long rule, then the one that decides.
 longrule() { # longrule LENGTH FILE
-    printf -- '-%s\n+*.png\n' "$(rep a "$1")" >"$2"
+    printf -- '-%s\n+*.png\n' "$(repeat_chars "$1" a)" >"$2"
 }
 
 # At the bound the rule is kept, so the one that decides is the second. The
@@ -63,7 +59,7 @@ assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
     "$(why "$tmpdir/many.txt")" "5000 one-byte seeds"
 
 # The URL token beside it is copied by the same code and bounded on its own.
-printf 'http://www.example.com/%s\n+*.png\n' "$(rep a $((maxurl - 22)))" \
+printf 'http://www.example.com/%s\n+*.png\n' "$(repeat_chars $((maxurl - 22)) a)" \
     >"$tmpdir/longurl.txt"
 assert_eq "http://www.example.com/a.png: accepted by rule #1 (+*.png)" \
     "$(why "$tmpdir/longurl.txt")" "URL of $((maxurl + 1)) bytes"
@@ -81,7 +77,7 @@ echo '<html><body>seed</body></html>' >"$doc/index.html"
 local_server_start --root "$doc"
 
 # Through -%S, since every argv entry is already capped at HTS_CDLMAXSIZE.
-long="$BASEURL/$(rep a $((maxurl + 1 - ${#BASEURL} - 1)))"
+long="$BASEURL/$(repeat_chars $((maxurl + 1 - ${#BASEURL} - 1)) a)"
 assert_eq "$((maxurl + 1))" "${#long}" "seed one byte past the URL buffer"
 printf '%s\n' "$long" >"$tmpdir/seed.txt"
 local_crawl --log "$tmpdir/crawl.log" -O "$tmpdir/m" --quiet --robots=0 \

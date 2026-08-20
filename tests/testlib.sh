@@ -300,6 +300,15 @@ make_tls_pem() {
     }
 }
 
+# The over-long strings the bounds tests feed. printf and tr, because
+# ${v// /c} is quadratic on the bash 3.2 macOS runners.
+repeat_chars() { # repeat_chars COUNT [CHAR]
+    # A negative width left-justifies instead of erroring, so a computed
+    # COUNT that goes negative would pad silently.
+    case $1 in '' | *[!0-9]*) fail "repeat_chars: COUNT is not a number: $1" ;; esac
+    printf '%*s' "$1" '' | tr ' ' "${2:-a}"
+}
+
 # Longest surviving run of char $2 in file $1, or 0: the length a field was
 # clipped to, read back out of a binary artifact.
 runlen() {

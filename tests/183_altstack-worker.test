@@ -102,7 +102,6 @@ fi
 
 tmp=$(mktemp -d)
 cleanup_push rm -rf "$tmp"
-trap 'exit 1' HUP INT TERM
 
 # See 181: the shim loads ahead of libasan and allocates nothing.
 export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"

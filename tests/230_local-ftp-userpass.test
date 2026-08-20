@@ -37,8 +37,6 @@ serverpid=$!
 port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
 
 ok() { echo "OK: $*"; }
-rep() { awk -v n="$2" -v c="$1" 'BEGIN { while (i++ < n) printf "%s", c }'; }
-
 crawl() {
     : >"$cmds"
     rm -rf "${out:?}"
@@ -59,8 +57,8 @@ ok "bob:secret reaches the server verbatim, and mirrors"
 
 # --- the longest userinfo that fits, byte for byte ---------------------------
 # 255 of each: a 256th byte is refused, so this is what the wire must carry.
-user=$(rep a 255)
-pass=$(rep b 255)
+user=$(repeat_chars 255 a)
+pass=$(repeat_chars 255 b)
 crawl "${user}:${pass}" || fail "the 255-byte login crawl never finished"
 sent=$(<"$cmds")
 grep -qxF "USER ${user}" <<<"$sent" ||
@@ -71,7 +69,7 @@ ok "a 255-byte user and password reach the server unclipped"
 
 # --- over-long userinfo never opens a session --------------------------------
 # The bare name has no ':' to bound it, only the '@', and is the worse branch.
-for u in "$(rep a 256):pw" "$(rep a 256)"; do
+for u in "$(repeat_chars 256 a):pw" "$(repeat_chars 256 a)"; do
     crawl "$u" || fail "the over-long crawl never finished"
     grep -aq "FTP user name or password too long" "${out}/hts-log.txt" ||
         fail "over-long userinfo was not refused: $(<"${out}/hts-log.txt")"
