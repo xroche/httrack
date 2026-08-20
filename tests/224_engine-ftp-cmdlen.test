@@ -9,15 +9,12 @@ set -euo pipefail
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpcmdlen.XXXXXX") || exit 1
 cleanup_push rm -rf "${tmpdir}"
-trap 'exit 1' HUP INT QUIT TERM
 
 out=$(httrack -O "${tmpdir}/st" "-#test=ftp-cmdlen" run 2>&1) ||
     fail "self-test exited non-zero: ${out}"
 grep -q "ftp-cmdlen self-test OK" <<<"${out}" || fail "unexpected output: ${out}"
 
 # The reachable half: the copy into _adr[256] aborted on a long host.
-rep() { awk -v n="$1" 'BEGIN { while (i++ < n) printf "a" }'; }
-
 probe_host() {
     rm -rf "${tmpdir}/host"
     httrack "ftp://$1/f.txt" -O "${tmpdir}/host" -q >/dev/null 2>&1 ||
@@ -26,13 +23,13 @@ probe_host() {
 }
 
 for n in 256 257 300; do
-    log=$(probe_host "$(rep "${n}")")
+    log=$(probe_host "$(repeat_chars "${n}")")
     grep -q "Host name too long" <<<"${log}" ||
         fail "a ${n}-byte host was not rejected: ${log}"
 done
 
 # 255 still fits _adr[256]; 127.0.0.1:1 is the outsider a widened gate swallows.
-log=$(probe_host "$(rep 255)")
+log=$(probe_host "$(repeat_chars 255)")
 grep -q "Unable to get server's address" <<<"${log}" ||
     fail "a 255-byte host did not reach the resolver: ${log}"
 log=$(probe_host "127.0.0.1:1")

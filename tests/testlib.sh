@@ -300,6 +300,12 @@ make_tls_pem() {
     }
 }
 
+# COUNT copies of CHAR, the over-long strings the bounds tests feed. Built with
+# printf and tr: ${v// /c} is quadratic on the bash 3.2 macOS runners.
+repeat_chars() { # repeat_chars COUNT [CHAR]
+    printf '%*s' "$1" '' | tr ' ' "${2:-a}"
+}
+
 # Longest surviving run of char $2 in file $1, or 0: the length a field was
 # clipped to, read back out of a binary artifact.
 runlen() {
