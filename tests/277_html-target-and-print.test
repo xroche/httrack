@@ -39,7 +39,7 @@ values=$(
 )
 values=$(tr -d "\"' \\t" <<<"${values}" | sed 's/^[Tt][Aa][Rr][Gg][Ee][Tt]=//' | grep . || true)
 
-seen=$(grep -c . <<<"${values}" || true)
+seen=$(count_matching_lines . <<<"${values}")
 test "${seen}" -ge 50 || fail "only ${seen} target attributes found under html/"
 
 # Anything but the four keywords is a named context: _new and new_ both were.

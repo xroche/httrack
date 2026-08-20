@@ -96,7 +96,7 @@ httrack "http://127.0.0.1:${SRV_PORT}/index.html" -O "$out" -q -r3 -%v0 ||
     fail "the query crawl did not run"
 # A clipped link went out as a 2 KB request and 404ed, so assert the outcome
 # and not just the refusal: nothing oversized asked for, nothing errored.
-errors=$(grep -acE '^[0-9:]*[[:space:]]Error:' "${out}/hts-log.txt" || true)
+errors=$(count_matching_lines -aE '^[0-9:]*[[:space:]]Error:' "${out}/hts-log.txt")
 test "$errors" -eq 0 || fail "the oversized query was fetched ($errors errors)"
 longest=$(awk '{ if (length($0) > n) n = length($0) } END { print n + 0 }' \
     "$SRV_LOG")

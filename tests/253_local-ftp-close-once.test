@@ -91,7 +91,7 @@ grep -aq 'Cancelled by User' "${out}/hts-log.txt" ||
 test -s "$closes" || fail "the interposer logged no close() at all"
 ok "the cancel landed on an in-flight transfer ($(wc -l <"$closes") closes seen)"
 
-badf=$(grep -c ' EBADF$' "$closes" || true)
+badf=$(count_matching_lines ' EBADF$' "$closes")
 test "$badf" -eq 0 ||
     fail "$badf close() calls hit a stale descriptor: $(tr '\n' ' ' <"$closes")"
 ok "every descriptor was closed once"

@@ -53,7 +53,7 @@ if ! grep -q "trying next address" "$log"; then
 fi
 
 # 0 errors and the file was actually fetched (over the live address)
-errs=$(grep -iEc "^[0-9:]*[[:space:]]Error:" "$log" || true)
+errs=$(count_matching_lines -iE "^[0-9:]*[[:space:]]Error:" "$log")
 test "$errs" == "0" || {
     echo "FAIL: $errs error(s) reported"
     grep -iE "Error:" "$log"

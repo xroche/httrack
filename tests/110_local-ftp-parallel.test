@@ -46,7 +46,7 @@ run_with_timeout 300 httrack "${urls[@]}" -O "$out" --quiet -Z -c8 \
     --disable-security-limits --robots=0 --timeout=20 --max-time=120 --retries=1 \
     >"${tmpdir}/log" 2>&1
 
-swapped=$(grep -ac 'slots ready moved to background' "${out}/hts-log.txt" || true)
+swapped=$(count_matching_lines -a 'slots ready moved to background' "${out}/hts-log.txt")
 test "${swapped:-0}" -gt 0 ||
     fail "no ready slot was swapped to disk; this run never reached the bug"
 ok "the crawl swapped ready slots to the on-disk table ${swapped} times"

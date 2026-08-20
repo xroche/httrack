@@ -34,7 +34,7 @@ echo '<p>bbb</p>' >"$site/sub/b.html"
 url="file://$site/index.html"
 
 # count Error: lines in the log (grep -c exits 1 on zero matches: guard it)
-errors() { grep -ciE '^[0-9:]*[[:space:]]Error:' "$out/hts-log.txt" || true; }
+errors() { count_matching_lines -iE '^[0-9:]*[[:space:]]Error:' "$out/hts-log.txt"; }
 
 # initial mirror with the url and a handful of options, so doit.log records a
 # multi-token command line for cmdl_ins to re-insert one token at a time.

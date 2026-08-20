@@ -145,7 +145,7 @@ test "$missing" -eq 0 || {
     cat "$ka/out.log" "$ka/socks.log" >&2
     exit 1
 }
-handshakes=$(grep -c "^CMD " "$ka/socks.log" || true)
+handshakes=$(count_matching_lines "^CMD " "$ka/socks.log")
 test "$handshakes" -eq 1 || {
     echo "FAIL: expected 1 SOCKS handshake for the reused socket, got $handshakes" >&2
     cat "$ka/socks.log" >&2

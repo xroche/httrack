@@ -38,7 +38,7 @@ crawl() {
 
 # count <label> <ERE>
 count() {
-    LC_ALL=C grep -ac "$2" "${tmpdir}/out_$1" || true
+    LC_ALL=C count_matching_lines -a "$2" "${tmpdir}/out_$1"
 }
 
 # expect <description> <actual> <op> <bound> <label>

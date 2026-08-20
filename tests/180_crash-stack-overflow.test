@@ -54,7 +54,7 @@ deepest_repeat() {
 
 # Raw frames in the report: backtrace_symbols_fd() closes every one with [0xADDR].
 frame_count() {
-    grep -c '\[0x' <<<"$1" || true
+    count_matching_lines '\[0x' <<<"$1"
 }
 
 # Control: an ordinary SIGSEGV was already reported before the fix, so a build

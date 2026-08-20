@@ -70,7 +70,7 @@ cleanup_push cleanup
 engine_fields="Host From User-Agent Accept Accept-Language Accept-Encoding Authorization"
 
 count_lines() { # count_lines RE FILE
-    grep -c "$1" "$2" || true
+    count_matching_lines "$1" "$2"
 }
 
 count_bytes() { # count_bytes BYTE FILE

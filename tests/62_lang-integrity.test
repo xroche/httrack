@@ -95,7 +95,7 @@ charset_declared_matches_bytes() {
     fi
     # No legacy 8-bit charset puts text at U+0080..U+009F, so a C1 there means
     # the bytes are really the matching Windows codepage.
-    n=$(LC_ALL=C grep -c "$c1" "$tmp/utf8" || true)
+    n=$(LC_ALL=C count_matching_lines "$c1" "$tmp/utf8")
     # An empty n means grep failed, not that it found nothing.
     if [ "${n:-1}" -ne 0 ]; then
         echo "${f##*/}: $n lines decode to C1 controls under $cs; the bytes are a Windows codepage"

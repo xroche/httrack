@@ -93,7 +93,7 @@ for want in "${refusals[@]}"; do
     grep -qF "Cookies: ignoring a line whose $want: $jar" <<<"$log" ||
         fail "no refusal for the $want in $out/hts-log.txt"
 done
-n=$(grep -c 'ignoring a line whose' <<<"$log" || true)
+n=$(count_matching_lines 'ignoring a line whose' <<<"$log")
 assert_eq "${#refusals[@]}" "$n" "refused jar lines"
 
 # a 7900-byte value fits its destination, so it is the jar's cap that drops it

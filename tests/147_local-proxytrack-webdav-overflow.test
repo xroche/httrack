@@ -96,7 +96,7 @@ for want in '<href>/webdav/example\.com</href>' \
         exit 1
     }
 done
-responses=$(grep -c '<response ' <<<"$resp" || true)
+responses=$(count_matching_lines '<response ' <<<"$resp")
 test "$responses" -eq 3 || {
     echo "FAIL: expected the root, the file and the directory, got $responses responses"
     printf '%s\n' "$resp"

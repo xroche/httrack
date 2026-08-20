@@ -309,6 +309,12 @@ repeat_chars() { # repeat_chars COUNT [CHAR]
     printf '%*s' "$1" '' | tr ' ' "${2:-a}"
 }
 
+# What grep -c really returns: a count of matching LINES, two hits on one line
+# counting once, and 0 instead of a failing status when nothing matches.
+count_matching_lines() { # count_matching_lines [GREP-OPTS] PATTERN [FILE]
+    grep -c "$@" || true
+}
+
 # A passing step, on stdout: the failures go to stderr through fail().
 ok() { echo "OK: $*"; }
 
