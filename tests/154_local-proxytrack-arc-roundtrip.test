@@ -65,7 +65,7 @@ test "$inner" != '\n\n' || fail "declared length still counts the blank line"
 
 # An empty archive is not a corrupt one...
 {
-    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 9\n'
+    printf 'filedesc://t.arc 0.0.0.0 %s text/plain 200 - - 0 t.arc 9\n' "$ARC_DATE"
     printf '2 0 test\n'
     printf '\n'
 } >"$dir/empty.arc"
@@ -74,9 +74,7 @@ convert "$dir/empty.arc" "$dir/d.arc" >/dev/null
 
 # ...but a length running past the end of the file still is.
 {
-    printf 'filedesc://t.arc 0.0.0.0 20250101000000 text/plain 200 - - 0 t.arc 99999\n'
-    printf '2 0 test\n'
-    printf '\n\n'
+    arc_filedesc 99999
 } >"$dir/truncated.arc"
 convert "$dir/truncated.arc" "$dir/e.arc" >/dev/null || true
 grep -q 'Unexpected' "$dir/log" || fail "a length past the end of the file loaded as an empty archive"

@@ -44,8 +44,8 @@ check_record_length() {
 printf 'HTTP/1.1 - Broken\r\nContent-Type: text/html\r\nContent-Length: 10\r\n\r\n' >"$dir/hdr"
 {
     arc_filedesc
-    printf 'http://example.com/p.html 0.0.0.0 20250101000000 text/html -1 - - 0 t.arc %d\n' \
-        "$(($(wc -c <"$dir/hdr") + 10))"
+    printf 'http://example.com/p.html 0.0.0.0 %s text/html -1 - - 0 t.arc %d\n' \
+        "$ARC_DATE" "$(($(wc -c <"$dir/hdr") + 10))"
     cat "$dir/hdr"
 } >"$dir/nobody.arc"
 
@@ -66,7 +66,7 @@ fi
 # used to malloc it and report whatever the short read left behind.
 {
     arc_filedesc
-    printf 'http://example.com/q.html 0.0.0.0 20250101000000 text/html 200 - - 0 t.arc 2000000000\n'
+    printf 'http://example.com/q.html 0.0.0.0 %s text/html 200 - - 0 t.arc 2000000000\n' "$ARC_DATE"
     printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\nHI'
 } >"$dir/huge.arc"
 
