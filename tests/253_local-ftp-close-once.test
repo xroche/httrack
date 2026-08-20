@@ -27,19 +27,11 @@ for lib in "${CLOSETRACK_LIB:-}" "${FTPCANCEL_LIB:-}"; do
     test -r "$lib" || fail "close-once: ${lib:-an interposer} was not built"
 done
 
-python=$(find_python) || skip "python3 not found"
 require_httrack
 
-server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpclose.XXXXXX")
-serverpid=
 crawlpid=
-cleanup() {
-    test -z "$crawlpid" || kill_tree "$crawlpid"
-    stop_server "$serverpid"
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
@@ -53,12 +45,11 @@ awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 100; i++) print s }' \
 # cancel lands.
 printf '* stall\n' >"${tmpdir}/modes"
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" \
-    --mode-file "$(nativepath "${tmpdir}/modes")" \
-    --log "$(nativepath "$cmds")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+ftp_server_start --root "$root" --mode-file "$(nativepath "${tmpdir}/modes")" \
+    --log "$(nativepath "$cmds")"
+
+kill_crawl() { test -z "$crawlpid" || kill_tree "$crawlpid"; }
+cleanup_push kill_crawl
 
 # An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
 # refuses by default. The shims allocate nothing, so the ordering is harmless.
@@ -69,7 +60,7 @@ export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
 # polls for cancelled links, and the request would never be seen.
 export CLOSETRACK_LOG="$closes" FTPCANCEL_TRIGGER="$trigger"
 export LD_PRELOAD="$CLOSETRACK_LIB $FTPCANCEL_LIB"
-httrack "ftp://127.0.0.1:${port}/f.bin" -O "$out" --quiet \
+httrack "ftp://127.0.0.1:${FTP_PORT}/f.bin" -O "$out" --quiet \
     --disable-security-limits --robots=0 --timeout=0 --max-time=0 -c2 \
     >"${tmpdir}/log" 2>&1 &
 crawlpid=$!

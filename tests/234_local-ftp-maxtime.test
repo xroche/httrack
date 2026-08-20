@@ -8,17 +8,10 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-python=$(find_python) || skip "python3 not found"
 require_httrack
 
-server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpmax.XXXXXX")
-serverpid=
-cleanup() {
-    stop_server "$serverpid"
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
@@ -29,15 +22,11 @@ awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 100; i++) print s }' \
     >"${root}/f.bin"
 printf '* stall\n' >"${tmpdir}/modes"
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" \
-    --mode-file "$(nativepath "${tmpdir}/modes")" \
-    --log "$(nativepath "$cmds")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+ftp_server_start --root "$root" --mode-file "$(nativepath "${tmpdir}/modes")" \
+    --log "$(nativepath "$cmds")"
 
 start=$SECONDS
-run_with_timeout 90 httrack "ftp://127.0.0.1:${port}/f.bin" -O "$out" --quiet \
+run_with_timeout 90 httrack "ftp://127.0.0.1:${FTP_PORT}/f.bin" -O "$out" --quiet \
     --disable-security-limits --robots=0 --timeout=200 --max-time=20 -c1 \
     >"${tmpdir}/log" 2>&1 || fail "the run did not finish in $((SECONDS - start))s"
 elapsed=$((SECONDS - start))

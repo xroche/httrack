@@ -13,14 +13,8 @@ set -euo pipefail
 python=$(find_python) || skip "python3 not found"
 require_httrack
 
-server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
-serverpid=
-cleanup() {
-    stop_server "$serverpid"
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
@@ -36,15 +30,12 @@ for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
         "$i" >"${root}/f${i}.bin"
 done
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-host="127.0.0.1_${port}"
+ftp_server_start --root "$root"
+host="127.0.0.1_${FTP_PORT}"
 
 urls=()
 for name in $names; do
-    urls+=("ftp://127.0.0.1:${port}/${name}.bin")
+    urls+=("ftp://127.0.0.1:${FTP_PORT}/${name}.bin")
 done
 
 # -c8, never -c1: a slot is only swapped out while other transfers keep the

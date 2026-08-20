@@ -13,14 +13,8 @@ set -euo pipefail
 python=$(find_python) || skip "python3 not found"
 require_httrack
 
-server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
-serverpid=
-cleanup() {
-    stop_server "$serverpid"
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
@@ -42,15 +36,11 @@ write_bodies() {
 write_bodies V1 4096
 : >"$mode"
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" \
-    --mode-file "$(nativepath "$mode")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-host="127.0.0.1_${port}"
+ftp_server_start --root "$root" --mode-file "$(nativepath "$mode")"
+host="127.0.0.1_${FTP_PORT}"
 urls=()
 for name in keep empty stay; do
-    urls+=("ftp://127.0.0.1:${port}/${name}.bin")
+    urls+=("ftp://127.0.0.1:${FTP_PORT}/${name}.bin")
 done
 # -c1: a parallel FTP crawl loses whole transfers to a separate, older bug in
 # the backlog slot swap (#797), which would flake this test on a loaded runner.

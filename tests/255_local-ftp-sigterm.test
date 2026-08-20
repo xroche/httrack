@@ -9,20 +9,12 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-python=$(find_python) || skip "python3 not found"
 skip_on_windows "MSYS cannot signal a native httrack.exe"
 require_httrack
 
-server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpterm.XXXXXX")
-serverpid=
 crawlpid=
-cleanup() {
-    test -z "$crawlpid" || kill_tree "$crawlpid"
-    stop_server "$serverpid"
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
@@ -39,18 +31,17 @@ head -c 102400 "${root}/big.bin" >"${root}/f.bin"
 # Three of them against two slots, for the all-slots-busy leg.
 for f in a b c; do cp "${root}/f.bin" "${root}/${f}.bin"; done
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" \
-    --mode-file "$(nativepath "$modes")" \
-    --log "$(nativepath "$cmds")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+ftp_server_start --root "$root" --mode-file "$(nativepath "$modes")" \
+    --log "$(nativepath "$cmds")"
+
+kill_crawl() { test -z "$crawlpid" || kill_tree "$crawlpid"; }
+cleanup_push kill_crawl
 
 # $1 is a space-separated list of files to fetch; $name is the first of them.
 name=
 start_crawl() {
     local urls=() f
-    for f in $1; do urls+=("ftp://127.0.0.1:${port}/${f}"); done
+    for f in $1; do urls+=("ftp://127.0.0.1:${FTP_PORT}/${f}"); done
     name=${1%% *}
     shift
     : >"$cmds"
@@ -116,7 +107,7 @@ grep -q 'Exit requested by shell or user' <<<"$log" ||
     fail "the mirror did not end through the engine's exit path: ${log}"
 # And the abandoned link has to be reported as abandoned. Returning the
 # already-done code leaves the wait too, and drops it without a word.
-grep -q "at link ftp://127.0.0.1:${port}/big.bin" <<<"$log" ||
+grep -q "at link ftp://127.0.0.1:${FTP_PORT}/big.bin" <<<"$log" ||
     fail "the abandoned link went unreported: ${log}"
 ok "the exit unwound through teardown, keeping the mirror"
 
@@ -149,7 +140,7 @@ await_exit 120 "the interrupted crawl"
 # a signal that never arrived leaves a crawl that was going to finish anyway.
 grep -q 'Finishing pending transfers' "${tmpdir}/log" ||
     fail "the ^C never reached sig_leave: $(<"${tmpdir}/log")"
-cmp -s "${out}/127.0.0.1_${port}/f.bin" "${root}/f.bin" ||
+cmp -s "${out}/127.0.0.1_${FTP_PORT}/f.bin" "${root}/f.bin" ||
     fail "^C cut the transfer short; mirror holds $(find "$out" -type f)"
 ok "a single ^C let the in-flight transfer complete"
 
@@ -157,6 +148,6 @@ ok "a single ^C let the in-flight transfer complete"
 : >"$modes"
 start_crawl f.bin --timeout=30 --max-time=120 -c2
 await_exit 120 "the plain crawl"
-cmp -s "${out}/127.0.0.1_${port}/f.bin" "${root}/f.bin" ||
+cmp -s "${out}/127.0.0.1_${FTP_PORT}/f.bin" "${root}/f.bin" ||
     fail "the plain crawl did not mirror; it holds $(find "$out" -type f)"
 ok "an unsignalled crawl still mirrors normally"

@@ -606,6 +606,38 @@ discover_server_port() {
     return 1
 }
 
+# Start ftp-server.py: sets FTP_PORT, FTP_PID and FTP_LOG. --root resolves for
+# the host, other arguments pass through, stdin off the terminal as in
+# local_server_start.
+ftp_server_start() { # ftp_server_start [--root DIR] [SERVER-ARGS...]
+    local root='' args=()
+    while test $# -gt 0; do
+        case $1 in
+        --root)
+            root=$2
+            shift 2
+            ;;
+        *)
+            args+=("$1")
+            shift
+            ;;
+        esac
+    done
+    test -n "${FTP_PYTHON:-}" || FTP_PYTHON=$(find_python) || skip "python3 not found"
+    # Numbered: a second server here would truncate the first's log and the port
+    # it reported. No --log option, the name colliding with ftp-server.py's own.
+    FTP_N=$((${FTP_N:-0} + 1))
+    FTP_LOG="${tmpdir:?no tmpdir set before ftp_server_start}/ftp-server.${FTP_N}.out"
+    : >"$FTP_LOG"
+    "$FTP_PYTHON" "$(nativepath "${testdir}/ftp-server.py")" \
+        ${root:+--root "$(nativepath "$root")"} ${args[@]+"${args[@]}"} \
+        >"$FTP_LOG" 2>&1 </dev/null &
+    FTP_PID=$!
+    cleanup_push stop_server "$FTP_PID"
+    FTP_PORT=$(discover_server_port "$FTP_LOG" "$FTP_PID") ||
+        fail "ftp-server did not come up: $(<"$FTP_LOG")"
+}
+
 # Dump and clear the crawl logs a hard-killed test leaves in TMPDIR (its cleanup
 # trap never ran): hts-log.txt alone records "More than N seconds passed.. giving
 # up", so a wedge past --max-time is undiagnosable without it (#605).

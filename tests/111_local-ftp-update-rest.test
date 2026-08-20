@@ -13,14 +13,8 @@ set -euo pipefail
 python=$(find_python) || skip "python3 not found"
 require_httrack
 
-server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
-serverpid=
-cleanup() {
-    stop_server "$serverpid"
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
@@ -47,14 +41,10 @@ write_body() {
 write_body OLD 8000
 echo '/a.bin truncate' >"$mode"
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" \
-    --mode-file "$(nativepath "$mode")" --log "$(nativepath "$cmds")" \
-    >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
-host="127.0.0.1_${port}"
-url="ftp://127.0.0.1:${port}/a.bin"
+ftp_server_start --root "$root" --mode-file "$(nativepath "$mode")" \
+    --log "$(nativepath "$cmds")"
+host="127.0.0.1_${FTP_PORT}"
+url="ftp://127.0.0.1:${FTP_PORT}/a.bin"
 mirror="${out}/${host}/a.bin"
 # Bounded like every crawl pass: a wedge must fail the test, not hang the job.
 crawl() { run_with_timeout 300 httrack "$url" -O "$out" --quiet \

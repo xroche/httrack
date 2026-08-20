@@ -9,17 +9,10 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-python=$(find_python) || skip "python3 not found"
 require_httrack
 
-server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpuser.XXXXXX")
-serverpid=
-cleanup() {
-    stop_server "$serverpid"
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
@@ -27,17 +20,13 @@ cmds="${tmpdir}/cmds"
 mkdir -p "$root" "$out"
 printf 'body\n' >"${root}/f.txt"
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" --require-pass \
-    --log "$(nativepath "$cmds")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+ftp_server_start --root "$root" --require-pass --log "$(nativepath "$cmds")"
 
 crawl() {
     : >"$cmds"
     rm -rf "${out:?}"
     mkdir -p "$out"
-    run_with_timeout 60 httrack "ftp://$1@127.0.0.1:${port}/f.txt" -O "$out" \
+    run_with_timeout 60 httrack "ftp://$1@127.0.0.1:${FTP_PORT}/f.txt" -O "$out" \
         --quiet --disable-security-limits --robots=0 --timeout=20 \
         --max-time=45 --retries=1 -c1 >"${tmpdir}/log" 2>&1
 }
@@ -47,7 +36,7 @@ crawl "bob:secret" || fail "the plain-login crawl never finished"
 sent=$(<"$cmds")
 grep -qxF "USER bob" <<<"$sent" || fail "no USER bob on the wire: ${sent}"
 grep -qxF "PASS secret" <<<"$sent" || fail "no PASS secret on the wire: ${sent}"
-cmp -s "${out}/127.0.0.1_${port}/f.txt" "${root}/f.txt" ||
+cmp -s "${out}/127.0.0.1_${FTP_PORT}/f.txt" "${root}/f.txt" ||
     fail "the login did not bring the body back; mirror holds $(find "$out" -type f)"
 ok "bob:secret reaches the server verbatim, and mirrors"
 

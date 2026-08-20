@@ -10,7 +10,6 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-python=$(find_python) || skip "python3 not found"
 skip_on_windows "MSYS cannot signal a native httrack.exe"
 require_httrack
 
@@ -18,16 +17,9 @@ require_httrack
 # short enough to keep the test under half a minute.
 TIMEOUT=8
 
-server=$(nativepath "${testdir}/ftp-server.py")
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpstop.XXXXXX")
-serverpid=
 crawlpid=
-cleanup() {
-    test -z "$crawlpid" || kill_tree "$crawlpid"
-    stop_server "$serverpid"
-    rm -rf "$tmpdir"
-}
-cleanup_push cleanup
+cleanup_push rm -rf "$tmpdir"
 
 root="${tmpdir}/root"
 out="${tmpdir}/crawl"
@@ -40,18 +32,17 @@ awk 'BEGIN { s = sprintf("%0999d", 0); for (i = 0; i < 800; i++) print s }' \
     >"${root}/big.bin"
 printf '* stall\n' >"$modes"
 
-serverlog="${tmpdir}/server.out"
-"$python" "$server" --root "$(nativepath "$root")" \
-    --mode-file "$(nativepath "$modes")" \
-    --log "$(nativepath "$cmds")" >"$serverlog" 2>&1 &
-serverpid=$!
-port=$(discover_server_port "$serverlog" "$serverpid") || exit 1
+ftp_server_start --root "$root" --mode-file "$(nativepath "$modes")" \
+    --log "$(nativepath "$cmds")"
+
+kill_crawl() { test -z "$crawlpid" || kill_tree "$crawlpid"; }
+cleanup_push kill_crawl
 
 start_crawl() {
     : >"$cmds"
     rm -rf "${out:?}"
     mkdir -p "$out"
-    httrack "ftp://127.0.0.1:${port}/big.bin" -O "$out" --quiet \
+    httrack "ftp://127.0.0.1:${FTP_PORT}/big.bin" -O "$out" --quiet \
         --disable-security-limits --robots=0 --retries=0 \
         --timeout="$TIMEOUT" --max-time=0 >"${tmpdir}/log" 2>&1 &
     crawlpid=$!
