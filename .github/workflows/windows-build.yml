@@ -265,6 +265,9 @@ jobs:
         working-directory: tests
         timeout-minutes: 45
         env:
+          # Half of 2*nproc: MSYS fork emulation breaks first under the pressure
+          # eight in flight put on a 4-vCPU runner (#1273).
+          HTTRACK_SUITE_JOBS: 4
           # Through the environment, never argv, which the process list exposes.
           WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WATCHDOG_REPO: ${{ github.repository }}
