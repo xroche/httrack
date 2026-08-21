@@ -244,6 +244,8 @@ Please visit our Website: http://www.httrack.com
   "Mozilla/5.0 (compatible; HTTrack/" HTTRACK_AFF_VERSION                      \
   "; +https://www.httrack.com/)"
 #define HTTRACK_WEB "http://www.httrack.com"
+/* Language=%s takes the catalog basename (LANGUAGE_FILE), an ASCII identifier;
+   LANGUAGE_NAME is a localized display string in a legacy codepage (#1353). */
 #define HTS_UPDATE_WEBSITE                                                     \
   "http://www.httrack.com/"                                                    \
   "update.php3?Product=HTTrack&Version=" HTTRACK_VERSIONID                     \
