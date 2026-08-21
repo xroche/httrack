@@ -255,7 +255,8 @@ trap 'set +e; kill "$heartbeat" 2>/dev/null; test -z "$watchdog" || kill_pid "$w
 
 pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
 # Tests in flight at once, min(2*nproc, 16) as ci.yml gives "make check" on every
-# platform: each binds its own ephemeral-port server, and they mostly sleep.
+# platform, unless the caller pins it (windows-build.yml does): each binds its own
+# ephemeral-port server, and they mostly sleep.
 cores=$(nproc 2>/dev/null || echo "${NUMBER_OF_PROCESSORS:-2}")
 case "$cores" in '' | 0 | *[!0-9]*) cores=2 ;; esac
 jobs=$((cores * 2))
