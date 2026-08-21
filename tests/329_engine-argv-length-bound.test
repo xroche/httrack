@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# The argv length pre-check is what bounds three diagnostic buffers
-# (htscoremain.c:784, :1800, :1810); nothing else pins it.
+# The argv length pre-check is what bounds the option-error diagnostic at
+# htscoremain.c:785; nothing else pins it.
 
 set -euo pipefail
 
@@ -10,10 +10,15 @@ set -euo pipefail
 
 h=$(httrack_path)
 
+# Both runs read ./hts-cache/doit.log and $HOME/.httrackrc, so they need a
+# directory no other test and no developer's own rc file can reach into.
+scratch=$(mktemp -d)
+cleanup_push rm -rf "$scratch"
+
 # First output line for an unrecognised option of exactly $1 bytes.
 unknown_opt() { # unknown_opt TOTALLEN
     local out
-    out=$("$h" "--$(repeat_chars $(($1 - 2)) A)" 2>&1) || true
+    out=$(cd "$scratch" && HOME=$scratch "$h" "--$(repeat_chars $(($1 - 2)) A)" 2>&1) || true
     firstline "$out"
 }
 
@@ -28,13 +33,16 @@ mirror=$(mktemp -d)
 cleanup_push rm -rf "$mirror"
 mkdir -p "$mirror/hts-cache"
 printf 'http://x/ --%s\n' "$(repeat_chars 3000 B)" >"$mirror/hts-cache/doit.log"
-reply=$(cd "$mirror" && "$h" 2>&1) || true
+reply=$(cd "$mirror" && HOME=$mirror "$h" 2>&1) || true
 line=$(firstline "$reply")
 
-# The token alone fills the 1280-byte message buffer, so the reply is the
-# clipped token and the " not recognized" suffix is gone. Unclipped, the write
-# overflows and the engine aborts before printing anything at all.
-test "${#line}" -gt 1000 || fail "no diagnostic, engine died first: $line"
-test "${#line}" -lt 2000 || fail "reply not clipped: ${#line} bytes"
+# The clip fills the 1280-byte buffer with the token, so the " not recognized"
+# suffix is gone; it survives only if nothing was clipped. Unclipped, the write
+# overflows and the engine aborts before printing anything.
+case $line in
+*"not recognized"*) fail "message was not clipped: $line" ;;
+esac
+test "${#line}" -ge 1279 || fail "no clipped diagnostic, engine died first: $line"
+test "${#line}" -le 1300 || fail "reply not clipped: ${#line} bytes"
 
 ok "argv length bound holds, and an oversized replayed token is clipped"
