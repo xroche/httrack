@@ -771,7 +771,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #ifdef _WIN32
             char s[HTS_CDLMAXSIZE + 256];
 
-            sprintf(s, "%s not available in this version", argv[i]);
+            slprintfbuff_clip(s, sizeof(s), "%s not available in this version",
+                              argv[i]);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
@@ -781,7 +782,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           else {
             char s[HTS_CDLMAXSIZE + 256];
 
-            sprintf(s, "%s not recognized", argv[i]);
+            slprintfbuff_clip(s, sizeof(s), "%s not recognized", argv[i]);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
@@ -1797,9 +1798,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                     if (ret == 0) {
                       char BIGSTK tmp[1024 * 2];
 
-                      sprintf(tmp,
-                              "option %%W : unable to plug the module %s (returncode != 1)",
-                              argv[na]);
+                      slprintfbuff_clip(tmp, sizeof(tmp),
+                                        "option %%W : unable to plug the "
+                                        "module %s (returncode != 1)",
+                                        argv[na]);
                       HTS_PANIC_PRINTF(tmp);
                       htsmain_free();
                       return -1;
@@ -1807,9 +1809,11 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                       char BIGSTK tmp[1024 * 2];
                       int last_errno = errno;
 
-                      sprintf(tmp,
-                              "option %%W : unable to load the module %s: %s (check the library path ?)",
-                              argv[na], strerror(last_errno));
+                      slprintfbuff_clip(
+                          tmp, sizeof(tmp),
+                          "option %%W : unable to load the module %s: %s "
+                          "(check the library path ?)",
+                          argv[na], strerror(last_errno));
                       HTS_PANIC_PRINTF(tmp);
                       htsmain_free();
                       return -1;
