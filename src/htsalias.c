@@ -424,10 +424,11 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           /* Copy parameters? */
           if (need_param == 2) {
             if (optparam_missing(argc, argv, n_arg, command)) {
-              snprintf(return_error, return_error_size,
-                       "Syntax error:\n\tOption %s needs to be followed by a "
-                       "parameter: %s <param>\n\t%s\n",
-                       command, command, _NOT_NULL(optalias_help(command)));
+              slprintfbuff_clip(
+                  return_error, return_error_size,
+                  "Syntax error:\n\tOption %s needs to be followed by a "
+                  "parameter: %s <param>\n\t%s\n",
+                  command, command, _NOT_NULL(optalias_help(command)));
               return 0;
             }
             strcpybuff(param, argv[n_arg + 1]);
@@ -476,14 +477,15 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
                enabling bare --index */
             if (suffix == NULL) {
               if (negated)
-                snprintf(return_error, return_error_size,
-                         "Unknown option: %s\n", argv[n_arg] + 2);
+                slprintfbuff_clip(return_error, return_error_size,
+                                  "Unknown option: %s\n", argv[n_arg] + 2);
               else
-                snprintf(return_error, return_error_size,
-                         "Syntax error:\n\tOption --%s does not take the value "
-                         "%s\n\t%s\n",
-                         hts_optalias[pos][0], param,
-                         _NOT_NULL(optalias_help(hts_optalias[pos][0])));
+                slprintfbuff_clip(
+                    return_error, return_error_size,
+                    "Syntax error:\n\tOption --%s does not take the value "
+                    "%s\n\t%s\n",
+                    hts_optalias[pos][0], param,
+                    _NOT_NULL(optalias_help(hts_optalias[pos][0])));
               return 0;
             }
             strlcatbuff(return_argv[0], suffix, return_argv_size);
@@ -491,8 +493,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           *return_argc = 1;     /* 1 parameter returned */
         }
       } else {
-        snprintf(return_error, return_error_size, "Unknown option: %s\n",
-                 command);
+        slprintfbuff_clip(return_error, return_error_size,
+                          "Unknown option: %s\n", command);
         return 0;
       }
       return need_param;
@@ -506,11 +508,11 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
         if (optparam_missing(argc, argv, n_arg, argv[n_arg])) {
-          snprintf(return_error, return_error_size,
-                   "Syntax error:\n\tOption %s needs to be followed by a "
-                   "parameter: %s <param>\n\t%s\n",
-                   argv[n_arg], argv[n_arg],
-                   _NOT_NULL(optalias_help(argv[n_arg])));
+          slprintfbuff_clip(
+              return_error, return_error_size,
+              "Syntax error:\n\tOption %s needs to be followed by a "
+              "parameter: %s <param>\n\t%s\n",
+              argv[n_arg], argv[n_arg], _NOT_NULL(optalias_help(argv[n_arg])));
           return 0;
         }
         /* Copy parameters */

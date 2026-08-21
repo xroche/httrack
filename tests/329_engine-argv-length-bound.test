@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# The argv length pre-check is what bounds three later sprintf destinations
+# The argv length pre-check is what bounds three diagnostic buffers
 # (htscoremain.c:784, :1800, :1810); nothing else pins it.
 
 set -euo pipefail
@@ -8,7 +8,6 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-require_httrack
 h=$(httrack_path)
 
 # First output line for an unrecognised option of exactly $1 bytes.
@@ -23,12 +22,19 @@ unknown_opt() { # unknown_opt TOTALLEN
 assert_match 'Unknown option' "$(unknown_opt 1023)" 'argv at the limit'
 assert_match 'argument too long' "$(unknown_opt 1024)" 'argv over the limit'
 
-# Same bound applies to arguments the rc file contributes, which reach argv only
-# after the pre-check has run.
-rc=$(mktemp -d)
-cleanup_push rm -rf "$rc"
-printf -- '--%s\n' "$(repeat_chars 60000 A)" >"$rc/.httrackrc"
-out=$(cd "$rc" && HOME=$rc "$h" http://example.invalid/ 2>&1) || true
-assert_match 'Unknown option' "$out" 'oversized rc option is reported, not fatal'
+# doit.log is replayed into argv AFTER the pre-check, with an 8000-byte line
+# budget, so it is the one injector that can oversize a diagnostic argument.
+mirror=$(mktemp -d)
+cleanup_push rm -rf "$mirror"
+mkdir -p "$mirror/hts-cache"
+printf 'http://x/ --%s\n' "$(repeat_chars 3000 B)" >"$mirror/hts-cache/doit.log"
+reply=$(cd "$mirror" && "$h" 2>&1) || true
+line=$(firstline "$reply")
 
-ok "argv length bound holds on both sides"
+# The token alone fills the 1280-byte message buffer, so the reply is the
+# clipped token and the " not recognized" suffix is gone. Unclipped, the write
+# overflows and the engine aborts before printing anything at all.
+test "${#line}" -gt 1000 || fail "no diagnostic, engine died first: $line"
+test "${#line}" -lt 2000 || fail "reply not clipped: ${#line} bytes"
+
+ok "argv length bound holds, and an oversized replayed token is clipped"
