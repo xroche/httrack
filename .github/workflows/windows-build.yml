@@ -260,6 +260,30 @@ jobs:
       # used to run inline (codecs, cache, fsize).
       # The *_local-* ones crawl the bundled Python server over loopback: the real
       # TLS handshake, cache and file writer, which nothing else on Windows covers.
+      # 0xC0000142 at fork time is classically the msys DLL failing to map at the
+      # parent's address (#1273), so this reports the state, turns mandatory ASLR
+      # off, and reports again: a system mitigation normally wants a reboot, and
+      # the second report is what says whether it took on a runner we cannot boot.
+      - name: Relax image relocation for the MSYS fork emulation
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          function Show($when) {
+            $s = Get-ProcessMitigation -System
+            "$when system ForceRelocateImages : $($s.Aslr.ForceRelocateImages)"
+            "$when system BottomUp            : $($s.Aslr.BottomUp)"
+            try {
+              $p = Get-ProcessMitigation -Name bash.exe
+              "$when bash   ForceRelocateImages : $($p.Aslr.ForceRelocateImages)"
+            } catch {
+              "$when bash   ForceRelocateImages : no per-process entry"
+            }
+          }
+          Show "before"
+          Set-ProcessMitigation -System -Disable ForceRelocateImages -ErrorAction Continue
+          Set-ProcessMitigation -Name bash.exe -Disable ForceRelocateImages -ErrorAction Continue
+          Show "after "
+
       - name: Run the engine test suite (offline tests)
         shell: bash
         working-directory: tests
