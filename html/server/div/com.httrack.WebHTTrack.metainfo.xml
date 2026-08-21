@@ -53,6 +53,18 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.49.23" date="2026-08-21">
+      <description>
+        <ul>
+          <li>A header you add by hand is no longer sent twice</li>
+          <li>Rebuilding the top index no longer leaves it blank while it is being written</li>
+          <li>WebHTTrack now saves and restores the proxy, and no longer offers a mirror mode it cannot run</li>
+          <li>Settings saved in one interface reopen unchanged in the others</li>
+          <li>The language menu shows every language in its own name and script</li>
+          <li>A long address or a long robots.txt rule no longer stops or misreads the mirror</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.22" date="2026-08-16">
       <description>
         <ul>

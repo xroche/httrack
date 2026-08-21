@@ -1,3 +1,12 @@
+httrack (3.49.23-1) unstable; urgency=medium
+
+  * New upstream release: a header added by hand was sent twice, rebuilding
+    the top index blanked it in place, a URL injected into a running mirror
+    crashed the engine, and WebHTTrack stored several settings under the
+    wrong keys; full list in history.txt.
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 21 Aug 2026 13:42:30 +0200
+
 httrack (3.49.22-1) unstable; urgency=medium
 
   * New upstream release: the interactive wizard can be answered for a whole
