@@ -4,6 +4,24 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-23
++ Fixed: a header typed into the extra-headers box was sent twice, since the engine wrote its own copy of the same line; the typed line now replaces the engine's where that is safe, and the engine keeps the ones a duplicate would corrupt (#1337, #1340)
++ Fixed: rebuilding the top index truncated index.html in place, so a reader who opened it mid-rebuild got a blank or partial page (#1329)
++ Fixed: a URL injected into a running mirror crashed the engine; hts_addurl() copies the list it is given instead of borrowing it (#1253)
++ Fixed: a filter rule was capped by a scratch buffer rather than by the slot it is stored in, and the refusal quoted a limit that was not the one applied (#1288)
++ Fixed: a crawled link long enough to fill the save-name buffer aborted the mirror under -N '<template>' (#1295)
++ Fixed: a line longer than its read buffer had the unread tail read back as another record, so a robots.txt rule past 1 KB could re-open the path it forbade (#1294)
++ Fixed: a scan rule's size clause kept only the first of its two bounds, so *[>1<80] applied one and dropped the other (#1303)
++ Fixed: WebHTTrack never saved or restored a proxy (#1325)
++ Fixed: WebHTTrack filed three option checkboxes under each other's keys, so a project made in WinHTTrack or on Android reopened with those three settings rotated (#1324)
++ Fixed: a combo box or a list saved by WinHTTrack read back as a different setting in WebHTTrack (#1314)
++ Fixed: WebHTTrack passed a WARC or sitemap value to the command line even when the box owning it was cleared; the CDXJ box also greys out under a clear WARC box, which is the state where ticking it did nothing (#1336)
++ Fixed: WebHTTrack offered a mirror mode whose questions it has no way to ask (#1237)
++ Fixed: the WebHTTrack language menu named half the languages in English, and now shows each one in its own name and script (#116)
++ Changed: the three front ends write hts-cache/winprofile.ini against one declared contract, so a project made in one of them reopens unchanged in the others
++ Changed: the macOS disk image can be named for a prerelease channel rather than only for the engine version
++ Changed: multiple internal hardening, test and build improvements
+
 3.49-22
 + New: an interactive wizard question can be answered for a whole domain rather than for the one exact host it asked about; a front end enumerates the scopes on offer through the newly exported hts_wizard_host_scope() (#1117)
 + New: the -%F footer template takes named fields ("{url}", "{date}") in place of positional "%s", so a custom footer keeps working as the list grows; hts_footer_field_ok() exports the engine's own field list, which the help text and the guide are now generated from (#1240, #1256)
