@@ -297,12 +297,9 @@ for f in "$langdir"/*.txt; do
     fi
 done
 
-# WinHTTrack sprintf()s these strings, so a value that drops or invents a
-# %-placeholder feeds a format its arguments no longer match; %n/%N/%t/%p/%h/%M/
-# %Q/%q are also HTTrack's own build-string letters, where a lost one drops a
-# field from the filename help. Compare as a multiset: order follows the target
-# grammar. An empty value falls back to English (htsserver.c's strnotempty
-# gate), so it is the untranslated pin's business rather than this check's.
+# WinHTTrack sprintf()s these strings, and %n/%N/%t/%p/%h/%M/%Q/%q are also
+# HTTrack's own build-string letters, so a dropped or invented placeholder
+# either breaks the format or drops a field from the filename help.
 placeholder_drift() {
     LC_ALL=C awk '
         # Two characters from each %, so a printf conversion and a build-string
@@ -328,9 +325,11 @@ placeholder_drift() {
         FNR == 1 { name = FILENAME; sub(/.*\//, "", name) }
         { sub(/\r$/, "") }
         FNR % 2 == 1 { key = $0; next }
+        # An empty value falls back to English; the untranslated pin owns it.
         $0 == "" { next }
         {
             pairs++
+            # A multiset, not a sequence: order follows the target grammar.
             want = sorted(toks(key))
             got = sorted(toks($0))
             if (want != got) {
@@ -346,7 +345,8 @@ placeholder_drift() {
 # carrying no % at all would satisfy the check with the scanner doing nothing.
 printf 'Delete %%s?\nSupprimer ?\n' >"$tmp/dropped.txt"
 printf 'Delete?\nSupprimer %%s ?\n' >"$tmp/invented.txt"
-for probe in dropped invented; do
+printf 'Delete %%s?\nSupprimer %%d ?\n' >"$tmp/swapped.txt"
+for probe in dropped invented swapped; do
     if placeholder_drift "$tmp/$probe.txt" >/dev/null; then
         echo "the placeholder check passed a deliberately damaged value ($probe)"
         exit 1
@@ -363,10 +363,8 @@ if [ "${npairs:-0}" -lt $((nfiles * nkeys * 9 / 10)) ]; then
     exit 1
 fi
 
-# conv_printf() copies the letter after an unknown backslash escape and drops the
-# backslash, so a "\n" that lost its n silently merges two combo-box entries and
-# the user picks a different disk structure than the row named. Scan the decoded
-# text: 0x5C is a legal trail byte in BIG5 and Shift-JIS.
+# conv_printf() copies the letter after an unknown escape and drops the backslash,
+# so a "\n" that lost its n merges two combo-box rows and mislabels every row after.
 unknown_escapes() {
     LC_ALL=C awk -v name="$2" '
         # Built here from character codes: a quote or a backslash spelled inside
@@ -393,14 +391,15 @@ if ! command -v iconv >/dev/null 2>&1; then
 else
     # Controls: a lost n, then a dangling backslash. Match the complaint rather
     # than the status, since an empty report also reads as success.
-    printf 'Two lines\nDeux lignes\\Trois lignes\n' >"$tmp/lostn.txt"
+    printf 'Two lines\nDeux lignes\\mTrois lignes\n' >"$tmp/lostn.txt"
     printf 'Ends badly\nFinit mal\\\n' >"$tmp/dangling.txt"
+    escape_wanted() { [ "$1" = lostn ] && printf '\\m' || printf '\\<end of line>'; }
     # An escaped backslash is legal and common (Windows paths in English.txt:812),
     # so prove the check does not fire on one.
     printf 'A path\nC:\\\\Temp\n' >"$tmp/legal.txt"
     for probe in lostn dangling; do
         case $(unknown_escapes "$tmp/$probe.txt" "$probe.txt") in
-        *"is not an escape"*) ;;
+        *"$(escape_wanted "$probe") is not an escape"*) ;;
         *)
             echo "the escape check passed a deliberately broken value ($probe)"
             exit 1
@@ -412,8 +411,11 @@ else
         exit 1
     fi
 
+    nesc=0
     for f in "$langdir"/*.txt; do
+        nesc=$((nesc + 1))
         cs=$(field "$f" LANGUAGE_CHARSET)
+        # Decoded, not raw: 0x5C is a legal trail byte in BIG5 and Shift-JIS.
         LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/esc" || fail "${f##*/}: iconv cannot read $cs"
         found=$(unknown_escapes "$tmp/esc" "${f##*/}")
         if [ -n "$found" ]; then
@@ -421,6 +423,10 @@ else
             fail=1
         fi
     done
+    if [ "$nesc" -ne "$nfiles" ]; then
+        echo "escape check saw $nesc of $nfiles language files"
+        exit 1
+    fi
 fi
 
 # A value copied verbatim from its msgid, or left empty, passes every check above
