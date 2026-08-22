@@ -560,7 +560,9 @@ jobs:
         # bytes by default, so max_malloc_fill_size lifts it to cover large cache
         # buffers; free_fill flags use-after-free reads.
         env:
-          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647
+          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647:log_path=${{ github.workspace }}/sanitizer-logs/asan
+          # No log_path here: gcc's UBSan ignores it and writes to stderr, so
+          # its findings are collected from the per-test logs instead.
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         timeout-minutes: 20
         run: |
@@ -570,6 +572,22 @@ jobs:
       - name: Print the test log on failure
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
+
+      - name: Collect sanitizer findings
+        if: always()
+        run: |
+          set -euo pipefail
+          sh tools/ci-sanitizer-report.sh "$GITHUB_WORKSPACE/sanitizer-logs" tests
+
+      - name: Upload the sanitizer and per-test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sanitize-logs
+          path: |
+            sanitizer-logs/
+            tests/*.log
+          if-no-files-found: ignore
 
   # MemorySanitizer catches reads of uninitialized memory (#143's stack-garbage
   # size filter) that ASan/UBSan miss. It flags any byte an uninstrumented lib
@@ -605,7 +623,7 @@ jobs:
 
       - name: Test (offline self-tests under MSan)
         env:
-          MSAN_OPTIONS: abort_on_error=1:halt_on_error=1
+          MSAN_OPTIONS: abort_on_error=1:halt_on_error=1:log_path=${{ github.workspace }}/sanitizer-logs/msan
         timeout-minutes: 20
         run: |
           set -euo pipefail
@@ -618,6 +636,22 @@ jobs:
       - name: Print the test log on failure
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
+
+      - name: Collect sanitizer findings
+        if: always()
+        run: |
+          set -euo pipefail
+          sh tools/ci-sanitizer-report.sh "$GITHUB_WORKSPACE/sanitizer-logs" tests
+
+      - name: Upload the sanitizer and per-test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: msan-logs
+          path: |
+            sanitizer-logs/
+            tests/*.log
+          if-no-files-found: ignore
 
   # libFuzzer smoke: build the fuzz/ harnesses over the pure hostile-input
   # parsers and replay each seed corpus under ASan+UBSan+LeakSanitizer. Replay
