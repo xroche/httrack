@@ -225,7 +225,7 @@ HTSEXT_API void hts_log_print(httrackp *opt, int type, const char *format, ...)
 /** va_list form of hts_log_print(). @p opt may be NULL (only the callback
    runs). Preserves errno. @p format must be non-NULL. */
 HTSEXT_API void hts_log_vprint(httrackp *opt, int type, const char *format,
-                               va_list args);
+                               va_list args) HTS_PRINTF_FUN(3, 0);
 
 /** Install the process-global log callback invoked by hts_log_vprint() for
    every message, regardless of opt->debug (NULL clears it). Not per-opt. */
