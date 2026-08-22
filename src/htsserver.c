@@ -1087,6 +1087,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           } else if ((p = strfield(line, "Origin:")) != 0) {
             copy_header_value(origin, sizeof(origin), line + p);
           } else if ((p = strfield(line, "Host:")) != 0) {
+            /* A repeated header keeps the last value. Safe only because we are
+               loopback-direct: behind a proxy honouring the first, the two
+               would disagree. */
             copy_header_value(host, sizeof(host), line + p);
           }
         }
