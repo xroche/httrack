@@ -47,24 +47,29 @@ void hts_fortify_copy(const char *src) { strcpy(hts_fortify_dst, src); }
 int main(void) { hts_fortify_copy("x"); return 0; }
 ]])], [
 			# The destination size is known above, so a working fortification
-			# had to lower that strcpy to __strcpy_chk. Believe nm's "absent"
-			# only once nm has demonstrably read the binary.
+			# had to lower that strcpy to __strcpy_chk. A level we cannot
+			# verify is refused: claiming one we do not have is the failure
+			# this macro exists to prevent.
 			hts_fortify_chk=unknown
 			if test -n "$NM" && $NM conftest$ac_exeext >conftest.nm 2>/dev/null &&
 				test -s conftest.nm; then
-				if grep '_chk' conftest.nm >/dev/null 2>&1; then
+				# __stack_chk_fail is -fstack-protector's, not fortification's.
+				if grep '_chk' conftest.nm | grep -v '__stack_chk' >/dev/null 2>&1; then
 					hts_fortify_chk=yes
 				else
 					hts_fortify_chk=no
 				fi
 			fi
 			rm -f conftest.nm
-			if test x"$hts_fortify_chk" = xno; then
+			if test x"$hts_fortify_chk" = xyes; then
+				AC_MSG_RESULT([yes])
+				FORTIFY_SOURCE_LEVEL=$hts_fortify_level
+			elif test x"$hts_fortify_chk" = xno; then
 				AC_MSG_RESULT([no (the compiler emitted no checked call)])
 				CPPFLAGS=$hts_fortify_save_cppflags
 			else
-				AC_MSG_RESULT([yes])
-				FORTIFY_SOURCE_LEVEL=$hts_fortify_level
+				AC_MSG_RESULT([no ($NM could not read the test binary)])
+				CPPFLAGS=$hts_fortify_save_cppflags
 			fi
 		], [
 			AC_MSG_RESULT([no])
