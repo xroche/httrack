@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# Form/ini percent-decoding keeps a malformed escape as text (it used to decode
+# "%ZZ" to a NUL, truncating the value).
+out=$(httrack -O /dev/null -#test=unescape-form run)
+grep -q "unescape-form self-test OK" <<<"$out"
+
+# One decoder, or the drift comes back: nothing outside htsescape.h may define
+# the hex helpers the server and the engine now share.
+srcdir="${abs_top_srcdir:?not run under make check}"
+dups=$(grep -rl '^[A-Za-z_].*[^a-z_]ehexh *(' "${srcdir}/src" --include='*.c' --include='*.h' || true)
+[ -z "$dups" ] || {
+    echo "private copy of the escape decoder is back: $dups"
+    exit 1
+}

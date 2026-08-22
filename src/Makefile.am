@@ -58,7 +58,7 @@ lib_LTLIBRARIES = libhttrack.la
 htsserver_SOURCES = htsserver.c htsserver.h htsweb.c htsweb.h htsstats.h \
 	htsrandom.c htsrandom.h \
 	htscmdline.c htscmdline.h \
-	htsurlport.c htsurlport.h
+	htsurlport.c htsurlport.h htsescape.c htsescape.h
 proxytrack_SOURCES = proxy/main.c \
 	proxy/proxytrack.c proxy/store.c \
 	htsurlport.c htsurlport.h htsnet.c \
@@ -83,7 +83,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsalias.c htsthread.c htsindex.c htsbauth.c \
 	htscrashtest.c \
 	htsmd5.c htsnet.c htscodec.c htswarc.c htschanges.c htssinglefile.c htssitemap.c htsproxy.c htszlib.c htswrap.c htsconcat.c \
-	htsmodules.c htscharset.c punycode.c htsencoding.c htssniff.c \
+	htsmodules.c htscharset.c punycode.c htsencoding.c htsescape.c htssniff.c \
 	md5.c \
 	minizip/ioapi.c minizip/mztools.c minizip/unzip.c minizip/zip.c \
 	hts-indextmpl.h htsalias.h htsback.h htsbase.h htssafe.h \
@@ -95,7 +95,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsopt.h htsrobots.h htsthread.h  \
 	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htssitemap.h htsproxy.h htszlib.h  \
 	htsstrings.h htsarrays.h htsarena.h httrack-library.h \
-	htscharset.h punycode.h htsencoding.h \
+	htscharset.h punycode.h htsencoding.h htsescape.h \
 	htsentities.h htsentities.sh htsbasiccharsets.sh htscodepages.h \
 	winprofile-keys.h \
 	md5.h coucal/murmurhash3.h \

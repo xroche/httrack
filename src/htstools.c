@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htstools.h"
 #include "htsio.h"
 #include "htsstrings.h"
+#include "htsescape.h"
 #include "htscharset.h"
 #ifdef _WIN32
 #include "windows.h"
@@ -72,42 +73,6 @@ struct find_handle_struct {
 #endif
 
 /* Tools */
-
-static int ehexh(char c) {
-  if ((c >= '0') && (c <= '9'))
-    return c - '0';
-  if ((c >= 'a') && (c <= 'f'))
-    c -= ('a' - 'A');
-  if ((c >= 'A') && (c <= 'F'))
-    return (c - 'A' + 10);
-  return 0;
-}
-
-static int ehex(const char *s) {
-  return 16 * ehexh(*s) + ehexh(*(s + 1));
-}
-
-static void unescapehttp(const char *s, String * tempo) {
-  size_t i;
-
-  /* A truncated escape has no digits: decoding one runs past the terminator. */
-  for(i = 0; s[i] != '\0'; i++) {
-    if (s[i] == '%' && s[i + 1] == '%') {
-      i++;
-      StringAddchar(*tempo, '%');
-    } else if (s[i] == '%' && s[i + 1] != '\0' && s[i + 2] != '\0') {
-      char hc;
-
-      i++;
-      hc = (char) ehex(s + i);
-      StringAddchar(*tempo, (char) hc);
-      i++;                      // sauter 2 caractères finalement
-    } else if (s[i] == '+') {
-      StringAddchar(*tempo, ' ');
-    } else
-      StringAddchar(*tempo, s[i]);
-  }
-}
 
 // forme à partir d'un lien et du contexte (origin_fil et origin_adr d'où il est tiré) adr et fil
 // [adr et fil sont des buffers de 1ko]
@@ -1261,7 +1226,7 @@ HTSEXT_API char *hts_getcategory(const char *filename) {
 
         if (n > 0) {
           if (strfield(line, "category=")) {
-            unescapehttp(line + 9, &categ);
+            hts_unescapehttp(line + 9, &categ);
             done = 1;
           }
         }
@@ -1318,7 +1283,7 @@ HTSEXT_API char *hts_getcategories(char *path, int type) {
                         if (StringLength(categ) > 0) {
                           StringCat(categ, "\r\n");
                         }
-                        unescapehttp(line2 + 9, &categ);
+                        hts_unescapehttp(line2 + 9, &categ);
                       }
                     }
                     done = 1;

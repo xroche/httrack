@@ -35,42 +35,6 @@ Please visit our Website: http://www.httrack.com
 
 /* Tools */
 
-HTS_UNUSED static int ehexh(char c) {
-  if ((c >= '0') && (c <= '9'))
-    return c - '0';
-  if ((c >= 'a') && (c <= 'f'))
-    c -= ('a' - 'A');
-  if ((c >= 'A') && (c <= 'F'))
-    return (c - 'A' + 10);
-  return 0;
-}
-
-HTS_UNUSED static int ehex(const char *s) {
-  return 16 * ehexh(*s) + ehexh(*(s + 1));
-}
-
-HTS_UNUSED static void unescapehttp(const char *s, String * tempo) {
-  int i;
-
-  /* A truncated escape has no digits: decoding one runs past the terminator. */
-  for(i = 0; s[i] != '\0'; i++) {
-    if (s[i] == '%' && s[i + 1] == '%') {
-      i++;
-      StringAddchar(*tempo, '%');
-    } else if (s[i] == '%' && s[i + 1] != '\0' && s[i + 2] != '\0') {
-      char hc;
-
-      i++;
-      hc = (char) ehex(s + i);
-      StringAddchar(*tempo, (char) hc);
-      i++;                      // sauter 2 caractères finalement
-    } else if (s[i] == '+') {
-      StringAddchar(*tempo, ' ');
-    } else
-      StringAddchar(*tempo, s[i]);
-  }
-}
-
 HTS_UNUSED static void escapexml(const char *s, String * tempo) {
   int i;
 

@@ -58,6 +58,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscmdline.h"
 #include "htscoremain.h"
 #include "htsencoding.h"
+#include "htsescape.h"
 #include "htsftp.h"
 #include "htsmd5.h"
 #include "htssniff.h"
@@ -1496,6 +1497,56 @@ static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
     assertf(strcmp(wide, "\xC3\xA9") == 0);
   }
   printf("unescape-bounds self-test OK\n");
+  return 0;
+}
+
+/* A malformed escape must survive as text. The two decoders behind the server
+   forms decoded "%ZZ" to NUL, which truncated the value at the next read. */
+static int st_unescape_form(httrackp *opt, int argc, char **argv) {
+  /* expected[] is compared with its length, so a decoded NUL is not mistaken
+     for a short string */
+  static const struct {
+    const char *in;
+    const char *expected;
+    size_t len;
+    int ini; /* run hts_unescapeini() rather than http */
+  } cases[] = {
+      {"a%41b", "aAb", 3, 0},
+      {"%c3%a9", "\xc3\xa9", 2, 0},
+      {"a+b", "a b", 3, 0},
+      {"100%%", "100%", 4, 0},
+      {"%ZZ", "%ZZ", 3, 0}, /* not hex: kept literal, not decoded to NUL */
+      {"%4", "%4", 2, 0},   /* truncated: no second digit to read */
+      {"%", "%", 1, 0},
+      {"a%2Gb", "a%2Gb", 5, 0},   /* second digit not hex */
+      {"a+b", "a+b", 3, 1},       /* the ini form has no '+' rule */
+      {"a%0d%0ab", "a\rb", 3, 1}, /* a decoded separator run collapses */
+      {"a%ZZb", "a%ZZb", 5, 1},
+  };
+
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    String out = STRING_EMPTY;
+
+    if (cases[i].ini) {
+      hts_unescapeini(cases[i].in, &out);
+    } else {
+      hts_unescapehttp(cases[i].in, &out);
+    }
+    if (StringLength(out) != cases[i].len ||
+        memcmp(StringBuff(out), cases[i].expected, cases[i].len) != 0) {
+      fprintf(stderr, "unescape-form: %s gave %d bytes, expected %d\n",
+              cases[i].in, (int) StringLength(out), (int) cases[i].len);
+      StringFree(out);
+      return 1;
+    }
+    StringFree(out);
+  }
+  printf("unescape-form self-test OK\n");
   return 0;
 }
 
@@ -11797,6 +11848,8 @@ static const struct selftest_entry {
      st_footerfmt},
     {"unescape-bounds", "", "unescapers reserve the NUL byte (no 1-byte OOB)",
      st_unescape_bounds},
+    {"unescape-form", "", "form/ini percent-decoding keeps a malformed escape",
+     st_unescape_form},
     {"cmdline-split", "",
      "webhttrack command-line to argv split (bounds, quoting)",
      st_cmdlinesplit},
