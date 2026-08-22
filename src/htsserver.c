@@ -253,36 +253,6 @@ static int gethost(const char *hostname, SOCaddr * server) {
   return 0;
 }
 
-static int my_getlocalhost(char *h_loc, size_t size) {
-  SOCaddr addr;
-  strcpy(h_loc, "localhost");
-  if (gethost(h_loc, &addr) == 1) {
-    return 0;
-  }
-  // come on ...
-  else {
-    strcpy(h_loc, "127.0.0.1");
-    return 0;
-  }
-}
-
-// get local hostname; falls back to "localhost" in case of error 
-// always returns 0
-static int my_gethostname(char *h_loc, size_t size) {
-  h_loc[0] = '\0';
-  if (gethostname(h_loc, (int) size) == 0) {    // host name
-    SOCaddr addr;
-    if (gethost(h_loc, &addr) == 1) {
-      return 0;
-    } else {
-      return my_getlocalhost(h_loc, size);
-    }
-  } else {
-    return my_getlocalhost(h_loc, size);
-  }
-  return 0;
-}
-
 // smallserver_init(&port,&return_host);
 T_SOC smallserver_init(int *port, char *adr, const char *bindAddr) {
   T_SOC soc = INVALID_SOCKET;
@@ -298,15 +268,16 @@ T_SOC smallserver_init(int *port, char *adr, const char *bindAddr) {
     free(commandReturnCmdl);
   commandReturnCmdl = NULL;
 
-  SOCaddr_initany(server);
+  /* Loopback unless asked otherwise: the handler trusts its client, and every
+     request is unauthenticated. --bind widens it deliberately. */
+  SOCaddr_initloopback(server);
+  strcpybuff(h_loc, "127.0.0.1");
   if (bindAddr != NULL && *bindAddr != '\0') {
     /* advertise the bound address, else the URL we print is unreachable */
     if (strlen(bindAddr) >= sizeof(h_loc) || !gethost(bindAddr, &server)) {
       return INVALID_SOCKET;
     }
     strcpybuff(h_loc, bindAddr);
-  } else if (my_gethostname(h_loc, 256) != 0) { // host name
-    return INVALID_SOCKET;
   }
 
   if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) !=
