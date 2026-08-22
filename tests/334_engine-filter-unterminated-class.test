@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Where the *[...] class scan stops, terminated and not. Verdicts pinned to the
+# behavior predating joker_class_end().
+
+match() { selftest_queue "$2 does match $1" filter "$1" "$2"; }
+nomatch() { selftest_queue "$2 does NOT match $1" filter "$1" "$2"; }
+
+# reserved names keep their own semantics unterminated: [file]/[name] stop at
+# '/', [path] spans it
+match '*[file' 'abc'
+nomatch '*[file' 'a/b/x'
+match '*[name' 'abc'
+match '*[path' 'a/b/x'
+nomatch '*[param' 'a?x=1'
+
+# ranges and comma-separated members
+match '*[a-z' 'abc'
+nomatch '*[a-z' 'ABC9'
+match '*[A-Z,0-9' 'ABC9'
+nomatch '*[A-Z,0-9' 'abc'
+
+# a truncated range and a trailing escape are members, not a scan overrun
+nomatch '*[a-' 'abc'
+nomatch "*[\\" 'abc'
+
+# an empty unterminated class allows nothing
+nomatch '*[' 'abc'
+
+# the '(' form scans for its own terminator
+nomatch '*(a' 'abc'
+nomatch '*(file' 'abc'
+
+# A terminated class is where the returned index is observable: it decides where
+# the pattern resumes, so a wrong one changes the verdict rather than nothing.
+match '*[file]x' 'abcx'
+nomatch '*[file]x' 'abc'
+nomatch '*[file]x' 'a/bx'
+match '*[file]' 'abc'
+match '*[file]/a' 'abc/a'
+nomatch '*(file)' 'abc'
+match '*[a-z]x' 'abcx'
+nomatch '*[a-z]x' 'abc9x'
+
+# an unterminated size bound stays neutral
+nomatch '*[<10' 'abc'
+
+selftest_run_queued

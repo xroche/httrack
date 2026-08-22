@@ -47,9 +47,9 @@ static hts_boolean proxytrack_verbose = HTS_FALSE;
 /* Without a handler coucal writes to stderr itself, prefixing the table
    address; the per-enumeration statistics summary then lands on the operator's
    console once per WebDAV request (#918). */
-static void proxytrack_coucal_loghandler(coucal_opaque arg,
-                                         coucal_loglevel level,
-                                         const char *format, va_list args) {
+static HTS_PRINTF_FUN(3, 0) void proxytrack_coucal_loghandler(
+    coucal_opaque arg, coucal_loglevel level, const char *format,
+    va_list args) {
   const char *severity;
 
   (void) arg;
