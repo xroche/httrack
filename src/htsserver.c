@@ -471,6 +471,8 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
   return seen;
 }
 
+#define IS_PATH_SEP(c) ((c) == '/' || (c) == '\\')
+
 /** Append src to the NUL-terminated dst of capacity size (NUL included).
     False, leaving dst untouched, if it would not fit: unlike strcatbuff() this
     never aborts, because every piece appended here is client-supplied. */
@@ -484,6 +486,26 @@ static hts_boolean path_append(char *dst, size_t size, const char *src) {
     return HTS_FALSE;
   }
   memcpy(dst + used, src, len + 1);
+  return HTS_TRUE;
+}
+
+/** Whether path stays inside the directory it is resolved against, i.e. holds
+    no ".." component. Lexical: no symlink is followed, and "a..b" is a name.
+    Both separators count, a posted path being client text. */
+static hts_boolean hts_path_is_contained(const char *path) {
+  const char *s;
+
+  for (s = path; *s != '\0';) {
+    while (IS_PATH_SEP(*s)) {
+      s++;
+    }
+    if (s[0] == '.' && s[1] == '.' && (s[2] == '\0' || IS_PATH_SEP(s[2]))) {
+      return HTS_FALSE;
+    }
+    while (*s != '\0' && !IS_PATH_SEP(*s)) {
+      s++;
+    }
+  }
   return HTS_TRUE;
 }
 
@@ -1176,7 +1198,13 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             StringCat(fspath, "/.httrack.ini");
 #endif
           }
-          fp = fopen(StringBuff(fspath), "rb");
+          /* fspath is two posted fields: a ".." would read a file outside the
+             mirror into the form. */
+          if (hts_path_is_contained(StringBuff(fspath))) {
+            fp = fopen(StringBuff(fspath), "rb");
+          } else {
+            fp = NULL;
+          }
           if (fp) {
             /* Read file */
             while (!feof(fp) && !ferror(fp)) {
@@ -1306,15 +1334,15 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                   StringCat(tmpbuff, StringBuff(fspath));
                   StringCat(tmpbuff, "/hts-cache/");
 
-                  /* Create minimal directory structure */
-                  if (!structcheck(StringBuff(tmpbuff))) {
+                  /* Create the structure, unless a ".." component in either
+                     posted half would put it outside the named directory. */
+                  if (!hts_path_is_contained(StringBuff(fspath))) {
+                    SET_ERRORF("Project path escapes its parent directory: %s",
+                               StringBuff(fspath));
+                  } else if (!structcheck(StringBuff(tmpbuff))) {
                     FILE *fp;
 
-                    /* Both halves of fspath come from posted fields, so a ".."
-                       in them would escape the mirror once served. */
-                    if (strstr(StringBuff(fspath), "..") == NULL) {
-                      StringCopy(website, StringBuff(fspath));
-                    }
+                    StringCopy(website, StringBuff(fspath));
                     StringCat(tmpbuff, "winprofile.ini");
                     fp = fopen(StringBuff(tmpbuff), "wb");
                     if (fp != NULL) {
