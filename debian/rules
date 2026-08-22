@@ -3,26 +3,6 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-# *** Patch for s390, mips ..
-# It seems that htscore.c can not compile on several archs, due to compiler
-# capacity limits. These lines shall be removed when gcc is upgraded.
-# See discussions on 'Assembler messages: Branch out of range'
-# Addition (04/2004): gcc-3.3 on arm fcks up with htscoremain.c and -O3 (..)
-ifeq ($(DEB_HOST_ARCH),$(findstring $(DEB_HOST_ARCH),s390 mips mipsel m68k arm))
-	CFLAGS += -DNOSTRDEBUG
-endif
-
-DEB_CFLAGS_MAINT_APPEND=-O3
-
-# DEB_BUILD_OPTIONS flags
-ifneq (,$(findstring noopt,$(DEB_BUILD_OPTIONS)))
-	CFLAGS += -g3
-endif
-
-ifeq (,$(findstring nostrip,$(DEB_BUILD_OPTIONS)))
-	INSTALL_PROGRAM += -s
-endif
-
 # as suggested by Simon McVittie
 # (https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=744380)
 override_dh_auto_test:
