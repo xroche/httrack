@@ -15,10 +15,19 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftp.XXXXXX")
 cleanup_push rm -rf "$tmpdir"
 
 errlog="${tmpdir}/httrack.err"
+# The CI job sends ASan reports to its own log_path, which would leave the grep
+# below with nothing to find. Last value wins, so take them back here.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}log_path=${tmpdir}/asan"
 # A sanitized build reports the use-after-free and still exits 1, so the status
 # alone is blind to it. Leaks at exit are out of scope, hence no LeakSanitizer.
 assert_clean_run() {
     cat "$errlog" >&2 # the redirect must not cost the harness log the crawl's stderr
+    local report
+    report=$(cat "${tmpdir}"/asan.* 2>/dev/null || true)
+    test -z "$report" || {
+        echo "$report" >&2
+        fail "$1: the crawl produced a sanitizer report (#1051)"
+    }
     ! grep -Eq 'AddressSanitizer:|MemorySanitizer:|runtime error:' "$errlog" ||
         fail "$1: the crawl produced a sanitizer report (#1051)"
 }
