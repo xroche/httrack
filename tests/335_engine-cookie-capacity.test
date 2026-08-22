@@ -1,0 +1,15 @@
+#!/bin/bash
+#
+# cookie_add must refuse a value that does not fit max_len, and leave the bytes
+# past it alone. Driven by the 'httrack -#test=cookiecap' selftest.
+
+set -eu
+
+out=$(httrack -#test=cookiecap run)
+
+# Exact match: the selftest prints its own diagnosis before the verdict, and a
+# renamed or removed registry entry prints the whole registry instead.
+test "$out" = "cookie-cap: OK" || {
+    echo "expected 'cookie-cap: OK', got: $out" >&2
+    exit 1
+}

@@ -64,14 +64,22 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
   if (strlen(domain) > 256)
     return -1;                  // trop long
   if (strlen(path) > 256)
-    return -1;                  // trop long
-  if (strlen(cookie->data)
-             + strlen(cook_value)
-             + strlen(cook_name)
-             + strlen(domain)
-             + strlen(path)
-             + 256 > cookie->max_len)
-    return -1;                  // impossible d'ajouter
+    return -1; // too long
+  /* Each part against the room left, never a sum: the sum of five lengths
+     read off the wire can wrap and pass a check it should fail. */
+  {
+    const size_t parts[] = {strlen(cookie->data), strlen(cook_value),
+                            strlen(cook_name),    strlen(domain),
+                            strlen(path),         256};
+    size_t left = cookie->max_len;
+    size_t i;
+
+    for (i = 0; i < sizeof(parts) / sizeof(parts[0]); i++) {
+      if (parts[i] > left)
+        return -1; // no room to add it
+      left -= parts[i];
+    }
+  }
 
   insert = a;                   // insérer ici
   while(*a) {
@@ -103,8 +111,13 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
   strcatbuff(cook, "\t");
   strcatbuff(cook, cook_value);
   strcatbuff(cook, "\n");
-  if (!((strlen(cookie->data) + strlen(cook)) < cookie->max_len))
-    return -1;                  // impossible d'ajouter
+  /* Overflow-safe: the new field alone against the room left. */
+  {
+    const size_t used = strlen(cookie->data);
+
+    if (used >= cookie->max_len || strlen(cook) >= cookie->max_len - used)
+      return -1; // no room to add it
+  }
   cookie_insert(insert, cookie->max_len - (size_t) (insert - cookie->data),
                 cook);
 #if DEBUG_COOK
@@ -311,7 +324,7 @@ int cookie_load(httrackp *opt, t_cookie *cookie, const char *fpath,
       char BIGSTK line[8192];
       const size_t line_max = 8000;
 
-      while((!feof(fp)) && (((int) strlen(cookie->data)) < cookie->max_len)) {
+      while ((!feof(fp)) && (strlen(cookie->data) < cookie->max_len)) {
         rawlinput(fp, line, 8100);
         if (strnotempty(line)) {
           if (strlen(line) < line_max) {
