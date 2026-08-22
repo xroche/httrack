@@ -63,7 +63,7 @@ Pøidat
 Scan Rules
 Filtry
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-Používej zástupných znakù (wildcards) pro pøidání nebo odebrání URL nebo odkazù. \nMùžeš použít nìkolik zástupných znakù na jediném øádku. \Používej mezery jako oddìlovaèe. \n\nNapøíklad: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi */
+Používej zástupných znakù (wildcards) pro pøidání nebo odebrání URL nebo odkazù. \nMùžeš použít nìkolik zástupných znakù na jediném øádku. \nPoužívej mezery jako oddìlovaèe. \n\nNapøíklad: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi */
 Exclude links
 Vylouèit odkaz(y)
 Include link(s)
@@ -809,7 +809,7 @@ Základní cesta:
 Project category:
 
 C:\\My Web Sites
-C:\\Temp\Projekty
+C:\\Temp\\Projekty
 Type a new project name, \r\nor select existing project to update/resume
 Napiš nový název projektu, \r\nnebo vyber projekt k aktualizaci
 New project

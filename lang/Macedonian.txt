@@ -87,7 +87,7 @@ bigfile.mov\r\nЌе ја најде датотеката 'bigfile.mov', но не и 'bigfile2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
 cgi\r\nЌе најде линкови со фолдер чие име го содржи суб-стрингот 'cgi' како на пример  /cgi-bin/somecgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
-cgi-bin\r\Ќе најде линкови со фолдер чие име го содржи целиот 'cgi-bin' стринг (но не и cgi-bin-2, на пример)
+cgi-bin\r\nЌе најде линкови со фолдер чие име го содржи целиот 'cgi-bin' стринг (но не и cgi-bin-2, на пример)
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
 someweb.com\r\nЌе најде линкови како  www.someweb.com, private.someweb.com итн.
 someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
@@ -641,7 +641,7 @@ Save settings only, do not launch download now.
 On hold
 На чекање
 Transfer scheduled for: (hh/mm/ss)
-Трансферот е закажан за: (hh\mm\ss)
+Трансферот е закажан за: (hh/mm/ss)
 Start
 Старт
 Connect to provider (RAS)
@@ -653,7 +653,7 @@ Disconnect when finished
 Disconnect modem on completion
 Дисконектирај го модемот на крај
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\Ве молиме известете не за било каква грешка или проблем)\r\n\r\nDevelopment:\r\nИнтерфејс (Windows):Xavier Roche\r\nSpider:Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche и други\r\nМНОГУ БЛАГОДАРНОСТ за македонскиот превод на:\r\nАлександар Савиќ (aleks@macedonia.eu.org)
+\r\n(Ве молиме известете не за било каква грешка или проблем)\r\n\r\nDevelopment:\r\nИнтерфејс (Windows):Xavier Roche\r\nSpider:Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche и други\r\nМНОГУ БЛАГОДАРНОСТ за македонскиот превод на:\r\nАлександар Савиќ (aleks@macedonia.eu.org)
 About WinHTTrack Website Copier
 За WinHTTrack Website Copier
 Please visit our Web page

@@ -83,7 +83,7 @@ gif\r\nPronalazi sve datoteke GIF
 blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
 blue\r\nPronalazi sve datoteke koje sadržavaju 'blue' kao primjerice 'bluesky-small.jpeg'
 bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
-bigfile.mov\r\Pronalazi sve datoteke 'bigfile.mov', ali ne i 'bigfile2.mov'
+bigfile.mov\r\nPronalazi sve datoteke 'bigfile.mov', ali ne i 'bigfile2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
 cgi\r\nPronalazi sve poveznice s mapama koje u nazivu sadrže 'cgi' kao primjerice /cgi-bin/somecgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)

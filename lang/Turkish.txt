@@ -915,7 +915,7 @@ Asla\nBilinmiyorsa (/ hariç)\nBilinmiyorsa
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
 robots.txt kurallarý yok\nsihirbaz hariç robots.txt\nrobots.txt kurallarýný izle
 normal\nextended\ndebug
-normal\ngeniþletilmiþ\hata ayýklama
+normal\ngeniþletilmiþ\nhata ayýklama
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
 Web sitelerini indir\nWeb sitelerini + sorularý indir\nTek tek dosyalarý al\nSayfalardaki tüm siteleri indir (çoklu yansý)\nSayfalardaki baðlantýlarý test et (yer imi testi)\n* Kesintiye uðramýþ indirmeye devam et\n* Mevcut indirmeyi güncelle
 Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL

@@ -763,9 +763,9 @@ Salva &come...
 User-defined structure
 Struttura definita dall'utente
 %n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
-%n\tNome del file senza il tipo (es.: immagine)\n%N\tNome del file, incluso il tipo (es.: immagine)\n%t\tTipo del file (es.: gif)\n%p\tPercorso [senza fine /] (es.: /immagini)\n%h\tIl nome del host (es.: www.someweb.com)\n\n%s?\tVersione corta per il DOS (es.: %sN)
+%n\tNome del file senza il tipo (es.: immagine)\r\n%N\tNome del file, incluso il tipo (es.: immagine.gif)\r\n%t\tSolo il tipo di file (es.: gif)\r\n%p\tPercorso [senza / finale] (es.: /immagini)\r\n%h\tNome dell'host (es.: www.someweb.com)\r\n%M\tMD5 dell'URL (128 bit, 32 byte ascii)\r\n%Q\tMD5 della query string (128 bit, 32 byte ascii)\r\n%q\tMD5 breve della query string (16 bit, 4 byte ascii)\r\n\r\n%s?\tNome breve (es.: %sN)
 Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
-Esempio:\t%h%p/%n.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
+Esempio:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
 Proxy settings
 Preferenze del proxy
 Proxy address:
