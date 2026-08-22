@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# _FORTIFY_SOURCE expands to nothing without -O, and glibc stopped warning about
+# it: configure said "yes" while the shipped binaries carried no checked call at
+# all. Assert the mitigation in the products, not in a configure answer.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is nothing configured to inspect.
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+[ -n "${FORTIFY_SOURCE_LEVEL:-}" ] || skip "configure added no -D_FORTIFY_SOURCE"
+
+nm=${NM:-nm}
+command -v "$nm" >/dev/null 2>&1 || skip "no nm ($nm)"
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+cflags_argv=()
+if [ -n "${TEST_CFLAGS:-}" ]; then
+    read -r -a cflags_argv <<<"$TEST_CFLAGS"
+fi
+cppflags_argv=()
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a cppflags_argv <<<"$TEST_CPPFLAGS"
+fi
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+# Anchored on the trailing _chk, or __stack_chk_fail -- there whatever
+# _FORTIFY_SOURCE does -- counts as a fortified call and hides the collapse.
+n_chk() { # n_chk FILE
+    "$nm" -u "$1" 2>/dev/null |
+        awk '{ s = $NF; sub(/@.*/, "", s); if (s ~ /_chk$/) n++ } END { print n + 0 }' || true
+}
+
+# A known destination size is what fortification needs to lower strcpy to
+# __strcpy_chk.
+cat >"$tmp/probe.c" <<'EOF'
+#include <string.h>
+char dst[16];
+void copy(const char *src) { strcpy(dst, src); }
+EOF
+
+compile() { # compile OUT FLAGS...
+    local out=$1
+    shift
+    "${cc_argv[@]}" "${cflags_argv[@]}" "$@" -w -c -o "$out" "$tmp/probe.c" 2>"$tmp/cc.log" || {
+        head -5 "$tmp/cc.log" >&2
+        fail "the probe does not compile with $*"
+    }
+}
+
+# Without both controls every verdict below is vacuous: the build's own flags
+# must produce a checked call, and the same flags minus the define must not.
+compile "$tmp/dirty.o" ${cppflags_argv[@]+"${cppflags_argv[@]}"}
+compile "$tmp/clean.o" -U_FORTIFY_SOURCE
+dirty=$(n_chk "$tmp/dirty.o")
+clean=$(n_chk "$tmp/clean.o")
+[ "$dirty" -gt 0 ] ||
+    skip "${CC:-cc} does not fortify at level $FORTIFY_SOURCE_LEVEL, nothing to assert"
+[ "$clean" -eq 0 ] ||
+    fail "the unfortified control already shows $clean checked symbol(s), the count means nothing"
+
+# Static-only and macOS builds have no libhttrack.so; the engine binary is always
+# there, and on a static build it is the only place the checks can show up.
+artifacts=()
+for f in "${HTTRACK_BIN:-}" "${HTTRACK_SHLIB:-}"; do
+    if [ -n "$f" ] && [ -f "$f" ]; then
+        artifacts+=("$f")
+    fi
+done
+[ "${#artifacts[@]}" -gt 0 ] || skip "no built binary to inspect"
+
+for f in "${artifacts[@]}"; do
+    n=$(n_chk "$f")
+    echo "$(basename "$f"): $n checked libc import(s)"
+    [ "$n" -gt 0 ] ||
+        fail "$f imports no __*_chk, so -D_FORTIFY_SOURCE=$FORTIFY_SOURCE_LEVEL bought nothing"
+done
+
+exit 0

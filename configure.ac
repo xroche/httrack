@@ -193,7 +193,7 @@ AX_CHECK_LINK_FLAG([-Wl,-z,noexecstack], [DEFAULT_LDFLAGS="$DEFAULT_LDFLAGS -Wl,
 # sanitizer builds, whose interceptors want the unfortified calls.
 case "$CFLAGS" in
 *-fsanitize=*) ;;
-*) AX_ADD_FORTIFY_SOURCE ;;
+*) HTS_ADD_FORTIFY_SOURCE ;;
 esac
 
 # Force libc back into DT_NEEDED for libraries that reach it only through

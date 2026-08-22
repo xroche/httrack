@@ -59,6 +59,10 @@ TESTS_ENVIRONMENT += MAKE="$(MAKE)"
 # openssl@3 is keg-only, so htsbasenet.h finds <openssl/ssl.h> only through it.
 TESTS_ENVIRONMENT += CC="$(CC)"
 TESTS_ENVIRONMENT += TEST_CPPFLAGS="$(CPPFLAGS)"
+# 331_fortify-source.test rebuilds a fortifiable probe with the build's own
+# flags, and skips when configure found no usable level.
+TESTS_ENVIRONMENT += TEST_CFLAGS="$(CFLAGS)"
+TESTS_ENVIRONMENT += FORTIFY_SOURCE_LEVEL=$(FORTIFY_SOURCE_LEVEL)
 # 218_crash-nopie-frames.test links the crash printer, which calls dladdr().
 TESTS_ENVIRONMENT += DL_LIBS="$(DL_LIBS)"
 # 207_install-headers-symbols.test links a consumer probe against it; absent on a
