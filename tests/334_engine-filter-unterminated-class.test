@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A *[...] class with no closing bracket: the scan for it stops on the end of
+# the pattern, and what follows the star is skipped as for a closed class.
+# Verdicts pinned from the behavior predating joker_class_end().
+
+match() { selftest_queue "$2 does match $1" filter "$1" "$2"; }
+nomatch() { selftest_queue "$2 does NOT match $1" filter "$1" "$2"; }
+
+# reserved names keep their own semantics unterminated: [file]/[name] stop at
+# '/', [path] spans it
+match '*[file' 'abc'
+nomatch '*[file' 'a/b/x'
+match '*[name' 'abc'
+match '*[path' 'a/b/x'
+nomatch '*[param' 'a?x=1'
+
+# ranges and comma-separated members
+match '*[a-z' 'abc'
+nomatch '*[a-z' 'ABC9'
+match '*[A-Z,0-9' 'ABC9'
+nomatch '*[A-Z,0-9' 'abc'
+
+# a truncated range and a trailing escape are members, not a scan overrun
+nomatch '*[a-' 'abc'
+nomatch "*[\\" 'abc'
+
+# an empty unterminated class allows nothing
+nomatch '*[' 'abc'
+
+# the '(' form scans for its own terminator
+nomatch '*(a' 'abc'
+nomatch '*(file' 'abc'
+
+# an unterminated size bound stays neutral
+nomatch '*[<10' 'abc'
+
+selftest_run_queued

@@ -2449,7 +2449,7 @@ void host_ban(httrackp * opt, int ptr,
       if (heap(i)->adr) {
         int l = 0;
 
-        while((heap(i)->adr[l]) && (l < 1020))
+        while (l < 1020 && heap(i)->adr[l] != '\0')
           l++;
         if ((l > 0) && (l < 1020)) {    // sécurité
           if (strfield2(jump_identification_const(heap(i)->adr), host)) {    // host

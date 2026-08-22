@@ -248,6 +248,18 @@ const char *strjoker_bounds(const char *chaine, const char *joker,
   return r;
 }
 
+/* Index of the class terminator `right` in a "*[...]" joker, scanning past the
+   two-character prefix; the index of the NUL when the class is unterminated.
+   The bound is tested first, so joker[i] is only read once i is in range. */
+static int joker_class_end(const char *joker, char right) {
+  const int len = (int) strlen(joker);
+  int i = 2;
+
+  while (i < len && joker[i] != right)
+    i++;
+  return i;
+}
+
 static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
                                  const char *joker, LLint *size, int *size_flag,
                                  size_t depth) {
@@ -299,37 +311,19 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
         pass[(int) '?'] = 0;
         //pass[(int) ';'] = 0;
         pass[(int) '/'] = 0;
-        i = 2;
-        {
-          int len = (int) strlen(joker);
-
-          while((joker[i] != RIGHT) && (joker[i]) && (i < len))
-            i++;
-        }
+        i = joker_class_end(joker, RIGHT);
       } else if (strfield(joker + 2, "path")) {
         for(i = 0; i < 256; i++)
           pass[i] = 1;
         pass[(int) '?'] = 0;
         //pass[(int) ';'] = 0;
-        i = 2;
-        {
-          int len = (int) strlen(joker);
-
-          while((joker[i] != RIGHT) && (joker[i]) && (i < len))
-            i++;
-        }
+        i = joker_class_end(joker, RIGHT);
       } else if (strfield(joker + 2, "param")) {
         if (chaine[0] == '?') { // il y a un paramètre juste là
           for(i = 0; i < 256; i++)
             pass[i] = 1;
         }                       // sinon synonyme de 'rien'
-        i = 2;
-        {
-          int len = (int) strlen(joker);
-
-          while((joker[i] != RIGHT) && (joker[i]) && (i < len))
-            i++;
-        }
+        i = joker_class_end(joker, RIGHT);
       } else {
         // décode les directives comme *[A-Z,âêîôû,0-9]
         i = 2;
@@ -340,7 +334,7 @@ static const char *strjoker_impl(strjoker_memo *memo, const char *chaine,
           int nbounds = 0;  // size bounds read so far, all satisfied
           LLint slimit = 0; // last of them, reported back as the limit
 
-          while((joker[i] != RIGHT) && (joker[i]) && (i < len)) {
+          while (i < len && joker[i] != RIGHT) {
             // '\' escapes the next char as a literal member, e.g. *[\[\]]
             if (joker[i] == '\\' && joker[i + 1] != '\0') {
               i++;
