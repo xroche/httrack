@@ -37,7 +37,7 @@ Zatvoriù projekt?
 Delete this project?
 Vymazaù projekt?
 Delete empty project %s?
-Vymazaù pr·zdne projekty?
+Vymazaù pr·zdny projekt %s?
 Action not yet implemented
 Akcia zatiaæ nebola zaraden·
 Error deleting this project
@@ -63,7 +63,7 @@ Pridaj
 Scan Rules
 Pravidl· pre vyhæad·vanie
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-Pouûiù masky na vyl˙Ëenie alebo doplnenie URL alebo linkov. n\Do jednÈho riadku moûno vloûiù aj viac reùazcov.\nAko oddeæovaË pouûiù medzeru.n\n\Napr.: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Pouûiù masky na vyl˙Ëenie alebo doplnenie URL alebo linkov.\nDo jednÈho riadku moûno vloûiù aj viac reùazcov.\nAko oddeæovaË pouûiù medzeru.\n\nNapr.: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
 Exclude links
 Vyl˙Ëiù linky
 Include link(s)

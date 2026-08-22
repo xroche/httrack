@@ -897,7 +897,7 @@ Frys fönstret
 More information:
 Mera information:
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
-Välkommen till WinHTTrack Website Copier!\n\Klicka på 'Nästa' för att för att\n-Starta ett nytt projekt\n-eller uppdatera ett existerande projekt.
+Välkommen till WinHTTrack Website Copier!\n\nKlicka på 'Nästa' för att för att\n-Starta ett nytt projekt\n-eller uppdatera ett existerande projekt.
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
 Filnamn med filtilläg:\nFilnamn som innehåller:\nDetta filnamn:\nMappnamn som innehåller:\nDetta mappnamn:\nLänkar på denna domän:\nLänkar på denna domän som innehåller:\nLänkar från denna värd:\nLänkar som innehåller:\nDenna Länk:\nAlla Länkar
 Show all\nHide debug\nHide infos\nHide debug and infos
