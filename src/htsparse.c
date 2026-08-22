@@ -522,13 +522,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         intag_name = NULL;
       }
       /* Check is the file is a .js file */
-      else
-        if ((compare_mime
-             (opt, r->contenttype, str->url_file,
-              "application/x-javascript") != 0)
-            || (compare_mime(opt, r->contenttype, str->url_file, "text/css") !=
-                0)
-        ) {                     /* JavaScript js file */
+      else if ((is_javascript_mime(opt, r->contenttype, str->url_file) != 0) ||
+               (compare_mime(opt, r->contenttype, str->url_file, "text/css") !=
+                0)) { /* JavaScript js file */
         inscript = 1;
         inscript_locked = 1;    /* Don't exit js space upon </script> */
         if (opt->parsedebug) {
@@ -539,9 +535,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         intag_start_valid = 0;  // OUI car nous sommes dans du code, plus dans du "vrai" tag
         hts_log_print(opt, LOG_DEBUG, "note: this file is a javascript file");
         // for javascript only
-        if (compare_mime
-            (opt, r->contenttype, str->url_file,
-             "application/x-javascript") != 0) {
+        if (is_javascript_mime(opt, r->contenttype, str->url_file) != 0) {
           // all links must be checked against parent, not this link
           if (heap(ptr)->precedent != 0) {
             parent_relative = 1;
@@ -549,28 +543,34 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         }
       }
       /* Or a real audio */
-      else if (compare_mime(opt, r->contenttype, str->url_file, "audio/x-pn-realaudio") != 0) { /* realaudio link file */
+      else if (compare_mime(opt, r->contenttype, str->url_file,
+                            "audio/x-pn-realaudio") !=
+               0) { /* realaudio link file */
         inscript = intag = 0;
         inscript_name = "media";
         intag_start_valid = 0;
         in_media = "LNK";       // real media! -> links
       }
       /* Or a m3u playlist */
-      else if (compare_mime(opt, r->contenttype, str->url_file, "audio/x-mpegurl") != 0) {      /* mp3 link file */
+      else if (compare_mime(opt, r->contenttype, str->url_file,
+                            "audio/x-mpegurl") != 0) { /* mp3 link file */
         inscript = intag = 0;
         inscript_name = "media";
         intag_start_valid = 0;
         in_media = "LNK";       // m3u! -> links
-      } else if (compare_mime(opt, r->contenttype, str->url_file, "application/x-authorware-map") != 0) {       /* macromedia aam file */
+      } else if (compare_mime(opt, r->contenttype, str->url_file,
+                              "application/x-authorware-map") !=
+                 0) { /* macromedia aam file */
         inscript = intag = 0;
         inscript_name = "media";
         intag_start_valid = 0;
         in_media = "AAM";       // aam
       }
       /* Or a RSS file */
-      else if (compare_mime(opt, r->contenttype, str->url_file, "text/xml") != 0
-               || compare_mime(opt, r->contenttype, str->url_file,
-                               "application/xml") != 0) {
+      else if (compare_mime(opt, r->contenttype, str->url_file, "text/xml") !=
+                   0 ||
+               compare_mime(opt, r->contenttype, str->url_file,
+                            "application/xml") != 0) {
         if (strstr(html, "http://purl.org/rss/") != NULL)        // Hmm, this is a bit lame ; will have to cleanup
         {                       /* RSS file */
           inscript = intag = 0;

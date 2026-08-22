@@ -606,17 +606,21 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
    (strfield2((a), HTS_UNKNOWN_MIME) !=                                        \
     0) /* no declared type: treat as html */                                   \
   )
-#define is_hypertext_mime__(a) \
-  ( \
-  is_html_mime_type(a)\
-  || (strfield2((a),"application/x-javascript")!=0) \
-  || (strfield2((a),"text/css")!=0) \
-  /*|| (strfield2((a),"text/vnd.wap.wml")!=0)*/ \
-  || (strfield2((a),"image/svg+xml")!=0) \
-  || (strfield2((a),"image/svg-xml")!=0) \
-  /*|| (strfield2((a),"audio/x-pn-realaudio")!=0) */\
-  || (strfield2((a),"application/x-authorware-map")!=0) \
-  )
+/* Every JavaScript type we link-scan: IANA's text/javascript, which our own
+   mime table emits for .js and .mjs, plus the legacy application spellings. */
+#define is_javascript_mime_type(a)                                             \
+  ((strfield2((a), "text/javascript") != 0) ||                                 \
+   (strfield2((a), "application/javascript") != 0) ||                          \
+   (strfield2((a), "application/x-javascript") != 0) ||                        \
+   (strfield2((a), "application/ecmascript") != 0))
+#define is_hypertext_mime__(a)                                                 \
+  (is_html_mime_type(a) || is_javascript_mime_type(a) ||                       \
+   (strfield2((a), "text/css") !=                                              \
+    0) /*|| (strfield2((a),"text/vnd.wap.wml")!=0)*/                           \
+   || (strfield2((a), "image/svg+xml") != 0) ||                                \
+   (strfield2((a), "image/svg-xml") !=                                         \
+    0) /*|| (strfield2((a),"audio/x-pn-realaudio")!=0) */                      \
+   || (strfield2((a), "application/x-authorware-map") != 0))
 #define may_be_hypertext_mime__(a) \
    (\
      (strfield2((a),"audio/x-pn-realaudio")!=0) \
@@ -639,6 +643,22 @@ HTS_STATIC int is_hypertext_mime(httrackp * opt, const char *mime,
     if (!guess_httptype_sized(opt, guessed, sizeof(guessed), file))
       return 0;
     return is_hypertext_mime__(guessed);
+  }
+  return 0;
+}
+
+// check if (mime, file) is JavaScript, guessing from the extension as above
+HTS_STATIC int is_javascript_mime(httrackp *opt, const char *mime,
+                                  const char *file) {
+  if (is_javascript_mime_type(mime))
+    return 1;
+  if (file != NULL && file[0] != '\0' && may_unknown(opt, mime)) {
+    char guessed[256];
+
+    guessed[0] = '\0';
+    if (!guess_httptype_sized(opt, guessed, sizeof(guessed), file))
+      return 0;
+    return is_javascript_mime_type(guessed);
   }
   return 0;
 }

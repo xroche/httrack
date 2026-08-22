@@ -17,6 +17,7 @@
 #       --errors N --errors-content N --files N --found PATH ... --directory PATH ... \
 #       --log-found REGEX ... --log-not-found REGEX ... \
 #       --file-matches PATH REGEX ... --file-not-matches PATH REGEX ... \
+#       --files-identical PATH PATH ... \
 #       --cache-found URLTAIL ... --cache-not-found URLTAIL ... \
 #       --file-min-bytes PATH N --file-mode PATH OCTAL --max-mirror-bytes N \
 #       httrack BASEURL/some/path [httrack-args...]
@@ -29,6 +30,8 @@
 # --cache-found/--cache-not-found assert whether hts-cache/new.zip holds an
 # entry whose URL ends with URLTAIL, e.g. /dir/page.html; being mirrored and
 # being cached are separate outcomes (#840).
+# --files-identical compares two mirrored files byte for byte, e.g. a scanned
+# copy against one served under a type nothing scans.
 # --file-min-bytes asserts a mirrored file (PATH) is at least N bytes.
 # --file-mode asserts its octal permissions (e.g. 644); POSIX hosts only.
 # --rerun-args runs a second pass (same server and mirror dir) with the given
@@ -230,7 +233,7 @@ while test "$pos" -lt "$nargs"; do
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}")
         pos=$((pos + 1))
         ;;
-    --file-matches | --file-not-matches | --file-min-bytes | --file-mode)
+    --file-matches | --file-not-matches | --file-min-bytes | --file-mode | --files-identical)
         audit+=("${args[$pos]}" "${args[$((pos + 1))]}" "${args[$((pos + 2))]}")
         pos=$((pos + 2))
         ;;
@@ -719,6 +722,15 @@ while test "$i" -lt "${#audit[@]}"; do
             result "matched"
             exit 1
         else result "OK"; fi
+        ;;
+    --files-identical)
+        path="${audit[$((i + 1))]}"
+        i=$((i + 2))
+        info "checking ${path} is byte-identical to ${audit[$i]}"
+        if cmp -s "${hostroot}/${path}" "${hostroot}/${audit[$i]}"; then result "OK"; else
+            result "differs"
+            exit 1
+        fi
         ;;
     --file-min-bytes)
         path="${audit[$((i + 1))]}"

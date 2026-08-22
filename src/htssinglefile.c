@@ -436,10 +436,7 @@ static int sf_mime_class(httrackp *opt, const char *path, char *mime,
     return SF_C_FONT;
   if (strfield2(mime, "text/css") != 0)
     return SF_C_CSS;
-  if (strfield2(mime, "text/javascript") != 0 ||
-      strfield2(mime, "application/javascript") != 0 ||
-      strfield2(mime, "application/x-javascript") != 0 ||
-      strfield2(mime, "application/ecmascript") != 0)
+  if (is_javascript_mime_type(mime))
     return SF_C_JS;
   return 0;
 }

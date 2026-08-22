@@ -173,9 +173,7 @@ int index_keyword(const char *html_data, LLint size, const char *mime,
   else if ((strfield2(mime, "image/svg+xml"))
            || (strfield2(mime, "image/svg-xml"))) {
     inscript = 0;
-  } else if ((strfield2(mime, "application/x-javascript"))
-             || (strfield2(mime, "text/css"))
-    ) {
+  } else if (is_javascript_mime_type(mime) || (strfield2(mime, "text/css"))) {
     inscript = 1;
   } else
     return 0;

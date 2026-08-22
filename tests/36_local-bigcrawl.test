@@ -1,21 +1,22 @@
 #!/bin/bash
 #
 # Diverse seeded /big/ crawl: 12 pattern families, decoy absence, update pass
-# must 304-revalidate. 361 = 1 index + 96 pages + 192 imgs + 5 shared + 61
-# family + 6 singles; the 4 planted errors write -o1 pages, not counted.
+# must 304-revalidate. 362 = 1 index + 96 pages + 192 imgs + 5 shared + 61
+# family + 7 singles; the 4 planted errors write -o1 pages, not counted.
 
 set -euo pipefail
 
 : "${top_srcdir:=..}"
 
 bash "$top_srcdir/tests/local-crawl.sh" --rerun \
-    --errors-content 4 --files 361 \
+    --errors-content 4 --files 362 \
     --found 'big/p/95.html' \
     --found 'big/a/d1/d2/d3/d4/d5/d6/d7/d8/deep.png' \
     --found 'big/a/f2-2x.png' \
     --found 'big/a/subs.vtt' \
     --found 'big/a/font.woff2' \
     --found 'big/a/js-data.bin' \
+    --found 'big/a/js3.png' \
     --found 'big/d/01.pdf' \
     --found 'big/d/named.pdf' \
     --found 'big/a/doc.pdf' \
@@ -30,7 +31,6 @@ bash "$top_srcdir/tests/local-crawl.sh" --rerun \
     --not-found 'big/x/og' \
     --not-found 'big/x/tw' \
     --not-found 'big/x/jsonld.png' \
-    --not-found 'big/x/never-scanned.png' \
     --not-found 'big/x/atom-only.html' \
     --not-found 'big/x/sitemap-only.html' \
     --not-found 'big/x/form-target.html' \
