@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsback.h"
 #include "htsdefines.h"
 #include "htslib.h"
+#include "htsio.h"
 #include "htsalias.h"
 #include "htsarrays.h"
 #include "htsparse.h"
@@ -1125,8 +1126,9 @@ static void st_assume_rule(httrackp *opt, size_t value_len) {
 
 static unsigned st_assume_clips; /* clip warnings the callback has seen */
 
-static void st_assume_log(httrackp *opt, int type, const char *format,
-                          va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_assume_log(httrackp *opt, int type,
+                                               const char *format,
+                                               va_list args) {
   (void) opt;
   (void) format;
   (void) args;
@@ -1708,7 +1710,7 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
     FILE *fp = fopen(snum, "rb");
     if (fp != NULL) {
       buff = malloct(size);
-      if (buff != NULL && fread(buff, 1, size, fp) == size) {
+      if (buff != NULL && hts_fread_exact(buff, (size_t) size, fp)) {
         size_t capa = 0;
         size_t i, last;
         for (i = 0, last = 0, count = 0; i < size; i++) {
@@ -2650,8 +2652,9 @@ static int st_binputline(httrackp *opt, int argc, char **argv) {
 
 static int st_location_logged = 0;
 
-static void st_location_log(httrackp *opt, int type, const char *format,
-                            va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_location_log(httrackp *opt, int type,
+                                                 const char *format,
+                                                 va_list args) {
   (void) opt;
   (void) type;
   (void) format;
@@ -3344,7 +3347,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     const size_t n = st_decode_body(body, data, sizeof(data));
     FILE *const fp = fopen(bodyfile, "wb");
 
-    if (fp == NULL || fwrite(data, 1, n, fp) != n) {
+    if (fp == NULL || !hts_fwrite_exact(data, n, fp)) {
       fprintf(stderr, "savename: can not write %s\n", bodyfile);
       return 1;
     }
@@ -3531,8 +3534,9 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
 
 static char st_log_callback_seen[256];
 
-static void st_log_callback(httrackp *opt, int type, const char *format,
-                            va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_log_callback(httrackp *opt, int type,
+                                                 const char *format,
+                                                 va_list args) {
   (void) opt;
   (void) type;
   (void) vsnprintf(st_log_callback_seen, sizeof(st_log_callback_seen), format,
@@ -3848,7 +3852,7 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
   snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
   fp = fopen(in, "wb");
-  if (fp == NULL || fwrite(zip, 1, sizeof(zip), fp) != sizeof(zip)) {
+  if (fp == NULL || !hts_fwrite_exact(zip, sizeof(zip), fp)) {
     if (fp != NULL)
       fclose(fp);
     fprintf(stderr, "zip-repair-shift: cannot write %s\n", in);
@@ -3916,7 +3920,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
-  cookie.max_len = (int) sizeof(cookie.data);
+  cookie.max_len = sizeof(cookie.data);
   cookie.data[0] = '\0';
   added = cookie_add(&cookie, "name", "value", dom, "/");
   added |= cookie_add(&cookie, "has_js", "1", dom, "/");
@@ -3942,7 +3946,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     memset(&r, 0, sizeof(r));
     memset(host, 'a', sizeof(host) - 1);
     host[sizeof(host) - 1] = '\0';
-    ck2.max_len = (int) sizeof(ck2.data);
+    ck2.max_len = sizeof(ck2.data);
     ck2.data[0] = '\0';
     strcpybuff(line, "Set-Cookie: SID=1; path=/");
     treathead(&ck2, host, "/", &r, line);
@@ -3981,6 +3985,99 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   printf("cookie-header: %s\n", err ? "FAIL" : "OK");
   if (err)
     printf("  got: %s\n", hdr);
+  return err;
+}
+
+/* cookie_add must refuse rather than write past max_len, whatever the caller
+   set that to, and must leave the bytes beyond it alone. */
+static int st_cookiecap(httrackp *opt, int argc, char **argv) {
+  static t_cookie cookie;
+  /* Above the 256 bytes of headroom cookie_add reserves, or it refuses all. */
+  const size_t cap = 512;
+  static const char NAME[] = "n", DOM[] = "www.example.com", PATH[] = "/";
+  char big[1024];
+  int err = 0;
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* A non-zero canary: a stray NUL from an off-by-one terminator is invisible
+     against a zero fill, which is the exact bug a capacity check guards. */
+  memset(cookie.data, 'C', sizeof(cookie.data));
+  cookie.max_len = cap;
+  cookie.data[0] = '\0';
+
+  memset(big, 'v', sizeof(big) - 1);
+  big[sizeof(big) - 1] = '\0';
+
+  /* Far past the capacity: refused, and nothing written. */
+  if (cookie_add(&cookie, NAME, big, DOM, PATH) == 0) {
+    printf("cookie-cap: FAIL (a value %u bytes long was accepted into %u)\n",
+           (unsigned) strlen(big), (unsigned) cap);
+    err = 1;
+  }
+  if (cookie.data[0] != '\0') {
+    printf("cookie-cap: FAIL (the store was written despite the refusal)\n");
+    err = 1;
+  }
+  for (i = cap; i < sizeof(cookie.data); i++) {
+    if (cookie.data[i] != 'C') {
+      printf("cookie-cap: FAIL (byte %u past max_len was modified)\n",
+             (unsigned) i);
+      err = 1;
+      break;
+    }
+  }
+
+  /* The exact boundary, derived rather than hardcoded so it survives a change
+     to the fixture strings: cookie_add reserves 256 bytes beyond the parts. */
+  {
+    const size_t fixed = strlen(NAME) + strlen(DOM) + strlen(PATH) + 256;
+    const size_t fits = cap - fixed;
+
+    /* Exactly filling max_len is accepted... */
+    memset(big, 'v', fits);
+    big[fits] = '\0';
+    cookie.data[0] = '\0';
+    if (cookie_add(&cookie, NAME, big, DOM, PATH) != 0) {
+      printf("cookie-cap: FAIL (a value of %u, exactly max_len, was refused)\n",
+             (unsigned) fits);
+      err = 1;
+    } else if (strlen(cookie.data) == 0 || strlen(cookie.data) >= cap) {
+      printf("cookie-cap: FAIL (accepted, store is %u against max_len %u)\n",
+             (unsigned) strlen(cookie.data), (unsigned) cap);
+      err = 1;
+    }
+
+    /* ...and one byte more is not. */
+    memset(big, 'v', fits + 1);
+    big[fits + 1] = '\0';
+    cookie.data[0] = '\0';
+    if (cookie_add(&cookie, NAME, big, DOM, PATH) == 0) {
+      printf(
+          "cookie-cap: FAIL (a value of %u, one past max_len, was accepted)\n",
+          (unsigned) (fits + 1));
+      err = 1;
+    } else if (cookie.data[0] != '\0') {
+      printf("cookie-cap: FAIL (the store was written despite the refusal)\n");
+      err = 1;
+    }
+  }
+
+  /* The canary again, after the accepted write: an insert bounded by
+     sizeof(data) rather than max_len would show up here. */
+  for (i = cap; i < sizeof(cookie.data); i++) {
+    if (cookie.data[i] != 'C') {
+      printf("cookie-cap: FAIL (byte %u past max_len was modified)\n",
+             (unsigned) i);
+      err = 1;
+      break;
+    }
+  }
+
+  printf("cookie-cap: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -5649,7 +5746,7 @@ static char *makeindex_slurp(const char *path) {
   rewind(fp);
   buf = malloct((size_t) size + 1);
   /* a read error would otherwise render a silently truncated template */
-  assertf(fread(buf, 1, (size_t) size, fp) == (size_t) size);
+  assertf(hts_fread_exact(buf, (size_t) size, fp));
   buf[size] = '\0';
   fclose(fp);
   return buf;
@@ -6262,7 +6359,7 @@ static int ae_write_packed(const char *path, int windowBits,
     strm.avail_out = sizeof(out);
     zerr = deflate(&strm, Z_FINISH);
     n = sizeof(out) - strm.avail_out;
-    if (n > 0 && fwrite(out, 1, n, f) != n) {
+    if (n > 0 && !hts_fwrite_exact(out, n, f)) {
       deflateEnd(&strm);
       fclose(f);
       return 1;
@@ -6304,7 +6401,7 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   memcpy(buf + p, src + n1, n2);
   p += n2;
   f = FOPEN(path, "wb");
-  ok = (f != NULL && fwrite(buf, 1, p, f) == p);
+  ok = (f != NULL && hts_fwrite_exact(buf, p, f));
   if (f != NULL)
     fclose(f);
   freet(buf);
@@ -6319,7 +6416,7 @@ static int ae_write_raw(const char *path, const unsigned char *src,
 
   if (f == NULL)
     return 1;
-  ok = fwrite(src, 1, len, f) == len;
+  ok = hts_fwrite_exact(src, len, f);
   fclose(f);
   return ok ? 0 : 1;
 }
@@ -8197,8 +8294,9 @@ static char st_cdx_log[2048];
 
 /* Collect the "WARC:" diagnostics only, so an unrelated message cannot satisfy
    (or break) a silence assertion. */
-static void st_cdx_log_cb(httrackp *opt, int type, const char *format,
-                          va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_cdx_log_cb(httrackp *opt, int type,
+                                               const char *format,
+                                               va_list args) {
   char line[512];
   (void) opt;
   (void) type;
@@ -8777,7 +8875,7 @@ static hts_boolean sf_try_put(const char *dir, const char *rel,
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
   if (fp == NULL)
     return HTS_FALSE;
-  assertf(len == 0 || fwrite(data, 1, len, fp) == len);
+  assertf(len == 0 || hts_fwrite_exact(data, len, fp));
   fclose(fp);
   return HTS_TRUE;
 }
@@ -9509,7 +9607,7 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
             strerror(errno));
     return 1;
   }
-  assertf(fwrite(payload, 1, sizeof(payload), fp) == sizeof(payload));
+  assertf(hts_fwrite_exact(payload, sizeof(payload), fp));
   fclose(fp);
 
   STRUCT_STAT st;
@@ -9521,7 +9619,7 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
 
   fp = FOPEN(path, "rb");
   assertf(fp != NULL);
-  assertf(fread(buf, 1, sizeof(payload), fp) == sizeof(payload));
+  assertf(hts_fread_exact(buf, sizeof(payload), fp));
   fclose(fp);
   assertf(memcmp(buf, payload, sizeof(payload)) == 0);
   assertf(UNLINK(path) == 0);
@@ -9583,7 +9681,7 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
             strerror(errno));
     return 1;
   }
-  assertf(fwrite(payload, 1, sizeof(payload), fp) == sizeof(payload));
+  assertf(hts_fwrite_exact(payload, sizeof(payload), fp));
   fclose(fp);
   assertf(fexist_utf8(path));
   assertf(fsize_utf8(path) == (LLint) sizeof(payload));
@@ -9625,7 +9723,7 @@ static void ro_put(const char *path, const char *data) {
   FILE *const fp = FOPEN(path, "wb");
 
   assertf(fp != NULL);
-  assertf(fwrite(data, 1, strlen(data), fp) == strlen(data));
+  assertf(hts_fwrite_exact(data, strlen(data), fp));
   fclose(fp);
 }
 
@@ -10151,7 +10249,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
 
   static t_cookie ck;
 
-  ck.max_len = (int) sizeof(ck.data);
+  ck.max_len = sizeof(ck.data);
   ck.data[0] = '\0';
   assertf(cookie_load(NULL, &ck, fpath, "cookies.txt") == 0);
   assertf(strstr(ck.data, "JARCOOK") != NULL); /* jar read on a long path */
@@ -10930,7 +11028,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
         return 1;
       }
       for (n = 0; n < 16384; n++)
-        fwrite("0123456789abcdef", 1, 16, fp);
+        (void) hts_fwrite_exact("0123456789abcdef", 16, fp);
       fclose(fp);
     }
   }
@@ -11519,6 +11617,112 @@ static int st_batch(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+// -#test=ioexact <dir>: the hts_fread_exact/hts_fwrite_exact contract - a
+// partial transfer is a failure, a zero-length one is not, and a short read
+// leaves the bytes it could not fill alone.
+static int st_ioexact(httrackp *opt, int argc, char **argv) {
+  const size_t payload_size = 70000; /* past any stdio buffer */
+  const unsigned char poison = 0xa5;
+  char path[HTS_URLMAXSIZE * 2];
+  char *payload, *readback;
+  FILE *fp;
+  int plen;
+  size_t i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "ioexact: needs a writable dir\n");
+    return 1;
+  }
+  plen = snprintf(path, sizeof(path), "%s/ioexact.bin", argv[0]);
+  assertf(plen > 0 && (size_t) plen < sizeof(path));
+  payload = malloct(payload_size);
+  readback = malloct(payload_size + 1);
+  for (i = 0; i < payload_size; i++)
+    payload[i] = (char) (i * 7 + (i >> 8));
+
+  /* Round trip: a helper that swapped fwrite's size and nmemb would report a
+     count of 1 here and die. */
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(payload, payload_size, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+  memset(readback, poison, payload_size + 1);
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(readback, payload_size, fp) == HTS_TRUE);
+  assertf(memcmp(readback, payload, payload_size) == 0);
+  assertf((unsigned char) readback[payload_size] == poison);
+  assertf(hts_fread_exact(readback, 1, fp) == HTS_FALSE); /* at EOF */
+  assertf(hts_fread_exact(readback, 0, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+
+  /* Short read: four of the eight bytes asked for, so a failure, and the tail
+     of the destination keeps its poison. */
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(payload, 4, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+  memset(readback, poison, 16);
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(readback, 8, fp) == HTS_FALSE);
+  assertf(memcmp(readback, payload, 4) == 0);
+  for (i = 4; i < 16; i++)
+    assertf((unsigned char) readback[i] == poison);
+  assertf(fclose(fp) == 0);
+
+  /* Wrong direction: an I/O error is a failure, not a silent no-op. */
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(readback, 4, fp) == HTS_FALSE);
+  assertf(fclose(fp) == 0);
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(payload, 4, fp) == HTS_FALSE);
+  assertf(hts_fwrite_exact(payload, 0, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+
+  /* Short WRITE: the cases above only ever get 0 back, so a helper accepting
+     any non-zero count survives them. fmemopen's buffer is smaller than the
+     payload, which yields a partial count instead. */
+#if !defined(_WIN32)
+  {
+    char small[8];
+    /* Short by many, then by exactly one: only the second catches a helper
+       that accepts an off-by-one count. */
+    const size_t over[2] = {sizeof(small) * 2, sizeof(small) + 1};
+
+    for (i = 0; i < 2; i++) {
+      /* Unbuffered, or stdio takes the whole payload and reports the overflow
+         only at flush, leaving fwrite's own count complete. */
+      FILE *mem = fmemopen(small, sizeof(small), "wb");
+
+      if (mem != NULL && setvbuf(mem, NULL, _IONBF, 0) == 0)
+        assertf(hts_fwrite_exact(payload, over[i], mem) == HTS_FALSE);
+      if (mem != NULL)
+        (void) fclose(mem);
+    }
+  }
+#endif
+
+  /* A zero size must leave dest alone rather than write a terminator. */
+  memset(readback, poison, 4);
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(readback, 0, fp) == HTS_TRUE);
+  for (i = 0; i < 4; i++)
+    assertf((unsigned char) readback[i] == poison);
+  assertf(hts_fread_exact(NULL, 0, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+
+  assertf(UNLINK(path) == 0);
+  freet(payload);
+  freet(readback);
+  printf("ioexact: a partial transfer is a failure: OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -11713,6 +11917,7 @@ static const struct selftest_entry {
     {"dnstimeout", "", "a slow DNS resolve is bounded and holds no lock",
      st_dnstimeout},
     {"cookies", "", "cookie request-header self-test", st_cookies},
+    {"cookiecap", "", "cookie_add honours max_len", st_cookiecap},
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},
@@ -11763,6 +11968,8 @@ static const struct selftest_entry {
     {"warc-longurl", "<dir>",
      "a URL past the header-format buffer still reaches the archive",
      st_warc_longurl},
+    {"ioexact", "<dir>",
+     "hts_fread_exact/hts_fwrite_exact reject a partial transfer", st_ioexact},
     {"longpath", "<dir>",
      "round-trip a >MAX_PATH file through the _w* wrappers (\\\\?\\ on "
      "Windows)",

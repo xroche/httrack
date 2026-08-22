@@ -44,8 +44,8 @@ Please visit our Website: http://www.httrack.com
 // Fonctions
 /* Read one line off a socket; HTS_TRUE if it did not fit "s". */
 hts_boolean socinput(T_SOC soc, char *s, int max);
-/* Listen on bindAddr, or every interface if NULL/empty; adr (>= 258 bytes) gets
-   the address to advertise. INVALID_SOCKET on error. */
+/* Listen on bindAddr, or the loopback interface if NULL/empty; adr (>= 258
+   bytes) gets the address to advertise. INVALID_SOCKET on error. */
 T_SOC smallserver_init_std(int *port_prox, char *adr_prox, int defaultPort,
                            const char *bindAddr);
 T_SOC smallserver_init(int *port, char *adr, const char *bindAddr);

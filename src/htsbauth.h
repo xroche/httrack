@@ -59,7 +59,7 @@ struct bauth_chain {
 typedef struct t_cookie t_cookie;
 #endif
 struct t_cookie {
-  int max_len;      /* capacity of data[] in use */
+  size_t max_len;   /* capacity of data[] in use */
   char data[32768]; /* raw cookie store (NUL-terminated field list) */
   bauth_chain auth; /* embedded head of the basic-auth list */
 };

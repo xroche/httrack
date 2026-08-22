@@ -63,8 +63,8 @@ int proxytrack_main(char *proxyAddr, int proxyPort, char *icpAddr, int icpPort,
 /* Static definitions */
 
 /* Log one line; a NULL severity discards it. */
-HTS_UNUSED static void proxytrack_vprint_log(const char *severity,
-                                             const char *format, va_list args) {
+HTS_UNUSED HTS_PRINTF_FUN(2, 0) static void proxytrack_vprint_log(
+    const char *severity, const char *format, va_list args) {
   if (severity != NULL) {
     const int error = errno;
     FILE *const fp = stderr;
@@ -77,8 +77,11 @@ HTS_UNUSED static void proxytrack_vprint_log(const char *severity,
   }
 }
 
-HTS_UNUSED static void proxytrack_print_log(const char *severity,
-                                            const char *format, ...) {
+HTS_UNUSED
+HTS_PRINTF_FUN(2, 3)
+
+static void proxytrack_print_log(const char *severity, const char *format,
+                                 ...) {
   if (severity != NULL) {
     va_list args;
 

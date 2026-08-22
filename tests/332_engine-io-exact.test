@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Drives -#test=ioexact: the all-or-nothing stdio helpers must fail a short
+# read or write rather than report the bytes they did move.
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+out=$(httrack -O /dev/null -#test=ioexact "$dir")
+grep -q "ioexact:.*OK" <<<"$out"

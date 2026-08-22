@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscoremain.h"
 #include "htscatchurl.h"
 #include "htslib.h"
+#include "htsio.h"
 #include "htstools.h"
 #include "htsalias.h"
 #include "htsmodules.h"
@@ -430,7 +431,7 @@ void help_catchurl(const char *dest_path) {
         FILE *fp = FOPEN(dest, "wb");
 
         if (fp) {
-          fwrite(data, strlen(data), 1, fp);
+          (void) hts_fwrite_exact(data, strlen(data), fp);
           fclose(fp);
         }
       }

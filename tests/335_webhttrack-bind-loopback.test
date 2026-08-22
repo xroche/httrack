@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+# The panel htsserver serves is unauthenticated, so nothing off this host may
+# reach its default socket. 77 checks that against a loopback alias only.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_bind.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+# "ok", or the errno name: a filtered address times out where an unbound one is
+# refused, and only the refusal proves nothing is listening.
+probe() { # $1 = host, $2 = port
+    htsserver_python - "$1" "$2" <<'PY'
+import socket, sys
+try:
+    socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=5).close()
+    print("ok")
+except OSError as e:
+    print(type(e).__name__)
+PY
+}
+
+# The primary outbound IPv4, which a UDP connect() picks without sending a byte.
+# A function, not a heredoc inside $(): bash 3.2 runs that one as commands.
+primary_ipv4() {
+    htsserver_python - <<'PY'
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+try:
+    s.connect(("192.0.2.1", 9))  # TEST-NET-1, never routed
+    ip = s.getsockname()[0]
+except OSError:
+    ip = ""
+finally:
+    s.close()
+print("" if ip.startswith("127.") else ip)
+PY
+}
+
+addr=$(primary_ipv4)
+test -n "${addr}" || skip "no non-loopback IPv4 address here"
+
+# Without this control a refusal below could just mean the box filters ${addr}.
+htsserver_python - "${addr}" <<'PY' || skip "cannot bind and reach ${addr} here"
+import socket, sys
+try:
+    srv = socket.socket()
+    srv.bind((sys.argv[1], 0))
+    srv.listen(1)
+    socket.create_connection(srv.getsockname(), timeout=5).close()
+    srv.close()
+except OSError as e:
+    sys.exit(str(e))
+PY
+
+port=$(htsserver_freeport)
+htsserver_start --port "${port}" --home "${work}/wide" -- --bind "${addr}"
+case ${HTS_URL} in
+*"//${addr}:"*) ;;
+*) fail "--bind ${addr} advertised ${HTS_URL}" ;;
+esac
+got=$(probe "${addr}" "${port}")
+test "${got}" = ok || fail "--bind ${addr} did not answer on ${addr} (${got})"
+echo "ok: --bind ${addr} widens the socket"
+htsserver_stop
+
+port=$(htsserver_freeport)
+htsserver_start --port "${port}" --home "${work}/default"
+# webhttrack launches the browser on this URL, so a loopback bind has to
+# advertise a loopback address.
+case ${HTS_URL} in
+*//127.0.0.1:*) ;;
+*) fail "the default run advertised ${HTS_URL}, unreachable on a loopback bind" ;;
+esac
+got=$(probe 127.0.0.1 "${port}")
+test "${got}" = ok || fail "the default run refused 127.0.0.1 (${got})"
+got=$(probe "${addr}" "${port}")
+test "${got}" = ConnectionRefusedError ||
+    fail "the default run answers on ${addr} (${got})"
+echo "ok: the default socket is loopback-only"
+
+cleanup
+echo "PASS"

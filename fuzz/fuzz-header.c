@@ -42,7 +42,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   int first = 1;
 
   memset(&r, 0, sizeof(r));
-  cookie->max_len = (int) sizeof(cookie->data);
+  cookie->max_len = sizeof(cookie->data);
   r.location = malloct(HTS_URLMAXSIZE * 2);
   r.location[0] = '\0';
 

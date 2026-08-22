@@ -45,6 +45,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscache.h"
 #include "htscore.h"
 #include "htslib.h"
+#include "htsio.h"
 #include "htszlib.h"
 
 #include <errno.h>
@@ -268,7 +269,7 @@ static int disk_fallback_selftest(httrackp *opt) {
             path);
     return 1;
   }
-  if (fwrite(body, 1, body_len, fp) != body_len) {
+  if (!hts_fwrite_exact(body, body_len, fp)) {
     fprintf(stderr, "cache-selftest: disk-fallback: short write to '%s'\n",
             path);
     fail++;
@@ -1042,15 +1043,19 @@ static void reconcile_wipe(httrackp *opt) {
 }
 
 /* Create a filler file of exactly `size` bytes. */
-static void reconcile_put(httrackp *opt, const char *name, size_t size) {
+/* LLint, not size_t: the callers hold file sizes, which they also hand to
+   reconcile_expect() and to fsize(). */
+static void reconcile_put(httrackp *opt, const char *name, LLint size) {
   FILE *const fp = fopen(reconcile_st_path(opt, name), "wb");
   static const char filler[1024] = {'x'};
 
   assertf(fp != NULL);
   while (size > 0) {
-    const size_t n = size > sizeof(filler) ? sizeof(filler) : size;
+    /* Narrowing is safe: the ternary bounds n by sizeof(filler) first. */
+    const size_t n =
+        size > (LLint) sizeof(filler) ? sizeof(filler) : (size_t) size;
 
-    assertf(fwrite(filler, 1, n, fp) == n);
+    assertf(hts_fwrite_exact(filler, n, fp));
     size -= n;
   }
   fclose(fp);
@@ -1443,7 +1448,7 @@ static void corrupt_patch(httrackp *opt, const char *pat, size_t patlen,
   memcpy(data + at, rep, patlen);
   fp = fopen(reconcile_st_path(opt, "hts-cache/new.zip"), "wb");
   assertf(fp != NULL);
-  assertf(fwrite(data, 1, n, fp) == n);
+  assertf(hts_fwrite_exact(data, n, fp));
   fclose(fp);
   freet(data);
 }
@@ -1472,7 +1477,7 @@ static void corrupt_victim_body(httrackp *opt) {
   memset(data + off, 0xFF, 4);
   fp = fopen(reconcile_st_path(opt, "hts-cache/new.zip"), "wb");
   assertf(fp != NULL);
-  assertf(fwrite(data, 1, n, fp) == n);
+  assertf(hts_fwrite_exact(data, n, fp));
   fclose(fp);
   freet(data);
 }
