@@ -489,9 +489,8 @@ static hts_boolean path_append(char *dst, size_t size, const char *src) {
   return HTS_TRUE;
 }
 
-/** Whether path stays inside the directory it is resolved against, i.e. holds
-    no ".." component. Lexical: no symlink is followed, and "a..b" is a name.
-    Both separators count, a posted path being client text. */
+/** True if path holds no ".." component, either separator counting. Lexical
+    only, so "a..b" is a name and no symlink is resolved. */
 static hts_boolean hts_path_is_contained(const char *path) {
   const char *s;
 
