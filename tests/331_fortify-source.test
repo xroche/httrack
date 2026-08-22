@@ -68,10 +68,10 @@ clean=$(n_chk "$tmp/clean.o")
 [ "$clean" -eq 0 ] ||
     skip "the unfortified control shows $clean checked symbol(s) here, so counting them cannot discriminate"
 
-# Static-only and macOS builds have no libhttrack.so, so inspect whichever of the
-# two artifacts exist rather than requiring both.
+# libtool names the library .dylib on macOS and a static build has none at all,
+# so inspect whichever artifacts exist rather than requiring a fixed set.
 artifacts=()
-for f in "${HTTRACK_BIN:-}" "${HTTRACK_SHLIB:-}"; do
+for f in "${HTTRACK_BIN:-}" "${HTTRACK_SHLIB:-}" "${HTTRACK_SHLIB%.so}.dylib"; do
     if [ -n "$f" ] && [ -f "$f" ]; then
         artifacts+=("$f")
     fi
@@ -79,10 +79,14 @@ done
 [ "${#artifacts[@]}" -gt 0 ] || skip "no built binary to inspect"
 
 for f in "${artifacts[@]}"; do
-    n=$(n_chk "$f")
-    echo "$(basename "$f"): $n checked libc import(s)"
-    [ "$n" -gt 0 ] ||
-        fail "$f imports no __*_chk, so -D_FORTIFY_SOURCE=$FORTIFY_SOURCE_LEVEL bought nothing"
+    echo "$(basename "$f"): $(n_chk "$f") checked libc import(s)"
 done
+
+# Assert on whichever artifact holds the engine: the library where one is built,
+# the binary on a static build. Summing instead would let a vendored subdirectory
+# that stayed fortified cover for an engine that did not.
+subject=${artifacts[-1]}
+[ "$(n_chk "$subject")" -gt 0 ] ||
+    fail "$subject imports no __*_chk, so -D_FORTIFY_SOURCE=$FORTIFY_SOURCE_LEVEL bought nothing"
 
 exit 0
