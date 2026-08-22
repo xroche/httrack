@@ -29,6 +29,12 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
+# 3:16:0 kept DELIBERATELY across an ABI break: #1365 widened t_cookie.max_len
+# from int to size_t in htsbauth.h, an installed header, moving data[] from
+# offset 4 to 8 on LP64. By the rules above that is current++ plus the Debian
+# libhttrack3 -> libhttrack4 rename; Xavier decided against both, HTTrackQt
+# being the only consumer of these headers. Recorded so the soname staying at
+# .so.3 reads as a decision rather than an oversight.
 # 3:16:0: revision-only bump. hts_addurl() now deep-copies the array it is handed,
 # which relaxes a caller contract without moving a layout or touching a symbol.
 # 3:15:0: revision-only bump. httrackp gained a tail field (wizard_filters) and two
