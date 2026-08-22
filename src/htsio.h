@@ -38,9 +38,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 
 /** Read exactly size bytes into dest. HTS_TRUE only when the whole block was
-    read; a short read, EOF or error alike, is a failure. A zero size succeeds
-    without touching dest. Wrong for a read-to-EOF loop, which must keep the
-    count fread() returns. **/
+    read; a short read, EOF or error alike, is a failure, with errno left as
+    fread() set it. A zero size succeeds without touching dest. Wrong for a
+    read-to-EOF loop, which must keep the count fread() returns. **/
 static HTS_INLINE HTS_UNUSED hts_boolean hts_fread_exact(void *dest,
                                                          size_t size,
                                                          FILE *fp) {
@@ -48,7 +48,8 @@ static HTS_INLINE HTS_UNUSED hts_boolean hts_fread_exact(void *dest,
 }
 
 /** Write exactly size bytes from src. HTS_TRUE only when the whole block
-    reached fp; a zero size succeeds. **/
+    reached fp, with errno left as fwrite() set it; a zero size succeeds.
+    Best-effort writers ignore the verdict, so it is not HTS_CHECK_RESULT. **/
 static HTS_INLINE HTS_UNUSED hts_boolean hts_fwrite_exact(const void *src,
                                                           size_t size,
                                                           FILE *fp) {

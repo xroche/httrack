@@ -11586,6 +11586,39 @@ static int st_ioexact(httrackp *opt, int argc, char **argv) {
   assertf(hts_fwrite_exact(payload, 0, fp) == HTS_TRUE);
   assertf(fclose(fp) == 0);
 
+  /* Short WRITE: the cases above only ever get 0 back, so a helper accepting
+     any non-zero count survives them. fmemopen's buffer is smaller than the
+     payload, which yields a partial count instead. */
+#if !defined(_WIN32)
+  {
+    char small[8];
+    /* Short by many, then by exactly one: only the second catches a helper
+       that accepts an off-by-one count. */
+    const size_t over[2] = {sizeof(small) * 2, sizeof(small) + 1};
+
+    for (i = 0; i < 2; i++) {
+      /* Unbuffered, or stdio takes the whole payload and reports the overflow
+         only at flush, leaving fwrite's own count complete. */
+      FILE *mem = fmemopen(small, sizeof(small), "wb");
+
+      if (mem != NULL && setvbuf(mem, NULL, _IONBF, 0) == 0)
+        assertf(hts_fwrite_exact(payload, over[i], mem) == HTS_FALSE);
+      if (mem != NULL)
+        (void) fclose(mem);
+    }
+  }
+#endif
+
+  /* A zero size must leave dest alone rather than write a terminator. */
+  memset(readback, poison, 4);
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(readback, 0, fp) == HTS_TRUE);
+  for (i = 0; i < 4; i++)
+    assertf((unsigned char) readback[i] == poison);
+  assertf(hts_fread_exact(NULL, 0, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+
   assertf(UNLINK(path) == 0);
   freet(payload);
   freet(readback);

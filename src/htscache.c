@@ -1368,7 +1368,7 @@ char *readfile2(const char *fil, LLint * size) {
         *size = len;
       if (adr != NULL) {
         if (buflen > 0 &&
-            !hts_fread_exact(adr, buflen, fp)) { // fichier endommagé ?
+            !hts_fread_exact(adr, buflen, fp)) { // file corrupted?
           freet(adr);
           adr = NULL;
         } else
@@ -1399,7 +1399,7 @@ char *readfile2_utf8(const char *fil, LLint *size) {
       adr = (char *) malloct(buflen + 1);
       if (adr != NULL) {
         if (buflen > 0 &&
-            !hts_fread_exact(adr, buflen, fp)) { // fichier endommagé ?
+            !hts_fread_exact(adr, buflen, fp)) { // file corrupted?
           freet(adr);
           adr = NULL;
         } else {

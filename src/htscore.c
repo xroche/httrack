@@ -2847,7 +2847,7 @@ int filesave(httrackp * opt, const char *adr, int len, const char *s,
       written = hts_fwrite_exact(adr, (size_t) len, fp);
     }
     fclose(fp);
-    if (!written) // erreur
+    if (!written) // error
       return -1;
   } else
     return -1;
