@@ -75,7 +75,7 @@ typedef int (*t_htsAddLink)(htsmoduleStruct *str, char *link);
     Field access classes are noted; engine owns all pointers unless stated. */
 struct htsmoduleStruct {
   /* Read-only elements */
-  const char *filename; /* filename (C:\My Web Sites\...) */
+  const char *filename; /* filename (project path, e.g. My Web Sites/...) */
   int size;             /* size of filename (should be > 0) */
   const char *mime;     /* MIME type of the object */
   const char *url_host; /* incoming hostname (www.foo.com) */
