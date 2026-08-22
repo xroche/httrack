@@ -1,0 +1,90 @@
+#!/bin/bash
+#
+# The update link must name the language the way WinHTTrack does: Language=,
+# carrying the catalog basename, never the localized LANGUAGE_NAME (#1353).
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+distdir=${HTS_DISTDIR}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_langkey.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+root="${work}/root"
+mkdir -p "${root}"
+cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
+chmod -R u+w "${root}"
+
+# LANGUAGE_NAME differs from LANGUAGE_FILE, and carries a high byte the way the
+# shipped endonyms do, so a render that reaches for the wrong key is visible
+# rather than merely equal.
+eacute=$(printf '\351')
+printf '%s\r\n' \
+    LANGUAGE_NAME "Fran${eacute}ais-1353" \
+    LANGUAGE_FILE 'Francais' \
+    LANGUAGE_ISO 'fr' \
+    LANGUAGE_CHARSET 'iso-8859-1' \
+    OK 'OK' \
+    Cancel 'Annuler' \
+    >"${root}/lang/Francais.txt"
+
+printf 'path=/tmp\r\nlang=\r\n' >"${work}/.httrack.ini"
+
+printf '[the update link names the language as WinHTTrack does] ..\t'
+htsserver_start --root "${root}" --home "${work}"
+
+"${HTS_PYTHON}" - "${HTS_URL}" <<'PY' || fail "the update link names the language wrongly (see above)"
+import re, sys, urllib.parse, urllib.request
+
+url = sys.argv[1].rstrip("/")
+form = urllib.request.urlopen(url + "/server/index.html", timeout=20).read()
+m = re.search(rb'name="sid" value="([0-9a-f]+)"', form)
+if not m:
+    sys.exit("no session id in server/index.html")
+sid = m.group(1).decode()
+
+req = urllib.request.Request(
+    url + "/server/help.html",
+    data=urllib.parse.urlencode({"sid": sid, "lang": "2"}).encode("latin-1"),
+    method="POST")
+body = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+if 'lang="fr"' not in body:
+    sys.exit("help.html did not switch to LANGUAGE_2:\n%s" % body[:2000])
+
+m = re.search(r'update\.php3\?([^"\']+)', body)
+if not m:
+    sys.exit("no update.php3 link in help.html:\n%s" % body[:2000])
+query = m.group(1).replace("&amp;", "&")
+fields = dict(urllib.parse.parse_qsl(query, keep_blank_values=True))
+
+# WinHTTrack's key, so one endpoint sees one parameter from both front ends.
+if "Language" not in fields:
+    sys.exit("no Language= in the update link: %s" % query)
+if "LanguageId" in fields:
+    sys.exit("LanguageId= is still sent, so the two front ends disagree: %s" % query)
+
+# The basename, not the endonym: the mutant this test exists to kill.
+if fields["Language"] != "Francais":
+    sys.exit("Language=%r, want the catalog basename 'Francais'" % fields["Language"])
+
+# The endpoint cannot decode a per-catalog codepage, so the value must be ASCII.
+try:
+    fields["Language"].encode("ascii")
+except UnicodeEncodeError:
+    sys.exit("Language=%r is not ASCII" % fields["Language"])
+
+# The other fields still resolve, so an empty render cannot pass the checks above.
+for key in ("Product", "Version", "VersionStr", "Platform"):
+    if not fields.get(key):
+        sys.exit("%s= is empty in the update link: %s" % (key, query))
+PY
+
+printf 'ok\n'
