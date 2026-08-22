@@ -562,10 +562,11 @@ jobs:
         env:
           ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647:log_path=${{ github.workspace }}/sanitizer-logs/asan
           # No log_path here: gcc's UBSan ignores it and writes to stderr, so
-          # its findings are collected from the per-test logs instead.
+          # its findings show up in the per-test logs instead.
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         timeout-minutes: 20
         run: |
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
           jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           make check -j"$jobs"
 
@@ -627,6 +628,7 @@ jobs:
         timeout-minutes: 20
         run: |
           set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
           # 01_engine-* only; zlib-dependent self-tests are named 01_zlib-* and
           # skipped here (uninstrumented libz floods MSan with false positives).
           tests="$(cd tests && ls 01_engine-*.test | tr '\n' ' ')"

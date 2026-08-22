@@ -1,17 +1,17 @@
 #!/bin/sh
-# Surface sanitizer findings the test harness would otherwise swallow: automake
-# keeps only failing tests in test-suite.log, so an abort inside a script that
-# lacks `set -e` leaves no trace in a green run. Both sources are needed, since
-# the log_path files carry a report whose stderr a test redirected away, and the
-# per-test logs carry gcc's UBSan, which writes to stderr and ignores log_path.
+# Surface sanitizer findings automake swallows in a green run: it keeps only the
+# failing tests in test-suite.log, and most test scripts lack `set -e`.
+# Both sources matter. A test that redirects its own stderr hides its report
+# everywhere but the log_path file, and gcc's UBSan writes to stderr and ignores
+# log_path, unlike clang's.
 #
 # Usage: ci-sanitizer-report.sh LOG_PATH_DIR [TEST_LOG_DIR...]; exits 1 on a hit.
 set -eu
 
-# Anchored on each runtime's banner: severity alone is not the signal. MSan
-# reports findings as WARNING, while ASan uses WARNING for the over-large
-# allocation 237_engine-arrays has it refuse on purpose; and the engine's own
-# "detected memory leaks" message is not LeakSanitizer's.
+# Anchored on each runtime's banner: severity is not enough, since MSan reports
+# findings as WARNING and ASan uses WARNING for 237_engine-arrays' deliberate
+# over-large allocation. The engine's own "detected memory leaks" message is
+# also not LeakSanitizer's.
 pattern='ERROR: (Address|Leak|Memory|Thread|UndefinedBehavior)Sanitizer|WARNING: (Memory|Thread)Sanitizer|runtime error:|SUMMARY: .*Sanitizer|ERROR: libFuzzer|DEADLYSIGNAL'
 
 log_dir=$1
@@ -25,7 +25,7 @@ report() { # report LABEL FILE
 }
 
 # Print every log_path file, but fail only on one that matches: an unrecognised
-# diagnostic stays visible without turning a deliberate one into a red build.
+# diagnostic stays visible, and a deliberate one does not turn the build red.
 if [ -d "$log_dir" ]; then
     for f in "$log_dir"/*; do
         [ -f "$f" ] || continue
@@ -38,15 +38,19 @@ if [ -d "$log_dir" ]; then
     done
 fi
 
+# Only the harness logs: an in-tree build puts the .test sources here too, and
+# one of them carries the pattern as literal text.
 for dir in "$@"; do
     [ -d "$dir" ] || continue
-    for f in $(grep -rlE "$pattern" "$dir" 2>/dev/null || true); do
-        report "sanitizer output in a test log" "$f"
+    for f in "$dir"/*.log; do
+        [ -f "$f" ] || continue
+        grep -qE "$pattern" "$f" 2>/dev/null &&
+            report "sanitizer output in a test log" "$f"
     done
 done
 
 [ "$found" -eq 0 ] || {
-    echo "FAIL: a sanitizer reported above; a passing test can still hide one." >&2
+    echo "FAIL: a sanitizer reported above, which \`make check\` alone did not catch." >&2
     exit 1
 }
 echo "No sanitizer finding in $log_dir or the per-test logs."
