@@ -239,8 +239,8 @@ int main(int argc, char *argv[]) {
   int ret = 0;
   int defaultPort = 0;
   int parentPid = 0;
-  /* loopback by default: the handler trusts its input; --bind widens it */
-  const char *bindAddr = "127.0.0.1";
+  /* NULL leaves smallserver_init on its loopback default; --bind widens it */
+  const char *bindAddr = NULL;
 
   printf("Initializing the server..\n");
 
@@ -267,7 +267,8 @@ int main(int argc, char *argv[]) {
   if (argc < 2 || (argc % 2) != 0) {
     fprintf(stderr, "** Warning: use the webhttrack frontend if available\n");
     fprintf(stderr,
-            "usage: %s [--port <port>] [--bind <address>] [--ppid parent-pid] "
+            "usage: %s [--port <port>] [--bind <address>: default 127.0.0.1] "
+            "[--ppid parent-pid] "
             "[--ping-timeout <seconds>] "
             "<path-to-html-root-dir> [key value [key value]..]\n",
             argv[0]);

@@ -214,6 +214,23 @@ static HTS_INLINE HTS_UNUSED socklen_t SOCaddr_initany_(SOCaddr *const addr,
     SOCaddr_initany_(&(server), __FILE__, __LINE__);                           \
   } while (0)
 
+/** Initialize as an IPv4 loopback (127.0.0.1) address; returns its sockaddr
+    length. IPv4, so it binds whether or not the host has IPv6. */
+static HTS_INLINE HTS_UNUSED socklen_t
+SOCaddr_initloopback_(SOCaddr *const addr, const char *file, const int line) {
+  assertf_(addr != NULL, file, line);
+  memset(&addr->m_addr.in, 0, sizeof(addr->m_addr.in));
+  addr->m_addr.in.sin_family = AF_INET;
+  addr->m_addr.in.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+  return SOCaddr_size_(addr, file, line);
+}
+
+/** Initialize server as an IPv4 loopback (127.0.0.1) address. */
+#define SOCaddr_initloopback(server)                                           \
+  do {                                                                         \
+    SOCaddr_initloopback_(&(server), __FILE__, __LINE__);                      \
+  } while (0)
+
 /** Populate server from data. data_size selects the source form: a full
     sockaddr_in / sockaddr_in6, or a raw 4-byte (IPv4) / 16-byte (IPv6) address
     with port zeroed. Any other size leaves an AF_INET shell. Returns the
