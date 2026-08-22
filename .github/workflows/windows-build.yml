@@ -285,7 +285,7 @@ jobs:
 
       # Its own step: the watchdog can kill the suite's step before it counts,
       # which is exactly when the count is worth having.
-      - name: Count the MSYS fork failures
+      - name: Count the MSYS fork failures and the lost workers
         if: always()
         shell: bash
         working-directory: tests
