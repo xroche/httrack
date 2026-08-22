@@ -111,7 +111,9 @@ int cookie_add(t_cookie * cookie, const char *cook_name, const char *cook_value,
   strcatbuff(cook, "\t");
   strcatbuff(cook, cook_value);
   strcatbuff(cook, "\n");
-  /* Overflow-safe: the new field alone against the room left. */
+  /* Backstop, not a live gate: the check above reserves 256 bytes and this
+     record adds ~30 of literals, so it fires only if that assembly ever
+     outgrows the headroom. Overflow-safe form regardless. */
   {
     const size_t used = strlen(cookie->data);
 

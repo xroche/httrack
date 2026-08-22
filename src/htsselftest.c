@@ -3993,7 +3993,8 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
   static t_cookie cookie;
   /* Above the 256 bytes of headroom cookie_add reserves, or it refuses all. */
   const size_t cap = 512;
-  char big[512];
+  static const char NAME[] = "n", DOM[] = "www.example.com", PATH[] = "/";
+  char big[1024];
   int err = 0;
   size_t i;
 
@@ -4011,7 +4012,7 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
   big[sizeof(big) - 1] = '\0';
 
   /* Far past the capacity: refused, and nothing written. */
-  if (cookie_add(&cookie, "n", big, "www.example.com", "/") == 0) {
+  if (cookie_add(&cookie, NAME, big, DOM, PATH) == 0) {
     printf("cookie-cap: FAIL (a value %u bytes long was accepted into %u)\n",
            (unsigned) strlen(big), (unsigned) cap);
     err = 1;
@@ -4029,14 +4030,50 @@ static int st_cookiecap(httrackp *opt, int argc, char **argv) {
     }
   }
 
-  /* A value that fits is still accepted, so the check is not refusing all. */
-  if (cookie_add(&cookie, "n", "v", "www.example.com", "/") != 0) {
-    printf("cookie-cap: FAIL (a short cookie was refused)\n");
-    err = 1;
-  } else if (strlen(cookie.data) >= cap) {
-    printf("cookie-cap: FAIL (accepted, but the store is %u >= max_len %u)\n",
-           (unsigned) strlen(cookie.data), (unsigned) cap);
-    err = 1;
+  /* The exact boundary, derived rather than hardcoded so it survives a change
+     to the fixture strings: cookie_add reserves 256 bytes beyond the parts. */
+  {
+    const size_t fixed = strlen(NAME) + strlen(DOM) + strlen(PATH) + 256;
+    const size_t fits = cap - fixed;
+
+    /* Exactly filling max_len is accepted... */
+    memset(big, 'v', fits);
+    big[fits] = '\0';
+    cookie.data[0] = '\0';
+    if (cookie_add(&cookie, NAME, big, DOM, PATH) != 0) {
+      printf("cookie-cap: FAIL (a value of %u, exactly max_len, was refused)\n",
+             (unsigned) fits);
+      err = 1;
+    } else if (strlen(cookie.data) == 0 || strlen(cookie.data) >= cap) {
+      printf("cookie-cap: FAIL (accepted, store is %u against max_len %u)\n",
+             (unsigned) strlen(cookie.data), (unsigned) cap);
+      err = 1;
+    }
+
+    /* ...and one byte more is not. */
+    memset(big, 'v', fits + 1);
+    big[fits + 1] = '\0';
+    cookie.data[0] = '\0';
+    if (cookie_add(&cookie, NAME, big, DOM, PATH) == 0) {
+      printf(
+          "cookie-cap: FAIL (a value of %u, one past max_len, was accepted)\n",
+          (unsigned) (fits + 1));
+      err = 1;
+    } else if (cookie.data[0] != '\0') {
+      printf("cookie-cap: FAIL (the store was written despite the refusal)\n");
+      err = 1;
+    }
+  }
+
+  /* The canary again, after the accepted write: an insert bounded by
+     sizeof(data) rather than max_len would show up here. */
+  for (i = cap; i < sizeof(cookie.data); i++) {
+    if (cookie.data[i] != 'C') {
+      printf("cookie-cap: FAIL (byte %u past max_len was modified)\n",
+             (unsigned) i);
+      err = 1;
+      break;
+    }
   }
 
   printf("cookie-cap: %s\n", err ? "FAIL" : "OK");
