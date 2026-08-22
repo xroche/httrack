@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 
 /* specific definitions */
 #include "htsbase.h"
+#include "htsio.h"
 #include "htsnet.h"
 #include "htsbauth.h"
 #include "htsthread.h"
@@ -2046,7 +2047,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
         // nouvelle taille
         if (nl > 0) {
           r->size += nl;
-          if (fwrite(buff, 1, nl, r->out) != nl) {
+          if (!hts_fwrite_exact(buff, (size_t) nl, r->out)) {
             r->statuscode = STATUSCODE_INVALID;
             strcpybuff(r->msg, "Write error on disk");
             nl = READ_ERROR;

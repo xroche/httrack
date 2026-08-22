@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsbase.h"
 #include "htscore.h"
 #include "htscodec.h"
+#include "htsio.h"
 #include "htszlib.h"
 
 #if HTS_USEBROTLI
@@ -132,7 +133,7 @@ static hts_boolean codec_sink(FILE *out, const void *buf, size_t produced,
   *total += (LLint) produced;
   if (*total > maxout)
     return HTS_FALSE;
-  return fwrite(buf, 1, produced, out) == produced ? HTS_TRUE : HTS_FALSE;
+  return hts_fwrite_exact(buf, produced, out);
 }
 #endif
 

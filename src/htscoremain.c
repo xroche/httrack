@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsglobal.h"
 #include "htscore.h"
+#include "htsio.h"
 #include "htsdefines.h"
 #include "htsalias.h"
 #include "htswarc.h"
@@ -1629,7 +1630,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                         url[cl] = ' ';
                         cl++;
                       }
-                      if (fread(url + cl, 1, fzs, fp) != fzs) {
+                      if (!hts_fread_exact(url + cl, (size_t) fzs, fp)) {
                         fclose(fp);
                         HTS_PANIC_PRINTF("File url list could not be read");
                         htsmain_free();

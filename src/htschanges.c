@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htscore.h"
 #include "htslib.h"
+#include "htsio.h"
 #include "htsmd5.h"
 #include "htssafe.h"
 #include "htsthread.h"
@@ -636,7 +637,7 @@ void hts_changes_close_opt(httrackp *opt) {
   if (fp != NULL) {
     const size_t len = StringLength(report);
 
-    if (len != 0 && fwrite(StringBuff(report), 1, len, fp) != len)
+    if (len != 0 && !hts_fwrite_exact(StringBuff(report), len, fp))
       hts_log_print(opt, LOG_ERROR | LOG_ERRNO,
                     "Unable to write the change report %s", path);
     fclose(fp);

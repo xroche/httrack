@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 #include "htslib.h"
+#include "htsio.h"
 #include "htssafe.h"
 #include "htsrandom.h"
 #include "htstools.h"
@@ -827,7 +828,7 @@ static hts_boolean sf_replace_file(httrackp *opt, const char *path,
     StringFree(tmp);
     return HTS_FALSE;
   }
-  if (len > 0 && fwrite(body, 1, len, fp) != len)
+  if (len > 0 && !hts_fwrite_exact(body, len, fp))
     ok = HTS_FALSE;
   if (fclose(fp) != 0)
     ok = HTS_FALSE;

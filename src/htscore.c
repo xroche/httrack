@@ -46,6 +46,7 @@ Please visit our Website: http://www.httrack.com
 
 /* specific definitions */
 #include "htsbase.h"
+#include "htsio.h"
 #include "htsnet.h"
 #include "htsbauth.h"
 #include "htsmd5.h"
@@ -410,7 +411,7 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
     hts_changes_html(opt, cache, r, adr, fil, save);
     *fp = filecreate(&opt->state.strc, save);
     if (*fp) {
-      if (ht_len > 0 && fwrite(ht_buff, 1, ht_len, *fp) != ht_len) {
+      if (ht_len > 0 && !hts_fwrite_exact(ht_buff, (size_t) ht_len, *fp)) {
         int fcheck = check_fatal_io_errno();
 
         if (fcheck)
@@ -841,7 +842,7 @@ int httpmirror(char *url1, httrackp * opt) {
           filelist_buff = malloct(filelist_sz + 1);
           if (filelist_buff == NULL) {
             filelist_err = "out of memory";
-          } else if (fread(filelist_buff, 1, filelist_sz, fp) != filelist_sz) {
+          } else if (!hts_fread_exact(filelist_buff, filelist_sz, fp)) {
             freet(filelist_buff);
             filelist_err = "read error";
           } else {
@@ -2129,7 +2130,7 @@ int httpmirror(char *url1, httrackp * opt) {
           char *adr = (char *) malloct(sz + 1);
 
           if (adr) {
-            if (fread(adr, 1, sz, new_lst) == sz) {
+            if (hts_fread_exact(adr, (size_t) sz, new_lst)) {
               adr[sz] = '\0';
               char line[1100];
               int purge = 0;
@@ -2840,13 +2841,13 @@ int filesave(httrackp * opt, const char *adr, int len, const char *s,
 
   // écrire le fichier
   if ((fp = filecreate(&opt->state.strc, s)) != NULL) {
-    int nl = 0;
+    hts_boolean written = (len == 0);
 
     if (len > 0) {
-      nl = (int) fwrite(adr, 1, len, fp);
+      written = hts_fwrite_exact(adr, (size_t) len, fp);
     }
     fclose(fp);
-    if (nl != len)              // erreur
+    if (!written) // error
       return -1;
   } else
     return -1;
