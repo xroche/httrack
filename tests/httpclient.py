@@ -10,6 +10,12 @@ import sys
 import urllib.parse
 
 
+def host_header(args):
+    """The Host line, or none at all when --host is empty: an HTTP/1.0 client
+    may send none, and the server has to answer that request too."""
+    return "Host: %s\r\n" % args.host if args.host else ""
+
+
 def build_request(args):
     if args.field or args.post is not None:
         if args.field:
@@ -19,12 +25,14 @@ def build_request(args):
         else:
             body = args.post
         return (
-            "POST %s HTTP/1.0\r\nHost: 127.0.0.1\r\n"
+            "POST %s HTTP/1.0\r\n%s"
             "Content-type: application/x-www-form-urlencoded\r\n"
-            "Content-length: %d\r\n\r\n%s" % (args.path or "/", len(body), body)
+            "Content-length: %d\r\n\r\n%s"
+            % (args.path or "/", host_header(args), len(body), body)
         )
-    return "GET %s HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n" % (
-        args.path or "/server/index.html"
+    return "GET %s HTTP/1.0\r\n%s\r\n" % (
+        args.path or "/server/index.html",
+        host_header(args),
     )
 
 
@@ -38,6 +46,11 @@ def main():
         action="append",
         metavar="K=V",
         help="POST field, form-encoded here; repeatable",
+    )
+    p.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host header value; empty sends none",
     )
     p.add_argument("--timeout", type=float, default=30)
     p.add_argument(
