@@ -51,40 +51,48 @@ if not m:
     sys.exit("no session id in server/index.html")
 sid = m.group(1).decode()
 
-req = urllib.request.Request(
-    url + "/server/help.html",
-    data=urllib.parse.urlencode({"sid": sid, "lang": "2"}).encode("latin-1"),
-    method="POST")
-body = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
-if 'lang="fr"' not in body:
-    sys.exit("help.html did not switch to LANGUAGE_2:\n%s" % body[:2000])
+def link_fields(lang):
+    req = urllib.request.Request(
+        url + "/server/help.html",
+        data=urllib.parse.urlencode({"sid": sid, "lang": lang}).encode("latin-1"),
+        method="POST")
+    body = urllib.request.urlopen(req, timeout=20).read().decode("latin-1")
+    m = re.search(r'update\.php3\?([^"\']+)', body)
+    if not m:
+        sys.exit("no update.php3 link in help.html at lang=%s:\n%s" % (lang, body[:2000]))
+    query = m.group(1).replace("&amp;", "&")
+    return body, query, dict(urllib.parse.parse_qsl(query, keep_blank_values=True))
 
-m = re.search(r'update\.php3\?([^"\']+)', body)
-if not m:
-    sys.exit("no update.php3 link in help.html:\n%s" % body[:2000])
-query = m.group(1).replace("&amp;", "&")
-fields = dict(urllib.parse.parse_qsl(query, keep_blank_values=True))
 
-# WinHTTrack's key, so one endpoint sees one parameter from both front ends.
-if "Language" not in fields:
-    sys.exit("no Language= in the update link: %s" % query)
-if "LanguageId" in fields:
-    sys.exit("LanguageId= is still sent, so the two front ends disagree: %s" % query)
+# Two languages, because one cannot tell "renders the basename" apart from
+# "prints a constant". lang=2 uses the fixture whose LANGUAGE_NAME differs;
+# lang=3 is the shipped Castellano.
+for lang, iso, want in (("2", "fr", "Francais"), ("3", "es", "Castellano")):
+    body, query, fields = link_fields(lang)
+    if 'lang="%s"' % iso not in body:
+        sys.exit("help.html did not switch to LANGUAGE_%s:\n%s" % (lang, body[:2000]))
 
-# The basename, not the endonym: the mutant this test exists to kill.
-if fields["Language"] != "Francais":
-    sys.exit("Language=%r, want the catalog basename 'Francais'" % fields["Language"])
+    # WinHTTrack's key, so one endpoint sees one parameter from both front ends.
+    if "Language" not in fields:
+        sys.exit("no Language= in the update link at lang=%s: %s" % (lang, query))
+    if "LanguageId" in fields:
+        sys.exit("LanguageId= is still sent, so the front ends disagree: %s" % query)
 
-# The endpoint cannot decode a per-catalog codepage, so the value must be ASCII.
-try:
-    fields["Language"].encode("ascii")
-except UnicodeEncodeError:
-    sys.exit("Language=%r is not ASCII" % fields["Language"])
+    # The basename, not the endonym: the mutant this test exists to kill.
+    if fields["Language"] != want:
+        sys.exit("lang=%s gave Language=%r, want the basename %r"
+                 % (lang, fields["Language"], want))
 
-# The other fields still resolve, so an empty render cannot pass the checks above.
-for key in ("Product", "Version", "VersionStr", "Platform"):
-    if not fields.get(key):
-        sys.exit("%s= is empty in the update link: %s" % (key, query))
+    # The endpoint cannot decode a per-catalog codepage, so the value is ASCII.
+    try:
+        fields["Language"].encode("ascii")
+    except UnicodeEncodeError:
+        sys.exit("Language=%r is not ASCII" % fields["Language"])
+
+    # The other fields still resolve, so an empty render cannot pass the above.
+    for key in ("Product", "Version", "VersionStr", "Platform"):
+        if not fields.get(key):
+            sys.exit("%s= is empty in the update link: %s" % (key, query))
 PY
 
 printf 'ok\n'

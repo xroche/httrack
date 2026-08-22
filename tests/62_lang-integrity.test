@@ -155,6 +155,26 @@ else
     fi
 fi
 
+# LANGUAGE_FILE is the catalog basename and reaches the network as the update
+# link's Language= (#1353), so it must exist, be ASCII, and match the filename.
+# The loader backfills an absent key from English, which would silently report
+# the wrong language rather than nothing.
+for f in "$langdir"/*.txt; do
+    base=${f##*/}
+    base=${base%.txt}
+    lf=$(field "$f" LANGUAGE_FILE)
+    if [ -z "$lf" ]; then
+        echo "$base.txt: no LANGUAGE_FILE; the loader would report English instead"
+        fail=1
+    elif [ "$lf" != "$base" ]; then
+        echo "$base.txt: LANGUAGE_FILE is \"$lf\", not the basename"
+        fail=1
+    elif printf '%s' "$lf" | LC_ALL=C grep -q '[^ -~]'; then
+        echo "$base.txt: LANGUAGE_FILE \"$lf\" is not ASCII; the update endpoint cannot decode it"
+        fail=1
+    fi
+done
+
 # LANGUAGE_NAME must be the endonym, not English: the menu shows every catalog
 # together (#116). Two oracles rather than a copy of the current values, so the
 # name may repeat neither a word of the catalog's own English LANGUAGE_WINDOWSID
