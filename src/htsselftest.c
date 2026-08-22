@@ -1125,8 +1125,9 @@ static void st_assume_rule(httrackp *opt, size_t value_len) {
 
 static unsigned st_assume_clips; /* clip warnings the callback has seen */
 
-static void st_assume_log(httrackp *opt, int type, const char *format,
-                          va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_assume_log(httrackp *opt, int type,
+                                               const char *format,
+                                               va_list args) {
   (void) opt;
   (void) format;
   (void) args;
@@ -2650,8 +2651,9 @@ static int st_binputline(httrackp *opt, int argc, char **argv) {
 
 static int st_location_logged = 0;
 
-static void st_location_log(httrackp *opt, int type, const char *format,
-                            va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_location_log(httrackp *opt, int type,
+                                                 const char *format,
+                                                 va_list args) {
   (void) opt;
   (void) type;
   (void) format;
@@ -3531,8 +3533,9 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
 
 static char st_log_callback_seen[256];
 
-static void st_log_callback(httrackp *opt, int type, const char *format,
-                            va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_log_callback(httrackp *opt, int type,
+                                                 const char *format,
+                                                 va_list args) {
   (void) opt;
   (void) type;
   (void) vsnprintf(st_log_callback_seen, sizeof(st_log_callback_seen), format,
@@ -8197,8 +8200,9 @@ static char st_cdx_log[2048];
 
 /* Collect the "WARC:" diagnostics only, so an unrelated message cannot satisfy
    (or break) a silence assertion. */
-static void st_cdx_log_cb(httrackp *opt, int type, const char *format,
-                          va_list args) {
+static HTS_PRINTF_FUN(3, 0) void st_cdx_log_cb(httrackp *opt, int type,
+                                               const char *format,
+                                               va_list args) {
   char line[512];
   (void) opt;
   (void) type;

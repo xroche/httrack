@@ -78,8 +78,10 @@ HTS_UNUSED HTS_PRINTF_FUN(2, 0) static void proxytrack_vprint_log(
 }
 
 HTS_UNUSED
-HTS_PRINTF_FUN(2, 3) static void proxytrack_print_log(const char *severity,
-                                                      const char *format, ...) {
+HTS_PRINTF_FUN(2, 3)
+
+static void proxytrack_print_log(const char *severity, const char *format,
+                                 ...) {
   if (severity != NULL) {
     va_list args;
 
