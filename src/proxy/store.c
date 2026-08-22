@@ -54,6 +54,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscore.h"
 #include "htsback.h"
 #include "htslib.h" /* hts_effective_mime */
+#include "htsio.h"
 
 #include "store.h"
 #include "proxystrings.h"
@@ -1238,8 +1239,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                     if (fp != NULL) {
                       r->adr = (char *) malloc(r->size + 1);
                       if (r->adr != NULL) {
-                        if (r->size > 0
-                            && fread(r->adr, 1, r->size, fp) != r->size) {
+                        if (r->size > 0 &&
+                            !hts_fread_exact(r->adr, r->size, fp)) {
                           int last_errno = errno;
 
                           r->statuscode = STATUSCODE_INVALID;
@@ -1492,7 +1493,7 @@ static void cache_rstr(FILE *fp, char *s, size_t s_size) {
     const size_t want = (size_t) i;
     const size_t store = want < s_size ? want : s_size - 1;
 
-    if (fread(s, 1, store, fp) != store) {
+    if (!hts_fread_exact(s, store, fp)) {
       assertf(! "fread_cache_failed");
     }
     if (want > store && fseek(fp, (long) (want - store), SEEK_CUR) != 0) {
@@ -1516,7 +1517,7 @@ static char *cache_rstr_addr(FILE * fp) {
   if (i > 0) {
     addr = malloc(i + 1);
     if (addr != NULL) {
-      if ((int) fread(addr, 1, i, fp) != i) {
+      if (!hts_fread_exact(addr, (size_t) i, fp)) {
         assertf(! "fread_cache_failed");
       }
       *(addr + i) = '\0';
@@ -1589,7 +1590,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
     if (cache->dat != NULL && cache->ndx != NULL && ndxSize > 0) {
       char *use = malloc(ndxSize + 1);
 
-      if (fread(use, 1, ndxSize, cache->ndx) == ndxSize) {
+      if (hts_fread_exact(use, (size_t) ndxSize, cache->ndx)) {
         char firstline[256];
         char *a = use;
 
@@ -1754,7 +1755,9 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
       if (cache->version == 0) {
         OLD_htsblk old_r;
 
-        if (fread((char *) &old_r, 1, sizeof(old_r), cache->dat) == sizeof(old_r)) {    // lire tout (y compris statuscode etc)
+        if (hts_fread_exact(
+                &old_r, sizeof(old_r),
+                cache->dat)) { // lire tout (y compris statuscode etc)
           int i;
           String urlDecoded;
 
@@ -1910,7 +1913,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
               if (fp != NULL) {
                 r->adr = cache_alloc_body(r->size);
                 if (r->adr != NULL) {
-                  if (r->size > 0 && fread(r->adr, 1, r->size, fp) != r->size) {
+                  if (r->size > 0 && !hts_fread_exact(r->adr, r->size, fp)) {
                     r->statuscode = STATUSCODE_INVALID;
                     strcpybuff(r->msg, "Read error in cache disk data");
                   }
@@ -1931,7 +1934,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
             if (flags & FETCH_BODY) {
               r->adr = cache_alloc_body(r->size);
               if (r->adr != NULL) {
-                if (fread(r->adr, 1, r->size, cache->dat) != r->size) { // erreur
+                if (!hts_fread_exact(r->adr, r->size, cache->dat)) { // erreur
                   free(r->adr);
                   r->adr = NULL;
                   r->statuscode = STATUSCODE_INVALID;
@@ -2560,8 +2563,8 @@ static int PT_SaveCache__Arc_Fun(void *arg, const char *url, PT_Element element)
           (element->location ? element->location : "-"), (long int) ftell(fp),
           st->filename, (long int) (size_headers + body_size));
   /* network_doc */
-  if (fwrite(st->headers, 1, size_headers, fp) != size_headers ||
-      (body_size != 0 && fwrite(element->adr, 1, body_size, fp) != body_size)) {
+  if (!hts_fwrite_exact(st->headers, size_headers, fp) ||
+      (body_size != 0 && !hts_fwrite_exact(element->adr, body_size, fp))) {
     return 1;                   /* Error */
   }
 

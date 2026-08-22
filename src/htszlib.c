@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsbase.h"
 #include "htscore.h"
+#include "htsio.h"
 #include "htscodec.h"
 #include "htszlib.h"
 
@@ -129,8 +130,7 @@ int hts_zunpack(const char *filename, const char *newfile) {
                 ok = HTS_FALSE;
                 break;
               }
-              if (produced > 0 &&
-                  fwrite(outbuf, 1, produced, fpout) != produced) {
+              if (produced > 0 && !hts_fwrite_exact(outbuf, produced, fpout)) {
                 env_error = HTS_TRUE;
                 ok = HTS_FALSE;
                 break;
@@ -157,7 +157,7 @@ int hts_zunpack(const char *filename, const char *newfile) {
           int size = 0;
 
           while ((navail = fread(inbuf, 1, sizeof(inbuf), in)) > 0) {
-            if (fwrite(inbuf, 1, navail, fpout) != navail) {
+            if (!hts_fwrite_exact(inbuf, navail, fpout)) {
               size = -1;
               break;
             }

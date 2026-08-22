@@ -43,6 +43,7 @@ Please visit our Website: http://www.httrack.com
 
 /* specific definitions */
 #include "htsbase.h"
+#include "htsio.h"
 #include "htsnet.h"
 #include "htsbauth.h"
 #include "htsmd5.h"
@@ -2872,7 +2873,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                             HTTRACK_AFF_AUTHORS " -->" LF,
                                             cat_data);
                                   } else {      // data
-                                    fwrite(cat_data, cat_data_len, 1, fp);
+                                    (void) hts_fwrite_exact(
+                                        cat_data, (size_t) cat_data_len, fp);
                                   }
                                   fclose(fp);
                                   usercommand(opt, 0, NULL,

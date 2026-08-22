@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsindex.h"
 #include "htsglobal.h"
 #include "htslib.h"
+#include "htsio.h"
 
 #if HTS_MAKE_KEYWORD_INDEX
 #include "htshash.h"
@@ -327,7 +328,7 @@ void index_finish(const char *indexpath, int mode) {
         blk = malloct(size + 1);
         if (blk) {
           fseek(fp_tmpproject, 0, SEEK_SET);
-          if ((INTsys) fread(blk, 1, size, fp_tmpproject) == size) {
+          if (hts_fread_exact(blk, (size_t) size, fp_tmpproject)) {
             char *a = blk, *b;
             int index = 0;
             int i;
@@ -440,7 +441,6 @@ void index_finish(const char *indexpath, int mode) {
                 fprintf(fp, "</td></tr>\r\n</table>\r\n");
               fclose(fp);
             }
-
           }
           freet(blk);
         }

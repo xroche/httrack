@@ -40,6 +40,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsnet.h"
 #include "htslib.h"
+#include "htsio.h"
 #include "htscharset.h"
 #include <limits.h>
 #include <stdio.h>
@@ -1294,8 +1295,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 #endif
                       fp = fopen(StringBuff(tmpbuff), "wb");
                       if (fp != NULL) {
-                        (void) ((int)
-                                fwrite((void *) adruserprofile, 1, count, fp));
+                        (void) hts_fwrite_exact((const char *) adruserprofile,
+                                                (size_t) count, fp);
                         fclose(fp);
                       }
                     }
@@ -1324,8 +1325,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                          them and this server reads them back (#1314). */
                       ini_rebase_lists((char *) adrw, -1, &profile);
                       count = (int) StringLength(profile);
-                      if ((int) fwrite(StringBuff(profile), 1, count, fp) ==
-                          count) {
+                      if (hts_fwrite_exact(StringBuff(profile), (size_t) count,
+                                           fp)) {
 
                         /* Wipe the doit.log file, useless here (all options are replicated) and
                            even a bit annoying (duplicate/ghost options)

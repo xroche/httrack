@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscore.h"
 #include "htslib.h"
+#include "htsio.h"
 #include "htsback.h"
 #include "htstools.h"
 #include "htssafe.h"
@@ -219,7 +220,7 @@ static int member_begin(member *m, warc_writer *w) {
 
 static int member_write(member *m, const void *p, size_t n) {
   if (!m->w->gz)
-    return (n == 0 || fwrite(p, 1, n, m->w->f) == n) ? 0 : -1;
+    return (n == 0 || hts_fwrite_exact(p, n, m->w->f)) ? 0 : -1;
   m->strm.next_in = (const Bytef *) p;
   while (n > 0) {
     unsigned char out[8192];
@@ -232,7 +233,7 @@ static int member_write(member *m, const void *p, size_t n) {
       if (deflate(&m->strm, Z_NO_FLUSH) != Z_OK)
         return -1;
       got = sizeof(out) - m->strm.avail_out;
-      if (got > 0 && fwrite(out, 1, got, m->w->f) != got)
+      if (got > 0 && !hts_fwrite_exact(out, got, m->w->f))
         return -1;
     } while (m->strm.avail_out == 0);
     n -= chunk;
@@ -252,7 +253,7 @@ static int member_end(member *m) {
       zerr = deflate(&m->strm, Z_FINISH);
       {
         size_t got = sizeof(out) - m->strm.avail_out;
-        if (got > 0 && fwrite(out, 1, got, m->w->f) != got)
+        if (got > 0 && !hts_fwrite_exact(out, got, m->w->f))
           rc = -1;
       }
     } while (zerr == Z_OK);

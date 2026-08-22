@@ -39,6 +39,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsftp.h"
 
 #include "htscore.h"
+#include "htsio.h"
 #include "htsthread.h"
 
 #include <limits.h>
@@ -922,8 +923,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
                   back->r.size += len;
                   HTS_STAT.HTS_TOTAL_RECV += len;
                   if (back->r.fp) {
-                    if ((INTsys) fwrite(buff, 1, (INTsys) len, back->r.fp) !=
-                        len) {
+                    if (!hts_fwrite_exact(buff, (size_t) len, back->r.fp)) {
                       /*
                          int fcheck;
                          if ((fcheck=check_fatal_io_errno())) {

@@ -37,6 +37,7 @@ Please visit our Website: http://www.httrack.com
 /* specific definitions */
 #include "htsnet.h"
 #include "htscore.h"
+#include "htsio.h"
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsthread.h"
@@ -901,9 +902,9 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                 back[p].r.out = FOPEN(back[p].tmpfile, "wb");
                 if (back[p].r.out) {
                   if ((back[p].r.adr) && (back[p].r.size > 0)) {
-                    if (fwrite
-                        (back[p].r.adr, 1, (size_t) back[p].r.size,
-                         back[p].r.out) != back[p].r.size) {
+                    if (!hts_fwrite_exact(back[p].r.adr,
+                                          (size_t) back[p].r.size,
+                                          back[p].r.out)) {
                       back[p].r.statuscode = STATUSCODE_INVALID;
                       strcpybuff(back[p].r.msg,
                                  "Write error when decompressing");
@@ -1072,7 +1073,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   if (fp) {
                     back[p].r.adr = malloct((size_t) sz + 1);
                     if (back[p].r.adr) {
-                      if (fread(back[p].r.adr, 1, sz, fp) == sz) {
+                      if (hts_fread_exact(back[p].r.adr, (size_t) sz, fp)) {
                         back[p].r.size = sz;
                         back[p].r.adr[sz] = '\0';
                         back[p].r.is_write = 0; /* not anymore a direct-to-disk file */
@@ -1368,9 +1369,8 @@ void back_copy_static(const lien_back * src, lien_back * dst) {
 }
 
 static int back_data_serialize(FILE * fp, const void *data, size_t size) {
-  if (fwrite(&size, 1, sizeof(size), fp) == sizeof(size)
-      && (size == 0 || fwrite(data, 1, size, fp) == size)
-    )
+  if (hts_fwrite_exact(&size, sizeof(size), fp) &&
+      (size == 0 || hts_fwrite_exact(data, size, fp)))
     return 0;
   return 1;                     /* error */
 }
@@ -1383,14 +1383,14 @@ static int back_string_serialize(FILE * fp, const char *str) {
 
 static int back_data_unserialize(FILE * fp, void **str, size_t * size) {
   *str = NULL;
-  if (fread(size, 1, sizeof(*size), fp) == sizeof(*size)) {
+  if (hts_fread_exact(size, sizeof(*size), fp)) {
     if (*size == 0)             /* serialized NULL ptr */
       return 0;
     *str = malloct(*size + 1);
     if (*str == NULL)
       return 1;                 /* error */
     ((char *) *str)[*size] = 0; /* guard byte */
-    if (fread(*str, 1, *size, fp) == *size)
+    if (hts_fread_exact(*str, *size, fp))
       return 0;
   }
   return 1;                     /* error */
@@ -4515,8 +4515,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               back[i].r.size = resume;
                               if (back[i].r.totalsize >= 0)
                                 back[i].r.totalsize += resume; // -> full size
-                              if ((fread(back[i].r.adr, 1, (size_t) resume,
-                                         fp)) != (size_t) resume) {
+                              if (!hts_fread_exact(back[i].r.adr,
+                                                   (size_t) resume, fp)) {
                                 back[i].status = STATUS_READY;  // terminé (voir plus loin)
                                 back_set_finished(sback, i);
                                 strcpybuff(back[i].r.msg,

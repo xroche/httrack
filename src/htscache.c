@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 
 /* specific definitions */
 #include "htscore.h"
+#include "htsio.h"
 #include "htsbasenet.h"
 #include "htsmd5.h"
 #include <limits.h>
@@ -799,7 +800,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                                            (int) minimum(size, 32768));
                       if (nl > 0) {
                         size -= nl;
-                        if (fwrite(buff, 1, nl, r.out) != nl) { // erreur
+                        if (!hts_fwrite_exact(buff, (size_t) nl,
+                                              r.out)) { // erreur
                           int last_errno = errno;
 
                           r.statuscode = STATUSCODE_INVALID;
@@ -862,8 +864,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                   if (fp != NULL) {
                     r.adr = (char *) malloct((int) r.size + 1);
                     if (r.adr != NULL) {
-                      if (r.size > 0
-                          && fread(r.adr, 1, (int) r.size, fp) != r.size) {
+                      if (r.size > 0 &&
+                          !hts_fread_exact(r.adr, (size_t) r.size, fp)) {
                         int last_errno = errno;
 
                         r.statuscode = STATUSCODE_INVALID;
@@ -1366,7 +1368,7 @@ char *readfile2(const char *fil, LLint * size) {
         *size = len;
       if (adr != NULL) {
         if (buflen > 0 &&
-            fread(adr, 1, buflen, fp) != buflen) { // fichier endommagé ?
+            !hts_fread_exact(adr, buflen, fp)) { // fichier endommagé ?
           freet(adr);
           adr = NULL;
         } else
@@ -1397,7 +1399,7 @@ char *readfile2_utf8(const char *fil, LLint *size) {
       adr = (char *) malloct(buflen + 1);
       if (adr != NULL) {
         if (buflen > 0 &&
-            fread(adr, 1, buflen, fp) != buflen) { // fichier endommagé ?
+            !hts_fread_exact(adr, buflen, fp)) { // fichier endommagé ?
           freet(adr);
           adr = NULL;
         } else {
@@ -1440,9 +1442,9 @@ int cache_wstr(FILE * fp, const char *s) {
 
   i = (s != NULL) ? ((INTsys) strlen(s)) : 0;
   sprintf(buff, INTsysP "\n", i);
-  if (fwrite(buff, 1, strlen(buff), fp) != strlen(buff))
+  if (!hts_fwrite_exact(buff, strlen(buff), fp))
     return -1;
-  if (i > 0 && fwrite(s, 1, i, fp) != i)
+  if (i > 0 && !hts_fwrite_exact(s, (size_t) i, fp))
     return -1;
   return 0;
 }
@@ -1461,7 +1463,7 @@ void cache_rstr(FILE *fp, char *s, size_t s_size) {
     const size_t want = (size_t) i;
     const size_t store = want < s_size ? want : s_size - 1;
 
-    if (fread(s, 1, store, fp) != store) {
+    if (!hts_fread_exact(s, store, fp)) {
       int fread_cache_failed = 0;
 
       assertf(fread_cache_failed);
@@ -1488,7 +1490,7 @@ char *cache_rstr_addr(FILE * fp) {
   if (i > 0) {
     addr = malloct(i + 1);
     if (addr != NULL) {
-      if ((int) fread(addr, 1, i, fp) != i) {
+      if (!hts_fread_exact(addr, (size_t) i, fp)) {
         int fread_cache_failed = 0;
 
         assertf(fread_cache_failed);

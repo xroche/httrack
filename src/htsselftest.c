@@ -47,6 +47,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsback.h"
 #include "htsdefines.h"
 #include "htslib.h"
+#include "htsio.h"
 #include "htsalias.h"
 #include "htsarrays.h"
 #include "htsparse.h"
@@ -1708,7 +1709,7 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
     FILE *fp = fopen(snum, "rb");
     if (fp != NULL) {
       buff = malloct(size);
-      if (buff != NULL && fread(buff, 1, size, fp) == size) {
+      if (buff != NULL && hts_fread_exact(buff, (size_t) size, fp)) {
         size_t capa = 0;
         size_t i, last;
         for (i = 0, last = 0, count = 0; i < size; i++) {
@@ -3344,7 +3345,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     const size_t n = st_decode_body(body, data, sizeof(data));
     FILE *const fp = fopen(bodyfile, "wb");
 
-    if (fp == NULL || fwrite(data, 1, n, fp) != n) {
+    if (fp == NULL || !hts_fwrite_exact(data, n, fp)) {
       fprintf(stderr, "savename: can not write %s\n", bodyfile);
       return 1;
     }
@@ -3848,7 +3849,7 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   snprintf(out, sizeof(out), "%s/repair.zip", argv[0]);
   snprintf(tmp, sizeof(tmp), "%s/repair.tmp", argv[0]);
   fp = fopen(in, "wb");
-  if (fp == NULL || fwrite(zip, 1, sizeof(zip), fp) != sizeof(zip)) {
+  if (fp == NULL || !hts_fwrite_exact(zip, sizeof(zip), fp)) {
     if (fp != NULL)
       fclose(fp);
     fprintf(stderr, "zip-repair-shift: cannot write %s\n", in);
@@ -5649,7 +5650,7 @@ static char *makeindex_slurp(const char *path) {
   rewind(fp);
   buf = malloct((size_t) size + 1);
   /* a read error would otherwise render a silently truncated template */
-  assertf(fread(buf, 1, (size_t) size, fp) == (size_t) size);
+  assertf(hts_fread_exact(buf, (size_t) size, fp));
   buf[size] = '\0';
   fclose(fp);
   return buf;
@@ -6262,7 +6263,7 @@ static int ae_write_packed(const char *path, int windowBits,
     strm.avail_out = sizeof(out);
     zerr = deflate(&strm, Z_FINISH);
     n = sizeof(out) - strm.avail_out;
-    if (n > 0 && fwrite(out, 1, n, f) != n) {
+    if (n > 0 && !hts_fwrite_exact(out, n, f)) {
       deflateEnd(&strm);
       fclose(f);
       return 1;
@@ -6304,7 +6305,7 @@ static int ae_write_collision(const char *path, const unsigned char *src,
   memcpy(buf + p, src + n1, n2);
   p += n2;
   f = FOPEN(path, "wb");
-  ok = (f != NULL && fwrite(buf, 1, p, f) == p);
+  ok = (f != NULL && hts_fwrite_exact(buf, p, f));
   if (f != NULL)
     fclose(f);
   freet(buf);
@@ -6319,7 +6320,7 @@ static int ae_write_raw(const char *path, const unsigned char *src,
 
   if (f == NULL)
     return 1;
-  ok = fwrite(src, 1, len, f) == len;
+  ok = hts_fwrite_exact(src, len, f);
   fclose(f);
   return ok ? 0 : 1;
 }
@@ -8777,7 +8778,7 @@ static hts_boolean sf_try_put(const char *dir, const char *rel,
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
   if (fp == NULL)
     return HTS_FALSE;
-  assertf(len == 0 || fwrite(data, 1, len, fp) == len);
+  assertf(len == 0 || hts_fwrite_exact(data, len, fp));
   fclose(fp);
   return HTS_TRUE;
 }
@@ -9509,7 +9510,7 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
             strerror(errno));
     return 1;
   }
-  assertf(fwrite(payload, 1, sizeof(payload), fp) == sizeof(payload));
+  assertf(hts_fwrite_exact(payload, sizeof(payload), fp));
   fclose(fp);
 
   STRUCT_STAT st;
@@ -9521,7 +9522,7 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
 
   fp = FOPEN(path, "rb");
   assertf(fp != NULL);
-  assertf(fread(buf, 1, sizeof(payload), fp) == sizeof(payload));
+  assertf(hts_fread_exact(buf, sizeof(payload), fp));
   fclose(fp);
   assertf(memcmp(buf, payload, sizeof(payload)) == 0);
   assertf(UNLINK(path) == 0);
@@ -9583,7 +9584,7 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
             strerror(errno));
     return 1;
   }
-  assertf(fwrite(payload, 1, sizeof(payload), fp) == sizeof(payload));
+  assertf(hts_fwrite_exact(payload, sizeof(payload), fp));
   fclose(fp);
   assertf(fexist_utf8(path));
   assertf(fsize_utf8(path) == (LLint) sizeof(payload));
@@ -9625,7 +9626,7 @@ static void ro_put(const char *path, const char *data) {
   FILE *const fp = FOPEN(path, "wb");
 
   assertf(fp != NULL);
-  assertf(fwrite(data, 1, strlen(data), fp) == strlen(data));
+  assertf(hts_fwrite_exact(data, strlen(data), fp));
   fclose(fp);
 }
 
@@ -10930,7 +10931,7 @@ static int st_changes_race(httrackp *opt, int argc, char **argv) {
         return 1;
       }
       for (n = 0; n < 16384; n++)
-        fwrite("0123456789abcdef", 1, 16, fp);
+        (void) hts_fwrite_exact("0123456789abcdef", 16, fp);
       fclose(fp);
     }
   }
@@ -11519,6 +11520,79 @@ static int st_batch(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+// -#test=ioexact <dir>: the hts_fread_exact/hts_fwrite_exact contract - a
+// partial transfer is a failure, a zero-length one is not, and a short read
+// leaves the bytes it could not fill alone.
+static int st_ioexact(httrackp *opt, int argc, char **argv) {
+  const size_t payload_size = 70000; /* past any stdio buffer */
+  const unsigned char poison = 0xa5;
+  char path[HTS_URLMAXSIZE * 2];
+  char *payload, *readback;
+  FILE *fp;
+  int plen;
+  size_t i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "ioexact: needs a writable dir\n");
+    return 1;
+  }
+  plen = snprintf(path, sizeof(path), "%s/ioexact.bin", argv[0]);
+  assertf(plen > 0 && (size_t) plen < sizeof(path));
+  payload = malloct(payload_size);
+  readback = malloct(payload_size + 1);
+  for (i = 0; i < payload_size; i++)
+    payload[i] = (char) (i * 7 + (i >> 8));
+
+  /* Round trip: a helper that swapped fwrite's size and nmemb would report a
+     count of 1 here and die. */
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(payload, payload_size, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+  memset(readback, poison, payload_size + 1);
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(readback, payload_size, fp) == HTS_TRUE);
+  assertf(memcmp(readback, payload, payload_size) == 0);
+  assertf((unsigned char) readback[payload_size] == poison);
+  assertf(hts_fread_exact(readback, 1, fp) == HTS_FALSE); /* at EOF */
+  assertf(hts_fread_exact(readback, 0, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+
+  /* Short read: four of the eight bytes asked for, so a failure, and the tail
+     of the destination keeps its poison. */
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(payload, 4, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+  memset(readback, poison, 16);
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(readback, 8, fp) == HTS_FALSE);
+  assertf(memcmp(readback, payload, 4) == 0);
+  for (i = 4; i < 16; i++)
+    assertf((unsigned char) readback[i] == poison);
+  assertf(fclose(fp) == 0);
+
+  /* Wrong direction: an I/O error is a failure, not a silent no-op. */
+  fp = FOPEN(path, "wb");
+  assertf(fp != NULL);
+  assertf(hts_fread_exact(readback, 4, fp) == HTS_FALSE);
+  assertf(fclose(fp) == 0);
+  fp = FOPEN(path, "rb");
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(payload, 4, fp) == HTS_FALSE);
+  assertf(hts_fwrite_exact(payload, 0, fp) == HTS_TRUE);
+  assertf(fclose(fp) == 0);
+
+  assertf(UNLINK(path) == 0);
+  freet(payload);
+  freet(readback);
+  printf("ioexact: a partial transfer is a failure: OK\n");
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -11763,6 +11837,8 @@ static const struct selftest_entry {
     {"warc-longurl", "<dir>",
      "a URL past the header-format buffer still reaches the archive",
      st_warc_longurl},
+    {"ioexact", "<dir>",
+     "hts_fread_exact/hts_fwrite_exact reject a partial transfer", st_ioexact},
     {"longpath", "<dir>",
      "round-trip a >MAX_PATH file through the _w* wrappers (\\\\?\\ on "
      "Windows)",
