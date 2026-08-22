@@ -248,9 +248,8 @@ const char *strjoker_bounds(const char *chaine, const char *joker,
   return r;
 }
 
-/* Index of the class terminator `right` in a "*[...]" joker, scanning past the
-   two-character prefix; the index of the NUL when the class is unterminated.
-   The bound is tested first, so joker[i] is only read once i is in range. */
+/* Index of the class terminator `right` in a "*[...]" joker, scanned past the
+   two-character prefix; the index of the NUL if the class is unterminated. */
 static int joker_class_end(const char *joker, char right) {
   const int len = (int) strlen(joker);
   int i = 2;

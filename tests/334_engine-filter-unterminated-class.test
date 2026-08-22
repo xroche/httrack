@@ -6,9 +6,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-# A *[...] class with no closing bracket: the scan for it stops on the end of
-# the pattern, and what follows the star is skipped as for a closed class.
-# Verdicts pinned from the behavior predating joker_class_end().
+# Where the *[...] class scan stops, terminated and not. Verdicts pinned to the
+# behavior predating joker_class_end().
 
 match() { selftest_queue "$2 does match $1" filter "$1" "$2"; }
 nomatch() { selftest_queue "$2 does NOT match $1" filter "$1" "$2"; }
@@ -37,6 +36,17 @@ nomatch '*[' 'abc'
 # the '(' form scans for its own terminator
 nomatch '*(a' 'abc'
 nomatch '*(file' 'abc'
+
+# A terminated class is where the returned index is observable: it decides where
+# the pattern resumes, so a wrong one changes the verdict rather than nothing.
+match '*[file]x' 'abcx'
+nomatch '*[file]x' 'abc'
+nomatch '*[file]x' 'a/bx'
+match '*[file]' 'abc'
+match '*[file]/a' 'abc/a'
+nomatch '*(file)' 'abc'
+match '*[a-z]x' 'abcx'
+nomatch '*[a-z]x' 'abc9x'
 
 # an unterminated size bound stays neutral
 nomatch '*[<10' 'abc'

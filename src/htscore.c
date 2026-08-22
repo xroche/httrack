@@ -2444,14 +2444,14 @@ void host_ban(httrackp * opt, int ptr,
 
   // effacer liens
   for (i = 0; i < opt->lien_tot; i++) {
-    // Calcul de taille sécurisée
+    // bounded length
     if (heap(i)) {
       if (heap(i)->adr) {
         int l = 0;
 
         while (l < 1020 && heap(i)->adr[l] != '\0')
           l++;
-        if ((l > 0) && (l < 1020)) {    // sécurité
+        if ((l > 0) && (l < 1020)) { // in range
           if (strfield2(jump_identification_const(heap(i)->adr), host)) {    // host
             hts_log_print(opt, LOG_DEBUG, "Cancel: %s%s", heap(i)->adr,
                           heap(i)->fil);
