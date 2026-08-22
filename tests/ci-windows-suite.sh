@@ -550,7 +550,9 @@ want=$(printf '%s\n' $expected_skips | sort)
 if [ "$got" != "$want" ]; then
     echo "::error::skip set changed from expected; - missing, + newly skipped"
     diff -u <(echo "$want") <(echo "$got") | tail -n +3 | sed 's/^/      /'
-    exit 1
+    # A worker that vanished cannot have recorded its skip, so the set differs
+    # for a reason we already know; keep that a re-run, not a red.
+    [ "$lost" -gt 0 ] || exit 1
 fi
 [ "$fail" -eq 0 ] || {
     echo "::error::failing:$failed"
