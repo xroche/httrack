@@ -299,7 +299,9 @@ done
 
 # WinHTTrack sprintf()s these strings, and %n/%N/%t/%p/%h/%M/%Q/%q are also
 # HTTrack's own build-string letters, so a dropped or invented placeholder
-# either breaks the format or drops a field from the filename help.
+# either breaks the format or drops a field from the filename help. Order is
+# part of it: the formats carry no positional specifiers, so a %s that swaps
+# with a %d binds to the other's argument.
 placeholder_drift() {
     LC_ALL=C awk '
         # Two characters from each %, so a printf conversion and a build-string
@@ -313,15 +315,6 @@ placeholder_drift() {
                 }
             return out
         }
-        function sorted(s,   a, n, i, j, t, o) {
-            n = split(s, a, " ")
-            for (i = 1; i < n; i++)
-                for (j = i + 1; j <= n; j++)
-                    if (a[i] > a[j]) { t = a[i]; a[i] = a[j]; a[j] = t }
-            for (i = 1; i <= n; i++)
-                o = o a[i] " "
-            return o
-        }
         FNR == 1 { name = FILENAME; sub(/.*\//, "", name) }
         { sub(/\r$/, "") }
         FNR % 2 == 1 { key = $0; next }
@@ -329,9 +322,8 @@ placeholder_drift() {
         $0 == "" { next }
         {
             pairs++
-            # A multiset, not a sequence: order follows the target grammar.
-            want = sorted(toks(key))
-            got = sorted(toks($0))
+            want = toks(key)
+            got = toks($0)
             if (want != got) {
                 printf "%s:%d: placeholders [%s] became [%s]\n", name, FNR, want, got
                 bad++
@@ -346,7 +338,8 @@ placeholder_drift() {
 printf 'Delete %%s?\nSupprimer ?\n' >"$tmp/dropped.txt"
 printf 'Delete?\nSupprimer %%s ?\n' >"$tmp/invented.txt"
 printf 'Delete %%s?\nSupprimer %%d ?\n' >"$tmp/swapped.txt"
-for probe in dropped invented swapped; do
+printf 'Copy %%s to %%d\nCopie %%d vers %%s\n' >"$tmp/reordered.txt"
+for probe in dropped invented swapped reordered; do
     if placeholder_drift "$tmp/$probe.txt" >/dev/null; then
         echo "the placeholder check passed a deliberately damaged value ($probe)"
         exit 1

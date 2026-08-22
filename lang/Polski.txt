@@ -763,7 +763,7 @@ Zapisz j&ako...
 User-defined structure
 Struktura zdefiniowana przez u¿ytkownika
 %n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
-%n\r\nNazwa pliku bez typu pliku (np: image)\r\n%N\r\nNazwa wraz z typem pliku (np: image.gif)\r\n%t\r\nTyp pliku (np: .gif)\r\n%p\r\nScie¿ka [bez koñcowego /] (np: /pewneobrazki)\r\n%h\r\nNazwa hosta (np: www.pewnyhost.com)\r\n%s?\r\n%M\tURL MD5 (128 bits, 32 ascii bytes)\r\n%Q\tquery string MD5 (128 bits, 32 ascii bytes)\r\n%q\tsmall query string MD5 (16 bits, 4 ascii bytes)\r\n\r\nKrótka wersja dla DOS (np: %sN)
+%n\r\nNazwa pliku bez typu pliku (np: image)\r\n%N\r\nNazwa wraz z typem pliku (np: image.gif)\r\n%t\r\nTyp pliku (np: .gif)\r\n%p\r\nScie¿ka [bez koñcowego /] (np: /pewneobrazki)\r\n%h\r\nNazwa hosta (np: www.pewnyhost.com)\r\n%M\tURL MD5 (128 bits, 32 ascii bytes)\r\n%Q\tquery string MD5 (128 bits, 32 ascii bytes)\r\n%q\tsmall query string MD5 (16 bits, 4 ascii bytes)\r\n\r\n%s?\tKrótka wersja dla DOS (np: %sN)
 Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
 Przyk³ad:\r\n%h%p/%n%q.%t\r\n-> \t\tc:\\mirror\\www.pewienhost.com\\pewneobrazki\\obrazek.gif
 Proxy settings
