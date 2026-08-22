@@ -1,0 +1,124 @@
+#!/bin/bash
+#
+# The panel is unauthenticated, so it must refuse a request naming an authority
+# it does not answer for, and advertise a URL a browser can actually open.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_authority.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+# Fetch a URL the way webhttrack's browser would: the status, or the error name.
+opens() {
+    htsserver_python - "$1" <<'PY'
+import sys, urllib.request
+
+try:
+    with urllib.request.urlopen(sys.argv[1], timeout=10) as r:
+        print(r.status)
+except Exception as e:
+    print(type(e).__name__)
+PY
+}
+
+htsserver_start --home "${work}/default"
+sid=$(htsserver_sid)
+# Control: without a real sid every POST below would be refused for that reason.
+test "${#sid}" -eq 32 || fail "did not scrape a 32-hex sid from the page (got '${sid}')"
+
+# "redirect" is the cheapest field whose reply is visible in the headers.
+post_as() { # $1 = Host value, "" sends none
+    htsserver_client --host "$1" --path / --post "sid=${sid}&redirect=/accepted"
+}
+
+for good in "127.0.0.1" "127.0.0.1:${HTS_PORT}" "localhost" "localhost:${HTS_PORT}" \
+    "LocalHost:${HTS_PORT}" "[::1]" "[::1]:${HTS_PORT}" ""; do
+    grep -q '^Location: /accepted' <<<"$(post_as "${good}")" ||
+        fail "Host '${good}' was refused"
+done
+echo "ok: the panel answers at every authority it is reachable at"
+
+for bad in "evil.example" "evil.example:${HTS_PORT}" "127.0.0.1.evil.example"; do
+    resp=$(post_as "${bad}")
+    grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
+        fail "POST with Host '${bad}' was not a 403: '$(firstline "${resp}")'"
+    grep -q '^Location:' <<<"${resp}" && fail "POST with Host '${bad}' still ran"
+    # GET too: a guard sitting on the POST path alone is the shape of the last
+    # bug found here.
+    resp=$(htsserver_client --host "${bad}" --path /server/index.html)
+    grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
+        fail "GET with Host '${bad}' was not a 403: '$(firstline "${resp}")'"
+    grep -q 'name="sid"' <<<"${resp}" &&
+        fail "GET with Host '${bad}' still handed out a session id"
+done
+echo "ok: a foreign authority is refused, on every method"
+
+# Suppressing the reply is not refusing the write: the body lands in one global
+# key store that later requests render from. step3 interpolates ${projname}.
+store_page() {
+    page=$(htsserver_get /server/step3.html) || fail "the key store probe failed"
+    grep -q '^HTTP/1\.0 200 ' <<<"${page}" ||
+        fail "the key store probe did not answer: '$(firstline "${page}")'"
+}
+
+htsserver_client --host evil.example --path / \
+    --post "sid=${sid}&projname=REBOUND" >/dev/null 2>&1 || true
+store_page
+grep -q 'REBOUND' <<<"${page}" &&
+    fail "a body sent with a foreign Host reached the key store"
+# Paired accept: without it the assertion above passes on a server that ignores
+# every body, which would prove nothing.
+htsserver_client --host "127.0.0.1:${HTS_PORT}" --path / \
+    --post "sid=${sid}&projname=SAMEHOST" >/dev/null 2>&1 || true
+store_page
+grep -q 'SAMEHOST' <<<"${page}" ||
+    fail "a body sent with our own Host was not written to the key store"
+echo "ok: a refused body is not applied"
+
+htsserver_stop
+
+# webhttrack greps this URL out and hands it to the browser, so a wildcard bind
+# has to name a host that exists, and an IPv6 literal needs its URL brackets.
+htsserver_start --port "$(htsserver_freeport)" --home "${work}/wild" -- --bind 0.0.0.0
+case ${HTS_URL} in
+*//127.0.0.1:*) ;;
+*) fail "--bind 0.0.0.0 advertised ${HTS_URL}, which no browser can open" ;;
+esac
+got=$(opens "${HTS_URL}")
+test "${got}" = 200 || fail "--bind 0.0.0.0 advertised ${HTS_URL}, which answered ${got}"
+echo "ok: a wildcard bind advertises a loopback URL"
+htsserver_stop
+
+if htsserver_python - <<'PY'; then
+import socket, sys
+
+try:
+    s = socket.socket(socket.AF_INET6)
+    s.bind(("::1", 0))
+    s.close()
+except OSError:
+    sys.exit(1)
+PY
+    htsserver_start --port "$(htsserver_freeport)" --home "${work}/v6" -- --bind ::1
+    case ${HTS_URL} in
+    *"//[::1]:"*) ;;
+    *) fail "--bind ::1 advertised ${HTS_URL}, which no browser can open" ;;
+    esac
+    got=$(opens "${HTS_URL}")
+    test "${got}" = 200 || fail "--bind ::1 advertised ${HTS_URL}, which answered ${got}"
+    echo "ok: an IPv6 literal is advertised bracketed"
+else
+    echo "skipped the IPv6 advert: no ::1 here"
+fi
+
+cleanup
+echo "PASS"
