@@ -1043,13 +1043,17 @@ static void reconcile_wipe(httrackp *opt) {
 }
 
 /* Create a filler file of exactly `size` bytes. */
-static void reconcile_put(httrackp *opt, const char *name, size_t size) {
+/* LLint, not size_t: the callers hold file sizes, which they also hand to
+   reconcile_expect() and to fsize(). */
+static void reconcile_put(httrackp *opt, const char *name, LLint size) {
   FILE *const fp = fopen(reconcile_st_path(opt, name), "wb");
   static const char filler[1024] = {'x'};
 
   assertf(fp != NULL);
   while (size > 0) {
-    const size_t n = size > sizeof(filler) ? sizeof(filler) : size;
+    /* Narrowing is safe: the ternary bounds n by sizeof(filler) first. */
+    const size_t n =
+        size > (LLint) sizeof(filler) ? sizeof(filler) : (size_t) size;
 
     assertf(hts_fwrite_exact(filler, n, fp));
     size -= n;

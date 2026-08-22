@@ -3920,7 +3920,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
-  cookie.max_len = (int) sizeof(cookie.data);
+  cookie.max_len = sizeof(cookie.data);
   cookie.data[0] = '\0';
   added = cookie_add(&cookie, "name", "value", dom, "/");
   added |= cookie_add(&cookie, "has_js", "1", dom, "/");
@@ -3946,7 +3946,7 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
     memset(&r, 0, sizeof(r));
     memset(host, 'a', sizeof(host) - 1);
     host[sizeof(host) - 1] = '\0';
-    ck2.max_len = (int) sizeof(ck2.data);
+    ck2.max_len = sizeof(ck2.data);
     ck2.data[0] = '\0';
     strcpybuff(line, "Set-Cookie: SID=1; path=/");
     treathead(&ck2, host, "/", &r, line);
@@ -3985,6 +3985,99 @@ static int st_cookies(httrackp *opt, int argc, char **argv) {
   printf("cookie-header: %s\n", err ? "FAIL" : "OK");
   if (err)
     printf("  got: %s\n", hdr);
+  return err;
+}
+
+/* cookie_add must refuse rather than write past max_len, whatever the caller
+   set that to, and must leave the bytes beyond it alone. */
+static int st_cookiecap(httrackp *opt, int argc, char **argv) {
+  static t_cookie cookie;
+  /* Above the 256 bytes of headroom cookie_add reserves, or it refuses all. */
+  const size_t cap = 512;
+  static const char NAME[] = "n", DOM[] = "www.example.com", PATH[] = "/";
+  char big[1024];
+  int err = 0;
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* A non-zero canary: a stray NUL from an off-by-one terminator is invisible
+     against a zero fill, which is the exact bug a capacity check guards. */
+  memset(cookie.data, 'C', sizeof(cookie.data));
+  cookie.max_len = cap;
+  cookie.data[0] = '\0';
+
+  memset(big, 'v', sizeof(big) - 1);
+  big[sizeof(big) - 1] = '\0';
+
+  /* Far past the capacity: refused, and nothing written. */
+  if (cookie_add(&cookie, NAME, big, DOM, PATH) == 0) {
+    printf("cookie-cap: FAIL (a value %u bytes long was accepted into %u)\n",
+           (unsigned) strlen(big), (unsigned) cap);
+    err = 1;
+  }
+  if (cookie.data[0] != '\0') {
+    printf("cookie-cap: FAIL (the store was written despite the refusal)\n");
+    err = 1;
+  }
+  for (i = cap; i < sizeof(cookie.data); i++) {
+    if (cookie.data[i] != 'C') {
+      printf("cookie-cap: FAIL (byte %u past max_len was modified)\n",
+             (unsigned) i);
+      err = 1;
+      break;
+    }
+  }
+
+  /* The exact boundary, derived rather than hardcoded so it survives a change
+     to the fixture strings: cookie_add reserves 256 bytes beyond the parts. */
+  {
+    const size_t fixed = strlen(NAME) + strlen(DOM) + strlen(PATH) + 256;
+    const size_t fits = cap - fixed;
+
+    /* Exactly filling max_len is accepted... */
+    memset(big, 'v', fits);
+    big[fits] = '\0';
+    cookie.data[0] = '\0';
+    if (cookie_add(&cookie, NAME, big, DOM, PATH) != 0) {
+      printf("cookie-cap: FAIL (a value of %u, exactly max_len, was refused)\n",
+             (unsigned) fits);
+      err = 1;
+    } else if (strlen(cookie.data) == 0 || strlen(cookie.data) >= cap) {
+      printf("cookie-cap: FAIL (accepted, store is %u against max_len %u)\n",
+             (unsigned) strlen(cookie.data), (unsigned) cap);
+      err = 1;
+    }
+
+    /* ...and one byte more is not. */
+    memset(big, 'v', fits + 1);
+    big[fits + 1] = '\0';
+    cookie.data[0] = '\0';
+    if (cookie_add(&cookie, NAME, big, DOM, PATH) == 0) {
+      printf(
+          "cookie-cap: FAIL (a value of %u, one past max_len, was accepted)\n",
+          (unsigned) (fits + 1));
+      err = 1;
+    } else if (cookie.data[0] != '\0') {
+      printf("cookie-cap: FAIL (the store was written despite the refusal)\n");
+      err = 1;
+    }
+  }
+
+  /* The canary again, after the accepted write: an insert bounded by
+     sizeof(data) rather than max_len would show up here. */
+  for (i = cap; i < sizeof(cookie.data); i++) {
+    if (cookie.data[i] != 'C') {
+      printf("cookie-cap: FAIL (byte %u past max_len was modified)\n",
+             (unsigned) i);
+      err = 1;
+      break;
+    }
+  }
+
+  printf("cookie-cap: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -10156,7 +10249,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
 
   static t_cookie ck;
 
-  ck.max_len = (int) sizeof(ck.data);
+  ck.max_len = sizeof(ck.data);
   ck.data[0] = '\0';
   assertf(cookie_load(NULL, &ck, fpath, "cookies.txt") == 0);
   assertf(strstr(ck.data, "JARCOOK") != NULL); /* jar read on a long path */
@@ -11824,6 +11917,7 @@ static const struct selftest_entry {
     {"dnstimeout", "", "a slow DNS resolve is bounded and holds no lock",
      st_dnstimeout},
     {"cookies", "", "cookie request-header self-test", st_cookies},
+    {"cookiecap", "", "cookie_add honours max_len", st_cookiecap},
     {"useragent", "", "default User-Agent self-test", st_useragent},
     {"makeindex", "[dir]", "hts_finish_makeindex footer/refresh self-test",
      st_makeindex},

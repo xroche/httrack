@@ -1979,7 +1979,10 @@ LLint http_xfread1(htsblk * r, int bufl) {
         }
         if (r->adr != NULL) {
           // lecture
-          const size_t req_size = r->totalsize - r->size;
+          /* Signed first: a body longer than its announced totalsize makes
+             this negative, and as a size_t it would drive a read past adr. */
+          const LLint remaining = r->totalsize - r->size;
+          const size_t req_size = remaining > 0 ? (size_t) remaining : 0;
 
           nl = req_size > 0 ? hts_read(r, r->adr + ((int) r->size), (int) req_size) : 0;        /* NO 32 bit overlow possible here (no 4GB html!) */
           // nouvelle taille
