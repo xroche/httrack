@@ -523,6 +523,128 @@ elif [ "$rc" -ne 0 ]; then
     fail=1
 fi
 
+# hts-cache, robots.txt and cgi-bin are named on disk and on the wire, so a
+# translated one points the user at a path that does not exist: "htscache/new.*"
+# and "robot.txt" both shipped that way. Case is the translator's (a label may
+# start a sentence); the spelling is not. Example hostnames are deliberately not
+# on this list, since localising www.someweb.com is a translator's call.
+literal_tokens="hts-cache robots.txt cgi-bin"
+translated_literals() {
+    LC_ALL=C awk -v name="$2" -v toks="$literal_tokens" '
+        function lc(s) { return tolower(s) }
+        BEGIN { split(toks, t, " ") }
+        { sub(/\r$/, "") }
+        NR % 2 == 1 { key = $0; next }
+        $0 == "" { next }
+        {
+            for (i in t)
+                if (index(lc(key), t[i]) > 0 && index(lc($0), t[i]) == 0)
+                    printf "%s:%d: msgid names %s, the translation does not\n", name, NR, t[i]
+        }
+    ' "$1"
+}
+
+# A fixture carrying one kept and one lost literal, so a checker that never
+# fires cannot pass for one that has nothing to report.
+printf 'Erase hts-cache/new.*\nEfface hts-cache/new.*\nFollow robots.txt\nSuivre robot.txt\n' >"$tmp/literals.txt"
+case $(translated_literals "$tmp/literals.txt" literals.txt) in
+*"msgid names robots.txt"*) ;;
+*)
+    echo "the literal-token check missed a translated robots.txt"
+    exit 1
+    ;;
+esac
+if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 1 ]; then
+    echo "the literal-token check fired on a literal the translation kept"
+    exit 1
+fi
+
+for f in "$langdir"/*.txt; do
+    found=$(translated_literals "$f" "${f##*/}")
+    if [ -n "$found" ]; then
+        printf '%s\n' "$found"
+        fail=1
+    fi
+done
+
+# Each "\n" in a combo-box string starts a list item, so a value that carries a
+# different number of line breaks than its msgid shifts every row after the
+# first one that moved. Most of the drift here is prose reflowed to a different
+# width, harmless and long-standing, so the per-catalog counts are pinned the
+# way the untranslated ones are; a new one has to be looked at.
+count_linebreaks() {
+    LC_ALL=C awk -v name="$2" '
+        # Escaped backslashes go first: in "\\n" the break belongs to neither
+        # the pair nor the n, and counting it hides a row that never breaks.
+        function breaks(s,   n) {
+            gsub(/\\\\/, "", s)
+            n = gsub(/\\r\\n/, "", s)
+            return n + gsub(/\\n/, "", s)
+        }
+        { sub(/\r$/, "") }
+        NR % 2 == 1 { key = $0; next }
+        # An empty value renders as English, breaks included.
+        $0 == "" { next }
+        breaks(key) != breaks($0) { drift++ }
+        END { printf "%-25s %d\n", name, drift + 0 }
+    ' "$1"
+}
+
+# A catalog pinned at zero would also match a counter stuck there, so count a
+# fixture holding one drifting pair and one matching pair first.
+printf 'a\\nb\nx\\ny\nc\\nd\nz\ne\\nf\ng\\\\nh\n' >"$tmp/breaks.txt"
+got=$(count_linebreaks "$tmp/breaks.txt" breaks.txt)
+want=$(printf '%-25s %d\n' breaks.txt 2)
+if [ "$got" != "$want" ]; then
+    echo "the line-break counter miscounts a known fixture: got [$got] want [$want]"
+    exit 1
+fi
+
+lbpin="$testdir/62_lang-linebreaks.counts"
+[ -f "$lbpin" ] || fail "cannot find $lbpin"
+: >"$tmp/lb"
+for f in "$langdir"/*.txt; do
+    [ "$f" != "$eng" ] || continue
+    count_linebreaks "$f" "${f##*/}" >>"$tmp/lb"
+done
+LC_ALL=C sort -o "$tmp/lb" "$tmp/lb"
+LC_ALL=C awk -v pin="$lbpin" '
+    BEGIN {
+        while ((getline line < pin) > 0) {
+            sub(/\r$/, "", line)
+            if (line ~ /^[ \t]*(#|$)/)
+                continue
+            if (split(line, a, /[ \t]+/) != 2 || a[2] !~ /^[0-9]+$/ || a[1] in pinned) {
+                printf "%s: malformed pin line: %s\n", pin, line
+                bad++
+                continue
+            }
+            want[a[1]] = a[2]
+            pinned[a[1]] = 1
+        }
+    }
+    {
+        seen[$1] = 1
+        if (!($1 in pinned)) {
+            printf "%s: no pinned line-break count; add it\n", $1
+            bad++
+            next
+        }
+        if ($2 > want[$1])
+            printf "%s: %d values whose line breaks differ from their msgid, pinned at %d: a combo-box row moved\n", $1, $2, want[$1], bad++
+        else if ($2 < want[$1])
+            printf "%s: %d line-break mismatches, pinned at %d: lower the pin\n", $1, $2, want[$1], bad++
+    }
+    END {
+        for (f in pinned)
+            if (!(f in seen)) {
+                printf "%s: pinned but no such catalog\n", f
+                bad++
+            }
+        exit(bad > 0)
+    }
+' "$tmp/lb" || fail=1
+
 # An unknown ${LANG_*} renders as nothing rather than erroring, so check that
 # every macro the templates interpolate, in any wrapper form, resolves.
 LC_ALL=C grep -oh '[$]{[^}]*LANG_[A-Za-z0-9_]*}' "$top_srcdir"/html/server/*.html |

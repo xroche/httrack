@@ -913,7 +913,7 @@ Zùstat na stejné adrese (výchozí)\nZùstat ve stejné doménì\nZùstat ve stejné dom
 Never\nIf unknown (except /)\nIf unknown
 Nikdy\nPokud není znám (kromì /)\nPokud není znám
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
-žádná pravidla podle robot.txt\nrobot.txt kromì pomocníka\naplikovat pravidla podle robot.txt
+žádná pravidla podle robots.txt\nrobots.txt kromì pomocníka\naplikovat pravidla podle robots.txt
 normal\nextended\ndebug
 normální\nrozšíøený\nladìní
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download

@@ -1,0 +1,36 @@
+# Per-catalog count of values whose line-break count differs from their msgid.
+# English.txt is not listed: it is the msgid side of every pair.
+# Most of these are prose reflowed to a different width. A combo-box string is
+# not: there a lost break merges two rows, so a count that RISES wants reading
+# before the pin is raised to match.
+#
+# catalog                 drift
+Bulgarian.txt             2
+Castellano.txt            22
+Cesky.txt                 3
+Chinese-BIG5.txt          2
+Chinese-Simplified.txt    2
+Croatian.txt              1
+Dansk.txt                 5
+Deutsch.txt               5
+Eesti.txt                 2
+Finnish.txt               2
+Francais.txt              7
+Greek.txt                 2
+Italiano.txt              10
+Japanese.txt              7
+Macedonian.txt            8
+Magyar.txt                3
+Nederlands.txt            12
+Norsk.txt                 1
+Polski.txt                15
+Portugues-Brasil.txt      6
+Portugues.txt             5
+Romanian.txt              6
+Russian.txt               9
+Slovak.txt                9
+Slovenian.txt             1
+Svenska.txt               8
+Turkish.txt               1
+Ukrainian.txt             9
+Uzbek.txt                 9

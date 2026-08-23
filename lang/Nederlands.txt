@@ -559,7 +559,7 @@ Instellingen wegschrijven
 Max transfer rate
 Maximale transfer snelheid
 Follow robots.txt
-Volg de regels in robot.txt
+Volg de regels in robots.txt
 No external pages
 Geen externe pagina's
 Do not purge old files

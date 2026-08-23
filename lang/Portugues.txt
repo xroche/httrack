@@ -899,7 +899,7 @@ Mais informações:
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
 Benvindo ao WinHTTrack Website Copier!\n\nClique no botão Seguinte para\n\n- iniciar um novo projecto ou\n- retomar um projecto existente.
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
-Ficheiros de tipo:\nFicheiros contendo:\nEste ficheiro:\nNomes de pastas contendo:\nEsta pasta:\nHiperligações neste domínio:\nHiperligações num domínio contendo:\nHiperligações deste servidor:\nHiperligações contendo:\nEsta hiperligação:\nTODAS AS HIPERLIGAÇÕES\r\n
+Ficheiros de tipo:\nFicheiros contendo:\nEste ficheiro:\nNomes de pastas contendo:\nEsta pasta:\nHiperligações neste domínio:\nHiperligações num domínio contendo:\nHiperligações deste servidor:\nHiperligações contendo:\nEsta hiperligação:\nTODAS AS HIPERLIGAÇÕES
 Show all\nHide debug\nHide infos\nHide debug and infos
 Mostrar tudo\nOcultar erros\nOcultar informações\nOcultar erros e informações
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
@@ -913,7 +913,7 @@ Manter no mesmo endereço (padrão)\nManter no mesmo domínio\nManter no mesmo domí
 Never\nIf unknown (except /)\nIf unknown
 Nunca\nSe desconhecido (excepto /)\nSe desconhecido
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
-sem regras robots.txt\regras robots.txt excepto filtros\nseguir as regras robots.txt
+sem regras robots.txt\nregras robots.txt excepto filtros\nseguir as regras robots.txt
 normal\nextended\ndebug
 normal\nestendido\ncorrigir
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download

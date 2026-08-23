@@ -7,11 +7,11 @@ ro
 LANGUAGE_AUTHOR
 Alin Gheorghe Miron (miron.alin@personal.ro)
 LANGUAGE_CHARSET
-ISO-8859-1
+ISO-8859-2
 LANGUAGE_WINDOWSID
 Romanian
 OK
-LANGUAGE_WINDOWSID
+OK
 Cancel
 Anuleazã
 Exit
@@ -85,7 +85,7 @@ blue\r\nVa gãsi toate fiºierele care conþin un subºir 'blue' cum ar fi  'bluesky
 bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
 bigfile.mov\r\nVa detecta numai fiºierul  'bigfile.mov', dar nu ºi  'bigfile2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
-cgi\r\nVa gãsi linkuri spre folderele în  numele  cãrora  se gãseºte subºirul "cgi" cum ar fi /cgi/bin/oricecgi,cgi
+cgi\r\nVa gãsi linkuri spre folderele în  numele  cãrora  se gãseºte subºirul "cgi" cum ar fi /cgi-bin/oricecgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
 cgi-bin\r\nVa gãsi linkuri spre folderele în  numele  cãrora  se gãseºte numai subºirul  'cgi-bin' (dar nu ºi  cgi-bin-2, de exemplu)
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
