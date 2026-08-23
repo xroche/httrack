@@ -55,8 +55,7 @@ ok "the write failure is reported as a disk problem"
 if grep -qE 'Retry after error.*diskfull/big\.bin' <<<"$log"; then
     fail "the full disk was retried as if the network had dropped: ${log}"
 fi
-# The body is short because the writes failed, and the length check used to
-# relabel it as a lost connection.
+# What master reports here instead of the disk.
 if grep -q 'Incorrect length' <<<"$log"; then
     fail "the full disk is still reported as a truncated download: ${log}"
 fi

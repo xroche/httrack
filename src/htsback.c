@@ -3665,9 +3665,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               }
             }
 
-            /* A body cut short by a full disk is short by definition: leave
-               it classed as the write failure it is, not as a lost connection
-               the engine would retry. */
+            /* A body cut short by a full disk is short by definition: keep
+               the write failure it is already classed as. */
             if (back[i].r.totalsize >= 0 &&
                 back[i].r.statuscode != STATUSCODE_IO_FATAL) {
               if (back[i].r.totalsize != back[i].r.size) {      // pas la même!
