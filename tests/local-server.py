@@ -1215,7 +1215,7 @@ class Handler(SimpleHTTPRequestHandler):
     # --- a hub page that fails on the update, taking its children with it --
     # The children are only reachable through hub.html: if the engine drops
     # them from new.lst because the hub was never parsed, the purge unlinks
-    # them. gone.html is the live control -- it really does leave the site.
+    # them. gone.html is the live control: it really does leave the site.
     HUBFAIL_CHILD = b"<html><body><p>HUBFAIL-CHILD-%d</p></body></html>"
 
     def route_hubfail_index(self):
@@ -1224,10 +1224,9 @@ class Handler(SimpleHTTPRequestHandler):
             links += '\t<a href="gone.html">gone</a>\n'
         self.send_html(links)
 
-    # Hangs up for the whole of the caller's second crawl -- fetches 2 and 3,
-    # its initial request and the one retry --retries=1 buys -- then answers
-    # again, so the purge the fix defers can be seen to happen on the next
-    # clean crawl.
+    # Cuts off both attempts of the caller's second crawl (the request and the
+    # one retry --retries=1 buys), then answers again, so the third crawl can
+    # show the held-back purge running.
     def route_hubfail_hub(self):
         if 2 <= self.refetch_pass() <= 3:
             self.send_cut_headers()

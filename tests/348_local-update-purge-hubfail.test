@@ -1,10 +1,9 @@
 #!/bin/bash
 #
-# A page that fails to re-fetch on --update keeps its own copy (#746), but its
-# children were never queued, so the end-of-update purge unlinked them. Only
-# hub.html links child1/child2, and it hangs up on pass 2. gone.html leaves the
-# site on pass 3, the pass where nothing fails: purging it there is what says
-# the fix held the purge back rather than disabling it.
+# A page that fails to re-fetch on --update keeps its copy (#746), but its
+# children were never queued, so the purge unlinked them. hub.html, their only
+# parent, hangs up on pass 2. gone.html leaves the site on pass 3, where
+# nothing fails: purging it there says the purge was held back, not disabled.
 
 set -euo pipefail
 

@@ -537,6 +537,10 @@ int httpmirror(char *url1, httrackp * opt) {
   opt->robotsptr = &robots;
   //
 
+  /* per mirror, not per opt: an embedder reusing one opt would otherwise
+     carry the last run's verdict and never purge again */
+  opt->links_unqueued = HTS_FALSE;
+
   // noter heure actuelle de départ en secondes
   memset(&HTS_STAT, 0, sizeof(HTS_STAT));
   HTS_STAT.stat_timestart = time_local();
@@ -2110,9 +2114,8 @@ int httpmirror(char *url1, httrackp * opt) {
     } else if (opt->delete_old || opt->changes) {
       FILE *old_lst, *new_lst;
 
-      /* A page that gave up before it could be parsed leaves the links it
-         carries out of new.lst, so their absence says nothing about the site:
-         report the difference, delete none of it. */
+      /* A page that gave up before parsing keeps its own links out of
+         new.lst, so their absence says nothing about the site. */
       const hts_boolean purge_files = opt->delete_old && !opt->links_unqueued;
 
       if (opt->delete_old && !purge_files) {

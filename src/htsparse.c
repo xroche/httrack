@@ -3555,8 +3555,7 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
 }
 
 /* Could this link have carried links of its own? Its own answer first, then
-   what the previous run recorded for it, then the name that run saved it
-   under. */
+   what the previous run recorded for it, then the name it saved it under. */
 static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
                                             const htsblk *r, const char *adr,
                                             const char *fil, const char *save) {
@@ -3928,12 +3927,8 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             }
           }
 
-          /* Retries are gone and the page was never parsed, so the links it
-             carries were never queued: they are missing from new.lst through
-             no fault of the site, and the purge must not read that as gone.
-             A failure this side of the headers leaves no content type; what
-             the previous run cached for this URL is the better evidence, and
-             a link it never mirrored has no children in old.lst anyway. */
+          /* The page failed every retry before it could be parsed, so its
+             links are missing from new.lst though the site still has them. */
           if (can_retry && !heap(ptr)->testmode &&
               hts_link_may_carry_links(opt, cache, r, urladr(), urlfil(),
                                        savename())) {
