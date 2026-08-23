@@ -117,6 +117,7 @@
     <ClCompile Include="htscrashtest.c" />
     <ClCompile Include="htsdns_selftest.c" />
     <ClCompile Include="htsencoding.c" />
+    <ClCompile Include="htsescape.c" />
     <ClCompile Include="htsfilters.c" />
     <ClCompile Include="htsftp.c" />
     <ClCompile Include="htshash.c" />

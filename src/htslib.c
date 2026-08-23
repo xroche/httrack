@@ -4211,30 +4211,6 @@ void code64(unsigned char *a, int size_a, unsigned char *b, int crlf) {
   *b++ = '\0';
 }
 
-// return the hex character value, or -1 on error.
-static HTS_INLINE int ehexh(const char c) {
-  if (c >= '0' && c <= '9')
-    return c - '0';
-  else if (c >= 'a' && c <= 'f')
-    return (c - 'a' + 10);
-  else if (c >= 'A' && c <= 'F')
-    return (c - 'A' + 10);
-  else
-    return -1;
-}
-
-// return the two-hex character value, or -1 on error.
-static HTS_INLINE int ehex(const char *s) {
-  const int c1 = ehexh(s[0]);
-  if (c1 >= 0) {
-    const int c2 = ehexh(s[1]);
-    if (c2 >= 0) {
-      return 16*c1 + c2;
-    }
-  }
-  return -1;
-}
-
 void unescape_amp(char *s) {
   if (hts_unescapeEntities(s, s, strlen(s) + 1) != 0) {
     assertf(! "error escaping html entities");
@@ -4250,11 +4226,10 @@ HTSEXT_API char *unescape_http(char *const catbuff, const size_t size, const cha
 
   for(i = 0, j = 0; s[i] != '\0' && j + 1 < size ; i++) {
     int h;
-    if (s[i] == '%' && (h = ehex(&s[i + 1])) >= 0) {
+    if (s[i] == '%' && (h = hts_ehex(&s[i + 1])) >= 0) {
       catbuff[j++] = (char) h;
       i += 2;
-    }
-    else
+    } else
       catbuff[j++] = s[i];
   }
   catbuff[j++] = '\0';
@@ -4274,7 +4249,7 @@ HTSEXT_API char *unescape_http_unharm(char *const catbuff, const size_t size,
 
   for(i = 0, j = 0; s[i] != '\0' && j + 1 < size ; i++) {
     if (s[i] == '%') {
-      const int nchar = ehex(&s[i + 1]);
+      const int nchar = hts_ehex(&s[i + 1]);
 
       const int test = 
         ( CHAR_RESERVED(nchar) && nchar != '+' )        /* %2B => + (not in query!) */

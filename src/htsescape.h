@@ -18,55 +18,31 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+Ethical use: we kindly ask that you NOT use this software to harvest email
+addresses or to collect any other private information about people. Doing so
+would dishonor our work and waste the many hours we have spent on it.
+
 Please visit our Website: http://www.httrack.com
 */
 
 /* ------------------------------------------------------------ */
-/* File: Strings                                                */
+/* File: percent-escape decoding, shared by the engine and       */
+/*       htsserver                                              */
 /* Author: Xavier Roche                                         */
 /* ------------------------------------------------------------ */
 
-// Strings a bit safer than static buffers
+#ifndef HTSESCAPE_DEFH
+#define HTSESCAPE_DEFH
 
-#ifndef HTS_PROXYSTRINGS_DEFSTATIC
-#define HTS_PROXYSTRINGS_DEFSTATIC
-
+#include "htsencoding.h"
 #include "htsstrings.h"
 
-/* Tools */
+/* Decode form-urlencoded 's' into 'tempo': "%%" is '%', '+' is space, and a
+   bad escape stays literal. */
+extern void hts_unescapehttp(const char *s, String *tempo);
 
-HTS_UNUSED static void escapexml(const char *s, String * tempo) {
-  int i;
-
-  for(i = 0; s[i] != '\0'; i++) {
-    if (s[i] == '&')
-      StringCat(*tempo, "&amp;");
-    else if (s[i] == '<')
-      StringCat(*tempo, "&lt;");
-    else if (s[i] == '>')
-      StringCat(*tempo, "&gt;");
-    else if (s[i] == '\"')
-      StringCat(*tempo, "&quot;");
-    else
-      StringAddchar(*tempo, s[i]);
-  }
-}
-
-HTS_UNUSED static char* file_convert(char *dest, size_t size, const char *src) {
-  size_t i;
-  for(i = 0 ; src[i] != '\0' && i + 1 < size ; i++) {
-#ifdef _WIN32
-    if (src[i] == '/') {
-      dest[i] = '\\';
-    } else {
-#endif
-    dest[i] = src[i];
-#ifdef _WIN32
-    }
-#endif
-  }
-  dest[i] = '\0';
-  return dest;
-}
+/* As hts_unescapehttp(), minus the '+' rule, and collapsing a decoded run of
+   line separators so an escaped CRLF cannot forge an .ini line break. */
+extern void hts_unescapeini(const char *s, String *tempo);
 
 #endif

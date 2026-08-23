@@ -509,7 +509,7 @@ static hts_boolean body_sid_is_valid(const char *body, const char *expected) {
 
         memcpy(raw, eq + 1, len);
         raw[len] = '\0';
-        unescapehttp(raw, &value);
+        hts_unescapehttp(raw, &value);
         /* StringBuff is NULL until written, so an empty value lands here. */
         if (StringBuff(value) != NULL &&
             strcmp(StringBuff(value), expected) == 0) {
@@ -1188,7 +1188,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           ua = e + 1;
           if (strfield2(ua, "on"))      /* hack : "on" == 1 */
             ua = "1";
-          unescapehttp(ua, &sua);
+          hts_unescapehttp(ua, &sua);
           coucal_write(NewLangList, s, (intptr_t) StringAcquire(&sua));
           s = f + 1;
         }
@@ -1303,7 +1303,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                 /* A key in the file overwrites the default even when it is
                    empty, and an acquired NULL reads back as absent (#1186). */
                 StringClear(escline);
-                unescapeini(pos, &escline);
+                hts_unescapeini(pos, &escline);
                 coucal_write(NewLangList, line,
                               (intptr_t) StringAcquire(&escline));
               }
