@@ -70,16 +70,6 @@ int domd5mem(const char *buf, size_t len, char *digest, int asAscii) {
   return 0;
 }
 
-unsigned long int md5sum32(const char *buff) {
-  union {
-    char md5digest[16];
-    unsigned long int hash;
-  } u;
-
-  domd5mem(buff, strlen(buff), u.md5digest, 0);
-  return u.hash;
-}
-
 void md5selftest(void) {
   static const char str1[] = "The quick brown fox jumps over the lazy dog\n";
   static const char str1m[] = "37c4b87edffc5d198ff5a185cee7ee09";

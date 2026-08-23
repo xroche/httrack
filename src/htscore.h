@@ -180,8 +180,6 @@ struct struct_back {
   hts_connect_fallback *connect_fallback; /**< per-slot, count+1 entries */
 };
 
-typedef struct cache_back_zip_entry cache_back_zip_entry;
-
 /** Open handle to the mirror cache (the read-from-old / write-to-new state
     used to resume and to avoid re-fetching unchanged files). Engine-owned. */
 #ifndef HTS_DEF_FWSTRUCT_cache_back
@@ -210,9 +208,6 @@ struct cache_back {
   /* ZIP-backed cache backend (newer format) */
   void *zipInput;
   void *zipOutput;
-  cache_back_zip_entry *zipEntries;
-  int zipEntriesOffs;
-  int zipEntriesCapa;
   hts_boolean
       zipWriteFailed; /**< a cache write failed; stop touching the stream */
   int zipWriteFailures; /**< consecutive entry write failures; reset on store */
@@ -546,22 +541,12 @@ int nombre_digit(int n);
 int check_flot(T_SOC s);
 
 int check_stdin(void);
-
-int read_stdin(char *s, int max);
 #endif
-/* Socket readiness probes: nonzero if the socket has an error / has data. */
+/* Nonzero if the socket has a pending error. */
 int check_sockerror(T_SOC s);
-
-int check_sockdata(T_SOC s);
 
 /* external modules: register a link discovered by a parser plugin. */
 int htsAddLink(htsmoduleStruct * str, char *link);
-
-/* No-op function (used as a do-nothing callback / to defeat optimizers). */
-void voidf(void);
-
-/* HTML marker comment marking where the top index is spliced. */
-#define HTS_TOPINDEX "TOP_INDEX_HTTRACK"
 
 /* Worst-case byte expansion HT_ADD_HTMLESCAPED* must reserve per escaper. */
 #define HTS_HTMLESCAPE_MAXEXP 5      /* escape_for_html_print: '&'->"&amp;" */

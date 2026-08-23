@@ -560,18 +560,11 @@ int optreal_find(const char *token) {
   return -1;
 }
 
-const char *optreal_value(int p) {
-  return hts_optalias[p][1];
-}
-const char *optalias_value(int p) {
-  return hts_optalias[p][0];
-}
-const char *opttype_value(int p) {
-  return hts_optalias[p][2];
-}
-const char *opthelp_value(int p) {
-  return hts_optalias[p][3];
-}
+const char *optreal_value(int p) { return hts_optalias[p][1]; }
+
+const char *optalias_value(int p) { return hts_optalias[p][0]; }
+
+const char *opttype_value(int p) { return hts_optalias[p][2]; }
 
 /* Help for option <token>, empty if not available, or NULL if unknown <token> */
 const char *optalias_help(const char *token) {

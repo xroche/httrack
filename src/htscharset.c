@@ -1384,11 +1384,5 @@ size_t hts_getUTF8SequenceLength(const char lead) {
   }
 }
 
-size_t hts_stringLengthUCS4(const hts_UCS4 *s) {
-  size_t i;
-  for(i = 0 ; s[i] != 0 ; i++) ;
-  return i;
-}
-
 #undef ADD_BYTE
 #undef INCREASE_CAPA

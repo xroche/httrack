@@ -148,12 +148,6 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
     }                                                                          \
   } while (0)
 
-struct cache_back_zip_entry {
-  unsigned long int hdrPos;
-  unsigned long int size;
-  int compressionMethod;
-};
-
 /* A corrupt cache can carry a field wider than ours; clipping it keeps the
    entry, where aborting would take the crawl down. */
 #define ZIP_READFIELD_STRING(line, value, refline, refvalue, refvalue_size)    \
@@ -1434,72 +1428,6 @@ char *readfile_or(const char *fil, const char *defaultdata) {
   return NULL;
 }
 
-// écriture/lecture d'une chaîne sur un fichier
-// -1 : erreur, sinon 0
-int cache_wstr(FILE * fp, const char *s) {
-  INTsys i;
-  char buff[256 + 4];
-
-  i = (s != NULL) ? ((INTsys) strlen(s)) : 0;
-  sprintf(buff, INTsysP "\n", i);
-  if (!hts_fwrite_exact(buff, strlen(buff), fp))
-    return -1;
-  if (i > 0 && !hts_fwrite_exact(s, (size_t) i, fp))
-    return -1;
-  return 0;
-}
-void cache_rstr(FILE *fp, char *s, size_t s_size) {
-  INTsys i;
-  char buff[256 + 4];
-
-  linput(fp, buff, 256);
-  sscanf(buff, INTsysP, &i);
-  if (i < 0 || i > 32768)       /* error, something nasty happened */
-    i = 0;
-  if (i > 0) {
-    /* Store at most s_size-1 bytes into s, but consume all i bytes from the
-       stream so the next field stays aligned (the field may be longer than the
-       destination in a tampered/old cache). */
-    const size_t want = (size_t) i;
-    const size_t store = want < s_size ? want : s_size - 1;
-
-    if (!hts_fread_exact(s, store, fp)) {
-      int fread_cache_failed = 0;
-
-      assertf(fread_cache_failed);
-    }
-    if (want > store && fseek(fp, (long) (want - store), SEEK_CUR) != 0) {
-      int fseek_cache_failed = 0;
-
-      assertf(fseek_cache_failed);
-    }
-    s[store] = '\0';
-  } else {
-    s[0] = '\0';
-  }
-}
-char *cache_rstr_addr(FILE * fp) {
-  INTsys i = 0;
-  char *addr = NULL;
-  char buff[256 + 4];
-
-  linput(fp, buff, 256);
-  /* an unmatched sscanf leaves i untouched: length 0, not a stack value */
-  if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > 32768)
-    i = 0;
-  if (i > 0) {
-    addr = malloct(i + 1);
-    if (addr != NULL) {
-      if (!hts_fread_exact(addr, (size_t) i, fp)) {
-        int fread_cache_failed = 0;
-
-        assertf(fread_cache_failed);
-      }
-      *(addr + i) = '\0';
-    }
-  }
-  return addr;
-}
 int cache_brstr(char *adr, char *s, size_t s_size) {
   int i;
   int off;
@@ -1538,40 +1466,6 @@ int cache_binput(const char *adr, const char *end, char *s, int max) {
     return 0;
   }
   return binput(adr, s, max);
-}
-
-/* idem, mais en int */
-int cache_brint(char *adr, int *i) {
-  char s[256];
-  int r = cache_brstr(adr, s, sizeof(s));
-
-  if (r != -1)
-    sscanf(s, "%d", i);
-  return r;
-}
-void cache_rint(FILE * fp, int *i) {
-  char s[256];
-
-  cache_rstr(fp, s, sizeof(s));
-  sscanf(s, "%d", i);
-}
-int cache_wint(FILE * fp, int i) {
-  char s[256];
-
-  sprintf(s, "%d", (int) i);
-  return cache_wstr(fp, s);
-}
-void cache_rLLint(FILE * fp, LLint * i) {
-  char s[256];
-
-  cache_rstr(fp, s, sizeof(s));
-  sscanf(s, LLintP, i);
-}
-int cache_wLLint(FILE * fp, LLint i) {
-  char s[256];
-
-  sprintf(s, LLintP, (LLint) i);
-  return cache_wstr(fp, s);
 }
 
 // -- cache --

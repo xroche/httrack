@@ -2617,7 +2617,6 @@ HTSEXT_API int structcheck(const char *path) {
   char BIGSTK tmpbuf[HTS_URLMAXSIZE * 2];
   char BIGSTK file[HTS_URLMAXSIZE * 2];
   int i = 0;
-  int npaths;
 
   if (strnotempty(path) == 0)
     return 0;
@@ -2673,7 +2672,7 @@ HTSEXT_API int structcheck(const char *path) {
 #endif
 
   /* Check paths */
-  for(npaths = 1;; npaths++) {
+  for (;;) {
     char end_char;
 
     /* Go to next path */
@@ -2729,7 +2728,6 @@ HTSEXT_API int structcheck_utf8(const char *path) {
   char BIGSTK tmpbuf[HTS_URLMAXSIZE * 2];
   char BIGSTK file[HTS_URLMAXSIZE * 2];
   int i = 0;
-  int npaths;
 
   if (strnotempty(path) == 0)
     return 0;
@@ -2785,7 +2783,7 @@ HTSEXT_API int structcheck_utf8(const char *path) {
 #endif
 
   /* Check paths */
-  for(npaths = 1;; npaths++) {
+  for (;;) {
     char end_char;
 
     /* Go to next path */
@@ -3435,16 +3433,6 @@ int back_fill(struct_back * sback, httrackp * opt, cache_back * cache,
 
 // Poll stdin.. si besoin
 #if HTS_POLL
-// lecture stdin des caractères disponibles
-int read_stdin(char *s, int max) {
-  int i = 0;
-
-  while((check_stdin()) && (i < (max - 1)))
-    s[i++] = fgetc(stdin);
-  s[i] = '\0';
-  return i;
-}
-
 #ifdef _WIN32
 int check_stdin(void) {
   /* The console queue, not stdin: no end of file to mistake for a keystroke. */
@@ -3488,19 +3476,6 @@ int check_sockerror(T_SOC s) {
   tv.tv_sec = 0;
   tv.tv_usec = 0;
   select((int) s + 1, NULL, NULL, &fds, &tv);
-  return FD_ISSET(s, &fds);
-}
-
-/* check incoming data */
-int check_sockdata(T_SOC s) {
-  fd_set fds;
-  struct timeval tv;
-
-  FD_ZERO(&fds);
-  FD_SET((T_SOC) s, &fds);
-  tv.tv_sec = 0;
-  tv.tv_usec = 0;
-  select((int) s + 1, &fds, NULL, NULL, &tv);
   return FD_ISSET(s, &fds);
 }
 
@@ -4053,31 +4028,6 @@ int htsAddLink(htsmoduleStruct * str, char *link) {
     return (forbidden_url == 0);
   }
   return 0;
-}
-
-// message copyright interne
-void voidf(void) {
-  static const char *a;
-
-  a = "" CRLF "" CRLF;
-  a = "+-----------------------------------------------+" CRLF;
-  a = "|HyperTextTRACKer, Offline Browser Utility      |" CRLF;
-  a = "|                      HTTrack Website Copier   |" CRLF;
-  a = "|Code:         Windows Interface Xavier Roche   |" CRLF;
-  a = "|                    HTS/HTTrack Xavier Roche   |" CRLF;
-  a = "|                                               |" CRLF;
-  a = "|Tested on:                 Windows95,98,NT,2K  |" CRLF;
-  a = "|                           Linux PC            |" CRLF;
-  a = "|                           Sun-Solaris 5.6     |" CRLF;
-  a = "|                           AIX 4               |" CRLF;
-  a = "|                                               |" CRLF;
-  a = "|Copyright (C) Xavier Roche and other           |" CRLF;
-  a = "|contributors                                   |" CRLF;
-  a = "|                                               |" CRLF;
-  a = "|Use this program at your own risks!            |" CRLF;
-  a = "+-----------------------------------------------+" CRLF;
-  a = "" CRLF;
-  (void) a;
 }
 
 // HTTrack Website Copier Copyright (C) 1998 Xavier Roche and other contributors

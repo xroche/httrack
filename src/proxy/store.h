@@ -44,12 +44,6 @@ typedef struct _PT_Indexes _PT_Indexes;
 typedef struct _PT_Index *PT_Index;
 typedef struct _PT_Indexes *PT_Indexes;
 
-typedef struct _PT_Cache _PT_Cache;
-typedef struct _PT_Cache *PT_Cache;
-
-typedef struct _PT_CacheItem _PT_CacheItem;
-typedef struct _PT_CacheItem *PT_CacheItem;
-
 typedef struct _PT_Element {
   int indexId;                  // index identifier, if suitable (!= -1)
   //
@@ -90,7 +84,6 @@ void PT_Delete(PT_Indexes index);
 PT_Element PT_ReadIndex(PT_Indexes indexes, const char *url, int flags);
 int PT_LookupIndex(PT_Indexes indexes, const char *url);
 int PT_AddIndex(PT_Indexes index, const char *path);
-int PT_RemoveIndex(PT_Indexes index, int indexId);
 int PT_IndexMerge(PT_Indexes indexes, PT_Index * pindex);
 PT_Index PT_GetIndex(PT_Indexes indexes, int indexId);
 time_t PT_GetTimeIndex(PT_Indexes indexes);

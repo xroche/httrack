@@ -114,7 +114,6 @@ extern int smallserver_setkeyint(const char *key, LLint value);
 extern int smallserver_setkeyarr(const char *key, int id, const char *key2, const char *value);
 
 int htslang_init(void);
-int htslang_uninit(void);
 
 /* Static definitions */
 
