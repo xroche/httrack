@@ -1,0 +1,101 @@
+#!/bin/bash
+# A file kept in place instead of downloaded must say so at the default log
+# level (#113). Both acceptance paths were silent: the 416 answered to a resume
+# request, and --sizehack over a server that refuses Range. The re-fetch legs
+# are the control, since a marker that always appears proves nothing.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+marker='Kept existing file'
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_343.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+require_httrack
+
+# plain.bin is served from the docroot, whose handler ignores Range; the crawl
+# reaches /ranged/asset.bin, which honours it.
+mkdir -p "${tmpdir}/root"
+repeat_chars 8192 P >"${tmpdir}/root/plain.bin"
+cat >"${tmpdir}/root/index.html" <<'HTML'
+<html><body>
+<a href="plain.bin">plain</a>
+<a href="/ranged/asset.bin">ranged</a>
+</body></html>
+HTML
+
+local_server_start --root "${tmpdir}/root"
+
+crawl() { # crawl <label> <outdir> [httrack args...]
+    local label=$1 out=$2
+    shift 2
+    local_crawl --log "${tmpdir}/crawl-${label}.log" \
+        "${BASEURL}/index.html" -O "$out" --quiet --robots=0 --timeout=30 \
+        "$@" || fail "$label: crawl failed"
+}
+
+# Reference mirror, downloaded the ordinary way: what a kept file must not
+# become, and what a re-fetched one must.
+refout="${tmpdir}/out-ref"
+crawl ref "$refout"
+refhost="${refout}/127.0.0.1_${SRV_PORT}"
+assert_file "${refhost}/plain.bin" "reference mirror"
+assert_file "${refhost}/ranged/asset.bin" "reference mirror"
+
+# A clean directory holding only the assets, as the reporter's workflow builds
+# it: no cache, and mtimes stamped now, so If-Unmodified-Since always passes.
+seed() { # seed <outdir> <plain source> <ranged source>
+    local host="$1/127.0.0.1_${SRV_PORT}"
+    rm -rf "$1"
+    mkdir -p "${host}/ranged"
+    cp "$2" "${host}/plain.bin"
+    cp "$3" "${host}/ranged/asset.bin"
+}
+
+kept_lines() { # kept_lines <outdir>
+    count_matching_lines -F "$marker" "$1/hts-log.txt"
+}
+
+# Right size, wrong bytes: both paths accept these, and the log must name them.
+poison="${tmpdir}/poison"
+mkdir -p "$poison"
+repeat_chars "$(size_of "${refhost}/plain.bin")" Q >"${poison}/plain.bin"
+repeat_chars "$(size_of "${refhost}/ranged/asset.bin")" Q >"${poison}/asset.bin"
+
+keptout="${tmpdir}/out-kept"
+seed "$keptout" "${poison}/plain.bin" "${poison}/asset.bin"
+crawl kept "$keptout" '-%N0' --sizehack
+kepthost="${keptout}/127.0.0.1_${SRV_PORT}"
+n=$(kept_lines "$keptout")
+test "$n" -eq 2 || fail "kept: log names $n kept files, expected 2:
+$(grep -a 'complete\|Kept existing' "${keptout}/hts-log.txt" || true)"
+cmp -s "${poison}/plain.bin" "${kepthost}/plain.bin" ||
+    fail "kept: plain.bin was re-fetched, so the log line describes nothing"
+cmp -s "${poison}/asset.bin" "${kepthost}/ranged/asset.bin" ||
+    fail "kept: ranged/asset.bin was re-fetched"
+ok "both kept files are named in the log"
+
+# Control: a genuine prefix of each asset. Neither size matches, so both are
+# completed off the server and nothing may claim a file was kept.
+part="${tmpdir}/part"
+mkdir -p "$part"
+dd if="${refhost}/plain.bin" of="${part}/plain.bin" bs=1 count=4096 2>/dev/null
+dd if="${refhost}/ranged/asset.bin" of="${part}/asset.bin" bs=1 count=4096 \
+    2>/dev/null
+
+fetchout="${tmpdir}/out-fetch"
+seed "$fetchout" "${part}/plain.bin" "${part}/asset.bin"
+crawl fetch "$fetchout" '-%N0' --sizehack
+fetchhost="${fetchout}/127.0.0.1_${SRV_PORT}"
+n=$(kept_lines "$fetchout")
+test "$n" -eq 0 || fail "fetch: log claims $n files were kept"
+cmp -s "${refhost}/plain.bin" "${fetchhost}/plain.bin" ||
+    fail "fetch: plain.bin does not match the server's copy"
+cmp -s "${refhost}/ranged/asset.bin" "${fetchhost}/ranged/asset.bin" ||
+    fail "fetch: ranged/asset.bin does not match the server's copy"
+ok "a re-fetched file is not reported as kept"

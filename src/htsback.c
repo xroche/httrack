@@ -4106,9 +4106,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       back[i].r.size = back[i].r.totalsize =
                         back[i].range_req_size;
                       back[i].r.statuscode = HTTP_NOT_MODIFIED; // NOT MODIFIED
-                      hts_log_print(opt, LOG_DEBUG,
-                                    "File seems complete (good 416 message), breaking connection: %s%s",
-                                    back[i].url_adr, back[i].url_fil);
+                      hts_log_print(
+                          opt, LOG_NOTICE,
+                          "Kept existing file %s (" LLintP
+                          " bytes), matching size and timestamp: %s%s",
+                          back[i].url_sav, (LLint) back[i].range_req_size,
+                          back[i].url_adr, back[i].url_fil);
                     }
                   }
                   // transform 406 into 200 ; we'll catch embedded links inside the choice page
@@ -4156,9 +4159,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                               back[i].r.statuscode = HTTP_NOT_MODIFIED; // forcer NOT MODIFIED
                               deletehttp(&back[i].r);
                               back[i].r.soc = INVALID_SOCKET;
-                              hts_log_print(opt, LOG_DEBUG,
-                                            "File seems complete (same size), breaking connection: %s%s",
-                                            back[i].url_adr, back[i].url_fil);
+                              hts_log_print(
+                                  opt, LOG_NOTICE,
+                                  "Kept existing file %s (" LLintP
+                                  " bytes), matching the cached size: %s%s",
+                                  back[i].url_sav, (LLint) len1,
+                                  back[i].url_adr, back[i].url_fil);
                             }
                           }
                         } else {
@@ -4196,8 +4202,11 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                             back[i].url_fil, back[i].url_sav, 0,
                                             0, back[i].r.notmodified);
                                 back[i].r.statuscode = HTTP_NOT_MODIFIED;       // NOT MODIFIED
-                                hts_log_print(opt, LOG_DEBUG,
-                                              "File seems complete (same size file discovered), breaking connection: %s%s",
+                                hts_log_print(opt, LOG_NOTICE,
+                                              "Kept existing file %s (" LLintP
+                                              " bytes), matching the announced "
+                                              "size: %s%s",
+                                              back[i].url_sav, (LLint) size,
                                               back[i].url_adr, back[i].url_fil);
                               }
                             }
@@ -4239,10 +4248,14 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                                                     back[i].url_sav, 0, 0,
                                                     back[i].r.notmodified);
                                         back[i].r.statuscode = HTTP_NOT_MODIFIED;       // NOT MODIFIED
-                                        hts_log_print(opt, LOG_DEBUG,
-                                                      "File seems complete (reget failed), breaking connection: %s%s",
-                                                      back[i].url_adr,
-                                                      back[i].url_fil);
+                                        hts_log_print(
+                                            opt, LOG_NOTICE,
+                                            "Kept existing file %s (" LLintP
+                                            " bytes), matching the announced "
+                                            "size, range ignored: %s%s",
+                                            back[i].url_sav,
+                                            (LLint) back[i].range_req_size,
+                                            back[i].url_adr, back[i].url_fil);
                                       }
                                     }
                                   }

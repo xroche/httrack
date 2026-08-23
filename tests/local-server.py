@@ -1122,6 +1122,33 @@ class Handler(SimpleHTTPRequestHandler):
             "application/octet-stream",
         )
 
+    # Range-capable asset for 343: a resume at or past the end gets the 416 the
+    # on-disk acceptance path reads as "already complete", shorter gets a 206.
+    RANGED_BIN = b"RANGED-" + bytes((i * 11 + 5) % 256 for i in range(8192))
+
+    def route_ranged_asset(self):
+        body = self.RANGED_BIN
+        m = re.match(r"bytes=(\d+)-", self.headers.get("Range", "") or "")
+        start = int(m.group(1)) if m else 0
+        if not m or start == 0:
+            self.send_raw(body, "application/octet-stream")
+        elif start >= len(body):
+            self.send_response(416, "Requested Range Not Satisfiable")
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Range", "bytes */%d" % len(body))
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        else:
+            self.send_response(206, "Partial Content")
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header(
+                "Content-Range", "bytes %d-%d/%d" % (start, len(body) - 1, len(body))
+            )
+            self.send_header("Content-Length", str(len(body) - start))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body[start:])
+
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
         self.send_raw(
@@ -2671,6 +2698,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/keep/data.bin": route_keep_data,
         "/keep/err.bin": route_keep_err,
         "/keep/stay.bin": route_keep_stay,
+        "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
         "/types/photo.png": route_types,
