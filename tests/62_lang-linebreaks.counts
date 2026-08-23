@@ -1,8 +1,6 @@
 # Per-catalog count of values whose line-break count differs from their msgid.
-# English.txt is not listed: it is the msgid side of every pair.
-# Most of these are prose reflowed to a different width. A combo-box string is
-# not: there a lost break merges two rows, so a count that RISES wants reading
-# before the pin is raised to match.
+# English.txt is the msgid side of every pair, so it is not listed. A rising
+# count must be read before the pin is raised to match it.
 #
 # catalog                 drift
 Bulgarian.txt             2

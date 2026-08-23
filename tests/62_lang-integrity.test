@@ -297,11 +297,9 @@ for f in "$langdir"/*.txt; do
     fi
 done
 
-# WinHTTrack sprintf()s these strings, and %n/%N/%t/%p/%h/%M/%Q/%q are also
-# HTTrack's own build-string letters, so a dropped or invented placeholder
-# either breaks the format or drops a field from the filename help. Order is
-# part of it: the formats carry no positional specifiers, so a %s that swaps
-# with a %d binds to the other's argument.
+# WinHTTrack sprintf()s these strings, and %n/%N/%t/%p/%h/%M/%Q/%q double as
+# HTTrack's own build-string letters, so a lost or invented one breaks either.
+# No positional specifiers, so a %s that swaps with a %d takes its argument.
 placeholder_drift() {
     LC_ALL=C awk '
         # Two characters from each %, so a printf conversion and a build-string
@@ -404,9 +402,8 @@ else
         exit 1
     fi
 
-    # Shift-JIS maps 0x5C to the yen sign, so decoding turns every escape in
-    # Japanese.txt into "\u00a5" and the scan below sees none at all. The engine
-    # reads the byte, not the glyph, so put the backslashes back.
+    # Shift-JIS maps 0x5C to the yen sign, hiding every escape in Japanese.txt
+    # from the scan below. The engine reads the byte, so put the backslashes back.
     yen=$(printf '\302\245')
     nesc=0
     for f in "$langdir"/*.txt; do
@@ -532,16 +529,11 @@ elif [ "$rc" -ne 0 ]; then
     fail=1
 fi
 
-# hts-cache, robots.txt and cgi-bin are named on disk and on the wire, so a
-# translated one points the user at a path that does not exist: "htscache/new.*"
-# and "robot.txt" both shipped that way. Case is the translator's (a label may
-# start a sentence); the spelling is not. Example hostnames are deliberately not
-# on this list, since localising www.someweb.com is a translator's call.
-# web, html and images are the directories the structure dropdown promises, so
-# they are counted rather than merely looked for: a value keeping one of eleven
-# still sends ten rows to a folder that is never created. site_name and
-# www.domain.xxx are placeholders rather than real directories, kept literal so
-# every catalog reads the same.
+# These name real paths on disk and on the wire, so a translated one sends the
+# user nowhere: "htscache/new.*" and "robot.txt" both shipped. Case is the
+# translator's, spelling is not, and example hostnames stay their call. Counted
+# rather than matched: keeping one web/ of eleven still misroutes ten rows.
+# site_name and www.domain.xxx are placeholders, literal only for consistency.
 literal_tokens="hts-cache robots.txt cgi-bin web/images web/html site_name/images site_name/html www.domain.xxx"
 translated_literals() {
     LC_ALL=C awk -v name="$2" -v toks="$literal_tokens" '
@@ -594,11 +586,9 @@ for f in "$langdir"/*.txt; do
     fi
 done
 
-# Each "\n" in a combo-box string starts a list item, so a value that carries a
-# different number of line breaks than its msgid shifts every row after the
-# first one that moved. Most of the drift here is prose reflowed to a different
-# width, harmless and long-standing, so the per-catalog counts are pinned the
-# way the untranslated ones are; a new one has to be looked at.
+# A combo-box "\n" starts a row, so a value whose break count differs from its
+# msgid shifts every row after it. Most drift here is prose reflowed to another
+# width, so counts are pinned per catalog; a new one has to be looked at.
 count_linebreaks() {
     LC_ALL=C awk -v name="$2" '
         # Escaped backslashes go first: in "\\n" the break belongs to neither
