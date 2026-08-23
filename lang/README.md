@@ -13,7 +13,13 @@ Plain text, entries in consecutive pairs of lines:
 
 The first line of a pair is the lookup key and must stay identical to the one in `English.txt`; translate only the second line. Missing entries fall back to the English text at runtime, so a partial translation works.
 
-Preserve any `\r\n`, `\t` and `printf` placeholders (`%s`, `%d`, ...) in the translation.
+Preserve any `\r\n`, `\n`, `\t` and `printf` placeholders (`%s`, `%d`, ...) in the translation, in the same order: the strings go through `sprintf`, so a `%s` that swaps places with a `%d` picks up the wrong argument. A backslash before anything else is not an escape and loses its backslash, so a `\n` that lost its `n` silently joins two lines.
+
+Line breaks are load-bearing in the dropdown strings, where each `\n` starts a list item. A break lost there shifts every row after it, and the user picks something other than what the row named.
+
+Some words are not translatable text but names on disk or on the wire, and must be copied through unchanged: `hts-cache`, `robots.txt`, `cgi-bin`, and the `web/`, `web/html` and `web/images` directories in the local-structure list. Translating one points the user at a path HTTrack never creates. Example hostnames such as `www.someweb.com` are the opposite: localise them freely. `site_name` and `www.domain.xxx` are placeholders, kept as they are only so every catalog reads alike.
+
+`tests/62_lang-integrity.test` enforces all of this. Two of its counts are pinned per catalog, in `tests/62_lang-untranslated.counts` and `tests/62_lang-linebreaks.counts`, because the existing files carry long-standing differences that are not worth churning; if your change moves one of those numbers, look at why before editing the pin to match.
 
 A few `LANGUAGE_*` entries at the top describe the file itself:
 
