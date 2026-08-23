@@ -11,7 +11,6 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c a
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \
 	pty-resize.py ttyrun.py test-timeout.sh png-colors.py \
-	sanitizer-stderr-wrap.sh \
 	local-crawl.sh local-server.py ftp-server.py testlib.sh proclib.sh \
 	webhttracklib.sh httpclient.py webtestlib.py crawllib.sh arclib.sh \
 	guide-image-check.py \
@@ -92,6 +91,7 @@ TESTS_ENVIRONMENT += HTTRACK_LIBDIR=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)
 TESTS_ENVIRONMENT += SHLIBPATH_VAR=$(SHLIBPATH_VAR)
 # The shim directory test-timeout.sh puts on PATH under a sanitizer.
 TESTS_ENVIRONMENT += HTTRACK_STDERR_WRAP_DIR=$(abs_builddir)/$(STDERR_WRAP_DIR)
+TESTS_ENVIRONMENT += HTTRACK_STDERR_WRAP_EXE=$(abs_builddir)/stderrwrap$(EXEEXT)
 
 # rename() interposer for 01_engine-renameover.test; -rpath is what makes
 # libtool build a shared module rather than a static-only convenience library.
@@ -132,9 +132,12 @@ libftpcancel_la_LIBADD = $(DL_LIBS) -lpthread
 
 # realloc stub for 152_engine-string-oom.test; links nothing, so it stays a
 # plain binary rather than a libtool wrapper script.
-check_PROGRAMS = stringoom
+check_PROGRAMS = stringoom stderrwrap
 stringoom_SOURCES = stringoom.c
 stringoom_CPPFLAGS = -I$(top_srcdir)/src
+
+# Body of the PATH shims below.
+stderrwrap_SOURCES = stderrwrap.c
 
 # PATH shims the sanitizer legs run the engine through, so a UBSan report only
 # its stderr carries survives a test that redirects it. Built always, prepended
@@ -143,11 +146,11 @@ STDERR_WRAP_DIR = stderr-wrap
 check_SCRIPTS = $(STDERR_WRAP_DIR)/httrack $(STDERR_WRAP_DIR)/htsserver \
 	$(STDERR_WRAP_DIR)/proxytrack
 
-$(check_SCRIPTS): Makefile $(srcdir)/sanitizer-stderr-wrap.sh
+$(check_SCRIPTS): Makefile stderrwrap$(EXEEXT)
 	$(AM_V_GEN)$(MKDIR_P) $(STDERR_WRAP_DIR) && \
 	  prog=`echo $@ | sed 's|.*/||'` && \
 	  { echo '#!/bin/sh'; \
-	    echo "exec $(BASH_SHELL) $(abs_srcdir)/sanitizer-stderr-wrap.sh $(abs_top_builddir)/src/$$prog$(EXEEXT) \"\$$@\""; \
+	    echo "exec $(abs_builddir)/stderrwrap$(EXEEXT) $(abs_top_builddir)/src/$$prog$(EXEEXT) \"\$$@\""; \
 	  } >$@ && chmod +x $@
 
 clean-local:
