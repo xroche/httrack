@@ -12,11 +12,7 @@ set -euo pipefail
 htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_lang.XXXXXX") || fail "no tmpdir"
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${work}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${work}"
 
 # Leaves the URL in ${HTS_URL}; never call it from a $(...), or the pids it
 # records would stay in the subshell and every server would keep running.

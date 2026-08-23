@@ -21,11 +21,7 @@ for asset in server/ping.js server/style.css images/screenshot_01.jpg \
 done
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_ctype.XXXXXX") || fail "no tmpdir"
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${work}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${work}"
 
 # A mirror to serve through /website/, holding the awkward names: the crawl
 # itself is not under test.

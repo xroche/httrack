@@ -45,10 +45,8 @@ crawl "http://127.0.0.1:$port/" -O "$tmpdir/m1" \
     -c1 --robots=0 --retries=0 --quiet -%v0
 stop_server "$serverpid"
 serverpid=
-"$python" "$checker" "$tmpdir/direct.wire" direct "$port" || {
-    cat "$tmpdir/log" >&2
-    exit 1
-}
+"$python" "$checker" "$tmpdir/direct.wire" direct "$port" ||
+    fail_dump "the direct crawl's wire failed the header checks" "$tmpdir/log"
 
 # 2. Host, the proxy absolute-URI request line and its ftp:// variant. Only
 # reachable through an http proxy: without one the poisoned authority fails to
@@ -58,7 +56,5 @@ crawl "http://start.example/" '+*' -P "127.0.0.1:$port" \
     -O "$tmpdir/m2" -c1 --robots=0 --retries=0 --quiet -%v0
 stop_server "$serverpid"
 serverpid=
-"$python" "$checker" "$tmpdir/proxy.wire" proxy || {
-    cat "$tmpdir/log" >&2
-    exit 1
-}
+"$python" "$checker" "$tmpdir/proxy.wire" proxy ||
+    fail_dump "the proxied crawl's wire failed the header checks" "$tmpdir/log"

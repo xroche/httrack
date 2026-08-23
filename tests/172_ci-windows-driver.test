@@ -253,10 +253,7 @@ wedge_leg() (
 )
 # Held back: bash announces every job it reaps from a signal, which reads as a
 # failure in a log that passed.
-wedge_leg >"$tmp/wedge.log" 2>&1 || {
-    cat "$tmp/wedge.log" >&2
-    exit 1
-}
+wedge_leg >"$tmp/wedge.log" 2>&1 || fail_dump "the wedge leg failed" "$tmp/wedge.log"
 
 # A sleep still holding the step's stdout keeps its reader waiting for EOF past the
 # trap that killed the heartbeat (#949); 171 shims sleep, forks nothing, is blind to it.

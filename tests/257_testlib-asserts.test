@@ -34,6 +34,14 @@ fires() {
     esac
 }
 
+fires_without() { # the negative control fires needs: presence proves nothing alone
+    run_subject "$1"
+    test "$rc" -eq 1 || fail "[$1] should have failed, exited $rc: $out"
+    case "$out" in
+    *"$2"*) fail "[$1] still printed '$2': $out" ;;
+    esac
+}
+
 ## assert_eq prints both sides
 holds 'assert_eq abc abc'
 holds 'assert_eq "a b" "a b"'
@@ -72,6 +80,57 @@ fires "assert_file $tmpdir/adir" "missing file: $tmpdir/adir"
 fires "assert_file $tmpdir/nothing" "missing file: $tmpdir/nothing"
 fires "assert_file $tmpdir/adir 'the cache fixture'" "the cache fixture: missing file"
 ok "assert_file rejects a directory and a missing path alike"
+
+## fail_dump prints the logs a failure is about
+printf 'first line\nsecond line\n' >"$tmpdir/log1"
+printf 'other\n' >"$tmpdir/log2"
+: >"$tmpdir/empty"
+fires "fail_dump 'no pong' $tmpdir/log1" 'FAIL: no pong'
+fires "fail_dump 'no pong' $tmpdir/log1" "--- $tmpdir/log1"
+# Indented: a plain cat of the log would pass every other leg here.
+fires "fail_dump 'no pong' $tmpdir/log1" '  | second line'
+# Every named log, not just the first.
+fires "fail_dump two $tmpdir/log1 $tmpdir/log2" '  | first line'
+fires "fail_dump two $tmpdir/log1 $tmpdir/log2" '  | other'
+# A log the run never wrote must not turn the verdict into a sed error, and a
+# header with nothing under it reads as a truncated log.
+fires "fail_dump gone $tmpdir/nothing" 'FAIL: gone'
+fires_without "fail_dump gone $tmpdir/nothing" '---'
+fires_without "fail_dump 'no pong' $tmpdir/empty" '---'
+# stderr, like every other verdict: on stdout it lands in the test's own output.
+printf 'set -euo pipefail\n. "%s/testlib.sh"\nfail_dump x %s\n' \
+    "$testdir" "$tmpdir/log1" >"$tmpdir/subject.sh"
+leaked=$(bash "$tmpdir/subject.sh" 2>/dev/null) || true
+test -z "$leaked" || fail "fail_dump wrote to stdout: $leaked"
+ok "fail_dump names the file, indents it, and stays silent on an empty one"
+
+## fail_dump_var arms fail() itself, by variable name
+armed="out=$tmpdir/log1
+fail_dump_var out"
+fires "$armed
+fail boom" 'FAIL: boom'
+fires "$armed
+fail boom" '  | first line'
+# The whole point of naming the variable: a test that retargets its log mid-run
+# dumps the log it is on, not the one it registered.
+fires "$armed
+out=$tmpdir/log2
+fail boom" '  | other'
+fires_without "$armed
+out=$tmpdir/log2
+fail boom" '  | first line'
+# An unregistered, unset or emptied variable leaves the verdict alone.
+fires 'fail boom' 'FAIL: boom'
+fires_without 'fail boom' '---'
+fires "fail_dump_var never
+fail boom" 'FAIL: boom'
+fires "$armed
+out=
+fail boom" 'FAIL: boom'
+fires_without "$armed
+out=
+fail boom" '---'
+ok "fail_dump_var dumps whatever its variable names when the failure happens"
 
 ## assert_selftest
 holds 'assert_selftest "identabs self-test OK" identabs'

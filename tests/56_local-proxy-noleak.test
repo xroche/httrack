@@ -68,11 +68,8 @@ if grep -qE '"(GET|POST|HEAD|CONNECT) ' "$SRV_LOG"; then
 fi
 
 # the crawl must fail at the proxy (proves it really tried the proxy, not a no-op)
-grep -q 'Connect Error' "$log" || {
-    echo "FAIL: expected a proxy connect error"
-    cat "$log"
-    exit 1
-}
+grep -q 'Connect Error' "$log" ||
+    fail_dump "expected a proxy connect error" "$log"
 
 # and it must not have tried an origin-address fallback under the proxy
 if grep -q "trying next address" "$log"; then

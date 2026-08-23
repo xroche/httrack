@@ -72,16 +72,10 @@ HTTRACK_DEBUG_RESOLVE="alldead:127.0.0.2,127.0.0.3" \
     local_crawl --log "$tmpdir/log2" "http://alldead:${SRV_PORT}/simple/basic.html" -O "$out2" -c1 --robots=0 --timeout=5 --retries=0 --quiet -Z
 log2="$out2/hts-log.txt"
 
-grep -q "trying next address" "$log2" || {
-    echo "FAIL: exhaustion path never tried the fallback address"
-    cat "$log2"
-    exit 1
-}
-grep -iqE "^[0-9:]*[[:space:]]Error:" "$log2" || {
-    echo "FAIL: all addresses failing did not report an error"
-    cat "$log2"
-    exit 1
-}
+grep -q "trying next address" "$log2" ||
+    fail_dump "exhaustion path never tried the fallback address" "$log2"
+grep -iqE "^[0-9:]*[[:space:]]Error:" "$log2" ||
+    fail_dump "all addresses failing did not report an error" "$log2"
 test ! -f "$out2/alldead_${SRV_PORT}/simple/basic.html" || fail "file downloaded despite every address failing"
 
 echo "OK: connect fallback succeeds, and exhausting all addresses errors out"

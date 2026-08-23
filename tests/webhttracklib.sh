@@ -173,6 +173,27 @@ htsserver_cleanup() {
     HTS_TMP_LOGS=()
 }
 
+# Teardown for a test that owns a work dir: htsserver holds ${HOME} under it, so
+# the reap has to precede the removal. Takes the dir rather than reading a
+# caller variable, since cleanup_push records its arguments at push time.
+htsserver_cleanup_dir() { # htsserver_cleanup_dir DIR
+    htsserver_cleanup
+    rm -rf "$1"
+}
+
+# Reap helper processes the test backgrounded, named by VARIABLE: their pids are
+# assigned after the teardown frame is pushed.
+htsserver_reap_vars() { # htsserver_reap_vars VAR...
+    local v
+    for v in "$@"; do
+        test -z "${!v:-}" || kill -9 "${!v}" 2>/dev/null || true
+    done
+    # Absorbs bash's async "Killed" notice, which reads as a failure otherwise.
+    for v in "$@"; do
+        test -z "${!v:-}" || wait "${!v}" 2>/dev/null || true
+    done
+}
+
 # A leaked htsserver wedges the parallel harness behind a green log.
 htsserver_assert_reaped() {
     local pid

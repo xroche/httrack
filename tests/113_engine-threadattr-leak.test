@@ -41,20 +41,14 @@ log="$dir/counts"
 THREADATTRFAIL=1 THREADATTRFAIL_LOG="$log" LD_PRELOAD="$THREADATTRFAIL_LIB" \
     httrack -O "$dir/o" -#test=threadwait >"$dir/out" 2>&1 || true
 
-test -r "$log" || {
-    echo "threadattr: the interposer wrote no counts" >&2
-    cat "$dir/out" >&2
-    exit 1
-}
+test -r "$log" ||
+    fail_dump "threadattr: the interposer wrote no counts" "$dir/out"
 sabotaged=$(sed -n 's/^sabotaged //p' "$log")
 undestroyed=$(sed -n 's/^undestroyed //p' "$log")
 
 # Teeth: with no refused create there is nothing to leak, and the check below
 # would pass on any build.
-test "${sabotaged:-0}" -ge 1 || {
-    echo "threadattr: no pthread_create() was refused, nothing was tested" >&2
-    cat "$dir/out" >&2
-    exit 1
-}
+test "${sabotaged:-0}" -ge 1 ||
+    fail_dump "threadattr: no pthread_create() was refused, nothing was tested" "$dir/out"
 test "${undestroyed:-1}" -eq 0 || fail "threadattr: $undestroyed of $sabotaged attributes objects survived a refused pthread_create()"
 echo "OK: a refused pthread_create() destroys the attributes object ($sabotaged refused)"

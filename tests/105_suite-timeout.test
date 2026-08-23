@@ -14,11 +14,7 @@ set -eu
 driver="${testdir}/test-timeout.sh"
 test -r "$driver" || fail "no test-timeout.sh next to $0"
 
-fail() {
-    echo "FAIL: $*" >&2
-    test -z "${out:-}" || sed 's/^/  | /' <"$out" >&2
-    exit 1
-}
+fail_dump_var out
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_sutmo.XXXXXX") || exit 1
 # A colon-free root for the PATH shim below: MSYS hands out a drive-letter TMPDIR

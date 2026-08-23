@@ -17,11 +17,7 @@ for asset in server/index.html server/ping.js; do
 done
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_sandbox.XXXXXX") || fail "no tmpdir"
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${work}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${work}"
 
 # Stand in for a finished mirror: the crawl itself is not under test.
 proj="${work}/websites/proj"
