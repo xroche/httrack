@@ -2227,3 +2227,134 @@ int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
 
   return failures;
 }
+
+/* Store one entry through cache_zip_store_stream and hand back what the ZIP
+   holds for it: the byte count, or -1 if the store or the readback failed. */
+static int readfail_roundtrip(const char *path, FILE *src, int want_status,
+                              char *out, size_t outsz) {
+  zipFile zf = hts_zipOpen_utf8(path, APPEND_STATUS_CREATE);
+  zip_fileinfo fi;
+  unzFile uf;
+  int got, n;
+
+  if (zf == NULL)
+    return -1;
+  memset(&fi, 0, sizeof(fi));
+  if (zipOpenNewFileInZip(zf, "entry.bin", &fi, NULL, 0, NULL, 0, NULL,
+                          Z_DEFLATED, Z_DEFAULT_COMPRESSION) != ZIP_OK) {
+    zipClose(zf, NULL);
+    return -1;
+  }
+  got = cache_zip_store_stream(zf, src);
+  zipCloseFileInZip(zf);
+  zipClose(zf, NULL);
+  if (got != want_status) {
+    fprintf(stderr, "cache-readfail: status %d, want %d\n", got, want_status);
+    return -1;
+  }
+  uf = hts_unzOpen_utf8(path);
+  if (uf == NULL || unzLocateFile(uf, "entry.bin", 1) != UNZ_OK ||
+      unzOpenCurrentFile(uf) != UNZ_OK) {
+    if (uf != NULL)
+      unzClose(uf);
+    return -1;
+  }
+  n = unzReadCurrentFile(uf, out, (unsigned) outsz);
+  unzCloseCurrentFile(uf);
+  unzClose(uf);
+  return n;
+}
+
+/* A short read is indistinguishable from EOF, so without the ferror() check the
+   loop commits a silently truncated body and reports success. */
+int cache_readfail_selftest(httrackp *opt, const char *dir) {
+  static const char body[] = "cache-readfail body\x00\x01\x02 payload";
+  const size_t body_len = sizeof(body) - 1;
+  char zippath[HTS_URLMAXSIZE], srcpath[HTS_URLMAXSIZE];
+  char catbuff[CATBUFF_SIZE];
+  char out[256];
+  FILE *fp;
+  int fail = 0, n;
+
+  (void) opt;
+  fconcat(zippath, sizeof(zippath), dir, "readfail.zip");
+  fconcat(srcpath, sizeof(srcpath), dir, "readfail-src.bin");
+
+  /* control: a readable source still copies byte for byte */
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), srcpath), "wb");
+  assertf(fp != NULL);
+  assertf(fwrite(body, 1, body_len, fp) == body_len);
+  fclose(fp);
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), srcpath), "rb");
+  assertf(fp != NULL);
+  n = readfail_roundtrip(zippath, fp, Z_OK, out, sizeof(out));
+  fclose(fp);
+  if (n != (int) body_len || memcmp(out, body, body_len) != 0) {
+    fprintf(stderr, "cache-readfail: readable source stored %d/%d byte(s)\n", n,
+            (int) body_len);
+    fail++;
+  }
+
+  /* control: an empty source is not an error */
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), srcpath), "wb");
+  assertf(fp != NULL);
+  fclose(fp);
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), srcpath), "rb");
+  assertf(fp != NULL);
+  n = readfail_roundtrip(zippath, fp, Z_OK, out, sizeof(out));
+  fclose(fp);
+  if (n != 0) {
+    fprintf(stderr, "cache-readfail: empty source stored %d byte(s)\n", n);
+    fail++;
+  }
+
+  /* a write-only stream fails every read and sets the error indicator */
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), srcpath), "wb");
+  assertf(fp != NULL);
+  n = readfail_roundtrip(zippath, fp, CACHE_ZIP_READ_ERROR, out, sizeof(out));
+  fclose(fp);
+  if (n != 0) {
+    fprintf(stderr, "cache-readfail: unreadable source stored %d byte(s)\n", n);
+    fail++;
+  }
+
+  /* r.msg is 80 bytes inside an installed-header struct, and both the reason
+     and strerror() are unbounded, so the message must clip, not smash. */
+  {
+    static const int errs[] = {0, ENOENT, EIO, EACCES};
+    char what[512];
+    size_t i;
+
+    memset(what, 'W', sizeof(what) - 1);
+    what[sizeof(what) - 1] = '\0';
+    for (i = 0; i < sizeof(errs) / sizeof(errs[0]); i++) {
+      htsblk r;
+
+      hts_init_htsblk(&r);
+      memset(r.contenttype, 'C', sizeof(r.contenttype)); /* poisoned canary */
+      cache_read_failed(&r, what, errs[i]);
+      if (r.msg[sizeof(r.msg) - 1] != '\0' || strlen(r.msg) >= sizeof(r.msg)) {
+        fprintf(stderr, "cache-readfail: msg not terminated in %d bytes\n",
+                (int) sizeof(r.msg));
+        fail++;
+      }
+      if (memchr(r.contenttype, 'C', sizeof(r.contenttype)) == NULL ||
+          r.contenttype[0] != 'C') {
+        fprintf(stderr,
+                "cache-readfail: the message overran msg into "
+                "contenttype (errno %d)\n",
+                errs[i]);
+        fail++;
+      }
+      if (r.statuscode != STATUSCODE_INVALID) {
+        fprintf(stderr, "cache-readfail: statuscode left at %d\n",
+                r.statuscode);
+        fail++;
+      }
+    }
+  }
+
+  UNLINK(fconv(catbuff, sizeof(catbuff), srcpath));
+  UNLINK(fconv(catbuff, sizeof(catbuff), zippath));
+  return fail;
+}

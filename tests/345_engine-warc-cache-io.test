@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Two I/O seams that fail silently: the CDXJ record offset must stay 64-bit past
+# the 2GB `long` ceiling, and a failed read of a cached file must abandon the
+# entry rather than commit a truncated body under its declared X-Size.
+
+set -e
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_warccacheio.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/"
+httrack -O "$tmp/out" "-#test=cache-readfail" "$tmp/"

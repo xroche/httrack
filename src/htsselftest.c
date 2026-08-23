@@ -3950,6 +3950,18 @@ static int st_cache_corrupt(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static int st_cache_readfail(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  if (argc < 1) {
+    fprintf(stderr, "cache-readfail: needs a directory\n");
+    return 1;
+  }
+  err = cache_readfail_selftest(opt, argv[0]);
+  printf("cache-readfail: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* Drives unzRepair over a damaged local file header whose CRC field's high
    16-bit word has bit 15 set. Before the READ_32 fix that shifted an int and
    overflowed, so UBSan aborts here; after it, repair recovers the one entry. */
@@ -8191,6 +8203,67 @@ static int st_warc_surt(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The CDXJ offset is a uint64_t, and the tell behind it must carry the same
+   width: `long`/ftell caps at 2GB, and is 32-bit even on 64-bit Windows, so
+   every record past the cap would be indexed at a wrong offset (or at the last
+   good one). Seeking alone costs no disk: the file stays empty. */
+static int st_warc_offset(httrackp *opt, int argc, char **argv) {
+  static const uint64_t cases[] = {
+      0,
+      2147483647ULL, /* LONG_MAX where long is 32 bits */
+      2147483648ULL, /* first offset a 32-bit signed tell cannot hold */
+      4294967295ULL,
+      4294967296ULL,
+      1099511627775ULL, /* 1TB - 1: a plausible archive on a big mirror */
+  };
+  char path[HTS_URLMAXSIZE];
+  char catbuff[CATBUFF_SIZE];
+  FILE *fp;
+  int err = 0;
+  size_t i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "warc-offset: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(path, sizeof(path), argv[0], "warc-offset.bin");
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "wb");
+  if (fp == NULL) {
+    fprintf(stderr, "warc-offset: cannot create '%s': %s\n", path,
+            strerror(errno));
+    return 1;
+  }
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    const uint64_t want = cases[i];
+    uint64_t got;
+
+    if (fseeko(fp, (LLint) want, SEEK_SET) != 0) {
+      fprintf(stderr, "warc-offset: cannot seek to %" PRIu64 ": %s\n", want,
+              strerror(errno));
+      err = 1;
+      continue;
+    }
+    /* the sentinel must never survive: a failed tell would leak it back */
+    got = warc_stream_offset(fp, 0xdeadbeefULL);
+    if (got != want) {
+      fprintf(stderr, "warc-offset: tell at %" PRIu64 " reported %" PRIu64 "\n",
+              want, got);
+      err = 1;
+    }
+  }
+  fclose(fp);
+  /* seeking never wrote: a several-GB file here would mean a real write */
+  if (fsize_utf8(path) != 0) {
+    fprintf(stderr, "warc-offset: the probe file is not empty (%" PRIu64 ")\n",
+            (uint64_t) fsize_utf8(path));
+    err = 1;
+  }
+  UNLINK(fconv(catbuff, sizeof(catbuff), path));
+  printf("warc-offset: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 /* A URL longer than the old 1024-byte header-format buffer must still reach the
    archive: the record used to be abandoned whole, silently (#785). The sweep
    straddles the boundary so both the stack-buffer and the grow path run. */
@@ -8822,7 +8895,7 @@ static int st_warc_wacz(httrackp *opt, int argc, char **argv) {
   warc_close(w);
 
   /* Unzip every member in-process. */
-  uf = unzOpen(waczpath);
+  uf = hts_unzOpen_utf8(waczpath);
   assertf(uf != NULL);
   if (unzGoToFirstFile(uf) == UNZ_OK) {
     do {
@@ -12037,6 +12110,9 @@ static const struct selftest_entry {
      st_cache_legacy},
     {"cache-corrupt", "<dir>", "cache read-side corruption self-test",
      st_cache_corrupt},
+    {"cache-readfail", "<dir>",
+     "a failed source read abandons the entry, never truncates it",
+     st_cache_readfail},
     {"cache-hdrbounds", "<dir>",
      "cache header block must stay bounded at max-length fields",
      st_cache_hdrbounds},
@@ -12101,6 +12177,8 @@ static const struct selftest_entry {
      st_warc_verbatim},
     {"warc-surt", "", "SURT canonicalization of the CDXJ sort key",
      st_warc_surt},
+    {"warc-offset", "<dir>", "the CDXJ record offset stays 64-bit past 2GB",
+     st_warc_offset},
     {"warc-longurl", "<dir>",
      "a URL past the header-format buffer still reaches the archive",
      st_warc_longurl},

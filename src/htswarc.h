@@ -37,6 +37,9 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsopt.h"
 
+#include <stdint.h>
+#include <stdio.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -106,6 +109,10 @@ void warc_close(warc_writer *w);
 /* SURT-canonicalize url into out[outsz] (the CDXJ sort key). Returns 0 on
    success, -1 on error or truncation. Exposed for the -#test=warc-surt test. */
 int warc_surt(const char *url, char *out, size_t outsz);
+
+/* Byte offset of f, or `current` if the tell failed. Exposed for the
+   -#test=warc-offset test, which pins it wide past the 2GB `long` ceiling. */
+uint64_t warc_stream_offset(FILE *f, uint64_t current);
 
 /* unchanged_kind for warc_write_transaction. */
 #define WARC_UNCHANGED_NONE 0       /* a fresh exchange: a full response */

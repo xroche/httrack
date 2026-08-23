@@ -1003,12 +1003,6 @@ static int wacz_add_mem(zipFile zf, const char *zipname, const void *data,
   return 0;
 }
 
-static zipFile wacz_zip_open(const char *path) {
-  zlib_filefunc64_def ff;
-  fill_fopen64_filefunc(&ff);
-  return zipOpen2_64(path, 0 /*create*/, NULL, &ff);
-}
-
 /* Package the segment(s) + .cdx + a generated pages.jsonl into <base>.wacz at
    crawl end (the archive file(s) and .cdx are already closed on disk). */
 static void warc_wacz_package(warc_writer *w) {
@@ -1031,7 +1025,7 @@ static void warc_wacz_package(warc_writer *w) {
   snprintf(tmppath, sizeof(tmppath), "%s.wacz.tmp", w->base_path);
   /* Build into a temp; only full success replaces <base>.wacz, so a zero-record
      re-run can't destroy a good archive (#522). */
-  zf = wacz_zip_open(fconv(catbuff, sizeof(catbuff), tmppath));
+  zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), tmppath), 0);
   if (zf == NULL) {
     hts_log_print(w->opt, LOG_WARNING, "WACZ: could not create %s", tmppath);
     return;
@@ -1267,11 +1261,7 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
     if (member_end(&m) != 0)
       goto done;
 
-    {
-      long pos = ftell(w->f);
-      if (pos >= 0)
-        w->offset = (uint64_t) pos;
-    }
+    w->offset = warc_stream_offset(w->f, w->offset);
     /* Index response/revisit/resource records only (not warcinfo/request). */
     if (w->cdx_on && target_uri != NULL && target_uri[0] != '\0' &&
         (strcmp(type, "response") == 0 || strcmp(type, "revisit") == 0 ||
@@ -1293,6 +1283,15 @@ done:
   if (rc != 0)
     w->failed = HTS_TRUE; /* a truncated run must not replace a whole one */
   return rc;
+}
+
+/* Byte offset of f, for the CDXJ index and the segment-rotation cap. ftello,
+   never ftell: long tops out at 2GB, and is 32-bit even on 64-bit Windows, so
+   every offset past the cap would be indexed wrong. `current` on failure. */
+uint64_t warc_stream_offset(FILE *f, uint64_t current) {
+  const LLint pos = ftello(f);
+
+  return pos >= 0 ? (uint64_t) pos : current;
 }
 
 /* ---- segment rotation (--warc-max-size) ---- */

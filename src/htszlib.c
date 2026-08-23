@@ -273,3 +273,37 @@ const char *hts_get_zerror(int err) {
     break;
   }
 }
+
+/* Open a ZIP through hts_fopen_utf8 so a non-ASCII path isn't mangled to ANSI
+   on Windows (#630); the 64-bit funcs keep multi-GB archives whole on LLP64. */
+static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const void *filename,
+                                           int mode) {
+  const char *mode_fopen = NULL;
+
+  (void) opaque;
+  if ((mode & ZLIB_FILEFUNC_MODE_READWRITEFILTER) == ZLIB_FILEFUNC_MODE_READ)
+    mode_fopen = "rb";
+  else if (mode & ZLIB_FILEFUNC_MODE_EXISTING)
+    mode_fopen = "r+b";
+  else if (mode & ZLIB_FILEFUNC_MODE_CREATE)
+    mode_fopen = "wb";
+  if (filename == NULL || mode_fopen == NULL)
+    return NULL;
+  return (voidpf) FOPEN((const char *) filename, mode_fopen);
+}
+
+unzFile hts_unzOpen_utf8(const char *path) {
+  zlib_filefunc64_def ff;
+
+  fill_fopen64_filefunc(&ff);
+  ff.zopen64_file = hts_zip_fopen_utf8;
+  return unzOpen2_64(path, &ff);
+}
+
+zipFile hts_zipOpen_utf8(const char *path, int append) {
+  zlib_filefunc64_def ff;
+
+  fill_fopen64_filefunc(&ff);
+  ff.zopen64_file = hts_zip_fopen_utf8;
+  return zipOpen2_64(path, append, NULL, &ff);
+}
