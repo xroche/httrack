@@ -1,0 +1,45 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A bracketed IPv6 authority carries colons of its own, so the port separator is
+# the first ':' after the ']'. -#test=toport prints what jump_toport_const()
+# finds in a URL; -#test=ftpaddr prints the host/port the FTP path splits out of
+# a URL address.
+
+toport() { selftest_queue "$2" toport "$1"; }
+
+# a scheme-carrying URL is the case that regressed: CONNECT lost its port
+toport 'https://[::1]' '(none)'
+toport 'https://[::1]:8080' ':8080'
+toport 'https://[::1]/x' '(none)'
+toport 'https://[::1]:8080/x' ':8080/x'
+toport 'https://user@[::1]:8080/x' ':8080/x'
+toport 'http://127.0.0.1:81/x' ':81/x'
+toport 'http://127.0.0.1/x' '(none)'
+toport '[::1]:8080' ':8080'
+# no ']' to end the literal: the first ':' stands, and the port parse rejects it
+toport 'https://[::1:8080' '::1:8080'
+
+ftpaddr() { selftest_queue "$2" ftpaddr "$1"; }
+
+ftpaddr 'ftp://[::1]:2121' 'host=[::1] port=2121'
+ftpaddr 'ftp://[::1]' 'host=[::1] port=21'
+ftpaddr 'ftp://user:pass@[::1]:2121' 'host=[::1] port=2121'
+ftpaddr 'ftp://ftp.example.com:2121' 'host=ftp.example.com port=2121'
+ftpaddr 'ftp://ftp.example.com' 'host=ftp.example.com port=21'
+ftpaddr '[::1]:2121' 'host=[::1] port=2121'
+ftpaddr 'ftp://[::1:2121' 'error=Invalid port: :1:2121'
+ftpaddr 'ftp://[::1]:99999' 'error=Invalid port: 99999'
+# a host that cannot fit is refused, never clipped onto another one
+ftpaddr "ftp://$(printf 'a%.0s' $(seq 1 256))" 'error=Host name too long'
+# the echoed port comes off the wire: clipped into the 128-byte message buffer,
+# never aborted on
+ftpaddr "ftp://[::1]:$(printf '9%.0s' $(seq 1 200))" \
+    "error=Invalid port: $(printf '9%.0s' $(seq 1 113))"
+
+selftest_run_queued

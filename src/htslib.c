@@ -4017,7 +4017,9 @@ HTSEXT_API const char *jump_toport_const(const char *source) {
   const char *a, *trytofind;
 
   a = jump_identification_const(source);
-  trytofind = strrchr_limit(a, ']', strchr(source, '/'));       // find last ] (http://[3ffe:b80:1234::1]:80/foo.html)
+  // last ] of the authority (http://[3ffe:b80:1234::1]:80/foo.html), bounded
+  // from a: source's own scheme "//" would end the scan before it
+  trytofind = strrchr_limit(a, ']', strchr(a, '/'));
   a = strchr((trytofind) ? trytofind : a, ':');
   return a;
 }
