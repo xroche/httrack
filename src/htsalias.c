@@ -109,7 +109,7 @@ const char *hts_optalias[][4] = {
   {"language", "-%l", "param1", ""}, {"lang", "-%l", "param1", ""},
   {"accept", "-%a", "param1", ""},
   {"headers", "-%X", "param1", ""},
-  {"structure", "-N", "param1", "user-defined structure"},
+  {"structure", "-N", "param", "structure type, or -N0..-N199 preset"},
   {"user-structure", "-N", "param1", ""},
   {"long-names", "-L", "param", ""},
   {"keep-links", "-K", "param", ""},

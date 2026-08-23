@@ -112,13 +112,13 @@ for name in $(awk '{print $2}' <<<"${rows}" | sort | uniq -d); do
         fail "--${name} has ${n} classes in the table; the first row silently wins"
 done
 
-# A non-numeric value must be its own argv word, or -N never consumes it. Assert
-# on the name the template produces: doit.log would only show the argv rewrite.
-for name in structure user-structure; do
-    crawl "--${name}" '%n-probe.%t'
-    test "${RC}" -eq 0 || fail "--${name} with a template exited ${RC}"
-    test -n "$(find "${tmp}/out" -name 'page-probe.html' -print -quit)" ||
-        fail "--${name} did not apply its template: no page-probe.html"
+# --structure is a preset number, and the engine reads a DETACHED -N value as a
+# user template whatever it holds, so the presets must stay glued (#1380).
+for n in 0 1 5; do
+    crawl "--structure=${n}"
+    test "${RC}" -eq 0 || fail "--structure=${n} exited ${RC}"
+    test -z "$(find "${tmp}/out" -name "${n}" -print -quit)" ||
+        fail "--structure=${n} made a file named ${n}: the preset became a template"
 done
 
 # The file-list synonyms share a short option, so they must share its class.
