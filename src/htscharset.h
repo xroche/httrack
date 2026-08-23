@@ -140,11 +140,6 @@ extern hts_UCS4* hts_convertUTF8StringToUCS4(const char *s, size_t size,
 extern char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars);
 
 /**
- * Return the length (in characters) of an UCS4 string terminated by 0.
- **/
-extern size_t hts_stringLengthUCS4(const hts_UCS4 *s);
-
-/**
  * Write the Unicode character 'uc' in 'dest' of maximum size 'size'.
  * Return the number of bytes written, or 0 upon error.
  * Note: does not \0-terminate the destination buffer.

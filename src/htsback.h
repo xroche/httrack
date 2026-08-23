@@ -126,7 +126,6 @@ void back_delayed_discard(httrackp *opt, lien_back *back);
    HTS_FALSE = file lost, slot flagged in error. */
 hts_boolean back_delayed_rename(httrackp *opt, lien_back *back,
                                 const char *newname);
-void back_index_unlock(struct_back * sback, const int p);
 int back_clear_entry(lien_back * back);
 int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
                       const int p);

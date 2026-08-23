@@ -201,7 +201,6 @@ LLint check_downloadable_bytes(int rate);
 HTSEXT_API int hts_uninit_module(void);
 
 // fonctions principales
-T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * retour);
 T_SOC http_xfopen(httrackp * opt, int mode, int treat, int waitconnect,
                   const char *xsend, const char *adr, const char *fil, htsblk * retour);
 int http_sendhead(httrackp * opt, t_cookie * cookie, int mode, const char *xsend,
@@ -251,8 +250,7 @@ T_SOC newhttp_addr(httrackp *opt, const char *iadr, htsblk *retour, int port,
 HTS_INLINE void deletehttp(htsblk * r);
 HTS_INLINE int deleteaddr(htsblk * r);
 HTS_INLINE void deletesoc(T_SOC soc);
-HTS_INLINE void deletesoc_r(htsblk * r);
-htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc);
+HTS_INLINE void deletesoc_r(htsblk *r);
 int check_readinput(htsblk * r);
 int check_readinput_t(T_SOC soc, int timeout);
 int check_writeinput_t(T_SOC soc, int timeout);
@@ -305,8 +303,6 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
                                 const char **error);
 HTS_INLINE SOCaddr *hts_dns_resolve2(httrackp *opt, const char *iadr,
                                      SOCaddr *const addr, const char **error);
-HTS_INLINE SOCaddr* hts_dns_resolve(httrackp * opt, const char *iadr,
-                                    SOCaddr *const addr);
 HTSEXT_API SOCaddr* hts_dns_resolve_nocache2(const char *const hostname, 
                                               SOCaddr *const addr,
                                               const char **error);
@@ -362,7 +358,6 @@ void rawlinput(FILE * fp, char *s, int max);
 const char *strstrcase(const char *s, const char *o);
 int ident_url_absolute(const char *url, lien_adrfil *adrfil);
 void fil_simplifie(char *f);
-int is_unicode_utf8(const char *buffer, const size_t size);
 void map_characters(unsigned char *buffer, unsigned int size,
                     unsigned int *map);
 int ishtml(httrackp * opt, const char *urlfil);
@@ -390,11 +385,8 @@ const char *jump_protocol_const(const char *source);
 void hts_parse_proxy(const char *arg, char *name, size_t name_size, int *port);
 void code64(unsigned char *a, int size_a, unsigned char *b, int crlf);
 
-#define copychar(catbuff,a) concat(catbuff,(a),NULL)
-
 char *convtolower(char *catbuff, size_t catbuffsize, const char *a);
 void hts_lowcase(char *s);
-void hts_replace(char *s, char from, char to);
 int multipleStringMatch(const char *s, const char *match);
 
 void fprintfio(FILE * fp, const char *buff, const char *prefix);
@@ -453,9 +445,6 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 /* True when a front end registered its own NAME callback */
 #define HAS_CALLBACK(OPT, NAME)                                                \
   (CBSTRUCT(OPT) != NULL && CBSTRUCT(OPT)->NAME.fun != NULL)
-#define GET_USERDEF(OPT, NAME)                                                 \
-  (HAS_CALLBACK(OPT, NAME) ? (GET_USERARG(OPT, NAME))                          \
-                           : (default_callbacks.NAME.carg))
 #define GET_CALLBACK(OPT, NAME)                                                \
   (HAS_CALLBACK(OPT, NAME) ? (GET_USERCALLBACK(OPT, NAME))                     \
                            : (default_callbacks.NAME.fun))
@@ -469,8 +458,9 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define RUN_CALLBACK4(OPT, NAME, ARG1, ARG2, ARG3, ARG4) GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4)
 #define RUN_CALLBACK5(OPT, NAME, ARG1, ARG2, ARG3, ARG4, ARG5) GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, ARG5)
 #define RUN_CALLBACK6(OPT, NAME, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6) GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6)
-#define RUN_CALLBACK7(OPT, NAME, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7) GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7)
-#define RUN_CALLBACK8(OPT, NAME, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7, ARG8) GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7, ARG8)
+#define RUN_CALLBACK7(OPT, NAME, ARG1, ARG2, ARG3, ARG4, ARG5, ARG6, ARG7)     \
+  GET_CALLBACK(OPT, NAME)(GET_USERARG(OPT, NAME), OPT, ARG1, ARG2, ARG3, ARG4, \
+                          ARG5, ARG6, ARG7)
 
 /* UTF-8 aware FILE API */
 #ifndef HTS_DEF_FILEAPI

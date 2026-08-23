@@ -224,19 +224,6 @@ struct _PT_Indexes {
   int index_size;
 };
 
-struct _PT_CacheItem {
-  time_t lastUsed;
-  size_t size;
-  void *data;
-};
-
-struct _PT_Cache {
-  coucal index;
-  size_t maxSize;
-  size_t totalSize;
-  int count;
-};
-
 PT_Indexes PT_New(void) {
   PT_Indexes index = (PT_Indexes) calloc(sizeof(_PT_Indexes), 1);
 
@@ -259,10 +246,6 @@ void PT_Delete(PT_Indexes index) {
     coucal_delete(&index->cil);
     free(index);
   }
-}
-
-int PT_RemoveIndex(PT_Indexes index, int indexId) {
-  return 0;
 }
 
 /* Reads one line into "s" (at most "max" chars plus its NUL) and returns the

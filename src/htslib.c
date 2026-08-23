@@ -649,13 +649,6 @@ void hts_init_htsblk(htsblk * r) {
   r->totalsize = -1;
 }
 
-// ouvre une liaison http, envoie une requète GET et réceptionne le header
-// retour: socket
-T_SOC http_fopen(httrackp * opt, const char *adr, const char *fil, htsblk * retour) {
-  //                / GET, traiter en-tête
-  return http_xfopen(opt, 0, 1, 1, NULL, adr, fil, retour);
-}
-
 // ouverture d'une liaison http, envoi d'une requète
 // mode: 0 GET  1 HEAD  [2 POST]
 // treat: traiter header?
@@ -2125,121 +2118,6 @@ LLint http_xfread1(htsblk * r, int bufl) {
   }
 }
 
-// teste si une URL (validité, header, taille)
-// retourne 200 ou le code d'erreur (404=NOT FOUND, etc)
-// en cas de moved xx, dans location
-// abandonne désormais au bout de 30 secondes (aurevoir les sites
-// qui nous font poireauter 5 heures..) -> -2=timeout
-htsblk http_test(httrackp * opt, const char *adr, const char *fil, char *loc) {
-  T_SOC soc;
-  htsblk retour;
-
-  TStamp tl;
-  int timeout = 30;             // timeout pour un check (arbitraire) // **
-
-  // pour abandonner un site trop lent
-  tl = time_local();
-
-  loc[0] = '\0';
-  hts_init_htsblk(&retour);
-  retour.location = loc;        // si non nul, contiendra l'adresse véritable en cas de moved xx
-
-  // on ouvre en head, et on traite l'en tête
-  soc = http_xfopen(opt, 1, 0, 1, NULL, adr, fil, &retour);     // ouvrir HEAD, + envoi header
-
-  if (soc != INVALID_SOCKET) {
-    int e = 0;
-
-    // tant qu'on a des données, et qu'on ne recoit pas deux LF, et que le timeout n'arrie pas
-    do {
-      if (http_xfread1(&retour, HTS_XFREAD_LINE_BLOCK) < 0)
-        e = 1;
-      else {
-        if (retour.adr != NULL) {
-          if ((retour.adr[retour.size - 1] != 10)
-              || (retour.adr[retour.size - 2] != 10))
-            e = 1;
-        }
-      }
-
-      if (!e) {
-        if ((time_local() - tl) >= timeout) {
-          e = -1;
-        }
-      }
-
-    } while(!e);
-
-    if (e == 1) {
-      if (adr != NULL) {
-        int ptr = 0;
-        int adv = 0;
-        char rcvd[1100];
-
-        // note: en gros recopie du traitement de back_wait()
-        //
-
-        // ----------------------------------------
-        // traiter en-tête!
-        // status-line à récupérer
-        binput_line(retour.adr + ptr, retour.adr + retour.size, rcvd, 1024,
-                    &adv);
-        ptr += adv;
-        // some buggy servers send a leading \n (RFC)
-        if (strnotempty(rcvd) == 0) {
-          binput_line(retour.adr + ptr, retour.adr + retour.size, rcvd, 1024,
-                      &adv);
-          ptr += adv;
-        }
-
-        // traiter status-line
-        treatfirstline(&retour, rcvd);
-
-#if HDEBUG
-        printf("(Buffer) Status-Code=%d\n", retour.statuscode);
-#endif
-
-        // en-tête
-
-        // header // ** !attention! HTTP/0.9 non supporté
-        do {
-          const hts_boolean cut = binput_line(
-              retour.adr + ptr, retour.adr + retour.size, rcvd, 1024, &adv);
-
-          ptr += adv;
-#if HDEBUG
-          printf("(buffer)>%s\n", rcvd);
-#endif
-          if (cut)
-            hts_log_print(NULL, LOG_WARNING, "Over-long header dropped");
-          else if (strnotempty(rcvd))
-            treathead(NULL, NULL, NULL, &retour, rcvd);
-
-        } while(strnotempty(rcvd));
-        // ----------------------------------------                    
-
-        // libérer mémoire
-        if (retour.adr != NULL) {
-          freet(retour.adr);
-          retour.adr = NULL;
-        }
-      }
-    } else {
-      retour.statuscode = STATUSCODE_TIMEOUT;
-      strcpybuff(retour.msg, "Timeout While Testing");
-    }
-
-#if HTS_DEBUG_CLOSESOCK
-    DEBUG_W("http_test: deletehttp\n");
-#endif
-    // this probe's htsblk is discarded by callers, so free any WARC stash here
-    warc_free_request(&retour);
-    deletehttp(&retour);
-    retour.soc = INVALID_SOCKET;
-  }
-  return retour;
-}
-
 hts_boolean socket_set_nonblocking(T_SOC soc, hts_boolean nonblocking) {
 #ifdef _WIN32
   unsigned long p = nonblocking ? 1 : 0;
@@ -3362,70 +3240,6 @@ typedef struct {
 #define BAD_SEQ                     ( (ok == 0) && (inseq != 0) && (!err) )
 // no sequence started
 #define NO_SEQ                      ( inseq == 0 )
-
-// is this block an UTF unicode textfile?
-// 0 : no
-// 1 : yes
-// -1: don't know
-int is_unicode_utf8(const char *buffer_, const size_t size) {
-  const unsigned char *buffer = (const unsigned char *) buffer_;
-  t_auto_seq seq;
-  size_t i;
-  int is_utf = -1;
-
-  RUNTIME_TIME_CHECK_SIZE(size);
-
-  seq.pos = 0;
-  for(i = 0; i < size; i++) {
-    unsigned int ok = 0;
-    unsigned int inseq = 0;
-    unsigned int err = 0;
-
-    seq.data[seq.pos] = buffer[i];
-     /**/ if (SEQBEG && BLK(0, 00, 7F) && IN_SEQ && SEQEND) {
-    } else if (SEQBEG && BLK(0, C2, DF) && IN_SEQ && BLK(1, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, E0) && IN_SEQ && BLK(1, A0, BF)
-               && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && BLK(0, E1, EC) && IN_SEQ && BLK(1, 80, BF)
-               && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, ED) && IN_SEQ && BLK(1, 80, 9F)
-               && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && BLK(0, EE, EF) && IN_SEQ && BLK(1, 80, BF)
-               && BLK(2, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, F0) && IN_SEQ && BLK(1, 90, BF)
-               && BLK(2, 80, BF) && BLK(3, 80, BF) && SEQEND) {
-    } else if (SEQBEG && BLK(0, F1, F3) && IN_SEQ && BLK(1, 80, BF)
-               && BLK(2, 80, BF) && BLK(3, 80, BF) && SEQEND) {
-    } else if (SEQBEG && ELT(0, F4) && IN_SEQ && BLK(1, 80, 8F)
-               && BLK(2, 80, BF) && BLK(3, 80, BF) && SEQEND) {
-    } else if (NO_SEQ) {        // bad, unknown
-      return 0;
-    }
-    /* */
-
-    /* Error */
-    if (BAD_SEQ) {
-      return 0;
-    }
-
-    /* unicode character */
-    if (seq.pos > 0)
-      is_utf = 1;
-
-    /* Next */
-    if (ok)
-      seq.pos = 0;
-    else
-      seq.pos++;
-
-    /* Internal error */
-    if (seq.pos >= 4)
-      return 0;
-
-  }
-
-  return is_utf;
-}
 
 void map_characters(unsigned char *buffer, unsigned int size, unsigned int *map) {
   unsigned int i;
@@ -4741,15 +4555,6 @@ void hts_lowcase(char *s) {
       s[i] += ('a' - 'A');
 }
 
-// remplacer un caractère d'une chaîne dans une autre
-void hts_replace(char *s, char from, char to) {
-  char *a;
-
-  while((a = strchr(s, from)) != NULL) {
-    *a = to;
-  }
-}
-
 // guess a local file's mime type (e.g. fil="toto.gif" -> s="image/gif")
 // returns 1 if a type was written to s, 0 otherwise
 hts_boolean guess_httptype_sized(httrackp *opt, char *s, size_t ssize,
@@ -5858,10 +5663,6 @@ SOCaddr *hts_dns_resolve2(httrackp *opt, const char *_iadr, SOCaddr *const addr,
     return SOCaddr_is_valid(*addr) ? addr : NULL;
   }
   return NULL;
-}
-
-SOCaddr* hts_dns_resolve(httrackp * opt, const char *_iadr, SOCaddr *const addr) {
-  return hts_dns_resolve2(opt, _iadr, addr, NULL);
 }
 
 // --- Tracage des mallocs() ---

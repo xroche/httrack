@@ -57,7 +57,7 @@
     <ClCompile>
       <!-- Matches proxytrack_CFLAGS in Makefile.am. Standalone: it does not link
            libhttrack, it only borrows headers (hts_effective_mime is a macro). -->
-      <PreprocessorDefinitions>WIN32;_CONSOLE;_MBCS;NO_MALLOCT;HTS_NO_LIBHTTRACK;ZLIB_CONST;HTS_INTHASH_USES_MD5;ZLIB_DLL;WINVER=0x0601;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;_MBCS;HTS_NO_LIBHTTRACK;ZLIB_CONST;HTS_INTHASH_USES_MD5;ZLIB_DLL;WINVER=0x0601;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory);$(MSBuildThisFileDirectory)coucal;$(MSBuildThisFileDirectory)proxy;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WarningLevel>Level3</WarningLevel>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>

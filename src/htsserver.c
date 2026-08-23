@@ -2268,13 +2268,6 @@ int htslang_init(void) {
   return 1;
 }
 
-int htslang_uninit(void) {
-  if (NewLangList != NULL) {
-    coucal_delete(&NewLangList);
-  }
-  return 1;
-}
-
 void smallserver_setpinghandler(void (*fun)(void *, smallserver_client_event,
                                             const char *),
                                 void *arg) {

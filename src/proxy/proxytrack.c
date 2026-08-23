@@ -148,25 +148,6 @@ Remark: If no cache newer than the added one is found, all entries can be added 
 #endif
 
 /* External references */
-void abortLog__fnc(char *msg, char *file, int line);
-void abortLog__fnc(char *msg, char *file, int line) {
-  FILE *fp = fopen("CRASH.TXT", "wb");
-
-  if (!fp)
-    fp = fopen("/tmp/CRASH.TXT", "wb");
-  if (!fp)
-    fp = fopen("C:\\CRASH.TXT", "wb");
-  if (!fp)
-    fp = fopen("CRASH.TXT", "wb");
-  if (fp) {
-    fprintf(fp, "HTTrack " HTTRACK_VERSIONID " closed at '%s', line %d\r\n",
-            file, line);
-    fprintf(fp, "Reason:\r\n%s\r\n", msg);
-    fflush(fp);
-    fclose(fp);
-  }
-}
-
 #define webhttrack_lock(A) do{}while(0)
 
 /* Static definitions */

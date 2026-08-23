@@ -1848,15 +1848,6 @@ int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,
   return 0;
 }
 
-/* ensure that the entry is not locked */
-void back_index_unlock(struct_back * sback, const int p) {
-  lien_back *const back = sback->lnk;
-
-  if (back[p].locked) {
-    back[p].locked = 0;         /* not locked anymore */
-  }
-}
-
 /* the entry is available again */
 static void back_set_free(lien_back * back) {
   back->locked = 0;
@@ -2673,43 +2664,11 @@ void back_clean(httrackp * opt, cache_back * cache, struct_back * sback) {
         back_maydelete(opt, cache, sback, i);   // May delete backing entry
       } else {
         if (!back[i].finalized) {
-          if (1) {
-            /* Ensure deleted or recycled socket */
-            /* BUT DO NOT YET WIPE back[i].r.adr */
-            hts_log_print(opt, LOG_DEBUG,
-                          "file %s%s validated (cached, left in memory)",
-                          back[i].url_adr, back[i].url_fil);
-            back_maydeletehttp(opt, cache, sback, i);
-          } else {
-            /*
-               NOT YET HANDLED CORRECTLY (READ IN NEW CACHE TO DO)
-             */
-            /* Lock the entry but do not keep the html data in memory (in cache) */
-            if (opt->cache) {
-              htsblk r;
-
-              /* Ensure deleted or recycled socket */
-              back_maydeletehttp(opt, cache, sback, i);
-              assertf(back[i].r.soc == INVALID_SOCKET);
-
-              /* Check header */
-              cache_header(opt, cache, back[i].url_adr, back[i].url_fil, &r);
-              if (r.statuscode == HTTP_OK) {
-                if (back[i].r.soc == INVALID_SOCKET) {
-                  /* Delete buffer and sockets */
-                  deleteaddr(&back[i].r);
-                  deletehttp(&back[i].r);
-                  hts_log_print(opt, LOG_DEBUG,
-                                "file %s%s temporarily left in cache to spare memory",
-                                back[i].url_adr, back[i].url_fil);
-                }
-              } else {
-                hts_log_print(opt, LOG_WARNING,
-                              "Unexpected html cache lookup error during back clean");
-              }
-              // xxc xxc
-            }
-          }
+          /* recycle the socket, but keep back[i].r.adr in memory */
+          hts_log_print(opt, LOG_DEBUG,
+                        "file %s%s validated (cached, left in memory)",
+                        back[i].url_adr, back[i].url_fil);
+          back_maydeletehttp(opt, cache, sback, i);
         }
       }
     } else if (back[i].status == STATUS_ALIVE) {        // waiting (keep-alive)

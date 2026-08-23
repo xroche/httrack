@@ -109,18 +109,9 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode);
 /* The ZIP entry name is the key behind a "http://" the index load strips. */
 #define CACHE_ENTRYNAME_SIZE (CACHE_KEY_SIZE + 8)
 
-void cache_rstr(FILE *fp, char *s, size_t s_size);
-char *cache_rstr_addr(FILE * fp);
 int cache_brstr(char *adr, char *s, size_t s_size);
 /* binput over a NUL-terminated buffer, bounded: no read starts at/past end. */
 int cache_binput(const char *adr, const char *end, char *s, int max);
-int cache_brint(char *adr, int *i);
-void cache_rint(FILE * fp, int *i);
-void cache_rLLint(FILE * fp, LLint * i);
-
-int cache_wstr(FILE * fp, const char *s);
-int cache_wint(FILE * fp, int i);
-int cache_wLLint(FILE * fp, LLint i);
 
 #endif
 
