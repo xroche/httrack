@@ -100,6 +100,9 @@ static mock_host mock_hosts[] = {
       {AF_INET, {10, 0, 0, 6}}},
      0},
     {"nodns.test", EAI_NONAME, 0, {{0}}, 0},
+    /* fails like nodns.test until the test clears gai_err, standing in for a
+       host first met while the network was down */
+    {"flaky.test", EAI_NONAME, 1, {{AF_INET, {192, 0, 2, 7}}}, 0},
     /* resolves, but only well after --timeout: the #606 wedge */
     {"slow.test", 0, 1, {{AF_INET, {127, 0, 0, 9}}}, 0, MOCK_SLOW_MS},
     /* a second one, so a cancelled resolve cannot cache an answer the next
@@ -312,6 +315,24 @@ int dns_selftests(httrackp *opt) {
     CHECK(hts_dns_resolve2(opt, "nodns.test", &a2, &err) == NULL);
     CHECK(mock_find("nodns.test")->calls == 1); /* resolved once, then cached */
   }
+
+  /* But it expires: a host that only failed because the network was down must
+     be asked again, or the whole crawl stays dead behind one outage. */
+  mock_reset_calls();
+  hts_dns_set_negative_ttl_ms(50);
+  {
+    SOCaddr a;
+    const char *err = NULL;
+
+    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
+    mock_find("flaky.test")->gai_err = 0; /* the network comes back */
+    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
+    CHECK(mock_read_calls("flaky.test") == 1); /* still inside the TTL */
+    Sleep(60);
+    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) != NULL);
+    CHECK(mock_read_calls("flaky.test") == 2);
+  }
+  hts_dns_set_negative_ttl_ms(HTS_DNS_NEGATIVE_TTL_MS);
 
   /* Multi-address resolution: count and order are the connect-fallback
      contract. A dead first address is retried against the next, so both must be

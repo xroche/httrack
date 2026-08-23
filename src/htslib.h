@@ -155,6 +155,10 @@ struct t_dnscache {
   int host_count;
   size_t host_length[HTS_MAXADDRNUM]; // sockaddr length of each (16 or 28)
   char host_addr[HTS_MAXADDRNUM][HTS_MAXADDRLEN];
+  // mtime_local() past which a negative record must be resolved again; 0 for a
+  // positive one, which never expires. Appended at the tail: the record is only
+  // ever held through a pointer, so nothing embeds it. ABI
+  TStamp expiry;
 };
 
 /* Break t down as UTC into the caller's buffer, HTS_FALSE if that failed.
@@ -317,6 +321,11 @@ int ftp_available(void);
    on first use. Records are owned by the table and freed on coucal_delete. */
 coucal hts_cache(httrackp *opt);
 #endif
+
+/* How long a name that did not resolve stays negative-cached. */
+#define HTS_DNS_NEGATIVE_TTL_MS 60000
+/* Test-only seam: shorten that so a self-test need not wait a minute. */
+void hts_dns_set_negative_ttl_ms(int ms);
 
 // outils divers
 HTS_INLINE TStamp time_local(void);

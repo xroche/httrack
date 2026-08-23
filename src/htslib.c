@@ -5186,9 +5186,15 @@ coucal hts_cache(httrackp *opt) {
   return opt->state.dns_cache;
 }
 
+/* Lifetime of a negative DNS answer; the self-test shortens it. */
+static int hts_dns_negative_ttl_ms = HTS_DNS_NEGATIVE_TTL_MS;
+
+void hts_dns_set_negative_ttl_ms(int ms) { hts_dns_negative_ttl_ms = ms; }
+
 // MUST BE LOCKED (coucal is not internally serialized vs FTP/web threads)
 // Look up iadr in the DNS cache, filling out[0..min(count,max)-1].
-// Returns: -1 not yet tested; 0 negative-cached (not in DNS); >0 address count.
+// Returns: -1 not tested, or a negative answer past its expiry; 0
+// negative-cached (not in DNS); >0 address count.
 static int hts_ghbn_all(coucal cache, const char *const iadr,
                         SOCaddr *const out, const int max) {
   void *ptr;
@@ -5203,6 +5209,11 @@ static int hts_ghbn_all(coucal cache, const char *const iadr,
     int i;
 
     assertf(record->host_count <= HTS_MAXADDRNUM);
+    /* A name that failed to resolve while the network was down must not stay
+       dead for the rest of the crawl: past its expiry, ask again. */
+    if (record->expiry != 0 && mtime_local() >= record->expiry) {
+      return -1;
+    }
     for (i = 0; i < record->host_count && i < max; i++) {
       assertf(record->host_length[i] <= sizeof(record->host_addr[i]));
       SOCaddr_copyaddr2(out[i], record->host_addr[i], record->host_length[i]);
@@ -5640,6 +5651,8 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
     if (record != NULL) {
       memset(record, 0, sizeof(*record));
       record->host_count = count;
+      /* "does not resolve" is only as good as the network that answered it */
+      record->expiry = count == 0 ? mtime_local() + hts_dns_negative_ttl_ms : 0;
       for (i = 0; i < count; i++) {
         record->host_length[i] = SOCaddr_size(resolved[i]);
         assertf(record->host_length[i] <= sizeof(record->host_addr[i]));
