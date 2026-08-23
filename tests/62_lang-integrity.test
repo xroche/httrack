@@ -403,6 +403,14 @@ else
         echo "the escape check rejects a legally escaped backslash"
         exit 1
     fi
+    # One probe per letter the catalogs actually got wrong, so widening the
+    # valid set by any of them cannot pass.
+    printf 'Five bad\na\\Pb\\Dc\\Kd\\he\\sf\n' >"$tmp/letters.txt"
+    nbad=$(unknown_escapes "$tmp/letters.txt" letters.txt | LC_ALL=C grep -c 'is not an escape') || true
+    if [ "${nbad:-0}" -ne 5 ]; then
+        echo "the escape check named ${nbad:-0} of 5 bad escape letters"
+        exit 1
+    fi
 
     # Shift-JIS maps 0x5C to the yen sign, hiding every escape in Japanese.txt
     # from the scan below. The engine reads the byte, so put the backslashes back.
@@ -574,7 +582,7 @@ translated_literals() {
 
 # A fixture carrying one kept and one lost literal, so a checker that never
 # fires cannot pass for one that has nothing to report.
-printf 'Erase hts-cache/new.*\nEfface hts-cache/new.*\nFollow robots.txt\nSuivre robot.txt\nrobots.txt, robots.txt and robots.txt\nrobots.txt et robots.txt\n' >"$tmp/literals.txt"
+printf 'Erase hts-cache/new.*\nEfface hts-cache/new.*\nFollow robots.txt\nSuivre robot.txt\nrobots.txt, robots.txt and robots.txt\nrobots.txt et robots.txt\nHtml in web/images and web/images\nHtml dans web/images\n' >"$tmp/literals.txt"
 case $(translated_literals "$tmp/literals.txt" literals.txt) in
 *"msgid names robots.txt 1 times, the translation 0"*) ;;
 *)
@@ -584,8 +592,18 @@ case $(translated_literals "$tmp/literals.txt" literals.txt) in
 esac
 # Two findings, not one: the second pair drops one robots.txt of three, which a
 # checker looking only for presence would pass.
-if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 2 ]; then
-    echo "the literal-token check miscounts a fixture naming a token three times"
+# The list is the spec, so pin it: a fixture can only ever exercise the tokens
+# it happens to name, and dropping any other one would go unnoticed.
+want_tokens="hts-cache robots.txt cgi-bin web/images web/html"
+if [ "$literal_tokens" != "$want_tokens" ]; then
+    echo "literal_tokens is [$literal_tokens], expected [$want_tokens]"
+    exit 1
+fi
+
+# Three findings: a token lost outright, one of three kept, and one of two
+# kept on a structure path. Fewer means the counting shrank.
+if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 3 ]; then
+    echo "the literal-token check did not report all three damaged fixtures"
     exit 1
 fi
 
