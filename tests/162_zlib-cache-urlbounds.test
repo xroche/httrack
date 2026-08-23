@@ -20,8 +20,5 @@ httrack -#test=cache-urlbounds "$dir" >"$dir/out" 2>"$dir/err" ||
     }
 
 out=$(tail -n1 "$dir/out")
-test "$out" = "cache-urlbounds: OK" || {
-    echo "expected 'cache-urlbounds: OK', got: $out" >&2
-    cat "$dir/err" >&2
-    exit 1
-}
+test "$out" = "cache-urlbounds: OK" ||
+    fail_dump "expected 'cache-urlbounds: OK', got: $out" "$dir/err"

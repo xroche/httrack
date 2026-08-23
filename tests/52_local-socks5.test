@@ -51,11 +51,8 @@ start_server() {
         grep -q "^ready" "$ports" 2>/dev/null && break
         sleep 0.1
     done
-    grep -q "^ready" "$ports" 2>/dev/null || {
-        echo "server ($mode) did not start" >&2
-        cat "$dir/server.err" >&2
-        exit 1
-    }
+    grep -q "^ready" "$ports" 2>/dev/null ||
+        fail_dump "server ($mode) did not start" "$dir/server.err"
     tls_port=$(awk '/^TLS/{print $2}' "$ports")
     http_port=$(awk '/^HTTP/{print $2}' "$ports")
     socks_port=$(awk '/^SOCKS/{print $2}' "$ports")
@@ -88,16 +85,10 @@ ok="$tmpdir/ok"
 start_server "$ok" ok
 
 run_crawl "$ok/out" "https://${host}:${tls_port}/" "socks5://127.0.0.1:${socks_port}"
-grep -rq "ORIGIN-PAGE-563" "$ok/out" || {
-    echo "FAIL: origin page not downloaded through the socks proxy" >&2
-    cat "$ok/out.log" "$ok/server.err" >&2
-    exit 1
-}
-grep -q "^ATYP domain ${host}\$" "$ok/socks.log" || {
-    echo "FAIL: proxy did not receive ATYP=domain ${host} (no remote DNS)" >&2
-    cat "$ok/socks.log" >&2
-    exit 1
-}
+grep -rq "ORIGIN-PAGE-563" "$ok/out" ||
+    fail_dump "origin page not downloaded through the socks proxy" "$ok/out.log" "$ok/server.err"
+grep -q "^ATYP domain ${host}\$" "$ok/socks.log" ||
+    fail_dump "proxy did not receive ATYP=domain ${host} (no remote DNS)" "$ok/socks.log"
 # a client that resolved locally would have sent an address, not a name
 grep -q "^ATYP ipv4" "$ok/socks.log" && {
     echo "FAIL: httrack resolved locally and sent an IPv4 to the proxy" >&2
@@ -109,18 +100,12 @@ echo "OK: https tunneled through socks5 with remote DNS"
 # --- plain http over socks --------------------------------------------------
 : >"$ok/origin-headers.log" # the https crawl above also logged a request line
 run_crawl "$ok/outh" "http://${host}:${http_port}/" "socks5://127.0.0.1:${socks_port}"
-grep -rq "ORIGIN-PAGE-563" "$ok/outh" || {
-    echo "FAIL: plain http not tunneled through the socks proxy" >&2
-    cat "$ok/outh.log" "$ok/socks.log" >&2
-    exit 1
-}
+grep -rq "ORIGIN-PAGE-563" "$ok/outh" ||
+    fail_dump "plain http not tunneled through the socks proxy" "$ok/outh.log" "$ok/socks.log"
 # the tunneled request is origin-form, as on a direct connection: the http-proxy
 # absolute URI would reach the origin as "GET http://host/"
-grep -q "^REQUEST GET / " "$ok/origin-headers.log" || {
-    echo "FAIL: tunneled request is not origin-form" >&2
-    cat "$ok/origin-headers.log" >&2
-    exit 1
-}
+grep -q "^REQUEST GET / " "$ok/origin-headers.log" ||
+    fail_dump "tunneled request is not origin-form" "$ok/origin-headers.log"
 grep -q "^REQUEST GET http" "$ok/origin-headers.log" && {
     echo "FAIL: absolute-URI request sent through the socks tunnel" >&2
     cat "$ok/origin-headers.log" >&2
@@ -140,17 +125,11 @@ missing=0
 for i in 1 2 3 4 5; do
     grep -rq "SUBPAGE-563 /p${i}.html" "$ka/out" || missing=1
 done
-test "$missing" -eq 0 || {
-    echo "FAIL: a keep-alive subpage was lost (re-handshake corrupted the reused socket)" >&2
-    cat "$ka/out.log" "$ka/socks.log" >&2
-    exit 1
-}
+test "$missing" -eq 0 ||
+    fail_dump "a keep-alive subpage was lost (re-handshake corrupted the reused socket)" "$ka/out.log" "$ka/socks.log"
 handshakes=$(count_matching_lines "^CMD " "$ka/socks.log")
-test "$handshakes" -eq 1 || {
-    echo "FAIL: expected 1 SOCKS handshake for the reused socket, got $handshakes" >&2
-    cat "$ka/socks.log" >&2
-    exit 1
-}
+test "$handshakes" -eq 1 ||
+    fail_dump "expected 1 SOCKS handshake for the reused socket, got $handshakes" "$ka/socks.log"
 echo "OK: keep-alive socket reused over one socks tunnel, no re-handshake"
 
 # --- authenticated socks (RFC 1929) -----------------------------------------
@@ -167,21 +146,12 @@ grep -q "^AUTHVER-BAD" "$auth/socks.log" && {
     cat "$auth/socks.log" >&2
     exit 1
 }
-grep -rq "ORIGIN-PAGE-563" "$auth/out" || {
-    echo "FAIL: origin not downloaded through the authenticated socks proxy" >&2
-    cat "$auth/out.log" "$auth/socks.log" >&2
-    exit 1
-}
-grep -q "^METHOD userpass\$" "$auth/socks.log" || {
-    echo "FAIL: user/pass method not negotiated (auth ignored)" >&2
-    cat "$auth/socks.log" >&2
-    exit 1
-}
-grep -q "^AUTH user secret\$" "$auth/socks.log" || {
-    echo "FAIL: wrong socks credentials sent" >&2
-    cat "$auth/socks.log" >&2
-    exit 1
-}
+grep -rq "ORIGIN-PAGE-563" "$auth/out" ||
+    fail_dump "origin not downloaded through the authenticated socks proxy" "$auth/out.log" "$auth/socks.log"
+grep -q "^METHOD userpass\$" "$auth/socks.log" ||
+    fail_dump "user/pass method not negotiated (auth ignored)" "$auth/socks.log"
+grep -q "^AUTH user secret\$" "$auth/socks.log" ||
+    fail_dump "wrong socks credentials sent" "$auth/socks.log"
 grep -qi "secret\|proxy-authorization" "$auth/origin-headers.log" && {
     echo "FAIL: socks credentials leaked into the origin request" >&2
     cat "$auth/origin-headers.log" >&2

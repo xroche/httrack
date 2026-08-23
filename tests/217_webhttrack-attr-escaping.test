@@ -12,11 +12,7 @@ htsserver_require
 distdir=${HTS_DISTDIR}
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_attresc.XXXXXX") || fail "no tmpdir"
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${work}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${work}"
 
 # A private data root, so LANGUAGE_2 can carry the hostile strings. distcheck's
 # srcdir is read-only and cp keeps that mode.

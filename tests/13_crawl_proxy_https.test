@@ -50,11 +50,8 @@ start_server() {
         grep -q "^ready" "$ports" 2>/dev/null && break
         sleep 0.1
     done
-    grep -q "^ready" "$ports" 2>/dev/null || {
-        echo "server ($mode) did not start" >&2
-        cat "$dir/server.err" >&2
-        exit 1
-    }
+    grep -q "^ready" "$ports" 2>/dev/null ||
+        fail_dump "server ($mode) did not start" "$dir/server.err"
     origin_port=$(awk '/^ORIGIN/{print $2}' "$ports")
     proxy_port=$(awk '/^PROXY/{print $2}' "$ports")
 }
@@ -84,16 +81,10 @@ start_server "$ok" ok
 
 # 1. page retrieved AND the proxy saw a CONNECT to the origin
 run_crawl "$ok/out" "127.0.0.1:${proxy_port}" "$origin_port"
-grep -rq "ORIGIN-PAGE-85" "$ok/out" || {
-    echo "FAIL: origin page not downloaded through proxy" >&2
-    cat "$ok/out.log" >&2
-    exit 1
-}
-grep -q "^CONNECT 127.0.0.1:${origin_port} " "$ok/proxy.log" || {
-    echo "FAIL: proxy never received a CONNECT (https bypassed the proxy)" >&2
-    cat "$ok/proxy.log" >&2
-    exit 1
-}
+grep -rq "ORIGIN-PAGE-85" "$ok/out" ||
+    fail_dump "origin page not downloaded through proxy" "$ok/out.log"
+grep -q "^CONNECT 127.0.0.1:${origin_port} " "$ok/proxy.log" ||
+    fail_dump "proxy never received a CONNECT (https bypassed the proxy)" "$ok/proxy.log"
 echo "OK: https tunneled through proxy via CONNECT"
 
 # 2. authenticated proxy: creds ride the CONNECT, and NEVER reach the origin
@@ -104,11 +95,8 @@ grep -rq "ORIGIN-PAGE-85" "$ok/out2" || fail "origin page not downloaded through
 got=$(awk '/^AUTH Basic /{print $3}' "$ok/proxy.log" | head -1)
 # base64("user:secret"); compared as a literal to stay portable (no base64 -d,
 # which differs between GNU and BSD)
-test "$got" == "dXNlcjpzZWNyZXQ=" || {
-    echo "FAIL: Proxy-Authorization not carried on CONNECT (got '$got')" >&2
-    cat "$ok/proxy.log" >&2
-    exit 1
-}
+test "$got" == "dXNlcjpzZWNyZXQ=" ||
+    fail_dump "Proxy-Authorization not carried on CONNECT (got '$got')" "$ok/proxy.log"
 if grep -qi "proxy-authorization" "$ok/origin-headers.log"; then
     echo "FAIL: proxy credentials leaked to the origin through the tunnel" >&2
     cat "$ok/origin-headers.log" >&2

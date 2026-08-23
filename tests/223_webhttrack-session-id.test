@@ -11,11 +11,7 @@ set -euo pipefail
 htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_sid.XXXXXX") || fail "no tmpdir"
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${work}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${work}"
 
 launch() { # $1 = tag, $2 = port; leaves the URL in ${HTS_URL}
     htsserver_start --port "$2" --home "${work}/$1" --log "${work}/$1.log"
@@ -43,7 +39,7 @@ for _ in $(seq 1 10); do
     urlb=${HTS_URL}
     t1=$(date +%s)
     test "${t0}" != "${t1}" || break
-    cleanup
+    htsserver_cleanup_dir "${work}"
     urla=
 done
 test -n "${urla}" || skip "the box never started two servers inside one second"
@@ -72,5 +68,5 @@ print(("ok: " if ok else "FAIL: ") + "same-second ids differ (%r)" % ids)
 sys.exit(rc | (0 if ok else 1))
 PY
 
-cleanup
+htsserver_cleanup_dir "${work}"
 echo "PASS"

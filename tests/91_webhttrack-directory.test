@@ -11,11 +11,7 @@ set -euo pipefail
 htsserver_require
 
 base=$(mktemp -d)
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${base}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${base}"
 
 # GET $1, or fail with $2 when the reply never comes.
 get() {

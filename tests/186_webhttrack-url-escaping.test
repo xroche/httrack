@@ -12,13 +12,8 @@ htsserver_require
 
 work=$(mktemp -d)
 csrv=
-cleanup() {
-    htsserver_cleanup
-    test -z "${csrv}" || kill -9 "${csrv}" 2>/dev/null || true
-    wait "${csrv}" 2>/dev/null || true # absorb bash's async "Killed" notice
-    rm -rf "${work}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${work}"
+cleanup_push htsserver_reap_vars csrv
 
 htsserver_start --home "${work}"
 

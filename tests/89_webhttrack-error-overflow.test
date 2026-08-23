@@ -16,11 +16,7 @@ msgmax=1023
 # Physical path: macOS resolves TMPDIR through /var -> private/var, and the
 # paths built below sit within a few bytes of its 1024-byte PATH_MAX.
 base=$(cd "$(mktemp -d)" && pwd -P)
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${base}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${base}"
 
 # Echo a path under the root $1 exactly $2 bytes long, in NAME_MAX-sized parts.
 padpath() {

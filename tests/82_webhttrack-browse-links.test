@@ -19,11 +19,7 @@ bad=$(grep -l 'file://' "${distdir}"/html/server/finished.html || true)
 test -z "${bad}" || fail "file: link left in: ${bad}"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_browse.XXXXXX") || fail "no tmpdir"
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${work}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${work}"
 
 # Stand in for a finished mirror: the crawl itself is not under test.
 proj="${work}/websites/proj"

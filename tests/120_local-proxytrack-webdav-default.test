@@ -68,72 +68,42 @@ propfind() {
         "http://127.0.0.1:$proxyport/webdav/example.com/$path"
 }
 
-resp=$(propfind page.html) || {
-    echo "FAIL: PROPFIND on an exact cache entry did not answer"
-    cat "$ptlog"
-    exit 1
-}
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
-    echo "FAIL: expected 207 Multi-Status"
-    printf '%s\n' "$resp"
-    exit 1
-}
-grep -q '<displayname>Default Document for the Folder</displayname>' <<<"$resp" || {
-    echo "FAIL: the default document of the entry was not listed"
-    printf '%s\n' "$resp"
-    exit 1
-}
+resp=$(propfind page.html) ||
+    fail_dump "PROPFIND on an exact cache entry did not answer" "$ptlog"
+grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
+    fail "expected 207 Multi-Status: $resp"
+grep -q '<displayname>Default Document for the Folder</displayname>' <<<"$resp" ||
+    fail "the default document of the entry was not listed: $resp"
 # The name alone would still pass on a truncated or garbage URL, so pin the
 # href: the default document is the collection path plus an empty name.
-grep -q '<href>/webdav/example\.com/page\.html/</href>' <<<"$resp" || {
-    echo "FAIL: the default document was listed under the wrong href"
-    printf '%s\n' "$resp"
-    exit 1
-}
+grep -q '<href>/webdav/example\.com/page\.html/</href>' <<<"$resp" ||
+    fail "the default document was listed under the wrong href: $resp"
 responses=$(count_matching_lines '<response ' <<<"$resp")
-test "$responses" -eq 2 || {
-    echo "FAIL: expected the root and its default document, got $responses responses"
-    printf '%s\n' "$resp"
-    exit 1
-}
+test "$responses" -eq 2 ||
+    fail "expected the root and its default document, got $responses responses: $resp"
 
 # The crash killed the process, so a second request is the liveness proof.
-resp=$(propfind "") || {
-    echo "FAIL: proxytrack died serving the previous PROPFIND"
-    cat "$ptlog"
-    exit 1
-}
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
-    echo "FAIL: expected 207 Multi-Status on the follow-up listing"
-    printf '%s\n' "$resp"
-    exit 1
-}
+resp=$(propfind "") ||
+    fail_dump "proxytrack died serving the previous PROPFIND" "$ptlog"
+grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
+    fail "expected 207 Multi-Status on the follow-up listing: $resp"
 
 # Leftover traces echoed the client's body and the generated response (#911).
 # The padding spills the canary past any stdio buffer, newline or not.
 sentinel=PT911-DAV-BODY-CANARY
 pad=$(printf '%8192s' '')
-resp=$(propfind "" -H 'Expect:' --data-binary "$sentinel${pad// /x}") || {
-    echo "FAIL: proxytrack died serving a PROPFIND carrying a body"
-    cat "$ptlog"
-    exit 1
-}
-grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" || {
-    echo "FAIL: expected 207 Multi-Status on the canary listing"
-    printf '%s\n' "$resp"
-    exit 1
-}
+resp=$(propfind "" -H 'Expect:' --data-binary "$sentinel${pad// /x}") ||
+    fail_dump "proxytrack died serving a PROPFIND carrying a body" "$ptlog"
+grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||
+    fail "expected 207 Multi-Status on the canary listing: $resp"
 
 # The 207 is what makes the absence below mean something: a depth-rejected
 # PROPFIND is logged 403 without ever reaching the traces. It is logged after
 # them, so waiting on it also fences the drainer's copy.
 waited=0
 until test "$(count_matching_lines_nocase ' \* log: HTTP [^ ]* 207 [0-9]* propfind ' "$ptlog")" -ge 3; do
-    test "$waited" -lt 50 || {
-        echo "FAIL: fewer than three PROPFINDs were answered 207, so the checks below prove nothing"
-        cat "$ptlog"
-        exit 1
-    }
+    test "$waited" -lt 50 ||
+        fail_dump "fewer than three PROPFINDs were answered 207, so the checks below prove nothing" "$ptlog"
     sleep 0.1
     waited=$((waited + 1))
 done

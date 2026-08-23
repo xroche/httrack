@@ -42,11 +42,8 @@ EOF
 expect() {
     local label="$1" want="$2" got="$3" rep="${4:-$report}"
     printf '[%s] ..\t' "$label"
-    test "$want" == "$got" || {
-        echo "FAIL: expected '${want}', got '${got}'"
-        cat "$rep"
-        exit 1
-    }
+    test "$want" == "$got" ||
+        fail_dump "expected '${want}', got '${got}'" "$rep"
     echo "OK"
 }
 # Every count must equal the length of the list it counts.
@@ -55,11 +52,8 @@ expect_counts_match() {
     printf '[%s] ..\t' "$label"
     for bucket in new changed unchanged gone; do
         n=$(listed "$bucket" "$rep" | grep -c . || true)
-        test "$(field "$bucket" "$rep")" == "$n" || {
-            echo "FAIL: ${bucket} count $(field "$bucket" "$rep") but $n listed"
-            cat "$rep"
-            exit 1
-        }
+        test "$(field "$bucket" "$rep")" == "$n" ||
+            fail_dump "${bucket} count $(field "$bucket" "$rep") but $n listed" "$rep"
     done
     echo "OK"
 }

@@ -13,11 +13,7 @@ libdir="${CONFIGURED_LIBDIR:?not run under make check}"
 
 out=
 
-fail() {
-    echo "FAIL: $*" >&2
-    test -z "${out}" || sed 's/^/  | /' <"${out}" >&2
-    exit 1
-}
+fail_dump_var out
 
 if is_windows; then
     skip "no backtrace() on Windows"

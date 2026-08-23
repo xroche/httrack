@@ -11,8 +11,40 @@ testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # own value, so the default only serves a hand-run and the Windows suite.
 : "${top_srcdir:=..}"
 
+# Paths a failure should print, named by VARIABLE: a test that retargets its log
+# mid-run keeps the dump pointed at the current one.
+FAIL_DUMP_VARS=(${FAIL_DUMP_VARS[@]+"${FAIL_DUMP_VARS[@]}"})
+fail_dump_var() { FAIL_DUMP_VARS+=("$@"); }
+
+# Headed and indented, so a dumped log cannot be read as the harness's own
+# output. Silent on a missing or empty file: the verdict still stands alone.
+dump_file() { # dump_file FILE
+    test -s "$1" || return 0
+    echo "--- $1" >&2
+    sed 's/^/  | /' <"$1" >&2
+}
+
 fail() {
+    local i v
     echo "FAIL: $*" >&2
+    # By index: ${!ARR[@]+...} would read each element as a variable name.
+    for ((i = 0; i < ${#FAIL_DUMP_VARS[@]}; i++)); do
+        v=${FAIL_DUMP_VARS[i]}
+        dump_file "${!v:-}"
+    done
+    exit 1
+}
+
+# fail(), plus the logs the failure is about: a verdict with no evidence sends
+# the reader back to a run that no longer exists.
+fail_dump() { # fail_dump MSG FILE...
+    local msg=$1
+    shift
+    echo "FAIL: ${msg}" >&2
+    while test $# -gt 0; do
+        dump_file "$1"
+        shift
+    done
     exit 1
 }
 

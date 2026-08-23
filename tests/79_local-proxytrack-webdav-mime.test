@@ -39,15 +39,9 @@ start_proxytrack "$dir/pt" launch_proxytrack
 curl -s --max-time 30 -X PROPFIND -H "Depth: 1" \
     "http://127.0.0.1:$proxyport/webdav/example.com/" >"$dir/resp.xml"
 
-grep -q '<getcontenttype>application/octet-stream</getcontenttype>' "$dir/resp.xml" || {
-    echo "FAIL: missing Content-Type did not fall back to application/octet-stream"
-    cat "$dir/resp.xml"
-    exit 1
-}
-grep -q '<getlastmodified>Wed, 01 Jan 2025 00:00:00 GMT</getlastmodified>' "$dir/resp.xml" || {
-    echo "FAIL: missing Last-Modified did not fall back to the index timestamp"
-    cat "$dir/resp.xml"
-    exit 1
-}
+grep -q '<getcontenttype>application/octet-stream</getcontenttype>' "$dir/resp.xml" ||
+    fail_dump "missing Content-Type did not fall back to application/octet-stream" "$dir/resp.xml"
+grep -q '<getlastmodified>Wed, 01 Jan 2025 00:00:00 GMT</getlastmodified>' "$dir/resp.xml" ||
+    fail_dump "missing Last-Modified did not fall back to the index timestamp" "$dir/resp.xml"
 
 echo "OK: WebDAV listing falls back correctly for an entry with no Content-Type/Last-Modified"

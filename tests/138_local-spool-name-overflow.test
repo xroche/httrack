@@ -21,11 +21,8 @@ require_httrack
 
 rc=0
 local_crawl --log "${tmpdir}/log" -O "${tmpdir}/out" --quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -Z -p0 -N '%n' -c4 "http://127.0.0.1:${SRV_PORT}/bakname/index.html" || rc=$?
-test "$rc" -eq 0 || {
-    echo "httrack exited $rc"
-    cat "${tmpdir}/log"
-    exit 1
-}
+test "$rc" -eq 0 ||
+    fail_dump "httrack exited $rc" "${tmpdir}/log"
 
 enginelog="${tmpdir}/out/hts-log.txt"
 test -r "$enginelog" || fail "no engine log at $enginelog"
