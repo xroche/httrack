@@ -36,4 +36,4 @@ fuzz_arc_SOURCES = fuzz-arc.c fuzz.h $(top_srcdir)/src/proxy/store.c
 fuzz_arc_CPPFLAGS = $(AM_CPPFLAGS) -DZLIB_CONST
 
 # Corpus list comes from configure: automake does not expand EXTRA_DIST globs.
-EXTRA_DIST = README.md run-fuzzers.sh $(FUZZ_CORPUS_LIST)
+EXTRA_DIST = README.md run-fuzzers.sh check-corpus-list.sh $(FUZZ_CORPUS_LIST)
