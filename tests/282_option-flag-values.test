@@ -103,27 +103,30 @@ while read -r class name; do
     done
 done <<<"${rows}"
 
-# A name may appear twice and the first row wins, so a wrong class on the first
-# row silently shadows the right one: --structure took its template as a URL
-# because -N was classed "param", which glues the value onto the short form.
+# Duplicate alias names must agree on their class, or the shadowed row's is
+# dead. This does not see two rows that share a class but target different
+# short options; --test is one, and is harmless because the help agrees.
 for name in $(awk '{print $2}' <<<"${rows}" | sort | uniq -d); do
     n=$(awk -v k="${name}" '$2 == k {print $1}' <<<"${rows}" | sort -u | grep -c .)
     test "${n}" -eq 1 ||
         fail "--${name} has ${n} classes in the table; the first row silently wins"
 done
 
-# An option whose value is not a number must reach the engine as its own argv
-# word, or the engine never consumes it and it becomes a URL.
+# A non-numeric value must be its own argv word, or -N never consumes it. Assert
+# on the name the template produces: doit.log would only show the argv rewrite.
 for name in structure user-structure; do
-    crawl "--${name}" '%h%p/%n%q.%t'
-    grep -q -- '-N %h%p/%n%q\.%t' "${tmp}/out/hts-cache/doit.log" ||
-        fail "--${name} did not pass its template to -N as a separate word"
+    crawl "--${name}" '%n-probe.%t'
+    test "${RC}" -eq 0 || fail "--${name} with a template exited ${RC}"
+    test -n "$(find "${tmp}/out" -name 'page-probe.html' -print -quit)" ||
+        fail "--${name} did not apply its template: no page-probe.html"
 done
 
 # The file-list synonyms share a short option, so they must share its class.
 : >"${tmp}/urls.txt"
 for name in list filelist urllist filterlist; do
     crawl "--${name}=${tmp}/urls.txt"
+    # an empty log means the run died before the parser, not that it accepted
+    test -s "${tmp}/out/.log" || fail "--${name}=FILE produced no log"
     ! grep -q 'Syntax error' "${tmp}/out/.log" ||
         fail "--${name}=FILE is refused, but its synonym takes the same value"
 done
