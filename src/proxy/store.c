@@ -901,14 +901,15 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
       line[0] = '\0';                                                          \
     }                                                                          \
   } while (0)
-#define ZIP_READFIELD_INT(line, value, refline, refvalue) do { \
-  if (line[0] != '\0' && strfield2(line, refline)) { \
-    int intval = 0; \
-    sscanf(value, "%d", &intval); \
-    (refvalue) = intval; \
-    line[0] = '\0'; \
-	} \
-} while(0)
+#define ZIP_READFIELD_INT(line, value, refline, refvalue)                      \
+  do {                                                                         \
+    if (line[0] != '\0' && strfield2(line, refline)) {                         \
+      int intval = 0;                                                          \
+      sscanf(value, "%d", &intval);                                            \
+      (refvalue) = intval;                                                     \
+      line[0] = '\0';                                                          \
+    }                                                                          \
+  } while (0)
 
 /* Set path (capacity size) to filename's parent directory, separator included,
    from an absolute filename. Empty when there is none, or when it would not
@@ -1118,7 +1119,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               ZIP_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
               ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
                                    sizeof(r->msg));
-              ZIP_READFIELD_INT(line, value, "X-Size", r->size);        // size
+              ZIP_READFIELD_INT(line, value, "X-Size", r->size); // size
               ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
                                    sizeof(r->contenttype));
               ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset,

@@ -360,8 +360,7 @@ int dns_selftests(httrackp *opt) {
     hts_dns_set_negative_ttl_ms(500);
   }
 
-  /* "no such host" is an answer about the name, so it still stands for the
-     whole crawl: same TTL, same sleep, no second resolve. */
+  /* "no such host" is an answer about the name, so it stands for the crawl. */
   {
     SOCaddr a;
     const char *err = NULL;

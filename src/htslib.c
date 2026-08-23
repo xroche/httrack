@@ -5189,7 +5189,9 @@ coucal hts_cache(httrackp *opt) {
 /* First lifetime of a negative DNS answer. */
 static int hts_dns_negative_ttl_ms = HTS_DNS_NEGATIVE_TTL_MS;
 
-void hts_dns_set_negative_ttl_ms(int ms) { hts_dns_negative_ttl_ms = ms; }
+void hts_dns_set_negative_ttl_ms(int ms) {
+  hts_dns_negative_ttl_ms = ms > 0 ? ms : 1; /* the doubling needs a floor */
+}
 
 int hts_dns_negative_failures(httrackp *opt, const char *host) {
   void *ptr;
@@ -5456,9 +5458,8 @@ static int hts_dns_resolve_nocache_list_(const char *const hostname,
   } else {
     if (error != NULL)
       *error = gai_strerror(gerr);
-    /* EAI_NONAME is the resolver's own answer about the name; every other
-       code (EAI_AGAIN, EAI_FAIL, EAI_SYSTEM, EAI_NODATA where it exists) says
-       it could not answer, which an outage produces for any host. */
+    /* EAI_NONAME answers about the name; every other code says the resolver
+       could not answer at all. */
     if (permanent != NULL && gerr == EAI_NONAME)
       *permanent = HTS_TRUE;
   }
@@ -5477,6 +5478,8 @@ static int hts_dns_resolve_nocache_list(const char *const hostname,
                                         const char **error,
                                         hts_boolean *permanent) {
   if (!strnotempty(hostname) || max <= 0) {
+    if (permanent != NULL)
+      *permanent = HTS_FALSE;
     return 0;
   }
   if ((hostname[0] == '[') && (hts_lastchar(hostname) == ']')) {
