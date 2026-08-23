@@ -357,10 +357,13 @@ fi
 # conv_printf() copies the letter after an unknown escape and drops the backslash,
 # so a "\n" that lost its n merges two combo-box rows and mislabels every row after.
 unknown_escapes() {
-    LC_ALL=C awk -v name="$2" '
+    LC_ALL=C awk -v name="$2" -v showok="${3:-}" '
         # Built here from character codes: a quote or a backslash spelled inside
         # an -v assignment is eaten before awk sees it.
-        BEGIN { ok = "abfnrtv?" sprintf("%c%c%c", 39, 34, 92) }
+        BEGIN {
+            ok = "abfnrtv?" sprintf("%c%c%c", 39, 34, 92)
+            if (showok) { print ok; exit }
+        }
         { sub(/\r$/, "") }
         NR % 2 == 1 { next }
         {
@@ -403,8 +406,17 @@ else
         echo "the escape check rejects a legally escaped backslash"
         exit 1
     fi
-    # One probe per letter the catalogs actually got wrong, so widening the
-    # valid set by any of them cannot pass.
+    # The set is the spec, mirroring conv_printf's switch: a probe can only ever
+    # name the letters it happens to use, so widening by any other one is invisible.
+    want_ok="abfnrtv?$(printf '\047\042\134')"
+    got_ok=$(printf 'x\ny\n' >"$tmp/ok.txt" && unknown_escapes "$tmp/ok.txt" ok.txt 1 | head -1)
+    if [ "$got_ok" != "$want_ok" ]; then
+        echo "the escape valid set is [$got_ok], expected [$want_ok]"
+        exit 1
+    fi
+
+    # One probe per letter the catalogs actually got wrong, so a widened set
+    # also fails loudly rather than only through the pin above.
     printf 'Five bad\na\\Pb\\Dc\\Kd\\he\\sf\n' >"$tmp/letters.txt"
     nbad=$(unknown_escapes "$tmp/letters.txt" letters.txt | LC_ALL=C grep -c 'is not an escape') || true
     if [ "${nbad:-0}" -ne 5 ]; then
@@ -582,7 +594,7 @@ translated_literals() {
 
 # A fixture carrying one kept and one lost literal, so a checker that never
 # fires cannot pass for one that has nothing to report.
-printf 'Erase hts-cache/new.*\nEfface hts-cache/new.*\nFollow robots.txt\nSuivre robot.txt\nrobots.txt, robots.txt and robots.txt\nrobots.txt et robots.txt\nHtml in web/images and web/images\nHtml dans web/images\nHtml in web/html\nHtml dans web/html et web/html\n' >"$tmp/literals.txt"
+printf 'Erase hts-cache/new.*\nEfface htscache/new.*\nFollow robots.txt\nSuivre robot.txt\nrobots.txt, robots.txt and robots.txt\nrobots.txt et robots.txt\nHtml in web/images and web/images\nHtml dans web/images\nHtml in web/html\nHtml dans web/html et web/html\nSee cgi-bin\nVoir cgi-poubelle\n' >"$tmp/literals.txt"
 case $(translated_literals "$tmp/literals.txt" literals.txt) in
 *"msgid names robots.txt 1 times, the translation 0"*) ;;
 *)
@@ -600,11 +612,11 @@ if [ "$literal_tokens" != "$want_tokens" ]; then
     exit 1
 fi
 
-# Four findings, and the last one is the other direction: a token named twice
-# where the msgid names it once duplicates a dropdown row, so more is a defect
-# too and a one-sided comparison has to fail here.
-if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 4 ]; then
-    echo "the literal-token check did not report all four damaged fixtures"
+# One damaged pair per token, so narrowing the list cannot pass, plus the other
+# direction: a token named twice where the msgid names it once duplicates a
+# dropdown row, so a one-sided comparison has to fail here too.
+if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 6 ]; then
+    echo "the literal-token check did not report all six damaged fixtures"
     exit 1
 fi
 
@@ -702,7 +714,7 @@ LC_ALL=C awk -v pin="$lbpin" '
 never_used="ro:ãºþ pl:¹³ê¿ cs:øìèù sk:è¾ï hu:õû hr:èæð sl:è"
 
 foreign_letters() {
-    LC_ALL=C awk -v name="$2" -v iso="$3" -v table="$never_used" '
+    LC_ALL=C awk -v name="$2" -v iso="$3" -v only="${4:-}" -v table="$never_used" '
         BEGIN {
             n = split(table, rows, " ")
             for (i = 1; i <= n; i++) {
@@ -710,6 +722,8 @@ foreign_letters() {
                 if (kv[1] == iso)
                     bad = kv[2]
             }
+            if (only != "")
+                bad = only
             if (bad == "")
                 exit 0
         }
@@ -756,10 +770,15 @@ else
             exit 1
         fi
         LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$rfile" >"$tmp/mis"
-        if [ -z "$(foreign_letters "$tmp/mis" "${rfile##*/}" "$riso")" ]; then
-            echo "never_used row $row never fires: those letters are not what a Latin-1 misread makes"
-            exit 1
-        fi
+        # Per letter, not per row: a row keeping one live letter of three would
+        # otherwise pass while the rest of it sat dead.
+        for letter in $(LC_ALL=C awk -v l="${row#*:}" '
+            BEGIN { for (i = 1; i <= length(l); i += 2) print substr(l, i, 2) }'); do
+            if [ -z "$(foreign_letters "$tmp/mis" "${rfile##*/}" "$riso" "$letter")" ]; then
+                echo "never_used $riso lists $letter, which a Latin-1 misread never makes"
+                exit 1
+            fi
+        done
     done
 
     # Control: Romanian read as the Latin-1 it used to claim must be rejected,
