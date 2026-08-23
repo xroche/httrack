@@ -19,6 +19,10 @@ stderr_dir=
 while [ $# -gt 0 ]; do
     case $1 in
     -s)
+        [ $# -ge 2 ] || {
+            echo "usage: $0 [-s STDERR_DIR] LOG_PATH_DIR [TEST_LOG_DIR...]" >&2
+            exit 2
+        }
         stderr_dir=$2
         shift 2
         ;;

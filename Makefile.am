@@ -12,7 +12,8 @@ EXTRA_DIST = INSTALL.Linux \
 		bootstrap build.sh doc/winprofile-ini.md \
 		winprofile-keys.tsv winprofile-escapes.tsv \
 		tools/gen-winprofile-keys.py \
-		tools/doc-chrome.py
+		tools/doc-chrome.py \
+		tools/ci-sanitizer-report.sh
 
 # Build the signed Debian packages from a clean source export. Pass the signing
 # key and other options through DEB_FLAGS, e.g.:
