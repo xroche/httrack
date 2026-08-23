@@ -38,6 +38,9 @@ static const int handled[] = {SIGHUP,  SIGINT,  SIGQUIT, SIGABRT, SIGALRM,
 
 static struct sigaction inherited[NHANDLED];
 static volatile sig_atomic_t child = 0;
+/* Self-pipe: the loop below has to learn of the child's death at once, an
+   unreaped child being a pid the suite still reads as a running server. */
+static int wakefd[2] = {-1, -1};
 
 /* Only a kill(2) from elsewhere: what the kernel raises here -- a tty ^C, our
    own child's SIGCHLD -- has reached the child already, or is not for it. */
@@ -48,6 +51,11 @@ static void forward(int sig, siginfo_t *info, void *ctx) {
   if (child > 0 && info != NULL &&
       (info->si_code == SI_USER || info->si_code == SI_QUEUE)) {
     kill((pid_t) child, sig);
+  }
+  if (wakefd[1] >= 0) {
+    const ssize_t ignored = write(wakefd[1], "!", 1);
+
+    (void) ignored;
   }
   errno = saved;
 }
@@ -172,6 +180,15 @@ int main(int argc, char **argv) {
     close(logfd);
     run_bare(argv + 1);
   }
+  if (pipe(wakefd) != 0) {
+    close(pipefd[0]);
+    close(pipefd[1]);
+    close(logfd);
+    run_bare(argv + 1);
+  }
+  /* Never block the handler, whatever the loop is doing. */
+  fcntl(wakefd[0], F_SETFL, O_NONBLOCK);
+  fcntl(wakefd[1], F_SETFL, O_NONBLOCK);
 
   catch_signals();
   /* Or a signal landing before the pid is known would be lost. */
@@ -190,6 +207,8 @@ int main(int argc, char **argv) {
     block_signals(SIG_UNBLOCK);
     close(pipefd[0]);
     close(logfd);
+    close(wakefd[0]);
+    close(wakefd[1]);
     if (dup2(pipefd[1], STDERR_FILENO) < 0) {
       _exit(127);
     }
@@ -209,49 +228,61 @@ int main(int argc, char **argv) {
   close(pipefd[1]);
 
   for (;;) {
-    struct pollfd pfd;
+    struct pollfd pfd[2];
+    char drain[64];
     ssize_t n;
     int ready;
 
-    pfd.fd = pipefd[0];
-    pfd.events = POLLIN;
-    pfd.revents = 0;
-    /* Once the child is reaped everything it wrote is already here, and only
-       something it left behind still holds the pipe open -- htsserver does, and
-       waiting out that EOF would outlive the server 289 is timing. */
-    ready = poll(&pfd, 1, reaped ? 0 : 200);
+    pfd[0].fd = pipefd[0];
+    pfd[0].events = POLLIN;
+    pfd[0].revents = 0;
+    pfd[1].fd = wakefd[0];
+    pfd[1].events = POLLIN;
+    pfd[1].revents = 0;
+    /* Zero once the child is reaped: everything it wrote is here already, and
+       only something it left behind still holds the pipe open -- htsserver
+       does, and waiting out that EOF would outlive the server 289 is timing. */
+    ready = poll(pfd, 2, reaped ? 0 : -1);
     if (ready < 0) {
       if (errno == EINTR) {
         continue;
       }
       break;
     }
-    if (ready == 0) {
-      if (reaped) {
+    if (pfd[0].revents != 0) {
+      n = read(pipefd[0], buf, sizeof buf);
+      if (n < 0) {
+        if (errno == EINTR) {
+          continue;
+        }
         break;
       }
-      if (waitpid(pid, &status, WNOHANG) == pid) {
+      if (n == 0) {
+        break;
+      }
+      /* The caller's own copy first: it is the one a test reads back. */
+      if (caller_ok) {
+        caller_ok = write_all(STDERR_FILENO, buf, (size_t) n);
+      }
+      write_all(logfd, buf, (size_t) n);
+      continue;
+    }
+    if (pfd[1].revents != 0) {
+      while (read(wakefd[0], drain, sizeof drain) > 0) {
+        /* a signal arrived; what it means is decided below */
+      }
+      if (!reaped && waitpid(pid, &status, WNOHANG) == pid) {
         reaped = 1;
       }
       continue;
     }
-    n = read(pipefd[0], buf, sizeof buf);
-    if (n < 0) {
-      if (errno == EINTR) {
-        continue;
-      }
+    if (reaped) {
       break;
     }
-    if (n == 0) {
-      break;
-    }
-    /* The caller's own copy first: it is the one a test reads back. */
-    if (caller_ok) {
-      caller_ok = write_all(STDERR_FILENO, buf, (size_t) n);
-    }
-    write_all(logfd, buf, (size_t) n);
   }
   close(pipefd[0]);
+  close(wakefd[0]);
+  close(wakefd[1]);
   close(logfd);
 
   while (!reaped) {

@@ -27,6 +27,14 @@ export HTTRACK_STDERR_CAPTURE_TAG=349_probe
 # write to either stream and pick its own exit status.
 run_wrapped() { "$wrap" /bin/sh -c "$1"; }
 
+# Lines in file $1, counted without forking: a fork between the shim's exit and
+# the read hands a lagging writer all the grace it needs. bash 3.2, the one
+# macOS ships, has no readarray.
+count_lines_here() { # count_lines_here FILE
+    lines_here=0
+    while IFS= read -r _; do lines_here=$((lines_here + 1)); done <"$1"
+}
+
 # A shell snippet writing $1 numbered lines to stderr, tagged $2.
 # shellcheck disable=SC2016 # the wrapped program expands these, not us
 loop_to_stderr() { printf 'i=0; while [ $i -lt %s ]; do echo %s$i >&2; i=$((i+1)); done' "$1" "$2"; }
@@ -84,10 +92,9 @@ for bad in "$tmp/absent" "$tmp/plainfile"; do
 done
 
 # 5. What the caller redirected stderr into has to be whole the moment the shim
-# exits; a tee nobody waited for left it short (#1374). Read it with a builtin,
-# since a fork in between hands a lagging writer all the grace it needs, and go a
-# batch at a time, which one run can win on luck and which also checks that
-# concurrent shims do not collide: 32 at once, 32 whole logs.
+# exits; a tee nobody waited for left it short (#1374). Go a batch at a time,
+# which one run can win on luck and which also checks that concurrent shims do
+# not collide: 32 at once, 32 whole logs.
 race=$tmp/race
 mkdir -p "$race/cap"
 LINES_PER_RUN=50
@@ -99,21 +106,21 @@ for round in $(seq 1 "$ROUNDS"); do
         (
             HTTRACK_STDERR_CAPTURE_DIR=$race/cap HTTRACK_STDERR_CAPTURE_TAG=349_race \
                 "$wrap" /bin/sh -c "$racy" 2>"$race/$round.$slot.err"
-            readarray -t got <"$race/$round.$slot.err"
-            [ "${#got[@]}" -eq "$LINES_PER_RUN" ] ||
-                echo "round $round slot $slot: ${#got[@]} lines" >>"$race/short"
+            count_lines_here "$race/$round.$slot.err"
+            [ "$lines_here" -eq "$LINES_PER_RUN" ] ||
+                echo "round $round slot $slot: $lines_here lines" >>"$race/short"
         ) &
     done
     wait
 done
 [ ! -s "$race/short" ] ||
     fail "the caller's stderr was still being written after the shim exited: $(<"$race/short")"
-copies_kept=$(find "$race/cap" -name '349_race.*.log' | wc -l)
-assert_eq $((BATCH * ROUNDS)) "$copies_kept" "capture copies from concurrent shims"
+copies_kept=0
 for f in "$race"/cap/349_race.*.log; do
-    lines=$(wc -l <"$f")
-    assert_eq "$LINES_PER_RUN" "$lines" "lines in $f"
+    copies_kept=$((copies_kept + 1))
+    assert_eq "$LINES_PER_RUN" "$(lines_of "$f")" "lines in $f"
 done
+assert_eq $((BATCH * ROUNDS)) "$copies_kept" "capture copies from concurrent shims"
 
 # 6. The shim is a parent, not an exec, so what a test reads off the program has
 # to come back through it: its exit status (above), its death by signal, the
@@ -145,7 +152,7 @@ assert_eq "<a b><q'\"q><><end>" "$argv_seen" "argv through the shim"
 
 # Heavy enough that the copy cannot be one buffer the shim happened to hold.
 run_wrapped "$(loop_to_stderr 20000 bulk)" 2>"$tmp/heavy.err"
-assert_eq 20000 "$(wc -l <"$tmp/heavy.err")" "heavy stderr reaching the caller"
+assert_eq 20000 "$(lines_of "$tmp/heavy.err")" "heavy stderr reaching the caller"
 
 # 7. The generated shim runs the real engine, PATH-first, with stdout intact.
 [ -n "${HTTRACK_STDERR_WRAP_DIR:-}" ] || skip "HTTRACK_STDERR_WRAP_DIR unset, no automake environment"
