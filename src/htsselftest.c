@@ -1706,11 +1706,14 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
 
   /* produce random patterns, or read from a file */
   if (sscanf(snum, "%lu", &count) != 1) {
-    const LLint size = fsize(snum);
-    FILE *fp = fopen(snum, "rb");
+    const LLint fs = fsize(snum);
+    /* one width for the buffer and the walk below: a 64-bit size wraps
+       malloct() short while the loop still counts to the real end */
+    const size_t size = fs >= 0 ? llint_to_size_t(fs) : (size_t) -1;
+    FILE *fp = size != (size_t) -1 ? fopen(snum, "rb") : NULL;
     if (fp != NULL) {
       buff = malloct(size);
-      if (buff != NULL && hts_fread_exact(buff, (size_t) size, fp)) {
+      if (buff != NULL && hts_fread_exact(buff, size, fp)) {
         size_t capa = 0;
         size_t i, last;
         for (i = 0, last = 0, count = 0; i < size; i++) {
@@ -3105,6 +3108,10 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
       {10, HTS_ST_GROWSIZE_OVER32, 8192, WIDTH},
   };
 
+  /* 0xffffffff doubles as a 32-bit size_t's error value, so it stays out */
+  static const LLint narrowing[] = {0,  1,    8192, HTS_ST_GROWSIZE_OVER32,
+                                    -1, -4096};
+
   size_t k;
   int rc = 0;
 
@@ -3140,6 +3147,24 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
       rc = 1;
     }
   }
+
+  /* llint_to_size_t() refuses only what size_t cannot hold: a negative size
+     round-trips intact on LP64, so callers check the sign themselves. */
+  for (k = 0; k < sizeof(narrowing) / sizeof(narrowing[0]); k++) {
+    const LLint v = narrowing[k];
+    const hts_boolean representable =
+        sizeof(size_t) >= sizeof(LLint) || (v >= 0 && v <= 0xffffffffLL);
+    const size_t want = representable ? (size_t) v : (size_t) -1;
+    const size_t got = llint_to_size_t(v);
+
+    if (got != want) {
+      fprintf(stderr,
+              "growsize: narrow(" LLintP ") = " LLintP " (want " LLintP ")\n",
+              v, (LLint) got, (LLint) want);
+      rc = 1;
+    }
+  }
+
   printf("growsize self-test %s\n", rc == 0 ? "OK" : "FAILED");
   return rc;
 }
