@@ -484,7 +484,8 @@ expected_skips="01_engine-footer-overflow.test
 88_local-proxytrack-badmtime.test
 241_local-single-file-gui.test
 288_testlib-holdport.test
-350_local-diskfull-abort.test"
+350_local-diskfull-abort.test
+352_engine-filesave-diskfull.test"
 # First, or the deadline reads as an unexplained shortfall in the gates below.
 [ "$deadline" -eq 0 ] || {
     echo "::error::suite did not finish within ${suite_deadline}s"
