@@ -24,7 +24,8 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c a
 	server-root/fraglink/index.html server-root/fraglink/target.html \
 	fixtures/cache-golden/hts-cache/new.zip \
 	install-manifest.txt \
-	62_lang-untranslated.counts
+	62_lang-untranslated.counts \
+	62_lang-linebreaks.counts
 
 TESTS_ENVIRONMENT =
 TESTS_ENVIRONMENT += PATH=$(top_builddir)/src$(PATH_SEPARATOR)$$PATH
