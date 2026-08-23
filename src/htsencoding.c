@@ -40,18 +40,6 @@ Please visit our Website: http://www.httrack.com
  */
 #include "htsentities.h"
 
-/* hexadecimal conversion */
-static int get_hex_value(char c) {
-  if (c >= '0' && c <= '9')
-    return c - '0';
-  else if (c >= 'a' && c <= 'f')
-    return (c - 'a' + 10);
-  else if (c >= 'A' && c <= 'F')
-    return (c - 'A' + 10);
-  else
-    return -1;
-}
-
 /* 64-bit FNV-1a; must match htsentities.sh, which keys the entity table on it.
  */
 #define HASH_INIT 0xcbf29ce484222325ULL
@@ -189,7 +177,7 @@ int hts_unescapeEntitiesWithCharsetSpecial(const char *src, char *dest,
         }
         /* hex */
         else {
-          const int h = get_hex_value(src[i]);
+          const int h = hts_ehexh(src[i]);
           if (h != -1) {
             if (uc > (0x10FFFF - h) / 16) {
               ampStart = (size_t) -1;
@@ -266,8 +254,8 @@ int hts_unescapeUrlSpecial(const char *src, char *dest, const size_t max,
     }
     /* End of sequence seen */
     else if (i >= 2 && i == lastI + 2) {
-      const int a1 = get_hex_value(src[lastI + 1]);
-      const int a2 = get_hex_value(src[lastI + 2]);
+      const int a1 = hts_ehexh(src[lastI + 1]);
+      const int a2 = hts_ehexh(src[lastI + 2]);
       if (a1 != -1 && a2 != -1) {
         const char ec = a1*16 + a2;  /* new character */
         cUtf = (unsigned char) ec;

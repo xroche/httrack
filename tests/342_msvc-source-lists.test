@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# The Visual Studio projects carry their own hand-written source lists, so a new
+# .c added to Makefile.am alone links fine everywhere except MSVC (#1376 lost two
+# Windows legs to exactly that).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# the MSVC job runs the scripts with no automake around them
+[ -n "${abs_top_srcdir:-}" ] || skip "abs_top_srcdir unset, no automake environment"
+top=${abs_top_srcdir}
+am="$top/src/Makefile.am"
+test -r "$am" || fail "no $am"
+
+# iowin32.c is the Win32 ioapi: MSVC-only by design, never in Makefile.am.
+win_only="minizip/iowin32.c"
+
+# Sources of one automake variable, one per line, continuations folded.
+am_sources() {
+    awk -v var="$1" '
+        $0 ~ "^" var "[ \t]*=" { inlist = 1; sub(/^[^=]*=/, "") }
+        inlist {
+            line = $0
+            cont = sub(/\\[ \t]*$/, "")
+            n = split(line, tok, /[ \t]+/)
+            for (i = 1; i <= n; i++)
+                if (tok[i] ~ /\.c$/) print tok[i]
+            if (!cont) exit
+        }' "$am" | sort -u
+}
+
+# ClCompile entries of one project, backslashes folded to slashes.
+proj_sources() {
+    sed -n 's|.*<ClCompile Include="\([^"]*\)".*|\1|p' "$top/src/$1" |
+        tr '\134' '/' | sort -u
+}
+
+check() {
+    var=$1 proj=$2
+    test -r "$top/src/$proj" || fail "no src/$proj"
+    missing=$(comm -23 <(am_sources "$var") <(proj_sources "$proj") | tr '\n' ' ')
+    [ -z "$missing" ] || fail "$proj is missing: $missing"
+
+    extra=$(comm -13 <(am_sources "$var") <(proj_sources "$proj") |
+        grep -v -x -F "$win_only" | tr '\n' ' ' || true)
+    [ -z "$extra" ] || fail "$proj builds sources $var does not: $extra"
+}
+
+# A typo in a variable name would make every check vacuously pass.
+[ -n "$(am_sources libhttrack_la_SOURCES)" ] || fail "parsed no sources from $am"
+
+check libhttrack_la_SOURCES libhttrack.vcxproj
+check htsserver_SOURCES webhttrack.vcxproj
+check proxytrack_SOURCES proxytrack.vcxproj
+check httrack_SOURCES httrack.vcxproj

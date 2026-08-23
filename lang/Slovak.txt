@@ -37,7 +37,7 @@ Zatvori projekt?
 Delete this project?
 Vymaza projekt?
 Delete empty project %s?
-Vymaza prázdne projekty?
+Vymaza prázdny projekt %s?
 Action not yet implemented
 Akcia zatia¾ nebola zaradená
 Error deleting this project
@@ -63,7 +63,7 @@ Pridaj
 Scan Rules
 Pravidlá pre vyh¾adávanie
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-Poui masky na vylúèenie alebo doplnenie URL alebo linkov. n\Do jedného riadku mono vloi aj viac reazcov.\nAko odde¾ovaè poui medzeru.n\n\Napr.: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+Poui masky na vylúèenie alebo doplnenie URL alebo linkov.\nDo jedného riadku mono vloi aj viac reazcov.\nAko odde¾ovaè poui medzeru.\n\nNapr.: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
 Exclude links
 Vylúèi linky
 Include link(s)
@@ -903,7 +903,7 @@ Názvy súborov s príponou:\nNázvy súborov obsahujúcich:\nNázov tohoto súboru:\nNá
 Show all\nHide debug\nHide infos\nHide debug and infos
 Ukáza všetko\nSkry ladenie\nSkry informácie\nSkry ladenie a informácie
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Štruktúra stránky (default)\nHtml vo webe/,       obrázky/iné súbory vo webe/obrázky/\nHtml vo webe/html,   obrázky/iné vo webe/obrázky\nHtml vo webe/,       obrázky/iné vo webe/\nHtml vo webe/,       obrázky/iné vo webe/xxx, kde xxx je prípona súboru\nHtml vo webe/html,   obrázky/iné vo webe/xxx\nŠtruktúra stránky, bez www.doména.xxx/\nHtml v názve stránky/, obrázky/iné súbory v názve stránky/obrázky/\nHtml v názve stránky/html, obrázky/iné v názve stránky/obrázky\nHtml v názve stránky/, obrázky/iné v názve stránky/\nHtml v názve stránky/, obrázky/iné v názve stránky/xxx\nHtml v názve stránky/html, obrázky/iné v názve stránky/xxx\nVšetky súbory vo webe/, s náhodnımi menami (gadget !)\nVšetky súbory v názve stránky/, s náhodnımi menami (gadget !)\nUívate¾om definovaná štruktúra..
+Štruktúra stránky (default)\nHtml vo web/,       obrázky/iné súbory vo web/images/\nHtml vo web/html,   obrázky/iné vo web/images\nHtml vo web/,       obrázky/iné vo web/\nHtml vo web/,       obrázky/iné vo web/xxx, kde xxx je prípona súboru\nHtml vo web/html,   obrázky/iné vo web/xxx\nŠtruktúra stránky, bez www.domain.xxx/\nHtml v site_name/, obrázky/iné súbory v site_name/images/\nHtml v site_name/html, obrázky/iné v site_name/images\nHtml v site_name/, obrázky/iné v site_name/\nHtml v site_name/, obrázky/iné v site_name/xxx\nHtml v site_name/html, obrázky/iné v site_name/xxx\nVšetky súbory vo web/, s náhodnımi menami (gadget !)\nVšetky súbory v site_name/, s náhodnımi menami (gadget !)\nUívate¾om definovaná štruktúra..
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
 Iba skenova\nUloi html súbory\nUloi nie-html súbory\nUloi všetky súbory (default)\nUloi najprv html súbory
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
@@ -913,7 +913,7 @@ Osta na tej istej adrese (default)\nOsta na tej istej doméne\nOsta -//- najvy
 Never\nIf unknown (except /)\nIf unknown
 Nikdy\nAk nie je známe (s vınimkou/)\nAk nie je známe
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
-Ignorova pravidlá v robots.txt\nPrevza pravidlá -//- okrem filtrov\nPrevzia všetky pravidlá v -//-
+Ignorova pravidlá v robots.txt\nPrevza pravidlá robots.txt okrem filtrov\nPrevzia všetky pravidlá v robots.txt
 normal\nextended\ndebug
 normálny\nrozšírenı\nladenie
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download

@@ -47,11 +47,7 @@ done
 common=(--quiet --disable-security-limits --robots=0 --timeout=20 --max-time=120
     --retries=1 -c1 --changes)
 
-fail() {
-    echo "FAIL: $*" >&2
-    test ! -f "$report" || cat "$report" >&2
-    exit 1
-}
+fail_dump_var report
 # Files listed under a report bucket, one "file:size" per line.
 listed() {
     "$python" - "$report" "$1" <<'EOF' | tr -d '\r'

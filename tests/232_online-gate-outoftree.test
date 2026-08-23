@@ -72,6 +72,7 @@ eval_re='(^|[;&|(`])[[:space:]]*eval[[:space:]]'
 # shape, because a shape exemption cannot tell them from #1016 in disguise.
 allowed='172_ci-windows-driver.test ci-windows-suite.sh
 286_ci-windows-pool.test ci-windows-suite.sh
+337_ci-lost-worker.test ci-windows-suite.sh
 ci-windows-suite.sh test-timeout.sh'
 
 # Matching lines of the given files as file:line:text, comments dropped:

@@ -638,6 +638,19 @@ AC_SUBST([TESTS_LIST])
 AC_MSG_RESULT([$hts_ntests])
 test "$hts_ntests" -gt 0 || AC_MSG_ERROR([no test script matched tests/[[0-9]]*_*.test])
 
+# Same for the fuzz corpus, for the same reason: automake expands no EXTRA_DIST glob.
+AC_MSG_CHECKING([for fuzz corpus files])
+FUZZ_CORPUS_LIST=
+hts_ncorpus=0
+for hts_c in "$srcdir"/fuzz/corpus/*/*; do
+	test -f "$hts_c" || continue
+	FUZZ_CORPUS_LIST="$FUZZ_CORPUS_LIST `echo "$hts_c" | sed 's|.*/corpus/|corpus/|'`"
+	hts_ncorpus=`expr $hts_ncorpus + 1`
+done
+AC_SUBST([FUZZ_CORPUS_LIST])
+AC_MSG_RESULT([$hts_ncorpus])
+test "$hts_ncorpus" -gt 0 || AC_MSG_ERROR([no fuzz corpus file matched fuzz/corpus/*/*])
+
 # Final output
 AC_CONFIG_FILES([
 Makefile

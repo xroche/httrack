@@ -22,8 +22,5 @@ httrack -#test=cache-hdrbounds "$dir" >"$dir/out" 2>"$dir/err" ||
     }
 
 out=$(tail -n1 "$dir/out")
-test "$out" = "cache-hdrbounds: OK" || {
-    echo "expected 'cache-hdrbounds: OK', got: $out" >&2
-    cat "$dir/err" >&2
-    exit 1
-}
+test "$out" = "cache-hdrbounds: OK" ||
+    fail_dump "expected 'cache-hdrbounds: OK', got: $out" "$dir/err"

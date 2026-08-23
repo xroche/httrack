@@ -28,6 +28,16 @@ budget=$(budget_secs)
 for path in "$@"; do :; done
 name=$(basename "$path")
 
+# gcc's UBSan ignores log_path and reports on stderr, which most tests discard.
+# Route the engine through the shims that keep a copy (sanitizer-stderr-wrap.sh)
+# when a capture directory is named; PATH is untouched otherwise, so no plain run
+# pays for the extra layer.
+if test -n "${HTTRACK_STDERR_CAPTURE_DIR:-}" && test -d "${HTTRACK_STDERR_WRAP_DIR:-}"; then
+    PATH="$HTTRACK_STDERR_WRAP_DIR${PATH:+:}$PATH"
+    HTTRACK_STDERR_CAPTURE_TAG=$name
+    export PATH HTTRACK_STDERR_CAPTURE_TAG
+fi
+
 # A test whose work legitimately outlasts the wedge budget says so in its header
 # (269 sweeps n^2 compiles and paces itself inside it). The name carries the rule the
 # reader cannot see: it raises the budget, so no test can disarm the guard. Read with

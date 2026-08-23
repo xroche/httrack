@@ -23,11 +23,8 @@ rc=0
 run_with_timeout 60 httrack -#test=strsafe overflow "$overflow" >"$out" 2>&1 || rc=$?
 test "$rc" -ne 124 || fail "the crash handler did not finish within the deadline"
 
-grep -q '^Caught signal ' "$out" || {
-    echo "no 'Caught signal' line:" >&2
-    cat "$out" >&2
-    exit 1
-}
+grep -q '^Caught signal ' "$out" ||
+    fail_dump "no 'Caught signal' line:" "$out"
 if grep -q 'No stack trace available on this OS' "$out"; then
     echo "no backtrace() on this platform; skipping" >&2
     exit 77
@@ -43,11 +40,8 @@ arm | armv*)
     ;;
 esac
 # Unconditional and first: symbolizing must never cost the raw trace.
-grep -q "$rawframe" "$out" || {
-    echo "raw module+offset frames are gone:" >&2
-    cat "$out" >&2
-    exit 1
-}
+grep -q "$rawframe" "$out" ||
+    fail_dump "raw module+offset frames are gone:" "$out"
 
 command -v addr2line >/dev/null || skip "addr2line not installed"
 
@@ -69,11 +63,8 @@ grep -qE 'st_strsafe|strcpy_safe_' "$oracle" || skip "addr2line names no hidden 
 # names are static, so .dynsym could never have carried them. Not anchored on
 # the "0xOFF:" line, the inline chain puts the name on either half.
 symbolized=$(grep -v "$rawframe" "$out" || true)
-grep -qE 'st_strsafe|strcpy_safe_' <<<"$symbolized" || {
-    echo "the handler did not name the hidden frames:" >&2
-    cat "$out" >&2
-    exit 1
-}
+grep -qE 'st_strsafe|strcpy_safe_' <<<"$symbolized" ||
+    fail_dump "the handler did not name the hidden frames:" "$out"
 
 # Opt-out: raw trace kept, nothing spawned.
 export HTTRACK_NO_SYMBOLIZE=1
@@ -81,13 +72,7 @@ rc=0
 run_with_timeout 60 httrack -#test=strsafe overflow "$overflow" >"$raw" 2>&1 || rc=$?
 unset HTTRACK_NO_SYMBOLIZE
 test "$rc" -ne 124 || fail "the opt-out run did not finish within the deadline"
-grep -q "$rawframe" "$raw" || {
-    echo "the opt-out lost the raw trace:" >&2
-    cat "$raw" >&2
-    exit 1
-}
-! grep -q '^0x[0-9a-f]*: ' "$raw" || {
-    echo "the opt-out still symbolized:" >&2
-    cat "$raw" >&2
-    exit 1
-}
+grep -q "$rawframe" "$raw" ||
+    fail_dump "the opt-out lost the raw trace:" "$raw"
+! grep -q '^0x[0-9a-f]*: ' "$raw" ||
+    fail_dump "the opt-out still symbolized:" "$raw"

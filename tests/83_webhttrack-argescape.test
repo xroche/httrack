@@ -11,10 +11,7 @@ set -euo pipefail
 
 htsserver_require
 
-cleanup() {
-    htsserver_cleanup
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup
 
 htsserver_start
 test -n "${HTS_PID}" || fail "htsserver did not report its pid"

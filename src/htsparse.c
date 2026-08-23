@@ -3554,6 +3554,22 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
   return strcasecmp(n_fil, pn_fil) == 0;
 }
 
+/* Does this link have a mirrored subtree the purge could take? Only a previous
+   run's successful fetch does; a link never mirrored endangers nothing. */
+static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
+                                            const char *adr, const char *fil) {
+  char BIGSTK prev_save[HTS_URLMAXSIZE * 2];
+  htsblk prev;
+
+  prev_save[0] = '\0'; /* a cache miss leaves it untouched */
+  prev = cache_read_including_broken(opt, cache, adr, fil, prev_save);
+
+  return HTTP_IS_OK(prev.statuscode) && strnotempty(prev_save) &&
+                 is_hypertext_mime(opt, prev.contenttype, prev_save)
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
 /*
 Check 301, 302, .. statuscodes (moved)
 */
@@ -3908,6 +3924,18 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                */
               HTS_STAT.stat_errors_front++;
             }
+          }
+
+          /* No response at all, so nothing here says the site dropped the
+             links this page carries. Same predicate as the one keeping the
+             previous copy (#746), and it must stay so: every file this run
+             preserves keeps its children. An answered error is not in it and
+             needs nothing, being recovered from the cache and re-parsed. */
+          const hts_boolean unanswered = back_transfer_failed(r->statuscode);
+
+          if (unanswered && !heap(ptr)->testmode &&
+              hts_link_may_carry_links(opt, cache, urladr(), urlfil())) {
+            opt->links_unqueued = HTS_TRUE;
           }
 
         } else { // retry, or a refused-resume restart

@@ -2293,7 +2293,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                                 fprintf(stdout,
                                         "X-Content-Length: " LLintP "\r\n",
                                         (r.size >= 0) ? r.size : (-r.size));
-                                if (r.contenttype >= 0) {
+                                if (r.contenttype[0]) {
                                   fprintf(stdout, "Content-Type: %s\r\n",
                                           hts_effective_mime(r.contenttype));
                                 }

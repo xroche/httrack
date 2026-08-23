@@ -21,10 +21,11 @@ ci_annotate() {
     printf '\n::%s title=%s::%s\n' "$level" "$title" "$msg"
 }
 
-# Count the MSYS fork-emulation failures in the console log $1. Nothing counted
-# them, so a leg that struggled read exactly like one that never did (#1273).
+# Count the MSYS fork-emulation failures in the console log $1, and the workers the
+# suite lost with them (#1273). A worker can die without bash saying a word, so those
+# counts at zero are not by themselves a clean leg (#1352).
 ci_report_fork_failures() {
-    local log=$1 died retried gaveup
+    local log=$1 died retried gaveup lost
     test -r "$log" || {
         echo "no console log at $log: MSYS fork failures not counted"
         return 0
@@ -32,27 +33,69 @@ ci_report_fork_failures() {
     # Split on CR first: the console carries stdout and stderr merged, so two
     # messages can share a physical line and a line count would see one. bash
     # retries on EAGAIN alone, so a give-up can carry any strerror; each `next`
-    # keeps one message out of a second class.
-    read -r died retried gaveup <<<"$(tr '\r' '\n' <"$log" | awk '
+    # keeps one message out of a second class. The LOST verdicts sit at column 0,
+    # where the suite's indented failure tails cannot forge one.
+    read -r died retried gaveup lost <<<"$(tr '\r' '\n' <"$log" | awk '
+        /^LOST / { lost++; next }
         /fork: child -1|child_info_fork::abort|sync_with_child:/ { died++; next }
         /reserve memory for parent stack/ { died++; next }
         /fork: retry:/ { retried++; next }
         /: fork: / { gaveup++ }
-        END { print died + 0, retried + 0, gaveup + 0 }')"
+        END { print died + 0, retried + 0, gaveup + 0, lost + 0 }')"
     test -z "${GITHUB_STEP_SUMMARY:-}" ||
-        printf 'MSYS forks: %s died, %s retried, %s given up\n' \
-            "$died" "$retried" "$gaveup" >>"$GITHUB_STEP_SUMMARY"
+        printf 'MSYS forks: %s died, %s retried, %s given up; %s worker(s) lost\n' \
+            "$died" "$retried" "$gaveup" "$lost" >>"$GITHUB_STEP_SUMMARY"
     if test $((died + retried + gaveup)) -eq 0; then
-        echo "no MSYS fork failure in $log"
-        return 0
+        # Never bare: "no MSYS fork failure" alone is what called the #1352 leg clean.
+        if test "$lost" -eq 0; then
+            echo "no MSYS fork failure and no lost worker in $log"
+        else
+            echo "no MSYS fork failure in $log, but $lost worker(s) left no status"
+        fi
+    else
+        ci_annotate warning "MSYS fork failures" "$(
+            printf '%s child(ren) died at DLL init, %s retry wait(s), %s fork(s) given up\n' \
+                "$died" "$retried" "$gaveup"
+            # -a: one NUL in the log would otherwise cost every sample line.
+            tr '\r' '\n' <"$log" | grep -am 3 -e 'fork: child -1' -e 'sync_with_child:' \
+                -e 'child_info_fork::abort' -e 'reserve memory' -e ': fork: ' || true
+        )"
     fi
-    ci_annotate warning "MSYS fork failures" "$(
-        printf '%s child(ren) died at DLL init, %s retry wait(s), %s fork(s) given up\n' \
-            "$died" "$retried" "$gaveup"
-        # -a: one NUL in the log would otherwise cost every sample line.
-        tr '\r' '\n' <"$log" | grep -am 3 -e 'fork: child -1' -e 'sync_with_child:' \
-            -e 'child_info_fork::abort' -e 'reserve memory' -e ': fork: ' || true
+    # error, not warning: a lost worker is re-run where a fork storm is investigated.
+    test "$lost" -eq 0 || ci_annotate error "workers lost with no status" "$(
+        printf '%s worker(s) died before reporting: re-run this leg, and see #1228\n' "$lost"
+        tr '\r' '\n' <"$log" | grep -am 3 '^LOST ' || true
     )"
+}
+
+# Classify test $1's outcome from what its worker left in results dir $2, into
+# ci_outcome (pass, skip, fail, lost) and ci_rc. "lost" is a worker that died before
+# writing any status: an infrastructure symptom, not a test result. Assigned, not
+# printed: a fork per test costs tens of milliseconds under MSYS.
+ci_rc='' ci_outcome=''
+ci_read_outcome() {
+    ci_rc=''
+    # An empty .rc is a worker that died mid-write, never a status of 0.
+    test ! -r "$2/$1.rc" || read -r ci_rc <"$2/$1.rc" || true
+    case "$ci_rc" in
+    0) ci_outcome=pass ;;
+    77) ci_outcome=skip ;;
+    '') ci_outcome=lost ;;
+    *) ci_outcome=fail ;;
+    esac
+}
+
+# How far test $1's vanished worker got, into ci_reason, read off the log it opened:
+# wait -n reaps workers the pool can no longer name, so the wait status is gone.
+ci_reason=''
+ci_lost_reason() {
+    if test ! -e "$1.log"; then
+        ci_reason='no log at all: it died before opening one'
+    elif test ! -s "$1.log"; then
+        ci_reason='0-byte log: it died before its test wrote anything'
+    else
+        ci_reason='log written: it died after its test had run'
+    fi
 }
 
 # End a wedged suite before its runner dies: a step that fails on its own terms
@@ -253,7 +296,7 @@ ci_suite_heartbeat 960 360 "$progress" "$stuck" $$ "$hard_deadline" &
 heartbeat=$!
 trap 'set +e; kill "$heartbeat" 2>/dev/null; test -z "$watchdog" || kill_pid "$watchdog"' EXIT
 
-pass=0 fail=0 skip=0 failed="" skipped="" deadline=0
+pass=0 fail=0 skip=0 lost=0 failed="" skipped="" vanished="" deadline=0
 # Tests in flight at once, min(2*nproc, 16) as ci.yml gives "make check" on every
 # platform, unless the caller pins it (windows-build.yml does): each binds its own
 # ephemeral-port server, and they mostly sleep.
@@ -416,16 +459,17 @@ done
 # In test order, once nothing is still writing: eight workers interleaving their
 # failure tails is noise.
 for t in ${ran_tests[@]+"${ran_tests[@]}"}; do
-    # read, not $(cat): a fork per test costs tens of milliseconds under MSYS.
-    rc=
-    test ! -r "$results/$t.rc" || read -r rc <"$results/$t.rc" || true
-    case "$rc" in
-    0) pass=$((pass + 1)) ;;
-    77) skip=$((skip + 1)) skipped="$skipped $t" ;;
+    ci_read_outcome "$t" "$results"
+    case "$ci_outcome" in
+    pass) pass=$((pass + 1)) ;;
+    skip) skip=$((skip + 1)) skipped="$skipped $t" ;;
+    fail) fail=$((fail + 1)) failed="$failed $t" ;;
     *)
-        fail=$((fail + 1)) failed="$failed $t"
-        # A worker killed before it could report leaves no status behind.
-        test -n "$rc" || echo "FAIL $t (its worker left no status)"
+        lost=$((lost + 1)) vanished="$vanished $t"
+        # Its own verdict, not a FAIL: a test that crashed is not a worker killed
+        # under it.
+        ci_lost_reason "$t"
+        echo "LOST $t (worker left no status; $ci_reason)"
         ;;
     esac
     test ! -s "$results/$t.tail" || cat "$results/$t.tail"
@@ -433,7 +477,7 @@ done
 # An orphaned httrack.exe spins and starves the runner ("lost communication"). Once,
 # at the end: matching by image name, an earlier reap cannot spare a live sibling.
 reap_leftover_processes "the suite" | tee -a "$progress"
-echo "ran=$((pass + fail + skip)) pass=$pass fail=$fail skip=$skip" |
+echo "ran=$((pass + fail + skip + lost)) pass=$pass fail=$fail skip=$skip lost=$lost" |
     tee -a "$GITHUB_STEP_SUMMARY"
 
 # Every gate here exits 77, so an all-skipped suite would report green having
@@ -491,9 +535,14 @@ expected_skips="01_engine-footer-overflow.test
     echo "::error::suite did not finish within ${suite_deadline}s"
     exit 1
 }
+# Ahead of the gates below, each of which a lost worker can trip on its own: it
+# leaves the pass count short and the skip set holed.
+test "$lost" -eq 0 ||
+    echo "::error::worker(s) vanished with no status, re-run this leg:$vanished"
 [ "$pass" -ge 90 ] || {
     echo "::error::only $pass tests passed ($skip skipped)"
-    exit 1
+    # Vanished workers lower the count without anything having failed.
+    [ "$lost" -gt 0 ] || exit 1
 }
 # Word-split on whitespace (space-joined $skipped, newline-joined
 # expected_skips both work) and sort, so the compare is a set, not a string.
@@ -503,10 +552,15 @@ got=$(printf '%s\n' $skipped | sort)
 want=$(printf '%s\n' $expected_skips | sort)
 if [ "$got" != "$want" ]; then
     echo "::error::skip set changed from expected; - missing, + newly skipped"
-    diff -u <(echo "$want") <(echo "$got") | tail -n +3 | sed 's/^/      /'
-    exit 1
+    diff -u <(echo "$want") <(echo "$got") | tail -n +3 | sed 's/^/      /' || true
+    # A worker that vanished cannot have recorded its skip, so the set differs
+    # for a reason we already know; keep that a re-run, not a red.
+    [ "$lost" -gt 0 ] || exit 1
 fi
 [ "$fail" -eq 0 ] || {
     echo "::error::failing:$failed"
     exit 1
 }
+# Last, and 3 rather than 1: nothing failed on its own terms, so this leg is one to
+# repeat rather than a red to investigate (#1228).
+[ "$lost" -eq 0 ] || exit 3

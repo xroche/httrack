@@ -3,12 +3,8 @@
 # Control for wait_bounded: a wedged fetch must be reaped at the harness deadline,
 # not hang the CI step to its 45-min cap.
 
-: "${top_srcdir:=..}"
-
-fail() {
-    echo "FAIL: $*" >&2
-    exit 1
-}
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
 
 start=$SECONDS
 out=$(CRAWL_DEADLINE=3 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
@@ -17,14 +13,8 @@ elapsed=$((SECONDS - start))
 
 # Skip (not fail) on causes unrelated to the watchdog: no python3/server, or a
 # port-announce race (flaky-13).
-test "$rc" -ne 77 || {
-    echo "SKIP: local crawl prerequisites missing" >&2
-    exit 77
-}
-if grep -q "could not discover server port" <<<"$out"; then
-    echo "SKIP: server port announce raced" >&2
-    exit 77
-fi
+test "$rc" -ne 77 || skip "local crawl prerequisites missing"
+! grep -q "could not discover server port" <<<"$out" || skip "server port announce raced"
 
 # The message prints only on the 124 reap, and 25s < the engine's --timeout=30, so
 # together they pin the fast exit on the 3s watchdog, not httrack giving up.

@@ -20,11 +20,7 @@ done
 echo OK
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_warc.XXXXXX") || fail "no tmpdir"
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${work}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${work}"
 
 printf '[webhttrack emits the WARC options] ..\t'
 htsserver_start --home "${work}"

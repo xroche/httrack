@@ -44,11 +44,8 @@ start_server() {
         grep -q "^ready" "$ports" 2>/dev/null && break
         sleep 0.1
     done
-    grep -q "^ready" "$ports" 2>/dev/null || {
-        echo "server ($mode) did not start" >&2
-        cat "$dir/server.err" >&2
-        exit 1
-    }
+    grep -q "^ready" "$ports" 2>/dev/null ||
+        fail_dump "server ($mode) did not start" "$dir/server.err"
     origin_port=$(awk '/^ORIGIN/{print $2}' "$ports")
     proxy_port=$(awk '/^PROXY/{print $2}' "$ports")
 }
@@ -77,21 +74,12 @@ start_server "$ok" ok
 
 # 1. page fetched through a CONNECT tunnel, request delivered origin-form
 run_crawl "$ok/out" "connect://127.0.0.1:${proxy_port}" "$origin_port"
-grep -rq "ORIGIN-PAGE-564" "$ok/out" || {
-    echo "FAIL: origin page not downloaded through the CONNECT tunnel" >&2
-    cat "$ok/out.log" >&2
-    exit 1
-}
-grep -q "^CONNECT 127.0.0.1:${origin_port} " "$ok/proxy.log" || {
-    echo "FAIL: proxy never received a CONNECT for the plain-http origin" >&2
-    cat "$ok/proxy.log" >&2
-    exit 1
-}
-grep -q "^GET / HTTP/1" "$ok/origin-headers.log" || {
-    echo "FAIL: origin did not see an origin-form request line" >&2
-    cat "$ok/origin-headers.log" >&2
-    exit 1
-}
+grep -rq "ORIGIN-PAGE-564" "$ok/out" ||
+    fail_dump "origin page not downloaded through the CONNECT tunnel" "$ok/out.log"
+grep -q "^CONNECT 127.0.0.1:${origin_port} " "$ok/proxy.log" ||
+    fail_dump "proxy never received a CONNECT for the plain-http origin" "$ok/proxy.log"
+grep -q "^GET / HTTP/1" "$ok/origin-headers.log" ||
+    fail_dump "origin did not see an origin-form request line" "$ok/origin-headers.log"
 if grep -q "^GET http://" "$ok/origin-headers.log"; then
     echo "FAIL: absolute-URI request leaked through the tunnel to the origin" >&2
     exit 1
@@ -104,11 +92,8 @@ echo "OK: plain http tunneled origin-form through CONNECT"
 # makes this log ":443" and fail.
 : >"$ok/proxy.log"
 run_crawl "$ok/out_port" "connect://127.0.0.1:${proxy_port}" "" "http://127.0.0.1/" || true
-grep -q "^CONNECT 127.0.0.1:80 " "$ok/proxy.log" || {
-    echo "FAIL: portless http origin did not CONNECT to the default port 80" >&2
-    cat "$ok/proxy.log" >&2
-    exit 1
-}
+grep -q "^CONNECT 127.0.0.1:80 " "$ok/proxy.log" ||
+    fail_dump "portless http origin did not CONNECT to the default port 80" "$ok/proxy.log"
 echo "OK: portless http origin tunnels to the default port 80"
 
 # 3. teeth: without connect://, httrack sends the absolute-URI form, which the
@@ -121,11 +106,8 @@ grep -rq "ORIGIN-PAGE-564" "$ok/out_plain" && {
     echo "FAIL: absolute-URI form unexpectedly fetched through a CONNECT-only proxy" >&2
     exit 1
 }
-grep -q "^GET http://127.0.0.1:${origin_port}/" "$ok/proxy.log" || {
-    echo "FAIL: a plain proxy should have received an absolute-URI GET" >&2
-    cat "$ok/proxy.log" >&2
-    exit 1
-}
+grep -q "^GET http://127.0.0.1:${origin_port}/" "$ok/proxy.log" ||
+    fail_dump "a plain proxy should have received an absolute-URI GET" "$ok/proxy.log"
 echo "OK: absolute-URI form (no connect://) rejected by the CONNECT-only proxy"
 
 # 4. authenticated proxy: creds ride the CONNECT, never reach the origin
@@ -135,11 +117,8 @@ run_crawl "$ok/out2" "connect://user:secret@127.0.0.1:${proxy_port}" "$origin_po
 grep -rq "ORIGIN-PAGE-564" "$ok/out2" || fail "origin page not downloaded through the authenticated proxy"
 got=$(awk '/^AUTH Basic /{print $3}' "$ok/proxy.log" | head -1)
 # base64("user:secret"); compared literally to stay portable (no base64 -d)
-test "$got" == "dXNlcjpzZWNyZXQ=" || {
-    echo "FAIL: Proxy-Authorization not carried on CONNECT (got '$got')" >&2
-    cat "$ok/proxy.log" >&2
-    exit 1
-}
+test "$got" == "dXNlcjpzZWNyZXQ=" ||
+    fail_dump "Proxy-Authorization not carried on CONNECT (got '$got')" "$ok/proxy.log"
 if grep -qi "proxy-authorization" "$ok/origin-headers.log"; then
     echo "FAIL: proxy credentials leaked to the origin through the tunnel" >&2
     exit 1

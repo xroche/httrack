@@ -559,7 +559,7 @@ Instellingen wegschrijven
 Max transfer rate
 Maximale transfer snelheid
 Follow robots.txt
-Volg de regels in robot.txt
+Volg de regels in robots.txt
 No external pages
 Geen externe pagina's
 Do not purge old files
@@ -903,7 +903,7 @@ Bestandsnamen met extentie:\nBestandsnamen bevattend:\nDit bestandsnaam:\nDirect
 Show all\nHide debug\nHide infos\nHide debug and infos
 Toon alles\nVerstop debug\nverstop informaties\nVerstop debug en informaties
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Site-struktuur (default)\nHtml in web/,     images/andere bestanden in web/images/\nHtml in web/html,   images/andere in web/images\nHtml in web/,    images/other in web/\nHtml in web/,    images/other in web/xxx, waarbij xxx de extentie is\nHtml in web/html,    images/andere in web/xxx\nSite-struktuur, zonder www.domain.xxx/\nHtml in site_naam/, images/andere files in site_naam/images/\nHtml in site_naam/html, images/andere in site_naam/images\nHtml in site_naam, images/andere in site_name/\nHtml in site_naam/, images/andere in site_naam/xxx\nHtml in site_naam/html, images/andere in site_naam/xxx\nAlle bestenden in web/, met toevallige namen\nAlle bestanden in site_naam/, met toevallige namen\nGebruikers-gedefiniëerde struktuur...
+Site-struktuur (default)\nHtml in web/,     images/andere bestanden in web/images/\nHtml in web/html,   images/andere in web/images\nHtml in web/,    images/other in web/\nHtml in web/,    images/other in web/xxx, waarbij xxx de extentie is\nHtml in web/html,    images/andere in web/xxx\nSite-struktuur, zonder www.domain.xxx/\nHtml in site_name/, images/andere files in site_name/images/\nHtml in site_name/html, images/andere in site_name/images\nHtml in site_name/, images/andere in site_name/\nHtml in site_name/, images/andere in site_name/xxx\nHtml in site_name/html, images/andere in site_name/xxx\nAlle bestenden in web/, met toevallige namen\nAlle bestanden in site_name/, met toevallige namen\nGebruikers-gedefiniëerde struktuur...
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
 Enkel scannen\nHtml-bestanden wegschrijven\nNiet-Html-bestanden wegschrijven\nAlle bestanden wegschrijven (default)\nEerst Html-bestanden wegschrijven
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down

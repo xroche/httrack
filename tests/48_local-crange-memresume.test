@@ -50,11 +50,8 @@ printf '[pass 2: hostile 206, no overflow, refetch] ..\t'
 rc=0
 local_crawl --log "${tmpdir}/log2" "${common[@]}" --continue "${BASEURL}/crange206mem/index.html" || rc=$?
 # a crash here would otherwise read as a clean "terminated"
-test "$rc" -eq 0 || {
-    echo "FAIL: httrack exited $rc"
-    cat "${tmpdir}/log2" >&2
-    exit 1
-}
+test "$rc" -eq 0 ||
+    fail_dump "httrack exited $rc" "${tmpdir}/log2"
 echo "OK (terminated)"
 
 blob=$(find "$out" -name blob.bin 2>/dev/null | head -1)

@@ -16,11 +16,7 @@ set -euo pipefail
 htsserver_require
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_charset.XXXXXX") || fail "no tmpdir"
-cleanup() {
-    htsserver_cleanup
-    rm -rf "${work}"
-}
-cleanup_push cleanup
+cleanup_push htsserver_cleanup_dir "${work}"
 
 htsserver_start --home "${work}"
 

@@ -13,11 +13,7 @@ builddir=${abs_top_builddir:?not run under make check}
 
 out=
 
-fail() {
-    echo "FAIL: $*" >&2
-    test -z "${out}" || sed 's/^/  | /' <"${out}" >&2
-    exit 1
-}
+fail_dump_var out
 
 test "$HTS_OS" = "Linux" || skip "the ELF load bias is a Linux matter"
 if ! command -v addr2line >/dev/null && ! command -v llvm-symbolizer >/dev/null; then

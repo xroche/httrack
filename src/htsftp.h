@@ -80,6 +80,15 @@ int send_line(T_SOC soc, const char *data);
    Optional back ends the wait on a stop, opt clips it to --max-time. */
 int get_ftp_line(lien_back *back, T_SOC soc, char *line, size_t line_size,
                  int timeout, const httrackp *opt);
+/* Start of the authority in a URL address: the scheme and its slashes skipped.
+   Bracket-aware, unlike a hand-rolled split on the first ':'. */
+char *ftp_jump_authority(char *url_adr);
+/* Split "host[:port]" (host may be a "[IPv6]" literal) into host[host_size] and
+   *port. Returns HTS_FALSE with host emptied and the reason in err[err_size]
+   when the host does not fit or the port is malformed; an empty ":" keeps the
+   caller's default port (#614). */
+hts_boolean ftp_split_hostport(const char *adr, char *host, size_t host_size,
+                               int *port, char *err, size_t err_size);
 /* Split a "user[:pass]@" prefix (end = jump_identification result) into
    NUL-terminated user/pass buffers. Returns HTS_FALSE and empties both when a
    field does not fit, as a clipped one would name another account.

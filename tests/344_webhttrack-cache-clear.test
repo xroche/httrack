@@ -1,0 +1,121 @@
+#!/bin/bash
+#
+# Neither cache box had the hidden companion that clears it, so an unticked box
+# posted nothing and the stored "1" survived: the cache could not be turned off.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/webhttracklib.sh
+. "${testdir}/webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_cacheclear.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    htsserver_cleanup
+    rm -rf "${work}"
+}
+cleanup_push cleanup
+
+htsserver_start --home "${work}"
+
+htsserver_python - "${HTS_URL}" "${work}" <<'PY' || fail "the cache boxes cannot be cleared (see above)"
+import os
+import re
+import sys
+
+from webtestlib import Session, checked, textarea
+
+s, work = Session(sys.argv[1]), sys.argv[2]
+rc = 0
+
+
+def check(ok, what):
+    global rc
+    print(("ok: " if ok else "FAIL: ") + what)
+    if not ok:
+        rc = 1
+
+
+def browser_post(page_name, unticked=()):
+    """POST what a browser sends from PAGE, with the UNTICKED boxes cleared.
+
+    An unticked checkbox contributes nothing, which is the whole bug: only a
+    hidden companion of the same name can carry the cleared state.
+    """
+    page = s.get(page_name)
+    fields = []
+    for m in re.finditer(r"<(input|select)\b([^>]*)>", page):
+        attrs = m.group(2)
+        name = re.search(r'name="([^"]+)"', attrs)
+        kind = re.search(r'type="([^"]+)"', attrs)
+        kind = kind.group(1) if kind else m.group(1)
+        if name is None or kind in ("submit", "button", "hidden"):
+            continue
+        name = name.group(1)
+        if kind == "checkbox":
+            if name not in unticked and checked(page, name):
+                fields.append((name, "on"))
+        elif kind == "select":
+            sel = re.search(r"<option value=(\d+) selected>", page[m.end():])
+            fields.append((name, sel.group(1) if sel else ""))
+        else:
+            value = re.search(r'value="([^"]*)"', attrs)
+            fields.append((name, value.group(1) if value else ""))
+    # The hidden fields the page draws, verbatim and ahead of the boxes.
+    hidden = [(m.group(1), m.group(2)) for m in re.finditer(
+        r'<input type="hidden" name="([^"]+)" value="([^"]*)">', page)]
+    s.post(page_name, [kv for kv in hidden if kv[0] != "sid"] + fields)
+
+
+def cmdline():
+    return textarea(s.post("step4.html", []), "command").split()
+
+
+# The box the user unticks, and the flag its cleared state must produce.
+BOXES = [("cache", "option3.html", "--cache=0", True),
+         ("cache2", "option9.html", "--store-all-in-cache", False)]
+
+for box, page, flag, on_when_clear in BOXES:
+    # Tick it first: cache2 is off by default, so clearing it proves nothing yet.
+    browser_post(page, unticked=())
+    if not checked(s.get(page), box):
+        s.post(page, [(box, "on")])
+    check(checked(s.get(page), box), "%s starts ticked" % box)
+    check((flag in cmdline()) is not on_when_clear,
+          "%s ticked %s %s" % (box, "drops" if on_when_clear else "emits", flag))
+
+    browser_post(page, unticked=(box,))
+    check(not checked(s.get(page), box), "%s draws an empty box once unticked" % box)
+    check((flag in cmdline()) is on_when_clear,
+          "%s unticked %s %s" % (box, "emits" if on_when_clear else "drops", flag))
+
+# step2.html copies the Cache profile key onto the box on every render, so a
+# seeded key would put the cache back on behind the user's back. First render
+# of this session: ${do:copy} consumes its source, so a later one sees nothing.
+s.get("step2.html")
+check("--cache=0" in cmdline(), "an unticked cache survives the step2 pass")
+check(not checked(s.get("option3.html"), "cache"),
+      "an unticked cache still draws an empty box after step2")
+
+# The seed is gone; a stored profile must still decide, both ways.
+for n, (stored, want) in enumerate((("1", False), ("0", True), ("1", False))):
+    proj = "proj%d" % n
+    os.makedirs(os.path.join(work, proj, "hts-cache"))
+    with open(os.path.join(work, proj, "hts-cache", "winprofile.ini"), "wb") as fp:
+        fp.write(("CurrentUrl=http://example.com/\nCache=%s\n" % stored)
+                 .encode("latin-1"))
+    loaded = s.post("step2.html", [("path", work), ("loadprojname", proj)])
+    check("http://example.com/" in loaded, "step2.html loaded %s" % proj)
+    check(("--cache=0" in cmdline()) is want,
+          "a profile with Cache=%s %s --cache=0" % (stored,
+                                                    "emits" if want else "drops"))
+
+sys.exit(rc)
+PY
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "PASS"

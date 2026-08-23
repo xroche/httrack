@@ -188,11 +188,8 @@ for cap in notanumber 12abc 0 99999999999999999999; do
     local_crawl --log "${tmpdir}/log4" -O "$bad" "${opts[@]}" \
         --single-file-max-size "$cap" "${BASEURL}/index.html" || rc=$?
     test "$rc" -ne 0 || fail "--single-file-max-size $cap was accepted"
-    grep -q 'positive size' "${tmpdir}/log4" || {
-        echo "FAIL: --single-file-max-size $cap was refused without saying so"
-        cat "${tmpdir}/log4"
-        exit 1
-    }
+    grep -q 'positive size' "${tmpdir}/log4" ||
+        fail_dump "--single-file-max-size $cap was refused without saying so" "${tmpdir}/log4"
 done
 test ! -e "${bad}/127.0.0.1_${SRV_PORT}/index.html" || fail "a rejected cap still crawled"
 echo OK

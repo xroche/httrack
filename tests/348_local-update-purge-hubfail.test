@@ -1,0 +1,132 @@
+#!/bin/bash
+#
+# A page that fails to re-fetch on --update keeps its copy (#746), but its
+# children were never queued, so the purge unlinked them. A hang-up and a
+# decode failure hold the purge back for the run; a link never mirrored, an
+# answered error and a deliberate size skip must not.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_hubfail.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1 --timeout=20 --changes)
+
+# assert_purged WANT OUTDIR: what the run reported doing to the old files.
+assert_purged() {
+    local want="$1" json="${2}/hts-changes.json"
+    grep -q "\"purged\": ${want}" "$json" ||
+        fail "expected \"purged\": ${want} in $(<"$json")"
+}
+
+local_server_start --log "${tmpdir}/server.log"
+
+# --- a hub that hangs up mid-header ----------------------------------------
+out="${tmpdir}/crawl"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/hubfail"
+
+local_crawl --log "${tmpdir}/log1" "${common[@]}" -O "$out" \
+    "${BASEURL}/hubfail/index.html"
+for name in hub child1 child2 leaf gone; do
+    test -s "${site}/${name}.html" || fail "pass 1 did not mirror ${name}.html"
+done
+ok "pass 1 mirrored the hub, its two children and both controls"
+
+local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/hubfail/index.html"
+
+log=$(<"${out}/hts-log.txt")
+grep -qE 'Error:.*at link .*/hubfail/hub\.html' <<<"$log" ||
+    fail "the hub re-fetch did not fail, so nothing went unparsed: ${log}"
+test -s "${site}/hub.html" || fail "hub.html was dropped despite #746"
+for name in child1 child2 leaf; do
+    test -s "${site}/${name}.html" ||
+        fail "${name}.html was purged: its only parent failed to re-fetch"
+done
+assert_purged false "$out"
+ok "the children of the failed page survived, and the run says so"
+
+# --- what fails without a mirrored copy of its own does not hold anything ---
+# missing.html is a 404, dead.bin and dead.html hang up; all three appear for
+# the first time on this crawl, so gone.html must still go.
+local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/hubfail/index.html"
+
+for name in hub child1 child2 leaf; do
+    test -s "${site}/${name}.html" || fail "${name}.html was purged by pass 3"
+done
+test ! -e "${site}/gone.html" ||
+    fail "gone.html left the site and a crawl that scanned it all kept it"
+assert_purged true "$out"
+ok "three new dead links do not hold the purge back"
+
+# --- a hub that answers with a body that cannot be decoded ------------------
+out="${tmpdir}/gz"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/gzfail"
+
+local_crawl --log "${tmpdir}/gzlog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/gzfail/index.html"
+for name in gzhub gzchild gzgone; do
+    test -s "${site}/${name}.html" || fail "pass 1 did not mirror ${name}.html"
+done
+
+local_crawl --log "${tmpdir}/gzlog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/gzfail/index.html"
+for name in gzhub gzchild gzgone; do
+    test -s "${site}/${name}.html" ||
+        fail "${name}.html was purged after a decode failure on gzhub.html"
+done
+assert_purged false "$out"
+ok "a mangled gzip body holds the purge like a hang-up does"
+
+# --- boundary: a hub that answers 500 needs no hold at all ------------------
+# An update recovers the page from the cache and re-queues its children, so a
+# guard that fired on every failed link would keep errgone.html for nothing.
+out="${tmpdir}/err"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/errfail"
+
+local_crawl --log "${tmpdir}/errlog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/errfail/index.html"
+for name in errhub errchild errgone; do
+    test -s "${site}/${name}.html" || fail "pass 1 did not mirror ${name}.html"
+done
+
+local_crawl --log "${tmpdir}/errlog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/errfail/index.html"
+for name in errhub errchild; do
+    test -s "${site}/${name}.html" ||
+        fail "${name}.html was purged after errhub.html answered 500"
+done
+test ! -e "${site}/errgone.html" ||
+    fail "errgone.html left the site and the recovered 500 kept the purge back"
+assert_purged true "$out"
+ok "an answered error recovers its links, so the purge still runs"
+
+# --- boundary: a hub over the size cap is a deliberate skip, not a failure ---
+# The engine passes it over and drops its previous copy (#746 excludes the
+# skips), so the purge must go on and take what only it linked.
+out="${tmpdir}/big"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/bigfail"
+
+local_crawl --log "${tmpdir}/biglog1" "${common[@]}" -m,4000 -O "$out" \
+    "${BASEURL}/bigfail/index.html"
+for name in bighub bigchild biggone; do
+    test -s "${site}/${name}.html" || fail "pass 1 did not mirror ${name}.html"
+done
+
+local_crawl --log "${tmpdir}/biglog2" "${common[@]}" -m,4000 -O "$out" --update \
+    "${BASEURL}/bigfail/index.html"
+assert_purged true "$out"
+test ! -e "${site}/biggone.html" ||
+    fail "biggone.html left the site and an over-size hub kept the purge back"
+ok "a deliberate size skip does not hold the purge back"

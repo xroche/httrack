@@ -58,6 +58,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscmdline.h"
 #include "htscoremain.h"
 #include "htsencoding.h"
+#include "htsescape.h"
 #include "htsftp.h"
 #include "htsmd5.h"
 #include "htssniff.h"
@@ -1499,6 +1500,68 @@ static int st_unescape_bounds(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* A malformed escape must survive as text. */
+static int st_unescape_form(httrackp *opt, int argc, char **argv) {
+  /* compared by length, so a decoded NUL is not mistaken for a short string */
+  static const struct {
+    const char *in;
+    const char *expected;
+    size_t len;
+    int ini; /* run hts_unescapeini() rather than http */
+  } cases[] = {
+      {"", "", 0, 0},
+      {"a%41b", "aAb", 3, 0},
+      {"%c3%a9", "\xc3\xa9", 2, 0},
+      {"%C3%A9", "\xc3\xa9", 2, 0}, /* hex case does not matter */
+      {"a+b", "a b", 3, 0},
+      {"100%%", "100%", 4, 0},
+      {"%00", "\0", 1, 0},  /* well-formed, so it really does decode to NUL */
+      {"%ZZ", "%ZZ", 3, 0}, /* not hex: kept literal, not decoded to NUL */
+      {"%zz", "%zz", 3, 0}, /* lower case too, or a widened 'a'-'f' arm hides */
+      {"%4", "%4", 2, 0},   /* truncated: no second digit to read */
+      {"%", "%", 1, 0},
+      {"%%%", "%%", 2, 0},
+      {"a%2Gb", "a%2Gb", 5, 0}, /* second digit not hex */
+      {"", "", 0, 1},
+      {"a+b", "a+b", 3, 1},          /* the ini form has no '+' rule */
+      {"a%0d%0ab", "a\rb", 3, 1},    /* a decoded separator run collapses */
+      {"a%0d%0a%0db", "a\rb", 3, 1}, /* however long the run is */
+      {"a\r\nb", "a\r\nb", 4, 1},    /* but raw separators pass through */
+      {"a%ZZb", "a%ZZb", 5, 1},
+  };
+
+  size_t i;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    String out = STRING_EMPTY;
+    const char *got;
+
+    if (cases[i].ini) {
+      hts_unescapeini(cases[i].in, &out);
+    } else {
+      hts_unescapehttp(cases[i].in, &out);
+    }
+    got = StringBuff(out);
+    /* callers read the result with strcmp(), so the terminator is part of the
+       contract */
+    if (StringLength(out) != cases[i].len ||
+        (cases[i].len != 0 &&
+         memcmp(got, cases[i].expected, cases[i].len) != 0) ||
+        (got != NULL && got[cases[i].len] != '\0')) {
+      fprintf(stderr, "unescape-form: %s gave %d bytes, expected %d\n",
+              cases[i].in, (int) StringLength(out), (int) cases[i].len);
+      StringFree(out);
+      return 1;
+    }
+    StringFree(out);
+  }
+  printf("unescape-form self-test OK\n");
+  return 0;
+}
+
 // hts_split_cmdline(): the vector must grow with the argument count, and a
 // quote inside a value must not end the argument and hand -V to the parser.
 static int st_cmdlinesplit(httrackp *opt, int argc, char **argv) {
@@ -2219,6 +2282,48 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
     printf("adr=%s fil=%s\n", af.adr, af.fil);
   else
     printf("error=%d\n", r);
+  return 0;
+}
+
+/* Print the ":port" jump_toport_const() finds in a URL, or "(none)". */
+static int st_toport(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "toport: needs a URL\n");
+    return 1;
+  }
+  for (i = 0; i < argc; i++) {
+    const char *const port = jump_toport_const(argv[i]);
+
+    printf("%s\n", port != NULL ? port : "(none)");
+  }
+  return 0;
+}
+
+/* Print the host/port the FTP path splits out of a URL address. */
+static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "ftpaddr: needs a URL address\n");
+    return 1;
+  }
+  for (i = 0; i < argc; i++) {
+    char BIGSTK url[HTS_URLMAXSIZE * 2];
+    char host[256];
+    char err[128];
+    int port = 21;
+
+    strcpybuff(url, argv[i]);
+    if (ftp_split_hostport(jump_identification(ftp_jump_authority(url)), host,
+                           sizeof(host), &port, err, sizeof(err)))
+      printf("host=%s port=%d\n", host, port);
+    else
+      printf("error=%s\n", err);
+  }
   return 0;
 }
 
@@ -6378,6 +6483,51 @@ static int st_status(httrackp *opt, int argc, char **argv) {
   assertf(s != NULL && strcmp(s, "Not Found") == 0);
   assertf(infostatuscode_const(799) == NULL);
   printf("status self-test OK\n");
+  return 0;
+}
+
+/* Which statuses excuse a response that stored no body. */
+static int st_nobody(httrackp *opt, int argc, char **argv) {
+  /* every status the engine excuses, and near misses that it must not */
+  static const struct {
+    int code;
+    hts_boolean excused;
+  } cases[] = {
+      {301, HTS_TRUE},  {302, HTS_TRUE},  {303, HTS_TRUE},  {304, HTS_FALSE},
+      {305, HTS_FALSE}, {306, HTS_FALSE}, {307, HTS_TRUE},  {308, HTS_TRUE},
+      {309, HTS_FALSE}, {300, HTS_FALSE}, {411, HTS_FALSE}, {412, HTS_TRUE},
+      {413, HTS_FALSE}, {415, HTS_FALSE}, {416, HTS_TRUE},  {417, HTS_FALSE},
+      {200, HTS_FALSE}, {204, HTS_FALSE}, {404, HTS_FALSE}, {500, HTS_FALSE},
+  };
+
+  char body[] = "body";
+  size_t i;
+  htsblk r;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    memset(&r, 0, sizeof(r));
+    r.statuscode = cases[i].code;
+    if (hts_body_missing_unexpectedly(&r) == cases[i].excused) {
+      fprintf(stderr, "status %d: expected %s\n", cases[i].code,
+              cases[i].excused ? "excused" : "unexpected");
+      return 1;
+    }
+  }
+
+  /* a stored body is never missing, whatever the status */
+  memset(&r, 0, sizeof(r));
+  r.statuscode = 404;
+  r.adr = body;
+  assertf(!hts_body_missing_unexpectedly(&r));
+  memset(&r, 0, sizeof(r));
+  r.statuscode = 404;
+  r.is_write = 1;
+  assertf(!hts_body_missing_unexpectedly(&r));
+
+  printf("nobody self-test OK\n");
   return 0;
 }
 
@@ -11844,6 +11994,8 @@ static const struct selftest_entry {
      st_footerfmt},
     {"unescape-bounds", "", "unescapers reserve the NUL byte (no 1-byte OOB)",
      st_unescape_bounds},
+    {"unescape-form", "", "form/ini percent-decoding keeps a malformed escape",
+     st_unescape_form},
     {"cmdline-split", "",
      "webhttrack command-line to argv split (bounds, quoting)",
      st_cmdlinesplit},
@@ -11885,6 +12037,10 @@ static const struct selftest_entry {
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
     {"identurl", "<url>", "split an absolute URL into (adr, fil)", st_identurl},
+    {"toport", "<url>...", "port separator found in a URL authority",
+     st_toport},
+    {"ftpaddr", "<url-address>...", "host/port the FTP path splits out",
+     st_ftpaddr},
     {"proxyurl", "<proxy-arg>", "parse a -P proxy URL into host/port",
      st_proxyurl},
     {"socks5", "", "SOCKS5 handshake framing and credential self-test",
@@ -11986,6 +12142,8 @@ static const struct selftest_entry {
     {"escape-room", "", "HT_ADD_HTMLESCAPED* reservation-factor self-test",
      st_escape_room},
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
+    {"nobody", "", "which statuses excuse a response that stored no body",
+     st_nobody},
     {"acceptencoding", "[dir]",
      "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},
     {"contentcodings", "[dir]",

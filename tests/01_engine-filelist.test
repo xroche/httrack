@@ -24,11 +24,8 @@ run() {
     LOG="$out/hts-log.txt"
 }
 
-fail() {
-    echo "FAIL: $1"
-    cat "$LOG"
-    exit 1
-}
+# Every assertion below is about the crawl log, testlib's own included.
+fail_dump_var LOG
 loghas() {
     grep -Eq "$1" "$LOG" || fail "expected /$1/ in $LOG"
 }

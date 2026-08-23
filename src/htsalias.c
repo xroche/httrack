@@ -66,6 +66,9 @@ Please visit our Website: http://www.httrack.com
   param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
+
+  A name may appear twice; the FIRST row wins, for the expansion and the help
+  text. Later rows exist so a reverse lookup by short option finds a name.
 */
 const char *hts_optalias[][4] = {
   /*   {"","","",""}, */
@@ -106,7 +109,8 @@ const char *hts_optalias[][4] = {
   {"language", "-%l", "param1", ""}, {"lang", "-%l", "param1", ""},
   {"accept", "-%a", "param1", ""},
   {"headers", "-%X", "param1", ""},
-  {"structure", "-N", "param", ""}, {"user-structure", "-N", "param1", ""},
+  {"structure", "-N", "param", ""},
+  {"user-structure", "-N", "param1", ""},
   {"long-names", "-L", "param", ""},
   {"keep-links", "-K", "param", ""},
   {"mime-html", "-%M", "onoff", ""}, {"mht", "-%M", "onoff", ""},
@@ -184,7 +188,6 @@ const char *hts_optalias[][4] = {
   {"callback", "-%W", "param1", "plug an external callback"}, {"wrapper", "-%W",
                                                                "param1",
                                                                "plug an external callback"},
-  {"structure", "-N", "param1", "user-defined structure"},
   {"usercommand", "-V", "param1", "user-defined command"},
   {"display", "-%v", "level",
    "show files transferred and other funny realtime information"},
@@ -257,8 +260,8 @@ const char *hts_optalias[][4] = {
   {"tiny", "-c1", "single", ""},
   {"ultrawide", "-c48", "single", ""},
   {"http10", "-%h", "onoff", ""},
-  {"filelist", "-%L", "single", ""}, {"list", "-%L", "single", ""},
-  {"filterlist", "-%S", "single", ""},
+  {"filelist", "-%L", "param1", ""},
+  {"filterlist", "-%S", "param1", ""},
   /* END OF ALIASES */
 
   /* Filters */

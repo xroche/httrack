@@ -63,7 +63,7 @@ Pøidat
 Scan Rules
 Filtry
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-Používej zástupných znakù (wildcards) pro pøidání nebo odebrání URL nebo odkazù. \nMùžeš použít nìkolik zástupných znakù na jediném øádku. \Používej mezery jako oddìlovaèe. \n\nNapøíklad: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi */
+Používej zástupných znakù (wildcards) pro pøidání nebo odebrání URL nebo odkazù. \nMùžeš použít nìkolik zástupných znakù na jediném øádku. \nPoužívej mezery jako oddìlovaèe. \n\nNapøíklad: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi */
 Exclude links
 Vylouèit odkaz(y)
 Include link(s)
@@ -809,7 +809,7 @@ Základní cesta:
 Project category:
 
 C:\\My Web Sites
-C:\\Temp\Projekty
+C:\\Temp\\Projekty
 Type a new project name, \r\nor select existing project to update/resume
 Napiš nový název projektu, \r\nnebo vyber projekt k aktualizaci
 New project
@@ -903,7 +903,7 @@ Názvy souborù s pøíponami:\nNázvy souborù obsahující:\n Tento název souboru:\nJm
 Show all\nHide debug\nHide infos\nHide debug and infos
 Zobraz vše\nSkryj ladìní\nSkryj informace\nSkryj ladìní a informace
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Struktura stránky (výchozí)\nHtml ve web/,       obrázky/ostatní soubory ve web/obrázky/\nHtml ve web/html,   obrázky/ostatní ve web/obrázky\nHtml ve web/,       obrázky/ostatní ve web/\nHtml ve web/,       obrázky/ostatní ve web/xxx, kde xxx znaèí pøíponu souboru\nHtml ve web/html,   obrázky/ostatní ve web/xxx\nStruktura stránky bez www.doména.xxx/\nHtml v název_stránky/, obrázky/ostatní soubory v název_stránky/obrázky/\nHtml v název_stránky/html, obrázky/ostatní v název_stránky/obrázky\nHtml v název_stránky/, obrázky/ostatní v název_stránky/\nHtml v název_stránky/, obrázky/ostatní v název_stránky/xxx\nHtml v název_stránky/html, obrázky/ostatní v název_stránky/xxx\nVšechny soubory ve web/, s náhodnými názvy (vynález!)\nVšechny soubory v název_stránky/, s náhodnými názvy (vynález!)\nUživatelsky-definovaná struktura..
+Struktura stránky (výchozí)\nHtml ve web/,       obrázky/ostatní soubory ve web/images/\nHtml ve web/html,   obrázky/ostatní ve web/images\nHtml ve web/,       obrázky/ostatní ve web/\nHtml ve web/,       obrázky/ostatní ve web/xxx, kde xxx znaèí pøíponu souboru\nHtml ve web/html,   obrázky/ostatní ve web/xxx\nStruktura stránky bez www.domain.xxx/\nHtml v site_name/, obrázky/ostatní soubory v site_name/images/\nHtml v site_name/html, obrázky/ostatní v site_name/images\nHtml v site_name/, obrázky/ostatní v site_name/\nHtml v site_name/, obrázky/ostatní v site_name/xxx\nHtml v site_name/html, obrázky/ostatní v site_name/xxx\nVšechny soubory ve web/, s náhodnými názvy (vynález!)\nVšechny soubory v site_name/, s náhodnými názvy (vynález!)\nUživatelsky-definovaná struktura..
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
 Pouze provìøit\nUložit HTML soubory\nUložit ne-HTML soubory\nUložit všechny soubory (výchozí)\nUložit nejprve HTML soubory
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
@@ -913,7 +913,7 @@ Zùstat na stejné adrese (výchozí)\nZùstat ve stejné doménì\nZùstat ve stejné dom
 Never\nIf unknown (except /)\nIf unknown
 Nikdy\nPokud není znám (kromì /)\nPokud není znám
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
-žádná pravidla podle robot.txt\nrobot.txt kromì pomocníka\naplikovat pravidla podle robot.txt
+žádná pravidla podle robots.txt\nrobots.txt kromì pomocníka\naplikovat pravidla podle robots.txt
 normal\nextended\ndebug
 normální\nrozšíøený\nladìní
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download

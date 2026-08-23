@@ -66,11 +66,8 @@ echo "OK"
 printf '[pass 2: repair, reject range, refetch] ..\t'
 rc=0
 local_crawl --log "${tmpdir}/log2" "${common[@]}" --continue "${BASEURL}/crange206mem/index.html" || rc=$?
-test "$rc" -eq 0 || {
-    echo "FAIL: httrack exited $rc"
-    cat "${tmpdir}/log2" >&2
-    exit 1
-}
+test "$rc" -eq 0 ||
+    fail_dump "httrack exited $rc" "${tmpdir}/log2"
 echo "OK (terminated)"
 
 # The repair path must actually have run, else this is just a copy of test 48.

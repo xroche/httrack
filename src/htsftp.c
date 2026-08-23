@@ -184,6 +184,41 @@ void launch_ftp(FTPDownloadStruct * params) {
   return 0; \
   }
 
+/* Start of the authority in a URL address (see htsftp.h). */
+char *ftp_jump_authority(char *url_adr) {
+  char *a = jump_protocol(url_adr);
+
+  while (*a == '/')
+    a++;
+  return a;
+}
+
+/* Split "host[:port]" (see htsftp.h). */
+hts_boolean ftp_split_hostport(const char *adr, char *host, size_t host_size,
+                               int *port, char *err, size_t err_size) {
+  static const char portmsg[] = "Invalid port: ";
+  const char *const a = jump_toport_const(adr);
+  const size_t len = a != NULL ? (size_t) (a - adr) : strlen(adr);
+
+  /* the caller owns err[], so a size too small for either message is a bug */
+  assertf(host_size > 0 && err_size > sizeof("Host name too long"));
+  host[0] = err[0] = '\0';
+  /* no resolvable name is this long, and clipping would query another host */
+  if (len >= host_size) {
+    strlcpybuff(err, "Host name too long", err_size);
+    return HTS_FALSE;
+  }
+  /* folding a nonsense port into 1..65535 fetches one the link never named */
+  if (a != NULL && a[1] != '\0' && !hts_parse_url_port(a + 1, port)) {
+    strlcpybuff(err, portmsg, err_size);
+    /* wire data: clip the echoed port rather than abort on an over-long one */
+    strlncatbuff(err, a + 1, err_size, err_size - sizeof(portmsg));
+    return HTS_FALSE;
+  }
+  strlncatbuff(host, adr, host_size, len);
+  return HTS_TRUE;
+}
+
 /* Split a hostile-URL "user[:pass]@" prefix (see htsftp.h). */
 hts_boolean ftp_split_userpass(const char *src, const char *end, char *user,
                                size_t user_size, char *pass, size_t pass_size) {
@@ -403,14 +438,7 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   back->r.size = 0;
   back->r.lastmodified[0] = '\0'; // a retry must not stamp the previous MDTM
 
-  // récupérer user et pass si présents, et sauter user:id@ dans adr
-  real_adr = strchr(back->url_adr, ':');
-  if (real_adr)
-    real_adr++;
-  else
-    real_adr = back->url_adr;
-  while(*real_adr == '/')
-    real_adr++;                 // sauter /
+  real_adr = ftp_jump_authority(back->url_adr);
   if ((adr = jump_identification(real_adr)) != real_adr) {      // user
     if (!ftp_split_userpass_buf(real_adr, adr, user, pass)) {
       strcpybuff(back->r.msg, "FTP user name or password too long");
@@ -467,36 +495,17 @@ int run_launch_ftp(FTPDownloadStruct * pStruct) {
   // connexion
   {
     SOCaddr server;
-    char *a;
     char _adr[256];
-    size_t adr_len;
+    char err[128];
     const char *error = "unknown error";
 
-    _adr[0] = '\0';
-    //T_SOC soc_ctl;
-    // effacer structure
     memset(&server, 0, sizeof(server));
 
-    // port
-    a = strchr(adr, ':');       // port
-    if (a) {
-      // folding a nonsense port into 1..65535 fetches one the link never named;
-      // an empty "host:" just means the default (#614)
-      if (a[1] != '\0' && !hts_parse_url_port(a + 1, &port)) {
-        htsblk_failf(&back->r, "Invalid port: %s", a + 1);
-        back->r.statuscode = STATUSCODE_INVALID; // permanent, unlike a DNS miss
-        _HALT_FTP return 0;
-      }
-      adr_len = (size_t) (a - adr);
-    } else
-      adr_len = strlen(adr);
-    // no resolvable name is this long, and clipping would query another host
-    if (adr_len >= sizeof(_adr)) {
-      htsblk_failf(&back->r, "Host name too long");
-      back->r.statuscode = STATUSCODE_INVALID;
+    if (!ftp_split_hostport(adr, _adr, sizeof(_adr), &port, err, sizeof(err))) {
+      htsblk_failf(&back->r, "%s", err);
+      back->r.statuscode = STATUSCODE_INVALID; // permanent, unlike a DNS miss
       _HALT_FTP return 0;
     }
-    strncatbuff(_adr, adr, (int) adr_len);
 
     // récupérer adresse résolue
     strcpybuff(back->info, "host name");
