@@ -66,9 +66,9 @@ skip() {
 # is merely not on Windows.
 skip_on_windows() { ! is_windows || skip "$*"; }
 
-# The emulated leg (tools/emulated-suite.sh) interprets every instruction, so a
-# sweep that spawns one compiler per case costs minutes there. Same guard form.
-skip_if_emulated() { [ -z "${EMULATED_ARCH:-}" ] || skip "$* under emulated ${EMULATED_ARCH}"; }
+# Set by tools/emulated-suite.sh, which interprets every instruction it runs.
+is_emulated() { [ -n "${EMULATED_ARCH:-}" ]; }
+skip_on_emulated() { ! is_emulated || skip "emulated ${EMULATED_ARCH}: $*"; }
 
 # Assertions, each printing what it wanted beside what arrived: a bare
 # `|| exit 1` reds a test without naming the value that differed.

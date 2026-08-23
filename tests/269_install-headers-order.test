@@ -7,8 +7,8 @@
 # of reach here. The sweep is shared with the MSVC job, which has no automake to
 # install with and so stages the same list out of DevIncludes_DATA (#1153).
 #
-# n^2 compiles is real work, not a wedge: emulated, it needs more than the suite's
-# default budget, and the sweep paces itself against whatever is left of this one.
+# n^2 compiles is real work, not a wedge: the sweep paces itself against whatever
+# is left of this budget.
 # TEST_TIMEOUT_AT_LEAST: 900
 
 set -euo pipefail
@@ -16,7 +16,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-skip_if_emulated "include order says nothing about the target: 205 still compiles these headers against this arch's config.h"
+skip_on_emulated "include order cannot vary by target, and 205 still runs here"
 
 if [ -z "${abs_top_builddir:-}" ]; then
     echo "abs_top_builddir unset, no automake environment, skipping" >&2
