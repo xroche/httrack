@@ -54,7 +54,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsmodules.h"
 #include "htscharset.h"
 #include "htsencoding.h"
-#include "htsescape.h"
 #include "htscodec.h"
 
 #ifdef _WIN32

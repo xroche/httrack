@@ -33,6 +33,8 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTS_ENCODING_DEFH
 #define HTS_ENCODING_DEFH
 
+#include "htsglobal.h"
+
 /** Standard includes. **/
 #include <stdlib.h>
 #include <string.h>
@@ -47,6 +49,33 @@ typedef enum unescapeFlags {
   /** Do not decode ASCII. **/
   UNESCAPE_URL_NO_ASCII = 1
 } unescapeFlags;
+
+/* Value of one hex digit, or -1 if 'c' is not one. */
+static HTS_INLINE HTS_UNUSED int hts_ehexh(const char c) {
+  if (c >= '0' && c <= '9')
+    return c - '0';
+  else if (c >= 'a' && c <= 'f')
+    return (c - 'a' + 10);
+  else if (c >= 'A' && c <= 'F')
+    return (c - 'A' + 10);
+  else
+    return -1;
+}
+
+/* Value of the two-hex-digit sequence at 's', or -1 if either digit is not one.
+ */
+static HTS_INLINE HTS_UNUSED int hts_ehex(const char *s) {
+  const int c1 = hts_ehexh(s[0]);
+
+  if (c1 >= 0) {
+    const int c2 = hts_ehexh(s[1]);
+
+    if (c2 >= 0) {
+      return 16 * c1 + c2;
+    }
+  }
+  return -1;
+}
 
 /**
  * Unescape HTML entities (as per HTML 4.0 Specification)
