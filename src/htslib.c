@@ -6388,6 +6388,7 @@ HTSEXT_API httrackp *hts_create_opt(void) {
   opt->single_file = HTS_FALSE;
   opt->single_file_max_size = SINGLEFILE_DEFAULT_MAX_SIZE;
   opt->singlefile_state = NULL;
+  opt->links_unqueued = HTS_FALSE;
   StringCopy(opt->why_url, "");
   opt->pause_min_ms = 0;
   opt->pause_max_ms = 0;

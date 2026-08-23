@@ -537,6 +537,10 @@ int httpmirror(char *url1, httrackp * opt) {
   opt->robotsptr = &robots;
   //
 
+  /* per mirror, not per opt: an embedder reusing one opt would otherwise
+     carry the last run's verdict and never purge again */
+  opt->links_unqueued = HTS_FALSE;
+
   // noter heure actuelle de départ en secondes
   memset(&HTS_STAT, 0, sizeof(HTS_STAT));
   HTS_STAT.stat_timestart = time_local();
@@ -2097,6 +2101,10 @@ int httpmirror(char *url1, httrackp * opt) {
     } else if (opt->delete_old || opt->changes) {
       FILE *old_lst, *new_lst;
 
+      /* A page that gave up before parsing keeps its own links out of
+         new.lst, so their absence says nothing about the site. */
+      const hts_boolean purge_files = opt->delete_old && !opt->links_unqueued;
+
       hts_changes_indexed(opt);
       //
       opt->state._hts_in_html_parsing = 3;
@@ -2105,6 +2113,12 @@ int httpmirror(char *url1, httrackp * opt) {
                               StringBuff(opt->path_log), "hts-cache/old.lst"),
                       "rb");
       if (old_lst) {
+        if (opt->delete_old && !purge_files) {
+          hts_log_print(opt, LOG_WARNING,
+                        "A page could not be fetched and the links it carries "
+                        "were never scanned: keeping all previously mirrored "
+                        "files");
+        }
         const size_t sz = llint_to_size_t(fsize_utf8(
             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                     StringBuff(opt->path_log), "hts-cache/new.lst")));
@@ -2141,13 +2155,12 @@ int httpmirror(char *url1, httrackp * opt) {
                        is about to be purged, its previous copy stands and the
                        file is not gone. */
                     const hts_boolean kept =
-                        !opt->delete_old &&
-                        hash_read(opt->hash, file, NULL,
-                                  HASH_STRUCT_FILENAME) >= 0;
+                        !purge_files && hash_read(opt->hash, file, NULL,
+                                                  HASH_STRUCT_FILENAME) >= 0;
 
                     hts_changes_dropped(
                         opt, file + StringLength(opt->path_html), kept);
-                    if (opt->delete_old) {
+                    if (purge_files) {
                       hts_log_print(opt, LOG_INFO, "Purging %s", file);
                       UNLINK(file);
                       purge = 1;
@@ -2155,7 +2168,7 @@ int httpmirror(char *url1, httrackp * opt) {
                   }
                 }
               }
-              if (opt->delete_old) { // emptied directories go with the files
+              if (purge_files) { // emptied directories go with the files
                 fseek(old_lst, 0, SEEK_SET);
                 while(!feof(old_lst)) {
                   linput(old_lst, line, 1000);
@@ -2188,7 +2201,7 @@ int httpmirror(char *url1, httrackp * opt) {
                 }
               }
               //
-              if (opt->delete_old && !purge) {
+              if (purge_files && !purge) {
                 hts_log_print(opt, LOG_INFO, "No files purged");
               }
             }

@@ -765,9 +765,7 @@ void back_refetch_backup(httrackp *opt, lien_back *const back) {
   }
 }
 
-/* Did the fetch fail to produce a response, as opposed to the engine
-   deliberately passing the resource over? Only the latter may be purged. */
-static hts_boolean back_transfer_failed(const int statuscode) {
+hts_boolean back_transfer_failed(const int statuscode) {
   switch (statuscode) {
   case STATUSCODE_TOO_BIG:
   case STATUSCODE_EXCLUDED:
