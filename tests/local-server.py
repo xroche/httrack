@@ -1212,6 +1212,25 @@ class Handler(SimpleHTTPRequestHandler):
             if self.command != "HEAD":
                 self.wfile.write(body[start:])
 
+    # --- a body big enough that its write reaches the disk ------------------
+    # 256 KB, so the transfer is well past both stdio's buffer and the
+    # "nothing was transferred" rollback threshold.
+    DISKFULL_BIN = b"DISKFULL\n" + b"\x41\x42\x43\x44" * 65536
+
+    def route_diskfull_index(self):
+        self.send_html('\t<a href="big.bin">big</a>\n')
+
+    # A second index, for the page arm: small.html fits in stdio's buffer, so
+    # its write only fails when the file is closed.
+    def route_diskfull_smallindex(self):
+        self.send_html('\t<a href="small.html">small</a>\n')
+
+    def route_diskfull_small(self):
+        self.send_raw(b"<html><body><p>DISKFULL-SMALL</p></body></html>", "text/html")
+
+    def route_diskfull_big(self):
+        self.send_raw(self.DISKFULL_BIN, "application/octet-stream")
+
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
         self.send_raw(
@@ -2761,6 +2780,10 @@ class Handler(SimpleHTTPRequestHandler):
         "/keep/data.bin": route_keep_data,
         "/keep/err.bin": route_keep_err,
         "/keep/stay.bin": route_keep_stay,
+        "/diskfull/index.html": route_diskfull_index,
+        "/diskfull/big.bin": route_diskfull_big,
+        "/diskfull/smallindex.html": route_diskfull_smallindex,
+        "/diskfull/small.html": route_diskfull_small,
         "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,

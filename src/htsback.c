@@ -3584,11 +3584,23 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                  back[i].r.totalsize);
 #endif
             if (retour_fread < 0 && retour_fread != READ_EOF) {
-              if (back[i].r.size > 0)
-                strcpybuff(back[i].r.msg, "Interrupted transfer");
-              else
-                strcpybuff(back[i].r.msg, "No data (connection closed)");
-              back[i].r.statuscode = STATUSCODE_CONNERROR;
+              if (back[i].r.statuscode == STATUSCODE_IO_FATAL) {
+                /* a full or read-only disk, not a network error: retrying
+                   writes nothing, and the mirror the purge measures itself
+                   against would be a truncated one */
+                hts_log_print(
+                    opt, LOG_ERROR,
+                    "Mirror aborted: disk full or filesystem problems");
+                hts_log_print(opt, LOG_ERROR, "Unable to write file %s",
+                              back[i].url_sav);
+                opt->state.exit_xh = -1;
+              } else {
+                if (back[i].r.size > 0)
+                  strcpybuff(back[i].r.msg, "Interrupted transfer");
+                else
+                  strcpybuff(back[i].r.msg, "No data (connection closed)");
+                back[i].r.statuscode = STATUSCODE_CONNERROR;
+              }
             } else if ((back[i].r.statuscode <= 0)
                        && (strnotempty(back[i].r.msg) == 0)) {
 #if HDEBUG

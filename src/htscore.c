@@ -411,8 +411,20 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
     hts_changes_html(opt, cache, r, adr, fil, save);
     *fp = filecreate(&opt->state.strc, save);
     if (*fp) {
-      if (ht_len > 0 && !hts_fwrite_exact(ht_buff, (size_t) ht_len, *fp)) {
-        int fcheck = check_fatal_io_errno();
+      hts_boolean written =
+          ht_len == 0 || hts_fwrite_exact(ht_buff, (size_t) ht_len, *fp);
+      int last_errno = written ? 0 : errno;
+
+      /* a page small enough to sit in stdio's buffer only fails at fclose */
+      if (fclose(*fp) != 0) {
+        written = HTS_FALSE;
+        last_errno = errno;
+      }
+      if (!written) {
+        int fcheck;
+
+        errno = last_errno; /* fclose() has been over it since */
+        fcheck = check_fatal_io_errno();
 
         if (fcheck)
           opt->state.exit_xh = -1;
@@ -423,7 +435,6 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
             hts_log_print(opt, LOG_ERROR, "* * Fatal write error, giving up");
         }
       }
-      fclose(*fp);
       *fp = NULL;
       if (strnotempty(r->lastmodified))
         set_filetime_rfc822(save, r->lastmodified);
@@ -2840,13 +2851,22 @@ int filesave(httrackp * opt, const char *adr, int len, const char *s,
   // écrire le fichier
   if ((fp = filecreate(&opt->state.strc, s)) != NULL) {
     hts_boolean written = (len == 0);
+    int last_errno;
 
     if (len > 0) {
       written = hts_fwrite_exact(adr, (size_t) len, fp);
     }
-    fclose(fp);
-    if (!written) // error
+    last_errno = written ? 0 : errno;
+    /* stdio can still hold the whole body, so a full disk often surfaces
+       here and nowhere else */
+    if (fclose(fp) != 0) {
+      written = HTS_FALSE;
+      last_errno = errno;
+    }
+    if (!written) { // error; the caller reads errno
+      errno = last_errno;
       return -1;
+    }
   } else
     return -1;
 
