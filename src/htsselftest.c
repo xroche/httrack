@@ -2219,6 +2219,48 @@ static int st_resolve(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Print the ":port" jump_toport_const() finds in a URL, or "(none)". */
+static int st_toport(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "toport: needs a URL\n");
+    return 1;
+  }
+  for (i = 0; i < argc; i++) {
+    const char *const port = jump_toport_const(argv[i]);
+
+    printf("%s\n", port != NULL ? port : "(none)");
+  }
+  return 0;
+}
+
+/* Print the host/port the FTP path splits out of a URL address. */
+static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
+  int i;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "ftpaddr: needs a URL address\n");
+    return 1;
+  }
+  for (i = 0; i < argc; i++) {
+    char BIGSTK url[HTS_URLMAXSIZE * 2];
+    char host[256];
+    char err[128];
+    int port = 21;
+
+    strcpybuff(url, argv[i]);
+    if (ftp_split_hostport(jump_identification(ftp_jump_authority(url)), host,
+                           sizeof(host), &port, err, sizeof(err)))
+      printf("host=%s port=%d\n", host, port);
+    else
+      printf("error=%s\n", err);
+  }
+  return 0;
+}
+
 /* Split a URL into (adr, fil), or print "error" if rejected. A second arg pads
    the URL with that many 'a's to reach lengths a CLI arg can't. */
 static int st_identurl(httrackp *opt, int argc, char **argv) {
@@ -11838,6 +11880,10 @@ static const struct selftest_entry {
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
     {"identurl", "<url>", "split an absolute URL into (adr, fil)", st_identurl},
+    {"toport", "<url>...", "port separator found in a URL authority",
+     st_toport},
+    {"ftpaddr", "<url-address>...", "host/port the FTP path splits out",
+     st_ftpaddr},
     {"proxyurl", "<proxy-arg>", "parse a -P proxy URL into host/port",
      st_proxyurl},
     {"socks5", "", "SOCKS5 handshake framing and credential self-test",
