@@ -1479,13 +1479,13 @@ void cache_rstr(FILE *fp, char *s, size_t s_size) {
   }
 }
 char *cache_rstr_addr(FILE * fp) {
-  INTsys i;
+  INTsys i = 0;
   char *addr = NULL;
   char buff[256 + 4];
 
   linput(fp, buff, 256);
-  sscanf(buff, INTsysP, &i);
-  if (i < 0 || i > 32768)       /* error, something nasty happened */
+  /* an unmatched sscanf leaves i untouched: length 0, not a stack value */
+  if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > 32768)
     i = 0;
   if (i > 0) {
     addr = malloct(i + 1);

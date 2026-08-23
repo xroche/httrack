@@ -319,16 +319,19 @@ void index_finish(const char *indexpath, int mode) {
   char catbuff[CATBUFF_SIZE];
   char **tab;
   char *blk;
-  LLint size = fpsize(fp_tmpproject);
+  const LLint fs = fpsize(fp_tmpproject);
+  /* fail closed on a size size_t cannot hold: malloct() wraps short while
+     the reader and the terminator keep the 64-bit length */
+  const size_t size = fs > 0 ? llint_to_size_t(fs) : (size_t) -1;
 
-  if (size > 0) {
+  if (size != (size_t) -1) {
     if (fp_tmpproject) {
       tab = (char **) malloct(sizeof(char *) * (hts_primindex_size + 2));
       if (tab) {
         blk = malloct(size + 1);
         if (blk) {
           fseek(fp_tmpproject, 0, SEEK_SET);
-          if (hts_fread_exact(blk, (size_t) size, fp_tmpproject)) {
+          if (hts_fread_exact(blk, size, fp_tmpproject)) {
             char *a = blk, *b;
             int index = 0;
             int i;

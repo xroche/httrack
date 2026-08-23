@@ -95,6 +95,10 @@ int commandReturnSet = 0;
 
 httrackp *global_opt = NULL;
 
+/* Address the listening socket was bound to, as given: an authority we
+   answer for, whatever a request's Host header claims. */
+static char server_bound_addr[256 + 2] = "";
+
 static void (*pingFun)(void *, smallserver_client_event, const char *) = NULL;
 static void* pingFunArg = NULL;
 
@@ -254,6 +258,26 @@ static int gethost(const char *hostname, SOCaddr * server) {
   return 0;
 }
 
+/** Form of a bound address a client can actually open: a wildcard names no
+    reachable host, and an IPv6 literal needs its URL brackets. */
+static void advertised_host(char *dst, size_t size, const char *bound) {
+  const char *host = bound;
+
+  /* every address reaches us, and loopback is the one the local browser has */
+  if (strcmp(host, "0.0.0.0") == 0) {
+    host = "127.0.0.1";
+  } else if (strcmp(host, "::") == 0) {
+    host = "::1";
+  }
+  if (strchr(host, ':') != NULL) {
+    strlcpybuff(dst, "[", size);
+    strlcatbuff(dst, host, size);
+    strlcatbuff(dst, "]", size);
+  } else {
+    strlcpybuff(dst, host, size);
+  }
+}
+
 // smallserver_init(&port,&return_host);
 T_SOC smallserver_init(int *port, char *adr, const char *bindAddr) {
   T_SOC soc = INVALID_SOCKET;
@@ -280,13 +304,17 @@ T_SOC smallserver_init(int *port, char *adr, const char *bindAddr) {
     }
     strcpybuff(h_loc, bindAddr);
   }
+  strcpybuff(server_bound_addr, h_loc);
 
   if ((soc = (T_SOC) socket(SOCaddr_sinfamily(server), SOCK_STREAM, 0)) !=
       INVALID_SOCKET) {
     SOCaddr_initport(server, *port);
     if (bind(soc, &SOCaddr_sockaddr(server), SOCaddr_size(server)) == 0) {
       if (listen(soc, 10) >= 0) {
-        strcpy(adr, h_loc);
+        char adv[sizeof(h_loc) + 2]; /* + the brackets of an IPv6 literal */
+
+        advertised_host(adv, sizeof(adv), h_loc);
+        strcpy(adr, adv);
       } else {
 #ifdef _WIN32
         closesocket(soc);
@@ -354,6 +382,62 @@ static hts_boolean origin_is_self(const char *origin, const char *host) {
   const char *const authority = origin + p;
 
   return host[0] != '\0' && p != 0 && strfield2(authority, host) != 0;
+}
+
+/** Hostname part of a Host header value, URL brackets and ":port" removed.
+    False, and dst empty, when it names no host or does not fit. */
+static hts_boolean host_hostname(char *dst, size_t size, const char *host) {
+  const char *start = host;
+  const char *end;
+
+  dst[0] = '\0';
+  if (*start == '[') {
+    end = strchr(++start, ']');
+    if (end == NULL || (end[1] != '\0' && end[1] != ':')) {
+      return HTS_FALSE;
+    }
+  } else if ((end = strchr(start, ':')) == NULL) {
+    end = start + strlen(start);
+  }
+  if (end == start || (size_t) (end - start) >= size) {
+    return HTS_FALSE;
+  }
+  memcpy(dst, start, (size_t) (end - start));
+  dst[end - start] = '\0';
+  return HTS_TRUE;
+}
+
+/** Is this an address literal rather than a DNS name? A colon survived
+    host_hostname only from inside brackets, so it means IPv6. */
+static hts_boolean host_is_address(const char *name) {
+  size_t i;
+
+  if (strchr(name, ':') != NULL) {
+    return HTS_TRUE;
+  }
+  for (i = 0; name[i] != '\0'; i++) {
+    if (!isdigit((unsigned char) name[i]) && name[i] != '.') {
+      return HTS_FALSE;
+    }
+  }
+  return i != 0 ? HTS_TRUE : HTS_FALSE;
+}
+
+/** May a request presenting this authority drive the panel?
+    A page can point a name of its own at our address and have the browser call
+    us same-origin, which an unauthenticated panel must refuse. That always
+    presents a name: an address literal is whoever opened the socket, and the
+    only names we vouch for are localhost and whatever --bind was given. */
+static hts_boolean host_is_self(const char *host, const char *bound) {
+  char name[256];
+
+  if (!host_hostname(name, sizeof(name), host)) {
+    return HTS_FALSE;
+  }
+  return strfield2(name, "localhost") != 0 || host_is_address(name) ||
+                 (bound[0] != '\0' && strfield2(name, bound) != 0)
+             ? HTS_TRUE
+             : HTS_FALSE;
 }
 
 /** Header value with leading blanks dropped, clipped to fit dst. */
@@ -930,7 +1014,8 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
     T_SOC soc_c;
     LLint length = 0;
     const char *error_redirect = NULL;
-    hts_boolean denied = HTS_FALSE;
+    /* Why the request was refused, shown on the 403 page; NULL until it is. */
+    const char *denied = NULL;
     /* The request proved it holds the session id. */
     hts_boolean authed = HTS_FALSE;
     char origin[256];
@@ -1002,6 +1087,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
           } else if ((p = strfield(line, "Origin:")) != 0) {
             copy_header_value(origin, sizeof(origin), line + p);
           } else if ((p = strfield(line, "Host:")) != 0) {
+            /* A repeated header keeps the last value. Safe only because we are
+               loopback-direct: behind a proxy honouring the first, the two
+               would disagree. */
             copy_header_value(host, sizeof(host), line + p);
           }
         }
@@ -1050,6 +1138,14 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
         }
       }
 
+      /* Every method, not just POST: a GET hands out the session id. An absent
+         Host is allowed, since only a non-browser client omits it. */
+      if (meth && host[0] != '\0' && !host_is_self(host, server_bound_addr)) {
+        buffer[0] = '\0';
+        meth = 0;
+        denied = "Foreign Host header.";
+      }
+
       /* CSP stops a mirrored page reading /server/, not posting to it blind:
          a no-cors POST still runs the command. Origin is browser-set and script
          cannot forge it. Absent is allowed, most non-browser clients send none.
@@ -1057,7 +1153,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       if (meth == 2 && origin[0] != '\0' && !origin_is_self(origin, host)) {
         buffer[0] = '\0';
         meth = 0;
-        denied = HTS_TRUE;
+        denied = "Foreign origin.";
       }
 
       /* Authenticate the body before parsing it: every field it carries is
@@ -1072,7 +1168,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             !body_sid_is_valid(buffer, (const char *) expected)) {
           buffer[0] = '\0';
           meth = 0;
-          denied = HTS_TRUE;
+          denied = "Missing or invalid session id.";
         } else {
           authed = HTS_TRUE;
         }
@@ -2063,12 +2159,12 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             StringCat(output, error);
           }
         }
-      } else if (denied) {
+      } else if (denied != NULL) {
         StringCat(headers, "HTTP/1.0 403 Forbidden\r\n"
                            "Server: httrack small server\r\n"
                            "Content-type: text/html\r\n");
-        StringCat(output,
-                  "Missing or invalid session id, or foreign origin.\r\n");
+        StringCat(output, denied);
+        StringCat(output, "\r\n");
       } else {
 #ifdef _DEBUG
         char error_hdr[] =
@@ -2090,7 +2186,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
       /* a refusal cleared meth, yet the Content-length above promises a body */
       if ((send(soc_c, StringBuff(headers), (int) StringLength(headers), 0) !=
            StringLength(headers)) ||
-          ((meth == 1 || denied) &&
+          ((meth == 1 || denied != NULL) &&
            (send(soc_c, StringBuff(output), (int) StringLength(output), 0) !=
             StringLength(output)))) {
 #ifdef _DEBUG
