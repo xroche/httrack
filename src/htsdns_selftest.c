@@ -100,8 +100,11 @@ static mock_host mock_hosts[] = {
       {AF_INET, {10, 0, 0, 6}}},
      0},
     {"nodns.test", EAI_NONAME, 0, {{0}}, 0},
-    /* the outage case: fails until the test clears gai_err */
-    {"flaky.test", EAI_NONAME, 1, {{AF_INET, {192, 0, 2, 7}}}, 0},
+    /* the outage case: the resolver cannot answer, until the test says it can
+       (EAI_AGAIN, not EAI_NONAME, which is an answer about the name) */
+    {"flaky.test", EAI_AGAIN, 1, {{AF_INET, {192, 0, 2, 7}}}, 0},
+    /* the control: the resolver answers, and the answer is "no such host" */
+    {"dead.test", EAI_NONAME, 0, {{0}}, 0},
     /* resolves, but only well after --timeout: the #606 wedge */
     {"slow.test", 0, 1, {{AF_INET, {127, 0, 0, 9}}}, 0, MOCK_SLOW_MS},
     /* a second one, so a cancelled resolve cannot cache an answer the next
@@ -315,7 +318,8 @@ int dns_selftests(httrackp *opt) {
     CHECK(mock_find("nodns.test")->calls == 1); /* resolved once, then cached */
   }
 
-  /* But it expires: one outage must not kill the whole crawl. */
+  /* But a failure the resolver could not answer expires: one outage must not
+     kill the whole crawl. */
   mock_reset_calls();
   hts_dns_set_negative_ttl_ms(500);
   {
@@ -333,8 +337,19 @@ int dns_selftests(httrackp *opt) {
     CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) != NULL);
     CHECK(mock_read_calls("flaky.test") == 2); /* the answer does not expire */
   }
+  /* "no such host" is an answer about the name, so it still stands for the
+     whole crawl: same TTL, same sleep, no second resolve. */
+  {
+    SOCaddr a;
+    const char *err = NULL;
+
+    CHECK(hts_dns_resolve2(opt, "dead.test", &a, &err) == NULL);
+    Sleep(600);
+    CHECK(hts_dns_resolve2(opt, "dead.test", &a, &err) == NULL);
+    CHECK(mock_read_calls("dead.test") == 1);
+  }
   hts_dns_set_negative_ttl_ms(HTS_DNS_NEGATIVE_TTL_MS);
-  mock_find("flaky.test")->gai_err = EAI_NONAME; /* leave the row as found */
+  mock_find("flaky.test")->gai_err = EAI_AGAIN; /* leave the row as found */
 
   /* Multi-address resolution: count and order are the connect-fallback
      contract. A dead first address is retried against the next, so both must be

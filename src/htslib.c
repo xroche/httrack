@@ -5378,15 +5378,23 @@ static void hts_resolver_check_env(void) {
 
 // Resolve hostname into up to max addresses (resolver/RFC 6724 order), no
 // cache. Returns the count copied into out[0..count-1]; 0 = does not resolve.
+/* On a zero count, *permanent tells the two failures apart: the resolver
+   saying the name does not exist, or it being unable to answer at all. */
 static int hts_dns_resolve_nocache_list_(const char *const hostname,
                                          SOCaddr *const out, const int max,
-                                         const char **error) {
+                                         const char **error,
+                                         hts_boolean *permanent) {
   int count = 0;
+
+  if (permanent != NULL)
+    *permanent = HTS_FALSE;
 
 #if HTS_INET6==0
   /* IPv4 resolver */
   struct hostent *const hp = gethostbyname(hostname);
 
+  if (hp == NULL && permanent != NULL && h_errno == HOST_NOT_FOUND)
+    *permanent = HTS_TRUE;
   if (hp != NULL) {
     char **h;
 
@@ -5422,8 +5430,14 @@ static int hts_dns_resolve_nocache_list_(const char *const hostname,
           count++;
       }
     }
-  } else if (error != NULL) {
-    *error = gai_strerror(gerr);
+  } else {
+    if (error != NULL)
+      *error = gai_strerror(gerr);
+    /* EAI_NONAME is the resolver's own answer about the name; every other
+       code (EAI_AGAIN, EAI_FAIL, EAI_SYSTEM, EAI_NODATA where it exists) says
+       it could not answer, which an outage produces for any host. */
+    if (permanent != NULL && gerr == EAI_NONAME)
+      *permanent = HTS_TRUE;
   }
   if (res) {
     hts_resolver->freeaddrinfo(res);
@@ -5437,7 +5451,8 @@ static int hts_dns_resolve_nocache_list_(const char *const hostname,
 // take, then resolve into a list. Returns the count.
 static int hts_dns_resolve_nocache_list(const char *const hostname,
                                         SOCaddr *const out, const int max,
-                                        const char **error) {
+                                        const char **error,
+                                        hts_boolean *permanent) {
   if (!strnotempty(hostname) || max <= 0) {
     return 0;
   }
@@ -5449,11 +5464,11 @@ static int hts_dns_resolve_nocache_list(const char *const hostname,
     assertf(copy != NULL);
     copy[0] = '\0';
     strncat(copy, hostname + 1, size - 2);
-    count = hts_dns_resolve_nocache_list_(copy, out, max, error);
+    count = hts_dns_resolve_nocache_list_(copy, out, max, error, permanent);
     freet(copy);
     return count;
   } else {
-    return hts_dns_resolve_nocache_list_(hostname, out, max, error);
+    return hts_dns_resolve_nocache_list_(hostname, out, max, error, permanent);
   }
 }
 
@@ -5461,7 +5476,7 @@ HTSEXT_API SOCaddr *hts_dns_resolve_nocache2(const char *const hostname,
                                              SOCaddr *const addr,
                                              const char **error) {
   SOCaddr_clear(*addr);
-  if (hts_dns_resolve_nocache_list(hostname, addr, 1, error) > 0) {
+  if (hts_dns_resolve_nocache_list(hostname, addr, 1, error, NULL) > 0) {
     return SOCaddr_is_valid(*addr) ? addr : NULL;
   }
   return NULL;
@@ -5486,6 +5501,7 @@ typedef struct dns_resolve_job {
   SOCaddr addr[HTS_MAXADDRNUM];
   int count;
   const char *error;
+  hts_boolean permanent; /* a zero count that was about the name itself */
 } dns_resolve_job;
 
 /* Copy the first min(count, max) addresses of src into dest. */
@@ -5515,13 +5531,15 @@ static void dns_resolve_thread(void *arg) {
   dns_resolve_job *const job = (dns_resolve_job *) arg;
   SOCaddr resolved[HTS_MAXADDRNUM];
   const char *error = NULL;
-  const int count = hts_dns_resolve_nocache_list(job->hostname, resolved,
-                                                 HTS_MAXADDRNUM, &error);
+  hts_boolean permanent = HTS_FALSE;
+  const int count = hts_dns_resolve_nocache_list(
+      job->hostname, resolved, HTS_MAXADDRNUM, &error, &permanent);
 
   hts_mutexlock(&job->lock);
   dns_copy_addrs(job->addr, resolved, count, HTS_MAXADDRNUM);
   job->count = count;
   job->error = error;
+  job->permanent = permanent;
   job->done = HTS_TRUE; /* published last: gates the caller's read of addr[] */
   hts_mutexrelease(&job->lock);
   dns_job_release(job);
@@ -5533,7 +5551,8 @@ static void dns_resolve_thread(void *arg) {
    gets negative-cached. */
 static int hts_dns_resolve_nocache_list_bounded(
     const char *hostname, SOCaddr *const out, const int max, const int timeout,
-    const volatile hts_boolean *cancel, const char **error) {
+    const volatile hts_boolean *cancel, const char **error,
+    hts_boolean *permanent) {
   dns_resolve_job *job;
   TStamp deadline;
   int count = -1;
@@ -5541,7 +5560,7 @@ static int hts_dns_resolve_nocache_list_bounded(
 
   /* no bound asked for (--timeout 0), and nobody to cut it short either */
   if (timeout <= 0 && cancel == NULL)
-    return hts_dns_resolve_nocache_list(hostname, out, max, error);
+    return hts_dns_resolve_nocache_list(hostname, out, max, error, permanent);
 
   job = calloct(1, sizeof(*job));
   assertf(job != NULL);
@@ -5551,7 +5570,7 @@ static int hts_dns_resolve_nocache_list_bounded(
   if (hts_newthread(dns_resolve_thread, job) != 0) {
     job->refcount = 1; /* no worker: fall back to resolving inline */
     dns_job_release(job);
-    return hts_dns_resolve_nocache_list(hostname, out, max, error);
+    return hts_dns_resolve_nocache_list(hostname, out, max, error, permanent);
   }
 
   /* timeout <= 0 got here only for a cancellable resolve: no deadline then */
@@ -5566,6 +5585,8 @@ static int hts_dns_resolve_nocache_list_bounded(
       dns_copy_addrs(out, job->addr, count, max);
       if (error != NULL)
         *error = job->error;
+      if (permanent != NULL)
+        *permanent = job->permanent;
     }
     hts_mutexrelease(&job->lock);
     if (done || (cancel != NULL && *cancel) ||
@@ -5594,6 +5615,7 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
                                 const char **error) {
   char BIGSTK host[HTS_URLMAXSIZE * 2];
   SOCaddr resolved[HTS_MAXADDRNUM];
+  hts_boolean permanent = HTS_FALSE;
   coucal cache;
   int count, i;
 
@@ -5629,8 +5651,8 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
 
   /* Resolve with no lock held: getaddrinfo can block for a long time, and
      state.lock also gates the stop request (#606). */
-  count = hts_dns_resolve_nocache_list_bounded(host, resolved, HTS_MAXADDRNUM,
-                                               timeout, cancel, error);
+  count = hts_dns_resolve_nocache_list_bounded(
+      host, resolved, HTS_MAXADDRNUM, timeout, cancel, error, &permanent);
 
 #if HTS_WIDE_DEBUG
   DEBUG_W("gethostbyname done\n");
@@ -5650,8 +5672,11 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
     if (record != NULL) {
       memset(record, 0, sizeof(*record));
       record->host_count = count;
-      /* "does not resolve" is only as good as the network that answered it */
-      record->expiry = count == 0 ? mtime_local() + hts_dns_negative_ttl_ms : 0;
+      /* The resolver saying the name does not exist stands for the crawl;
+         it being unable to answer is only as good as the network it asked. */
+      record->expiry = (count == 0 && !permanent)
+                           ? mtime_local() + hts_dns_negative_ttl_ms
+                           : 0;
       for (i = 0; i < count; i++) {
         record->host_length[i] = SOCaddr_size(resolved[i]);
         assertf(record->host_length[i] <= sizeof(record->host_addr[i]));
