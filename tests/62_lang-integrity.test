@@ -582,7 +582,7 @@ translated_literals() {
 
 # A fixture carrying one kept and one lost literal, so a checker that never
 # fires cannot pass for one that has nothing to report.
-printf 'Erase hts-cache/new.*\nEfface hts-cache/new.*\nFollow robots.txt\nSuivre robot.txt\nrobots.txt, robots.txt and robots.txt\nrobots.txt et robots.txt\nHtml in web/images and web/images\nHtml dans web/images\n' >"$tmp/literals.txt"
+printf 'Erase hts-cache/new.*\nEfface hts-cache/new.*\nFollow robots.txt\nSuivre robot.txt\nrobots.txt, robots.txt and robots.txt\nrobots.txt et robots.txt\nHtml in web/images and web/images\nHtml dans web/images\nHtml in web/html\nHtml dans web/html et web/html\n' >"$tmp/literals.txt"
 case $(translated_literals "$tmp/literals.txt" literals.txt) in
 *"msgid names robots.txt 1 times, the translation 0"*) ;;
 *)
@@ -600,10 +600,11 @@ if [ "$literal_tokens" != "$want_tokens" ]; then
     exit 1
 fi
 
-# Three findings: a token lost outright, one of three kept, and one of two
-# kept on a structure path. Fewer means the counting shrank.
-if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 3 ]; then
-    echo "the literal-token check did not report all three damaged fixtures"
+# Four findings, and the last one is the other direction: a token named twice
+# where the msgid names it once duplicates a dropdown row, so more is a defect
+# too and a one-sided comparison has to fail here.
+if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 4 ]; then
+    echo "the literal-token check did not report all four damaged fixtures"
     exit 1
 fi
 
