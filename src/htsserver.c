@@ -955,11 +955,11 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   {
     char pth[1024];
 
-    /* "cache" beside "Cache": step2.html must not re-default it on every
-       render, or a reloaded profile that cleared it flips back. */
-    const char *initOn[] = {"Cache",   "cache",   "ka",        "cookies",
-                            "logf",    "ftpprox", "parsejava", "testall",
-                            "updhack", "urlhack", "index",     NULL};
+    /* Field names only: a profile-key seed here is copied back over a box the
+       user cleared, by step2.html's ${do:copy}. */
+    const char *initOn[] = {"cache",   "ka",        "cookies", "logf",
+                            "ftpprox", "parsejava", "testall", "updhack",
+                            "urlhack", "index",     NULL};
     const initIntElt initInt[] = {
       {"filter", 4},
       {"travel", 2},

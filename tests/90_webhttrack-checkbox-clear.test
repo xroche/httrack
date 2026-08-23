@@ -38,8 +38,6 @@ def check(ok, what):
         rc = 1
 
 
-# cache/cache2 are left to the separate rework of the dead "Cache" seed.
-skip = {"cache", "cache2"}
 page_of = {}
 boxes = 0
 for path in sorted(glob.glob(os.path.join(srcdir, "html", "server", "option*.html"))):
@@ -48,8 +46,6 @@ for path in sorted(glob.glob(os.path.join(srcdir, "html", "server", "option*.htm
                    re.finditer(r'<input type="hidden" name="([^"]+)" value="">', page))
     for m in re.finditer(r'<input type="checkbox" name="([^"]+)"', page):
         boxes += 1
-        if m.group(1) in skip:
-            continue
         page_of[m.group(1)] = os.path.basename(path)
         at = cleared.get(m.group(1))
         check(at is not None and at < m.start(), "%s: %s is cleared before it is drawn"
@@ -67,6 +63,8 @@ BOXES = [
     ("testall", "ParseAll", "--extended-parsing", None),
     # htmlfirst emits --priority=7, which the scan-priority list also emits.
     ("htmlfirst", "HTMLFirst", None, None),
+    ("cache", "Cache", None, "--cache=0"),
+    ("cache2", "StoreAllInCache", "--store-all-in-cache", None),
     ("errpage", "NoErrorPages", "--generate-errors=0", None),
     ("external", "NoExternalPages", "--replace-external", None),
     ("hidepwd", "NoPwdInPages", "--disable-passwords", None),
