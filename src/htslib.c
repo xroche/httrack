@@ -5186,7 +5186,7 @@ coucal hts_cache(httrackp *opt) {
   return opt->state.dns_cache;
 }
 
-/* Lifetime of a negative DNS answer; the self-test shortens it. */
+/* Lifetime of a negative DNS answer. */
 static int hts_dns_negative_ttl_ms = HTS_DNS_NEGATIVE_TTL_MS;
 
 void hts_dns_set_negative_ttl_ms(int ms) { hts_dns_negative_ttl_ms = ms; }
@@ -5209,8 +5209,7 @@ static int hts_ghbn_all(coucal cache, const char *const iadr,
     int i;
 
     assertf(record->host_count <= HTS_MAXADDRNUM);
-    /* A name that failed to resolve while the network was down must not stay
-       dead for the rest of the crawl: past its expiry, ask again. */
+    /* an outage must not blacklist a host for the rest of the crawl */
     if (record->expiry != 0 && mtime_local() >= record->expiry) {
       return -1;
     }
