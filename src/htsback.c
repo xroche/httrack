@@ -4124,11 +4124,12 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                       back[i].is_update && !back[i].testmode &&
                       back[i].range_req_size == 0 && back[i].url_sav[0] &&
                       fexist_utf8(back[i].url_sav)) {
-                    hts_log_print(opt, LOG_DEBUG,
-                                  "Error %d (%s) ignored on update, keeping "
-                                  "existing copy: %s%s",
-                                  back[i].r.statuscode, back[i].r.msg,
-                                  back[i].url_adr, back[i].url_fil);
+                    hts_log_print(opt, LOG_NOTICE,
+                                  "Kept existing file %s after error %d (%s) "
+                                  "on update: %s%s",
+                                  back[i].url_sav, back[i].r.statuscode,
+                                  back[i].r.msg, back[i].url_adr,
+                                  back[i].url_fil);
                     back[i].r.statuscode = HTTP_NOT_MODIFIED;
                     deletehttp(&back[i].r);
                     back[i].r.soc = INVALID_SOCKET;

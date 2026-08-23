@@ -74,6 +74,16 @@ kepthost="${keptout}/127.0.0.1_${SRV_PORT}"
 n=$(kept_lines "$keptout")
 test "$n" -eq 2 || fail "kept: log names $n kept files, expected 2:
 $(grep -a 'complete\|Kept existing' "${keptout}/hts-log.txt" || true)"
+# A count alone passes a line naming the wrong file or a garbage size, which is
+# the whole value of the line.
+names_file() { # names_file <mirror-relative path>
+    count_matching_lines -F "$1 ($(size_of "${refhost}/$1") bytes)" \
+        "${keptout}/hts-log.txt"
+}
+for want in plain.bin ranged/asset.bin; do
+    test "$(names_file "$want")" -ge 1 || fail "kept: no line names $want with its size:
+$(grep -a 'Kept existing' "${keptout}/hts-log.txt" || true)"
+done
 cmp -s "${poison}/plain.bin" "${kepthost}/plain.bin" ||
     fail "kept: plain.bin was re-fetched, so the log line describes nothing"
 cmp -s "${poison}/asset.bin" "${kepthost}/ranged/asset.bin" ||
