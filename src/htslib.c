@@ -2044,9 +2044,8 @@ LLint http_xfread1(htsblk * r, int bufl) {
         if (nl > 0) {
           r->size += nl;
           if (!hts_fwrite_exact(buff, (size_t) nl, r->out)) {
-            /* Read the disk's verdict here: by the time back_wait() sees the
-               error, errno has been through free() and fflush(), and it
-               rewrites this as a connection error the engine would retry. */
+            /* Classify here: back_wait() sees errno after free() and fflush()
+               and rewrites this as a retryable connection error. */
             r->statuscode = check_fatal_io_errno() ? STATUSCODE_IO_FATAL
                                                    : STATUSCODE_INVALID;
             strcpybuff(r->msg, "Write error on disk");

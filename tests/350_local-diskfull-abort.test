@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# A body write that fails on a full disk was reported as a connection error and
-# retried, leaving exit_xh clear: the mirror carried on and its end-of-update
-# purge then measured the site against a truncated copy. /dev/full stands in
-# for the full disk, under the save name the crawl is about to write.
+# A full disk must abort the mirror, not pass for a dropped connection that the
+# engine retries and then purges against. /dev/full stands in, under the save
+# name each crawl is about to write: once for a body that reaches the disk as
+# it streams, once for a page and once for a file small enough that stdio holds
+# them until the close.
 
 set -euo pipefail
 
@@ -11,23 +12,37 @@ set -euo pipefail
 . "${0%"${0##*/}"}./crawllib.sh"
 
 require_httrack
-test -w /dev/full || skip "no writable /dev/full"
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_diskfull.XXXXXX")
 cleanup() { rm -rf "$tmpdir"; }
 cleanup_push cleanup
 
-out="${tmpdir}/crawl"
+# Probe the mechanism, not the node: MSYS answers `test -w /dev/full` and then
+# copies the file instead of linking it, so the writes below would succeed.
+probe="${tmpdir}/probe"
+ln -s /dev/full "$probe" 2>/dev/null || skip "cannot symlink /dev/full"
+if printf x >"$probe" 2>/dev/null; then
+    skip "a write through /dev/full succeeds here, so it stands in for nothing"
+fi
+rm -f "$probe"
+
+common=(--quiet --disable-security-limits --robots=0 --retries=2 -c1 --timeout=20)
 local_server_start --log "${tmpdir}/server.log"
-site="${out}/127.0.0.1_${SRV_PORT}/diskfull"
-mkdir -p "$site"
-ln -s /dev/full "${site}/big.bin"
 
-local_crawl --log "${tmpdir}/log" --quiet --disable-security-limits \
-    --robots=0 --retries=2 -c1 --timeout=20 -O "$out" \
-    "${BASEURL}/diskfull/index.html"
+# Mirror $1 with $2 pointed at /dev/full, and leave its log in $log.
+crawl_onto_full() {
+    local dir="${tmpdir}/$1" doomed="$2" entry="$3"
+    local site="${dir}/127.0.0.1_${SRV_PORT}/diskfull"
 
-log=$(<"${out}/hts-log.txt")
+    mkdir -p "$site"
+    ln -s /dev/full "${site}/${doomed}"
+    local_crawl --log "${tmpdir}/log-$1" "${common[@]}" -O "$dir" \
+        "${BASEURL}/diskfull/${entry}"
+    log=$(<"${dir}/hts-log.txt")
+}
+
+# --- a body that streams: the write itself fails ----------------------------
+crawl_onto_full stream big.bin index.html
 grep -q 'disk full or filesystem problems' <<<"$log" ||
     fail "a failed disk write was not reported as fatal: ${log}"
 ok "the write failure is reported as a disk problem"
@@ -41,19 +56,18 @@ grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
     fail "the mirror carried on past the full disk, purge armed: ${log}"
 ok "the mirror gives up and keeps every mirrored file"
 
-# --- a page small enough to sit in stdio's buffer fails only at fclose -------
-out2="${tmpdir}/crawl2"
-site2="${out2}/127.0.0.1_${SRV_PORT}/diskfull"
-mkdir -p "$site2"
-ln -s /dev/full "${site2}/small.html"
-
-local_crawl --log "${tmpdir}/log2" --quiet --disable-security-limits \
-    --robots=0 --retries=2 -c1 --timeout=20 -O "$out2" \
-    "${BASEURL}/diskfull/smallindex.html"
-
-log2=$(<"${out2}/hts-log.txt")
-grep -q 'Unable to write HTML file' <<<"$log2" ||
-    fail "a page whose close failed was saved as a success: ${log2}"
-grep -q 'Fatal write error, giving up' <<<"$log2" ||
-    fail "the full disk did not stop the mirror on the page path: ${log2}"
+# --- a page that fits in stdio's buffer: only the close fails ---------------
+crawl_onto_full page small.html smallindex.html
+grep -q 'Unable to write HTML file' <<<"$log" ||
+    fail "a page whose close failed was saved as a success: ${log}"
+grep -q 'Fatal write error, giving up' <<<"$log" ||
+    fail "the full disk did not stop the mirror on the page path: ${log}"
 ok "a page that only fails on close is fatal too"
+
+# --- and a file that fits: its close is the engine's only warning -----------
+crawl_onto_full tiny tiny.bin index.html
+grep -q 'disk full or filesystem problems' <<<"$log" ||
+    fail "a file whose close failed was counted as written: ${log}"
+grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
+    fail "the mirror carried on past the full disk, purge armed: ${log}"
+ok "a small file that only fails on close is fatal too"

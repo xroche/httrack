@@ -1697,7 +1697,11 @@ void back_set_finished(struct_back * sback, const int p) {
       back[p].r.fp = NULL;
     }
     if (back[p].r.out != NULL) {        // fermer fichier sortie
-      fclose(back[p].r.out);
+      /* No opt here to stop the mirror with, so the verdict rides in the
+         status code and back_flush_output() acts on it. */
+      if (fclose(back[p].r.out) != 0 && check_fatal_io_errno() &&
+          back[p].r.statuscode > 0)
+        back[p].r.statuscode = STATUSCODE_IO_FATAL;
       back[p].r.out = NULL;
     }
   }
@@ -1737,10 +1741,20 @@ int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
       fclose(back[p].r.fp);
       back[p].r.fp = NULL;
     }
-    /* fichier de sortie */
+    /* A body small enough to sit in stdio's buffer reaches the disk only at
+       this close, so a full disk is silent everywhere else. */
     if (back[p].r.out != NULL) {        // fermer fichier sortie
-      fclose(back[p].r.out);
+      if (fclose(back[p].r.out) != 0 && check_fatal_io_errno() &&
+          back[p].r.statuscode > 0)
+        back[p].r.statuscode = STATUSCODE_IO_FATAL;
       back[p].r.out = NULL;
+    }
+    if (back[p].r.statuscode == STATUSCODE_IO_FATAL &&
+        opt->state.exit_xh == 0) {
+      hts_log_print(opt, LOG_ERROR, "Unable to write file %s", back[p].url_sav);
+      hts_log_print(opt, LOG_ERROR,
+                    "Mirror aborted: disk full or filesystem problems");
+      opt->state.exit_xh = -1;
     }
     /* set file time */
     if (back[p].r.is_write) {   // ecriture directe
@@ -3585,9 +3599,8 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
 #endif
             if (retour_fread < 0 && retour_fread != READ_EOF) {
               if (back[i].r.statuscode == STATUSCODE_IO_FATAL) {
-                /* a full or read-only disk, not a network error: retrying
-                   writes nothing, and the mirror the purge measures itself
-                   against would be a truncated one */
+                /* disk full, not a network blink: a retry writes nothing and
+                   the purge would measure a truncated mirror */
                 hts_log_print(
                     opt, LOG_ERROR,
                     "Mirror aborted: disk full or filesystem problems");

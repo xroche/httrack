@@ -423,7 +423,7 @@ void hts_finish_html_file(httrackp *opt, cache_back *cache, htsblk *r,
       if (!written) {
         int fcheck;
 
-        errno = last_errno; /* fclose() has been over it since */
+        errno = last_errno; /* fclose() clobbered it */
         fcheck = check_fatal_io_errno();
 
         if (fcheck)
@@ -2857,13 +2857,12 @@ int filesave(httrackp * opt, const char *adr, int len, const char *s,
       written = hts_fwrite_exact(adr, (size_t) len, fp);
     }
     last_errno = written ? 0 : errno;
-    /* stdio can still hold the whole body, so a full disk often surfaces
-       here and nowhere else */
+    /* stdio may hold the whole body, so a full disk surfaces only here */
     if (fclose(fp) != 0) {
       written = HTS_FALSE;
       last_errno = errno;
     }
-    if (!written) { // error; the caller reads errno
+    if (!written) { // the caller reads errno
       errno = last_errno;
       return -1;
     }

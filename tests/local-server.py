@@ -1212,16 +1212,17 @@ class Handler(SimpleHTTPRequestHandler):
             if self.command != "HEAD":
                 self.wfile.write(body[start:])
 
-    # --- a body big enough that its write reaches the disk ------------------
-    # 256 KB, so the transfer is well past both stdio's buffer and the
-    # "nothing was transferred" rollback threshold.
+    # 256 KB: past stdio's buffer, so the write itself reaches the disk.
     DISKFULL_BIN = b"DISKFULL\n" + b"\x41\x42\x43\x44" * 65536
 
     def route_diskfull_index(self):
-        self.send_html('\t<a href="big.bin">big</a>\n')
+        self.send_html('\t<a href="big.bin">big</a>\n\t<a href="tiny.bin">tiny</a>\n')
 
-    # A second index, for the page arm: small.html fits in stdio's buffer, so
-    # its write only fails when the file is closed.
+    # 12 bytes: stdio holds them, so only the close reports the full disk.
+    def route_diskfull_tiny(self):
+        self.send_raw(b"DISKFULL-TINY", "application/octet-stream")
+
+    # The page arm: small.html fits in stdio's buffer, so only fclose fails.
     def route_diskfull_smallindex(self):
         self.send_html('\t<a href="small.html">small</a>\n')
 
@@ -2782,6 +2783,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/keep/stay.bin": route_keep_stay,
         "/diskfull/index.html": route_diskfull_index,
         "/diskfull/big.bin": route_diskfull_big,
+        "/diskfull/tiny.bin": route_diskfull_tiny,
         "/diskfull/smallindex.html": route_diskfull_smallindex,
         "/diskfull/small.html": route_diskfull_small,
         "/ranged/asset.bin": route_ranged_asset,
