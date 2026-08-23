@@ -1228,9 +1228,9 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
             }
           }
 
-          /* Corrupt: negative, wider than the reader holds, or claiming more
-             zip data than the 32-bit write API could store. A headers-only
-             entry above INT_MAX is legitimate. Mirrors htscache.c. */
+          /* Corrupt: negative, or in-cache at or above what the 32-bit zip
+             writer could store. A headers-only entry above INT_MAX is
+             legitimate; one wider than size_t is refused, not truncated. */
           if (declared_size < 0 ||
               (LLint) (size_t) declared_size != declared_size ||
               (dataincache && declared_size >= INT_MAX)) {
