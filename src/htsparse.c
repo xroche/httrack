@@ -3554,21 +3554,20 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
   return strcasecmp(n_fil, pn_fil) == 0;
 }
 
-/* Could this link have carried links of its own? What the previous run
-   recorded decides, since the files at risk are the ones it wrote, and a
-   content type on an error reply describes the error page. Failing that, this
-   reply, then the name the link was saved under. */
+/* Does this link have a mirrored subtree the purge could take? Only a previous
+   run's successful fetch does; a link never mirrored endangers nothing. */
 static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
-                                            const htsblk *r, const char *adr,
-                                            const char *fil, const char *save) {
-  const htsblk prev = cache_read_including_broken(opt, cache, adr, fil, NULL);
+                                            const char *adr, const char *fil) {
+  char BIGSTK prev_save[HTS_URLMAXSIZE * 2];
+  htsblk prev;
 
-  if (prev.statuscode > 0 && strnotempty(prev.contenttype))
-    return is_hypertext_mime(opt, prev.contenttype, save) ? HTS_TRUE
-                                                          : HTS_FALSE;
-  if (strnotempty(r->contenttype))
-    return is_hypertext_mime(opt, r->contenttype, fil) ? HTS_TRUE : HTS_FALSE;
-  return ishtml(opt, save) == 1 ? HTS_TRUE : HTS_FALSE;
+  prev_save[0] = '\0'; /* a cache miss leaves it untouched */
+  prev = cache_read_including_broken(opt, cache, adr, fil, prev_save);
+
+  return HTTP_IS_OK(prev.statuscode) && strnotempty(prev_save) &&
+                 is_hypertext_mime(opt, prev.contenttype, prev_save)
+             ? HTS_TRUE
+             : HTS_FALSE;
 }
 
 /*
@@ -3821,7 +3820,6 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
       }
     } else if (r->statuscode != HTTP_OK) {
       int can_retry = 0;
-      hts_boolean banned = HTS_FALSE;
 
       // cas où l'on peut reessayer
       switch (r->statuscode) {
@@ -3829,7 +3827,6 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         if (opt->hostcontrol) { // timeout et retry épuisés
           if ((opt->hostcontrol & HTS_HOSTCONTROL_BAN_TIMEOUT) &&
               (heap(ptr)->retry <= 0)) {
-            banned = HTS_TRUE;
             hts_log_print(opt, LOG_DEBUG, "Link banned: %s%s", urladr(), urlfil());
             host_ban(opt, ptr, sback, jump_identification_const(urladr()));
             hts_log_print(opt, LOG_DEBUG,
@@ -3843,7 +3840,6 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
       case STATUSCODE_SLOW:
         if ((opt->hostcontrol) && (heap(ptr)->retry <= 0)) {   // too slow
           if (opt->hostcontrol & HTS_HOSTCONTROL_BAN_SLOW) {
-            banned = HTS_TRUE;
             hts_log_print(opt, LOG_DEBUG, "Link banned: %s%s", urladr(), urlfil());
             host_ban(opt, ptr, sback, jump_identification_const(urladr()));
             hts_log_print(opt, LOG_DEBUG,
@@ -3930,15 +3926,15 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             }
           }
 
-          /* Nothing here says the site dropped the links this page carries:
-             it ran out of retries, its host was banned, or a size cap cut the
-             transfer, all before the parser could queue them. */
-          const hts_boolean unanswered =
-              can_retry || banned || r->statuscode == STATUSCODE_TOO_BIG;
+          /* No response at all, so nothing here says the site dropped the
+             links this page carries. Same predicate as the one keeping the
+             previous copy (#746), and it must stay so: every file this run
+             preserves keeps its children. An answered error is not in it and
+             needs nothing, being recovered from the cache and re-parsed. */
+          const hts_boolean unanswered = back_transfer_failed(r->statuscode);
 
           if (unanswered && !heap(ptr)->testmode &&
-              hts_link_may_carry_links(opt, cache, r, urladr(), urlfil(),
-                                       savename())) {
+              hts_link_may_carry_links(opt, cache, urladr(), urlfil())) {
             opt->links_unqueued = HTS_TRUE;
           }
 

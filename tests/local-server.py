@@ -1223,10 +1223,11 @@ class Handler(SimpleHTTPRequestHandler):
         links = '\t<a href="hub.html">hub</a>\n' '\t<a href="leaf.html">leaf</a>\n'
         if crawl <= 2:  # gone.html leaves the site for the third crawl
             links += '\t<a href="gone.html">gone</a>\n'
-        if crawl >= 3:  # neither of these may hold the third crawl's purge
+        if crawl >= 3:  # none of these may hold the third crawl's purge
             links += (
                 '\t<a href="missing.html">missing</a>\n'
                 '\t<a href="dead.bin">dead</a>\n'
+                '\t<a href="dead.html">deadhtml</a>\n'
             )
         self.send_html(links)
 
@@ -1235,8 +1236,8 @@ class Handler(SimpleHTTPRequestHandler):
     def route_hubfail_missing(self):
         self.send_error(404)
 
-    # Control: fails like the hub, but nothing it could carry was ever
-    # mirrored, so it must not hold the purge either.
+    # Controls: they fail like the hub but are new on the third crawl, so
+    # neither has a subtree to lose. dead.html wears a page's extension.
     def route_hubfail_dead(self):
         self.send_cut_headers()
 
@@ -1263,6 +1264,75 @@ class Handler(SimpleHTTPRequestHandler):
     # that failed ever carried links, so that crawl must purge it.
     def route_hubfail_gone(self):
         self.send_raw(b"<html><body><p>HUBFAIL-GONE</p></body></html>", "text/html")
+
+    # --- same, for a hub that answers with a body that will not decode -----
+    # A mangled gzip gives up as STATUSCODE_INVALID, not a transport code.
+    GZFAIL_HUB = b'<html><body><a href="gzchild.html">c</a></body></html>'
+
+    def route_gzfail_index(self):
+        links = '\t<a href="gzhub.html">hub</a>\n'
+        if self.refetch_pass() == 1:  # gzgone.html leaves the site afterwards
+            links += '\t<a href="gzgone.html">gone</a>\n'
+        self.send_html(links)
+
+    def route_gzfail_hub(self):
+        body = (
+            self.gzipped(self.GZFAIL_HUB)
+            if self.refetch_pass() == 1
+            else self.bad_gzip(self.GZFAIL_HUB)
+        )
+        self.send_coded(body, "text/html")
+
+    def route_gzfail_child(self):
+        self.send_raw(b"<html><body><p>GZFAIL-CHILD</p></body></html>", "text/html")
+
+    def route_gzfail_gone(self):
+        self.send_raw(b"<html><body><p>GZFAIL-GONE</p></body></html>", "text/html")
+
+    # --- same, for a server error the engine would have retried ------------
+    ERRFAIL_HUB = b'<html><body><a href="errchild.html">c</a></body></html>'
+
+    def route_errfail_index(self):
+        links = '\t<a href="errhub.html">hub</a>\n'
+        if self.refetch_pass() == 1:  # errgone.html leaves the site afterwards
+            links += '\t<a href="errgone.html">gone</a>\n'
+        self.send_html(links)
+
+    # 500 on every attempt of the second crawl: retryable, yet answered, so no
+    # transport failure ever reports it.
+    def route_errfail_hub(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.ERRFAIL_HUB, "text/html")
+        else:
+            self.send_error(500)
+
+    def route_errfail_child(self):
+        self.send_raw(b"<html><body><p>ERRFAIL-CHILD</p></body></html>", "text/html")
+
+    def route_errfail_gone(self):
+        self.send_raw(b"<html><body><p>ERRFAIL-GONE</p></body></html>", "text/html")
+
+    # --- boundary: a hub the size cap makes the engine skip on purpose ------
+    BIGFAIL_HUB = b'<html><body><a href="bigchild.html">c</a></body></html>'
+
+    def route_bigfail_index(self):
+        links = '\t<a href="bighub.html">hub</a>\n'
+        if self.refetch_pass() == 1:  # biggone.html leaves the site afterwards
+            links += '\t<a href="biggone.html">gone</a>\n'
+        self.send_html(links)
+
+    # Second crawl serves it past the caller's -m,N html cap.
+    def route_bigfail_hub(self):
+        body = self.BIGFAIL_HUB
+        if self.refetch_pass() != 1:
+            body += b"<!--" + b"x" * 8192 + b"-->"
+        self.send_raw(body, "text/html")
+
+    def route_bigfail_child(self):
+        self.send_raw(b"<html><body><p>BIGFAIL-CHILD</p></body></html>", "text/html")
+
+    def route_bigfail_gone(self):
+        self.send_raw(b"<html><body><p>BIGFAIL-GONE</p></body></html>", "text/html")
 
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
@@ -2821,6 +2891,19 @@ class Handler(SimpleHTTPRequestHandler):
         "/hubfail/gone.html": route_hubfail_gone,
         "/hubfail/missing.html": route_hubfail_missing,
         "/hubfail/dead.bin": route_hubfail_dead,
+        "/hubfail/dead.html": route_hubfail_dead,
+        "/gzfail/index.html": route_gzfail_index,
+        "/gzfail/gzhub.html": route_gzfail_hub,
+        "/gzfail/gzchild.html": route_gzfail_child,
+        "/gzfail/gzgone.html": route_gzfail_gone,
+        "/errfail/index.html": route_errfail_index,
+        "/errfail/errhub.html": route_errfail_hub,
+        "/errfail/errchild.html": route_errfail_child,
+        "/errfail/errgone.html": route_errfail_gone,
+        "/bigfail/index.html": route_bigfail_index,
+        "/bigfail/bighub.html": route_bigfail_hub,
+        "/bigfail/bigchild.html": route_bigfail_child,
+        "/bigfail/biggone.html": route_bigfail_gone,
         "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
