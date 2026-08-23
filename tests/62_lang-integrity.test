@@ -550,7 +550,7 @@ fi
 # user nowhere: "htscache/new.*" and "robot.txt" both shipped. Case is the
 # translator's, spelling is not, and example hostnames stay their call. Counted
 # rather than matched: keeping one web/ of eleven still misroutes ten rows.
-# Fewer than the msgid is the defect; more is a gloss, which is allowed.
+# Counts must match: one too few loses a path, one too many duplicates a row.
 literal_tokens="hts-cache robots.txt cgi-bin web/images web/html"
 translated_literals() {
     LC_ALL=C awk -v name="$2" -v toks="$literal_tokens" '
@@ -572,7 +572,7 @@ translated_literals() {
             for (i in t) {
                 want = count(tolower(key), t[i])
                 got = count(tolower($0), t[i])
-                if (got < want)
+                if (got != want)
                     printf "%s:%d: msgid names %s %d times, the translation %d\n",
                         name, NR, t[i], want, got
             }
@@ -693,10 +693,12 @@ LC_ALL=C awk -v pin="$lbpin" '
 
 # A single-byte charset maps all 256 values, so a catalog can declare the wrong
 # one and still decode: Romanian said ISO-8859-1 with ISO-8859-2 bytes for years,
-# and every a-breve reached the browser as a-tilde. Catch it where it shows, by
-# naming letters a language does not use. Only the pairs that have gone wrong are
-# listed; a language absent here is simply unchecked.
-never_used="ro:ãÃõÕºª pl:ãÃßÿ cs:ãÃßÿ sk:ãÃßÿ hu:ãÃßÿ hr:ãÃßÿ sl:ãÃßÿ"
+# and every a-breve reached the browser as a-tilde. Catch it by naming letters
+# the language never writes. These are not merely absent from the language, they
+# are what reading its own bytes as Latin-1 produces, which is the mistake being
+# caught; the loop below proves each row still fires. A language absent from the
+# table is unchecked, so a pass here says nothing about one.
+never_used="ro:ãºþ pl:¹³ê¿ cs:øìèù sk:è¾ï hu:õû hr:èæð sl:è"
 
 foreign_letters() {
     LC_ALL=C awk -v name="$2" -v iso="$3" -v table="$never_used" '
@@ -734,7 +736,31 @@ foreign_letters() {
     ' "$1"
 }
 
-if command -v iconv >/dev/null 2>&1; then
+if ! command -v iconv >/dev/null 2>&1; then
+    echo "iconv not found; charset repertoire check skipped" >&2
+else
+    # Every row must fire when its own catalog is read as Latin-1, the mislabel
+    # this exists to catch. A row naming letters that mistake never produces is
+    # inert, and an inert row reads exactly like a clean catalog.
+    for row in $never_used; do
+        riso=${row%%:*}
+        rfile=""
+        for f in "$langdir"/*.txt; do
+            [ "$(field "$f" LANGUAGE_ISO)" = "$riso" ] || continue
+            rfile=$f
+            break
+        done
+        if [ -z "$rfile" ]; then
+            echo "never_used names $riso, which no catalog declares"
+            exit 1
+        fi
+        LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$rfile" >"$tmp/mis"
+        if [ -z "$(foreign_letters "$tmp/mis" "${rfile##*/}" "$riso")" ]; then
+            echo "never_used row $row never fires: those letters are not what a Latin-1 misread makes"
+            exit 1
+        fi
+    done
+
     # Control: Romanian read as the Latin-1 it used to claim must be rejected,
     # and read as the Latin-2 it is must pass.
     LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$langdir/Romanian.txt" >"$tmp/ro-wrong"

@@ -19,7 +19,9 @@ Line breaks are load-bearing in the dropdown strings, where each `\n` starts a l
 
 Some words are not translatable text but names on disk or on the wire, and must be copied through unchanged: `hts-cache`, `robots.txt`, `cgi-bin`, and the `web/html` and `web/images` directories in the local-structure list, along with the bare `web/` they sit under. Translating one points the user at a path HTTrack never creates. Example hostnames such as `www.someweb.com` are the opposite: localise them freely. `site_name` and `www.domain.xxx` are placeholders, kept as they are only so every catalog reads alike.
 
-`tests/62_lang-integrity.test` enforces all of this. Two of its counts are pinned per catalog, in `tests/62_lang-untranslated.counts` and `tests/62_lang-linebreaks.counts`, because the existing files carry long-standing differences that are not worth churning; if your change moves one of those numbers, look at why before editing the pin to match.
+Save the file in exactly the charset its `LANGUAGE_CHARSET` names, and check the header when you start from an existing file: Romanian declared ISO-8859-1 for years while its bytes were ISO-8859-2, so every `ă` reached the browser as `ã`. A single-byte charset decodes anything, so nothing catches this for you except the letters looking wrong.
+
+`tests/62_lang-integrity.test` checks most of the above: the placeholder sequence, escapes it does not recognise, the line-break count, the literal names `hts-cache`, `robots.txt`, `cgi-bin`, `web/html` and `web/images`, and a mislabelled charset for the languages it has letters for. It does not check `\t` or `\r\n` counts, the bare `web/`, or `site_name` and `www.domain.xxx`; follow those rules anyway. Two of its counts are pinned per catalog, in `tests/62_lang-untranslated.counts` and `tests/62_lang-linebreaks.counts`, because the existing files carry long-standing differences not worth churning; if your change moves one of those numbers, look at why before editing the pin to match.
 
 A few `LANGUAGE_*` entries at the top describe the file itself:
 
