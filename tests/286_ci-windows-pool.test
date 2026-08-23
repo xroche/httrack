@@ -84,7 +84,7 @@ run_suite() { # run_suite <dir> <jobs>
 assert_tally() {
     local got
     got=$(grep '^ran=' "$tmp/out" || true)
-    test "$got" = 'ran=12 pass=10 fail=1 skip=1' || fail "$1: wrong tally: $got"
+    test "$got" = 'ran=12 pass=10 fail=1 skip=1 lost=0' || fail "$1: wrong tally: $got"
     grep -q 'FAIL 12_engine-fail.test (exit 3)' "$tmp/out" || fail "$1: the failing test was not named"
     grep -q '^SKIP 11_engine-skip.test$' "$tmp/out" || fail "$1: the skipped test was not named"
 }

@@ -163,7 +163,7 @@ test "$rc" -eq 1 || fail "stub suite exited $rc, want 1 from the pass floor"
 # test would run it twice and inflate every tally the gates read.
 dup=$(awk '/^RUN /{print $2}' suite-progress.log | sort | uniq -d)
 test -z "$dup" || fail "a test was selected by two categories: $dup"
-grep -q '^ran=12 pass=10 fail=1 skip=1$' <<<"$out" ||
+grep -q '^ran=12 pass=10 fail=1 skip=1 lost=0$' <<<"$out" ||
     fail "wrong tally: $(grep '^ran=' <<<"$out")"
 grep -q '::error::only 10 tests passed (1 skipped)' <<<"$out" ||
     fail "the pass floor did not report the count"

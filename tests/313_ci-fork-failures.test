@@ -48,7 +48,7 @@ assert_counts() { # assert_counts LOG WANT-DIED WANT-RETRIED WANT-GAVEUP LABEL S
     # The counts alone name no test and no time: an annotation without an example
     # line sends the reader back to a log the runner may no longer have.
     grep -q "$6" <<<"$out" || fail "$label: no sample line matching [$6]: $out"
-    grep -q "MSYS forks: $2 died, $3 retried, $4 given up" "$GITHUB_STEP_SUMMARY" ||
+    grep -q "MSYS forks: $2 died, $3 retried, $4 given up; 0 worker(s) lost" "$GITHUB_STEP_SUMMARY" ||
         fail "$label: step summary says $(<"$GITHUB_STEP_SUMMARY")"
 }
 
@@ -89,9 +89,10 @@ assert_counts "$tmp/crjoined.log" 2 0 0 "two messages joined by a CR" "forked pr
 : >"$GITHUB_STEP_SUMMARY"
 grep -v 'fork' "$tmp/console.log" >"$tmp/clean.log"
 out=$(ci_report_fork_failures "$tmp/clean.log") || fail "counting a clean leg failed"
-grep -q 'no MSYS fork failure' <<<"$out" || fail "a clean leg said: $out"
+grep -q 'no MSYS fork failure and no lost worker' <<<"$out" ||
+    fail "a clean leg said: $out"
 ! grep -q '::warning' <<<"$out" || fail "a clean leg raised an annotation: $out"
-grep -q 'MSYS forks: 0 died, 0 retried, 0 given up' "$GITHUB_STEP_SUMMARY" ||
+grep -q 'MSYS forks: 0 died, 0 retried, 0 given up; 0 worker(s) lost' "$GITHUB_STEP_SUMMARY" ||
     fail "a clean leg wrote no count: $(<"$GITHUB_STEP_SUMMARY")"
 
 # The suite step can die before writing a log; the counter step still runs.
