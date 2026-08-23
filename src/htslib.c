@@ -5186,7 +5186,8 @@ coucal hts_cache(httrackp *opt) {
   return opt->state.dns_cache;
 }
 
-/* First lifetime of a negative DNS answer. */
+/* First lifetime of a negative DNS answer. Unlocked because only the
+   self-test writes it, from the single thread that then resolves. */
 static int hts_dns_negative_ttl_ms = HTS_DNS_NEGATIVE_TTL_MS;
 
 void hts_dns_set_negative_ttl_ms(int ms) {
@@ -5202,6 +5203,21 @@ int hts_dns_negative_failures(httrackp *opt, const char *host) {
     failures = ((const t_dnscache *) ptr)->failures;
   hts_mutexrelease(&opt->state.lock);
   return failures;
+}
+
+void hts_dns_test_move_clock(httrackp *opt, const char *host, TStamp ms) {
+  void *ptr;
+
+  hts_mutexlock(&opt->state.lock);
+  if (coucal_read_pvoid(hts_cache(opt), host, &ptr)) {
+    t_dnscache *const record = (t_dnscache *) ptr;
+
+    if (record->expiry != 0) { /* a positive record carries no stamps */
+      record->expiry -= ms;
+      record->stored -= ms;
+    }
+  }
+  hts_mutexrelease(&opt->state.lock);
 }
 
 /* Doubles per consecutive failure up to the ceiling: an outage is retried
@@ -5234,9 +5250,15 @@ static int hts_ghbn_all(coucal cache, const char *const iadr,
     int i;
 
     assertf(record->host_count <= HTS_MAXADDRNUM);
-    /* an outage must not blacklist a host for the rest of the crawl */
-    if (record->expiry != 0 && mtime_local() >= record->expiry) {
-      return -1;
+    /* An outage must not blacklist a host for the rest of the crawl, and the
+       stamps are wall-clock: a clock now behind the store time expires the
+       record too, or an NTP step delays the retry by the size of the step. */
+    if (record->expiry != 0) {
+      const TStamp now = mtime_local();
+
+      if (now >= record->expiry || now < record->stored) {
+        return -1;
+      }
     }
     for (i = 0; i < record->host_count && i < max; i++) {
       assertf(record->host_length[i] <= sizeof(record->host_addr[i]));
@@ -5706,9 +5728,10 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
       record->failures = count == 0 ? failures : 0;
       /* The resolver saying the name does not exist stands for the crawl;
          it being unable to answer is only as good as the network it asked. */
-      record->expiry = (count == 0 && !permanent)
-                           ? mtime_local() + hts_dns_negative_wait_ms(failures)
-                           : 0;
+      if (count == 0 && !permanent) {
+        record->stored = mtime_local();
+        record->expiry = record->stored + hts_dns_negative_wait_ms(failures);
+      }
       for (i = 0; i < count; i++) {
         record->host_length[i] = SOCaddr_size(resolved[i]);
         assertf(record->host_length[i] <= sizeof(record->host_addr[i]));

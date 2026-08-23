@@ -105,6 +105,8 @@ static mock_host mock_hosts[] = {
     {"flaky.test", EAI_AGAIN, 1, {{AF_INET, {192, 0, 2, 7}}}, 0},
     /* the control: the resolver answers, and the answer is "no such host" */
     {"dead.test", EAI_NONAME, 0, {{0}}, 0},
+    /* the same outage, seen across a backward clock step */
+    {"stepped.test", EAI_AGAIN, 1, {{AF_INET, {192, 0, 2, 8}}}, 0},
     /* resolves, but only well after --timeout: the #606 wedge */
     {"slow.test", 0, 1, {{AF_INET, {127, 0, 0, 9}}}, 0, MOCK_SLOW_MS},
     /* a second one, so a cancelled resolve cannot cache an answer the next
@@ -319,10 +321,10 @@ int dns_selftests(httrackp *opt) {
   }
 
   /* But a failure the resolver could not answer expires: one outage must not
-     kill the whole crawl. Every sleep below only ever needs to be LONGER than
-     the wait it outlasts, so a slow runner cannot turn this red. */
+     kill the whole crawl. The wait is minutes long and the test moves the clock
+     rather than sleeping, so no stall expires an entry a check needs. */
   mock_reset_calls();
-  hts_dns_set_negative_ttl_ms(200);
+  hts_dns_set_negative_ttl_ms(100000);
   {
     SOCaddr a;
     const char *err = NULL;
@@ -331,19 +333,41 @@ int dns_selftests(httrackp *opt) {
     CHECK(hts_dns_negative_failures(opt, "flaky.test") == 1);
     CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
     CHECK(mock_read_calls("flaky.test") == 1); /* still inside the wait */
-    Sleep(300);
+    hts_dns_test_move_clock(opt, "flaky.test", 150000);
     /* asking again after the wait counts, and lengthens the next one */
     CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
     CHECK(mock_read_calls("flaky.test") == 2);
     CHECK(hts_dns_negative_failures(opt, "flaky.test") == 2);
-    mock_find("flaky.test")->gai_err = 0; /* the network comes back */
-    Sleep(500);                           /* past the doubled wait */
+    /* that next one is twice as long, so the same move no longer reaches it */
+    hts_dns_test_move_clock(opt, "flaky.test", 150000);
+    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
+    CHECK(mock_read_calls("flaky.test") == 2);
+    mock_find("flaky.test")->gai_err = 0; /* the network is back */
+    hts_dns_test_move_clock(opt, "flaky.test", 100000); /* now past it */
     CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) != NULL);
     CHECK(mock_read_calls("flaky.test") == 3);
     CHECK(hts_dns_negative_failures(opt, "flaky.test") == 0);
-    Sleep(500);
+    hts_dns_test_move_clock(opt, "flaky.test", 1000000);
     CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) != NULL);
     CHECK(mock_read_calls("flaky.test") == 3); /* the answer does not expire */
+  }
+
+  /* The stamps are wall-clock, there being no monotonic clock here: a backward
+     step must expire them too, or it delays the retry by the size of the step,
+     which at the ceiling means the rest of the crawl. */
+  mock_reset_calls();
+  {
+    SOCaddr a;
+    const char *err = NULL;
+
+    CHECK(hts_dns_resolve2(opt, "stepped.test", &a, &err) == NULL);
+    CHECK(hts_dns_resolve2(opt, "stepped.test", &a, &err) == NULL);
+    CHECK(mock_read_calls("stepped.test") == 1); /* still inside the wait */
+    mock_find("stepped.test")->gai_err = 0;      /* the network is back */
+    hts_dns_test_move_clock(opt, "stepped.test", -600000); /* NTP steps back */
+    CHECK(hts_dns_resolve2(opt, "stepped.test", &a, &err) != NULL);
+    CHECK(mock_read_calls("stepped.test") == 2);
+    mock_find("stepped.test")->gai_err = EAI_AGAIN; /* leave the row as found */
   }
 
   /* The wait doubles per consecutive failure, up to the ceiling. Table-tested
