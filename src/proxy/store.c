@@ -926,6 +926,15 @@ static PT_Element PT_ReadCache__New(PT_Index index, const char *url, int flags) 
     line[0] = '\0'; \
 	} \
 } while(0)
+#define ZIP_READFIELD_LLINT(line, value, refline, refvalue)                    \
+  do {                                                                         \
+    if (line[0] != '\0' && strfield2(line, refline)) {                         \
+      LLint intval = 0;                                                        \
+      sscanf(value, LLintP, &intval);                                          \
+      (refvalue) = intval;                                                     \
+      line[0] = '\0';                                                          \
+    }                                                                          \
+  } while (0)
 
 /* Set path (capacity size) to filename's parent directory, separator included,
    from an absolute filename. Empty when there is none, or when it would not
@@ -1098,6 +1107,8 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
         char headerBuff[8192 + 2];
         int readSizeHeader;
         int dataincache = 0;
+        /* signed, so a corrupt value is judged before it becomes a size_t */
+        LLint declared_size = 0;
 
         /* For BIG comments */
         headerBuff[0]
@@ -1135,7 +1146,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               ZIP_READFIELD_INT(line, value, "X-Statuscode", r->statuscode);
               ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r->msg,
                                    sizeof(r->msg));
-              ZIP_READFIELD_INT(line, value, "X-Size", r->size);        // size
+              ZIP_READFIELD_LLINT(line, value, "X-Size", declared_size); // size
               ZIP_READFIELD_STRING(line, value, "Content-Type", r->contenttype,
                                    sizeof(r->contenttype));
               ZIP_READFIELD_STRING(line, value, "X-Charset", r->charset,
@@ -1215,6 +1226,18 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                          index->path, previous_save_);
               }
             }
+          }
+
+          /* Corrupt: negative, wider than the reader holds, or claiming more
+             zip data than the 32-bit write API could store. A headers-only
+             entry above INT_MAX is legitimate. Mirrors htscache.c. */
+          if (declared_size < 0 ||
+              (LLint) (size_t) declared_size != declared_size ||
+              (dataincache && declared_size >= INT_MAX)) {
+            r->statuscode = STATUSCODE_INVALID;
+            strcpybuff(r->msg, "Cache Read Error : Bad Size");
+          } else {
+            r->size = (size_t) declared_size;
           }
 
           /* Complete fields */
@@ -1356,7 +1379,7 @@ static int PT_SaveCache__New_Fun(void *arg, const char *url, PT_Element element)
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-StatusMessage",
                    element->msg);
   ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-Size",
-                (int) body_size); // size
+                body_size); // size
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "Content-Type",
                    element->contenttype); // contenttype
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-Charset",
