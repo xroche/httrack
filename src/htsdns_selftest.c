@@ -319,32 +319,56 @@ int dns_selftests(httrackp *opt) {
   }
 
   /* But a failure the resolver could not answer expires: one outage must not
-     kill the whole crawl. */
+     kill the whole crawl. Every sleep below only ever needs to be LONGER than
+     the wait it outlasts, so a slow runner cannot turn this red. */
   mock_reset_calls();
-  hts_dns_set_negative_ttl_ms(500);
+  hts_dns_set_negative_ttl_ms(200);
   {
     SOCaddr a;
     const char *err = NULL;
 
     CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
-    mock_find("flaky.test")->gai_err = 0; /* the network comes back */
+    CHECK(hts_dns_negative_failures(opt, "flaky.test") == 1);
     CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
-    CHECK(mock_read_calls("flaky.test") == 1); /* still inside the TTL */
-    Sleep(600);
-    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) != NULL);
+    CHECK(mock_read_calls("flaky.test") == 1); /* still inside the wait */
+    Sleep(300);
+    /* asking again after the wait counts, and lengthens the next one */
+    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) == NULL);
     CHECK(mock_read_calls("flaky.test") == 2);
-    Sleep(600);
+    CHECK(hts_dns_negative_failures(opt, "flaky.test") == 2);
+    mock_find("flaky.test")->gai_err = 0; /* the network comes back */
+    Sleep(500);                           /* past the doubled wait */
     CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) != NULL);
-    CHECK(mock_read_calls("flaky.test") == 2); /* the answer does not expire */
+    CHECK(mock_read_calls("flaky.test") == 3);
+    CHECK(hts_dns_negative_failures(opt, "flaky.test") == 0);
+    Sleep(500);
+    CHECK(hts_dns_resolve2(opt, "flaky.test", &a, &err) != NULL);
+    CHECK(mock_read_calls("flaky.test") == 3); /* the answer does not expire */
   }
+
+  /* The wait doubles per consecutive failure, up to the ceiling. Table-tested
+     rather than slept through: a resolver Android maps every failure onto,
+     NXDOMAIN included, would otherwise re-ask a dead host all crawl. */
+  {
+    const int first = 1000;
+
+    hts_dns_set_negative_ttl_ms(first);
+    CHECK(hts_dns_negative_wait_ms(1) == first);
+    CHECK(hts_dns_negative_wait_ms(2) == 2 * first);
+    CHECK(hts_dns_negative_wait_ms(3) == 4 * first);
+    CHECK(hts_dns_negative_wait_ms(99) == HTS_DNS_NEGATIVE_TTL_MAX_MS);
+    hts_dns_set_negative_ttl_ms(500);
+  }
+
   /* "no such host" is an answer about the name, so it still stands for the
      whole crawl: same TTL, same sleep, no second resolve. */
   {
     SOCaddr a;
     const char *err = NULL;
 
+    hts_dns_set_negative_ttl_ms(200);
     CHECK(hts_dns_resolve2(opt, "dead.test", &a, &err) == NULL);
-    Sleep(600);
+    Sleep(300);
     CHECK(hts_dns_resolve2(opt, "dead.test", &a, &err) == NULL);
     CHECK(mock_read_calls("dead.test") == 1);
   }

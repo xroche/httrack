@@ -158,6 +158,7 @@ struct t_dnscache {
   // mtime_local() past which a negative record must be resolved again; 0 on a
   // positive one, which never expires
   TStamp expiry;
+  int failures; // consecutive failed resolves, which lengthen the next wait
 };
 
 /* Break t down as UTC into the caller's buffer, HTS_FALSE if that failed.
@@ -321,10 +322,17 @@ int ftp_available(void);
 coucal hts_cache(httrackp *opt);
 #endif
 
-/* How long a name that did not resolve stays negative-cached. */
+/* How long a name that did not resolve stays negative-cached, and the ceiling
+   the wait doubles up to. */
 #define HTS_DNS_NEGATIVE_TTL_MS 60000
-/* Test-only: shorten it so a self-test need not wait a minute. */
+#define HTS_DNS_NEGATIVE_TTL_MAX_MS 900000
+/* Wait before asking again, after this many consecutive failures (>= 1). */
+int hts_dns_negative_wait_ms(int failures);
+/* Test-only: shorten the first wait so a self-test need not wait a minute. */
 void hts_dns_set_negative_ttl_ms(int ms);
+/* Consecutive failed resolves recorded for host, 0 if it is not cached or
+   resolves. Test-only: nothing in the engine reads it back. */
+int hts_dns_negative_failures(httrackp *opt, const char *host);
 
 // outils divers
 HTS_INLINE TStamp time_local(void);

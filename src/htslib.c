@@ -5186,10 +5186,33 @@ coucal hts_cache(httrackp *opt) {
   return opt->state.dns_cache;
 }
 
-/* Lifetime of a negative DNS answer. */
+/* First lifetime of a negative DNS answer. */
 static int hts_dns_negative_ttl_ms = HTS_DNS_NEGATIVE_TTL_MS;
 
 void hts_dns_set_negative_ttl_ms(int ms) { hts_dns_negative_ttl_ms = ms; }
+
+int hts_dns_negative_failures(httrackp *opt, const char *host) {
+  void *ptr;
+  int failures = 0;
+
+  hts_mutexlock(&opt->state.lock);
+  if (coucal_read_pvoid(hts_cache(opt), host, &ptr))
+    failures = ((const t_dnscache *) ptr)->failures;
+  hts_mutexrelease(&opt->state.lock);
+  return failures;
+}
+
+/* Doubles per consecutive failure up to the ceiling: an outage is retried
+   soon, a host that is simply gone costs a handful of lookups per crawl. */
+int hts_dns_negative_wait_ms(int failures) {
+  int wait = hts_dns_negative_ttl_ms;
+  int i;
+
+  for (i = 1; i < failures && wait < HTS_DNS_NEGATIVE_TTL_MAX_MS; i++)
+    wait *= 2;
+  return wait < HTS_DNS_NEGATIVE_TTL_MAX_MS ? wait
+                                            : HTS_DNS_NEGATIVE_TTL_MAX_MS;
+}
 
 // MUST BE LOCKED (coucal is not internally serialized vs FTP/web threads)
 // Look up iadr in the DNS cache, filling out[0..min(count,max)-1].
@@ -5668,14 +5691,20 @@ int hts_dns_resolve_all_bounded(httrackp *opt, const char *iadr, SOCaddr *out,
   { /* store the full list (coucal owns the record and dups the host key; a
        concurrent resolve of the same host replaces, and frees, this one) */
     t_dnscache *const record = malloct(sizeof(t_dnscache));
+    void *previous;
+    const int failures =
+        (count == 0 && coucal_read_pvoid(cache, host, &previous))
+            ? ((const t_dnscache *) previous)->failures + 1
+            : 1;
 
     if (record != NULL) {
       memset(record, 0, sizeof(*record));
       record->host_count = count;
+      record->failures = count == 0 ? failures : 0;
       /* The resolver saying the name does not exist stands for the crawl;
          it being unable to answer is only as good as the network it asked. */
       record->expiry = (count == 0 && !permanent)
-                           ? mtime_local() + hts_dns_negative_ttl_ms
+                           ? mtime_local() + hts_dns_negative_wait_ms(failures)
                            : 0;
       for (i = 0; i < count; i++) {
         record->host_length[i] = SOCaddr_size(resolved[i]);
