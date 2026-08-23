@@ -404,12 +404,21 @@ else
         exit 1
     fi
 
+    # Shift-JIS maps 0x5C to the yen sign, so decoding turns every escape in
+    # Japanese.txt into "\u00a5" and the scan below sees none at all. The engine
+    # reads the byte, not the glyph, so put the backslashes back.
+    yen=$(printf '\302\245')
     nesc=0
     for f in "$langdir"/*.txt; do
         nesc=$((nesc + 1))
         cs=$(field "$f" LANGUAGE_CHARSET)
         # Decoded, not raw: 0x5C is a legal trail byte in BIG5 and Shift-JIS.
         LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/esc" || fail "${f##*/}: iconv cannot read $cs"
+        case $(printf '%s' "$cs" | LC_ALL=C tr '[:upper:]' '[:lower:]') in
+        shift-jis | shift_jis | sjis | cp932)
+            LC_ALL=C sed "s|$yen|\\\\|g" "$tmp/esc" >"$tmp/esc.bs" && mv "$tmp/esc.bs" "$tmp/esc"
+            ;;
+        esac
         found=$(unknown_escapes "$tmp/esc" "${f##*/}")
         if [ -n "$found" ]; then
             printf '%s\n' "$found"
@@ -528,18 +537,36 @@ fi
 # and "robot.txt" both shipped that way. Case is the translator's (a label may
 # start a sentence); the spelling is not. Example hostnames are deliberately not
 # on this list, since localising www.someweb.com is a translator's call.
-literal_tokens="hts-cache robots.txt cgi-bin"
+# web, html and images are the directories the structure dropdown promises, so
+# they are counted rather than merely looked for: a value keeping one of eleven
+# still sends ten rows to a folder that is never created. site_name and
+# www.domain.xxx are placeholders rather than real directories, kept literal so
+# every catalog reads the same.
+literal_tokens="hts-cache robots.txt cgi-bin web/images web/html site_name/images site_name/html www.domain.xxx"
 translated_literals() {
     LC_ALL=C awk -v name="$2" -v toks="$literal_tokens" '
-        function lc(s) { return tolower(s) }
+        function count(hay, needle,   n, i) {
+            n = 0
+            i = index(hay, needle)
+            while (i > 0) {
+                n++
+                hay = substr(hay, i + length(needle))
+                i = index(hay, needle)
+            }
+            return n
+        }
         BEGIN { split(toks, t, " ") }
         { sub(/\r$/, "") }
         NR % 2 == 1 { key = $0; next }
         $0 == "" { next }
         {
-            for (i in t)
-                if (index(lc(key), t[i]) > 0 && index(lc($0), t[i]) == 0)
-                    printf "%s:%d: msgid names %s, the translation does not\n", name, NR, t[i]
+            for (i in t) {
+                want = count(tolower(key), t[i])
+                got = count(tolower($0), t[i])
+                if (want != got)
+                    printf "%s:%d: msgid names %s %d times, the translation %d\n",
+                        name, NR, t[i], want, got
+            }
         }
     ' "$1"
 }
@@ -548,7 +575,7 @@ translated_literals() {
 # fires cannot pass for one that has nothing to report.
 printf 'Erase hts-cache/new.*\nEfface hts-cache/new.*\nFollow robots.txt\nSuivre robot.txt\n' >"$tmp/literals.txt"
 case $(translated_literals "$tmp/literals.txt" literals.txt) in
-*"msgid names robots.txt"*) ;;
+*"msgid names robots.txt 1 times, the translation 0"*) ;;
 *)
     echo "the literal-token check missed a translated robots.txt"
     exit 1

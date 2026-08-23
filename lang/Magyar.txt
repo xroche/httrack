@@ -903,7 +903,7 @@ Fájlnév kiterjesztéssel:\nFájlnév, tartalmazva:\nIlyen fájlnév:\nMappanév, tarta
 Show all\nHide debug\nHide infos\nHide debug and infos
 Mind látszik\nHibakeresés elrejtése\nInfók elrejtése\nHibakeresés és infók elrejtése
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Hely-szerkezet (alapértelmezett)\nHtml a web/,       képek/egyéb fájlok a web/kepek/\nHtml a web/html,   képek/egyebek a web/kepek\nHtml a web/,       képek/egyebek a web/\nHtml a web/,       képek/egyebek a web/xxx, ahol xxx a  fájlkiterjesztés\nHtml a web/html,   képek/egyebek a web/xxx\nHely-szerkezet, www.tartomany.xxx nélkül/\nHtml a hely_nev/, képek/egyéb fájlok a hely_nev/kepek/\nHtml a hely_nev/html, képek/egyebek a hely_nev/kepek\nHtml a hely_nev/, képek/egyebek a hely_nev/\nHtml a hely_nev/, képek/egyebek a hely_nev/xxx\nHtml a hely_nev/html, képek/egyebek a hely_nev/xxx\nMinden fájl a web/, véletlen nevekkel (bonyolult !)\nMinden fájl a hely_nev/, véletlen nevekkel (bonyolult !)\nFelhasználó által meghatározott szerkezet...
+Hely-szerkezet (alapértelmezett)\nHtml a web/,       képek/egyéb fájlok a web/images/\nHtml a web/html,   képek/egyebek a web/images\nHtml a web/,       képek/egyebek a web/\nHtml a web/,       képek/egyebek a web/xxx, ahol xxx a  fájlkiterjesztés\nHtml a web/html,   képek/egyebek a web/xxx\nHely-szerkezet, www.domain.xxx nélkül/\nHtml a site_name/, képek/egyéb fájlok a site_name/images/\nHtml a site_name/html, képek/egyebek a site_name/images\nHtml a site_name/, képek/egyebek a site_name/\nHtml a site_name/, képek/egyebek a site_name/xxx\nHtml a site_name/html, képek/egyebek a site_name/xxx\nMinden fájl a web/, véletlen nevekkel (bonyolult !)\nMinden fájl a site_name/, véletlen nevekkel (bonyolult !)\nFelhasználó által meghatározott szerkezet...
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
 Csak keresés\nHTML fájlok tárolása\nNem HTML-fájlok tárolása\nMinden fájl tárolása (alapértelmezett)\nElõbb a HTML-fájlokat tárolja
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
@@ -913,7 +913,7 @@ Ugyanazon a címen marad (alapértelm.)\nUgyanazon a tartományon marad\nUgyanazon 
 Never\nIf unknown (except /)\nIf unknown
 Soha\nHa ismeretlen (kivéve /)\nHa ismeretlen
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
-nincs robot txt szabály\nrobots.txt a varázsló kivételével\nrobots.txt szabályok követése
+nincs robots.txt szabály\nrobots.txt a varázsló kivételével\nrobots.txt szabályok követése
 normal\nextended\ndebug
 normál\nkiterjesztett\nhibakeresés
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
