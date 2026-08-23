@@ -941,21 +941,6 @@ jobs:
     # The name is a required status check on master; renaming it blocks every PR.
     name: lint (shellcheck, shfmt)
     runs-on: ubuntu-24.04
-    # Every tracked shell script; the globs expand at run time. Kept here so the
-    # shellcheck and shfmt steps below cannot drift apart.
-    env:
-      SHELL_SCRIPTS: >-
-        .githooks/pre-commit
-        bootstrap
-        build.sh
-        html/div/search.sh
-        man/makeman.sh
-        src/htsbasiccharsets.sh
-        src/htsentities.sh
-        src/webhttrack.in
-        tests/*.sh
-        tests/*.test
-        tools/*.sh
     steps:
       - uses: actions/checkout@v7
 
@@ -974,6 +959,38 @@ jobs:
           appstreamcli --version
           black --version
           flake8 --version
+
+      # Read the list rather than hand-keeping one: a script added outside the
+      # old globs then gets checked without anyone widening them.
+      - name: List the tracked shell scripts
+        run: |
+          set -euo pipefail
+          mapfile -t sh < <(
+            git ls-files '*.sh' '*.test'
+            # The rest are named by their shebang, not by an extension.
+            git ls-files | while IFS= read -r f; do
+              case "$f" in *.sh | *.test) continue ;; esac
+              IFS= read -r line <"$f" 2>/dev/null || continue
+              case "$line" in
+              '#!'*/sh | '#!'*/bash | '#!'*/sh\ * | '#!'*/bash\ * | '#!'*env*\ sh | '#!'*env*\ bash)
+                printf '%s\n' "$f"
+                ;;
+              esac
+            done
+          )
+          # shellcheck given no paths exits 0, checking nothing. A non-zero
+          # count is too weak a floor: the shebang scan can drop almost every
+          # file and still pass one, so pin the half that cannot shrink and
+          # name the extension-less scripts the scan must reach.
+          test "${#sh[@]}" -ge "$(git ls-files '*.sh' '*.test' | wc -l)"
+          for must in bootstrap .githooks/pre-commit src/webhttrack.in; do
+            case " ${sh[*]} " in
+            *" $must "*) ;;
+            *) echo "the shebang scan no longer finds $must" >&2; exit 1 ;;
+            esac
+          done
+          echo "${#sh[@]} tracked shell scripts"
+          echo "SHELL_SCRIPTS=${sh[*]}" >> "$GITHUB_ENV"
 
       - name: shellcheck
         run: shellcheck $SHELL_SCRIPTS
@@ -1001,6 +1018,11 @@ jobs:
       # missing without failing anything.
       - name: test file names
         run: bash tests/check-test-names.sh
+
+      # The corpus glob is what ships the vectors in a tarball, and it has no
+      # oracle of its own: three were missing for exactly that reason.
+      - name: fuzz corpus list
+        run: bash fuzz/check-corpus-list.sh
 
       # MSBuild rejects a malformed .vcxproj with a bare MSB4025 and no build, so
       # catch it here in seconds rather than on a Windows runner minutes in.

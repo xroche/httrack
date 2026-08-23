@@ -13,13 +13,16 @@ srcdir="${abs_top_srcdir:?not run under make check}"
 chrome_src="${srcdir}/tools/doc-chrome.py"
 
 command -v python3 >/dev/null 2>&1 || skip "no python3"
-test -r "${chrome_src}" || skip "no ${chrome_src}"
+# Missing is fatal, never a skip: a dist that drops it has to red here.
+test -r "${chrome_src}" || fail "missing ${chrome_src}"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/docyear.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 # doc-chrome.py finds html/ relative to its own path, so it needs both trees.
 cp -a "${srcdir}/tools" "${srcdir}/html" "${work}/"
+# distcheck hands out a read-only srcdir, and cp -a copies the mode along.
+chmod -R u+w "${work}"
 chrome="${work}/tools/doc-chrome.py"
 page="${work}/html/index.html"
 
