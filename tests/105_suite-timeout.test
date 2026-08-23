@@ -226,15 +226,18 @@ secs 0 0
 
 # budget_left hands a child what is left of it, and keeps 0 meaning "no guard".
 # shellcheck disable=SC2016 # the fixture has to call the helper, not us
-printf '. "%s"\nsleep 2\necho "left=$(budget_left) at=$SECONDS"\n' "${testdir}/testlib.sh" \
-    >"$tmp/98_left.test"
-# Exact, against the clock the child itself read: a tolerance would pass a wrong epoch.
+printf '. "%s"\nsleep 2\nat=$SECONDS\nleft=$(budget_left)\necho "left=$left at=$at at2=$SECONDS"\n' \
+    "${testdir}/testlib.sh" >"$tmp/98_left.test"
+# Bracketed by the child's own clock either side of the call, not a tolerance:
+# SECONDS floors, so a read that straddles a tick is one high and nothing is wrong.
 HTTRACK_TEST_TIMEOUT=60 bash "$driver" "$tmp/98_left.test" >"$out" 2>&1
 got=$(sed -n 's/^left=\([0-9][0-9]*\) .*/\1/p' "$out")
-at=$(sed -n 's/^left=[0-9][0-9]* at=\([0-9][0-9]*\)$/\1/p' "$out")
-case "$got$at" in '' | *[!0-9]*) fail "a 60s budget printed '$(cat "$out")'" ;; esac
-test "$got" -eq "$((60 - at))" ||
-    fail "a 60s budget left $got with $at gone, want $((60 - at))"
+at=$(sed -n 's/^left=[0-9][0-9]* at=\([0-9][0-9]*\) .*/\1/p' "$out")
+at2=$(sed -n 's/^left=[0-9][0-9]* at=[0-9][0-9]* at2=\([0-9][0-9]*\)$/\1/p' "$out")
+case "$got$at$at2" in '' | *[!0-9]*) fail "a 60s budget printed '$(cat "$out")'" ;; esac
+if test "$got" -gt "$((60 - at))" || test "$got" -lt "$((60 - at2))"; then
+    fail "a 60s budget left $got with $at to $at2 gone, want $((60 - at2))..$((60 - at))"
+fi
 HTTRACK_TEST_TIMEOUT=0 bash "$driver" "$tmp/98_left.test" >"$out" 2>&1
 grep -q '^left=0 ' "$out" || fail "a disabled guard left '$(cat "$out")', want 0"
 # Never 0 on an exhausted budget: a child would read that as the guard being off.
