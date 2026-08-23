@@ -50,7 +50,12 @@ ok "the write failure is reported as a disk problem"
 if grep -qE 'Retry after error.*diskfull/big\.bin' <<<"$log"; then
     fail "the full disk was retried as if the network had dropped: ${log}"
 fi
-ok "it is not retried as a network error"
+# The body is short because the writes failed, and the length check used to
+# relabel it as a lost connection.
+if grep -q 'Incorrect length' <<<"$log"; then
+    fail "the full disk is still reported as a truncated download: ${log}"
+fi
+ok "it is not retried, nor relabelled a truncated download"
 
 grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
     fail "the mirror carried on past the full disk, purge armed: ${log}"

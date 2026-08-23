@@ -2443,7 +2443,7 @@ void host_ban(httrackp * opt, int ptr,
         DEBUG_W("host control: deletehttp\n");
 #endif
         back[i].status = 0;     // terminé
-        back_set_finished(sback, i);
+        back_set_finished(opt, sback, i);
         if (back[i].r.soc != INVALID_SOCKET)
           deletehttp(&back[i].r);
         back[i].r.soc = INVALID_SOCKET;
