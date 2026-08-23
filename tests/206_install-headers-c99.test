@@ -10,6 +10,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+skip_if_emulated "a dialect sweep says nothing about the target: 205 still compiles these headers against this arch's config.h"
+
 # Unset means no automake run (the Windows job runs the scripts directly), so
 # there is no install rule to drive.
 if [ -z "${abs_top_builddir:-}" ]; then

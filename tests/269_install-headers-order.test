@@ -16,6 +16,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+skip_if_emulated "include order says nothing about the target: 205 still compiles these headers against this arch's config.h"
+
 if [ -z "${abs_top_builddir:-}" ]; then
     echo "abs_top_builddir unset, no automake environment, skipping" >&2
     exit 77
