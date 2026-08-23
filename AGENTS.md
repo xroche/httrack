@@ -127,6 +127,11 @@ Before pushing, and when reviewing others, don't skim for bugs:
 - **Audit tests against the spec, not the code.** For each new test ask: "what
   buggy path would still pass this?" If you can build one, the test is
   confirmation-biased: assertions copied from observed output lock bugs in.
+- **A green suite is not evidence the old behavior was chosen.** A test can be
+  written from the same mental model as the code and pin the defect as
+  intended: `htsdns_selftest.c` asserted the never-re-resolve bug #1392 fixes,
+  and a purge guard firing on any dead link passed all 372 tests. When a fix
+  makes you invert an existing assertion, that inversion is the finding.
 - **Risk areas need runtime probes.** Touching hostile-input parsing, struct
   layout/ABI, cache/wire format, or a security path? A static or unit check
   isn't enough; exercise the wrong behavior at runtime. Claude Code:
