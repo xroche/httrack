@@ -4348,7 +4348,7 @@ int hts_mirror_wait_for_next_file(htsmoduleStruct * str,
                     back[i].r.statuscode = STATUSCODE_INVALID;
                     strcpybuff(back[i].r.msg, "Cancelled by User");
                     back[i].status = 0; // terminé
-                    back_set_finished(sback, i);
+                    back_set_finished(opt, sback, i);
                   } else        // cancel ftp.. flag à 1
                     back[i].stop_ftp = 1;
                 }

@@ -115,7 +115,7 @@ int back_unserialize(FILE * fp, lien_back ** dst);
 int back_serialize_ref(httrackp * opt, const lien_back * src);
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst);
-void back_set_finished(struct_back * sback, const int p);
+void back_set_finished(httrackp *opt, struct_back *sback, const int p);
 void back_set_locked(struct_back * sback, const int p);
 void back_set_unlocked(struct_back * sback, const int p);
 int back_delete(httrackp * opt, cache_back * cache, struct_back * sback,

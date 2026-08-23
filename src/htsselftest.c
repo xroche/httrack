@@ -6296,6 +6296,28 @@ static size_t st_structcheck_longpath(char *dst, size_t dstsize,
   return n;
 }
 
+/* filesave() reports a write failure only through its close, and its one crawl
+   caller is unreachable: <doomed> is a save name that cannot take the bytes. */
+static int st_filesave(httrackp *opt, int argc, char **argv) {
+  static const char body[] = "DISKFULL-FILESAVE";
+  const int len = (int) sizeof(body) - 1;
+  int rc, err;
+
+  if (argc < 2) {
+    fprintf(stderr, "usage: -#test=filesave <doomed-save> <control-save>\n");
+    return 1;
+  }
+  errno = 0;
+  rc = filesave(opt, body, len, argv[0], "127.0.0.1", "/x.bin");
+  err = errno;
+  assertf(rc == -1);
+  assertf(err == ENOSPC);
+  /* control: the same call succeeds on a name that can take the bytes */
+  assertf(filesave(opt, body, len, argv[1], "127.0.0.1", "/x.bin") == 0);
+  printf("filesave: refused with ENOSPC, control saved\n");
+  return 0;
+}
+
 /* The path guard, and the <name>.txt rename structcheck() performs when a
    regular file sits where a directory has to go (#745). */
 static int st_structcheck(httrackp *opt, int argc, char **argv) {
@@ -12105,6 +12127,8 @@ static const struct selftest_entry {
     {"structcheck", "<dir>",
      "structcheck path guard and the <name>.txt rename it performs",
      st_structcheck},
+    {"filesave", "<doomed-save> <control-save>",
+     "filesave() reports a failing close, errno intact", st_filesave},
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
