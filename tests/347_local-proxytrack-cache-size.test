@@ -1,0 +1,98 @@
+#!/bin/bash
+# X-Size rides the cache as a signed 64-bit value, and the proxy hands it to
+# malloc(): a negative one becomes SIZE_MAX and the body inflates into the
+# 1-byte allocation that follows. Cases mirror htscache_selftest.c's.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+bad_size='Bad Size'   # the reader's verdict on a size it refuses
+at_int_max=2147483647 # the >= boundary: the zip write API takes an int
+over_int_max=2147483648
+
+BODY='<html>hi</html>'
+# a forged X-Size must keep the block's byte length, which the zip's extra-field
+# header declares, so give the writer a long field to overwrite
+etag=$(printf '%0.sE' $(seq 1 60))
+etagline="Etag: \"$etag\""
+printf 'HTTP/1.0 200 OK\r\nContent-type: text/html\r\nEtag: "%s"\r\nContent-length: %d\r\n\r\n' \
+    "$etag" ${#BODY} >"$dir/hdr"
+printf '%s' "$BODY" >"$dir/body"
+{
+    arc_filedesc
+    arc_record http://example.com/p.html text/html 200 "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+proxytrack --convert "$dir/good.zip" "$dir/in.arc" >/dev/null 2>&1 ||
+    fail "proxytrack died writing the cache"
+
+# overwrite a literal in place; same length, so every zip offset still holds
+poke() {
+    local file=$1 needle=$2 repl=$3 offs
+    test ${#needle} -eq ${#repl} ||
+        fail "poke: '$needle' and the replacement differ in length"
+    offs=$(grep -abo -F -- "$needle" "$file") || fail "poke: '$needle' not in $file"
+    # a second hit would leave the others in place and forge nothing
+    test "$(printf '%s\n' "$offs" | wc -l)" -eq 1 ||
+        fail "poke: '$needle' is not unique in $file"
+    printf '%s' "$repl" |
+        dd of="$file" bs=1 seek="${offs%%:*}" conv=notrunc 2>/dev/null
+}
+
+# the parser keeps the last X-Size seen, so the forged line replaces the Etag;
+# the colon-free pad after it is skipped, restoring the block's length
+forge_size() {
+    local out=$1 value=$2 line pad
+    cp "$dir/good.zip" "$out"
+    line="X-Size: $value"$'\r\n'
+    pad=$(printf "%$((${#etagline} - ${#line}))s" '' | tr ' ' 'E')
+    poke "$out" "$etagline" "$line$pad"
+}
+
+read_back() {
+    proxytrack --convert "$dir/out.arc" "$1" >/dev/null 2>&1 ||
+        fail "proxytrack died reading $1"
+}
+
+# control: without it, a fix that rejected every entry would pass the rest
+read_back "$dir/good.zip"
+grep -qF "$BODY" "$dir/out.arc" || fail "an untouched cache lost its body"
+
+forge_size "$dir/neg.zip" -1
+read_back "$dir/neg.zip"
+grep -q "$bad_size" "$dir/out.arc" || fail "a negative X-Size was accepted"
+if grep -qF "$BODY" "$dir/out.arc"; then
+    fail "a negative X-Size still returned a body"
+fi
+
+# in-zip data cannot exceed what the 32-bit zip write API stored, and INT_MAX
+# itself is out: reading it back would overflow the (int) the reader passes
+for value in "$over_int_max" "$at_int_max"; do
+    forge_size "$dir/big-$value.zip" "$value"
+    read_back "$dir/big-$value.zip"
+    grep -q "$bad_size" "$dir/out.arc" ||
+        fail "an in-cache X-Size of $value was accepted"
+done
+
+# a headers-only entry legitimately claims >2GB, and refusing it would re-fetch
+# that file on every update; a negative one is still corrupt
+forge_size "$dir/hdronly.zip" "$over_int_max"
+poke "$dir/hdronly.zip" 'X-In-Cache: 1' 'X-In-Cache: 0'
+read_back "$dir/hdronly.zip"
+if grep -q "$bad_size" "$dir/out.arc"; then
+    fail "a headers-only X-Size of $over_int_max was refused"
+fi
+
+forge_size "$dir/hdrneg.zip" -1
+poke "$dir/hdrneg.zip" 'X-In-Cache: 1' 'X-In-Cache: 0'
+read_back "$dir/hdrneg.zip"
+grep -q "$bad_size" "$dir/out.arc" ||
+    fail "a headers-only negative X-Size was accepted"
+
+exit 0
