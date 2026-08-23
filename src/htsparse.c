@@ -3554,20 +3554,20 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
   return strcasecmp(n_fil, pn_fil) == 0;
 }
 
-/* Could this link have carried links of its own? Its own answer first, then
-   what the previous run recorded for it, then the name it saved it under. */
+/* Could this link have carried links of its own? What the previous run
+   recorded decides, since the files at risk are the ones it wrote, and a
+   content type on an error reply describes the error page. Failing that, this
+   reply, then the name the link was saved under. */
 static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
                                             const htsblk *r, const char *adr,
                                             const char *fil, const char *save) {
+  const htsblk prev = cache_read_including_broken(opt, cache, adr, fil, NULL);
+
+  if (prev.statuscode > 0 && strnotempty(prev.contenttype))
+    return is_hypertext_mime(opt, prev.contenttype, save) ? HTS_TRUE
+                                                          : HTS_FALSE;
   if (strnotempty(r->contenttype))
     return is_hypertext_mime(opt, r->contenttype, fil) ? HTS_TRUE : HTS_FALSE;
-  {
-    const htsblk prev = cache_read_including_broken(opt, cache, adr, fil, NULL);
-
-    if (prev.statuscode > 0 && strnotempty(prev.contenttype))
-      return is_hypertext_mime(opt, prev.contenttype, save) ? HTS_TRUE
-                                                            : HTS_FALSE;
-  }
   return ishtml(opt, save) == 1 ? HTS_TRUE : HTS_FALSE;
 }
 
@@ -3821,6 +3821,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
       }
     } else if (r->statuscode != HTTP_OK) {
       int can_retry = 0;
+      hts_boolean banned = HTS_FALSE;
 
       // cas où l'on peut reessayer
       switch (r->statuscode) {
@@ -3828,6 +3829,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
         if (opt->hostcontrol) { // timeout et retry épuisés
           if ((opt->hostcontrol & HTS_HOSTCONTROL_BAN_TIMEOUT) &&
               (heap(ptr)->retry <= 0)) {
+            banned = HTS_TRUE;
             hts_log_print(opt, LOG_DEBUG, "Link banned: %s%s", urladr(), urlfil());
             host_ban(opt, ptr, sback, jump_identification_const(urladr()));
             hts_log_print(opt, LOG_DEBUG,
@@ -3841,6 +3843,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
       case STATUSCODE_SLOW:
         if ((opt->hostcontrol) && (heap(ptr)->retry <= 0)) {   // too slow
           if (opt->hostcontrol & HTS_HOSTCONTROL_BAN_SLOW) {
+            banned = HTS_TRUE;
             hts_log_print(opt, LOG_DEBUG, "Link banned: %s%s", urladr(), urlfil());
             host_ban(opt, ptr, sback, jump_identification_const(urladr()));
             hts_log_print(opt, LOG_DEBUG,
@@ -3927,9 +3930,13 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
             }
           }
 
-          /* The page failed every retry before it could be parsed, so its
-             links are missing from new.lst though the site still has them. */
-          if (can_retry && !heap(ptr)->testmode &&
+          /* Nothing here says the site dropped the links this page carries:
+             it ran out of retries, its host was banned, or a size cap cut the
+             transfer, all before the parser could queue them. */
+          const hts_boolean unanswered =
+              can_retry || banned || r->statuscode == STATUSCODE_TOO_BIG;
+
+          if (unanswered && !heap(ptr)->testmode &&
               hts_link_may_carry_links(opt, cache, r, urladr(), urlfil(),
                                        savename())) {
             opt->links_unqueued = HTS_TRUE;

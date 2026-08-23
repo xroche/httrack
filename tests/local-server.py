@@ -1219,10 +1219,26 @@ class Handler(SimpleHTTPRequestHandler):
     HUBFAIL_CHILD = b"<html><body><p>HUBFAIL-CHILD-%d</p></body></html>"
 
     def route_hubfail_index(self):
-        links = '\t<a href="hub.html">hub</a>\n\t<a href="leaf.html">leaf</a>\n'
-        if self.refetch_pass() <= 2:  # dropped for the third crawl only
+        crawl = self.refetch_pass()
+        links = '\t<a href="hub.html">hub</a>\n' '\t<a href="leaf.html">leaf</a>\n'
+        if crawl <= 2:  # gone.html leaves the site for the third crawl
             links += '\t<a href="gone.html">gone</a>\n'
+        if crawl >= 3:  # neither of these may hold the third crawl's purge
+            links += (
+                '\t<a href="missing.html">missing</a>\n'
+                '\t<a href="dead.bin">dead</a>\n'
+            )
         self.send_html(links)
+
+    # Control: the site answers, and its answer is that the page is gone. The
+    # third crawl must still purge with this in it.
+    def route_hubfail_missing(self):
+        self.send_error(404)
+
+    # Control: fails like the hub, but nothing it could carry was ever
+    # mirrored, so it must not hold the purge either.
+    def route_hubfail_dead(self):
+        self.send_cut_headers()
 
     # Cuts off both attempts of the caller's second crawl (the request and the
     # one retry --retries=1 buys), then answers again, so the third crawl can
@@ -1243,8 +1259,8 @@ class Handler(SimpleHTTPRequestHandler):
     def route_hubfail_leaf(self):
         self.send_raw(b"<html><body><p>HUBFAIL-LEAF</p></body></html>", "text/html")
 
-    # Control: the index stops linking it on the third crawl, the one where
-    # nothing fails, so that crawl must purge it.
+    # Control: the index stops linking it on the third crawl, where nothing
+    # that failed ever carried links, so that crawl must purge it.
     def route_hubfail_gone(self):
         self.send_raw(b"<html><body><p>HUBFAIL-GONE</p></body></html>", "text/html")
 
@@ -2803,6 +2819,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/hubfail/child2.html": route_hubfail_child,
         "/hubfail/leaf.html": route_hubfail_leaf,
         "/hubfail/gone.html": route_hubfail_gone,
+        "/hubfail/missing.html": route_hubfail_missing,
+        "/hubfail/dead.bin": route_hubfail_dead,
         "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,

@@ -2,8 +2,9 @@
 #
 # A page that fails to re-fetch on --update keeps its copy (#746), but its
 # children were never queued, so the purge unlinked them. hub.html, their only
-# parent, hangs up on pass 2. gone.html leaves the site on pass 3, where
-# nothing fails: purging it there says the purge was held back, not disabled.
+# parent, hangs up on pass 2. Pass 3 pins the other direction: a 404 and a
+# failed .bin carry nothing that was ever mirrored, so they must not hold the
+# purge, and gone.html goes.
 
 set -euo pipefail
 
@@ -51,13 +52,17 @@ grep -q 'keeping all previously mirrored files' <<<"$log" ||
     fail "the deferred purge went unreported: ${log}"
 ok "the run says it kept everything"
 
-# --- pass 3: nothing fails, so the purge runs again -------------------------
-local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --update \
+# --- pass 3: what fails carries nothing, so the purge runs ------------------
+# missing.html is a 404 and dead.bin hangs up; neither was ever a page holding
+# mirrored links, so neither may hold the purge back.
+local_crawl --log "${tmpdir}/log3" "${common[@]}" --changes -O "$out" --update \
     "${BASEURL}/hubfail/index.html"
 
 for name in hub child1 child2 leaf; do
     test -s "${site}/${name}.html" || fail "${name}.html was purged by pass 3"
 done
 test ! -e "${site}/gone.html" ||
-    fail "gone.html left the site and the crawl that scanned it all kept it"
-ok "a crawl that scanned the whole site still purges"
+    fail "gone.html left the site and a crawl that scanned it all kept it"
+grep -q '"purged": true' "${out}/hts-changes.json" ||
+    fail "the report denies a purge that happened: $(<"${out}/hts-changes.json")"
+ok "a 404 and a failed download do not hold the purge back"
