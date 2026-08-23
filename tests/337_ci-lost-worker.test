@@ -281,4 +281,20 @@ report "$tmp/out"
 grep -q '::error title=workers lost with no status::' <<<"$out" ||
     fail "the counter read the suite's own console as clean: $out"
 
+# A loss alongside a real failure: the failure decides, or a red ships as a leg to
+# repeat and nobody investigates it.
+stage "$tmp/mixed" "$killer"
+stub "$tmp/mixed/900_zlib-pass.test" 3
+run_suite "$tmp/mixed"
+case "$(<"$share/killed")" in
+none*) fail "the mixed stub killed no worker: $(<"$share/killed")" ;;
+esac
+grep -q '^LOST 906_engine-lost.test (worker left no status; ' "$tmp/out" ||
+    fail "the vanished worker was not reported beside the failure: $(<"$tmp/out")"
+grep -q '::error::failing: 900_zlib-pass.test' "$tmp/out" ||
+    fail "the failing test was not named: $(<"$tmp/out")"
+test "$rc" -eq 1 ||
+    fail "a failure alongside a loss exited $rc, want 1: $(<"$tmp/out")"
+ok "a real failure outranks a lost worker"
+
 echo "lost-worker classification OK"
