@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# gcc's UBSan ignores log_path and reports on stderr, which most tests discard,
+# so the harness keeps a copy (sanitizer-stderr-wrap.sh). Both halves matter: the
+# copy is kept, and what the test itself reads is untouched.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+wrap="${testdir}/sanitizer-stderr-wrap.sh"
+[ -r "$wrap" ] || fail "no $wrap"
+report="${testdir}/../tools/ci-sanitizer-report.sh"
+[ -r "$report" ] || fail "no $report"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+cap=$tmp/cap
+export HTTRACK_STDERR_CAPTURE_TAG=342_probe
+
+# run_wrapped SHELL_SNIPPET -- the wrapped program is a shell, so a case can
+# write to either stream and pick its own exit status.
+sh_run=${BASH_SHELL:-bash}
+run_wrapped() { "$sh_run" "$wrap" /bin/sh -c "$1"; }
+
+# 1. Capture off: nothing is created, and the shim is a bare exec.
+rc=0
+out=$(
+    unset HTTRACK_STDERR_CAPTURE_DIR # the sanitizer leg exports its own
+    run_wrapped 'echo out; echo err >&2; exit 3' 2>"$tmp/off.err"
+) || rc=$?
+assert_eq 3 "$rc" "exit status without capture"
+assert_eq out "$out" "stdout without capture"
+assert_eq err "$(cat "$tmp/off.err")" "stderr without capture"
+[ ! -e "$cap" ] || fail "capture directory created while capture was off"
+
+export HTTRACK_STDERR_CAPTURE_DIR=$cap
+
+# 2. The case this exists for: stderr discarded, the copy survives anyway.
+run_wrapped 'echo "runtime error: store to address 0x1 with insufficient space" >&2' 2>/dev/null
+grep -rq 'insufficient space' "$cap" || fail "a discarded UBSan report left no copy"
+copies=("$cap"/342_probe.*.log)
+[ -e "${copies[0]}" ] || fail "the copy is not named after the test: $(echo "$cap"/*)"
+
+# 3. Passthrough, both streams, plus the exit status the caller reads.
+rc=0
+out=$(run_wrapped 'echo out; echo err-passed >&2; exit 7' 2>"$tmp/on.err") || rc=$?
+assert_eq 7 "$rc" "exit status under capture"
+assert_eq out "$out" "stdout under capture"
+assert_eq err-passed "$(cat "$tmp/on.err")" "stderr under capture"
+grep -rq err-passed "$cap" || fail "the copy missed a passed-through line"
+grep -rq '^out$' "$cap" && fail "stdout leaked into the capture"
+
+# 4. The collector reads the copies, and says so only when one carries a finding.
+logs=$tmp/logs
+mkdir -p "$logs"
+"$sh_run" "$report" -s "$cap" "$logs" >"$tmp/hit.out" 2>&1 && fail "the collector missed the report"
+grep -q 'insufficient space' "$tmp/hit.out" || fail "the collector did not print the finding: $(cat "$tmp/hit.out")"
+
+rm -rf "$cap"
+run_wrapped 'echo ordinary chatter >&2' 2>/dev/null
+"$sh_run" "$report" -s "$cap" "$logs" >"$tmp/clean.out" 2>&1 ||
+    fail "the collector reddened a clean run: $(cat "$tmp/clean.out")"
+grep -q 'ordinary chatter' "$tmp/clean.out" && fail "the collector printed a clean capture"
+
+# 4b. A directory that is not there is the wiring having moved, and scanning
+# nothing must not read as a clean run.
+: >"$tmp/plainfile"
+for bad in "$tmp/absent" "$tmp/plainfile"; do
+    rc=0
+    "$sh_run" "$report" -s "$bad" "$logs" >"$tmp/bad.out" 2>&1 || rc=$?
+    assert_eq 2 "$rc" "collector took -s $bad"
+    rc=0
+    "$sh_run" "$report" -s "$cap" "$bad" >"$tmp/bad.out" 2>&1 || rc=$?
+    assert_eq 2 "$rc" "collector took a log dir of $bad"
+done
+
+# 5. The generated shim runs the real engine, PATH-first, with stdout intact.
+[ -n "${HTTRACK_STDERR_WRAP_DIR:-}" ] || skip "HTTRACK_STDERR_WRAP_DIR unset, no automake environment"
+[ -r "$HTTRACK_STDERR_WRAP_DIR/httrack" ] || fail "no generated shim in $HTTRACK_STDERR_WRAP_DIR"
+PATH="$HTTRACK_STDERR_WRAP_DIR:$PATH"
+# Leaks at exit would _exit() past the flush of the pipe this reads, as the CI
+# job's own detect_leaks=0 says; last value wins in the flag parser.
+version=$(ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=0" \
+    httrack --version 2>/dev/null) || true
+case $version in
+"HTTrack version "*) ;;
+*) fail "the engine through the shim printed [$version]" ;;
+esac

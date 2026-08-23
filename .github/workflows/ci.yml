@@ -561,12 +561,14 @@ jobs:
         # buffers; free_fill flags use-after-free reads.
         env:
           ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647:log_path=${{ github.workspace }}/sanitizer-logs/asan
-          # No log_path here: gcc's UBSan ignores it and writes to stderr, so
-          # its findings show up in the per-test logs instead.
+          # No log_path here: gcc's UBSan ignores it and writes to stderr, which
+          # most tests redirect away; the harness keeps a copy under the directory
+          # below.
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
         timeout-minutes: 20
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
           jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           make check -j"$jobs"
 
@@ -578,7 +580,8 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          sh tools/ci-sanitizer-report.sh "$GITHUB_WORKSPACE/sanitizer-logs" tests
+          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
+            "$GITHUB_WORKSPACE/sanitizer-logs" tests
 
       - name: Upload the sanitizer and per-test logs
         if: always()
@@ -587,6 +590,7 @@ jobs:
           name: sanitize-logs
           path: |
             sanitizer-logs/
+            sanitizer-stderr/
             tests/*.log
           if-no-files-found: ignore
 
@@ -625,10 +629,11 @@ jobs:
       - name: Test (offline self-tests under MSan)
         env:
           MSAN_OPTIONS: abort_on_error=1:halt_on_error=1:log_path=${{ github.workspace }}/sanitizer-logs/msan
+          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
         timeout-minutes: 20
         run: |
           set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
           # 01_engine-* only; zlib-dependent self-tests are named 01_zlib-* and
           # skipped here (uninstrumented libz floods MSan with false positives).
           tests="$(cd tests && ls 01_engine-*.test | tr '\n' ' ')"
@@ -643,7 +648,8 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          sh tools/ci-sanitizer-report.sh "$GITHUB_WORKSPACE/sanitizer-logs" tests
+          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
+            "$GITHUB_WORKSPACE/sanitizer-logs" tests
 
       - name: Upload the sanitizer and per-test logs
         if: always()
@@ -652,6 +658,7 @@ jobs:
           name: msan-logs
           path: |
             sanitizer-logs/
+            sanitizer-stderr/
             tests/*.log
           if-no-files-found: ignore
 
