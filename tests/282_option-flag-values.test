@@ -103,6 +103,31 @@ while read -r class name; do
     done
 done <<<"${rows}"
 
+# A name may appear twice and the first row wins, so a wrong class on the first
+# row silently shadows the right one: --structure took its template as a URL
+# because -N was classed "param", which glues the value onto the short form.
+for name in $(awk '{print $2}' <<<"${rows}" | sort | uniq -d); do
+    n=$(awk -v k="${name}" '$2 == k {print $1}' <<<"${rows}" | sort -u | grep -c .)
+    test "${n}" -eq 1 ||
+        fail "--${name} has ${n} classes in the table; the first row silently wins"
+done
+
+# An option whose value is not a number must reach the engine as its own argv
+# word, or the engine never consumes it and it becomes a URL.
+for name in structure user-structure; do
+    crawl "--${name}" '%h%p/%n%q.%t'
+    grep -q -- '-N %h%p/%n%q\.%t' "${tmp}/out/hts-cache/doit.log" ||
+        fail "--${name} did not pass its template to -N as a separate word"
+done
+
+# The file-list synonyms share a short option, so they must share its class.
+: >"${tmp}/urls.txt"
+for name in list filelist urllist filterlist; do
+    crawl "--${name}=${tmp}/urls.txt"
+    ! grep -q 'Syntax error' "${tmp}/out/.log" ||
+        fail "--${name}=FILE is refused, but its synonym takes the same value"
+done
+
 # Non-circular control on the classes, since the sweep above reads the table it
 # is checking: every --name=0 the wizard writes has to be a row that takes a
 # value, or the flag means the opposite of the box (#1195, #1200).
