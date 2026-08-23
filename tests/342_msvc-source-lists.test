@@ -9,7 +9,9 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+# the MSVC job runs the scripts with no automake around them
+[ -n "${abs_top_srcdir:-}" ] || skip "abs_top_srcdir unset, no automake environment"
+top=${abs_top_srcdir}
 am="$top/src/Makefile.am"
 test -r "$am" || fail "no $am"
 

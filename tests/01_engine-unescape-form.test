@@ -9,12 +9,16 @@ grep -q "unescape-form self-test OK" <<<"$out"
 
 # Guard against the duplication coming back: only htsencoding.h may define the
 # hex helpers the server and the engine share. This catches a copied block, not
-# a renamed one.
-srcdir="${abs_top_srcdir:?not run under make check}"
-dups=$(grep -rlE '^[A-Za-z_].*[^a-z_](ehexh|get_hex_value) *\(' \
-    "${srcdir}/src" --include='*.c' --include='*.h' |
-    grep -v -x -F "${srcdir}/src/htsencoding.h" || true)
-[ -z "$dups" ] || {
-    echo "private copy of the escape decoder is back: $dups"
-    exit 1
-}
+# a renamed one. The MSVC job runs the scripts with no automake around them, so
+# it gets the self-test above and not this.
+if [ -n "${abs_top_srcdir:-}" ]; then
+    dups=$(grep -rlE '^[A-Za-z_].*[^a-z_](ehexh|get_hex_value) *\(' \
+        "${abs_top_srcdir}/src" --include='*.c' --include='*.h' |
+        grep -v -x -F "${abs_top_srcdir}/src/htsencoding.h" || true)
+    [ -z "$dups" ] || {
+        echo "private copy of the escape decoder is back: $dups"
+        exit 1
+    }
+else
+    echo "abs_top_srcdir unset: the single-definition check did not run" >&2
+fi
