@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# filesave() reports a write failure only through its fclose, and its one crawl
+# caller is a cache-recovery path no crawl reaches: drive it directly.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# The engine is a native binary and the shell is MSYS, so a symlink the shell
+# writes through as /dev/full is a plain file to it.
+skip_on_windows "a native binary does not follow an MSYS symlink to /dev/full"
+test -c /dev/full || skip "no /dev/full device"
+
+dir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_filesave.XXXXXX")
+cleanup_push rm -rf "$dir"
+
+doomed="${dir}/doomed.bin"
+ln -s /dev/full "$doomed" 2>/dev/null || skip "cannot symlink /dev/full"
+# Probe the mechanism, not the node: macOS links to a missing /dev/full happily.
+if printf x >"$doomed" 2>/dev/null; then
+    skip "a write through /dev/full succeeds here, so it stands in for nothing"
+fi
+
+assert_selftest "filesave: refused with ENOSPC, control saved" \
+    filesave "$doomed" "${dir}/control.bin"

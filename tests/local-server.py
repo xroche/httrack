@@ -1215,8 +1215,9 @@ class Handler(SimpleHTTPRequestHandler):
     # 256 KB: past stdio's buffer, so the write itself reaches the disk.
     DISKFULL_BIN = b"DISKFULL\n" + b"\x41\x42\x43\x44" * 65536
 
+    # tiny.bin first, so the arm that dooms big.bin has a mirrored file to keep.
     def route_diskfull_index(self):
-        self.send_html('\t<a href="big.bin">big</a>\n\t<a href="tiny.bin">tiny</a>\n')
+        self.send_html('\t<a href="tiny.bin">tiny</a>\n\t<a href="big.bin">big</a>\n')
 
     # 12 bytes: stdio holds them, so only the close reports the full disk.
     def route_diskfull_tiny(self):
@@ -1231,6 +1232,58 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_diskfull_big(self):
         self.send_raw(self.DISKFULL_BIN, "application/octet-stream")
+
+    # 8000 bytes: one read completes the body and its write fails, the size the
+    # engine used to relaunder into a clean EOF.
+    def route_diskfull_midindex(self):
+        self.send_html('\t<a href="mid.bin">mid</a>\n')
+
+    def route_diskfull_mid(self):
+        self.send_raw(b"M" * 8000, "application/octet-stream")
+
+    # Same body, chunked: the failing write lands on the read that completes a
+    # chunk, where r.size reaching the chunk end used to erase the error.
+    def route_diskfull_chunkedindex(self):
+        self.send_html('\t<a href="chunked.bin">chunked</a>\n')
+
+    def route_diskfull_chunked(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        body = b"C" * 4097
+        for i in range(0, len(body), 1500):
+            chunk = body[i : i + 1500]
+            self.wfile.write(b"%X\r\n" % len(chunk) + chunk + b"\r\n")
+            self.wfile.flush()
+        self.wfile.write(b"0\r\n\r\n")
+        self.close_connection = True
+
+    # 100 bytes then an endless stall: stdio holds them, so the interrupted
+    # slot's close is the only place the full disk can surface.
+    def route_diskfull_stallindex(self):
+        self.send_html('\t<a href="stall.bin">stall</a>\n')
+
+    def route_diskfull_stall(self):
+        counter = os.environ.get("DISKFULL_COUNTER")
+        if counter:
+            with open(counter, "a") as fp:
+                fp.write("x")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", "100000")  # never delivered
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(b"S" * 100)
+            self.wfile.flush()
+            try:
+                while True:
+                    time.sleep(3600)
+            except OSError:
+                pass
 
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
@@ -2786,6 +2839,12 @@ class Handler(SimpleHTTPRequestHandler):
         "/diskfull/tiny.bin": route_diskfull_tiny,
         "/diskfull/smallindex.html": route_diskfull_smallindex,
         "/diskfull/small.html": route_diskfull_small,
+        "/diskfull/midindex.html": route_diskfull_midindex,
+        "/diskfull/mid.bin": route_diskfull_mid,
+        "/diskfull/chunkedindex.html": route_diskfull_chunkedindex,
+        "/diskfull/chunked.bin": route_diskfull_chunked,
+        "/diskfull/stallindex.html": route_diskfull_stallindex,
+        "/diskfull/stall.bin": route_diskfull_stall,
         "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,

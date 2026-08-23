@@ -3569,7 +3569,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             retour_fread = READ_EOF;    // interruption ou annulation interne (peut ne pas être une erreur)
 
           // Si réception chunk, tester si on est pas à la fin!
-          if (back[i].status == 1) {
+          /* Skipped on a fatal write error: these completion tests read r.size,
+             which counts bytes read, and would relaunder the error into EOF. */
+          if (back[i].status == 1 &&
+              back[i].r.statuscode != STATUSCODE_IO_FATAL) {
             if (back[i].is_chunk) {     // attendre prochain chunk
               if (back[i].r.size == back[i].r.totalsize) { // fin chunk!
                 back[i].status = STATUS_CHUNK_CR;       /* fetch ending CRLF */

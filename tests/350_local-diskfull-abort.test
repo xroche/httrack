@@ -32,16 +32,20 @@ fi
 rm -f "$probe"
 
 common=(--quiet --disable-security-limits --robots=0 --retries=2 -c1 --timeout=20)
-local_server_start --log "${tmpdir}/server.log"
+counter="${tmpdir}/stallhits" # a byte per stall.bin request, so we know when to interrupt
+local_server_start --log "${tmpdir}/server.log" --env DISKFULL_COUNTER="$counter"
 
-# Mirror $1 with $2 pointed at /dev/full, and leave its log in $log.
+# Mirror $1 with $2 pointed at /dev/full, and leave its log in $log. Anything
+# past $3 is extra httrack options.
 crawl_onto_full() {
-    local dir="${tmpdir}/$1" doomed="$2" entry="$3"
+    local name="$1" doomed="$2" entry="$3"
+    local dir="${tmpdir}/${name}"
     local site="${dir}/127.0.0.1_${SRV_PORT}/diskfull"
 
+    shift 3
     mkdir -p "$site"
     ln -s /dev/full "${site}/${doomed}"
-    local_crawl --log "${tmpdir}/log-$1" "${common[@]}" -O "$dir" \
+    local_crawl --log "${tmpdir}/log-${name}" "${common[@]}" "$@" -O "$dir" \
         "${BASEURL}/diskfull/${entry}"
     log=$(<"${dir}/hts-log.txt")
 }
@@ -65,6 +69,16 @@ grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
     fail "the mirror carried on past the full disk, purge armed: ${log}"
 ok "the mirror gives up and keeps every mirrored file"
 
+# Keeping the mirror is the point of the abort, so read the tree, not the log:
+# what preceded the full disk survives and the doomed name is still the symlink.
+site="${tmpdir}/stream/127.0.0.1_${SRV_PORT}/diskfull"
+test -s "${site}/index.html" || fail "the page mirrored before the abort was lost"
+grep -q DISKFULL-TINY "${site}/tiny.bin" ||
+    fail "the file mirrored before the abort was lost or truncated"
+test -L "${site}/big.bin" ||
+    fail "a truncated big.bin replaced the name the crawl wrote through"
+ok "the files mirrored before the abort survive it"
+
 # --- a page that fits in stdio's buffer: only the close fails ---------------
 crawl_onto_full page small.html smallindex.html
 grep -q 'Unable to write HTML file' <<<"$log" ||
@@ -80,3 +94,83 @@ grep -q 'disk full or filesystem problems' <<<"$log" ||
 grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
     fail "the mirror carried on past the full disk, purge armed: ${log}"
 ok "a small file that only fails on close is fatal too"
+
+# --- the body that one read completes: its write fails on that same read ------
+# Under 4 KB the fclose net catches this; past it only the read's own return
+# says anything, and r.size had already reached totalsize when the write failed.
+crawl_onto_full mid mid.bin midindex.html
+grep -q 'disk full or filesystem problems' <<<"$log" ||
+    fail "a body completed by the read whose write failed passed for an EOF: ${log}"
+grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
+    fail "the mirror carried on past the full disk, purge armed: ${log}"
+ok "a body whose last read is the failing write is fatal too"
+
+# Chunked, same shape: the chunk-end test next door erased the error outright.
+crawl_onto_full chunked chunked.bin chunkedindex.html
+grep -q 'disk full or filesystem problems' <<<"$log" ||
+    fail "a chunk completed by the read whose write failed passed for clean: ${log}"
+ok "the chunked path is fatal too"
+
+# --- and it is not re-reported as a truncated download -----------------------
+# --tolerant downgrades a length mismatch to a warning instead of rewriting the
+# status, which is where a disk-cut body would be blamed on the server instead.
+crawl_onto_full tolerant big.bin index.html --tolerant
+grep -q 'disk full or filesystem problems' <<<"$log" ||
+    fail "the tolerant crawl did not report the full disk: ${log}"
+if grep -q 'Incorrect length' <<<"$log"; then
+    fail "a body the disk cut short was also blamed on the server: ${log}"
+fi
+ok "a length mismatch the full disk caused is not reported as one"
+
+# --- a write error outside the fatal class must stay retryable ---------------
+# A pipe whose reader has gone gives EPIPE, which is about this file, not the
+# filesystem: the mirror must finish the rest rather than give up.
+epipe="${tmpdir}/epipe"
+epipesite="${epipe}/127.0.0.1_${SRV_PORT}/diskfull"
+mkdir -p "$epipesite"
+mkfifo "${epipesite}/big.bin"
+# Take one byte and close, so the next block the engine writes gets EPIPE.
+(head -c 1 <"${epipesite}/big.bin" >/dev/null 2>&1 || true) &
+reader=$!
+# --retries=0: a retry would re-open the fifo and block on a reader that is gone.
+local_crawl --log "${tmpdir}/log-epipe" "${common[@]}" --retries=0 -O "$epipe" \
+    "${BASEURL}/diskfull/index.html" || true
+kill "$reader" 2>/dev/null || true
+log=$(<"${epipe}/hts-log.txt")
+if grep -q 'disk full or filesystem problems' <<<"$log"; then
+    fail "a broken pipe was treated as a full disk: ${log}"
+fi
+if grep -q 'Mirror aborted' <<<"$log"; then
+    fail "a write error outside the fatal class gave up the whole mirror: ${log}"
+fi
+grep -q DISKFULL-TINY "${epipesite}/tiny.bin" ||
+    fail "the rest of the mirror did not survive a non-fatal write error"
+ok "a non-fatal write error leaves the mirror running"
+
+# --- an interrupted transfer: the slot's flush is the only close there is ----
+# 100 buffered bytes never reach the disk, so nothing fails until the stopped
+# slot is flushed on the way out.
+stall="${tmpdir}/stall"
+stallsite="${stall}/127.0.0.1_${SRV_PORT}/diskfull"
+mkdir -p "$stallsite"
+ln -s /dev/full "${stallsite}/stall.bin"
+crawlpid=
+kill_crawl() { test -z "$crawlpid" || kill -9 "$crawlpid" 2>/dev/null || true; }
+cleanup_push kill_crawl
+httrack "${common[@]}" --retries=0 -O "$stall" \
+    "${BASEURL}/diskfull/stallindex.html" >"${tmpdir}/log-stall" 2>&1 &
+crawlpid=$!
+for _ in $(seq 1 300); do
+    test -s "$counter" && break
+    kill -0 "$crawlpid" 2>/dev/null || break
+    sleep 0.1
+done
+test -s "$counter" || fail "the crawl never reached stall.bin; nothing was interrupted"
+sleep 0.5
+kill -TERM "$crawlpid" 2>/dev/null || true
+wait "$crawlpid" 2>/dev/null || true
+crawlpid=
+log=$(<"${stall}/hts-log.txt")
+grep -q 'Unable to write file .*stall\.bin' <<<"$log" ||
+    fail "the stopped slot's buffered bytes were dropped without a word: ${log}"
+ok "a slot flushed on the way out still reports the full disk"

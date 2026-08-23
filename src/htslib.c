@@ -2113,6 +2113,11 @@ LLint http_xfread1(htsblk * r, int bufl) {
       nl = tot_nl;
     }
   }
+  /* Ahead of the EOF test below: r->size is advanced above the fwrite that
+     failed, so a body completed by that very read would report a clean EOF. */
+  if (nl == READ_ERROR && r->statuscode == STATUSCODE_IO_FATAL) {
+    return READ_ERROR;
+  }
   // EOF
   if (r->totalsize >= 0 && r->size == r->totalsize) {
     return READ_EOF;
