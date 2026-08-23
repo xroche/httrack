@@ -8260,6 +8260,37 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
     err = 1;
   }
   UNLINK(fconv(catbuff, sizeof(catbuff), path));
+
+  /* The width has to survive all the way to the CDXJ text: 01_zlib-warc-cdx
+     covers the wiring, but only at offsets a 32-bit field would also hold. */
+  {
+    static const struct {
+      uint64_t length, offset;
+      const char *want;
+    } extents[] = {
+        {0, 0, ", \"length\": \"0\", \"offset\": \"0\""},
+        {4096, 4294967295ULL,
+         ", \"length\": \"4096\", \"offset\": \"4294967295\""},
+        {4294967296ULL, 4294967296ULL,
+         ", \"length\": \"4294967296\", \"offset\": \"4294967296\""},
+        {18446744073709551615ULL, 1099511627776ULL,
+         ", \"length\": \"18446744073709551615\", \"offset\": "
+         "\"1099511627776\""},
+    };
+
+    for (i = 0; i < sizeof(extents) / sizeof(extents[0]); i++) {
+      char got[WARC_CDX_EXTENT_SIZE];
+
+      got[0] = '\0';
+      if (warc_cdx_extent(got, sizeof(got), extents[i].length,
+                          extents[i].offset) < 0 ||
+          strcmp(got, extents[i].want) != 0) {
+        fprintf(stderr, "warc-offset: CDXJ extent is '%s', want '%s'\n", got,
+                extents[i].want);
+        err = 1;
+      }
+    }
+  }
   printf("warc-offset: %s\n", err ? "FAIL" : "OK");
   return err;
 }

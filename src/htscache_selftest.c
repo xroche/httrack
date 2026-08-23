@@ -2228,8 +2228,14 @@ int cache_savename_bounds_selftest(httrackp *opt, const char *dir) {
   return failures;
 }
 
-/* Store one entry through cache_zip_store_stream and hand back what the ZIP
-   holds for it: the byte count, or -1 if the store or the readback failed. */
+/* Poison bytes: CANARY fills the field a msg overrun would land in, FILL the
+   oversized reason string. Non-zero, so a stray NUL terminator shows up. */
+#define READFAIL_CANARY 'C'
+#define READFAIL_FILL 'W'
+
+/* Store one entry through cache_zip_store_stream, committing it only when the
+   store succeeded (what cache_add does). Hands back the bytes the ZIP holds for
+   it, or -1 when the entry is absent. */
 static int readfail_roundtrip(const char *path, FILE *src, int want_status,
                               char *out, size_t outsz) {
   zipFile zf = hts_zipOpen_utf8(path, APPEND_STATUS_CREATE);
@@ -2246,7 +2252,10 @@ static int readfail_roundtrip(const char *path, FILE *src, int want_status,
     return -1;
   }
   got = cache_zip_store_stream(zf, src);
-  zipCloseFileInZip(zf);
+  if (got == Z_OK)
+    zipCloseFileInZip(zf);
+  else
+    zipAbandonFileInZip(zf);
   zipClose(zf, NULL);
   if (got != want_status) {
     fprintf(stderr, "cache-readfail: status %d, want %d\n", got, want_status);
@@ -2265,18 +2274,76 @@ static int readfail_roundtrip(const char *path, FILE *src, int want_status,
   return n;
 }
 
-/* A short read is indistinguishable from EOF, so without the ferror() check the
-   loop commits a silently truncated body and reports success. */
+/* Store one is_write entry: cache_add re-reads the body from `save` itself. */
+static void readfail_store_file(httrackp *opt, cache_back *cache,
+                                const char *fil, const char *save,
+                                LLint declared) {
+  htsblk r;
+  char locbuf[4];
+
+  hts_init_htsblk(&r);
+  r.statuscode = 200;
+  r.size = declared;
+  strcpybuff(r.msg, "OK");
+  strcpybuff(r.contenttype, "application/octet-stream");
+  locbuf[0] = '\0';
+  r.location = locbuf;
+  r.is_write = 1;
+  cache_add(opt, cache, &r, "example.com", fil, save, 1, NULL);
+}
+
+/* Write `len` bytes of body at the fconv()-resolved `save`. */
+static int readfail_write_source(const char *save, const char *body,
+                                 size_t len) {
+  char catbuff[HTS_URLMAXSIZE * 2];
+  char *path = fconv(catbuff, sizeof(catbuff), save);
+  FILE *fp;
+
+  (void) structcheck(path);
+  fp = FOPEN(path, "wb");
+  if (fp == NULL)
+    return -1;
+  if (len != 0 && !hts_fwrite_exact(body, len, fp)) {
+    fclose(fp);
+    return -1;
+  }
+  fclose(fp);
+  return 0;
+}
+
+/* A source cache_add sizes and opens but cannot read: on Linux /proc/self/mem
+   is a regular zero-length file whose reads return EIO. NULL elsewhere, so the
+   case skips rather than assert on a branch it never reached. */
+static const char *readfail_unreadable_source(void) {
+  static const char path[] = "/proc/self/mem";
+  char catbuff[HTS_URLMAXSIZE * 2];
+  char probe[1];
+  FILE *fp;
+  int usable;
+
+  if (fsize_utf8(fconv(catbuff, sizeof(catbuff), path)) < 0)
+    return NULL;
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "rb");
+  if (fp == NULL)
+    return NULL;
+  usable = fread(probe, 1, sizeof(probe), fp) == 0 && ferror(fp) != 0;
+  fclose(fp);
+  return usable ? path : NULL;
+}
+
+/* A short read is indistinguishable from EOF, so a failed read must abandon the
+   entry: committing it would leave a truncated body under the X-Size the local
+   header already declares, which the reader then has to catch. */
 int cache_readfail_selftest(httrackp *opt, const char *dir) {
   static const char body[] = "cache-readfail body\x00\x01\x02 payload";
   const size_t body_len = sizeof(body) - 1;
   char zippath[HTS_URLMAXSIZE], srcpath[HTS_URLMAXSIZE];
   char catbuff[CATBUFF_SIZE];
   char out[256];
+  const char *unreadable = readfail_unreadable_source();
   FILE *fp;
   int fail = 0, n;
 
-  (void) opt;
   fconcat(zippath, sizeof(zippath), dir, "readfail.zip");
   fconcat(srcpath, sizeof(srcpath), dir, "readfail-src.bin");
 
@@ -2308,14 +2375,146 @@ int cache_readfail_selftest(httrackp *opt, const char *dir) {
     fail++;
   }
 
-  /* a write-only stream fails every read and sets the error indicator */
+  /* a write-only stream fails every read: the entry must not reach the ZIP */
   fp = FOPEN(fconv(catbuff, sizeof(catbuff), srcpath), "wb");
   assertf(fp != NULL);
   n = readfail_roundtrip(zippath, fp, CACHE_ZIP_READ_ERROR, out, sizeof(out));
   fclose(fp);
-  if (n != 0) {
-    fprintf(stderr, "cache-readfail: unreadable source stored %d byte(s)\n", n);
+  if (n != -1) {
+    fprintf(stderr, "cache-readfail: unreadable source left an entry (%d)\n",
+            n);
     fail++;
+  }
+
+  /* the real cache_add path: an unreadable body drops the whole entry, and the
+     failure streak is charged once per entry, not twice */
+  if (unreadable == NULL) {
+    fprintf(stderr,
+            "cache-readfail: no unreadable source here, case skipped\n");
+  } else {
+    cache_back cache;
+    char extra[8192];
+    char rbody[256];
+    int i;
+
+    memset(&cache, 0, sizeof(cache));
+    cache.type = 1;
+    cache.log = stderr;
+    cache.errlog = stderr;
+    cache.hashtable = coucal_new(0);
+    cache.zipOutput = hts_zipOpen_utf8(zippath, APPEND_STATUS_CREATE);
+    assertf(cache.zipOutput != NULL);
+    opt->state.exit_xh = 0;
+
+    if (readfail_write_source(srcpath, body, body_len) != 0) {
+      fprintf(stderr, "cache-readfail: cannot create '%s'\n", srcpath);
+      return fail + 1;
+    }
+    readfail_store_file(opt, &cache, "/good.bin", srcpath, (LLint) body_len);
+    readfail_store_file(opt, &cache, "/unreadable.bin", unreadable,
+                        (LLint) body_len);
+    /* the rolled-back member must leave the stream usable */
+    readfail_store_file(opt, &cache, "/good2.bin", srcpath, (LLint) body_len);
+    /* CACHE_MAX_WRITE_FAILURES consecutive drops abort the mirror; charging
+       one failed entry twice would trip it after half as many */
+    for (i = 1; i <= CACHE_MAX_WRITE_FAILURES; i++) {
+      char fil[32];
+
+      if (cache.zipWriteFailed) {
+        fprintf(stderr,
+                "cache-readfail: aborted after %d dropped entr(ies), expected "
+                "%d\n",
+                i - 1, CACHE_MAX_WRITE_FAILURES);
+        fail++;
+        break;
+      }
+      snprintf(fil, sizeof(fil), "/u%d.bin", i);
+      readfail_store_file(opt, &cache, fil, unreadable, (LLint) body_len);
+    }
+    if (!cache.zipWriteFailed || opt->state.exit_xh != -1) {
+      fprintf(stderr,
+              "cache-readfail: %d dropped entries did not abort the mirror "
+              "(flagged=%d, exit_xh=%d)\n",
+              CACHE_MAX_WRITE_FAILURES, (int) cache.zipWriteFailed,
+              opt->state.exit_xh);
+      fail++;
+    }
+    opt->state.exit_xh = 0; /* the abort is the assertion, not a real one */
+    zipClose(cache.zipOutput, NULL);
+    cache.zipOutput = NULL;
+
+    if (writefail_read_entry(zippath, "http://example.com/unreadable.bin",
+                             extra, sizeof(extra), rbody, sizeof(rbody)) >= 0) {
+      fprintf(stderr, "cache-readfail: the unreadable entry was cached\n");
+      fail++;
+    }
+    for (i = 0; i < 2; i++) {
+      const char *const sibling = i == 0 ? "http://example.com/good.bin"
+                                         : "http://example.com/good2.bin";
+
+      n = writefail_read_entry(zippath, sibling, extra, sizeof(extra), rbody,
+                               sizeof(rbody));
+      if (n != (int) body_len || memcmp(rbody, body, body_len) != 0) {
+        fprintf(stderr, "cache-readfail: '%s' stored %d byte(s)\n", sibling, n);
+        fail++;
+      }
+    }
+  }
+
+  /* a truncated entry must not read back as a complete file */
+  {
+    cache_back cache;
+    char save[HTS_URLMAXSIZE * 2];
+    char *locbuf = malloct(HTS_LOCATION_SIZE);
+    htsblk r;
+    const LLint stored = (LLint) body_len;
+    const LLint declared = stored + 4096;
+
+    concat(save, sizeof(save), StringBuff(opt->path_html_utf8),
+           "example.com/trunc.bin");
+    if (readfail_write_source(save, body, body_len) != 0) {
+      fprintf(stderr, "cache-readfail: cannot create '%s'\n", save);
+      freet(locbuf);
+      return fail + 1;
+    }
+    selftest_open_for_write(&cache, opt);
+    /* the source is short of what the headers declare: exactly the entry a
+       failed read used to commit */
+    readfail_store_file(opt, &cache, "/trunc.bin", save, declared);
+    readfail_store_file(opt, &cache, "/whole.bin", save, stored);
+    selftest_close(&cache);
+
+    selftest_open_for_read(&cache, opt);
+    locbuf[0] = '\0';
+    /* readonly=0: the direct-disk branch, which writes the body out again */
+    r = cache_readex(opt, &cache, "example.com", "/trunc.bin", save, locbuf,
+                     NULL, 0);
+    if (r.statuscode != STATUSCODE_INVALID) {
+      fprintf(stderr,
+              "cache-readfail: truncated entry read back as %d ('%s')\n",
+              r.statuscode, r.msg);
+      fail++;
+    }
+    freet(r.adr);
+    /* control: the same read on a whole entry succeeds */
+    locbuf[0] = '\0';
+    r = cache_readex(opt, &cache, "example.com", "/whole.bin", save, locbuf,
+                     NULL, 0);
+    if (r.statuscode != HTTP_OK) {
+      fprintf(stderr, "cache-readfail: whole entry read back as %d ('%s')\n",
+              r.statuscode, r.msg);
+      fail++;
+    } else if (fsize_utf8(fconv(catbuff, sizeof(catbuff), save)) != stored) {
+      fprintf(stderr,
+              "cache-readfail: whole entry restored " LLintP
+              " byte(s), expected " LLintP "\n",
+              (LLint) fsize_utf8(fconv(catbuff, sizeof(catbuff), save)),
+              stored);
+      fail++;
+    }
+    freet(r.adr);
+    freet(locbuf);
+    selftest_close(&cache);
   }
 
   /* r.msg is 80 bytes inside an installed-header struct, and both the reason
@@ -2325,21 +2524,23 @@ int cache_readfail_selftest(httrackp *opt, const char *dir) {
     char what[512];
     size_t i;
 
-    memset(what, 'W', sizeof(what) - 1);
+    memset(what, READFAIL_FILL, sizeof(what) - 1);
     what[sizeof(what) - 1] = '\0';
     for (i = 0; i < sizeof(errs) / sizeof(errs[0]); i++) {
       htsblk r;
 
       hts_init_htsblk(&r);
-      memset(r.contenttype, 'C', sizeof(r.contenttype)); /* poisoned canary */
+      memset(r.contenttype, READFAIL_CANARY, sizeof(r.contenttype));
+      r.statuscode = HTTP_OK; /* poisoned: the failure must overwrite it */
       cache_read_failed(&r, what, errs[i]);
       if (r.msg[sizeof(r.msg) - 1] != '\0' || strlen(r.msg) >= sizeof(r.msg)) {
         fprintf(stderr, "cache-readfail: msg not terminated in %d bytes\n",
                 (int) sizeof(r.msg));
         fail++;
       }
-      if (memchr(r.contenttype, 'C', sizeof(r.contenttype)) == NULL ||
-          r.contenttype[0] != 'C') {
+      if (memchr(r.contenttype, READFAIL_CANARY, sizeof(r.contenttype)) ==
+              NULL ||
+          r.contenttype[0] != READFAIL_CANARY) {
         fprintf(stderr,
                 "cache-readfail: the message overran msg into "
                 "contenttype (errno %d)\n",

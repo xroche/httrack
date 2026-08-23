@@ -323,6 +323,13 @@ extern int ZEXPORT zipCloseFileInZip(zipFile file);
   Close the current file in the zipfile
 */
 
+extern int ZEXPORT zipAbandonFileInZip(zipFile file);
+/*
+  Roll back the current file in the zipfile: the write position returns to its
+  local header and no central-directory record is created, so the partial
+  member never appears in the archive. (httrack addition, see zip.c.diff)
+*/
+
 extern int ZEXPORT zipCloseFileInZipRaw(zipFile file,
                                         uLong uncompressed_size,
                                         uLong crc32);

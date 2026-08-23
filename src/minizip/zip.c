@@ -1706,6 +1706,39 @@ extern int ZEXPORT zipCloseFileInZip(zipFile file) {
     return zipCloseFileInZipRaw (file,0,0);
 }
 
+/* httrack addition: abandon the member being written instead of committing it.
+   Rewinding to its local header is the only rollback minizip can offer: once
+   zipCloseFileInZipRaw64() has appended the central-directory record there is
+   no API to take it back, and the next member simply overwrites this one. */
+extern int ZEXPORT zipAbandonFileInZip(zipFile file) {
+  zip64_internal *zi;
+
+  if (file == NULL)
+    return ZIP_PARAMERROR;
+  zi = (zip64_internal *) file;
+  if (zi->in_opened_file_inzip == 0)
+    return ZIP_PARAMERROR;
+
+  if (zi->ci.stream_initialised) {
+    if ((zi->ci.method == Z_DEFLATED) && (!zi->ci.raw))
+      (void) deflateEnd(&zi->ci.stream);
+#ifdef HAVE_BZIP2
+    else if ((zi->ci.method == Z_BZIP2ED) && (!zi->ci.raw))
+      (void) BZ2_bzCompressEnd(&zi->ci.bstream);
+#endif
+    zi->ci.stream_initialised = 0;
+  }
+  free(zi->ci.central_header);
+  zi->ci.central_header = NULL;
+  zi->in_opened_file_inzip = 0;
+
+  /* not counted in zi->number_entry: the member never existed */
+  if (ZSEEK64(zi->z_filefunc, zi->filestream, zi->ci.pos_local_header,
+              ZLIB_FILEFUNC_SEEK_SET) != 0)
+    return ZIP_ERRNO;
+  return ZIP_OK;
+}
+
 local int Write_Zip64EndOfCentralDirectoryLocator(zip64_internal* zi, ZPOS64_T zip64eocd_pos_inzip) {
   int err = ZIP_OK;
   ZPOS64_T pos = zip64eocd_pos_inzip - zi->add_position_when_writing_offset;

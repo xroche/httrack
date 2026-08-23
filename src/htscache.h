@@ -114,6 +114,9 @@ int cache_brstr(char *adr, char *s, size_t s_size);
 /* binput over a NUL-terminated buffer, bounded: no read starts at/past end. */
 int cache_binput(const char *adr, const char *end, char *s, int max);
 
+/* Consecutive entry write failures before the cache stream is declared dead. */
+#define CACHE_MAX_WRITE_FAILURES 8
+
 /* Fail r with "<what>: <strerror(err)>", clipped into r->msg. */
 void cache_read_failed(htsblk *r, const char *what, int err);
 

@@ -174,9 +174,6 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
 	} \
 } while(0)
 
-/* Consecutive entry write failures before the cache stream is declared dead. */
-#define CACHE_MAX_WRITE_FAILURES 8
-
 /* Cache write failed: a fatal errno or a failure streak aborts the mirror
    (exit_xh); an isolated failure only drops the current entry. */
 static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
@@ -185,6 +182,10 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
                                    const char *url_fil) {
   const int fatal_errno = zErr == ZIP_ERRNO && check_fatal_io_errno();
 
+  /* Roll the partial member back: closing it would commit a short body under
+     the X-Size already written into its local header. */
+  if (entry_open)
+    (void) zipAbandonFileInZip((zipFile) cache->zipOutput);
   cache->zipWriteFailures++;
   if (fatal_errno || cache->zipWriteFailures >= CACHE_MAX_WRITE_FAILURES) {
     if (!cache->zipWriteFailed) {
@@ -200,8 +201,6 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
     }
     opt->state.exit_xh = -1; /* fatal: stop the mirror, exit non-zero */
   } else {
-    if (entry_open)
-      zipCloseFileInZip((zipFile) cache->zipOutput); /* abandon, best-effort */
     hts_log_print(opt, LOG_WARNING,
                   "cache write failed (%s: %s), entry not cached: %s%s", what,
                   hts_get_zerror(zErr), url_adr, url_fil);
@@ -423,17 +422,18 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
         fp = FOPEN(fconv(catbuff, sizeof(catbuff), url_save), "rb");
         if (fp != NULL) {
           zErr = cache_zip_store_stream((zipFile) cache->zipOutput, fp);
-
-          fclose(fp);
           if (zErr != Z_OK) {
+            /* before fclose(): check_fatal_io_errno() reads the live errno */
             cache_zip_write_failed(
                 opt, cache,
                 zErr == CACHE_ZIP_READ_ERROR ? "reading a file into the cache"
                                              : "writing to the cache",
                 zErr == CACHE_ZIP_READ_ERROR ? ZIP_ERRNO : zErr, HTS_TRUE,
                 url_adr, url_fil);
+            fclose(fp);
             return;
           }
+          fclose(fp);
         } else {
           /* Err FIXME - lost file */
         }
@@ -823,6 +823,15 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                         }
                       }
                     } while((nl > 0) && (size > 0) && (r.statuscode != -1));
+                    /* the member ran out before X-Size: a truncated entry,
+                       which the loop cannot tell from a clean EOF */
+                    if (size > 0 && r.statuscode != STATUSCODE_INVALID) {
+                      r.statuscode = STATUSCODE_INVALID;
+                      htsblk_failf(&r,
+                                   "Cache Read Error : Truncated entry, " LLintP
+                                   " byte(s) missing",
+                                   (LLint) size);
+                    }
                   }
 
                   fclose(r.out);

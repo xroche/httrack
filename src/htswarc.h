@@ -114,6 +114,14 @@ int warc_surt(const char *url, char *out, size_t outsz);
    -#test=warc-offset test, which pins it wide past the 2GB `long` ceiling. */
 uint64_t warc_stream_offset(FILE *f, uint64_t current);
 
+/* Longest ", "length": "<u64>", "offset": "<u64>"" plus its NUL. */
+#define WARC_CDX_EXTENT_SIZE 80
+
+/* Render the CDXJ length/offset pair into out[outsz]; returns its length, or
+   -1 if it did not fit. Exposed for the -#test=warc-offset test, which pins
+   the emitted text past 4GB. */
+int warc_cdx_extent(char *out, size_t outsz, uint64_t length, uint64_t offset);
+
 /* unchanged_kind for warc_write_transaction. */
 #define WARC_UNCHANGED_NONE 0       /* a fresh exchange: a full response */
 #define WARC_UNCHANGED_SERVER_304 1 /* the server itself answered 304 */
