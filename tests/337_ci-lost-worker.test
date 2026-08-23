@@ -140,6 +140,15 @@ chmod +x "$bin/httrack" "$bin/cygpath"
 # Ahead of the driver's own command -v, which asks access(X_OK) and reads false here.
 test -x "$bin/httrack" || skip "${TMPDIR:-/tmp} is noexec, the stub bindir cannot be run"
 
+# The killer stub finds its target by reading argv out of ps, and the emulated
+# leg's rootfs has no procps: a walk that matches nothing there is the missing
+# tool, not a missing worker.
+psargs=$(ps -o args= -p $$ 2>/dev/null || true)
+psppid=$(ps -o ppid= -p $$ 2>/dev/null | tr -d " " || true)
+if test -z "$psargs" || test -z "$psppid"; then
+    skip "no ps reporting argv and ppid, so the ancestry walk cannot run"
+fi
+
 share=$tmp/share
 mkdir -p "$share"
 export POOLSHARE=$share
