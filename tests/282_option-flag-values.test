@@ -103,6 +103,40 @@ while read -r class name; do
     done
 done <<<"${rows}"
 
+# Duplicate alias names must agree on their class, or the shadowed row's is
+# dead. This does not see two rows that share a class but target different
+# short options; --test is one, and is harmless because the help agrees.
+for name in $(awk '{print $2}' <<<"${rows}" | sort | uniq -d); do
+    n=$(awk -v k="${name}" '$2 == k {print $1}' <<<"${rows}" | sort -u | grep -c .)
+    test "${n}" -eq 1 ||
+        fail "--${name} has ${n} classes in the table; the first row silently wins"
+done
+
+# --structure is a preset number, and the engine reads a DETACHED -N value as a
+# user template whatever it holds, so the presets must stay glued (#1380).
+# Assert the layout each preset produces: a dropped value falls back to -N0's,
+# which "no file named 5" cannot tell apart from the preset working.
+structure_layout() { # structure_layout PRESET RELATIVE-PATH
+    crawl "--structure=$1"
+    test "${RC}" -eq 0 || fail "--structure=$1 exited ${RC}"
+    test -f "${tmp}/out/$2" ||
+        fail "--structure=$1 did not produce $2: the preset never reached -N"
+}
+structure_layout 1 web/page.html
+structure_layout 5 web/html/page.html
+structure_layout 0 "file/${tmp#/}/page.html"
+
+# The file-list synonyms share a short option, so they must share its class. A
+# list naming a URL must be read, not merely not refused: a run that dies before
+# the parser also prints no syntax error.
+echo "file://${tmp}/page.html" >"${tmp}/urls.txt"
+for name in list filelist urllist filterlist; do
+    crawl "--${name}=${tmp}/urls.txt"
+    test "${RC}" -eq 0 || fail "--${name}=FILE exited ${RC}"
+    ! grep -q 'Syntax error' "${tmp}/out/.log" ||
+        fail "--${name}=FILE is refused, but its synonym takes the same value"
+done
+
 # Non-circular control on the classes, since the sweep above reads the table it
 # is checking: every --name=0 the wizard writes has to be a row that takes a
 # value, or the flag means the opposite of the box (#1195, #1200).
