@@ -539,7 +539,8 @@ test "$lost" -eq 0 ||
     echo "::error::worker(s) vanished with no status, re-run this leg:$vanished"
 [ "$pass" -ge 90 ] || {
     echo "::error::only $pass tests passed ($skip skipped)"
-    exit 1
+    # Vanished workers lower the count without anything having failed.
+    [ "$lost" -gt 0 ] || exit 1
 }
 # Word-split on whitespace (space-joined $skipped, newline-joined
 # expected_skips both work) and sort, so the compare is a set, not a string.
@@ -549,7 +550,7 @@ got=$(printf '%s\n' $skipped | sort)
 want=$(printf '%s\n' $expected_skips | sort)
 if [ "$got" != "$want" ]; then
     echo "::error::skip set changed from expected; - missing, + newly skipped"
-    diff -u <(echo "$want") <(echo "$got") | tail -n +3 | sed 's/^/      /'
+    diff -u <(echo "$want") <(echo "$got") | tail -n +3 | sed 's/^/      /' || true
     # A worker that vanished cannot have recorded its skip, so the set differs
     # for a reason we already know; keep that a re-run, not a red.
     [ "$lost" -gt 0 ] || exit 1

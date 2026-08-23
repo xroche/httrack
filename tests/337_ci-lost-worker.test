@@ -203,7 +203,14 @@ stage() { # stage <dir> <lost stub body>
     done
     # shellcheck disable=SC2086 # one stub per name, so the splitting is the point
     for t in $expected_skips; do stub "$d/$t" 77; done
-    stub "$d/906_engine-lost.test" 0 "$2"
+    if test -n "${3:-}"; then
+        # The killer on a pinned skip: the vanished worker cannot record its
+        # skip, so the set gate fires before the lost gate is ever consulted.
+        stub "$d/906_engine-lost.test" 0
+        stub "$d/$3" 77 "$2"
+    else
+        stub "$d/906_engine-lost.test" 0 "$2"
+    fi
 }
 
 # Drive the suite staged in $1 into $tmp/out, its status into $rc.
@@ -241,6 +248,24 @@ grep -q '::error::failing:' "$tmp/out" &&
     fail "a killed worker was reported as a failing test: $(<"$tmp/out")"
 # 3, so the workflow can tell a leg to repeat from a leg to investigate (#1228).
 test "$rc" -eq 3 || fail "a lost worker exited $rc, want 3: $(<"$tmp/out")"
+
+# Again with the killer on one of the pinned skips. That run reaches the skip-set
+# gate, which exits before the lost gate unless it is told a vanished worker
+# explains the difference: the reason this stays a leg to repeat.
+# shellcheck disable=SC2086 # the splitting is what picks one name
+pinned=$(printf '%s\n' $expected_skips | head -1)
+stage "$tmp/killedskip" "$killer" "$pinned"
+run_suite "$tmp/killedskip"
+case "$(<"$share/killed")" in
+none*) fail "the pinned-skip stub killed no worker: $(<"$share/killed")" ;;
+esac
+grep -q "^LOST $pinned (worker left no status; " "$tmp/out" ||
+    fail "the vanished skip was not reported: $(<"$tmp/out")"
+grep -q '::error::skip set changed from expected' "$tmp/out" ||
+    fail "the skip set did not change, so this run reaches the wrong gate: $(<"$tmp/out")"
+test "$rc" -eq 3 ||
+    fail "a worker lost from the pinned skips exited $rc, want 3: $(<"$tmp/out")"
+ok "a skip that vanished is still a leg to repeat"
 
 # The counter reading that very console back, which is the path the Windows leg takes.
 report "$tmp/out"
