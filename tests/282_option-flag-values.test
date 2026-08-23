@@ -114,19 +114,25 @@ done
 
 # --structure is a preset number, and the engine reads a DETACHED -N value as a
 # user template whatever it holds, so the presets must stay glued (#1380).
-for n in 0 1 5; do
-    crawl "--structure=${n}"
-    test "${RC}" -eq 0 || fail "--structure=${n} exited ${RC}"
-    test -z "$(find "${tmp}/out" -name "${n}" -print -quit)" ||
-        fail "--structure=${n} made a file named ${n}: the preset became a template"
-done
+# Assert the layout each preset produces: a dropped value falls back to -N0's,
+# which "no file named 5" cannot tell apart from the preset working.
+structure_layout() { # structure_layout PRESET RELATIVE-PATH
+    crawl "--structure=$1"
+    test "${RC}" -eq 0 || fail "--structure=$1 exited ${RC}"
+    test -f "${tmp}/out/$2" ||
+        fail "--structure=$1 did not produce $2: the preset never reached -N"
+}
+structure_layout 1 web/page.html
+structure_layout 5 web/html/page.html
+structure_layout 0 "file/${tmp#/}/page.html"
 
-# The file-list synonyms share a short option, so they must share its class.
-: >"${tmp}/urls.txt"
+# The file-list synonyms share a short option, so they must share its class. A
+# list naming a URL must be read, not merely not refused: a run that dies before
+# the parser also prints no syntax error.
+echo "file://${tmp}/page.html" >"${tmp}/urls.txt"
 for name in list filelist urllist filterlist; do
     crawl "--${name}=${tmp}/urls.txt"
-    # an empty log means the run died before the parser, not that it accepted
-    test -s "${tmp}/out/.log" || fail "--${name}=FILE produced no log"
+    test "${RC}" -eq 0 || fail "--${name}=FILE exited ${RC}"
     ! grep -q 'Syntax error' "${tmp}/out/.log" ||
         fail "--${name}=FILE is refused, but its synonym takes the same value"
 done
