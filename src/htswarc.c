@@ -788,8 +788,9 @@ static int cdx_lines_add(warc_writer *w, char *line) {
   return 0;
 }
 
-/* PRIu64 against uint64_t: narrowing either half is a -Wformat error, not a
-   wrong index past 4GB. */
+/* PRIu64 straight off the uint64_t: an `(unsigned long)` cast compiles clean
+   and truncates past 4GB on LLP64 Windows, where only that leg's run of
+   -#test=warc-offset would ever see the wrong offset. */
 int warc_cdx_extent(char *out, size_t outsz, uint64_t length, uint64_t offset) {
   const int n = snprintf(
       out, outsz, ", \"length\": \"%" PRIu64 "\", \"offset\": \"%" PRIu64 "\"",

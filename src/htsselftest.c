@@ -4008,6 +4008,185 @@ static int st_zip_repair_shift(httrackp *opt, int argc, char **argv) {
   return (err == Z_OK && nrec == 1) ? 0 : 1;
 }
 
+/* Members kept on either side of the abandoned one. */
+static const char *const zip_abandon_kept[] = {"before.bin", "after1.bin",
+                                               "after2.bin"};
+static const char zip_abandon_body[] = "zip-abandon kept member body";
+
+/* Build `path` with the kept members, opening a `doomed`-byte member after the
+   first one and abandoning it mid-write (0: never open it, the reference). The
+   doomed member is stored, so its body reaches the file byte for byte. */
+static int zip_abandon_build(const char *path, size_t doomed) {
+  char catbuff[CATBUFF_SIZE];
+  char chunk[4096];
+  zip_fileinfo fi;
+  zipFile zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), path),
+                                APPEND_STATUS_CREATE);
+  size_t i;
+
+  if (zf == NULL)
+    return -1;
+  memset(&fi, 0, sizeof(fi));
+  memset(chunk, 'Z', sizeof(chunk));
+  for (i = 0; i < sizeof(zip_abandon_kept) / sizeof(zip_abandon_kept[0]); i++) {
+    size_t left;
+
+    if (zipOpenNewFileInZip(zf, zip_abandon_kept[i], &fi, NULL, 0, NULL, 0,
+                            NULL, Z_DEFLATED,
+                            Z_DEFAULT_COMPRESSION) != ZIP_OK ||
+        zipWriteInFileInZip(zf, zip_abandon_body,
+                            (unsigned) (sizeof(zip_abandon_body) - 1)) !=
+            ZIP_OK ||
+        zipCloseFileInZip(zf) != ZIP_OK)
+      goto fail;
+    if (i != 0 || doomed == 0)
+      continue;
+    if (zipOpenNewFileInZip(zf, "doomed.bin", &fi, NULL, 0, NULL, 0, NULL,
+                            0 /* stored */, Z_NO_COMPRESSION) != ZIP_OK)
+      goto fail;
+    for (left = doomed; left != 0;) {
+      const size_t n = left < sizeof(chunk) ? left : sizeof(chunk);
+
+      if (zipWriteInFileInZip(zf, chunk, (unsigned) n) != ZIP_OK)
+        goto fail;
+      left -= n;
+    }
+    if (zipAbandonFileInZip(zf) != ZIP_OK)
+      goto fail;
+  }
+  return zipClose(zf, NULL) == ZIP_OK ? 0 : -1;
+
+fail:
+  zipClose(zf, NULL);
+  return -1;
+}
+
+/* Whole file into a malloct'd buffer: binary, not terminated. */
+static int zip_abandon_slurp(const char *path, char **out, size_t *len) {
+  char catbuff[CATBUFF_SIZE];
+  const LLint size = fsize_utf8(fconv(catbuff, sizeof(catbuff), path));
+  FILE *fp;
+
+  *out = NULL;
+  *len = 0;
+  if (size < 0)
+    return -1;
+  fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "rb");
+  if (fp == NULL)
+    return -1;
+  *out = malloct((size_t) size + 1);
+  if (*out == NULL ||
+      (size != 0 && !hts_fread_exact(*out, (size_t) size, fp))) {
+    freet(*out);
+    fclose(fp);
+    return -1;
+  }
+  fclose(fp);
+  *len = (size_t) size;
+  return 0;
+}
+
+/* Every kept member is readable and holds its body. */
+static int zip_abandon_check_members(unzFile uf) {
+  char got[sizeof(zip_abandon_body)];
+  size_t i;
+
+  for (i = 0; i < sizeof(zip_abandon_kept) / sizeof(zip_abandon_kept[0]); i++) {
+    const int want = (int) sizeof(zip_abandon_body) - 1;
+    int n;
+
+    if (unzLocateFile(uf, zip_abandon_kept[i], 1) != UNZ_OK ||
+        unzOpenCurrentFile(uf) != UNZ_OK) {
+      fprintf(stderr, "zip-abandon: '%s' is missing\n", zip_abandon_kept[i]);
+      return -1;
+    }
+    n = unzReadCurrentFile(uf, got, (unsigned) sizeof(got));
+    unzCloseCurrentFile(uf);
+    if (n != want || memcmp(got, zip_abandon_body, (size_t) want) != 0) {
+      fprintf(stderr, "zip-abandon: '%s' read back %d byte(s), want %d\n",
+              zip_abandon_kept[i], n, want);
+      return -1;
+    }
+  }
+  return 0;
+}
+
+/* A member abandoned mid-write must leave the archive byte-identical to one
+   that never opened it: a rewind that does not truncate keeps what the member
+   flushed past the end-of-central-directory written later, which readers stop
+   finding once that tail outgrows their 64KB backscan (unzip.c uMaxBack). */
+static int st_zip_abandon(httrackp *opt, int argc, char **argv) {
+  static const size_t doomed[] = {
+      70000,  /* one 64KB flush: a leftover tail a reader still scans past */
+      200000, /* three of them: a tail that buries the directory for good */
+  };
+  char refpath[HTS_URLMAXSIZE], path[HTS_URLMAXSIZE], name[64];
+  char *ref = NULL;
+  size_t reflen = 0;
+  size_t i;
+  int fail = 0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "zip-abandon: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(refpath, sizeof(refpath), argv[0], "zip-abandon-ref.zip");
+  if (zip_abandon_build(refpath, 0) != 0 ||
+      zip_abandon_slurp(refpath, &ref, &reflen) != 0 || reflen == 0) {
+    fprintf(stderr, "zip-abandon: cannot build the reference archive\n");
+    freet(ref);
+    return 1;
+  }
+  for (i = 0; i < sizeof(doomed) / sizeof(doomed[0]); i++) {
+    unz_global_info64 gi;
+    unzFile uf;
+    char *got = NULL;
+    size_t gotlen = 0;
+
+    snprintf(name, sizeof(name), "zip-abandon-%d.zip", (int) doomed[i]);
+    fconcat(path, sizeof(path), argv[0], name);
+    if (zip_abandon_build(path, doomed[i]) != 0 ||
+        zip_abandon_slurp(path, &got, &gotlen) != 0) {
+      fprintf(stderr, "zip-abandon: cannot build '%s'\n", path);
+      fail++;
+      freet(got);
+      continue;
+    }
+    if (gotlen != reflen || memcmp(got, ref, reflen) != 0) {
+      fprintf(stderr,
+              "zip-abandon: %d abandoned byte(s) left a %d-byte archive, want "
+              "%d byte(s) identical to the reference\n",
+              (int) doomed[i], (int) gotlen, (int) reflen);
+      fail++;
+    }
+    freet(got);
+    uf = hts_unzOpen_utf8(path);
+    if (uf == NULL) {
+      fprintf(stderr,
+              "zip-abandon: '%s' does not open: no directory found within the "
+              "backscan\n",
+              path);
+      fail++;
+      continue;
+    }
+    if (unzGetGlobalInfo64(uf, &gi) != UNZ_OK ||
+        gi.number_entry !=
+            sizeof(zip_abandon_kept) / sizeof(zip_abandon_kept[0])) {
+      fprintf(stderr,
+              "zip-abandon: '%s' holds %" PRIu64 " entr(ies), want %d\n", path,
+              (uint64_t) gi.number_entry,
+              (int) (sizeof(zip_abandon_kept) / sizeof(zip_abandon_kept[0])));
+      fail++;
+    } else if (zip_abandon_check_members(uf) != 0)
+      fail++;
+    unzClose(uf);
+  }
+  freet(ref);
+  printf("zip-abandon: %s\n", fail ? "FAIL" : "OK");
+  return fail;
+}
+
 static int st_cache_legacy(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -8290,6 +8469,36 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
         err = 1;
       }
     }
+
+    /* the truncation return, which no WARC_CDX_EXTENT_SIZE buffer reaches: the
+       widest pair fits it, and a clipped extent must be refused, not indexed */
+    {
+      struct {
+        char buf[24];
+        char canary[8];
+      } tight;
+
+      char full[WARC_CDX_EXTENT_SIZE];
+      int n;
+
+      memset(&tight, 'C', sizeof(tight));
+      if (warc_cdx_extent(tight.buf, sizeof(tight.buf), 4294967296ULL,
+                          1099511627776ULL) != -1) {
+        fprintf(stderr, "warc-offset: a clipped CDXJ extent was not refused\n");
+        err = 1;
+      }
+      if (memcmp(tight.canary, "CCCCCCCC", sizeof(tight.canary)) != 0) {
+        fprintf(stderr, "warc-offset: the CDXJ extent overran its buffer\n");
+        err = 1;
+      }
+      n = warc_cdx_extent(full, sizeof(full), UINT64_MAX, UINT64_MAX);
+      if (n < 0 || (size_t) n != strlen(full)) {
+        fprintf(stderr,
+                "warc-offset: the widest CDXJ extent does not fit %d bytes\n",
+                (int) sizeof(full));
+        err = 1;
+      }
+    }
   }
   printf("warc-offset: %s\n", err ? "FAIL" : "OK");
   return err;
@@ -12156,6 +12365,8 @@ static const struct selftest_entry {
     {"zip-repair-shift", "<dir>",
      "cache zip-repair header read must not overflow a signed shift",
      st_zip_repair_shift},
+    {"zip-abandon", "<dir>",
+     "an abandoned member leaves the archive byte-identical", st_zip_abandon},
     {"dns", "", "DNS resolver/cache self-test", st_dns},
     {"dnstimeout", "", "a slow DNS resolve is bounded and holds no lock",
      st_dnstimeout},

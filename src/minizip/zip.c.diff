@@ -9,14 +9,14 @@
        zi->ci.stream.avail_in = len;
  
        while ((err==ZIP_OK) && (zi->ci.stream.avail_in>0))
-@@ -1706,6 +1706,39 @@
+@@ -1706,6 +1706,44 @@
      return zipCloseFileInZipRaw (file,0,0);
  }
  
 +/* httrack addition: abandon the member being written instead of committing it.
-+   Rewinding to its local header is the only rollback minizip can offer: once
-+   zipCloseFileInZipRaw64() has appended the central-directory record there is
-+   no API to take it back, and the next member simply overwrites this one. */
++   Rewinding and truncating to its local header is the only rollback minizip can
++   offer: once zipCloseFileInZipRaw64() has appended the central-directory
++   record there is no API to take it back. */
 +extern int ZEXPORT zipAbandonFileInZip(zipFile file) {
 +  zip64_internal *zi;
 +
@@ -43,13 +43,18 @@
 +  if (ZSEEK64(zi->z_filefunc, zi->filestream, zi->ci.pos_local_header,
 +              ZLIB_FILEFUNC_SEEK_SET) != 0)
 +    return ZIP_ERRNO;
++  /* the rewind alone leaves what the member flushed past the end-of-central-
++     directory written later, which no reader finds once that tail outgrows the
++     64KB backscan */
++  if (ZTRUNCATE64(zi->z_filefunc, zi->filestream, zi->ci.pos_local_header) != 0)
++    return ZIP_ERRNO;
 +  return ZIP_OK;
 +}
 +
  local int Write_Zip64EndOfCentralDirectoryLocator(zip64_internal* zi, ZPOS64_T zip64eocd_pos_inzip) {
    int err = ZIP_OK;
    ZPOS64_T pos = zip64eocd_pos_inzip - zi->add_position_when_writing_offset;
-@@ -1830,6 +1863,18 @@
+@@ -1830,6 +1868,18 @@
    return err;
  }
  

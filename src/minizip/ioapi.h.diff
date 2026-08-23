@@ -51,15 +51,26 @@
      tell_file_func      ztell_file;
      seek_file_func      zseek_file;
      close_file_func     zclose_file;
-@@ -166,6 +189,7 @@
+@@ -160,14 +183,18 @@
+ typedef ZPOS64_T (ZCALLBACK *tell64_file_func)    (voidpf opaque, voidpf stream);
+ typedef long     (ZCALLBACK *seek64_file_func)    (voidpf opaque, voidpf stream, ZPOS64_T offset, int origin);
+ typedef voidpf   (ZCALLBACK *open64_file_func)    (voidpf opaque, const void* filename, int mode);
++typedef int(ZCALLBACK *truncate64_file_func)(voidpf opaque, voidpf stream,
++                                             ZPOS64_T size);
+ 
+ typedef struct zlib_filefunc64_def_s
+ {
      open64_file_func    zopen64_file;
      read_file_func      zread_file;
      write_file_func     zwrite_file;
 +    flush_file_func     zflush_file;
      tell64_file_func    ztell64_file;
      seek64_file_func    zseek64_file;
++    truncate64_file_func ztruncate64_file;
      close_file_func     zclose_file;
-@@ -188,6 +212,7 @@
+     testerror_file_func zerror_file;
+     voidpf              opaque;
+@@ -188,6 +215,7 @@
  
  #define ZREAD64(filefunc,filestream,buf,size)     ((*((filefunc).zfile_func64.zread_file))   ((filefunc).zfile_func64.opaque,filestream,buf,size))
  #define ZWRITE64(filefunc,filestream,buf,size)    ((*((filefunc).zfile_func64.zwrite_file))  ((filefunc).zfile_func64.opaque,filestream,buf,size))
@@ -67,3 +78,22 @@
  //#define ZTELL64(filefunc,filestream)            ((*((filefunc).ztell64_file)) ((filefunc).opaque,filestream))
  //#define ZSEEK64(filefunc,filestream,pos,mode)   ((*((filefunc).zseek64_file)) ((filefunc).opaque,filestream,pos,mode))
  #define ZCLOSE64(filefunc,filestream)             ((*((filefunc).zfile_func64.zclose_file))  ((filefunc).zfile_func64.opaque,filestream))
+@@ -196,12 +224,18 @@
+ voidpf call_zopen64(const zlib_filefunc64_32_def* pfilefunc,const void*filename,int mode);
+ long call_zseek64(const zlib_filefunc64_32_def* pfilefunc,voidpf filestream, ZPOS64_T offset, int origin);
+ ZPOS64_T call_ztell64(const zlib_filefunc64_32_def* pfilefunc,voidpf filestream);
++/* Shorten filestream to `size`, 0 on success. Also 0 where the backend has no
++   truncate: rolling a member back is then a rewind only. */
++int call_ztruncate64(const zlib_filefunc64_32_def *pfilefunc, voidpf filestream,
++                     ZPOS64_T size);
+ 
+ void fill_zlib_filefunc64_32_def_from_filefunc32(zlib_filefunc64_32_def* p_filefunc64_32,const zlib_filefunc_def* p_filefunc32);
+ 
+ #define ZOPEN64(filefunc,filename,mode)         (call_zopen64((&(filefunc)),(filename),(mode)))
+ #define ZTELL64(filefunc,filestream)            (call_ztell64((&(filefunc)),(filestream)))
+ #define ZSEEK64(filefunc,filestream,pos,mode)   (call_zseek64((&(filefunc)),(filestream),(pos),(mode)))
++#define ZTRUNCATE64(filefunc, filestream, size)                                \
++  (call_ztruncate64((&(filefunc)), (filestream), (size)))
+ 
+ #ifdef __cplusplus
+ }

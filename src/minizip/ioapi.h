@@ -183,6 +183,8 @@ typedef struct zlib_filefunc_def_s
 typedef ZPOS64_T (ZCALLBACK *tell64_file_func)    (voidpf opaque, voidpf stream);
 typedef long     (ZCALLBACK *seek64_file_func)    (voidpf opaque, voidpf stream, ZPOS64_T offset, int origin);
 typedef voidpf   (ZCALLBACK *open64_file_func)    (voidpf opaque, const void* filename, int mode);
+typedef int(ZCALLBACK *truncate64_file_func)(voidpf opaque, voidpf stream,
+                                             ZPOS64_T size);
 
 typedef struct zlib_filefunc64_def_s
 {
@@ -192,6 +194,7 @@ typedef struct zlib_filefunc64_def_s
     flush_file_func     zflush_file;
     tell64_file_func    ztell64_file;
     seek64_file_func    zseek64_file;
+    truncate64_file_func ztruncate64_file;
     close_file_func     zclose_file;
     testerror_file_func zerror_file;
     voidpf              opaque;
@@ -221,12 +224,18 @@ typedef struct zlib_filefunc64_32_def_s
 voidpf call_zopen64(const zlib_filefunc64_32_def* pfilefunc,const void*filename,int mode);
 long call_zseek64(const zlib_filefunc64_32_def* pfilefunc,voidpf filestream, ZPOS64_T offset, int origin);
 ZPOS64_T call_ztell64(const zlib_filefunc64_32_def* pfilefunc,voidpf filestream);
+/* Shorten filestream to `size`, 0 on success. Also 0 where the backend has no
+   truncate: rolling a member back is then a rewind only. */
+int call_ztruncate64(const zlib_filefunc64_32_def *pfilefunc, voidpf filestream,
+                     ZPOS64_T size);
 
 void fill_zlib_filefunc64_32_def_from_filefunc32(zlib_filefunc64_32_def* p_filefunc64_32,const zlib_filefunc_def* p_filefunc32);
 
 #define ZOPEN64(filefunc,filename,mode)         (call_zopen64((&(filefunc)),(filename),(mode)))
 #define ZTELL64(filefunc,filestream)            (call_ztell64((&(filefunc)),(filestream)))
 #define ZSEEK64(filefunc,filestream,pos,mode)   (call_zseek64((&(filefunc)),(filestream),(pos),(mode)))
+#define ZTRUNCATE64(filefunc, filestream, size)                                \
+  (call_ztruncate64((&(filefunc)), (filestream), (size)))
 
 #ifdef __cplusplus
 }
