@@ -1280,32 +1280,19 @@ int httpmirror(char *url1, httrackp * opt) {
         goto jump_if_done;
       }                         // test si url existe (non vide!)
 
-      // ---tester taille a posteriori---
-      // tester r.adr
+      // check the size after the fact
       if (!error) {
-        // erreur, pas de fichier chargé:
-        if ((!r.adr) && (r.is_write == 0) && (r.statuscode != 301) &&
-            (r.statuscode != 302) && (r.statuscode != 303) &&
-            (r.statuscode != 307) && (r.statuscode != 412) &&
-            (r.statuscode != 416)) {
-
-          // peut être que le fichier était trop gros?
-          if ((istoobig
-               (opt, r.totalsize, opt->maxfile_html, opt->maxfile_nonhtml,
-                r.contenttype))
-              ||
-              (istoobig
-               (opt, r.totalsize, opt->maxfile_html, opt->maxfile_nonhtml,
-                r.contenttype))) {
+        if (hts_body_missing_unexpectedly(&r)) {
+          // maybe the file was too big?
+          if (istoobig(opt, r.totalsize, opt->maxfile_html,
+                       opt->maxfile_nonhtml, r.contenttype)) {
             error = 0;
             hts_log_print(opt, LOG_WARNING,
                           "Big file cancelled according to user's preferences: %s%s",
                           urladr(), urlfil());
           }
-          // // // error=1;    // ne pas traiter la suite -- euhh si finalement..
         }
       }
-      // ---fin tester taille a posteriori---    
 
       // -------------------- 
       // BOGUS MIME TYPE HACK

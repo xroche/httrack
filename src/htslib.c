@@ -921,6 +921,16 @@ int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
   return append_cookie_header(&bstr, cookie, domain, path);
 }
 
+hts_boolean hts_body_missing_unexpectedly(const htsblk *r) {
+  if (r->adr != NULL || r->is_write != 0)
+    return HTS_FALSE;
+  if (HTTP_IS_REDIRECT(r->statuscode) ||
+      r->statuscode == HTTP_PRECONDITION_FAILED ||
+      r->statuscode == HTTP_REQUESTED_RANGE_NOT_SATISFIABLE)
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
 hts_boolean http_headers_have_field(const char *headers,
                                     const char *field_name) {
   size_t len;

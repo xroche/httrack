@@ -1174,16 +1174,8 @@ char *hts_convertStringIDNAToUTF8(const char *s, size_t size) {
             if (uc < 0x80) {
               ADD_BYTE((char) uc);
             } else {
-              /* emiter (byte per byte) */
-#define EM(C) do { \
-  if (C != -1) {   \
-    ADD_BYTE(C);   \
-  } else {         \
-    FREE_BUFFER(); \
-    return NULL;   \
-  }                \
-} while(0)
-              /* Emit codepoint */
+              /* EMIT_UNICODE only ever emits a byte, never an error */
+#define EM(C) ADD_BYTE(C)
               EMIT_UNICODE(uc, EM);
 #undef EM
             }
@@ -1303,15 +1295,8 @@ char *hts_convertUCS4StringToUTF8(const hts_UCS4 *s, size_t nChars) {
   size_t capa = 0, destSize = 0;
   for(i = 0 ; i < nChars ; i++) {
     const hts_UCS4 uc = s[i];
-    /* emitter (byte per byte) */
-#define EM(C) do { \
-  if (C != -1) {   \
-    ADD_BYTE(C);   \
-  } else {         \
-    FREE_BUFFER(); \
-    return NULL;   \
-  }                \
-} while(0)
+    /* EMIT_UNICODE only ever emits a byte, never an error */
+#define EM(C) ADD_BYTE(C)
     EMIT_UNICODE(uc, EM);
 #undef EM
   }

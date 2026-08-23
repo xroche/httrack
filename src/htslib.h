@@ -219,6 +219,10 @@ int http_cookie_header(t_cookie *cookie, const char *domain, const char *path,
 hts_boolean http_headers_have_field(const char *headers,
                                     const char *field_name);
 
+/* True when the response stored no body and no status excuses it: a redirect to
+   follow, or the 412/416 whose stale resume partial the parser re-gets. */
+hts_boolean hts_body_missing_unexpectedly(const htsblk *r);
+
 /* Append the custom header block to dst (capacity dst_size), dropping any line
    whose field dst carries plus its folded continuations. Aborts on overflow. */
 void http_append_custom_headers(char *dst, size_t dst_size,
