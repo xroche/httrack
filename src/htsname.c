@@ -1176,11 +1176,8 @@ int url_savename(lien_adrfilsave *const afs,
           {
             DECLARE_ADR(final_adr);
 
-            /* Copy address */
-            if (!short_ver)
-              TMPL_CAT(final_adr);
-            else
-              TMPL_CAT(final_adr);
+            /* Copy address (8.3 mode does not shorten a host name) */
+            TMPL_CAT(final_adr);
 
             /* release */
             RELEASE_ADR();

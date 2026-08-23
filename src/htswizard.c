@@ -623,24 +623,6 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
 
     }                           // tester interdiction de descendre?
 
-    {                           // tester interdiction de monter
-      char BIGSTK tempo[HTS_URLMAXSIZE * 2];
-      char BIGSTK tempo2[HTS_URLMAXSIZE * 2];
-
-      if (lienrelatif(tempo, sizeof(tempo), fil,
-                      heap(heap(ptr)->premier)->fil) == 0) {
-        if (lienrelatif(tempo2, sizeof(tempo2), fil, heap(ptr)->fil) == 0) {
-        } else {
-          hts_log_print(opt, LOG_ERROR,
-                        "Error building relative link %s and %s", fil,
-                        heap(ptr)->fil);
-        }
-      } else {
-        hts_log_print(opt, LOG_ERROR, "Error building relative link %s and %s",
-                      fil, heap(heap(ptr)->premier)->fil);
-      }
-    }                           // fin tester interdiction de monter
-
   } else {                      // adresse différente, sortir?
 
     // doit-on traiter ce lien?.. vérifier droits de sortie

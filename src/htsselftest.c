@@ -6464,6 +6464,51 @@ static int st_status(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Which statuses excuse a response that stored no body. */
+static int st_nobody(httrackp *opt, int argc, char **argv) {
+  /* every status the engine excuses, and near misses that it must not */
+  static const struct {
+    int code;
+    hts_boolean excused;
+  } cases[] = {
+      {301, HTS_TRUE},  {302, HTS_TRUE},  {303, HTS_TRUE},  {304, HTS_FALSE},
+      {305, HTS_FALSE}, {306, HTS_FALSE}, {307, HTS_TRUE},  {308, HTS_TRUE},
+      {309, HTS_FALSE}, {300, HTS_FALSE}, {411, HTS_FALSE}, {412, HTS_TRUE},
+      {413, HTS_FALSE}, {415, HTS_FALSE}, {416, HTS_TRUE},  {417, HTS_FALSE},
+      {200, HTS_FALSE}, {204, HTS_FALSE}, {404, HTS_FALSE}, {500, HTS_FALSE},
+  };
+
+  char body[] = "body";
+  size_t i;
+  htsblk r;
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+    memset(&r, 0, sizeof(r));
+    r.statuscode = cases[i].code;
+    if (hts_body_missing_unexpectedly(&r) == cases[i].excused) {
+      fprintf(stderr, "status %d: expected %s\n", cases[i].code,
+              cases[i].excused ? "excused" : "unexpected");
+      return 1;
+    }
+  }
+
+  /* a stored body is never missing, whatever the status */
+  memset(&r, 0, sizeof(r));
+  r.statuscode = 404;
+  r.adr = body;
+  assertf(!hts_body_missing_unexpectedly(&r));
+  memset(&r, 0, sizeof(r));
+  r.statuscode = 404;
+  r.is_write = 1;
+  assertf(!hts_body_missing_unexpectedly(&r));
+
+  printf("nobody self-test OK\n");
+  return 0;
+}
+
 /* Deflate src->path at windowBits (16+ gzip, + zlib, - raw); 0 on success. */
 static int ae_write_packed(const char *path, int windowBits,
                            const unsigned char *src, size_t len) {
@@ -12073,6 +12118,8 @@ static const struct selftest_entry {
     {"escape-room", "", "HT_ADD_HTMLESCAPED* reservation-factor self-test",
      st_escape_room},
     {"status", "", "HTTP status code -> reason phrase self-test", st_status},
+    {"nobody", "", "which statuses excuse a response that stored no body",
+     st_nobody},
     {"acceptencoding", "[dir]",
      "Accept-Encoding advertises gzip+deflate, both decode", st_acceptencoding},
     {"contentcodings", "[dir]",
