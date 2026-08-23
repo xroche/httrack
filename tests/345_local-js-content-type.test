@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# An external script is link-scanned whatever spelling of the JavaScript type
+# the server sends: text/javascript (with or without a charset parameter),
+# application/javascript, the legacy application/x-javascript, and a .mjs
+# module. Only the legacy spelling was recognised before, so the targets of
+# every other script went unmirrored (#302).
+#
+# The link-free quiet/q.js guards the other direction: widening the set widens
+# what gets scanned, and a scanned script must come out byte-identical to
+# quiet/q.bin, the same bytes served under a type nothing scans. json/d.json
+# holds a link-shaped string under a non-script type and must stay unscanned.
+
+set -euo pipefail
+
+: "${top_srcdir:=..}"
+
+bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
+    --found 'jsmime/xjs/s.js' \
+    --found 'jsmime/xjs1.html' --found 'jsmime/xjs2.html' --found 'jsmime/xjs3.html' \
+    --found 'jsmime/txt/s.js' \
+    --found 'jsmime/txt1.html' --found 'jsmime/txt2.html' --found 'jsmime/txt3.html' \
+    --found 'jsmime/app/s.js' \
+    --found 'jsmime/app1.html' --found 'jsmime/app2.html' --found 'jsmime/app3.html' \
+    --found 'jsmime/chs/s.js' \
+    --found 'jsmime/chs1.html' --found 'jsmime/chs2.html' --found 'jsmime/chs3.html' \
+    --found 'jsmime/mod/s.mjs' \
+    --found 'jsmime/mod1.html' --found 'jsmime/mod2.html' --found 'jsmime/mod3.html' \
+    --files-identical 'jsmime/quiet/q.js' 'jsmime/quiet/q.bin' \
+    --found 'jsmime/json/d.json' --not-found 'jsmime/jsn1.html' \
+    --files 24 \
+    httrack 'BASEURL/jsmime/index.html'

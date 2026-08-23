@@ -165,10 +165,9 @@ BIG_TEXT_ASSETS = {
         "// %s\n" % _hexfill("heavy.js"),
         "application/x-javascript",
     ),
-    # text/javascript is fetched but never scanned: the URL inside must stay
-    # out of the mirror.
-    "decoy.js": (
-        'var d = new Image(); d.src = "/big/x/never-scanned.png";\n',
+    # text/javascript is scanned like the legacy spelling, so this one lands.
+    "modern.js": (
+        'var d = new Image(); d.src = "/big/a/js3.png";\n',
         "text/javascript",
     ),
     "subs.vtt": ("WEBVTT\n\n00:00.000 --> 00:01.000\nbig\n", "text/vtt"),
@@ -242,7 +241,7 @@ def _fam_js(port):
     # The concatenated string is rejected by the scanner (no single literal).
     return (
         '<script src="/big/a/heavy.js"></script>'
-        '<script src="/big/a/decoy.js"></script>'
+        '<script src="/big/a/modern.js"></script>'
         "<script>document.write('<a href=\"/big/f5/dw.html\">dw</a>');\n"
         'var nope = "xx-" + "/big/x/concat.html";</script>'
     )
@@ -772,6 +771,70 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    # --- JavaScript content types (#302 increment) -------------------------
+    # One spelling of the JS type per directory; links inside a script resolve
+    # against the parent page, so every target lands directly under /jsmime/.
+    JSMIME_TYPES = {
+        "xjs": ("application/x-javascript", "js"),
+        "txt": ("text/javascript", "js"),
+        "app": ("application/javascript", "js"),
+        "chs": ("text/javascript; charset=utf-8", "js"),
+        "mod": ("text/javascript", "mjs"),
+    }
+
+    # Link-free script: scanning it must invent no link and rewrite no byte.
+    # q.bin serves the same bytes under a type nothing scans, as the reference.
+    JSMIME_QUIET = (
+        b'"use strict";\n'
+        b'var cfg = { name: "app/main", version: "1.2.3", sep: "/" };\n'
+        b'function join(a, b) { return a + "/" + b; }\n'
+        b"var re = /^[a-z]+\\.[a-z]+$/;\n"
+        b'var tpl = "<div class=\\"x\\">no link here</div>";\n'
+        b"console.log(join(cfg.name, tpl), re);\n"
+    )
+
+    @staticmethod
+    def jsmime_script(key):
+        return (
+            b'var a = "%(k)s1.html";\n'
+            b"var b = '%(k)s2.html';\n"
+            b'window.location = "%(k)s3.html";\n' % {b"k": key.encode()}
+        )
+
+    def route_jsmime(self):
+        path = urlsplit(self.path).path
+        rest = path[len("/jsmime/") :]
+        if rest in ("", "index.html"):
+            body = ""
+            for key, (_, ext) in self.JSMIME_TYPES.items():
+                attr = ' type="module"' if key == "mod" else ""
+                body += '\t<script%s src="%s/s.%s"></script>\n' % (attr, key, ext)
+            body += '\t<script src="quiet/q.js"></script>\n'
+            body += '\t<a href="quiet/q.bin">reference copy</a>\n'
+            body += '\t<a href="json/d.json">data</a>\n'
+            self.send_html(body)
+            return
+        if rest == "quiet/q.js":
+            self.send_raw(self.JSMIME_QUIET, "text/javascript")
+            return
+        if rest == "quiet/q.bin":
+            self.send_raw(self.JSMIME_QUIET, "application/octet-stream")
+            return
+        if rest == "json/d.json":
+            # Not a script type: widening the JS set must not reach this one.
+            self.send_raw(b'{ "u": "jsn1.html" }\n', "application/json")
+            return
+        key = rest.split("/")[0]
+        if key in self.JSMIME_TYPES:
+            ctype, ext = self.JSMIME_TYPES[key]
+            if rest == "%s/s.%s" % (key, ext):
+                self.send_raw(self.jsmime_script(key), ctype)
+                return
+        elif re.fullmatch(r"[a-z]{3}[123]\.html", rest):
+            self.send_html("\tTarget %s reached from a script.\n" % rest)
+            return
+        self.send_error(404)
+
     # --- type/extension matrix (issue #267 family) -------------------------
 
     def send_raw(self, body, content_type, extra_headers=()):
@@ -1121,6 +1184,33 @@ class Handler(SimpleHTTPRequestHandler):
             b"KEEP-STAY-V%d\n" % v + b"\x71\x72\x73\x74" * 512,
             "application/octet-stream",
         )
+
+    # Range-capable asset for 343: a resume at or past the end gets the 416 the
+    # on-disk acceptance path reads as "already complete", shorter gets a 206.
+    RANGED_BIN = b"RANGED-" + bytes((i * 11 + 5) % 256 for i in range(8192))
+
+    def route_ranged_asset(self):
+        body = self.RANGED_BIN
+        m = re.match(r"bytes=(\d+)-", self.headers.get("Range", "") or "")
+        start = int(m.group(1)) if m else 0
+        if not m or start == 0:
+            self.send_raw(body, "application/octet-stream")
+        elif start >= len(body):
+            self.send_response(416, "Requested Range Not Satisfiable")
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Range", "bytes */%d" % len(body))
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        else:
+            self.send_response(206, "Partial Content")
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header(
+                "Content-Range", "bytes %d-%d/%d" % (start, len(body) - 1, len(body))
+            )
+            self.send_header("Content-Length", str(len(body) - start))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body[start:])
 
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
@@ -2671,6 +2761,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/keep/data.bin": route_keep_data,
         "/keep/err.bin": route_keep_err,
         "/keep/stay.bin": route_keep_stay,
+        "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
         "/types/photo.png": route_types,
@@ -3024,6 +3115,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/asset/"):
             self.route_asset()
+            return True
+        if path.startswith("/jsmime/"):
+            self.route_jsmime()
             return True
         if path.startswith("/charset/"):
             self.route_charset()
