@@ -548,7 +548,8 @@ static void changes_serialize(httrackp *opt, String *out) {
   StringCat(*out, ",\n  \"partial\": ");
   StringCat(*out, changes->overflow ? "true" : "false");
   StringCat(*out, ",\n  \"purged\": ");
-  StringCat(*out, opt->delete_old ? "true" : "false");
+  /* links_unqueued holds the purge back for the whole run */
+  StringCat(*out, opt->delete_old && !opt->links_unqueued ? "true" : "false");
 
   StringCat(*out, ",\n  \"counts\": {");
   for (bucket = 0; bucket < HTS_CHANGE_BUCKETS; bucket++) {

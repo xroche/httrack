@@ -574,6 +574,11 @@ struct httrackp {
   int wizard_filters; /**< count of filters the wizard has inserted, held at the
                            low indices of the array. Live state, so copy_htsopt
                            must leave it alone. Tail: ABI */
+  hts_boolean links_unqueued; /**< a page gave up before it could be parsed, so
+                                   the links it carries were never queued and
+                                   the update purge would take what they point
+                                   at. Live state, so copy_htsopt must leave it
+                                   alone. Tail: ABI */
 };
 
 /* Running statistics for a mirror. */

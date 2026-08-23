@@ -1212,6 +1212,43 @@ class Handler(SimpleHTTPRequestHandler):
             if self.command != "HEAD":
                 self.wfile.write(body[start:])
 
+    # --- a hub page that fails on the update, taking its children with it --
+    # The children are only reachable through hub.html: if the engine drops
+    # them from new.lst because the hub was never parsed, the purge unlinks
+    # them. gone.html is the live control -- it really does leave the site.
+    HUBFAIL_CHILD = b"<html><body><p>HUBFAIL-CHILD-%d</p></body></html>"
+
+    def route_hubfail_index(self):
+        links = '\t<a href="hub.html">hub</a>\n\t<a href="leaf.html">leaf</a>\n'
+        if self.refetch_pass() <= 2:  # dropped for the third crawl only
+            links += '\t<a href="gone.html">gone</a>\n'
+        self.send_html(links)
+
+    # Hangs up for the whole of the caller's second crawl -- fetches 2 and 3,
+    # its initial request and the one retry --retries=1 buys -- then answers
+    # again, so the purge the fix defers can be seen to happen on the next
+    # clean crawl.
+    def route_hubfail_hub(self):
+        if 2 <= self.refetch_pass() <= 3:
+            self.send_cut_headers()
+        else:
+            self.send_html(
+                '\t<a href="child1.html">c1</a>\n\t<a href="child2.html">c2</a>\n'
+            )
+
+    def route_hubfail_child(self):
+        n = int(self.path.rstrip(".html")[-1])
+        self.send_raw(self.HUBFAIL_CHILD % n, "text/html")
+
+    # Control: linked from the index on both passes, so it is never at risk.
+    def route_hubfail_leaf(self):
+        self.send_raw(b"<html><body><p>HUBFAIL-LEAF</p></body></html>", "text/html")
+
+    # Control: the index stops linking it on the third crawl, the one where
+    # nothing fails, so that crawl must purge it.
+    def route_hubfail_gone(self):
+        self.send_raw(b"<html><body><p>HUBFAIL-GONE</p></body></html>", "text/html")
+
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
         self.send_raw(
@@ -2761,6 +2798,12 @@ class Handler(SimpleHTTPRequestHandler):
         "/keep/data.bin": route_keep_data,
         "/keep/err.bin": route_keep_err,
         "/keep/stay.bin": route_keep_stay,
+        "/hubfail/index.html": route_hubfail_index,
+        "/hubfail/hub.html": route_hubfail_hub,
+        "/hubfail/child1.html": route_hubfail_child,
+        "/hubfail/child2.html": route_hubfail_child,
+        "/hubfail/leaf.html": route_hubfail_leaf,
+        "/hubfail/gone.html": route_hubfail_gone,
         "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,

@@ -3554,6 +3554,24 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
   return strcasecmp(n_fil, pn_fil) == 0;
 }
 
+/* Could this link have carried links of its own? Its own answer first, then
+   what the previous run recorded for it, then the name that run saved it
+   under. */
+static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
+                                            const htsblk *r, const char *adr,
+                                            const char *fil, const char *save) {
+  if (strnotempty(r->contenttype))
+    return is_hypertext_mime(opt, r->contenttype, fil) ? HTS_TRUE : HTS_FALSE;
+  {
+    const htsblk prev = cache_read_including_broken(opt, cache, adr, fil, NULL);
+
+    if (prev.statuscode > 0 && strnotempty(prev.contenttype))
+      return is_hypertext_mime(opt, prev.contenttype, save) ? HTS_TRUE
+                                                            : HTS_FALSE;
+  }
+  return ishtml(opt, save) == 1 ? HTS_TRUE : HTS_FALSE;
+}
+
 /*
 Check 301, 302, .. statuscodes (moved)
 */
@@ -3908,6 +3926,18 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
                */
               HTS_STAT.stat_errors_front++;
             }
+          }
+
+          /* Retries are gone and the page was never parsed, so the links it
+             carries were never queued: they are missing from new.lst through
+             no fault of the site, and the purge must not read that as gone.
+             A failure this side of the headers leaves no content type; what
+             the previous run cached for this URL is the better evidence, and
+             a link it never mirrored has no children in old.lst anyway. */
+          if (can_retry && !heap(ptr)->testmode &&
+              hts_link_may_carry_links(opt, cache, r, urladr(), urlfil(),
+                                       savename())) {
+            opt->links_unqueued = HTS_TRUE;
           }
 
         } else { // retry, or a refused-resume restart

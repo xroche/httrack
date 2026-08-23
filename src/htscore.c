@@ -2110,6 +2110,18 @@ int httpmirror(char *url1, httrackp * opt) {
     } else if (opt->delete_old || opt->changes) {
       FILE *old_lst, *new_lst;
 
+      /* A page that gave up before it could be parsed leaves the links it
+         carries out of new.lst, so their absence says nothing about the site:
+         report the difference, delete none of it. */
+      const hts_boolean purge_files = opt->delete_old && !opt->links_unqueued;
+
+      if (opt->delete_old && !purge_files) {
+        hts_log_print(opt, LOG_WARNING,
+                      "A page could not be fetched and the links it carries "
+                      "were never scanned: keeping all previously mirrored "
+                      "files");
+      }
+
       hts_changes_indexed(opt);
       //
       opt->state._hts_in_html_parsing = 3;
@@ -2154,13 +2166,12 @@ int httpmirror(char *url1, httrackp * opt) {
                        is about to be purged, its previous copy stands and the
                        file is not gone. */
                     const hts_boolean kept =
-                        !opt->delete_old &&
-                        hash_read(opt->hash, file, NULL,
-                                  HASH_STRUCT_FILENAME) >= 0;
+                        !purge_files && hash_read(opt->hash, file, NULL,
+                                                  HASH_STRUCT_FILENAME) >= 0;
 
                     hts_changes_dropped(
                         opt, file + StringLength(opt->path_html), kept);
-                    if (opt->delete_old) {
+                    if (purge_files) {
                       hts_log_print(opt, LOG_INFO, "Purging %s", file);
                       UNLINK(file);
                       purge = 1;
@@ -2168,7 +2179,7 @@ int httpmirror(char *url1, httrackp * opt) {
                   }
                 }
               }
-              if (opt->delete_old) { // emptied directories go with the files
+              if (purge_files) { // emptied directories go with the files
                 fseek(old_lst, 0, SEEK_SET);
                 while(!feof(old_lst)) {
                   linput(old_lst, line, 1000);
@@ -2201,7 +2212,7 @@ int httpmirror(char *url1, httrackp * opt) {
                 }
               }
               //
-              if (opt->delete_old && !purge) {
+              if (purge_files && !purge) {
                 hts_log_print(opt, LOG_INFO, "No files purged");
               }
             }
