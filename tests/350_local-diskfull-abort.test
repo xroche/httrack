@@ -17,8 +17,11 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_diskfull.XXXXXX")
 cleanup() { rm -rf "$tmpdir"; }
 cleanup_push cleanup
 
-# Probe the mechanism, not the node: MSYS answers `test -w /dev/full` and then
-# copies the file instead of linking it, so the writes below would succeed.
+# Probe the mechanism, not the node. Two ways this stand-in fails without
+# saying so: macOS has no /dev/full and links to it happily, so the write below
+# fails with ENOENT rather than ENOSPC; MSYS has the node but copies the file
+# instead of linking it, so the write succeeds.
+test -c /dev/full || skip "no /dev/full device"
 probe="${tmpdir}/probe"
 ln -s /dev/full "$probe" 2>/dev/null || skip "cannot symlink /dev/full"
 if printf x >"$probe" 2>/dev/null; then
