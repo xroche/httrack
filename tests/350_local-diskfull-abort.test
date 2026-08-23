@@ -17,10 +17,12 @@ tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_diskfull.XXXXXX")
 cleanup() { rm -rf "$tmpdir"; }
 cleanup_push cleanup
 
-# Probe the mechanism, not the node. Two ways this stand-in fails without
-# saying so: macOS has no /dev/full and links to it happily, so the write below
-# fails with ENOENT rather than ENOSPC; MSYS has the node but copies the file
-# instead of linking it, so the write succeeds.
+# The engine here is a native binary and the shell is MSYS, so a symlink the
+# shell writes through as /dev/full is a plain file to the crawl: the probe
+# below cannot see that difference and would let the test run.
+skip_on_windows "a native binary does not follow an MSYS symlink to /dev/full"
+# Probe the mechanism, not the node: macOS has no /dev/full and links to it
+# happily, so a write through the probe fails with ENOENT rather than ENOSPC.
 test -c /dev/full || skip "no /dev/full device"
 probe="${tmpdir}/probe"
 ln -s /dev/full "$probe" 2>/dev/null || skip "cannot symlink /dev/full"
