@@ -297,6 +297,166 @@ for f in "$langdir"/*.txt; do
     fi
 done
 
+# WinHTTrack sprintf()s these strings, and %n/%N/%t/%p/%h/%M/%Q/%q double as
+# HTTrack's own build-string letters, so a lost or invented one breaks either.
+# No positional specifiers, so a %s that swaps with a %d takes its argument.
+placeholder_drift() {
+    LC_ALL=C awk '
+        # Two characters from each %, so a printf conversion and a build-string
+        # letter read alike; %% pairs off on both sides and cancels.
+        function toks(s,   n, i, out) {
+            n = length(s)
+            for (i = 1; i <= n; i++)
+                if (substr(s, i, 1) == "%") {
+                    out = out substr(s, i, 2) " "
+                    i++
+                }
+            return out
+        }
+        FNR == 1 { name = FILENAME; sub(/.*\//, "", name) }
+        { sub(/\r$/, "") }
+        FNR % 2 == 1 { key = $0; next }
+        # An empty value falls back to English; the untranslated pin owns it.
+        $0 == "" { next }
+        {
+            pairs++
+            want = toks(key)
+            got = toks($0)
+            if (want != got) {
+                printf "%s:%d: placeholders [%s] became [%s]\n", name, FNR, want, got
+                bad++
+            }
+        }
+        END { printf "pairs=%d\n", pairs; exit(bad > 0) }
+    ' "$@"
+}
+
+# One control per direction: a dropped placeholder, then an invented one. A file
+# carrying no % at all would satisfy the check with the scanner doing nothing.
+printf 'Delete %%s?\nSupprimer ?\n' >"$tmp/dropped.txt"
+printf 'Delete?\nSupprimer %%s ?\n' >"$tmp/invented.txt"
+printf 'Delete %%s?\nSupprimer %%d ?\n' >"$tmp/swapped.txt"
+printf 'Copy %%s to %%d\nCopie %%d vers %%s\n' >"$tmp/reordered.txt"
+for probe in dropped invented swapped reordered; do
+    if placeholder_drift "$tmp/$probe.txt" >/dev/null; then
+        echo "the placeholder check passed a deliberately damaged value ($probe)"
+        exit 1
+    fi
+done
+
+placeholder_drift "$langdir"/*.txt >"$tmp/ph" || fail=1
+LC_ALL=C sed '/^pairs=/d' "$tmp/ph"
+# Every catalog carries English.txt's msgid count, minus the few empty values
+# skipped above; far fewer means the scan read something other than the catalogs.
+npairs=$(LC_ALL=C sed -n 's/^pairs=//p' "$tmp/ph")
+if [ "${npairs:-0}" -lt $((nfiles * nkeys * 9 / 10)) ]; then
+    echo "placeholder check saw only ${npairs:-0} value lines across $nfiles catalogs"
+    exit 1
+fi
+
+# conv_printf() copies the letter after an unknown escape and drops the backslash,
+# so a "\n" that lost its n merges two combo-box rows and mislabels every row after.
+unknown_escapes() {
+    LC_ALL=C awk -v name="$2" -v showok="${3:-}" '
+        # Built here from character codes: a quote or a backslash spelled inside
+        # an -v assignment is eaten before awk sees it.
+        BEGIN {
+            ok = "abfnrtv?" sprintf("%c%c%c", 39, 34, 92)
+            if (showok) { print ok; exit }
+        }
+        { sub(/\r$/, "") }
+        NR % 2 == 1 { next }
+        {
+            values++
+            n = length($0)
+            for (i = 1; i <= n; i++)
+                if (substr($0, i, 1) == "\\") {
+                    c = substr($0, i + 1, 1)
+                    if (c == "" || index(ok, c) == 0)
+                        printf "%s:%d: \\%s is not an escape; conv_printf drops the backslash\n",
+                            name, NR, (c == "" ? "<end of line>" : c)
+                    i++
+                }
+        }
+        END { printf "values=%d\n", values + 0 }
+    ' "$1"
+}
+
+if ! command -v iconv >/dev/null 2>&1; then
+    echo "iconv not found; escape check skipped" >&2
+else
+    # Controls: a lost n, then a dangling backslash. Match the complaint rather
+    # than the status, since an empty report also reads as success.
+    printf 'Two lines\nDeux lignes\\mTrois lignes\n' >"$tmp/lostn.txt"
+    printf 'Ends badly\nFinit mal\\\n' >"$tmp/dangling.txt"
+    escape_wanted() { [ "$1" = lostn ] && printf '\\m' || printf '\\<end of line>'; }
+    # An escaped backslash is legal and common (Windows paths in English.txt:812),
+    # so prove the check does not fire on one.
+    printf 'A path\nC:\\\\Temp\n' >"$tmp/legal.txt"
+    for probe in lostn dangling; do
+        case $(unknown_escapes "$tmp/$probe.txt" "$probe.txt" | LC_ALL=C sed '/^values=/d') in
+        *"$(escape_wanted "$probe") is not an escape"*) ;;
+        *)
+            echo "the escape check passed a deliberately broken value ($probe)"
+            exit 1
+            ;;
+        esac
+    done
+    if [ -n "$(unknown_escapes "$tmp/legal.txt" legal.txt | LC_ALL=C sed '/^values=/d')" ]; then
+        echo "the escape check rejects a legally escaped backslash"
+        exit 1
+    fi
+    # The set is the spec, mirroring conv_printf's switch: a probe can only ever
+    # name the letters it happens to use, so widening by any other one is invisible.
+    want_ok="abfnrtv?$(printf '\047\042\134')"
+    got_ok=$(printf 'x\ny\n' >"$tmp/ok.txt" && unknown_escapes "$tmp/ok.txt" ok.txt 1 | head -1)
+    if [ "$got_ok" != "$want_ok" ]; then
+        echo "the escape valid set is [$got_ok], expected [$want_ok]"
+        exit 1
+    fi
+
+    # One probe per letter the catalogs actually got wrong, so a widened set
+    # also fails loudly rather than only through the pin above.
+    printf 'Five bad\na\\Pb\\Dc\\Kd\\he\\sf\n' >"$tmp/letters.txt"
+    nbad=$(unknown_escapes "$tmp/letters.txt" letters.txt | LC_ALL=C grep -c 'is not an escape') || true
+    if [ "${nbad:-0}" -ne 5 ]; then
+        echo "the escape check named ${nbad:-0} of 5 bad escape letters"
+        exit 1
+    fi
+
+    # Shift-JIS maps 0x5C to the yen sign, hiding every escape in Japanese.txt
+    # from the scan below. The engine reads the byte, so put the backslashes back.
+    yen=$(printf '\302\245')
+    nesc=0
+    for f in "$langdir"/*.txt; do
+        nesc=$((nesc + 1))
+        cs=$(field "$f" LANGUAGE_CHARSET)
+        # Decoded, not raw: 0x5C is a legal trail byte in BIG5 and Shift-JIS.
+        LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/esc" || fail "${f##*/}: iconv cannot read $cs"
+        case $(printf '%s' "$cs" | LC_ALL=C tr '[:upper:]' '[:lower:]') in
+        shift-jis | shift_jis | sjis | cp932)
+            LC_ALL=C sed "s|$yen|\\\\|g" "$tmp/esc" >"$tmp/esc.bs" && mv "$tmp/esc.bs" "$tmp/esc"
+            ;;
+        esac
+        out=$(unknown_escapes "$tmp/esc" "${f##*/}")
+        nval=$(printf '%s\n' "$out" | LC_ALL=C sed -n 's/^values=//p')
+        # A scan that stopped after the first pair would satisfy every control.
+        if [ "${nval:-0}" -lt $((nkeys * 9 / 10)) ]; then
+            echo "${f##*/}: escape scan read only ${nval:-0} of $nkeys values"
+            exit 1
+        fi
+        found=$(printf '%s\n' "$out" | LC_ALL=C sed '/^values=/d')
+        if [ -n "$found" ]; then
+            printf '%s\n' "$found"
+            fail=1
+        fi
+    done
+    if [ "$nesc" -ne "$nfiles" ]; then
+        echo "escape check saw $nesc of $nfiles language files"
+        exit 1
+    fi
+fi
+
 # A value copied verbatim from its msgid, or left empty, passes every check above
 # while the string is still English on screen (#1260). A handful are legitimate,
 # so the per-catalog counts are pinned and have to match exactly.
@@ -398,6 +558,254 @@ elif [ "$rc" -ne 0 ]; then
     fail=1
 fi
 
+# These name real paths on disk and on the wire, so a translated one sends the
+# user nowhere: "htscache/new.*" and "robot.txt" both shipped. Case is the
+# translator's, spelling is not, and example hostnames stay their call. Counted
+# rather than matched: keeping one web/ of eleven still misroutes ten rows.
+# Counts must match: one too few loses a path, one too many duplicates a row.
+literal_tokens="hts-cache robots.txt cgi-bin web/images web/html"
+translated_literals() {
+    LC_ALL=C awk -v name="$2" -v toks="$literal_tokens" '
+        function count(hay, needle,   n, i) {
+            n = 0
+            i = index(hay, needle)
+            while (i > 0) {
+                n++
+                hay = substr(hay, i + length(needle))
+                i = index(hay, needle)
+            }
+            return n
+        }
+        BEGIN { split(toks, t, " ") }
+        { sub(/\r$/, "") }
+        NR % 2 == 1 { key = $0; next }
+        $0 == "" { next }
+        {
+            for (i in t) {
+                want = count(tolower(key), t[i])
+                got = count(tolower($0), t[i])
+                if (got != want)
+                    printf "%s:%d: msgid names %s %d times, the translation %d\n",
+                        name, NR, t[i], want, got
+            }
+        }
+    ' "$1"
+}
+
+# A fixture carrying one kept and one lost literal, so a checker that never
+# fires cannot pass for one that has nothing to report.
+printf 'Erase hts-cache/new.*\nEfface htscache/new.*\nFollow robots.txt\nSuivre robot.txt\nrobots.txt, robots.txt and robots.txt\nrobots.txt et robots.txt\nHtml in web/images and web/images\nHtml dans web/images\nHtml in web/html\nHtml dans web/html et web/html\nSee cgi-bin\nVoir cgi-poubelle\n' >"$tmp/literals.txt"
+case $(translated_literals "$tmp/literals.txt" literals.txt) in
+*"msgid names robots.txt 1 times, the translation 0"*) ;;
+*)
+    echo "the literal-token check missed a translated robots.txt"
+    exit 1
+    ;;
+esac
+# Two findings, not one: the second pair drops one robots.txt of three, which a
+# checker looking only for presence would pass.
+# The list is the spec, so pin it: a fixture can only ever exercise the tokens
+# it happens to name, and dropping any other one would go unnoticed.
+want_tokens="hts-cache robots.txt cgi-bin web/images web/html"
+if [ "$literal_tokens" != "$want_tokens" ]; then
+    echo "literal_tokens is [$literal_tokens], expected [$want_tokens]"
+    exit 1
+fi
+
+# One damaged pair per token, so narrowing the list cannot pass, plus the other
+# direction: a token named twice where the msgid names it once duplicates a
+# dropdown row, so a one-sided comparison has to fail here too.
+if [ "$(translated_literals "$tmp/literals.txt" literals.txt | wc -l)" -ne 6 ]; then
+    echo "the literal-token check did not report all six damaged fixtures"
+    exit 1
+fi
+
+for f in "$langdir"/*.txt; do
+    found=$(translated_literals "$f" "${f##*/}")
+    if [ -n "$found" ]; then
+        printf '%s\n' "$found"
+        fail=1
+    fi
+done
+
+# A combo-box "\n" starts a row, so a value whose break count differs from its
+# msgid shifts every row after it. Most drift here is prose reflowed to another
+# width, so counts are pinned per catalog; a new one has to be looked at.
+count_linebreaks() {
+    LC_ALL=C awk -v name="$2" '
+        # Escaped backslashes go first: in "\\n" the break belongs to neither
+        # the pair nor the n, and counting it hides a row that never breaks.
+        function breaks(s,   n) {
+            gsub(/\\\\/, "", s)
+            n = gsub(/\\r\\n/, "", s)
+            return n + gsub(/\\n/, "", s)
+        }
+        { sub(/\r$/, "") }
+        NR % 2 == 1 { key = $0; next }
+        # An empty value renders as English, breaks included.
+        $0 == "" { next }
+        breaks(key) != breaks($0) { drift++ }
+        END { printf "%-25s %d\n", name, drift + 0 }
+    ' "$1"
+}
+
+# A catalog pinned at zero would also match a counter stuck there, so count a
+# fixture holding one drifting pair and one matching pair first.
+printf 'a\\nb\nx\\ny\nc\\nd\nz\ne\\nf\ng\\\\nh\n' >"$tmp/breaks.txt"
+got=$(count_linebreaks "$tmp/breaks.txt" breaks.txt)
+want=$(printf '%-25s %d\n' breaks.txt 2)
+if [ "$got" != "$want" ]; then
+    echo "the line-break counter miscounts a known fixture: got [$got] want [$want]"
+    exit 1
+fi
+
+lbpin="$testdir/62_lang-linebreaks.counts"
+[ -f "$lbpin" ] || fail "cannot find $lbpin"
+: >"$tmp/lb"
+for f in "$langdir"/*.txt; do
+    [ "$f" != "$eng" ] || continue
+    count_linebreaks "$f" "${f##*/}" >>"$tmp/lb"
+done
+LC_ALL=C sort -o "$tmp/lb" "$tmp/lb"
+LC_ALL=C awk -v pin="$lbpin" '
+    BEGIN {
+        while ((getline line < pin) > 0) {
+            sub(/\r$/, "", line)
+            if (line ~ /^[ \t]*(#|$)/)
+                continue
+            if (split(line, a, /[ \t]+/) != 2 || a[2] !~ /^[0-9]+$/ || a[1] in pinned) {
+                printf "%s: malformed pin line: %s\n", pin, line
+                bad++
+                continue
+            }
+            want[a[1]] = a[2]
+            pinned[a[1]] = 1
+        }
+    }
+    {
+        seen[$1] = 1
+        if (!($1 in pinned)) {
+            printf "%s: no pinned line-break count; add it\n", $1
+            bad++
+            next
+        }
+        if ($2 > want[$1])
+            printf "%s: %d values whose line breaks differ from their msgid, pinned at %d: read the new one before raising it\n", $1, $2, want[$1], bad++
+        else if ($2 < want[$1])
+            printf "%s: %d line-break mismatches, pinned at %d: lower the pin\n", $1, $2, want[$1], bad++
+    }
+    END {
+        for (f in pinned)
+            if (!(f in seen)) {
+                printf "%s: pinned but no such catalog\n", f
+                bad++
+            }
+        exit(bad > 0)
+    }
+' "$tmp/lb" || fail=1
+
+# A single-byte charset maps all 256 values, so a catalog can declare the wrong
+# one and still decode: Romanian said ISO-8859-1 with ISO-8859-2 bytes for years,
+# and every a-breve reached the browser as a-tilde. Catch it by naming letters
+# the language never writes. These are not merely absent from the language, they
+# are what reading its own bytes as Latin-1 produces, which is the mistake being
+# caught; the loop below proves each row still fires. A language absent from the
+# table is unchecked, so a pass here says nothing about one.
+never_used="ro:ãºþ pl:¹³ê¿ cs:øìèù sk:è¾ï hu:õû hr:èæð sl:è"
+
+foreign_letters() {
+    LC_ALL=C awk -v name="$2" -v iso="$3" -v only="${4:-}" -v table="$never_used" '
+        BEGIN {
+            n = split(table, rows, " ")
+            for (i = 1; i <= n; i++) {
+                split(rows[i], kv, ":")
+                if (kv[1] == iso)
+                    bad = kv[2]
+            }
+            if (only != "")
+                bad = only
+            if (bad == "")
+                exit 0
+        }
+        { sub(/\r$/, "") }
+        NR % 2 == 1 { next }
+        {
+            # Byte-wise under LC_ALL=C, so walk the UTF-8 two-byte sequences.
+            for (i = 1; i <= length(bad); i += 2) {
+                ch = substr(bad, i, 2)
+                if (index($0, ch) > 0) {
+                    # One line per catalog: a wrong charset hits nearly every
+                    # value, and the count is the evidence, not the list.
+                    if (hits++ == 0)
+                        printf "%s:%d: %s is not used in %s; the declared charset is wrong\n",
+                            name, NR, ch, iso
+                    break
+                }
+            }
+        }
+        END {
+            if (hits > 1)
+                printf "%s: %d more values carry letters %s does not use\n",
+                    name, hits - 1, iso
+        }
+    ' "$1"
+}
+
+if ! command -v iconv >/dev/null 2>&1; then
+    echo "iconv not found; charset repertoire check skipped" >&2
+else
+    # Every row must fire when its own catalog is read as Latin-1, the mislabel
+    # this exists to catch. A row naming letters that mistake never produces is
+    # inert, and an inert row reads exactly like a clean catalog.
+    for row in $never_used; do
+        riso=${row%%:*}
+        rfile=""
+        for f in "$langdir"/*.txt; do
+            [ "$(field "$f" LANGUAGE_ISO)" = "$riso" ] || continue
+            rfile=$f
+            break
+        done
+        if [ -z "$rfile" ]; then
+            echo "never_used names $riso, which no catalog declares"
+            exit 1
+        fi
+        LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$rfile" >"$tmp/mis"
+        # Per letter, not per row: a row keeping one live letter of three would
+        # otherwise pass while the rest of it sat dead.
+        # Process substitution, not a pipe: a piped loop runs in a subshell and
+        # its exit would not end the test.
+        while read -r letter; do
+            if [ -z "$(foreign_letters "$tmp/mis" "${rfile##*/}" "$riso" "$letter")" ]; then
+                echo "never_used $riso lists $letter, which a Latin-1 misread never makes"
+                exit 1
+            fi
+        done < <(LC_ALL=C awk -v l="${row#*:}" '
+            BEGIN { for (i = 1; i <= length(l); i += 2) print substr(l, i, 2) }')
+    done
+
+    # Control: Romanian read as the Latin-1 it used to claim must be rejected,
+    # and read as the Latin-2 it is must pass.
+    LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$langdir/Romanian.txt" >"$tmp/ro-wrong"
+    if [ -z "$(foreign_letters "$tmp/ro-wrong" Romanian.txt ro)" ]; then
+        echo "the charset check passed Romanian decoded as ISO-8859-1"
+        exit 1
+    fi
+    LC_ALL=C iconv -f ISO-8859-2 -t UTF-8 "$langdir/Romanian.txt" >"$tmp/ro-right"
+    if [ -n "$(foreign_letters "$tmp/ro-right" Romanian.txt ro)" ]; then
+        echo "the charset check rejected Romanian decoded as ISO-8859-2"
+        exit 1
+    fi
+
+    for f in "$langdir"/*.txt; do
+        cs=$(field "$f" LANGUAGE_CHARSET)
+        LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/rep" || fail "${f##*/}: iconv cannot read $cs"
+        found=$(foreign_letters "$tmp/rep" "${f##*/}" "$(field "$f" LANGUAGE_ISO)")
+        if [ -n "$found" ]; then
+            printf '%s\n' "$found"
+            fail=1
+        fi
+    done
+fi
 # An unknown ${LANG_*} renders as nothing rather than erroring, so check that
 # every macro the templates interpolate, in any wrapper form, resolves.
 LC_ALL=C grep -oh '[$]{[^}]*LANG_[A-Za-z0-9_]*}' "$top_srcdir"/html/server/*.html |

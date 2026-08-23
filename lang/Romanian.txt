@@ -7,11 +7,11 @@ ro
 LANGUAGE_AUTHOR
 Alin Gheorghe Miron (miron.alin@personal.ro)
 LANGUAGE_CHARSET
-ISO-8859-1
+ISO-8859-2
 LANGUAGE_WINDOWSID
 Romanian
 OK
-LANGUAGE_WINDOWSID
+OK
 Cancel
 Anuleazã
 Exit
@@ -85,7 +85,7 @@ blue\r\nVa gãsi toate fiºierele care conþin un subºir 'blue' cum ar fi  'bluesky
 bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
 bigfile.mov\r\nVa detecta numai fiºierul  'bigfile.mov', dar nu ºi  'bigfile2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
-cgi\r\nVa gãsi linkuri spre folderele în  numele  cãrora  se gãseºte subºirul "cgi" cum ar fi /cgi/bin/oricecgi,cgi
+cgi\r\nVa gãsi linkuri spre folderele în  numele  cãrora  se gãseºte subºirul "cgi" cum ar fi /cgi-bin/oricecgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
 cgi-bin\r\nVa gãsi linkuri spre folderele în  numele  cãrora  se gãseºte numai subºirul  'cgi-bin' (dar nu ºi  cgi-bin-2, de exemplu)
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
@@ -903,7 +903,7 @@ Nume de fiºier cu extensie:\nNume de fiºiere ce conþin:\nAcest nume de fiºier:\n
 Show all\nHide debug\nHide infos\nHide debug and infos
 Aratã tot\nAscunde informaþiile de depanare\nAscunde informaþiile generale\nAscunde ºi informaþiile de depanare ºi cele generale
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Structura site-ului (implicit)\nHtml în web/,       imagini/alte fiºiere din web/imagini/\nHtml în web/html,   imagini/altele în web/imagini\nHtml în web/,       imagini/altele în web/\nHtml în web/,       imagini/altele în web/xxx, unde xxx este extensia fiºierului\nHtml în web/html,   imagini/altele în web/xxx\nStructura-site, fãrã www.domeniu.xxx/\nHtml în numele_site-ului/, imagini/alte fiºiere în numele_site-ului/imagini/\nHtml în numele_site-ului/html, imagini/altele  în numele_site-ului/imagini\nHtml în site_name/, imagini/altele în numele_site-ului /\nHtml în numele_site-ului/, imagini/altele în numele_site-ului/xxx\nHtml în numele_site-ului/html, imagini/alte în numele_site-ului/xxx\nToate fiºierele în web/, cu nume aleatoare (gadget !)\nToate fiºierele în numele_site-ului/, cu nume aleatoare (gadget !)\nStructurã personalizatã (definitã de utilizator )..
+Structura site-ului (implicit)\nHtml în web/,       imagini/alte fiºiere din web/images/\nHtml în web/html,   imagini/altele în web/images\nHtml în web/,       imagini/altele în web/\nHtml în web/,       imagini/altele în web/xxx, unde xxx este extensia fiºierului\nHtml în web/html,   imagini/altele în web/xxx\nStructura-site, fãrã www.domain.xxx/\nHtml în site_name/, imagini/alte fiºiere în site_name/images/\nHtml în site_name/html, imagini/altele  în site_name/images\nHtml în site_name/, imagini/altele în site_name/\nHtml în site_name/, imagini/altele în site_name/xxx\nHtml în site_name/html, imagini/alte în site_name/xxx\nToate fiºierele în web/, cu nume aleatoare (gadget !)\nToate fiºierele în site_name/, cu nume aleatoare (gadget !)\nStructurã personalizatã (definitã de utilizator )..
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
 Doar scaneazã\nStocheazã fiºiere\nStocheazã fiºiere non HTML\nStocheazã toate fiºierele (implicit)\nStocheazã întâi fiºierele html
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down

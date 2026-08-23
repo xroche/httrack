@@ -87,7 +87,7 @@ bigfile.mov\r\nЌе ја најде датотеката 'bigfile.mov', но не и 'bigfile2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
 cgi\r\nЌе најде линкови со фолдер чие име го содржи суб-стрингот 'cgi' како на пример  /cgi-bin/somecgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
-cgi-bin\r\Ќе најде линкови со фолдер чие име го содржи целиот 'cgi-bin' стринг (но не и cgi-bin-2, на пример)
+cgi-bin\r\nЌе најде линкови со фолдер чие име го содржи целиот 'cgi-bin' стринг (но не и cgi-bin-2, на пример)
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
 someweb.com\r\nЌе најде линкови како  www.someweb.com, private.someweb.com итн.
 someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
@@ -641,7 +641,7 @@ Save settings only, do not launch download now.
 On hold
 На чекање
 Transfer scheduled for: (hh/mm/ss)
-Трансферот е закажан за: (hh\mm\ss)
+Трансферот е закажан за: (hh/mm/ss)
 Start
 Старт
 Connect to provider (RAS)
@@ -653,7 +653,7 @@ Disconnect when finished
 Disconnect modem on completion
 Дисконектирај го модемот на крај
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\Ве молиме известете не за било каква грешка или проблем)\r\n\r\nDevelopment:\r\nИнтерфејс (Windows):Xavier Roche\r\nSpider:Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche и други\r\nМНОГУ БЛАГОДАРНОСТ за македонскиот превод на:\r\nАлександар Савиќ (aleks@macedonia.eu.org)
+\r\n(Ве молиме известете не за било каква грешка или проблем)\r\n\r\nDevelopment:\r\nИнтерфејс (Windows):Xavier Roche\r\nSpider:Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche и други\r\nМНОГУ БЛАГОДАРНОСТ за македонскиот превод на:\r\nАлександар Савиќ (aleks@macedonia.eu.org)
 About WinHTTrack Website Copier
 За WinHTTrack Website Copier
 Please visit our Web page
@@ -903,9 +903,9 @@ File names with extension:\nFile names containing:\nThis file name:\nFolder name
 Show all\nHide debug\nHide infos\nHide debug and infos
 Покажи ги сите\nСокриј debug\nСокриј ги информациите\nСокриј debug и информации
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Структура на сајтот (стандардно)\nHtml во web/,       слики/др. датотеки во web/слики/\nHtml во web/html,   слики/друго во web/слики\nHtml во web/,       слики/друго во web/\nHtml во web/,       слики/друго во web/xxx, каде xxx е наставката на датотеката\nHtml во web/html,   слики/друго во web/xxx\nСтруктура на сајтот, без www.domain.xxx/\nHtml во site_name/, слики/др. датотеки во site_name/слики/\nHtml во site_name/html, слики/друго во site_name/слики\nHtml во site_name/, слики/друго во site_name/\nHtml во site_name/, слики/друго во site_name/xxx\nHtml во site_name/html, слики/друго во site_name/xxx\nСите датотеки во web/, со произволни имиња (gadget !)\nСите датотеки во site_name/, со произволни имиња (gadget !)\nСтруктура дефинирана од корисникот..
+Структура на сајтот (стандардно)\nHtml во web/,       слики/др. датотеки во web/images/\nHtml во web/html,   слики/друго во web/images\nHtml во web/,       слики/друго во web/\nHtml во web/,       слики/друго во web/xxx, каде xxx е наставката на датотеката\nHtml во web/html,   слики/друго во web/xxx\nСтруктура на сајтот, без www.domain.xxx/\nHtml во site_name/, слики/др. датотеки во site_name/images/\nHtml во site_name/html, слики/друго во site_name/images\nHtml во site_name/, слики/друго во site_name/\nHtml во site_name/, слики/друго во site_name/xxx\nHtml во site_name/html, слики/друго во site_name/xxx\nСите датотеки во web/, со произволни имиња (gadget !)\nСите датотеки во site_name/, со произволни имиња (gadget !)\nСтруктура дефинирана од корисникот..
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
-Само скенирај\nСмести ги HTML датотеките\nСмести ги не-HTML датотеките\nСмести ги сите датотеки (default)жнСмести ги првин HTML датотеките
+Само скенирај\nСмести ги HTML датотеките\nСмести ги не-HTML датотеките\nСмести ги сите датотеки (default)\nСмести ги првин HTML датотеките
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
 Остани во истиот директориум\nМоже да оди надолу (default)\nМоже да оди нагоре\nМоже да оди и нагоре и надолу
 Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web

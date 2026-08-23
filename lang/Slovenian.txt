@@ -863,7 +863,7 @@ Prosimo, da zagrabite le mape
 Select user-defined structure?
 Naj izberem uporabniško doloèeno strukturo?
 Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
-Preverite pravilnost uporabniško doloèenega stringa,\ ker bodo imena ponarejena!
+Preverite pravilnost uporabniško doloèenega stringa,\nker bodo imena ponarejena!
 Do you really want to use a user-defined structure?
 Resnièno želite uporabljati uporabniško doloèeno strukturo?
 Too manu URLs, cannot handle so many links!!
