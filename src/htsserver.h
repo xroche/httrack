@@ -88,7 +88,9 @@ extern httrackp *global_opt;
 #define  is_space(c)      ( ((c)==' ') || ((c)=='\"') || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11) || ((c)=='\'') )
 #define  is_realspace(c)  ( ((c)==' ')                || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11)                )
 #define  is_taborspace(c) ( ((c)==' ')                                          || ((c)==9)                             )
-#define is_quote(c) (((c) == '\"') || ((c) == '\''))
+#define  is_quote(c)      (               ((c)=='\"')                                                    || ((c)=='\'') )
+#define  is_retorsep(c)   (                              ((c)==10) || ((c)==13) || ((c)==9)                                          )
+
 #undef min
 #undef max
 #define min(a,b) ((a)>(b)?(b):(a))
