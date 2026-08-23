@@ -54,14 +54,28 @@ grep -rq err-passed "$cap" || fail "the copy missed a passed-through line"
 grep -rq '^out$' "$cap" && fail "stdout leaked into the capture"
 
 # 4. The collector reads the copies, and says so only when one carries a finding.
-"$sh_run" "$report" -s "$cap" "$tmp/absent" >"$tmp/hit.out" 2>&1 && fail "the collector missed the report"
+logs=$tmp/logs
+mkdir -p "$logs"
+"$sh_run" "$report" -s "$cap" "$logs" >"$tmp/hit.out" 2>&1 && fail "the collector missed the report"
 grep -q 'insufficient space' "$tmp/hit.out" || fail "the collector did not print the finding: $(cat "$tmp/hit.out")"
 
 rm -rf "$cap"
 run_wrapped 'echo ordinary chatter >&2' 2>/dev/null
-"$sh_run" "$report" -s "$cap" "$tmp/absent" >"$tmp/clean.out" 2>&1 ||
+"$sh_run" "$report" -s "$cap" "$logs" >"$tmp/clean.out" 2>&1 ||
     fail "the collector reddened a clean run: $(cat "$tmp/clean.out")"
 grep -q 'ordinary chatter' "$tmp/clean.out" && fail "the collector printed a clean capture"
+
+# 4b. A directory that is not there is the wiring having moved, and scanning
+# nothing must not read as a clean run.
+: >"$tmp/plainfile"
+for bad in "$tmp/absent" "$tmp/plainfile"; do
+    rc=0
+    "$sh_run" "$report" -s "$bad" "$logs" >"$tmp/bad.out" 2>&1 || rc=$?
+    assert_eq 2 "$rc" "collector took -s $bad"
+    rc=0
+    "$sh_run" "$report" -s "$cap" "$bad" >"$tmp/bad.out" 2>&1 || rc=$?
+    assert_eq 2 "$rc" "collector took a log dir of $bad"
+done
 
 # 5. The generated shim runs the real engine, PATH-first, with stdout intact.
 [ -n "${HTTRACK_STDERR_WRAP_DIR:-}" ] || skip "HTTRACK_STDERR_WRAP_DIR unset, no automake environment"
