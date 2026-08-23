@@ -606,8 +606,9 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
    (strfield2((a), HTS_UNKNOWN_MIME) !=                                        \
     0) /* no declared type: treat as html */                                   \
   )
-/* Every JavaScript type we link-scan: IANA's text/javascript, which our own
-   mime table emits for .js and .mjs, plus the legacy application spellings. */
+/* Every JavaScript type we link-scan: IANA's text/javascript, which is what
+   servers send and what our own table emits for .mjs, plus the legacy
+   application spellings .js still maps to. */
 #define is_javascript_mime_type(a)                                             \
   ((strfield2((a), "text/javascript") != 0) ||                                 \
    (strfield2((a), "application/javascript") != 0) ||                          \
