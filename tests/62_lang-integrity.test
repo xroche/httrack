@@ -772,13 +772,15 @@ else
         LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$rfile" >"$tmp/mis"
         # Per letter, not per row: a row keeping one live letter of three would
         # otherwise pass while the rest of it sat dead.
-        for letter in $(LC_ALL=C awk -v l="${row#*:}" '
-            BEGIN { for (i = 1; i <= length(l); i += 2) print substr(l, i, 2) }'); do
+        # Process substitution, not a pipe: a piped loop runs in a subshell and
+        # its exit would not end the test.
+        while read -r letter; do
             if [ -z "$(foreign_letters "$tmp/mis" "${rfile##*/}" "$riso" "$letter")" ]; then
                 echo "never_used $riso lists $letter, which a Latin-1 misread never makes"
                 exit 1
             fi
-        done
+        done < <(LC_ALL=C awk -v l="${row#*:}" '
+            BEGIN { for (i = 1; i <= length(l); i += 2) print substr(l, i, 2) }')
     done
 
     # Control: Romanian read as the Latin-1 it used to claim must be rejected,
