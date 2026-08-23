@@ -941,21 +941,6 @@ jobs:
     # The name is a required status check on master; renaming it blocks every PR.
     name: lint (shellcheck, shfmt)
     runs-on: ubuntu-24.04
-    # Every tracked shell script; the globs expand at run time. Kept here so the
-    # shellcheck and shfmt steps below cannot drift apart.
-    env:
-      SHELL_SCRIPTS: >-
-        .githooks/pre-commit
-        bootstrap
-        build.sh
-        html/div/search.sh
-        man/makeman.sh
-        src/htsbasiccharsets.sh
-        src/htsentities.sh
-        src/webhttrack.in
-        tests/*.sh
-        tests/*.test
-        tools/*.sh
     steps:
       - uses: actions/checkout@v7
 
@@ -974,6 +959,28 @@ jobs:
           appstreamcli --version
           black --version
           flake8 --version
+
+      # Read the list rather than hand-keeping one: a script added outside the
+      # old globs then gets checked without anyone widening them.
+      - name: List the tracked shell scripts
+        run: |
+          set -euo pipefail
+          mapfile -t sh < <(
+            git ls-files '*.sh' '*.test'
+            # The rest are named by their shebang, not by an extension.
+            git ls-files | while IFS= read -r f; do
+              case "$f" in *.sh | *.test) continue ;; esac
+              IFS= read -r line <"$f" 2>/dev/null || continue
+              case "$line" in
+              '#!'*/sh | '#!'*/bash | '#!'*/sh\ * | '#!'*/bash\ * | '#!'*env*\ sh | '#!'*env*\ bash)
+                printf '%s\n' "$f"
+                ;;
+              esac
+            done
+          )
+          test "${#sh[@]}" -gt 0  # shellcheck given no paths exits 0, checking nothing
+          echo "${#sh[@]} tracked shell scripts"
+          echo "SHELL_SCRIPTS=${sh[*]}" >> "$GITHUB_ENV"
 
       - name: shellcheck
         run: shellcheck $SHELL_SCRIPTS

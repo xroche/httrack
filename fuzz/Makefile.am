@@ -35,33 +35,5 @@ fuzz_sitemap_SOURCES = fuzz-sitemap.c fuzz.h
 fuzz_arc_SOURCES = fuzz-arc.c fuzz.h $(top_srcdir)/src/proxy/store.c
 fuzz_arc_CPPFLAGS = $(AM_CPPFLAGS) -DZLIB_CONST
 
-# List corpus files explicitly: automake does not expand EXTRA_DIST globs.
-EXTRA_DIST = README.md run-fuzzers.sh \
-	corpus/charset/utf8.txt corpus/charset/latin1.txt corpus/charset/sjis.txt \
-	corpus/meta/meta-charset.html corpus/meta/meta-http-equiv.html \
-	corpus/idna/idna.txt corpus/idna/unicode.txt \
-	corpus/idna/regress-multilabel-leak.txt \
-	corpus/entities/entities.txt \
-	corpus/unescape/percent.txt \
-	corpus/filters/filter.bin corpus/filters/filter-size.bin \
-	corpus/filters/regress-empty-subject-unique.bin \
-	corpus/filters/redos-star-classes.bin \
-	corpus/filters/regress-classdepth-timeout.bin \
-	corpus/url/http-url.txt corpus/url/relative-path.txt \
-	corpus/url/regress-file-empty-path.txt corpus/url/regress-long-path-abort.txt \
-	corpus/header/full-response.txt corpus/header/redirect.txt \
-	corpus/cachendx/new-format.txt corpus/cachendx/old-format.txt \
-	corpus/cachendx/regress-overadvance.bin \
-	corpus/cachendx/regress-truncated-entry.bin \
-	corpus/htsparse/basic.html corpus/htsparse/script-inscript.html \
-	corpus/htsparse/meta-usemap.html corpus/htsparse/malformed.html \
-	corpus/singlefile/img-src.html corpus/singlefile/link-rel.html \
-	corpus/singlefile/style-block.html corpus/singlefile/style-attr.html \
-	corpus/singlefile/srcset.html corpus/singlefile/rawtext.html \
-	corpus/singlefile/malformed.html \
-	corpus/singlefile/mark-at-eof.html corpus/singlefile/mark-only.html \
-	corpus/singlefile/mark-degenerate.html corpus/singlefile/traversal.html \
-	corpus/sitemap/urlset.xml corpus/sitemap/sitemapindex.xml \
-	corpus/sitemap/truncated.xml corpus/sitemap/urlset.xml.gz \
-	corpus/arc/roundtrip.arc corpus/arc/truncated.arc \
-	corpus/arc/regress-null-body.arc
+# Corpus list comes from configure: automake does not expand EXTRA_DIST globs.
+EXTRA_DIST = README.md run-fuzzers.sh $(FUZZ_CORPUS_LIST)
