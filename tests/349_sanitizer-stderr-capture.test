@@ -117,8 +117,7 @@ hit leak '==23646==ERROR: LeakSanitizer: detected memory leaks' \
     'Direct leak of 7 byte(s) in 1 object(s) allocated from:' \
     '    #0 0x4af01b in operator new[](unsigned long) asan_new_delete.cc:66'
 
-# MemorySanitizer reports as WARNING, never ERROR (see the pattern comment
-# above); no SUMMARY line.
+# MemorySanitizer's own finding is a WARNING, not an ERROR; no SUMMARY line.
 hit msan '==29418==WARNING: MemorySanitizer: use-of-uninitialized-value' \
     '    #0 0x4008d6 in main umr.cc:5'
 
@@ -126,13 +125,25 @@ hit msan '==29418==WARNING: MemorySanitizer: use-of-uninitialized-value' \
 hit tsan 'WARNING: ThreadSanitizer: data race (pid=19219)' \
     '  Write of size 4 at 0x7fcf47b21bc0 by thread T1:'
 
-# A SUMMARY line with no ERROR/WARNING header at all, e.g. a log truncated
-# to its tail.
+# A SUMMARY line with no ERROR/WARNING header at all -- for example, a log
+# truncated to its tail.
 hit summary-only 'SUMMARY: AddressSanitizer: heap-buffer-overflow example.c:5 in main'
 
-# 4d. A full report carries both a header and a SUMMARY line, so the
-# collector only goes blind once BOTH arms are gone -- the two combinations
-# #1405 names as leaving `msan`, a required check, silently green.
+# compiler-rt's signal handler is shared: a crash reports through the
+# ERROR-group, not the WARNING form above.
+hit msan-crash '==46812==ERROR: MemorySanitizer: SEGV on unknown address 0x006000000000 (pc 0xaaaac1b12dd4 bp 0xffffcba33690 sp 0xffffcba31760 T46812)' \
+    '==46812==The signal is caused by a WRITE memory access.'
+
+hit tsan-crash '==205049==ERROR: ThreadSanitizer: SEGV on unknown address 0x000000000000 (pc 0x000000490f8a bp 0x000000000000 sp 0x7f88234bf268 T205050)' \
+    '==205049==The signal is caused by a WRITE memory access.'
+
+# The bare marker a sanitizer writes before its full report, in case that
+# report itself crashes; no "ERROR:" prefix, so it pins DEADLYSIGNAL alone.
+hit deadlysignal 'AddressSanitizer:DEADLYSIGNAL'
+
+# 4d. A full report carries a header AND a SUMMARY line: only losing both
+# arms blinds it. These are the two combinations #1405 flags for `msan`, a
+# required check.
 hit leak-full '==23646==ERROR: LeakSanitizer: detected memory leaks' \
     '' \
     'Direct leak of 7 byte(s) in 1 object(s) allocated from:' \
