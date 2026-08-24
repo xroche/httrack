@@ -99,7 +99,7 @@ race=$tmp/race
 mkdir -p "$race/cap"
 LINES_PER_RUN=50
 BATCH=8
-ROUNDS=4
+ROUNDS=6 # 48 runs: catches a 5% short-read ~91% of the time, 4 rounds ~81%
 racy=$(loop_to_stderr "$LINES_PER_RUN" line)
 for round in $(seq 1 "$ROUNDS"); do
     for slot in $(seq 1 "$BATCH"); do

@@ -199,6 +199,8 @@ int main(int argc, char **argv) {
   if (pid < 0) {
     close(pipefd[0]);
     close(pipefd[1]);
+    close(wakefd[0]);
+    close(wakefd[1]);
     close(logfd);
     block_signals(SIG_UNBLOCK);
     restore_signals();
@@ -217,7 +219,9 @@ int main(int argc, char **argv) {
     close(pipefd[1]);
 #ifdef __linux__
     /* A kill -9 reaches us and not PROGRAM; the re-check closes the window
-       where the parent died before the request was in. */
+       where the parent died before the request was in. BSD has no equivalent,
+       so there a killed wrapper orphans PROGRAM; only the two Linux sanitizer
+       jobs export the capture variable, so nothing reaches that today. */
     prctl(PR_SET_PDEATHSIG, SIGKILL);
     if (getppid() != parent) {
       _exit(127);
