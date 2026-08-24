@@ -1361,11 +1361,11 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   assertf(wn == 1);
   n = WideCharToMultiByte(932, 0, wide, wn, raw, (int) sizeof(raw), NULL, NULL);
   assertf(n == 2);
-  /* for the record: which way the two sizing passes disagree */
-  fprintf(stderr, "nobestfit: micro sizes best-fit=%d nobestfit=%d\n",
-          WideCharToMultiByte(932, 0, wide, wn, NULL, 0, NULL, NULL),
-          WideCharToMultiByte(932, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0,
-                              NULL, NULL));
+  /* the sizing passes disagree, and the shorter one under-allocates: banning
+     best-fit sizes to the substitute but converts into room for the best-fit */
+  n = WideCharToMultiByte(932, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0, NULL,
+                          NULL);
+  assertf(n == 1);
   /* control: banning best-fit must not break what the codepage does hold */
   s = hts_convertStringFromUTF8Strict(hira, strlen(hira), cs);
   assertf(s != NULL);
