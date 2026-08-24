@@ -1285,6 +1285,76 @@ class Handler(SimpleHTTPRequestHandler):
             except OSError:
                 pass
 
+    # A body delivered in two parts, the pause splitting it across two reads:
+    # a save nobody can take then fails on the read that ends the body, where
+    # r.size has already reached totalsize.
+    def route_diskfull_splitindex(self):
+        self.send_html('\t<a href="split.bin">split</a>\n')
+
+    def route_diskfull_splitsmallindex(self):
+        self.send_html('\t<a href="splitsmall.bin">splitsmall</a>\n')
+
+    def route_diskfull_splitchunkedindex(self):
+        self.send_html('\t<a href="splitchunked.bin">splitchunked</a>\n')
+
+    def route_diskfull_split(self):
+        self.send_split(8000)
+
+    # Same shape, small enough that stdio holds the whole body: nothing fails
+    # until the save is closed.
+    def route_diskfull_splitsmall(self):
+        self.send_split(100)
+
+    # Same, chunked: the failing write lands on the read completing a chunk,
+    # where r.size reaching the chunk end is what erases the error.
+    def route_diskfull_splitchunked(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        self.wfile.write(b"1\r\nS\r\n")
+        self.wfile.flush()
+        time.sleep(1)
+        body = b"S" * 7999
+        self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+        self.wfile.write(b"0\r\n\r\n")
+        self.wfile.flush()
+        self.close_connection = True
+
+    def send_split(self, total):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(total))
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        self.wfile.write(b"S")  # opens the save file; stdio holds this byte
+        self.wfile.flush()
+        time.sleep(1)
+        self.wfile.write(b"S" * (total - 1))  # the read that completes the body
+        self.wfile.flush()
+
+    # A gzip-coded asset never reaches the save name as it streams: it spools
+    # through ~hts-tmp/<name>.z and is decoded into place afterwards.
+    GZ_BODY = b"DISKFULL-GZ\n" + b"\x00\x01\x02\xff" * 16384
+
+    def route_diskfull_gzindex(self):
+        self.send_html(
+            '\t<a href="gz.bin">gz</a>\n\t<a href="gzpage.html">gzpage</a>\n'
+        )
+
+    def route_diskfull_gz(self):
+        self.send_coded(gzip.compress(self.GZ_BODY), "application/octet-stream")
+
+    def route_diskfull_gzpage(self):
+        self.send_coded(
+            gzip.compress(b"<html><body><p>DISKFULL-GZPAGE</p></body></html>"),
+            "text/html",
+        )
+
     # --- a hub page that fails on the update, taking its children with it --
     # The children are only reachable through hub.html: if the engine drops
     # them from new.lst because the hub was never parsed, the purge unlinks
@@ -2967,6 +3037,15 @@ class Handler(SimpleHTTPRequestHandler):
         "/diskfull/chunked.bin": route_diskfull_chunked,
         "/diskfull/stallindex.html": route_diskfull_stallindex,
         "/diskfull/stall.bin": route_diskfull_stall,
+        "/diskfull/splitindex.html": route_diskfull_splitindex,
+        "/diskfull/split.bin": route_diskfull_split,
+        "/diskfull/splitsmallindex.html": route_diskfull_splitsmallindex,
+        "/diskfull/splitsmall.bin": route_diskfull_splitsmall,
+        "/diskfull/splitchunkedindex.html": route_diskfull_splitchunkedindex,
+        "/diskfull/splitchunked.bin": route_diskfull_splitchunked,
+        "/diskfull/gzindex.html": route_diskfull_gzindex,
+        "/diskfull/gz.bin": route_diskfull_gz,
+        "/diskfull/gzpage.html": route_diskfull_gzpage,
         "/hubfail/index.html": route_hubfail_index,
         "/hubfail/hub.html": route_hubfail_hub,
         "/hubfail/child1.html": route_hubfail_child,

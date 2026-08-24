@@ -155,8 +155,14 @@ typedef enum BackStatusCode {
   STATUSCODE_TOO_BIG = -7,
   STATUSCODE_TEST_OK = -10,
   STATUSCODE_EXCLUDED = -11, /* aborted: MIME excluded by a -mime: filter */
-  STATUSCODE_IO_FATAL = -12  /* the body write hit a fatal I/O errno */
+  STATUSCODE_IO_FATAL = -12, /* the body write hit a fatal I/O errno */
+  STATUSCODE_IO_ERROR = -13  /* the body write failed, but not fatally */
 } BackStatusCode;
+
+/* Either write-error class: r.size counts bytes read, so every size-based
+   completion test would read a body a failed write cut short as a clean end. */
+#define STATUSCODE_IS_WRITE_ERROR(code)                                        \
+  ((code) == STATUSCODE_IO_FATAL || (code) == STATUSCODE_IO_ERROR)
 
 /** HTTrack status ('status' member of of 'lien_back') **/
 typedef enum HTTrackStatus {

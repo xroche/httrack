@@ -2057,7 +2057,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
             /* Classify here: back_wait() sees errno after free() and fflush()
                and rewrites this as a retryable connection error. */
             r->statuscode = check_fatal_io_errno() ? STATUSCODE_IO_FATAL
-                                                   : STATUSCODE_INVALID;
+                                                   : STATUSCODE_IO_ERROR;
             strcpybuff(r->msg, "Write error on disk");
             nl = READ_ERROR;
           }
@@ -2125,7 +2125,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
   }
   /* Ahead of the EOF test below: r->size is advanced above the fwrite that
      failed, so a body completed by that very read would report a clean EOF. */
-  if (nl == READ_ERROR && r->statuscode == STATUSCODE_IO_FATAL) {
+  if (nl == READ_ERROR && STATUSCODE_IS_WRITE_ERROR(r->statuscode)) {
     return READ_ERROR;
   }
   // EOF

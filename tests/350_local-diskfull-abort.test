@@ -4,7 +4,8 @@
 # engine retries and then purges against. /dev/full stands in, under the save
 # name each crawl is about to write: once for a body that reaches the disk as
 # it streams, once for a page and once for a file small enough that stdio holds
-# them until the close.
+# them until the close. A coded body never reaches its save name as it streams,
+# so its arm dooms the ~hts-tmp spool it lands in instead.
 
 set -euo pipefail
 
@@ -43,7 +44,7 @@ crawl_onto_full() {
     local site="${dir}/127.0.0.1_${SRV_PORT}/diskfull"
 
     shift 3
-    mkdir -p "$site"
+    mkdir -p "$(dirname "${site}/${doomed}")" # a spool name has a directory of its own
     ln -s /dev/full "${site}/${doomed}"
     local_crawl --log "${tmpdir}/log-${name}" "${common[@]}" "$@" -O "$dir" \
         "${BASEURL}/diskfull/${entry}"
@@ -122,6 +123,22 @@ if grep -q 'Incorrect length' <<<"$log"; then
 fi
 ok "a length mismatch the full disk caused is not reported as one"
 
+# --- a coded body: the disk runs out under the spool, not the save name ------
+# gz.bin streams into ~hts-tmp/gz.bin.z and is decoded into place afterwards,
+# so nothing the crawl writes to the save name can stand in for a full disk.
+crawl_onto_full gzspool '~hts-tmp/gz.bin.z' gzindex.html
+grep -q 'disk full or filesystem problems' <<<"$log" ||
+    fail "a full disk under the compressed spool was not reported: ${log}"
+ok "a full disk under a coded body's spool is fatal too"
+
+# The decoded page, written the same way an uncoded one is.
+crawl_onto_full gzpage gzpage.html gzindex.html
+grep -q 'Unable to write HTML file' <<<"$log" ||
+    fail "a coded page the disk refused was saved as a success: ${log}"
+grep -q 'Fatal write error, giving up' <<<"$log" ||
+    fail "the full disk did not stop the mirror on the coded page path: ${log}"
+ok "a coded page that cannot be written is fatal too"
+
 # --- a write error outside the fatal class must stay retryable ---------------
 # A pipe whose reader has gone gives EPIPE, which is about this file, not the
 # filesystem: the mirror must finish the rest rather than give up.
@@ -137,6 +154,15 @@ local_crawl --log "${tmpdir}/log-epipe" "${common[@]}" --retries=0 -O "$epipe" \
     "${BASEURL}/diskfull/index.html" || true
 kill "$reader" 2>/dev/null || true
 log=$(<"${epipe}/hts-log.txt")
+grep -q 'Unable to write file .*big\.bin' <<<"$log" ||
+    fail "the broken pipe went unreported, so nothing here failed to be written: ${log}"
+grep -q 'Write error on disk' <<<"$log" ||
+    fail "the broken pipe was not reported as a write error: ${log}"
+# What master reports instead: a body our own write cut short, blamed on the server.
+if grep -q 'Incorrect length' <<<"$log"; then
+    fail "a write error was reported as a truncated download: ${log}"
+fi
+ok "a write error outside the fatal class is still reported against its file"
 if grep -q 'disk full or filesystem problems' <<<"$log"; then
     fail "a broken pipe was treated as a full disk: ${log}"
 fi
