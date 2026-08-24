@@ -210,15 +210,15 @@ ${/* an empty -F mutes the header instead of defaulting, so a blank box sends no
 	${ztest:index2:--search-index=0:--search-index}
 \
 ${/* the extension is the rule key, so a MIME type with none is no rule */}
-	${test:ext1:--assume "}${arg:ext1}${test:ext1:=}${arg:mime1}${test:ext1:"}
-	${test:ext2:--assume "}${arg:ext2}${test:ext2:=}${arg:mime2}${test:ext2:"}
-	${test:ext3:--assume "}${arg:ext3}${test:ext3:=}${arg:mime3}${test:ext3:"}
-	${test:ext4:--assume "}${arg:ext4}${test:ext4:=}${arg:mime4}${test:ext4:"}
-	${test:ext5:--assume "}${arg:ext5}${test:ext5:=}${arg:mime5}${test:ext5:"}
-	${test:ext6:--assume "}${arg:ext6}${test:ext6:=}${arg:mime6}${test:ext6:"}
-	${test:ext7:--assume "}${arg:ext7}${test:ext7:=}${arg:mime7}${test:ext7:"}
-	${test:ext8:--assume "}${arg:ext8}${test:ext8:=}${arg:mime8}${test:ext8:"}
-	${test:prox:--proxy "}${do:if-not-empty:prox}${test:proxytype::socks5:connect}${test:proxytype:\3A//}${do:end-if}${do:output-mode:html}${arg:prox}${test:prox:\3A}${arg:portprox}${test:prox:"}
+	${test:ext1:--assume "}${arg:ext1}${test:ext1:=}${do:if-not-empty:ext1}${arg:mime1}${do:end-if}${do:output-mode:html}${test:ext1:"}
+	${test:ext2:--assume "}${arg:ext2}${test:ext2:=}${do:if-not-empty:ext2}${arg:mime2}${do:end-if}${do:output-mode:html}${test:ext2:"}
+	${test:ext3:--assume "}${arg:ext3}${test:ext3:=}${do:if-not-empty:ext3}${arg:mime3}${do:end-if}${do:output-mode:html}${test:ext3:"}
+	${test:ext4:--assume "}${arg:ext4}${test:ext4:=}${do:if-not-empty:ext4}${arg:mime4}${do:end-if}${do:output-mode:html}${test:ext4:"}
+	${test:ext5:--assume "}${arg:ext5}${test:ext5:=}${do:if-not-empty:ext5}${arg:mime5}${do:end-if}${do:output-mode:html}${test:ext5:"}
+	${test:ext6:--assume "}${arg:ext6}${test:ext6:=}${do:if-not-empty:ext6}${arg:mime6}${do:end-if}${do:output-mode:html}${test:ext6:"}
+	${test:ext7:--assume "}${arg:ext7}${test:ext7:=}${do:if-not-empty:ext7}${arg:mime7}${do:end-if}${do:output-mode:html}${test:ext7:"}
+	${test:ext8:--assume "}${arg:ext8}${test:ext8:=}${do:if-not-empty:ext8}${arg:mime8}${do:end-if}${do:output-mode:html}${test:ext8:"}
+	${test:prox:--proxy "}${do:if-not-empty:prox}${test:proxytype::socks5:connect}${test:proxytype:\3A//}${do:end-if}${do:output-mode:html}${arg:prox}${test:prox:\3A}${do:if-not-empty:prox}${arg:portprox}${do:end-if}${do:output-mode:html}${test:prox:"}
 	${test:ftpprox:--httpproxy-ftp=0:--httpproxy-ftp}
 </textarea>
 

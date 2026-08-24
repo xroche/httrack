@@ -146,9 +146,8 @@ for key, value in [("Warc", "0"), ("Wacz", "1"), ("NoExternalPages", "0")]:
     if ini.get(key) != value:
         sys.exit("%s saved back as %r, wanted %r" % (key, ini.get(key), value))
 
-# A key in the file wins over the startup default even when it holds nothing,
-# and a checkbox the wizard defaults to on is only clearable that way (#1186).
-# The box is the observable, not a flag: an empty -F mutes the header (#1386).
+# A key in the file wins over the startup default even when it holds nothing
+# (#1186); the box is the observable, since an empty -F now emits nothing (#1386).
 box = field(s.get("option6.html?sid=" + sid), "user")
 if box != "":
     sys.exit("the emptied browser id came back as %r" % box)
