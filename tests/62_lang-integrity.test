@@ -819,7 +819,7 @@ LC_ALL=C awk '
     { sub(/\r$/, "") }
     NR % 2 == 1 { macro = $0; next }
     macro ~ /^LISTDEF_/ { print }
-' "$def" >"$listdef_keys"
+' "$def" | LC_ALL=C sort -u >"$listdef_keys"
 nlist=$(wc -l <"$listdef_keys")
 # Pinned: a new list is a new combo box whose indices want looking at, not a
 # number to bump. A parse that returned nothing would otherwise pass everything.
@@ -831,10 +831,11 @@ fi
 listdef_items() {
     LC_ALL=C awk -v name="$2" -v keyfile="$3" '
         # Items, not breaks: an escaped backslash is not a separator.
-        function items(s,   n) {
+        # An escaped backslash is not a separator, so it goes first; the count
+        # that follows sees a \n inside a \r\n exactly once either way.
+        function items(s) {
             gsub(/\\\\/, "", s)
-            n = gsub(/\\r\\n/, "", s)
-            return n + gsub(/\\n/, "", s) + 1
+            return gsub(/\\n/, "", s) + 1
         }
         BEGIN { while ((getline k < keyfile) > 0) want[k] = items(k) }
         { sub(/\r$/, "") }
@@ -843,10 +844,12 @@ listdef_items() {
         # An empty value renders as English, so English sets its row count.
         $0 == "" { next }
         {
+            cmp++
             if (items($0) != want[key])
                 printf "%s:%d: list has %d items, its msgid %d: a combo row selects the wrong option\n",
                     name, NR, items($0), want[key]
         }
+        END { printf "cmp=%d\n", cmp + 0 }
     ' "$1"
 }
 
@@ -863,8 +866,14 @@ LC_ALL=C awk -v kf="$listdef_keys" -v dir="$tmp" '
         print short > (dir "/short.txt")
         print k > (dir "/long.txt")
         print k "\\nextra" > (dir "/long.txt")
+        # An escaped backslash before an n is not a separator. No catalog holds
+        # one today, so without this the guard that strips them is unreachable.
+        esc = k
+        sub(/\\n/, "\\\\n", esc)
+        print k > (dir "/escbs.txt")
+        print esc > (dir "/escbs.txt")
     }' </dev/null
-for probe in short long; do
+for probe in short long escbs; do
     case $(listdef_items "$tmp/$probe.txt" "$probe.txt" "$listdef_keys") in
     *"selects the wrong option"*) ;;
     *)
@@ -874,13 +883,22 @@ for probe in short long; do
     esac
 done
 
+ncmp=0
 for f in "$langdir"/*.txt; do
-    found=$(listdef_items "$f" "${f##*/}" "$listdef_keys")
+    out=$(listdef_items "$f" "${f##*/}" "$listdef_keys")
+    ncmp=$((ncmp + $(printf '%s\n' "$out" | LC_ALL=C sed -n 's/^cmp=//p')))
+    found=$(printf '%s\n' "$out" | LC_ALL=C sed '/^cmp=/d')
     if [ -n "$found" ]; then
         printf '%s\n' "$found"
         fail=1
     fi
 done
+# Every catalog owns every list, bar a couple of empty values. A scan narrowed
+# to one list, one catalog or none would otherwise report nothing and pass.
+if [ "$ncmp" -lt $((nfiles * nlist * 9 / 10)) ]; then
+    echo "LISTDEF check compared $ncmp values, expected about $((nfiles * nlist))"
+    exit 1
+fi
 # An unknown ${LANG_*} renders as nothing rather than erroring, so check that
 # every macro the templates interpolate, in any wrapper form, resolves.
 LC_ALL=C grep -oh '[$]{[^}]*LANG_[A-Za-z0-9_]*}' "$top_srcdir"/html/server/*.html |
