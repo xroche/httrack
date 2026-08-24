@@ -824,6 +824,28 @@ static hts_boolean back_in_chunk_trailers(const lien_back *const back) {
              : HTS_FALSE;
 }
 
+/* A body small enough to sit in stdio's buffer reaches the disk only when its
+   stream is closed, so this is where a write failure first shows up. */
+static void back_report_write_failure(httrackp *opt, lien_back *const back) {
+  const hts_boolean fatal = check_fatal_io_errno() ? HTS_TRUE : HTS_FALSE;
+
+  /* the read path already named and classed a write error it saw itself */
+  if (!STATUSCODE_IS_WRITE_ERROR(back->r.statuscode)) {
+    hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to write file %s",
+                  back->url_sav);
+    /* a slot still claiming success would be cached and counted as mirrored */
+    if (back->r.statuscode > 0) {
+      back->r.statuscode = fatal ? STATUSCODE_IO_FATAL : STATUSCODE_IO_ERROR;
+      strcpybuff(back->r.msg, "Write error on disk");
+    }
+  }
+  if (fatal && opt->state.exit_xh == 0) {
+    hts_log_print(opt, LOG_ERROR,
+                  "Mirror aborted: disk full or filesystem problems");
+    opt->state.exit_xh = -1;
+  }
+}
+
 // objet (lien) téléchargé ou transféré depuis le cache
 //
 // fermer les paramètres de transfert,
@@ -992,6 +1014,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   }
                 } else {
                   back[p].r.statuscode = STATUSCODE_INVALID;
+                  /* Our own disk, not the coded body: hts_codec_unpack() leaves
+                     a local write's errno behind, and 0 for a bad stream. */
+                  if (check_fatal_io_errno())
+                    back_report_write_failure(opt, &back[p]);
                   snprintf(back[p].r.msg, sizeof(back[p].r.msg),
                            codec == HTS_CODEC_UNSUPPORTED
                                ? "Unsupported Content-Encoding (%s)"
@@ -1679,28 +1705,6 @@ int back_search(httrackp * opt, struct_back * sback) {
 
   /* oops, can't find a place */
   return -1;
-}
-
-/* A body small enough to sit in stdio's buffer reaches the disk only when its
-   stream is closed, so this is where a write failure first shows up. */
-static void back_report_write_failure(httrackp *opt, lien_back *const back) {
-  const hts_boolean fatal = check_fatal_io_errno() ? HTS_TRUE : HTS_FALSE;
-
-  /* the read path already named and classed a write error it saw itself */
-  if (!STATUSCODE_IS_WRITE_ERROR(back->r.statuscode)) {
-    hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to write file %s",
-                  back->url_sav);
-    /* a slot still claiming success would be cached and counted as mirrored */
-    if (back->r.statuscode > 0) {
-      back->r.statuscode = fatal ? STATUSCODE_IO_FATAL : STATUSCODE_IO_ERROR;
-      strcpybuff(back->r.msg, "Write error on disk");
-    }
-  }
-  if (fatal && opt->state.exit_xh == 0) {
-    hts_log_print(opt, LOG_ERROR,
-                  "Mirror aborted: disk full or filesystem problems");
-    opt->state.exit_xh = -1;
-  }
 }
 
 void back_set_finished(httrackp *opt, struct_back *sback, const int p) {

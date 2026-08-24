@@ -47,6 +47,8 @@ Please visit our Website: http://www.httrack.com
 /* Inflate filename into newfile (gzip, zlib or raw deflate); decoded size, or
    -1 on a corrupt/truncated stream, an over-budget body, or an I/O failure. A
    body provably in no deflate framing is copied verbatim. */
+/* Decode filename into newfile, returning the decoded size or -1. Same errno
+   contract as hts_codec_unpack(). */
 extern int hts_zunpack(const char *filename, const char *newfile);
 /* Inflate the head of a gzip/zlib stream, out_len max; 0 if undecodable */
 extern size_t hts_zhead(const void *in, size_t in_len, void *out,

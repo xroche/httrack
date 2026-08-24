@@ -126,19 +126,25 @@ hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext) {
 /* Append produced bytes to out under the decoded-size budget, advancing *total.
    HTS_FALSE on a short write or once the budget is exceeded (a bomb); the
    over-budget bytes are never written. */
+/* io_errno takes the errno of a failed write, so the caller can tell a full
+   disk from a bomb over the budget. */
 static hts_boolean codec_sink(FILE *out, const void *buf, size_t produced,
-                              LLint *total, LLint maxout) {
+                              LLint *total, LLint maxout, int *io_errno) {
   if (produced == 0)
     return HTS_TRUE;
   *total += (LLint) produced;
   if (*total > maxout)
     return HTS_FALSE;
-  return hts_fwrite_exact(buf, produced, out);
+  if (hts_fwrite_exact(buf, produced, out))
+    return HTS_TRUE;
+  *io_errno = errno;
+  return HTS_FALSE;
 }
 #endif
 
 #if HTS_USEBROTLI
-static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout) {
+static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout,
+                               int *io_errno) {
   BrotliDecoderState *const state =
       BrotliDecoderCreateInstance(NULL, NULL, NULL);
   hts_boolean ok = HTS_TRUE, done = HTS_FALSE;
@@ -163,7 +169,7 @@ static int codec_unpack_brotli(FILE *in, FILE *out, LLint maxout) {
       res = BrotliDecoderDecompressStream(state, &avail_in, &next_in,
                                           &avail_out, &next_out, NULL);
       produced = sizeof(outbuf) - avail_out;
-      if (!codec_sink(out, outbuf, produced, &total, maxout)) {
+      if (!codec_sink(out, outbuf, produced, &total, maxout, io_errno)) {
         ok = HTS_FALSE;
         break;
       }
@@ -204,7 +210,7 @@ static size_t codec_head_brotli(const void *in, size_t in_len, void *out,
 #endif
 
 #if HTS_USEZSTD
-static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout) {
+static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout, int *io_errno) {
   ZSTD_DStream *const zds = ZSTD_createDStream();
   hts_boolean ok = HTS_TRUE, eof = HTS_FALSE;
   size_t zret = 1; /* 0 once a frame is fully flushed */
@@ -240,7 +246,7 @@ static int codec_unpack_zstd(FILE *in, FILE *out, LLint maxout) {
         ok = HTS_FALSE;
         break;
       }
-      if (!codec_sink(out, outbuf, output.pos, &total, maxout)) {
+      if (!codec_sink(out, outbuf, output.pos, &total, maxout, io_errno)) {
         ok = HTS_FALSE;
         break;
       }
@@ -292,6 +298,7 @@ LLint hts_codec_coded_size(FILE *in) {
 
 int hts_codec_unpack(hts_codec codec, const char *filename,
                      const char *newfile) {
+  errno = 0; /* nothing local failed: see the contract in htscodec.h */
   if (filename == NULL || newfile == NULL || !filename[0] || !newfile[0])
     return -1;
   switch (codec) {
@@ -308,26 +315,33 @@ int hts_codec_unpack(hts_codec codec, const char *filename,
     char catbuff[CATBUFF_SIZE];
     FILE *out, *in = FOPEN(fconv(catbuff, sizeof(catbuff), filename), "rb");
     LLint maxout;
-    int ret = -1;
+    int ret = -1, io_errno = 0;
 
     if (in == NULL)
       return -1;
     maxout = hts_codec_maxout(hts_codec_coded_size(in));
     out = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
     if (out == NULL) {
+      io_errno = errno;
       fclose(in);
+      errno = io_errno;
       return -1;
     }
 #if HTS_USEBROTLI
     if (codec == HTS_CODEC_BROTLI)
-      ret = codec_unpack_brotli(in, out, maxout);
+      ret = codec_unpack_brotli(in, out, maxout, &io_errno);
 #endif
 #if HTS_USEZSTD
     if (codec == HTS_CODEC_ZSTD)
-      ret = codec_unpack_zstd(in, out, maxout);
+      ret = codec_unpack_zstd(in, out, maxout, &io_errno);
 #endif
-    fclose(out);
+    /* stdio may still hold the tail, so the close is a write of its own */
+    if (fclose(out) != 0) {
+      io_errno = errno;
+      ret = -1;
+    }
     fclose(in);
+    errno = ret < 0 ? io_errno : 0;
     return ret;
   }
 #else

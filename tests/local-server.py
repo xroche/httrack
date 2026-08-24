@@ -1346,8 +1346,16 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="gz.bin">gz</a>\n\t<a href="gzpage.html">gzpage</a>\n'
         )
 
+    def route_diskfull_gzbadindex(self):
+        self.send_html('\t<a href="gzbad.bin">gzbad</a>\n')
+
     def route_diskfull_gz(self):
         self.send_coded(gzip.compress(self.GZ_BODY), "application/octet-stream")
+
+    # A gzip stream that cannot be decoded: the control for the spool arms, where
+    # a stale errno would read a corrupt body as a full disk.
+    def route_diskfull_gzbad(self):
+        self.send_coded(self.bad_gzip(self.GZ_BODY), "application/octet-stream")
 
     def route_diskfull_gzpage(self):
         self.send_coded(
@@ -3044,7 +3052,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/diskfull/splitchunkedindex.html": route_diskfull_splitchunkedindex,
         "/diskfull/splitchunked.bin": route_diskfull_splitchunked,
         "/diskfull/gzindex.html": route_diskfull_gzindex,
+        "/diskfull/gzbadindex.html": route_diskfull_gzbadindex,
         "/diskfull/gz.bin": route_diskfull_gz,
+        "/diskfull/gzbad.bin": route_diskfull_gzbad,
         "/diskfull/gzpage.html": route_diskfull_gzpage,
         "/hubfail/index.html": route_hubfail_index,
         "/hubfail/hub.html": route_hubfail_hub,
