@@ -314,8 +314,15 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
                                          hts_boolean *plossy) {
   /* Best-fit maps U+00A5 to CP932's backslash, usedDefault unset. */
   const DWORD flags = cp_reports_default_char(cp) ? WC_NO_BEST_FIT_CHARS : 0;
-  const int usize =
-      WideCharToMultiByte(cp, flags, woutput, wsize, NULL, 0, NULL, NULL);
+  /* A sizing pass does not substitute, so it can report the best-fit length
+     while the conversion writes a shorter one (U+00B5 is 2 bytes on CP932, its
+     substitute 1). Neither size bounds the other: take the larger. */
+  const int bsize =
+      WideCharToMultiByte(cp, 0, woutput, wsize, NULL, 0, NULL, NULL);
+  const int fsize = flags != 0 ? WideCharToMultiByte(cp, flags, woutput, wsize,
+                                                     NULL, 0, NULL, NULL)
+                               : bsize;
+  const int usize = bsize > fsize ? bsize : fsize;
 
   if (plossy != NULL) {
     *plossy = HTS_FALSE;
@@ -328,9 +335,12 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
       LPBOOL const pUsedDefault =
           plossy != NULL && cp_reports_default_char(cp) ? &usedDefault : NULL;
 
-      if (WideCharToMultiByte(cp, flags, woutput, wsize, uoutput, usize, NULL,
-                              pUsedDefault) == usize) {
-        uoutput[usize] = '\0';
+      const int n = WideCharToMultiByte(cp, flags, woutput, wsize, uoutput,
+                                        usize, NULL, pUsedDefault);
+
+      /* usize only bounds the result; the written length is what n reports */
+      if (n > 0 && n <= usize) {
+        uoutput[n] = '\0';
         if (plossy != NULL && usedDefault) {
           *plossy = HTS_TRUE;
         }
