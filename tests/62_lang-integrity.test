@@ -108,8 +108,10 @@ except UnicodeDecodeError as e:
 PYEOF
     # Positive controls, one per branch, each planting its defect where a check
     # that only read the head, the keys, or the header would miss it.
-    cp "$langdir/Francais.txt" "$tmp/legacy.txt"
-    printf 'Caf\351\r\n' >>"$tmp/legacy.txt"
+    {
+        cat "$langdir/Francais.txt"
+        printf 'Caf\351\r\n'
+    } >"$tmp/legacy.txt"
     LC_ALL=C awk -v r="$replacement" 'NR == 500 { print r; next } { print }' \
         "$langdir/Francais.txt" >"$tmp/lossy.txt"
     LC_ALL=C awk 'NR == 501 { print "LANGUAGE_CHARSET" } { print }' \
