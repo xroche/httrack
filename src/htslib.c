@@ -5427,16 +5427,14 @@ static int hts_dns_resolve_nocache_list_(const char *const hostname,
                                          const char **error,
                                          hts_boolean *permanent) {
   int count = 0;
-
-  if (permanent != NULL)
-    *permanent = HTS_FALSE;
+  hts_boolean is_permanent = HTS_FALSE;
 
 #if HTS_INET6==0
   /* IPv4 resolver */
   struct hostent *const hp = gethostbyname(hostname);
 
-  if (hp == NULL && permanent != NULL && h_errno == HOST_NOT_FOUND)
-    *permanent = HTS_TRUE;
+  if (hp == NULL && h_errno == HOST_NOT_FOUND)
+    is_permanent = HTS_TRUE;
   if (hp != NULL) {
     char **h;
 
@@ -5477,14 +5475,16 @@ static int hts_dns_resolve_nocache_list_(const char *const hostname,
       *error = gai_strerror(gerr);
     /* EAI_NONAME answers about the name; every other code says the resolver
        could not answer at all. */
-    if (permanent != NULL && gerr == EAI_NONAME)
-      *permanent = HTS_TRUE;
+    if (gerr == EAI_NONAME)
+      is_permanent = HTS_TRUE;
   }
   if (res) {
     hts_resolver->freeaddrinfo(res);
   }
 #endif
 
+  if (permanent != NULL)
+    *permanent = is_permanent;
   return count;
 }
 
