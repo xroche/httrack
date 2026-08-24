@@ -98,6 +98,13 @@ httrackp *global_opt = NULL;
    answer for, whatever a request's Host header claims. */
 static char server_bound_addr[256 + 2] = "";
 
+/* Other names this host answers to, resolved once before we serve anything,
+   since a lookup a request could steer would reopen the rebinding hole. Room
+   for a hostname, its full name and one reverse-lookup result. */
+#define SELF_NAMES_MAX 8
+static char server_self_names[SELF_NAMES_MAX][256];
+static size_t server_self_names_count = 0;
+
 static void (*pingFun)(void *, smallserver_client_event, const char *) = NULL;
 static void* pingFunArg = NULL;
 
@@ -255,6 +262,98 @@ static int gethost(const char *hostname, SOCaddr * server) {
 #endif
   }
   return 0;
+}
+
+/** Remember a name we answer to, if it is new and it fits. */
+static void add_self_name(const char *name) {
+  size_t i;
+
+  if (name == NULL || *name == '\0' ||
+      strlen(name) >= sizeof(server_self_names[0]) ||
+      server_self_names_count == SELF_NAMES_MAX) {
+    return;
+  }
+  for (i = 0; i < server_self_names_count; i++) {
+    if (strfield2(server_self_names[i], name) != 0) {
+      return;
+    }
+  }
+  strcpybuff(server_self_names[server_self_names_count++], name);
+}
+
+/** Add the canonical name our own hostname resolves to. */
+static void add_resolved_self_names(const char *hostname) {
+#if HTS_INET6 == 0
+  const struct hostent *const hp = gethostbyname(hostname);
+
+  if (hp != NULL) {
+    add_self_name(hp->h_name);
+  }
+#else
+  struct addrinfo *res = NULL;
+  struct addrinfo hints;
+  const struct addrinfo *ai;
+
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = PF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
+  hints.ai_flags = AI_CANONNAME;
+  if (getaddrinfo(hostname, NULL, &hints, &res) == 0) {
+    for (ai = res; ai != NULL; ai = ai->ai_next) {
+      add_self_name(ai->ai_canonname);
+    }
+  }
+  if (res != NULL) {
+    freeaddrinfo(res);
+  }
+#endif
+}
+
+/** Add the name the bound address reverse-resolves to, kept only when that
+    name resolves back to the bound address: an unconfirmed reverse lookup
+    says whatever the address's owner likes. */
+static void add_reverse_self_name(SOCaddr *bound) {
+  char name[256];
+  char addr[256];
+  char back[256];
+  SOCaddr resolved;
+
+  SOCaddr_inetntoa(addr, sizeof(addr), *bound);
+  /* a wildcard is no address to ask about, and none can confirm back to it */
+  if (addr[0] == '\0' || strcmp(addr, "0.0.0.0") == 0 ||
+      strcmp(addr, "::") == 0 ||
+      getnameinfo(&SOCaddr_sockaddr(*bound), SOCaddr_size(*bound), name,
+                  sizeof(name), NULL, 0, NI_NAMEREQD) != 0) {
+    return;
+  }
+  memset(&resolved, 0, sizeof(resolved));
+  if (!gethost(name, &resolved)) {
+    return;
+  }
+  SOCaddr_inetntoa(back, sizeof(back), resolved);
+  if (back[0] != '\0' && strcmp(addr, back) == 0) {
+    add_self_name(name);
+  }
+}
+
+/** Gather the names this host answers to, for the address soc is bound to.
+    Resets the set, so a second call replaces it rather than adding to it. */
+static void collect_self_names(T_SOC soc) {
+  SOCaddr bound;
+  SOClen len = SOCaddr_capacity(bound);
+  char host[256];
+
+  server_self_names_count = 0;
+  if (getsockname(soc, &SOCaddr_sockaddr(bound), &len) != 0) {
+    return;
+  }
+  if (gethostname(host, sizeof(host)) == 0) {
+    host[sizeof(host) - 1] = '\0';
+    add_self_name(host);
+    add_resolved_self_names(host);
+  }
+  add_reverse_self_name(&bound);
 }
 
 /** Form of a bound address a client can actually open: a wildcard names no
@@ -425,18 +524,26 @@ static hts_boolean host_is_address(const char *name) {
 /** May a request presenting this authority drive the panel?
     A page can point a name of its own at our address and have the browser call
     us same-origin, which an unauthenticated panel must refuse. That always
-    presents a name: an address literal is whoever opened the socket, and the
-    only names we vouch for are localhost and whatever --bind was given. */
+    presents a name. An address literal is whoever opened the socket, and the
+    names we vouch for are localhost, whatever --bind was given, and this
+    host's own names. */
 static hts_boolean host_is_self(const char *host, const char *bound) {
   char name[256];
+  size_t i;
 
   if (!host_hostname(name, sizeof(name), host)) {
     return HTS_FALSE;
   }
-  return strfield2(name, "localhost") != 0 || host_is_address(name) ||
-                 (bound[0] != '\0' && strfield2(name, bound) != 0)
-             ? HTS_TRUE
-             : HTS_FALSE;
+  if (strfield2(name, "localhost") != 0 || host_is_address(name) ||
+      (bound[0] != '\0' && strfield2(name, bound) != 0)) {
+    return HTS_TRUE;
+  }
+  for (i = 0; i < server_self_names_count; i++) {
+    if (strfield2(server_self_names[i], name) != 0) {
+      return HTS_TRUE;
+    }
+  }
+  return HTS_FALSE;
 }
 
 /** Header value with leading blanks dropped, clipped to fit dst. */
@@ -940,6 +1047,10 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
      and deliberately not cleared between requests. */
   String website = STRING_EMPTY;
   char catbuff[CATBUFF_SIZE];
+
+  /* Not at bind time: the launcher prints the URL the moment smallserver_init
+     returns, and a stalled resolver would hold that line back. */
+  collect_self_names(soc);
 
   /* Load strings */
   htslang_init();
