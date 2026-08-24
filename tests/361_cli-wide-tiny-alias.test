@@ -3,10 +3,10 @@
 # --wide-mirror and --tiny-mirror built the connection count their prefix
 # exists to add, then dropped it: the value was written and never read.
 #
-# The engine never prints its connection count, so what is asserted here is the
-# count reaching the option: above 8 the security limiter clamps it and says so
-# in hts-log.txt, and that line is the engine speaking about the value it got.
-# The exact short form each prefix emits is pinned by -#test=optalias.
+# hts-log.txt echoes the expanded command line on its second line, so the word
+# the engine actually received is readable; the security limiter, which caps a
+# count above 8 and logs it, then says the count reached the option and not
+# just the argv.
 
 set -euo pipefail
 
@@ -32,42 +32,59 @@ crawl() { # crawl ARG...
         >"${tmp}/run.log" 2>&1 || RC=$?
 }
 
-# clamped WANT LABEL ARG...: whether the limiter capped the count it was handed
-clamped() {
-    local want=$1 label=$2 got=no hits
+# echoed WANT LABEL ARG...: the option word the engine was handed
+echoed() {
+    local want=$1 label=$2 line
     shift 2
     crawl "$@"
     assert_eq 0 "${RC}" "${label} exited"
     assert_file "${tmp}/out/hts-log.txt" "${label}"
+    line=$(sed -n 2p "${tmp}/out/hts-log.txt")
+    grep -q -- " ${want} " <<<"${line}" ||
+        fail "${label}: the engine was handed ${line}, wanted ${want}"
+}
+
+echoed '-wc32' 'wide mirror' --wide-mirror
+echoed '-wc1' 'tiny mirror' --tiny-mirror
+echoed '-w' 'plain mirror' --mirror
+echoed '-p0C0I0tc32' 'wide spider' --wide-spider
+echoed '-p0C0I0tc1' 'tiny spider' --tiny-spider
+echoed '-p0C0I0t' 'plain spider' --spider
+echoed '-p1c32' 'wide skeleton' --wide-skeleton
+echoed '-p1' 'plain skeleton' --skeleton
+echoed '-Xc32' 'wide purge-old' --wide-purge-old
+echoed '-o2c1' 'tiny generate-errors' --tiny-generate-errors 2
+echoed '-c8' 'plain sockets' --sockets 8
+ok "the prefix glues its count on, and only the prefix does"
+
+# ...and the count reaches the option, not just the rebuilt argv: above 8 the
+# security limiter caps it and says so. 32 is above the ceiling, the default 4
+# and tiny's 1 are below.
+clamped() { # clamped WANT LABEL ARG...
+    local want=$1 label=$2 got=no hits
+    shift 2
+    crawl "$@"
+    assert_eq 0 "${RC}" "${label} exited"
     hits=$(count_matching_lines 'simultaneous connections limited to' \
         "${tmp}/out/hts-log.txt")
     test "${hits}" -eq 0 || got=yes
     assert_eq "${want}" "${got}" "${label} was clamped"
 }
 
-# 32 is above the limiter's ceiling of 8, the default 4 and tiny's 1 are below
 clamped yes 'wide mirror' --wide-mirror
 clamped no 'tiny mirror' --tiny-mirror
 clamped no 'plain mirror' --mirror
-clamped yes 'wide spider' --wide-spider
-clamped no 'tiny spider' --tiny-spider
-clamped no 'plain spider' --spider
-clamped yes 'wide skeleton' --wide-skeleton
-clamped no 'plain skeleton' --skeleton
-ok "the wide-/tiny- prefix reaches the connection count"
-
-# Against an explicit count, which the prefix has to win or lose on its own: the
-# unprefixed alias adds nothing, so 32 survives it.
+# against an explicit count, which the prefix has to win or lose on its own
 clamped no 'tiny mirror over --sockets 32' --sockets 32 --tiny-mirror
 clamped yes 'plain mirror over --sockets 32' --sockets 32 --mirror
 clamped yes 'wide mirror over --sockets 1' --sockets 1 --wide-mirror
-clamped no 'plain mirror over --sockets 1' --sockets 1 --mirror
-ok "the count is the prefix's, and only the prefix's"
+ok "the count applies, and the unprefixed alias adds none"
 
-# An alias keeping its value in a word of its own (-O <path>, +*.gif) has
-# nowhere to glue the count, so the prefix is refused rather than dropped.
+# Everywhere the glue would be misread, the prefix is refused instead: a value
+# sharing the word or holding it alone, a long form, an option name the caller
+# matches whole, and a cluster already carrying a count of its own.
 refused() { # refused LABEL ARG...
-    local label=$1
+    local label=$1 reply
     shift
     crawl "$@"
     test "${RC}" -ne 0 || fail "${label}: accepted, exit 0"
@@ -76,6 +93,19 @@ refused() { # refused LABEL ARG...
         fail "${label}: refused without saying why: ${reply}"
 }
 
+refused 'wide structure' --wide-structure '%h%p/%n.%t'
+refused 'wide sockets' --wide-sockets 8
+refused 'tiny wide' --tiny-wide
+refused 'wide version' --wide-version
+refused 'wide warc' --wide-warc
 refused 'wide path' --wide-path "${tmp}/out"
 refused 'tiny allow' --tiny-allow '*.gif'
-ok "a prefix with nowhere to go is refused"
+refused 'tiny help' --tiny-help
+ok "a prefix that cannot be glued on is refused"
+
+# The unprefixed spellings the refusals are built from still work, template
+# included: gluing a count into it corrupted the template as well as losing it.
+echoed '-N%h%p/%n.%t' 'plain structure' --structure '%h%p/%n.%t'
+test -f "${tmp}/out/file${tmp}/page.html" ||
+    fail "--structure did not lay the mirror out by its template"
+ok "the unprefixed aliases are untouched"

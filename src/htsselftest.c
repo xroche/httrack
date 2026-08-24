@@ -4639,19 +4639,24 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-%T", "--utf8-conversion", NULL);
 
   /* the --wide-/--tiny- prefix glues the --wide/--tiny connection count onto
-     the alias it prefixes; it was built and then dropped, never read */
+     the plain clusters, and is refused wherever the glue would be misread */
   EXPANDS("-wc32", "--wide-mirror", NULL);
   assertf(used == 1);
   EXPANDS("-wc1", "--tiny-mirror", NULL);
   EXPANDS("-p0C0I0tc32", "--wide-spider", NULL);
-  EXPANDS("-p1c1", "--tiny-skeleton", NULL);
-  EXPANDS("-C0c32", "--wide-cache", "0");
+  EXPANDS("-qgc1", "--tiny-get", NULL);
+  EXPANDS("-Xc32", "--wide-purge-old", NULL);
+  EXPANDS("-o2c1", "--tiny-generate-errors", "2");
   assertf(used == 2);
-  EXPANDS("-r2c1", "--tiny-depth", "2");
-  /* nowhere to glue it: a value of its own, or a long form */
-  REFUSES("--wide-path", "/tmp");
+  REFUSES("--wide-path", "/tmp"); /* the value is a word of its own */
   REFUSES("--tiny-allow", "*.gif");
-  REFUSES("--wide-clean", NULL);
+  REFUSES("--wide-clean", NULL);    /* a long form */
+  REFUSES("--wide-sockets", "8");   /* -c8 already: 8 or 32? */
+  REFUSES("--tiny-wide", NULL);     /* -c32 already: 32 or 1? */
+  REFUSES("--wide-structure", "1"); /* -N takes a template, not a cluster */
+  REFUSES("--wide-warc", NULL);     /* -%rc is --warc-cdx, not -%r -c */
+  REFUSES("--wide-version", NULL);  /* -#h is matched as a whole word */
+  REFUSES("--tiny-help", NULL);
 
   /* the value-taking classes are untouched */
   EXPANDS("-C0", "--cache=0", NULL);

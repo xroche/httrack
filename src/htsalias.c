@@ -342,17 +342,24 @@ static const char *optalias_prefix_count(const char *name) {
                                                     : "";
 }
 
-/* Whether the alias emits one short-option cluster a count can be glued onto
-   (-w -> -wc32). A class keeping its value in a word of its own (-O <path>,
-   +*.gif) and a long form (--clean) have nowhere to put it. */
+/* Whether the alias expands to a plain cluster a count can be glued onto
+   (-w -> -wc32). The rest is refused rather than glued blind: a value sharing
+   the word (-N <template>, -c8) or holding it alone (-O <path>), a long form,
+   the -% and -# families (-%r plus a c is the -%rc of --warc-cdx), a cluster
+   already carrying -c, and -h, which the caller matches as a whole word. */
 static hts_boolean optalias_clusters(const char *type, const char *command) {
-  const hts_boolean glued =
-      strcmp(type, "single") == 0 || strcmp(type, "onoff") == 0 ||
-      strcmp(type, "level") == 0 || strcmp(type, "param") == 0;
+  size_t i;
 
-  return glued && command[0] == '-' && command[1] != '-' && command[1] != '\0'
-             ? HTS_TRUE
-             : HTS_FALSE;
+  if (strcmp(type, "single") != 0 && strcmp(type, "onoff") != 0 &&
+      strcmp(type, "level") != 0)
+    return HTS_FALSE;
+  if (command[0] != '-' || command[1] == '\0' || strcmp(command, "-h") == 0)
+    return HTS_FALSE;
+  for (i = 1; command[i] != '\0'; i++) {
+    if (command[i] == 'c' || !isalnum((unsigned char) command[i]))
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
 }
 
 /* Suffix the short form takes for a value ("0", "2", or none), or NULL when
