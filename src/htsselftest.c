@@ -4658,10 +4658,32 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N %h%p/%n%q.%t", "--user-structure", "%h%p/%n%q.%t");
   /* an empty value is -N "", which the engine reads as "back to the default" */
   EXPANDS("-N ", "--structure=", NULL);
+  /* what "param" glued keeps gluing: a preset trailed by more short options,
+     and the on/off values every param row takes */
+  EXPANDS("-N1L0", "--structure=1L0", NULL);
+  EXPANDS("-N1L0", "--structure", "1L0");
+  EXPANDS("-N1%c8", "--structure=1%c8", NULL);
+  EXPANDS("-N0", "--structure=off", NULL);
+  EXPANDS("-N", "--structure=on", NULL);
+  /* a template may open with a digit, so the leading digits do not decide it */
+  EXPANDS("-N 2col/%n.%t", "--structure=2col/%n.%t", NULL);
+  EXPANDS("-N 2col/%n.%t", "--structure", "2col/%n.%t");
+  /* past 9 digits sscanf("%d") wraps, and a wrap onto -1 crashes url_savename
+   */
+  EXPANDS("-N 4294967295", "--structure=4294967295", NULL);
+  EXPANDS("-N999999999", "--structure=999999999", NULL);
   /* the short form agrees, rather than reading -N 1 as a template named 1 */
   EXPANDS("-N1", "-N", "1");
   assertf(used == 2);
   EXPANDS("-N", "-N", "%h%p/%n%q.%t");
+  assertf(used == 1);
+  /* and there a bare digit run is the only thing it takes: 1L0 and an overlong
+     run stay templates, as they were before the class existed */
+  EXPANDS("-N", "-N", "2col/%n.%t");
+  assertf(used == 1);
+  EXPANDS("-N", "-N", "4294967295");
+  assertf(used == 1);
+  EXPANDS("-N", "-N", "1L0");
   assertf(used == 1);
 
   /* invariant: every name's bare long form still emits its short form, and a

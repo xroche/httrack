@@ -14,18 +14,31 @@ cleanup_push rm -rf "${tmp}"
 
 echo '<html><body>hello</body></html>' >"${tmp}/page.html"
 
+run() { # run ARG...
+    rm -rf "${tmp}/out"
+    mkdir -p "${tmp}/out"
+    RC=0
+    httrack "file://${tmp}/page.html" -O "${tmp}/out" --quiet -n "$@" \
+        >"${tmp}/out/.log" 2>&1 || RC=$?
+}
+
+# Everything the crawl saved, minus the engine's own furniture. Naming the whole
+# set, not just the wanted path, is what catches a value that fell through to
+# the URL list: the mirror then holds the wanted file AND the junk one.
+mirrored() {
+    (cd "${tmp}/out" && find . -type f ! -path './hts-cache/*' ! -name '.log' \
+        ! -name 'hts-log.txt' ! -name '*.gif' ! -name '*.lock' -print |
+        grep -v '^\./index\.html$' | sort)
+}
+
 # Only the layout on disk tells whether -N applied: hts-cache/doit.log is the
 # invocation rebuilt from argv, so it says the alias expanded and nothing more.
 layout() { # layout RELATIVE-PATH ARG...
-    local want=$1 rc=0
+    local want=$1
     shift
-    rm -rf "${tmp}/out"
-    mkdir -p "${tmp}/out"
-    httrack "file://${tmp}/page.html" -O "${tmp}/out" --quiet -n "$@" \
-        >"${tmp}/out/.log" 2>&1 || rc=$?
-    assert_eq 0 "${rc}" "$* exited"
-    test -f "${tmp}/out/${want}" ||
-        fail "$*: no ${want}, got $(cd "${tmp}/out" && find . -name page.html -o -name 1)"
+    run "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    assert_eq "./${want}" "$(mirrored)" "$* mirrored"
 }
 
 # The presets, in every spelling. 100 and 5 pin the whole value: a truncated one
@@ -43,7 +56,20 @@ layout "${default_layout}" --structure=0
 # A detached -N 1 used to mean a user template literally named "1", collapsing
 # the mirror onto one file; it is preset 1 now, and the long forms agree.
 layout web/page.html -N 1
-test ! -e "${tmp}/out/1" || fail '-N 1 wrote a file named 1: it is still a template'
+
+# What the old "param" class glued has to keep gluing. WEB/PAGE.HTM needs both
+# halves of 1L0, so it fails whether the preset or the trailing -L0 went missing;
+# a value read as a template instead collapses the mirror onto a file named 1L0.
+layout WEB/PAGE.HTM --structure=1L0
+layout WEB/PAGE.HTM --structure 1L0
+layout web/page.html --structure=1c8
+layout web/page.html --structure=1%c8
+
+# param maps off to 0 and swallows on, and every other param row still does.
+layout "${default_layout}" --structure=off
+run --structure=on
+test "${RC}" -ne 0 || fail '--structure=on was accepted as a template named on'
+test "${RC}" -ne 134 || fail '--structure=on aborted'
 
 # A template reaches the engine whatever spelling carried it. The literal "tpl/"
 # is the point: no preset can produce it, so this cannot pass on a fallback.
@@ -52,10 +78,25 @@ layout tpl/page.html --structure tpl/%n.%t
 layout tpl/page.html --structure=tpl/%n.%t
 layout tpl/page.html --user-structure tpl/%n.%t
 
+# A template may open with a digit, so the leading digits cannot decide alone.
+layout 2col/page.html --structure 2col/%n.%t
+layout 2col/page.html --structure=2col/%n.%t
+layout 2col/page.html -N 2col/%n.%t
+
+# Past 9 digits sscanf("%d") wraps, and a wrap onto -1 is "userdef" with no
+# template: url_savename then crashes. Such a run is a template, as -N always
+# read it, and above all is not an abort.
+for form in --structure=4294967295 "-N 4294967295"; do
+    # shellcheck disable=SC2086 # the two spellings differ by that word split
+    layout 4294967295 ${form}
+done
+# 9 digits still glue, 10 do not. A nonsense preset names files from a hash of
+# the URL, so only the file the template form would have written is stable.
+run --structure=999999999
+assert_eq 0 "${RC}" '--structure=999999999 exited'
+test ! -e "${tmp}/out/999999999" ||
+    fail '--structure=999999999 became a template: the digit bound is off by one'
+
 # An empty value is -N "", which the engine reads as "back to the default".
 layout "${default_layout}" --structure=
 layout "${default_layout}" --user-structure ''
-
-# The URL list stays clean: a template the alias failed to detach fell through
-# to it, and the run mirrored a junk name instead of failing.
-test ! -e "${tmp}/out/tpl" || fail 'the template was mirrored as a URL'

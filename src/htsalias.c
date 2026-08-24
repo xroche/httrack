@@ -66,10 +66,11 @@ Please visit our Website: http://www.httrack.com
   param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
-  paramn : glues a bare number like param (-N1), detaches anything else like param1 (-N <template>)
+  paramn : glues like param what -N reads glued (1, 1L0, on/off), detaches the rest as a user template
 
   A name may appear twice; the FIRST row wins, for the expansion and the help
-  text. Later rows exist so a reverse lookup by short option finds a name.
+  text. Later rows exist so a reverse lookup by short option finds a name, and
+  that lookup takes the first row too, so -N's class is "structure"'s.
 */
 const char *hts_optalias[][4] = {
   /*   {"","","",""}, */
@@ -357,16 +358,37 @@ static const char *optalias_suffix(const char *type, const char *value) {
   return NULL;
 }
 
-/* Whether a "paramn" value is one of -N's presets rather than a user template:
-   the engine only reads a template the alias left detached (#1380). */
-static hts_boolean optalias_is_number(const char *value) {
+/* Longest digit run -N may carry: sscanf("%d") wraps past it, and a wrap onto
+   -1 is "userdef" with no template, which crashes url_savename. */
+#define PARAMN_MAX_DIGITS 9
+
+/* A bare digit run short enough for -N to read it as a preset number. */
+static hts_boolean optalias_is_digits(const char *value) {
   size_t i;
 
   for (i = 0; value[i] != '\0'; i++) {
     if (!isdigit((unsigned char) value[i]))
       return HTS_FALSE;
   }
-  return i != 0 ? HTS_TRUE : HTS_FALSE;
+  return i != 0 && i <= PARAMN_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Whether a "paramn" value glues onto the short form the way "param" does: a
+   preset, on/off, or a preset trailed by more short options (-N1L0). A path
+   separator or an extension dot marks a user template instead, which no option
+   cluster carries and which only reaches the engine detached (#1380). */
+static hts_boolean optalias_paramn_glues(const char *value) {
+  size_t i;
+
+  if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
+    return HTS_TRUE;
+  for (i = 0; isdigit((unsigned char) value[i]); i++) {
+  }
+  if (i == 0 || i > PARAMN_MAX_DIGITS)
+    return HTS_FALSE;
+  return strchr(value + i, '/') == NULL && strchr(value + i, '.') == NULL
+             ? HTS_TRUE
+             : HTS_FALSE;
 }
 
 /*
@@ -460,10 +482,10 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 
         /* Final result */
 
-        /* Must be alone (-P /tmp), or a paramn value that is not a preset */
+        /* Must be alone (-P /tmp), or a paramn value -N cannot take glued */
         if (strcmp(hts_optalias[pos][2], "param1") == 0 ||
             (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
-             !optalias_is_number(param))) {
+             !optalias_paramn_glues(param))) {
           strlcpybuff(return_argv[0], command, return_argv_size);
           strlcpybuff(return_argv[1], param, return_argv_size);
           *return_argc = 2;     /* 2 parameters returned */
@@ -523,9 +545,10 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     int pos;
 
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
-      /* -N 1 is preset 1; a template stays detached, as the engine reads it */
+      /* -N 1 is preset 1; anything else stays detached, since a template may
+         legitimately open with a digit (-N 2col/%n.%t) */
       if (strcmp(hts_optalias[pos][2], "paramn") == 0 && n_arg + 1 < argc &&
-          optalias_is_number(argv[n_arg + 1])) {
+          optalias_is_digits(argv[n_arg + 1])) {
         strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
         strlcatbuff(return_argv[0], argv[n_arg + 1], return_argv_size);
         *return_argc = 1;
