@@ -35,19 +35,26 @@ common=(--quiet --disable-security-limits --robots=0 --retries=2 -c1 --timeout=2
 counter="${tmpdir}/stallhits" # a byte per stall.bin request, so we know when to interrupt
 local_server_start --log "${tmpdir}/server.log" --env DISKFULL_COUNTER="$counter"
 
+# What an aborted mirror exits with; HTS_EXIT_MIRROR_ABORTED in the engine.
+ABORTED_STATUS=2
+
 # Mirror $1 with $2 pointed at /dev/full, and leave its log in $log. Anything
-# past $3 is extra httrack options.
+# past $3 is extra httrack options. Every arm below is a fatal write, so the
+# status the engine reports for one is asserted here rather than per arm.
 crawl_onto_full() {
-    local name="$1" doomed="$2" entry="$3"
+    local name="$1" doomed="$2" entry="$3" rc=0
     local dir="${tmpdir}/${name}"
     local site="${dir}/127.0.0.1_${SRV_PORT}/diskfull"
 
     shift 3
     mkdir -p "$site"
     ln -s /dev/full "${site}/${doomed}"
+    # Captured on the line itself: the log read below would clobber $? first.
     local_crawl --log "${tmpdir}/log-${name}" "${common[@]}" "$@" -O "$dir" \
-        "${BASEURL}/diskfull/${entry}"
+        "${BASEURL}/diskfull/${entry}" || rc=$?
     log=$(<"${dir}/hts-log.txt")
+    test "$rc" -eq "$ABORTED_STATUS" ||
+        fail "the ${name} arm exited ${rc}, wanted ${ABORTED_STATUS}: ${log}"
 }
 
 # --- a body that streams: the write itself fails ----------------------------
@@ -133,8 +140,9 @@ mkfifo "${epipesite}/big.bin"
 (head -c 1 <"${epipesite}/big.bin" >/dev/null 2>&1 || true) &
 reader=$!
 # --retries=0: a retry would re-open the fifo and block on a reader that is gone.
+epipe_rc=0
 local_crawl --log "${tmpdir}/log-epipe" "${common[@]}" --retries=0 -O "$epipe" \
-    "${BASEURL}/diskfull/index.html" || true
+    "${BASEURL}/diskfull/index.html" || epipe_rc=$?
 kill "$reader" 2>/dev/null || true
 log=$(<"${epipe}/hts-log.txt")
 if grep -q 'disk full or filesystem problems' <<<"$log"; then
@@ -145,7 +153,11 @@ if grep -q 'Mirror aborted' <<<"$log"; then
 fi
 grep -q DISKFULL-TINY "${epipesite}/tiny.bin" ||
     fail "the rest of the mirror did not survive a non-fatal write error"
-ok "a non-fatal write error leaves the mirror running"
+# The other half of the status the arms above assert: without this, that status
+# could mean "a write failed" rather than "the mirror was given up on".
+test "$epipe_rc" -eq 0 ||
+    fail "a mirror that finished exited ${epipe_rc}: ${log}"
+ok "a non-fatal write error leaves the mirror running, and exits 0"
 
 # --- an interrupted transfer: the slot's flush is the only close there is ----
 # 100 buffered bytes never reach the disk, so nothing fails until the stopped
