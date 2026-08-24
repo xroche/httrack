@@ -96,17 +96,15 @@ assert_write_error "a body stdio held until the close" 'splitsmall.bin'
 ok "a body that only fails when its file is closed is reported too"
 
 # --- no Content-Length and no chunking: the closing flush is the only writer -
-# totalsize stays -1, so no completion test can see this one, and glibc's later
-# fclose() returns 0 once the flush has taken the error.
+# totalsize stays -1, so no completion test can stand in for it here.
 crawl_onto_dead_pipe noclen noclenindex.html noclen.bin
 assert_write_error "a body delimited by the close alone" 'noclen.bin'
 ok "a close-delimited body the disk refused is not a clean end either"
 
 # --- the decode's own output: our disk, not the coded body ------------------
-# gz.bin is decoded into ~hts-tmp/gz.bin.u before being renamed into place. A
-# directory in that name's way makes the decode fail on us, with an errno the
-# fatal class does not cover: the failure must be named as ours, and must leave
-# the mirror running.
+# gz.bin is decoded into ~hts-tmp/gz.bin.u before being renamed into place; a
+# directory in that name's way fails it on us, with an errno outside the fatal
+# class.
 decode="${tmpdir}/decode"
 decodesite="${decode}/127.0.0.1_${SRV_PORT}/diskfull"
 mkdir -p "${decodesite}/~hts-tmp/gz.bin.u"

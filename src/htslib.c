@@ -2072,9 +2072,8 @@ LLint http_xfread1(htsblk * r, int bufl) {
       } else
         nl = READ_ERROR;
 
-      /* The tail stdio still holds is written here, and glibc's later fclose()
-         returns 0 once this flush has taken the error: a body with no length
-         and no chunking would otherwise be recorded as mirrored. */
+      /* The tail stdio held is written here, and glibc's later fclose() returns
+         0 once this flush has taken the error. */
       if ((nl < 0) && (r->out != NULL) && fflush(r->out) != 0 &&
           !statuscode_is_write_error(r->statuscode)) {
         classify_write_error(r);
