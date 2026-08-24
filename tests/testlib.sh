@@ -144,15 +144,19 @@ selftest_queue_head() { # selftest_queue_head WANT NAME [ARGS...]
 # Queue NAME once per base-dir length across a full segment period: the tree the
 # long-path self-tests build starts at the base's own length, so a length-blind
 # stop bound clears MAX_PATH for some bases and lands exactly on it for others
-# (#1409).
-selftest_queue_base_lengths() { # selftest_queue_base_lengths WANT NAME DIR
-    local want=$1 name=$2 dir=$3 pad i
+# (#1409). What detects that is st_mkdeep's own assertf, which aborts the engine
+# and so the whole batch; WANT only pins that each base length got that far.
+selftest_queue_base_lengths() { # selftest_queue_base_lengths MODE WANT NAME DIR
+    local mode=$1 want=$2 name=$3 dir=$4 pad i
     # 41 is st_mkdeep's ASCII segment, so this covers every residue.
-    local width=41 before=${#SELFTEST_WANT[@]}
+    local width=41 before=${#SELFTEST_WANT[@]} accent
+    # The base is non-ASCII too, or the length axis is all the sweep exercises:
+    # a byte count overstates the UTF-16 units Windows measures MAX_PATH in.
+    accent=$(printf '\303\251%.0s' $(seq 1 15)) # 15 x U+00E9: 30 bytes, 15 units
     for ((i = 1; i <= width; i++)); do
-        pad=$(repeat_chars "$i" p)
+        pad=$accent$(repeat_chars "$i" p)
         mkdir "$dir/$pad" || fail "cannot create $dir/$pad"
-        selftest_queue_tail "$want" "$name" "$dir/$pad"
+        selftest_queue_mode "$mode" "$want" "$name" "$dir/$pad"
     done
     # A sweep that queued nothing would be a silent pass.
     test "$((${#SELFTEST_WANT[@]} - before))" -eq "$width" ||

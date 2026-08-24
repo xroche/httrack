@@ -11,5 +11,5 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-selftest_queue_base_lengths "-char non-ASCII dir: OK" cookieimport "$dir"
+selftest_queue_base_lengths tail "-char non-ASCII dir: OK" cookieimport "$dir"
 selftest_run_queued

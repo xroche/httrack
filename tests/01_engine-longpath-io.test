@@ -10,5 +10,5 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-out=$(httrack -O /dev/null -#test=longpath "$dir")
-grep -q "longpath:.*OK" <<<"$out"
+selftest_queue_base_lengths tail "-char path: OK" longpath "$dir"
+selftest_run_queued
