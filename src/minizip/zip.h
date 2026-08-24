@@ -75,6 +75,9 @@ typedef voidp zipFile;
 #define ZIP_PARAMERROR                  (-102)
 #define ZIP_BADZIPFILE                  (-103)
 #define ZIP_INTERNALERROR               (-104)
+/* httrack addition: rolled back by a rewind only, the member's bytes still
+   there. Past the UNZ_* codes (-105 is UNZ_CRCERROR), which share the space. */
+#define ZIP_NOTRUNCATED (-110)
 
 #ifndef DEF_MEM_LEVEL
 #  if MAX_MEM_LEVEL >= 8
@@ -327,7 +330,8 @@ extern int ZEXPORT zipAbandonFileInZip(zipFile file);
 /*
   Roll back the current file in the zipfile: the write position returns to its
   local header and no central-directory record is created, so the partial
-  member never appears in the archive. (httrack addition, see zip.c.diff)
+  member never appears in the archive. ZIP_NOTRUNCATED when the file could only
+  be rewound, its bytes still past the end. (httrack addition, see zip.c.diff)
 */
 
 extern int ZEXPORT zipCloseFileInZipRaw(zipFile file,

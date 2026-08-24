@@ -1,0 +1,91 @@
+--- iowin32.c.orig	2026-08-24 22:06:17.024142482 +0200
++++ iowin32.c	2026-08-24 22:06:17.036984782 +0200
+@@ -227,6 +227,22 @@
+     return ret;
+ }
+ 
++/* The handle carries no user-space buffer, so this is the OS write cache. */
++int ZCALLBACK win32_flush_file_func(voidpf opaque, voidpf stream) {
++  HANDLE hFile = NULL;
++
++  (void) opaque;
++  if (stream != NULL)
++    hFile = ((WIN32FILE_IOWIN *) stream)->hf;
++  if (hFile == NULL)
++    return -1;
++  if (!FlushFileBuffers(hFile)) {
++    ((WIN32FILE_IOWIN *) stream)->error = (int) GetLastError();
++    return -1;
++  }
++  return 0;
++}
++
+ static BOOL MySetFilePointerEx(HANDLE hFile, LARGE_INTEGER pos, LARGE_INTEGER *newPos, DWORD dwMoveMethod) {
+ #ifdef IOWIN32_USING_WINRT_API
+     return SetFilePointerEx(hFile, pos, newPos, dwMoveMethod);
+@@ -367,6 +383,30 @@
+     return ret;
+ }
+ 
++/* Shorten the file to `size`, leaving the position where the caller had it:
++   SetEndOfFile cuts at the current one, so it has to be moved and put back. */
++int ZCALLBACK win32_truncate64_file_func(voidpf opaque, voidpf stream,
++                                         ZPOS64_T size) {
++  HANDLE hFile = NULL;
++  LARGE_INTEGER cur, want;
++
++  (void) opaque;
++  if (stream != NULL)
++    hFile = ((WIN32FILE_IOWIN *) stream)->hf;
++  if (hFile == NULL)
++    return -1;
++  cur.QuadPart = 0;
++  want.QuadPart = (LONGLONG) size;
++  if (!MySetFilePointerEx(hFile, cur, &cur, FILE_CURRENT) ||
++      !MySetFilePointerEx(hFile, want, NULL, FILE_BEGIN) ||
++      !SetEndOfFile(hFile) ||
++      !MySetFilePointerEx(hFile, cur, NULL, FILE_BEGIN)) {
++    ((WIN32FILE_IOWIN *) stream)->error = (int) GetLastError();
++    return -1;
++  }
++  return 0;
++}
++
+ int ZCALLBACK win32_close_file_func(voidpf opaque, voidpf stream) {
+     int ret=-1;
+ 
+@@ -399,6 +439,7 @@
+     pzlib_filefunc_def->zwrite_file = win32_write_file_func;
+     pzlib_filefunc_def->ztell_file = win32_tell_file_func;
+     pzlib_filefunc_def->zseek_file = win32_seek_file_func;
++    pzlib_filefunc_def->zflush_file = win32_flush_file_func;
+     pzlib_filefunc_def->zclose_file = win32_close_file_func;
+     pzlib_filefunc_def->zerror_file = win32_error_file_func;
+     pzlib_filefunc_def->opaque = NULL;
+@@ -410,6 +451,8 @@
+     pzlib_filefunc_def->zwrite_file = win32_write_file_func;
+     pzlib_filefunc_def->ztell64_file = win32_tell64_file_func;
+     pzlib_filefunc_def->zseek64_file = win32_seek64_file_func;
++    pzlib_filefunc_def->ztruncate64_file = win32_truncate64_file_func;
++    pzlib_filefunc_def->zflush_file = win32_flush_file_func;
+     pzlib_filefunc_def->zclose_file = win32_close_file_func;
+     pzlib_filefunc_def->zerror_file = win32_error_file_func;
+     pzlib_filefunc_def->opaque = NULL;
+@@ -422,6 +465,8 @@
+     pzlib_filefunc_def->zwrite_file = win32_write_file_func;
+     pzlib_filefunc_def->ztell64_file = win32_tell64_file_func;
+     pzlib_filefunc_def->zseek64_file = win32_seek64_file_func;
++    pzlib_filefunc_def->ztruncate64_file = win32_truncate64_file_func;
++    pzlib_filefunc_def->zflush_file = win32_flush_file_func;
+     pzlib_filefunc_def->zclose_file = win32_close_file_func;
+     pzlib_filefunc_def->zerror_file = win32_error_file_func;
+     pzlib_filefunc_def->opaque = NULL;
+@@ -434,6 +479,8 @@
+     pzlib_filefunc_def->zwrite_file = win32_write_file_func;
+     pzlib_filefunc_def->ztell64_file = win32_tell64_file_func;
+     pzlib_filefunc_def->zseek64_file = win32_seek64_file_func;
++    pzlib_filefunc_def->ztruncate64_file = win32_truncate64_file_func;
++    pzlib_filefunc_def->zflush_file = win32_flush_file_func;
+     pzlib_filefunc_def->zclose_file = win32_close_file_func;
+     pzlib_filefunc_def->zerror_file = win32_error_file_func;
+     pzlib_filefunc_def->opaque = NULL;

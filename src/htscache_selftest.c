@@ -381,6 +381,8 @@ typedef struct {
   int fail_errno; /**< errno set on the failing write (ENOSPC, EIO, ...) */
   int writes;     /**< zwrite call count, to detect re-entry into the stream */
   int fail_once;  /**< recover (unlimited budget) after the first failure */
+  int truncates;  /**< ztruncate call count, to prove the rollback truncates */
+  truncate64_file_func truncate; /**< the backend's own, NULL if it has none */
 } writefail_inject;
 
 /* zwrite that copies until the budget runs out, then fails with inj->fail_errno
@@ -401,16 +403,30 @@ static uLong selftest_failing_zwrite(voidpf opaque, voidpf stream,
   return 0; /* short write -> the minizip op returns an error */
 }
 
+/* Count the truncate the rolled-back entry goes through, then run it. */
+static int ZCALLBACK selftest_counting_ztruncate(voidpf opaque, voidpf stream,
+                                                 ZPOS64_T size) {
+  writefail_inject *inj = (writefail_inject *) opaque;
+
+  inj->truncates++;
+  if (inj->truncate == NULL)
+    return -1;
+  return inj->truncate(opaque, stream, size);
+}
+
 /* Open a ZIP whose writes fail past inj->budget, so cache_add() hits an error.
- */
+   Through the table the cache itself opens with (#1402): a table without a
+   truncate rolls a member back by rewinding, leaving the bytes behind. */
 static zipFile selftest_open_failing_zip(const char *path,
                                          writefail_inject *inj) {
-  zlib_filefunc_def ff;
+  zlib_filefunc64_def ff;
 
-  fill_fopen_filefunc(&ff); /* real fopen/read/seek/close; ignores opaque */
+  hts_zip_filefunc64(&ff); /* real fopen/read/seek/close; ignores opaque */
+  inj->truncate = ff.ztruncate64_file;
+  ff.ztruncate64_file = selftest_counting_ztruncate;
   ff.zwrite_file = selftest_failing_zwrite;
   ff.opaque = inj;
-  return zipOpen2(path, APPEND_STATUS_CREATE, NULL, &ff);
+  return zipOpen2_64(path, APPEND_STATUS_CREATE, NULL, &ff);
 }
 
 /* Store one octet-stream body into `cache` (all-in-cache, body in the ZIP). */
@@ -501,6 +517,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     inj.budget = (phase == 0) ? 4096 : 0;
     inj.fail_errno = (phase == 0) ? ENOSPC : EIO;
     inj.writes = 0;
+    inj.truncates = 0;
     inj.fail_once = 0;
     memset(&cache, 0, sizeof(cache));
     cache.type = 1;
@@ -573,6 +590,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     inj.budget = (size_t) -1;
     inj.fail_errno = EIO;
     inj.writes = 0;
+    inj.truncates = 0;
     inj.fail_once = 0;
     memset(&cache, 0, sizeof(cache));
     cache.type = 1;
@@ -614,6 +632,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     inj.budget = 4096;
     inj.fail_errno = EIO;
     inj.writes = 0;
+    inj.truncates = 0;
     inj.fail_once = 1;
     memset(&cache, 0, sizeof(cache));
     cache.type = 1;
@@ -629,6 +648,19 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               "cache-writefail: skip: isolated failure aborted the mirror "
               "(flagged=%d, exit_xh=%d)\n",
               (int) cache.zipWriteFailed, opt->state.exit_xh);
+      fail++;
+    }
+    /* the rolled-back entry is truncated away, not merely rewound: #1402,
+       where a table with no truncate still reported the rollback as done */
+    if (inj.truncate == NULL) {
+      fprintf(stderr, "cache-writefail: skip: the table the cache opens with "
+                      "carries no truncate, so the rollback only rewound\n");
+      fail++;
+    } else if (inj.truncates != 1) {
+      fprintf(stderr,
+              "cache-writefail: skip: abandoned entry truncated %d time(s), "
+              "want 1\n",
+              inj.truncates);
       fail++;
     }
     writefail_store(opt, &cache, "/blob2.bin", body, 16);
@@ -656,6 +688,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     inj.budget = (size_t) -1; /* no injected failure */
     inj.fail_errno = 0;
     inj.writes = 0;
+    inj.truncates = 0;
     inj.fail_once = 0;
     memset(&cache, 0, sizeof(cache));
     cache.type = 1;

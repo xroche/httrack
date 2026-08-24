@@ -4013,19 +4013,15 @@ static const char *const zip_abandon_kept[] = {"before.bin", "after1.bin",
                                                "after2.bin"};
 static const char zip_abandon_body[] = "zip-abandon kept member body";
 
-/* Build `path` with the kept members, opening a `doomed`-byte member after the
+/* Fill `zf` with the kept members, opening a `doomed`-byte member after the
    first one and abandoning it mid-write (0: never open it, the reference). The
-   doomed member is stored, so its body reaches the file byte for byte. */
-static int zip_abandon_build(const char *path, size_t doomed) {
-  char catbuff[CATBUFF_SIZE];
+   doomed member is stored, so its body reaches the file byte for byte. What the
+   abandon returned lands in *abandon_err. */
+static int zip_abandon_fill(zipFile zf, size_t doomed, int *abandon_err) {
   char chunk[4096];
   zip_fileinfo fi;
-  zipFile zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), path),
-                                APPEND_STATUS_CREATE);
   size_t i;
 
-  if (zf == NULL)
-    return -1;
   memset(&fi, 0, sizeof(fi));
   memset(chunk, 'Z', sizeof(chunk));
   for (i = 0; i < sizeof(zip_abandon_kept) / sizeof(zip_abandon_kept[0]); i++) {
@@ -4051,14 +4047,41 @@ static int zip_abandon_build(const char *path, size_t doomed) {
         goto fail;
       left -= n;
     }
-    if (zipAbandonFileInZip(zf) != ZIP_OK)
-      goto fail;
+    *abandon_err = zipAbandonFileInZip(zf);
   }
-  return zipClose(zf, NULL) == ZIP_OK ? 0 : -1;
+  return 0;
 
 fail:
-  zipClose(zf, NULL);
   return -1;
+}
+
+/* zip_abandon_fill() through a private filefunc table, `truncatable` telling
+   whether it carries a truncate entry: without one, as the Win32 tables were
+   before #1402, a rollback can only rewind. */
+static int zip_abandon_build_table(const char *path, size_t doomed,
+                                   hts_boolean truncatable, int *abandon_err) {
+  char catbuff[CATBUFF_SIZE];
+  zlib_filefunc64_def ff;
+  zipFile zf;
+  int ret;
+
+  hts_zip_filefunc64(&ff);
+  if (!truncatable)
+    ff.ztruncate64_file = NULL;
+  zf = zipOpen2_64(fconv(catbuff, sizeof(catbuff), path), APPEND_STATUS_CREATE,
+                   NULL, &ff);
+  if (zf == NULL)
+    return -1;
+  ret = zip_abandon_fill(zf, doomed, abandon_err);
+  return zipClose(zf, NULL) == ZIP_OK ? ret : -1;
+}
+
+static int zip_abandon_build(const char *path, size_t doomed) {
+  int abandon_err = ZIP_OK;
+
+  if (zip_abandon_build_table(path, doomed, HTS_TRUE, &abandon_err) != 0)
+    return -1;
+  return abandon_err == ZIP_OK ? 0 : -1;
 }
 
 /* Whole file into a malloct'd buffer: binary, not terminated. */
@@ -4184,6 +4207,84 @@ static int st_zip_abandon(httrackp *opt, int argc, char **argv) {
   }
   freet(ref);
   printf("zip-abandon: %s\n", fail ? "FAIL" : "OK");
+  return fail;
+}
+
+/* A rollback that could only rewind must say so (#1402): reporting ZIP_OK for
+   it hands the caller an archive whose directory no reader finds, the very
+   damage the truncate is there to prevent. */
+static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
+  static const size_t doomed = 200000; /* a tail past unzip.c's 64KB backscan */
+  char refpath[HTS_URLMAXSIZE], path[HTS_URLMAXSIZE];
+  char *ref = NULL, *got = NULL;
+  size_t reflen = 0, gotlen = 0;
+  int abandon_err = ZIP_OK;
+  int fail = 0;
+  unzFile uf;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "zip-abandon-notrunc: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(refpath, sizeof(refpath), argv[0], "zip-notrunc-ref.zip");
+  fconcat(path, sizeof(path), argv[0], "zip-notrunc.zip");
+
+  /* control: the table the cache opens with truncates, and reports ZIP_OK */
+  if (zip_abandon_build_table(refpath, doomed, HTS_TRUE, &abandon_err) != 0 ||
+      zip_abandon_slurp(refpath, &ref, &reflen) != 0 || reflen == 0) {
+    fprintf(stderr, "zip-abandon-notrunc: cannot build the reference\n");
+    freet(ref);
+    return 1;
+  }
+  freet(ref);
+  if (abandon_err != ZIP_OK) {
+    fprintf(stderr,
+            "zip-abandon-notrunc: a truncating backend returned %d, want %d\n",
+            abandon_err, ZIP_OK);
+    fail++;
+  }
+  if (reflen >= doomed) {
+    fprintf(stderr,
+            "zip-abandon-notrunc: the reference kept %d byte(s), so the "
+            "abandoned member was not truncated away\n",
+            (int) reflen);
+    fail++;
+  }
+
+  abandon_err = ZIP_OK;
+  if (zip_abandon_build_table(path, doomed, HTS_FALSE, &abandon_err) != 0 ||
+      zip_abandon_slurp(path, &got, &gotlen) != 0) {
+    fprintf(stderr, "zip-abandon-notrunc: cannot build '%s'\n", path);
+    freet(got);
+    return fail + 1;
+  }
+  freet(got);
+  if (abandon_err == ZIP_OK) {
+    fprintf(stderr, "zip-abandon-notrunc: a backend with no truncate reported "
+                    "the rollback as done\n");
+    fail++;
+  }
+  /* only what the member had flushed stays, and it takes more than a reader's
+     64KB backscan (unzip.c uMaxBack) to bury the directory behind it */
+  if (gotlen <= reflen + 65535) {
+    fprintf(stderr,
+            "zip-abandon-notrunc: %d byte(s) left over the reference's %d, too "
+            "few to outgrow a 64KB backscan\n",
+            (int) gotlen, (int) reflen);
+    fail++;
+  }
+  /* what the wrong return hides: the tail buries the directory written after */
+  uf = hts_unzOpen_utf8(path);
+  if (uf != NULL) {
+    fprintf(stderr,
+            "zip-abandon-notrunc: '%s' still opens, so the case proves "
+            "nothing\n",
+            path);
+    unzClose(uf);
+    fail++;
+  }
+  printf("zip-abandon-notrunc: %s\n", fail ? "FAIL" : "OK");
   return fail;
 }
 
@@ -12434,6 +12535,9 @@ static const struct selftest_entry {
      st_zip_repair_shift},
     {"zip-abandon", "<dir>",
      "an abandoned member leaves the archive byte-identical", st_zip_abandon},
+    {"zip-abandon-notrunc", "<dir>",
+     "a rollback that could only rewind reports a failure",
+     st_zip_abandon_notrunc},
     {"dns", "", "DNS resolver/cache self-test", st_dns},
     {"dnstimeout", "", "a slow DNS resolve is bounded and holds no lock",
      st_dnstimeout},

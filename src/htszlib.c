@@ -292,18 +292,21 @@ static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const void *filename,
   return (voidpf) FOPEN((const char *) filename, mode_fopen);
 }
 
+void hts_zip_filefunc64(zlib_filefunc64_def *ff) {
+  fill_fopen64_filefunc(ff);
+  ff->zopen64_file = hts_zip_fopen_utf8;
+}
+
 unzFile hts_unzOpen_utf8(const char *path) {
   zlib_filefunc64_def ff;
 
-  fill_fopen64_filefunc(&ff);
-  ff.zopen64_file = hts_zip_fopen_utf8;
+  hts_zip_filefunc64(&ff);
   return unzOpen2_64(path, &ff);
 }
 
 zipFile hts_zipOpen_utf8(const char *path, int append) {
   zlib_filefunc64_def ff;
 
-  fill_fopen64_filefunc(&ff);
-  ff.zopen64_file = hts_zip_fopen_utf8;
+  hts_zip_filefunc64(&ff);
   return zipOpen2_64(path, append, NULL, &ff);
 }

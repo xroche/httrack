@@ -58,6 +58,8 @@ extern const char *hts_get_zerror(int err);
    (#630). `append` takes the zipOpen2_64 APPEND_STATUS_* values. */
 extern unzFile hts_unzOpen_utf8(const char *path);
 extern zipFile hts_zipOpen_utf8(const char *path, int append);
+/* The table both open with, for a caller that overrides one entry. */
+extern void hts_zip_filefunc64(zlib_filefunc64_def *ff);
 #endif
 
 #endif
