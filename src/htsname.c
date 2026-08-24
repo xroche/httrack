@@ -409,8 +409,8 @@ int url_savename(lien_adrfilsave *const afs,
   char catbuff[CATBUFF_SIZE];
   const int is_redirect = headers != NULL && HTTP_IS_REDIRECT(headers->r.statuscode);
   const char *mime_type = headers != NULL && !is_redirect ? headers->r.contenttype : NULL;
-  /*const char* mime_type = ( headers && HTTP_IS_OK(headers->r.statuscode) ) ? headers->r.contenttype : NULL; */
-  lien_back *const back = sback->lnk;
+  /*const char* mime_type = ( headers && HTTP_IS_OK(headers->r.statuscode) ) ?
+   * headers->r.contenttype : NULL; */
 
   /* */
   char BIGSTK fil[HTS_URLMAXSIZE * 2];       /* ="" */
@@ -717,8 +717,9 @@ int url_savename(lien_adrfilsave *const afs,
               ext_chg_delayed = 1;      /* due to naming system */
             }
           }
-          // test imposible dans le cache, faire une requête
-          else {
+          // not in the cache: probe the type with a request
+          // no backing to probe with: -#C names offline (#1393)
+          else if (sback != NULL) {
             //
             int hihp = opt->state._hts_in_html_parsing;
             int has_been_moved = 0;
@@ -745,6 +746,7 @@ int url_savename(lien_adrfilsave *const afs,
 
               b = back_index(opt, sback, current.adr, current.fil, BACK_ADD_TEST);
               if (b >= 0) {
+                lien_back *const back = sback->lnk;
                 int stop_looping = 0;
                 int petits_tours = 0;
                 int get_test_request = 0;       // en cas de bouclage sur soi même avec HEAD, tester avec GET.. parfois c'est la cause des problèmes
