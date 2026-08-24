@@ -75,6 +75,8 @@ c1=$(printf '\302[\200-\237]')
 # the ASCII range because an awk record cannot hold one, and no lang file has any.
 utf8_full_line=$(printf '^([\001-\177]|[\302-\337][\200-\277]|\340[\240-\277][\200-\277]|[\341-\354][\200-\277][\200-\277]|\355[\200-\237][\200-\277]|[\356-\357][\200-\277][\200-\277]|\360[\220-\277][\200-\277][\200-\277]|[\361-\363][\200-\277][\200-\277][\200-\277]|\364[\200-\217][\200-\277][\200-\277])*$')
 high_byte=$(printf '[\200-\377]')
+smart_quote=$(printf '\342\200[\230-\236]')
+lead_quote=$(printf '^\342\200[\230-\236]')
 # The value line following a metadata key. Most catalogs are CRLF, Uzbek.txt is not.
 field() {
     LC_ALL=C awk -v key="$2" '
@@ -118,6 +120,15 @@ charset_declared_matches_bytes() {
         echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
         return 1
     fi
+    # ISO-8859-7 reads 0xa2 as a right single quote where cp1253 reads capital
+    # alpha with tonos, so a value authored in the codepage opens a word with a
+    # quote that never closes. Above C1, so the check above cannot see it.
+    ln=$(LC_ALL=C awk -v lead="$lead_quote" -v any="$smart_quote" \
+        '$0 ~ lead { s = $0; if (gsub(any, "", s) == 1) { print NR; exit } }' "$tmp/utf8")
+    if [ -n "$ln" ]; then
+        echo "${f##*/}:$ln: value opens with an unclosed curly quote under declared $cs; a codepage letter"
+        return 1
+    fi
     return 0
 }
 
@@ -137,7 +148,10 @@ else
         'NR == 20 { print repl; next } { print }' "$langdir/Francais.txt" >"$tmp/utf8mix.txt"
     LC_ALL=C awk -v repl="$leak" \
         'NR == 20 { print repl; next } { print }' "$langdir/Chinese-Simplified.txt" >"$tmp/utf8mixmb.txt"
-    for probe in undecodable c1 utf8mix utf8mixmb; do
+    # 0xa2 is the byte Greek.txt carried on five values until it was repaired.
+    LC_ALL=C awk -v q="$(printf '\242')" \
+        'NR == 16 { print q substr($0, 2); next } { print }' "$langdir/Greek.txt" >"$tmp/leadquote.txt"
+    for probe in undecodable c1 utf8mix utf8mixmb leadquote; do
         if charset_declared_matches_bytes "$tmp/$probe.txt" >/dev/null; then
             echo "the charset check passed a deliberately mislabelled file ($probe)"
             exit 1
