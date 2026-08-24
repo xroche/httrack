@@ -4632,10 +4632,10 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
 
 /* The short form optalias_check() emits for the option words, both joined by a
    space when it returns two, or NULL when it refuses them; *used counts the
-   words consumed. */
+   words consumed and warn takes the message an accepted option still drew. */
 static const char *st_optalias_expand(char *dest, size_t dest_size,
                                       const char *word, const char *next,
-                                      int *used) {
+                                      int *used, char *warn, size_t warn_size) {
   char BIGSTK out[2][HTS_CDLMAXSIZE];
   char *outv[2] = {out[0], out[1]};
   const char *argv[2];
@@ -4645,13 +4645,14 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
 
   argv[0] = word;
   argv[1] = next;
-  out[0][0] = out[1][0] = dest[0] = '\0';
+  out[0][0] = out[1][0] = dest[0] = warn[0] = '\0';
   *used = optalias_check(argc, argv, 0, &outc, outv, sizeof(out[0]), error,
                          sizeof(error));
   if (*used == 0) {
     assertf(error[0] != '\0'); /* a refusal has to say why */
     return NULL;
   }
+  strlcpybuff(warn, error, warn_size);
   assertf(outc >= 1 && outc <= 2);
   strlcpybuff(dest, out[0], dest_size);
   if (outc == 2) {
@@ -4664,7 +4665,7 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
 /* Long-option value handling (#1195): a value the option's class did not take
    was dropped, so --index=0 read back as the enabling bare --index. */
 static int st_optalias(httrackp *opt, int argc, char **argv) {
-  char got[HTS_CDLMAXSIZE * 2];
+  char got[HTS_CDLMAXSIZE * 2], warn[256];
   int i, used;
 
   (void) opt;
@@ -4676,20 +4677,31 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
     return 0;
   }
   if (argc >= 1) {
-    const char *const out = st_optalias_expand(
-        got, sizeof(got), argv[0], argc >= 2 ? argv[1] : NULL, &used);
+    const char *const out = st_optalias_expand(got, sizeof(got), argv[0],
+                                               argc >= 2 ? argv[1] : NULL,
+                                               &used, warn, sizeof(warn));
 
     printf("%s\n", out != NULL ? out : "(refused)");
     return out != NULL ? 0 : 1;
   }
 #define EXPANDS(want, word, next)                                              \
   do {                                                                         \
-    const char *const out__ =                                                  \
-        st_optalias_expand(got, sizeof(got), (word), (next), &used);           \
+    const char *const out__ = st_optalias_expand(                              \
+        got, sizeof(got), (word), (next), &used, warn, sizeof(warn));          \
     assertf(out__ != NULL && strcmp(out__, (want)) == 0);                      \
+    assertf(warn[0] == '\0');                                                  \
+  } while (0)
+/* accepted, expanding to WANT, but drawing a warning on the way */
+#define WARNS(want, word, next)                                                \
+  do {                                                                         \
+    const char *const out__ = st_optalias_expand(                              \
+        got, sizeof(got), (word), (next), &used, warn, sizeof(warn));          \
+    assertf(out__ != NULL && strcmp(out__, (want)) == 0);                      \
+    assertf(warn[0] != '\0');                                                  \
   } while (0)
 #define REFUSES(word, next)                                                    \
-  assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used) == NULL)
+  assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used, warn,    \
+                             sizeof(warn)) == NULL)
 
   /* -I0 has always disabled the index; now the long form can say it too */
   EXPANDS("-I0", "--index=0", NULL);
@@ -4746,6 +4758,27 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-y0", "--no-background-on-suspend", NULL);
   EXPANDS("-%T", "--utf8-conversion", NULL);
 
+  /* the --wide-/--tiny- prefix glues the --wide/--tiny connection count onto
+     the plain clusters, and is refused wherever the glue would be misread */
+  EXPANDS("-wc32", "--wide-mirror", NULL);
+  assertf(used == 1);
+  EXPANDS("-wc1", "--tiny-mirror", NULL);
+  EXPANDS("-p0C0I0tc32", "--wide-spider", NULL);
+  EXPANDS("-qgc1", "--tiny-get", NULL);
+  EXPANDS("-Xc32", "--wide-purge-old", NULL);
+  EXPANDS("-o2c1", "--tiny-generate-errors", "2");
+  assertf(used == 2);
+  /* elsewhere the alias applies without the count, and says so */
+  WARNS("-O /tmp", "--wide-path", "/tmp"); /* the value is a word of its own */
+  WARNS("+*.gif", "--tiny-allow", "*.gif");
+  WARNS("--clean", "--wide-clean", NULL); /* a long form */
+  WARNS("-c8", "--wide-sockets", "8");    /* -c8 already: 8 or 32? */
+  WARNS("-c32", "--tiny-wide", NULL);     /* -c32 already: 32 or 1? */
+  WARNS("-N1", "--wide-structure", "1");  /* -N takes a template */
+  WARNS("-%r", "--wide-warc", NULL);      /* -%rc is --warc-cdx, not -%r -c */
+  WARNS("-#h", "--wide-version", NULL);   /* -#h is matched as a whole word */
+  WARNS("-h", "--tiny-help", NULL);
+
   /* the value-taking classes are untouched */
   EXPANDS("-C0", "--cache=0", NULL);
   EXPANDS("-C0", "--nocache", NULL);
@@ -4771,6 +4804,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   }
   assertf(i > 100); /* the table was walked, not skipped */
 #undef EXPANDS
+#undef WARNS
 #undef REFUSES
 
   printf("optalias self-test OK\n");

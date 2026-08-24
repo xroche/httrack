@@ -384,6 +384,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           htsmain_free();
           return -1;
         }
+        /* an option that parsed, but not as asked (a --wide-/--tiny- prefix
+           the alias cannot carry) */
+        if (tmp_error[0] != '\0')
+          fprintf(stderr, "* %s\n", tmp_error);
 
         /* Copier */
         if (!cmdl_add(&x_cmd, tmp_argv[0]) ||
