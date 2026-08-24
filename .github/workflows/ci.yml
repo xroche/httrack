@@ -274,8 +274,9 @@ jobs:
 
   # Portability: build and test on macOS (Darwin/clang) on a native runner --
   # no VM. The tree has no __APPLE__ branches, so Darwin exercises the
-  # generic-Unix path on a second libc and kernel. brew's openssl@3 is keg-only,
-  # so point configure at it; everything else is in the SDK or default paths.
+  # generic-Unix path on a second libc and kernel. openssl@4 is what the
+  # homebrew-core formula depends on, so it is what brew installs run; the DMG
+  # ships openssl@3, which macos-app still builds. Keg-only, hence the paths.
   macos:
     name: build (macOS arm64, clang)
     runs-on: macos-15
@@ -292,13 +293,16 @@ jobs:
       - name: Configure
         run: |
           set -euo pipefail
-          ssl="$(brew --prefix openssl@3)"
+          ssl="$(brew --prefix openssl@4)"
           brewp="$(brew --prefix)"
           autoreconf -fi
           ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
             LDFLAGS="-L${ssl}/lib -L${brewp}/lib"
           grep -q "define HTS_USEBROTLI 1" config.h
           grep -q "define HTS_USEZSTD 1" config.h
+          # brew --prefix answers for a formula it has not installed, so a
+          # renamed or missing bottle would leave every TLS test skipping.
+          grep -q "define HTS_USEOPENSSL 1" config.h
 
       - name: Build
         run: make -j"$(sysctl -n hw.ncpu)"
@@ -340,7 +344,7 @@ jobs:
       - name: Build and install into a temp prefix
         run: |
           set -euo pipefail
-          ssl="$(brew --prefix openssl@3)"
+          ssl="$(brew --prefix openssl@4)"
           brewp="$(brew --prefix)"
           autoreconf -fi
           ./configure CPPFLAGS="-I${ssl}/include -I${brewp}/include" \
@@ -402,6 +406,8 @@ jobs:
       - name: Build and install into a temp prefix
         run: |
           set -euo pipefail
+          # openssl@3, matching macos-release.yml: this job is the release path
+          # minus Apple, so it has to bundle what the signed DMG bundles.
           ssl="$(brew --prefix openssl@3)"
           brewp="$(brew --prefix)"
           ./bootstrap
