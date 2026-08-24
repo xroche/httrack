@@ -22,12 +22,11 @@ chmod -R u+w "${root}"
 # LANGUAGE_NAME differs from LANGUAGE_FILE, and carries a high byte the way the
 # shipped endonyms do, so a render that reaches for the wrong key is visible
 # rather than merely equal.
-eacute=$(printf '\351')
+eacute=$(printf '\303\251')
 printf '%s\r\n' \
     LANGUAGE_NAME "Fran${eacute}ais-1353" \
     LANGUAGE_FILE 'Francais' \
     LANGUAGE_ISO 'fr' \
-    LANGUAGE_CHARSET 'iso-8859-1' \
     OK 'OK' \
     Cancel 'Annuler' \
     >"${root}/lang/Francais.txt"

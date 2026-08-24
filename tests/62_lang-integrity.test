@@ -21,7 +21,7 @@ tmp=$(mktemp -d)
 cleanup_push rm -rf "$tmp"
 keys="$tmp/english.keys"
 
-# Byte-wise: each file is in its own declared legacy charset, lang.def is CRLF.
+# Byte-wise: the catalogs and lang.def are UTF-8, and CRLF but for Uzbek.txt.
 LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$eng" >"$keys"
 
 # An empty parse would make every check below pass vacuously.
@@ -62,21 +62,10 @@ if [ "$nfiles" -lt 25 ]; then
     exit 1
 fi
 
-# html/server/*.html copies LANGUAGE_CHARSET straight into its <meta>, and
-# htsserver.c decodes the POST body with it, so bytes that are not what it says
-# render and convert wrong (#963).
-c1=$(printf '\302[\200-\237]')
-# A single-byte charset maps all 256 byte values, so the iconv decode above
-# can never fail on it and cannot see a value left as raw UTF-8; a whole line
-# that itself decodes as valid multi-byte UTF-8 is that leak.
-# Under 8 bytes a line can be valid UTF-8 by chance (Ukrainian.txt:686 is a
-# 2-byte word that is), so short mixed-encoding lines go undetected.
-# Raw bytes in an awk ERE, not grep -P: BSD grep has no -P. NUL is left out of
-# the ASCII range because an awk record cannot hold one, and no lang file has any.
-utf8_full_line=$(printf '^([\001-\177]|[\302-\337][\200-\277]|\340[\240-\277][\200-\277]|[\341-\354][\200-\277][\200-\277]|\355[\200-\237][\200-\277]|[\356-\357][\200-\277][\200-\277]|\360[\220-\277][\200-\277][\200-\277]|[\361-\363][\200-\277][\200-\277][\200-\277]|\364[\200-\217][\200-\277][\200-\277])*$')
-high_byte=$(printf '[\200-\377]')
-smart_quote=$(printf '\342\200[\230-\236]')
-lead_quote=$(printf '^\342\200[\230-\236]')
+# The catalogs are UTF-8 and html/server/*.html says so in its <meta>. A
+# re-encode that guessed the source wrong leaves U+FFFD or bytes that do not
+# decode (#963).
+replacement=$(printf '\357\277\275')
 # The value line following a metadata key. Most catalogs are CRLF, Uzbek.txt is not.
 field() {
     LC_ALL=C awk -v key="$2" '
@@ -84,73 +73,52 @@ field() {
         $0 == key { getline v; sub(/\r$/, "", v); print v; exit }' "$1"
 }
 
-charset_declared_matches_bytes() {
+bytes_are_utf8() {
     f=$1
-    cs=$(field "$f" LANGUAGE_CHARSET)
-    if [ -z "$cs" ]; then
-        echo "${f##*/}: no LANGUAGE_CHARSET declared"
+    # Not iconv: macOS 14 swapped GNU libiconv for a Citrus one that rejects
+    # valid UTF-8, reporting a stale ENOTTY that no conversion can produce.
+    if ! "$py" "$tmp/utf8.py" "$f" 2>"$tmp/err"; then
+        echo "${f##*/}: not valid UTF-8: $(<"$tmp/err")"
         return 1
     fi
-    if ! LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/utf8" 2>"$tmp/err"; then
-        echo "${f##*/}: bytes do not decode as the declared $cs: $(<"$tmp/err")"
-        return 1
-    fi
-    # No legacy 8-bit charset puts text at U+0080..U+009F, so a C1 there means
-    # the bytes are really the matching Windows codepage.
-    n=$(LC_ALL=C count_matching_lines "$c1" "$tmp/utf8")
-    # An empty n means grep failed, not that it found nothing.
-    if [ "${n:-1}" -ne 0 ]; then
-        echo "${f##*/}: $n lines decode to C1 controls under $cs; the bytes are a Windows codepage"
-        return 1
-    fi
-    # BIG5, gb2312 and shift-jis reach here too: iconv passes a raw UTF-8 leak of
-    # accented Latin letters, whose bytes are valid singles in all three. Their own
-    # text tops out at 4 non-ASCII bytes per UTF-8-shaped line, so gate on that
-    # count rather than on the charset family, and ask for more than 4.
-    case "$(printf '%s' "$cs" | LC_ALL=C tr '[:upper:]' '[:lower:]')" in
-    # Nothing to tell apart once UTF-8 is what the file claims to be.
-    utf-8 | utf8) return 0 ;;
-    iso-8859-* | windows-125*) minhigh=1 ;;
-    *) minhigh=8 ;;
-    esac
-    ln=$(LC_ALL=C awk -v u="$utf8_full_line" -v h="$high_byte" -v m="$minhigh" \
-        '{ s = $0; nhigh = gsub(h, "", s) }
-         length($0) >= 8 && nhigh >= m && $0 ~ u { print NR; exit }' "$f")
+    ln=$(LC_ALL=C awk -v r="$replacement" 'index($0, r) { print NR; exit }' "$f")
     if [ -n "$ln" ]; then
-        echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
+        echo "${f##*/}:$ln: holds U+FFFD, so the re-encode lost a character"
         return 1
     fi
-    # The C1 check sees 0x80..0x9f only; cp1253's letters at 0xa1/0xa2 read as quotes here.
-    ln=$(LC_ALL=C awk -v lead="$lead_quote" -v any="$smart_quote" \
-        '$0 ~ lead { s = $0; if (gsub(any, "", s) == 1) { print NR; exit } }' "$tmp/utf8")
+    ln=$(LC_ALL=C awk '/LANGUAGE_CHARSET/ { print NR; exit }' "$f")
     if [ -n "$ln" ]; then
-        echo "${f##*/}:$ln: value opens with an unclosed curly quote under declared $cs; the byte is a letter in the codepage"
+        echo "${f##*/}:$ln: still declares LANGUAGE_CHARSET; the catalogs are UTF-8 now"
         return 1
     fi
     return 0
 }
 
-if ! command -v iconv >/dev/null 2>&1; then
-    echo "iconv not found; charset check skipped" >&2
+py=$(find_python || true)
+if [ -z "$py" ]; then
+    echo "python3 not found; encoding check skipped" >&2
 else
-    # Positive controls, one per branch: a file cannot pass while mislabelled.
-    # No CR: BSD sed writes a literal r, and the extractor strips CR anyway.
-    LC_ALL=C sed '10s/.*/UTF-8/' "$langdir/Francais.txt" >"$tmp/undecodable.txt"
-    LC_ALL=C sed '10s/.*/ISO-8859-2/' "$langdir/Croatian.txt" >"$tmp/c1.txt"
-    # A value line left as raw UTF-8, under a declared single-byte charset and then
-    # under gb2312, the multi-byte one whose own text comes closest to that shape.
-    # Its 8 non-ASCII bytes are what pin minhigh from above; the tree pins it from
-    # below, so widening either past the other is caught here.
-    leak=$(printf 'Une fuite UTF-8 : caf\xc3\xa9, na\xc3\xafve, t\xc3\xa9l\xc3\xa9phone')
-    LC_ALL=C awk -v repl="$leak" \
-        'NR == 20 { print repl; next } { print }' "$langdir/Francais.txt" >"$tmp/utf8mix.txt"
-    LC_ALL=C awk -v repl="$leak" \
-        'NR == 20 { print repl; next } { print }' "$langdir/Chinese-Simplified.txt" >"$tmp/utf8mixmb.txt"
-    # Greek read as ISO-8859-7 is the defect itself: its letters become quotes.
-    LC_ALL=C sed '10s/.*/ISO-8859-7/' "$langdir/Greek.txt" >"$tmp/leadquote.txt"
-    for probe in undecodable c1 utf8mix utf8mixmb leadquote; do
-        if charset_declared_matches_bytes "$tmp/$probe.txt" >/dev/null; then
-            echo "the charset check passed a deliberately mislabelled file ($probe)"
+    cat >"$tmp/utf8.py" <<'PYEOF'
+import sys
+
+try:
+    open(sys.argv[1], "rb").read().decode("utf-8")
+except UnicodeDecodeError as e:
+    sys.exit("byte %d: %s" % (e.start, e.reason))
+PYEOF
+    # Positive controls, one per branch, each planting its defect where a check
+    # that only read the head, the keys, or the header would miss it.
+    {
+        cat "$langdir/Francais.txt"
+        printf 'Caf\351\r\n'
+    } >"$tmp/legacy.txt"
+    LC_ALL=C awk -v r="$replacement" 'NR == 500 { print r; next } { print }' \
+        "$langdir/Francais.txt" >"$tmp/lossy.txt"
+    LC_ALL=C awk 'NR == 501 { print "LANGUAGE_CHARSET" } { print }' \
+        "$langdir/Francais.txt" >"$tmp/declared.txt"
+    for probe in legacy lossy declared; do
+        if bytes_are_utf8 "$tmp/$probe.txt" >/dev/null; then
+            echo "the encoding check passed a deliberately broken file ($probe)"
             exit 1
         fi
     done
@@ -158,25 +126,27 @@ else
     nchecked=0
     for f in "$langdir"/*.txt; do
         nchecked=$((nchecked + 1))
-        charset_declared_matches_bytes "$f" || fail=1
+        bytes_are_utf8 "$f" || fail=1
     done
     if [ "$nchecked" -ne "$nfiles" ]; then
-        echo "charset check saw $nchecked of $nfiles language files"
+        echo "encoding check saw $nchecked of $nfiles language files"
         exit 1
     fi
 fi
 
-# Άκυρο in windows-1253. The check above only proves a value is not a quote.
+# Άκυρο. Valid UTF-8 does not say the re-encode read the right source: cp1253
+# and ISO-8859-7 disagree on this letter, and reading the file as the label
+# rather than the bytes turns it into a curly quote.
 cancel=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "Cancel" { getline v; sub(/\r$/, "", v); print v; exit }' \
     "$langdir/Greek.txt")
-if [ "$cancel" != "$(printf '\242\352\365\361\357')" ]; then
-    echo "Greek.txt: the Cancel value is not the expected windows-1253 bytes for the Greek word"
+if [ "$cancel" != "$(printf '\316\206\316\272\317\205\317\201\316\277')" ]; then
+    echo "Greek.txt: the Cancel value is not the UTF-8 for the Greek word"
     fail=1
 fi
-# 0xb6 is the ISO-8859-7 spelling of that same letter, and a pilcrow here.
-stray=$(LC_ALL=C tr -dc '\266' <"$langdir/Greek.txt" | wc -c)
-if [ "$stray" -ne 0 ]; then
-    echo "Greek.txt: $stray bytes 0xb6 remain, mixing ISO-8859-7 into windows-1253"
+ln=$(LC_ALL=C awk -v q="$(printf '\342\200\231')" 'index($0, q) { print NR; exit }' \
+    "$langdir/Greek.txt")
+if [ -n "$ln" ]; then
+    echo "Greek.txt:$ln: a curly quote, so the re-encode read cp1253 as ISO-8859-7"
     fail=1
 fi
 
@@ -217,13 +187,8 @@ exonyms=$(printf '%s' "$exonyms" | tr '\n' ' ')
 
 name_is_endonym() {
     f=$1
-    cs=$(field "$f" LANGUAGE_CHARSET)
-    if ! LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/u8"; then
-        echo "${f##*/}: iconv cannot read $cs"
-        return 1
-    fi
-    LC_ALL=C awk -v name="$(field "$tmp/u8" LANGUAGE_NAME)" -v iso="$(field "$f" LANGUAGE_ISO)" \
-        -v wid="$(field "$tmp/u8" LANGUAGE_WINDOWSID)" -v exonyms="$exonyms" -v n="${f##*/}" \
+    LC_ALL=C awk -v name="$(field "$f" LANGUAGE_NAME)" -v iso="$(field "$f" LANGUAGE_ISO)" \
+        -v wid="$(field "$f" LANGUAGE_WINDOWSID)" -v exonyms="$exonyms" -v n="${f##*/}" \
         -v exempt="$own_name_is_english" '
         BEGIN {
             split(exempt, x, /[ \t\n]+/)
@@ -449,21 +414,10 @@ else
         exit 1
     fi
 
-    # Shift-JIS maps 0x5C to the yen sign, hiding every escape in Japanese.txt
-    # from the scan below. The engine reads the byte, so put the backslashes back.
-    yen=$(printf '\302\245')
     nesc=0
     for f in "$langdir"/*.txt; do
         nesc=$((nesc + 1))
-        cs=$(field "$f" LANGUAGE_CHARSET)
-        # Decoded, not raw: 0x5C is a legal trail byte in BIG5 and Shift-JIS.
-        LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/esc" || fail "${f##*/}: iconv cannot read $cs"
-        case $(printf '%s' "$cs" | LC_ALL=C tr '[:upper:]' '[:lower:]') in
-        shift-jis | shift_jis | sjis | cp932)
-            LC_ALL=C sed "s|$yen|\\\\|g" "$tmp/esc" >"$tmp/esc.bs" && mv "$tmp/esc.bs" "$tmp/esc"
-            ;;
-        esac
-        out=$(unknown_escapes "$tmp/esc" "${f##*/}")
+        out=$(unknown_escapes "$f" "${f##*/}")
         nval=$(printf '%s\n' "$out" | LC_ALL=C sed -n 's/^values=//p')
         # A scan that stopped after the first pair would satisfy every control.
         if [ "${nval:-0}" -lt $((nkeys * 9 / 10)) ]; then
@@ -729,107 +683,64 @@ LC_ALL=C awk -v pin="$lbpin" '
     }
 ' "$tmp/lb" || fail=1
 
-# A single-byte charset maps all 256 values, so a catalog can declare the wrong
-# one and still decode: Romanian said ISO-8859-1 with ISO-8859-2 bytes for years,
-# and every a-breve reached the browser as a-tilde. Catch it by naming letters
-# the language never writes. These are not merely absent from the language, they
-# are what reading its own bytes as Latin-1 produces, which is the mistake being
-# caught; the loop below proves each row still fires. A language absent from the
-# table is unchecked, so a pass here says nothing about one.
-never_used="ro:ãºþ pl:¹³ê¿ cs:øìèù sk:è¾ï hu:õû hr:èæð sl:è"
+# A catalog re-encoded from the wrong source is still valid UTF-8, so the check
+# above cannot see it. Mojibake is exactly text that survives a trip back to
+# Latin-1 and reads as UTF-8 again. A byte pattern instead flags real
+# punctuation: French needs a no-break space after an accent before ! ? : ; ».
+if [ -n "$py" ]; then
+    cat >"$tmp/mojibake.py" <<'PYEOF'
+import sys
 
-foreign_letters() {
-    LC_ALL=C awk -v name="$2" -v iso="$3" -v only="${4:-}" -v table="$never_used" '
-        BEGIN {
-            n = split(table, rows, " ")
-            for (i = 1; i <= n; i++) {
-                split(rows[i], kv, ":")
-                if (kv[1] == iso)
-                    bad = kv[2]
-            }
-            if (only != "")
-                bad = only
-            if (bad == "")
-                exit 0
-        }
-        { sub(/\r$/, "") }
-        NR % 2 == 1 { next }
-        {
-            # Byte-wise under LC_ALL=C, so walk the UTF-8 two-byte sequences.
-            for (i = 1; i <= length(bad); i += 2) {
-                ch = substr(bad, i, 2)
-                if (index($0, ch) > 0) {
-                    # One line per catalog: a wrong charset hits nearly every
-                    # value, and the count is the evidence, not the list.
-                    if (hits++ == 0)
-                        printf "%s:%d: %s is not used in %s; the declared charset is wrong\n",
-                            name, NR, ch, iso
-                    break
-                }
-            }
-        }
-        END {
-            if (hits > 1)
-                printf "%s: %d more values carry letters %s does not use\n",
-                    name, hits - 1, iso
-        }
-    ' "$1"
-}
+name = sys.argv[2]
+for n, line in enumerate(open(sys.argv[1], "rb").read().decode("utf-8").split("\n"), 1):
+    try:
+        again = line.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        continue
+    if any(ord(c) > 127 for c in again):
+        print("%s:%d: mojibake, so the source charset was wrong" % (name, n))
+        break
+PYEOF
 
-if ! command -v iconv >/dev/null 2>&1; then
-    echo "iconv not found; charset repertoire check skipped" >&2
-else
-    # Every row must fire when its own catalog is read as Latin-1, the mislabel
-    # this exists to catch. A row naming letters that mistake never produces is
-    # inert, and an inert row reads exactly like a clean catalog.
-    for row in $never_used; do
-        riso=${row%%:*}
-        rfile=""
-        for f in "$langdir"/*.txt; do
-            [ "$(field "$f" LANGUAGE_ISO)" = "$riso" ] || continue
-            rfile=$f
-            break
-        done
-        if [ -z "$rfile" ]; then
-            echo "never_used names $riso, which no catalog declares"
-            exit 1
-        fi
-        LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$rfile" >"$tmp/mis"
-        # Per letter, not per row: a row keeping one live letter of three would
-        # otherwise pass while the rest of it sat dead.
-        # Process substitution, not a pipe: a piped loop runs in a subshell and
-        # its exit would not end the test.
-        while read -r letter; do
-            if [ -z "$(foreign_letters "$tmp/mis" "${rfile##*/}" "$riso" "$letter")" ]; then
-                echo "never_used $riso lists $letter, which a Latin-1 misread never makes"
-                exit 1
-            fi
-        done < <(LC_ALL=C awk -v l="${row#*:}" '
-            BEGIN { for (i = 1; i <= length(l); i += 2) print substr(l, i, 2) }')
-    done
-
-    # Control: Romanian read as the Latin-1 it used to claim must be rejected,
-    # and read as the Latin-2 it is must pass.
-    LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$langdir/Romanian.txt" >"$tmp/ro-wrong"
-    if [ -z "$(foreign_letters "$tmp/ro-wrong" Romanian.txt ro)" ]; then
-        echo "the charset check passed Romanian decoded as ISO-8859-1"
+    # Control: the mistake itself, on a catalog with enough accents to carry it.
+    # English is pure ASCII and would prove nothing.
+    LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$langdir/Francais.txt" >"$tmp/mis"
+    if [ -z "$("$py" "$tmp/mojibake.py" "$tmp/mis" Francais.txt)" ]; then
+        echo "the mojibake check passed a deliberately misread catalog"
         exit 1
     fi
-    LC_ALL=C iconv -f ISO-8859-2 -t UTF-8 "$langdir/Romanian.txt" >"$tmp/ro-right"
-    if [ -n "$(foreign_letters "$tmp/ro-right" Romanian.txt ro)" ]; then
-        echo "the charset check rejected Romanian decoded as ISO-8859-2"
+    # And the other way, since the pattern this replaced flagged it: legitimate
+    # punctuation after an accent must pass.
+    printf 'Miroir termin\303\251\302\240!\r\n' >"$tmp/nbsp"
+    if [ -n "$("$py" "$tmp/mojibake.py" "$tmp/nbsp" nbsp)" ]; then
+        echo "the mojibake check rejected a no-break space after an accent"
         exit 1
     fi
-
     for f in "$langdir"/*.txt; do
-        cs=$(field "$f" LANGUAGE_CHARSET)
-        LC_ALL=C iconv -f "$cs" -t UTF-8 "$f" >"$tmp/rep" || fail "${f##*/}: iconv cannot read $cs"
-        found=$(foreign_letters "$tmp/rep" "${f##*/}" "$(field "$f" LANGUAGE_ISO)")
+        found=$("$py" "$tmp/mojibake.py" "$f" "${f##*/}")
         if [ -n "$found" ]; then
             printf '%s\n' "$found"
             fail=1
         fi
     done
+fi
+
+# The catalogs carry no charset any more, so the served pages are the only place
+# left that names one, and a browser decodes by it.
+npage=0
+for f in "$top_srcdir"/html/server/*.html; do
+    test -f "$f" || continue
+    npage=$((npage + 1))
+    LC_ALL=C awk '/charset=utf-8/ { found = 1 } END { exit !found }' "$f" || {
+        echo "${f##*/}: does not declare charset=utf-8"
+        fail=1
+    }
+done
+# Before the loop's silence can mean anything: an unmatched glob leaves the
+# literal, which test -f skips, so zero pages would otherwise read as clean.
+if [ "$npage" -lt 20 ]; then
+    echo "only $npage server pages scanned for their charset"
+    exit 1
 fi
 
 # Each combo box is filled from a LISTDEF_* list and read back as a bare row

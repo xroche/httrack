@@ -20,16 +20,15 @@ root="${work}/root"
 mkdir -p "${root}"
 cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
 chmod -R u+w "${root}"
-# Latin-1, like every shipped translation: an escaper that entity-encodes bytes
-# >= 0x80 has to fail here rather than read as clean.
-eacute=$(printf '\351')
+# A non-ASCII letter, like most shipped translations: an escaper that
+# entity-encodes it has to fail here rather than read as clean.
+eacute=$(printf '\303\251')
 # CRLF line pairs, English key then translation. "OK" lands in a value="
 # attribute, "Click to confirm" in a single-quoted title=.
 printf '%s\r\n' \
     LANGUAGE_NAME 'Francais-989' \
     LANGUAGE_FILE 'Francais' \
     LANGUAGE_ISO 'fr' \
-    LANGUAGE_CHARSET 'iso-8859-1' \
     OK "Va \"y\" <ok> d${eacute}j${eacute}" \
     'Click to confirm' "Cliquez \"ici\" <maintenant> d${eacute}j${eacute}" \
     Cancel 'Annuler' \
@@ -76,11 +75,13 @@ def render(page, fields):
     fields = dict(fields, sid=sid, lang="2")
     req = urllib.request.Request(
         url + "/server/" + page,
-        data=urllib.parse.urlencode(fields).encode("latin-1"), method="POST")
+        data=urllib.parse.urlencode(fields).encode("utf-8"), method="POST")
     resp = urllib.request.urlopen(req, timeout=20)
     if resp.status != 200:
         sys.exit("%s answered %d" % (page, resp.status))
-    body = resp.read().decode("latin-1")
+    # replace, not strict: a server emitting legacy bytes must fail on the
+    # assertion below rather than on a traceback here.
+    body = resp.read().decode("utf-8", "replace")
     if 'lang="fr"' not in body:
         sys.exit("%s did not switch to LANGUAGE_2:\n%s" % (page, body[:2000]))
     return body

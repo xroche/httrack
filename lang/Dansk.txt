@@ -6,28 +6,26 @@ LANGUAGE_ISO
 da
 LANGUAGE_AUTHOR
 Jesper Bramm (bramm@get2net.dk)\r\nscootergrisen\r\n
-LANGUAGE_CHARSET
-ISO-8859-1
 LANGUAGE_WINDOWSID
 Danish
 OK
 OK
 Cancel
-Annullér
+AnnullÃ©r
 Exit
 Afslut
 Close
 Luk
 Cancel changes
-Annullér ændringer
+AnnullÃ©r Ã¦ndringer
 Click to confirm
-Klik for at bekræfte
+Klik for at bekrÃ¦fte
 Click to get help!
-Klik for at få hjælp!
+Klik for at fÃ¥ hjÃ¦lp!
 Click to return to previous screen
-Klik for at gå til den forrige skærm
+Klik for at gÃ¥ til den forrige skÃ¦rm
 Click to go to next screen
-Klik for at gå til den næste skærm
+Klik for at gÃ¥ til den nÃ¦ste skÃ¦rm
 Hide password
 Skjul adgangskode
 Save project
@@ -43,33 +41,33 @@ Denne handling er endnu ikke implementeret
 Error deleting this project
 Der opstod fejl under sletningen af dette projekt
 Select a rule for the filter
-Vælg en regel til filteret
+VÃ¦lg en regel til filteret
 Enter keywords for the filter
-Indtast nøgleord til filteret
+Indtast nÃ¸gleord til filteret
 Cancel
-Annullér
+AnnullÃ©r
 Add this rule
-Tilføj denne regel
+TilfÃ¸j denne regel
 Please enter one or several keyword(s) for the rule
-Indtast et eller flere nøgleord for denne regel
+Indtast et eller flere nÃ¸gleord for denne regel
 Add Scan Rule
-Tilføj en skanningsregel
+TilfÃ¸j en skanningsregel
 Criterion
 Kriterie:
 String
 Streng
 Add
-Tilføj
+TilfÃ¸j
 Scan Rules
 Skanningsregler
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-Brug 'Jokertegn' [ * ] til at udelukke eller medtage URL' er eller links.\nDu kan indsætte flere skanningsstrenge i samme linje.\nBrug mellemrum som separatortegn.\n\nEksempel: +*.zip -www.*.dk -www.*.edu/cgi-bin/*.cgi
+Brug 'Jokertegn' [ * ] til at udelukke eller medtage URL' er eller links.\nDu kan indsÃ¦tte flere skanningsstrenge i samme linje.\nBrug mellemrum som separatortegn.\n\nEksempel: +*.zip -www.*.dk -www.*.edu/cgi-bin/*.cgi
 Exclude links
 Udeluk link(s)
 Include link(s)
 Medtag link(s)
 Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
-Tip: for at medtage ALLE GIF-filer, så prøv at bruge: +www.eksempel.dk/*.gif. \n(+*.gif / -*.gif inkluderer/ekskluderer ALLE GIF-filer fra ALLE steder)
+Tip: for at medtage ALLE GIF-filer, sÃ¥ prÃ¸v at bruge: +www.eksempel.dk/*.gif. \n(+*.gif / -*.gif inkluderer/ekskluderer ALLE GIF-filer fra ALLE steder)
 Save prefs
 Gem foretrukne indstillinger
 Matching links will be excluded:
@@ -81,37 +79,37 @@ Eksempel:
 gif\r\nWill match all GIF files
 gif\r\nVil matche alle .GIF filer
 blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
-gul\r\nMedtager alle filer med en matchende 'gul'-understreng, såsom 'gulsky-lille.jpeg'
+gul\r\nMedtager alle filer med en matchende 'gul'-understreng, sÃ¥som 'gulsky-lille.jpeg'
 bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
 storfil.mov\r\nVil medtage filen 'storfil.mov', men ikke filen 'storfil2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
-cgi\r\nvil finde links med mappenavne der matcher understrengen 'cgi', såsom /cgi-bin/nogetcgi.cgi
+cgi\r\nvil finde links med mappenavne der matcher understrengen 'cgi', sÃ¥som /cgi-bin/nogetcgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
 cgi-bin\r\nvil finde links med mappenavne der matcher hele tekststrengen 'cgi-bin', men ikke 'cgi-bin-2'
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
-eksempel.dk\r\nFinder links med matchende understreng, såsom www.eksempel.dk, privat.eksempel.dk osv.
+eksempel.dk\r\nFinder links med matchende understreng, sÃ¥som www.eksempel.dk, privat.eksempel.dk osv.
 someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
-eksempel\r\nFinder links med matchende mappe-understreng, såsom www.eksempel.dk, www.eksempel.edu, privat.eksempel.andetweb.dk osv.
+eksempel\r\nFinder links med matchende mappe-understreng, sÃ¥som www.eksempel.dk, www.eksempel.edu, privat.eksempel.andetweb.dk osv.
 www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
-www.eksempel.dk\r\nFinder links der matcher hele understrengen 'www.eksempel.dk' , (men IKKE links, såsom privat.eksempel.dk/..)
+www.eksempel.dk\r\nFinder links der matcher hele understrengen 'www.eksempel.dk' , (men IKKE links, sÃ¥som privat.eksempel.dk/..)
 someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
-eksempel\r\nFinder ethvert link med matchende understreng, såsom www.eksempel.dk/.., www.test.abc/franogetweb/index.html, www.test.abc/test/eksempel.html osv.
+eksempel\r\nFinder ethvert link med matchende understreng, sÃ¥som www.eksempel.dk/.., www.test.abc/franogetweb/index.html, www.test.abc/test/eksempel.html osv.
 www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
-www.test.dk/test/eksempel.html\r\nFinder kun 'www.test.dk/test/eksempel.html' file. Bemærk at du skal skrive den fulde sti [URL + stedsti]
+www.test.dk/test/eksempel.html\r\nFinder kun 'www.test.dk/test/eksempel.html' file. BemÃ¦rk at du skal skrive den fulde sti [URL + stedsti]
 All links will match
 Alle links vil matche
 Add exclusion filter
-Tilføj udelukkelses-filter
+TilfÃ¸j udelukkelses-filter
 Add inclusion filter
-Tilføj et inkluderings-filter
+TilfÃ¸j et inkluderings-filter
 Existing filters
 Eksisterende filtre
 Cancel changes
-Annullér ændringer
+AnnullÃ©r Ã¦ndringer
 Save current preferences as default values
-Gem aktuelle præferencer som standardværdier
+Gem aktuelle prÃ¦ferencer som standardvÃ¦rdier
 Click to confirm
-Klik for at bekræfte
+Klik for at bekrÃ¦fte
 No log files in %s!
 Der findes ingen logfil i %s!
 No 'index.html' file in %s!
@@ -123,7 +121,7 @@ Vis logfiler
 Browse HTML start page
 Se HTML-startside
 End of mirror
-Slut på spejlkopiering
+Slut pÃ¥ spejlkopiering
 View log files
 Vis logfiler
 Browse Mirrored Website
@@ -143,9 +141,9 @@ Fejl
 Infos
 Information
 Find
-Søg
+SÃ¸g
 Find a word
-Søg efter et ord
+SÃ¸g efter et ord
 Info log file
 Info logfil
 Warning/Errors log file
@@ -163,7 +161,7 @@ anmoder
 connect
 opret forbindelse
 search
-søger
+sÃ¸ger
 ready
 klar
 error
@@ -171,29 +169,29 @@ fejl
 Receiving files..
 Modtager filer...
 Parsing HTML file..
-Overfører HTML-fil...
+OverfÃ¸rer HTML-fil...
 Purging files..
 Sletter filer...
 Loading cache in progress..
-Indlæser cache...
+IndlÃ¦ser cache...
 Parsing HTML file (testing links)..
-Overfører HTML-fil (tester links)...
+OverfÃ¸rer HTML-fil (tester links)...
 Pause - Toggle [Mirror]/[Pause download] to resume operation
-Pause - Vælg [Spejlkopiér]/[Sæt download på pause] for at genoptage overførslen
+Pause - VÃ¦lg [SpejlkopiÃ©r]/[SÃ¦t download pÃ¥ pause] for at genoptage overfÃ¸rslen
 Finishing pending transfers - Select [Cancel] to stop now!
-Afslutter igangværende overførsler - Vælg [Annullér] for at afslutte nu!
+Afslutter igangvÃ¦rende overfÃ¸rsler - VÃ¦lg [AnnullÃ©r] for at afslutte nu!
 scanning
 skanner
 Waiting for scheduled time..
-Venter på planlagt tidspunkt...
+Venter pÃ¥ planlagt tidspunkt...
 Transferring data..
-Overfører data...
+OverfÃ¸rer data...
 Connecting to provider
 Opretter forbindelse til udbyder
 [%d seconds] to go before start of operation
 [%d sekunder] inden denne handling starter
 Site mirroring in progress [%s, %s bytes]
-Igangværende spejlkopiering af sted [%s, %s byte]
+IgangvÃ¦rende spejlkopiering af sted [%s, %s byte]
 Site mirroring finished!
 Spejlkopieringen af sted er afsluttet!
 A problem occurred during the mirroring operation\n
@@ -201,49 +199,49 @@ Der opstod et problem under spejlkopieringen\n
 \nDuring:\n
 \nSamtidigt:\n
 \nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
-Se eventuelt logfilen.\n\nKlik på UDFØR for at afslutte WinHTTrack Website Copier.\n\nTak for at du brugte WinHTTrack!
+Se eventuelt logfilen.\n\nKlik pÃ¥ UDFÃ˜R for at afslutte WinHTTrack Website Copier.\n\nTak for at du brugte WinHTTrack!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
-Spejlkopieringen fuldført.\nKlik på Afslut for at afslutte WinHTTrack.\nSe logfil(erne) for at sikre at alt forløb OK.\n\nTak for at du brugte WinHTTrack!\r\n
+Spejlkopieringen fuldfÃ¸rt.\nKlik pÃ¥ Afslut for at afslutte WinHTTrack.\nSe logfil(erne) for at sikre at alt forlÃ¸b OK.\n\nTak for at du brugte WinHTTrack!\r\n
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * SPEJLKOPIERING AFBRUDT! * *\r\nDen aktuelle cache er påkrævet for alle opdaterings operationer og indeholder kun data der er downloadet med den aktuelle afbrudte session.\r\nDen tidligere cache kan indeholde mere fyldestgørende information; hvis du ønsker at bevare den information, skal du gendanne den og slette den aktuelle cache.\r\n[Bemærk: dette kan nemt gøres ved at slette 'hts-cache/new.* files]\r\n\r\nTror du den tidligere cache-fil muligvis indeholder mere fyldestgørende information, og vil du gendanne denne?
+* * SPEJLKOPIERING AFBRUDT! * *\r\nDen aktuelle cache er pÃ¥krÃ¦vet for alle opdaterings operationer og indeholder kun data der er downloadet med den aktuelle afbrudte session.\r\nDen tidligere cache kan indeholde mere fyldestgÃ¸rende information; hvis du Ã¸nsker at bevare den information, skal du gendanne den og slette den aktuelle cache.\r\n[BemÃ¦rk: dette kan nemt gÃ¸res ved at slette 'hts-cache/new.* files]\r\n\r\nTror du den tidligere cache-fil muligvis indeholder mere fyldestgÃ¸rende information, og vil du gendanne denne?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
-* * SPEJLKOPIERINGS FEJL! * *\r\nWinHTTrack har opdaget at den igangværende spejlkopiering er tom. Hvis du var i gang med at opdatere, vil den tidligere spejlkopiering blive gendannet.\r\nMulig årsag: den første side kunne enten ikke findes eller der opstod et problem med forbindelsen.\r\n=> Kontroller at webstedet findes og/eller kontroller proxy-indstillingerne! <=
+* * SPEJLKOPIERINGS FEJL! * *\r\nWinHTTrack har opdaget at den igangvÃ¦rende spejlkopiering er tom. Hvis du var i gang med at opdatere, vil den tidligere spejlkopiering blive gendannet.\r\nMulig Ã¥rsag: den fÃ¸rste side kunne enten ikke findes eller der opstod et problem med forbindelsen.\r\n=> Kontroller at webstedet findes og/eller kontroller proxy-indstillingerne! <=
 \n\nTip: Click [View log file] to see warning or error messages
-\n\nTip: klik på [Vis logfil] for at se advarsels- og fejlmeddelelser
+\n\nTip: klik pÃ¥ [Vis logfil] for at se advarsels- og fejlmeddelelser
 Error deleting a hts-cache/new.* file, please do it manually
 Der opstod en fejl i forbindelse med sletningen af hts-cache/new.*filen. Slet venligst filen manuelt.
 Do you really want to quit WinHTTrack Website Copier?
-Er du sikker på, at du vil afslutte WinHTTrack Website Copier?
+Er du sikker pÃ¥, at du vil afslutte WinHTTrack Website Copier?
 - Mirroring Mode -\n\nEnter address(es) in URL box
 - Spejlkopieringstilstand -\n\nIndtast adresse(r) i URL-feltet
 - Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
-- Interaktiv guide-tilstand (spørgsmål) -\n\nIndtast adresse(r) i URL-feltet
+- Interaktiv guide-tilstand (spÃ¸rgsmÃ¥l) -\n\nIndtast adresse(r) i URL-feltet
 - File Download Mode -\n\nEnter file address(es) in URL box
 - Fil-download-tilstand-\n\nIndtast adresse(r) i URL-feltet
 - Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
 - Links test tilstand-\n\nIndtast webadresse(r) med links til test i URL-feltet
 - Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
-- Opdateringstilstand -\n\nBekræft adresse(r) i URL-feltet. Tjek eventuelt dine indstillinger og klik derefter på 'Næste'.
+- Opdateringstilstand -\n\nBekrÃ¦ft adresse(r) i URL-feltet. Tjek eventuelt dine indstillinger og klik derefter pÃ¥ 'NÃ¦ste'.
 - Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
-- Genoptag kopiering (hvis overførslen blev afbrudt) -\n\nBekræft adresse(r) i URL-feltet. Tjek eventuelt dine indstillinger og klik derefter på 'Næste'.
+- Genoptag kopiering (hvis overfÃ¸rslen blev afbrudt) -\n\nBekrÃ¦ft adresse(r) i URL-feltet. Tjek eventuelt dine indstillinger og klik derefter pÃ¥ 'NÃ¦ste'.
 Log files Path
 Stinavn for logfil
 Path
 Sti
 - Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
-- Links liste -\n\nBrug URL-feltet til at angive adresse(r) på sider der indeholder links som skal spejlkopieres.
+- Links liste -\n\nBrug URL-feltet til at angive adresse(r) pÃ¥ sider der indeholder links som skal spejlkopieres.
 New project / Import?
-Nyt projekt / Importér?
+Nyt projekt / ImportÃ©r?
 Choose criterion
-Vælg kriterier
+VÃ¦lg kriterier
 Maximum link scanning depth
 Maksimal skanningsdybde for links
 Enter address(es) here
 Indtast adresse(r) her
 Define additional filtering rules
-Tilføj yderligere filtreringsregler
+TilfÃ¸j yderligere filtreringsregler
 Proxy Name (if needed)
-Proxy-navn (om nødvendigt)
+Proxy-navn (om nÃ¸dvendigt)
 Proxy Port
 Proxy portnummer
 Define proxy settings
@@ -253,35 +251,35 @@ Brug standard HTTP proxy som FTP-proxy
 Path
 Sti
 Select Path
-Vælg sti
+VÃ¦lg sti
 Path
 Sti
 Select Path
-Vælg sti
+VÃ¦lg sti
 Quit WinHTTrack Website Copier
 Afslut WinHTTrack Website Copier
 About WinHTTrack
 Om WinHTTrack
 Save current preferences as default values
-Gem de aktuelle præferencer som standardværdier
+Gem de aktuelle prÃ¦ferencer som standardvÃ¦rdier
 Click to continue
-Klik for at fortsætte
+Klik for at fortsÃ¦tte
 Click to define options
 Klik for at definere valgmuligheder
 Click to add a URL
-Klik for at tilføje en URL
+Klik for at tilfÃ¸je en URL
 Load URL(s) from text file
-Indlæs URL(er) fra tekstfil
+IndlÃ¦s URL(er) fra tekstfil
 WinHTTrack preferences (*.opt)|*.opt||
-WinHTTrack-præferencer (*.opt)|*.opt||
+WinHTTrack-prÃ¦ferencer (*.opt)|*.opt||
 Address List text file (*.txt)|*.txt||
 Adresseliste-tekstfil (*.txt)|*.txt||
 File not found!
 Filen blev ikke fundet!
 Do you really want to change the project name/path?
-Er du sikker på, at ændre i projekt/sti-navnet?
+Er du sikker pÃ¥, at Ã¦ndre i projekt/sti-navnet?
 Load user-default options?
-Indlæs brugerdefinerede valgmuligheder?
+IndlÃ¦s brugerdefinerede valgmuligheder?
 Save user-default options?
 Gem brugerdefinerede valgmuligheder?
 Reset all default options?
@@ -305,11 +303,11 @@ Angiv...
 Set options..
 Angiv valgmuligheder...
 Preferences and mirror options:
-Præferencer og spejlkopiering-valgmuligheder:
+PrÃ¦ferencer og spejlkopiering-valgmuligheder:
 Project name
 Projektnavn
 Add a URL...
-Tilføj URL...
+TilfÃ¸j URL...
 Web Addresses: (URL)
 Webadresser: (URL)
 Stop WinHTTrack?
@@ -317,13 +315,13 @@ Stop WinHTTrack?
 No log files in %s!
 Der er ikke nogen logfiler i %s!
 Pause Download?
-Sæt download på pause?
+SÃ¦t download pÃ¥ pause?
 Stop the mirroring operation
 Stop spejlkopieringen?
 Minimize to System Tray
-Minimér til proceslinjen
+MinimÃ©r til proceslinjen
 Click to skip a link or stop parsing
-Klik for at springe et link over eller stoppe overførslen
+Klik for at springe et link over eller stoppe overfÃ¸rslen
 Click to skip a link
 Klik for at springe et link over
 Bytes saved
@@ -335,11 +333,11 @@ Tid:
 Connections:
 Forbindelser:
 Running:
-Kører:
+KÃ¸rer:
 Hide
-Minimér
+MinimÃ©r
 Transfer rate
-Overfør. hastighed
+OverfÃ¸r. hastighed
 SKIP
 Spring over
 Information
@@ -353,21 +351,21 @@ Fejl:
 In progress:
 Arbejder:
 Follow external links
-Følg eksterne links
+FÃ¸lg eksterne links
 Test all links in pages
-Test alle links på siderne
+Test alle links pÃ¥ siderne
 Try to ferret out all links
-Prøv at udvide alle links
+PrÃ¸v at udvide alle links
 Download HTML files first (faster)
-Download HTML-filer først (hurtigere)
+Download HTML-filer fÃ¸rst (hurtigere)
 Choose local site structure
-Vælg lokal sted-struktur
+VÃ¦lg lokal sted-struktur
 Set user-defined structure on disk
-Sæt brugerdefinerede indstillinger for den lokale struktur
+SÃ¦t brugerdefinerede indstillinger for den lokale struktur
 Use a cache for updates and retries
-Brug cache til opdateringer og opdateringsforsøg
+Brug cache til opdateringer og opdateringsforsÃ¸g
 Do not update zero size or user-erased files
-Opdater ikke filer med nul-værdi eller filer som brugeren har slettet
+Opdater ikke filer med nul-vÃ¦rdi eller filer som brugeren har slettet
 Create a Start Page
 Opret en startside
 Create a word database of all html pages
@@ -377,77 +375,77 @@ Byg et komplet RFC822 mail (MHT/EML)-arkiv af spejlkopieringen
 Create error logging and report files
 Lav fejllog og rapport-filer
 Generate DOS 8-3 filenames ONLY
-Generér KUN DOS-8-3-filnavne
+GenerÃ©r KUN DOS-8-3-filnavne
 Generate ISO9660 filenames ONLY for CDROM medias
-Generér KUN ISO9660-filnavne for CDROM-medier
+GenerÃ©r KUN ISO9660-filnavne for CDROM-medier
 Do not create HTML error pages
 Opret ikke HTML-fejlsider
 Select file types to be saved to disk
-Vælg filtyper der skal gemmes på disken
+VÃ¦lg filtyper der skal gemmes pÃ¥ disken
 Select parsing direction
-Vælg overførselsretning
+VÃ¦lg overfÃ¸rselsretning
 Select global parsing direction
-Vælg overordnet overførselsretning
+VÃ¦lg overordnet overfÃ¸rselsretning
 Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
-Opsæt URL-genskrivningsregel for interne links (downloadede links), og eksterne links (ikke downloadede)
+OpsÃ¦t URL-genskrivningsregel for interne links (downloadede links), og eksterne links (ikke downloadede)
 Max simultaneous connections
 Maks.antal samtidige forbindelser
 File timeout
 Fil time-out
 Cancel all links from host if timeout occurs
-Annullér alle links hvis time-out opstår hos vært
+AnnullÃ©r alle links hvis time-out opstÃ¥r hos vÃ¦rt
 Minimum admissible transfer rate
-Mindste acceptable overførselshastighed
+Mindste acceptable overfÃ¸rselshastighed
 Cancel all links from host if too slow
-Annullér alle links hvis værten er for langsom
+AnnullÃ©r alle links hvis vÃ¦rten er for langsom
 Maximum number of retries on non-fatal errors
-Maksimal antal forsøg efter ikke-fatale fejl
+Maksimal antal forsÃ¸g efter ikke-fatale fejl
 Maximum size for any single HTML file
-Maksimal størrelse for enkelte HTML-filer
+Maksimal stÃ¸rrelse for enkelte HTML-filer
 Maximum size for any single non-HTML file
-Maksimal størrelse for ikke-HTML-filer
+Maksimal stÃ¸rrelse for ikke-HTML-filer
 Maximum amount of bytes to retrieve from the Web
 Maksimal antal byte der modtages fra webbet
 Make a pause after downloading this amount of bytes
-Hold pause efter download af denne mængde byte
+Hold pause efter download af denne mÃ¦ngde byte
 Maximum duration time for the mirroring operation
 Maksimal varighed for spejlkopieringen
 Maximum transfer rate
-Maksimal overførselshastighed
+Maksimal overfÃ¸rselshastighed
 Maximum connections/seconds (avoid server overload)
-Maksimal antal forbindelser/sekunder (for at undgå server overbelastning)
+Maksimal antal forbindelser/sekunder (for at undgÃ¥ server overbelastning)
 Maximum number of links that can be tested (not saved!)
 Maksimal antal links der kan testes (ikke gemt!)
 Browser identity
 Browser-identitet
 Comment to be placed in each HTML file
-Kommentarer der indsættes i alle HTML-filer
+Kommentarer der indsÃ¦ttes i alle HTML-filer
 Languages accepted by the browser
 Sprog som accepteres af browseren
 Additional HTTP headers to be sent in each requests
-Yderligere HTTP-headere som skal sendes i hver forespørgsel
+Yderligere HTTP-headere som skal sendes i hver forespÃ¸rgsel
 HTTP referer to be sent for initial URLs
 HTTP reference som skal sendes for indledende URL'er
 Back to starting page
 Tilbage til startsiden
 Save current preferences as default values
-Gem aktuelle præferencer som standardværdier
+Gem aktuelle prÃ¦ferencer som standardvÃ¦rdier
 Click to continue
-Klik for at fortsætte
+Klik for at fortsÃ¦tte
 Click to cancel changes
-Klik for at annullere ændringerne
+Klik for at annullere Ã¦ndringerne
 Follow local robots rules on sites
-Følg lokale robot-regler på steder
+FÃ¸lg lokale robot-regler pÃ¥ steder
 Links to non-localised external pages will produce error pages
-Links til ikke-fundne eksterne sider, vil medføre fejlside(r)
+Links til ikke-fundne eksterne sider, vil medfÃ¸re fejlside(r)
 Do not erase obsolete files after update
-Slet ikke forældede filer efter opdatering
+Slet ikke forÃ¦ldede filer efter opdatering
 Accept cookies?
-Acceptér cookies?
+AcceptÃ©r cookies?
 Check document type when unknown?
 Tjek dokumenttypen hvis ukendt?
 Parse java applets to retrieve included files that must be downloaded?
-Overfør Java-applets sammen med inkluderede filer der skal downloades?
+OverfÃ¸r Java-applets sammen med inkluderede filer der skal downloades?
 Store all files in cache instead of HTML only
 Opbevar alle filer i cache fremfor kun HTML?
 Log file type (if generated)
@@ -455,29 +453,29 @@ Log filtype (hvis genereret)
 Maximum mirroring depth from root address
 Maksimal spejlkopieringsdybde fra rod-adressen
 Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
-Maksimal spejlkopieringsdybde for eksterne/forbudte adresser(0, altså ingen, er standard)
+Maksimal spejlkopieringsdybde for eksterne/forbudte adresser(0, altsÃ¥ ingen, er standard)
 Create a debugging file
 Opret en fejlfindings-fil
 Use non-standard requests to get round some server bugs
-Brug ikke-standard forespørgsler for at omgå server-fejl
+Brug ikke-standard forespÃ¸rgsler for at omgÃ¥ server-fejl
 Use old HTTP/1.0 requests (limits engine power!)
-Brug gamle HTTP/1.0-type forespørgsler (begrænser effektiviteten!)
+Brug gamle HTTP/1.0-type forespÃ¸rgsler (begrÃ¦nser effektiviteten!)
 Attempt to limit retransfers through several tricks (file size test..)
-Forsøg at begrænse gen-overførsler gennem brug af 'tricks' (test af filstørrelse...)
+ForsÃ¸g at begrÃ¦nse gen-overfÃ¸rsler gennem brug af 'tricks' (test af filstÃ¸rrelse...)
 Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
-Forsøg at begrænse antallet af links, ved at ignorer lignende URL'er (www.foo.dk==foo.dk, http=https ..)
+ForsÃ¸g at begrÃ¦nse antallet af links, ved at ignorer lignende URL'er (www.foo.dk==foo.dk, http=https ..)
 Write external links without login/password
 Skriv eksterne links uden brug af brugernavn/adgangskode
 Write internal links without query string
-Skriv interne links uden forespørgsels-streng
+Skriv interne links uden forespÃ¸rgsels-streng
 Get non-HTML files related to a link, eg external .ZIP or pictures
 Hent ikke-HTML-filer relateret til et link, eksempelvis .ZIP -filer eller billeder
 Test all links (even forbidden ones)
-Test alle links (også forbudte links)
+Test alle links (ogsÃ¥ forbudte links)
 Try to catch all URLs (even in unknown tags/code)
-Forsøg at fange alle URL'er (også i ukendte opmærkninger/kode)
+ForsÃ¸g at fange alle URL'er (ogsÃ¥ i ukendte opmÃ¦rkninger/kode)
 Get HTML files first!
-Hent HTML-filer først!
+Hent HTML-filer fÃ¸rst!
 Structure type (how links are saved)
 Angiv struktur (hvordan links skal gemmes)
 Use a cache for updates
@@ -499,21 +497,21 @@ ISO9660-navne (CDROM)
 No error pages
 Ingen fejl-sider
 Primary Scan Rule
-Primær skanningsregel
+PrimÃ¦r skanningsregel
 Travel mode
-Søgemetode
+SÃ¸gemetode
 Global travel mode
-Global søgemetode
+Global sÃ¸gemetode
 These options should be modified only exceptionally
-Disse valgmuligheder bør kun ændres undtagelsesvist
+Disse valgmuligheder bÃ¸r kun Ã¦ndres undtagelsesvist
 Activate Debugging Mode (winhttrack.log)
-Aktivér fejlfindingstilstand (winhttrack.log)
+AktivÃ©r fejlfindingstilstand (winhttrack.log)
 Rewrite links: internal / external
 Genskriv links: internt/eksternt
 Flow control
 Flow-kontrol
 Limits
-Begrænsninger
+BegrÃ¦nsninger
 Identity
 Identitet
 HTML footer
@@ -527,59 +525,59 @@ Standard reference URL
 N# connections
 Antal forbindelser
 Abandon host if error
-Forlad vært hvis der opstår fejl
+Forlad vÃ¦rt hvis der opstÃ¥r fejl
 Minimum transfer rate (B/s)
-Mindste overførselshastighed (B/s)
+Mindste overfÃ¸rselshastighed (B/s)
 Abandon host if too slow
-Forlad værten hvis denne er for langsom
+Forlad vÃ¦rten hvis denne er for langsom
 Configure
 Konfigurer
 Use proxy for ftp transfers
-Brug proxy til FTP-overførsler
+Brug proxy til FTP-overfÃ¸rsler
 TimeOut(s)
 Timeout(s)
 Persistent connections (Keep-Alive)
 Vedvarende forbindelser (Keep-Alive)
 Reduce connection time and type lookup time using persistent connections
-Reducér forbindelsestid og typeopslagstid, ved at anvende vedvarende forbindelser
+ReducÃ©r forbindelsestid og typeopslagstid, ved at anvende vedvarende forbindelser
 Retries
-Antal forsøg
+Antal forsÃ¸g
 Size limit
-Størrelsesbegrænsning
+StÃ¸rrelsesbegrÃ¦nsning
 Max size of any HTML file (B)
-Maksimal størrelse for HTML-filer (B)
+Maksimal stÃ¸rrelse for HTML-filer (B)
 Max size of any non-HTML file
-Maksimal størrelse for ikke-HTML-filer
+Maksimal stÃ¸rrelse for ikke-HTML-filer
 Max site size
-Maksimal størrelse af sted
+Maksimal stÃ¸rrelse af sted
 Max time
 Maksimal tid
 Save prefs
 Gem indstillinger
 Max transfer rate
-Maksimal overførselshastighed
+Maksimal overfÃ¸rselshastighed
 Follow robots.txt
-Følg robots.txt
+FÃ¸lg robots.txt
 No external pages
 Ingen eksterne sider
 Do not purge old files
 Slet ikke gamle filer
 Accept cookies
-Acceptér cookies
+AcceptÃ©r cookies
 Check document type
 Tjek dokumenttypen
 Parse java files
-Overfør Java-filer
+OverfÃ¸r Java-filer
 Store ALL files in cache
 Opbevar alle filer i cache
 Tolerant requests (for servers)
-Acceptér forespørgsler (for servere)
+AcceptÃ©r forespÃ¸rgsler (for servere)
 Update hack (limit re-transfers)
-Opdatér hack (begræns gen-overførsler)
+OpdatÃ©r hack (begrÃ¦ns gen-overfÃ¸rsler)
 URL hacks (join similar URLs)
-URL-hacks (sammenføj ligende URL'er)
+URL-hacks (sammenfÃ¸j ligende URL'er)
 Force old HTTP/1.0 requests (no 1.1)
-Gennemtving HTTP / 1.0-type forespørgsler (gælder ikke ver. 1.1)
+Gennemtving HTTP / 1.0-type forespÃ¸rgsler (gÃ¦lder ikke ver. 1.1)
 Max connections / seconds
 Maks.forbindelser/sekunder
 Maximum number of links
@@ -589,7 +587,7 @@ Pause efter download...
 Hide passwords
 Skjul adgangskoder
 Hide query strings
-Skjul forespørgsels-streng
+Skjul forespÃ¸rgsels-streng
 Links
 Links
 Build
@@ -599,7 +597,7 @@ Kun eksperter
 Flow Control
 Flow-kontrol
 Limits
-Begrænsninger
+BegrÃ¦nsninger
 Browser ID
 Browser-ID
 Scan Rules
@@ -613,13 +611,13 @@ Proxy
 MIME Types
 MIME-typer
 Do you really want to quit WinHTTrack Website Copier?
-Er du sikker på, at du vil afslutte WinHTTrack Website Copier?
+Er du sikker pÃ¥, at du vil afslutte WinHTTrack Website Copier?
 Do not connect to a provider (already connected)
 Opret ikke forbindelse til en udbyder (er allerede forbundet)
 Do not use remote access connection
 Brug ikke en fjernadgangsforbindelse
 Schedule the mirroring operation
-Planlæg spejlkopieringen
+PlanlÃ¦g spejlkopieringen
 Quit WinHTTrack Website Copier
 Afslut WinHTTrack Website Copier
 Back to starting page
@@ -631,17 +629,17 @@ Der er ikke gemt en adgangskode for denne forbindelse!
 Can not get remote connection settings
 Kan ikke hente fjernforbindelsesindstillinger
 Select a connection provider
-Vælg en forbindelsesudbyder
+VÃ¦lg en forbindelsesudbyder
 Start
 Start
 Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
-Justér venligst forbindelsesparameterne hvis det er nødvendigt.\nKlik på UDFØR for at starte spejlkopieringen.
+JustÃ©r venligst forbindelsesparameterne hvis det er nÃ¸dvendigt.\nKlik pÃ¥ UDFÃ˜R for at starte spejlkopieringen.
 Save settings only, do not launch download now.
 Gem indstillingerne, men start ikke download endnu.
 On hold
-På hold
+PÃ¥ hold
 Transfer scheduled for: (hh/mm/ss)
-Overførsel planlagt til: (tt/mm/ss)
+OverfÃ¸rsel planlagt til: (tt/mm/ss)
 Start
 Start
 Connect to provider (RAS)
@@ -649,39 +647,39 @@ Forbind til en udbyder (RAS)
 Connect to this provider
 Forbind til denne udbyder
 Disconnect when finished
-Afbryd forbindelsen når overførslen er færdig
+Afbryd forbindelsen nÃ¥r overfÃ¸rslen er fÃ¦rdig
 Disconnect modem on completion
-Afbryd modem når overførslen er færdig
+Afbryd modem nÃ¥r overfÃ¸rslen er fÃ¦rdig
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(finder du fejl eller opstår der problemer så kontakt os venligst)\r\n\r\nUdvikling:\r\nBrugerflade (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche og andre bidragydere\r\nMange tak for dansk oversættelse til:\r\nJesper Bramm (bramm@get2net.dk)\r\nscootergrisen
+\r\n(finder du fejl eller opstÃ¥r der problemer sÃ¥ kontakt os venligst)\r\n\r\nUdvikling:\r\nBrugerflade (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche og andre bidragydere\r\nMange tak for dansk oversÃ¦ttelse til:\r\nJesper Bramm (bramm@get2net.dk)\r\nscootergrisen
 About WinHTTrack Website Copier
 Om WinHTTrack Website Copier
 Please visit our Web page
-Besøg vores webside
+BesÃ¸g vores webside
 Wizard query
-Guide-forespørgsel
+Guide-forespÃ¸rgsel
 Your answer:
 Dit svar:
 Link detected..
 Link fundet
 Choose a rule
-Vælg en regel
+VÃ¦lg en regel
 Ignore this link
 Ignorer dette link
 Ignore directory
 Ignorer dette bibliotek (mappe)
 Ignore domain
-Ignorer domæne
+Ignorer domÃ¦ne
 Catch this page only
 Gem kun denne side
 Mirror site
-Spejlkopiér sted
+SpejlkopiÃ©r sted
 Mirror domain
-Spejlkopiér domæne
+SpejlkopiÃ©r domÃ¦ne
 Ignore all
 Ignorer alt
 Wizard query
-Guide-forespørgsel
+Guide-forespÃ¸rgsel
 NO
 Nej
 File
@@ -693,9 +691,9 @@ Log
 Window
 Vindue
 Help
-Hjælp
+HjÃ¦lp
 Pause transfer
-Pause overførsel
+Pause overfÃ¸rsel
 Exit
 Afslut
 Modify options
@@ -705,15 +703,15 @@ Vis log
 View error log
 Vis fejllog
 View file transfers
-Vis filoverførsler
+Vis filoverfÃ¸rsler
 Hide
-Minimér
+MinimÃ©r
 About WinHTTrack Website Copier
 Om WinHTTrack Website Copier
 Check program updates...
-Søg efter opdateringer...
+SÃ¸g efter opdateringer...
 &Toolbar
-&Værktøjslinje
+&VÃ¦rktÃ¸jslinje
 &Status Bar
 &Statuslinje
 S&plit
@@ -721,25 +719,25 @@ S&plit
 File
 Filer
 Preferences
-Præferencer
+PrÃ¦ferencer
 Mirror
-Spejlkopiér
+SpejlkopiÃ©r
 Log
 Log
 Window
 Vindue
 Help
-Hjælp
+HjÃ¦lp
 Exit
 Afslut
 Load default options
-Indlæs standard-valgmuligheder
+IndlÃ¦s standard-valgmuligheder
 Save default options
 Gem standard-valgmuligheder
 Reset to default options
 Nulstil standard-valgmuligheder
 Load options...
-Indlæs valgmuligheder...
+IndlÃ¦s valgmuligheder...
 Save options as...
 Gem valgmuligheder som...
 Language preference...
@@ -751,7 +749,7 @@ Om WinHTTrack...
 New project\tCtrl+N
 Nyt projekt\tCtrl+N
 &Open...\tCtrl+O
-&Åbn...\tCtrl+O
+&Ã…bn...\tCtrl+O
 &Save\tCtrl+S
 &Gem\tCtrl+S
 Save &As...
@@ -763,7 +761,7 @@ Gem &som...
 User-defined structure
 Brugerdefineret struktur
 %n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
-%n\tFilnavn uden type(eks: image)\r\n%N\tHele filnavnet inklusive filtype (eks: billede.gif)\r\n%t\tKun filtype (eks: gif)\r\n%p\tSti [uden endelsen /] (eks: /noglebilleder)\r\n%h\tVærts navn (eks: www.eksempel.dk)\r\n%M\tMD5 URL (128 bit, 32 ascii byte)\r\n%Q\tMD5 forespørgsel streng (128 bit, 32 ascii byte)\r\n%q\tMD5 kort forespørgselsstreng (16 bit, 4 ascii byte)\r\n\r\n%s?\tKort navn (eks: %sN)
+%n\tFilnavn uden type(eks: image)\r\n%N\tHele filnavnet inklusive filtype (eks: billede.gif)\r\n%t\tKun filtype (eks: gif)\r\n%p\tSti [uden endelsen /] (eks: /noglebilleder)\r\n%h\tVÃ¦rts navn (eks: www.eksempel.dk)\r\n%M\tMD5 URL (128 bit, 32 ascii byte)\r\n%Q\tMD5 forespÃ¸rgsel streng (128 bit, 32 ascii byte)\r\n%q\tMD5 kort forespÃ¸rgselsstreng (16 bit, 4 ascii byte)\r\n\r\n%s?\tKort navn (eks: %sN)
 Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
 Eksempel:\t%h%p/%n%q.%t\n->\t\tc:\\spejlkopiering\\www.eksempel.dk\\noglebilleder\\billede.gif
 Proxy settings
@@ -773,7 +771,7 @@ Proxy-adresse
 Proxy port:
 Proxy port
 Authentication (only if needed)
-Godkendelse (kun hvis det er nødvendigt)
+Godkendelse (kun hvis det er nÃ¸dvendigt)
 Login
 Brugernavn
 Password
@@ -791,11 +789,11 @@ Indtast projektets navn her
 Enter saving path here
 Indtast stinavnet hvor projektet skal gemmes
 Select existing project to update
-Vælg et projektnavn at opdatere
+VÃ¦lg et projektnavn at opdatere
 Click here to select path
-Klik her for at vælge en stil
+Klik her for at vÃ¦lge en stil
 Select or create a new category name, to sort your mirrors in categories
-Vælg eller opret et nyt kategorinavn, for at sortere dine spejlkopieringer i kategorier
+VÃ¦lg eller opret et nyt kategorinavn, for at sortere dine spejlkopieringer i kategorier
 HTTrack Project Wizard...
 HTTrack-projektguide...
 New project name:
@@ -811,7 +809,7 @@ Projektkategori:
 C:\\My Web Sites
 C:\\Mine websteder
 Type a new project name, \r\nor select existing project to update/resume
-Skriv navnet på et nyt projekt, \r\neller vælg at opdatere et eksisterende projekt
+Skriv navnet pÃ¥ et nyt projekt, \r\neller vÃ¦lg at opdatere et eksisterende projekt
 New project
 Nyt projekt
 Insert URL
@@ -819,7 +817,7 @@ Indtast URL
 URL:
 Adresse URL:
 Authentication (only if needed)
-Godkendelse (kun hvis det er nødvendigt)
+Godkendelse (kun hvis det er nÃ¸dvendigt)
 Login
 Brugernavn
 Password
@@ -835,47 +833,47 @@ Indtast sted-brugernavn
 Enter site password
 Indtast sted-adgangskode
 Use this capture tool for links that can only be accessed through forms or javascript code
-Brug dette værktøj til at 'fange' links der kun kan opnås adgang til via formularer eller JavaScript-kode
+Brug dette vÃ¦rktÃ¸j til at 'fange' links der kun kan opnÃ¥s adgang til via formularer eller JavaScript-kode
 Choose language according to preference
-Vælg dit foretrukne sprog
+VÃ¦lg dit foretrukne sprog
 Catch URL!
 'Fang' URL!
 Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
-Sæt venligst browserens proxy indstillinger til følgende værdier:(Kopiér/Indsæt proxy-adresse og port).\nKlik på formularens SUBMIT-knap på din browser-side, eller klik på det specifikke link du ønsker at hente.\r\n\r\n
+SÃ¦t venligst browserens proxy indstillinger til fÃ¸lgende vÃ¦rdier:(KopiÃ©r/IndsÃ¦t proxy-adresse og port).\nKlik pÃ¥ formularens SUBMIT-knap pÃ¥ din browser-side, eller klik pÃ¥ det specifikke link du Ã¸nsker at hente.\r\n\r\n
 This will send the desired link from your browser to WinHTTrack.
-Dette vil sende det ønskede link fra din browser til WinHTTrack.
+Dette vil sende det Ã¸nskede link fra din browser til WinHTTrack.
 ABORT
-Annullér
+AnnullÃ©r
 Copy/Paste the temporary proxy parameters here
-Kopiér og indsæt de midlertidige proxy parametre her
+KopiÃ©r og indsÃ¦t de midlertidige proxy parametre her
 Cancel
-Annullér
+AnnullÃ©r
 Unable to find Help files!
-Kan ikke finde Hjælpefilerne!
+Kan ikke finde HjÃ¦lpefilerne!
 Unable to save parameters!
 Kan ikke gemme parametrene!
 Please drag only one folder at a time
-Træk kun én mappe ad gangen
+TrÃ¦k kun Ã©n mappe ad gangen
 Please drag only folders, not files
-Træk kun mapper, ikke filer
+TrÃ¦k kun mapper, ikke filer
 Please drag folders only
-Træk kun mapper
+TrÃ¦k kun mapper
 Select user-defined structure?
-Vælg brugerdefineret struktur?
+VÃ¦lg brugerdefineret struktur?
 Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
-Vær sikker på, at den brugerdefinerede streng er korrekt\nI modsat fald vil filnavnene være ugyldige!
+VÃ¦r sikker pÃ¥, at den brugerdefinerede streng er korrekt\nI modsat fald vil filnavnene vÃ¦re ugyldige!
 Do you really want to use a user-defined structure?
-Er du sikker på, at ville bruge en brugerdefineret struktur?
+Er du sikker pÃ¥, at ville bruge en brugerdefineret struktur?
 Too manu URLs, cannot handle so many links!!
-For mange URL' er, WinHTTrack kan ikke håndtere så mange links!!!
+For mange URL' er, WinHTTrack kan ikke hÃ¥ndtere sÃ¥ mange links!!!
 Not enough memory, fatal internal error..
 Ikke nok hukommelse, fatal intern fejl...
 Unknown operation!
 Ukendt handling!
 Add this URL?\r\n
-Tilføj denne URL?\r\n
+TilfÃ¸j denne URL?\r\n
 Warning: main process is still not responding, cannot add URL(s)..
-Advarsel: hovedprocessen svarer stadigvæk ikke, URL'en kan ikke tilføjes...
+Advarsel: hovedprocessen svarer stadigvÃ¦k ikke, URL'en kan ikke tilfÃ¸jes...
 Type/MIME associations
 Type/MIME-tilknytning
 File types:
@@ -883,13 +881,13 @@ Fil typer:
 MIME identity:
 MIME-identitet:
 Select or modify your file type(s) here
-Vælg eller ændrer dine filtype(r) her
+VÃ¦lg eller Ã¦ndrer dine filtype(r) her
 Select or modify your MIME type(s) here
-Vælg elle ændrer dine MIME-type(r) her
+VÃ¦lg elle Ã¦ndrer dine MIME-type(r) her
 Go up
-Gå op
+GÃ¥ op
 Go down
-Gå ned
+GÃ¥ ned
 File download information
 Fil-downloadinformation
 Freeze Window
@@ -897,33 +895,33 @@ Frys vindue
 More information:
 Mere information
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
-Velkommen til WinHTTrack Website Copier!\n\nKlik på Næste for at for at\n\n- starte et nyt projekt\n- eller genoptage et delvist download.
+Velkommen til WinHTTrack Website Copier!\n\nKlik pÃ¥ NÃ¦ste for at for at\n\n- starte et nyt projekt\n- eller genoptage et delvist download.
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
-Filnavne med 'efternavn':\nFilnavne der indeholder:\nDette filnavn:\nMappenavne der indeholder:\nDette mappenavn:\nLinks på dette domæne:\nLinks på dette domæne der indeholder:\nLinks fra denne vært:\nLinks der indeholder:\nDette Link:\nAlle Links*/
+Filnavne med 'efternavn':\nFilnavne der indeholder:\nDette filnavn:\nMappenavne der indeholder:\nDette mappenavn:\nLinks pÃ¥ dette domÃ¦ne:\nLinks pÃ¥ dette domÃ¦ne der indeholder:\nLinks fra denne vÃ¦rt:\nLinks der indeholder:\nDette Link:\nAlle Links*/
 Show all\nHide debug\nHide infos\nHide debug and infos
 Vis alle\nSkjul fejlfinding\nSkjul information\nSkjul fejlfinding og information
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Sted-struktur (standard)\nHtml i web/,       images/other-filer i web/images/\nHtml i web/html,   images/other i web/images\nHtml i web/,       images/other i web/\nHtml i web/,       images/other i web/xxx, hvor xxx er filendelsen\nHtml i web/html,   images/other i web/xxx\nWebsted-struktur, uden www.domain.xxx/\nHtml i site_name/, images/other-filer i site_name/images/\nHtml i site_name/html, images/other i site_name/images\nHtml i site_name/, images/other i site_name/\nHtml i site_name/, images/other i site_name/xxx\nHtml i site_name/html, images/other i site_name/xxx\nAlle filer in web/, med tilfældige navne (gadget !)\nAlle filer i site_name/, med tilfældige navne (gadget !)\nBrugerdefineret struktur...
+Sted-struktur (standard)\nHtml i web/,       images/other-filer i web/images/\nHtml i web/html,   images/other i web/images\nHtml i web/,       images/other i web/\nHtml i web/,       images/other i web/xxx, hvor xxx er filendelsen\nHtml i web/html,   images/other i web/xxx\nWebsted-struktur, uden www.domain.xxx/\nHtml i site_name/, images/other-filer i site_name/images/\nHtml i site_name/html, images/other i site_name/images\nHtml i site_name/, images/other i site_name/\nHtml i site_name/, images/other i site_name/xxx\nHtml i site_name/html, images/other i site_name/xxx\nAlle filer in web/, med tilfÃ¦ldige navne (gadget !)\nAlle filer i site_name/, med tilfÃ¦ldige navne (gadget !)\nBrugerdefineret struktur...
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
-ust skan\nOpbevar html-filer\nGem ikke-html-filer\nGem alle filer (standard)\nGem html-filer først
+ust skan\nOpbevar html-filer\nGem ikke-html-filer\nGem alle filer (standard)\nGem html-filer fÃ¸rst
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
-Bliv i det samme bibliotek\nKan gå ned (standard]\nKan gå op\nKan gå både op og ned
+Bliv i det samme bibliotek\nKan gÃ¥ ned (standard]\nKan gÃ¥ op\nKan gÃ¥ bÃ¥de op og ned
 Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
-Bliv på den samme adresse (standard)\nBliv på det samme domæne\nBliv på det samme top-level-domæne\nGå overalt på webbet.
+Bliv pÃ¥ den samme adresse (standard)\nBliv pÃ¥ det samme domÃ¦ne\nBliv pÃ¥ det samme top-level-domÃ¦ne\nGÃ¥ overalt pÃ¥ webbet.
 Never\nIf unknown (except /)\nIf unknown
 Aldrig\nUkendt (undtaget /]\nhvis ukendt
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
-Ingen robots.txt-regler\nrobots.txt med undtagelse af guiden\nfølg reglerne i robots.txt
+Ingen robots.txt-regler\nrobots.txt med undtagelse af guiden\nfÃ¸lg reglerne i robots.txt
 normal\nextended\ndebug
 Normal\nUdvidet\nFejlfinding
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
-Download websted(er)\nDownload websted(er) + spørgsmål\nHent enkelte filer\nDownload alle steder på sider (flere spejlkopiering)\nTest links på siderne (bogmærke test)\n* Fortsæt afbrudt projekt\n* Opdater tidligere projekt
+Download websted(er)\nDownload websted(er) + spÃ¸rgsmÃ¥l\nHent enkelte filer\nDownload alle steder pÃ¥ sider (flere spejlkopiering)\nTest links pÃ¥ siderne (bogmÃ¦rke test)\n* FortsÃ¦t afbrudt projekt\n* Opdater tidligere projekt
 Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
 Relativ URL / absolut URL (standard)\nAbsolut URL / absolut URL\nAbsolut URL / absolut URL\nOriginal URL / original URL
 Open Source offline browser
 Open source-offline-browser
 Website Copier/Offline Browser. Copy remote websites to your computer. Free.
-Webstedskopiering/offline-browser. Kopiér fjern-websteder til din computer. Gratis.
+Webstedskopiering/offline-browser. KopiÃ©r fjern-websteder til din computer. Gratis.
 httrack, winhttrack, webhttrack, offline browser
 httrack, winhttrack, webhttrack, offline-browser
 URL list (.txt)
@@ -931,13 +929,13 @@ URL-liste (.txt)
 Previous
 Forrige
 Next
-Næste
+NÃ¦ste
 URLs
 URL'er
 Warning
 Advarsel
 Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
-Din browser understøtter ikke JavaScript, på nuværende tidspunkt. Brug venligst en browser som forstår JavaScript, for at få et bedre resultat.
+Din browser understÃ¸tter ikke JavaScript, pÃ¥ nuvÃ¦rende tidspunkt. Brug venligst en browser som forstÃ¥r JavaScript, for at fÃ¥ et bedre resultat.
 Thank you
 Tak
 You can now close this window
@@ -949,13 +947,13 @@ Det opstod en fatal fejl under denne spejlkopiering
 View Documentation
 Vis dokumentation
 Go To HTTrack Website
-Gå til HTTrack website
+GÃ¥ til HTTrack website
 Go To HTTrack Forum
-Gå til HTTrack forum
+GÃ¥ til HTTrack forum
 View License
 Vis licens
 Beware: you local browser might be unable to browse files with embedded filenames
-OBS: din lokale browser er måske ikke i stand til at browse filer med indlejrede filnavne
+OBS: din lokale browser er mÃ¥ske ikke i stand til at browse filer med indlejrede filnavne
 Recreated HTTrack internal cached resources
 Genskabte HTTrack internt mellemlagret ressourcer
 Could not create internal cached resources
@@ -969,86 +967,86 @@ Skrivebeskyttet medie (SDCARD)
 No storage media (SDCARD)
 Intet lagringsmedie (SDCARD)
 HTTrack may not be able to download websites until this problem is fixed
-HTTrack er måske ikke i stand til at downloade websteder før dette problem er rettet
+HTTrack er mÃ¥ske ikke i stand til at downloade websteder fÃ¸r dette problem er rettet
 HTTrack: mirror '%s' stopped!
 HTTrack: spejlkopiering '%s' stoppet!
 Click on this notification to restart the interrupted mirror
-Klik på denne notifikation for at genstarte den afbrudte spejlkopiering
+Klik pÃ¥ denne notifikation for at genstarte den afbrudte spejlkopiering
 HTTrack: could not save profile for '%s'!
 HTTrack: kunne ikke gemme profil for '%s'!
 Proxy type:
 Proxytype:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
-Proxyprotokol. HTTP: standardproxy. HTTP (CONNECT-tunnel): sender hver forespørgsel gennem en CONNECT-tunnel, til proxyer der kun understøtter CONNECT som Tors HTTPTunnelPort. SOCKS5: standardport 1080.
+Proxyprotokol. HTTP: standardproxy. HTTP (CONNECT-tunnel): sender hver forespÃ¸rgsel gennem en CONNECT-tunnel, til proxyer der kun understÃ¸tter CONNECT som Tors HTTPTunnelPort. SOCKS5: standardport 1080.
 Load cookies from file:
-Indlæs cookies fra fil:
+IndlÃ¦s cookies fra fil:
 Preload cookies from a Netscape cookies.txt file before crawling.
-Indlæs cookies fra en Netscape cookies.txt-fil, før crawlingen starter.
+IndlÃ¦s cookies fra en Netscape cookies.txt-fil, fÃ¸r crawlingen starter.
 Pause between files:
 Pause mellem filer:
 Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
-Tilfældig forsinkelse mellem filoverførsler, i sekunder. Brug MIN:MAX for et tilfældigt interval (f.eks. 2:8).
+TilfÃ¦ldig forsinkelse mellem filoverfÃ¸rsler, i sekunder. Brug MIN:MAX for et tilfÃ¦ldigt interval (f.eks. 2:8).
 Keep the www. prefix (do not merge www.host with host)
-Behold www.-præfikset (sammenlæg ikke www.host med host)
+Behold www.-prÃ¦fikset (sammenlÃ¦g ikke www.host med host)
 Do not treat www.host and host as the same site.
 Behandl ikke www.host og host som det samme websted.
 Keep double slashes in URLs
-Behold dobbelte skråstreger i URL'er
+Behold dobbelte skrÃ¥streger i URL'er
 Do not collapse duplicate slashes in URLs.
-Sammenfold ikke gentagne skråstreger i URL'er.
+Sammenfold ikke gentagne skrÃ¥streger i URL'er.
 Keep the original query-string order
-Behold den oprindelige rækkefølge i forespørgselsstrengen
+Behold den oprindelige rÃ¦kkefÃ¸lge i forespÃ¸rgselsstrengen
 Do not reorder query-string parameters when deduplicating URLs.
-Omorden ikke forespørgselsstrengens parametre, når dublerede URL'er fjernes.
+Omorden ikke forespÃ¸rgselsstrengens parametre, nÃ¥r dublerede URL'er fjernes.
 Strip query keys:
-Fjern forespørgselsnøgler:
+Fjern forespÃ¸rgselsnÃ¸gler:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
-Kommaseparerede forespørgselsnøgler, der udelades i navngivningen af gemte filer (f.eks. sid,utm_source).
+Kommaseparerede forespÃ¸rgselsnÃ¸gler, der udelades i navngivningen af gemte filer (f.eks. sid,utm_source).
 Write a WARC archive of the crawl
-Skriv et WARC-arkiv af gennemsøgningen
+Skriv et WARC-arkiv af gennemsÃ¸gningen
 Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
-Gem også hvert hentet svar i et ISO-28500 WARC/1.1-arkiv ved siden af spejlet.
+Gem ogsÃ¥ hvert hentet svar i et ISO-28500 WARC/1.1-arkiv ved siden af spejlet.
 WARC archive name:
-Navn på WARC-arkiv:
+Navn pÃ¥ WARC-arkiv:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
-Valgfrit basisnavn til WARC-arkivet; lad feltet stå tomt for automatisk navngivning i outputmappen.
+Valgfrit basisnavn til WARC-arkivet; lad feltet stÃ¥ tomt for automatisk navngivning i outputmappen.
 Report what changed since the previous mirror
-Rapportér hvad der er ændret siden den forrige spejling
+RapportÃ©r hvad der er Ã¦ndret siden den forrige spejling
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
-Skriv også hts-changes.json med en liste over, hvad denne gennemgang efterlader som nyt, ændret, uændret eller forsvundet i forhold til den forrige spejling.
+Skriv ogsÃ¥ hts-changes.json med en liste over, hvad denne gennemgang efterlader som nyt, Ã¦ndret, uÃ¦ndret eller forsvundet i forhold til den forrige spejling.
 Inline assets as data: URIs (self-contained pages)
-Indlejr ressourcer som data:-URI'er (selvstændige sider)
+Indlejr ressourcer som data:-URI'er (selvstÃ¦ndige sider)
 Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
-Når spejlingen er færdig, omskrives hver gemt side med dens typografiark, scripts, billeder og skrifttyper indlejret, så en side også kan åbnes alene.
+NÃ¥r spejlingen er fÃ¦rdig, omskrives hver gemt side med dens typografiark, scripts, billeder og skrifttyper indlejret, sÃ¥ en side ogsÃ¥ kan Ã¥bnes alene.
 Largest inlined asset (bytes):
-Største indlejrede ressource (byte):
+StÃ¸rste indlejrede ressource (byte):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
-En ressource over denne størrelse beholder et almindeligt link; lad feltet stå tomt for standardværdien på 10485760 byte.
+En ressource over denne stÃ¸rrelse beholder et almindeligt link; lad feltet stÃ¥ tomt for standardvÃ¦rdien pÃ¥ 10485760 byte.
 Seed the crawl from the site's sitemap
 Start gennemgangen fra webstedets sitemap
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
-Læs webstedets sitemap (Sitemap:-linjer i robots.txt, derefter /sitemap.xml) og tilføj hver angivet URL som startadresse.
+LÃ¦s webstedets sitemap (Sitemap:-linjer i robots.txt, derefter /sitemap.xml) og tilfÃ¸j hver angivet URL som startadresse.
 Sitemap address:
 Sitemap-adresse:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
-Adressen på et sitemap, der skal læses i stedet for at undersøge webstedet; lad feltet stå tomt for at undersøge robots.txt og derefter /sitemap.xml.
+Adressen pÃ¥ et sitemap, der skal lÃ¦ses i stedet for at undersÃ¸ge webstedet; lad feltet stÃ¥ tomt for at undersÃ¸ge robots.txt og derefter /sitemap.xml.
 Write a CDXJ index of the WARC archive
 Skriv et CDXJ-indeks over WARC-arkivet
 Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
-Skriv også et sorteret CDXJ-indeks over hver post i WARC-arkivet, til afspilningsværktøjer.
+Skriv ogsÃ¥ et sorteret CDXJ-indeks over hver post i WARC-arkivet, til afspilningsvÃ¦rktÃ¸jer.
 Package the crawl as a WACZ file
-Pak gennemsøgningen som en WACZ-fil
+Pak gennemsÃ¸gningen som en WACZ-fil
 Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
-Saml WARC-arkivet, dets CDXJ-indeks og de spejlede sider i én WACZ-fil; medfører WARC-arkivet og CDXJ-indekset.
+Saml WARC-arkivet, dets CDXJ-indeks og de spejlede sider i Ã©n WACZ-fil; medfÃ¸rer WARC-arkivet og CDXJ-indekset.
 WARC segment size limit:
-Største størrelse på WARC-segment:
+StÃ¸rste stÃ¸rrelse pÃ¥ WARC-segment:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
-Begynd et nyt WARC-segment, når det aktuelle overstiger dette antal byte; lad feltet stå tomt eller skriv 0 for én fil.
+Begynd et nyt WARC-segment, nÃ¥r det aktuelle overstiger dette antal byte; lad feltet stÃ¥ tomt eller skriv 0 for Ã©n fil.
 Host aliases:
-Værtsaliasser:
+VÃ¦rtsaliasser:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Andre værtsnavne der betjener det samme websted, samlet til ét, én regel pr. linje (f.eks. www2.example.com,m.example.com=example.com).
+Andre vÃ¦rtsnavne der betjener det samme websted, samlet til Ã©t, Ã©n regel pr. linje (f.eks. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
-Spejlkopiér %s og alle værter under den
+SpejlkopiÃ©r %s og alle vÃ¦rter under den
 Ignore %s and every host below it
-Ignorer %s og alle værter under den
+Ignorer %s og alle vÃ¦rter under den

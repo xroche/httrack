@@ -5,9 +5,7 @@ Finnish
 LANGUAGE_ISO
 fi
 LANGUAGE_AUTHOR
-Mika K‰hkˆnen (mika.kahkonen at mbnet.fi)
-LANGUAGE_CHARSET
-ISO-8859-1
+Mika K√§hk√∂nen (mika.kahkonen at mbnet.fi)
 LANGUAGE_WINDOWSID
 Finnish
 OK
@@ -21,7 +19,7 @@ Sulje
 Cancel changes
 Peruuta muutokset
 Click to confirm
-Hyv‰ksy
+Hyv√§ksy
 Click to get help!
 Apua!
 Click to return to previous screen
@@ -29,7 +27,7 @@ Palaa edelliseen ruutuun
 Click to go to next screen
 Mene seuraavaan ruutuun
 Hide password
-K‰tke salasana
+K√§tke salasana
 Save project
 Tallenna projekti
 Close current project?
@@ -37,73 +35,73 @@ Sulje nykyinen projekti?
 Delete this project?
 Poista projekti?
 Delete empty project %s?
-Poista tyhj‰ projekti %s?
+Poista tyhj√§ projekti %s?
 Action not yet implemented
-Toimintoa ei toteutettu viel‰
+Toimintoa ei toteutettu viel√§
 Error deleting this project
 Virhe poistettaessa projektia
 Select a rule for the filter
-Valitse suodattimen s‰‰ntˆ
+Valitse suodattimen s√§√§nt√∂
 Enter keywords for the filter
 Kirjoita suodattimen avainsanat
 Cancel
 Peruuta
 Add this rule
-Lis‰‰ s‰‰ntˆ
+Lis√§√§ s√§√§nt√∂
 Please enter one or several keyword(s) for the rule
-Valitse yksi tai useampi avainsana s‰‰nnˆksi
+Valitse yksi tai useampi avainsana s√§√§nn√∂ksi
 Add Scan Rule
-Lis‰‰ lukus‰‰ntˆ
+Lis√§√§ lukus√§√§nt√∂
 Criterion
 Kriteeri
 String
 Teksti
 Add
-Lis‰‰
+Lis√§√§
 Scan Rules
-Lukus‰‰nnˆt
+Lukus√§√§nn√∂t
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-K‰yt‰ jokerimerkkej‰ sis‰llytt‰‰ksesi URL:i‰ tai linkkej‰.\nVoit kirjoittaa useita lukujonoja samalle riville.\nK‰yt‰ v‰lilyˆnti‰ erottelijana.\n\nEsimerkki: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+K√§yt√§ jokerimerkkej√§ sis√§llytt√§√§ksesi URL:i√§ tai linkkej√§.\nVoit kirjoittaa useita lukujonoja samalle riville.\nK√§yt√§ v√§lily√∂nti√§ erottelijana.\n\nEsimerkki: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
 Exclude links
-Hylk‰‰ linkkej‰
+Hylk√§√§ linkkej√§
 Include link(s)
-Sis‰llyt‰ linkkej‰
+Sis√§llyt√§ linkkej√§
 Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
-Vinkki: Saadaksesi KAIKKI gif-tiedostot, kirjoita t‰h‰n tapaan: +www.jokin.fi/*.gif. \n(+*.gif / -*.gif sis‰llytt‰‰/hylk‰‰ KAIKKi giffit kaikilta sivuilta)
+Vinkki: Saadaksesi KAIKKI gif-tiedostot, kirjoita t√§h√§n tapaan: +www.jokin.fi/*.gif. \n(+*.gif / -*.gif sis√§llytt√§√§/hylk√§√§ KAIKKi giffit kaikilta sivuilta)
 Save prefs
 Tallenna asetukset
 Matching links will be excluded:
-Sopivat linkit hyl‰t‰‰n:
+Sopivat linkit hyl√§t√§√§n:
 Matching links will be included:
-Sopivat linkit sis‰llytet‰‰n:
+Sopivat linkit sis√§llytet√§√§n:
 Example:
 Esimerkki:
 gif\r\nWill match all GIF files
 gif\r\nSopii kaikiin gif-tiedostoihin
 blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
-sini\r\nLˆyt‰‰ kaikki tiedostot, joissa on 'sini', myˆs sanan keskelt‰ kuten 'sinitaivas_pieni.jpeg'
+sini\r\nL√∂yt√§√§ kaikki tiedostot, joissa on 'sini', my√∂s sanan keskelt√§ kuten 'sinitaivas_pieni.jpeg'
 bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
 iso.mov\r\nSopii tiedostoon 'iso.mov', muttei tiedostoon 'iso2.mov'
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
-cgi\r\nLˆyt‰‰ linkit, joiden kansion nimi sis‰lt‰‰ tekstin 'cgi' kuten /cgi-bin/jokincgi.cgi
+cgi\r\nL√∂yt√§√§ linkit, joiden kansion nimi sis√§lt√§√§ tekstin 'cgi' kuten /cgi-bin/jokincgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
-cgi-bin\r\nLˆyt‰‰ linkit, joiden kansion nimess‰ on vain teksti 'cgi-bin' (mutta ei cgi-bin-2, esimerkiksi)
+cgi-bin\r\nL√∂yt√§√§ linkit, joiden kansion nimess√§ on vain teksti 'cgi-bin' (mutta ei cgi-bin-2, esimerkiksi)
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
-jokinnetti.fi\r\nLˆyt‰‰ linkit, jotka sis‰lt‰v‰t tekstin 'jokinnetti.fi', esimerkiksi www.jokinnetti.fi, yksityinen.jokinnetti.fi jne.
+jokinnetti.fi\r\nL√∂yt√§√§ linkit, jotka sis√§lt√§v√§t tekstin 'jokinnetti.fi', esimerkiksi www.jokinnetti.fi, yksityinen.jokinnetti.fi jne.
 someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
-jokinnetti\r\nLˆyt‰‰ linkit, joka sis‰lt‰‰ t‰m‰n tekstin, kuten www.jokinnetti.fi, www.jokinnetti.eu, yksityinen.jokinnetti.toinennetti.fi jne.
+jokinnetti\r\nL√∂yt√§√§ linkit, joka sis√§lt√§√§ t√§m√§n tekstin, kuten www.jokinnetti.fi, www.jokinnetti.eu, yksityinen.jokinnetti.toinennetti.fi jne.
 www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
-www.jokinnetti.fi\r\nLˆyt‰‰ linkit, joissa on 'www.jokinnetti.fi' (mutta ei linkkej‰ yksityinen.jokinnetti.fi/...)
+www.jokinnetti.fi\r\nL√∂yt√§√§ linkit, joissa on 'www.jokinnetti.fi' (mutta ei linkkej√§ yksityinen.jokinnetti.fi/...)
 someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
-jokinnetti\r\nLˆyt‰‰ kaikki linkit, jotka sis‰lt‰v‰t t‰m‰n tekstin, kuten www.jokinnetti.fi/..., www.testi.abc/fromjokinnetti/index.html, www.testi.abc/test/jokinnetti.html jne.
+jokinnetti\r\nL√∂yt√§√§ kaikki linkit, jotka sis√§lt√§v√§t t√§m√§n tekstin, kuten www.jokinnetti.fi/..., www.testi.abc/fromjokinnetti/index.html, www.testi.abc/test/jokinnetti.html jne.
 www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
-www.testi.com/test/jokinnetti.html\r\nLˆyt‰‰ vain tiedoston 'www.testi.com/test/jokinnetti.html'. Huomaa, ett‰ sinun pit‰‰ kirjoittaa koko polku (URL + paikan polku)
+www.testi.com/test/jokinnetti.html\r\nL√∂yt√§√§ vain tiedoston 'www.testi.com/test/jokinnetti.html'. Huomaa, ett√§ sinun pit√§√§ kirjoittaa koko polku (URL + paikan polku)
 All links will match
 Kaikki linkit sopii
 Add exclusion filter
-Lis‰‰ hylk‰‰v‰ suodatin
+Lis√§√§ hylk√§√§v√§ suodatin
 Add inclusion filter
-Lis‰‰ sis‰llytt‰v‰ suodatin
+Lis√§√§ sis√§llytt√§v√§ suodatin
 Existing filters
 Suodattimet
 Cancel changes
@@ -111,7 +109,7 @@ Peruuta muutokset
 Save current preferences as default values
 Tallenna nykyiset asetukset vakioarvoiksi
 Click to confirm
-Hyv‰ksy
+Hyv√§ksy
 No log files in %s!
 Ei lokitiedostoja: %s!
 No 'index.html' file in %s!
@@ -119,21 +117,21 @@ Ei 'index.html'-tiedostoa: %s!
 Click to quit WinHTTrack Website Copier
 Poistu WinHTTrack Website Copierista
 View log files
-N‰yt‰ lokitiedostot
+N√§yt√§ lokitiedostot
 Browse HTML start page
 Selaa HTML-alkusivua
 End of mirror
 Peilin loppu
 View log files
-N‰yt‰ lokitiedostot
+N√§yt√§ lokitiedostot
 Browse Mirrored Website
 Selaa peilisivua
 New project...
 Uusi projekti...
 View error and warning reports
-N‰yt‰ virhe- ja varoitusraportit
+N√§yt√§ virhe- ja varoitusraportit
 View report
-N‰yt‰ raportti
+N√§yt√§ raportti
 Close the log file window
 Sulje lokitiedostoikkuna
 Info type:
@@ -151,17 +149,17 @@ Infolokitiedosto
 Warning/Errors log file
 Varoitukset/virheet -loki
 Unable to initialize the OLE system
-Ei voi alustaa OLE-j‰rjestelm‰‰
+Ei voi alustaa OLE-j√§rjestelm√§√§
 WinHTTrack could not find any interrupted download file cache in the specified folder!
-WinHTTrack ei voi lˆyt‰‰ keskeytetty‰ latausta m‰‰ritetyst‰ kansiosta! 
+WinHTTrack ei voi l√∂yt√§√§ keskeytetty√§ latausta m√§√§ritetyst√§ kansiosta! 
 Could not connect to provider
-Ei voi yhdist‰‰ tarjoajaan
+Ei voi yhdist√§√§ tarjoajaan
 receive
 vastaanota
 request
 kutsu
 connect
-yhdist‰
+yhdist√§
 search
 etsi
 ready
@@ -175,25 +173,25 @@ Parsii HTML-tiedostoa...
 Purging files..
 Puhdistaa tiedostoja...
 Loading cache in progress..
-V‰limuistin lataus k‰ynniss‰...
+V√§limuistin lataus k√§ynniss√§...
 Parsing HTML file (testing links)..
-Parsii HTML-tiedostoa (testaa linkkej‰)...
+Parsii HTML-tiedostoa (testaa linkkej√§)...
 Pause - Toggle [Mirror]/[Pause download] to resume operation
-Pys‰ytys - Vaihda [Peili]/[Pys‰yt‰ lataus] jatkaaksesi operaatiota
+Pys√§ytys - Vaihda [Peili]/[Pys√§yt√§ lataus] jatkaaksesi operaatiota
 Finishing pending transfers - Select [Cancel] to stop now!
-P‰‰tt‰‰ avoimia siirtoja - Valitse [Peruuta] lopettaaksesi nyt!
+P√§√§tt√§√§ avoimia siirtoja - Valitse [Peruuta] lopettaaksesi nyt!
 scanning
 lukee
 Waiting for scheduled time..
-Odottaa ajoitettua hetke‰...
+Odottaa ajoitettua hetke√§...
 Transferring data..
-Siirt‰‰ tietoa...
+Siirt√§√§ tietoa...
 Connecting to provider
-Yhdist‰‰ tarjoajaan
+Yhdist√§√§ tarjoajaan
 [%d seconds] to go before start of operation
 [%d sekuntia] operaation alkuun
 Site mirroring in progress [%s, %s bytes]
-Sivun peilaus k‰ynniss‰ [%s, %s tavua]
+Sivun peilaus k√§ynniss√§ [%s, %s tavua]
 Site mirroring finished!
 Sivun peilaus valmis!
 A problem occurred during the mirroring operation\n
@@ -201,15 +199,15 @@ Ongelma peilausoperaation aikana\n
 \nDuring:\n
 \nAikana:\n
 \nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
-\nKatso lokitiedostoa tarvittaessa.\n\nPaina VALMIS poistuaksesi WinHTTrack Website Copierista.\n\nKiitoksia WinHTTrackin k‰ytˆst‰!
+\nKatso lokitiedostoa tarvittaessa.\n\nPaina VALMIS poistuaksesi WinHTTrack Website Copierista.\n\nKiitoksia WinHTTrackin k√§yt√∂st√§!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
-Peilausoperaatio valmis.\nPaina poistu sulkeaksesi WinHTTrackin.\nKatso lokitiedosto(j)a varmistaaksesi, ett‰ kaikki on kunnossa.\n\nKiitoksia WinHTTrackin k‰ytˆst‰!
+Peilausoperaatio valmis.\nPaina poistu sulkeaksesi WinHTTrackin.\nKatso lokitiedosto(j)a varmistaaksesi, ett√§ kaikki on kunnossa.\n\nKiitoksia WinHTTrackin k√§yt√∂st√§!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * PEILI KESKEYTETTY! * *\r\nNykyist‰ v‰limuistia tarvitaan p‰ivitysoperaatioihin ja se sis‰lt‰‰ tietoa vain ‰sken keskeytetyst‰ imuroinnista.\r\nAiempi v‰limuisti saattaa sis‰lt‰‰ t‰ydellisemp‰‰ tietoa; jos et halua menett‰‰ t‰t‰ tietoa, sinun pit‰‰ palauttaa se ja poistaa nykyinen v‰limuisti.\r\n[Huomaa: T‰m‰n voi helposti tehd‰ nyt poistamalla hts-cache/new.*-tiedostot]\r\n\r\nLuuletko, ett‰ edellinen v‰limuisti sis‰lt‰isi t‰ydellisemp‰‰ tietoa, ja ett‰ haluat palauttaa sen?
+* * PEILI KESKEYTETTY! * *\r\nNykyist√§ v√§limuistia tarvitaan p√§ivitysoperaatioihin ja se sis√§lt√§√§ tietoa vain √§sken keskeytetyst√§ imuroinnista.\r\nAiempi v√§limuisti saattaa sis√§lt√§√§ t√§ydellisemp√§√§ tietoa; jos et halua menett√§√§ t√§t√§ tietoa, sinun pit√§√§ palauttaa se ja poistaa nykyinen v√§limuisti.\r\n[Huomaa: T√§m√§n voi helposti tehd√§ nyt poistamalla hts-cache/new.*-tiedostot]\r\n\r\nLuuletko, ett√§ edellinen v√§limuisti sis√§lt√§isi t√§ydellisemp√§√§ tietoa, ja ett√§ haluat palauttaa sen?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
-* * PEILIVIRHE! * *\r\nHTTrack huomasi, ett‰ nykyinen peili on tyhj‰. Jos se oli p‰ivitys, edellinen peli on palautettu.\r\nSyy: ensimm‰iset sivut eiv‰t lˆytyneet tai tapahtui yhteysvirhe.\r\n=> Varmista ett‰ nettisivu on yh‰ olemassa ja tarkista v‰lityspalvelinasetuksesi! <=
+* * PEILIVIRHE! * *\r\nHTTrack huomasi, ett√§ nykyinen peili on tyhj√§. Jos se oli p√§ivitys, edellinen peli on palautettu.\r\nSyy: ensimm√§iset sivut eiv√§t l√∂ytyneet tai tapahtui yhteysvirhe.\r\n=> Varmista ett√§ nettisivu on yh√§ olemassa ja tarkista v√§lityspalvelinasetuksesi! <=
 \n\nTip: Click [View log file] to see warning or error messages
-\n\nVinkki: Paina [N‰yt‰ lokitiedosto] n‰hd‰ksesi varoitus- ja virheviestit
+\n\nVinkki: Paina [N√§yt√§ lokitiedosto] n√§hd√§ksesi varoitus- ja virheviestit
 Error deleting a hts-cache/new.* file, please do it manually
 Virhe hts-cache/new.* -tiedostojen poistamisessa, tee se itse.
 Do you really want to quit WinHTTrack Website Copier?
@@ -217,39 +215,39 @@ Haluatko varmasti poistua WinHTTrack Website Copierista?
 - Mirroring Mode -\n\nEnter address(es) in URL box
 - Peilaustapa -\n\nKirjoita osoitteet URL-laatikkoon
 - Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
-- Vuorovaikutteisen velhon tapa (kysymyksi‰) -\n\nKirjoita osoitteet URL-laatikkoon
+- Vuorovaikutteisen velhon tapa (kysymyksi√§) -\n\nKirjoita osoitteet URL-laatikkoon
 - File Download Mode -\n\nEnter file address(es) in URL box
 - Tiedoston lataus -tapa -\n\nKirjoita tiedostojen osoitteet URL-laatikkoon
 - Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
 - Linkkien testaus -tapa -\n\nKirjoita nettiosoitteet ja testattavat linkit URL-laatikkoon
 - Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
-- P‰ivitystapa -\n\nTarkista URL-laatikon osoitteet, tarkista m‰‰ritteet tarvittaessa ja paina 'SEURAAVA'
+- P√§ivitystapa -\n\nTarkista URL-laatikon osoitteet, tarkista m√§√§ritteet tarvittaessa ja paina 'SEURAAVA'
 - Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
-- Jatkamistapa (keskeytetyt operaatiot) -\n\nTarkista URL-laatikon osoitteet, tarkista m‰‰ritteet tarvittaessa ja paina 'SEURAAVA'
+- Jatkamistapa (keskeytetyt operaatiot) -\n\nTarkista URL-laatikon osoitteet, tarkista m√§√§ritteet tarvittaessa ja paina 'SEURAAVA'
 Log files Path
 Lokitiedostojen polku
 Path
 Polku
 - Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
-- Linkkilistatapa -\n\nKirjoita URL-laatikkoon sivujen osoitteet, joilla on linkkej‰ peileihin
+- Linkkilistatapa -\n\nKirjoita URL-laatikkoon sivujen osoitteet, joilla on linkkej√§ peileihin
 New project / Import?
 Uusi projekti / Tuonti?
 Choose criterion
 Valitse kriteeri
 Maximum link scanning depth
-Linkkien lukemisen enimm‰issyvyys
+Linkkien lukemisen enimm√§issyvyys
 Enter address(es) here
-Kirjoita osoitteet t‰h‰n
+Kirjoita osoitteet t√§h√§n
 Define additional filtering rules
-M‰‰rit‰ lis‰suodatins‰‰nnˆt
+M√§√§rit√§ lis√§suodatins√§√§nn√∂t
 Proxy Name (if needed)
-V‰lityspalvelimen nimi (tarvittaessa)
+V√§lityspalvelimen nimi (tarvittaessa)
 Proxy Port
-V‰lityspalvelimen portti
+V√§lityspalvelimen portti
 Define proxy settings
-M‰‰rit‰ v‰lityspalvelinasetukset
+M√§√§rit√§ v√§lityspalvelinasetukset
 Use standard HTTP proxy as FTP proxy
-K‰yt‰ standardia HTTP-v‰lityspalvelinta FTP-v‰lityspalvelimena
+K√§yt√§ standardia HTTP-v√§lityspalvelinta FTP-v√§lityspalvelimena
 Path
 Polku
 Select Path
@@ -267,9 +265,9 @@ Tallenna nykyiset asetukset vakioarvoiksi
 Click to continue
 Jatka
 Click to define options
-M‰‰rit‰ asetukset
+M√§√§rit√§ asetukset
 Click to add a URL
-Lis‰‰ URL
+Lis√§√§ URL
 Load URL(s) from text file
 Lataa URL:t tekstitiedostosta
 WinHTTrack preferences (*.opt)|*.opt||
@@ -277,13 +275,13 @@ WinHTTrack-asetukset (*.opt)|*.opt||
 Address List text file (*.txt)|*.txt||
 Osoitelistaustekstitiedosto (*.txt)|*.txt||
 File not found!
-Tiedostoa ei lˆydy!
+Tiedostoa ei l√∂ydy!
 Do you really want to change the project name/path?
-Haluatko varmasti vaihtaa projektin nime‰ tai polkua?
+Haluatko varmasti vaihtaa projektin nime√§ tai polkua?
 Load user-default options?
-Ladataanko k‰ytt‰j‰n vakioasetukset?
+Ladataanko k√§ytt√§j√§n vakioasetukset?
 Save user-default options?
-Tallennetaanko k‰ytt‰j‰n vakioasetukset?
+Tallennetaanko k√§ytt√§j√§n vakioasetukset?
 Reset all default options?
 Palautetaanko kaikki vakioasetukset?
 Welcome to WinHTTrack!
@@ -291,17 +289,17 @@ Tervetuloa WinHTTrackiin!
 Action:
 Toiminto:
 Max Depth
-Enimm‰issyvyys
+Enimm√§issyvyys
 Maximum external depth:
-Ulkoinen enimm‰issyvyys:
+Ulkoinen enimm√§issyvyys:
 Filters (refuse/accept links) :
-Suodattimet (hylk‰‰/hyv‰ksy linkit) :
+Suodattimet (hylk√§√§/hyv√§ksy linkit) :
 Paths
 Polut
 Save prefs
 Tallenna asetukset
 Define..
-M‰‰rit‰...
+M√§√§rit√§...
 Set options..
 Asetukset...
 Preferences and mirror options:
@@ -309,27 +307,27 @@ Asetukset ja peilivalinnat:
 Project name
 Projektin nimi
 Add a URL...
-Lis‰‰ URL...
+Lis√§√§ URL...
 Web Addresses: (URL)
 Nettiosoitteet: (URL)
 Stop WinHTTrack?
-Pys‰yt‰ WinHTTrack?
+Pys√§yt√§ WinHTTrack?
 No log files in %s!
 Ei lokitiedostoja %s!
 Pause Download?
-Pys‰yt‰ imurointi?
+Pys√§yt√§ imurointi?
 Stop the mirroring operation
-Pys‰yt‰ peilausoperaatio
+Pys√§yt√§ peilausoperaatio
 Minimize to System Tray
-Pienenn‰ teht‰v‰palkkiin
+Pienenn√§ teht√§v√§palkkiin
 Click to skip a link or stop parsing
-Ohita linkki tai pys‰yt‰ parsinta
+Ohita linkki tai pys√§yt√§ parsinta
 Click to skip a link
 Ohita linkki
 Bytes saved
 Tavuja tallennettu
 Links scanned
-Linkkej‰ luettu
+Linkkej√§ luettu
 Time:
 Aika:
 Connections:
@@ -347,41 +345,41 @@ Tiedot
 Files written:
 Kirjoitetut tiedostot:
 Files updated:
-P‰ivitetyt tiedostot:
+P√§ivitetyt tiedostot:
 Errors:
 Virheet:
 In progress:
-K‰ynniss‰:
+K√§ynniss√§:
 Follow external links
-Seuraa ulkoisia linkkej‰
+Seuraa ulkoisia linkkej√§
 Test all links in pages
 Testaa kaikki sivujen linkit
 Try to ferret out all links
-Yrit‰ nuuskia kaikki linkit
+Yrit√§ nuuskia kaikki linkit
 Download HTML files first (faster)
 Lataa HTML-tiedostot ensin (nopeampi)
 Choose local site structure
 Valitse paikallisen sivun rakenne
 Set user-defined structure on disk
-Aseta k‰ytt‰j‰n m‰‰rittelem‰ rakenne levyll‰
+Aseta k√§ytt√§j√§n m√§√§rittelem√§ rakenne levyll√§
 Use a cache for updates and retries
-K‰yt‰ v‰limuistia p‰ivityksiin ja uudelleenyrityksiin
+K√§yt√§ v√§limuistia p√§ivityksiin ja uudelleenyrityksiin
 Do not update zero size or user-erased files
-ƒl‰ p‰ivit‰ tyhji‰ tai k‰ytt‰j‰n luomia tiedostoja
+√Ñl√§ p√§ivit√§ tyhji√§ tai k√§ytt√§j√§n luomia tiedostoja
 Create a Start Page
 Luo aloitussivu
 Create a word database of all html pages
 Luo sanatietokanta kaikista html-sivuista
 Build a complete RFC822 mail (MHT/EML) archive of the mirror
-Luo peilist‰ t‰ydellinen RFC822-postiarkisto (MHT/EML)
+Luo peilist√§ t√§ydellinen RFC822-postiarkisto (MHT/EML)
 Create error logging and report files
 Luo virheloki- ja raporttitiedostot
 Generate DOS 8-3 filenames ONLY
-Kehit‰ VAIN DOSin 8-3 tiedostonimet
+Kehit√§ VAIN DOSin 8-3 tiedostonimet
 Generate ISO9660 filenames ONLY for CDROM medias
-Kehit‰ ISO9660-tiedostonimet VAIN cd-rom-medioille
+Kehit√§ ISO9660-tiedostonimet VAIN cd-rom-medioille
 Do not create HTML error pages
-ƒl‰ luo HTML-virhesivuja
+√Ñl√§ luo HTML-virhesivuja
 Select file types to be saved to disk
 Valitse levylle tallennettavat tiedostotyypit
 Select parsing direction
@@ -389,45 +387,45 @@ Valitse parsintasuunta
 Select global parsing direction
 Valitse yleinen parsintasuunta
 Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
-Aseta URL-uudelleenkirjoitusss‰‰nnˆt sis‰isille (ladatut) ja ulkoisille (ei ladattu) linkeille
+Aseta URL-uudelleenkirjoitusss√§√§nn√∂t sis√§isille (ladatut) ja ulkoisille (ei ladattu) linkeille
 Max simultaneous connections
-Yht‰aikaisten yhteyksien enimm‰ism‰‰r‰
+Yht√§aikaisten yhteyksien enimm√§ism√§√§r√§
 File timeout
 Tiedoston aikakatkaisu
 Cancel all links from host if timeout occurs
-Peruuta kaikki linkit is‰nn‰lt‰ jos aikakatkaistaan
+Peruuta kaikki linkit is√§nn√§lt√§ jos aikakatkaistaan
 Minimum admissible transfer rate
-Hyv‰ksytt‰v‰ v‰himm‰issiirtonopeus
+Hyv√§ksytt√§v√§ v√§himm√§issiirtonopeus
 Cancel all links from host if too slow
-Peruuta kaikki linkit is‰nn‰lt‰ jos liian hidasta
+Peruuta kaikki linkit is√§nn√§lt√§ jos liian hidasta
 Maximum number of retries on non-fatal errors
-Uudelleenyritt‰misten enimm‰ism‰‰r‰ v‰hemm‰n vakavissa virheiss‰
+Uudelleenyritt√§misten enimm√§ism√§√§r√§ v√§hemm√§n vakavissa virheiss√§
 Maximum size for any single HTML file
-Yksitt‰isen HTML-tiedoston enimm‰iskoko
+Yksitt√§isen HTML-tiedoston enimm√§iskoko
 Maximum size for any single non-HTML file
-Yksitt‰isen tiedoston enimm‰iskoko (muu kuin HTML)
+Yksitt√§isen tiedoston enimm√§iskoko (muu kuin HTML)
 Maximum amount of bytes to retrieve from the Web
-Netist‰ ladattavien tavujen enimm‰ism‰‰r‰
+Netist√§ ladattavien tavujen enimm√§ism√§√§r√§
 Make a pause after downloading this amount of bytes
-Pys‰yt‰, kun on ladattu t‰m‰n verran tavuja
+Pys√§yt√§, kun on ladattu t√§m√§n verran tavuja
 Maximum duration time for the mirroring operation
-Peilausoperaation enimm‰iskesto
+Peilausoperaation enimm√§iskesto
 Maximum transfer rate
-Enimm‰issiirtonopeus
+Enimm√§issiirtonopeus
 Maximum connections/seconds (avoid server overload)
-Enimmill‰‰n yhteyksi‰ sekunnissa (v‰ltt‰‰ palvelimen ylikuormitusta)
+Enimmill√§√§n yhteyksi√§ sekunnissa (v√§ltt√§√§ palvelimen ylikuormitusta)
 Maximum number of links that can be tested (not saved!)
-Testattavien linkkien enimm‰ism‰‰r‰ (ei tallennettujen!)
+Testattavien linkkien enimm√§ism√§√§r√§ (ei tallennettujen!)
 Browser identity
-Esitt‰ydy selaimena
+Esitt√§ydy selaimena
 Comment to be placed in each HTML file
 Jokaiseen HTML-tiedostoon pantava kommentti
 Languages accepted by the browser
-Selaimen hyv‰ksym‰t kielet
+Selaimen hyv√§ksym√§t kielet
 Additional HTTP headers to be sent in each requests
-Lis‰otsakkeet, jotka l‰hetet‰‰n jokaisessa HTTP-pyynnˆss‰
+Lis√§otsakkeet, jotka l√§hetet√§√§n jokaisessa HTTP-pyynn√∂ss√§
 HTTP referer to be sent for initial URLs
-Alkuper‰isille URL-osoitteille l‰hetett‰v‰ HTTP-referer
+Alkuper√§isille URL-osoitteille l√§hetett√§v√§ HTTP-referer
 Back to starting page
 Palaa aloitussivulle
 Save current preferences as default values
@@ -437,53 +435,53 @@ Paina jatkaaksesi
 Click to cancel changes
 Paina peruuttaaksesi muutokset
 Follow local robots rules on sites
-Noudata paikallisia robottis‰‰ntˆj‰ sivuilla
+Noudata paikallisia robottis√§√§nt√∂j√§ sivuilla
 Links to non-localised external pages will produce error pages
 Linkit paikallisoimattoimiin ulkoisiin sivuihin antavat virhesivuja
 Do not erase obsolete files after update
-ƒl‰ poista vanhentuneita tiedostoja p‰ivityksen j‰lkeen
+√Ñl√§ poista vanhentuneita tiedostoja p√§ivityksen j√§lkeen
 Accept cookies?
-Hyv‰ksyt‰‰nkˆ ev‰steet?
+Hyv√§ksyt√§√§nk√∂ ev√§steet?
 Check document type when unknown?
 Tarkistetaanko dokumentin tuntematon tyyppi?
 Parse java applets to retrieve included files that must be downloaded?
-Parsitaanko java-apletit saadaksesi ladattua myˆs tarvittavat sis‰llytetyt tiedostot?
+Parsitaanko java-apletit saadaksesi ladattua my√∂s tarvittavat sis√§llytetyt tiedostot?
 Store all files in cache instead of HTML only
-Tallenna kaikki tiedostot v‰limuistiin vain HTML-tiedostojen asemesta
+Tallenna kaikki tiedostot v√§limuistiin vain HTML-tiedostojen asemesta
 Log file type (if generated)
 Lokitiedoston tyyppi (jos luodaan)
 Maximum mirroring depth from root address
-Juuriosoitteesta peilauksen enimm‰issyvyys
+Juuriosoitteesta peilauksen enimm√§issyvyys
 Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
-Peilauksen enimm‰issyvyys ulkoisiin/kielletyihin osoitteisiin (0 eli ei mit‰‰n on vakiona)
+Peilauksen enimm√§issyvyys ulkoisiin/kielletyihin osoitteisiin (0 eli ei mit√§√§n on vakiona)
 Create a debugging file
 Luo debuggaustiedosto
 Use non-standard requests to get round some server bugs
-K‰yt‰ ep‰standardeja pyyntˆj‰ kiert‰‰ksesi joitakin palvelinbugeja
+K√§yt√§ ep√§standardeja pyynt√∂j√§ kiert√§√§ksesi joitakin palvelinbugeja
 Use old HTTP/1.0 requests (limits engine power!)
-K‰yt‰ vanhoja HTTP/1.0-pyyntˆj‰ (rajoittaa moottorin tehoa!)
+K√§yt√§ vanhoja HTTP/1.0-pyynt√∂j√§ (rajoittaa moottorin tehoa!)
 Attempt to limit retransfers through several tricks (file size test..)
-Yrit‰ rajoittaa uudelleensiirtoja eri tempuilla (tiedostokoon testi, ...)
+Yrit√§ rajoittaa uudelleensiirtoja eri tempuilla (tiedostokoon testi, ...)
 Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
-Yrit‰ rajoittaa linkkien m‰‰r‰‰ hylk‰‰m‰ll‰ samankaltaiset URL:t (www.foo.com==foo.com, http=https ...)
+Yrit√§ rajoittaa linkkien m√§√§r√§√§ hylk√§√§m√§ll√§ samankaltaiset URL:t (www.foo.com==foo.com, http=https ...)
 Write external links without login/password
 Kirjoita ulkoiset linkit ilman tunnusta ja salasanaa
 Write internal links without query string
-Kirjoita sis‰iset linkit ilman kyselyteksti‰
+Kirjoita sis√§iset linkit ilman kyselyteksti√§
 Get non-HTML files related to a link, eg external .ZIP or pictures
-Ota linkki‰ koskevat muut kuin HTML-tiedostot, esimerkiksi ulkoiset zipit tai kuvat
+Ota linkki√§ koskevat muut kuin HTML-tiedostot, esimerkiksi ulkoiset zipit tai kuvat
 Test all links (even forbidden ones)
 Testaa kaikki linkit (kielletytkin)
 Try to catch all URLs (even in unknown tags/code)
-Yrit‰ napata kaikki URL:t (jopa tuntemattomissa tageissa/koodeissa)
+Yrit√§ napata kaikki URL:t (jopa tuntemattomissa tageissa/koodeissa)
 Get HTML files first!
 Ota HTML-tiedostot ensin!
 Structure type (how links are saved)
 Rakenteen tyyppi (kuinka linkit tallennetaan)
 Use a cache for updates
-K‰yt‰ v‰limuistia p‰ivitykseen
+K√§yt√§ v√§limuistia p√§ivitykseen
 Do not re-download locally erased files
-ƒl‰ imuroi uudelleen paikallisesti poistettuja tiedostoja
+√Ñl√§ imuroi uudelleen paikallisesti poistettuja tiedostoja
 Make an index
 Tee indeksi
 Make a word database
@@ -499,97 +497,97 @@ ISO9660-nimet (CDROM)
 No error pages
 Ei virhesivuja
 Primary Scan Rule
-P‰‰lukus‰‰ntˆ
+P√§√§lukus√§√§nt√∂
 Travel mode
 Kulkutapa
 Global travel mode
 Yleinen kulkutapa
 These options should be modified only exceptionally
-N‰m‰ asetukset pit‰isi muuttaa poikkeustapauksissa
+N√§m√§ asetukset pit√§isi muuttaa poikkeustapauksissa
 Activate Debugging Mode (winhttrack.log)
 Aktivoi debuggaustapa (winhttrack.log)
 Rewrite links: internal / external
-Kirjoita linkit uudelleen: sis‰iset / ulkoiset
+Kirjoita linkit uudelleen: sis√§iset / ulkoiset
 Flow control
 Datavuon ohjaus
 Limits
 Rajoitukset
 Identity
-Esitt‰ydy
+Esitt√§ydy
 HTML footer
 HTML-alatunniste
 Languages
 Kielet
 Additional HTTP Headers
-HTTP-lis‰otsakkeet
+HTTP-lis√§otsakkeet
 Default referer URL
 Oletusarvoinen referer-URL
 N# connections
-Yhteyksi‰
+Yhteyksi√§
 Abandon host if error
-Hylk‰‰ is‰nt‰, jos virhe
+Hylk√§√§ is√§nt√§, jos virhe
 Minimum transfer rate (B/s)
-V‰himm‰issiirtonopeus (t/s)
+V√§himm√§issiirtonopeus (t/s)
 Abandon host if too slow
-Hylk‰‰ is‰nt‰, jos liian hidas
+Hylk√§√§ is√§nt√§, jos liian hidas
 Configure
-S‰‰d‰
+S√§√§d√§
 Use proxy for ftp transfers
-K‰yt‰ v‰lityspalvelinta ftp-siirtoihin
+K√§yt√§ v√§lityspalvelinta ftp-siirtoihin
 TimeOut(s)
 Aikakatkaisut
 Persistent connections (Keep-Alive)
-Pysyv‰t yhteydet (herkistele)
+Pysyv√§t yhteydet (herkistele)
 Reduce connection time and type lookup time using persistent connections
-V‰henn‰ yhteysaikaa ja tyypintarkastusaikaa k‰ytt‰m‰ll‰ pysyvi‰ yhteyksi‰
+V√§henn√§ yhteysaikaa ja tyypintarkastusaikaa k√§ytt√§m√§ll√§ pysyvi√§ yhteyksi√§
 Retries
 Uudelleenyritykset
 Size limit
 Kokorajoitus
 Max size of any HTML file (B)
-HTML-tiedostojen enimm‰iskoko
+HTML-tiedostojen enimm√§iskoko
 Max size of any non-HTML file
-Muiden kuin HTML:ien enimm‰iskoko
+Muiden kuin HTML:ien enimm√§iskoko
 Max site size
-Sivuston enimm‰iskoko
+Sivuston enimm√§iskoko
 Max time
-Enimm‰isaika
+Enimm√§isaika
 Save prefs
 Tallenna asetukset
 Max transfer rate
-Enimm‰issiirtonopeus
+Enimm√§issiirtonopeus
 Follow robots.txt
-Noudata robots.txt:t‰
+Noudata robots.txt:t√§
 No external pages
 Ei ulkoisia sivuja
 Do not purge old files
-ƒl‰ puhdista vanhoja tiedostoja
+√Ñl√§ puhdista vanhoja tiedostoja
 Accept cookies
-Hyv‰ksy ev‰steet
+Hyv√§ksy ev√§steet
 Check document type
 Valitse dokumentin tyyppi
 Parse java files
 Parsi java-tiedostot
 Store ALL files in cache
-Tallenna KAIKKI tiedostot v‰limuistiin
+Tallenna KAIKKI tiedostot v√§limuistiin
 Tolerant requests (for servers)
-Hyv‰ksyv‰t pyynnˆt (palvelimille)
+Hyv√§ksyv√§t pyynn√∂t (palvelimille)
 Update hack (limit re-transfers)
-P‰ivityspilkeet (rajoita uudelleensiirtoja)
+P√§ivityspilkeet (rajoita uudelleensiirtoja)
 URL hacks (join similar URLs)
-URL-pilkkeet (liit‰ samanlaiset URL:t)
+URL-pilkkeet (liit√§ samanlaiset URL:t)
 Force old HTTP/1.0 requests (no 1.1)
-Pakota vanhat HTTP/1.0-pyynnˆt (ei 1.1)
+Pakota vanhat HTTP/1.0-pyynn√∂t (ei 1.1)
 Max connections / seconds
-Yhteyksien enimm‰ism‰‰r‰ sekunnissa
+Yhteyksien enimm√§ism√§√§r√§ sekunnissa
 Maximum number of links
-Linkkien enimm‰ism‰‰r‰
+Linkkien enimm√§ism√§√§r√§
 Pause after downloading..
-Pys‰yt‰, kun imuroitu...
+Pys√§yt√§, kun imuroitu...
 Hide passwords
-K‰tke salasanat
+K√§tke salasanat
 Hide query strings
-K‰tke kyselytekstit
+K√§tke kyselytekstit
 Links
 Linkit
 Build
@@ -603,21 +601,21 @@ Rajoitukset
 Browser ID
 Selaimen ID
 Scan Rules
-Lukus‰‰nnˆt
+Lukus√§√§nn√∂t
 Spider
 Nettirobotti
 Log, Index, Cache
-Loki, indeksi, v‰limuisti
+Loki, indeksi, v√§limuisti
 Proxy
-V‰lityspalvelin
+V√§lityspalvelin
 MIME Types
 MIME-tyypit
 Do you really want to quit WinHTTrack Website Copier?
 Haluatko varmasti poistua WinHTTrack Website Copierista?
 Do not connect to a provider (already connected)
-ƒl‰ yhdist‰ tarjoajaan (on jo yhditetty)
+√Ñl√§ yhdist√§ tarjoajaan (on jo yhditetty)
 Do not use remote access connection
-ƒl‰ k‰yt‰ et‰yhteytt‰
+√Ñl√§ k√§yt√§ et√§yhteytt√§
 Schedule the mirroring operation
 Ajoita peilausoperaatio
 Quit WinHTTrack Website Copier
@@ -627,37 +625,37 @@ Palaa aloitussivulle
 Click to start!
 Aloita!
 No saved password for this connection!
-Ei tallennettuja salasanoja t‰lle yhteydelle!
+Ei tallennettuja salasanoja t√§lle yhteydelle!
 Can not get remote connection settings
-Ei voi ottaa et‰yhteyden asetuksia
+Ei voi ottaa et√§yhteyden asetuksia
 Select a connection provider
 Valitse puhelinverkkoyhteys
 Start
 Aloita
 Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
-S‰‰d‰ yhteysasetukset tarvittaessa,\nsen j‰lkeen paina VALMIS peilioperaation aloittamiseksi.
+S√§√§d√§ yhteysasetukset tarvittaessa,\nsen j√§lkeen paina VALMIS peilioperaation aloittamiseksi.
 Save settings only, do not launch download now.
-Tallenna vain asetukset, ‰l‰ aloita lataamista viel‰
+Tallenna vain asetukset, √§l√§ aloita lataamista viel√§
 On hold
 Odottele
 Transfer scheduled for: (hh/mm/ss)
-Siirt‰minen ajastettu: (tt/mm/ss)
+Siirt√§minen ajastettu: (tt/mm/ss)
 Start
 Aloita
 Connect to provider (RAS)
-Yhdist‰ tarjoajaan (RAS)
+Yhdist√§ tarjoajaan (RAS)
 Connect to this provider
-Yhdist‰ t‰h‰n tarjoajaan
+Yhdist√§ t√§h√§n tarjoajaan
 Disconnect when finished
 Katkaise yhteys, kun on valmista
 Disconnect modem on completion
 Katkaise modeemiyhteys, kun on valmista
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Kerro meille bugeista ja ongelmista)\r\n\r\nKehitys:\r\nK‰yttˆliittym‰ (Windows): Xavier Roche\r\nNettirobotti: Xavier Roche\r\n\r\n(C) 1998-2003 Xavier Roche ja muut avustajat\r\nSuomentanut Mika K‰hkˆnen 22.-24.7.2005\r\nmika.kahkonen@mbnet.fi\r\nhttp://koti.mbnet.fi/kahoset
+\r\n(Kerro meille bugeista ja ongelmista)\r\n\r\nKehitys:\r\nK√§ytt√∂liittym√§ (Windows): Xavier Roche\r\nNettirobotti: Xavier Roche\r\n\r\n(C) 1998-2003 Xavier Roche ja muut avustajat\r\nSuomentanut Mika K√§hk√∂nen 22.-24.7.2005\r\nmika.kahkonen@mbnet.fi\r\nhttp://koti.mbnet.fi/kahoset
 About WinHTTrack Website Copier
 Tietoja WinHTTrack Website Copier
 Please visit our Web page
-K‰y nettisivuillamme
+K√§y nettisivuillamme
 Wizard query
 Velhokysely
 Your answer:
@@ -665,15 +663,15 @@ Vastauksesi:
 Link detected..
 Linkki havaittu...
 Choose a rule
-Valitse s‰‰ntˆ
+Valitse s√§√§nt√∂
 Ignore this link
-Sivuuta t‰m‰ linkki
+Sivuuta t√§m√§ linkki
 Ignore directory
 Sivuuta hakemisto
 Ignore domain
 Sivuuta verkkotunnus
 Catch this page only
-Huomioi vain t‰m‰ sivu
+Huomioi vain t√§m√§ sivu
 Mirror site
 Peilisivu
 Mirror domain
@@ -695,25 +693,25 @@ Window
 Help
 O&hje
 Pause transfer
-Pys‰yt‰ siirto
+Pys√§yt√§ siirto
 Exit
 Poistu
 Modify options
 &Muokkaa valintoja
 View log
-&N‰yt‰ loki
+&N√§yt√§ loki
 View error log
-N‰yt‰ &virheloki
+N√§yt√§ &virheloki
 View file transfers
-N‰yt‰ tiedostosiirrot
+N√§yt√§ tiedostosiirrot
 Hide
 P&iilota
 About WinHTTrack Website Copier
 &Tietoja WinHTTrack Website Copier
 Check program updates...
-Tarkista ohjelman &p‰ivitykset...
+Tarkista ohjelman &p√§ivitykset...
 &Toolbar
-&Tyˆkalupalkki
+&Ty√∂kalupalkki
 &Status Bar
 T&ilapalkki
 S&plit
@@ -741,7 +739,7 @@ Reset to default options
 Load options...
 Lataa &valinnat...
 Save options as...
-Tallenna valinnat &nimell‰...
+Tallenna valinnat &nimell√§...
 Language preference...
 &Kieliasetukset...
 Contents...
@@ -755,23 +753,23 @@ New project\tCtrl+N
 &Save\tCtrl+S
 &Tallenna\tCtrl+S
 Save &As...
-Tallenna &nimell‰...
+Tallenna &nimell√§...
 &Delete...
 P&oista...
 &Browse sites...
 S&elaa sivuja...
 User-defined structure
-K‰ytt‰j‰n m‰‰rittelem‰ rakenne
+K√§ytt√§j√§n m√§√§rittelem√§ rakenne
 %n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
-%n\tTiedostonimi ilman tyyppi‰ (esim: kuva)\r\n%N\tTiedostonimi ja tyyppi (esim: kuva.png)\r\n%t\tVain tiedostotyyppi (esim: png)\r\n%p\tPolku [loppuun ei /] (esim: /kuvia)\r\n%h\tIs‰nt‰nimi (esim: www.jokinnetti.fi)\r\n%M\tMD5-URL (128 bitti‰, 32 ascii-tavua)\r\n%Q\tMD5-kyselyjono (128 bitti‰, 32 ascii-tavua)\r\n%q\tPieni MD5-kyselyjono (16 bitti‰, 4 ascii-tavua)\r\n\r\n%s?\tLyhyt nimi(esim: %sN)
+%n\tTiedostonimi ilman tyyppi√§ (esim: kuva)\r\n%N\tTiedostonimi ja tyyppi (esim: kuva.png)\r\n%t\tVain tiedostotyyppi (esim: png)\r\n%p\tPolku [loppuun ei /] (esim: /kuvia)\r\n%h\tIs√§nt√§nimi (esim: www.jokinnetti.fi)\r\n%M\tMD5-URL (128 bitti√§, 32 ascii-tavua)\r\n%Q\tMD5-kyselyjono (128 bitti√§, 32 ascii-tavua)\r\n%q\tPieni MD5-kyselyjono (16 bitti√§, 4 ascii-tavua)\r\n\r\n%s?\tLyhyt nimi(esim: %sN)
 Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
 Esimerkki:\t%h%p/%n%q.%t\n->\t\tc:\\peili\\www.jokinnetti.com\\jotainkuvia\\kuva.gif
 Proxy settings
-V‰lityspalvelinasetukset
+V√§lityspalvelinasetukset
 Proxy address:
-V‰lityspalvelimen osoite:
+V√§lityspalvelimen osoite:
 Proxy port:
-V‰lityspalvelimen portti:
+V√§lityspalvelimen portti:
 Authentication (only if needed)
 Autentisointi (vain tarvittaessa)
 Login
@@ -779,19 +777,19 @@ Kirjaudu
 Password
 Salasana
 Enter proxy address here
-V‰lityspalvelimen osoite
+V√§lityspalvelimen osoite
 Enter proxy port here
-V‰lityspalvelimen portti
+V√§lityspalvelimen portti
 Enter proxy login
-V‰lityspalvelimen kirjautuminen
+V√§lityspalvelimen kirjautuminen
 Enter proxy password
-V‰lityspalvelimen salasana
+V√§lityspalvelimen salasana
 Enter project name here
 Projektin nimi
 Enter saving path here
 Tallennuspolku
 Select existing project to update
-Valitse p‰ivitett‰v‰ projekti
+Valitse p√§ivitett√§v√§ projekti
 Click here to select path
 Valitse polku
 Select or create a new category name, to sort your mirrors in categories
@@ -811,11 +809,11 @@ Projektin luokka:
 C:\\My Web Sites
 C:\\Nettisivuni
 Type a new project name, \r\nor select existing project to update/resume
-Kirjoita uuden projektin nimi, \r\tai valitse p‰ivitett‰v‰ tai jatkettava projekti
+Kirjoita uuden projektin nimi, \r\tai valitse p√§ivitett√§v√§ tai jatkettava projekti
 New project
 Uusi projekti
 Insert URL
-Lis‰‰ URL
+Lis√§√§ URL
 URL:
 URL:
 Authentication (only if needed)
@@ -829,31 +827,31 @@ Lomakkeet tai monimutkaiset linkit:
 Capture URL...
 Kaappaa URL...
 Enter URL address(es) here
-Kirjoita URL-osoitteet t‰h‰n
+Kirjoita URL-osoitteet t√§h√§n
 Enter site login
 Kirjoita sivun tunnus
 Enter site password
 Kirjoita sivun salasana
 Use this capture tool for links that can only be accessed through forms or javascript code
-K‰yt‰ t‰t‰ kaappaustyˆkalua linkkeihin, joihin voi p‰‰st‰ vain lomakkeiden tai javascript-koodien avulla
+K√§yt√§ t√§t√§ kaappausty√∂kalua linkkeihin, joihin voi p√§√§st√§ vain lomakkeiden tai javascript-koodien avulla
 Choose language according to preference
 Valitse asetettu kieli
 Catch URL!
 Nappaa URL!
 Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
-Aseta v‰liaikaisesti selaimen v‰lityspalvelinasetukset seuraavilla arvoilla (Kopioi osoite ja portti).\nSen j‰lkeen paina lomakkeen L‰het‰-painiketta selaimesi sivulla tai paina linkki‰, jonka haluat kaapata.
+Aseta v√§liaikaisesti selaimen v√§lityspalvelinasetukset seuraavilla arvoilla (Kopioi osoite ja portti).\nSen j√§lkeen paina lomakkeen L√§het√§-painiketta selaimesi sivulla tai paina linkki√§, jonka haluat kaapata.
 This will send the desired link from your browser to WinHTTrack.
-T‰m‰ l‰hett‰‰ halutun linkit selaimeltasi WinHTTrackiin.
+T√§m√§ l√§hett√§√§ halutun linkit selaimeltasi WinHTTrackiin.
 ABORT
-KESKEYTƒ
+KESKEYT√Ñ
 Copy/Paste the temporary proxy parameters here
-Kopioi ja liit‰ v‰liaikaiset v‰lityspalvelinparametrit t‰h‰n
+Kopioi ja liit√§ v√§liaikaiset v√§lityspalvelinparametrit t√§h√§n
 Cancel
 Peruuta
 Unable to find Help files!
-Ohje-tiedostoja ei lˆydy!
+Ohje-tiedostoja ei l√∂ydy!
 Unable to save parameters!
-Ei voi tallentaa parametrej‰!
+Ei voi tallentaa parametrej√§!
 Please drag only one folder at a time
 Raahaa vain yksi kansio kerrallaan
 Please drag only folders, not files
@@ -861,67 +859,67 @@ Raahaa vain kansiot, ei tiedostoja
 Please drag folders only
 Raahaa vain kansiot
 Select user-defined structure?
-Valitse k‰ytt‰j‰n m‰‰rittelem‰ rakenne?
+Valitse k√§ytt√§j√§n m√§√§rittelem√§ rakenne?
 Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
-Varmista, ett‰ k‰ytt‰j‰n m‰‰rittelem‰ merkkijono on oikea,\nmuutoin tiedostonimist‰ tulee roskaa!
+Varmista, ett√§ k√§ytt√§j√§n m√§√§rittelem√§ merkkijono on oikea,\nmuutoin tiedostonimist√§ tulee roskaa!
 Do you really want to use a user-defined structure?
-Haluatko varmasti k‰ytt‰‰ k‰ytt‰j‰n m‰‰rittelem‰‰ rakennetta?
+Haluatko varmasti k√§ytt√§√§ k√§ytt√§j√§n m√§√§rittelem√§√§ rakennetta?
 Too manu URLs, cannot handle so many links!!
-Liian monta URL:‰, ei voi k‰sitell‰ niin monta!!!
+Liian monta URL:√§, ei voi k√§sitell√§ niin monta!!!
 Not enough memory, fatal internal error..
-Ei tarpeeksi muistia, vakava sis‰inen virhe...
+Ei tarpeeksi muistia, vakava sis√§inen virhe...
 Unknown operation!
 Tuntematon operaatio!
 Add this URL?\r\n
-Lis‰‰ URL?\r\n
+Lis√§√§ URL?\r\n
 Warning: main process is still not responding, cannot add URL(s)..
-Varoitus: p‰‰prosessi ei viel‰k‰‰n vastaa, ei voi lis‰t‰ URL:i‰...
+Varoitus: p√§√§prosessi ei viel√§k√§√§n vastaa, ei voi lis√§t√§ URL:i√§...
 Type/MIME associations
-Tyyppi/MIME-kytkenn‰t
+Tyyppi/MIME-kytkenn√§t
 File types:
 Tiedostotyypit:
 MIME identity:
 MIME-identiteetti:
 Select or modify your file type(s) here
-Valitse tai muokkaa tiedostotyyppej‰si
+Valitse tai muokkaa tiedostotyyppej√§si
 Select or modify your MIME type(s) here
-Valitse tai muokkaa MIME-tyyppej‰si
+Valitse tai muokkaa MIME-tyyppej√§si
 Go up
-Ylˆs
+Yl√∂s
 Go down
 Alas
 File download information
 Tiedoston imuroinnin tiedot
 Freeze Window
-J‰‰dyt‰ ikkuna
+J√§√§dyt√§ ikkuna
 More information:
-Lis‰tietoa:
+Lis√§tietoa:
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
-Tervetuloa WinHTTrack Website Copieriin!\n\nPaina seuraava\n\n- aloittaaksesi uuden projektin\n- tai jatkaaksesi keskeytynytt‰ latausta
+Tervetuloa WinHTTrack Website Copieriin!\n\nPaina seuraava\n\n- aloittaaksesi uuden projektin\n- tai jatkaaksesi keskeytynytt√§ latausta
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
-Tiedostonimet, joilla p‰‰te:\nTiedostonimet, joissa on:\nT‰m‰ tiedostonimi:\nKansionimet, joissa on:\nT‰m‰ kansionimi:\nT‰m‰n verkkotunnuksen linkit:\nLinkit verkkotunnuksissa, joissa on:\nLinkit t‰lt‰ is‰nn‰lt‰:\nLinkit, joissa on:\nT‰m‰ linkki:\nKAIKKI LINKIT
+Tiedostonimet, joilla p√§√§te:\nTiedostonimet, joissa on:\nT√§m√§ tiedostonimi:\nKansionimet, joissa on:\nT√§m√§ kansionimi:\nT√§m√§n verkkotunnuksen linkit:\nLinkit verkkotunnuksissa, joissa on:\nLinkit t√§lt√§ is√§nn√§lt√§:\nLinkit, joissa on:\nT√§m√§ linkki:\nKAIKKI LINKIT
 Show all\nHide debug\nHide infos\nHide debug and infos
-N‰yt‰ kaikki\nK‰tke debug\nK‰tke infot\nK‰tke debug and infot
+N√§yt√§ kaikki\nK√§tke debug\nK√§tke infot\nK√§tke debug and infot
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Sivuston rakenne (vakio)\nHtml:t kansioon web/,       kuvat ja muut web/images/\nHtml:t kansioon web/html/,   kuvat ja muut web/images/\nHtml:t kansioon web/,       kuvat ja muut web/\nHtml:t kansioon web/,       kuvat ja muut web/xxx/, miss‰ xxx on tiedostop‰‰te\nHtml:t kansioon web/html/,   kuvat ja muut web/xxx/\nSivuston rakenne, ilman www.domain.xxx/\nHtml:t kansioon site_name/, kuvat ja muut site_name/images/\nHtml:t kansioon site_name/html/, kuvat ja muut site_name/images/\nHtml:t kansioon site_name/, kuvat ja muut site_name/\nHtml:t kansioon site_name/, kuvat ja muut site_name/xxx/\nHtml:t kansioon site_name/html/, kuvat ja muut site_name/xxx/\nKaikki kansioon web/, luo satunnaiset nimet (!)\nKaikki kansioon site_name/, luo satunnaiset nimet (!)\nK‰ytt‰j‰n m‰‰rittelem‰ rakenne...
+Sivuston rakenne (vakio)\nHtml:t kansioon web/,       kuvat ja muut web/images/\nHtml:t kansioon web/html/,   kuvat ja muut web/images/\nHtml:t kansioon web/,       kuvat ja muut web/\nHtml:t kansioon web/,       kuvat ja muut web/xxx/, miss√§ xxx on tiedostop√§√§te\nHtml:t kansioon web/html/,   kuvat ja muut web/xxx/\nSivuston rakenne, ilman www.domain.xxx/\nHtml:t kansioon site_name/, kuvat ja muut site_name/images/\nHtml:t kansioon site_name/html/, kuvat ja muut site_name/images/\nHtml:t kansioon site_name/, kuvat ja muut site_name/\nHtml:t kansioon site_name/, kuvat ja muut site_name/xxx/\nHtml:t kansioon site_name/html/, kuvat ja muut site_name/xxx/\nKaikki kansioon web/, luo satunnaiset nimet (!)\nKaikki kansioon site_name/, luo satunnaiset nimet (!)\nK√§ytt√§j√§n m√§√§rittelem√§ rakenne...
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
-Vain lue\nS‰ilˆ html-tiedostot\nS‰ilˆ muut kuin html-tiedostot\nS‰ilˆ kaikki tiedostot (vakio)\nS‰ilˆ html-tiedostot ensin
+Vain lue\nS√§il√∂ html-tiedostot\nS√§il√∂ muut kuin html-tiedostot\nS√§il√∂ kaikki tiedostot (vakio)\nS√§il√∂ html-tiedostot ensin
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
-Pysy samassa hakemistossa\nVoi menn‰ alas (vakio)\nVoi menn‰ ylˆs\nVoi menn‰ sek‰ ylˆs ett‰ alas
+Pysy samassa hakemistossa\nVoi menn√§ alas (vakio)\nVoi menn√§ yl√∂s\nVoi menn√§ sek√§ yl√∂s ett√§ alas
 Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
-Pysy samassa osoitteessa (vakio)\nPysy samalla verkkotunnuksella\nPysy samalla ylimm‰n tason verkkotunnuksella\nMene kaikkialle nettiin
+Pysy samassa osoitteessa (vakio)\nPysy samalla verkkotunnuksella\nPysy samalla ylimm√§n tason verkkotunnuksella\nMene kaikkialle nettiin
 Never\nIf unknown (except /)\nIf unknown
 Ei koskaan\nJos tuntematon (paitsi /)\nJos tuntematon
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
-ei robots.txt-s‰‰ntˆj‰\nrobots.txt paitsi velhoa\nnoudata robots.txt-s‰‰ntˆj‰
+ei robots.txt-s√§√§nt√∂j√§\nrobots.txt paitsi velhoa\nnoudata robots.txt-s√§√§nt√∂j√§
 normal\nextended\ndebug
 normaali\nlaajennettu\ndebug
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
-Imuroi nettisivut\nImuroi nettisivut ja kysymykset\nOta yksitt‰iset tiedostot\nImuroi kaikki sivut sivustolla (useat peilit)\nTestaa sivujen linkit (kirjanmerkkitestaus)\n* Jatka keskeytynytt‰ latausta\n* P‰ivit‰ jo imuroitu
+Imuroi nettisivut\nImuroi nettisivut ja kysymykset\nOta yksitt√§iset tiedostot\nImuroi kaikki sivut sivustolla (useat peilit)\nTestaa sivujen linkit (kirjanmerkkitestaus)\n* Jatka keskeytynytt√§ latausta\n* P√§ivit√§ jo imuroitu
 Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
-Suhteellinen URI / tarkka URL (vakio)\nTarkka URL / tarkka URL\nTarkka URI / tarkka URL\nAlkuper‰inen URL / alkuper‰inen URL
+Suhteellinen URI / tarkka URL (vakio)\nTarkka URL / tarkka URL\nTarkka URI / tarkka URL\nAlkuper√§inen URL / alkuper√§inen URL
 Open Source offline browser
-Avoimen l‰hdekoodin yhteydetˆn selain
+Avoimen l√§hdekoodin yhteydet√∂n selain
 Website Copier/Offline Browser. Copy remote websites to your computer. Free.
 Nettisivun lataaja/Offline-selain. Kopioi nettisivut koneellesi. Ilmainen.
 httrack, winhttrack, webhttrack, offline browser
@@ -937,31 +935,31 @@ URL:t
 Warning
 Varoitus
 Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
-Selaimesi ei tue javascripti‰ juuri nyt. Parempia tuloksia tulee javascripti‰ k‰ytt‰v‰ll‰ selaimella.
+Selaimesi ei tue javascripti√§ juuri nyt. Parempia tuloksia tulee javascripti√§ k√§ytt√§v√§ll√§ selaimella.
 Thank you
 Kiitos
 You can now close this window
-Voit nyt sulkea t‰m‰n ikkunan
+Voit nyt sulkea t√§m√§n ikkunan
 Server terminated
 Palvelin lopetettu
 A fatal error has occurred during this mirror
-T‰ll‰ peilill‰ tapahtui vakava virhe
+T√§ll√§ peilill√§ tapahtui vakava virhe
 View Documentation
-N‰yt‰ ohjeet
+N√§yt√§ ohjeet
 Go To HTTrack Website
 Siirry HTTrackin sivustolle
 Go To HTTrack Forum
 Siirry HTTrackin foorumille
 View License
-N‰yt‰ lisenssi
+N√§yt√§ lisenssi
 Beware: you local browser might be unable to browse files with embedded filenames
-Huomio: paikallinen selaimesi ei ehk‰ pysty avaamaan tiedostoja, joiden nimi on upotettu
+Huomio: paikallinen selaimesi ei ehk√§ pysty avaamaan tiedostoja, joiden nimi on upotettu
 Recreated HTTrack internal cached resources
-HTTrackin sis‰iset v‰limuistiresurssit luotiin uudelleen
+HTTrackin sis√§iset v√§limuistiresurssit luotiin uudelleen
 Could not create internal cached resources
-Sis‰isi‰ v‰limuistiresursseja ei voitu luoda
+Sis√§isi√§ v√§limuistiresursseja ei voitu luoda
 Could not get the system external storage directory
-J‰rjestelm‰n ulkoista tallennushakemistoa ei lˆytynyt
+J√§rjestelm√§n ulkoista tallennushakemistoa ei l√∂ytynyt
 Could not write to:
 Ei voi kirjoittaa kohteeseen:
 Read-only media (SDCARD)
@@ -969,85 +967,85 @@ Vain luku -media (SDCARD)
 No storage media (SDCARD)
 Ei tallennusmediaa (SDCARD)
 HTTrack may not be able to download websites until this problem is fixed
-HTTrack ei ehk‰ pysty lataamaan sivustoja ennen kuin t‰m‰ ongelma on korjattu
+HTTrack ei ehk√§ pysty lataamaan sivustoja ennen kuin t√§m√§ ongelma on korjattu
 HTTrack: mirror '%s' stopped!
-HTTrack: peilaus "%s" pys‰ytettiin!
+HTTrack: peilaus "%s" pys√§ytettiin!
 Click on this notification to restart the interrupted mirror
-Jatka keskeytynytt‰ peilausta napauttamalla t‰t‰ ilmoitusta
+Jatka keskeytynytt√§ peilausta napauttamalla t√§t√§ ilmoitusta
 HTTrack: could not save profile for '%s'!
 HTTrack: profiilia "%s" ei voitu tallentaa!
 Proxy type:
-V‰lityspalvelimen tyyppi:
+V√§lityspalvelimen tyyppi:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
-V‰lityspalvelimen protokolla. HTTP: tavallinen v‰lityspalvelin. HTTP (CONNECT-tunneli): l‰hett‰‰ jokaisen pyynnˆn CONNECT-tunnelin kautta, vain CONNECT-yhteyksi‰ tukeville v‰lityspalvelimille kuten Torin HTTPTunnelPort. SOCKS5: oletusportti 1080.
+V√§lityspalvelimen protokolla. HTTP: tavallinen v√§lityspalvelin. HTTP (CONNECT-tunneli): l√§hett√§√§ jokaisen pyynn√∂n CONNECT-tunnelin kautta, vain CONNECT-yhteyksi√§ tukeville v√§lityspalvelimille kuten Torin HTTPTunnelPort. SOCKS5: oletusportti 1080.
 Load cookies from file:
-Lataa ev‰steet tiedostosta:
+Lataa ev√§steet tiedostosta:
 Preload cookies from a Netscape cookies.txt file before crawling.
-Lataa ev‰steet Netscape cookies.txt -tiedostosta ennen sivuston l‰pik‰ynti‰.
+Lataa ev√§steet Netscape cookies.txt -tiedostosta ennen sivuston l√§pik√§ynti√§.
 Pause between files:
-Tauko tiedostojen v‰lill‰:
+Tauko tiedostojen v√§lill√§:
 Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
-Satunnainen viive tiedostolatausten v‰lill‰, sekunteina. K‰yt‰ muotoa MIN:MAX satunnaista v‰li‰ varten (esim. 2:8).
+Satunnainen viive tiedostolatausten v√§lill√§, sekunteina. K√§yt√§ muotoa MIN:MAX satunnaista v√§li√§ varten (esim. 2:8).
 Keep the www. prefix (do not merge www.host with host)
-S‰ilyt‰ www.-etuliite (‰l‰ yhdist‰ www.host- ja host-osoitteita)
+S√§ilyt√§ www.-etuliite (√§l√§ yhdist√§ www.host- ja host-osoitteita)
 Do not treat www.host and host as the same site.
-ƒl‰ k‰sittele www.host- ja host-osoitteita samana sivustona.
+√Ñl√§ k√§sittele www.host- ja host-osoitteita samana sivustona.
 Keep double slashes in URLs
-S‰ilyt‰ kaksoiskenoviivat URL-osoitteissa
+S√§ilyt√§ kaksoiskenoviivat URL-osoitteissa
 Do not collapse duplicate slashes in URLs.
-ƒl‰ yhdist‰ toistuvia kenoviivoja URL-osoitteissa.
+√Ñl√§ yhdist√§ toistuvia kenoviivoja URL-osoitteissa.
 Keep the original query-string order
-S‰ilyt‰ kyselymerkkijonon alkuper‰inen j‰rjestys
+S√§ilyt√§ kyselymerkkijonon alkuper√§inen j√§rjestys
 Do not reorder query-string parameters when deduplicating URLs.
-ƒl‰ j‰rjest‰ kyselymerkkijonon parametreja uudelleen, kun URL-osoitteiden kaksoiskappaleet poistetaan.
+√Ñl√§ j√§rjest√§ kyselymerkkijonon parametreja uudelleen, kun URL-osoitteiden kaksoiskappaleet poistetaan.
 Strip query keys:
 Poista kyselyavaimet:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
-Pilkuin erotellut kyselyavaimet, jotka j‰tet‰‰n pois tallennettujen tiedostojen nime‰misest‰ (esim. sid,utm_source).
+Pilkuin erotellut kyselyavaimet, jotka j√§tet√§√§n pois tallennettujen tiedostojen nime√§misest√§ (esim. sid,utm_source).
 Write a WARC archive of the crawl
 Kirjoita imuroinnin WARC-arkisto
 Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
-Tallenna myˆs jokainen noudettu vastaus ISO-28500 WARC/1.1 -arkistoon peilin viereen.
+Tallenna my√∂s jokainen noudettu vastaus ISO-28500 WARC/1.1 -arkistoon peilin viereen.
 WARC archive name:
 WARC-arkiston nimi:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
-Valinnainen WARC-arkiston perusnimi; j‰t‰ tyhj‰ksi, jotta se nimet‰‰n automaattisesti tulostehakemistoon.
+Valinnainen WARC-arkiston perusnimi; j√§t√§ tyhj√§ksi, jotta se nimet√§√§n automaattisesti tulostehakemistoon.
 Report what changed since the previous mirror
-Raportoi, mik‰ on muuttunut edellisen peilauksen j‰lkeen
+Raportoi, mik√§ on muuttunut edellisen peilauksen j√§lkeen
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
-Kirjoita myˆs hts-changes.json, joka luettelee, mik‰ on edelliseen peilaukseen verrattuna uutta, muuttunutta, muuttumatonta tai kadonnutta.
+Kirjoita my√∂s hts-changes.json, joka luettelee, mik√§ on edelliseen peilaukseen verrattuna uutta, muuttunutta, muuttumatonta tai kadonnutta.
 Inline assets as data: URIs (self-contained pages)
-Upota resurssit data:-URI-osoitteina (itsen‰iset sivut)
+Upota resurssit data:-URI-osoitteina (itsen√§iset sivut)
 Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
-Kun peilaus on valmis, kirjoita jokainen tallennettu sivu uudelleen niin, ett‰ sen tyylitiedostot, komentosarjat, kuvat ja fontit upotetaan, jolloin sivun voi avata myˆs yksin‰‰n.
+Kun peilaus on valmis, kirjoita jokainen tallennettu sivu uudelleen niin, ett√§ sen tyylitiedostot, komentosarjat, kuvat ja fontit upotetaan, jolloin sivun voi avata my√∂s yksin√§√§n.
 Largest inlined asset (bytes):
 Suurin upotettu resurssi (tavua):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
-T‰t‰ suurempi resurssi s‰ilytt‰‰ tavallisen linkin; j‰t‰ tyhj‰ksi, jolloin k‰ytet‰‰n oletusarvoa 10485760 tavua.
+T√§t√§ suurempi resurssi s√§ilytt√§√§ tavallisen linkin; j√§t√§ tyhj√§ksi, jolloin k√§ytet√§√§n oletusarvoa 10485760 tavua.
 Seed the crawl from the site's sitemap
 Aloita haku sivuston sivukartasta
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
-Lue sivuston sivukartta (robots.txt-tiedoston Sitemap:-rivit, sitten /sitemap.xml) ja lis‰‰ jokainen siin‰ lueteltu URL-osoite aloitusosoitteeksi.
+Lue sivuston sivukartta (robots.txt-tiedoston Sitemap:-rivit, sitten /sitemap.xml) ja lis√§√§ jokainen siin√§ lueteltu URL-osoite aloitusosoitteeksi.
 Sitemap address:
 Sivukartan osoite:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
-Luettavan sivukartan osoite sivuston luotaamisen sijaan; j‰t‰ tyhj‰ksi, jolloin tarkistetaan robots.txt ja sitten /sitemap.xml.
+Luettavan sivukartan osoite sivuston luotaamisen sijaan; j√§t√§ tyhj√§ksi, jolloin tarkistetaan robots.txt ja sitten /sitemap.xml.
 Write a CDXJ index of the WARC archive
 Kirjoita WARC-arkiston CDXJ-hakemisto
 Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
-Kirjoita myˆs lajiteltu CDXJ-hakemisto, jossa on kaikki WARC-arkiston tietueet, toistotyˆkaluja varten.
+Kirjoita my√∂s lajiteltu CDXJ-hakemisto, jossa on kaikki WARC-arkiston tietueet, toistoty√∂kaluja varten.
 Package the crawl as a WACZ file
 Paketoi imurointi WACZ-tiedostoksi
 Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
-Kokoa WARC-arkisto, sen CDXJ-hakemisto ja peilatut sivut yhteen WACZ-tiedostoon; ottaa k‰yttˆˆn myˆs WARC-arkiston ja CDXJ-hakemiston.
+Kokoa WARC-arkisto, sen CDXJ-hakemisto ja peilatut sivut yhteen WACZ-tiedostoon; ottaa k√§ytt√∂√∂n my√∂s WARC-arkiston ja CDXJ-hakemiston.
 WARC segment size limit:
-WARC-osan enimm‰iskoko:
+WARC-osan enimm√§iskoko:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
-Aloita uusi WARC-osa, kun nykyinen ylitt‰‰ t‰m‰n tavum‰‰r‰n; j‰t‰ tyhj‰ksi tai 0, jolloin tiedosto pysyy yhten‰.
+Aloita uusi WARC-osa, kun nykyinen ylitt√§√§ t√§m√§n tavum√§√§r√§n; j√§t√§ tyhj√§ksi tai 0, jolloin tiedosto pysyy yhten√§.
 Host aliases:
 Palvelimen aliakset:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Muut samaa sivustoa palvelevat palvelinnimet yhdistettyn‰ yhdeksi, yksi s‰‰ntˆ rivi‰ kohden (esim. www2.example.com,m.example.com=example.com).
+Muut samaa sivustoa palvelevat palvelinnimet yhdistettyn√§ yhdeksi, yksi s√§√§nt√∂ rivi√§ kohden (esim. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
 Peilaa %s ja kaikki sen alla olevat palvelimet
 Ignore %s and every host below it
