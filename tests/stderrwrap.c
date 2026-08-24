@@ -43,13 +43,15 @@ static volatile sig_atomic_t child = 0;
 static int wakefd[2] = {-1, -1};
 
 /* Only a kill(2) from elsewhere: what the kernel raises here -- a tty ^C, our
-   own child's SIGCHLD -- has reached the child already, or is not for it. */
+   own child's SIGCHLD -- has reached the child already, or is not for it. That
+   is the si_code <= 0 convention, not SI_USER: Darwin leaves si_code 0 for
+   kill(2) while defining SI_USER as 0x10001, so naming the constant forwarded
+   nothing there and the suite hung on the first pid-directed signal. */
 static void forward(int sig, siginfo_t *info, void *ctx) {
   const int saved = errno;
 
   (void) ctx;
-  if (child > 0 && info != NULL &&
-      (info->si_code == SI_USER || info->si_code == SI_QUEUE)) {
+  if (child > 0 && info != NULL && sig != SIGCHLD && info->si_code <= 0) {
     kill((pid_t) child, sig);
   }
   if (wakefd[1] >= 0) {
