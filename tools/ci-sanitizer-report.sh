@@ -84,7 +84,7 @@ fi
 # Only the harness logs: an in-tree build puts the .test sources here too, and
 # one of them carries the pattern as literal text.
 for dir in "$@"; do
-    [ -d "$dir" ] || continue
+    need_dir "TEST_LOG_DIR" "$dir"
     for f in "$dir"/*.log; do
         scan "sanitizer output in a test log" "$f"
     done
