@@ -75,6 +75,8 @@ c1=$(printf '\302[\200-\237]')
 # the ASCII range because an awk record cannot hold one, and no lang file has any.
 utf8_full_line=$(printf '^([\001-\177]|[\302-\337][\200-\277]|\340[\240-\277][\200-\277]|[\341-\354][\200-\277][\200-\277]|\355[\200-\237][\200-\277]|[\356-\357][\200-\277][\200-\277]|\360[\220-\277][\200-\277][\200-\277]|[\361-\363][\200-\277][\200-\277][\200-\277]|\364[\200-\217][\200-\277][\200-\277])*$')
 high_byte=$(printf '[\200-\377]')
+smart_quote=$(printf '\342\200[\230-\236]')
+lead_quote=$(printf '^\342\200[\230-\236]')
 # The value line following a metadata key. Most catalogs are CRLF, Uzbek.txt is not.
 field() {
     LC_ALL=C awk -v key="$2" '
@@ -118,6 +120,13 @@ charset_declared_matches_bytes() {
         echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
         return 1
     fi
+    # The C1 check sees 0x80..0x9f only; cp1253's letters at 0xa1/0xa2 read as quotes here.
+    ln=$(LC_ALL=C awk -v lead="$lead_quote" -v any="$smart_quote" \
+        '$0 ~ lead { s = $0; if (gsub(any, "", s) == 1) { print NR; exit } }' "$tmp/utf8")
+    if [ -n "$ln" ]; then
+        echo "${f##*/}:$ln: value opens with an unclosed curly quote under declared $cs; the byte is a letter in the codepage"
+        return 1
+    fi
     return 0
 }
 
@@ -137,7 +146,9 @@ else
         'NR == 20 { print repl; next } { print }' "$langdir/Francais.txt" >"$tmp/utf8mix.txt"
     LC_ALL=C awk -v repl="$leak" \
         'NR == 20 { print repl; next } { print }' "$langdir/Chinese-Simplified.txt" >"$tmp/utf8mixmb.txt"
-    for probe in undecodable c1 utf8mix utf8mixmb; do
+    # Greek read as ISO-8859-7 is the defect itself: its letters become quotes.
+    LC_ALL=C sed '10s/.*/ISO-8859-7/' "$langdir/Greek.txt" >"$tmp/leadquote.txt"
+    for probe in undecodable c1 utf8mix utf8mixmb leadquote; do
         if charset_declared_matches_bytes "$tmp/$probe.txt" >/dev/null; then
             echo "the charset check passed a deliberately mislabelled file ($probe)"
             exit 1
@@ -153,6 +164,20 @@ else
         echo "charset check saw $nchecked of $nfiles language files"
         exit 1
     fi
+fi
+
+# Άκυρο in windows-1253. The check above only proves a value is not a quote.
+cancel=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "Cancel" { getline v; sub(/\r$/, "", v); print v; exit }' \
+    "$langdir/Greek.txt")
+if [ "$cancel" != "$(printf '\242\352\365\361\357')" ]; then
+    echo "Greek.txt: the Cancel value is not the expected windows-1253 bytes for the Greek word"
+    fail=1
+fi
+# 0xb6 is the ISO-8859-7 spelling of that same letter, and a pilcrow here.
+stray=$(LC_ALL=C tr -dc '\266' <"$langdir/Greek.txt" | wc -c)
+if [ "$stray" -ne 0 ]; then
+    echo "Greek.txt: $stray bytes 0xb6 remain, mixing ISO-8859-7 into windows-1253"
+    fail=1
 fi
 
 # LANGUAGE_FILE is the catalog basename and reaches the network as the update
