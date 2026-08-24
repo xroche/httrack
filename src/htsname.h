@@ -90,6 +90,7 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 #endif
 
 // note: 'headers' can either be null, or incomplete (only r member filled)
+// note: 'sback' can be null: the type-probing request is then skipped
 int url_savename(lien_adrfilsave *const afs,
                  lien_adrfil *const former,
                  const char *referer_adr, const char *referer_fil, 

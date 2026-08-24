@@ -3322,6 +3322,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   const char *bodyfile = "st-savename-body.tmp";
   int statuscode = HTTP_OK, status = 0;
   int filpad = 0;
+  int nosback = 0;
   int i;
 
   if (argc < 2) {
@@ -3360,6 +3361,10 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       cached = a + 7;
     else if (strncmp(a, "filpad=", 7) == 0)
       filpad = atoi(a + 7);
+    else if (strncmp(a, "delayed=", 8) == 0) /* -%N */
+      opt->savename_delayed = (hts_savename_delayed) atoi(a + 8);
+    else if (strncmp(a, "nosback=", 8) == 0) /* as -#C: no backing at all */
+      nosback = atoi(a + 8);
     else if (strncmp(a, "userdef=", 8) == 0) { /* -N, which selects type -1 */
       StringCopy(opt->savename_userdef, a + 8);
       opt->savename_type = -1;
@@ -3441,7 +3446,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     cache.hashtable = (void *) coucal_new(0);
   }
 
-  sback = back_new(opt, opt->maxsoc * 32 + 1024);
+  sback = nosback ? NULL : back_new(opt, opt->maxsoc * 32 + 1024);
   /* same wiring as hts_mirror (htscore.c) */
   hash_init(opt, &hash, opt->urlhack);
   hash.liens = (const lien_url *const *const *) &opt->liens;
