@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# Issue #1380: --structure took the numeric presets only. A template glued onto
+# the short form is not something -N consumes, so the token fell through to the
+# URL list and the mirror silently ran with the default structure.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_structure.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+
+# Only the layout on disk tells whether -N applied: hts-cache/doit.log is the
+# invocation rebuilt from argv, so it says the alias expanded and nothing more.
+layout() { # layout RELATIVE-PATH ARG...
+    local want=$1 rc=0
+    shift
+    rm -rf "${tmp}/out"
+    mkdir -p "${tmp}/out"
+    httrack "file://${tmp}/page.html" -O "${tmp}/out" --quiet -n "$@" \
+        >"${tmp}/out/.log" 2>&1 || rc=$?
+    assert_eq 0 "${rc}" "$* exited"
+    test -f "${tmp}/out/${want}" ||
+        fail "$*: no ${want}, got $(cd "${tmp}/out" && find . -name page.html -o -name 1)"
+}
+
+# The presets, in every spelling. 100 and 5 pin the whole value: a truncated one
+# lands back on the default layout, which "no web/page.html" cannot tell apart
+# from the option never arriving.
+default_layout="file/${tmp#/}/page.html"
+layout web/page.html -N1
+layout web/page.html --structure 1
+layout web/page.html --structure=1
+layout web/html/page.html -N5
+layout web/html/page.html --structure=5
+layout "${tmp#/}/page.html" --structure=100
+layout "${default_layout}" --structure=0
+
+# A detached -N 1 used to mean a user template literally named "1", collapsing
+# the mirror onto one file; it is preset 1 now, and the long forms agree.
+layout web/page.html -N 1
+test ! -e "${tmp}/out/1" || fail '-N 1 wrote a file named 1: it is still a template'
+
+# A template reaches the engine whatever spelling carried it. The literal "tpl/"
+# is the point: no preset can produce it, so this cannot pass on a fallback.
+layout tpl/page.html -N tpl/%n.%t
+layout tpl/page.html --structure tpl/%n.%t
+layout tpl/page.html --structure=tpl/%n.%t
+layout tpl/page.html --user-structure tpl/%n.%t
+
+# An empty value is -N "", which the engine reads as "back to the default".
+layout "${default_layout}" --structure=
+layout "${default_layout}" --user-structure ''
+
+# The URL list stays clean: a template the alias failed to detach fell through
+# to it, and the run mirrored a junk name instead of failing.
+test ! -e "${tmp}/out/tpl" || fail 'the template was mirrored as a URL'

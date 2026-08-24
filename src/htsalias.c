@@ -66,6 +66,7 @@ Please visit our Website: http://www.httrack.com
   param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
+  paramn : glues a bare number like param (-N1), detaches anything else like param1 (-N <template>)
 
   A name may appear twice; the FIRST row wins, for the expansion and the help
   text. Later rows exist so a reverse lookup by short option finds a name.
@@ -109,7 +110,7 @@ const char *hts_optalias[][4] = {
   {"language", "-%l", "param1", ""}, {"lang", "-%l", "param1", ""},
   {"accept", "-%a", "param1", ""},
   {"headers", "-%X", "param1", ""},
-  {"structure", "-N", "param", ""},
+  {"structure", "-N", "paramn", ""},
   {"user-structure", "-N", "param1", ""},
   {"long-names", "-L", "param", ""},
   {"keep-links", "-K", "param", ""},
@@ -356,6 +357,18 @@ static const char *optalias_suffix(const char *type, const char *value) {
   return NULL;
 }
 
+/* Whether a "paramn" value is one of -N's presets rather than a user template:
+   the engine only reads a template the alias left detached (#1380). */
+static hts_boolean optalias_is_number(const char *value) {
+  size_t i;
+
+  for (i = 0; value[i] != '\0'; i++) {
+    if (!isdigit((unsigned char) value[i]))
+      return HTS_FALSE;
+  }
+  return i != 0 ? HTS_TRUE : HTS_FALSE;
+}
+
 /*
   Check for alias in command-line
   argc,argv     as in main()
@@ -447,8 +460,10 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 
         /* Final result */
 
-        /* Must be alone (-P /tmp) */
-        if (strcmp(hts_optalias[pos][2], "param1") == 0) {
+        /* Must be alone (-P /tmp), or a paramn value that is not a preset */
+        if (strcmp(hts_optalias[pos][2], "param1") == 0 ||
+            (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
+             !optalias_is_number(param))) {
           strlcpybuff(return_argv[0], command, return_argv_size);
           strlcpybuff(return_argv[1], param, return_argv_size);
           *return_argc = 2;     /* 2 parameters returned */
@@ -508,6 +523,14 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     int pos;
 
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
+      /* -N 1 is preset 1; a template stays detached, as the engine reads it */
+      if (strcmp(hts_optalias[pos][2], "paramn") == 0 && n_arg + 1 < argc &&
+          optalias_is_number(argv[n_arg + 1])) {
+        strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
+        strlcatbuff(return_argv[0], argv[n_arg + 1], return_argv_size);
+        *return_argc = 1;
+        return 2;
+      }
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
         if (optparam_missing(argc, argv, n_arg, argv[n_arg])) {

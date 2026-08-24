@@ -4645,6 +4645,25 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-P proxy:8080", "--proxy", "proxy:8080");
   EXPANDS("+*.gif", "--allow", "*.gif");
 
+  /* --structure glues a preset and detaches a template (#1380): the engine
+     reads a detached -N value as a user template whatever it holds */
+  EXPANDS("-N1", "--structure=1", NULL);
+  EXPANDS("-N100", "--structure=100", NULL);
+  EXPANDS("-N1", "--structure", "1");
+  assertf(used == 2);
+  EXPANDS("-N %h%p/%n%q.%t", "--structure=%h%p/%n%q.%t", NULL);
+  assertf(used == 1);
+  EXPANDS("-N %h%p/%n%q.%t", "--structure", "%h%p/%n%q.%t");
+  assertf(used == 2);
+  EXPANDS("-N %h%p/%n%q.%t", "--user-structure", "%h%p/%n%q.%t");
+  /* an empty value is -N "", which the engine reads as "back to the default" */
+  EXPANDS("-N ", "--structure=", NULL);
+  /* the short form agrees, rather than reading -N 1 as a template named 1 */
+  EXPANDS("-N1", "-N", "1");
+  assertf(used == 2);
+  EXPANDS("-N", "-N", "%h%p/%n%q.%t");
+  assertf(used == 1);
+
   /* invariant: every name's bare long form still emits its short form, and a
      param name still demands its own value. A duplicate name (test, continue)
      resolves to its first row */

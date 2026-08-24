@@ -92,6 +92,7 @@ void infomsg(const char *msg) {
               if (p >= 0) {
                 /* fings type of parameter: number,param,param concatenated,single cmd */
                 if (strcmp(opttype_value(p), "param") == 0 ||
+                    strcmp(opttype_value(p), "paramn") == 0 ||
                     strcmp(opttype_value(p), "level") == 0)
                   printf("%s (--%s[=N])\n", msg, optalias_value(p));
                 else if (strcmp(opttype_value(p), "onoff") == 0)
@@ -539,7 +540,8 @@ void help(const char *app, int more) {
   infomsg("");
   infomsg("Build options:");
   infomsg("  NN structure type (0 *original structure, 1+: see below)");
-  infomsg("     or user defined structure (-N \"%h%p/%n%q.%t\")");
+  infomsg("     or user defined structure (-N \"%h%p/%n%q.%t\", "
+          "--structure or --user-structure)");
   infomsg
     (" %N  delayed type check, don't make any link test but wait for files download to start instead (experimental) (%N0 don't use, %N1 use for unknown extensions, * %N2 always use)");
   infomsg
