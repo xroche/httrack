@@ -120,13 +120,11 @@ charset_declared_matches_bytes() {
         echo "${f##*/}:$ln: line fully decodes as UTF-8 despite declared $cs; mixed encoding"
         return 1
     fi
-    # ISO-8859-7 reads 0xa2 as a right single quote where cp1253 reads capital
-    # alpha with tonos, so a value authored in the codepage opens a word with a
-    # quote that never closes. Above C1, so the check above cannot see it.
+    # The C1 check sees 0x80..0x9f only; cp1253's letters at 0xa1/0xa2 read as quotes here.
     ln=$(LC_ALL=C awk -v lead="$lead_quote" -v any="$smart_quote" \
         '$0 ~ lead { s = $0; if (gsub(any, "", s) == 1) { print NR; exit } }' "$tmp/utf8")
     if [ -n "$ln" ]; then
-        echo "${f##*/}:$ln: value opens with an unclosed curly quote under declared $cs; a codepage letter"
+        echo "${f##*/}:$ln: value opens with an unclosed curly quote under declared $cs; the byte is a letter in the codepage"
         return 1
     fi
     return 0
@@ -148,7 +146,7 @@ else
         'NR == 20 { print repl; next } { print }' "$langdir/Francais.txt" >"$tmp/utf8mix.txt"
     LC_ALL=C awk -v repl="$leak" \
         'NR == 20 { print repl; next } { print }' "$langdir/Chinese-Simplified.txt" >"$tmp/utf8mixmb.txt"
-    # 0xa2 is the byte Greek.txt carried on five values until it was repaired.
+    # Put the cp1253 byte back on a Greek value; the check must reject it.
     LC_ALL=C awk -v q="$(printf '\242')" \
         'NR == 16 { print q substr($0, 2); next } { print }' "$langdir/Greek.txt" >"$tmp/leadquote.txt"
     for probe in undecodable c1 utf8mix utf8mixmb leadquote; do
@@ -167,6 +165,15 @@ else
         echo "charset check saw $nchecked of $nfiles language files"
         exit 1
     fi
+fi
+
+# Άκυρο in ISO-8859-7. The check above only proves a value is not a quote, so
+# pin the one the repair landed on: a wrong byte there is a different word.
+cancel=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "Cancel" { getline v; sub(/\r$/, "", v); print v; exit }' \
+    "$langdir/Greek.txt")
+if [ "$cancel" != "$(printf '\266\352\365\361\357')" ]; then
+    echo "Greek.txt: the Cancel value is not the expected ISO-8859-7 bytes for the Greek word"
+    fail=1
 fi
 
 # LANGUAGE_FILE is the catalog basename and reaches the network as the update
