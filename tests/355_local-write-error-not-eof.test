@@ -158,3 +158,18 @@ test "$(wc -c <"${clean}/127.0.0.1_${SRV_PORT}/diskfull/split.bin")" -eq 8000 ||
 grep -qF 'split.bin' "${clean}/hts-cache/new.txt" ||
     fail "the control mirror did not count the file it wrote"
 ok "a body that reaches the disk is not reported as a write error"
+
+# The control the one above cannot be: a Content-Length body returns before the
+# closing flush, so only a close-delimited one crosses the code the arms rely on.
+cleannoclen="${tmpdir}/clean-noclen"
+local_crawl --log "${tmpdir}/log-clean-noclen" "${common[@]}" --retries=0 \
+    -O "$cleannoclen" "${BASEURL}/diskfull/noclenindex.html"
+log=$(<"${cleannoclen}/hts-log.txt")
+if grep -qE 'Write error on disk|Unable to write file' <<<"$log"; then
+    fail "a close-delimited body that reached the disk was reported as a write error: ${log}"
+fi
+test "$(wc -c <"${cleannoclen}/127.0.0.1_${SRV_PORT}/diskfull/noclen.bin")" -eq 100 ||
+    fail "the control mirror did not write the whole close-delimited body"
+grep -qF 'noclen.bin' "${cleannoclen}/hts-cache/new.txt" ||
+    fail "the control mirror did not count the close-delimited file it wrote"
+ok "a close-delimited body that reaches the disk is not reported as a write error"

@@ -340,7 +340,8 @@ int hts_codec_unpack(hts_codec codec, const char *filename,
     }
     fclose(in);
     /* io_errno is set only where ret is already < 0, so this is the whole
-       contract: the closes above are free to clobber what it restores. */
+       contract. It reads as a no-op on glibc, where the live errno already
+       equals it, but POSIX lets a successful fclose() set errno: keep it. */
     errno = io_errno;
     return ret;
   }
