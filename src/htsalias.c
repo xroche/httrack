@@ -51,6 +51,7 @@ Please visit our Website: http://www.httrack.com
   --sockets 8       --cache off
                     --nocache
   -c8               -C0
+  --wide-mirror     --tiny-mirror     (--mirror at --wide/--tiny's count)
   in config file:
   sockets=8         cache=0
   set sockets 8     cache off
@@ -332,6 +333,28 @@ static hts_boolean optparam_missing(int argc, const char *const *argv,
   return HTS_TRUE;
 }
 
+/* The short form the --wide-/--tiny- prefix glues onto the alias it prefixes,
+   read from the --wide/--tiny row itself so the two cannot drift ("c32"). */
+static const char *optalias_prefix_count(const char *name) {
+  const int pos = optalias_find(name);
+
+  return pos >= 0 && hts_optalias[pos][1][0] == '-' ? hts_optalias[pos][1] + 1
+                                                    : "";
+}
+
+/* Whether the alias emits one short-option cluster a count can be glued onto
+   (-w -> -wc32). A class keeping its value in a word of its own (-O <path>,
+   +*.gif) and a long form (--clean) have nowhere to put it. */
+static hts_boolean optalias_clusters(const char *type, const char *command) {
+  const hts_boolean glued =
+      strcmp(type, "single") == 0 || strcmp(type, "onoff") == 0 ||
+      strcmp(type, "level") == 0 || strcmp(type, "param") == 0;
+
+  return glued && command[0] == '-' && command[1] != '-' && command[1] != '\0'
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
 /* Suffix the short form takes for a value ("0", "2", or none), or NULL when
    the class refuses it: onoff reads 0/1 only, level reads a number. */
 static const char *optalias_suffix(const char *type, const char *value) {
@@ -382,6 +405,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 
       /* */
       char *position;
+      const char *addname = NULL;
       int need_param = 1;
       hts_boolean negated = HTS_FALSE;
 
@@ -406,12 +430,15 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       }
       /* --sockets 8 */
       else {
-        if (strncmp(argv[n_arg] + 2, "wide-", 5) == 0) {
-          strcpybuff(addcommand, "c32");
-          strcpybuff(command, strchr(argv[n_arg] + 2, '-') + 1);
-        } else if (strncmp(argv[n_arg] + 2, "tiny-", 5) == 0) {
-          strcpybuff(addcommand, "c1");
-          strcpybuff(command, strchr(argv[n_arg] + 2, '-') + 1);
+        /* --wide-mirror is --mirror carrying --wide's connection count */
+        if (strncmp(argv[n_arg] + 2, "wide-", 5) == 0)
+          addname = "wide";
+        else if (strncmp(argv[n_arg] + 2, "tiny-", 5) == 0)
+          addname = "tiny";
+        if (addname != NULL) {
+          strlcpybuff(addcommand, optalias_prefix_count(addname),
+                      sizeof(addcommand));
+          strcpybuff(command, argv[n_arg] + 7);
         } else
           strcpybuff(command, argv[n_arg] + 2);
         need_param = 2;
@@ -422,6 +449,16 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       if (pos >= 0) {
         /* Copy real name */
         strcpybuff(command, hts_optalias[pos][1]);
+        /* Refuse a prefix the expansion cannot carry, rather than drop it */
+        if (addcommand[0] != '\0' &&
+            !optalias_clusters(hts_optalias[pos][2], command)) {
+          slprintfbuff_clip(return_error, return_error_size,
+                            "Syntax error:\n\tThe %s- prefix does not apply to "
+                            "--%s: write --%s --%s instead\n",
+                            addname, hts_optalias[pos][0], addname,
+                            hts_optalias[pos][0]);
+          return 0;
+        }
         /* With parameters? */
         if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
           /* Copy parameters? */
@@ -493,6 +530,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
             }
             strlcatbuff(return_argv[0], suffix, return_argv_size);
           }
+          /* --wide-mirror: -w with the count clustered onto it (-wc32) */
+          strlcatbuff(return_argv[0], addcommand, return_argv_size);
           *return_argc = 1;     /* 1 parameter returned */
         }
       } else {

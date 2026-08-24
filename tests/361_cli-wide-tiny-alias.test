@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# --wide-mirror and --tiny-mirror built the connection count their prefix
+# exists to add, then dropped it: the value was written and never read.
+#
+# The engine never prints its connection count, so what is asserted here is the
+# count reaching the option: above 8 the security limiter clamps it and says so
+# in hts-log.txt, and that line is the engine speaking about the value it got.
+# The exact short form each prefix emits is pinned by -#test=optalias.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_widealias.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    rm -rf "${tmp}"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT QUIT TERM
+
+require_httrack
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+
+crawl() { # crawl ARG...
+    rm -rf "${tmp}/out"
+    mkdir -p "${tmp}/out"
+    RC=0
+    httrack "file://${tmp}/page.html" -O "${tmp}/out" --quiet "$@" \
+        >"${tmp}/run.log" 2>&1 || RC=$?
+}
+
+# clamped WANT LABEL ARG...: whether the limiter capped the count it was handed
+clamped() {
+    local want=$1 label=$2 got=no hits
+    shift 2
+    crawl "$@"
+    assert_eq 0 "${RC}" "${label} exited"
+    assert_file "${tmp}/out/hts-log.txt" "${label}"
+    hits=$(count_matching_lines 'simultaneous connections limited to' \
+        "${tmp}/out/hts-log.txt")
+    test "${hits}" -eq 0 || got=yes
+    assert_eq "${want}" "${got}" "${label} was clamped"
+}
+
+# 32 is above the limiter's ceiling of 8, the default 4 and tiny's 1 are below
+clamped yes 'wide mirror' --wide-mirror
+clamped no 'tiny mirror' --tiny-mirror
+clamped no 'plain mirror' --mirror
+clamped yes 'wide spider' --wide-spider
+clamped no 'tiny spider' --tiny-spider
+clamped no 'plain spider' --spider
+clamped yes 'wide skeleton' --wide-skeleton
+clamped no 'plain skeleton' --skeleton
+ok "the wide-/tiny- prefix reaches the connection count"
+
+# Against an explicit count, which the prefix has to win or lose on its own: the
+# unprefixed alias adds nothing, so 32 survives it.
+clamped no 'tiny mirror over --sockets 32' --sockets 32 --tiny-mirror
+clamped yes 'plain mirror over --sockets 32' --sockets 32 --mirror
+clamped yes 'wide mirror over --sockets 1' --sockets 1 --wide-mirror
+clamped no 'plain mirror over --sockets 1' --sockets 1 --mirror
+ok "the count is the prefix's, and only the prefix's"
+
+# An alias keeping its value in a word of its own (-O <path>, +*.gif) has
+# nowhere to glue the count, so the prefix is refused rather than dropped.
+refused() { # refused LABEL ARG...
+    local label=$1
+    shift
+    crawl "$@"
+    test "${RC}" -ne 0 || fail "${label}: accepted, exit 0"
+    reply=$(cat "${tmp}/run.log")
+    grep -q 'prefix does not apply' <<<"${reply}" ||
+        fail "${label}: refused without saying why: ${reply}"
+}
+
+refused 'wide path' --wide-path "${tmp}/out"
+refused 'tiny allow' --tiny-allow '*.gif'
+ok "a prefix with nowhere to go is refused"

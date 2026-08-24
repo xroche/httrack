@@ -4638,6 +4638,21 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-y0", "--no-background-on-suspend", NULL);
   EXPANDS("-%T", "--utf8-conversion", NULL);
 
+  /* the --wide-/--tiny- prefix glues the --wide/--tiny connection count onto
+     the alias it prefixes; it was built and then dropped, never read */
+  EXPANDS("-wc32", "--wide-mirror", NULL);
+  assertf(used == 1);
+  EXPANDS("-wc1", "--tiny-mirror", NULL);
+  EXPANDS("-p0C0I0tc32", "--wide-spider", NULL);
+  EXPANDS("-p1c1", "--tiny-skeleton", NULL);
+  EXPANDS("-C0c32", "--wide-cache", "0");
+  assertf(used == 2);
+  EXPANDS("-r2c1", "--tiny-depth", "2");
+  /* nowhere to glue it: a value of its own, or a long form */
+  REFUSES("--wide-path", "/tmp");
+  REFUSES("--tiny-allow", "*.gif");
+  REFUSES("--wide-clean", NULL);
+
   /* the value-taking classes are untouched */
   EXPANDS("-C0", "--cache=0", NULL);
   EXPANDS("-C0", "--nocache", NULL);
