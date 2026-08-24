@@ -1328,11 +1328,19 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
    back a path separator for it. */
 static int st_nobestfit(httrackp *opt, int argc, char **argv) {
 #ifdef _WIN32
+  /* internal, not in htscharset.h: ties cp below to cs by name, not by guess */
+  extern UINT hts_getCodepage(const char *name);
   static const char *const yen = "\xC2\xA5";      /* U+00A5 */
   static const char *const micro = "\xC2\xB5";    /* U+00B5, best-fit 83 CA */
   static const char *const hira = "\xE3\x81\x82"; /* U+3042, CP932 82 A0 */
+  /* yen + micro + hira + ASCII: a best-fit-shorter, a best-fit-longer, a
+     native and an untouched code point in one string */
+  static const char *const mixed = "\xC2\xA5\xC2\xB5\xE3\x81\x82"
+                                   "A";
   const char *const cs = "shift_jis";
+  const UINT cp = hts_getCodepage(cs);
   BOOL usedDefault = TRUE;
+  BOOL gotCpInfo;
   CPINFO cpi;
   WCHAR wide[4];
   char raw[8];
@@ -1342,7 +1350,8 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
-  if (!IsValidCodePage(932)) {
+  assertf(cp == 932);
+  if (!IsValidCodePage(cp)) {
     printf("nobestfit: CP932 is not installed\n");
     return 77;
   }
@@ -1351,7 +1360,7 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   wn = MultiByteToWideChar(CP_UTF8, 0, yen, (int) strlen(yen), wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn == 1);
-  n = WideCharToMultiByte(932, 0, wide, wn, raw, (int) sizeof(raw), NULL,
+  n = WideCharToMultiByte(cp, 0, wide, wn, raw, (int) sizeof(raw), NULL,
                           &usedDefault);
   assertf(n == 1 && raw[0] == '\\' && !usedDefault);
   /* U+00B5 best-fits to two bytes where the substitute is one, so a flag
@@ -1359,13 +1368,23 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   wn = MultiByteToWideChar(CP_UTF8, 0, micro, (int) strlen(micro), wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn == 1);
-  n = WideCharToMultiByte(932, 0, wide, wn, raw, (int) sizeof(raw), NULL, NULL);
+  n = WideCharToMultiByte(cp, 0, wide, wn, raw, (int) sizeof(raw), NULL, NULL);
   assertf(n == 2);
   /* the sizing passes disagree, and the shorter one under-allocates: banning
      best-fit sizes to the substitute but converts into room for the best-fit */
-  n = WideCharToMultiByte(932, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0, NULL,
+  n = WideCharToMultiByte(cp, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0, NULL,
                           NULL);
   assertf(n == 1);
+  /* same disagreement, summed over 4 code points instead of 1: a flag gated
+     on wsize==1 would leave yen/micro best-fit instead of substituted here */
+  wn = MultiByteToWideChar(CP_UTF8, 0, mixed, (int) strlen(mixed), wide,
+                           (int) (sizeof(wide) / sizeof(wide[0])));
+  assertf(wn == 4);
+  n = WideCharToMultiByte(cp, 0, wide, wn, NULL, 0, NULL, NULL);
+  assertf(n == 6); /* yen 1 + micro best-fit 2 + hira 2 + 'A' 1 */
+  n = WideCharToMultiByte(cp, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0, NULL,
+                          NULL);
+  assertf(n == 5); /* yen 1 + micro default 1 + hira 2 + 'A' 1 */
   /* control: banning best-fit must not break what the codepage does hold */
   s = hts_convertStringFromUTF8Strict(hira, strlen(hira), cs);
   assertf(s != NULL);
@@ -1375,7 +1394,8 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   assertf(s == NULL);
   /* the non-strict caller still substitutes, but with the codepage's own
      default character rather than a lookalike */
-  assertf(GetCPInfo(932, &cpi));
+  gotCpInfo = GetCPInfo(cp, &cpi);
+  assertf(gotCpInfo);
   s = hts_convertStringFromUTF8(yen, strlen(yen), cs);
   assertf(s != NULL);
   assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
@@ -1385,6 +1405,18 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   s = hts_convertStringFromUTF8(micro, strlen(micro), cs);
   assertf(s != NULL);
   assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
+  freet(s);
+  /* the mixed string, asserted byte-exact: both mutants above would either
+     mis-size the buffer (undersized usize) or mis-gate flags (best-fit
+     leaking through for a >1 code point string), and either shows up here */
+  s = hts_convertStringFromUTF8Strict(mixed, strlen(mixed), cs);
+  assertf(s == NULL); /* yen and micro are both lossy */
+  s = hts_convertStringFromUTF8(mixed, strlen(mixed), cs);
+  assertf(s != NULL);
+  assertf(s[0] == (char) cpi.DefaultChar[0]);
+  assertf(s[1] == (char) cpi.DefaultChar[0]);
+  assertf((unsigned char) s[2] == 0x82 && (unsigned char) s[3] == 0xA0);
+  assertf(s[4] == 'A' && s[5] == '\0');
   freet(s);
   /* the other arm of the gate: a codepage that refuses a non-zero dwFlags must
      still convert, so UTF-7 encodes the yen instead of failing */

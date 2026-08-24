@@ -314,9 +314,7 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
                                          hts_boolean *plossy) {
   /* Best-fit maps U+00A5 to CP932's backslash, usedDefault unset. */
   const DWORD flags = cp_reports_default_char(cp) ? WC_NO_BEST_FIT_CHARS : 0;
-  /* WC_NO_BEST_FIT_CHARS sizes to the substitute, but converting still wants
-     room for the form it replaced: U+00B5 sizes as 1 on CP932 and fails in a
-     1-byte buffer, its best-fit taking 2. Size for the larger of the two. */
+  /* U+00B5 sizes 1 on CP932, best-fit needs 2: size for the larger pass. */
   const int bsize =
       WideCharToMultiByte(cp, 0, woutput, wsize, NULL, 0, NULL, NULL);
   const int fsize = flags != 0 ? WideCharToMultiByte(cp, flags, woutput, wsize,
