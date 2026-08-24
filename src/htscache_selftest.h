@@ -85,6 +85,10 @@ int cache_savename_bounds_selftest(httrackp *opt, const char *dir);
    tainting a sibling entry. */
 int cache_corruption_selftest(httrackp *opt, const char *dir);
 
+/* A failed read of the source file must abandon the cache entry rather than
+   commit a silently truncated body. */
+int cache_readfail_selftest(httrackp *opt, const char *dir);
+
 #endif
 
 #endif

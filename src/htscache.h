@@ -38,6 +38,7 @@ Please visit our Website: http://www.httrack.com
 #ifdef HTS_INTERNAL_BYTECODE
 
 #include "htsglobal.h"
+#include "htszlib.h" /* zipFile */
 
 #include <stdlib.h>
 
@@ -112,6 +113,17 @@ void hts_cache_reconcile(httrackp *opt, hts_cache_reconcile_mode mode);
 int cache_brstr(char *adr, char *s, size_t s_size);
 /* binput over a NUL-terminated buffer, bounded: no read starts at/past end. */
 int cache_binput(const char *adr, const char *end, char *s, int max);
+
+/* Consecutive entry write failures before the cache stream is declared dead. */
+#define CACHE_MAX_WRITE_FAILURES 8
+
+/* Fail r with "<what>: <strerror(err)>", clipped into r->msg. */
+void cache_read_failed(htsblk *r, const char *what, int err);
+
+/* cache_zip_store_stream() status: the source file read failed, as opposed to
+   any zip-side error, which comes back as its own Z_* code. */
+#define CACHE_ZIP_READ_ERROR (-1000)
+int cache_zip_store_stream(zipFile zf, FILE *fp);
 
 #endif
 

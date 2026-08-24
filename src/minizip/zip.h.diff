@@ -1,6 +1,6 @@
 --- zip.h.orig	2024-01-27 14:07:18.636193212 +0100
 +++ zip.h	2024-01-27 14:10:04.104643731 +0100
-@@ -313,6 +313,11 @@
+@@ -313,11 +313,23 @@
    Write data in the zipfile
  */
  
@@ -12,3 +12,15 @@
  extern int ZEXPORT zipCloseFileInZip(zipFile file);
  /*
    Close the current file in the zipfile
+ */
+ 
++extern int ZEXPORT zipAbandonFileInZip(zipFile file);
++/*
++  Roll back the current file in the zipfile: the write position returns to its
++  local header and no central-directory record is created, so the partial
++  member never appears in the archive. (httrack addition, see zip.c.diff)
++*/
++
+ extern int ZEXPORT zipCloseFileInZipRaw(zipFile file,
+                                         uLong uncompressed_size,
+                                         uLong crc32);
