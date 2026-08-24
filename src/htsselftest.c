@@ -1270,7 +1270,7 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   static const char *const utf8 = "caf\xC3\xA9 \xE2\x82\xAC"; /* "café €" */
   const UINT cp = GetACP();
   const int len = (int) strlen(utf8);
-  /* the engine bans best-fit, and UTF-8 is the only ACP its gate spares */
+  /* the engine blocks best-fit; UTF-8 is the only ACP that check exempts */
   const DWORD flags = cp == CP_UTF8 ? 0 : WC_NO_BEST_FIT_CHARS;
   WCHAR wide[64], round[64];
   char want[64];
@@ -1324,14 +1324,16 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
 #endif
 }
 
-/* Best-fit is what kept the strict converter from being strict: CP932 has no
-   U+00A5 and quietly emitted a path separator for it. */
+/* Best-fit defeated the strict converter: CP932 lacks U+00A5 and quietly gave
+   back a path separator for it. */
 static int st_nobestfit(httrackp *opt, int argc, char **argv) {
 #ifdef _WIN32
   static const char *const yen = "\xC2\xA5";      /* U+00A5 */
+  static const char *const micro = "\xC2\xB5";    /* U+00B5, best-fit 83 CA */
   static const char *const hira = "\xE3\x81\x82"; /* U+3042, CP932 82 A0 */
   const char *const cs = "shift_jis";
   BOOL usedDefault = TRUE;
+  CPINFO cpi;
   WCHAR wide[4];
   char raw[8];
   char *s;
@@ -1352,6 +1354,13 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   n = WideCharToMultiByte(932, 0, wide, wn, raw, (int) sizeof(raw), NULL,
                           &usedDefault);
   assertf(n == 1 && raw[0] == '\\' && !usedDefault);
+  /* U+00B5 best-fits to two bytes where the substitute is one, so a flag
+     carried by only one of the two calls shows up as a length disagreement */
+  wn = MultiByteToWideChar(CP_UTF8, 0, micro, (int) strlen(micro), wide,
+                           (int) (sizeof(wide) / sizeof(wide[0])));
+  assertf(wn == 1);
+  n = WideCharToMultiByte(932, 0, wide, wn, raw, (int) sizeof(raw), NULL, NULL);
+  assertf(n == 2);
   /* control: banning best-fit must not break what the codepage does hold */
   s = hts_convertStringFromUTF8Strict(hira, strlen(hira), cs);
   assertf(s != NULL);
@@ -1359,10 +1368,23 @@ static int st_nobestfit(httrackp *opt, int argc, char **argv) {
   freet(s);
   s = hts_convertStringFromUTF8Strict(yen, strlen(yen), cs);
   assertf(s == NULL);
-  /* the non-strict caller keeps its substitute, but a visible one */
+  /* the non-strict caller still substitutes, but with the codepage's own
+     default character rather than a lookalike */
+  assertf(GetCPInfo(932, &cpi));
   s = hts_convertStringFromUTF8(yen, strlen(yen), cs);
   assertf(s != NULL);
-  assertf(strcmp(s, "?") == 0);
+  assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
+  freet(s);
+  s = hts_convertStringFromUTF8Strict(micro, strlen(micro), cs);
+  assertf(s == NULL);
+  s = hts_convertStringFromUTF8(micro, strlen(micro), cs);
+  assertf(s != NULL);
+  assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
+  freet(s);
+  /* the other arm of the gate: a codepage that refuses a non-zero dwFlags must
+     still convert, so UTF-7 encodes the yen instead of failing */
+  s = hts_convertStringFromUTF8(yen, strlen(yen), "utf-7");
+  assertf(s != NULL && s[0] == '+');
   freet(s);
   printf("nobestfit: OK\n");
   return 0;

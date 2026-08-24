@@ -312,8 +312,7 @@ static hts_boolean cp_reports_default_char(UINT cp) {
    and a substitute was emitted for it. */
 static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
                                          hts_boolean *plossy) {
-  /* Best-fit is a silent loss: U+00A5 lands on CP932 as a backslash, and never
-     sets lpUsedDefaultChar. Both calls must agree on the flag. */
+  /* Best-fit maps U+00A5 to CP932's backslash, usedDefault unset. */
   const DWORD flags = cp_reports_default_char(cp) ? WC_NO_BEST_FIT_CHARS : 0;
   const int usize =
       WideCharToMultiByte(cp, flags, woutput, wsize, NULL, 0, NULL, NULL);
