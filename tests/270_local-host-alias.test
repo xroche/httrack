@@ -74,8 +74,13 @@ bash "$top_srcdir/tests/local-crawl.sh" --errors 0 --files 5 \
     httrack 'BASEURL/hostalias/index.html' \
     --host-alias 'http://alias.example.invalid=http://BASEHOST'
 
+# One throwaway -O for the parse probes below: none of them crawls, and an
+# inline $(mktemp -d) per probe leaked a directory per run.
+odir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_hostalias.XXXXXX")
+trap 'set +e; rm -rf "$odir"' EXIT
+
 # a rule the option cannot use is refused up front, not silently ignored
-out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
+out=$(httrack 'http://127.0.0.1:1/x.html' -O "$odir" \
     --host-alias 'no-equals-sign' 2>&1) && {
     echo "FAIL: httrack accepted a malformed --host-alias rule"
     exit 1
@@ -87,13 +92,13 @@ grep -q "Invalid host-alias rule" <<<"$out" || {
 
 # A path is not part of an address. The accepted rule differs from the refused
 # one by the path alone, so the refusal cannot be blamed on the scheme.
-httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
+httrack 'http://127.0.0.1:1/x.html' -O "$odir" \
     --host-alias 'https://a.example/=ftp://b.example/' >/dev/null 2>&1
 test $? -ne 2 || {
     echo "FAIL: httrack refused a scheme-bearing --host-alias rule"
     exit 1
 }
-out=$(httrack 'http://127.0.0.1:1/x.html' -O "$(mktemp -d)" \
+out=$(httrack 'http://127.0.0.1:1/x.html' -O "$odir" \
     --host-alias 'https://a.example/=ftp://b.example/pub/' 2>&1) && {
     echo "FAIL: httrack accepted a --host-alias rule naming a path"
     exit 1
