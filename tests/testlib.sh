@@ -66,6 +66,10 @@ skip() {
 # is merely not on Windows.
 skip_on_windows() { ! is_windows || skip "$*"; }
 
+# Set by tools/emulated-suite.sh, which interprets every instruction it runs.
+is_emulated() { [ -n "${EMULATED_ARCH:-}" ]; }
+skip_on_emulated() { ! is_emulated || skip "emulated ${EMULATED_ARCH}: $*"; }
+
 # Assertions, each printing what it wanted beside what arrived: a bare
 # `|| exit 1` reds a test without naming the value that differed.
 assert_eq() { # assert_eq WANT GOT [LABEL]

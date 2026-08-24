@@ -24,6 +24,15 @@ holds() {
     test "$rc" -eq 0 || fail "[$1] should have held, exited $rc: $out"
 }
 
+skips() { # skip_on_* exits 77, which holds() would read as a failure
+    run_subject "$1"
+    test "$rc" -eq 77 || fail "[$1] should have skipped, exited $rc: $out"
+    case "$out" in
+    *"$2"*) ;;
+    *) fail "[$1] skipped without reporting '$2': $out" ;;
+    esac
+}
+
 # Match $2 literally, not with assert_match, which is what this file tests.
 fires() {
     run_subject "$1"
@@ -213,3 +222,14 @@ esac
 got=$(env -u IS_WINDOWS bash "$tmpdir/win.sh")
 test "$got" = "$want" || fail "is_windows on this host is [$got], want [$want]"
 ok "is_windows agrees with the host's own uname -s ($want)"
+
+# skip_on_emulated deletes tests when it fires, and a skip is green, so an
+# inverted guard would quietly empty every leg with nothing going red.
+holds 'unset EMULATED_ARCH; skip_on_emulated why; printf ok'
+ok "skip_on_emulated holds where EMULATED_ARCH is unset"
+# Exported but empty is the shape a workflow typo leaves behind.
+holds 'EMULATED_ARCH=; export EMULATED_ARCH; skip_on_emulated why; printf ok'
+ok "an empty EMULATED_ARCH does not delete the suite"
+skips 'EMULATED_ARCH=s390x; export EMULATED_ARCH; skip_on_emulated why' 'why'
+skips 'EMULATED_ARCH=s390x; export EMULATED_ARCH; skip_on_emulated why' 's390x'
+ok "skip_on_emulated skips under an emulated arch, naming it and the reason"
