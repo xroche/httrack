@@ -10080,6 +10080,71 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   return sf_err;
 }
 
+// é and 中 in UTF-8: the charset axis of the long-path tests (#630).
+#define ST_NONASCII "\xC3\xA9\xE4\xB8\xAD"
+
+// mkdir path, tolerating one already there; n is only for the message.
+static hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
+  if (MKDIR(path) != 0 && errno != EEXIST) {
+    fprintf(stderr, "%s: mkdir failed at %u chars: %s\n", who, (unsigned) n,
+            strerror(errno));
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+// Create a tree under dir whose deepest path clears MAX_PATH (260): an optional
+// non-ASCII first segment, then ASCII ones (#133). Returns its length in buf, 0
+// on failure; *baselen, when asked for, is where teardown must stop.
+static size_t st_mkdeep(char *buf, size_t bufsize, const char *dir,
+                        const char *nseg, const char *who, size_t *baselen) {
+  // 40-char segments: each under the 255 per-component limit \\?\ can't lift.
+  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  // Headroom left for one more segment and the caller's leaf name.
+  const size_t room = bufsize - (sizeof(seg) + 64);
+  size_t n = (size_t) snprintf(buf, bufsize, "%s", dir);
+
+  assertf(bufsize > sizeof(seg) + 64);
+  if (n >= room) {
+    goto too_long;
+  }
+  while (n > 0 && (buf[n - 1] == '/' || buf[n - 1] == '\\')) {
+    buf[--n] = '\0';
+  }
+  if (baselen != NULL) {
+    *baselen = n;
+  }
+  if (nseg != NULL) {
+    const size_t nseglen = strlen(nseg);
+
+    if (nseglen >= room - n) { /* room - n > 0 above */
+      goto too_long;
+    }
+    memcpybuff(buf + n, nseg, nseglen + 1);
+    n += nseglen;
+    if (!st_mkdir_at(buf, n, who)) {
+      return 0;
+    }
+  }
+  // Until the path genuinely clears the limit: a fixed arithmetic bound landed
+  // on exactly 260 for a band of base lengths, so $TMPDIR decided (#1409).
+  while (n <= 260) {
+    if (n >= room) {
+      goto too_long;
+    }
+    memcpybuff(buf + n, seg, sizeof(seg));
+    n += sizeof(seg) - 1;
+    if (!st_mkdir_at(buf, n, who)) {
+      return 0;
+    }
+  }
+  return n;
+
+too_long:
+  fprintf(stderr, "%s: base dir too long (%u chars)\n", who, (unsigned) n);
+  return 0;
+}
+
 // -#test=longpath <dir>: round-trip a >MAX_PATH (260) file through the file
 // wrappers, exercising hts_pathToUCS2's \\?\ prefixing on Windows (#133).
 static int st_longpath(httrackp *opt, int argc, char **argv) {
@@ -10089,21 +10154,10 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   char path[HTS_URLMAXSIZE * 2];
-  size_t n = (size_t) snprintf(path, sizeof(path), "%s", argv[0]);
+  size_t n = st_mkdeep(path, sizeof(path), argv[0], NULL, "longpath", NULL);
 
-  while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
-    path[--n] = '\0';
-  }
-  // 40-char segments: each under the 255 per-component limit \\?\ can't lift.
-  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-  while (n + sizeof(seg) - 1 < 300) {
-    memcpybuff(path + n, seg, sizeof(seg));
-    n += sizeof(seg) - 1;
-    if (MKDIR(path) != 0 && errno != EEXIST) {
-      fprintf(stderr, "longpath: mkdir failed at %u chars: %s\n", (unsigned) n,
-              strerror(errno));
-      return 1;
-    }
+  if (n == 0) {
+    return 1;
   }
   memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
   n += sizeof("/leaf.bin") - 1;
@@ -10148,32 +10202,12 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   char path[HTS_URLMAXSIZE * 2];
-  size_t n = (size_t) snprintf(path, sizeof(path), "%s", argv[0]);
+  size_t base = 0;
+  size_t n = st_mkdeep(path, sizeof(path), argv[0],
+                       "/" ST_NONASCII "-non-ascii-seg", "mirrorio", &base);
 
-  while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
-    path[--n] = '\0';
-  }
-  const size_t base = n; /* the caller's base dir; teardown stops here */
-  // First segment carries non-ASCII UTF-8 (é 中) to drive the charset axis
-  // (#630); ASCII 40-char segments then push the total past MAX_PATH (#133).
-  static const char nseg[] = "/\xC3\xA9\xE4\xB8\xAD-non-ascii-seg";
-  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-  memcpybuff(path + n, nseg, sizeof(nseg));
-  n += sizeof(nseg) - 1;
-  if (MKDIR(path) != 0 && errno != EEXIST) {
-    fprintf(stderr, "mirrorio: mkdir failed (non-ascii): %s\n",
-            strerror(errno));
+  if (n == 0) {
     return 1;
-  }
-  while (n + sizeof(seg) - 1 < 300) {
-    memcpybuff(path + n, seg, sizeof(seg));
-    n += sizeof(seg) - 1;
-    if (MKDIR(path) != 0 && errno != EEXIST) {
-      fprintf(stderr, "mirrorio: mkdir failed at %u chars: %s\n", (unsigned) n,
-              strerror(errno));
-      return 1;
-    }
   }
   const size_t leafdir = n;
 
@@ -10603,35 +10637,14 @@ static int st_direnum(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   char path[HTS_URLMAXSIZE * 2];
-  size_t n = (size_t) snprintf(path, sizeof(path), "%s", argv[0]);
+  size_t base = 0;
+  const size_t dirlen =
+      st_mkdeep(path, sizeof(path), argv[0], "/" ST_NONASCII "-non-ascii-seg",
+                "direnum", &base);
 
-  while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
-    path[--n] = '\0';
-  }
-  const size_t base = n;
-  // Non-ASCII first segment + 40-char ASCII segments push the dir past
-  // MAX_PATH.
-  static const char nseg[] = "/\xC3\xA9\xE4\xB8\xAD-non-ascii-seg";
-  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-  memcpybuff(path + n, nseg, sizeof(nseg));
-  n += sizeof(nseg) - 1;
-  if (MKDIR(path) != 0 && errno != EEXIST) {
-    fprintf(stderr, "direnum: mkdir failed (non-ascii): %s\n", strerror(errno));
+  if (dirlen == 0) {
     return 1;
   }
-  while (n + sizeof(seg) - 1 < 300) {
-    memcpybuff(path + n, seg, sizeof(seg));
-    n += sizeof(seg) - 1;
-    if (MKDIR(path) != 0 && errno != EEXIST) {
-      fprintf(stderr, "direnum: mkdir failed at %u chars: %s\n", (unsigned) n,
-              strerror(errno));
-      return 1;
-    }
-  }
-  const size_t dirlen = n;
-
-  assertf(dirlen > 260); /* the enumerated directory itself exceeds MAX_PATH */
 
   // Two non-ASCII leaf files to read back by name.
   static const char *const leaves[] = {"/\xC3\xA9-un.bin",
@@ -10704,33 +10717,14 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   char dir[HTS_URLMAXSIZE * 2];
-  size_t n = (size_t) snprintf(dir, sizeof(dir), "%s", argv[0]);
+  size_t base = 0;
+  const size_t dirlen =
+      st_mkdeep(dir, sizeof(dir), argv[0], "/" ST_NONASCII "-cookie-seg",
+                "cookieimport", &base);
 
-  while (n > 0 && (dir[n - 1] == '/' || dir[n - 1] == '\\')) {
-    dir[--n] = '\0';
-  }
-  const size_t base = n;
-  static const char nseg[] = "/\xC3\xA9\xE4\xB8\xAD-cookie-seg";
-  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-  memcpybuff(dir + n, nseg, sizeof(nseg));
-  n += sizeof(nseg) - 1;
-  if (MKDIR(dir) != 0 && errno != EEXIST) {
-    fprintf(stderr, "cookieimport: mkdir failed: %s\n", strerror(errno));
+  if (dirlen == 0) {
     return 1;
   }
-  while (n + sizeof(seg) - 1 < 300) {
-    memcpybuff(dir + n, seg, sizeof(seg));
-    n += sizeof(seg) - 1;
-    if (MKDIR(dir) != 0 && errno != EEXIST) {
-      fprintf(stderr, "cookieimport: mkdir failed at %u: %s\n", (unsigned) n,
-              strerror(errno));
-      return 1;
-    }
-  }
-  const size_t dirlen = n;
-
-  assertf(dirlen > 260); /* the cookie folder itself exceeds MAX_PATH */
 
   char fpath[HTS_URLMAXSIZE * 2];
   char file[HTS_URLMAXSIZE * 2];
