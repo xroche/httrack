@@ -224,8 +224,8 @@ typedef struct zlib_filefunc64_32_def_s
 voidpf call_zopen64(const zlib_filefunc64_32_def* pfilefunc,const void*filename,int mode);
 long call_zseek64(const zlib_filefunc64_32_def* pfilefunc,voidpf filestream, ZPOS64_T offset, int origin);
 ZPOS64_T call_ztell64(const zlib_filefunc64_32_def* pfilefunc,voidpf filestream);
-/* Shorten filestream to `size`, 0 on success. Also 0 where the backend has no
-   truncate: rolling a member back is then a rewind only. */
+/* Shorten filestream to `size`: 0 on success, -1 on failure, 1 where the
+   backend has no truncate and rolling a member back is a rewind only. */
 int call_ztruncate64(const zlib_filefunc64_32_def *pfilefunc, voidpf filestream,
                      ZPOS64_T size);
 

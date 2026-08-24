@@ -1712,6 +1712,7 @@ extern int ZEXPORT zipCloseFileInZip(zipFile file) {
    record there is no API to take it back. */
 extern int ZEXPORT zipAbandonFileInZip(zipFile file) {
   zip64_internal *zi;
+  int truncate_err;
 
   if (file == NULL)
     return ZIP_PARAMERROR;
@@ -1736,12 +1737,14 @@ extern int ZEXPORT zipAbandonFileInZip(zipFile file) {
   if (ZSEEK64(zi->z_filefunc, zi->filestream, zi->ci.pos_local_header,
               ZLIB_FILEFUNC_SEEK_SET) != 0)
     return ZIP_ERRNO;
+  truncate_err =
+      ZTRUNCATE64(zi->z_filefunc, zi->filestream, zi->ci.pos_local_header);
+  if (truncate_err < 0)
+    return ZIP_ERRNO;
   /* the rewind alone leaves what the member flushed past the end-of-central-
      directory written later, which no reader finds once that tail outgrows the
      64KB backscan */
-  if (ZTRUNCATE64(zi->z_filefunc, zi->filestream, zi->ci.pos_local_header) != 0)
-    return ZIP_ERRNO;
-  return ZIP_OK;
+  return truncate_err == 0 ? ZIP_OK : ZIP_NOTRUNCATED;
 }
 
 local int Write_Zip64EndOfCentralDirectoryLocator(zip64_internal* zi, ZPOS64_T zip64eocd_pos_inzip) {

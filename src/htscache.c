@@ -184,8 +184,12 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
 
   /* Roll the partial member back: closing it would commit a short body under
      the X-Size already written into its local header. */
-  if (entry_open)
-    (void) zipAbandonFileInZip((zipFile) cache->zipOutput);
+  if (entry_open && zipAbandonFileInZip((zipFile) cache->zipOutput) != ZIP_OK) {
+    /* the bytes are still past the rewound position, and a tail longer than a
+       reader's backscan hides the directory the close writes after it */
+    hts_log_print(opt, LOG_WARNING,
+                  "cache rollback incomplete, the cache file may not reopen");
+  }
   cache->zipWriteFailures++;
   if (fatal_errno || cache->zipWriteFailures >= CACHE_MAX_WRITE_FAILURES) {
     if (!cache->zipWriteFailed) {

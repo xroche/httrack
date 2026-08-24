@@ -21,3 +21,6 @@ grep -qx "cache-writefail: OK" <<<"$out" || fail "expected 'cache-writefail: OK'
 
 # A skipped entry must be warned about with its URL.
 grep -q "entry not cached: example.com/" <<<"$out" || fail "expected a URL-bearing skip warning"
+
+# A backend that cannot truncate rolls back by rewinding, and says so (#1402).
+grep -q "cache rollback incomplete" <<<"$out" || fail "expected a warning about the incomplete rollback"
