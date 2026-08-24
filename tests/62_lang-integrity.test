@@ -146,9 +146,8 @@ else
         'NR == 20 { print repl; next } { print }' "$langdir/Francais.txt" >"$tmp/utf8mix.txt"
     LC_ALL=C awk -v repl="$leak" \
         'NR == 20 { print repl; next } { print }' "$langdir/Chinese-Simplified.txt" >"$tmp/utf8mixmb.txt"
-    # Put the cp1253 byte back on a Greek value; the check must reject it.
-    LC_ALL=C awk -v q="$(printf '\242')" \
-        'NR == 16 { print q substr($0, 2); next } { print }' "$langdir/Greek.txt" >"$tmp/leadquote.txt"
+    # Greek read as ISO-8859-7 is the defect itself: its letters become quotes.
+    LC_ALL=C sed '10s/.*/ISO-8859-7/' "$langdir/Greek.txt" >"$tmp/leadquote.txt"
     for probe in undecodable c1 utf8mix utf8mixmb leadquote; do
         if charset_declared_matches_bytes "$tmp/$probe.txt" >/dev/null; then
             echo "the charset check passed a deliberately mislabelled file ($probe)"
@@ -167,12 +166,17 @@ else
     fi
 fi
 
-# Άκυρο in ISO-8859-7. The check above only proves a value is not a quote, so
-# pin the one the repair landed on: a wrong byte there is a different word.
+# Άκυρο in windows-1253. The check above only proves a value is not a quote.
 cancel=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "Cancel" { getline v; sub(/\r$/, "", v); print v; exit }' \
     "$langdir/Greek.txt")
-if [ "$cancel" != "$(printf '\266\352\365\361\357')" ]; then
-    echo "Greek.txt: the Cancel value is not the expected ISO-8859-7 bytes for the Greek word"
+if [ "$cancel" != "$(printf '\242\352\365\361\357')" ]; then
+    echo "Greek.txt: the Cancel value is not the expected windows-1253 bytes for the Greek word"
+    fail=1
+fi
+# 0xb6 is the ISO-8859-7 spelling of that same letter, and a pilcrow here.
+stray=$(LC_ALL=C tr -dc '\266' <"$langdir/Greek.txt" | wc -c)
+if [ "$stray" -ne 0 ]; then
+    echo "Greek.txt: $stray bytes 0xb6 remain, mixing ISO-8859-7 into windows-1253"
     fail=1
 fi
 
