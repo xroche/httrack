@@ -10083,7 +10083,7 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
 // é and 中 in UTF-8: the charset axis of the long-path tests (#630).
 #define ST_NONASCII "\xC3\xA9\xE4\xB8\xAD"
 
-// mkdir path, tolerating one already there; n is only for the message.
+// mkdir path, tolerating one that already exists.
 static hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
   if (MKDIR(path) != 0 && errno != EEXIST) {
     fprintf(stderr, "%s: mkdir failed at %u chars: %s\n", who, (unsigned) n,
@@ -10093,9 +10093,9 @@ static hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
   return HTS_TRUE;
 }
 
-// Create a tree under dir whose deepest path clears MAX_PATH (260): an optional
-// non-ASCII first segment, then ASCII ones (#133). Returns its length in buf, 0
-// on failure; *baselen, when asked for, is where teardown must stop.
+// Build a tree under dir whose deepest path clears MAX_PATH (260): an optional
+// non-ASCII first segment, then ASCII ones (#133). 0 on failure; *baselen, when
+// asked for, is where teardown must stop.
 static size_t st_mkdeep(char *buf, size_t bufsize, const char *dir,
                         const char *nseg, const char *who, size_t *baselen) {
   // 40-char segments: each under the 255 per-component limit \\?\ can't lift.
@@ -10103,6 +10103,7 @@ static size_t st_mkdeep(char *buf, size_t bufsize, const char *dir,
   // Headroom left for one more segment and the caller's leaf name.
   const size_t room = bufsize - (sizeof(seg) + 64);
   size_t n = (size_t) snprintf(buf, bufsize, "%s", dir);
+  size_t slack = 0; /* by how much the byte count overstates the UTF-16 one */
 
   assertf(bufsize > sizeof(seg) + 64);
   if (n >= room) {
@@ -10122,13 +10123,19 @@ static size_t st_mkdeep(char *buf, size_t bufsize, const char *dir,
     }
     memcpybuff(buf + n, nseg, nseglen + 1);
     n += nseglen;
+    for (size_t i = 0; i < nseglen; i++) { /* count code points, not bytes */
+      if (((unsigned char) nseg[i] & 0xC0) == 0x80) {
+        slack++;
+      }
+    }
     if (!st_mkdir_at(buf, n, who)) {
       return 0;
     }
   }
-  // Until the path genuinely clears the limit: a fixed arithmetic bound landed
-  // on exactly 260 for a band of base lengths, so $TMPDIR decided (#1409).
-  while (n <= 260) {
+  // A real MAX_PATH comparison, not an arithmetic bound: the old form landed
+  // exactly on 260 for some base lengths (#1409). Windows measures the limit in
+  // UTF-16 units, so charge the non-ASCII segment by code point (all BMP here).
+  while (n - slack <= 260) {
     if (n >= room) {
       goto too_long;
     }
@@ -10138,6 +10145,7 @@ static size_t st_mkdeep(char *buf, size_t bufsize, const char *dir,
       return 0;
     }
   }
+  assertf(n - slack > 260); /* the guarantee every caller depends on */
   return n;
 
 too_long:
@@ -10645,6 +10653,7 @@ static int st_direnum(httrackp *opt, int argc, char **argv) {
   if (dirlen == 0) {
     return 1;
   }
+  assertf(dirlen > 260); /* the enumerated directory itself exceeds MAX_PATH */
 
   // Two non-ASCII leaf files to read back by name.
   static const char *const leaves[] = {"/\xC3\xA9-un.bin",
@@ -10725,6 +10734,7 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   if (dirlen == 0) {
     return 1;
   }
+  assertf(dirlen > 260); /* the cookie folder itself exceeds MAX_PATH */
 
   char fpath[HTS_URLMAXSIZE * 2];
   char file[HTS_URLMAXSIZE * 2];

@@ -141,19 +141,22 @@ selftest_queue_head() { # selftest_queue_head WANT NAME [ARGS...]
     selftest_queue_mode head "$@"
 }
 
-# Queue NAME once per base-dir length over a full segment period. The long-path
-# self-tests grow their tree from the base's own length, so a stop bound that is
-# arithmetic rather than a real MAX_PATH comparison clears the limit for some
-# lengths and lands exactly on it for others, which made $TMPDIR decide whether
-# the run aborted (#1409).
+# Queue NAME once per base-dir length across a full segment period: the tree the
+# long-path self-tests build starts at the base's own length, so a length-blind
+# stop bound clears MAX_PATH for some bases and lands exactly on it for others
+# (#1409).
 selftest_queue_base_lengths() { # selftest_queue_base_lengths WANT NAME DIR
-    local want=$1 name=$2 dir=$3 pad= i
+    local want=$1 name=$2 dir=$3 pad i
     # 41 is st_mkdeep's ASCII segment, so this covers every residue.
-    for ((i = 0; i < 41; i++)); do
-        pad="${pad}p"
+    local width=41 before=${#SELFTEST_WANT[@]}
+    for ((i = 1; i <= width; i++)); do
+        pad=$(repeat_chars "$i" p)
         mkdir "$dir/$pad" || fail "cannot create $dir/$pad"
         selftest_queue_tail "$want" "$name" "$dir/$pad"
     done
+    # A sweep that queued nothing would be a silent pass.
+    test "$((${#SELFTEST_WANT[@]} - before))" -eq "$width" ||
+        fail "queued $((${#SELFTEST_WANT[@]} - before)) of $width cases"
 }
 
 # Queue a -#test=filtersize case (nothing to do with -#test=fsize): a negative
