@@ -10093,19 +10093,40 @@ static hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
   return HTS_TRUE;
 }
 
+// UTF-16 units a UTF-8 run costs, which is what Windows measures MAX_PATH in.
+// A stray byte is charged short, and short only ever builds a longer path.
+static size_t st_utf16_units(const char *s, size_t n) {
+  size_t units = 0;
+
+  for (size_t i = 0; i < n; i++) {
+    const unsigned char c = (unsigned char) s[i];
+
+    if ((c & 0xC0) == 0x80) {
+      continue; /* continuation byte: charged with its lead */
+    }
+    units += c >= 0xF0 ? 2 : 1; /* outside the BMP is a surrogate pair */
+  }
+  return units;
+}
+
+// Headroom st_mkdeep keeps for one more segment plus the caller's leaf name,
+// the longest of which is direnum's "/\xE4\xB8\xAD-deux.bin".
+#define ST_LEAF_ROOM 64
+
 // Build a tree under dir whose deepest path clears MAX_PATH (260): an optional
-// non-ASCII first segment, then ASCII ones (#133). 0 on failure; *baselen, when
-// asked for, is where teardown must stop.
+// non-ASCII first segment, then ASCII ones (#133). 0 on failure; *baselen is
+// where teardown must stop, and is written on every path.
 static size_t st_mkdeep(char *buf, size_t bufsize, const char *dir,
                         const char *nseg, const char *who, size_t *baselen) {
   // 40-char segments: each under the 255 per-component limit \\?\ can't lift.
   static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-  // Headroom left for one more segment and the caller's leaf name.
-  const size_t room = bufsize - (sizeof(seg) + 64);
+  const size_t room = bufsize - (sizeof(seg) + ST_LEAF_ROOM);
   size_t n = (size_t) snprintf(buf, bufsize, "%s", dir);
-  size_t slack = 0; /* by how much the byte count overstates the UTF-16 one */
 
-  assertf(bufsize > sizeof(seg) + 64);
+  assertf(bufsize > sizeof(seg) + ST_LEAF_ROOM);
+  if (baselen != NULL) {
+    *baselen = 0;
+  }
   if (n >= room) {
     goto too_long;
   }
@@ -10123,19 +10144,13 @@ static size_t st_mkdeep(char *buf, size_t bufsize, const char *dir,
     }
     memcpybuff(buf + n, nseg, nseglen + 1);
     n += nseglen;
-    for (size_t i = 0; i < nseglen; i++) { /* count code points, not bytes */
-      if (((unsigned char) nseg[i] & 0xC0) == 0x80) {
-        slack++;
-      }
-    }
     if (!st_mkdir_at(buf, n, who)) {
       return 0;
     }
   }
-  // A real MAX_PATH comparison, not an arithmetic bound: the old form landed
-  // exactly on 260 for some base lengths (#1409). Windows measures the limit in
-  // UTF-16 units, so charge the non-ASCII segment by code point (all BMP here).
-  while (n - slack <= 260) {
+  // Loop on the limit itself, over the whole path: an arithmetic bound landed
+  // exactly on 260 for some base lengths, a byte count on a non-ASCII base.
+  while (st_utf16_units(buf, n) <= 260) {
     if (n >= room) {
       goto too_long;
     }
@@ -10145,7 +10160,7 @@ static size_t st_mkdeep(char *buf, size_t bufsize, const char *dir,
       return 0;
     }
   }
-  assertf(n - slack > 260); /* the guarantee every caller depends on */
+  assertf(st_utf16_units(buf, n) > 260); /* what every caller depends on */
   return n;
 
 too_long:
@@ -10169,7 +10184,7 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
   }
   memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
   n += sizeof("/leaf.bin") - 1;
-  assertf(n > 260); /* must exceed the limit \\?\ lifts */
+  assertf(st_utf16_units(path, n) > 260); /* the limit \\?\ lifts */
 
   static const char payload[] = "longpath-ok";
   FILE *fp = FOPEN(path, "wb");
@@ -10221,7 +10236,7 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
 
   memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
   n += sizeof("/leaf.bin") - 1;
-  assertf(n > 260); /* must exceed the limit \\?\ lifts */
+  assertf(st_utf16_units(path, n) > 260); /* the limit \\?\ lifts */
 
   static const char payload[] = "mirrorio-ok";
 
@@ -10653,7 +10668,6 @@ static int st_direnum(httrackp *opt, int argc, char **argv) {
   if (dirlen == 0) {
     return 1;
   }
-  assertf(dirlen > 260); /* the enumerated directory itself exceeds MAX_PATH */
 
   // Two non-ASCII leaf files to read back by name.
   static const char *const leaves[] = {"/\xC3\xA9-un.bin",
@@ -10734,7 +10748,6 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
   if (dirlen == 0) {
     return 1;
   }
-  assertf(dirlen > 260); /* the cookie folder itself exceeds MAX_PATH */
 
   char fpath[HTS_URLMAXSIZE * 2];
   char file[HTS_URLMAXSIZE * 2];
