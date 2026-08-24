@@ -50,8 +50,10 @@ crawl_status() {
 # --- a mirror that runs to the end -------------------------------------------
 crawl_status clean index.html
 test "$rc" -eq 0 || fail "a completed mirror exited $rc: $(<"$rc_log")"
-test -s "${tmpdir}/clean/127.0.0.1_${SRV_PORT}/diskfull/index.html" ||
-    fail "the control crawl mirrored nothing, so its exit 0 proves nothing"
+# The engine's own verdict, not just a file on disk: a crawl that mirrored the
+# entry page and then gave up would satisfy the weaker check and exit 0 too.
+grep -q 'mirror complete in' <<<"$log" ||
+    fail "the control crawl did not finish, so its exit 0 proves nothing: ${log}"
 ok "a mirror that completes still exits 0"
 
 # --- the engine gives up on a body it cannot write ---------------------------
@@ -83,17 +85,36 @@ ok "the page path aborts with the same status"
 mkdir -p "${tmpdir}/cache/hts-cache"
 ln -s /dev/full "${tmpdir}/cache/hts-cache/new.zip"
 crawl_status cache index.html
-grep -q 'Mirror aborted' <<<"$log" ||
-    fail "the cache arm did not abort the mirror: ${log}"
+grep -q 'Mirror aborted: disk full or filesystem problems' <<<"$log" ||
+    fail "the cache arm did not reach the fatal cache write: ${log}"
+# The cache zip is the only /dev/full node this arm creates, and it is still
+# the symlink, so no page or file write is what reported the full disk.
+test -L "${tmpdir}/cache/hts-cache/new.zip" ||
+    fail "the engine replaced the doomed cache zip, so the arm proves nothing"
 test "$rc" -eq "$ABORTED" || fail "the cache arm exited $rc, wanted $ABORTED"
 ok "a cache write failure aborts with the same status"
+
+# --- a producer that has nothing to do with the disk -------------------------
+# -#L caps the link table. The parser reached that cap and returned quietly
+# while htsAddLink's identical refusal aborted, so one limit gave two statuses.
+crawl_status linklimit index.html "-#L1"
+grep -q 'Too many URLs, giving up' <<<"$log" ||
+    fail "the link cap was not reached, so the status proves nothing: ${log}"
+test "$rc" -eq "$ABORTED" || fail "the link-cap arm exited $rc, wanted $ABORTED"
+ok "the link cap aborts with the same status, disk or no disk"
+
+# Same crawl with room to finish, so the arm above is about the cap, not -#L.
+crawl_status linkroom index.html "-#L100"
+test "$rc" -eq 0 || fail "a crawl inside the link cap exited $rc: ${log}"
+ok "and a crawl that fits under the cap still exits 0"
 
 # --- a command line httrack refuses is a different failure -------------------
 # Without this, $ABORTED could mean "anything went wrong" and still pass above.
 rc=0
 local_crawl --log "${tmpdir}/out-badopt" "${common[@]}" --no-such-option-here \
     -O "${tmpdir}/badopt" "${BASEURL}/diskfull/index.html" || rc=$?
-test "$rc" -ne 0 || fail "a refused command line exited 0"
-test "$rc" -ne "$ABORTED" ||
-    fail "a refused command line exits $ABORTED too, so the status says nothing"
-ok "a refused command line keeps its own status ($rc)"
+# 255 exactly: hts_main2() returns -1 for a refused command line, and a status
+# that merely differs from $ABORTED would also be satisfied by, say, a crash.
+test "$rc" -eq 255 ||
+    fail "a refused command line exited $rc, wanted 255: $(<"${tmpdir}/out-badopt")"
+ok "a refused command line keeps its own status"

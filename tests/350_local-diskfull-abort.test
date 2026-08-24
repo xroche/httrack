@@ -180,9 +180,17 @@ done
 test -s "$counter" || fail "the crawl never reached stall.bin; nothing was interrupted"
 sleep 0.5
 kill -TERM "$crawlpid" 2>/dev/null || true
-wait "$crawlpid" 2>/dev/null || true
+stall_rc=0
+wait "$crawlpid" 2>/dev/null || stall_rc=$?
 crawlpid=
 log=$(<"${stall}/hts-log.txt")
 grep -q 'Unable to write file .*stall\.bin' <<<"$log" ||
     fail "the stopped slot's buffered bytes were dropped without a word: ${log}"
 ok "a slot flushed on the way out still reports the full disk"
+
+# An exit the user asked for is not an abort, whatever the flush then finds:
+# WebHTTrack renders its cancel button through this status (htsserver.c
+# branches on commandReturn), so an abort here would put an error page on it.
+test "$stall_rc" -eq 0 ||
+    fail "a mirror stopped by SIGTERM exited ${stall_rc}, wanted 0: ${log}"
+ok "and the signalled exit is still 0, not an abort"

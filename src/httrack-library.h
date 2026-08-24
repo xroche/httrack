@@ -161,9 +161,12 @@ HTSEXT_API void htsthread_wait(void);
 
 /* Main functions */
 /** hts_main()/hts_main2() exit code: a mirror started but the engine gave up
-    before the end (full disk, cache write failure, an FTP fatal). Distinct
-    from the command-line and startup failures, which return -1 or 1 and never
-    reach the mirror. Since 3.50. */
+    before the end, on a write it cannot retry (a full disk, a cache write
+    failure) or a link table it cannot grow past -#L. Distinct from the
+    command-line and startup failures, which return -1 or 1 and never reach the
+    mirror. Unrelated to hts_is_exiting(), whose own value 2 means a session
+    that transferred nothing and was rolled back: separate channels that happen
+    to share the integer. Since 3.50. */
 #define HTS_EXIT_MIRROR_ABORTED 2
 
 /** Run a full mirror from a command-line argv (argv[0] is ignored, as in

@@ -520,8 +520,12 @@ The mirror ran to the end, or stopped because it was asked to \- a signal, or
 the interactive shell.
 .IP 2
 A mirror started and the engine gave up before the end: a full disk, a cache
-write failure, or another fatal error. The reason is in the log file, and what
-was mirrored before the abort is kept.
+write failure, or a link table that hit the
+.I \-#L
+cap. The reason is in the log file, and what was mirrored before the abort is
+kept. This is the process exit status, unrelated to the engine's own
+.I exit_xh
+value, which uses 2 for something else.
 .IP "1, 255"
 .B httrack
 refused the command line, or a cache operation it asked for failed. No mirror ran.
