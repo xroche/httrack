@@ -6,8 +6,6 @@ LANGUAGE_ISO
 nl
 LANGUAGE_AUTHOR
 Rudi Ferrari (Wyando at netcologne.de) \r\n
-LANGUAGE_CHARSET
-ISO-8859-1
 LANGUAGE_WINDOWSID
 Dutch (Netherlands)
 OK
@@ -15,7 +13,7 @@ OK
 Cancel
 Annuleren
 Exit
-Beëindigen
+BeÃ«indigen
 Close
 Sluiten
 Cancel changes
@@ -51,7 +49,7 @@ Annuleren
 Add this rule
 Deze regel toevoegen
 Please enter one or several keyword(s) for the rule
-Eén of meerdere sleutelwoord(en) voor deze regel in te geven
+EÃ©n of meerdere sleutelwoord(en) voor deze regel in te geven
 Add Scan Rule
 Filter toevoegen
 Criterion
@@ -117,7 +115,7 @@ Geen protocolbestanden in %s!
 No 'index.html' file in %s!
 Geen index.html in %s!
 Click to quit WinHTTrack Website Copier
-Klik om WinHTTrack Website Copier te beëindigen
+Klik om WinHTTrack Website Copier te beÃ«indigen
 View log files
 Toon protocolbestanden
 Browse HTML start page
@@ -181,7 +179,7 @@ Doorlopen van het HTML bestand (test links)...
 Pause - Toggle [Mirror]/[Pause download] to resume operation
 Gepauzeerd (Kies [Spiegeling]/[Pauzeer transfer] om verder te gaan)
 Finishing pending transfers - Select [Cancel] to stop now!
-Beëindig lopende transfers - Kies [Cancel] om direkt te stoppen!
+BeÃ«indig lopende transfers - Kies [Cancel] om direkt te stoppen!
 scanning
 scanning
 Waiting for scheduled time..
@@ -195,15 +193,15 @@ Spiegeling wachtend [%d seconden]
 Site mirroring in progress [%s, %s bytes]
 Spiegeling is bezig... [%s, %s bytes]
 Site mirroring finished!
-Spiegeling beëindigd!
+Spiegeling beÃ«indigd!
 A problem occurred during the mirroring operation\n
 Een probleem is opgetreden tijdens de spiegeling\n
 \nDuring:\n
 \r\n\nTijdens:\n\r\n
 \nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
-Indien noodzakelijk, zie in het protocolbestand.\n\nKlik OK om WinHTTrack Website Copier te beëindigen.\n\nAlvast bedankt voor het gebruik van WinHTTrack!
+Indien noodzakelijk, zie in het protocolbestand.\n\nKlik OK om WinHTTrack Website Copier te beÃ«indigen.\n\nAlvast bedankt voor het gebruik van WinHTTrack!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
-De spiegeling is uitgevoerd.\nKlik OK om WinHTTrack te beëindigen.\nIndien nodig, zie protocolbestand(en) om zeker te gaan dat alles OK is\n\nAlvast bedankt voor het gebruik van WinHTTrack!
+De spiegeling is uitgevoerd.\nKlik OK om WinHTTrack te beÃ«indigen.\nIndien nodig, zie protocolbestand(en) om zeker te gaan dat alles OK is\n\nAlvast bedankt voor het gebruik van WinHTTrack!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
 * * SPIEGELING AFGEBROKEN! * *\r\nDe aktuele tijdelijke cache is noodzakelijk voor gelijkwelke update operatie en bevat enkel data gedownload gedurende de zoeven afgebroken sessie.\r\nDe eerste cache kan juistere informaties bevatten; indien je deze informatie niet wenst te verliezen, dan moet je deze restoren and de aktuele cache wissen.\r\n[Opmerking: Dit is het eenvoudigst door het wissen van de hts-cache/new.* bestanden]\r\n\r\nDenk je dat de eerste cache juistere informaties bevat, en wil je deze restoren?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
@@ -213,7 +211,7 @@ De spiegeling is uitgevoerd.\nKlik OK om WinHTTrack te beëindigen.\nIndien nodig
 Error deleting a hts-cache/new.* file, please do it manually
 Het wissen van hts-cache/new.* bestanden is niet gelukt, gelieve dit manueel te doen
 Do you really want to quit WinHTTrack Website Copier?
-Wil je werkelijk WinHTTrack Website Copier beëindigen?
+Wil je werkelijk WinHTTrack Website Copier beÃ«indigen?
 - Mirroring Mode -\n\nEnter address(es) in URL box
 - Spiegelmodus -\n\nVul de adressen in het URL venster in
 - Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
@@ -241,13 +239,13 @@ Maximale linkdiepte om te scannen
 Enter address(es) here
 Vul hier de adressen in
 Define additional filtering rules
-Definiëer bijkomende filters
+DefiniÃ«er bijkomende filters
 Proxy Name (if needed)
 Proxy indien nodig
 Proxy Port
 Proxy poort
 Define proxy settings
-Definiëer proxy instellingen
+DefiniÃ«er proxy instellingen
 Use standard HTTP proxy as FTP proxy
 Gebruik de standaard HTTP proxy voor FTP proxy
 Path
@@ -259,7 +257,7 @@ Pad
 Select Path
 Kies een pad
 Quit WinHTTrack Website Copier
-WinHTTrack Website Copier beëindigen
+WinHTTrack Website Copier beÃ«indigen
 About WinHTTrack
 Info's over WinHTTrack
 Save current preferences as default values
@@ -267,7 +265,7 @@ Schrijf voorkeur weg als standaard waarden.
 Click to continue
 Klik om verder te gaan
 Click to define options
-Klik om instellingen te definiëeren.
+Klik om instellingen te definiÃ«eren.
 Click to add a URL
 Klik om een URL toetevoegen
 Load URL(s) from text file
@@ -301,9 +299,9 @@ Paths
 Save prefs
 Instellingen wegschrijven
 Define..
-Definiëren...
+DefiniÃ«ren...
 Set options..
-Instellingen definiëren...
+Instellingen definiÃ«ren...
 Preferences and mirror options:
 Voorkeur en instellingen van de spiegelingen:
 Project name
@@ -363,7 +361,7 @@ Eerst HTML-bestanden downloaden (sneller)
 Choose local site structure
 Kies een struktuur voor de lokale bestanden
 Set user-defined structure on disk
-Definiëer de struktuur van een site op disk
+DefiniÃ«er de struktuur van een site op disk
 Use a cache for updates and retries
 Gebruik een cache voor updates en herhalingen
 Do not update zero size or user-erased files
@@ -371,7 +369,7 @@ Geen bestanden herladen indien deze nul bytes groot of door de gebruiker gewist 
 Create a Start Page
 Startpagina aanmaken
 Create a word database of all html pages
-Kreëer een woorden-gegevensbank van alle HTML paginas
+KreÃ«er een woorden-gegevensbank van alle HTML paginas
 Build a complete RFC822 mail (MHT/EML) archive of the mirror
 Maak een volledig RFC822 mailarchief (MHT/EML) van de spiegeling
 Create error logging and report files
@@ -487,7 +485,7 @@ Lokaal gewiste bestanden niet nogmaals laden
 Make an index
 Maak een index
 Make a word database
-Kreëer een woorden-gegevensbank
+KreÃ«er een woorden-gegevensbank
 Build a mail archive
 Maak een mailarchief
 Log files
@@ -613,7 +611,7 @@ Proxy
 MIME Types
 MIME typen
 Do you really want to quit WinHTTrack Website Copier?
-Wil je werkelijk WinHTTrack Website Copier beëindigen?
+Wil je werkelijk WinHTTrack Website Copier beÃ«indigen?
 Do not connect to a provider (already connected)
 Geen verbinding met een provider (reeds verbonden)
 Do not use remote access connection
@@ -635,7 +633,7 @@ Kies hier een provider voor de verbinding
 Start
 Start
 Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
-Je kan de spiegeling starten, als je de FINISH knop klikt of definiëer meer instellingen voor de verbinding
+Je kan de spiegeling starten, als je de FINISH knop klikt of definiÃ«er meer instellingen voor de verbinding
 Save settings only, do not launch download now.
 Enkel de instellingen wegschrijven, download nu niet lanceren
 On hold
@@ -697,7 +695,7 @@ Help
 Pause transfer
 Pauzeer transfer
 Exit
-Beëindigen
+BeÃ«indigen
 Modify options
 Instellingen veranderen
 View log
@@ -711,7 +709,7 @@ Verstoppen
 About WinHTTrack Website Copier
 Over WinHTTrack Website Copier
 Check program updates...
-Verifiëer programma updates...
+VerifiÃ«er programma updates...
 &Toolbar
 Toolmenu
 &Status Bar
@@ -731,7 +729,7 @@ Venster
 Help
 Help
 Exit
-Beëindigen
+BeÃ«indigen
 Load default options
 Standaard opties laden
 Save default options
@@ -761,7 +759,7 @@ Wegschrijven &als...
 &Browse sites...
 We&bpaginas aantonen...
 User-defined structure
-Struktuur door de gebruiker gedefiniëerd
+Struktuur door de gebruiker gedefiniÃ«erd
 %n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
 %n\tNaam van het bestand zonder extensie (bv: image)\r\n%N\tNaam van het bestand met extensie (bv: image.gif)\r\n%t\tBestandstype (bv: gif)\r\n%p\tPath [zonder / op het einde] (bv: /someimages)\r\n%h\tHost naam (ex: www.someweb.com)\r\n%M\tURL MD5 (128 bits, 32 ascii bytes)\r\n%Q\tquery string MD5 (128 bits, 32 ascii bytes)\r\n%q\tsmall query string MD5 (16 bits, 4 ascii bytes)\r\n\r\n%s?\tkorte naam versie (ex: %sN)
 Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
@@ -861,11 +859,11 @@ Enkel een directory toe te voegen, geen bestanden
 Please drag folders only
 Enkel een directory toe te voegen
 Select user-defined structure?
-Gebruikersdefiniëeerde struktuur kiezen?
+GebruikersdefiniÃ«eerde struktuur kiezen?
 Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
-Verzeker je ervan, dat de gebruikersdefiniëeerde struktuur correct is.\nIndien niet, zullen de bestandsnamen verkeerd zijn.\r\n
+Verzeker je ervan, dat de gebruikersdefiniÃ«eerde struktuur correct is.\nIndien niet, zullen de bestandsnamen verkeerd zijn.\r\n
 Do you really want to use a user-defined structure?
-Wil je werkelijk de gebruikersdefiniëerde struktuur kiezen?
+Wil je werkelijk de gebruikersdefiniÃ«erde struktuur kiezen?
 Too manu URLs, cannot handle so many links!!
 Veel te veel URLs, onmogelijk zoveel links te behandelen!!
 Not enough memory, fatal internal error..
@@ -903,7 +901,7 @@ Bestandsnamen met extentie:\nBestandsnamen bevattend:\nDit bestandsnaam:\nDirect
 Show all\nHide debug\nHide infos\nHide debug and infos
 Toon alles\nVerstop debug\nverstop informaties\nVerstop debug en informaties
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Site-struktuur (default)\nHtml in web/,     images/andere bestanden in web/images/\nHtml in web/html,   images/andere in web/images\nHtml in web/,    images/other in web/\nHtml in web/,    images/other in web/xxx, waarbij xxx de extentie is\nHtml in web/html,    images/andere in web/xxx\nSite-struktuur, zonder www.domain.xxx/\nHtml in site_name/, images/andere files in site_name/images/\nHtml in site_name/html, images/andere in site_name/images\nHtml in site_name/, images/andere in site_name/\nHtml in site_name/, images/andere in site_name/xxx\nHtml in site_name/html, images/andere in site_name/xxx\nAlle bestenden in web/, met toevallige namen\nAlle bestanden in site_name/, met toevallige namen\nGebruikers-gedefiniëerde struktuur...
+Site-struktuur (default)\nHtml in web/,     images/andere bestanden in web/images/\nHtml in web/html,   images/andere in web/images\nHtml in web/,    images/other in web/\nHtml in web/,    images/other in web/xxx, waarbij xxx de extentie is\nHtml in web/html,    images/andere in web/xxx\nSite-struktuur, zonder www.domain.xxx/\nHtml in site_name/, images/andere files in site_name/images/\nHtml in site_name/html, images/andere in site_name/images\nHtml in site_name/, images/andere in site_name/\nHtml in site_name/, images/andere in site_name/xxx\nHtml in site_name/html, images/andere in site_name/xxx\nAlle bestenden in web/, met toevallige namen\nAlle bestanden in site_name/, met toevallige namen\nGebruikers-gedefiniÃ«erde struktuur...
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
 Enkel scannen\nHtml-bestanden wegschrijven\nNiet-Html-bestanden wegschrijven\nAlle bestanden wegschrijven (default)\nEerst Html-bestanden wegschrijven
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
@@ -1039,15 +1037,15 @@ Ook een gesorteerde CDXJ-index schrijven met elk record uit het WARC-archief, vo
 Package the crawl as a WACZ file
 De crawl als WACZ-bestand verpakken
 Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
-Het WARC-archief, de CDXJ-index en de gespiegelde pagina's in één WACZ-bestand bundelen; impliceert het WARC-archief en de CDXJ-index.
+Het WARC-archief, de CDXJ-index en de gespiegelde pagina's in Ã©Ã©n WACZ-bestand bundelen; impliceert het WARC-archief en de CDXJ-index.
 WARC segment size limit:
 Maximale grootte van een WARC-segment:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
-Een nieuw WARC-segment beginnen zodra het huidige dit aantal bytes overschrijdt; laat leeg of 0 voor één bestand.
+Een nieuw WARC-segment beginnen zodra het huidige dit aantal bytes overschrijdt; laat leeg of 0 voor Ã©Ã©n bestand.
 Host aliases:
 Host-aliassen:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Andere hostnamen die dezelfde site aanbieden, samengevoegd tot één; één vermelding per regel (bijv. www2.example.com,m.example.com=example.com).
+Andere hostnamen die dezelfde site aanbieden, samengevoegd tot Ã©Ã©n; Ã©Ã©n vermelding per regel (bijv. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
 %s en alle onderliggende hosts spiegelen
 Ignore %s and every host below it

@@ -214,7 +214,6 @@ printf '%s\r\n' \
     LANGUAGE_NAME 'Francais-864' \
     LANGUAGE_FILE 'Francais' \
     LANGUAGE_ISO 'fr' \
-    LANGUAGE_CHARSET 'iso-8859-1' \
     'Click to get help!' "Cliquez pour avoir de l'aide!" \
     'Click to confirm' 'Guillemet " et </script> ici' \
     'Cancel changes' 'Antislash \\ et & ici' \

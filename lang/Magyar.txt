@@ -6,492 +6,490 @@ LANGUAGE_ISO
 hu
 LANGUAGE_AUTHOR
 Jozsef Tamas Herczeg (hdodi at freemail.hu) \r\n
-LANGUAGE_CHARSET
-ISO-8859-2
 LANGUAGE_WINDOWSID
 Hungarian
 OK
 OK
 Cancel
-Mégse
+MÃ©gse
 Exit
-Kilépés
+KilÃ©pÃ©s
 Close
-Bezárás
+BezÃ¡rÃ¡s
 Cancel changes
-Törli a módosításokat
+TÃ¶rli a mÃ³dosÃ­tÃ¡sokat
 Click to confirm
-Kattintson rá a megerõsítéshez
+Kattintson rÃ¡ a megerÅ‘sÃ­tÃ©shez
 Click to get help!
-Kattintson rá segítségért!
+Kattintson rÃ¡ segÃ­tsÃ©gÃ©rt!
 Click to return to previous screen
-Az elõzõ képernyõhöz visz vissza
+Az elÅ‘zÅ‘ kÃ©pernyÅ‘hÃ¶z visz vissza
 Click to go to next screen
-A következõ képernyõre visz
+A kÃ¶vetkezÅ‘ kÃ©pernyÅ‘re visz
 Hide password
-Jelszó titkosítása
+JelszÃ³ titkosÃ­tÃ¡sa
 Save project
-Projekt mentése
+Projekt mentÃ©se
 Close current project?
-Bezárja az aktuális projektet?
+BezÃ¡rja az aktuÃ¡lis projektet?
 Delete this project?
-Törli ezt a projektet?
+TÃ¶rli ezt a projektet?
 Delete empty project %s?
-Törli a(z) %s üres projektet?
+TÃ¶rli a(z) %s Ã¼res projektet?
 Action not yet implemented
-A mûvelet még nem használható
+A mÅ±velet mÃ©g nem hasznÃ¡lhatÃ³
 Error deleting this project
-Hiba a projekt törlésekor
+Hiba a projekt tÃ¶rlÃ©sekor
 Select a rule for the filter
-Jelöljön ki szabályt a szûrõhöz
+JelÃ¶ljÃ¶n ki szabÃ¡lyt a szÅ±rÅ‘hÃ¶z
 Enter keywords for the filter
-Itt írja be a szûrõ kulcsszavait
+Itt Ã­rja be a szÅ±rÅ‘ kulcsszavait
 Cancel
-Mégse
+MÃ©gse
 Add this rule
-Hozzáadja ezt a szabályt
+HozzÃ¡adja ezt a szabÃ¡lyt
 Please enter one or several keyword(s) for the rule
-Írjon be egy vagy több kulcsszót a szabályhoz
+Ãrjon be egy vagy tÃ¶bb kulcsszÃ³t a szabÃ¡lyhoz
 Add Scan Rule
-Szûrõ hozzáadása
+SzÅ±rÅ‘ hozzÃ¡adÃ¡sa
 Criterion
-Válasszon szabályt
+VÃ¡lasszon szabÃ¡lyt
 String
-Kulcsszó beírása
+KulcsszÃ³ beÃ­rÃ¡sa
 Add
-Hozzáadás
+HozzÃ¡adÃ¡s
 Scan Rules
-Szûrõk
+SzÅ±rÅ‘k
 Use wildcards to exclude or include URLs or links.\nYou can put several scan strings on the same line.\nUse spaces as separators.\n\nExample: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
-Karakterhelyettesítõk használatával kizárhat vagy elfogadhat URL-eket vagy hivatkozásokat.\nTegyen szóközt a szûrõk közé.\n\nPéldául: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
+KarakterhelyettesÃ­tÅ‘k hasznÃ¡latÃ¡val kizÃ¡rhat vagy elfogadhat URL-eket vagy hivatkozÃ¡sokat.\nTegyen szÃ³kÃ¶zt a szÅ±rÅ‘k kÃ¶zÃ©.\n\nPÃ©ldÃ¡ul: +*.zip -www.*.com -www.*.edu/cgi-bin/*.cgi
 Exclude links
-Hivatkozás kizárása
+HivatkozÃ¡s kizÃ¡rÃ¡sa
 Include link(s)
-Hivatkozás elfogadása
+HivatkozÃ¡s elfogadÃ¡sa
 Tip: To have ALL GIF files included, use something like +www.someweb.com/*.gif. \n(+*.gif / -*.gif will include/exclude ALL GIFs from ALL sites)
-Tipp: Ha a webrõl minden gif fájlt fogadni akar, használjon ilyet +www.someweb.com/*.gif. \n(+*.gif / -*.gif elfogad/letilt MINDEN gifet MINDEN webhelyen)
+Tipp: Ha a webrÅ‘l minden gif fÃ¡jlt fogadni akar, hasznÃ¡ljon ilyet +www.someweb.com/*.gif. \n(+*.gif / -*.gif elfogad/letilt MINDEN gifet MINDEN webhelyen)
 Save prefs
-Beállítások mentése
+BeÃ¡llÃ­tÃ¡sok mentÃ©se
 Matching links will be excluded:
-A megegyezõ hivatkozások kizárásra kerülnek:
+A megegyezÅ‘ hivatkozÃ¡sok kizÃ¡rÃ¡sra kerÃ¼lnek:
 Matching links will be included:
-A megegyezõ hivatkozásokat tartalmazni fogja:
+A megegyezÅ‘ hivatkozÃ¡sokat tartalmazni fogja:
 Example:
-Például:
+PÃ©ldÃ¡ul:
 gif\r\nWill match all GIF files
-gif\r\nKiszûr minden GIF fájlt
+gif\r\nKiszÅ±r minden GIF fÃ¡jlt
 blue\r\nWill find all files with a matching 'blue' sub-string such as 'bluesky-small.jpeg'
-blue\r\nMegkeres minden olyan fájlt, ami tartalmazza a 'blue' szöveget, azaz 'bluesky-small.jpeg'
+blue\r\nMegkeres minden olyan fÃ¡jlt, ami tartalmazza a 'blue' szÃ¶veget, azaz 'bluesky-small.jpeg'
 bigfile.mov\r\nWill match the file 'bigfile.mov', but not 'bigfile2.mov'
-bigfile.mov\r\nKiszûri a 'bigfile.mov' fájlt, viszont a 'bigfile2.mov' fájlt nem
+bigfile.mov\r\nKiszÅ±ri a 'bigfile.mov' fÃ¡jlt, viszont a 'bigfile2.mov' fÃ¡jlt nem
 cgi\r\nWill find links with folder name matching sub-string 'cgi' such as /cgi-bin/somecgi.cgi
-cgi\r\nMegkeres minden olyan mappanév hivatkozást, ami tartalmazza a 'cgi' szöveget, azaz /cgi-bin/somecgi.cgi
+cgi\r\nMegkeres minden olyan mappanÃ©v hivatkozÃ¡st, ami tartalmazza a 'cgi' szÃ¶veget, azaz /cgi-bin/somecgi.cgi
 cgi-bin\r\nWill find links with folder name matching whole 'cgi-bin' string (but not cgi-bin-2, for example)
-cgi-bin\r\nMegkeres minden olyan mappanév hivatkozást, ami tartalmazza a teljes 'cgi-bin' szöveget (de a cgi-bin-2 már nem)
+cgi-bin\r\nMegkeres minden olyan mappanÃ©v hivatkozÃ¡st, ami tartalmazza a teljes 'cgi-bin' szÃ¶veget (de a cgi-bin-2 mÃ¡r nem)
 someweb.com\r\nWill find links with matching sub-string such as www.someweb.com, private.someweb.com etc.
-someweb.com\r\nMegkeres minden olyan hivatkozást, ami tartalmazza a www.someweb.com, private.someweb.com stb. szöveget
+someweb.com\r\nMegkeres minden olyan hivatkozÃ¡st, ami tartalmazza a www.someweb.com, private.someweb.com stb. szÃ¶veget
 someweb\r\nWill find links with matching folder sub-string such as www.someweb.com, www.someweb.edu, private.someweb.otherweb.com etc.
-someweb\r\nMegkeres minden olyan hivatkozást, ami tartalmazza a www.someweb.com, www.someweb.edu, private.someweb.otherweb.com stb. mappanév szöveget.
+someweb\r\nMegkeres minden olyan hivatkozÃ¡st, ami tartalmazza a www.someweb.com, www.someweb.edu, private.someweb.otherweb.com stb. mappanÃ©v szÃ¶veget.
 www.someweb.com\r\nWill find links matching whole 'www.someweb.com' sub-string (but not links such as private.someweb.com/..)
-www.someweb.com\r\nMegkeres minden olyan hivatkozást, ami tartalmazza a teljes 'www.someweb.com' szöveget (de nem olyan hivatkozásokat, mint a private.someweb.com/..)
+www.someweb.com\r\nMegkeres minden olyan hivatkozÃ¡st, ami tartalmazza a teljes 'www.someweb.com' szÃ¶veget (de nem olyan hivatkozÃ¡sokat, mint a private.someweb.com/..)
 someweb\r\nWill find any links with matching sub-string such as www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html etc.
-someweb\r\nMegkeres minden olyan hivatkozást, ami tartalmazza a www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html stb. szövegeket.
+someweb\r\nMegkeres minden olyan hivatkozÃ¡st, ami tartalmazza a www.someweb.com/.., www.test.abc/fromsomeweb/index.html, www.test.abc/test/someweb.html stb. szÃ¶vegeket.
 www.test.com/test/someweb.html\r\nWill only find the 'www.test.com/test/someweb.html' file. Note that you have to type the complete path (URL + site path)
-www.test.com/test/someweb.html\r\nCsak a www.test.com/test/someweb.html fájlt keresi meg. Jegyezze meg, hogy be kell írnia a teljes útvonalat (URL + elérési út)
+www.test.com/test/someweb.html\r\nCsak a www.test.com/test/someweb.html fÃ¡jlt keresi meg. Jegyezze meg, hogy be kell Ã­rnia a teljes Ãºtvonalat (URL + elÃ©rÃ©si Ãºt)
 All links will match
-Minden hivatkozást egyeztet
+Minden hivatkozÃ¡st egyeztet
 Add exclusion filter
-Kizárás szûrõ hozzáadása
+KizÃ¡rÃ¡s szÅ±rÅ‘ hozzÃ¡adÃ¡sa
 Add inclusion filter
-Belefoglalás szûrõ hozzáadása
+BelefoglalÃ¡s szÅ±rÅ‘ hozzÃ¡adÃ¡sa
 Existing filters
-Létezõ szûrõk
+LÃ©tezÅ‘ szÅ±rÅ‘k
 Cancel changes
-Törli a módosításokat
+TÃ¶rli a mÃ³dosÃ­tÃ¡sokat
 Save current preferences as default values
-Az aktuális beállítások mentése alapértelmezett értékekként
+Az aktuÃ¡lis beÃ¡llÃ­tÃ¡sok mentÃ©se alapÃ©rtelmezett Ã©rtÃ©kekkÃ©nt
 Click to confirm
-Nyomja meg a megerõsítéshez
+Nyomja meg a megerÅ‘sÃ­tÃ©shez
 No log files in %s!
-%s nem tartalmaz naplófájlt!
+%s nem tartalmaz naplÃ³fÃ¡jlt!
 No 'index.html' file in %s!
-%s nem tartalmaz index.html fájlt
+%s nem tartalmaz index.html fÃ¡jlt
 Click to quit WinHTTrack Website Copier
-Kattintson rá a WinHTTrack webhely másolóból való kilépéshez
+Kattintson rÃ¡ a WinHTTrack webhely mÃ¡solÃ³bÃ³l valÃ³ kilÃ©pÃ©shez
 View log files
-Naplófájlok megjelenítése
+NaplÃ³fÃ¡jlok megjelenÃ­tÃ©se
 Browse HTML start page
-HTML kezdõlap böngészése
+HTML kezdÅ‘lap bÃ¶ngÃ©szÃ©se
 End of mirror
-Tükrözés vége
+TÃ¼krÃ¶zÃ©s vÃ©ge
 View log files
-Naplófájlok megtekintése
+NaplÃ³fÃ¡jlok megtekintÃ©se
 Browse Mirrored Website
-Tükrözött weblap böngészõ
+TÃ¼krÃ¶zÃ¶tt weblap bÃ¶ngÃ©szÅ‘
 New project...
-Új projekt...
+Ãšj projekt...
 View error and warning reports
-Hiba- és figyelmeztetési jelentések megtekintése
+Hiba- Ã©s figyelmeztetÃ©si jelentÃ©sek megtekintÃ©se
 View report
-Jelentés megtekintése
+JelentÃ©s megtekintÃ©se
 Close the log file window
-Naplófájl ablakának bezárása
+NaplÃ³fÃ¡jl ablakÃ¡nak bezÃ¡rÃ¡sa
 Info type:
-Adat típusa:
+Adat tÃ­pusa:
 Errors
-Hibák
+HibÃ¡k
 Infos
 Adatok
 Find
-Keresés
+KeresÃ©s
 Find a word
-Szó keresése
+SzÃ³ keresÃ©se
 Info log file
-Információs naplófájl
+InformÃ¡ciÃ³s naplÃ³fÃ¡jl
 Warning/Errors log file
-Figyelmeztetés/Hiba naplófájl
+FigyelmeztetÃ©s/Hiba naplÃ³fÃ¡jl
 Unable to initialize the OLE system
-Az OLE rendszer nem inicializálható
+Az OLE rendszer nem inicializÃ¡lhatÃ³
 WinHTTrack could not find any interrupted download file cache in the specified folder!
-A WinHTTrack nem talált megszakadt letöltési fájl gyorsítótárat a megadott mappában!
+A WinHTTrack nem talÃ¡lt megszakadt letÃ¶ltÃ©si fÃ¡jl gyorsÃ­tÃ³tÃ¡rat a megadott mappÃ¡ban!
 Could not connect to provider
-Nem lehet csatlakozni a szolgáltatóhoz
+Nem lehet csatlakozni a szolgÃ¡ltatÃ³hoz
 receive
-fogadás
+fogadÃ¡s
 request
-kérés
+kÃ©rÃ©s
 connect
-csatlakozás
+csatlakozÃ¡s
 search
-keresés
+keresÃ©s
 ready
-kész
+kÃ©sz
 error
 hiba
 Receiving files..
-Fájlok fogadása
+FÃ¡jlok fogadÃ¡sa
 Parsing HTML file..
-HTML fájl elemzése
+HTML fÃ¡jl elemzÃ©se
 Purging files..
-Fájlok kiürítése
+FÃ¡jlok kiÃ¼rÃ­tÃ©se
 Loading cache in progress..
-A gyorsítótár betöltése folyamatban..
+A gyorsÃ­tÃ³tÃ¡r betÃ¶ltÃ©se folyamatban..
 Parsing HTML file (testing links)..
-HTML fájl elemzése (hivatkozások tesztelése)
+HTML fÃ¡jl elemzÃ©se (hivatkozÃ¡sok tesztelÃ©se)
 Pause - Toggle [Mirror]/[Pause download] to resume operation
-Szünet - Kattintson a [Tükrözés]/[Letöltés szüneteltetése] parancsra a mûvelet folytatásához
+SzÃ¼net - Kattintson a [TÃ¼krÃ¶zÃ©s]/[LetÃ¶ltÃ©s szÃ¼neteltetÃ©se] parancsra a mÅ±velet folytatÃ¡sÃ¡hoz
 Finishing pending transfers - Select [Cancel] to stop now!
-Függõben lévõ átvitelek befejezése - Leállítás a [Mégse] gombbal!
+FÃ¼ggÅ‘ben lÃ©vÅ‘ Ã¡tvitelek befejezÃ©se - LeÃ¡llÃ­tÃ¡s a [MÃ©gse] gombbal!
 scanning
-vizsgálat
+vizsgÃ¡lat
 Waiting for scheduled time..
-Várakozás az ütemezett idõpontra
+VÃ¡rakozÃ¡s az Ã¼temezett idÅ‘pontra
 Transferring data..
-Adatok átvitele..
+Adatok Ã¡tvitele..
 Connecting to provider
-Csatlakozás a szolgáltatóhoz
+CsatlakozÃ¡s a szolgÃ¡ltatÃ³hoz
 [%d seconds] to go before start of operation
-[%d másodperc] van hátra a mûvelet megkezdéséhez
+[%d mÃ¡sodperc] van hÃ¡tra a mÅ±velet megkezdÃ©sÃ©hez
 Site mirroring in progress [%s, %s bytes]
-A tükrözés folyamatban [%s, %s bájt]
+A tÃ¼krÃ¶zÃ©s folyamatban [%s, %s bÃ¡jt]
 Site mirroring finished!
-A webhely tükrözése befejezõdött
+A webhely tÃ¼krÃ¶zÃ©se befejezÅ‘dÃ¶tt
 A problem occurred during the mirroring operation\n
-A tükrözés közben hiba történt\n
+A tÃ¼krÃ¶zÃ©s kÃ¶zben hiba tÃ¶rtÃ©nt\n
 \nDuring:\n
-\nKözben:\n
+\nKÃ¶zben:\n
 \nSee the log file if necessary.\n\nClick FINISH to quit WinHTTrack Website Copier.\n\nThanks for using WinHTTrack!
-\nNézze meg a naplófájlt, ha szükséges.\n\nKattintson a BEFEJEZÉS gombra a WinHTTrack webhely másolóból való kilépéshez.\n\nKöszönet a WinHTTrack használatáért!
+\nNÃ©zze meg a naplÃ³fÃ¡jlt, ha szÃ¼ksÃ©ges.\n\nKattintson a BEFEJEZÃ‰S gombra a WinHTTrack webhely mÃ¡solÃ³bÃ³l valÃ³ kilÃ©pÃ©shez.\n\nKÃ¶szÃ¶net a WinHTTrack hasznÃ¡latÃ¡Ã©rt!
 Mirroring operation complete.\nClick Exit to quit WinHTTrack.\nSee log file(s) if necessary to ensure that everything is OK.\n\nThanks for using WinHTTrack!
-A tükrözés befejezõdött.\nKattintson az OK gombra a WinHTTrack bezárásához.\nNézze meg a naplófájl(oka)t, ha szükséges, hogy meggyõzõdjön róla, minden rendben van-e.\n\nKöszönet a WinHTTrack használatáért!
+A tÃ¼krÃ¶zÃ©s befejezÅ‘dÃ¶tt.\nKattintson az OK gombra a WinHTTrack bezÃ¡rÃ¡sÃ¡hoz.\nNÃ©zze meg a naplÃ³fÃ¡jl(oka)t, ha szÃ¼ksÃ©ges, hogy meggyÅ‘zÅ‘djÃ¶n rÃ³la, minden rendben van-e.\n\nKÃ¶szÃ¶net a WinHTTrack hasznÃ¡latÃ¡Ã©rt!
 * * MIRROR ABORTED! * *\r\nThe current temporary cache is required for any update operation and only contains data downloaded during the present aborted session.\r\nThe former cache might contain more complete information; if you do not want to lose that information, you have to restore it and delete the current cache.\r\n[Note: This can easily be done here by erasing the hts-cache/new.* files]\r\n\r\nDo you think the former cache might contain more complete information, and do you want to restore it?
-* * TÜKRÖZÉS MEGSZAKÍTVA! * *\r\nA frissítéshez az aktuális ideiglenes gyorsítótárra van szükség, és csak az imént megszakított mûvelettel letöltött adatokat tartalmazza.\r\nA régi gyorsítótár bizonyára több információt tartalmaz; ha nem akarja elveszíteni azt az információt, vissza kell állítania és törölnie a jelenlegi gyorsítótárat.\r\n[Megjegyzés: Ez könnyen elvégezhetõ itt a hts-cache/new fájlok* törlésével.]\r\n\r\nÚgy gondolja, hogy a régi gyorsítótár teljesebb információt tartalmazhat, és vissza kívánja állítani?
+* * TÃœKRÃ–ZÃ‰S MEGSZAKÃTVA! * *\r\nA frissÃ­tÃ©shez az aktuÃ¡lis ideiglenes gyorsÃ­tÃ³tÃ¡rra van szÃ¼ksÃ©g, Ã©s csak az imÃ©nt megszakÃ­tott mÅ±velettel letÃ¶ltÃ¶tt adatokat tartalmazza.\r\nA rÃ©gi gyorsÃ­tÃ³tÃ¡r bizonyÃ¡ra tÃ¶bb informÃ¡ciÃ³t tartalmaz; ha nem akarja elveszÃ­teni azt az informÃ¡ciÃ³t, vissza kell Ã¡llÃ­tania Ã©s tÃ¶rÃ¶lnie a jelenlegi gyorsÃ­tÃ³tÃ¡rat.\r\n[MegjegyzÃ©s: Ez kÃ¶nnyen elvÃ©gezhetÅ‘ itt a hts-cache/new fÃ¡jlok* tÃ¶rlÃ©sÃ©vel.]\r\n\r\nÃšgy gondolja, hogy a rÃ©gi gyorsÃ­tÃ³tÃ¡r teljesebb informÃ¡ciÃ³t tartalmazhat, Ã©s vissza kÃ­vÃ¡nja Ã¡llÃ­tani?
 * * MIRROR ERROR! * *\r\nHTTrack has detected that the current mirror is empty. If it was an update, the previous mirror has been restored.\r\nReason: the first page(s) either could not be found, or a connection problem occurred.\r\n=> Ensure that the website still exists, and/or check your proxy settings! <=
-* * TÜKRÖZÉSI HIBA! * *\r\nA HTTrack felismerte, hogy az aktuális tükrözés üres. Ha frissítés volt, vissza lett állítva az elõzõ tükrözés.\r\nOk: az elsõ oldal(ak) vagy nem találhatók, vagy csatlakozási probléma lépett föl.\r\n=> Nézze meg, hogy a webhely létezik-e még, és/vagy ellenõrizze a proxy beállításokat! <=
+* * TÃœKRÃ–ZÃ‰SI HIBA! * *\r\nA HTTrack felismerte, hogy az aktuÃ¡lis tÃ¼krÃ¶zÃ©s Ã¼res. Ha frissÃ­tÃ©s volt, vissza lett Ã¡llÃ­tva az elÅ‘zÅ‘ tÃ¼krÃ¶zÃ©s.\r\nOk: az elsÅ‘ oldal(ak) vagy nem talÃ¡lhatÃ³k, vagy csatlakozÃ¡si problÃ©ma lÃ©pett fÃ¶l.\r\n=> NÃ©zze meg, hogy a webhely lÃ©tezik-e mÃ©g, Ã©s/vagy ellenÅ‘rizze a proxy beÃ¡llÃ­tÃ¡sokat! <=
 \n\nTip: Click [View log file] to see warning or error messages
-\nTipp: Kattintson a [Naplófájl megjelenítése] menüpontra a figyelmeztetések vagy hibaüzenetek megtekintéséhez
+\nTipp: Kattintson a [NaplÃ³fÃ¡jl megjelenÃ­tÃ©se] menÃ¼pontra a figyelmeztetÃ©sek vagy hibaÃ¼zenetek megtekintÃ©sÃ©hez
 Error deleting a hts-cache/new.* file, please do it manually
-Hiba a hts-cache/new.* fájl törléskor, végezze el kézzel
+Hiba a hts-cache/new.* fÃ¡jl tÃ¶rlÃ©skor, vÃ©gezze el kÃ©zzel
 Do you really want to quit WinHTTrack Website Copier?
-Valóban ki kíván lépni a WinHTTrack webhely másolóból?
+ValÃ³ban ki kÃ­vÃ¡n lÃ©pni a WinHTTrack webhely mÃ¡solÃ³bÃ³l?
 - Mirroring Mode -\n\nEnter address(es) in URL box
-- Tükrözés mód -\n\nÍrja be a cím(ek)et az URL mezõbe
+- TÃ¼krÃ¶zÃ©s mÃ³d -\n\nÃrja be a cÃ­m(ek)et az URL mezÅ‘be
 - Interactive Wizard Mode (questions) -\n\nEnter address(es) in URL box
-- Interaktív Varázsló mód (kérdések) -\n\nÍrja be a cím(ek)et az URL mezõbe
+- InteraktÃ­v VarÃ¡zslÃ³ mÃ³d (kÃ©rdÃ©sek) -\n\nÃrja be a cÃ­m(ek)et az URL mezÅ‘be
 - File Download Mode -\n\nEnter file address(es) in URL box
-- Fájl letöltés mód -\n\nÍrja be a fájl(ok) címe(i)t az URL mezõbe
+- FÃ¡jl letÃ¶ltÃ©s mÃ³d -\n\nÃrja be a fÃ¡jl(ok) cÃ­me(i)t az URL mezÅ‘be
 - Link Testing Mode -\n\nEnter Web address(es) with links to test in URL box
-- Hivatkozás tesztelési mód -\n\nÍrja be a tesztelendõ hivatkozás(oka)t tartalmazó oldal(ak) címe(i)t az URL mezõbe
+- HivatkozÃ¡s tesztelÃ©si mÃ³d -\n\nÃrja be a tesztelendÅ‘ hivatkozÃ¡s(oka)t tartalmazÃ³ oldal(ak) cÃ­me(i)t az URL mezÅ‘be
 - Update Mode -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
-- Frissítés mód -\n\nEllenõrizze a cím(ek)et az URL mezõben, s szükség esetén a paramétereket, majd kattintson a 'TOVÁBB' gombra.
+- FrissÃ­tÃ©s mÃ³d -\n\nEllenÅ‘rizze a cÃ­m(ek)et az URL mezÅ‘ben, s szÃ¼ksÃ©g esetÃ©n a paramÃ©tereket, majd kattintson a 'TOVÃBB' gombra.
 - Resume Mode (Interrupted Operation) -\n\nVerify address(es) in URL box, check parameters if necessary then click on 'NEXT' button
-- Folytatás mód (Megszakadt mûvelet) -\n\nEllenõrizze a címe(ke)t az URL mezõben, s szükség esetén a paramétereket, majd kattintson a 'TOVÁBB' gombra.
+- FolytatÃ¡s mÃ³d (Megszakadt mÅ±velet) -\n\nEllenÅ‘rizze a cÃ­me(ke)t az URL mezÅ‘ben, s szÃ¼ksÃ©g esetÃ©n a paramÃ©tereket, majd kattintson a 'TOVÃBB' gombra.
 Log files Path
-Naplófájlok útvonala
+NaplÃ³fÃ¡jlok Ãºtvonala
 Path
-Útvonal
+Ãštvonal
 - Links List Mode -\n\nUse URL box to enter address(es) of page(s) containing links to mirror
-- Hivatkozásjegyzék mód -\n\nÍrja be az URL mezõbe azon oldal(ak) címe(i)t, melyek tükrözendõ hivatkozásokat tartalmaznak
+- HivatkozÃ¡sjegyzÃ©k mÃ³d -\n\nÃrja be az URL mezÅ‘be azon oldal(ak) cÃ­me(i)t, melyek tÃ¼krÃ¶zendÅ‘ hivatkozÃ¡sokat tartalmaznak
 New project / Import?
-Új projekt / importálás?
+Ãšj projekt / importÃ¡lÃ¡s?
 Choose criterion
-Válassza ki a feltételt
+VÃ¡lassza ki a feltÃ©telt
 Maximum link scanning depth
-Maximális hivatkozási mélység
+MaximÃ¡lis hivatkozÃ¡si mÃ©lysÃ©g
 Enter address(es) here
-Ide írja be a címe(ke)t
+Ide Ã­rja be a cÃ­me(ke)t
 Define additional filtering rules
-Kiegészítõ szûrési szabályok meghatározása
+KiegÃ©szÃ­tÅ‘ szÅ±rÃ©si szabÃ¡lyok meghatÃ¡rozÃ¡sa
 Proxy Name (if needed)
-Proxy neve (ha szükséges)
+Proxy neve (ha szÃ¼ksÃ©ges)
 Proxy Port
 Proxy port
 Define proxy settings
-Proxy beállításainak meghatározása
+Proxy beÃ¡llÃ­tÃ¡sainak meghatÃ¡rozÃ¡sa
 Use standard HTTP proxy as FTP proxy
-A szabványos HTTP proxy FTP proxyként való használata
+A szabvÃ¡nyos HTTP proxy FTP proxykÃ©nt valÃ³ hasznÃ¡lata
 Path
-Útvonal
+Ãštvonal
 Select Path
-Útvonal kijelölése
+Ãštvonal kijelÃ¶lÃ©se
 Path
-Útvonal
+Ãštvonal
 Select Path
-Útvonal kijelölése
+Ãštvonal kijelÃ¶lÃ©se
 Quit WinHTTrack Website Copier
-Kilépés a WinHTTrack webhely másolóból
+KilÃ©pÃ©s a WinHTTrack webhely mÃ¡solÃ³bÃ³l
 About WinHTTrack
-WinHTTrack névjegye
+WinHTTrack nÃ©vjegye
 Save current preferences as default values
-Aktuális beállítások mentése alapértelemezett értékekként
+AktuÃ¡lis beÃ¡llÃ­tÃ¡sok mentÃ©se alapÃ©rtelemezett Ã©rtÃ©kekkÃ©nt
 Click to continue
-Nyomja meg a folytatáshoz
+Nyomja meg a folytatÃ¡shoz
 Click to define options
-Nyomja meg az opciók meghatározásához
+Nyomja meg az opciÃ³k meghatÃ¡rozÃ¡sÃ¡hoz
 Click to add a URL
-Nyomja meg URL hozzáadásához
+Nyomja meg URL hozzÃ¡adÃ¡sÃ¡hoz
 Load URL(s) from text file
-URL(-ek) betöltése szövegfájlból
+URL(-ek) betÃ¶ltÃ©se szÃ¶vegfÃ¡jlbÃ³l
 WinHTTrack preferences (*.opt)|*.opt||
-WinHTTrack beállítások (*.opt)|*.opt||
+WinHTTrack beÃ¡llÃ­tÃ¡sok (*.opt)|*.opt||
 Address List text file (*.txt)|*.txt||
-Címlista szövegfájl (*.txt)|*.txt||
+CÃ­mlista szÃ¶vegfÃ¡jl (*.txt)|*.txt||
 File not found!
-A fájl nem található!
+A fÃ¡jl nem talÃ¡lhatÃ³!
 Do you really want to change the project name/path?
-Valóban módosítani kívánja a projekt nevét/útvonalát?
+ValÃ³ban mÃ³dosÃ­tani kÃ­vÃ¡nja a projekt nevÃ©t/ÃºtvonalÃ¡t?
 Load user-default options?
-Betölti a felhasználó-alapértelmezett opciókat?
+BetÃ¶lti a felhasznÃ¡lÃ³-alapÃ©rtelmezett opciÃ³kat?
 Save user-default options?
-Menti a felhasználó-alapértelmezett opciókat?
+Menti a felhasznÃ¡lÃ³-alapÃ©rtelmezett opciÃ³kat?
 Reset all default options?
-Visszaállít minden alapértelmezett opciót?
+VisszaÃ¡llÃ­t minden alapÃ©rtelmezett opciÃ³t?
 Welcome to WinHTTrack!
-Üdvözli a WinHTTrack webhely másoló!
+ÃœdvÃ¶zli a WinHTTrack webhely mÃ¡solÃ³!
 Action:
-Mûvelet:
+MÅ±velet:
 Max Depth
-Max. mélység:
+Max. mÃ©lysÃ©g:
 Maximum external depth:
-Maximális külsõ mélység:
+MaximÃ¡lis kÃ¼lsÅ‘ mÃ©lysÃ©g:
 Filters (refuse/accept links) :
-Szûrõk (hivatkozások kizárása/belefoglalása):
+SzÅ±rÅ‘k (hivatkozÃ¡sok kizÃ¡rÃ¡sa/belefoglalÃ¡sa):
 Paths
-Útvonalak
+Ãštvonalak
 Save prefs
-Beállítások mentése
+BeÃ¡llÃ­tÃ¡sok mentÃ©se
 Define..
-Meghatározás...
+MeghatÃ¡rozÃ¡s...
 Set options..
-Beállítások...
+BeÃ¡llÃ­tÃ¡sok...
 Preferences and mirror options:
-Beállítások és tükrözési opciók:
+BeÃ¡llÃ­tÃ¡sok Ã©s tÃ¼krÃ¶zÃ©si opciÃ³k:
 Project name
 Projekt neve
 Add a URL...
-URL hozzáadása...
+URL hozzÃ¡adÃ¡sa...
 Web Addresses: (URL)
-Webcímek (URL):
+WebcÃ­mek (URL):
 Stop WinHTTrack?
-Leállítja a programot?
+LeÃ¡llÃ­tja a programot?
 No log files in %s!
-A(z) %s nem tartalmaz naplófájlt!
+A(z) %s nem tartalmaz naplÃ³fÃ¡jlt!
 Pause Download?
-Szünetelteti a letöltést?
+SzÃ¼netelteti a letÃ¶ltÃ©st?
 Stop the mirroring operation
-Tükrözés leállítása
+TÃ¼krÃ¶zÃ©s leÃ¡llÃ­tÃ¡sa
 Minimize to System Tray
-Kis méretre zárás a tálcára
+Kis mÃ©retre zÃ¡rÃ¡s a tÃ¡lcÃ¡ra
 Click to skip a link or stop parsing
-Nyomja meg hivatkozás kihagyásához vagy az elemzés leállításához
+Nyomja meg hivatkozÃ¡s kihagyÃ¡sÃ¡hoz vagy az elemzÃ©s leÃ¡llÃ­tÃ¡sÃ¡hoz
 Click to skip a link
-Nyomja meg hivatkozás kihagyásához
+Nyomja meg hivatkozÃ¡s kihagyÃ¡sÃ¡hoz
 Bytes saved
-Mentett bájt:
+Mentett bÃ¡jt:
 Links scanned
-Vizsgált hivatkozás:
+VizsgÃ¡lt hivatkozÃ¡s:
 Time:
-Idõ:
+IdÅ‘:
 Connections:
-Csatlakozás:
+CsatlakozÃ¡s:
 Running:
-Futtatás:
+FuttatÃ¡s:
 Hide
-Elrejtés
+ElrejtÃ©s
 Transfer rate
-Átviteli sebesség
+Ãtviteli sebessÃ©g
 SKIP
 KIHAGY
 Information
-Információ
+InformÃ¡ciÃ³
 Files written:
-Írott fájl:
+Ãrott fÃ¡jl:
 Files updated:
-Frissített fájl:
+FrissÃ­tett fÃ¡jl:
 Errors:
 Hiba:
 In progress:
 Folyamatban:
 Follow external links
-Külsõ hivatkozások követése
+KÃ¼lsÅ‘ hivatkozÃ¡sok kÃ¶vetÃ©se
 Test all links in pages
-Az oldal(ak) összes hivatkozásának tesztelése
+Az oldal(ak) Ã¶sszes hivatkozÃ¡sÃ¡nak tesztelÃ©se
 Try to ferret out all links
-Felismer minden hivatkozást
+Felismer minden hivatkozÃ¡st
 Download HTML files first (faster)
-Elõbb a HTML-fájlokat tölti le (gyorsabb)
+ElÅ‘bb a HTML-fÃ¡jlokat tÃ¶lti le (gyorsabb)
 Choose local site structure
-Weblap helyi szerkezetének kiválasztása
+Weblap helyi szerkezetÃ©nek kivÃ¡lasztÃ¡sa
 Set user-defined structure on disk
-Felhasználói meghatározású szerkezet beállítása a lemezen
+FelhasznÃ¡lÃ³i meghatÃ¡rozÃ¡sÃº szerkezet beÃ¡llÃ­tÃ¡sa a lemezen
 Use a cache for updates and retries
-Gyorsítótár használata a frissítésekhez és próbákhoz
+GyorsÃ­tÃ³tÃ¡r hasznÃ¡lata a frissÃ­tÃ©sekhez Ã©s prÃ³bÃ¡khoz
 Do not update zero size or user-erased files
-Nem frissíti a nulla méretû vagy a felhasználó által törölt fájlokat
+Nem frissÃ­ti a nulla mÃ©retÅ± vagy a felhasznÃ¡lÃ³ Ã¡ltal tÃ¶rÃ¶lt fÃ¡jlokat
 Create a Start Page
-Kezdõlap létrehozása
+KezdÅ‘lap lÃ©trehozÃ¡sa
 Create a word database of all html pages
-Az összes HTML oldal szóadatbázisának létrehozása
+Az Ã¶sszes HTML oldal szÃ³adatbÃ¡zisÃ¡nak lÃ©trehozÃ¡sa
 Build a complete RFC822 mail (MHT/EML) archive of the mirror
-A tükrözés teljes RFC822 levélarchívumának (MHT/EML) létrehozása
+A tÃ¼krÃ¶zÃ©s teljes RFC822 levÃ©larchÃ­vumÃ¡nak (MHT/EML) lÃ©trehozÃ¡sa
 Create error logging and report files
-Hibanapló- és jelentásfájl létrehozása
+HibanaplÃ³- Ã©s jelentÃ¡sfÃ¡jl lÃ©trehozÃ¡sa
 Generate DOS 8-3 filenames ONLY
-CSAK 8-3 formátumú DOS-fájlnév generálása
+CSAK 8-3 formÃ¡tumÃº DOS-fÃ¡jlnÃ©v generÃ¡lÃ¡sa
 Generate ISO9660 filenames ONLY for CDROM medias
-ISO9660 fájlnevek generálása CSAK CDROM adathordozóhoz
+ISO9660 fÃ¡jlnevek generÃ¡lÃ¡sa CSAK CDROM adathordozÃ³hoz
 Do not create HTML error pages
-Nem hoz létre HTML hibaoldalakat
+Nem hoz lÃ©tre HTML hibaoldalakat
 Select file types to be saved to disk
-Jelölje ki a lemezre mentendõ fájltípusokat
+JelÃ¶lje ki a lemezre mentendÅ‘ fÃ¡jltÃ­pusokat
 Select parsing direction
-Jelölje ki az elemzés irányát
+JelÃ¶lje ki az elemzÃ©s irÃ¡nyÃ¡t
 Select global parsing direction
-Jelölje ki a globális elemzési irányt
+JelÃ¶lje ki a globÃ¡lis elemzÃ©si irÃ¡nyt
 Setup URL rewriting rules for internal links (downloaded ones) and external links (not downloaded ones)
-Szabályok alkotása a belsõ (letöltött) hivatkozások és a külsõ (nem letöltött) hivatkozások átírásához
+SzabÃ¡lyok alkotÃ¡sa a belsÅ‘ (letÃ¶ltÃ¶tt) hivatkozÃ¡sok Ã©s a kÃ¼lsÅ‘ (nem letÃ¶ltÃ¶tt) hivatkozÃ¡sok Ã¡tÃ­rÃ¡sÃ¡hoz
 Max simultaneous connections
-Egyidejû kapcsolatok max. száma
+EgyidejÅ± kapcsolatok max. szÃ¡ma
 File timeout
-Fájl idõtúllépés
+FÃ¡jl idÅ‘tÃºllÃ©pÃ©s
 Cancel all links from host if timeout occurs
-Minden hivatkozás törlése a kiszolgálóról idõtúllépés esetén
+Minden hivatkozÃ¡s tÃ¶rlÃ©se a kiszolgÃ¡lÃ³rÃ³l idÅ‘tÃºllÃ©pÃ©s esetÃ©n
 Minimum admissible transfer rate
-Minimális engedélyezett átviteli szint
+MinimÃ¡lis engedÃ©lyezett Ã¡tviteli szint
 Cancel all links from host if too slow
-Minden hivatkozás törlése a kiszolgálóról, ha az túl lassú
+Minden hivatkozÃ¡s tÃ¶rlÃ©se a kiszolgÃ¡lÃ³rÃ³l, ha az tÃºl lassÃº
 Maximum number of retries on non-fatal errors
-Próbálkozások maximális száma nem végzetes hiba esetén
+PrÃ³bÃ¡lkozÃ¡sok maximÃ¡lis szÃ¡ma nem vÃ©gzetes hiba esetÃ©n
 Maximum size for any single HTML file
-Bármilyen egyszerû HTML fájl maximális mérete
+BÃ¡rmilyen egyszerÅ± HTML fÃ¡jl maximÃ¡lis mÃ©rete
 Maximum size for any single non-HTML file
-Bármilyen egyszerû nem HTML-fájl maximális mérete
+BÃ¡rmilyen egyszerÅ± nem HTML-fÃ¡jl maximÃ¡lis mÃ©rete
 Maximum amount of bytes to retrieve from the Web
-A webrõl letöltendõ maximális bájt mennyiség
+A webrÅ‘l letÃ¶ltendÅ‘ maximÃ¡lis bÃ¡jt mennyisÃ©g
 Make a pause after downloading this amount of bytes
-Szüneteltetés ennyi mennyiségû bájt letöltése után
+SzÃ¼neteltetÃ©s ennyi mennyisÃ©gÅ± bÃ¡jt letÃ¶ltÃ©se utÃ¡n
 Maximum duration time for the mirroring operation
-A tükrözés maximális idõtartama
+A tÃ¼krÃ¶zÃ©s maximÃ¡lis idÅ‘tartama
 Maximum transfer rate
-Maximális átviteli szint
+MaximÃ¡lis Ã¡tviteli szint
 Maximum connections/seconds (avoid server overload)
-Max. csatlakozás/másodperc (a kiszolgáló túlterheltségének csökkentésére)
+Max. csatlakozÃ¡s/mÃ¡sodperc (a kiszolgÃ¡lÃ³ tÃºlterheltsÃ©gÃ©nek csÃ¶kkentÃ©sÃ©re)
 Maximum number of links that can be tested (not saved!)
-A tesztelhetõ hivatkozások max. száma (nincs mentve!)
+A tesztelhetÅ‘ hivatkozÃ¡sok max. szÃ¡ma (nincs mentve!)
 Browser identity
-Böngészõ beazonosítása
+BÃ¶ngÃ©szÅ‘ beazonosÃ­tÃ¡sa
 Comment to be placed in each HTML file
-Mindegyik HTML fájlban elhelyezendõ megjegyzés
+Mindegyik HTML fÃ¡jlban elhelyezendÅ‘ megjegyzÃ©s
 Languages accepted by the browser
-A böngészõ által elfogadott nyelvek
+A bÃ¶ngÃ©szÅ‘ Ã¡ltal elfogadott nyelvek
 Additional HTTP headers to be sent in each requests
-Minden kérésben elküldendõ további HTTP fejlécek
+Minden kÃ©rÃ©sben elkÃ¼ldendÅ‘ tovÃ¡bbi HTTP fejlÃ©cek
 HTTP referer to be sent for initial URLs
-A kiinduló URL-ekhez küldendõ HTTP referer
+A kiindulÃ³ URL-ekhez kÃ¼ldendÅ‘ HTTP referer
 Back to starting page
-Vissza a kezdõlaphoz
+Vissza a kezdÅ‘laphoz
 Save current preferences as default values
-Aktuális beállítások mentése alapértékekként
+AktuÃ¡lis beÃ¡llÃ­tÃ¡sok mentÃ©se alapÃ©rtÃ©kekkÃ©nt
 Click to continue
-Nyomja meg a folytatáshoz
+Nyomja meg a folytatÃ¡shoz
 Click to cancel changes
-Nyomja meg a módosítások törléséhez
+Nyomja meg a mÃ³dosÃ­tÃ¡sok tÃ¶rlÃ©sÃ©hez
 Follow local robots rules on sites
-Helyi robotok szabályainak követése a webhelyeken
+Helyi robotok szabÃ¡lyainak kÃ¶vetÃ©se a webhelyeken
 Links to non-localised external pages will produce error pages
-Meghatározatlan helyû külsõ weblapokra mutató hivatkozások hibaoldalakat eredményeznek
+MeghatÃ¡rozatlan helyÅ± kÃ¼lsÅ‘ weblapokra mutatÃ³ hivatkozÃ¡sok hibaoldalakat eredmÃ©nyeznek
 Do not erase obsolete files after update
-Aktualizálás után nem törli a régi fájlokat
+AktualizÃ¡lÃ¡s utÃ¡n nem tÃ¶rli a rÃ©gi fÃ¡jlokat
 Accept cookies?
-Fogadja a sütiket?
+Fogadja a sÃ¼tiket?
 Check document type when unknown?
-Ellenõrzi a dokumentum típusát, ha ismeretlen?
+EllenÅ‘rzi a dokumentum tÃ­pusÃ¡t, ha ismeretlen?
 Parse java applets to retrieve included files that must be downloaded?
-Elemzi a Java appleteket a letöltendõ fájlok kikeresésének szempontjából?
+Elemzi a Java appleteket a letÃ¶ltendÅ‘ fÃ¡jlok kikeresÃ©sÃ©nek szempontjÃ¡bÃ³l?
 Store all files in cache instead of HTML only
-Minden fájlt csak a gyorsítótárban tárol a HTML helyett
+Minden fÃ¡jlt csak a gyorsÃ­tÃ³tÃ¡rban tÃ¡rol a HTML helyett
 Log file type (if generated)
-Naplófájl típusa (generálás esetén)
+NaplÃ³fÃ¡jl tÃ­pusa (generÃ¡lÃ¡s esetÃ©n)
 Maximum mirroring depth from root address
-Tükrözés maximális mélysége a gyökércímtõl
+TÃ¼krÃ¶zÃ©s maximÃ¡lis mÃ©lysÃ©ge a gyÃ¶kÃ©rcÃ­mtÅ‘l
 Maximum mirroring depth for external/forbidden addresses (0, that is, none, is the default)
 Maximum mirroring depth for external/fodbidden addresses (0, that is, none, is the default)
 Create a debugging file
-Hibakeresõ fájl létrehozása
+HibakeresÅ‘ fÃ¡jl lÃ©trehozÃ¡sa
 Use non-standard requests to get round some server bugs
-Nem szabványos kérések használata bizonyos kiszolgáló hibák elkerüléséhez
+Nem szabvÃ¡nyos kÃ©rÃ©sek hasznÃ¡lata bizonyos kiszolgÃ¡lÃ³ hibÃ¡k elkerÃ¼lÃ©sÃ©hez
 Use old HTTP/1.0 requests (limits engine power!)
-Régi HTTP/1.0 kérések használata (korlátozza a motor energiáját!)
+RÃ©gi HTTP/1.0 kÃ©rÃ©sek hasznÃ¡lata (korlÃ¡tozza a motor energiÃ¡jÃ¡t!)
 Attempt to limit retransfers through several tricks (file size test..)
-Ismételt átvitel korlátozása különféle trükkökkel (fájlméret teszt...)
+IsmÃ©telt Ã¡tvitel korlÃ¡tozÃ¡sa kÃ¼lÃ¶nfÃ©le trÃ¼kkÃ¶kkel (fÃ¡jlmÃ©ret teszt...)
 Attempt to limit the number of links by skipping similar URLs (www.foo.com==foo.com, http=https ..)
 
 Write external links without login/password
-Külsõ hivatkozások felhasználónév/jelszó nélküli írása
+KÃ¼lsÅ‘ hivatkozÃ¡sok felhasznÃ¡lÃ³nÃ©v/jelszÃ³ nÃ©lkÃ¼li Ã­rÃ¡sa
 Write internal links without query string
-Belsõ hivatkozások írása lekérdezési szöveg nélkül
+BelsÅ‘ hivatkozÃ¡sok Ã­rÃ¡sa lekÃ©rdezÃ©si szÃ¶veg nÃ©lkÃ¼l
 Get non-HTML files related to a link, eg external .ZIP or pictures
-Hivatkozáshoz kapcsolódó nem HTML fájlok letöltése, pl. külsõ ZIP vagy képek
+HivatkozÃ¡shoz kapcsolÃ³dÃ³ nem HTML fÃ¡jlok letÃ¶ltÃ©se, pl. kÃ¼lsÅ‘ ZIP vagy kÃ©pek
 Test all links (even forbidden ones)
-Minden hivatkozás tesztelése (a tiltottak is)
+Minden hivatkozÃ¡s tesztelÃ©se (a tiltottak is)
 Try to catch all URLs (even in unknown tags/code)
-Minden URL felfogása (ismeretlen tagekben/kódban is)
+Minden URL felfogÃ¡sa (ismeretlen tagekben/kÃ³dban is)
 Get HTML files first!
-Elõbb töltse le a HTML-fájlokat!
+ElÅ‘bb tÃ¶ltse le a HTML-fÃ¡jlokat!
 Structure type (how links are saved)
-Szerkezet típusa (a hivatkozások mentésének módja)
+Szerkezet tÃ­pusa (a hivatkozÃ¡sok mentÃ©sÃ©nek mÃ³dja)
 Use a cache for updates
-Gyorsítótár használata a frissítésekhez
+GyorsÃ­tÃ³tÃ¡r hasznÃ¡lata a frissÃ­tÃ©sekhez
 Do not re-download locally erased files
-Nem tölti le ismét a helyben törölt fájlokat
+Nem tÃ¶lti le ismÃ©t a helyben tÃ¶rÃ¶lt fÃ¡jlokat
 Make an index
-Mutató készítése
+MutatÃ³ kÃ©szÃ­tÃ©se
 Make a word database
-Szóadatbázis létrehozása
+SzÃ³adatbÃ¡zis lÃ©trehozÃ¡sa
 Build a mail archive
-Levélarchívum létrehozása
+LevÃ©larchÃ­vum lÃ©trehozÃ¡sa
 Log files
-Naplófájlok
+NaplÃ³fÃ¡jlok
 DOS names (8+3)
 DOS nevek (8+3)
 ISO9660 names (CDROM)
@@ -499,556 +497,556 @@ ISO9660 nevek (CDROM)
 No error pages
 Nincs hibaoldal
 Primary Scan Rule
-Fõ keresési szabály
+FÅ‘ keresÃ©si szabÃ¡ly
 Travel mode
-Közlekedési mód
+KÃ¶zlekedÃ©si mÃ³d
 Global travel mode
-Globális közlekedési mód
+GlobÃ¡lis kÃ¶zlekedÃ©si mÃ³d
 These options should be modified only exceptionally
-Csak kivételes esetben módosítsa ezeket az opciókat
+Csak kivÃ©teles esetben mÃ³dosÃ­tsa ezeket az opciÃ³kat
 Activate Debugging Mode (winhttrack.log)
-Hibakeresõ mód aktiválása (winhttrack.log)
+HibakeresÅ‘ mÃ³d aktivÃ¡lÃ¡sa (winhttrack.log)
 Rewrite links: internal / external
-Hivatkozások átírása: belsõ / külsõ
+HivatkozÃ¡sok Ã¡tÃ­rÃ¡sa: belsÅ‘ / kÃ¼lsÅ‘
 Flow control
-Forgalom szabályozás
+Forgalom szabÃ¡lyozÃ¡s
 Limits
-Korlátozások
+KorlÃ¡tozÃ¡sok
 Identity
-Azonosítás
+AzonosÃ­tÃ¡s
 HTML footer
-HTML lábjegyzet
+HTML lÃ¡bjegyzet
 Languages
 Nyelvek
 Additional HTTP Headers
-További HTTP fejlécek
+TovÃ¡bbi HTTP fejlÃ©cek
 Default referer URL
-Alapértelmezett referer URL
+AlapÃ©rtelmezett referer URL
 N# connections
-Csatlakozások száma
+CsatlakozÃ¡sok szÃ¡ma
 Abandon host if error
-Hiba esetén leválik a kiszolgálóról
+Hiba esetÃ©n levÃ¡lik a kiszolgÃ¡lÃ³rÃ³l
 Minimum transfer rate (B/s)
-Minimális átviteli sebesség (B/s)
+MinimÃ¡lis Ã¡tviteli sebessÃ©g (B/s)
 Abandon host if too slow
-Leválik a kiszolgálóról, ha túl lassú
+LevÃ¡lik a kiszolgÃ¡lÃ³rÃ³l, ha tÃºl lassÃº
 Configure
-Beállítás
+BeÃ¡llÃ­tÃ¡s
 Use proxy for ftp transfers
-Proxy használata FTP átvitelekhez
+Proxy hasznÃ¡lata FTP Ã¡tvitelekhez
 TimeOut(s)
-Idõtúllépés
+IdÅ‘tÃºllÃ©pÃ©s
 Persistent connections (Keep-Alive)
-Folytonos kapcsolatok (Életben tartás)
+Folytonos kapcsolatok (Ã‰letben tartÃ¡s)
 Reduce connection time and type lookup time using persistent connections
-A csatlakozási idõ és típus keresési idõ csökkentése folytonos kapcsolatokkal
+A csatlakozÃ¡si idÅ‘ Ã©s tÃ­pus keresÃ©si idÅ‘ csÃ¶kkentÃ©se folytonos kapcsolatokkal
 Retries
-Próbák száma
+PrÃ³bÃ¡k szÃ¡ma
 Size limit
-Mérethatár
+MÃ©rethatÃ¡r
 Max size of any HTML file (B)
-Bármilyen HTML fájl (B) max. mérete
+BÃ¡rmilyen HTML fÃ¡jl (B) max. mÃ©rete
 Max size of any non-HTML file
-Bármilyen nem HTML-fájl max. mérete
+BÃ¡rmilyen nem HTML-fÃ¡jl max. mÃ©rete
 Max site size
-A webhely max. mérete
+A webhely max. mÃ©rete
 Max time
-Max. idõtartam
+Max. idÅ‘tartam
 Save prefs
-Beállítások mentése
+BeÃ¡llÃ­tÃ¡sok mentÃ©se
 Max transfer rate
-Max. átviteli sebesség
+Max. Ã¡tviteli sebessÃ©g
 Follow robots.txt
-Robots.txt követése
+Robots.txt kÃ¶vetÃ©se
 No external pages
-Nincs külsõ oldal
+Nincs kÃ¼lsÅ‘ oldal
 Do not purge old files
-Nem üríti ki a régi fájlokat
+Nem Ã¼rÃ­ti ki a rÃ©gi fÃ¡jlokat
 Accept cookies
-Sütik fogadása
+SÃ¼tik fogadÃ¡sa
 Check document type
-Dokumentum típus ellenõrzése
+Dokumentum tÃ­pus ellenÅ‘rzÃ©se
 Parse java files
-Java fájlok elemzése
+Java fÃ¡jlok elemzÃ©se
 Store ALL files in cache
-MINDEN fájl tárolása a gyorsítótárban
+MINDEN fÃ¡jl tÃ¡rolÃ¡sa a gyorsÃ­tÃ³tÃ¡rban
 Tolerant requests (for servers)
-Türelmes kérések (kiszolgálók részére)
+TÃ¼relmes kÃ©rÃ©sek (kiszolgÃ¡lÃ³k rÃ©szÃ©re)
 Update hack (limit re-transfers)
-Ismételt átvitelek korlátozása
+IsmÃ©telt Ã¡tvitelek korlÃ¡tozÃ¡sa
 URL hacks (join similar URLs)
 
 Force old HTTP/1.0 requests (no 1.1)
-Régi HTTP/1.0 (1.1 nem) kérések alkalmazása
+RÃ©gi HTTP/1.0 (1.1 nem) kÃ©rÃ©sek alkalmazÃ¡sa
 Max connections / seconds
-Max. csatlakozás/másodperc
+Max. csatlakozÃ¡s/mÃ¡sodperc
 Maximum number of links
-Hivatkozások max. száma
+HivatkozÃ¡sok max. szÃ¡ma
 Pause after downloading..
-Szünet letöltés után
+SzÃ¼net letÃ¶ltÃ©s utÃ¡n
 Hide passwords
-Jelszavak elrejtése
+Jelszavak elrejtÃ©se
 Hide query strings
-Lekérdezési szövegek elrejtése
+LekÃ©rdezÃ©si szÃ¶vegek elrejtÃ©se
 Links
-Hivatkozások
+HivatkozÃ¡sok
 Build
 Szerkezet
 Experts Only
 Csak szakembereknek
 Flow Control
-Forgalom szabályozás
+Forgalom szabÃ¡lyozÃ¡s
 Limits
-Korlátozások
+KorlÃ¡tozÃ¡sok
 Browser ID
-Böngészõ beazonosítás
+BÃ¶ngÃ©szÅ‘ beazonosÃ­tÃ¡s
 Scan Rules
-Keresési szabályok
+KeresÃ©si szabÃ¡lyok
 Spider
-Indexelés
+IndexelÃ©s
 Log, Index, Cache
-Napló, mutató, gyorsítótár
+NaplÃ³, mutatÃ³, gyorsÃ­tÃ³tÃ¡r
 Proxy
 Proxy
 MIME Types
-MIME-típusok
+MIME-tÃ­pusok
 Do you really want to quit WinHTTrack Website Copier?
-Biztos, hogy bezárja a programot?
+Biztos, hogy bezÃ¡rja a programot?
 Do not connect to a provider (already connected)
-nem csatlakozik szolgáltatóhoz (már csatlakozott)
+nem csatlakozik szolgÃ¡ltatÃ³hoz (mÃ¡r csatlakozott)
 Do not use remote access connection
-Nem használ távoli elérésû kapcsolatot
+Nem hasznÃ¡l tÃ¡voli elÃ©rÃ©sÅ± kapcsolatot
 Schedule the mirroring operation
-Tükrözés ütemezése
+TÃ¼krÃ¶zÃ©s Ã¼temezÃ©se
 Quit WinHTTrack Website Copier
-Kilépés a WinHTTrack webhely másolóból
+KilÃ©pÃ©s a WinHTTrack webhely mÃ¡solÃ³bÃ³l
 Back to starting page
-Vissza a kezdõlaphoz
+Vissza a kezdÅ‘laphoz
 Click to start!
-Nyomja meg az indításhoz!
+Nyomja meg az indÃ­tÃ¡shoz!
 No saved password for this connection!
-Nem mentette el a jelszót ehhez a kapcsolathoz!
+Nem mentette el a jelszÃ³t ehhez a kapcsolathoz!
 Can not get remote connection settings
-A távoli kapcsolat beállításai nem hozzáférhetõk
+A tÃ¡voli kapcsolat beÃ¡llÃ­tÃ¡sai nem hozzÃ¡fÃ©rhetÅ‘k
 Select a connection provider
-Válassza ki a szolgáltatót
+VÃ¡lassza ki a szolgÃ¡ltatÃ³t
 Start
-Indítás
+IndÃ­tÃ¡s
 Please adjust connection parameters if necessary,\nthen press FINISH to launch the mirroring operation.
-Szükség esetén állítsa be a kapcsolat tulajdonságait,\nmajd nyomja meg a BEFEJEZÉS gombot a tükrözés megkezdéséhez.
+SzÃ¼ksÃ©g esetÃ©n Ã¡llÃ­tsa be a kapcsolat tulajdonsÃ¡gait,\nmajd nyomja meg a BEFEJEZÃ‰S gombot a tÃ¼krÃ¶zÃ©s megkezdÃ©sÃ©hez.
 Save settings only, do not launch download now.
-Csak a beállításokat menti, nem indítja a letöltést.
+Csak a beÃ¡llÃ­tÃ¡sokat menti, nem indÃ­tja a letÃ¶ltÃ©st.
 On hold
-Várakozás
+VÃ¡rakozÃ¡s
 Transfer scheduled for: (hh/mm/ss)
-Átvitel ütemezése: (óó/pp/mm)
+Ãtvitel Ã¼temezÃ©se: (Ã³Ã³/pp/mm)
 Start
-Indítás
+IndÃ­tÃ¡s
 Connect to provider (RAS)
-Csatlakozás a szolgáltatóhoz
+CsatlakozÃ¡s a szolgÃ¡ltatÃ³hoz
 Connect to this provider
-Csatlakozás ehhez a szolgáltatóhoz
+CsatlakozÃ¡s ehhez a szolgÃ¡ltatÃ³hoz
 Disconnect when finished
-Vonalbontás, ha kész
+VonalbontÃ¡s, ha kÃ©sz
 Disconnect modem on completion
-Modem leválasztása, ha kész
+Modem levÃ¡lasztÃ¡sa, ha kÃ©sz
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Kérjük, jelezzen nekünk bármilyen hibát vagy problémát)\r\n\r\nFejlesztés:\r\nKezelõfelület (Windows): Xavier Roche\r\nIndexelés: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nEZER KÖSZÖNET a magyar fordításért:\r\nHerczeg József Tamásnak (hdodi@freemail.hu)
+\r\n(KÃ©rjÃ¼k, jelezzen nekÃ¼nk bÃ¡rmilyen hibÃ¡t vagy problÃ©mÃ¡t)\r\n\r\nFejlesztÃ©s:\r\nKezelÅ‘felÃ¼let (Windows): Xavier Roche\r\nIndexelÃ©s: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nEZER KÃ–SZÃ–NET a magyar fordÃ­tÃ¡sÃ©rt:\r\nHerczeg JÃ³zsef TamÃ¡snak (hdodi@freemail.hu)
 About WinHTTrack Website Copier
-WinHTTrack webhely másoló névjegye
+WinHTTrack webhely mÃ¡solÃ³ nÃ©vjegye
 Please visit our Web page
 Keresse fel weblapunkat!
 Wizard query
-Varázsló kérdése
+VarÃ¡zslÃ³ kÃ©rdÃ©se
 Your answer:
-Az ön válasza:
+Az Ã¶n vÃ¡lasza:
 Link detected..
-Hivatkozás található..
+HivatkozÃ¡s talÃ¡lhatÃ³..
 Choose a rule
-Válasszon ki egy szabályt
+VÃ¡lasszon ki egy szabÃ¡lyt
 Ignore this link
-Kihagyja ezt a hivatkozást
+Kihagyja ezt a hivatkozÃ¡st
 Ignore directory
-Mappa kihagyása
+Mappa kihagyÃ¡sa
 Ignore domain
-Tartomány kihagyása
+TartomÃ¡ny kihagyÃ¡sa
 Catch this page only
-Csak ezt az oldalt tölti le
+Csak ezt az oldalt tÃ¶lti le
 Mirror site
-Webhely tükrözése
+Webhely tÃ¼krÃ¶zÃ©se
 Mirror domain
-Tartomány tükrözése
+TartomÃ¡ny tÃ¼krÃ¶zÃ©se
 Ignore all
 Mindet kihagyja
 Wizard query
-Varázsló kérdése
+VarÃ¡zslÃ³ kÃ©rdÃ©se
 NO
 NEM
 File
-Fájl
+FÃ¡jl
 Options
-Beállítások
+BeÃ¡llÃ­tÃ¡sok
 Log
-Napló
+NaplÃ³
 Window
 Ablak
 Help
-Súgó
+SÃºgÃ³
 Pause transfer
-Átvitel szüneteltetése
+Ãtvitel szÃ¼neteltetÃ©se
 Exit
-Kilépés
+KilÃ©pÃ©s
 Modify options
-Opciók módosítása
+OpciÃ³k mÃ³dosÃ­tÃ¡sa
 View log
-Napló megjelenítése
+NaplÃ³ megjelenÃ­tÃ©se
 View error log
-Hibanapló megjelenítése
+HibanaplÃ³ megjelenÃ­tÃ©se
 View file transfers
-Fájlátvitelek megjelenítése
+FÃ¡jlÃ¡tvitelek megjelenÃ­tÃ©se
 Hide
-Elrejtés
+ElrejtÃ©s
 About WinHTTrack Website Copier
-Névjegy
+NÃ©vjegy
 Check program updates...
-Új verzió keresése...
+Ãšj verziÃ³ keresÃ©se...
 &Toolbar
-&Eszköztár
+&EszkÃ¶ztÃ¡r
 &Status Bar
-Állapot&sor
+Ãllapot&sor
 S&plit
-&Felosztás
+&FelosztÃ¡s
 File
-Fájl
+FÃ¡jl
 Preferences
-Beállítások
+BeÃ¡llÃ­tÃ¡sok
 Mirror
-Tükrözés
+TÃ¼krÃ¶zÃ©s
 Log
-Napló
+NaplÃ³
 Window
 Ablak
 Help
-Súgó
+SÃºgÃ³
 Exit
-Kilépés
+KilÃ©pÃ©s
 Load default options
-Alapértelmezett opciók betöltése
+AlapÃ©rtelmezett opciÃ³k betÃ¶ltÃ©se
 Save default options
-Alapértelmezett opciók visszaállítása
+AlapÃ©rtelmezett opciÃ³k visszaÃ¡llÃ­tÃ¡sa
 Reset to default options
-Alaértelmezett opciók visszaállítása
+AlaÃ©rtelmezett opciÃ³k visszaÃ¡llÃ­tÃ¡sa
 Load options...
-Opciók betöltése...
+OpciÃ³k betÃ¶ltÃ©se...
 Save options as...
-Opciók mentése másként...
+OpciÃ³k mentÃ©se mÃ¡skÃ©nt...
 Language preference...
-Nyelv átváltása...
+Nyelv Ã¡tvÃ¡ltÃ¡sa...
 Contents...
-Tartalomjegyzék...
+TartalomjegyzÃ©k...
 About WinHTTrack...
-WinHTTrack névjegye...
+WinHTTrack nÃ©vjegye...
 New project\tCtrl+N
-Új projekt\tCtrl+N
+Ãšj projekt\tCtrl+N
 &Open...\tCtrl+O
-M&egnyitás...\tCtrl+O
+M&egnyitÃ¡s...\tCtrl+O
 &Save\tCtrl+S
-&Mentés\tCtrl+S
+&MentÃ©s\tCtrl+S
 Save &As...
-Menté&s másként...
+MentÃ©&s mÃ¡skÃ©nt...
 &Delete...
-&Törlés...
+&TÃ¶rlÃ©s...
 &Browse sites...
-Webhelyek &böngészése...
+Webhelyek &bÃ¶ngÃ©szÃ©se...
 User-defined structure
-Felhasználói meghatározású szerkezet
+FelhasznÃ¡lÃ³i meghatÃ¡rozÃ¡sÃº szerkezet
 %n\tName of file without file type (ex: image)\r\n%N\tName of file including file type (ex: image.gif)\r\n%t\tFile type only (ex: gif)\r\n%p\tPath [without ending /] (ex: /someimages)\r\n%h\tHost name (ex: www.someweb.com)\r\n%M\tMD5 URL (128 bits, 32 ascii bytes)\r\n%Q\tMD5 query string (128 bits, 32 ascii bytes)\r\n%q\tMD5 small query string (16 bits, 4 ascii bytes)\r\n\r\n%s?\tShort name (ex: %sN)
-%n\tFájlnév fájltípus nélkül (kiv: kép)\r\n%N\tFájlnév fájltípussal (kiv: kep.gif)\r\n%t\tCsak fájltípus (kiv: gif)\r\n%p\tÚtvonal [vég nélkül /] (kiv: /nehanykep)\r\n%h\tKiszolgáló neve (kiv: www.someweb.com)\r\n%M\tMD5 URL (128 bit, 32 ascii bájt)\r\n%Q\tMD5 keresendõ szöveg (128 bit, 32 ascii bájt)\r\n%q\tMD5 kis keresési szöveg (16 bit, 4 ascii bájt)\r\n\r\n%s?\tRövid név (kiv: %sN)
+%n\tFÃ¡jlnÃ©v fÃ¡jltÃ­pus nÃ©lkÃ¼l (kiv: kÃ©p)\r\n%N\tFÃ¡jlnÃ©v fÃ¡jltÃ­pussal (kiv: kep.gif)\r\n%t\tCsak fÃ¡jltÃ­pus (kiv: gif)\r\n%p\tÃštvonal [vÃ©g nÃ©lkÃ¼l /] (kiv: /nehanykep)\r\n%h\tKiszolgÃ¡lÃ³ neve (kiv: www.someweb.com)\r\n%M\tMD5 URL (128 bit, 32 ascii bÃ¡jt)\r\n%Q\tMD5 keresendÅ‘ szÃ¶veg (128 bit, 32 ascii bÃ¡jt)\r\n%q\tMD5 kis keresÃ©si szÃ¶veg (16 bit, 4 ascii bÃ¡jt)\r\n\r\n%s?\tRÃ¶vid nÃ©v (kiv: %sN)
 Example:\t%h%p/%n%q.%t\n->\t\tc:\\mirror\\www.someweb.com\\someimages\\image.gif
-Példa:\t%h%p/%n%q.%t\n->\t\tc:\\tukor\\www.someweb.com\\nehanykep\\kep.gif
+PÃ©lda:\t%h%p/%n%q.%t\n->\t\tc:\\tukor\\www.someweb.com\\nehanykep\\kep.gif
 Proxy settings
-Proxy beállítások
+Proxy beÃ¡llÃ­tÃ¡sok
 Proxy address:
-Proxy címe:
+Proxy cÃ­me:
 Proxy port:
 Proxy port:
 Authentication (only if needed)
-Hitelesítés (csakszükség esetén)
+HitelesÃ­tÃ©s (csakszÃ¼ksÃ©g esetÃ©n)
 Login
-Felhasználó
+FelhasznÃ¡lÃ³
 Password
-Jelszó
+JelszÃ³
 Enter proxy address here
-Ide írja be a proxy címét
+Ide Ã­rja be a proxy cÃ­mÃ©t
 Enter proxy port here
-Ide írja be a proxy portot
+Ide Ã­rja be a proxy portot
 Enter proxy login
-Ide írja be a proxy felhasználóját
+Ide Ã­rja be a proxy felhasznÃ¡lÃ³jÃ¡t
 Enter proxy password
-Ide írja be a proxy jelszavát
+Ide Ã­rja be a proxy jelszavÃ¡t
 Enter project name here
-Ide írja be a projekt nevét
+Ide Ã­rja be a projekt nevÃ©t
 Enter saving path here
-Ide írja be a projekt mentési útvonalát
+Ide Ã­rja be a projekt mentÃ©si ÃºtvonalÃ¡t
 Select existing project to update
-Jelöljön ki egy létezõ, frissítendõ projektet
+JelÃ¶ljÃ¶n ki egy lÃ©tezÅ‘, frissÃ­tendÅ‘ projektet
 Click here to select path
-Nyomja meg az útvonal kijelöléséhez
+Nyomja meg az Ãºtvonal kijelÃ¶lÃ©sÃ©hez
 Select or create a new category name, to sort your mirrors in categories
 
 HTTrack Project Wizard...
-HTTrack Projekt Varázsló...
+HTTrack Projekt VarÃ¡zslÃ³...
 New project name:
-Az új projekt neve:
+Az Ãºj projekt neve:
 Existing project name:
-A létezõ projekt neve:
+A lÃ©tezÅ‘ projekt neve:
 Project name:
 Projekt neve:
 Base path:
-Útvonal:
+Ãštvonal:
 Project category:
 
 C:\\My Web Sites
 C:\\Letoltott weblapok
 Type a new project name, \r\nor select existing project to update/resume
-Írja be az új projekt nevét, \r\nvagy jelöljön ki létezõ projektet a frissítéshez/folytatáshoz
+Ãrja be az Ãºj projekt nevÃ©t, \r\nvagy jelÃ¶ljÃ¶n ki lÃ©tezÅ‘ projektet a frissÃ­tÃ©shez/folytatÃ¡shoz
 New project
-Új projekt
+Ãšj projekt
 Insert URL
-URL beszúrása
+URL beszÃºrÃ¡sa
 URL:
 URL:
 Authentication (only if needed)
-Hitelesítés (csak szükség esetén)
+HitelesÃ­tÃ©s (csak szÃ¼ksÃ©g esetÃ©n)
 Login
-Felhasználó
+FelhasznÃ¡lÃ³
 Password
-Jelszó
+JelszÃ³
 Forms or complex links:
-Ûrlapok vagy összetett hivatkozások:
+Å°rlapok vagy Ã¶sszetett hivatkozÃ¡sok:
 Capture URL...
-URL átvétele...
+URL Ã¡tvÃ©tele...
 Enter URL address(es) here
-Ide írja be az URL-t
+Ide Ã­rja be az URL-t
 Enter site login
-Írja be a webhely felhasználónevét
+Ãrja be a webhely felhasznÃ¡lÃ³nevÃ©t
 Enter site password
-Írja be a webhely jelszavát
+Ãrja be a webhely jelszavÃ¡t
 Use this capture tool for links that can only be accessed through forms or javascript code
-Ezt az átvételt segítõ eszközt olyan hivatkozásokhoz vegye igénybe, melyek csak ûrlapokon vagy JavaScript kódon keresztül hozzáférhetõk
+Ezt az Ã¡tvÃ©telt segÃ­tÅ‘ eszkÃ¶zt olyan hivatkozÃ¡sokhoz vegye igÃ©nybe, melyek csak Å±rlapokon vagy JavaScript kÃ³don keresztÃ¼l hozzÃ¡fÃ©rhetÅ‘k
 Choose language according to preference
-Válassza ki az ön által beszélt nyelvet
+VÃ¡lassza ki az Ã¶n Ã¡ltal beszÃ©lt nyelvet
 Catch URL!
-URL átvétele!
+URL Ã¡tvÃ©tele!
 Please set temporary browser proxy settings to the following values (Copy/Paste Proxy Address and Port).\nThen click on the Form SUBMIT button in your browser page, or click on the specific link you want to capture.
-Módosítsa ideiglenesen a böngészõ proxy beállításait a következõ értékekre (a proxy cím és port másolásával/beillesztésével).\nEzután kattintson a böngészõben az ûrlap SUBMIT gombjára, vagy kattintson az átvenni kívánt hivatkozásra.
+MÃ³dosÃ­tsa ideiglenesen a bÃ¶ngÃ©szÅ‘ proxy beÃ¡llÃ­tÃ¡sait a kÃ¶vetkezÅ‘ Ã©rtÃ©kekre (a proxy cÃ­m Ã©s port mÃ¡solÃ¡sÃ¡val/beillesztÃ©sÃ©vel).\nEzutÃ¡n kattintson a bÃ¶ngÃ©szÅ‘ben az Å±rlap SUBMIT gombjÃ¡ra, vagy kattintson az Ã¡tvenni kÃ­vÃ¡nt hivatkozÃ¡sra.
 This will send the desired link from your browser to WinHTTrack.
-Ez átküldi a böngészõbõl az óhajtott hivatkozást a WinHTTrack programhoz.
+Ez Ã¡tkÃ¼ldi a bÃ¶ngÃ©szÅ‘bÅ‘l az Ã³hajtott hivatkozÃ¡st a WinHTTrack programhoz.
 ABORT
-MÉGSE
+MÃ‰GSE
 Copy/Paste the temporary proxy parameters here
-Az ideiglenes proxy beállítások másolása/beillesztése itt
+Az ideiglenes proxy beÃ¡llÃ­tÃ¡sok mÃ¡solÃ¡sa/beillesztÃ©se itt
 Cancel
-Mégse
+MÃ©gse
 Unable to find Help files!
-Nem található a Súgó!
+Nem talÃ¡lhatÃ³ a SÃºgÃ³!
 Unable to save parameters!
-A paraméterek nem menthetõk!
+A paramÃ©terek nem menthetÅ‘k!
 Please drag only one folder at a time
-Egyszerre csak egy mappát húzzon át
+Egyszerre csak egy mappÃ¡t hÃºzzon Ã¡t
 Please drag only folders, not files
-Csak mappát húzzon át, ne fájlt
+Csak mappÃ¡t hÃºzzon Ã¡t, ne fÃ¡jlt
 Please drag folders only
-Csak mappát húzzon át
+Csak mappÃ¡t hÃºzzon Ã¡t
 Select user-defined structure?
-Felhasználói meghatározású szerkezetet jelöl ki?
+FelhasznÃ¡lÃ³i meghatÃ¡rozÃ¡sÃº szerkezetet jelÃ¶l ki?
 Please ensure that the user-defined-string is correct,\notherwise filenames will be bogus!
-Ellenõrizze, hogy a felhasználó által meghatározott szöveg megfelelõ-e,\nmert különben a fájlnevek hamisak lesznek!
+EllenÅ‘rizze, hogy a felhasznÃ¡lÃ³ Ã¡ltal meghatÃ¡rozott szÃ¶veg megfelelÅ‘-e,\nmert kÃ¼lÃ¶nben a fÃ¡jlnevek hamisak lesznek!
 Do you really want to use a user-defined structure?
-Valóban felhasználó által meghatározott szerkezetet kíván kijelölni?
+ValÃ³ban felhasznÃ¡lÃ³ Ã¡ltal meghatÃ¡rozott szerkezetet kÃ­vÃ¡n kijelÃ¶lni?
 Too manu URLs, cannot handle so many links!!
-Túl sok URL, ilyen sok hivatkozást nem lehet kezelni!!
+TÃºl sok URL, ilyen sok hivatkozÃ¡st nem lehet kezelni!!
 Not enough memory, fatal internal error..
-Nincs elég memória, végzetes belsõ hiba.
+Nincs elÃ©g memÃ³ria, vÃ©gzetes belsÅ‘ hiba.
 Unknown operation!
-Ismeretlen mûvelet!
+Ismeretlen mÅ±velet!
 Add this URL?\r\n
-Hozzáadja az URL-t?\r\n
+HozzÃ¡adja az URL-t?\r\n
 Warning: main process is still not responding, cannot add URL(s)..
-Figyelem! A fõ folyamat még nem válaszol, nem lehet URL-(eke)t hozzáadni..
+Figyelem! A fÅ‘ folyamat mÃ©g nem vÃ¡laszol, nem lehet URL-(eke)t hozzÃ¡adni..
 Type/MIME associations
-Típus/MIME társítások
+TÃ­pus/MIME tÃ¡rsÃ­tÃ¡sok
 File types:
-Fájltípusok:
+FÃ¡jltÃ­pusok:
 MIME identity:
-MIME azonosítás
+MIME azonosÃ­tÃ¡s
 Select or modify your file type(s) here
-Itt jelölje ki vagy módosítsa a fájltípus(oka)t
+Itt jelÃ¶lje ki vagy mÃ³dosÃ­tsa a fÃ¡jltÃ­pus(oka)t
 Select or modify your MIME type(s) here
-Itt jelölje ki vagy módosítsa a MIME típus(oka)t
+Itt jelÃ¶lje ki vagy mÃ³dosÃ­tsa a MIME tÃ­pus(oka)t
 Go up
 Fel
 Go down
 Le
 File download information
-Fájl letöltési információk
+FÃ¡jl letÃ¶ltÃ©si informÃ¡ciÃ³k
 Freeze Window
-Ablak rögzítése
+Ablak rÃ¶gzÃ­tÃ©se
 More information:
-További információ:
+TovÃ¡bbi informÃ¡ciÃ³:
 Welcome to WinHTTrack Website Copier!\n\nPlease click on the NEXT button to\n\n- start a new project\n- or resume a partial download
-Üdvözli a WinHTTrack webhely másoló!\n\nNyomja meg a TOVÁBB gombot\n\n- új projekt indításához\n- vagy megkezdett letöltés folytatásához.
+ÃœdvÃ¶zli a WinHTTrack webhely mÃ¡solÃ³!\n\nNyomja meg a TOVÃBB gombot\n\n- Ãºj projekt indÃ­tÃ¡sÃ¡hoz\n- vagy megkezdett letÃ¶ltÃ©s folytatÃ¡sÃ¡hoz.
 File names with extension:\nFile names containing:\nThis file name:\nFolder names containing:\nThis folder name:\nLinks on this domain:\nLinks on domains containing:\nLinks from this host:\nLinks containing:\nThis link:\nALL LINKS
-Fájlnév kiterjesztéssel:\nFájlnév, tartalmazva:\nIlyen fájlnév:\nMappanév, tartalmazva:\nIlyen mappanév:\nHivatkozások tartományokon:\nHivatkozások tartományokon, tartalmazva:\nHivatkozások errõl a kiszolgálóról:\nHivatkozások, tartalmazva:\nIlyen hivatkozás:\nMINDEN HIVATKOZÁS
+FÃ¡jlnÃ©v kiterjesztÃ©ssel:\nFÃ¡jlnÃ©v, tartalmazva:\nIlyen fÃ¡jlnÃ©v:\nMappanÃ©v, tartalmazva:\nIlyen mappanÃ©v:\nHivatkozÃ¡sok tartomÃ¡nyokon:\nHivatkozÃ¡sok tartomÃ¡nyokon, tartalmazva:\nHivatkozÃ¡sok errÅ‘l a kiszolgÃ¡lÃ³rÃ³l:\nHivatkozÃ¡sok, tartalmazva:\nIlyen hivatkozÃ¡s:\nMINDEN HIVATKOZÃS
 Show all\nHide debug\nHide infos\nHide debug and infos
-Mind látszik\nHibakeresés elrejtése\nInfók elrejtése\nHibakeresés és infók elrejtése
+Mind lÃ¡tszik\nHibakeresÃ©s elrejtÃ©se\nInfÃ³k elrejtÃ©se\nHibakeresÃ©s Ã©s infÃ³k elrejtÃ©se
 Site-structure (default)\nHtml in web/,       images/other files in web/images/\nHtml in web/html,   images/other in web/images\nHtml in web/,       images/other in web/\nHtml in web/,       images/other in web/xxx, where xxx is the file extension\nHtml in web/html,   images/other in web/xxx\nSite-structure, without www.domain.xxx/\nHtml in site_name/, images/other files in site_name/images/\nHtml in site_name/html, images/other in site_name/images\nHtml in site_name/, images/other in site_name/\nHtml in site_name/, images/other in site_name/xxx\nHtml in site_name/html, images/other in site_name/xxx\nAll files in web/, with random names (gadget !)\nAll files in site_name/, with random names (gadget !)\nUser-defined structure..
-Hely-szerkezet (alapértelmezett)\nHtml a web/,       képek/egyéb fájlok a web/images/\nHtml a web/html,   képek/egyebek a web/images\nHtml a web/,       képek/egyebek a web/\nHtml a web/,       képek/egyebek a web/xxx, ahol xxx a  fájlkiterjesztés\nHtml a web/html,   képek/egyebek a web/xxx\nHely-szerkezet, www.domain.xxx nélkül/\nHtml a site_name/, képek/egyéb fájlok a site_name/images/\nHtml a site_name/html, képek/egyebek a site_name/images\nHtml a site_name/, képek/egyebek a site_name/\nHtml a site_name/, képek/egyebek a site_name/xxx\nHtml a site_name/html, képek/egyebek a site_name/xxx\nMinden fájl a web/, véletlen nevekkel (bonyolult !)\nMinden fájl a site_name/, véletlen nevekkel (bonyolult !)\nFelhasználó által meghatározott szerkezet...
+Hely-szerkezet (alapÃ©rtelmezett)\nHtml a web/,       kÃ©pek/egyÃ©b fÃ¡jlok a web/images/\nHtml a web/html,   kÃ©pek/egyebek a web/images\nHtml a web/,       kÃ©pek/egyebek a web/\nHtml a web/,       kÃ©pek/egyebek a web/xxx, ahol xxx a  fÃ¡jlkiterjesztÃ©s\nHtml a web/html,   kÃ©pek/egyebek a web/xxx\nHely-szerkezet, www.domain.xxx nÃ©lkÃ¼l/\nHtml a site_name/, kÃ©pek/egyÃ©b fÃ¡jlok a site_name/images/\nHtml a site_name/html, kÃ©pek/egyebek a site_name/images\nHtml a site_name/, kÃ©pek/egyebek a site_name/\nHtml a site_name/, kÃ©pek/egyebek a site_name/xxx\nHtml a site_name/html, kÃ©pek/egyebek a site_name/xxx\nMinden fÃ¡jl a web/, vÃ©letlen nevekkel (bonyolult !)\nMinden fÃ¡jl a site_name/, vÃ©letlen nevekkel (bonyolult !)\nFelhasznÃ¡lÃ³ Ã¡ltal meghatÃ¡rozott szerkezet...
 Just scan\nStore html files\nStore non html files\nStore all files (default)\nStore html files first
-Csak keresés\nHTML fájlok tárolása\nNem HTML-fájlok tárolása\nMinden fájl tárolása (alapértelmezett)\nElõbb a HTML-fájlokat tárolja
+Csak keresÃ©s\nHTML fÃ¡jlok tÃ¡rolÃ¡sa\nNem HTML-fÃ¡jlok tÃ¡rolÃ¡sa\nMinden fÃ¡jl tÃ¡rolÃ¡sa (alapÃ©rtelmezett)\nElÅ‘bb a HTML-fÃ¡jlokat tÃ¡rolja
 Stay in the same directory\nCan go down (default)\nCan go up\nCan both go up & down
-Ugyanabban a mappában marad\nLemehet (alapértelmezett)\nFelmehet\nLe is, fel is mehet
+Ugyanabban a mappÃ¡ban marad\nLemehet (alapÃ©rtelmezett)\nFelmehet\nLe is, fel is mehet
 Stay on the same address (default)\nStay on the same domain\nStay on the same top level domain\nGo everywhere on the web
-Ugyanazon a címen marad (alapértelm.)\nUgyanazon a tartományon marad\nUgyanazon a felsõszintû tartományon m.\nMindenhova megy a weben
+Ugyanazon a cÃ­men marad (alapÃ©rtelm.)\nUgyanazon a tartomÃ¡nyon marad\nUgyanazon a felsÅ‘szintÅ± tartomÃ¡nyon m.\nMindenhova megy a weben
 Never\nIf unknown (except /)\nIf unknown
-Soha\nHa ismeretlen (kivéve /)\nHa ismeretlen
+Soha\nHa ismeretlen (kivÃ©ve /)\nHa ismeretlen
 no robots.txt rules\nrobots.txt except wizard\nfollow robots.txt rules
-nincs robots.txt szabály\nrobots.txt a varázsló kivételével\nrobots.txt szabályok követése
+nincs robots.txt szabÃ¡ly\nrobots.txt a varÃ¡zslÃ³ kivÃ©telÃ©vel\nrobots.txt szabÃ¡lyok kÃ¶vetÃ©se
 normal\nextended\ndebug
-normál\nkiterjesztett\nhibakeresés
+normÃ¡l\nkiterjesztett\nhibakeresÃ©s
 Download web site(s)\nDownload web site(s) + questions\nGet individual files\nDownload all sites in pages (multiple mirror)\nTest links in pages (bookmark test)\n* Continue interrupted download\n* Update existing download
-Webhely(ek) letöltése\nWebhely(ek) letöltése + kérdések\nÖnálló fájlok megszerzése\nMinden hely letöltése oldalakban (többszörös tükrözés)\nHivatkozások tesztelése az oldalakon (webcím teszt)\n* Megszakadt letöltés folytatása\n* Létezõ letöltés frissítrése
+Webhely(ek) letÃ¶ltÃ©se\nWebhely(ek) letÃ¶ltÃ©se + kÃ©rdÃ©sek\nÃ–nÃ¡llÃ³ fÃ¡jlok megszerzÃ©se\nMinden hely letÃ¶ltÃ©se oldalakban (tÃ¶bbszÃ¶rÃ¶s tÃ¼krÃ¶zÃ©s)\nHivatkozÃ¡sok tesztelÃ©se az oldalakon (webcÃ­m teszt)\n* Megszakadt letÃ¶ltÃ©s folytatÃ¡sa\n* LÃ©tezÅ‘ letÃ¶ltÃ©s frissÃ­trÃ©se
 Relative URI / Absolute URL (default)\nAbsolute URL / Absolute URL\nAbsolute URI / Absolute URL\nOriginal URL / Original URL
-Relatív URL / Abszolút URL (alapértelmezett)\nAbszolút URL / Abszolút URL\nAbszolút URL / Abszolút URL\nEredeti URL / Eredeti URL
+RelatÃ­v URL / AbszolÃºt URL (alapÃ©rtelmezett)\nAbszolÃºt URL / AbszolÃºt URL\nAbszolÃºt URL / AbszolÃºt URL\nEredeti URL / Eredeti URL
 Open Source offline browser
-Nyílt forráskódú kapcsolat nélküli böngészõ
+NyÃ­lt forrÃ¡skÃ³dÃº kapcsolat nÃ©lkÃ¼li bÃ¶ngÃ©szÅ‘
 Website Copier/Offline Browser. Copy remote websites to your computer. Free.
-Weblapmásoló/Kapcsolat nélküli böngészõ. A távoli webhelyek saját számítógépre másolásához. Ingyenes.
+WeblapmÃ¡solÃ³/Kapcsolat nÃ©lkÃ¼li bÃ¶ngÃ©szÅ‘. A tÃ¡voli webhelyek sajÃ¡t szÃ¡mÃ­tÃ³gÃ©pre mÃ¡solÃ¡sÃ¡hoz. Ingyenes.
 httrack, winhttrack, webhttrack, offline browser
-httrack, winhttrack, webhttrack, kapcsolat nélküli böngészõ
+httrack, winhttrack, webhttrack, kapcsolat nÃ©lkÃ¼li bÃ¶ngÃ©szÅ‘
 URL list (.txt)
 URL-lista (.txt)
 Previous
-Elõzõ
+ElÅ‘zÅ‘
 Next
-Következõ
+KÃ¶vetkezÅ‘
 URLs
 URL-ek
 Warning
-Figyelmeztetés
+FigyelmeztetÃ©s
 Your browser does not currently support javascript. For better results, please use a javascript-aware browser.
-Az ön böngészõje jelenleg nem rendelkezik JavaScript támogatással. JavaScriptes böngészõ használatával jobb eredményt érhet el.
+Az Ã¶n bÃ¶ngÃ©szÅ‘je jelenleg nem rendelkezik JavaScript tÃ¡mogatÃ¡ssal. JavaScriptes bÃ¶ngÃ©szÅ‘ hasznÃ¡latÃ¡val jobb eredmÃ©nyt Ã©rhet el.
 Thank you
-Köszönjük
+KÃ¶szÃ¶njÃ¼k
 You can now close this window
-Mostmár bezárhatja ezt az ablakot
+MostmÃ¡r bezÃ¡rhatja ezt az ablakot
 Server terminated
-A kiszolgáló befejezte a kapcsolatot
+A kiszolgÃ¡lÃ³ befejezte a kapcsolatot
 A fatal error has occurred during this mirror
-Végzetes hiba történt a tükrözés közben
+VÃ©gzetes hiba tÃ¶rtÃ©nt a tÃ¼krÃ¶zÃ©s kÃ¶zben
 View Documentation
-Dokumentáció megtekintése
+DokumentÃ¡ciÃ³ megtekintÃ©se
 Go To HTTrack Website
-Ugrás a HTTrack webhelyére
+UgrÃ¡s a HTTrack webhelyÃ©re
 Go To HTTrack Forum
-Ugrás a HTTrack fórumára
+UgrÃ¡s a HTTrack fÃ³rumÃ¡ra
 View License
-Licenc megtekintése
+Licenc megtekintÃ©se
 Beware: you local browser might be unable to browse files with embedded filenames
-Figyelem: a helyi böngészõ nem biztos, hogy meg tudja nyitni a beágyazott fájlneveket tartalmazó fájlokat
+Figyelem: a helyi bÃ¶ngÃ©szÅ‘ nem biztos, hogy meg tudja nyitni a beÃ¡gyazott fÃ¡jlneveket tartalmazÃ³ fÃ¡jlokat
 Recreated HTTrack internal cached resources
-A HTTrack belsõ gyorsítótárazott erõforrásai újra létrejöttek
+A HTTrack belsÅ‘ gyorsÃ­tÃ³tÃ¡razott erÅ‘forrÃ¡sai Ãºjra lÃ©trejÃ¶ttek
 Could not create internal cached resources
-A belsõ gyorsítótárazott erõforrásokat nem sikerült létrehozni
+A belsÅ‘ gyorsÃ­tÃ³tÃ¡razott erÅ‘forrÃ¡sokat nem sikerÃ¼lt lÃ©trehozni
 Could not get the system external storage directory
-A rendszer külsõ tárhelye nem található
+A rendszer kÃ¼lsÅ‘ tÃ¡rhelye nem talÃ¡lhatÃ³
 Could not write to:
-Nem lehet írni ide:
+Nem lehet Ã­rni ide:
 Read-only media (SDCARD)
-Csak olvasható adathordozó (SDCARD)
+Csak olvashatÃ³ adathordozÃ³ (SDCARD)
 No storage media (SDCARD)
-Nincs adathordozó (SDCARD)
+Nincs adathordozÃ³ (SDCARD)
 HTTrack may not be able to download websites until this problem is fixed
-Amíg ez a hiba fennáll, a HTTrack esetleg nem tud webhelyeket letölteni
+AmÃ­g ez a hiba fennÃ¡ll, a HTTrack esetleg nem tud webhelyeket letÃ¶lteni
 HTTrack: mirror '%s' stopped!
-HTTrack: a(z) "%s" tükrözés leállt!
+HTTrack: a(z) "%s" tÃ¼krÃ¶zÃ©s leÃ¡llt!
 Click on this notification to restart the interrupted mirror
-A megszakadt tükrözés folytatásához koppintson erre az értesítésre
+A megszakadt tÃ¼krÃ¶zÃ©s folytatÃ¡sÃ¡hoz koppintson erre az Ã©rtesÃ­tÃ©sre
 HTTrack: could not save profile for '%s'!
-HTTrack: a(z) "%s" profilját nem sikerült menteni!
+HTTrack: a(z) "%s" profiljÃ¡t nem sikerÃ¼lt menteni!
 Proxy type:
-Proxy típusa:
+Proxy tÃ­pusa:
 Proxy protocol. HTTP: standard proxy. HTTP (CONNECT tunnel): sends every request through a CONNECT tunnel, for CONNECT-only proxies like Tor's HTTPTunnelPort. SOCKS5: default port 1080.
-Proxy protokoll. HTTP: szabványos proxy. HTTP (CONNECT alagút): minden kérést CONNECT alagúton keresztül küld, a csak CONNECT-et támogató proxykhoz, mint a Tor HTTPTunnelPortja. SOCKS5: alapértelmezett port 1080.
+Proxy protokoll. HTTP: szabvÃ¡nyos proxy. HTTP (CONNECT alagÃºt): minden kÃ©rÃ©st CONNECT alagÃºton keresztÃ¼l kÃ¼ld, a csak CONNECT-et tÃ¡mogatÃ³ proxykhoz, mint a Tor HTTPTunnelPortja. SOCKS5: alapÃ©rtelmezett port 1080.
 Load cookies from file:
-Sütik betöltése fájlból:
+SÃ¼tik betÃ¶ltÃ©se fÃ¡jlbÃ³l:
 Preload cookies from a Netscape cookies.txt file before crawling.
-Sütik elõzetes betöltése egy Netscape cookies.txt fájlból a tükrözés elõtt.
+SÃ¼tik elÅ‘zetes betÃ¶ltÃ©se egy Netscape cookies.txt fÃ¡jlbÃ³l a tÃ¼krÃ¶zÃ©s elÅ‘tt.
 Pause between files:
-Szünet a fájlok között:
+SzÃ¼net a fÃ¡jlok kÃ¶zÃ¶tt:
 Random delay between file downloads, in seconds. Use MIN:MAX for a random range (e.g. 2:8).
-Véletlenszerû késleltetés a fájlletöltések között, másodpercben. Véletlen tartományhoz használja a MIN:MAX formát (pl. 2:8).
+VÃ©letlenszerÅ± kÃ©sleltetÃ©s a fÃ¡jlletÃ¶ltÃ©sek kÃ¶zÃ¶tt, mÃ¡sodpercben. VÃ©letlen tartomÃ¡nyhoz hasznÃ¡lja a MIN:MAX formÃ¡t (pl. 2:8).
 Keep the www. prefix (do not merge www.host with host)
-A www. elõtag megtartása (ne vonja össze a www.host és a host címet)
+A www. elÅ‘tag megtartÃ¡sa (ne vonja Ã¶ssze a www.host Ã©s a host cÃ­met)
 Do not treat www.host and host as the same site.
-Ne kezelje a www.host és a host címet ugyanazon webhelyként.
+Ne kezelje a www.host Ã©s a host cÃ­met ugyanazon webhelykÃ©nt.
 Keep double slashes in URLs
-Dupla perjelek megtartása az URL-ekben
+Dupla perjelek megtartÃ¡sa az URL-ekben
 Do not collapse duplicate slashes in URLs.
-Ne vonja össze az ismétlõdõ perjeleket az URL-ekben.
+Ne vonja Ã¶ssze az ismÃ©tlÅ‘dÅ‘ perjeleket az URL-ekben.
 Keep the original query-string order
-Az eredeti lekérdezési szöveg sorrendjének megtartása
+Az eredeti lekÃ©rdezÃ©si szÃ¶veg sorrendjÃ©nek megtartÃ¡sa
 Do not reorder query-string parameters when deduplicating URLs.
-Ne rendezze át a lekérdezési szöveg paramétereit az ismétlõdõ URL-ek kiszûrésekor.
+Ne rendezze Ã¡t a lekÃ©rdezÃ©si szÃ¶veg paramÃ©tereit az ismÃ©tlÅ‘dÅ‘ URL-ek kiszÅ±rÃ©sekor.
 Strip query keys:
-Lekérdezési kulcsok eltávolítása:
+LekÃ©rdezÃ©si kulcsok eltÃ¡volÃ­tÃ¡sa:
 Comma-separated query keys to drop from the saved-file naming (e.g. sid,utm_source).
-Vesszõvel elválasztott lekérdezési kulcsok, amelyeket el kell hagyni a mentett fájl elnevezésébõl (pl. sid,utm_source).
+VesszÅ‘vel elvÃ¡lasztott lekÃ©rdezÃ©si kulcsok, amelyeket el kell hagyni a mentett fÃ¡jl elnevezÃ©sÃ©bÅ‘l (pl. sid,utm_source).
 Write a WARC archive of the crawl
-A bejárás WARC archívumának írása
+A bejÃ¡rÃ¡s WARC archÃ­vumÃ¡nak Ã­rÃ¡sa
 Also save every fetched response into an ISO-28500 WARC/1.1 archive, next to the mirror.
-Minden letöltött válasz mentése ISO-28500 WARC/1.1 archívumba is, a tükör mellé.
+Minden letÃ¶ltÃ¶tt vÃ¡lasz mentÃ©se ISO-28500 WARC/1.1 archÃ­vumba is, a tÃ¼kÃ¶r mellÃ©.
 WARC archive name:
-WARC archívum neve:
+WARC archÃ­vum neve:
 Optional base name for the WARC archive; leave blank to auto-name it under the output directory.
-A WARC archívum opcionális alapneve; hagyja üresen az automatikus elnevezéshez a kimeneti könyvtárban.
+A WARC archÃ­vum opcionÃ¡lis alapneve; hagyja Ã¼resen az automatikus elnevezÃ©shez a kimeneti kÃ¶nyvtÃ¡rban.
 Report what changed since the previous mirror
-Jelentés arról, mi változott az elõzõ tükrözés óta
+JelentÃ©s arrÃ³l, mi vÃ¡ltozott az elÅ‘zÅ‘ tÃ¼krÃ¶zÃ©s Ã³ta
 Also write hts-changes.json listing what this crawl left new, changed, unchanged and gone compared to the previous mirror.
-A hts-changes.json fájl írása is, amely felsorolja, mi új, mi változott, mi maradt változatlan és mi tûnt el az elõzõ tükrözéshez képest.
+A hts-changes.json fÃ¡jl Ã­rÃ¡sa is, amely felsorolja, mi Ãºj, mi vÃ¡ltozott, mi maradt vÃ¡ltozatlan Ã©s mi tÅ±nt el az elÅ‘zÅ‘ tÃ¼krÃ¶zÃ©shez kÃ©pest.
 Inline assets as data: URIs (self-contained pages)
-Erõforrások beágyazása data: URI-ként (önálló oldalak)
+ErÅ‘forrÃ¡sok beÃ¡gyazÃ¡sa data: URI-kÃ©nt (Ã¶nÃ¡llÃ³ oldalak)
 Once the mirror is finished, rewrite every saved page with its stylesheets, scripts, images and fonts embedded, so a page can also be opened on its own.
-A tükrözés befejezése után minden mentett oldal újraírása a stíluslapok, parancsfájlok, képek és betûtípusok beágyazásával, így az oldal önmagában is megnyitható.
+A tÃ¼krÃ¶zÃ©s befejezÃ©se utÃ¡n minden mentett oldal ÃºjraÃ­rÃ¡sa a stÃ­luslapok, parancsfÃ¡jlok, kÃ©pek Ã©s betÅ±tÃ­pusok beÃ¡gyazÃ¡sÃ¡val, Ã­gy az oldal Ã¶nmagÃ¡ban is megnyithatÃ³.
 Largest inlined asset (bytes):
-Legnagyobb beágyazott erõforrás (bájt):
+Legnagyobb beÃ¡gyazott erÅ‘forrÃ¡s (bÃ¡jt):
 An asset above this size keeps an ordinary link; leave blank for the 10485760-byte default.
-Az ennél nagyobb erõforrás közönséges hivatkozás marad; hagyja üresen a 10485760 bájtos alapértelmezéshez.
+Az ennÃ©l nagyobb erÅ‘forrÃ¡s kÃ¶zÃ¶nsÃ©ges hivatkozÃ¡s marad; hagyja Ã¼resen a 10485760 bÃ¡jtos alapÃ©rtelmezÃ©shez.
 Seed the crawl from the site's sitemap
-A letöltés indítása a webhely webhelytérképérõl
+A letÃ¶ltÃ©s indÃ­tÃ¡sa a webhely webhelytÃ©rkÃ©pÃ©rÅ‘l
 Read the site's sitemap (robots.txt Sitemap: lines, then /sitemap.xml) and add every URL it lists as a start URL.
-A webhely webhelytérképének beolvasása (a robots.txt Sitemap: sorai, majd a /sitemap.xml), és a benne felsorolt összes URL felvétele kiindulási címként.
+A webhely webhelytÃ©rkÃ©pÃ©nek beolvasÃ¡sa (a robots.txt Sitemap: sorai, majd a /sitemap.xml), Ã©s a benne felsorolt Ã¶sszes URL felvÃ©tele kiindulÃ¡si cÃ­mkÃ©nt.
 Sitemap address:
-Webhelytérkép címe:
+WebhelytÃ©rkÃ©p cÃ­me:
 Address of a sitemap to read instead of probing the site; leave blank to probe robots.txt then /sitemap.xml.
-A webhely vizsgálata helyett beolvasandó webhelytérkép címe; hagyja üresen a robots.txt, majd a /sitemap.xml vizsgálatához.
+A webhely vizsgÃ¡lata helyett beolvasandÃ³ webhelytÃ©rkÃ©p cÃ­me; hagyja Ã¼resen a robots.txt, majd a /sitemap.xml vizsgÃ¡latÃ¡hoz.
 Write a CDXJ index of the WARC archive
-A WARC archívum CDXJ indexének írása
+A WARC archÃ­vum CDXJ indexÃ©nek Ã­rÃ¡sa
 Also write a sorted CDXJ index listing every record in the WARC archive, for replay tools.
-Rendezett CDXJ index írása is a WARC archívum minden rekordjáról, visszajátszó eszközök számára.
+Rendezett CDXJ index Ã­rÃ¡sa is a WARC archÃ­vum minden rekordjÃ¡rÃ³l, visszajÃ¡tszÃ³ eszkÃ¶zÃ¶k szÃ¡mÃ¡ra.
 Package the crawl as a WACZ file
-A bejárás csomagolása WACZ fájlba
+A bejÃ¡rÃ¡s csomagolÃ¡sa WACZ fÃ¡jlba
 Bundle the WARC archive, its CDXJ index and the mirrored pages into a single WACZ file; implies the WARC archive and the CDXJ index.
-A WARC archívum, a CDXJ index és a tükrözött oldalak egyetlen WACZ fájlba csomagolása; magával vonja a WARC archívumot és a CDXJ indexet.
+A WARC archÃ­vum, a CDXJ index Ã©s a tÃ¼krÃ¶zÃ¶tt oldalak egyetlen WACZ fÃ¡jlba csomagolÃ¡sa; magÃ¡val vonja a WARC archÃ­vumot Ã©s a CDXJ indexet.
 WARC segment size limit:
-WARC szegmens legnagyobb mérete:
+WARC szegmens legnagyobb mÃ©rete:
 Start a new WARC segment once the current one grows past this many bytes; leave blank or 0 to keep a single file.
-Új WARC szegmens kezdése, amint az aktuális túllépi ezt a bájtszámot; hagyja üresen vagy adjon meg 0-t egyetlen fájlhoz.
+Ãšj WARC szegmens kezdÃ©se, amint az aktuÃ¡lis tÃºllÃ©pi ezt a bÃ¡jtszÃ¡mot; hagyja Ã¼resen vagy adjon meg 0-t egyetlen fÃ¡jlhoz.
 Host aliases:
-Kiszolgálói álnevek:
+KiszolgÃ¡lÃ³i Ã¡lnevek:
 Other hostnames serving this same site, folded onto one, one rule per line (e.g. www2.example.com,m.example.com=example.com).
-Ugyanazt a webhelyet kiszolgáló további kiszolgálónevek egybeolvasztva, soronként egy szabály (pl. www2.example.com,m.example.com=example.com).
+Ugyanazt a webhelyet kiszolgÃ¡lÃ³ tovÃ¡bbi kiszolgÃ¡lÃ³nevek egybeolvasztva, soronkÃ©nt egy szabÃ¡ly (pl. www2.example.com,m.example.com=example.com).
 Mirror %s and every host below it
-%s és minden alatta lévõ kiszolgáló tükrözése
+%s Ã©s minden alatta lÃ©vÅ‘ kiszolgÃ¡lÃ³ tÃ¼krÃ¶zÃ©se
 Ignore %s and every host below it
-%s és minden alatta lévõ kiszolgáló kihagyása
+%s Ã©s minden alatta lÃ©vÅ‘ kiszolgÃ¡lÃ³ kihagyÃ¡sa

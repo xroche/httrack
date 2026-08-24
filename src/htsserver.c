@@ -1435,14 +1435,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
                            RUN THE SERVER
                          */
                         if (strcmp((char *) adrcd, "start") == 0) {
-                          /* POST body is in the form's charset, not the
-                             UTF-8 argv the engine now assumes (#629). */
-                          char *const cmdl = (char *) adr + p;
-                          char *cmdlUtf8 = hts_convertStringToUTF8(
-                              cmdl, strlen(cmdl), LANGSEL("LANGUAGE_CHARSET"));
-
-                          webhttrack_main(cmdlUtf8 != NULL ? cmdlUtf8 : cmdl);
-                          freet(cmdlUtf8);
+                          /* The pages declare utf-8, so the POST body is
+                             already the utf-8 argv the engine wants (#629). */
+                          webhttrack_main((char *) adr + p);
                         } else {
                           commandRunning = 0;
                           commandEnd = 1;
@@ -2610,18 +2605,9 @@ static int LANG_LIST(const char *path, char *buffer, size_t buffer_size) {
     strlcpybuff(lang_str, "LANGUAGE_NAME", sizeof(lang_str));
     htslang_load(lang_str, sizeof(lang_str), path);
     if (strlen(lang_str) > 0) {
-      char charset[64];
-      char *utf8;
-
-      /* Convert to UTF-8: each catalog names itself in its own charset, and
-         the menu carries all of them at once. */
-      strlcpybuff(charset, "LANGUAGE_CHARSET", sizeof(charset));
-      htslang_load(charset, sizeof(charset), path);
-      utf8 = hts_convertStringToUTF8(lang_str, strlen(lang_str), charset);
       if (buffer[0])
         strlcatbuff(buffer, "\n", buffer_size);
-      strlcatbuff(buffer, utf8 != NULL ? utf8 : lang_str, buffer_size);
-      freet(utf8);
+      strlcatbuff(buffer, lang_str, buffer_size);
     }
     i++;
   } while(strlen(lang_str) > 0);

@@ -6,8 +6,6 @@ LANGUAGE_ISO
 en
 LANGUAGE_AUTHOR
 Xavier Roche (roche at httrack.com)\r\nRobert Lagadec (rlagadec at yahoo.fr) \r\n
-LANGUAGE_CHARSET
-ISO-8859-1
 LANGUAGE_WINDOWSID
 English (United States)
 OK

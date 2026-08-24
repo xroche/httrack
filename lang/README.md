@@ -19,9 +19,9 @@ Line breaks are load-bearing in the dropdown strings, where each `\n` starts a l
 
 Some words are not translatable text but names on disk or on the wire, and must be copied through unchanged: `hts-cache`, `robots.txt`, `cgi-bin`, and the `web/html` and `web/images` directories in the local-structure list, along with the bare `web/` they sit under. Translating one points the user at a path HTTrack never creates. Example hostnames such as `www.someweb.com` are the opposite: localise them freely. `site_name` and `www.domain.xxx` are placeholders, kept as they are only so every catalog reads alike.
 
-Save the file in exactly the charset its `LANGUAGE_CHARSET` names, and check the header when you start from an existing file: Romanian declared ISO-8859-1 for years while its bytes were ISO-8859-2, so every `ă` reached the browser as `ã`. A single-byte charset decodes anything, so nothing catches this for you except the letters looking wrong.
+Save the file as UTF-8. The catalogs each named their own legacy charset until 3.50 and several disagreed with their own bytes, Romanian for years, so an editor that rewrote a file silently corrupted it; there is nothing left to disagree with now.
 
-`tests/62_lang-integrity.test` checks most of the above: the placeholder sequence, escapes it does not recognise, the line-break count, the literal names `hts-cache`, `robots.txt`, `cgi-bin`, `web/html` and `web/images`, and a mislabelled charset for the languages it has letters for. It does not check `\t` or `\r\n` counts, the bare `web/`, or `site_name` and `www.domain.xxx`; follow those rules anyway. Two of its counts are pinned per catalog, in `tests/62_lang-untranslated.counts` and `tests/62_lang-linebreaks.counts`, because the existing files carry long-standing differences not worth churning; if your change moves one of those numbers, look at why before editing the pin to match.
+`tests/62_lang-integrity.test` checks most of the above: the placeholder sequence, escapes it does not recognise, the line-break count, the literal names `hts-cache`, `robots.txt`, `cgi-bin`, `web/html` and `web/images`, and text re-encoded from the wrong source. It does not check `\t` or `\r\n` counts, the bare `web/`, or `site_name` and `www.domain.xxx`; follow those rules anyway. Two of its counts are pinned per catalog, in `tests/62_lang-untranslated.counts` and `tests/62_lang-linebreaks.counts`, because the existing files carry long-standing differences not worth churning; if your change moves one of those numbers, look at why before editing the pin to match.
 
 A few `LANGUAGE_*` entries at the top describe the file itself:
 
@@ -29,11 +29,8 @@ A few `LANGUAGE_*` entries at the top describe the file itself:
 | --- | --- |
 | `LANGUAGE_NAME` | Name shown in the language picker, in its own language (`Deutsch`, not `German`) |
 | `LANGUAGE_ISO` | ISO 639 code, with region if needed (`de`, `pt_BR`) |
-| `LANGUAGE_CHARSET` | Encoding the file is saved in (`ISO-8859-1`, `windows-1251`, `UTF-8`, ...) |
 | `LANGUAGE_AUTHOR` | Your name and contact |
 | `LANGUAGE_WINDOWSID` | Windows locale name used by WinHTTrack (`German (Standard)`) |
-
-Save the file in exactly its declared `LANGUAGE_CHARSET`; an editor that rewrites it as UTF-8 will corrupt the non-ASCII bytes.
 
 ## Adding or updating a language
 
