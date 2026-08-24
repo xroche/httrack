@@ -69,8 +69,8 @@ for f in "$log_dir"/*; do
     fi
 done
 
-# Copies of the engine's stderr, kept by tests/sanitizer-stderr-wrap.sh. Never
-# printed whole: these also hold the engine's ordinary chatter.
+# Copies of the engine's stderr, kept by tests/stderrwrap.c. Never printed
+# whole: these also hold the engine's ordinary chatter.
 if [ -n "$stderr_dir" ]; then
     for f in "$stderr_dir"/*.log; do
         [ -s "$f" ] || {

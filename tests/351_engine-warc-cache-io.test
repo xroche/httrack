@@ -1,0 +1,44 @@
+#!/bin/bash
+#
+# Three I/O seams that fail silently: the CDXJ record offset must stay 64-bit
+# past the 2GB `long` ceiling, a failed read of a cached file must abandon the
+# entry rather than commit a truncated body under its declared X-Size, and
+# abandoning it must leave the ZIP as if the entry had never been opened.
+
+set -e
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_warccacheio.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/"
+httrack -O "$tmp/out" "-#test=cache-readfail" "$tmp/"
+httrack -O "$tmp/out" "-#test=zip-abandon" "$tmp/"
+
+# Grade the archives with a reader that is not minizip: its own backscan is what
+# a leftover tail hides the central directory from.
+if py=$(find_python); then
+    "$py" - "$tmp/zip-abandon-ref.zip" "$tmp/zip-abandon-70000.zip" \
+        "$tmp/zip-abandon-200000.zip" <<'EOF'
+import os
+import sys
+import zipfile
+
+want = ["before.bin", "after1.bin", "after2.bin"]
+ref = None
+for path in sys.argv[1:]:
+    with zipfile.ZipFile(path) as z:
+        names = z.namelist()
+        assert names == want, (path, names)
+        assert z.testzip() is None, path
+    size = os.path.getsize(path)
+    if ref is None:
+        ref = size
+    assert size == ref, (path, size, ref)
+EOF
+else
+    echo "python3 not found: the independent zip reader is skipped"
+fi

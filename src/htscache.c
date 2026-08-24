@@ -174,9 +174,6 @@ void cache_mayadd(httrackp * opt, cache_back * cache, htsblk * r,
 	} \
 } while(0)
 
-/* Consecutive entry write failures before the cache stream is declared dead. */
-#define CACHE_MAX_WRITE_FAILURES 8
-
 /* Cache write failed: a fatal errno or a failure streak aborts the mirror
    (exit_xh); an isolated failure only drops the current entry. */
 static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
@@ -185,6 +182,10 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
                                    const char *url_fil) {
   const int fatal_errno = zErr == ZIP_ERRNO && check_fatal_io_errno();
 
+  /* Roll the partial member back: closing it would commit a short body under
+     the X-Size already written into its local header. */
+  if (entry_open)
+    (void) zipAbandonFileInZip((zipFile) cache->zipOutput);
   cache->zipWriteFailures++;
   if (fatal_errno || cache->zipWriteFailures >= CACHE_MAX_WRITE_FAILURES) {
     if (!cache->zipWriteFailed) {
@@ -200,12 +201,34 @@ static void cache_zip_write_failed(httrackp *opt, cache_back *cache,
     }
     opt->state.exit_xh = -1; /* fatal: stop the mirror, exit non-zero */
   } else {
-    if (entry_open)
-      zipCloseFileInZip((zipFile) cache->zipOutput); /* abandon, best-effort */
     hts_log_print(opt, LOG_WARNING,
                   "cache write failed (%s: %s), entry not cached: %s%s", what,
                   hts_get_zerror(zErr), url_adr, url_fil);
   }
+}
+
+/* Fail r with "<what>: <strerror(err)>". Bounded, never sprintf: msg is 80
+   bytes inside an installed-header struct, and strerror() is locale-sized. */
+void cache_read_failed(htsblk *r, const char *what, int err) {
+  r->statuscode = STATUSCODE_INVALID;
+  htsblk_failf(r, "%s: %s", what, strerror(err));
+}
+
+/* Stream fp into the cache entry already opened on zf. Z_OK, the zip error, or
+   CACHE_ZIP_READ_ERROR: a failed read must abandon the entry, since a short one
+   is indistinguishable from EOF and would commit a silently truncated body. */
+int cache_zip_store_stream(zipFile zf, FILE *fp) {
+  char BIGSTK buff[32768];
+  size_t nl;
+
+  do {
+    int zErr;
+
+    nl = fread(buff, 1, sizeof(buff), fp);
+    if (nl > 0 && (zErr = zipWriteInFileInZip(zf, buff, (int) nl)) != Z_OK)
+      return zErr;
+  } while (nl > 0);
+  return ferror(fp) ? CACHE_ZIP_READ_ERROR : Z_OK;
 }
 
 /* Ajout d'un fichier en cache */
@@ -398,22 +421,18 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
       if (file_size >= 0) {
         fp = FOPEN(fconv(catbuff, sizeof(catbuff), url_save), "rb");
         if (fp != NULL) {
-          char BIGSTK buff[32768];
-          size_t nl;
-
-          do {
-            nl = fread(buff, 1, 32768, fp);
-            if (nl > 0) {
-              if ((zErr =
-                   zipWriteInFileInZip((zipFile) cache->zipOutput, buff,
-                                       (int) nl)) != Z_OK) {
-                cache_zip_write_failed(opt, cache, "writing to the cache", zErr,
-                                       HTS_TRUE, url_adr, url_fil);
-                fclose(fp);
-                return;
-              }
-            }
-          } while(nl > 0);
+          zErr = cache_zip_store_stream((zipFile) cache->zipOutput, fp);
+          if (zErr != Z_OK) {
+            /* before fclose(): check_fatal_io_errno() reads the live errno */
+            cache_zip_write_failed(
+                opt, cache,
+                zErr == CACHE_ZIP_READ_ERROR ? "reading a file into the cache"
+                                             : "writing to the cache",
+                zErr == CACHE_ZIP_READ_ERROR ? ZIP_ERRNO : zErr, HTS_TRUE,
+                url_adr, url_fil);
+            fclose(fp);
+            return;
+          }
           fclose(fp);
         } else {
           /* Err FIXME - lost file */
@@ -798,12 +817,21 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                                               r.out)) { // erreur
                           int last_errno = errno;
 
-                          r.statuscode = STATUSCODE_INVALID;
-                          sprintf(r.msg, "Cache Read Error : Read To Disk: %s",
-                                  strerror(last_errno));
+                          cache_read_failed(&r,
+                                            "Cache Read Error : Read To Disk",
+                                            last_errno);
                         }
                       }
                     } while((nl > 0) && (size > 0) && (r.statuscode != -1));
+                    /* the member ran out before X-Size: a truncated entry,
+                       which the loop cannot tell from a clean EOF */
+                    if (size > 0 && r.statuscode != STATUSCODE_INVALID) {
+                      r.statuscode = STATUSCODE_INVALID;
+                      htsblk_failf(&r,
+                                   "Cache Read Error : Truncated entry, " LLintP
+                                   " byte(s) missing",
+                                   (LLint) size);
+                    }
                   }
 
                   fclose(r.out);
@@ -862,9 +890,8 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                           !hts_fread_exact(r.adr, (size_t) r.size, fp)) {
                         int last_errno = errno;
 
-                        r.statuscode = STATUSCODE_INVALID;
-                        sprintf(r.msg, "Read error in cache disk data: %s",
-                                strerror(last_errno));
+                        cache_read_failed(&r, "Read error in cache disk data",
+                                          last_errno);
                       } else if (r.size >= 0)
                         *(r.adr + r.size) = '\0';
                     } else {
@@ -922,40 +949,6 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
     r.location = NULL;
   }
   return r;
-}
-
-/* Open the cache ZIP via hts_fopen_utf8 so a non-ASCII path_log isn't mangled
-   to ANSI (#630); 64-bit funcs keep multi-GB caches whole on Windows LLP64. */
-static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const void *filename,
-                                           int mode) {
-  const char *mode_fopen = NULL;
-
-  (void) opaque;
-  if ((mode & ZLIB_FILEFUNC_MODE_READWRITEFILTER) == ZLIB_FILEFUNC_MODE_READ)
-    mode_fopen = "rb";
-  else if (mode & ZLIB_FILEFUNC_MODE_EXISTING)
-    mode_fopen = "r+b";
-  else if (mode & ZLIB_FILEFUNC_MODE_CREATE)
-    mode_fopen = "wb";
-  if (filename == NULL || mode_fopen == NULL)
-    return NULL;
-  return (voidpf) FOPEN((const char *) filename, mode_fopen);
-}
-
-static unzFile hts_unzOpen_utf8(const char *path) {
-  zlib_filefunc64_def ff;
-
-  fill_fopen64_filefunc(&ff);
-  ff.zopen64_file = hts_zip_fopen_utf8;
-  return unzOpen2_64(path, &ff);
-}
-
-static zipFile hts_zipOpen_utf8(const char *path, int append) {
-  zlib_filefunc64_def ff;
-
-  fill_fopen64_filefunc(&ff);
-  ff.zopen64_file = hts_zip_fopen_utf8;
-  return zipOpen2_64(path, append, NULL, &ff);
 }
 
 /* Pathname of a file inside the mirror dir (rotating concat buffer). */

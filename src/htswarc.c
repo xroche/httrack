@@ -105,6 +105,11 @@ struct warc_writer {
   char *main_date; /* its WARC-Date (mainPageDate) */
 };
 
+/* A 32-bit offset misindexes every record past 4GB, and `unsigned long` is
+   that narrow on LLP64: pin the width, not the spelling. */
+HTS_STATIC_ASSERT(sizeof(((struct warc_writer *) 0)->offset) >= 8,
+                  warc_offset_is_64bit);
+
 const char *warc_truncated_reason(int code) {
   switch (code) {
   case WARC_TRUNC_LENGTH:
@@ -783,6 +788,17 @@ static int cdx_lines_add(warc_writer *w, char *line) {
   return 0;
 }
 
+/* PRIu64 straight off the uint64_t: an `(unsigned long)` cast compiles clean
+   and truncates past 4GB on LLP64 Windows, where only that leg's run of
+   -#test=warc-offset would ever see the wrong offset. */
+int warc_cdx_extent(char *out, size_t outsz, uint64_t length, uint64_t offset) {
+  const int n = snprintf(
+      out, outsz, ", \"length\": \"%" PRIu64 "\", \"offset\": \"%" PRIu64 "\"",
+      length, offset);
+
+  return (n < 0 || (size_t) n >= outsz) ? -1 : n;
+}
+
 /* Build and stash one CDXJ line for a record. Best-effort: an OOM drops the
    line rather than failing the (already-written) record. */
 static void warc_cdx_add(warc_writer *w, const char *target_uri,
@@ -807,10 +823,13 @@ static void warc_cdx_add(warc_writer *w, const char *target_uri,
   if (payload_digest != NULL && payload_digest[0] != '\0' &&
       wbuf_printf(&line, ", \"digest\": \"sha1:%s\"", payload_digest) != 0)
     goto fail;
-  if (wbuf_printf(&line, ", \"length\": \"%llu\", \"offset\": \"%llu\"",
-                  (unsigned long long) length,
-                  (unsigned long long) offset) != 0)
-    goto fail;
+  {
+    char extent[WARC_CDX_EXTENT_SIZE];
+
+    if (warc_cdx_extent(extent, sizeof(extent), length, offset) < 0 ||
+        wbuf_puts(&line, extent) != 0)
+      goto fail;
+  }
   if (w->cur_seg != NULL && (wbuf_puts(&line, ", \"filename\": ") != 0 ||
                              cdx_json_str(&line, w->cur_seg) != 0))
     goto fail;
@@ -1003,12 +1022,6 @@ static int wacz_add_mem(zipFile zf, const char *zipname, const void *data,
   return 0;
 }
 
-static zipFile wacz_zip_open(const char *path) {
-  zlib_filefunc64_def ff;
-  fill_fopen64_filefunc(&ff);
-  return zipOpen2_64(path, 0 /*create*/, NULL, &ff);
-}
-
 /* Package the segment(s) + .cdx + a generated pages.jsonl into <base>.wacz at
    crawl end (the archive file(s) and .cdx are already closed on disk). */
 static void warc_wacz_package(warc_writer *w) {
@@ -1031,7 +1044,7 @@ static void warc_wacz_package(warc_writer *w) {
   snprintf(tmppath, sizeof(tmppath), "%s.wacz.tmp", w->base_path);
   /* Build into a temp; only full success replaces <base>.wacz, so a zero-record
      re-run can't destroy a good archive (#522). */
-  zf = wacz_zip_open(fconv(catbuff, sizeof(catbuff), tmppath));
+  zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), tmppath), 0);
   if (zf == NULL) {
     hts_log_print(w->opt, LOG_WARNING, "WACZ: could not create %s", tmppath);
     return;
@@ -1267,11 +1280,7 @@ static int warc_emit(warc_writer *w, const char *type, const char *content_type,
     if (member_end(&m) != 0)
       goto done;
 
-    {
-      long pos = ftell(w->f);
-      if (pos >= 0)
-        w->offset = (uint64_t) pos;
-    }
+    w->offset = warc_stream_offset(w->f, w->offset);
     /* Index response/revisit/resource records only (not warcinfo/request). */
     if (w->cdx_on && target_uri != NULL && target_uri[0] != '\0' &&
         (strcmp(type, "response") == 0 || strcmp(type, "revisit") == 0 ||
@@ -1293,6 +1302,18 @@ done:
   if (rc != 0)
     w->failed = HTS_TRUE; /* a truncated run must not replace a whole one */
   return rc;
+}
+
+/* Byte offset of f, for the CDXJ index and the segment-rotation cap. ftello,
+   never ftell: long tops out at 2GB, and is 32-bit even on 64-bit Windows, so
+   every offset past the cap would be indexed wrong. `current` on failure. */
+uint64_t warc_stream_offset(FILE *f, uint64_t current) {
+  const LLint pos = ftello(f);
+
+  /* ftell/long would compile here and cap at 2GB on LLP64 and 32-bit hosts */
+  HTS_STATIC_ASSERT(sizeof(pos) >= 8 && sizeof(ftello(f)) >= 8,
+                    warc_tell_is_64bit);
+  return pos >= 0 ? (uint64_t) pos : current;
 }
 
 /* ---- segment rotation (--warc-max-size) ---- */

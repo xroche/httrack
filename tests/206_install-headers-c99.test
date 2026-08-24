@@ -10,6 +10,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+skip_on_emulated "a dialect sweep cannot vary by target, and 205 still runs here"
+
 # Unset means no automake run (the Windows job runs the scripts directly), so
 # there is no install rule to drive.
 if [ -z "${abs_top_builddir:-}" ]; then

@@ -28,6 +28,12 @@
 
 #include "ioapi.h"
 
+#if defined(_WIN32) || defined(WIN32)
+#include <io.h> /* _chsize_s, _fileno */
+#else
+#include <unistd.h> /* ftruncate */
+#endif
+
 voidpf call_zopen64 (const zlib_filefunc64_32_def* pfilefunc, const void*filename, int mode) {
     if (pfilefunc->zfile_func64.zopen64_file != NULL)
         return (*(pfilefunc->zfile_func64.zopen64_file)) (pfilefunc->zfile_func64.opaque,filename,mode);
@@ -63,6 +69,16 @@ ZPOS64_T call_ztell64 (const zlib_filefunc64_32_def* pfilefunc, voidpf filestrea
     }
 }
 
+int call_ztruncate64(const zlib_filefunc64_32_def *pfilefunc, voidpf filestream,
+                     ZPOS64_T size) {
+  /* a backend with no truncate keeps its tail: better than failing a rollback
+     the caller has already performed */
+  if (pfilefunc->zfile_func64.ztruncate64_file == NULL)
+    return 0;
+  return (*(pfilefunc->zfile_func64.ztruncate64_file))(
+      pfilefunc->zfile_func64.opaque, filestream, size);
+}
+
 void fill_zlib_filefunc64_32_def_from_filefunc32(zlib_filefunc64_32_def* p_filefunc64_32, const zlib_filefunc_def* p_filefunc32) {
     p_filefunc64_32->zfile_func64.zopen64_file = NULL;
     p_filefunc64_32->zopen32_file = p_filefunc32->zopen_file;
@@ -71,6 +87,8 @@ void fill_zlib_filefunc64_32_def_from_filefunc32(zlib_filefunc64_32_def* p_filef
     p_filefunc64_32->zfile_func64.zflush_file = p_filefunc32->zflush_file;
     p_filefunc64_32->zfile_func64.ztell64_file = NULL;
     p_filefunc64_32->zfile_func64.zseek64_file = NULL;
+    p_filefunc64_32->zfile_func64.ztruncate64_file =
+        NULL; /* no 32-bit counterpart */
     p_filefunc64_32->zfile_func64.zclose_file = p_filefunc32->zclose_file;
     p_filefunc64_32->zfile_func64.zerror_file = p_filefunc32->zerror_file;
     p_filefunc64_32->zfile_func64.opaque = p_filefunc32->opaque;
@@ -201,6 +219,21 @@ static int ZCALLBACK fflush_file_func (voidpf opaque, voidpf stream)
     return ret;
 }
 
+/* Shorten the file to `size`, dropping what a rolled-back member flushed. */
+static int ZCALLBACK ftruncate64_file_func(voidpf opaque, voidpf stream,
+                                           ZPOS64_T size) {
+  FILE *file = (FILE *) stream;
+  (void) opaque;
+  /* buffered bytes would otherwise be written back past the new end */
+  if (fflush(file) != 0)
+    return -1;
+#if defined(_WIN32) || defined(WIN32)
+  return _chsize_s(_fileno(file), (__int64) size);
+#else
+  return ftruncate(fileno(file), (off_t) size);
+#endif
+}
+
 static int ZCALLBACK fclose_file_func(voidpf opaque, voidpf stream) {
     int ret;
     (void)opaque;
@@ -233,6 +266,7 @@ void fill_fopen64_filefunc(zlib_filefunc64_def* pzlib_filefunc_def) {
     pzlib_filefunc_def->zwrite_file = fwrite_file_func;
     pzlib_filefunc_def->ztell64_file = ftell64_file_func;
     pzlib_filefunc_def->zseek64_file = fseek64_file_func;
+    pzlib_filefunc_def->ztruncate64_file = ftruncate64_file_func;
     pzlib_filefunc_def->zflush_file = fflush_file_func;
     pzlib_filefunc_def->zclose_file = fclose_file_func;
     pzlib_filefunc_def->zerror_file = ferror_file_func;

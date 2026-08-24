@@ -2124,15 +2124,16 @@ int httpmirror(char *url1, httrackp * opt) {
                               StringBuff(opt->path_log), "hts-cache/old.lst"),
                       "rb");
       if (old_lst) {
+        const size_t sz = llint_to_size_t(fsize_utf8(
+            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                    StringBuff(opt->path_log), "hts-cache/new.lst")));
+
         if (opt->delete_old && !purge_files) {
           hts_log_print(opt, LOG_WARNING,
                         "A page could not be fetched and the links it carries "
                         "were never scanned: keeping all previously mirrored "
                         "files");
         }
-        const size_t sz = llint_to_size_t(fsize_utf8(
-            fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                    StringBuff(opt->path_log), "hts-cache/new.lst")));
         new_lst = FOPEN(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                 StringBuff(opt->path_log), "hts-cache/new.lst"),
                         "rb");

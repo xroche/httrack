@@ -3931,9 +3931,7 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
              previous copy (#746), and it must stay so: every file this run
              preserves keeps its children. An answered error is not in it and
              needs nothing, being recovered from the cache and re-parsed. */
-          const hts_boolean unanswered = back_transfer_failed(r->statuscode);
-
-          if (unanswered && !heap(ptr)->testmode &&
+          if (back_transfer_failed(r->statuscode) && !heap(ptr)->testmode &&
               hts_link_may_carry_links(opt, cache, urladr(), urlfil())) {
             opt->links_unqueued = HTS_TRUE;
           }
