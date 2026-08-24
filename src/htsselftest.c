@@ -3361,7 +3361,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       cached = a + 7;
     else if (strncmp(a, "filpad=", 7) == 0)
       filpad = atoi(a + 7);
-    else if (strncmp(a, "delayed=", 8) == 0) /* -#N */
+    else if (strncmp(a, "delayed=", 8) == 0) /* -%N */
       opt->savename_delayed = (hts_savename_delayed) atoi(a + 8);
     else if (strncmp(a, "nosback=", 8) == 0) /* as -#C: no backing at all */
       nosback = atoi(a + 8);
