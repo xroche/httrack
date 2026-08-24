@@ -68,12 +68,14 @@ htsblk cache_read(httrackp * opt, cache_back * cache, const char *adr,
 htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, const char *save, char *location);
 /* Like cache_read, but also yields entries whose transfer broke; return_save
-   (optional, HTS_URLMAXSIZE*2) receives the entry's recorded save name.
-   Header fields only: adr, headers and location come back NULL, so the caller
-   owns and frees nothing. */
+   (optional, HTS_URLMAXSIZE*2) receives the entry's recorded save name and
+   return_location (optional, HTS_LOCATION_SIZE) its Location, which outlives
+   the status an entry naming no local file is invalidated to. Header fields
+   only: adr and headers come back NULL, so the caller owns and frees nothing,
+   and the location is the one to read, not r.location. */
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
-                                   char *return_save);
+                                   char *return_save, char *return_location);
 htsblk cache_readex(httrackp * opt, cache_back * cache, const char *adr,
                     const char *fil, const char *save, char *location,
                     char *return_save, int readonly);

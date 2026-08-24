@@ -349,7 +349,7 @@ static int broken_ref_selftest(httrackp *opt) {
 
   selftest_open_for_read(&cache, opt);
   save[0] = '\0';
-  r = cache_read_including_broken(opt, &cache, adr, fil, save);
+  r = cache_read_including_broken(opt, &cache, adr, fil, save, NULL);
   selftest_close(&cache);
 
   if (r.statuscode != 200 || strcmp(r.contenttype, "text/html") != 0) {

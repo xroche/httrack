@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# The hold #1390 put on the update purge keyed on the previous run's cache
+# entry being 2xx hypertext. A redirect hub has no such entry, and a hub
+# failing twice in a row leaves none at all, so both lost live children (#1395).
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_redirhub.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1 --timeout=20 --changes)
+
+# assert_purged WANT OUTDIR: what the run reported doing to the old files.
+assert_purged() {
+    local want="$1" json="${2}/hts-changes.json"
+    grep -q "\"purged\": ${want}" "$json" ||
+        fail "expected \"purged\": ${want} in $(<"$json")"
+}
+
+# assert_alive FILE MARKER: still mirrored, and still the body we mirrored.
+assert_alive() {
+    test -s "$1" || fail "$1 is gone"
+    grep -q "$2" "$1" || fail "$1 no longer carries ${2}"
+}
+
+# assert_gave_up OUTDIR URLPATH: the link really did exhaust its retries.
+assert_gave_up() {
+    local log="${1}/hts-log.txt"
+    grep -qE "Error:.*\(-[0-9]+\).*at link .*${2}" "$log" ||
+        fail "no give-up on ${2}: $(<"$log")"
+}
+
+local_server_start --log "${tmpdir}/server.log"
+
+# --- a hub that is a redirect ----------------------------------------------
+# rtarget.html and rchild.html hang below a 301 whose cache entry is stored
+# headers-only: nothing in it is 2xx, and it names no local file.
+out="${tmpdir}/redir"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/redirfail"
+
+local_crawl --log "${tmpdir}/rlog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/redirfail/index.html"
+assert_alive "${site}/rtarget.html" REDIRFAIL-TARGET
+assert_alive "${site}/rchild.html" REDIRFAIL-CHILD
+assert_alive "${site}/rgone.html" REDIRFAIL-GONE
+ok "pass 1 followed the redirect and mirrored what hangs below it"
+
+local_crawl --log "${tmpdir}/rlog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/redirfail/index.html"
+assert_gave_up "$out" '/redirfail/rhub\.html'
+assert_alive "${site}/rtarget.html" REDIRFAIL-TARGET
+assert_alive "${site}/rchild.html" REDIRFAIL-CHILD
+assert_purged false "$out"
+ok "a failed redirect hub keeps the subtree only it led to"
+
+# The hub redirects again, so this pass scans the whole site and the hold ends:
+# rgone.html is off the index and must go.
+local_crawl --log "${tmpdir}/rlog3" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/redirfail/index.html"
+assert_alive "${site}/rtarget.html" REDIRFAIL-TARGET
+assert_alive "${site}/rchild.html" REDIRFAIL-CHILD
+test ! -e "${site}/rgone.html" ||
+    fail "rgone.html left the site and a pass that scanned it all kept it"
+assert_purged true "$out"
+ok "the hold lasts the run, not the mirror"
+
+# --- a hub that fails on two consecutive updates ---------------------------
+# Pass 2 holds on the cached page from pass 1 but stores no entry of its own,
+# so pass 3 has nothing in the cache left to read.
+out="${tmpdir}/twice"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/twicefail"
+
+local_crawl --log "${tmpdir}/tlog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/twicefail/index.html"
+assert_alive "${site}/thub.html" 'tchild\.html'
+assert_alive "${site}/tchild.html" TWICEFAIL-CHILD
+ok "pass 1 mirrored the hub and the child both its parents link"
+
+local_crawl --log "${tmpdir}/tlog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/twicefail/index.html"
+assert_gave_up "$out" '/twicefail/thub\.html'
+assert_alive "${site}/tchild.html" TWICEFAIL-CHILD
+assert_purged false "$out"
+
+# talt.html stops linking the child here, so only the hub's kept copy still
+# carries it: purging now would unlink a file that is still reachable.
+local_crawl --log "${tmpdir}/tlog3" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/twicefail/index.html"
+assert_gave_up "$out" '/twicefail/thub\.html'
+grep -q 'tchild\.html' "${site}/thub.html" ||
+    fail "the kept copy of thub.html no longer links tchild.html"
+assert_alive "${site}/tchild.html" TWICEFAIL-CHILD
+assert_purged false "$out"
+ok "a second consecutive failure still holds the purge"
+
+# --- what carries no links must not hold anything --------------------------
+# Same failure, same kept copy, on a blob: neither its cached type nor the
+# name it was saved under says hypertext, on either pass.
+out="${tmpdir}/bin"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/binfail"
+
+local_crawl --log "${tmpdir}/blog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/binfail/index.html"
+assert_alive "${site}/binblob.bin" BINFAIL-BLOB
+assert_alive "${site}/bingone.html" BINFAIL-GONE
+
+local_crawl --log "${tmpdir}/blog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/binfail/index.html"
+assert_gave_up "$out" '/binfail/binblob\.bin'
+assert_alive "${site}/binblob.bin" BINFAIL-BLOB
+assert_purged true "$out"
+
+local_crawl --log "${tmpdir}/blog3" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/binfail/index.html"
+assert_gave_up "$out" '/binfail/binblob\.bin'
+assert_alive "${site}/binblob.bin" BINFAIL-BLOB
+test ! -e "${site}/bingone.html" ||
+    fail "bingone.html left the site and a failing blob kept the purge back"
+assert_purged true "$out"
+ok "a blob that failed twice keeps its own copy and nothing else"

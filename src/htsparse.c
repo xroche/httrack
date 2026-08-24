@@ -3554,18 +3554,38 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
   return strcasecmp(n_fil, pn_fil) == 0;
 }
 
-/* Does this link have a mirrored subtree the purge could take? Only a previous
-   run's successful fetch does; a link never mirrored endangers nothing. */
+/* Does this link have a mirrored subtree the purge could take? A previous run's
+   hypertext page does, and so does a redirect, whose target and everything
+   below it reached the mirror through here alone (#1395). */
 static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
-                                            const char *adr, const char *fil) {
+                                            const char *adr, const char *fil,
+                                            const char *save) {
   char BIGSTK prev_save[HTS_URLMAXSIZE * 2];
+  char BIGSTK prev_location[HTS_LOCATION_SIZE];
+  char guessed[256];
   htsblk prev;
 
-  prev_save[0] = '\0'; /* a cache miss leaves it untouched */
-  prev = cache_read_including_broken(opt, cache, adr, fil, prev_save);
+  /* a cache miss leaves both untouched */
+  prev_save[0] = prev_location[0] = '\0';
+  prev = cache_read_including_broken(opt, cache, adr, fil, prev_save,
+                                     prev_location);
 
-  return HTTP_IS_OK(prev.statuscode) && strnotempty(prev_save) &&
-                 is_hypertext_mime(opt, prev.contenttype, prev_save)
+  /* A redirect is stored headers-only, so it has no local file and the read
+     invalidates its status; the Location it recorded is what survives. */
+  if (HTTP_IS_REDIRECT(prev.statuscode) || strnotempty(prev_location))
+    return HTS_TRUE;
+  if (prev.statuscode > 0) /* answered: an error mirrored nothing */
+    return HTTP_IS_OK(prev.statuscode) && strnotempty(prev_save) &&
+                   is_hypertext_mime(opt, prev.contenttype, prev_save)
+               ? HTS_TRUE
+               : HTS_FALSE;
+
+  /* A run that failed the same way stored no entry at all, so the copy it kept
+     (#746) is the only surviving record of what this page was. */
+  guessed[0] = '\0';
+  return save != NULL && strnotempty(save) && fexist_utf8(save) &&
+                 guess_httptype_sized(opt, guessed, sizeof(guessed), save) &&
+                 is_hypertext_mime__(guessed)
              ? HTS_TRUE
              : HTS_FALSE;
 }
@@ -3932,7 +3952,8 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
              preserves keeps its children. An answered error is not in it and
              needs nothing, being recovered from the cache and re-parsed. */
           if (back_transfer_failed(r->statuscode) && !heap(ptr)->testmode &&
-              hts_link_may_carry_links(opt, cache, urladr(), urlfil())) {
+              hts_link_may_carry_links(opt, cache, urladr(), urlfil(),
+                                       savename())) {
             opt->links_unqueued = HTS_TRUE;
           }
 

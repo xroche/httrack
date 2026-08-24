@@ -1407,6 +1407,82 @@ class Handler(SimpleHTTPRequestHandler):
     def route_bigfail_gone(self):
         self.send_raw(b"<html><body><p>BIGFAIL-GONE</p></body></html>", "text/html")
 
+    # --- a hub that is a redirect, failing on the update (#1395) ------------
+    # rtarget.html and its child reached the mirror through rhub.html alone,
+    # and the cached entry for a 301 carries no hypertext type to key on.
+    def route_redirfail_index(self):
+        links = '\t<a href="rhub.html">hub</a>\n'
+        if self.refetch_pass() <= 2:  # rgone.html leaves the site for crawl 3
+            links += '\t<a href="rgone.html">gone</a>\n'
+        self.send_html(links)
+
+    # Cuts off both attempts of crawl 2, then redirects again for crawl 3.
+    def route_redirfail_hub(self):
+        if 2 <= self.refetch_pass() <= 3:
+            self.send_cut_headers()
+        else:
+            self.send_response(301, "Moved Permanently")
+            self.send_header("Location", "/redirfail/rtarget.html")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    def route_redirfail_target(self):
+        self.send_raw(
+            b"<html><body><p>REDIRFAIL-TARGET</p>"
+            b'<a href="rchild.html">c</a></body></html>',
+            "text/html",
+        )
+
+    def route_redirfail_child(self):
+        self.send_raw(b"<html><body><p>REDIRFAIL-CHILD</p></body></html>", "text/html")
+
+    def route_redirfail_gone(self):
+        self.send_raw(b"<html><body><p>REDIRFAIL-GONE</p></body></html>", "text/html")
+
+    # --- a hub failing on two consecutive updates (#1395) ------------------
+    # Crawl 2 holds the purge on the cached page from crawl 1 and writes no
+    # entry of its own, leaving crawl 3 nothing in the cache to key on.
+    def route_twicefail_index(self):
+        self.send_html('\t<a href="thub.html">hub</a>\n\t<a href="talt.html">alt</a>\n')
+
+    def route_twicefail_hub(self):
+        if self.refetch_pass() == 1:
+            self.send_html('\t<a href="tchild.html">c</a>\n')
+        else:
+            self.send_cut_headers()
+
+    # The child's other parent, which stops linking it for crawl 3: only the
+    # hub still carries tchild.html then, and only its local copy says so.
+    def route_twicefail_alt(self):
+        links = '\t<a href="tchild.html">c</a>\n' if self.refetch_pass() <= 2 else ""
+        self.send_html(links)
+
+    def route_twicefail_child(self):
+        self.send_raw(b"<html><body><p>TWICEFAIL-CHILD</p></body></html>", "text/html")
+
+    # --- negative control: a blob that carries no links (#1395) ------------
+    # Previously mirrored and failing exactly like the hubs, but typed as a
+    # blob, so neither the cached entry nor the kept copy may hold the purge.
+    def route_binfail_index(self):
+        links = '\t<a href="binblob.bin">blob</a>\n'
+        if self.refetch_pass() <= 2:  # bingone.html leaves the site for crawl 3
+            links += '\t<a href="bingone.html">gone</a>\n'
+        self.send_html(links)
+
+    # Fails on crawls 2 and 3: the second failure has no cached entry left, so
+    # only the kept copy's name says what it was.
+    def route_binfail_blob(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(
+                b"BINFAIL-BLOB\n" + b"\x71\x72\x73\x74" * 256,
+                "application/octet-stream",
+            )
+        else:
+            self.send_cut_headers()
+
+    def route_binfail_gone(self):
+        self.send_raw(b"<html><body><p>BINFAIL-GONE</p></body></html>", "text/html")
+
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
         self.send_raw(
@@ -2988,6 +3064,18 @@ class Handler(SimpleHTTPRequestHandler):
         "/bigfail/bighub.html": route_bigfail_hub,
         "/bigfail/bigchild.html": route_bigfail_child,
         "/bigfail/biggone.html": route_bigfail_gone,
+        "/redirfail/index.html": route_redirfail_index,
+        "/redirfail/rhub.html": route_redirfail_hub,
+        "/redirfail/rtarget.html": route_redirfail_target,
+        "/redirfail/rchild.html": route_redirfail_child,
+        "/redirfail/rgone.html": route_redirfail_gone,
+        "/twicefail/index.html": route_twicefail_index,
+        "/twicefail/thub.html": route_twicefail_hub,
+        "/twicefail/talt.html": route_twicefail_alt,
+        "/twicefail/tchild.html": route_twicefail_child,
+        "/binfail/index.html": route_binfail_index,
+        "/binfail/binblob.bin": route_binfail_blob,
+        "/binfail/bingone.html": route_binfail_gone,
         "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
