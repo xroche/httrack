@@ -41,7 +41,6 @@ Please visit our Website: http://www.httrack.com
 #include "htsnet.h"
 #include "htslib.h"
 #include "htsio.h"
-#include "htscharset.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>

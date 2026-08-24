@@ -79,7 +79,9 @@ def render(page, fields):
     resp = urllib.request.urlopen(req, timeout=20)
     if resp.status != 200:
         sys.exit("%s answered %d" % (page, resp.status))
-    body = resp.read().decode("utf-8")
+    # replace, not strict: a server emitting legacy bytes must fail on the
+    # assertion below rather than on a traceback here.
+    body = resp.read().decode("utf-8", "replace")
     if 'lang="fr"' not in body:
         sys.exit("%s did not switch to LANGUAGE_2:\n%s" % (page, body[:2000]))
     return body

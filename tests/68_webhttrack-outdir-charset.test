@@ -1,11 +1,9 @@
 #!/bin/bash
 #
-# A non-ASCII -O output dir submitted through the web UI must land under the
-# UTF-8 directory, not an ISO-8859-1 twin (#629). The pages declare UTF-8 since
-# 3.50, so the browser posts UTF-8 and nothing transcodes on the way in; this
-# guards the path end to end rather than the conversion that used to sit in it.
-# The crawl target is a dead port: only the -O directory name is under test, and
-# htsserver creates it from the decoded path before any fetch.
+# A non-ASCII -O output dir posted through the web UI must land under the UTF-8
+# directory and not an ISO-8859-1 twin (#629). The crawl target is a dead port:
+# only the directory name is under test, and htsserver creates it from the
+# decoded path before any fetch.
 
 set -euo pipefail
 

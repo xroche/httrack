@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The menu shows every catalog's own name at once. Each name leaves as an ASCII
-# character reference, so the menu reads the same whichever language the page is
-# served in (#116), which two languages far apart in the list check here.
+# The menu shows every catalog's own name at once, each as an ASCII character
+# reference, so it must read identically whichever language is serving (#116).
 
 set -euo pipefail
 
@@ -36,8 +35,8 @@ PY
 }
 
 printf '[the language menu names every catalog, whichever is serving] ..\t'
-# 1 is English, 8 Russian: different scripts, so a menu built from the serving
-# catalog rather than from all of them cannot match in both.
+# 1 is English, 8 Russian: a menu built from the serving catalog rather than
+# from all of them differs between the two.
 menu 1 "${work}/menu-en"
 menu 8 "${work}/menu-ru"
 

@@ -21,7 +21,7 @@ tmp=$(mktemp -d)
 cleanup_push rm -rf "$tmp"
 keys="$tmp/english.keys"
 
-# Byte-wise: each file is in its own declared legacy charset, lang.def is CRLF.
+# Byte-wise: the catalogs and lang.def are UTF-8, and CRLF but for Uzbek.txt.
 LC_ALL=C awk 'NR%2==1 { sub(/\r$/, ""); print }' "$eng" >"$keys"
 
 # An empty parse would make every check below pass vacuously.
@@ -64,7 +64,7 @@ fi
 
 # The catalogs are UTF-8 and html/server/*.html says so in its <meta>. A
 # re-encode that guessed the source wrong leaves U+FFFD or bytes that do not
-# decode at all (#963 was the same defect back when each file named a charset).
+# decode (#963).
 replacement=$(printf '\357\277\275')
 # The value line following a metadata key. Most catalogs are CRLF, Uzbek.txt is not.
 field() {
@@ -75,7 +75,9 @@ field() {
 
 bytes_are_utf8() {
     f=$1
-    if ! LC_ALL=C iconv -f UTF-8 -t UTF-8 "$f" >/dev/null 2>"$tmp/err"; then
+    # Not iconv: macOS 14 swapped GNU libiconv for a Citrus one that rejects
+    # valid UTF-8, reporting a stale ENOTTY that no conversion can produce.
+    if ! "$py" "$tmp/utf8.py" "$f" 2>"$tmp/err"; then
         echo "${f##*/}: not valid UTF-8: $(<"$tmp/err")"
         return 1
     fi
@@ -84,23 +86,34 @@ bytes_are_utf8() {
         echo "${f##*/}:$ln: holds U+FFFD, so the re-encode lost a character"
         return 1
     fi
-    if LC_ALL=C awk '/LANGUAGE_CHARSET/ { exit 1 }' "$f"; then
-        return 0
+    ln=$(LC_ALL=C awk '/LANGUAGE_CHARSET/ { print NR; exit }' "$f")
+    if [ -n "$ln" ]; then
+        echo "${f##*/}:$ln: still declares LANGUAGE_CHARSET; the catalogs are UTF-8 now"
+        return 1
     fi
-    echo "${f##*/}: still declares LANGUAGE_CHARSET; the catalogs are UTF-8 now"
-    return 1
+    return 0
 }
 
-if ! command -v iconv >/dev/null 2>&1; then
-    echo "iconv not found; encoding check skipped" >&2
+py=$(find_python || true)
+if [ -z "$py" ]; then
+    echo "python3 not found; encoding check skipped" >&2
 else
-    # Positive controls, one per branch. Latin-1 bytes are the shape a catalog
-    # had before the re-encode; U+FFFD is what a wrong guess leaves behind.
-    LC_ALL=C iconv -f UTF-8 -t ISO-8859-1//TRANSLIT "$langdir/Francais.txt" \
-        >"$tmp/legacy.txt" 2>/dev/null
-    printf 'x\357\277\275y\n' >"$tmp/lossy.txt"
-    LC_ALL=C sed '9i\
-LANGUAGE_CHARSET' "$langdir/Francais.txt" >"$tmp/declared.txt"
+    cat >"$tmp/utf8.py" <<'PYEOF'
+import sys
+
+try:
+    open(sys.argv[1], "rb").read().decode("utf-8")
+except UnicodeDecodeError as e:
+    sys.exit("byte %d: %s" % (e.start, e.reason))
+PYEOF
+    # Positive controls, one per branch, each planting its defect where a check
+    # that only read the head, the keys, or the header would miss it.
+    cp "$langdir/Francais.txt" "$tmp/legacy.txt"
+    printf 'Caf\351\r\n' >>"$tmp/legacy.txt"
+    LC_ALL=C awk -v r="$replacement" 'NR == 500 { print r; next } { print }' \
+        "$langdir/Francais.txt" >"$tmp/lossy.txt"
+    LC_ALL=C awk 'NR == 501 { print "LANGUAGE_CHARSET" } { print }' \
+        "$langdir/Francais.txt" >"$tmp/declared.txt"
     for probe in legacy lossy declared; do
         if bytes_are_utf8 "$tmp/$probe.txt" >/dev/null; then
             echo "the encoding check passed a deliberately broken file ($probe)"
@@ -119,12 +132,19 @@ LANGUAGE_CHARSET' "$langdir/Francais.txt" >"$tmp/declared.txt"
     fi
 fi
 
-# Άκυρο. Valid UTF-8 does not mean the re-encode read the right source: Greek
-# was cp1253 under an ISO-8859-7 label, and the two disagree on this letter.
+# Άκυρο. Valid UTF-8 does not say the re-encode read the right source: cp1253
+# and ISO-8859-7 disagree on this letter, six values carry it, and reading the
+# file as the label rather than the bytes turns every one into a curly quote.
 cancel=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "Cancel" { getline v; sub(/\r$/, "", v); print v; exit }' \
     "$langdir/Greek.txt")
 if [ "$cancel" != "$(printf '\316\206\316\272\317\205\317\201\316\277')" ]; then
     echo "Greek.txt: the Cancel value is not the UTF-8 for the Greek word"
+    fail=1
+fi
+ln=$(LC_ALL=C awk -v q="$(printf '\342\200\231')" 'index($0, q) { print NR; exit }' \
+    "$langdir/Greek.txt")
+if [ -n "$ln" ]; then
+    echo "Greek.txt:$ln: a curly quote, so the re-encode read cp1253 as ISO-8859-7"
     fail=1
 fi
 
@@ -662,18 +682,16 @@ LC_ALL=C awk -v pin="$lbpin" '
 ' "$tmp/lb" || fail=1
 
 # A catalog re-encoded from the wrong source is still valid UTF-8, so the check
-# above cannot see it. The tell is a Latin-1 letter followed by a C1 character,
-# which no language writes and which every UTF-8 continuation byte misread as
-# Latin-1 produces (Romanian said ISO-8859-1 with ISO-8859-2 bytes for years).
-mojibake=$(printf '\303[\200-\277]\302[\200-\237]')
+# above cannot see it. The tell is one Latin-1 letter running straight into
+# another, which no language writes and every misread continuation byte makes.
+mojibake=$(printf '\303[\200-\277]\302[\200-\277]')
 
 reencoded_from_the_wrong_source() {
     LC_ALL=C awk -v m="$mojibake" -v n="$2" '$0 ~ m { print n ":" NR ": mojibake, so the source charset was wrong"; exit }' "$1"
 }
 
-# Control: the mistake itself. Francais read as Latin-1 and stored back is what
-# a wrong-source re-encode leaves, and it must fire. English cannot serve here,
-# being pure ASCII, and neither can a check that never saw a dirty file.
+# Control: the mistake itself, on a catalog with enough accents to carry it.
+# English is pure ASCII and would prove nothing.
 LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$langdir/Francais.txt" >"$tmp/mis"
 if [ -z "$(reencoded_from_the_wrong_source "$tmp/mis" Francais.txt)" ]; then
     echo "the mojibake check passed a deliberately misread catalog"
@@ -686,6 +704,18 @@ for f in "$langdir"/*.txt; do
         fail=1
     fi
 done
+
+# The catalogs carry no charset any more, so the served pages are the only place
+# left that names one, and a browser decodes by it.
+npage=0
+for f in "$top_srcdir"/html/server/*.html; do
+    npage=$((npage + 1))
+    LC_ALL=C awk '/charset=utf-8/ { found = 1 } END { exit !found }' "$f" ||
+        fail "${f##*/}: does not declare charset=utf-8"
+done
+if [ "$npage" -lt 20 ]; then
+    fail "only $npage server pages scanned for their charset"
+fi
 
 # An unknown ${LANG_*} renders as nothing rather than erroring, so check that
 # every macro the templates interpolate, in any wrapper form, resolves.
