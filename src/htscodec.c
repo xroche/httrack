@@ -124,10 +124,8 @@ hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext) {
 
 #if HTS_USEBROTLI || HTS_USEZSTD
 /* Append produced bytes to out under the decoded-size budget, advancing *total.
-   HTS_FALSE on a short write or once the budget is exceeded (a bomb); the
-   over-budget bytes are never written. */
-/* io_errno takes the errno of a failed write, so the caller can tell a full
-   disk from a bomb over the budget. */
+   HTS_FALSE on a short write, whose errno it leaves in *io_errno, or once the
+   budget is exceeded (a bomb); the over-budget bytes are never written. */
 static hts_boolean codec_sink(FILE *out, const void *buf, size_t produced,
                               LLint *total, LLint maxout, int *io_errno) {
   if (produced == 0)
@@ -341,7 +339,9 @@ int hts_codec_unpack(hts_codec codec, const char *filename,
       ret = -1;
     }
     fclose(in);
-    errno = ret < 0 ? io_errno : 0;
+    /* io_errno is set only where ret is already < 0, so this is the whole
+       contract: the closes above are free to clobber what it restores. */
+    errno = io_errno;
     return ret;
   }
 #else

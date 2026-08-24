@@ -824,16 +824,17 @@ static hts_boolean back_in_chunk_trailers(const lien_back *const back) {
              : HTS_FALSE;
 }
 
-/* A body small enough to sit in stdio's buffer reaches the disk only when its
-   stream is closed, so this is where a write failure first shows up. */
+/* Name a write we could not complete -- a failing close, or a decode that could
+   not write its output -- and give up the mirror on the fatal class. */
 static void back_report_write_failure(httrackp *opt, lien_back *const back) {
   const hts_boolean fatal = check_fatal_io_errno() ? HTS_TRUE : HTS_FALSE;
 
   /* the read path already named and classed a write error it saw itself */
-  if (!STATUSCODE_IS_WRITE_ERROR(back->r.statuscode)) {
+  if (!statuscode_is_write_error(back->r.statuscode)) {
     hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to write file %s",
                   back->url_sav);
-    /* a slot still claiming success would be cached and counted as mirrored */
+    /* a slot still claiming success would be cached as mirrored; a
+       STATUSCODE_INVALID must survive, the decode site's purge rests on it */
     if (back->r.statuscode > 0) {
       back->r.statuscode = fatal ? STATUSCODE_IO_FATAL : STATUSCODE_IO_ERROR;
       strcpybuff(back->r.msg, "Write error on disk");
@@ -1016,7 +1017,7 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   back[p].r.statuscode = STATUSCODE_INVALID;
                   /* Our own disk, not the coded body: hts_codec_unpack() leaves
                      a local write's errno behind, and 0 for a bad stream. */
-                  if (check_fatal_io_errno())
+                  if (errno != 0)
                     back_report_write_failure(opt, &back[p]);
                   snprintf(back[p].r.msg, sizeof(back[p].r.msg),
                            codec == HTS_CODEC_UNSUPPORTED
@@ -3583,7 +3584,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
           /* Skipped on a write error: these completion tests read r.size,
              which counts bytes read, and would relaunder the error into EOF. */
           if (back[i].status == 1 &&
-              !STATUSCODE_IS_WRITE_ERROR(back[i].r.statuscode)) {
+              !statuscode_is_write_error(back[i].r.statuscode)) {
             if (back[i].is_chunk) {     // attendre prochain chunk
               if (back[i].r.size == back[i].r.totalsize) { // fin chunk!
                 back[i].status = STATUS_CHUNK_CR;       /* fetch ending CRLF */
@@ -3617,7 +3618,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                  back[i].r.totalsize);
 #endif
             if (retour_fread < 0 && retour_fread != READ_EOF) {
-              if (STATUSCODE_IS_WRITE_ERROR(back[i].r.statuscode)) {
+              if (statuscode_is_write_error(back[i].r.statuscode)) {
                 /* our disk, not the server: keep the write error rather than
                    blame the transfer for what we could not store */
                 hts_log_print(opt, LOG_ERROR, "Unable to write file %s",
@@ -3686,7 +3687,7 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             /* A body cut short by a failed write is short by definition: keep
                the write failure it is already classed as. */
             if (back[i].r.totalsize >= 0 &&
-                !STATUSCODE_IS_WRITE_ERROR(back[i].r.statuscode)) {
+                !statuscode_is_write_error(back[i].r.statuscode)) {
               if (back[i].r.totalsize != back[i].r.size) {      // pas la même!
                 if (!opt->tolerant) {
                   deleteaddr(&back[i].r);

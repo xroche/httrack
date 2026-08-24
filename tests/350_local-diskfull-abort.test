@@ -112,6 +112,17 @@ grep -q 'disk full or filesystem problems' <<<"$log" ||
     fail "a chunk completed by the read whose write failed passed for clean: ${log}"
 ok "the chunked path is fatal too"
 
+# --- no Content-Length and no chunking: the closing flush is the only writer --
+# totalsize stays -1, so no completion test can see this one, and glibc's later
+# fclose() returns 0 once the flush has taken the error.
+crawl_onto_full noclen noclen.bin noclenindex.html
+grep -q 'disk full or filesystem problems' <<<"$log" ||
+    fail "a full disk under a close-delimited body was not reported: ${log}"
+if grep -qF 'noclen.bin' "${tmpdir}/noclen/hts-cache/new.txt"; then
+    fail "a body that never reached the disk was recorded as mirrored"
+fi
+ok "a close-delimited body the disk refused is fatal too"
+
 # --- and it is not re-reported as a truncated download -----------------------
 # --tolerant downgrades a length mismatch to a warning instead of rewriting the
 # status, which is where a disk-cut body would be blamed on the server instead.
@@ -167,7 +178,8 @@ ok "a coded page that cannot be written is fatal too"
 
 # --- a write error outside the fatal class must stay retryable ---------------
 # A pipe whose reader has gone gives EPIPE, which is about this file, not the
-# filesystem: the mirror must finish the rest rather than give up.
+# filesystem: the mirror must finish the rest rather than give up. The write
+# fails mid-body here; 355 pins the read that both completes a body and fails.
 epipe="${tmpdir}/epipe"
 epipesite="${epipe}/127.0.0.1_${SRV_PORT}/diskfull"
 mkdir -p "$epipesite"
@@ -184,7 +196,8 @@ grep -q 'Unable to write file .*big\.bin' <<<"$log" ||
     fail "the broken pipe went unreported, so nothing here failed to be written: ${log}"
 grep -q 'Write error on disk' <<<"$log" ||
     fail "the broken pipe was not reported as a write error: ${log}"
-# What master reports instead: a body our own write cut short, blamed on the server.
+# r.size counts bytes read, so a body our own write cut short must never be
+# reported as one the server truncated.
 if grep -q 'Incorrect length' <<<"$log"; then
     fail "a write error was reported as a truncated download: ${log}"
 fi

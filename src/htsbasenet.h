@@ -159,10 +159,12 @@ typedef enum BackStatusCode {
   STATUSCODE_IO_ERROR = -13  /* the body write failed, but not fatally */
 } BackStatusCode;
 
-/* Either write-error class: r.size counts bytes read, so every size-based
-   completion test would read a body a failed write cut short as a clean end. */
-#define STATUSCODE_IS_WRITE_ERROR(code)                                        \
-  ((code) == STATUSCODE_IO_FATAL || (code) == STATUSCODE_IO_ERROR)
+/** Either write-error class: r.size counts bytes read, so a size-based
+    completion test reads a body a failed write cut short as a clean end. **/
+static HTS_INLINE HTS_UNUSED hts_boolean statuscode_is_write_error(int code) {
+  return code == STATUSCODE_IO_FATAL || code == STATUSCODE_IO_ERROR ? HTS_TRUE
+                                                                    : HTS_FALSE;
+}
 
 /** HTTrack status ('status' member of of 'lien_back') **/
 typedef enum HTTrackStatus {

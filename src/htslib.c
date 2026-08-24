@@ -1954,6 +1954,14 @@ int check_writeinput_t(T_SOC soc, int timeout) {
     return 0;
 }
 
+/* Class the live errno now: back_wait() sees it after free() and fflush() and
+   would rewrite this as a retryable connection error. */
+static void classify_write_error(htsblk *r) {
+  r->statuscode =
+      check_fatal_io_errno() ? STATUSCODE_IO_FATAL : STATUSCODE_IO_ERROR;
+  strcpybuff(r->msg, "Write error on disk");
+}
+
 // Read one block: bufl is a byte count, or one of the HTS_XFREAD_* line modes.
 // Note: the +1 in the mallocs is the trailing NUL appended to the data.
 LLint http_xfread1(htsblk * r, int bufl) {
@@ -2054,11 +2062,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
         if (nl > 0) {
           r->size += nl;
           if (!hts_fwrite_exact(buff, (size_t) nl, r->out)) {
-            /* Classify here: back_wait() sees errno after free() and fflush()
-               and rewrites this as a retryable connection error. */
-            r->statuscode = check_fatal_io_errno() ? STATUSCODE_IO_FATAL
-                                                   : STATUSCODE_IO_ERROR;
-            strcpybuff(r->msg, "Write error on disk");
+            classify_write_error(r);
             nl = READ_ERROR;
           }
         }
@@ -2068,8 +2072,13 @@ LLint http_xfread1(htsblk * r, int bufl) {
       } else
         nl = READ_ERROR;
 
-      if ((nl < 0) && (r->out != NULL)) {
-        fflush(r->out);
+      /* The tail stdio still holds is written here, and glibc's later fclose()
+         returns 0 once this flush has taken the error: a body with no length
+         and no chunking would otherwise be recorded as mirrored. */
+      if ((nl < 0) && (r->out != NULL) && fflush(r->out) != 0 &&
+          !statuscode_is_write_error(r->statuscode)) {
+        classify_write_error(r);
+        nl = READ_ERROR;
       }
 
     }                           // stockage disque ou mémoire
@@ -2125,7 +2134,7 @@ LLint http_xfread1(htsblk * r, int bufl) {
   }
   /* Ahead of the EOF test below: r->size is advanced above the fwrite that
      failed, so a body completed by that very read would report a clean EOF. */
-  if (nl == READ_ERROR && STATUSCODE_IS_WRITE_ERROR(r->statuscode)) {
+  if (nl == READ_ERROR && statuscode_is_write_error(r->statuscode)) {
     return READ_ERROR;
   }
   // EOF

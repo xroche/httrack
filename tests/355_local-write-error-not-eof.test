@@ -40,7 +40,7 @@ crawl_onto_dead_pipe() {
     local dir="${tmpdir}/${name}"
 
     site="${dir}/127.0.0.1_${SRV_PORT}/diskfull"
-    mkdir -p "$site"
+    mkdir -p "$(dirname "${site}/${doomed}")" # a spool name has a directory of its own
     mkfifo "${site}/${doomed}"
     # Both ends block until the other arrives, so the reader cannot close ahead
     # of the engine's own open and leave it waiting for a reader that never comes.
@@ -62,8 +62,8 @@ assert_write_error() {
         fail "${what}: nothing said the file could not be written: ${log}"
     grep -q 'Write error on disk' <<<"$log" ||
         fail "${what}: the failure was not reported as a write error: ${log}"
-    # What master reports instead: a body our own write cut short, blamed on
-    # the server.
+    # r.size counts bytes read, so a body our own write cut short must never
+    # be reported as one the server truncated.
     if grep -q 'Incorrect length' <<<"$log"; then
         fail "${what}: a write error was reported as a truncated download: ${log}"
     fi
@@ -94,6 +94,58 @@ ok "a chunk whose last read is the failing write is not a clean end either"
 crawl_onto_dead_pipe small splitsmallindex.html splitsmall.bin
 assert_write_error "a body stdio held until the close" 'splitsmall.bin'
 ok "a body that only fails when its file is closed is reported too"
+
+# --- no Content-Length and no chunking: the closing flush is the only writer -
+# totalsize stays -1, so no completion test can see this one, and glibc's later
+# fclose() returns 0 once the flush has taken the error.
+crawl_onto_dead_pipe noclen noclenindex.html noclen.bin
+assert_write_error "a body delimited by the close alone" 'noclen.bin'
+ok "a close-delimited body the disk refused is not a clean end either"
+
+# --- the decode's own output: our disk, not the coded body ------------------
+# gz.bin is decoded into ~hts-tmp/gz.bin.u before being renamed into place. A
+# directory in that name's way makes the decode fail on us, with an errno the
+# fatal class does not cover: the failure must be named as ours, and must leave
+# the mirror running.
+decode="${tmpdir}/decode"
+decodesite="${decode}/127.0.0.1_${SRV_PORT}/diskfull"
+mkdir -p "${decodesite}/~hts-tmp/gz.bin.u"
+local_crawl --log "${tmpdir}/log-decode" "${common[@]}" --retries=0 \
+    -O "$decode" "${BASEURL}/diskfull/gzindex.html"
+log=$(<"${decode}/hts-log.txt")
+cached=$(<"${decode}/hts-cache/new.txt")
+grep -q 'Unable to write file .*gz\.bin' <<<"$log" ||
+    fail "a decode our own filesystem refused was blamed on the coded body: ${log}"
+if grep -qE 'Mirror aborted|disk full' <<<"$log"; then
+    fail "a non-fatal failure under the decode gave up the mirror: ${log}"
+fi
+gzrow=$(grep -F '/gz.bin' <<<"$cached" || true)
+grep -q "error (" <<<"$gzrow" ||
+    fail "a body that never reached the disk was not recorded as failed: ${gzrow}"
+test ! -e "${decodesite}/gz.bin" ||
+    fail "the coded bytes were committed as the file we could not decode"
+grep -q DISKFULL-GZPAGE "${decodesite}/gzpage.html" ||
+    fail "the rest of the mirror did not survive the failed decode"
+ok "a decode that cannot write its output names our own filesystem"
+
+# --- and the copy that failed decode preserved outlives the update purge -----
+# The re-fetch fails on our side, so the previous copy is all there is: dropping
+# it from new.lst would have the purge unlink the file we took care to keep.
+upd="${tmpdir}/update"
+updsite="${upd}/127.0.0.1_${SRV_PORT}/diskfull"
+local_crawl --log "${tmpdir}/log-update1" "${common[@]}" --retries=0 -O "$upd" \
+    "${BASEURL}/diskfull/gzindex.html"
+before=$(wc -c <"${updsite}/gz.bin")
+test "$before" -gt 0 || fail "the first pass did not mirror the coded body"
+mkdir -p "${updsite}/~hts-tmp/gz.bin.u"
+local_crawl --log "${tmpdir}/log-update2" "${common[@]}" --retries=0 --update \
+    -O "$upd" "${BASEURL}/diskfull/gzindex.html"
+log=$(<"${upd}/hts-log.txt")
+grep -q 'Unable to write file .*gz\.bin' <<<"$log" ||
+    fail "the update pass did not fail the decode it was set up to fail: ${log}"
+test "$(wc -c <"${updsite}/gz.bin" 2>/dev/null || echo 0)" -eq "$before" ||
+    fail "the purge deleted the copy the failed decode preserved: ${log}"
+ok "a failed decode keeps the previously mirrored copy through the purge"
 
 # --- the control: a write that works must not read as one that failed -------
 clean="${tmpdir}/clean"

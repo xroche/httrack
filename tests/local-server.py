@@ -1337,6 +1337,20 @@ class Handler(SimpleHTTPRequestHandler):
         self.wfile.write(b"S" * (total - 1))  # the read that completes the body
         self.wfile.flush()
 
+    # No Content-Length and no chunking: the body ends with the connection, so
+    # totalsize stays -1 and the tail leaves stdio only at the closing flush.
+    def route_diskfull_noclenindex(self):
+        self.send_html('\t<a href="noclen.bin">noclen</a>\n')
+
+    def route_diskfull_noclen(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(b"DISKFULL-NOCLEN\n" + b"N" * 84)
+        self.close_connection = True
+
     # A gzip-coded asset never reaches the save name as it streams: it spools
     # through ~hts-tmp/<name>.z and is decoded into place afterwards.
     GZ_BODY = b"DISKFULL-GZ\n" + b"\x00\x01\x02\xff" * 16384
@@ -3051,6 +3065,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/diskfull/splitsmall.bin": route_diskfull_splitsmall,
         "/diskfull/splitchunkedindex.html": route_diskfull_splitchunkedindex,
         "/diskfull/splitchunked.bin": route_diskfull_splitchunked,
+        "/diskfull/noclenindex.html": route_diskfull_noclenindex,
+        "/diskfull/noclen.bin": route_diskfull_noclen,
         "/diskfull/gzindex.html": route_diskfull_gzindex,
         "/diskfull/gzbadindex.html": route_diskfull_gzbadindex,
         "/diskfull/gz.bin": route_diskfull_gz,
