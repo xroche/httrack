@@ -368,6 +368,9 @@ ok() { echo "OK: $*"; }
 # Size of file $1 in bytes. wc pads its count on the BSDs.
 size_of() { wc -c <"$1" | tr -d '[:space:]'; }
 
+# Lines in file $1, padding stripped for the same reason.
+lines_of() { wc -l <"$1" | tr -d '[:space:]'; }
+
 # `which` is not POSIX and lies under MSYS; use `command -v`.
 require_httrack() {
     command -v httrack >/dev/null || fail "could not find httrack"

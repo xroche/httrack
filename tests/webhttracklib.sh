@@ -194,12 +194,20 @@ htsserver_reap_vars() { # htsserver_reap_vars VAR...
     done
 }
 
-# A leaked htsserver wedges the parallel harness behind a green log.
+# A leaked htsserver wedges the parallel harness behind a green log. Bounded
+# rather than instantaneous: under the sanitizer shim (tests/stderrwrap.c) the
+# server is the shim's child, so killing both leaves a zombie its reaper has yet
+# to collect, and a zombie holds neither the port nor the payload.
 htsserver_assert_reaped() {
-    local pid
+    local pid start
     test "${#HTS_REAPED_PIDS[@]}" -gt 0 || fail "nothing was reaped to assert on"
     for pid in ${HTS_REAPED_PIDS[@]+"${HTS_REAPED_PIDS[@]}"}; do
-        ! kill -0 "${pid}" 2>/dev/null || fail "htsserver ${pid} survived"
+        start=${SECONDS}
+        while kill -0 "${pid}" 2>/dev/null; do
+            test "$((SECONDS - start))" -le "${REAP_GRACE}" ||
+                fail "htsserver ${pid} survived"
+            poll_wait 0.1
+        done
     done
 }
 
