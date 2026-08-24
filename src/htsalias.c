@@ -796,7 +796,7 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
               printf("%s\n", return_error);
             } else {
               if (return_error[0] != '\0')
-                printf("%s\n", return_error);
+                fprintf(stderr, "* %s\n", return_error);
               /* Insert the option and its parameter after the ones already
                  inserted, so that the file order is preserved */
               if (!cmdl_ins(cmd, tmp_argv[2], insert_after) ||

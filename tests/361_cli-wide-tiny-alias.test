@@ -32,8 +32,10 @@ crawl() { # crawl ARG...
         >"${tmp}/run.log" 2>&1 || RC=$?
 }
 
-# expand_run WANT LABEL ARG...: run, and read back the option word the engine
-# was handed, plus whether the prefix said it could not add its count
+# expand_run PATTERN LABEL ARG...: run, and match PATTERN against the command
+# line the engine echoes, plus note whether the prefix said it could not add its
+# count. PATTERN carries its own delimiters, so a caller pins a whole word (" -w
+# ") or only a fragment, for a value whose word boundary is not ours to fix.
 expand_run() {
     local want=$1 label=$2 line
     shift 2
@@ -41,7 +43,7 @@ expand_run() {
     assert_eq 0 "${RC}" "${label} exited"
     assert_file "${tmp}/out/hts-log.txt" "${label}"
     line=$(sed -n 2p "${tmp}/out/hts-log.txt")
-    grep -qF -- " ${want} " <<<"${line}" ||
+    grep -qF -- "${want}" <<<"${line}" ||
         fail "${label}: the engine was handed ${line}, wanted ${want}"
     WARNED=no
     ! grep -q 'cannot add its connection count' "${tmp}/run.log" || WARNED=yes
@@ -59,17 +61,17 @@ warned() { # warned WANT LABEL ARG...
     assert_eq yes "${WARNED}" "$2 warned"
 }
 
-echoed '-wc32' 'wide mirror' --wide-mirror
-echoed '-wc1' 'tiny mirror' --tiny-mirror
-echoed '-w' 'plain mirror' --mirror
-echoed '-p0C0I0tc32' 'wide spider' --wide-spider
-echoed '-p0C0I0tc1' 'tiny spider' --tiny-spider
-echoed '-p0C0I0t' 'plain spider' --spider
-echoed '-p1c32' 'wide skeleton' --wide-skeleton
-echoed '-p1' 'plain skeleton' --skeleton
-echoed '-Xc32' 'wide purge-old' --wide-purge-old
-echoed '-o2c1' 'tiny generate-errors' --tiny-generate-errors 2
-echoed '-c8' 'plain sockets' --sockets 8
+echoed ' -wc32 ' 'wide mirror' --wide-mirror
+echoed ' -wc1 ' 'tiny mirror' --tiny-mirror
+echoed ' -w ' 'plain mirror' --mirror
+echoed ' -p0C0I0tc32 ' 'wide spider' --wide-spider
+echoed ' -p0C0I0tc1 ' 'tiny spider' --tiny-spider
+echoed ' -p0C0I0t ' 'plain spider' --spider
+echoed ' -p1c32 ' 'wide skeleton' --wide-skeleton
+echoed ' -p1 ' 'plain skeleton' --skeleton
+echoed ' -Xc32 ' 'wide purge-old' --wide-purge-old
+echoed ' -o2c1 ' 'tiny generate-errors' --tiny-generate-errors 2
+echoed ' -c8 ' 'plain sockets' --sockets 8
 ok "the prefix glues its count on, and only the prefix does"
 
 # ...and the count reaches the option, not just the rebuilt argv: above 8 the
@@ -93,23 +95,29 @@ clamped no 'plain mirror' --mirror
 clamped no 'tiny mirror over --sockets 32' --sockets 32 --tiny-mirror
 clamped yes 'plain mirror over --sockets 32' --sockets 32 --mirror
 clamped yes 'wide mirror over --sockets 1' --sockets 1 --wide-mirror
-ok "the count applies, and the unprefixed alias adds none"
+# 3 is under the ceiling, so a glued 32 read as far as its first digit would
+# leave this pair looking the same; only reading both digits clamps
+clamped no 'plain mirror over --sockets 3' --sockets 3 --mirror
+clamped yes 'wide mirror over --sockets 3' --sockets 3 --wide-mirror
+ok "the count applies whole, and the unprefixed alias adds none"
 
 # Everywhere the glue would be misread, the alias runs without the count and
 # warns: a value sharing the word (-N, -c8), the -% and -# families whose names
 # are not self-delimiting, a cluster already carrying a count, a value of its
 # own. The base alias has to still do its job.
-warned '-N%h%p/%n.%t' 'wide structure' --wide-structure '%h%p/%n.%t'
+# Whether -N takes its template glued or detached is #1380's business, so pin
+# the template followed by a word break: a glued count would land inside it.
+warned '%h%p/%n.%t ' 'wide structure' --wide-structure '%h%p/%n.%t'
 test -f "${tmp}/out/file${tmp}/page.html" ||
     fail "--wide-structure lost the template it warned about"
-warned '-c8' 'wide sockets' --wide-sockets 8
+warned ' -c8 ' 'wide sockets' --wide-sockets 8
 assert_eq 0 "$(count_matching_lines 'simultaneous connections limited to' \
     "${tmp}/out/hts-log.txt")" "--wide-sockets 8 stayed at 8"
-warned '-%r' 'wide warc' --wide-warc
+warned ' -%r ' 'wide warc' --wide-warc
 test -n "$(find "${tmp}/out" -name '*.warc*' -print -quit)" ||
     fail "--wide-warc wrote no archive"
-warned '-c32' 'tiny wide' --tiny-wide
-warned '+*.gif' 'tiny allow' --tiny-allow '*.gif'
+warned ' -c32 ' 'tiny wide' --tiny-wide
+warned ' +*.gif ' 'tiny allow' --tiny-allow '*.gif'
 
 # -#h returns before any crawl, so it is read straight off the run
 run_log=$(httrack -O "${tmp}/out" --quiet --wide-version 2>&1) || fail "--wide-version exited $?"
@@ -121,7 +129,7 @@ ok "a prefix that cannot be glued on warns, and the alias still runs"
 
 # The unprefixed spellings the refusals are built from still work, template
 # included: gluing a count into it corrupted the template as well as losing it.
-echoed '-N%h%p/%n.%t' 'plain structure' --structure '%h%p/%n.%t'
+echoed '%h%p/%n.%t ' 'plain structure' --structure '%h%p/%n.%t'
 test -f "${tmp}/out/file${tmp}/page.html" ||
     fail "--structure did not lay the mirror out by its template"
 ok "the unprefixed aliases are untouched"
