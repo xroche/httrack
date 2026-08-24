@@ -1270,6 +1270,8 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   static const char *const utf8 = "caf\xC3\xA9 \xE2\x82\xAC"; /* "café €" */
   const UINT cp = GetACP();
   const int len = (int) strlen(utf8);
+  /* the engine bans best-fit, and UTF-8 is the only ACP its gate spares */
+  const DWORD flags = cp == CP_UTF8 ? 0 : WC_NO_BEST_FIT_CHARS;
   WCHAR wide[64], round[64];
   char want[64];
   char *sys, *back, *part;
@@ -1281,12 +1283,11 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   wn = MultiByteToWideChar(CP_UTF8, 0, utf8, len, wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn > 0);
-  n = WideCharToMultiByte(cp, 0, wide, wn, want, (int) sizeof(want) - 1, NULL,
-                          NULL);
+  n = WideCharToMultiByte(cp, flags, wide, wn, want, (int) sizeof(want) - 1,
+                          NULL, NULL);
   assertf(n > 0);
   want[n] = '\0';
-  /* the ACP holds the string only if its bytes decode back to the same UTF-16;
-     lpUsedDefaultChar would miss a best-fit mapping (é to a bare e) */
+  /* the ACP holds it only if those bytes decode back to the same UTF-16 */
   lossless =
       MultiByteToWideChar(cp, 0, want, n, round,
                           (int) (sizeof(round) / sizeof(round[0]))) == wn &&
@@ -1314,6 +1315,56 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   freet(sys);
   printf("syscharset: acp=%u %s: OK\n", (unsigned) cp,
          lossless ? "round-trip" : "one-way");
+  return 0;
+#else
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  return 77; /* WIN32-only entry point */
+#endif
+}
+
+/* Best-fit is what kept the strict converter from being strict: CP932 has no
+   U+00A5 and quietly emitted a path separator for it. */
+static int st_nobestfit(httrackp *opt, int argc, char **argv) {
+#ifdef _WIN32
+  static const char *const yen = "\xC2\xA5";      /* U+00A5 */
+  static const char *const hira = "\xE3\x81\x82"; /* U+3042, CP932 82 A0 */
+  const char *const cs = "shift_jis";
+  BOOL usedDefault = TRUE;
+  WCHAR wide[4];
+  char raw[8];
+  char *s;
+  int wn, n;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  if (!IsValidCodePage(932)) {
+    printf("nobestfit: CP932 is not installed\n");
+    return 77;
+  }
+  /* the trap, asserted rather than assumed: left to itself the codepage hands
+     back a path separator and reports no substitution at all */
+  wn = MultiByteToWideChar(CP_UTF8, 0, yen, (int) strlen(yen), wide,
+                           (int) (sizeof(wide) / sizeof(wide[0])));
+  assertf(wn == 1);
+  n = WideCharToMultiByte(932, 0, wide, wn, raw, (int) sizeof(raw), NULL,
+                          &usedDefault);
+  assertf(n == 1 && raw[0] == '\\' && !usedDefault);
+  /* control: banning best-fit must not break what the codepage does hold */
+  s = hts_convertStringFromUTF8Strict(hira, strlen(hira), cs);
+  assertf(s != NULL);
+  assertf(strcmp(s, "\x82\xA0") == 0);
+  freet(s);
+  s = hts_convertStringFromUTF8Strict(yen, strlen(yen), cs);
+  assertf(s == NULL);
+  /* the non-strict caller keeps its substitute, but a visible one */
+  s = hts_convertStringFromUTF8(yen, strlen(yen), cs);
+  assertf(s != NULL);
+  assertf(strcmp(s, "?") == 0);
+  freet(s);
+  printf("nobestfit: OK\n");
   return 0;
 #else
   (void) opt;
@@ -12295,6 +12346,9 @@ static const struct selftest_entry {
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",
      st_syscharset},
+    {"nobestfit", "",
+     "no best-fit substitute when converting from UTF-8 (WIN32 only)",
+     st_nobestfit},
     {"metacharset", "<html>", "extract the <meta> charset from an HTML page",
      st_metacharset},
     {"isutf8", "<hex:..|string>", "is the string valid UTF-8 (1/0)", st_isutf8},

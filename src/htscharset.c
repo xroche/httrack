@@ -296,8 +296,9 @@ LPWSTR hts_convertUTF8StringToUCS2(const char *s, int size, int *pwsize) {
   return hts_convertStringToUCS2(s, size, CP_UTF8, pwsize);
 }
 
-/* WideCharToMultiByte rejects lpUsedDefaultChar on the Unicode, ISO-2022, HZ,
-   GB18030 and ISCII codepages, where a substitution stays invisible. */
+/* WideCharToMultiByte rejects lpUsedDefaultChar, and any non-zero dwFlags, on
+   the Unicode, ISO-2022, HZ, GB18030 and ISCII codepages, where a substitution
+   stays invisible. */
 static hts_boolean cp_reports_default_char(UINT cp) {
   if (cp == 42 /* CP_SYMBOL */ || cp == CP_UTF7 || cp == CP_UTF8 ||
       cp == 52936 || cp == 54936 || (cp >= 50220 && cp <= 50229) ||
@@ -311,8 +312,11 @@ static hts_boolean cp_reports_default_char(UINT cp) {
    and a substitute was emitted for it. */
 static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
                                          hts_boolean *plossy) {
+  /* Best-fit is a silent loss: U+00A5 lands on CP932 as a backslash, and never
+     sets lpUsedDefaultChar. Both calls must agree on the flag. */
+  const DWORD flags = cp_reports_default_char(cp) ? WC_NO_BEST_FIT_CHARS : 0;
   const int usize =
-      WideCharToMultiByte(cp, 0, woutput, wsize, NULL, 0, NULL, NULL);
+      WideCharToMultiByte(cp, flags, woutput, wsize, NULL, 0, NULL, NULL);
 
   if (plossy != NULL) {
     *plossy = HTS_FALSE;
@@ -325,7 +329,7 @@ static char *hts_convertUCS2StringToCPEx(LPWSTR woutput, int wsize, UINT cp,
       LPBOOL const pUsedDefault =
           plossy != NULL && cp_reports_default_char(cp) ? &usedDefault : NULL;
 
-      if (WideCharToMultiByte(cp, 0, woutput, wsize, uoutput, usize, NULL,
+      if (WideCharToMultiByte(cp, flags, woutput, wsize, uoutput, usize, NULL,
                               pUsedDefault) == usize) {
         uoutput[usize] = '\0';
         if (plossy != NULL && usedDefault) {
