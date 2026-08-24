@@ -132,6 +132,17 @@ cat <<'EOF'
 EOF
 printf '%s\n' "$options"
 cat <<'EOF'
+.SH EXIT STATUS
+.IP 0
+The mirror ran to the end, or stopped because it was asked to \- a signal, or
+the interactive shell.
+.IP 2
+A mirror started and the engine gave up before the end: a full disk, a cache
+write failure, or another fatal error. The reason is in the log file, and what
+was mirrored before the abort is kept.
+.IP "1, 255"
+.B httrack
+refused the command line, or a cache operation it asked for failed. No mirror ran.
 .SH FILES
 .I /etc/httrack.conf
 .RS

@@ -45,6 +45,7 @@
 <a href="#Shortcuts:">Shortcuts:</a><br>
 <a href="#Details: Option %W: External callbacks prototypes">Details: Option %W: External callbacks prototypes</a><br>
 <a href="#see htsdefines.h">see htsdefines.h</a><br>
+<a href="#EXIT STATUS">EXIT STATUS</a><br>
 <a href="#FILES">FILES</a><br>
 <a href="#ENVIRONMENT">ENVIRONMENT</a><br>
 <a href="#DIAGNOSTICS">DIAGNOSTICS</a><br>
@@ -2311,6 +2312,54 @@ capture an URL or a form post URL</p>
 <a name="see htsdefines.h"></a>
 </h3>
 
+
+<h2>EXIT STATUS
+<a name="EXIT STATUS"></a>
+</h2>
+
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="8%">
+
+
+<p style="margin-top: 1em">0</p></td>
+<td width="1%"></td>
+<td width="82%">
+
+
+<p style="margin-top: 1em">The mirror ran to the end, or
+stopped because it was asked to - a signal, or the
+interactive shell.</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="8%">
+
+
+<p>2</p></td>
+<td width="1%"></td>
+<td width="82%">
+
+
+<p>A mirror started and the engine gave up before the end:
+a full disk, a cache write failure, or another fatal error.
+The reason is in the log file, and what was mirrored before
+the abort is kept.</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="8%">
+
+
+<p>1, 255</p></td>
+<td width="1%"></td>
+<td width="82%">
+
+
+<p><b>httrack</b> refused the command line, or a cache
+operation it asked for failed. No mirror ran.</p></td></tr>
+</table>
 
 <h2>FILES
 <a name="FILES"></a>

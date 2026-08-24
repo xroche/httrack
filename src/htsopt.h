@@ -224,6 +224,9 @@ struct htsoptstate {
   /* */
   /** set to request the mirror to stop; volatile: polled without a lock */
   volatile int stop;
+  /** why the mirror ended early: 0 not at all, 1 an exit the caller asked for,
+      2 nothing transferred and rolled back, -1 an engine fatal (the only one
+      hts_main2() reports, as HTS_EXIT_MIRROR_ABORTED) */
   int exit_xh;
   int back_add_stats;
   /* */
