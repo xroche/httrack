@@ -99,6 +99,13 @@ httrackp *global_opt = NULL;
    answer for, whatever a request's Host header claims. */
 static char server_bound_addr[256 + 2] = "";
 
+/* Other names this host answers to, resolved once when the socket is bound: a
+   lookup a request could steer is the rebinding vector itself. Room for a
+   hostname, its FQDN, a couple of aliases and a PTR. */
+#define SELF_NAMES_MAX 8
+static char server_self_names[SELF_NAMES_MAX][256];
+static size_t server_self_names_count = 0;
+
 static void (*pingFun)(void *, smallserver_client_event, const char *) = NULL;
 static void* pingFunArg = NULL;
 
@@ -258,6 +265,94 @@ static int gethost(const char *hostname, SOCaddr * server) {
   return 0;
 }
 
+/** Remember a name we answer to, if it is new and it fits. */
+static void add_self_name(const char *name) {
+  size_t i;
+
+  if (name == NULL || *name == '\0' ||
+      strlen(name) >= sizeof(server_self_names[0]) ||
+      server_self_names_count == SELF_NAMES_MAX) {
+    return;
+  }
+  for (i = 0; i < server_self_names_count; i++) {
+    if (strfield2(server_self_names[i], name) != 0) {
+      return;
+    }
+  }
+  strcpybuff(server_self_names[server_self_names_count++], name);
+}
+
+/** Add the canonical name and aliases our own hostname resolves to. */
+static void add_resolved_self_names(const char *name) {
+#if HTS_INET6 == 0
+  const struct hostent *const hp = gethostbyname(name);
+
+  if (hp != NULL) {
+    int i;
+
+    add_self_name(hp->h_name);
+    for (i = 0; hp->h_aliases != NULL && hp->h_aliases[i] != NULL; i++) {
+      add_self_name(hp->h_aliases[i]);
+    }
+  }
+#else
+  struct addrinfo *res = NULL;
+  struct addrinfo hints;
+  const struct addrinfo *ai;
+
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_family = PF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_protocol = IPPROTO_TCP;
+  hints.ai_flags = AI_CANONNAME;
+  if (getaddrinfo(name, NULL, &hints, &res) == 0) {
+    for (ai = res; ai != NULL; ai = ai->ai_next) {
+      add_self_name(ai->ai_canonname);
+    }
+  }
+  if (res != NULL) {
+    freeaddrinfo(res);
+  }
+#endif
+}
+
+/** Add the name the bound address reverse-resolves to, kept only when it
+    resolves back to it: an unconfirmed PTR says whatever its owner likes. */
+static void add_reverse_self_name(SOCaddr *bound) {
+  char name[256];
+  char addr[256];
+  char back[256];
+  SOCaddr resolved;
+
+  SOCaddr_inetntoa(addr, sizeof(addr), *bound);
+  if (addr[0] == '\0' ||
+      getnameinfo(&SOCaddr_sockaddr(*bound), SOCaddr_size(*bound), name,
+                  sizeof(name), NULL, 0, NI_NAMEREQD) != 0) {
+    return;
+  }
+  memset(&resolved, 0, sizeof(resolved));
+  if (!gethost(name, &resolved)) {
+    return;
+  }
+  SOCaddr_inetntoa(back, sizeof(back), resolved);
+  if (back[0] != '\0' && strcmp(addr, back) == 0) {
+    add_self_name(name);
+  }
+}
+
+/** Gather the names this host answers to, for the address we just bound. */
+static void collect_self_names(SOCaddr *bound) {
+  char host[256];
+
+  server_self_names_count = 0;
+  if (gethostname(host, sizeof(host)) == 0) {
+    host[sizeof(host) - 1] = '\0';
+    add_self_name(host);
+    add_resolved_self_names(host);
+  }
+  add_reverse_self_name(bound);
+}
+
 /** Form of a bound address a client can actually open: a wildcard names no
     reachable host, and an IPv6 literal needs its URL brackets. */
 static void advertised_host(char *dst, size_t size, const char *bound) {
@@ -313,6 +408,8 @@ T_SOC smallserver_init(int *port, char *adr, const char *bindAddr) {
       if (listen(soc, 10) >= 0) {
         char adv[sizeof(h_loc) + 2]; /* + the brackets of an IPv6 literal */
 
+        /* only now: smallserver_init_std walks a list of ports to bind */
+        collect_self_names(&server);
         advertised_host(adv, sizeof(adv), h_loc);
         strcpy(adr, adv);
       } else {
@@ -427,17 +524,25 @@ static hts_boolean host_is_address(const char *name) {
     A page can point a name of its own at our address and have the browser call
     us same-origin, which an unauthenticated panel must refuse. That always
     presents a name: an address literal is whoever opened the socket, and the
-    only names we vouch for are localhost and whatever --bind was given. */
+    names we vouch for are localhost, whatever --bind was given, and the ones
+    this host itself answers to. */
 static hts_boolean host_is_self(const char *host, const char *bound) {
   char name[256];
+  size_t i;
 
   if (!host_hostname(name, sizeof(name), host)) {
     return HTS_FALSE;
   }
-  return strfield2(name, "localhost") != 0 || host_is_address(name) ||
-                 (bound[0] != '\0' && strfield2(name, bound) != 0)
-             ? HTS_TRUE
-             : HTS_FALSE;
+  if (strfield2(name, "localhost") != 0 || host_is_address(name) ||
+      (bound[0] != '\0' && strfield2(name, bound) != 0)) {
+    return HTS_TRUE;
+  }
+  for (i = 0; i < server_self_names_count; i++) {
+    if (strfield2(server_self_names[i], name) != 0) {
+      return HTS_TRUE;
+    }
+  }
+  return HTS_FALSE;
 }
 
 /** Header value with leading blanks dropped, clipped to fit dst. */
