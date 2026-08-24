@@ -53,26 +53,31 @@ echo "ok: the panel answers at every authority it is reachable at"
 # browsed at http://myhost.lan:8080/ presents. Dropped when another rule would
 # accept it anyway, since it would then prove nothing.
 selfname=$(htsserver_python -c 'import socket; print(socket.gethostname())')
-case ${selfname} in
+case $(printf '%s' "${selfname}" | tr '[:upper:]' '[:lower:]') in
 localhost) selfname='' ;;
 *[!0-9.]*) ;;
 *) selfname='' ;;
 esac
 test "${#selfname}" -lt 256 || selfname=''
 if test -n "${selfname}"; then
-    for good in "${selfname}" "${selfname}:${HTS_PORT}"; do
+    # Upper-cased too: the compare is case-insensitive, as it is for localhost.
+    for good in "${selfname}" "${selfname}:${HTS_PORT}" \
+        "$(printf '%s' "${selfname}" | tr '[:lower:]' '[:upper:]')"; do
         grep -q '^Location: /accepted' <<<"$(post_as "${good}")" ||
             fail "Host '${good}', this host's own name, was refused"
     done
     echo "ok: the panel answers at this host's own name"
 else
-    echo "skipped the own-name rows: this host has no name of its own"
+    echo "skipped the own-name rows: '${selfname}' is a name another rule covers"
 fi
 
 bad_hosts=("evil.example" "evil.example:${HTS_PORT}" "127.0.0.1.evil.example")
-# Near-misses on both sides: the match is the whole name, never a prefix of it.
-test -z "${selfname}" ||
-    bad_hosts+=("${selfname}.evil.example" "${selfname}x" "${selfname%?}")
+if test -n "${selfname}"; then
+    # Near-misses on every side: the match is the whole name, never part of it.
+    bad_hosts+=("${selfname}.evil.example" "evil.${selfname}" "${selfname}x")
+    # A one-character name truncates to "", which the good loop above accepts.
+    test "${#selfname}" -lt 2 || bad_hosts+=("${selfname%?}")
+fi
 for bad in "${bad_hosts[@]}"; do
     resp=$(post_as "${bad}")
     grep -q '^HTTP/1\.0 403 ' <<<"${resp}" ||
@@ -152,8 +157,9 @@ try:
     addrs = {a[4][0] for a in socket.getaddrinfo("ip6-localhost", None)}
 except OSError:
     sys.exit(1)
-sys.exit(0 if addrs == {"::1"}
-         and socket.getnameinfo(("::1", 0), 0)[0] != "ip6-localhost" else 1)
+# Skip where it could be one of ours, which is the whole premise of the row.
+ours = {socket.getnameinfo(("::1", 0), 0)[0], socket.gethostname(), socket.getfqdn()}
+sys.exit(0 if addrs == {"::1"} and "ip6-localhost" not in ours else 1)
 RESOLVES
         got=$(opens "http://ip6-localhost:${HTS_PORT}/")
         test "${got}" = 403 ||
