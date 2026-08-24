@@ -29,7 +29,7 @@ for path in "$@"; do :; done
 name=$(basename "$path")
 
 # gcc's UBSan ignores log_path and reports on stderr, which most tests discard.
-# Route the engine through the shims that keep a copy (sanitizer-stderr-wrap.sh)
+# Route the engine through the shims that keep a copy (tests/stderrwrap.c)
 # when a capture directory is named; PATH is untouched otherwise, so no plain run
 # pays for the extra layer.
 if test -n "${HTTRACK_STDERR_CAPTURE_DIR:-}" && test -d "${HTTRACK_STDERR_WRAP_DIR:-}"; then

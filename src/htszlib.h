@@ -53,6 +53,11 @@ extern size_t hts_zhead(const void *in, size_t in_len, void *out,
                         size_t out_len);
 extern int hts_extract_meta(const char *path);
 extern const char *hts_get_zerror(int err);
+/* Open a ZIP for reading / writing through the UTF-8 file wrappers: the
+   minizip default calls plain fopen, which mangles a non-ASCII path on Windows
+   (#630). `append` takes the zipOpen2_64 APPEND_STATUS_* values. */
+extern unzFile hts_unzOpen_utf8(const char *path);
+extern zipFile hts_zipOpen_utf8(const char *path, int append);
 #endif
 
 #endif

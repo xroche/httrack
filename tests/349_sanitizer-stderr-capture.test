@@ -1,29 +1,43 @@
 #!/bin/bash
 #
 # gcc's UBSan ignores log_path and reports on stderr, which most tests discard,
-# so the harness keeps a copy (sanitizer-stderr-wrap.sh). Both halves matter: the
-# copy is kept, and what the test itself reads is untouched.
+# so the harness keeps a copy (stderrwrap.c). Three things matter: the copy is
+# kept, what the test itself reads is untouched, and it is all there before the
+# shim exits.
 
 set -euo pipefail
 
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-wrap="${testdir}/sanitizer-stderr-wrap.sh"
-[ -r "$wrap" ] || fail "no $wrap"
 report="${testdir}/../tools/ci-sanitizer-report.sh"
 [ -r "$report" ] || fail "no $report"
+sh_run=${BASH_SHELL:-bash}
+wrap=${HTTRACK_STDERR_WRAP_EXE:-}
+# Built by "make check"; the MSVC suite builds no test C, so it has none.
+[ -x "$wrap" ] || skip "no stderrwrap binary, no automake environment"
 
 tmp=$(mktemp -d) || exit 1
 cleanup_push rm -rf "$tmp"
 
 cap=$tmp/cap
-export HTTRACK_STDERR_CAPTURE_TAG=342_probe
+export HTTRACK_STDERR_CAPTURE_TAG=349_probe
 
 # run_wrapped SHELL_SNIPPET -- the wrapped program is a shell, so a case can
 # write to either stream and pick its own exit status.
-sh_run=${BASH_SHELL:-bash}
-run_wrapped() { "$sh_run" "$wrap" /bin/sh -c "$1"; }
+run_wrapped() { "$wrap" /bin/sh -c "$1"; }
+
+# Lines in file $1, counted without forking: a fork between the shim's exit and
+# the read hands a lagging writer all the grace it needs. bash 3.2, the one
+# macOS ships, has no readarray.
+count_lines_here() { # count_lines_here FILE
+    lines_here=0
+    while IFS= read -r _; do lines_here=$((lines_here + 1)); done <"$1"
+}
+
+# A shell snippet writing $1 numbered lines to stderr, tagged $2.
+# shellcheck disable=SC2016 # the wrapped program expands these, not us
+loop_to_stderr() { printf 'i=0; while [ $i -lt %s ]; do echo %s$i >&2; i=$((i+1)); done' "$1" "$2"; }
 
 # 1. Capture off: nothing is created, and the shim is a bare exec.
 rc=0
@@ -41,7 +55,7 @@ export HTTRACK_STDERR_CAPTURE_DIR=$cap
 # 2. The case this exists for: stderr discarded, the copy survives anyway.
 run_wrapped 'echo "runtime error: store to address 0x1 with insufficient space" >&2' 2>/dev/null
 grep -rq 'insufficient space' "$cap" || fail "a discarded UBSan report left no copy"
-copies=("$cap"/342_probe.*.log)
+copies=("$cap"/349_probe.*.log)
 [ -e "${copies[0]}" ] || fail "the copy is not named after the test: $(echo "$cap"/*)"
 
 # 3. Passthrough, both streams, plus the exit status the caller reads.
@@ -77,7 +91,73 @@ for bad in "$tmp/absent" "$tmp/plainfile"; do
     assert_eq 2 "$rc" "collector took a log dir of $bad"
 done
 
-# 5. The generated shim runs the real engine, PATH-first, with stdout intact.
+# 5. What the caller redirected stderr into has to be whole the moment the shim
+# exits; a tee nobody waited for left it short (#1374). Go a batch at a time,
+# which one run can win on luck and which also checks that concurrent shims do
+# not collide: 32 at once, 32 whole logs.
+race=$tmp/race
+mkdir -p "$race/cap"
+LINES_PER_RUN=50
+BATCH=8
+ROUNDS=6 # 48 runs: catches a 5% short-read ~91% of the time, 4 rounds ~81%
+racy=$(loop_to_stderr "$LINES_PER_RUN" line)
+for round in $(seq 1 "$ROUNDS"); do
+    for slot in $(seq 1 "$BATCH"); do
+        (
+            HTTRACK_STDERR_CAPTURE_DIR=$race/cap HTTRACK_STDERR_CAPTURE_TAG=349_race \
+                "$wrap" /bin/sh -c "$racy" 2>"$race/$round.$slot.err"
+            count_lines_here "$race/$round.$slot.err"
+            [ "$lines_here" -eq "$LINES_PER_RUN" ] ||
+                echo "round $round slot $slot: $lines_here lines" >>"$race/short"
+        ) &
+    done
+    wait
+done
+[ ! -s "$race/short" ] ||
+    fail "the caller's stderr was still being written after the shim exited: $(<"$race/short")"
+copies_kept=0
+for f in "$race"/cap/349_race.*.log; do
+    copies_kept=$((copies_kept + 1))
+    assert_eq "$LINES_PER_RUN" "$(lines_of "$f")" "lines in $f"
+done
+assert_eq $((BATCH * ROUNDS)) "$copies_kept" "capture copies from concurrent shims"
+
+# 6. The shim is a parent, not an exec, so what a test reads off the program has
+# to come back through it: its exit status (above), its death by signal, the
+# signals a test sends it by pid, stdin, and an argv it must not reword.
+rc=0
+run_wrapped 'kill -TERM $$; sleep 30' || rc=$?
+assert_eq 143 "$rc" "a program killed by SIGTERM"
+
+for sig in TERM USR1; do
+    : >"$tmp/sig"
+    "$wrap" /bin/sh -c \
+        "trap 'echo $sig >>$tmp/sig; exit 0' $sig; echo r >$tmp/ready; while :; do sleep 0.1; done" &
+    wrapped=$!
+    deadline=$((SECONDS + 30))
+    until [ -s "$tmp/ready" ]; do
+        [ "$SECONDS" -lt "$deadline" ] || fail "the wrapped program never started"
+        poll_wait 0.1
+    done
+    rm -f "$tmp/ready"
+    kill -"$sig" "$wrapped"
+    rc=0
+    # A shim that swallows the signal wedges; a bare wait reports that only at 600s.
+    wait_bounded "$wrapped" 30 || rc=$?
+    assert_eq 0 "$rc" "the shim passed SIG$sig on and exited"
+    assert_eq "$sig" "$(cat "$tmp/sig")" "SIG$sig sent to the shim by pid"
+done
+
+assert_eq piped-in "$(echo piped-in | "$wrap" /bin/cat)" "stdin through the shim"
+# shellcheck disable=SC2016 # again the wrapped program's expansion
+argv_seen=$("$wrap" /bin/sh -c 'for a; do printf "<%s>" "$a"; done' argv0 'a b' "q'\"q" '' end)
+assert_eq "<a b><q'\"q><><end>" "$argv_seen" "argv through the shim"
+
+# Heavy enough that the copy cannot be one buffer the shim happened to hold.
+run_wrapped "$(loop_to_stderr 20000 bulk)" 2>"$tmp/heavy.err"
+assert_eq 20000 "$(lines_of "$tmp/heavy.err")" "heavy stderr reaching the caller"
+
+# 7. The generated shim runs the real engine, PATH-first, with stdout intact.
 [ -n "${HTTRACK_STDERR_WRAP_DIR:-}" ] || skip "HTTRACK_STDERR_WRAP_DIR unset, no automake environment"
 [ -r "$HTTRACK_STDERR_WRAP_DIR/httrack" ] || fail "no generated shim in $HTTRACK_STDERR_WRAP_DIR"
 PATH="$HTTRACK_STDERR_WRAP_DIR:$PATH"
