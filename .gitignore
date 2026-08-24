@@ -44,7 +44,6 @@ Makefile
 /src/proxytrack
 /tools/Info.plist
 /tests/stringoom
-/tests/stderr-wrap/
 /tests/*.log
 /tests/*.trs
 

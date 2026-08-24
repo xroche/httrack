@@ -513,15 +513,20 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
-  # Memory safety: build and run the suite under AddressSanitizer +
-  # UndefinedBehaviorSanitizer. The offline engine self-tests drive the parsers
-  # that chew on untrusted crawled input (charset, mime, HTML, entities, IDNA,
-  # filters, cache) straight through the sanitizers, so a buffer overrun,
+  # Memory safety: build and run the suite under AddressSanitizer, then again
+  # under UndefinedBehaviorSanitizer. The offline engine self-tests drive the
+  # parsers that chew on untrusted crawled input (charset, mime, HTML, entities,
+  # IDNA, filters, cache) straight through the sanitizers, so a buffer overrun,
   # use-after-free, or signed overflow there fails the build instead of slipping
-  # past a plain -O2 build. gcc's runtimes; one job is enough (the bug class is
-  # arch-independent and the matrix already covers compile portability).
-  sanitize:
-    name: sanitize (ASan+UBSan, gcc)
+  # past a plain -O2 build. gcc's runtimes; one job each is enough (the bug class
+  # is arch-independent and the matrix already covers compile portability).
+  #
+  # Two jobs rather than one combined -fsanitize=address,undefined build: the
+  # combined runtime ignores UBSan's log_path and writes to stderr, which most
+  # tests discard, so a finding a green test hid is lost. Alone, each runtime
+  # honours log_path and the collector below reads every report.
+  asan:
+    name: sanitize (ASan, gcc)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -536,18 +541,18 @@ jobs:
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
 
-      - name: Configure (sanitized)
+      - name: Configure (ASan)
         run: |
           set -euo pipefail
           autoreconf -fi
           ./configure CC=gcc \
-            CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
-            LDFLAGS="-fsanitize=address,undefined"
+            CFLAGS="-fsanitize=address -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            LDFLAGS="-fsanitize=address"
 
       - name: Build
         run: make -j"$(nproc)"
 
-      - name: Test (sanitized)
+      - name: Test (ASan)
         # Leaks at exit are out of scope (the CLI frees little on the way out);
         # we want memory-safety errors, so turn leak detection off and make every
         # other finding abort the run.
@@ -561,14 +566,9 @@ jobs:
         # buffers; free_fill flags use-after-free reads.
         env:
           ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647:log_path=${{ github.workspace }}/sanitizer-logs/asan
-          # No log_path here: gcc's UBSan ignores it and writes to stderr, which
-          # most tests redirect away; the harness keeps a copy under the directory
-          # below.
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
         timeout-minutes: 20
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
           jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
           make check -j"$jobs"
 
@@ -580,17 +580,73 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
-            "$GITHUB_WORKSPACE/sanitizer-logs" tests
+          sh tools/ci-sanitizer-report.sh "$GITHUB_WORKSPACE/sanitizer-logs" tests
 
       - name: Upload the sanitizer and per-test logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: sanitize-logs
+          name: asan-logs
           path: |
             sanitizer-logs/
-            sanitizer-stderr/
+            tests/*.log
+          if-no-files-found: ignore
+
+  ubsan:
+    name: sanitize (UBSan, gcc)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Configure (UBSan)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure CC=gcc \
+            CFLAGS="-fsanitize=undefined -fno-sanitize-recover=all -g -O1 -fno-omit-frame-pointer" \
+            LDFLAGS="-fsanitize=undefined"
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test (UBSan)
+        # log_path, so a finding survives the many tests that send the engine's
+        # stderr to /dev/null or into a tmpdir they delete.
+        env:
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1:log_path=${{ github.workspace }}/sanitizer-logs/ubsan
+        timeout-minutes: 20
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          make check -j"$jobs"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+      - name: Collect sanitizer findings
+        if: always()
+        run: |
+          set -euo pipefail
+          sh tools/ci-sanitizer-report.sh "$GITHUB_WORKSPACE/sanitizer-logs" tests
+
+      - name: Upload the sanitizer and per-test logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ubsan-logs
+          path: |
+            sanitizer-logs/
             tests/*.log
           if-no-files-found: ignore
 
@@ -629,11 +685,10 @@ jobs:
       - name: Test (offline self-tests under MSan)
         env:
           MSAN_OPTIONS: abort_on_error=1:halt_on_error=1:log_path=${{ github.workspace }}/sanitizer-logs/msan
-          HTTRACK_STDERR_CAPTURE_DIR: ${{ github.workspace }}/sanitizer-stderr
         timeout-minutes: 20
         run: |
           set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs" "$GITHUB_WORKSPACE/sanitizer-stderr"
+          mkdir -p "$GITHUB_WORKSPACE/sanitizer-logs"
           # 01_engine-* only; zlib-dependent self-tests are named 01_zlib-* and
           # skipped here (uninstrumented libz floods MSan with false positives).
           tests="$(cd tests && ls 01_engine-*.test | tr '\n' ' ')"
@@ -648,8 +703,7 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          sh tools/ci-sanitizer-report.sh -s "$GITHUB_WORKSPACE/sanitizer-stderr" \
-            "$GITHUB_WORKSPACE/sanitizer-logs" tests
+          sh tools/ci-sanitizer-report.sh "$GITHUB_WORKSPACE/sanitizer-logs" tests
 
       - name: Upload the sanitizer and per-test logs
         if: always()
@@ -658,7 +712,6 @@ jobs:
           name: msan-logs
           path: |
             sanitizer-logs/
-            sanitizer-stderr/
             tests/*.log
           if-no-files-found: ignore
 

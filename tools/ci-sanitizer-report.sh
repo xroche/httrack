@@ -1,12 +1,10 @@
 #!/bin/sh
 # Surface sanitizer findings automake swallows in a green run: it keeps only the
 # failing tests in test-suite.log, and most test scripts lack `set -e`.
-# Each source covers what the others cannot: the log_path file holds the report a
-# test redirecting its own stderr hides, and the stderr copies hold gcc's UBSan
-# findings, which land there because it ignores log_path, unlike clang's.
+# Both sources matter: the log_path file holds the report a test redirecting its
+# own stderr hides, the per-test logs hold what a test kept.
 #
-# Usage: ci-sanitizer-report.sh [-s STDERR_DIR] LOG_PATH_DIR [TEST_LOG_DIR...];
-# exits 1 on a hit.
+# Usage: ci-sanitizer-report.sh LOG_PATH_DIR [TEST_LOG_DIR...]; exits 1 on a hit.
 set -eu
 
 # Anchored on each runtime's banner: severity is not enough, since MSan reports
@@ -24,22 +22,10 @@ need_dir() { # need_dir WHAT PATH
     }
 }
 
-stderr_dir=
-while [ $# -gt 0 ]; do
-    case $1 in
-    -s)
-        [ $# -ge 2 ] || {
-            echo "usage: $0 [-s STDERR_DIR] LOG_PATH_DIR [TEST_LOG_DIR...]" >&2
-            exit 2
-        }
-        stderr_dir=$2
-        need_dir "-s" "$stderr_dir"
-        shift 2
-        ;;
-    *) break ;;
-    esac
-done
-
+[ $# -ge 1 ] || {
+    echo "usage: $0 LOG_PATH_DIR [TEST_LOG_DIR...]" >&2
+    exit 2
+}
 log_dir=$1
 need_dir "LOG_PATH_DIR" "$log_dir"
 shift
@@ -69,18 +55,6 @@ for f in "$log_dir"/*; do
     fi
 done
 
-# Copies of the engine's stderr, kept by tests/sanitizer-stderr-wrap.sh. Never
-# printed whole: these also hold the engine's ordinary chatter.
-if [ -n "$stderr_dir" ]; then
-    for f in "$stderr_dir"/*.log; do
-        [ -s "$f" ] || {
-            rm -f "$f"
-            continue
-        }
-        scan "engine stderr" "$f"
-    done
-fi
-
 # Only the harness logs: an in-tree build puts the .test sources here too, and
 # one of them carries the pattern as literal text.
 for dir in "$@"; do
@@ -94,4 +68,4 @@ done
     echo "FAIL: a sanitizer reported above, which \`make check\` alone did not catch." >&2
     exit 1
 }
-echo "No sanitizer finding in $log_dir${stderr_dir:+, $stderr_dir} or the per-test logs."
+echo "No sanitizer finding in $log_dir or the per-test logs."

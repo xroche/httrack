@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# tools/ci-sanitizer-report.sh is what turns a sanitizer report a green test hid
+# into a red leg, so its two verdicts and its refusal to scan nothing are tested.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+report="${testdir}/../tools/ci-sanitizer-report.sh"
+[ -r "$report" ] || fail "no $report"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+sh_run=${BASH_SHELL:-bash}
+logs=$tmp/logs   # log_path directory
+tlogs=$tmp/tlogs # per-test logs
+mkdir -p "$logs" "$tlogs"
+
+# collect ARGS... -- run the collector, leaving its status in $rc and output in
+# $tmp/out.
+collect() {
+    rc=0
+    "$sh_run" "$report" "$@" >"$tmp/out" 2>&1 || rc=$?
+}
+
+# 1. Nothing to find.
+collect "$logs" "$tlogs"
+assert_eq 0 "$rc" "clean run: $(cat "$tmp/out")"
+grep -q 'No sanitizer finding' "$tmp/out" || fail "clean run said [$(cat "$tmp/out")]"
+
+# 2. A directory that is not there is the wiring having moved, and scanning
+# nothing must not read as a clean run.
+: >"$tmp/plainfile"
+for bad in "$tmp/absent" "$tmp/plainfile"; do
+    collect "$bad" "$tlogs"
+    assert_eq 2 "$rc" "collector took a log dir of $bad"
+done
+collect
+assert_eq 2 "$rc" "collector took no argument"
+
+# 3. A report in the log_path file, the case gcc's UBSan needs log_path for.
+echo 'htsfoo.c:1:2: runtime error: index 9 out of bounds for type char[4]' >"$logs/ubsan.1234"
+collect "$logs" "$tlogs"
+assert_eq 1 "$rc" "collector missed a log_path report"
+grep -q 'out of bounds' "$tmp/out" || fail "collector did not print the finding: $(cat "$tmp/out")"
+rm -f "$logs/ubsan.1234"
+
+# 4. An unrecognised diagnostic stays visible without reddening the leg.
+echo 'ASan runtime chatter' >"$logs/asan.1234"
+collect "$logs" "$tlogs"
+assert_eq 0 "$rc" "collector reddened on a non-finding: $(cat "$tmp/out")"
+grep -q 'ASan runtime chatter' "$tmp/out" || fail "collector swallowed a non-finding"
+rm -f "$logs/asan.1234"
+
+# 5. And a report a test did keep in its own log.
+echo 'ERROR: AddressSanitizer: heap-buffer-overflow' >"$tlogs/99_something.log"
+collect "$logs" "$tlogs"
+assert_eq 1 "$rc" "collector missed a report in a test log"
+grep -q 'heap-buffer-overflow' "$tmp/out" || fail "collector did not print the test-log finding"
