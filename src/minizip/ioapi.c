@@ -75,8 +75,11 @@ int call_ztruncate64(const zlib_filefunc64_32_def *pfilefunc, voidpf filestream,
      the caller has already performed, but the caller has to hear about it */
   if (pfilefunc->zfile_func64.ztruncate64_file == NULL)
     return 1;
+  /* a backend may report failure as an errno rather than -1 (_chsize_s) */
   return (*(pfilefunc->zfile_func64.ztruncate64_file))(
-      pfilefunc->zfile_func64.opaque, filestream, size);
+             pfilefunc->zfile_func64.opaque, filestream, size) == 0
+             ? 0
+             : -1;
 }
 
 void fill_zlib_filefunc64_32_def_from_filefunc32(zlib_filefunc64_32_def* p_filefunc64_32, const zlib_filefunc_def* p_filefunc32) {

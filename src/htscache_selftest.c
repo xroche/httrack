@@ -415,15 +415,16 @@ static int ZCALLBACK selftest_counting_ztruncate(voidpf opaque, voidpf stream,
 }
 
 /* Open a ZIP whose writes fail past inj->budget, so cache_add() hits an error.
-   Through the table the cache itself opens with (#1402): a table without a
-   truncate rolls a member back by rewinding, leaving the bytes behind. */
+   Through the table the cache itself opens with (#1402), or with its truncate
+   entry dropped, as the Win32 tables were: a rollback then only rewinds. */
 static zipFile selftest_open_failing_zip(const char *path,
-                                         writefail_inject *inj) {
+                                         writefail_inject *inj,
+                                         hts_boolean truncatable) {
   zlib_filefunc64_def ff;
 
   hts_zip_filefunc64(&ff); /* real fopen/read/seek/close; ignores opaque */
-  inj->truncate = ff.ztruncate64_file;
-  ff.ztruncate64_file = selftest_counting_ztruncate;
+  inj->truncate = truncatable ? ff.ztruncate64_file : NULL;
+  ff.ztruncate64_file = truncatable ? selftest_counting_ztruncate : NULL;
   ff.zwrite_file = selftest_failing_zwrite;
   ff.opaque = inj;
   return zipOpen2_64(path, APPEND_STATUS_CREATE, NULL, &ff);
@@ -524,7 +525,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     cache.log = stderr;
     cache.errlog = stderr;
     cache.hashtable = coucal_new(0);
-    cache.zipOutput = selftest_open_failing_zip(path, &inj);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj, HTS_TRUE);
     if (cache.zipOutput == NULL) {
       fprintf(stderr, "cache-writefail: could not open injected ZIP\n");
       fail++;
@@ -597,7 +598,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     cache.log = stderr;
     cache.errlog = stderr;
     cache.hashtable = coucal_new(0);
-    cache.zipOutput = selftest_open_failing_zip(path, &inj);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj, HTS_TRUE);
     opt->state.exit_xh = 0;
 
     for (i = 0; i < 10; i++) {
@@ -639,7 +640,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     cache.log = stderr;
     cache.errlog = stderr;
     cache.hashtable = coucal_new(0);
-    cache.zipOutput = selftest_open_failing_zip(path, &inj);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj, HTS_TRUE);
     opt->state.exit_xh = 0;
 
     writefail_store(opt, &cache, "/blob.bin", body, body_len);
@@ -677,6 +678,57 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     }
   }
 
+  /* a backend with no truncate rolls back by rewinding: the entry still drops
+     and the mirror still lives, and the incomplete rollback is warned about */
+  {
+    cache_back cache;
+    writefail_inject inj;
+    char extra[8192];
+    char rbody[64];
+    int n;
+
+    inj.budget = 4096;
+    inj.fail_errno = EIO;
+    inj.writes = 0;
+    inj.truncates = 0;
+    inj.fail_once = 1;
+    memset(&cache, 0, sizeof(cache));
+    cache.type = 1;
+    cache.log = stderr;
+    cache.errlog = stderr;
+    cache.hashtable = coucal_new(0);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj, HTS_FALSE);
+    opt->state.exit_xh = 0;
+
+    writefail_store(opt, &cache, "/blob.bin", body, body_len);
+    if (cache.zipWriteFailed || opt->state.exit_xh != 0) {
+      fprintf(stderr,
+              "cache-writefail: notrunc: a rewind-only rollback aborted the "
+              "mirror (flagged=%d, exit_xh=%d)\n",
+              (int) cache.zipWriteFailed, opt->state.exit_xh);
+      fail++;
+    }
+    if (inj.truncates != 0) {
+      fprintf(stderr,
+              "cache-writefail: notrunc: %d truncate call(s) on a table that "
+              "has none\n",
+              inj.truncates);
+      fail++;
+    }
+    writefail_store(opt, &cache, "/blob2.bin", body, 16);
+    zipClose(cache.zipOutput, NULL);
+    cache.zipOutput = NULL;
+    n = writefail_read_entry(path, "http://example.com/blob2.bin", extra,
+                             sizeof(extra), rbody, sizeof(rbody));
+    if (n != 16 || memcmp(rbody, body, 16) != 0) {
+      fprintf(stderr,
+              "cache-writefail: notrunc: sibling entry lost after a rewind "
+              "(%d)\n",
+              n);
+      fail++;
+    }
+  }
+
   /* >2GB bodies: in-memory drops the entry, on-disk degrades to headers-only */
   {
     cache_back cache;
@@ -695,7 +747,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     cache.log = stderr;
     cache.errlog = stderr;
     cache.hashtable = coucal_new(0);
-    cache.zipOutput = selftest_open_failing_zip(path, &inj);
+    cache.zipOutput = selftest_open_failing_zip(path, &inj, HTS_TRUE);
     opt->state.exit_xh = 0;
 
     writefail_store_oversized(opt, &cache, "/bigmem.bin", 0 /* in-memory */);

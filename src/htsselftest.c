@@ -4244,7 +4244,9 @@ static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
             abandon_err, ZIP_OK);
     fail++;
   }
-  if (reflen >= doomed) {
+  /* a flushed-but-kept member shows up as more than a backscan of leftovers,
+     which is the size that matters, not the member's nominal one */
+  if (reflen > 65535) {
     fprintf(stderr,
             "zip-abandon-notrunc: the reference kept %d byte(s), so the "
             "abandoned member was not truncated away\n",
