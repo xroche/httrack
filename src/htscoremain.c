@@ -1289,6 +1289,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               }
             } else {
               sscanf(com + 1, "%d", &opt->savename_type);
+              /* only the detached form means userdef: a glued run past INT_MAX
+                 wraps onto -1 and url_savename then reads a null template */
+              if (opt->savename_type < 0)
+                opt->savename_type = 0;
               while(isdigit((unsigned char) *(com + 1)))
                 com++;
             }

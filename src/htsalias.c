@@ -66,7 +66,7 @@ Please visit our Website: http://www.httrack.com
   param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
-  paramn : glues like param what -N reads glued (1, 1L0, on/off), detaches the rest as a user template
+  paramn : glues like param what -N reads glued (1, 1L0, on/off), detaches a %-carrying template, refuses the rest
 
   A name may appear twice; the FIRST row wins, for the expansion and the help
   text. Later rows exist so a reverse lookup by short option finds a name, and
@@ -479,6 +479,19 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           strcpybuff(param, argv[n_arg + 1]);
         else
           need_param = 1;
+
+        /* A template with no % maps every URL onto one local name, so
+           --structure=flat is a typo rather than a template. --user-structure
+           still takes such a value verbatim. */
+        if (strcmp(hts_optalias[pos][2], "paramn") == 0 && param[0] != '\0' &&
+            !optalias_paramn_glues(param) && strchr(param, '%') == NULL) {
+          slprintfbuff_clip(return_error, return_error_size,
+                            "Syntax error:\n\tOption --%s does not take the "
+                            "value %s\n\t%s\n",
+                            hts_optalias[pos][0], param,
+                            _NOT_NULL(optalias_help(hts_optalias[pos][0])));
+          return 0;
+        }
 
         /* Final result */
 

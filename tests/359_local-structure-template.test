@@ -41,6 +41,15 @@ layout() { # layout RELATIVE-PATH ARG...
     assert_eq "./${want}" "$(mirrored)" "$* mirrored"
 }
 
+refused() { # refused WANTED-MESSAGE ARG...
+    local want=$1
+    shift
+    run "$@"
+    { test "${RC}" -ne 0 && test "${RC}" -ne 134; } || fail "$* not refused (exit ${RC})"
+    grep -q "${want}" "${tmp}/out/.log" ||
+        fail "$* refused without saying why: $(<"${tmp}/out/.log")"
+}
+
 # The presets, in every spelling. 100 and 5 pin the whole value: a truncated one
 # lands back on the default layout, which "no web/page.html" cannot tell apart
 # from the option never arriving.
@@ -83,13 +92,31 @@ layout 2col/page.html --structure 2col/%n.%t
 layout 2col/page.html --structure=2col/%n.%t
 layout 2col/page.html -N 2col/%n.%t
 
-# Past 9 digits sscanf("%d") wraps, and a wrap onto -1 is "userdef" with no
-# template: url_savename then crashes. Such a run is a template, as -N always
-# read it, and above all is not an abort.
-for form in --structure=4294967295 "-N 4294967295"; do
-    # shellcheck disable=SC2086 # the two spellings differ by that word split
-    layout 4294967295 ${form}
+# Past 9 digits sscanf("%d") wraps onto -1, which is "userdef" with an empty
+# template, and url_savename then crashes. optreal_find matches -N exactly, so
+# the glued spelling never reaches the alias table and the engine has to clamp
+# it itself; neither spelling may abort.
+layout "${default_layout}" -N4294967295
+layout "${default_layout}" -N99999999999999999999
+layout "${default_layout}" -N2147483648
+
+# The alias table does see the long form, where such a run is neither a preset
+# nor a template. -N <word> keeps taking its value verbatim.
+refused 'does not take the value' --structure=4294967295
+layout 4294967295 -N 4294967295
+
+# A %-free value maps every URL onto one local name, so it is a typo rather than
+# a template: these mirrored the whole site as ./flat and ./flat-2.
+for word in OFF flat none default yes -1; do
+    refused 'does not take the value' "--structure=${word}"
 done
+refused 'does not take the value' --structure none
+# Control: an option whose class checks its value rejects the same word, so this
+# is --structure catching up rather than a rule invented for it. (--cache cannot
+# play that part: it is "param", which glues any value into a mangled cluster.)
+refused 'does not take the value' --index=OFF
+# --user-structure is how to ask for such a name on purpose.
+layout flat --user-structure flat
 # 9 digits still glue, 10 do not. A nonsense preset names files from a hash of
 # the URL, so only the file the template form would have written is stable.
 run --structure=999999999

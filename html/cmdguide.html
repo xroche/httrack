@@ -252,7 +252,7 @@ really HTML.</p>
 
 <table class="tblRegular tableWidth" border="0">
   <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
-  <tr><td><tt>--structure (-N), --user-structure</tt></td><td>The local path and name layout. Presets are numeric, and you can also give a template such as <tt>--structure "%h%p/%n%q.%t"</tt>. <tt>--user-structure</tt> reads its value as a template only, so a pattern of bare digits is not taken for a preset.</td></tr>
+  <tr><td><tt>--structure (-N), --user-structure</tt></td><td>The local path and name layout. Presets are numeric, and you can also give a template such as <tt>--structure "%h%p/%n%q.%t"</tt>. <tt>--structure</tt> reads a value that opens with digits as a preset, and refuses one with no <tt>%</tt> in it, since that would map every URL onto a single local name. <tt>--user-structure</tt> takes its value as a template whatever it looks like, which is the way to ask for either of those on purpose.</td></tr>
   <tr><td><tt>--long-names (-L)</tt></td><td>Long names, 8.3 names, or ISO9660 for CD masters.</td></tr>
   <tr><td><tt>--assume (-%A)</tt></td><td>Assume a MIME type for an extension, for example <tt>--assume php=text/html</tt>. This also skips the extra HEAD probe HTTrack would otherwise send to learn the type.</td></tr>
   <tr><td><tt>--delayed-type-check (-%N), --cached-delayed-type-check (-%D), --check-type (-u), -%t</tt></td><td>When and how the content type is checked, and whether the original extension is kept.</td></tr>

@@ -4668,10 +4668,17 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   /* a template may open with a digit, so the leading digits do not decide it */
   EXPANDS("-N 2col/%n.%t", "--structure=2col/%n.%t", NULL);
   EXPANDS("-N 2col/%n.%t", "--structure", "2col/%n.%t");
-  /* past 9 digits sscanf("%d") wraps, and a wrap onto -1 crashes url_savename
-   */
-  EXPANDS("-N 4294967295", "--structure=4294967295", NULL);
+  /* past 9 digits sscanf("%d") wraps onto -1, and with no % to make it a
+     template either the value has nowhere left to go */
   EXPANDS("-N999999999", "--structure=999999999", NULL);
+  REFUSES("--structure=4294967295", NULL);
+  /* a %-free value would map every URL onto one name, so it is a typo */
+  REFUSES("--structure=OFF", NULL);
+  REFUSES("--structure=flat", NULL);
+  REFUSES("--structure", "none");
+  REFUSES("--structure=-1", NULL);
+  /* --user-structure is how to ask for such a value on purpose */
+  EXPANDS("-N flat", "--user-structure", "flat");
   /* the short form agrees, rather than reading -N 1 as a template named 1 */
   EXPANDS("-N1", "-N", "1");
   assertf(used == 2);
