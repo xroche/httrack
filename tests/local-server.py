@@ -1483,6 +1483,49 @@ class Handler(SimpleHTTPRequestHandler):
     def route_binfail_gone(self):
         self.send_raw(b"<html><body><p>BINFAIL-GONE</p></body></html>", "text/html")
 
+    # --- negative control: a Location on an answered blob (#1395) -----------
+    # Location: is parsed and cached whatever the status, so a 200 carrying one
+    # must not read as a redirect and hold the purge on the strength of it.
+    def route_locfail_index(self):
+        links = '\t<a href="locblob.bin">blob</a>\n'
+        if self.refetch_pass() == 1:  # locgone.html leaves the site afterwards
+            links += '\t<a href="locgone.html">gone</a>\n'
+        self.send_html(links)
+
+    def route_locfail_blob(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(
+                b"LOCFAIL-BLOB\n" + b"\x71\x72\x73\x74" * 256,
+                "application/octet-stream",
+                extra_headers=[("Location", "/locfail/elsewhere.bin")],
+            )
+        else:
+            self.send_cut_headers()
+
+    def route_locfail_gone(self):
+        self.send_raw(b"<html><body><p>LOCFAIL-GONE</p></body></html>", "text/html")
+
+    # --- a hub whose savename is not its URL (#1395) ------------------------
+    # dynhub.php mirrors as dynhub.html, so the guard has to read the name the
+    # cache recorded rather than the one the URL suggests.
+    def route_dynfail_index(self):
+        links = '\t<a href="dynhub.php">hub</a>\n'
+        if self.refetch_pass() == 1:  # dyngone.html leaves the site afterwards
+            links += '\t<a href="dyngone.html">gone</a>\n'
+        self.send_html(links)
+
+    def route_dynfail_hub(self):
+        if self.refetch_pass() == 1:
+            self.send_html('\t<a href="dynchild.html">c</a>\n')
+        else:
+            self.send_cut_headers()
+
+    def route_dynfail_child(self):
+        self.send_raw(b"<html><body><p>DYNFAIL-CHILD</p></body></html>", "text/html")
+
+    def route_dynfail_gone(self):
+        self.send_raw(b"<html><body><p>DYNFAIL-GONE</p></body></html>", "text/html")
+
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
         self.send_raw(
@@ -3076,6 +3119,13 @@ class Handler(SimpleHTTPRequestHandler):
         "/binfail/index.html": route_binfail_index,
         "/binfail/binblob.bin": route_binfail_blob,
         "/binfail/bingone.html": route_binfail_gone,
+        "/locfail/index.html": route_locfail_index,
+        "/locfail/locblob.bin": route_locfail_blob,
+        "/locfail/locgone.html": route_locfail_gone,
+        "/dynfail/index.html": route_dynfail_index,
+        "/dynfail/dynhub.php": route_dynfail_hub,
+        "/dynfail/dynchild.html": route_dynfail_child,
+        "/dynfail/dyngone.html": route_dynfail_gone,
         "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,

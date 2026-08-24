@@ -17,26 +17,6 @@ cleanup_push cleanup
 
 common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1 --timeout=20 --changes)
 
-# assert_purged WANT OUTDIR: what the run reported doing to the old files.
-assert_purged() {
-    local want="$1" json="${2}/hts-changes.json"
-    grep -q "\"purged\": ${want}" "$json" ||
-        fail "expected \"purged\": ${want} in $(<"$json")"
-}
-
-# assert_alive FILE MARKER: still mirrored, and still the body we mirrored.
-assert_alive() {
-    test -s "$1" || fail "$1 is gone"
-    grep -q "$2" "$1" || fail "$1 no longer carries ${2}"
-}
-
-# assert_gave_up OUTDIR URLPATH: the link really did exhaust its retries.
-assert_gave_up() {
-    local log="${1}/hts-log.txt"
-    grep -qE "Error:.*\(-[0-9]+\).*at link .*${2}" "$log" ||
-        fail "no give-up on ${2}: $(<"$log")"
-}
-
 local_server_start --log "${tmpdir}/server.log"
 
 # --- a hub that is a redirect ----------------------------------------------
@@ -128,3 +108,47 @@ test ! -e "${site}/bingone.html" ||
     fail "bingone.html left the site and a failing blob kept the purge back"
 assert_purged true "$out"
 ok "a blob that failed twice keeps its own copy and nothing else"
+
+# --- a Location header on an answered blob is not a redirect ---------------
+# Location: is parsed and cached whatever the status, so reading it without
+# first checking that no usable status came back would hold on this one.
+out="${tmpdir}/loc"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/locfail"
+
+local_crawl --log "${tmpdir}/llog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/locfail/index.html"
+assert_alive "${site}/locblob.bin" LOCFAIL-BLOB
+assert_alive "${site}/locgone.html" LOCFAIL-GONE
+
+local_crawl --log "${tmpdir}/llog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/locfail/index.html"
+assert_gave_up "$out" '/locfail/locblob\.bin'
+assert_alive "${site}/locblob.bin" LOCFAIL-BLOB
+test ! -e "${site}/locgone.html" ||
+    fail "locgone.html left the site and a 200 with a Location kept the purge back"
+assert_purged true "$out"
+ok "a cached Location on an answered blob holds nothing back"
+
+# --- a hub whose savename is not the name in its URL -----------------------
+# dynhub.php is mirrored as dynhub.html, so the guard has to type it by the
+# name the cache recorded. The second consecutive failure on such a hub is a
+# separate gap: the run recomputes the savename without a cache entry to type
+# it, lands back on .php and finds no file (#1421).
+out="${tmpdir}/dyn"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/dynfail"
+
+local_crawl --log "${tmpdir}/dlog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/dynfail/index.html"
+assert_alive "${site}/dynhub.html" 'dynchild\.html'
+assert_alive "${site}/dynchild.html" DYNFAIL-CHILD
+assert_alive "${site}/dyngone.html" DYNFAIL-GONE
+
+local_crawl --log "${tmpdir}/dlog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/dynfail/index.html"
+assert_gave_up "$out" '/dynfail/dynhub\.php'
+assert_alive "${site}/dynhub.html" 'dynchild\.html'
+assert_alive "${site}/dynchild.html" DYNFAIL-CHILD
+assert_purged false "$out"
+ok "a hub saved under another name still holds its subtree"

@@ -3570,24 +3570,24 @@ static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
   prev = cache_read_including_broken(opt, cache, adr, fil, prev_save,
                                      prev_location);
 
-  /* A redirect is stored headers-only, so it has no local file and the read
-     invalidates its status; the Location it recorded is what survives. */
-  if (HTTP_IS_REDIRECT(prev.statuscode) || strnotempty(prev_location))
+  if (HTTP_IS_REDIRECT(prev.statuscode))
     return HTS_TRUE;
   if (prev.statuscode > 0) /* answered: an error mirrored nothing */
     return HTTP_IS_OK(prev.statuscode) && strnotempty(prev_save) &&
-                   is_hypertext_mime(opt, prev.contenttype, prev_save)
-               ? HTS_TRUE
-               : HTS_FALSE;
+           is_hypertext_mime(opt, prev.contenttype, prev_save);
+
+  /* No usable status left. A redirect is stored headers-only, so naming no
+     local file invalidates it on read, but its Location survives. Below this
+     arm only, or a stray Location on an answered blob would hold too. */
+  if (strnotempty(prev_location))
+    return HTS_TRUE;
 
   /* A run that failed the same way stored no entry at all, so the copy it kept
      (#746) is the only surviving record of what this page was. */
   guessed[0] = '\0';
   return save != NULL && strnotempty(save) && fexist_utf8(save) &&
-                 guess_httptype_sized(opt, guessed, sizeof(guessed), save) &&
-                 is_hypertext_mime__(guessed)
-             ? HTS_TRUE
-             : HTS_FALSE;
+         guess_httptype_sized(opt, guessed, sizeof(guessed), save) &&
+         is_hypertext_mime__(guessed);
 }
 
 /*

@@ -18,25 +18,6 @@ cleanup_push cleanup
 
 common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1 --timeout=20 --changes)
 
-# assert_purged WANT OUTDIR: what the run reported doing to the old files.
-assert_purged() {
-    local want="$1" json="${2}/hts-changes.json"
-    grep -q "\"purged\": ${want}" "$json" ||
-        fail "expected \"purged\": ${want} in $(<"$json")"
-}
-
-# assert_alive FILE MARKER: still mirrored, and still the body we mirrored.
-assert_alive() {
-    test -s "$1" || fail "$1 is gone"
-    grep -q "$2" "$1" || fail "$1 no longer carries ${2}"
-}
-
-# assert_logged OUTDIR PATTERN WHAT: the premise a shape rests on, in the log.
-assert_logged() {
-    local log="${1}/hts-log.txt"
-    grep -qE "$2" "$log" || fail "${3}: $(<"$log")"
-}
-
 local_server_start --log "${tmpdir}/server.log"
 
 # --- a hub that hangs up mid-header ----------------------------------------
@@ -56,8 +37,7 @@ ok "pass 1 mirrored the hub, its two children and both controls"
 local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" --update \
     "${BASEURL}/hubfail/index.html"
 
-assert_logged "$out" 'Error:.*at link .*/hubfail/hub\.html' \
-    "the hub re-fetch did not fail, so nothing went unparsed"
+assert_gave_up "$out" '/hubfail/hub\.html'
 # #746 keeps the copy whole, links included, not just a non-empty file.
 assert_alive "${site}/hub.html" 'child2\.html'
 assert_alive "${site}/child1.html" HUBFAIL-CHILD-1
@@ -75,8 +55,7 @@ local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --update \
 assert_logged "$out" '"Not Found" \(404\) at link .*/hubfail/missing\.html' \
     "missing.html was never answered, so the 404 control did not run"
 for name in dead.bin dead.html; do
-    assert_logged "$out" "Error:.*\\(-[0-9]+\\).*at link .*/hubfail/${name}" \
-        "${name} did not fail the transfer, so it holds nothing back"
+    assert_gave_up "$out" "/hubfail/${name}"
 done
 assert_alive "${site}/hub.html" 'child2\.html'
 assert_alive "${site}/child1.html" HUBFAIL-CHILD-1
@@ -108,10 +87,8 @@ assert_purged false "$out"
 ok "a mangled gzip body holds the purge like a hang-up does"
 
 # --- boundary: a hub that answers 500 needs no hold at all ------------------
-# The update recovers the page from the previous copy and re-queues its
-# children well before the give-up arm the guard sits on, so the guard is never
-# asked. That ordering is what the guard rests on: assert it, or a recovery
-# that moved below the give-up arm would go unnoticed.
+# The update recovers it from the previous copy ahead of the give-up arm, so
+# the guard is never asked: the ordering the guard rests on, asserted below.
 out="${tmpdir}/err"
 mkdir -p "$out"
 site="${out}/127.0.0.1_${SRV_PORT}/errfail"
