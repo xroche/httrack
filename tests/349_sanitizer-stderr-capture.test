@@ -141,7 +141,10 @@ for sig in TERM USR1; do
     done
     rm -f "$tmp/ready"
     kill -"$sig" "$wrapped"
-    wait "$wrapped" || fail "the $sig-ed program exited non-zero"
+    rc=0
+    # A shim that swallows the signal wedges; a bare wait reports that only at 600s.
+    wait_bounded "$wrapped" 30 || rc=$?
+    assert_eq 0 "$rc" "the shim passed SIG$sig on and exited"
     assert_eq "$sig" "$(cat "$tmp/sig")" "SIG$sig sent to the shim by pid"
 done
 
