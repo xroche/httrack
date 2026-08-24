@@ -342,6 +342,10 @@ static const char *optalias_prefix_count(const char *name) {
                                                     : "";
 }
 
+/* What a --wide-/--tiny- prefix does where the count cannot be glued on.
+   0: apply the alias without the count and warn. 1: refuse the option. */
+#define OPTALIAS_PREFIX_STRICT 0
+
 /* Whether the alias expands to a plain cluster a count can be glued onto
    (-w -> -wc32). The rest is refused rather than glued blind: a value sharing
    the word (-N <template>, -c8) or holding it alone (-O <path>), a long form,
@@ -391,7 +395,7 @@ static const char *optalias_suffix(const char *type, const char *value) {
   argc,argv     as in main()
   n_arg         argument position
   return_argv   a char[2][] where to put result
-  return_error  buffer in case of syntax error
+  return_error  the syntax error, or a warning the caller shows and carries on
 
   return value: number of arguments treated (0 if error)
 */
@@ -456,15 +460,26 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       if (pos >= 0) {
         /* Copy real name */
         strcpybuff(command, hts_optalias[pos][1]);
-        /* Refuse a prefix the expansion cannot carry, rather than drop it */
+        /* Say so where the expansion cannot carry the prefix, rather than
+           drop the count in silence */
         if (addcommand[0] != '\0' &&
             !optalias_clusters(hts_optalias[pos][2], command)) {
+#if OPTALIAS_PREFIX_STRICT
           slprintfbuff_clip(return_error, return_error_size,
                             "Syntax error:\n\tThe %s- prefix does not apply to "
                             "--%s: write --%s --%s instead\n",
                             addname, hts_optalias[pos][0], addname,
                             hts_optalias[pos][0]);
           return 0;
+#else
+          slprintfbuff_clip(return_error, return_error_size,
+                            "Warning: the %s- prefix cannot add its connection "
+                            "count to --%s, so --%s runs without it; write "
+                            "--%s --%s instead",
+                            addname, hts_optalias[pos][0], hts_optalias[pos][0],
+                            addname, hts_optalias[pos][0]);
+          addcommand[0] = '\0';
+#endif
         }
         /* With parameters? */
         if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
@@ -780,6 +795,8 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
             if (!result) {
               printf("%s\n", return_error);
             } else {
+              if (return_error[0] != '\0')
+                printf("%s\n", return_error);
               /* Insert the option and its parameter after the ones already
                  inserted, so that the file order is preserved */
               if (!cmdl_ins(cmd, tmp_argv[2], insert_after) ||

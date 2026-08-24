@@ -32,16 +32,31 @@ crawl() { # crawl ARG...
         >"${tmp}/run.log" 2>&1 || RC=$?
 }
 
-# echoed WANT LABEL ARG...: the option word the engine was handed
-echoed() {
+# expand_run WANT LABEL ARG...: run, and read back the option word the engine
+# was handed, plus whether the prefix said it could not add its count
+expand_run() {
     local want=$1 label=$2 line
     shift 2
     crawl "$@"
     assert_eq 0 "${RC}" "${label} exited"
     assert_file "${tmp}/out/hts-log.txt" "${label}"
     line=$(sed -n 2p "${tmp}/out/hts-log.txt")
-    grep -q -- " ${want} " <<<"${line}" ||
+    grep -qF -- " ${want} " <<<"${line}" ||
         fail "${label}: the engine was handed ${line}, wanted ${want}"
+    WARNED=no
+    ! grep -q 'cannot add its connection count' "${tmp}/run.log" || WARNED=yes
+}
+
+# the count went on, with nothing to report
+echoed() { # echoed WANT LABEL ARG...
+    expand_run "$@"
+    assert_eq no "${WARNED}" "$2 warned"
+}
+
+# the alias applied without the count, and said so
+warned() { # warned WANT LABEL ARG...
+    expand_run "$@"
+    assert_eq yes "${WARNED}" "$2 warned"
 }
 
 echoed '-wc32' 'wide mirror' --wide-mirror
@@ -80,28 +95,29 @@ clamped yes 'plain mirror over --sockets 32' --sockets 32 --mirror
 clamped yes 'wide mirror over --sockets 1' --sockets 1 --wide-mirror
 ok "the count applies, and the unprefixed alias adds none"
 
-# Everywhere the glue would be misread, the prefix is refused instead: a value
-# sharing the word or holding it alone, a long form, an option name the caller
-# matches whole, and a cluster already carrying a count of its own.
-refused() { # refused LABEL ARG...
-    local label=$1 reply
-    shift
-    crawl "$@"
-    test "${RC}" -ne 0 || fail "${label}: accepted, exit 0"
-    reply=$(cat "${tmp}/run.log")
-    grep -q 'prefix does not apply' <<<"${reply}" ||
-        fail "${label}: refused without saying why: ${reply}"
-}
+# Everywhere the glue would be misread, the alias runs without the count and
+# warns: a value sharing the word (-N, -c8), the -% and -# families whose names
+# are not self-delimiting, a cluster already carrying a count, a value of its
+# own. The base alias has to still do its job.
+warned '-N%h%p/%n.%t' 'wide structure' --wide-structure '%h%p/%n.%t'
+test -f "${tmp}/out/file${tmp}/page.html" ||
+    fail "--wide-structure lost the template it warned about"
+warned '-c8' 'wide sockets' --wide-sockets 8
+assert_eq 0 "$(count_matching_lines 'simultaneous connections limited to' \
+    "${tmp}/out/hts-log.txt")" "--wide-sockets 8 stayed at 8"
+warned '-%r' 'wide warc' --wide-warc
+test -n "$(find "${tmp}/out" -name '*.warc*' -print -quit)" ||
+    fail "--wide-warc wrote no archive"
+warned '-c32' 'tiny wide' --tiny-wide
+warned '+*.gif' 'tiny allow' --tiny-allow '*.gif'
 
-refused 'wide structure' --wide-structure '%h%p/%n.%t'
-refused 'wide sockets' --wide-sockets 8
-refused 'tiny wide' --tiny-wide
-refused 'wide version' --wide-version
-refused 'wide warc' --wide-warc
-refused 'wide path' --wide-path "${tmp}/out"
-refused 'tiny allow' --tiny-allow '*.gif'
-refused 'tiny help' --tiny-help
-ok "a prefix that cannot be glued on is refused"
+# -#h returns before any crawl, so it is read straight off the run
+run_log=$(httrack -O "${tmp}/out" --quiet --wide-version 2>&1) || fail "--wide-version exited $?"
+grep -q 'cannot add its connection count' <<<"${run_log}" ||
+    fail "--wide-version applied silently: ${run_log}"
+grep -q 'HTTrack version' <<<"${run_log}" ||
+    fail "--wide-version stopped printing the version: ${run_log}"
+ok "a prefix that cannot be glued on warns, and the alias still runs"
 
 # The unprefixed spellings the refusals are built from still work, template
 # included: gluing a count into it corrupted the template as well as losing it.

@@ -226,7 +226,7 @@ below let you go faster when you own the target, and slower when you do not.</p>
 <table class="tblRegular tableWidth" border="0">
   <tr class="head"><td><b>Option</b></td><td><b>What it controls</b></td></tr>
   <tr><td><tt>--max-rate (-A)</tt></td><td>Maximum transfer rate in bytes/sec. <b>The default is about 100 KB/s even without this flag.</b> Raise it to go faster.</td></tr>
-  <tr><td><tt>--sockets (-c)</tt></td><td>Number of parallel connections (default 4). <tt>--tiny</tt>, <tt>--wide</tt> and <tt>--ultrawide</tt> are presets. The <tt>wide-</tt>/<tt>tiny-</tt> prefix carries one onto a plain alias, so <tt>--wide-mirror</tt> is <tt>--mirror</tt> at 32 connections; an alias that takes a value of its own refuses the prefix.</td></tr>
+  <tr><td><tt>--sockets (-c)</tt></td><td>Number of parallel connections (default 4). <tt>--tiny</tt>, <tt>--wide</tt> and <tt>--ultrawide</tt> are presets. The <tt>wide-</tt>/<tt>tiny-</tt> prefix carries one onto a plain alias, so <tt>--wide-mirror</tt> is <tt>--mirror</tt> at 32 connections; an alias that cannot take a clustered count runs without it and says so.</td></tr>
   <tr><td><tt>--connection-per-second (-%c)</tt></td><td>New connections opened per second (default 5).</td></tr>
   <tr><td><tt>--max-size (-M)</tt></td><td>Stop after N bytes <b>received from the network</b> across the whole mirror (this counts what was transferred, not what was saved).</td></tr>
   <tr><td><tt>--max-time (-E)</tt></td><td>Stop after N seconds of wall-clock time.</td></tr>
