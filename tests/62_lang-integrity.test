@@ -135,8 +135,8 @@ PYEOF
 fi
 
 # Άκυρο. Valid UTF-8 does not say the re-encode read the right source: cp1253
-# and ISO-8859-7 disagree on this letter, six values carry it, and reading the
-# file as the label rather than the bytes turns every one into a curly quote.
+# and ISO-8859-7 disagree on this letter, and reading the file as the label
+# rather than the bytes turns it into a curly quote.
 cancel=$(LC_ALL=C awk '{ sub(/\r$/, "") } $0 == "Cancel" { getline v; sub(/\r$/, "", v); print v; exit }' \
     "$langdir/Greek.txt")
 if [ "$cancel" != "$(printf '\316\206\316\272\317\205\317\201\316\277')" ]; then
@@ -684,39 +684,63 @@ LC_ALL=C awk -v pin="$lbpin" '
 ' "$tmp/lb" || fail=1
 
 # A catalog re-encoded from the wrong source is still valid UTF-8, so the check
-# above cannot see it. The tell is one Latin-1 letter running straight into
-# another, which no language writes and every misread continuation byte makes.
-mojibake=$(printf '\303[\200-\277]\302[\200-\277]')
+# above cannot see it. Mojibake is exactly text that survives a trip back to
+# Latin-1 and reads as UTF-8 again. A byte pattern instead flags real
+# punctuation: French needs a no-break space after an accent before ! ? : ; ».
+if [ -n "$py" ]; then
+    cat >"$tmp/mojibake.py" <<'PYEOF'
+import sys
 
-reencoded_from_the_wrong_source() {
-    LC_ALL=C awk -v m="$mojibake" -v n="$2" '$0 ~ m { print n ":" NR ": mojibake, so the source charset was wrong"; exit }' "$1"
-}
+name = sys.argv[2]
+for n, line in enumerate(open(sys.argv[1], "rb").read().decode("utf-8").split("\n"), 1):
+    try:
+        again = line.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        continue
+    if any(ord(c) > 127 for c in again):
+        print("%s:%d: mojibake, so the source charset was wrong" % (name, n))
+        break
+PYEOF
 
-# Control: the mistake itself, on a catalog with enough accents to carry it.
-# English is pure ASCII and would prove nothing.
-LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$langdir/Francais.txt" >"$tmp/mis"
-if [ -z "$(reencoded_from_the_wrong_source "$tmp/mis" Francais.txt)" ]; then
-    echo "the mojibake check passed a deliberately misread catalog"
-    exit 1
-fi
-for f in "$langdir"/*.txt; do
-    found=$(reencoded_from_the_wrong_source "$f" "${f##*/}")
-    if [ -n "$found" ]; then
-        printf '%s\n' "$found"
-        fail=1
+    # Control: the mistake itself, on a catalog with enough accents to carry it.
+    # English is pure ASCII and would prove nothing.
+    LC_ALL=C iconv -f ISO-8859-1 -t UTF-8 "$langdir/Francais.txt" >"$tmp/mis"
+    if [ -z "$("$py" "$tmp/mojibake.py" "$tmp/mis" Francais.txt)" ]; then
+        echo "the mojibake check passed a deliberately misread catalog"
+        exit 1
     fi
-done
+    # And the other way, since the pattern this replaced flagged it: legitimate
+    # punctuation after an accent must pass.
+    printf 'Miroir termin\303\251\302\240!\r\n' >"$tmp/nbsp"
+    if [ -n "$("$py" "$tmp/mojibake.py" "$tmp/nbsp" nbsp)" ]; then
+        echo "the mojibake check rejected a no-break space after an accent"
+        exit 1
+    fi
+    for f in "$langdir"/*.txt; do
+        found=$("$py" "$tmp/mojibake.py" "$f" "${f##*/}")
+        if [ -n "$found" ]; then
+            printf '%s\n' "$found"
+            fail=1
+        fi
+    done
+fi
 
 # The catalogs carry no charset any more, so the served pages are the only place
 # left that names one, and a browser decodes by it.
 npage=0
 for f in "$top_srcdir"/html/server/*.html; do
+    test -f "$f" || continue
     npage=$((npage + 1))
-    LC_ALL=C awk '/charset=utf-8/ { found = 1 } END { exit !found }' "$f" ||
-        fail "${f##*/}: does not declare charset=utf-8"
+    LC_ALL=C awk '/charset=utf-8/ { found = 1 } END { exit !found }' "$f" || {
+        echo "${f##*/}: does not declare charset=utf-8"
+        fail=1
+    }
 done
+# Before the loop's silence can mean anything: an unmatched glob leaves the
+# literal, which test -f skips, so zero pages would otherwise read as clean.
 if [ "$npage" -lt 20 ]; then
-    fail "only $npage server pages scanned for their charset"
+    echo "only $npage server pages scanned for their charset"
+    exit 1
 fi
 
 # An unknown ${LANG_*} renders as nothing rather than erroring, so check that

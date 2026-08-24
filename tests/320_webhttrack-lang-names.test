@@ -35,8 +35,8 @@ PY
 }
 
 printf '[the language menu names every catalog, whichever is serving] ..\t'
-# 1 is English, 8 Russian: a menu built from the serving catalog rather than
-# from all of them differs between the two.
+# 1 is English, 8 Russian: different scripts, so a menu that leaked the serving
+# catalog's own script would show it here.
 menu 1 "${work}/menu-en"
 menu 8 "${work}/menu-ru"
 
