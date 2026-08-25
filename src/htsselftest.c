@@ -3534,6 +3534,50 @@ static int st_getext(httrackp *opt, int argc, char **argv) {
   return rc;
 }
 
+/* The wiring hts_mirror() gives the naming path (htscore.c), and the teardown
+   it owes: a self-test that leaks it cannot be run under LeakSanitizer. */
+static void st_mirror_wiring(httrackp *opt, struct_back **sback,
+                             hash_struct *hash, hts_boolean backing) {
+  *sback = backing ? back_new(opt, opt->maxsoc * 32 + 1024) : NULL;
+  hash_init(opt, hash, opt->urlhack);
+  hash->liens = (const lien_url *const *const *) &opt->liens;
+  opt->hash = hash;
+  hts_record_init(opt);
+}
+
+/* Everything a cache_back holds, freed. Called again mid-test where the cache
+   is reopened read-only, since that drops the handles it already had. */
+static void st_cache_close(httrackp *opt, cache_back *cache) {
+  if (cache->zipOutput != NULL) {
+    zipClose(cache->zipOutput, NULL);
+    cache->zipOutput = NULL;
+  }
+  if (cache->zipInput != NULL) {
+    unzClose(cache->zipInput);
+    cache->zipInput = NULL;
+  }
+  if (cache->lst != NULL) {
+    fclose(cache->lst);
+    cache->lst = opt->state.strc.lst = NULL;
+  }
+  if (cache->txt != NULL) {
+    fclose(cache->txt);
+    cache->txt = NULL;
+  }
+  if (cache->hashtable != NULL)
+    coucal_delete(&cache->hashtable);
+}
+
+/* Torn down in XH_extuninit's order (htscore.c). */
+static void st_mirror_wiring_free(httrackp *opt, cache_back *cache,
+                                  struct_back **sback, hash_struct *hash) {
+  hts_record_free(opt);
+  back_free(sback);
+  st_cache_close(opt, cache);
+  hash_free(hash);
+  opt->hash = NULL; /* it pointed at the caller's stack frame */
+}
+
 static int st_savename(httrackp *opt, int argc, char **argv) {
   struct {
     lien_adrfilsave afs;
@@ -3560,6 +3604,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   int statuscode = HTTP_OK, status = 0;
   int filpad = 0;
   int nosback = 0;
+  int rc = 0;
   int i;
 
   if (argc < 2) {
@@ -3668,10 +3713,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     cr.size = 8;
     cache_add(opt, &cache, &cr, adr, argv[0], sep + 1, 1, NULL);
     freet(cr.adr);
-    if (cache.zipOutput != NULL) {
-      zipClose(cache.zipOutput, NULL);
-      cache.zipOutput = NULL;
-    }
+    st_cache_close(opt, &cache); /* the memset below orphans what it holds */
     memset(&cache, 0, sizeof(cache));
     cache.type = 1;
     cache.log = cache.errlog = stderr;
@@ -3683,12 +3725,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     cache.hashtable = (void *) coucal_new(0);
   }
 
-  sback = nosback ? NULL : back_new(opt, opt->maxsoc * 32 + 1024);
-  /* same wiring as hts_mirror (htscore.c) */
-  hash_init(opt, &hash, opt->urlhack);
-  hash.liens = (const lien_url *const *const *) &opt->liens;
-  opt->hash = &hash;
-  hts_record_init(opt);
+  st_mirror_wiring(opt, &sback, &hash, nosback ? HTS_FALSE : HTS_TRUE);
 
   for (i = 2; i < argc; i++) {
     if (strncmp(argv[i], "prior=", 6) == 0) {
@@ -3698,11 +3735,16 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
 
       if (p2 == NULL) {
         fprintf(stderr, "savename: prior needs adr|fil|sav\n");
-        return 1;
+        freet(dup);
+        rc = 1;
+        goto cleanup;
       }
       *p1 = *p2 = '\0';
-      if (!hts_record_link(opt, dup, p1 + 1, p2 + 1, "", "", NULL))
-        return 1;
+      if (!hts_record_link(opt, dup, p1 + 1, p2 + 1, "", "", NULL)) {
+        freet(dup);
+        rc = 1;
+        goto cleanup;
+      }
       freet(dup);
     }
   }
@@ -3721,7 +3763,10 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
 
     if (fp == NULL || !hts_fwrite_exact(data, n, fp)) {
       fprintf(stderr, "savename: can not write %s\n", bodyfile);
-      return 1;
+      if (fp != NULL)
+        fclose(fp);
+      rc = 1;
+      goto cleanup;
     }
     fclose(fp);
     strcpybuff(headers.url_sav, bodyfile);
@@ -3733,9 +3778,13 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     (void) UNLINK(bodyfile);
   if (!st_poison_intact("savename: save[]", probe.canary, 0,
                         sizeof(probe.canary)))
-    return 1;
-  printf("savename: %s\n", afs->save);
-  return 0;
+    rc = 1;
+  else
+    printf("savename: %s\n", afs->save);
+
+cleanup:
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  return rc;
 }
 
 /* url_savename_addstr() takes attacker-controlled link text and must clip to
@@ -3980,6 +4029,7 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
   struct_back *sback;
   hash_struct hash;
   int ptr = 0;
+  int rc = 0;
   int i;
 
   (void) argc;
@@ -3987,12 +4037,7 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
 
   memset(&cache, 0, sizeof(cache));
   cache.hashtable = (void *) coucal_new(0);
-  sback = back_new(opt, opt->maxsoc * 32 + 1024);
-  /* same wiring as hts_mirror (htscore.c) */
-  hash_init(opt, &hash, opt->urlhack);
-  hash.liens = (const lien_url *const *const *) &opt->liens;
-  opt->hash = &hash;
-  hts_record_init(opt);
+  st_mirror_wiring(opt, &sback, &hash, HTS_TRUE);
 
   memset(&str, 0, sizeof(str));
   str.opt = opt;
@@ -4019,20 +4064,26 @@ static int st_addlink(httrackp *opt, int argc, char **argv) {
     strcpybuff(link, lnk[i]);
     str.localLink = loc;
     str.localLinkSize = (int) sizeof(loc);
-    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", ""))
-      return 1;
+    if (!hts_record_link(opt, "www.example.com", fil[i], "", "", "", "")) {
+      rc = 1;
+      goto cleanup;
+    }
     ptr = heap_top_index();
     str.url_host = heap(ptr)->adr;
     str.url_file = heap(ptr)->fil;
     assertf(htsAddLink(&str, link) == 0); /* refused by the wizard either way */
     if (strcmp(loc, want[i]) != 0) {
       fprintf(stderr, "addlink[%d]: got '%s' want '%s'\n", i, loc, want[i]);
-      return 1;
+      rc = 1;
+      goto cleanup;
     }
   }
 
   printf("addlink self-test OK\n");
-  return 0;
+
+cleanup:
+  st_mirror_wiring_free(opt, &cache, &sback, &hash);
+  return rc;
 }
 
 static int st_cache(httrackp *opt, int argc, char **argv) {
