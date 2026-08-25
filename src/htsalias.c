@@ -287,9 +287,8 @@ const char *hts_optalias[][4] = {
 };
 /* clang-format on */
 
-/* Whether TOKEN is an option name, rather than a value that begins with '-'.
-   Only the spellings optalias_check() resolves: a cluster (-c8) is a value. */
-static hts_boolean optreal_or_alias(const char *token) {
+/* Only the spellings optalias_check() resolves: a cluster (-c8) is a value. */
+hts_boolean optreal_or_alias(const char *token) {
   char name[64];
   const char *eq;
   size_t len;
@@ -312,25 +311,76 @@ static hts_boolean optreal_or_alias(const char *token) {
          optalias_find(name + 5) >= 0;
 }
 
-/* Whether the real option OPT at ARGV[N_ARG] lacks the separate parameter it
-   needs. A strip-query key or a host-alias pattern may begin with '-' (#1179),
-   so those two take any following token that is not an option name; write
-   --strip-query=-q to hand them one that is. */
-static hts_boolean optparam_missing(int argc, const char *const *argv,
-                                    int n_arg, const char *opt) {
-  /* keep in sync with the strip-query and host-alias cases in htscoremain.c */
-  static const char *const rule_opt[] = {"-%g", "-%C", NULL};
+/* Real options whose value is user-written text, a rule or a path and may
+   legitimately begin with '-' (#1179, #1425): they take any following token
+   that does not name an option, and their '=' form takes even one that does.
+   Keep in sync with the same options' guards in htscoremain.c. */
+/* clang-format off: one row per option, so each name keeps its tag */
+/* clang-format off */
+static const char *const dashvalue_opt[] = {
+  "-%g",  /* strip-query */
+  "-%C",  /* host-alias */
+  "-%A",  /* assume */
+  "-%F",  /* footer */
+  "-%K",  /* cookies-file */
+  "-%L",  /* list */
+  "-%S",  /* urllist */
+  "-%rf", /* warc-file */
+  "-F",   /* user-agent */
+  NULL
+};
+/* clang-format on */
+
+/* How the real option OPT at ARGV[N_ARG] fares for the parameter it needs. */
+typedef enum {
+  OPTPARAM_PRESENT,  /* a value follows */
+  OPTPARAM_ABSENT,   /* nothing follows */
+  OPTPARAM_AS_OPTION /* what follows was read as an option name */
+} optparam_state;
+
+static optparam_state optparam_check(int argc, const char *const *argv,
+                                     int n_arg, const char *opt) {
   int i;
 
   if (n_arg + 1 >= argc)
-    return HTS_TRUE;
+    return OPTPARAM_ABSENT;
   if (argv[n_arg + 1][0] != '-')
-    return HTS_FALSE;
-  for (i = 0; rule_opt[i] != NULL; i++) {
-    if (strcmp(opt, rule_opt[i]) == 0)
-      return optreal_or_alias(argv[n_arg + 1]);
+    return OPTPARAM_PRESENT;
+  for (i = 0; dashvalue_opt[i] != NULL; i++) {
+    if (strcmp(opt, dashvalue_opt[i]) == 0)
+      return optreal_or_alias(argv[n_arg + 1]) ? OPTPARAM_AS_OPTION
+                                               : OPTPARAM_PRESENT;
   }
-  return HTS_TRUE;
+  return OPTPARAM_AS_OPTION;
+}
+
+/* Why the option the user wrote as SPELLING did not get the parameter REAL
+   needs. NEXT is the word that followed, if any, and NAME the long option whose
+   --name=value form to suggest, or NULL to look one up. Calling a parameter
+   missing when one was passed leaves the user nothing to work back from, and
+   the run dies here, before any log file exists to say more. */
+static void optparam_error(optparam_state state, const char *spelling,
+                           const char *name, const char *real, const char *next,
+                           char *return_error, size_t return_error_size) {
+  const int pos = optreal_find(real);
+  const char *const help = pos >= 0 ? hts_optalias[pos][3] : "";
+
+  /* -N is both --structure and --user-structure, so a short spelling can only
+     have the first long name the table gives back */
+  if (name == NULL)
+    name = pos >= 0 ? hts_optalias[pos][0] : NULL;
+  if (state == OPTPARAM_ABSENT || name == NULL)
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption %s needs to be followed by a "
+                      "parameter: %s <param>%s%s\n",
+                      spelling, spelling, help[0] != '\0' ? "\n\t" : "", help);
+  else
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption %s takes a value, and the next "
+                      "word \"%s\" was read as an option name\n\tWrite "
+                      "--%s=%s to pass it as the value%s%s\n",
+                      spelling, next, name, next, help[0] != '\0' ? "\n\t" : "",
+                      help);
 }
 
 /* The short form the --wide-/--tiny- prefix glues onto the alias it prefixes,
@@ -485,12 +535,13 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
           /* Copy parameters? */
           if (need_param == 2) {
-            if (optparam_missing(argc, argv, n_arg, command)) {
-              slprintfbuff_clip(
-                  return_error, return_error_size,
-                  "Syntax error:\n\tOption %s needs to be followed by a "
-                  "parameter: %s <param>\n\t%s\n",
-                  command, command, _NOT_NULL(optalias_help(command)));
+            const optparam_state state =
+                optparam_check(argc, argv, n_arg, command);
+
+            if (state != OPTPARAM_PRESENT) {
+              optparam_error(state, argv[n_arg], argv[n_arg] + 2, command,
+                             state == OPTPARAM_ABSENT ? "" : argv[n_arg + 1],
+                             return_error, return_error_size);
               return 0;
             }
             strcpybuff(param, argv[n_arg + 1]);
@@ -571,12 +622,13 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
-        if (optparam_missing(argc, argv, n_arg, argv[n_arg])) {
-          slprintfbuff_clip(
-              return_error, return_error_size,
-              "Syntax error:\n\tOption %s needs to be followed by a "
-              "parameter: %s <param>\n\t%s\n",
-              argv[n_arg], argv[n_arg], _NOT_NULL(optalias_help(argv[n_arg])));
+        const optparam_state state =
+            optparam_check(argc, argv, n_arg, argv[n_arg]);
+
+        if (state != OPTPARAM_PRESENT) {
+          optparam_error(state, argv[n_arg], NULL, argv[n_arg],
+                         state == OPTPARAM_ABSENT ? "" : argv[n_arg + 1],
+                         return_error, return_error_size);
           return 0;
         }
         /* Copy parameters */
