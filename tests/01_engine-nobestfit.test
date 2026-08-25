@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# UTF-8 to a codepage that lacks the character ('httrack -#test=nobestfit'):
+# a substitute must be visible, never a best-fit lookalike. WIN32 only.
+
+set -euo pipefail
+
+rc=0
+out=$(httrack -O /dev/null -#test=nobestfit) || rc=$?
+echo "$out"
+
+[ "$rc" = 77 ] && exit 77
+[ "$rc" = 0 ] || exit "$rc"
+
+case "$out" in
+"nobestfit: OK") ;;
+*)
+    echo "FAIL: unexpected report"
+    exit 1
+    ;;
+esac
