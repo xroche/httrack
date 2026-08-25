@@ -3451,13 +3451,15 @@ static char *fil_normalized_ex(const char *source, char *dest, int do_slash,
                                int do_query) {
   char lastc = 0;
   int gotquery = 0;
-  int ampargs = 0;
+  size_t ampargs = 0;
   size_t i, j;
   char *query = NULL;
 
   for(i = j = 0; source[i] != '\0'; i++) {
-    if (!gotquery && source[i] == '?')
-      gotquery = ampargs = 1;
+    if (!gotquery && source[i] == '?') {
+      gotquery = 1;
+      ampargs = 1;
+    }
     if (do_slash && !gotquery && lastc == '/' && source[i] == '/') {
       // foo//bar -> foo/bar
     } else {

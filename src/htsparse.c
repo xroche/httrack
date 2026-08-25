@@ -1558,7 +1558,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 // Check for bogus links (Vasiliy)
                                 if (a != NULL) {
                                   const size_t size = c - a + 1;
-                                  int i;
+                                  size_t i;
                                   int first = 1;
 
                                   for(i = 0; i < size; i++) {

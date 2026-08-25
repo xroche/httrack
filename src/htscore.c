@@ -245,7 +245,8 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   assertf(liensbuf != NULL);
 
   // Limit the number of links
-  if (opt->maxlink > 0 && TypedArraySize(liensbuf->ptr) >= opt->maxlink) {
+  if (opt->maxlink > 0 &&
+      TypedArraySize(liensbuf->ptr) >= (size_t) opt->maxlink) {
     return (size_t) -1;
   }
 
@@ -1718,7 +1719,8 @@ int httpmirror(char *url1, httrackp * opt) {
             }
             /* Attempt to find a meta charset */
             else if (is_html_mime_type(r.contenttype)) {
-              char *const charset = hts_getCharsetFromMeta(r.adr, r.size);
+              char *const charset =
+                  hts_getCharsetFromMeta(r.adr, (size_t) r.size);
 
               if (charset != NULL && strlen(charset) < sizeof(page_charset)) {
                 strcpy(page_charset, charset);
@@ -1830,8 +1832,8 @@ int httpmirror(char *url1, httrackp * opt) {
               hts_boolean keep_root = HTS_TRUE;
 #endif
 
-              robots_parse(opt, &robots, urladr(), r.adr, r.size, infobuff,
-                           sizeof(infobuff), keep_root, sitemaps,
+              robots_parse(opt, &robots, urladr(), r.adr, (size_t) r.size,
+                           infobuff, sizeof(infobuff), keep_root, sitemaps,
                            sizeof(sitemaps));
               if (strnotempty(infobuff)) {
                 hts_log_print(opt, LOG_INFO,
