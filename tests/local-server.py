@@ -1499,6 +1499,125 @@ class Handler(SimpleHTTPRequestHandler):
     def route_bigfail_gone(self):
         self.send_raw(b"<html><body><p>BIGFAIL-GONE</p></body></html>", "text/html")
 
+    # --- a hub that is a redirect, failing on the update (#1395) ------------
+    # rtarget.html and its child reached the mirror through rhub.html alone,
+    # and the cached entry for a 301 carries no hypertext type to key on.
+    def route_redirfail_index(self):
+        links = '\t<a href="rhub.html">hub</a>\n'
+        if self.refetch_pass() <= 2:  # rgone.html leaves the site for crawl 3
+            links += '\t<a href="rgone.html">gone</a>\n'
+        self.send_html(links)
+
+    # Cuts off both attempts of crawl 2, then redirects again for crawl 3.
+    def route_redirfail_hub(self):
+        if 2 <= self.refetch_pass() <= 3:
+            self.send_cut_headers()
+        else:
+            self.send_response(301, "Moved Permanently")
+            self.send_header("Location", "/redirfail/rtarget.html")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    def route_redirfail_target(self):
+        self.send_raw(
+            b"<html><body><p>REDIRFAIL-TARGET</p>"
+            b'<a href="rchild.html">c</a></body></html>',
+            "text/html",
+        )
+
+    def route_redirfail_child(self):
+        self.send_raw(b"<html><body><p>REDIRFAIL-CHILD</p></body></html>", "text/html")
+
+    def route_redirfail_gone(self):
+        self.send_raw(b"<html><body><p>REDIRFAIL-GONE</p></body></html>", "text/html")
+
+    # --- a hub failing on two consecutive updates (#1395) ------------------
+    # Crawl 2 holds the purge on the cached page from crawl 1 and writes no
+    # entry of its own, leaving crawl 3 nothing in the cache to key on.
+    def route_twicefail_index(self):
+        self.send_html('\t<a href="thub.html">hub</a>\n\t<a href="talt.html">alt</a>\n')
+
+    def route_twicefail_hub(self):
+        if self.refetch_pass() == 1:
+            self.send_html('\t<a href="tchild.html">c</a>\n')
+        else:
+            self.send_cut_headers()
+
+    # The child's other parent, which stops linking it for crawl 3: only the
+    # hub still carries tchild.html then, and only its local copy says so.
+    def route_twicefail_alt(self):
+        links = '\t<a href="tchild.html">c</a>\n' if self.refetch_pass() <= 2 else ""
+        self.send_html(links)
+
+    def route_twicefail_child(self):
+        self.send_raw(b"<html><body><p>TWICEFAIL-CHILD</p></body></html>", "text/html")
+
+    # --- negative control: a blob that carries no links (#1395) ------------
+    # Previously mirrored and failing exactly like the hubs, but typed as a
+    # blob, so neither the cached entry nor the kept copy may hold the purge.
+    def route_binfail_index(self):
+        links = '\t<a href="binblob.bin">blob</a>\n'
+        if self.refetch_pass() <= 2:  # bingone.html leaves the site for crawl 3
+            links += '\t<a href="bingone.html">gone</a>\n'
+        self.send_html(links)
+
+    # Fails on crawls 2 and 3: the second failure has no cached entry left, so
+    # only the kept copy's name says what it was.
+    def route_binfail_blob(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(
+                b"BINFAIL-BLOB\n" + b"\x71\x72\x73\x74" * 256,
+                "application/octet-stream",
+            )
+        else:
+            self.send_cut_headers()
+
+    def route_binfail_gone(self):
+        self.send_raw(b"<html><body><p>BINFAIL-GONE</p></body></html>", "text/html")
+
+    # --- negative control: a Location on an answered blob (#1395) -----------
+    # Location: is parsed and cached whatever the status, so a 200 carrying one
+    # must not read as a redirect and hold the purge on the strength of it.
+    def route_locfail_index(self):
+        links = '\t<a href="locblob.bin">blob</a>\n'
+        if self.refetch_pass() == 1:  # locgone.html leaves the site afterwards
+            links += '\t<a href="locgone.html">gone</a>\n'
+        self.send_html(links)
+
+    def route_locfail_blob(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(
+                b"LOCFAIL-BLOB\n" + b"\x71\x72\x73\x74" * 256,
+                "application/octet-stream",
+                extra_headers=[("Location", "/locfail/elsewhere.bin")],
+            )
+        else:
+            self.send_cut_headers()
+
+    def route_locfail_gone(self):
+        self.send_raw(b"<html><body><p>LOCFAIL-GONE</p></body></html>", "text/html")
+
+    # --- a hub whose savename is not its URL (#1395) ------------------------
+    # dynhub.php mirrors as dynhub.html, so the guard has to read the name the
+    # cache recorded rather than the one the URL suggests.
+    def route_dynfail_index(self):
+        links = '\t<a href="dynhub.php">hub</a>\n'
+        if self.refetch_pass() == 1:  # dyngone.html leaves the site afterwards
+            links += '\t<a href="dyngone.html">gone</a>\n'
+        self.send_html(links)
+
+    def route_dynfail_hub(self):
+        if self.refetch_pass() == 1:
+            self.send_html('\t<a href="dynchild.html">c</a>\n')
+        else:
+            self.send_cut_headers()
+
+    def route_dynfail_child(self):
+        self.send_raw(b"<html><body><p>DYNFAIL-CHILD</p></body></html>", "text/html")
+
+    def route_dynfail_gone(self):
+        self.send_raw(b"<html><body><p>DYNFAIL-GONE</p></body></html>", "text/html")
+
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
         self.send_raw(
@@ -2979,6 +3098,116 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             self.send_raw(self.FAKE_PNG, "image/png")
 
+    # --- an undeclared Content-Type on a failing hub (#1415) ---------------
+    # Same shape as /hubfail/, on a link whose type the server never declared.
+    # page/ is the control that still holds the purge back.
+    CTPURGE_TYPES = {
+        "empty": "",  # header sent with no value
+        "none": None,  # no header at all
+        "octet": "application/octet-stream",
+        "page": "text/html",
+    }
+    CTPURGE_BLOB = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+    CTPURGE_HUB = (
+        b'<html><body><p>CTPURGE-HUB</p><a href="child.html">c</a></body></html>'
+    )
+
+    # Pages carrying NUL bytes, to pin the ratio and floor the untyped-body
+    # binary check keeps: each must still be scanned, so its child is mirrored.
+    #   few    2 NULs in a short page -- over the ratio, under the floor
+    #   many  15 NULs in ~2 KB       -- over the floor, under the ratio
+    #   typed 30 NULs, but text/html -- declared, so the check never applies
+    CTPURGE_NULLS = {"few.php": (2, 0), "many.php": (15, 1900), "typed.html": (30, 0)}
+
+    def route_ctpurge_nulls(self, name):
+        if name == "index.html":
+            return self.send_html(
+                "".join('\t<a href="%s">p</a>\n' % p for p in self.CTPURGE_NULLS)
+            )
+        if name in self.CTPURGE_NULLS:
+            nuls, pad = self.CTPURGE_NULLS[name]
+            child = "c%s.html" % name.split(".")[0]
+            body = (
+                b'<html><body><p>CTPURGE-NULL</p><a href="%s">c</a>' % child.encode()
+                + b" " * pad
+                + b"\x00" * nuls
+                + b"</body></html>"
+            )
+            return self.send_raw(body, "text/html" if name.endswith(".html") else None)
+        if name.startswith("c") and name.endswith(".html"):
+            return self.send_raw(
+                b"<html><body><p>CTPURGE-NULLCHILD</p></body></html>", "text/html"
+            )
+        self.send_error(404)
+
+    def route_ctpurge(self):
+        case, _, name = urlsplit(self.path).path[len("/ctpurge/") :].partition("/")
+        if case == "nulls":
+            return self.route_ctpurge_nulls(name)
+        if case == "dyn":
+            return self.route_ctpurge_dyn(name)
+        if case == "twice":
+            return self.route_ctpurge_twice(name)
+        ctype = self.CTPURGE_TYPES.get(case)
+        target = "hub.html" if case == "page" else "blob.bin"
+        if name == "index.html":
+            links = '\t<a href="%s">hub</a>\n' % target
+            if self.refetch_pass() <= 1:  # gone.html leaves the site for crawl 2
+                links += '\t<a href="gone.html">gone</a>\n'
+            self.send_html(links)
+        elif name == target:
+            # Cuts off both attempts the second crawl's --retries=1 buys.
+            if self.refetch_pass() >= 2:
+                self.send_cut_headers()
+            elif case == "page":
+                self.send_raw(self.CTPURGE_HUB, ctype)
+            else:
+                self.send_raw(self.CTPURGE_BLOB, ctype)
+        elif name == "child.html":
+            self.send_raw(
+                b"<html><body><p>CTPURGE-CHILD</p></body></html>", "text/html"
+            )
+        elif name == "gone.html":
+            self.send_raw(b"<html><body><p>CTPURGE-GONE</p></body></html>", "text/html")
+        else:
+            self.send_error(404)
+
+    # An untyped blob already wearing a page's name, failing two updates in a
+    # row: the third crawl finds no cache entry left and falls to the copy #746
+    # kept, the one arm that types the file by the name it was saved under.
+    def route_ctpurge_twice(self, name):
+        if name == "index.html":
+            links = '\t<a href="blob.html">blob</a>\n'
+            if self.refetch_pass() <= 2:  # gone.html leaves for the third crawl
+                links += '\t<a href="gone.html">gone</a>\n'
+            return self.send_html(links)
+        if name == "blob.html":
+            if self.refetch_pass() >= 2:
+                return self.send_cut_headers()
+            return self.send_raw(self.CTPURGE_BLOB, None)
+        if name == "gone.html":
+            return self.send_raw(
+                b"<html><body><p>CTPURGE-GONE</p></body></html>", "text/html"
+            )
+        self.send_error(404)
+
+    # A dynamic page and a blob, both left untyped: the page must still be
+    # scanned, and the blob must reach disk with its bytes intact.
+    def route_ctpurge_dyn(self, name):
+        if name == "index.html":
+            return self.send_html(
+                '\t<a href="hub.php">hub</a>\n\t<a href="blob.php">blob</a>\n'
+            )
+        if name == "hub.php":
+            return self.send_raw(self.CTPURGE_HUB, None)
+        if name == "blob.php":
+            return self.send_raw(self.CTPURGE_BLOB, None)
+        if name == "child.html":
+            return self.send_raw(
+                b"<html><body><p>CTPURGE-CHILD</p></body></html>", "text/html"
+            )
+        self.send_error(404)
+
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
         "/cookies/entrance.php": route_entrance,
@@ -3093,6 +3322,25 @@ class Handler(SimpleHTTPRequestHandler):
         "/bigfail/bighub.html": route_bigfail_hub,
         "/bigfail/bigchild.html": route_bigfail_child,
         "/bigfail/biggone.html": route_bigfail_gone,
+        "/redirfail/index.html": route_redirfail_index,
+        "/redirfail/rhub.html": route_redirfail_hub,
+        "/redirfail/rtarget.html": route_redirfail_target,
+        "/redirfail/rchild.html": route_redirfail_child,
+        "/redirfail/rgone.html": route_redirfail_gone,
+        "/twicefail/index.html": route_twicefail_index,
+        "/twicefail/thub.html": route_twicefail_hub,
+        "/twicefail/talt.html": route_twicefail_alt,
+        "/twicefail/tchild.html": route_twicefail_child,
+        "/binfail/index.html": route_binfail_index,
+        "/binfail/binblob.bin": route_binfail_blob,
+        "/binfail/bingone.html": route_binfail_gone,
+        "/locfail/index.html": route_locfail_index,
+        "/locfail/locblob.bin": route_locfail_blob,
+        "/locfail/locgone.html": route_locfail_gone,
+        "/dynfail/index.html": route_dynfail_index,
+        "/dynfail/dynhub.php": route_dynfail_hub,
+        "/dynfail/dynchild.html": route_dynfail_child,
+        "/dynfail/dyngone.html": route_dynfail_gone,
         "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,
@@ -3447,6 +3695,9 @@ class Handler(SimpleHTTPRequestHandler):
             return True
         if path.startswith("/asset/"):
             self.route_asset()
+            return True
+        if path.startswith("/ctpurge/"):
+            self.route_ctpurge()
             return True
         if path.startswith("/jsmime/"):
             self.route_jsmime()

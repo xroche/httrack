@@ -39,6 +39,14 @@ Please visit our Website: http://www.httrack.com
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+/* Longest significant digit run -N and -L read as a number; more overflows
+   every int width and falls back to the option's default. */
+#define HTS_SAVENAME_PRESET_MAX_DIGITS 9
+
+/* Whether the LEN-digit run at DIGITS converts to an int rather than
+   overflowing: leading zeros cost nothing, so 0000000001 is the value 1. */
+hts_boolean optalias_digits_fit(const char *digits, size_t len);
+
 extern const char *hts_optalias[][4];
 int optalias_check(int argc, const char *const *argv, int n_arg,
                    int *return_argc, char **return_argv,

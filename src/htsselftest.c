@@ -4776,7 +4776,7 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
    was dropped, so --index=0 read back as the enabling bare --index. */
 static int st_optalias(httrackp *opt, int argc, char **argv) {
   char got[HTS_CDLMAXSIZE * 2], warn[256];
-  int i, used;
+  int i, used, params = 0;
 
   (void) opt;
   /* -list gives 282 the whole table: the rows to try against the engine's
@@ -4895,6 +4895,127 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-C2", "--cache", "2");
   EXPANDS("-P proxy:8080", "--proxy", "proxy:8080");
   EXPANDS("+*.gif", "--allow", "*.gif");
+
+  /* #1426, both directions and table-wide over the "param" rows */
+  for (i = 0; optalias_value(i)[0] != '\0'; i++) {
+    const int p = optalias_find(optalias_value(i));
+    char word[HTS_CDLMAXSIZE], want[HTS_CDLMAXSIZE];
+
+    if (strcmp(opttype_value(p), "param") != 0)
+      continue;
+    params++;
+    snprintf(word, sizeof(word), "--%s=yes", optalias_value(i));
+    REFUSES(word, NULL);
+    snprintf(word, sizeof(word), "--%s=none", optalias_value(i));
+    REFUSES(word, NULL);
+    snprintf(word, sizeof(word), "--%s=OFF", optalias_value(i));
+    REFUSES(word, NULL);
+    snprintf(word, sizeof(word), "--%s", optalias_value(i));
+    REFUSES(word, "http://foo/");
+    /* control: a number, and the on/off mapping, still pass in silence */
+    snprintf(word, sizeof(word), "--%s=2", optalias_value(i));
+    snprintf(want, sizeof(want), "%s2", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=off", optalias_value(i));
+    snprintf(want, sizeof(want), "%s0", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=on", optalias_value(i));
+    EXPANDS(optreal_value(p), word, NULL);
+    /* #1437, table-wide too: the bound is the destination's magnitude, so
+       padding rides through and a run past every destination does not */
+    snprintf(word, sizeof(word), "--%s=00000000000000000002",
+             optalias_value(i));
+    snprintf(want, sizeof(want), "%s00000000000000000002", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=2147483647", optalias_value(i));
+    snprintf(want, sizeof(want), "%s2147483647", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=99999999999999999999",
+             optalias_value(i));
+    REFUSES(word, NULL);
+    /* a sign is not a digit run: -2 would spill into the cluster loop */
+    snprintf(word, sizeof(word), "--%s=-2", optalias_value(i));
+    REFUSES(word, NULL);
+    snprintf(word, sizeof(word), "--%s=+2", optalias_value(i));
+    REFUSES(word, NULL);
+  }
+  assertf(params >= 27); /* the rows the issue enumerates were all walked */
+
+  /* the separator -m and -%c read besides digits, anchored to one occurrence
+     with a digit after it: 1.2.3 otherwise reached maxconn as 1.2 */
+  EXPANDS("-m,5000", "--max-files=,5000", NULL);
+  EXPANDS("-m100,5000", "--max-files=100,5000", NULL);
+  EXPANDS("-%c0.5", "--connection-per-second=0.5", NULL);
+  EXPANDS("-%c.5", "--connection-per-second=.5", NULL);
+  REFUSES("--connection-per-second=1.2.3", NULL);
+  REFUSES("--connection-per-second=0.", NULL);
+  REFUSES("--max-files=,", NULL);
+  REFUSES("--max-files=100,", NULL);
+  REFUSES("--max-files=,,,5", NULL);
+  REFUSES("--max-files=1,2,3", NULL);
+  REFUSES("--sockets=8,4", NULL);
+  REFUSES("--sockets=0.5", NULL);
+  REFUSES("--advanced-maxlinks=99999999999999999999", NULL);
+  /* --sockets=8I0 mirrored without a top index: the tail reached -I0 */
+  REFUSES("--sockets=8I0", NULL);
+  /* an empty value is the bare short form, as it has always been */
+  EXPANDS("-c", "--sockets=", NULL);
+
+  /* --structure glues a preset and detaches a template (#1380): the engine
+     reads a detached -N value as a user template whatever it holds */
+  EXPANDS("-N1", "--structure=1", NULL);
+  EXPANDS("-N100", "--structure=100", NULL);
+  EXPANDS("-N1", "--structure", "1");
+  assertf(used == 2);
+  EXPANDS("-N %h%p/%n%q.%t", "--structure=%h%p/%n%q.%t", NULL);
+  assertf(used == 1);
+  EXPANDS("-N %h%p/%n%q.%t", "--structure", "%h%p/%n%q.%t");
+  assertf(used == 2);
+  EXPANDS("-N %h%p/%n%q.%t", "--user-structure", "%h%p/%n%q.%t");
+  /* an empty value is -N "", which the engine reads as "back to the default" */
+  EXPANDS("-N ", "--structure=", NULL);
+  /* what "param" glued keeps gluing: a preset trailed by more short options,
+     and the on/off values every param row takes */
+  EXPANDS("-N1L0", "--structure=1L0", NULL);
+  EXPANDS("-N1L0", "--structure", "1L0");
+  EXPANDS("-N1%c8", "--structure=1%c8", NULL);
+  EXPANDS("-N0", "--structure=off", NULL);
+  /* both name the default preset: a bare -N would take the next word, and
+     with a URL there it mirrored nothing (#1434) */
+  EXPANDS("-N0", "--structure=on", NULL);
+  EXPANDS("-N0", "--structure", "on");
+  assertf(used == 2);
+  /* a template may open with a digit, so the leading digits do not decide it */
+  EXPANDS("-N 2col/%n.%t", "--structure=2col/%n.%t", NULL);
+  EXPANDS("-N 2col/%n.%t", "--structure", "2col/%n.%t");
+  /* past 9 digits sscanf("%d") wraps onto -1, and with no % to make it a
+     template either the value has nowhere left to go */
+  EXPANDS("-N999999999", "--structure=999999999", NULL);
+  REFUSES("--structure=4294967295", NULL);
+  /* leading zeros are not part of the number: this is the preset 1 */
+  EXPANDS("-N0000000001", "--structure=0000000001", NULL);
+  EXPANDS("-N0000000001", "-N", "0000000001");
+  assertf(used == 2);
+  /* a %-free value would map every URL onto one name, so it is a typo */
+  REFUSES("--structure=OFF", NULL);
+  REFUSES("--structure=flat", NULL);
+  REFUSES("--structure", "none");
+  REFUSES("--structure=-1", NULL);
+  /* --user-structure is how to ask for such a value on purpose */
+  EXPANDS("-N flat", "--user-structure", "flat");
+  /* the short form agrees, rather than reading -N 1 as a template named 1 */
+  EXPANDS("-N1", "-N", "1");
+  assertf(used == 2);
+  EXPANDS("-N", "-N", "%h%p/%n%q.%t");
+  assertf(used == 1);
+  /* and there a bare digit run is the only thing it takes: 1L0 and an overlong
+     run stay templates, as they were before the class existed */
+  EXPANDS("-N", "-N", "2col/%n.%t");
+  assertf(used == 1);
+  EXPANDS("-N", "-N", "4294967295");
+  assertf(used == 1);
+  EXPANDS("-N", "-N", "1L0");
+  assertf(used == 1);
 
   /* invariant: every name's bare long form still emits its short form, and a
      param name still demands its own value. A duplicate name (test, continue)
@@ -8308,10 +8429,10 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
           err = 1;
         seen_a_body = 1;
       }
-      if (warc_memstr((char *) rec, "Content-Encoding", hdr_len + block_len,
-                      16) != NULL ||
-          warc_memstr((char *) rec, "Transfer-Encoding", hdr_len + block_len,
-                      17) != NULL)
+      if (warc_memstr((char *) rec, "Content-Encoding",
+                      hdr_len + (size_t) block_len, 16) != NULL ||
+          warc_memstr((char *) rec, "Transfer-Encoding",
+                      hdr_len + (size_t) block_len, 17) != NULL)
         err = 1;
     }
     freet(rec);
@@ -11359,7 +11480,8 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
   (void) argv;
 
   /* no quota may fire instead of the stop, and no slot may time out */
-  opt->maxtime = opt->maxsite = 0;
+  opt->maxtime = 0;
+  opt->maxsite = 0;
   opt->timeout = 0;
   opt->state.stop = 0;
 

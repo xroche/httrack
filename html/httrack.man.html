@@ -45,6 +45,7 @@
 <a href="#Shortcuts:">Shortcuts:</a><br>
 <a href="#Details: Option %W: External callbacks prototypes">Details: Option %W: External callbacks prototypes</a><br>
 <a href="#see htsdefines.h">see htsdefines.h</a><br>
+<a href="#EXIT STATUS">EXIT STATUS</a><br>
 <a href="#FILES">FILES</a><br>
 <a href="#ENVIRONMENT">ENVIRONMENT</a><br>
 <a href="#DIAGNOSTICS">DIAGNOSTICS</a><br>
@@ -619,7 +620,8 @@ structure, 1+: see below) (--structure[=N])</p></td></tr>
 </table>
 
 <p style="margin-left:18%;">or user defined structure (-N
-&quot;%h%p/%n%q.%t&quot;)</p>
+&quot;%h%p/%n%q.%t&quot;, --structure or
+--user-structure)</p>
 
 <table width="100%" border="0" rules="none" frame="void"
        cellspacing="0" cellpadding="0">
@@ -2311,6 +2313,63 @@ capture an URL or a form post URL</p>
 <a name="see htsdefines.h"></a>
 </h3>
 
+
+<h2>EXIT STATUS
+<a name="EXIT STATUS"></a>
+</h2>
+
+
+<table width="100%" border="0" rules="none" frame="void"
+       cellspacing="0" cellpadding="0">
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="8%">
+
+
+<p style="margin-top: 1em">0</p></td>
+<td width="1%"></td>
+<td width="82%">
+
+
+<p style="margin-top: 1em">The mirror ran to the end, or
+stopped because it was asked to: a signal, the interactive
+shell, or a transfer budget set with <i>--max-time</i> or
+<i>--max-size</i>. Meeting a budget is the outcome that was
+asked for, not a failure, so it is not an abort even though
+the log file calls it one.</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="8%">
+
+
+<p>3</p></td>
+<td width="1%"></td>
+<td width="82%">
+
+
+<p>A mirror started and the engine gave up before the end:
+a full disk, a cache write failure, or a link table that hit
+the <i>-#L</i> cap. Unlike a time or size budget, that cap
+cuts short work that was asked for rather than granting it,
+which is why the two kinds of user-set limit report
+differently. The reason is in the log file, and what was
+mirrored before the abort is kept. This is the process exit
+status; the engine&rsquo;s own <i>exit_xh</i> is a separate
+channel with its own values, and the two are kept apart so
+that neither can be read as the other.</p></td></tr>
+<tr valign="top" align="left">
+<td width="9%"></td>
+<td width="8%">
+
+
+<p>1, 255</p></td>
+<td width="1%"></td>
+<td width="82%">
+
+
+<p><b>httrack</b> refused the command line, or a cache
+operation it asked for failed. No mirror ran.</p></td></tr>
+</table>
 
 <h2>FILES
 <a name="FILES"></a>

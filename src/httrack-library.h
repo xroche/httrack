@@ -160,6 +160,19 @@ HTSEXT_API int hts_uninit(void);
 HTSEXT_API void htsthread_wait(void);
 
 /* Main functions */
+/** hts_main()/hts_main2() exit code: a mirror started but the engine gave up
+    before the end, on a write it cannot retry (a full disk, a cache write
+    failure) or a link table it cannot grow past -#L. Distinct from the
+    command-line and startup failures, which return -1 or 1 and never reach the
+    mirror. Not every user-set limit lands here: --max-time and --max-size stop
+    through hts_request_stop() and return 0, because meeting a budget is the
+    outcome that was asked for, while -#L cuts short work that was asked for.
+    3 and not 2 because hts_is_exiting() already returns 2 for a session
+    that transferred nothing and was rolled back, which exits 0: the two are
+    separate channels, and they are kept off each other's values so a reader
+    cannot take one for the other. Since 3.50. */
+#define HTS_EXIT_MIRROR_ABORTED 3
+
 /** Run a full mirror from a command-line argv (argv[0] is ignored, as in
    main()). Creates a fresh option set, runs the engine, and frees it. Returns
    the engine exit code. Call hts_init() first. */
@@ -167,8 +180,14 @@ HTSEXT_API int hts_main(int argc, char **argv);
 
 /** Run a full mirror using a caller-supplied option set. Use this instead of
     hts_main() to set options or plug callbacks on opt first. Blocks until the
-    mirror ends and returns the engine exit code. The caller keeps ownership of
-    opt and must release it with hts_free_opt(). */
+    mirror ends. The caller keeps ownership of opt and must release it with
+    hts_free_opt().
+
+    Returns 0 when the mirror ran to the end, HTS_EXIT_MIRROR_ABORTED when the
+    engine aborted it, and -1 or 1 for a command line it refused before any
+    mirror started; hts_errmsg() describes any non-zero return. A mirror the
+    caller stopped itself (hts_request_stop(), a callback returning 0, SIGINT
+    on the command line) still returns 0: it ended as asked. */
 HTSEXT_API int hts_main2(int argc, char **argv, httrackp *opt);
 
 /* Options handling */

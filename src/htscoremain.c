@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscoremain.h"
 
+#include "httrack-library.h"
 #include "htsglobal.h"
 #include "htscore.h"
 #include "htsio.h"
@@ -260,6 +261,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   char *argv_firsturl = NULL;   // utilisé pour nommage par défaut
   char *url = NULL;             // URLS séparées par un espace
   size_t url_sz = 65535;
+
+  /* 0, or HTS_EXIT_MIRROR_ABORTED for a mirror that started and did not end */
+  int exit_code = 0;
 
   // the parametres
   int httrack_logmode = 3;      // ONE log file
@@ -1292,14 +1296,30 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   opt->savename_type = 0;       // -N "" : par défaut
               }
             } else {
-              sscanf(com + 1, "%d", &opt->savename_type);
-              while(isdigit((unsigned char) *(com + 1)))
+              /* A glued run is a preset, never userdef: sscanf("%d") past
+                 INT_MAX is negative on LP64 but INT_MAX on ILP32, so no clamp
+                 on its result is portable. */
+              const char *digits = com + 1;
+              int ndigits;
+
+              for (ndigits = 0; isdigit((unsigned char) *(com + 1)); ndigits++)
                 com++;
+              if (ndigits > 0)
+                opt->savename_type =
+                    optalias_digits_fit(digits, ndigits) ? atoi(digits) : 0;
             }
             break;
           case 'L': {
-            sscanf(com + 1, "%d", (int *) &opt->savename_83);
-            switch (opt->savename_83) {
+            /* L1 is the starred default, and what a bare -L selects; a run
+               too long to convert lands there too. */
+            const char *const digits = com + 1;
+            int ndigits, level = 1;
+
+            for (ndigits = 0; isdigit((unsigned char) *(com + 1)); ndigits++)
+              com++;
+            if (ndigits > 0 && optalias_digits_fit(digits, ndigits))
+              level = atoi(digits);
+            switch (level) {
             case 0: // 8-3 (ISO9660 L1)
               opt->savename_83 = HTS_SAVENAME_83_DOS;
               break;
@@ -1310,8 +1330,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               opt->savename_83 = HTS_SAVENAME_83_ISO9660;
               break;
             }
-            while (isdigit((unsigned char) *(com + 1)))
-              com++;
           } break;
           case 's':
             if (isdigit((unsigned char) *(com + 1))) {
@@ -2920,6 +2938,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       if (mirrored == 0) {
         printf("Error during operation (see log file), site has not been "
                "successfully mirrored\n");
+        exit_code = HTS_EXIT_MIRROR_ABORTED;
       } else if (opt->shell) {
         /* Inert: TRANSFER DONE goes to the scratch buffer, never to stdout. */
         HTT_REQUEST_START;
@@ -2949,6 +2968,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         hts_buildtopindex(opt, rpath, StringBuff(opt->path_bin));
         hts_log_print(opt, LOG_INFO, "Top index rebuilt (done)");
       }
+    }
+
+    /* Only the exit status tells a wrapper the engine gave up mid-mirror. */
+    if (opt->state.exit_xh == -1) {
+      exit_code = HTS_EXIT_MIRROR_ABORTED;
+      HTS_PANIC_PRINTF("mirror aborted before completion, see the log file");
     }
 
     if (opt->state.exit_xh == 1) {
@@ -3023,7 +3048,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   printf("Thanks for using HTTrack!\n");
   io_flush;
   htsmain_free();
-  return 0;                     // OK
+  return exit_code;
 }
 
 // main() subroutines

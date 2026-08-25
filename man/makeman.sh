@@ -132,6 +132,29 @@ cat <<'EOF'
 EOF
 printf '%s\n' "$options"
 cat <<'EOF'
+.SH EXIT STATUS
+.IP 0
+The mirror ran to the end, or stopped because it was asked to: a signal, the
+interactive shell, or a transfer budget set with
+.I \-\-max\-time
+or
+.IR \-\-max\-size .
+Meeting a budget is the outcome that was asked for, not a failure, so it is not
+an abort even though the log file calls it one.
+.IP 3
+A mirror started and the engine gave up before the end: a full disk, a cache
+write failure, or a link table that hit the
+.I \-#L
+cap. Unlike a time or size budget, that cap cuts short work that was asked for
+rather than granting it, which is why the two kinds of user-set limit report
+differently. The reason is in the log file, and what was mirrored before the
+abort is kept. This is the process exit status; the engine's own
+.I exit_xh
+is a separate channel with its own values, and the two are kept apart so that
+neither can be read as the other.
+.IP "1, 255"
+.B httrack
+refused the command line, or a cache operation it asked for failed. No mirror ran.
 .SH FILES
 .I /etc/httrack.conf
 .RS
