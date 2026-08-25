@@ -59,7 +59,9 @@ extern const char *hts_acceptencoding(hts_boolean compressible,
 extern hts_boolean hts_codec_is_archive_ext(hts_codec codec, const char *ext);
 
 /* Decode filename into newfile. Returns the decoded size, or -1 on a truncated
-   or corrupt stream, an unsupported coding, a bomb over the budget, or I/O. */
+   or corrupt stream, an unsupported coding, a bomb over the budget, or I/O.
+   On -1, errno is the local failure's, and 0 when the coded body was the
+   problem: a caller telling a full disk from a bad stream tests it. */
 extern int hts_codec_unpack(hts_codec codec, const char *filename,
                             const char *newfile);
 

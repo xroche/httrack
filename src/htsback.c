@@ -824,6 +824,29 @@ static hts_boolean back_in_chunk_trailers(const lien_back *const back) {
              : HTS_FALSE;
 }
 
+/* Name a write we could not complete -- a failing close, or a decode that could
+   not write its output -- and give up the mirror on the fatal class. */
+static void back_report_write_failure(httrackp *opt, lien_back *const back) {
+  const hts_boolean fatal = check_fatal_io_errno() ? HTS_TRUE : HTS_FALSE;
+
+  /* the read path already named and classed a write error it saw itself */
+  if (!statuscode_is_write_error(back->r.statuscode)) {
+    hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to write file %s",
+                  back->url_sav);
+    /* a slot still claiming success would be cached as mirrored; a
+       STATUSCODE_INVALID must survive, the decode site's purge rests on it */
+    if (back->r.statuscode > 0) {
+      back->r.statuscode = fatal ? STATUSCODE_IO_FATAL : STATUSCODE_IO_ERROR;
+      strcpybuff(back->r.msg, "Write error on disk");
+    }
+  }
+  if (fatal && opt->state.exit_xh == 0) {
+    hts_log_print(opt, LOG_ERROR,
+                  "Mirror aborted: disk full or filesystem problems");
+    opt->state.exit_xh = -1;
+  }
+}
+
 // objet (lien) téléchargé ou transféré depuis le cache
 //
 // fermer les paramètres de transfert,
@@ -992,6 +1015,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                   }
                 } else {
                   back[p].r.statuscode = STATUSCODE_INVALID;
+                  /* Our own disk, not the coded body: hts_codec_unpack() leaves
+                     a local write's errno behind, and 0 for a bad stream. */
+                  if (errno != 0)
+                    back_report_write_failure(opt, &back[p]);
                   snprintf(back[p].r.msg, sizeof(back[p].r.msg),
                            codec == HTS_CODEC_UNSUPPORTED
                                ? "Unsupported Content-Encoding (%s)"
@@ -1681,19 +1708,6 @@ int back_search(httrackp * opt, struct_back * sback) {
   return -1;
 }
 
-/* A body small enough to sit in stdio's buffer reaches the disk only when its
-   stream is closed, so this is where a full disk first shows up. */
-static void back_report_write_failure(httrackp *opt, const char *save) {
-  if (!check_fatal_io_errno())
-    return;
-  hts_log_print(opt, LOG_ERROR | LOG_ERRNO, "Unable to write file %s", save);
-  if (opt->state.exit_xh == 0) {
-    hts_log_print(opt, LOG_ERROR,
-                  "Mirror aborted: disk full or filesystem problems");
-    opt->state.exit_xh = -1;
-  }
-}
-
 void back_set_finished(httrackp *opt, struct_back *sback, const int p) {
   lien_back *const back = sback->lnk;
   const int back_max = sback->count;
@@ -1712,7 +1726,7 @@ void back_set_finished(httrackp *opt, struct_back *sback, const int p) {
 
       back[p].r.out = NULL;
       if (!closed)
-        back_report_write_failure(opt, back[p].url_sav);
+        back_report_write_failure(opt, &back[p]);
     }
   }
 }
@@ -1757,7 +1771,7 @@ int back_flush_output(httrackp * opt, cache_back * cache, struct_back * sback,
 
       back[p].r.out = NULL;
       if (!closed)
-        back_report_write_failure(opt, back[p].url_sav);
+        back_report_write_failure(opt, &back[p]);
     }
     /* set file time */
     if (back[p].r.is_write) {   // ecriture directe
@@ -3567,10 +3581,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
             retour_fread = READ_EOF;    // interruption ou annulation interne (peut ne pas être une erreur)
 
           // Si réception chunk, tester si on est pas à la fin!
-          /* Skipped on a fatal write error: these completion tests read r.size,
+          /* Skipped on a write error: these completion tests read r.size,
              which counts bytes read, and would relaunder the error into EOF. */
           if (back[i].status == 1 &&
-              back[i].r.statuscode != STATUSCODE_IO_FATAL) {
+              !statuscode_is_write_error(back[i].r.statuscode)) {
             if (back[i].is_chunk) {     // attendre prochain chunk
               if (back[i].r.size == back[i].r.totalsize) { // fin chunk!
                 back[i].status = STATUS_CHUNK_CR;       /* fetch ending CRLF */
@@ -3604,15 +3618,19 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                  back[i].r.totalsize);
 #endif
             if (retour_fread < 0 && retour_fread != READ_EOF) {
-              if (back[i].r.statuscode == STATUSCODE_IO_FATAL) {
-                /* disk full, not a network blink: a retry writes nothing and
-                   the purge would measure a truncated mirror */
-                hts_log_print(
-                    opt, LOG_ERROR,
-                    "Mirror aborted: disk full or filesystem problems");
+              if (statuscode_is_write_error(back[i].r.statuscode)) {
+                /* our disk, not the server: keep the write error rather than
+                   blame the transfer for what we could not store */
                 hts_log_print(opt, LOG_ERROR, "Unable to write file %s",
                               back[i].url_sav);
-                opt->state.exit_xh = -1;
+                if (back[i].r.statuscode == STATUSCODE_IO_FATAL) {
+                  /* disk full, not a network blink: a retry writes nothing and
+                     the purge would measure a truncated mirror */
+                  hts_log_print(
+                      opt, LOG_ERROR,
+                      "Mirror aborted: disk full or filesystem problems");
+                  opt->state.exit_xh = -1;
+                }
               } else {
                 if (back[i].r.size > 0)
                   strcpybuff(back[i].r.msg, "Interrupted transfer");
@@ -3666,10 +3684,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
               }
             }
 
-            /* A body cut short by a full disk is short by definition: keep
+            /* A body cut short by a failed write is short by definition: keep
                the write failure it is already classed as. */
             if (back[i].r.totalsize >= 0 &&
-                back[i].r.statuscode != STATUSCODE_IO_FATAL) {
+                !statuscode_is_write_error(back[i].r.statuscode)) {
               if (back[i].r.totalsize != back[i].r.size) {      // pas la même!
                 if (!opt->tolerant) {
                   deleteaddr(&back[i].r);

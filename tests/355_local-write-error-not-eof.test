@@ -1,0 +1,175 @@
+#!/bin/bash
+#
+# A write error the fatal class does not cover -- a broken pipe rather than a
+# full disk -- must still be told apart from a body that ended cleanly. r.size
+# counts bytes read, so the read that both completes a body and fails to write
+# it used to report a clean EOF. A fifo nobody holds open stands in for the save
+# name each crawl is about to write.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+# The engine is a native binary and the shell is MSYS, so a fifo the shell makes
+# is not one to the crawl.
+skip_on_windows "a native binary cannot write through an MSYS fifo"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_writeerr.XXXXXX")
+readers=()
+cleanup() {
+    test "${#readers[@]}" -eq 0 || kill "${readers[@]}" 2>/dev/null || true
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+mkfifo "${tmpdir}/probe" 2>/dev/null || skip "cannot create a fifo here"
+rm -f "${tmpdir}/probe"
+
+common=(--quiet --disable-security-limits --robots=0 -c1 --timeout=20)
+local_server_start --log "${tmpdir}/server.log"
+
+# Mirror $2 with $3 a fifo under the save name, closed by its reader as soon as
+# the engine opens it: every byte flushed there is then a broken pipe. Leaves
+# the log in $log, what the run recorded as mirrored in $cached, the tree in
+# $site.
+crawl_onto_dead_pipe() {
+    local name="$1" entry="$2" doomed="$3"
+    local dir="${tmpdir}/${name}"
+
+    site="${dir}/127.0.0.1_${SRV_PORT}/diskfull"
+    mkdir -p "$(dirname "${site}/${doomed}")" # a spool name has a directory of its own
+    mkfifo "${site}/${doomed}"
+    # Both ends block until the other arrives, so the reader cannot close ahead
+    # of the engine's own open and leave it waiting for a reader that never comes.
+    (: <"${site}/${doomed}") &
+    readers+=("$!")
+    # --retries=0: a retry would re-open the fifo and block on a reader that is gone.
+    local_crawl --log "${tmpdir}/log-${name}" "${common[@]}" --retries=0 \
+        -O "$dir" "${BASEURL}/diskfull/${entry}"
+    log=$(<"${dir}/hts-log.txt")
+    cached=$(<"${dir}/hts-cache/new.txt")
+}
+
+# What every arm owes: the file we could not write named, not counted as
+# mirrored, and the rest of the mirror still standing.
+assert_write_error() {
+    local what="$1" name="$2"
+
+    grep -q "Unable to write file .*${name}" <<<"$log" ||
+        fail "${what}: nothing said the file could not be written: ${log}"
+    grep -q 'Write error on disk' <<<"$log" ||
+        fail "${what}: the failure was not reported as a write error: ${log}"
+    # r.size counts bytes read, so a body our own write cut short must never
+    # be reported as one the server truncated.
+    if grep -q 'Incorrect length' <<<"$log"; then
+        fail "${what}: a write error was reported as a truncated download: ${log}"
+    fi
+    if grep -qF "$name" <<<"$cached"; then
+        fail "${what}: a file that never reached the disk counts as mirrored: ${cached}"
+    fi
+    if grep -qE 'Mirror aborted|disk full' <<<"$log"; then
+        fail "${what}: a write error outside the fatal class gave up the mirror: ${log}"
+    fi
+}
+
+# --- the read that completes the body is the one whose write fails ----------
+# One byte, then the rest: the first block stays in stdio, so the flush that
+# fails is the one on the read bringing r.size up to the announced length.
+crawl_onto_dead_pipe split splitindex.html split.bin
+assert_write_error "a body completed by the failing read" 'split.bin'
+test -s "${site}/splitindex.html" ||
+    fail "the page mirrored before the write error was lost"
+ok "a body whose last read is the failing write is not a clean end"
+
+# Chunked, same shape: there the chunk end erased the error outright and the
+# engine read on into a body it could no longer store.
+crawl_onto_dead_pipe chunked splitchunkedindex.html splitchunked.bin
+assert_write_error "a chunk completed by the failing read" 'splitchunked.bin'
+ok "a chunk whose last read is the failing write is not a clean end either"
+
+# --- a body small enough that stdio holds it: only the close fails ----------
+crawl_onto_dead_pipe small splitsmallindex.html splitsmall.bin
+assert_write_error "a body stdio held until the close" 'splitsmall.bin'
+ok "a body that only fails when its file is closed is reported too"
+
+# --- no Content-Length and no chunking: the closing flush is the only writer -
+# totalsize stays -1, so no completion test can stand in for it here.
+crawl_onto_dead_pipe noclen noclenindex.html noclen.bin
+assert_write_error "a body delimited by the close alone" 'noclen.bin'
+ok "a close-delimited body the disk refused is not a clean end either"
+
+# --- the decode's own output: our disk, not the coded body ------------------
+# gz.bin is decoded into ~hts-tmp/gz.bin.u before being renamed into place; a
+# directory in that name's way fails it on us, with an errno outside the fatal
+# class.
+decode="${tmpdir}/decode"
+decodesite="${decode}/127.0.0.1_${SRV_PORT}/diskfull"
+mkdir -p "${decodesite}/~hts-tmp/gz.bin.u"
+local_crawl --log "${tmpdir}/log-decode" "${common[@]}" --retries=0 \
+    -O "$decode" "${BASEURL}/diskfull/gzindex.html"
+log=$(<"${decode}/hts-log.txt")
+cached=$(<"${decode}/hts-cache/new.txt")
+grep -q 'Unable to write file .*gz\.bin' <<<"$log" ||
+    fail "a decode our own filesystem refused was blamed on the coded body: ${log}"
+if grep -qE 'Mirror aborted|disk full' <<<"$log"; then
+    fail "a non-fatal failure under the decode gave up the mirror: ${log}"
+fi
+gzrow=$(grep -F '/gz.bin' <<<"$cached" || true)
+grep -q "error (" <<<"$gzrow" ||
+    fail "a body that never reached the disk was not recorded as failed: ${gzrow}"
+test ! -e "${decodesite}/gz.bin" ||
+    fail "the coded bytes were committed as the file we could not decode"
+grep -q DISKFULL-GZPAGE "${decodesite}/gzpage.html" ||
+    fail "the rest of the mirror did not survive the failed decode"
+ok "a decode that cannot write its output names our own filesystem"
+
+# --- and the copy that failed decode preserved outlives the update purge -----
+# The re-fetch fails on our side, so the previous copy is all there is: dropping
+# it from new.lst would have the purge unlink the file we took care to keep.
+upd="${tmpdir}/update"
+updsite="${upd}/127.0.0.1_${SRV_PORT}/diskfull"
+local_crawl --log "${tmpdir}/log-update1" "${common[@]}" --retries=0 -O "$upd" \
+    "${BASEURL}/diskfull/gzindex.html"
+before=$(wc -c <"${updsite}/gz.bin")
+test "$before" -gt 0 || fail "the first pass did not mirror the coded body"
+mkdir -p "${updsite}/~hts-tmp/gz.bin.u"
+local_crawl --log "${tmpdir}/log-update2" "${common[@]}" --retries=0 --update \
+    -O "$upd" "${BASEURL}/diskfull/gzindex.html"
+log=$(<"${upd}/hts-log.txt")
+grep -q 'Unable to write file .*gz\.bin' <<<"$log" ||
+    fail "the update pass did not fail the decode it was set up to fail: ${log}"
+test "$(wc -c <"${updsite}/gz.bin" 2>/dev/null || echo 0)" -eq "$before" ||
+    fail "the purge deleted the copy the failed decode preserved: ${log}"
+ok "a failed decode keeps the previously mirrored copy through the purge"
+
+# --- the control: a write that works must not read as one that failed -------
+clean="${tmpdir}/clean"
+local_crawl --log "${tmpdir}/log-clean" "${common[@]}" --retries=0 -O "$clean" \
+    "${BASEURL}/diskfull/splitindex.html"
+log=$(<"${clean}/hts-log.txt")
+if grep -qE 'Write error on disk|Unable to write file' <<<"$log"; then
+    fail "a body that reached the disk was reported as a write error: ${log}"
+fi
+test "$(wc -c <"${clean}/127.0.0.1_${SRV_PORT}/diskfull/split.bin")" -eq 8000 ||
+    fail "the control mirror did not write the whole body"
+grep -qF 'split.bin' "${clean}/hts-cache/new.txt" ||
+    fail "the control mirror did not count the file it wrote"
+ok "a body that reaches the disk is not reported as a write error"
+
+# The control the one above cannot be: a Content-Length body returns before the
+# closing flush, so only a close-delimited one crosses the code the arms rely on.
+cleannoclen="${tmpdir}/clean-noclen"
+local_crawl --log "${tmpdir}/log-clean-noclen" "${common[@]}" --retries=0 \
+    -O "$cleannoclen" "${BASEURL}/diskfull/noclenindex.html"
+log=$(<"${cleannoclen}/hts-log.txt")
+if grep -qE 'Write error on disk|Unable to write file' <<<"$log"; then
+    fail "a close-delimited body that reached the disk was reported as a write error: ${log}"
+fi
+test "$(wc -c <"${cleannoclen}/127.0.0.1_${SRV_PORT}/diskfull/noclen.bin")" -eq 100 ||
+    fail "the control mirror did not write the whole close-delimited body"
+grep -qF 'noclen.bin' "${cleannoclen}/hts-cache/new.txt" ||
+    fail "the control mirror did not count the close-delimited file it wrote"
+ok "a close-delimited body that reaches the disk is not reported as a write error"

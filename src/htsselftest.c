@@ -7177,6 +7177,62 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The errno contract the disk-full classification rests on: a decode that
+   cannot write leaves the write's errno, a body the decoder refuses leaves 0
+   (#1398). Both are poisoned first, so a caller that never sets errno fails. */
+static int st_codecerrno(httrackp *opt, int argc, char **argv) {
+  static const unsigned char body[] = "codec errno contract, round-tripped";
+  const size_t len = sizeof(body) - 1;
+  char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
+  FILE *fp;
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "usage: -#test=codecerrno <dir> <doomed-out>\n");
+    return 1;
+  }
+  snprintf(inpath, sizeof(inpath), "%s/ce-in.z", argv[0]);
+  snprintf(outpath, sizeof(outpath), "%s/ce-out", argv[0]);
+  assertf(ae_write_packed(inpath, 16 + MAX_WBITS, body, len) == 0);
+  errno = ENOSPC;
+  assertf(hts_zunpack(inpath, outpath) == (int) len);
+  errno = 0;
+  assertf(hts_zunpack(inpath, argv[1]) == -1);
+  assertf(errno == ENOSPC);
+  errno = 0;
+  assertf(hts_codec_unpack(HTS_CODEC_DEFLATE, inpath, argv[1]) == -1);
+  assertf(errno == ENOSPC);
+  errno = ENOSPC;
+  assertf(hts_codec_unpack(HTS_CODEC_UNSUPPORTED, inpath, outpath) == -1);
+  assertf(errno == 0);
+  /* Past the gzip magic, so the header still parses and the identity fallback
+     stays out of it: the stream itself is what fails. */
+  fp = FOPEN(inpath, "r+b");
+  assertf(fp != NULL);
+  assertf(fseek(fp, 12, SEEK_SET) == 0);
+  assertf(hts_fwrite_exact("\xff\xff\xff\xff\xff\xff\xff\xff", 8, fp));
+  assertf(fclose(fp) == 0);
+  errno = ENOSPC;
+  assertf(hts_zunpack(inpath, outpath) == -1);
+  assertf(errno == 0);
+  errno = ENOSPC;
+  assertf(hts_codec_unpack(HTS_CODEC_DEFLATE, inpath, outpath) == -1);
+  assertf(errno == 0);
+#if HTS_USEBROTLI
+  /* and a backend of its own, where the write goes through codec_sink() */
+  assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text)) == 0);
+  errno = 0;
+  assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, argv[1]) == -1);
+  assertf(errno == ENOSPC);
+  assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text) - 4) == 0);
+  errno = ENOSPC;
+  assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) == -1);
+  assertf(errno == 0);
+#endif
+  printf("codecerrno: write failure kept, refused stream cleared\n");
+  return 0;
+}
+
 /* Each call parses `txt` under a fresh host, then checkrobots() for `path`. */
 static int rb_decide(robots_wizard *r, const char *txt, const char *path) {
   static int n = 0;
@@ -12609,6 +12665,10 @@ static const struct selftest_entry {
      st_structcheck},
     {"filesave", "<doomed-save> <control-save>",
      "filesave() reports a failing close, errno intact", st_filesave},
+    {"codecerrno", "<dir> <doomed-out>",
+     "hts_codec_unpack() errno: kept on a failed write, cleared on a bad "
+     "stream",
+     st_codecerrno},
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},
