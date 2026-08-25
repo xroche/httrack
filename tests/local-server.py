@@ -3147,6 +3147,24 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_collide_html(self):
         self.send_raw(b"<html><body><p>COLLIDE-HTML</p></body></html>", "text/html")
+
+    # --- a failed hub with no cache left at all (#1414's fallback) ----------
+    # #1414 types the kept copy by guessing from the file when no entry
+    # survives. A record carried forward supplies one wherever a cache exists,
+    # so only a mirror whose cache is gone still reaches that arm.
+
+    def route_nocachefail_index(self):
+        self.send_html('\t<a href="nhub.html">hub</a>\n')
+
+    def route_nocachefail_hub(self):
+        if self.refetch_pass() == 1:
+            self.send_html('\t<a href="nkid.html">kid</a>\n')
+        else:
+            self.send_cut_headers()
+
+    def route_nocachefail_kid(self):
+        self.send_raw(b"<html><body><p>NOCACHE-KID</p></body></html>", "text/html")
+
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
         "/cookies/entrance.php": route_entrance,
@@ -3469,6 +3487,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/collide/index.html": route_collide_index,
         "/collide/dupe.php": route_collide_php,
         "/collide/dupe.html": route_collide_html,
+        "/nocachefail/index.html": route_nocachefail_index,
+        "/nocachefail/nhub.html": route_nocachefail_hub,
+        "/nocachefail/nkid.html": route_nocachefail_kid,
     }
 
     # --- /big/ seeded pseudo-site ------------------------------------------

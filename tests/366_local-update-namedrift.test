@@ -159,3 +159,29 @@ blocks=$(cache_headers "$out" '/collide/dupe.php')
 grep -q 'dupe-2\.html' <<<"$blocks" &&
     fail "dupe.php's cache entry names dupe.html's file: ${blocks}"
 ok "a name the failed link no longer owns is not recorded as its own"
+
+# --- the guard's own fallback, which a carried record now hides ------------
+# #1414 types the kept copy by guessing from the file when no cache entry
+# survives. A record carried forward answers the guard one arm earlier, so
+# 354's twicefail no longer reaches that fallback; this does. The zips go and
+# new.lst stays, leaving the purge its candidates and the guard nothing to read.
+out="${tmpdir}/nocache"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/nocachefail"
+
+local_crawl --log "${tmpdir}/nlog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/nocachefail/index.html"
+assert_alive "${site}/nhub.html" 'nkid\.html'
+assert_alive "${site}/nkid.html" NOCACHE-KID
+
+rm -f "${out}/hts-cache/new.zip" "${out}/hts-cache/old.zip"
+test -s "${out}/hts-cache/new.lst" ||
+    fail "new.lst went with the cache, so the next pass has nothing to purge"
+local_crawl --log "${tmpdir}/nlog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/nocachefail/index.html"
+assert_gave_up "$out" '/nocachefail/nhub\.html'
+test ! -e "${out}/hts-cache/old.zip" ||
+    fail "a previous cache turned up after all, so the guard had an entry"
+assert_alive "${site}/nkid.html" NOCACHE-KID
+assert_purged false "$out"
+ok "with no cache left, the kept copy itself still holds the purge"
