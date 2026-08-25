@@ -1521,7 +1521,7 @@ static char *cache_rstr_addr(FILE * fp) {
   if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > 32768)
     i = 0;
   if (i > 0) {
-    addr = malloc(i + 1);
+    addr = malloc((size_t) i + 1);
     if (addr != NULL) {
       if (!hts_fread_exact(addr, (size_t) i, fp)) {
         assertf(! "fread_cache_failed");

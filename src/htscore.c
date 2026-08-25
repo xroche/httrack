@@ -248,7 +248,8 @@ static size_t hts_record_link_alloc(httrackp *opt) {
   assertf(liensbuf != NULL);
 
   // Limit the number of links
-  if (opt->maxlink > 0 && TypedArraySize(liensbuf->ptr) >= opt->maxlink) {
+  if (opt->maxlink > 0 &&
+      TypedArraySize(liensbuf->ptr) >= (size_t) opt->maxlink) {
     return (size_t) -1;
   }
 
@@ -1501,7 +1502,13 @@ int httpmirror(char *url1, httrackp * opt) {
 #undef CH_ADD_RNG0
 #undef CH_ADD_RNG1
 #undef CH_ADD_RNG2
-            } else if ((nspec > r.size / 100) && (nspec > 10)) {        // too many special characters
+              /* NULs count too where the wire declared nothing: the body is
+                 the only evidence there is, and the blanking below would
+                 corrupt what the server left untyped (#1415). Same ratio and
+                 floor as above, so a stray NUL in a page stays a page. */
+            } else if (((nspec > r.size / 100) && (nspec > 10)) ||
+                       ((map[0] > r.size / 100) && (map[0] > 10) &&
+                        strfield2(r.contenttype, HTS_UNKNOWN_MIME))) {
               is_binary = 1;
               strcpybuff(r.contenttype, "application/octet-stream");
               hts_log_print(opt, LOG_WARNING,
@@ -1726,7 +1733,8 @@ int httpmirror(char *url1, httrackp * opt) {
             }
             /* Attempt to find a meta charset */
             else if (is_html_mime_type(r.contenttype)) {
-              char *const charset = hts_getCharsetFromMeta(r.adr, r.size);
+              char *const charset =
+                  hts_getCharsetFromMeta(r.adr, (size_t) r.size);
 
               if (charset != NULL && strlen(charset) < sizeof(page_charset)) {
                 strcpy(page_charset, charset);
@@ -1838,8 +1846,8 @@ int httpmirror(char *url1, httrackp * opt) {
               hts_boolean keep_root = HTS_TRUE;
 #endif
 
-              robots_parse(opt, &robots, urladr(), r.adr, r.size, infobuff,
-                           sizeof(infobuff), keep_root, sitemaps,
+              robots_parse(opt, &robots, urladr(), r.adr, (size_t) r.size,
+                           infobuff, sizeof(infobuff), keep_root, sitemaps,
                            sizeof(sitemaps));
               if (strnotempty(infobuff)) {
                 hts_log_print(opt, LOG_INFO,

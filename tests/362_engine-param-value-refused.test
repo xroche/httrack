@@ -26,10 +26,7 @@ crawl() {
         >"${tmp}/log" 2>&1 || RC=$?
 }
 
-# Basenames of the mirror, so the checks read what was written rather than a
-# path this host may spell differently (macOS $TMPDIR, Windows ':' -> '_').
-saved() { find "${out}" -type f | sed 's|.*/||'; }
-has_name() { grep -Fqx "$1" <<<"$(saved)"; }
+has_name() { mirror_has_name "${out}" "$1"; }
 has_cache() { test -n "$(find "${out}/hts-cache" -type f 2>/dev/null)"; }
 
 # The discriminator, proven on the two spellings that ask for each layout:

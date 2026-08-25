@@ -1,0 +1,161 @@
+#!/bin/bash
+#
+# A Content-Type the server never declared reads as hypertext, so a blob that
+# failed to re-fetch on --update held the purge back as if it carried links,
+# and the parse it was given first blanked its NUL bytes (#1415).
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ctpurge.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1 --timeout=20 --changes)
+
+# purge_says WANT OUTDIR: what the run reported intending to do. The deletions
+# themselves are asserted on the files; this only pins the report agreeing.
+purge_says() {
+    local want="$1" json="${2}/hts-changes.json"
+    grep -q "\"purged\": ${want}" "$json" ||
+        fail "expected \"purged\": ${want} in $(<"$json")"
+}
+
+# blob_copy SITE: the file the blob was mirrored to. An undeclared type still
+# earns the .html tail, which is why the guard cannot go by the name.
+blob_copy() {
+    local f
+    for f in "${1}/blob.bin" "${1}/blob.bin.html"; do
+        test ! -s "$f" || {
+            printf '%s\n' "$f"
+            return 0
+        }
+    done
+    fail "the blob was not mirrored under ${1}"
+}
+
+# holds_nuls FILE: every NUL the blob is made of survived, so nothing parsed
+# the copy as a page and blanked them. The blob is a PNG magic then NULs.
+holds_nuls() {
+    local want got
+    want=$(($(wc -c <"$1") - 8))
+    test "$want" -gt 10 || fail "$1 is too short to carry the blob's NULs"
+    got=$(od -An -v -c -j 8 -N "$want" "$1" | tr -s ' ' '\n' | grep -c '^\\0$' || true)
+    test "$got" -eq "$want" || fail "$1 kept $got of its $want NUL bytes"
+}
+
+local_server_start --log "${tmpdir}/server.log"
+
+# blob_case CASE: the blob hangs up on the update. It carries no links to lose,
+# so the purge runs and the file the index dropped is unlinked.
+blob_case() {
+    local case="$1" out="${tmpdir}/$1" site copy
+    mkdir -p "$out"
+    site="${out}/127.0.0.1_${SRV_PORT}/ctpurge/${case}"
+
+    local_crawl --log "${tmpdir}/${case}1" "${common[@]}" -O "$out" \
+        "${BASEURL}/ctpurge/${case}/index.html"
+    copy=$(blob_copy "$site")
+    holds_nuls "$copy"
+    test -s "${site}/gone.html" || fail "${case}: pass 1 did not mirror gone.html"
+
+    local_crawl --log "${tmpdir}/${case}2" "${common[@]}" -O "$out" --update \
+        "${BASEURL}/ctpurge/${case}/index.html"
+    grep -qE "Error:.*\(-[0-9]+\).*at link .*/ctpurge/${case}/blob\.bin" \
+        "${out}/hts-log.txt" ||
+        fail "${case}: the blob re-fetch did not fail, so nothing was tested"
+    test -s "$copy" || fail "${case}: the failed blob lost its copy (#746)"
+    test ! -e "${site}/gone.html" ||
+        fail "${case}: gone.html left the site and a failing blob kept it"
+    purge_says true "$out"
+}
+
+blob_case empty
+blob_case none
+ok "a blob whose type nothing declared holds nothing back, header or no header"
+
+# The shape #1395 already handled, unchanged here: it proves the fixture drives
+# the guard at all, and fails on nothing this branch touches.
+blob_case octet
+ok "an explicitly typed blob behaves as it did before"
+
+# --- a blob that fails two updates in a row --------------------------------
+# The third crawl has no cache entry left and falls to the copy #746 kept, the
+# one arm that types the file by the name it was saved under. Serving the blob
+# at blob.html is what reaches it: a savename recomputed on a failed pass drops
+# the tail an undeclared type had added, and has to name a file that exists.
+out="${tmpdir}/twice"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/ctpurge/twice"
+
+local_crawl --log "${tmpdir}/twice1" "${common[@]}" -O "$out" \
+    "${BASEURL}/ctpurge/twice/index.html"
+holds_nuls "${site}/blob.html"
+test -s "${site}/gone.html" || fail "pass 1 did not mirror gone.html"
+
+for crawl in 2 3; do
+    local_crawl --log "${tmpdir}/twice${crawl}" "${common[@]}" -O "$out" --update \
+        "${BASEURL}/ctpurge/twice/index.html"
+    grep -qE "Error:.*\(-[0-9]+\).*at link .*/ctpurge/twice/blob\.html" \
+        "${out}/hts-log.txt" ||
+        fail "crawl ${crawl}: the blob re-fetch did not fail, so nothing was tested"
+done
+test -s "${site}/blob.html" || fail "the twice-failed blob lost its copy (#746)"
+test ! -e "${site}/gone.html" ||
+    fail "gone.html left the site and a blob that failed twice kept it"
+purge_says true "$out"
+ok "a blob that fails twice holds nothing back either"
+
+# --- what the html default is there for ------------------------------------
+# A dynamic page is html far more often than its extension admits, so an
+# undeclared type must keep reading as one: scanning it is what mirrors the
+# child. Nothing here may change, and the blob beside it keeps its bytes.
+out="${tmpdir}/dyn"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/ctpurge/dyn"
+
+local_crawl --log "${tmpdir}/dyn1" "${common[@]}" -O "$out" \
+    "${BASEURL}/ctpurge/dyn/index.html"
+test -s "${site}/child.html" ||
+    fail "an undeclared type stopped a dynamic page from being scanned"
+holds_nuls "${site}/blob.html"
+ok "an undeclared type still reads as a page, and its blob is not rewritten"
+
+# --- the NUL check keeps its ratio and its floor ----------------------------
+# Pages do carry the odd NUL, and calling one binary costs its whole subtree.
+# few.php clears the ratio and not the floor, many.php the reverse, and
+# typed.html clears both but declared its type, so the check never sees it.
+out="${tmpdir}/nulls"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/ctpurge/nulls"
+
+local_crawl --log "${tmpdir}/nulls1" "${common[@]}" -O "$out" \
+    "${BASEURL}/ctpurge/nulls/index.html"
+for child in cfew cmany ctyped; do
+    test -s "${site}/${child}.html" ||
+        fail "${child}.html is gone: a page with NULs in it was called binary"
+done
+ok "a page keeps its subtree over a NUL count no blob would have"
+
+# --- the other direction: a page that fails keeps its subtree ---------------
+out="${tmpdir}/page"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/ctpurge/page"
+
+local_crawl --log "${tmpdir}/page1" "${common[@]}" -O "$out" \
+    "${BASEURL}/ctpurge/page/index.html"
+test -s "${site}/child.html" || fail "pass 1 did not mirror child.html"
+test -s "${site}/gone.html" || fail "pass 1 did not mirror gone.html"
+
+local_crawl --log "${tmpdir}/page2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/ctpurge/page/index.html"
+test -s "${site}/child.html" ||
+    fail "child.html was purged: its only parent failed to re-fetch"
+test -s "${site}/gone.html" ||
+    fail "the purge ran while a page that could carry links had failed"
+purge_says false "$out"
+ok "a page that fails still holds the purge back"

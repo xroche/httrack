@@ -45,9 +45,13 @@ done
 
 # --- pass 2: -#L trips the link limit deep in the crawl loop -----------------
 # -C0 so the pass re-downloads: a revisit-only pass declines to swap on its own.
-local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" -C0 -\#L4 "${BASEURL}/changes/index.html"
+rc2=0
+local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" -C0 -\#L4 \
+    "${BASEURL}/changes/index.html" || rc2=$?
 expect "the link limit aborted the crawl" \
     grep -aq "Too many URLs" "${out}/hts-log.txt"
+# 3 is HTS_EXIT_MIRROR_ABORTED; hts_is_exiting() owns 2 and means the opposite.
+expect "the abort reported itself in the exit status" test "$rc2" -eq 3
 expect "the abort still committed the archive" \
     unpoisoned "${out}/warc-out.warc.gz"
 expect "the abort still rewrote the .cdx" unpoisoned "${out}/warc-out.cdx"
@@ -60,9 +64,14 @@ cp "${out}/warc-out.cdx" "${tmpdir}/cdx2"
 
 # --- pass 3: server gone, so the no-data rollback restores the last session --
 local_server_stop "$SRV_PID"
-local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --retries=1 --update "${BASEURL}/changes/index.html"
+rc3=0
+local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --retries=1 --update \
+    "${BASEURL}/changes/index.html" || rc3=$?
 expect "the dead pass rolled the session back" \
     grep -aq "restoring previous one" "${out}/hts-log.txt"
+# A rollback restores the last good session rather than leaving a half mirror,
+# so it is not the abort pass 2 reports, even though both set exit_xh.
+expect "the rollback is not reported as an abort" test "$rc3" -eq 0
 expect "the rollback kept the previous change report" \
     cmp -s "${tmpdir}/report1.json" "$report"
 expect "the rollback kept the previous archive" \

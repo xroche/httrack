@@ -1,0 +1,134 @@
+#!/bin/bash
+#
+# A long option value that maps to the bare short form used to mirror the wrong
+# thing at exit 0: --structure=on became a bare -N, which reads the next word as
+# a template and ate the URL, and --long-names= became a bare -L, which selected
+# DOS 8.3 names (#1434). Both digit runs are read by value, so a zero-padded
+# 0000000001 is the same as 1 rather than an overlong run.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmpbase=${TMPDIR:-/tmp}
+# Slash-stripped: the engine normalizes a "//" away, failing every layout below.
+tmp=$(mktemp -d "${tmpbase%/}/httrack_barevalue.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+assert_selftest "optalias self-test OK" optalias
+
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+url="file://${tmp}/page.html"
+out=${tmp}/out
+
+crawl() { # crawl ARG...
+    rm -rf "${out}"
+    mkdir -p "${out}"
+    RC=0
+    httrack -O "${out}" --quiet -n "$@" >"${tmp}/log" 2>&1 || RC=$?
+}
+
+# Basenames of the mirror, so the checks read what was written rather than a
+# path this host may spell differently (macOS $TMPDIR, Windows ':' -> '_').
+saved() { find "${out}" -type f ! -path '*hts-cache*' | sed 's|.*/||' | sort; }
+has_name() { grep -Fqx "$1" <<<"$(saved)"; }
+# The directories too, which is where a preset or a template is visible.
+tree_names() { find "${out}" ! -path '*hts-cache*' | sed 's|.*/||' | sort; }
+has_dir() { test -n "$(find "${out}" -type d -name "$1")"; }
+
+# The discriminator, proven on the two spellings that ask for each layout:
+# long names keep page.html, DOS 8.3 truncates it to PAGE.HTM.
+crawl --long-names=1 "${url}"
+assert_eq 0 "${RC}" "--long-names=1 exited"
+has_name page.html || fail_dump "--long-names=1 wrote no long name" "${tmp}/log"
+crawl --long-names=0 "${url}"
+assert_eq 0 "${RC}" "--long-names=0 exited"
+has_name PAGE.HTM || fail_dump "--long-names=0 wrote no 8.3 name" "${tmp}/log"
+
+longnames() { # longnames ARG...
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    has_name page.html || fail_dump "$* wrote no long name" "${tmp}/log"
+    ! has_name PAGE.HTM || fail_dump "$* wrote an 8.3 name too" "${tmp}/log"
+}
+
+dosnames() { # dosnames ARG...
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    has_name PAGE.HTM || fail_dump "$* wrote no 8.3 name" "${tmp}/log"
+    ! has_name page.html || fail_dump "$* wrote a long name too" "${tmp}/log"
+}
+
+# -L is "long names", whose starred default is L1, so every spelling that leaves
+# it bare selects them. The empty value is the config file's "long-names=" too.
+longnames --long-names= "${url}"
+longnames --long-names=on "${url}"
+longnames --long-names "" "${url}"
+longnames -L "${url}"
+# a bare -L no longer re-reads the layout the previous one mapped
+longnames -L1 -L "${url}"
+# ...and the spellings that ask for 8.3 still get it
+dosnames --long-names=off "${url}"
+dosnames -L0 "${url}"
+dosnames -L1 -L0 "${url}"
+
+# The level is the value of the digit run, not its length: 0000000001 is L1 and
+# 0000000000 is L0, where a run counted whole falls off the bound into ISO9660.
+longnames --long-names=0000000001 "${url}"
+longnames -L0000000001 "${url}"
+dosnames --long-names=0000000000 "${url}"
+dosnames -L0000000000 "${url}"
+
+mirrored() { # mirrored ARG...
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    has_name page.html || fail_dump "$* mirrored nothing" "${tmp}/log"
+}
+
+# The URL used to be read as -N's template, leaving nothing but the top index.
+mirrored --structure=on "${url}"
+mirrored --structure on "${url}"
+
+# on and off both name the default preset, so the two trees must match, paths
+# included: a preset would put the page under a directory of its own.
+crawl --structure=off "${url}"
+off=$(tree_names)
+crawl --structure=on "${url}"
+assert_eq "${off}" "$(tree_names)" "--structure=on is not the default structure"
+
+# What #1418 deliberately glues onto -N: a preset, and a preset trailed by more
+# short options, whose -L0 tail is visible on disk. web/ without html/ is preset
+# 1 and not 5, which no fallback to the default layout produces either.
+preset1() { # preset1 ARG...
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    has_dir web || has_dir WEB || fail_dump "$* lost its preset" "${tmp}/log"
+    if has_dir html || has_dir HTML; then
+        fail_dump "$* landed on another preset" "${tmp}/log"
+    fi
+}
+preset1 --structure=1 "${url}"
+preset1 --structure=1L0 "${url}"
+dosnames --structure=1L0 "${url}"
+# the same run by value, which the length bound refused outright
+preset1 --structure=0000000001 "${url}"
+preset1 -N0000000001 "${url}"
+
+# A %-carrying template still detaches, and reaches the engine whole: the
+# literal tpl/ is the point, since no preset produces it.
+crawl "--structure=tpl/%n.%t" "${url}"
+assert_eq 0 "${RC}" "--structure template exited"
+has_dir tpl || fail_dump "--structure template never reached -N" "${tmp}/log"
+
+# Anything else glued onto -N and was re-parsed as more short options, dropping
+# the top index at exit 0. Refused since #1418.
+crawl --structure=I0 "${url}"
+{ test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
+    fail_dump "--structure=I0 not refused (exit ${RC})" "${tmp}/log"
+grep -q 'does not take the value' "${tmp}/log" ||
+    fail_dump "--structure=I0 refused without saying why" "${tmp}/log"
+! has_name page.html || fail_dump "--structure=I0 still mirrored" "${tmp}/log"
+
+echo "PASS"

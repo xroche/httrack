@@ -4921,6 +4921,23 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
     EXPANDS(want, word, NULL);
     snprintf(word, sizeof(word), "--%s=on", optalias_value(i));
     EXPANDS(optreal_value(p), word, NULL);
+    /* #1437, table-wide too: the bound is the destination's magnitude, so
+       padding rides through and a run past every destination does not */
+    snprintf(word, sizeof(word), "--%s=00000000000000000002",
+             optalias_value(i));
+    snprintf(want, sizeof(want), "%s00000000000000000002", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=2147483647", optalias_value(i));
+    snprintf(want, sizeof(want), "%s2147483647", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=99999999999999999999",
+             optalias_value(i));
+    REFUSES(word, NULL);
+    /* a sign is not a digit run: -2 would spill into the cluster loop */
+    snprintf(word, sizeof(word), "--%s=-2", optalias_value(i));
+    REFUSES(word, NULL);
+    snprintf(word, sizeof(word), "--%s=+2", optalias_value(i));
+    REFUSES(word, NULL);
   }
   assertf(params >= 27); /* the rows the issue enumerates were all walked */
 
@@ -4963,7 +4980,11 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N1L0", "--structure", "1L0");
   EXPANDS("-N1%c8", "--structure=1%c8", NULL);
   EXPANDS("-N0", "--structure=off", NULL);
-  EXPANDS("-N", "--structure=on", NULL);
+  /* both name the default preset: a bare -N would take the next word, and
+     with a URL there it mirrored nothing (#1434) */
+  EXPANDS("-N0", "--structure=on", NULL);
+  EXPANDS("-N0", "--structure", "on");
+  assertf(used == 2);
   /* a template may open with a digit, so the leading digits do not decide it */
   EXPANDS("-N 2col/%n.%t", "--structure=2col/%n.%t", NULL);
   EXPANDS("-N 2col/%n.%t", "--structure", "2col/%n.%t");
@@ -4971,6 +4992,10 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
      template either the value has nowhere left to go */
   EXPANDS("-N999999999", "--structure=999999999", NULL);
   REFUSES("--structure=4294967295", NULL);
+  /* leading zeros are not part of the number: this is the preset 1 */
+  EXPANDS("-N0000000001", "--structure=0000000001", NULL);
+  EXPANDS("-N0000000001", "-N", "0000000001");
+  assertf(used == 2);
   /* a %-free value would map every URL onto one name, so it is a typo */
   REFUSES("--structure=OFF", NULL);
   REFUSES("--structure=flat", NULL);
@@ -8404,10 +8429,10 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
           err = 1;
         seen_a_body = 1;
       }
-      if (warc_memstr((char *) rec, "Content-Encoding", hdr_len + block_len,
-                      16) != NULL ||
-          warc_memstr((char *) rec, "Transfer-Encoding", hdr_len + block_len,
-                      17) != NULL)
+      if (warc_memstr((char *) rec, "Content-Encoding",
+                      hdr_len + (size_t) block_len, 16) != NULL ||
+          warc_memstr((char *) rec, "Transfer-Encoding",
+                      hdr_len + (size_t) block_len, 17) != NULL)
         err = 1;
     }
     freet(rec);
@@ -11455,7 +11480,8 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
   (void) argv;
 
   /* no quota may fire instead of the stop, and no slot may time out */
-  opt->maxtime = opt->maxsite = 0;
+  opt->maxtime = 0;
+  opt->maxsite = 0;
   opt->timeout = 0;
   opt->state.stop = 0;
 
