@@ -41,8 +41,6 @@ Please visit our Website: http://www.httrack.com
 
 #include <limits.h>
 
-#define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
-
 /*
   Aliases for command-line and config file definitions
   These definitions can be used:
@@ -64,7 +62,7 @@ Please visit our Website: http://www.httrack.com
   single : no options, and a value (--index=0, --noindex) is refused
   onoff  : optional 0/1 value, whose short form takes a 0 suffix (-I0)
   level  : optional numeric value, which the short form parses (-%v2)
-  param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
+  param  : this option takes a number (1, for example) and can be mixed with other options (R1C1c8); a value the short form cannot read is refused
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
   paramn : glues like param what -N reads glued (1, 1L0, on/off), detaches a %-carrying template, refuses the rest
@@ -174,7 +172,8 @@ const char *hts_optalias[][4] = {
   {"referer", "-%R", "param1", "default referer URL"},
   {"from", "-%E", "param1", "from email address"},
   {"footer", "-%F", "param1", ""},
-  {"cache", "-C", "param", "number of retries for non-fatal errors"},
+  {"cache", "-C", "param",
+   "cache mode (0 no cache, 1 read the cache first, 2 test for updates)"},
   {"store-all-in-cache", "-k", "single", ""},
   {"do-not-recatch", "-%n", "onoff", ""},
   {"do-not-log", "-Q", "single", ""},
@@ -421,6 +420,54 @@ static hts_boolean optalias_paramn_glues(const char *value) {
              : HTS_FALSE;
 }
 
+/* The one separator a "param" short form reads besides digits: -m takes N,N2
+   and -%c a rate with a decimal point. */
+static char optalias_param_separator(const char *command) {
+  if (strcmp(command, "-m") == 0)
+    return ',';
+  if (strcmp(command, "-%c") == 0)
+    return '.';
+  return '\0';
+}
+
+/* Whether the short form COMMAND can read VALUE glued onto it: the on/off
+   mapping, or a bounded number carrying at most one separator with a digit
+   right after it. What it converts short of, or not at all, leaves the option
+   at a value nobody asked for and spills the tail into the cluster loop as
+   further short options (--sockets=8I0 reaches -I0). */
+static hts_boolean optalias_param_takes(const char *command,
+                                        const char *value) {
+  const char sep = optalias_param_separator(command);
+  hts_boolean digit = HTS_FALSE, split = HTS_FALSE;
+  size_t i;
+
+  if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
+    return HTS_TRUE;
+  for (i = 0; value[i] != '\0'; i++) {
+    if (isdigit((unsigned char) value[i]))
+      digit = HTS_TRUE;
+    else if (value[i] != sep || split || !isdigit((unsigned char) value[i + 1]))
+      return HTS_FALSE;
+    else
+      split = HTS_TRUE;
+  }
+  /* bounded: an overlong run is refused, not appended */
+  return digit && i <= 16 ? HTS_TRUE : HTS_FALSE;
+}
+
+/* The row's help line, indented and terminated, or nothing where it has none:
+   19 param rows carry no help and the tab alone read as a truncated message. */
+static const char *optalias_help_line(char *dest, size_t dest_size,
+                                      const char *name) {
+  const char *const help = optalias_help(name);
+
+  if (help == NULL || help[0] == '\0')
+    dest[0] = '\0';
+  else
+    slprintfbuff_clip(dest, dest_size, "\t%s\n", help);
+  return dest;
+}
+
 /*
   Check for alias in command-line
   argc,argv     as in main()
@@ -444,6 +491,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       char command[HTS_CDLMAXSIZE];
       char param[HTS_CDLMAXSIZE];
       char addcommand[256];
+      char help[256];
 
       /* */
       char *position;
@@ -520,8 +568,9 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
               slprintfbuff_clip(
                   return_error, return_error_size,
                   "Syntax error:\n\tOption %s needs to be followed by a "
-                  "parameter: %s <param>\n\t%s\n",
-                  command, command, _NOT_NULL(optalias_help(command)));
+                  "parameter: %s <param>\n%s",
+                  command, command,
+                  optalias_help_line(help, sizeof(help), command));
               return 0;
             }
             strcpybuff(param, argv[n_arg + 1]);
@@ -540,11 +589,11 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
            still takes such a value verbatim. */
         if (strcmp(hts_optalias[pos][2], "paramn") == 0 && param[0] != '\0' &&
             !optalias_paramn_glues(param) && strchr(param, '%') == NULL) {
-          slprintfbuff_clip(return_error, return_error_size,
-                            "Syntax error:\n\tOption --%s does not take the "
-                            "value %s\n\t%s\n",
-                            hts_optalias[pos][0], param,
-                            _NOT_NULL(optalias_help(hts_optalias[pos][0])));
+          slprintfbuff_clip(
+              return_error, return_error_size,
+              "Syntax error:\n\tOption --%s does not take the value %s\n%s",
+              hts_optalias[pos][0], param,
+              optalias_help_line(help, sizeof(help), hts_optalias[pos][0]));
           return 0;
         }
 
@@ -570,6 +619,19 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           strlcpybuff(return_argv[0], command, return_argv_size);
           /* Parameters accepted */
           if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
+            /* refuse rather than glue on a value the short form cannot
+               read (#1426); "paramn" reads a template too, and rules its
+               own values out above */
+            if (strcmp(hts_optalias[pos][2], "param") == 0 &&
+                param[0] != '\0' && !optalias_param_takes(command, param)) {
+              slprintfbuff_clip(
+                  return_error, return_error_size,
+                  "Syntax error:\n\tOption --%s does not take the "
+                  "value %s\n%s",
+                  hts_optalias[pos][0], param,
+                  optalias_help_line(help, sizeof(help), hts_optalias[pos][0]));
+              return 0;
+            }
             /* --cache=off or --index=on */
             if (strcmp(param, "off") == 0)
               strlcatbuff(return_argv[0], "0", return_argv_size);
@@ -591,9 +653,10 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
                 slprintfbuff_clip(
                     return_error, return_error_size,
                     "Syntax error:\n\tOption --%s does not take the value "
-                    "%s\n\t%s\n",
+                    "%s\n%s",
                     hts_optalias[pos][0], param,
-                    _NOT_NULL(optalias_help(hts_optalias[pos][0])));
+                    optalias_help_line(help, sizeof(help),
+                                       hts_optalias[pos][0]));
               return 0;
             }
             strlcatbuff(return_argv[0], suffix, return_argv_size);
@@ -612,6 +675,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 
   /* Check -O <path> */
   {
+    char help[256];
     int pos;
 
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
@@ -630,8 +694,9 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           slprintfbuff_clip(
               return_error, return_error_size,
               "Syntax error:\n\tOption %s needs to be followed by a "
-              "parameter: %s <param>\n\t%s\n",
-              argv[n_arg], argv[n_arg], _NOT_NULL(optalias_help(argv[n_arg])));
+              "parameter: %s <param>\n%s",
+              argv[n_arg], argv[n_arg],
+              optalias_help_line(help, sizeof(help), argv[n_arg]));
           return 0;
         }
         /* Copy parameters */
