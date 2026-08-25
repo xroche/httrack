@@ -316,10 +316,12 @@ static hts_boolean optreal_or_alias(const char *token) {
 
 /* Real options whose value is user-written text, a rule or a path and may
    legitimately begin with '-' (#1179, #1425): they take any following token
-   that does not name an option. Every other option keeps the older guess, that
-   a leading '-' is the next option; relaxing it wholesale would turn a typo
-   into a mirror in a directory named after it. Keep the same options' guards in
-   htscoremain.c in sync, which is what a clustered spelling (-q%A) lands on. */
+   that does not name an option, and their --name=value form takes even one that
+   does, the escape #1179 documented for --strip-query. Every other option keeps
+   the older guess, that a leading '-' is the next option; relaxing it wholesale
+   would turn a typo into a mirror in a directory named after it. Keep the same
+   options' guards in htscoremain.c in sync, which is what a clustered (-q%A) or
+   quoted ("-%A") spelling lands on. */
 /* one row per option, so each name keeps its tag */
 /* clang-format off */
 static const char *const dashvalue_opt[] = {
@@ -363,9 +365,9 @@ static optparam_state optparam_check(int argc, const char *const *argv,
    needs, in the terms the code decided it: calling a parameter missing when one
    was passed, or naming the internal short option, leaves the user nothing to
    work back from, and the run dies here, before any log file exists to say
-   more. No spelling passes a refused word through, so none is suggested: the
-   '=' form meets the same guard in htscoremain.c, and a '--' value dies
-   unrecognized. */
+   more. No spelling is suggested: --name=value passes an option name through
+   for the dashvalue_opt options only, and a '--' value dies unrecognized in
+   every one. */
 static void optparam_error(optparam_state state, const char *spelling,
                            const char *real, const char *next,
                            char *return_error, size_t return_error_size) {
@@ -782,6 +784,11 @@ static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
   if (flags == NULL) /* argv stays grown; capacity does not, so it is retried */
     return HTS_FALSE;
   cmd->unquoted = flags;
+  flags = (hts_boolean *) realloct(cmd->param,
+                                   sizeof(hts_boolean) * (size_t) capacity);
+  if (flags == NULL)
+    return HTS_FALSE;
+  cmd->param = flags;
   cmd->capacity = capacity;
   return HTS_TRUE;
 }
@@ -799,6 +806,7 @@ void cmdl_free(cmdl_argv *cmd) {
   hts_arena_free(&cmd->tokens);
   freet(cmd->argv);
   freet(cmd->unquoted);
+  freet(cmd->param);
   memset(cmd, 0, sizeof(*cmd));
 }
 
@@ -816,9 +824,11 @@ hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
   for (i = cmd->argc; i > pos; i--) {
     cmd->argv[i] = cmd->argv[i - 1];
     cmd->unquoted[i] = cmd->unquoted[i - 1];
+    cmd->param[i] = cmd->param[i - 1];
   }
   cmd->argv[pos] = copy;
   cmd->unquoted[pos] = HTS_FALSE;
+  cmd->param[pos] = HTS_FALSE;
   cmd->argc++;
   return HTS_TRUE;
 }
@@ -832,6 +842,11 @@ hts_boolean cmdl_ins_unquoted(cmdl_argv *cmd, const char *token, int pos) {
 
 hts_boolean cmdl_add(cmdl_argv *cmd, const char *token) {
   return cmdl_ins(cmd, token, cmd->argc);
+}
+
+void cmdl_mark_param(cmdl_argv *cmd, int pos) {
+  assertf(pos >= 0 && pos < cmd->argc);
+  cmd->param[pos] = HTS_TRUE;
 }
 
 /* Include a file to the current command line */
@@ -918,6 +933,8 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
                 fclose(fp);
                 return CMDL_FILE_NOMEM;
               }
+              if (return_argc > 1)
+                cmdl_mark_param(cmd, insert_after + 1);
               insert_after += return_argc > 1 ? 2 : 1;
             }
           }

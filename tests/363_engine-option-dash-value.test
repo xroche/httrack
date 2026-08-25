@@ -95,18 +95,22 @@ parse --cookies-file '-cookies.txt' --assume '-foo=text/html'
 accepted "a dash value beside another"
 echo OK
 
-# Only where the option is the whole word, which is the shape the alias layer
-# vets. Clustered, nothing vets the pair and the URL pass reads the word after
-# it as short options, so -q%F -mirrored would silently mean -i; left relaxed,
-# -qF --mirror sends "-w" as the User-Agent and drops the mirror.
-printf '[a clustered option still refuses the word after it] ..\t'
+# Only where the alias layer put the word there as the option's parameter.
+# Nothing vets a clustered spelling, and the URL pass reads the word after it as
+# short options, so -q%F -mirrored would silently mean -i; left relaxed, -qF
+# --mirror sends "-w" as the User-Agent and drops the mirror. A quoted whole
+# token resolves through the alias layer no more than a clustered one does: the
+# quotes come off in a later pass, so the word looks canonical by the time the
+# engine reads it. hts_split_cmdline(), which WebHTTrack posts through, keeps
+# them inside the token, so this one is reachable from the UI.
+printf '[an unvetted spelling still refuses the word after it] ..\t'
 for opt in %A %F %K %L %S %rf F; do
-    parse "-q${opt}" --mirror
-    refused "-q${opt} --mirror" 'needs'
-    parse "-q${opt}" -q
-    refused "-q${opt} -q" 'needs'
-    parse "-q${opt}" -dashvalue
-    refused "-q${opt} -dashvalue" 'needs'
+    for word in --mirror -q -dashvalue; do
+        parse "-q${opt}" "$word"
+        refused "-q${opt} ${word}" 'needs'
+        parse "\"-${opt}\"" "$word"
+        refused "\"-${opt}\" ${word}" 'needs'
+    done
 done
 echo OK
 
@@ -169,18 +173,29 @@ parse --assume --mirror
 refused "--assume --mirror" '"--mirror" names an option'
 echo OK
 
-# Why no spelling is suggested: a '--' value never survives the pass that rejects
-# unknown long options, and the '=' form of a single-dash one meets the engine's
-# own guard, which the relaxation above deliberately did not remove.
-printf '[the escapes that do not work are not advertised] ..\t'
-parse --assume=--mirror
-refused "--assume=--mirror" 'not recognized'
-parse --proxy=--nope
-refused "--proxy=--nope" 'not recognized'
+# Why no spelling is suggested. --name=value is a real escape, but only for the
+# options exempted above, following what #1179 documented for --strip-query; for
+# the rest it meets the engine's own guard, and a '--' value is rejected as an
+# unknown long option whatever the option was.
+printf '[the escape exists for the exempted options only] ..\t'
+parse --assume=-q
+accepted "--assume=-q"
+parse --cookies-file=-q
+accepted "--cookies-file=-q"
+parse --user-agent=-q
+accepted "--user-agent=-q"
+parse --strip-query=-q
+accepted "--strip-query=-q"
 parse --path=-q
 refused "--path=-q" 'Option O needs'
 parse --referer=-q
 refused "--referer=-q" 'Option %R needs'
+parse --userdef-cmd=-q
+refused "--userdef-cmd=-q" 'Option V needs'
+parse --assume=--mirror
+refused "--assume=--mirror" 'not recognized'
+parse --proxy=--nope
+refused "--proxy=--nope" 'not recognized'
 echo OK
 
 # Nothing at all after the option is still that, and keeps the old wording:
@@ -207,6 +222,22 @@ parse -@i9
 if ! grep -q 'v6 routines not compiled' <<<"$stdout"; then
     refused "-@i9" 'Unknown value for -@i: 9'
 fi
+echo OK
+
+# The value has to survive the round trip through doit.log, which a resumed
+# mirror is rebuilt from: its words are re-inserted one by one, reaching none of
+# the checks the first run's command line went through.
+printf '[a dash value survives doit.log and --continue] ..\t'
+rm -rf "$tmp/resume"
+(cd "$tmp/cwd" && "$bin" -O "$tmp/resume" --quiet --timeout=1 --retries=0 \
+    "$url" --assume '-foo=text/html' --user-agent '-mybot/1.0' >/dev/null 2>&1) ||
+    fail "the run that writes doit.log failed"
+doit=$(cat "$tmp/resume/hts-cache/doit.log")
+assert_match '\-%A -foo=text/html' "$doit" "doit.log kept the value"
+rc=0
+stdout=$(cd "$tmp/cwd" && "$bin" -O "$tmp/resume" --quiet --continue 2>"$tmp/err") || rc=$?
+stderr=$(cat "$tmp/err")
+accepted "--continue over a dash value"
 echo OK
 
 # Control: an ordinary value on the very same options is untouched.
