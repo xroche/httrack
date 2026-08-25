@@ -4975,6 +4975,10 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
      template either the value has nowhere left to go */
   EXPANDS("-N999999999", "--structure=999999999", NULL);
   REFUSES("--structure=4294967295", NULL);
+  /* leading zeros are not part of the number: this is the preset 1 */
+  EXPANDS("-N0000000001", "--structure=0000000001", NULL);
+  EXPANDS("-N0000000001", "-N", "0000000001");
+  assertf(used == 2);
   /* a %-free value would map every URL onto one name, so it is a typo */
   REFUSES("--structure=OFF", NULL);
   REFUSES("--structure=flat", NULL);

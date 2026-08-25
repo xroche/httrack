@@ -1301,25 +1301,20 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               for (ndigits = 0; isdigit((unsigned char) *(com + 1)); ndigits++)
                 com++;
               if (ndigits > 0)
-                opt->savename_type = ndigits <= HTS_SAVENAME_PRESET_MAX_DIGITS
-                                         ? atoi(digits)
-                                         : 0;
+                opt->savename_type =
+                    optalias_digits_fit(digits, ndigits) ? atoi(digits) : 0;
             }
             break;
           case 'L': {
-            /* L1 is the starred default, and what a bare -L selects: sscanf
-               converted nothing from one and re-mapped the value already
-               stored, so -L meant 8.3 and -L1 -L meant it too (#1434). */
+            /* L1 is the starred default, and what a bare -L selects; a run
+               too long to convert lands there too. */
             const char *const digits = com + 1;
             int ndigits, level = 1;
 
             for (ndigits = 0; isdigit((unsigned char) *(com + 1)); ndigits++)
               com++;
-            /* bounded like -N's preset run: longer is out of range on every
-               int width, which is the ISO9660 arm anyway */
-            if (ndigits > 0)
-              level =
-                  ndigits <= HTS_SAVENAME_PRESET_MAX_DIGITS ? atoi(digits) : 2;
+            if (ndigits > 0 && optalias_digits_fit(digits, ndigits))
+              level = atoi(digits);
             switch (level) {
             case 0: // 8-3 (ISO9660 L1)
               opt->savename_83 = HTS_SAVENAME_83_DOS;

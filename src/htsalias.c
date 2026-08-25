@@ -391,7 +391,15 @@ static const char *optalias_suffix(const char *type, const char *value) {
   return NULL;
 }
 
-/* A bare digit run short enough for -N to read it as a preset number. */
+hts_boolean optalias_digits_fit(const char *digits, size_t len) {
+  size_t i;
+
+  for (i = 0; i < len && digits[i] == '0'; i++) {
+  }
+  return len - i <= HTS_SAVENAME_PRESET_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
+}
+
+/* A bare digit run -N reads as a preset number. */
 static hts_boolean optalias_is_digits(const char *value) {
   size_t i;
 
@@ -399,7 +407,7 @@ static hts_boolean optalias_is_digits(const char *value) {
     if (!isdigit((unsigned char) value[i]))
       return HTS_FALSE;
   }
-  return i != 0 && i <= HTS_SAVENAME_PRESET_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
+  return i != 0 && optalias_digits_fit(value, i) ? HTS_TRUE : HTS_FALSE;
 }
 
 /* Whether a "paramn" value glues onto the short form the way "param" does: a
@@ -413,7 +421,7 @@ static hts_boolean optalias_paramn_glues(const char *value) {
     return HTS_TRUE;
   for (i = 0; isdigit((unsigned char) value[i]); i++) {
   }
-  if (i == 0 || i > HTS_SAVENAME_PRESET_MAX_DIGITS)
+  if (i == 0 || !optalias_digits_fit(value, i))
     return HTS_FALSE;
   return strchr(value + i, '/') == NULL && strchr(value + i, '.') == NULL
              ? HTS_TRUE
