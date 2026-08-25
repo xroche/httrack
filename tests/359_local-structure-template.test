@@ -9,7 +9,9 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_structure.XXXXXX") || fail "no tmpdir"
+tmpbase=${TMPDIR:-/tmp}
+# Slash-stripped: the engine normalizes a "//" away, failing every layout below.
+tmp=$(mktemp -d "${tmpbase%/}/httrack_structure.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${tmp}"
 
 echo '<html><body>hello</body></html>' >"${tmp}/page.html"
@@ -92,13 +94,14 @@ layout 2col/page.html --structure 2col/%n.%t
 layout 2col/page.html --structure=2col/%n.%t
 layout 2col/page.html -N 2col/%n.%t
 
-# Past 9 digits sscanf("%d") wraps onto -1, which is "userdef" with an empty
-# template, and url_savename then crashes. optreal_find matches -N exactly, so
-# the glued spelling never reaches the alias table and the engine has to clamp
-# it itself; neither spelling may abort.
+# optreal_find matches -N exactly, so the engine bounds a glued run itself, and
+# not with sscanf("%d"): past INT_MAX that is negative on LP64 (userdef with an
+# empty template, which crashes url_savename) and INT_MAX on ILP32 (a preset
+# that flattens the mirror). INT_MAX itself pins the ILP32 half alone.
 layout "${default_layout}" -N4294967295
 layout "${default_layout}" -N99999999999999999999
 layout "${default_layout}" -N2147483648
+layout "${default_layout}" -N2147483647
 
 # The alias table does see the long form, where such a run is neither a preset
 # nor a template. -N <word> keeps taking its value verbatim.

@@ -358,10 +358,6 @@ static const char *optalias_suffix(const char *type, const char *value) {
   return NULL;
 }
 
-/* Longest digit run -N may carry: sscanf("%d") wraps past it, and a wrap onto
-   -1 is "userdef" with no template, which crashes url_savename. */
-#define PARAMN_MAX_DIGITS 9
-
 /* A bare digit run short enough for -N to read it as a preset number. */
 static hts_boolean optalias_is_digits(const char *value) {
   size_t i;
@@ -370,7 +366,7 @@ static hts_boolean optalias_is_digits(const char *value) {
     if (!isdigit((unsigned char) value[i]))
       return HTS_FALSE;
   }
-  return i != 0 && i <= PARAMN_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
+  return i != 0 && i <= HTS_SAVENAME_PRESET_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
 }
 
 /* Whether a "paramn" value glues onto the short form the way "param" does: a
@@ -384,7 +380,7 @@ static hts_boolean optalias_paramn_glues(const char *value) {
     return HTS_TRUE;
   for (i = 0; isdigit((unsigned char) value[i]); i++) {
   }
-  if (i == 0 || i > PARAMN_MAX_DIGITS)
+  if (i == 0 || i > HTS_SAVENAME_PRESET_MAX_DIGITS)
     return HTS_FALSE;
   return strchr(value + i, '/') == NULL && strchr(value + i, '.') == NULL
              ? HTS_TRUE
