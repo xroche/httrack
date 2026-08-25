@@ -2914,7 +2914,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     // ------------------------------------------------------------
     opt->state._hts_in_mirror = 1;
     {
-      const int mirrored = httpmirror(url, opt);
+      hts_boolean completed = HTS_FALSE;
+      const int mirrored = httpmirror(url, opt, &completed);
 
       if (mirrored == 0) {
         printf("Error during operation (see log file), site has not been "
@@ -2924,10 +2925,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         HTT_REQUEST_START;
         HT_PRINT("TRANSFER DONE" LF);
         HTT_REQUEST_END
-      } else if (mirrored > 0 && opt->state.exit_xh == 0) {
+      } else if (completed) {
         printf("Done.\n");
       } else {
-        /* Both a -1 bailout and an exit_xh abort miss the == 0 test above. */
+        /* The engine's verdict, so every kind of abort reads alike. */
         printf("Mirror not completed (see log file)\n");
       }
     }
