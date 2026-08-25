@@ -3411,23 +3411,33 @@ static hts_boolean st_poison_intact(const char *label, const char *buf,
    out whole and nothing may be written past `cap`. */
 static hts_boolean st_getext_case(char *arena, size_t cap, size_t guard,
                                   const char *fil, const char *want) {
+  hts_boolean ok = HTS_TRUE;
   const char *ext;
   size_t from;
 
   memset(arena, ST_POISON, cap + guard);
   ext = get_ext(arena, cap, fil);
+  /* every check runs: a wrong answer must not stop the canary from reporting */
   if (strcmp(ext, want) != 0) {
     fprintf(stderr, "getext: [%s] in %d bytes gave [%s], wanted [%s]\n", fil,
             (int) cap, ext, want);
-    return HTS_FALSE;
+    ok = HTS_FALSE;
   }
-  /* an extension that did not fit is the literal "", leaving the whole arena
-     poisoned; one that fitted ends on its own NUL */
-  from = ext == arena ? strlen(want) + 1 : 0;
+  /* the answer is built in the caller's buffer, and only the refusal is not */
+  if ((ext == arena) != (*want != '\0')) {
+    fprintf(stderr, "getext: [%s] in %d bytes answered from the wrong buffer\n",
+            fil, (int) cap);
+    ok = HTS_FALSE;
+  }
+  /* an extension that did not fit leaves the whole arena poisoned; one that
+     fitted ends on its own NUL */
+  from = ext == arena ? strlen(ext) + 1 : 0;
   if (!st_poison_intact("getext: inside the destination", arena, from, cap))
-    return HTS_FALSE;
-  return st_poison_intact("getext: past the destination", arena, cap,
-                          cap + guard);
+    ok = HTS_FALSE;
+  if (!st_poison_intact("getext: past the destination", arena, cap,
+                        cap + guard))
+    ok = HTS_FALSE;
+  return ok;
 }
 
 /* get_ext() stops at the '?', so a parameterised URL types by its extension,
