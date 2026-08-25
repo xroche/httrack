@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htscoremain.h"
 
+#include "httrack-library.h"
 #include "htsglobal.h"
 #include "htscore.h"
 #include "htsio.h"
@@ -260,6 +261,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   char *argv_firsturl = NULL;   // utilisé pour nommage par défaut
   char *url = NULL;             // URLS séparées par un espace
   size_t url_sz = 65535;
+
+  /* 0, or HTS_EXIT_MIRROR_ABORTED for a mirror that started and did not end */
+  int exit_code = 0;
 
   // the parametres
   int httrack_logmode = 3;      // ONE log file
@@ -2925,6 +2929,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     if (httpmirror(url, opt) == 0) {
       printf
         ("Error during operation (see log file), site has not been successfully mirrored\n");
+      exit_code = HTS_EXIT_MIRROR_ABORTED;
     } else {
       if (opt->shell) {
         HTT_REQUEST_START;
@@ -2950,6 +2955,12 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         hts_buildtopindex(opt, rpath, StringBuff(opt->path_bin));
         hts_log_print(opt, LOG_INFO, "Top index rebuilt (done)");
       }
+    }
+
+    /* Only the exit status tells a wrapper the engine gave up mid-mirror. */
+    if (opt->state.exit_xh == -1) {
+      exit_code = HTS_EXIT_MIRROR_ABORTED;
+      HTS_PANIC_PRINTF("mirror aborted before completion, see the log file");
     }
 
     if (opt->state.exit_xh == 1) {
@@ -3024,7 +3035,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   printf("Thanks for using HTTrack!\n");
   io_flush;
   htsmain_free();
-  return 0;                     // OK
+  return exit_code;
 }
 
 // main() subroutines

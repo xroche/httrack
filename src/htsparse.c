@@ -3184,6 +3184,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                       opt->maxlink);
                         hts_log_print(opt, LOG_INFO,
                                       "To avoid that: use #L option for more links (example: -#L1000000)");
+                        /* same limit as htsAddLink's: report the same abort */
+                        *stre->exit_xh_ = -1;
                         if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
                           if (fp) {
                             fclose(fp);
