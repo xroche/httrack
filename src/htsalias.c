@@ -287,8 +287,9 @@ const char *hts_optalias[][4] = {
 };
 /* clang-format on */
 
-/* Only the spellings optalias_check() resolves: a cluster (-c8) is a value. */
-hts_boolean optreal_or_alias(const char *token) {
+/* Whether TOKEN is an option name, rather than a value that begins with '-'.
+   Only the spellings optalias_check() resolves: a cluster (-c8) is a value. */
+static hts_boolean optreal_or_alias(const char *token) {
   char name[64];
   const char *eq;
   size_t len;
@@ -313,9 +314,11 @@ hts_boolean optreal_or_alias(const char *token) {
 
 /* Real options whose value is user-written text, a rule or a path and may
    legitimately begin with '-' (#1179, #1425): they take any following token
-   that does not name an option, and their '=' form takes even one that does.
-   Keep in sync with the same options' guards in htscoremain.c. */
-/* clang-format off: one row per option, so each name keeps its tag */
+   that does not name an option. Every other option keeps the older guess, that
+   a leading '-' is the next option; relaxing it wholesale would turn a typo
+   into a mirror in a directory named after it. Keep the same options' guards in
+   htscoremain.c in sync, which is what a clustered spelling (-q%A) lands on. */
+/* one row per option, so each name keeps its tag */
 /* clang-format off */
 static const char *const dashvalue_opt[] = {
   "-%g",  /* strip-query */
@@ -335,7 +338,7 @@ static const char *const dashvalue_opt[] = {
 typedef enum {
   OPTPARAM_PRESENT,  /* a value follows */
   OPTPARAM_ABSENT,   /* nothing follows */
-  OPTPARAM_AS_OPTION /* what follows was read as an option name */
+  OPTPARAM_AS_OPTION /* what follows was read as the next option */
 } optparam_state;
 
 static optparam_state optparam_check(int argc, const char *const *argv,
@@ -355,32 +358,35 @@ static optparam_state optparam_check(int argc, const char *const *argv,
 }
 
 /* Why the option the user wrote as SPELLING did not get the parameter REAL
-   needs. NEXT is the word that followed, if any, and NAME the long option whose
-   --name=value form to suggest, or NULL to look one up. Calling a parameter
-   missing when one was passed leaves the user nothing to work back from, and
-   the run dies here, before any log file exists to say more. */
+   needs, in the terms the code decided it: calling a parameter missing when one
+   was passed, or naming the internal short option, leaves the user nothing to
+   work back from, and the run dies here, before any log file exists to say
+   more. No spelling passes a refused word through, so none is suggested: the
+   '=' form meets the same guard in htscoremain.c, and a '--' value dies
+   unrecognized. */
 static void optparam_error(optparam_state state, const char *spelling,
-                           const char *name, const char *real, const char *next,
+                           const char *real, const char *next,
                            char *return_error, size_t return_error_size) {
   const int pos = optreal_find(real);
   const char *const help = pos >= 0 ? hts_optalias[pos][3] : "";
+  const char *const sep = help[0] != '\0' ? "\n\t" : "";
 
-  /* -N is both --structure and --user-structure, so a short spelling can only
-     have the first long name the table gives back */
-  if (name == NULL)
-    name = pos >= 0 ? hts_optalias[pos][0] : NULL;
-  if (state == OPTPARAM_ABSENT || name == NULL)
+  if (state == OPTPARAM_ABSENT)
     slprintfbuff_clip(return_error, return_error_size,
                       "Syntax error:\n\tOption %s needs to be followed by a "
                       "parameter: %s <param>%s%s\n",
-                      spelling, spelling, help[0] != '\0' ? "\n\t" : "", help);
+                      spelling, spelling, sep, help);
+  else if (optreal_or_alias(next))
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption %s takes a value, and the next "
+                      "word \"%s\" names an option%s%s\n",
+                      spelling, next, sep, help);
   else
     slprintfbuff_clip(return_error, return_error_size,
                       "Syntax error:\n\tOption %s takes a value, and the next "
-                      "word \"%s\" was read as an option name\n\tWrite "
-                      "--%s=%s to pass it as the value%s%s\n",
-                      spelling, next, name, next, help[0] != '\0' ? "\n\t" : "",
-                      help);
+                      "word \"%s\" begins with '-', so it was read as the next "
+                      "option%s%s\n",
+                      spelling, next, sep, help);
 }
 
 /* The short form the --wide-/--tiny- prefix glues onto the alias it prefixes,
@@ -539,7 +545,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
                 optparam_check(argc, argv, n_arg, command);
 
             if (state != OPTPARAM_PRESENT) {
-              optparam_error(state, argv[n_arg], argv[n_arg] + 2, command,
+              optparam_error(state, argv[n_arg], command,
                              state == OPTPARAM_ABSENT ? "" : argv[n_arg + 1],
                              return_error, return_error_size);
               return 0;
@@ -626,7 +632,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
             optparam_check(argc, argv, n_arg, argv[n_arg]);
 
         if (state != OPTPARAM_PRESENT) {
-          optparam_error(state, argv[n_arg], NULL, argv[n_arg],
+          optparam_error(state, argv[n_arg], argv[n_arg],
                          state == OPTPARAM_ABSENT ? "" : argv[n_arg + 1],
                          return_error, return_error_size);
           return 0;

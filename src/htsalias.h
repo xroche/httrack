@@ -47,9 +47,6 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 int optalias_find(const char *token);
 const char *optalias_help(const char *token);
 int optreal_find(const char *token);
-/* Whether TOKEN names an option, rather than being a value that begins with
-   '-'. Guards the options whose value may itself begin with one. */
-hts_boolean optreal_or_alias(const char *token);
 const char *optreal_value(int p);
 const char *optalias_value(int p);
 const char *opttype_value(int p);

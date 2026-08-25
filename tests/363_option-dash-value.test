@@ -11,17 +11,20 @@ set -euo pipefail
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_dashvalue.XXXXXX") || exit 1
 cleanup_push rm -rf "$tmp"
 
-# absolute: the probes cd into an empty directory, and make check puts the
-# build's src/ on PATH relatively
+# absolute: the probes cd into $tmp/cwd, and make check puts the build's src/ on
+# PATH relatively
 bin=$(httrack_path)
-mkdir -p "$tmp/cwd"
+mkdir -p "$tmp/cwd" "$tmp/bare"
+printf -- '-*.gif\n' >"$tmp/cwd/-rules.txt"
+printf -- '-*.gif\n' >"$tmp/cwd/rules.txt"
+: >"$tmp/cwd/-cookies.txt"
 
 url='http://127.0.0.1:1/'
 out=$tmp/mirror
 
 # Parse the command line and stop; --testscan opens no socket, so the dead URL
-# is never dialled. The streams are kept apart: the run dies before any log
-# file exists, so stderr is the only channel the diagnosis has.
+# is never dialled. The streams are kept apart: the run dies before any log file
+# exists, so stderr is the only channel the diagnosis has.
 parse() {
     rc=0
     rm -rf "$out"
@@ -32,12 +35,13 @@ parse() {
 # Same, minus the -O the -O probes cannot pass, from a directory kept empty so
 # an accidental mirror shows up as a stray file.
 noparam() { # noparam LABEL ARG...
-    rc=0
+    local label=$1
     shift
+    rc=0
     rm -rf "$out"
-    stdout=$(cd "$tmp/cwd" && "$bin" --quiet --testscan "$url" "$@" 2>"$tmp/err") || rc=$?
+    stdout=$(cd "$tmp/bare" && "$bin" --quiet --testscan "$url" "$@" 2>"$tmp/err") || rc=$?
     stderr=$(cat "$tmp/err")
-    test -z "$(ls -A "$tmp/cwd")" || fail "$*: mirrored into $(ls -A "$tmp/cwd")"
+    test -z "$(ls -A "$tmp/bare")" || fail "$label: mirrored into $(ls -A "$tmp/bare")"
 }
 
 accepted() { # accepted LABEL
@@ -45,13 +49,17 @@ accepted() { # accepted LABEL
     ! grep -q 'Syntax error' <<<"$stderr" || fail "$1: $stderr"
 }
 
-# A refusal says why on stderr and nowhere else, and leaves no mirror behind.
+# A refusal leaves no mirror behind and says why on stderr, never only on the
+# stdout the log and WebHTTrack never see. It suggests no spelling: none passes a
+# refused word through, and advice that dies at a second refusal is worse than
+# none.
 refused() { # refused LABEL RE...
     local label=$1
     shift
     test "$rc" -ne 0 || fail "$label: the option took the token after it"
-    test -z "$stdout" || fail "$label: diagnosis split onto stdout: $stdout"
     test ! -e "$out" || fail "$label: created $out"
+    test -n "$stderr" || fail "$label: refused with nothing on stderr"
+    ! grep -q 'Write --' <<<"$stderr" || fail "$label: suggests a spelling: $stderr"
     while test $# -gt 0; do
         assert_match "$1" "$stderr" "$label"
         shift
@@ -59,7 +67,7 @@ refused() { # refused LABEL RE...
 }
 
 # The complaint: --assume with a dash-leading extension, which is what the
-# WebHTTrack type page emits, and the same for the other free-text options.
+# WebHTTrack type page emits.
 printf '[a dash-leading value is taken, in every spelling] ..\t'
 parse --assume '-foo=text/html'
 accepted "--assume -foo=text/html"
@@ -75,12 +83,54 @@ parse -F '-mybot/1.0'
 accepted "-F -mybot/1.0"
 parse --footer '-<!-- mirrored -->'
 accepted "--footer -<!-- mirrored -->"
+parse -%F '-<!-- mirrored -->'
+accepted "-%F -<!-- mirrored -->"
+parse --cookies-file '-cookies.txt'
+accepted "--cookies-file -cookies.txt"
+parse --warc-file '-archive'
+accepted "--warc-file -archive"
+parse --list '-rules.txt'
+accepted "--list -rules.txt"
 parse --cookies-file '-cookies.txt' --assume '-foo=text/html'
 accepted "a dash value beside another"
 echo OK
 
-# The bytes, not just the verdict: the alias layer hands the engine the value
-# it was given, dash included, in each spelling the wizard and the man page use.
+# Only where the option is the whole word, which is the shape the alias layer
+# vets. Clustered, nothing vets the pair and the URL pass reads the word after
+# it as short options, so -q%F -mirrored would silently mean -i; left relaxed,
+# -qF --mirror sends "-w" as the User-Agent and drops the mirror.
+printf '[a clustered option still refuses the word after it] ..\t'
+for opt in %A %F %K %L %S %rf F; do
+    parse "-q${opt}" --mirror
+    refused "-q${opt} --mirror" 'needs'
+    parse "-q${opt}" -q
+    refused "-q${opt} -q" 'needs'
+    parse "-q${opt}" -dashvalue
+    refused "-q${opt} -dashvalue" 'needs'
+done
+echo OK
+
+# Control: every option this change did not relax keeps the answer it gave
+# before, in the clustered spelling as much as the bare one.
+printf '[an option that was not relaxed is untouched] ..\t'
+parse -qP -8080
+refused "-qP -8080" 'Option P needs'
+parse -qV -c8
+refused "-qV -c8" 'Option V needs'
+parse -N '-%h/%p/%n.%t'
+refused "-N -%h/%p/%n.%t" 'Option N needs'
+noparam "-wO -c8" -wO -c8
+refused "-wO -c8" 'Option O needs'
+# The long spelling of -N has to agree with it, having the same value to judge.
+parse --user-structure '-%h/%p/%n.%t'
+refused "--user-structure" 'Option --user-structure takes a value' \
+    '"-%h/%p/%n.%t" begins'
+echo OK
+
+# The bytes, not just the verdict. -#test=optalias calls optalias_check alone, so
+# it pins the alias layer; --filterlist is the one that reaches a syscall while
+# parsing, and a trimmed or rewritten name reads back as the open failure the
+# last probe shows.
 printf '[the value reaches the engine byte for byte] ..\t'
 expand() { # expand OPTION [VALUE]
     "$bin" -O /dev/null '-#test=optalias' "$@"
@@ -89,13 +139,6 @@ assert_eq '-%A -foo=text/html' "$(expand --assume -foo=text/html)" "--assume"
 assert_eq '-%A -foo=text/html' "$(expand --assume=-foo=text/html)" "--assume="
 assert_eq '-%A -foo=text/html' "$(expand -%A -foo=text/html)" "-%A"
 assert_eq '-F -mybot/1.0' "$(expand --user-agent -mybot/1.0)" "--user-agent"
-echo OK
-
-# And it reaches a syscall unmangled: --filterlist opens its file while parsing,
-# so a trimmed or rewritten name reads back as the open failure the second half
-# of this probe shows.
-printf '[a dash-leading file name is opened, not mangled] ..\t'
-printf -- '-*.gif\n' >"$tmp/cwd/-rules.txt"
 parse --filterlist -rules.txt
 accepted "--filterlist -rules.txt"
 parse --filterlist=-rules.txt
@@ -104,41 +147,44 @@ parse -%S -rules.txt
 accepted "-%S -rules.txt"
 parse --filterlist -nosuch.txt
 refused "--filterlist -nosuch.txt" 'File url list could not be opened'
-rm -f "$tmp/cwd/-rules.txt"
 echo OK
 
-# What the option refuses, it now explains: the option as the user spelled it,
-# the word it choked on, and the spelling that hands it over anyway. The old
-# message claimed the parameter was missing and named the internal -%A.
-printf '[a refusal names the option, the value and the way out] ..\t'
+# What the option refuses, it now explains in the terms the code decided it: the
+# option as the user spelled it, the word it choked on, and which of the two
+# tests rejected it. The old message claimed the parameter was missing and named
+# the internal -%A.
+printf '[a refusal names the option, the value and the reason] ..\t'
 parse --proxy '-proxy:8080'
-refused "--proxy -proxy:8080" 'Option --proxy takes a value' '"-proxy:8080"' \
-    'Write --proxy=-proxy:8080'
+refused "--proxy -proxy:8080" 'Option --proxy takes a value' \
+    '"-proxy:8080" begins with' 'read as the next option'
 parse -P '-proxy:8080'
-refused "-P -proxy:8080" 'Option -P takes a value' 'Write --proxy=-proxy:8080'
-parse --user-structure '-%h/%p/%n.%t'
-refused "--user-structure" 'Option --user-structure takes a value' \
-    'Write --user-structure=-'
+refused "-P -proxy:8080" 'Option -P takes a value' '"-proxy:8080" begins with'
 noparam "-O -q" -O -q
-refused "-O -q" 'Option -O takes a value' 'Write --path=-q'
-# An allowlisted option still refuses a real option name (#1179), with the same
-# wording, since that too is a value it declined to take.
+refused "-O -q" 'Option -O takes a value' '"-q" names an option'
+# An allowlisted option still refuses a real option name (#1179), and says which
+# of the two tests it was.
 parse --assume -q
-refused "--assume -q" 'Option --assume takes a value' '"-q"' \
-    'Write --assume=-q'
+refused "--assume -q" 'Option --assume takes a value' '"-q" names an option'
+parse --assume --mirror
+refused "--assume --mirror" '"--mirror" names an option'
 echo OK
 
-# The way out the message names has to work, or it is worse than no advice.
-printf '[the spelling the message suggests is taken] ..\t'
-parse --proxy=-proxy:8080
-accepted "--proxy=-proxy:8080"
-parse --path=-mirror
-accepted "--path=-mirror"
-rm -rf "$tmp/cwd/-mirror"
+# Why no spelling is suggested: a '--' value never survives the pass that rejects
+# unknown long options, and the '=' form of a single-dash one meets the engine's
+# own guard, which the relaxation above deliberately did not remove.
+printf '[the escapes that do not work are not advertised] ..\t'
+parse --assume=--mirror
+refused "--assume=--mirror" 'not recognized'
+parse --proxy=--nope
+refused "--proxy=--nope" 'not recognized'
+parse --path=-q
+refused "--path=-q" 'Option O needs'
+parse --referer=-q
+refused "--referer=-q" 'Option %R needs'
 echo OK
 
 # Nothing at all after the option is still that, and keeps the old wording:
-# there is no value to quote and no '=' form to suggest.
+# there is no value to quote and no test to name.
 printf '[an option with nothing after it still says so] ..\t'
 parse --proxy
 refused "--proxy alone" 'needs to be followed by a parameter'
@@ -167,13 +213,16 @@ echo OK
 printf '[an ordinary value on the same options is unaffected] ..\t'
 parse --assume 'php3=text/html'
 accepted "--assume php3=text/html"
+parse -q%A 'php3=text/html'
+accepted "-q%A php3=text/html"
+parse -qF 'mybot/1.0'
+accepted "-qF mybot/1.0"
 parse --proxy 'proxy.example.com:8080'
 accepted "--proxy proxy.example.com:8080"
 parse --user-agent 'mybot/1.0'
 accepted "--user-agent mybot/1.0"
 parse --footer '<!-- mirrored -->'
 accepted "--footer <!-- mirrored -->"
-printf -- '-*.gif\n' >"$tmp/cwd/rules.txt"
 parse --filterlist rules.txt
 accepted "--filterlist rules.txt"
 assert_eq '-%A php3=text/html' "$(expand --assume php3=text/html)" "plain --assume"
