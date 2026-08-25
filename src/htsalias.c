@@ -41,7 +41,6 @@ Please visit our Website: http://www.httrack.com
 
 #include <errno.h>
 #include <limits.h>
-#include <stdint.h>
 
 /*
   Aliases for command-line and config file definitions
@@ -369,6 +368,15 @@ static hts_boolean optalias_clusters(const char *type, const char *command) {
   return HTS_TRUE;
 }
 
+/* Whether the digit run at RUN converts to at most MAX. */
+static hts_boolean optalias_run_fits(const char *run, LLint max) {
+  LLint value;
+
+  errno = 0;
+  value = strtoll(run, NULL, 10);
+  return errno != ERANGE && value <= max ? HTS_TRUE : HTS_FALSE;
+}
+
 /* Suffix the short form takes for a value ("0", "2", or none), or NULL when
    the class refuses it: onoff reads 0/1 only, level reads a number. */
 static const char *optalias_suffix(const char *type, const char *value) {
@@ -379,12 +387,10 @@ static const char *optalias_suffix(const char *type, const char *value) {
   if (level && isdigit((unsigned char) value[0])) {
     size_t i;
 
-    /* bounded: an overlong digit run is refused, not appended */
-    for (i = 0; i < 16 && value[i] != '\0'; i++) {
-      if (!isdigit((unsigned char) value[i]))
-        return NULL;
+    for (i = 0; isdigit((unsigned char) value[i]); i++) {
     }
-    return value[i] == '\0' ? value : NULL;
+    /* a level reaches sscanf("%d") too, so bound it by what that holds */
+    return value[i] == '\0' && optalias_run_fits(value, INT_MAX) ? value : NULL;
   }
   if (strcmp(value, "0") == 0 || strcmp(value, "off") == 0)
     return "0";
@@ -434,20 +440,11 @@ static char optalias_param_separator(const char *command) {
 
 /* The widest value the short form's own parser holds: -m, -M and -G read an
    LLint, and -%c a float no strtoll-sized run overflows. */
-static int64_t optalias_param_max(const char *command) {
+static LLint optalias_param_max(const char *command) {
   if (strcmp(command, "-m") == 0 || strcmp(command, "-M") == 0 ||
       strcmp(command, "-G") == 0 || strcmp(command, "-%c") == 0)
     return INT64_MAX;
   return INT_MAX;
-}
-
-/* Whether the digit run at RUN converts to at most MAX. */
-static hts_boolean optalias_run_fits(const char *run, int64_t max) {
-  long long value;
-
-  errno = 0;
-  value = strtoll(run, NULL, 10);
-  return errno == 0 && value <= max ? HTS_TRUE : HTS_FALSE;
 }
 
 /* Whether the short form COMMAND can read VALUE glued onto it: the on/off
@@ -460,9 +457,9 @@ static hts_boolean optalias_run_fits(const char *run, int64_t max) {
 static hts_boolean optalias_param_takes(const char *command,
                                         const char *value) {
   const char sep = optalias_param_separator(command);
-  const int64_t max = optalias_param_max(command);
+  const LLint max = optalias_param_max(command);
   hts_boolean digit = HTS_FALSE, split = HTS_FALSE;
-  size_t i, run = 0;
+  size_t i, start = 0;
 
   if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
     return HTS_TRUE;
@@ -472,14 +469,14 @@ static hts_boolean optalias_param_takes(const char *command,
       continue;
     }
     /* the run just ended, if it held anything: -m and -%c carry two */
-    if (i > run && !optalias_run_fits(value + run, max))
+    if (i > start && !optalias_run_fits(value + start, max))
       return HTS_FALSE;
     if (value[i] == '\0')
       break;
     if (value[i] != sep || split || !isdigit((unsigned char) value[i + 1]))
       return HTS_FALSE;
     split = HTS_TRUE;
-    run = i + 1;
+    start = i + 1;
   }
   return digit;
 }
@@ -526,7 +523,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       char *position;
       const char *addname = NULL;
       int need_param = 1;
-      hts_boolean negated = HTS_FALSE;
+      hts_boolean negated = HTS_FALSE, detached;
 
       int pos;
 
@@ -628,10 +625,23 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 
         /* Final result */
 
-        /* Must be alone (-P /tmp), or a paramn value -N cannot take glued */
-        if (strcmp(hts_optalias[pos][2], "param1") == 0 ||
-            (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
-             !optalias_paramn_glues(param))) {
+        /* Alone (-P /tmp), or a paramn value -N cannot take glued */
+        detached = strcmp(hts_optalias[pos][2], "param1") == 0 ||
+                   (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
+                    !optalias_paramn_glues(param));
+
+        /* Every other class glues the value onto the short form in one
+           buffer, where strlcatbuff aborts rather than clips. */
+        if (!detached && strlen(param) >= return_argv_size - strlen(command)) {
+          slprintfbuff_clip(
+              return_error, return_error_size,
+              "Syntax error:\n\tOption --%s does not take the value %s\n%s",
+              hts_optalias[pos][0], param,
+              optalias_help_line(help, sizeof(help), hts_optalias[pos][0]));
+          return 0;
+        }
+
+        if (detached) {
           strlcpybuff(return_argv[0], command, return_argv_size);
           strlcpybuff(return_argv[1], param, return_argv_size);
           *return_argc = 2;     /* 2 parameters returned */

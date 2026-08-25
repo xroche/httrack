@@ -84,6 +84,16 @@ assert_match() { # assert_match RE TEXT [LABEL]
 
 assert_file() { test -f "$1" || fail "${2:+$2: }missing file: $1"; }
 
+# Basenames of the files a mirror wrote, so a check reads what was written
+# rather than a path this host may spell differently (macOS $TMPDIR, Windows
+# ':' -> '_').
+mirror_names() { # mirror_names DIR
+    find "$1" -type f | sed 's|.*/||'
+}
+mirror_has_name() { # mirror_has_name DIR BASENAME
+    grep -Fqx "$2" <<<"$(mirror_names "$1")"
+}
+
 # Every step skip_if_out_of_budget projects against ran. A skip is an exit, so a
 # loop that quietly ran fewer paces against a count that is a lie.
 assert_steps_ran() { # assert_steps_ran WANT GOT

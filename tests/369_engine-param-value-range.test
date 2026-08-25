@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# A "param" option's value was bounded at 16 characters rather than by
-# magnitude: --depth=0000000000000000001 was refused, while the sixteen digits
-# of --sockets=1234567890123456 reached sscanf("%d") as 1015724736 (#1437).
+# A "param" or "level" option's value was bounded at 16 characters rather than
+# by magnitude: --depth=0000000000000000001 was refused, while the sixteen
+# digits of --sockets=1234567890123456 reached sscanf("%d") as 1015724736, and
+# --generate-errors=3000000000 as -1294967296 (#1437).
 
 set -euo pipefail
 
@@ -13,64 +14,80 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_paramrange.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${tmp}"
 
-# The short form the alias expands to, which is what the engine's own option
-# parser then reads.
-takes() { # takes WORD EXPANSION
+# assert_selftest prints the short form the alias expands to, which is what the
+# engine's own option parser then reads.
+refuses() { # refuses WORD...
     local out rc=0
-    out=$(httrack "-#test=optalias" "$1" 2>&1) || rc=$?
-    assert_eq 0 "${rc}" "$1 exited"
-    assert_eq "$2" "${out}" "$1 expanded"
-}
-
-refuses() { # refuses WORD
-    local out rc=0
-    out=$(httrack "-#test=optalias" "$1" 2>&1) || rc=$?
+    out=$(httrack "-#test=optalias" "$@" 2>&1) || rc=$?
     { test "${rc}" -ne 0 && test "${rc}" -ne 134; } ||
-        fail "$1 not refused (exit ${rc})"
+        fail "$* not refused (exit ${rc})"
     grep -q 'does not take the value' <<<"${out}" ||
-        fail "$1 refused without saying why: ${out}"
+        fail "$* refused without saying why: ${out}"
 }
 
 # Padding is not a value: these all sat above the old 16-character cap.
-takes --depth=0000000000000000001 -r0000000000000000001
-takes --long-names=00000000000000001 -L00000000000000001
-takes --max-files=0000000100,0000005000 -m0000000100,0000005000
-takes --connection-per-second=00.5000000000000000 -%c00.5000000000000000
+assert_selftest -r0000000000000000001 optalias --depth=0000000000000000001
+assert_selftest -L00000000000000001 optalias --long-names=00000000000000001
+assert_selftest -m0000000100,0000005000 optalias --max-files=0000000100,0000005000
+assert_selftest -%c00.5000000000000000 optalias \
+    --connection-per-second=00.5000000000000000
 
 # Ten digits below INT_MAX, and the two-operand forms unpadded.
-takes --advanced-maxlinks=2000000000 -#L2000000000
-takes --max-files=100,5000 -m100,5000
-takes --connection-per-second=0.5 -%c0.5
-takes --max-files=,5000 -m,5000
-# -M reads an LLint, so its bound is not the int one
-takes --max-size=9999999999999999 -M9999999999999999
+assert_selftest -#L2000000000 optalias --advanced-maxlinks=2000000000
+assert_selftest -m100,5000 optalias --max-files=100,5000
+assert_selftest -%c0.5 optalias --connection-per-second=0.5
+assert_selftest -m,5000 optalias --max-files=,5000
 
 # The INT_MAX boundary, from both sides and through the padding.
-takes --depth=2147483647 -r2147483647
-takes --depth=00000000002147483647 -r00000000002147483647
+assert_selftest -r2147483647 optalias --depth=2147483647
+assert_selftest -r00000000002147483647 optalias --depth=00000000002147483647
 refuses --depth=2147483648
 refuses --depth=00000000002147483648
+
+# Each row is bounded by its own destination, not by one shared number: -m, -M
+# and -G read an LLint and -%c a float, where -r reads an int.
+assert_selftest -m3000000000 optalias --max-files=3000000000
+assert_selftest -G3000000000 optalias --max-pause=3000000000
+assert_selftest -M9999999999999999 optalias --max-size=9999999999999999
+assert_selftest -%c3000000000.5 optalias --connection-per-second=3000000000.5
+refuses --depth=3000000000
 
 # Out of range on an int row: each was read as some other number entirely.
 refuses --sockets=1234567890123456
 refuses --max-rate=3000000000
 refuses --timeout=99999999999
+# ...and the same on a "level" row, whose 16-character cap was the same one
+refuses --generate-errors=3000000000
+assert_selftest -o2147483647 optalias --generate-errors=2147483647
+
 # past strtoll itself, on the first operand and on the second
 refuses --max-size=99999999999999999999
 refuses --max-files=100,99999999999999999999
 refuses --connection-per-second=0.99999999999999999999
 
-# Controls: the structural rule the magnitude bound replaced still holds.
+# Controls: the structural rule the magnitude bound replaced still holds. A
+# sign is not a digit run, or -5 would spill into the cluster loop (#1426).
 refuses --sockets=8I0
 refuses --max-files=100,
 refuses --depth=none
+refuses --depth=-5
+refuses --depth=+5
+refuses --generate-errors=-5
+
+# The value still has to fit the buffer the expansion is glued into, which
+# aborts rather than clips. Only the detached form gets that far: the glued
+# --depth=<1022 zeros> is one argument past HTS_CDLMAXSIZE.
+zeros=$(printf '0%.0s' $(seq 1021))
+assert_selftest "-r${zeros}" optalias --depth "${zeros}"
+refuses --depth "${zeros}0"
+# ...and the same buffer under a "param0" row, which glues +<value>
+refuses --allow "$(printf 'a%.0s' $(seq 1023))"
 
 # On disk: a padded value reaches the engine as the number it spells. Long
 # names keep page.html, DOS 8.3 truncates it to PAGE.HTM.
 echo '<html><body>hello</body></html>' >"${tmp}/page.html"
 out=${tmp}/out
-saved() { find "${out}" -type f | sed 's|.*/||'; }
-has_name() { grep -Fqx "$1" <<<"$(saved)"; }
+has_name() { mirror_has_name "${out}" "$1"; }
 crawl() {
     rm -rf "${out}"
     mkdir -p "${out}"
