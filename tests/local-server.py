@@ -3098,6 +3098,92 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             self.send_raw(self.FAKE_PNG, "image/png")
 
+    # --- a page whose local name comes from its cached type (#1421) ---------
+    # page.php answers text/html, so it mirrors as page.html. It then fails to
+    # answer on two consecutive updates, answers again on the fourth crawl, and
+    # fails again for the two the cache-prioritary arm needs.
+
+    def namedrift_crawl(self):
+        """Which crawl this is: the index never fails, so its fetch count is
+        the crawl number even when a retry re-fetches the page."""
+        return Handler.REFETCH_SEEN.get("/namedrift/index.html", 1)
+
+    def route_namedrift_index(self):
+        links = '\t<a href="page.php">page</a>\n'
+        if self.refetch_pass() <= 3:  # stale.html leaves the site for crawl 4
+            links += '\t<a href="stale.html">stale</a>\n'
+        self.send_html(links)
+
+    def route_namedrift_page(self):
+        if self.namedrift_crawl() in (2, 3, 5, 6):
+            self.send_cut_headers()
+        else:
+            self.send_html('\t<a href="kid.html">kid</a>\n')
+
+    def route_namedrift_kid(self):
+        self.send_raw(b"<html><body><p>NAMEDRIFT-KID</p></body></html>", "text/html")
+
+    def route_namedrift_stale(self):
+        self.send_raw(b"<html><body><p>NAMEDRIFT-STALE</p></body></html>", "text/html")
+
+    # --- two URLs whose save names collide, in flipping order (#1421) -------
+    # dupe.php answers text/html, so it wants dupe.html, which dupe.html also
+    # wants. Whichever the index lists first takes it, and the index reorders
+    # them from crawl 2 on.
+
+    def collide_crawl(self):
+        return Handler.REFETCH_SEEN.get("/collide/index.html", 1)
+
+    def route_collide_index(self):
+        n = self.refetch_pass()
+        order = ["dupe.php", "dupe.html"] if n == 1 else ["dupe.html", "dupe.php"]
+        self.send_html("".join('\t<a href="%s">d</a>\n' % u for u in order))
+
+    def route_collide_php(self):
+        if self.collide_crawl() == 1:
+            self.send_html("\t<p>COLLIDE-PHP</p>\n")
+        else:
+            self.send_cut_headers()
+
+    def route_collide_html(self):
+        self.send_raw(b"<html><body><p>COLLIDE-HTML</p></body></html>", "text/html")
+
+    # --- a failed hub with no cache left at all (#1414's fallback) ----------
+    # #1414 types the kept copy by guessing from the file when no entry
+    # survives. A record carried forward supplies one wherever a cache exists,
+    # so only a mirror whose cache is gone still reaches that arm.
+
+    def route_nocachefail_index(self):
+        self.send_html('\t<a href="nhub.html">hub</a>\n')
+
+    def route_nocachefail_hub(self):
+        if self.refetch_pass() == 1:
+            self.send_html('\t<a href="nkid.html">kid</a>\n')
+        else:
+            self.send_cut_headers()
+
+    def route_nocachefail_kid(self):
+        self.send_raw(b"<html><body><p>NOCACHE-KID</p></body></html>", "text/html")
+
+    # Same, on a blob whose name says hypertext and whose bytes do not: the arm
+    # that types the kept copy by name is the one #1430's binary check guards.
+    NOCACHE_BLOB = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+
+    def route_nocacheblob_index(self):
+        links = '\t<a href="blob.html">blob</a>\n'
+        if self.refetch_pass() == 1:  # bgone.html leaves the site afterwards
+            links += '\t<a href="bgone.html">gone</a>\n'
+        self.send_html(links)
+
+    def route_nocacheblob_blob(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.NOCACHE_BLOB, None)  # no Content-Type at all
+        else:
+            self.send_cut_headers()
+
+    def route_nocacheblob_gone(self):
+        self.send_raw(b"<html><body><p>NOCACHE-GONE</p></body></html>", "text/html")
+
     # --- an undeclared Content-Type on a failing hub (#1415) ---------------
     # Same shape as /hubfail/, on a link whose type the server never declared.
     # page/ is the control that still holds the purge back.
@@ -3523,6 +3609,19 @@ class Handler(SimpleHTTPRequestHandler):
         "/maxrecv/r13.bin": route_maxrecv_404,
         "/maxrecv/r14.bin": route_maxrecv_404,
         "/maxrecv/r15.bin": route_maxrecv_404,
+        "/namedrift/index.html": route_namedrift_index,
+        "/namedrift/page.php": route_namedrift_page,
+        "/namedrift/kid.html": route_namedrift_kid,
+        "/namedrift/stale.html": route_namedrift_stale,
+        "/collide/index.html": route_collide_index,
+        "/collide/dupe.php": route_collide_php,
+        "/collide/dupe.html": route_collide_html,
+        "/nocachefail/index.html": route_nocachefail_index,
+        "/nocachefail/nhub.html": route_nocachefail_hub,
+        "/nocachefail/nkid.html": route_nocachefail_kid,
+        "/nocacheblob/index.html": route_nocacheblob_index,
+        "/nocacheblob/blob.html": route_nocacheblob_blob,
+        "/nocacheblob/bgone.html": route_nocacheblob_gone,
     }
 
     # --- /big/ seeded pseudo-site ------------------------------------------

@@ -235,10 +235,53 @@ int cache_zip_store_stream(zipFile zf, FILE *fp) {
   return ferror(fp) ? CACHE_ZIP_READ_ERROR : Z_OK;
 }
 
-/* Ajout d'un fichier en cache */
-void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
-               const char *url_adr, const char *url_fil, const char *url_save,
-               int all_in_cache, const char *path_prefix) {
+static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
+                         const char *url_adr, const char *url_fil,
+                         const char *url_save, int all_in_cache,
+                         const char *path_prefix, hts_boolean kept);
+static htsblk cache_readex_(httrackp *opt, cache_back *cache, const char *adr,
+                            const char *fil, const char *save, char *location,
+                            char *return_save, int readonly,
+                            hts_boolean include_kept);
+
+void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
+                         const char *url_fil, const char *url_save) {
+  char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
+  htsblk r;
+
+  if (!opt->cache || !cache_writable(cache) || url_save == NULL ||
+      !strnotempty(url_save) || IS_DELAYED_EXT(url_save))
+    return;
+  if (cache->kept != NULL) {
+    const char *const key =
+        concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), url_adr, url_fil);
+
+    if (coucal_read(cache->kept, key, NULL) != 0)
+      return; /* another attempt at the same link already stored it */
+    coucal_add(cache->kept, key, 1);
+  }
+  /* Headers only: a kept entry carries no body, so nothing is read from the
+     previous cache or from disk, whatever the file's size. */
+  previous_save[0] = '\0';
+  r = cache_readex_(opt, cache, url_adr, url_fil, NULL, NULL, previous_save, 1,
+                    HTS_TRUE);
+  /* The entry must name this very file: fexist() upstream proves only that
+     something occupies the name, which a collision flip fills with another
+     URL's file. */
+  if (r.statuscode > 0 && strcmp(previous_save, url_save) == 0) {
+    hts_log_print(opt, LOG_DEBUG, "keeping the previous cache entry for %s%s",
+                  url_adr, url_fil);
+    cache_add_ex(opt, cache, &r, url_adr, url_fil, url_save, opt->all_in_cache,
+                 StringBuff(opt->path_html_utf8), HTS_TRUE);
+  }
+}
+
+/* Store an entry. A kept one records a name, not a body: headers only, and
+   marked so nothing but the naming path reads it back (#1421). */
+static void cache_add_ex(httrackp *opt, cache_back *cache, const htsblk *r,
+                         const char *url_adr, const char *url_fil,
+                         const char *url_save, int all_in_cache,
+                         const char *path_prefix, hts_boolean kept) {
   char BIGSTK filename[CACHE_ENTRYNAME_SIZE];
   char catbuff[CATBUFF_SIZE];
   int dataincache = 0;          // put data in cache ?
@@ -277,6 +320,9 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
       dataincache = 1;
     }
   }
+
+  if (kept)
+    dataincache = 0;
 
   if (r->size < 0)              // error
     return;
@@ -329,6 +375,7 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                       dataincache);
   ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-StatusCode",
                 r->statuscode);
+  ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-Kept", kept ? 1 : 0);
   ZIP_FIELD_STRING(headers, headersSize, headersDropped, "X-StatusMessage",
                    r->msg);
   ZIP_FIELD_INT(headers, headersSize, headersDropped, "X-Size",
@@ -462,6 +509,13 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
   cache->zipWriteFailures = 0; /* entry stored: reset the failure streak */
 }
 
+void cache_add(httrackp *opt, cache_back *cache, const htsblk *r,
+               const char *url_adr, const char *url_fil, const char *url_save,
+               int all_in_cache, const char *path_prefix) {
+  cache_add_ex(opt, cache, r, url_adr, url_fil, url_save, all_in_cache,
+               path_prefix, HTS_FALSE);
+}
+
 htsblk cache_read(httrackp * opt, cache_back * cache, const char *adr,
                   const char *fil, const char *save, char *location) {
   return cache_readex(opt, cache, adr, fil, save, location, NULL, 0);
@@ -475,8 +529,8 @@ htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
                                    char *return_save, char *return_location) {
-  htsblk r =
-      cache_readex(opt, cache, adr, fil, NULL, return_location, return_save, 0);
+  htsblk r = cache_readex_(opt, cache, adr, fil, NULL, return_location,
+                           return_save, 0, HTS_TRUE);
 
   if (r.statuscode == -1) {
     lien_back *itemback = NULL;
@@ -504,19 +558,21 @@ htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
   return r;
 }
 
-static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
+static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                                const char *adr, const char *fil,
                                const char *save, char *location,
-                               char *return_save, int readonly);
+                               char *return_save, int readonly,
+                               hts_boolean include_kept);
 
 // lecture d'un fichier dans le cache
 // si save==null alors test unqiquement
-htsblk cache_readex(httrackp * opt, cache_back * cache, const char *adr,
-                    const char *fil, const char *save, char *location,
-                    char *return_save, int readonly) {
+static htsblk cache_readex_(httrackp *opt, cache_back *cache, const char *adr,
+                            const char *fil, const char *save, char *location,
+                            char *return_save, int readonly,
+                            hts_boolean include_kept) {
   if (cache->zipInput != NULL) {
     return cache_readex_new(opt, cache, adr, fil, save, location, return_save,
-                            readonly);
+                            readonly, include_kept);
   } else { /* no cache loaded */
     htsblk r;
 
@@ -532,10 +588,18 @@ htsblk cache_readex(httrackp * opt, cache_back * cache, const char *adr,
 
 // lecture d'un fichier dans le cache
 // si save==null alors test unqiquement
-static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
+htsblk cache_readex(httrackp *opt, cache_back *cache, const char *adr,
+                    const char *fil, const char *save, char *location,
+                    char *return_save, int readonly) {
+  return cache_readex_(opt, cache, adr, fil, save, location, return_save,
+                       readonly, HTS_FALSE);
+}
+
+static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
                                const char *adr, const char *fil,
                                const char *target_save, char *location,
-                               char *return_save, int readonly) {
+                               char *return_save, int readonly,
+                               hts_boolean include_kept) {
   char BIGSTK location_default[HTS_LOCATION_SIZE];
   char BIGSTK buff[CACHE_KEY_SIZE];
   char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
@@ -543,6 +607,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
   char catbuff[CATBUFF_SIZE];
   intptr_t hash_pos;
   int hash_pos_return;
+  int kept = 0;
   htsblk r;
 
   hts_init_htsblk(&r);
@@ -627,6 +692,7 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
                 value++;
               ZIP_READFIELD_INT(line, value, "X-In-Cache", dataincache);
               ZIP_READFIELD_INT(line, value, "X-Statuscode", r.statuscode);
+              ZIP_READFIELD_INT(line, value, "X-Kept", kept);
               ZIP_READFIELD_STRING(line, value, "X-StatusMessage", r.msg,
                                    sizeof(r.msg));
               ZIP_READFIELD_LLINT(line, value, "X-Size", r.size);       // size
@@ -674,6 +740,13 @@ static htsblk cache_readex_new(httrackp * opt, cache_back * cache,
           }
           if (return_save != NULL) {
             strlcpybuff(return_save, previous_save, HTS_URLMAXSIZE * 2);
+          }
+
+          /* Kept for its name alone: serving it, or building a conditional
+             request from it, would stand in for a fetch that never happened. */
+          if (kept && !include_kept) {
+            r.statuscode = STATUSCODE_INVALID;
+            strcpybuff(r.msg, "Cache Entry Kept For Naming Only");
           }
 
           /* A negative X-Size is corrupt; so is one >= INT_MAX when the data

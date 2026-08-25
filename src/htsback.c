@@ -1308,6 +1308,10 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
     filenote(&opt->state.strc, back[p].url_sav, NULL);
     file_notify(opt, back[p].url_adr, back[p].url_fil, back[p].url_sav, 0, 0,
                 back[p].r.notmodified);
+    /* This run stored no entry, and the entry is what names the copy on the
+       next run: keep the previous one (#1421). */
+    cache_keep_previous(opt, cache, back[p].url_adr, back[p].url_fil,
+                        back[p].url_sav);
   }
   return -1;
 }

@@ -65,6 +65,14 @@ void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                int all_in_cache, const char *path_prefix);
 htsblk cache_read(httrackp * opt, cache_back * cache, const char *adr,
                   const char *fil, const char *save, char *location);
+/* Re-store the previous run's entry for a link this run failed to fetch, so the
+   next one recomputes the same save name: nothing else maps the URL to it
+   (#1421). `url_save` is the copy that survived, which the caller has just
+   checked is on disk. The entry goes back marked kept, readable only through
+   cache_read_including_broken(): it names a file, it does not stand in for a
+   fetch. */
+void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
+                         const char *url_fil, const char *url_save);
 htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
                      const char *fil, const char *save, char *location);
 /* Like cache_read, but also yields entries whose transfer broke; return_save
@@ -72,7 +80,8 @@ htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
    return_location (optional, HTS_LOCATION_SIZE) its Location, which outlives
    the status an entry naming no local file is invalidated to. Header fields
    only: adr and headers come back NULL, so the caller owns and frees nothing,
-   and the location is the one to read, not r.location. */
+   and the location is the one to read, not r.location. This is also the one
+   reader that sees a kept entry (#1421). */
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
                                    char *return_save, char *return_location);
