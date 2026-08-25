@@ -531,10 +531,11 @@ bottom are the ones that keep you welcome.</p>
 <p>How the copy is laid out on disk.</p>
 
 <div class="opt">
-	<div class="opt-head"><span class="opt-name">Local structure type</span><span class="cli">-NN, --structure N</span></div>
+	<div class="opt-head"><span class="opt-name">Local structure type</span><span class="cli">-NN, --structure N, --user-structure</span></div>
 	<p>The default reproduces the site's own folders and names. The alternatives sort files by kind
 	instead: all the pages here, all the images there. A custom pattern such as
-	<code>-N "%h%p/%n%q.%t"</code> builds names from the host, path, name, query and type.</p>
+	<code>--structure "%h%p/%n%q.%t"</code> builds names from the host, path, name, query and type.
+	<code>--user-structure</code> takes the same pattern and never a preset number.</p>
 </div>
 
 <div class="opt">
