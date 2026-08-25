@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# The panel swapped every text/html reply for its own progress page, leaving the
-# documentation unreachable from the moment a crawl started (#1444). And a help
-# link is only worth having if the guide defines the section it names.
+# The panel swapped every text/html reply for its own progress page, so the docs
+# went unreachable once a crawl started (#1444). Each link must name a real section.
 
 set -euo pipefail
 
@@ -23,9 +22,33 @@ anchors=$(grep -oh 'guide\.html#web/[a-z0-9-]*' "${distdir}"/html/server/*.html 
 found=$(count_matching_lines . <<<"${anchors}")
 test "${found}" -ge 15 || fail "only ${found} guide anchors under html/server/"
 for a in ${anchors}; do
-    grep -qF "id=\"${a}\"" "${guide}" ||
+    tag=$(grep -m1 -o "<[^>]*id=\"${a}\"[^>]*>" "${guide}" || true)
+    test -n "${tag}" ||
         fail "a pane links guide.html#web/${a}, which the guide has no id for"
+    # guide.css hides a section scoped to another platform, so the link would
+    # open the guide and scroll nowhere.
+    case ${tag} in
+    *data-for=*)
+        grep -q 'data-for="[^"]*web' <<<"${tag}" ||
+            fail "guide section ${a} is not shown for web: ${tag}"
+        ;;
+    esac
 done
+
+# The pane and its section, pinned: an id that merely exists is not the right
+# one. finished.html named step-ready, "Last checks", for years (#1444).
+while read -r page anchor; do
+    grep -qF "guide.html#web/${anchor}\"" "${distdir}/html/server/${page}" ||
+        fail "${page} must link guide.html#web/${anchor}"
+done <<'PAIRS'
+index.html step-start
+step2.html step-project
+step3.html step-address
+addurl.html step-address
+step4.html step-ready
+refresh.html step-run
+finished.html step-done
+PAIRS
 # Control: the loop proves nothing unless a wrong anchor really misses.
 ! grep -qF 'id="no-such-section"' "${guide}" ||
     fail "the control anchor exists, so the loop above cannot discriminate"
@@ -54,6 +77,11 @@ test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
 
 PANE=/server/step2.html
 IDLE='Existing project name:'
+# Every pane, not one: a per-pane scoping bug leaves the others stale. The last
+# two spellings open the same files, since the path reaches open() unnormalized.
+PANES="/server/index.html ${PANE} /server/step3.html /server/step4.html \
+    /server/addurl.html /server/option1.html //server/step4.html \
+    /./server/step4.html"
 RUNNING='In progress:'
 DONE='Site mirroring finished!'
 
@@ -71,6 +99,17 @@ docs_reachable() { # docs_reachable WHAT
     serves /server/about.html 'About WebHTTrack Website Copier' "$1"
 }
 
+panes_follow() { # panes_follow MARKER WHAT
+    local p
+    for p in ${PANES}; do serves "${p}" "$1" "$2"; done
+}
+
+refutes() { # refutes PATH MARKER WHAT
+    local body
+    body=$(htsserver_get "$1")
+    ! grep -qF "$2" <<<"${body}" || fail "$3: $1 already serves \"$2\""
+}
+
 await() { # await MARKER WHAT
     local start=$SECONDS body
     while :; do
@@ -83,23 +122,28 @@ await() { # await MARKER WHAT
 }
 
 serves "${PANE}" "${IDLE}" 'idle'
+# Control: the markers asserted below are absent until a crawl sets them.
+for p in ${PANES}; do refutes "${p}" "${RUNNING}" 'idle'; done
 docs_reachable 'idle'
 
-# /trickle/ dribbles for a minute, so the crawl is still running when probed.
+# p0.bin dribbles for a minute on one socket, so the crawl outlives the probes.
 htsserver_client --path /server/step4.html --field "sid=${sid}" --field "path=${work}" \
     --field projname=crawl --field winprofile=x --field command_do=start \
-    --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/ -O ${work}/crawl" \
+    --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/p0.bin -O ${work}/crawl" \
     >/dev/null
 await "${RUNNING}" 'a running crawl'
 
-# The pane still follows the run: without this a dropped override passes above.
-serves "${PANE}" "${RUNNING}" 'running crawl'
+# The panes still follow the run: without this a dropped override passes above.
+panes_follow "${RUNNING}" 'running crawl'
 docs_reachable 'running crawl'
+# The crawl ending mid-probe would make the checks above read the finished pane
+# and pass for the wrong reason, so pin the state they ran in.
+serves "${PANE}" "${RUNNING}" 'still running after the probes'
 
 htsserver_client --path /server/step4.html --field "sid=${sid}" --field command=abort >/dev/null
 await "${DONE}" 'a finished crawl'
 
-serves "${PANE}" "${DONE}" 'finished crawl'
+panes_follow "${DONE}" 'finished crawl'
 docs_reachable 'finished crawl'
 
 htsserver_cleanup

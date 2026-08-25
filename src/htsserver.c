@@ -169,6 +169,17 @@ static int is_html(const char *file) {
   return type != NULL && strcmp(type, "text/html") == 0;
 }
 
+/* A wizard pane follows the run's state; the About box does not. The request
+   path reaches open() unnormalized, so "//server/x.html" must match too
+   (#1444). */
+static hts_boolean is_wizard_pane(const char *file) {
+  while (*file == '/' || (file[0] == '.' && file[1] == '/'))
+    file += (*file == '/') ? 1 : 2;
+  if (strncmp(file, "server/", 7) != 0)
+    return HTS_FALSE;
+  return strcmp(file + 7, "about.html") != 0;
+}
+
 static void sig_brpipe(int code) {
   /* ignore */
 }
@@ -1613,10 +1624,9 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
 
           virtualpath = strncmp(file, "/website/", 9) == 0;
 
-          /* Only the wizard panes carry the run's state; the documentation, the
-             About box and the mirror stay reachable throughout it (#1444). */
-          if (is_html(file) && strncmp(file, "/server/", 8) == 0 &&
-              strcmp(file, "/server/about.html") != 0) {
+          /* The documentation, the About box and the mirror stay reachable
+             throughout a run; only the wizard panes follow it (#1444). */
+          if (is_html(file) && is_wizard_pane(file)) {
             if (commandRunning) {
               file = "/server/refresh.html";
             } else if (commandEnd && !willexit) {

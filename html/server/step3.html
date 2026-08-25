@@ -87,7 +87,6 @@ ${do:end-if}
 <tr><td width="90%">
 	<h2 align="center"><em>${LANG_G44}</em></h2>
 </td>
-${/* the documentation is a separate package and may be absent */}
 ${do:if-file-exists:html/guide.html}
 <td>
 	<a href="/guide.html#web/step-address" target="_blank"
@@ -187,7 +186,7 @@ ${do:output-mode:}
 
 <table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
 	<tr>
-	<td id="footer"><small><small>&copy; 1998-${date:year} Xavier Roche &amp; other contributors - Web Design: Leto Kauler. - <a href="/server/about.html"
+	<td id="footer"><small><small>&copy; 1998-${date:year} Xavier Roche &amp; other contributors - Web Design: Leto Kauler. - <a href="/server/about.html" target="_blank"
 			onClick="window.open('/server/about.html', 'httrack-about', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false">${LANG_G21}</a></small></small></td>
 	</tr>
 </table>
