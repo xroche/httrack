@@ -1,0 +1,23 @@
+# Dependabot only ever bumps pins here (actions, vcpkg baseline, coucal), and CI
+# validates each one, so arming auto-merge just saves the manual click.
+name: Dependabot auto-merge
+
+# pull_request_target, because a dependabot pull_request gets a read-only token.
+# Nothing from the PR is checked out or run, so the writable token stays safe.
+on: pull_request_target
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    name: Arm auto-merge
+    if: github.repository == 'xroche/httrack' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Enable auto-merge
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
