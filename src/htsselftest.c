@@ -4812,11 +4812,6 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
 #define REFUSES(word, next)                                                    \
   assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used, warn,    \
                              sizeof(warn)) == NULL)
-/* accepted, whatever it expands to: -N's template gluing is #1418's to settle
- */
-#define ACCEPTS(word, next)                                                    \
-  assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used, warn,    \
-                             sizeof(warn)) != NULL)
 
   /* -I0 has always disabled the index; now the long form can say it too */
   EXPANDS("-I0", "--index=0", NULL);
@@ -4901,13 +4896,12 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-P proxy:8080", "--proxy", "proxy:8080");
   EXPANDS("+*.gif", "--allow", "*.gif");
 
-  /* #1426, both directions and table-wide: -N is out, reading a template too */
+  /* #1426, both directions and table-wide over the "param" rows */
   for (i = 0; optalias_value(i)[0] != '\0'; i++) {
     const int p = optalias_find(optalias_value(i));
     char word[HTS_CDLMAXSIZE], want[HTS_CDLMAXSIZE];
 
-    if (strcmp(opttype_value(p), "param") != 0 ||
-        strcmp(optreal_value(p), "-N") == 0)
+    if (strcmp(opttype_value(p), "param") != 0)
       continue;
     params++;
     snprintf(word, sizeof(word), "--%s=yes", optalias_value(i));
@@ -4950,12 +4944,53 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   /* an empty value is the bare short form, as it has always been */
   EXPANDS("-c", "--sockets=", NULL);
 
-  /* the exemption: --structure is the param row that also reads a template,
-     which the rule above must not refuse (glued or detached) */
-  ACCEPTS("--structure=%h%p/%n%q.%t", NULL);
-  ACCEPTS("--structure=%n.%t", NULL);
-  ACCEPTS("--structure", "%h%p/%n%q.%t");
+  /* --structure glues a preset and detaches a template (#1380): the engine
+     reads a detached -N value as a user template whatever it holds */
   EXPANDS("-N1", "--structure=1", NULL);
+  EXPANDS("-N100", "--structure=100", NULL);
+  EXPANDS("-N1", "--structure", "1");
+  assertf(used == 2);
+  EXPANDS("-N %h%p/%n%q.%t", "--structure=%h%p/%n%q.%t", NULL);
+  assertf(used == 1);
+  EXPANDS("-N %h%p/%n%q.%t", "--structure", "%h%p/%n%q.%t");
+  assertf(used == 2);
+  EXPANDS("-N %h%p/%n%q.%t", "--user-structure", "%h%p/%n%q.%t");
+  /* an empty value is -N "", which the engine reads as "back to the default" */
+  EXPANDS("-N ", "--structure=", NULL);
+  /* what "param" glued keeps gluing: a preset trailed by more short options,
+     and the on/off values every param row takes */
+  EXPANDS("-N1L0", "--structure=1L0", NULL);
+  EXPANDS("-N1L0", "--structure", "1L0");
+  EXPANDS("-N1%c8", "--structure=1%c8", NULL);
+  EXPANDS("-N0", "--structure=off", NULL);
+  EXPANDS("-N", "--structure=on", NULL);
+  /* a template may open with a digit, so the leading digits do not decide it */
+  EXPANDS("-N 2col/%n.%t", "--structure=2col/%n.%t", NULL);
+  EXPANDS("-N 2col/%n.%t", "--structure", "2col/%n.%t");
+  /* past 9 digits sscanf("%d") wraps onto -1, and with no % to make it a
+     template either the value has nowhere left to go */
+  EXPANDS("-N999999999", "--structure=999999999", NULL);
+  REFUSES("--structure=4294967295", NULL);
+  /* a %-free value would map every URL onto one name, so it is a typo */
+  REFUSES("--structure=OFF", NULL);
+  REFUSES("--structure=flat", NULL);
+  REFUSES("--structure", "none");
+  REFUSES("--structure=-1", NULL);
+  /* --user-structure is how to ask for such a value on purpose */
+  EXPANDS("-N flat", "--user-structure", "flat");
+  /* the short form agrees, rather than reading -N 1 as a template named 1 */
+  EXPANDS("-N1", "-N", "1");
+  assertf(used == 2);
+  EXPANDS("-N", "-N", "%h%p/%n%q.%t");
+  assertf(used == 1);
+  /* and there a bare digit run is the only thing it takes: 1L0 and an overlong
+     run stay templates, as they were before the class existed */
+  EXPANDS("-N", "-N", "2col/%n.%t");
+  assertf(used == 1);
+  EXPANDS("-N", "-N", "4294967295");
+  assertf(used == 1);
+  EXPANDS("-N", "-N", "1L0");
+  assertf(used == 1);
 
   /* invariant: every name's bare long form still emits its short form, and a
      param name still demands its own value. A duplicate name (test, continue)
@@ -4977,7 +5012,6 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
 #undef EXPANDS
 #undef WARNS
 #undef REFUSES
-#undef ACCEPTS
 
   printf("optalias self-test OK\n");
   return 0;

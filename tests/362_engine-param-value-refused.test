@@ -115,9 +115,13 @@ has_cache || fail_dump "--cache=on wrote no cache" "${tmp}/log"
 accepted --cache=0
 ! has_cache || fail_dump "--cache=0 still wrote a cache" "${tmp}/log"
 
-# --structure is exempt, being the param row that also reads a user template.
-# The glued long form does not apply that template yet (#1418); what the
-# exemption owes here is that the rule above does not refuse it.
+# The rule above is scoped to the "param" class, and --structure is "paramn"
+# since #1418. -N1L0 is the boundary: a preset trailed by more short options,
+# which the param rule would refuse, and whose -L0 tail is visible on disk.
+crawl --structure=1L0
+assert_eq 0 "${RC}" "--structure=1L0 exited"
+has_name PAGE.HTM ||
+    fail_dump "--structure=1L0 lost its clustered -L0" "${tmp}/log"
 accepted --structure=1
 crawl --structure=%h%p/%n%q.%t
 ! grep -q 'does not take the value' "${tmp}/log" ||

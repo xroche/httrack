@@ -39,6 +39,10 @@ Please visit our Website: http://www.httrack.com
 
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
+/* Longest digit run -N reads as a preset number; a longer one is out of range
+   on every int width and falls back to the default layout. */
+#define HTS_SAVENAME_PRESET_MAX_DIGITS 9
+
 extern const char *hts_optalias[][4];
 int optalias_check(int argc, const char *const *argv, int n_arg,
                    int *return_argc, char **return_argv,
