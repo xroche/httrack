@@ -1307,8 +1307,20 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             }
             break;
           case 'L': {
-            sscanf(com + 1, "%d", (int *) &opt->savename_83);
-            switch (opt->savename_83) {
+            /* L1 is the starred default, and what a bare -L selects: sscanf
+               converted nothing from one and re-mapped the value already
+               stored, so -L meant 8.3 and -L1 -L meant it too (#1434). */
+            const char *const digits = com + 1;
+            int ndigits, level = 1;
+
+            for (ndigits = 0; isdigit((unsigned char) *(com + 1)); ndigits++)
+              com++;
+            /* bounded like -N's preset run: longer is out of range on every
+               int width, which is the ISO9660 arm anyway */
+            if (ndigits > 0)
+              level =
+                  ndigits <= HTS_SAVENAME_PRESET_MAX_DIGITS ? atoi(digits) : 2;
+            switch (level) {
             case 0: // 8-3 (ISO9660 L1)
               opt->savename_83 = HTS_SAVENAME_83_DOS;
               break;
@@ -1319,8 +1331,6 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               opt->savename_83 = HTS_SAVENAME_83_ISO9660;
               break;
             }
-            while (isdigit((unsigned char) *(com + 1)))
-              com++;
           } break;
           case 's':
             if (isdigit((unsigned char) *(com + 1))) {

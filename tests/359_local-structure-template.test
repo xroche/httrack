@@ -80,11 +80,11 @@ layout WEB/PAGE.HTM --structure 1L0
 layout web/page.html --structure=1c8
 layout web/page.html --structure=1%c8
 
-# param maps off to 0 and swallows on, and every other param row still does.
+# param maps off to 0, and on to the bare short form, which for -N would read
+# the next word as a template: both name the default preset here (#1434).
 layout "${default_layout}" --structure=off
-run --structure=on
-test "${RC}" -ne 0 || fail '--structure=on was accepted as a template named on'
-test "${RC}" -ne 134 || fail '--structure=on aborted'
+layout "${default_layout}" --structure=on
+layout "${default_layout}" --structure on
 
 # A template reaches the engine whatever spelling carried it. The literal "tpl/"
 # is the point: no preset can produce it, so this cannot pass on a fallback.

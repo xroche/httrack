@@ -4915,7 +4915,11 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N1L0", "--structure", "1L0");
   EXPANDS("-N1%c8", "--structure=1%c8", NULL);
   EXPANDS("-N0", "--structure=off", NULL);
-  EXPANDS("-N", "--structure=on", NULL);
+  /* both name the default preset: a bare -N would take the next word, and
+     with a URL there it mirrored nothing (#1434) */
+  EXPANDS("-N0", "--structure=on", NULL);
+  EXPANDS("-N0", "--structure", "on");
+  assertf(used == 2);
   /* a template may open with a digit, so the leading digits do not decide it */
   EXPANDS("-N 2col/%n.%t", "--structure=2col/%n.%t", NULL);
   EXPANDS("-N 2col/%n.%t", "--structure", "2col/%n.%t");

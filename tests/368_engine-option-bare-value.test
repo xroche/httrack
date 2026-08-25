@@ -1,0 +1,104 @@
+#!/bin/bash
+#
+# A long option value that maps to the bare short form used to mirror the wrong
+# thing at exit 0: --structure=on became a bare -N, which reads the next word as
+# a template and ate the URL, and --long-names= became a bare -L, which selected
+# DOS 8.3 names (#1434).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_barevalue.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+assert_selftest "optalias self-test OK" optalias
+
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+url="file://${tmp}/page.html"
+out=${tmp}/out
+
+crawl() { # crawl ARG...
+    rm -rf "${out}"
+    mkdir -p "${out}"
+    RC=0
+    httrack -O "${out}" --quiet -n "$@" >"${tmp}/log" 2>&1 || RC=$?
+}
+
+# Basenames of the mirror, so the checks read what was written rather than a
+# path this host may spell differently (macOS $TMPDIR, Windows ':' -> '_').
+saved() { find "${out}" -type f ! -path '*hts-cache*' | sed 's|.*/||' | sort; }
+has_name() { grep -Fqx "$1" <<<"$(saved)"; }
+
+# The discriminator, proven on the two spellings that ask for each layout:
+# long names keep page.html, DOS 8.3 truncates it to PAGE.HTM.
+crawl --long-names=1 "${url}"
+assert_eq 0 "${RC}" "--long-names=1 exited"
+has_name page.html || fail_dump "--long-names=1 wrote no long name" "${tmp}/log"
+crawl --long-names=0 "${url}"
+assert_eq 0 "${RC}" "--long-names=0 exited"
+has_name PAGE.HTM || fail_dump "--long-names=0 wrote no 8.3 name" "${tmp}/log"
+
+longnames() { # longnames ARG...
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    has_name page.html || fail_dump "$* wrote 8.3 names" "${tmp}/log"
+}
+
+dosnames() { # dosnames ARG...
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    has_name PAGE.HTM || fail_dump "$* lost its 8.3 names" "${tmp}/log"
+}
+
+# -L is "long names", whose starred default is L1, so every spelling that leaves
+# it bare selects them. The empty value is the config file's "long-names=" too.
+longnames --long-names= "${url}"
+longnames --long-names=on "${url}"
+longnames --long-names "" "${url}"
+longnames -L "${url}"
+# a bare -L no longer re-reads the layout the previous one mapped
+longnames -L1 -L "${url}"
+# ...and the spellings that ask for 8.3 still get it
+dosnames --long-names=off "${url}"
+dosnames -L0 "${url}"
+dosnames -L1 -L0 "${url}"
+
+mirrored() { # mirrored ARG...
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    has_name page.html || fail_dump "$* mirrored nothing" "${tmp}/log"
+}
+
+# The URL used to be read as -N's template, leaving nothing but the top index.
+mirrored --structure=on "${url}"
+mirrored --structure on "${url}"
+
+# on and off both name the default preset, so the two mirrors must match.
+crawl --structure=off "${url}"
+off=$(saved)
+crawl --structure=on "${url}"
+assert_eq "${off}" "$(saved)" "--structure=on is not the default structure"
+
+# What #1418 deliberately glues onto -N: a preset, and a preset trailed by more
+# short options, whose -L0 tail is visible on disk.
+crawl --structure=1 "${url}"
+assert_eq 0 "${RC}" "--structure=1 exited"
+test -n "$(find "${out}" -type d -name web)" ||
+    fail_dump "--structure=1 lost its preset" "${tmp}/log"
+dosnames --structure=1L0 "${url}"
+# a %-carrying template still detaches
+mirrored "--structure=%h%p/%n%q.%t" "${url}"
+
+# A value that is neither glued onto -N and re-parsed as more short options,
+# dropping the top index at exit 0; it stays refused (#1418).
+crawl --structure=I0 "${url}"
+{ test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
+    fail_dump "--structure=I0 not refused (exit ${RC})" "${tmp}/log"
+grep -q 'does not take the value' "${tmp}/log" ||
+    fail_dump "--structure=I0 refused without saying why" "${tmp}/log"
+! has_name page.html || fail_dump "--structure=I0 still mirrored" "${tmp}/log"
+
+echo "PASS"

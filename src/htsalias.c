@@ -574,7 +574,10 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
             if (strcmp(param, "off") == 0)
               strlcatbuff(return_argv[0], "0", return_argv_size);
             else if (strcmp(param, "on") == 0) {
-              // on is the default
+              /* a bare -N reads the next word as a template and would eat the
+                 URL, so "on" names the default preset instead (#1434) */
+              if (strcmp(hts_optalias[pos][2], "paramn") == 0)
+                strlcatbuff(return_argv[0], "0", return_argv_size);
             } else
               strlcatbuff(return_argv[0], param, return_argv_size);
           } else if (param[0] != '\0') {
