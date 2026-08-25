@@ -122,6 +122,17 @@ await() { # await MARKER WHAT
 }
 
 serves "${PANE}" "${IDLE}" 'idle'
+
+# Control, in English: LISTDEF_5 uses an ampersand as prose, not as a marker.
+serves /server/option3.html 'go up &amp; down' 'a prose ampersand'
+
+# The catalogs are WinHTTrack's, so a translator may mark a menu accelerator the
+# panel would render as text: Finnish (lang.indexes fi:28) spells Help "O&hje".
+htsserver_client --path /server/index.html --field "sid=${sid}" --field lang=28 >/dev/null
+serves /server/index.html '>Ohje</a>' 'the Finnish help link'
+refutes /server/index.html 'O&hje' 'the Finnish help link'
+htsserver_client --path /server/index.html --field "sid=${sid}" --field lang=1 >/dev/null
+serves "${PANE}" "${IDLE}" 'back in English'
 # Control: the markers asserted below are absent until a crawl sets them.
 for p in ${PANES}; do refutes "${p}" "${RUNNING}" 'idle'; done
 docs_reachable 'idle'

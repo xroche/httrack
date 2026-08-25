@@ -2672,6 +2672,18 @@ static void conv_printf(const char *from, char *to) {
       a++;
     }
   }
+  /* WinHTTrack's menus mark an accelerator with '&'; this panel renders it as
+     text, so Finnish read "O&hje". "&&" and "& " stay literal (#1444). */
+  {
+    char *r = to, *w = to;
+
+    while (*r != '\0') {
+      if (r[0] == '&' && (r[1] == '&' || (r[1] != '\0' && r[1] != ' ')))
+        r++;
+      *w++ = *r++;
+    }
+    *w = '\0';
+  }
 }
 
 static void LANG_DELETE(void) {
