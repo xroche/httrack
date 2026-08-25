@@ -3165,6 +3165,25 @@ class Handler(SimpleHTTPRequestHandler):
     def route_nocachefail_kid(self):
         self.send_raw(b"<html><body><p>NOCACHE-KID</p></body></html>", "text/html")
 
+    # Same, on a blob whose name says hypertext and whose bytes do not: the arm
+    # that types the kept copy by name is the one #1430's binary check guards.
+    NOCACHE_BLOB = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+
+    def route_nocacheblob_index(self):
+        links = '\t<a href="blob.html">blob</a>\n'
+        if self.refetch_pass() == 1:  # bgone.html leaves the site afterwards
+            links += '\t<a href="bgone.html">gone</a>\n'
+        self.send_html(links)
+
+    def route_nocacheblob_blob(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(self.NOCACHE_BLOB, None)  # no Content-Type at all
+        else:
+            self.send_cut_headers()
+
+    def route_nocacheblob_gone(self):
+        self.send_raw(b"<html><body><p>NOCACHE-GONE</p></body></html>", "text/html")
+
     # --- an undeclared Content-Type on a failing hub (#1415) ---------------
     # Same shape as /hubfail/, on a link whose type the server never declared.
     # page/ is the control that still holds the purge back.
@@ -3600,6 +3619,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/nocachefail/index.html": route_nocachefail_index,
         "/nocachefail/nhub.html": route_nocachefail_hub,
         "/nocachefail/nkid.html": route_nocachefail_kid,
+        "/nocacheblob/index.html": route_nocacheblob_index,
+        "/nocacheblob/blob.html": route_nocacheblob_blob,
+        "/nocacheblob/bgone.html": route_nocacheblob_gone,
     }
 
     # --- /big/ seeded pseudo-site ------------------------------------------

@@ -185,3 +185,25 @@ test ! -e "${out}/hts-cache/old.zip" ||
 assert_alive "${site}/nkid.html" NOCACHE-KID
 assert_purged false "$out"
 ok "with no cache left, the kept copy itself still holds the purge"
+
+# Same again on a copy whose name says hypertext and whose bytes do not. That
+# fallback types the file by its name, so #1430's binary check is what has to
+# answer, and only a mirror without a cache still asks it.
+out="${tmpdir}/nocacheblob"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/nocacheblob"
+
+local_crawl --log "${tmpdir}/blog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/nocacheblob/index.html"
+test -s "${site}/blob.html" || fail "pass 1 did not mirror blob.html"
+assert_alive "${site}/bgone.html" NOCACHE-GONE
+
+rm -f "${out}/hts-cache/new.zip" "${out}/hts-cache/old.zip"
+local_crawl --log "${tmpdir}/blog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/nocacheblob/index.html"
+assert_gave_up "$out" '/nocacheblob/blob\.html'
+test -s "${site}/blob.html" || fail "the failed blob lost its copy (#746)"
+test ! -e "${site}/bgone.html" ||
+    fail "bgone.html left the site and a blob named .html kept the purge back"
+assert_purged true "$out"
+ok "a kept copy typed by its name alone is still read as the blob it is"
