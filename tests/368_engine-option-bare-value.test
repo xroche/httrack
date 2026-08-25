@@ -98,9 +98,8 @@ off=$(tree_names)
 crawl --structure=on "${url}"
 assert_eq "${off}" "$(tree_names)" "--structure=on is not the default structure"
 
-# What #1418 deliberately glues onto -N: a preset, and a preset trailed by more
-# short options, whose -L0 tail is visible on disk. web/ without html/ is preset
-# 1 and not 5, which no fallback to the default layout produces either.
+# What glues onto -N: a preset. web/ without html/ is preset 1 and not 5, which
+# no fallback to the default layout produces either.
 preset1() { # preset1 ARG...
     crawl "$@"
     assert_eq 0 "${RC}" "$* exited"
@@ -110,11 +109,18 @@ preset1() { # preset1 ARG...
     fi
 }
 preset1 --structure=1 "${url}"
-preset1 --structure=1L0 "${url}"
-dosnames --structure=1L0 "${url}"
 # the same run by value, which the length bound refused outright
 preset1 --structure=0000000001 "${url}"
 preset1 -N0000000001 "${url}"
+# The long form refuses the tail; the short cluster -N1L0 still applies both.
+crawl --structure=1L0 "${url}"
+{ test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
+    fail_dump "--structure=1L0 not refused (exit ${RC})" "${tmp}/log"
+! has_name PAGE.HTM || fail_dump "--structure=1L0 still wrote 8.3" "${tmp}/log"
+crawl -N1L0 "${url}"
+assert_eq 0 "${RC}" "-N1L0 exited"
+has_name PAGE.HTM || fail_dump "-N1L0 lost its clustered -L0" "${tmp}/log"
+has_dir WEB || fail_dump "-N1L0 lost its preset" "${tmp}/log"
 
 # A %-carrying template still detaches, and reaches the engine whole: the
 # literal tpl/ is the point, since no preset produces it.

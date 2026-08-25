@@ -72,13 +72,14 @@ layout "${default_layout}" --structure=0
 # the mirror onto one file; it is preset 1 now, and the long forms agree.
 layout web/page.html -N 1
 
-# What the old "param" class glued has to keep gluing. WEB/PAGE.HTM needs both
-# halves of 1L0, so it fails whether the preset or the trailing -L0 went missing;
-# a value read as a template instead collapses the mirror onto a file named 1L0.
-layout WEB/PAGE.HTM --structure=1L0
-layout WEB/PAGE.HTM --structure 1L0
-layout web/page.html --structure=1c8
-layout web/page.html --structure=1%c8
+# A preset trailed by more short options is refused, in either spelling: 1L0
+# used to apply preset 1 and the -L0 behind it. A value taken as a template
+# instead would exit 0, which refused() catches too, and that is 1%c8's risk.
+refused 'does not take the value' --structure=1L0
+refused 'does not take the value' --structure 1L0
+refused 'does not take the value' --structure=1c8
+refused 'does not take the value' --structure=1%c8
+refused 'does not take the value' --structure=8I0
 
 # param maps off to 0, and on to the bare short form, which for -N would read
 # the next word as a template: both name the default preset here (#1434).
