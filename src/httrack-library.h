@@ -164,10 +164,11 @@ HTSEXT_API void htsthread_wait(void);
     before the end, on a write it cannot retry (a full disk, a cache write
     failure) or a link table it cannot grow past -#L. Distinct from the
     command-line and startup failures, which return -1 or 1 and never reach the
-    mirror. Unrelated to hts_is_exiting(), whose own value 2 means a session
-    that transferred nothing and was rolled back: separate channels that happen
-    to share the integer. Since 3.50. */
-#define HTS_EXIT_MIRROR_ABORTED 2
+    mirror. 3 and not 2 because hts_is_exiting() already returns 2 for a session
+    that transferred nothing and was rolled back, which exits 0: the two are
+    separate channels, and they are kept off each other's values so a reader
+    cannot take one for the other. Since 3.50. */
+#define HTS_EXIT_MIRROR_ABORTED 3
 
 /** Run a full mirror from a command-line argv (argv[0] is ignored, as in
    main()). Creates a fresh option set, runs the engine, and frees it. Returns

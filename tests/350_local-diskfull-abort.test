@@ -37,7 +37,7 @@ counter="${tmpdir}/stallhits" # a byte per stall.bin request, so we know when to
 local_server_start --log "${tmpdir}/server.log" --env DISKFULL_COUNTER="$counter"
 
 # What an aborted mirror exits with; HTS_EXIT_MIRROR_ABORTED in the engine.
-ABORTED_STATUS=2
+ABORTED_STATUS=3
 
 # Mirror $1 with $2 pointed at /dev/full, and leave its log in $log. Anything
 # past $3 is extra httrack options. Every arm below is a fatal write, so the

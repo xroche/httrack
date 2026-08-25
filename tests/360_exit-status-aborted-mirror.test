@@ -13,7 +13,7 @@ set -euo pipefail
 require_httrack
 
 # What an aborted mirror must exit with; keep in step with HTS_EXIT_MIRROR_ABORTED.
-ABORTED=2
+ABORTED=3
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_exitstatus.XXXXXX")
 cleanup() { rm -rf "$tmpdir"; }
