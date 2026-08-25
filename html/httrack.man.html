@@ -2332,8 +2332,11 @@ capture an URL or a form post URL</p>
 
 
 <p style="margin-top: 1em">The mirror ran to the end, or
-stopped because it was asked to - a signal, or the
-interactive shell.</p></td></tr>
+stopped because it was asked to: a signal, the interactive
+shell, or a transfer budget set with <i>--max-time</i> or
+<i>--max-size</i>. Meeting a budget is the outcome that was
+asked for, not a failure, so it is not an abort even though
+the log file calls it one.</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="8%">
@@ -2346,11 +2349,14 @@ interactive shell.</p></td></tr>
 
 <p>A mirror started and the engine gave up before the end:
 a full disk, a cache write failure, or a link table that hit
-the <i>-#L</i> cap. The reason is in the log file, and what
-was mirrored before the abort is kept. This is the process
-exit status; the engine&rsquo;s own <i>exit_xh</i> is a
-separate channel with its own values, and the two are kept
-apart so that neither can be read as the other.</p></td></tr>
+the <i>-#L</i> cap. Unlike a time or size budget, that cap
+cuts short work that was asked for rather than granting it,
+which is why the two kinds of user-set limit report
+differently. The reason is in the log file, and what was
+mirrored before the abort is kept. This is the process exit
+status; the engine&rsquo;s own <i>exit_xh</i> is a separate
+channel with its own values, and the two are kept apart so
+that neither can be read as the other.</p></td></tr>
 <tr valign="top" align="left">
 <td width="9%"></td>
 <td width="8%">

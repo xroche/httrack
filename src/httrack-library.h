@@ -164,7 +164,10 @@ HTSEXT_API void htsthread_wait(void);
     before the end, on a write it cannot retry (a full disk, a cache write
     failure) or a link table it cannot grow past -#L. Distinct from the
     command-line and startup failures, which return -1 or 1 and never reach the
-    mirror. 3 and not 2 because hts_is_exiting() already returns 2 for a session
+    mirror. Not every user-set limit lands here: --max-time and --max-size stop
+    through hts_request_stop() and return 0, because meeting a budget is the
+    outcome that was asked for, while -#L cuts short work that was asked for.
+    3 and not 2 because hts_is_exiting() already returns 2 for a session
     that transferred nothing and was rolled back, which exits 0: the two are
     separate channels, and they are kept off each other's values so a reader
     cannot take one for the other. Since 3.50. */
