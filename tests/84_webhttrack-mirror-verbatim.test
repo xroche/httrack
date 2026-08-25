@@ -58,9 +58,9 @@ cmp -s "${mirror}" "${body}" || fail "mirrored file not served byte for byte"
 grep -qi '^Content-type: text/html' "${hdr}" ||
     fail "mirrored page lost its text/html type: $(<"${hdr}")"
 
-# The other direction: while a crawl runs, every .html request is overridden to
-# the GUI's own refresh page, so a /website/ URL stops naming mirrored content.
-# /trickle/ dribbles for a minute, which holds the crawl open for the probe.
+# The other direction: a running crawl must not hide the mirror behind the GUI.
+# Starting one rebinds /website/ to the new project, so the probe is planted
+# there. /trickle/ dribbles for a minute, which holds the crawl open.
 clog="${work}/content.log"
 "${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
 csrv=$!
@@ -72,10 +72,18 @@ htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" 
     --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/ -O ${work}/crawl" \
     >/dev/null
 
+start=$SECONDS
+while test ! -d "${work}/crawl"; do
+    test "$((SECONDS - start))" -lt 60 || fail "the crawl never created its project"
+    poll_wait 0.2
+done
+cp "${mirror}" "${work}/crawl/hostile.html"
+
 htsserver_client --path /website/hostile.html --head-file "${hdr}" --body-file "${body}"
 grep -q '^HTTP/1\.0 200 ' "${hdr}" ||
-    fail "running crawl: /website/ was not overridden to the GUI page: $(head -1 "${hdr}")"
-grep -qF "'crawl' - HTTrack Website Copier" "${body}" ||
-    fail "the overridden GUI page was not the expanded refresh page"
+    fail "running crawl: /website/ was not served: $(head -1 "${hdr}")"
+# cmp, not a "not the GUI page" check: that is only one of the wrong answers.
+cmp -s "${mirror}" "${body}" ||
+    fail "running crawl: /website/ did not serve the mirror byte for byte"
 
 echo "PASS"

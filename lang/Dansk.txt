@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Spejlkopiér %s og alle værter under den
 Ignore %s and every host below it
 Ignorer %s og alle værter under den
+Manual
+Vejledning

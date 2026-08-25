@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Copier %s et tous les hôtes en dessous
 Ignore %s and every host below it
 Ignorer %s et tous les hôtes en dessous
+Manual
+Manuel

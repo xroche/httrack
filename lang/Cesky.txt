@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Zrcadlit %s a všechny hostitele pod ním
 Ignore %s and every host below it
 Ignorovat %s a všechny hostitele pod ním
+Manual
+Příručka

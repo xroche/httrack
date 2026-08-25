@@ -1611,23 +1611,18 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             meth = 2;
           }
 
-          if (strncmp(file, "/website/", 9) == 0) {
-            virtualpath = HTS_TRUE;
-          }
+          virtualpath = strncmp(file, "/website/", 9) == 0;
 
-          /* override */
-          if (commandRunning) {
-            if (is_html(file)) {
+          /* Only the wizard panes carry the run's state; the documentation, the
+             About box and the mirror stay reachable throughout it (#1444). */
+          if (is_html(file) && strncmp(file, "/server/", 8) == 0 &&
+              strcmp(file, "/server/about.html") != 0) {
+            if (commandRunning) {
               file = "/server/refresh.html";
-            }
-          } else if (commandEnd && !virtualpath && !willexit) {
-            if (is_html(file)) {
+            } else if (commandEnd && !willexit) {
               file = "/server/finished.html";
             }
           }
-
-          /* the override above may have swapped a mirror path for a GUI page */
-          virtualpath = strncmp(file, "/website/", 9) == 0;
 
           if (!virtualpath) {
             if (!path_append(fsfile, sizeof(fsfile), path) ||

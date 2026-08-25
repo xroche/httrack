@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Дзеркалювати %s і всі хости під ним
 Ignore %s and every host below it
 Ігнорувати %s і всі хости під ним
+Manual
+Посібник

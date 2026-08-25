@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Αντιγραφή του %s και κάθε host κάτω από αυτό
 Ignore %s and every host below it
 Αγνόηση του %s και κάθε host κάτω από αυτό
+Manual
+Εγχειρίδιο

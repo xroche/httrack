@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 镜像 %s 及其下所有主机
 Ignore %s and every host below it
 忽略 %s 及其下所有主机
+Manual
+手册

@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Peilaa %s ja kaikki sen alla olevat palvelimet
 Ignore %s and every host below it
 Sivuuta %s ja kaikki sen alla olevat palvelimet
+Manual
+Käyttöohje

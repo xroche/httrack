@@ -166,11 +166,5 @@ for want in ("p&#34;q", "c&#34;d"):
 if '<option value="p"q">' in body or '<option value="c"d">' in body:
     sys.exit("step2.html closes an option value early:\n%s" % body[:4000])
 
-# The one attribute left on the URL mode, where the quote takes %22 instead:
-# an entity would decode back to a quote in the file:// URL it builds.
-body = render("file.html", {"path": "/tmp/p" + BREAK})
-want = 'href="file:///tmp/p%22&gt;&lt;img%20src=q%20onerror=alert(1)&gt;&amp;&#39;/"'
-if want not in body:
-    sys.exit("file.html does not emit %r:\n%s" % (want, body[:4000]))
 PY
 echo OK

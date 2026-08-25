@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Mirror %s and every host below it
 Ignore %s and every host below it
 Ignore %s and every host below it
+Manual
+Manual

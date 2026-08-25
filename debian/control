@@ -32,10 +32,11 @@ Multi-Arch: foreign
 Depends: ${misc:Depends}, ${shlibs:Depends}, webhttrack-common, sensible-utils
 # Recommends, not Depends: the autoremoval gatherer follows only a disjunction's
 # first alternative, which ties the httrack source to whichever browser leads it.
-Recommends: firefox-esr | chromium | www-browser
+# httrack-doc, not a Suggests: without it the panel's help links open nothing.
+Recommends: firefox-esr | chromium | www-browser, httrack-doc
 Replaces: webhttrack-common (<< 3.43.9-2)
 Breaks: webhttrack-common (<< 3.43.9-2)
-Suggests: httrack, httrack-doc
+Suggests: httrack
 Enhances: httrack
 Description: Copy websites to your computer, httrack with a Web interface
  WebHTTrack is an offline browser utility, allowing you to download a World

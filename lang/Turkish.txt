@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 %s ve altındaki tüm sunucuları yansıla
 Ignore %s and every host below it
 %s ve altındaki tüm sunucuları yoksay
+Manual
+Kılavuz

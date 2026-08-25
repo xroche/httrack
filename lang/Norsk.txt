@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Kopier %s og alle verter under den
 Ignore %s and every host below it
 Ignorer %s og alle verter under den
+Manual
+Håndbok

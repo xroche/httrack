@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 %s en alle onderliggende hosts spiegelen
 Ignore %s and every host below it
 %s en alle onderliggende hosts uitsluiten
+Manual
+Handleiding

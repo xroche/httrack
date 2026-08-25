@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Clonează %s şi toate gazdele de sub el
 Ignore %s and every host below it
 Ignoră %s şi toate gazdele de sub el
+Manual
+Manual

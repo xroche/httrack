@@ -1,0 +1,108 @@
+#!/bin/bash
+#
+# The panel swapped every text/html reply for its own progress page, leaving the
+# documentation unreachable from the moment a crawl started (#1444). And a help
+# link is only worth having if the guide defines the section it names.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+distdir=${HTS_DISTDIR}
+guide="${distdir}/html/guide.html"
+test -f "${guide}" || fail "no ${guide}"
+
+# ---- every pane points at a section the guide really has ----
+
+printf '[each pane links a guide section that exists] ..\t'
+anchors=$(grep -oh 'guide\.html#web/[a-z0-9-]*' "${distdir}"/html/server/*.html |
+    sed 's|.*#web/||' | LC_ALL=C sort -u)
+# An empty list would walk the loop below without ever reading the guide.
+found=$(count_matching_lines . <<<"${anchors}")
+test "${found}" -ge 15 || fail "only ${found} guide anchors under html/server/"
+for a in ${anchors}; do
+    grep -qF "id=\"${a}\"" "${guide}" ||
+        fail "a pane links guide.html#web/${a}, which the guide has no id for"
+done
+# Control: the loop proves nothing unless a wrong anchor really misses.
+! grep -qF 'id="no-such-section"' "${guide}" ||
+    fail "the control anchor exists, so the loop above cannot discriminate"
+# The step*.html stubs redirect without the platform, so no pane may name one.
+stale=$(grep -l 'href="/step[0-9]*\.html"\|/server/help\.html\|/server/file\.html' \
+    "${distdir}"/html/server/*.html || true)
+test -z "${stale}" || fail "a pane still links a retired page: ${stale}"
+printf 'ok\n'
+
+# ---- the override reaches the wizard panes and nothing else ----
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_help.XXXXXX") || fail "no tmpdir"
+csrv=
+cleanup_push htsserver_cleanup_dir "${work}"
+cleanup_push htsserver_reap_vars csrv
+export HOME="${work}" # not the developer's own ~/.httrack.ini
+
+clog="${work}/content.log"
+"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
+
+htsserver_start
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
+
+PANE=/server/step2.html
+IDLE='Existing project name:'
+RUNNING='In progress:'
+DONE='Site mirroring finished!'
+
+serves() { # serves PATH MARKER WHAT
+    local body
+    body=$(htsserver_get "$1")
+    grep -qF "$2" <<<"${body}" ||
+        fail "$3: $1 did not serve \"$2\": $(head -c 400 <<<"${body}")"
+}
+
+# The documentation, and the About box the footer opens: neither is wizard state.
+docs_reachable() { # docs_reachable WHAT
+    serves /guide.html 'The HTTrack interface, step by step' "$1"
+    serves /index.html 'HTTrack documentation' "$1"
+    serves /server/about.html 'About WebHTTrack Website Copier' "$1"
+}
+
+await() { # await MARKER WHAT
+    local start=$SECONDS body
+    while :; do
+        body=$(htsserver_get "${PANE}")
+        grep -qF "$1" <<<"${body}" && return 0
+        htsserver_alive || fail "htsserver died waiting for $2"
+        test "$((SECONDS - start))" -lt 120 || fail "the panel never reached $2"
+        poll_wait 0.2
+    done
+}
+
+serves "${PANE}" "${IDLE}" 'idle'
+docs_reachable 'idle'
+
+# /trickle/ dribbles for a minute, so the crawl is still running when probed.
+htsserver_client --path /server/step4.html --field "sid=${sid}" --field "path=${work}" \
+    --field projname=crawl --field winprofile=x --field command_do=start \
+    --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/ -O ${work}/crawl" \
+    >/dev/null
+await "${RUNNING}" 'a running crawl'
+
+# The pane still follows the run: without this a dropped override passes above.
+serves "${PANE}" "${RUNNING}" 'running crawl'
+docs_reachable 'running crawl'
+
+htsserver_client --path /server/step4.html --field "sid=${sid}" --field command=abort >/dev/null
+await "${DONE}" 'a finished crawl'
+
+serves "${PANE}" "${DONE}" 'finished crawl'
+docs_reachable 'finished crawl'
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "PASS"

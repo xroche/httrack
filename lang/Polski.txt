@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Utwórz lustro %s i wszystkich hostów poniżej
 Ignore %s and every host below it
 Ignoruj %s i wszystkie hosty poniżej
+Manual
+Podręcznik
