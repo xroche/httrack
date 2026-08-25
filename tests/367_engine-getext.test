@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# get_ext() must stop at the '?' and copy the length it measured, not the
+# destination size: the query would otherwise come back glued to the extension,
+# and a long enough one would put a terminator one byte past the buffer (#1433).
+
+assert_selftest "getext self-test OK" getext

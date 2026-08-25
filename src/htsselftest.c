@@ -3384,13 +3384,13 @@ static int st_growsize(httrackp *opt, int argc, char **argv) {
   return rc;
 }
 
-/* save[] is the last member of lien_adrfilsave, so a poisoned run right behind
-   it catches whatever the naming path appends past its end (#1269). */
-#define ST_SAVENAME_POISON 0x5a
+/* A poisoned run right behind a destination catches whatever a bounded write
+   appends past its end; save[] ends lien_adrfilsave (#1269). */
+#define ST_POISON 0x5a
 #define ST_SAVENAME_CANARY 128
 
 /* an off-by-one terminator writes a NUL, which a zero poison could not see */
-enum { st_poison_is_not_nul = 1 / (ST_SAVENAME_POISON != 0) };
+enum { st_poison_is_not_nul = 1 / (ST_POISON != 0) };
 
 /* Does the run from `from` to `size` still hold the poison? */
 static hts_boolean st_poison_intact(const char *label, const char *buf,
@@ -3398,13 +3398,130 @@ static hts_boolean st_poison_intact(const char *label, const char *buf,
   size_t i;
 
   for (i = size; i > from; i--) {
-    if (buf[i - 1] != (char) ST_SAVENAME_POISON) {
+    if (buf[i - 1] != (char) ST_POISON) {
       fprintf(stderr, "%s: wrote %d byte(s) past the end\n", label,
               (int) (i - from));
       return HTS_FALSE;
     }
   }
   return HTS_TRUE;
+}
+
+/* One get_ext() into a poisoned arena of `cap` bytes: the extension must come
+   out whole and nothing may be written past `cap`. */
+static hts_boolean st_getext_case(char *arena, size_t cap, size_t guard,
+                                  const char *fil, const char *want) {
+  const char *ext;
+  size_t from;
+
+  memset(arena, ST_POISON, cap + guard);
+  ext = get_ext(arena, cap, fil);
+  if (strcmp(ext, want) != 0) {
+    fprintf(stderr, "getext: [%s] in %d bytes gave [%s], wanted [%s]\n", fil,
+            (int) cap, ext, want);
+    return HTS_FALSE;
+  }
+  /* an extension that did not fit is the literal "", leaving the whole arena
+     poisoned; one that fitted ends on its own NUL */
+  from = ext == arena ? strlen(want) + 1 : 0;
+  if (!st_poison_intact("getext: inside the destination", arena, from, cap))
+    return HTS_FALSE;
+  return st_poison_intact("getext: past the destination", arena, cap,
+                          cap + guard);
+}
+
+/* get_ext() stops at the '?', so a parameterised URL types by its extension,
+   and copies the length it measured rather than the destination size, so a
+   long query cannot put a terminator past the end (#1433). */
+static int st_getext(httrackp *opt, int argc, char **argv) {
+  static const struct {
+    const char *fil;
+    const char *want;
+  } cases[] = {
+      {"x.php", "php"},
+      {"x.php?id=3", "php"},
+      /* the query is not scanned for dots */
+      {"x.php?id=3.txt", "php"},
+      {"/a/b.c?Q123456789012345678901234567890", "c"},
+      {"x.PHP?a", "PHP"}, /* no case folding */
+      {"x.php?", "php"},
+      {"foo", ""},
+      {"x.", ""},
+      {"?x.php", ""},
+  };
+
+  /* dodging sizeof(void *), which RUNTIME_TIME_CHECK_SIZE takes for a caller
+     that passed sizeof() of a pointer */
+  static const size_t caps[] = {1, 2, 3, 5, 6, 16, 64};
+  /* longer than any capacity below, so a size-bounded copy runs off the end */
+  static const char query[] = "?q=00000000001111111111222222222233333333334"
+                              "4444444445555555555666666666677777777778888";
+  const size_t guard = 64;
+  size_t c, k;
+  int rc = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+
+  /* the semantics, in a destination nothing here comes close to filling */
+  {
+    char *arena = malloct(256 + guard);
+
+    assertf(arena != NULL);
+    for (k = 0; k < sizeof(cases) / sizeof(cases[0]); k++) {
+      if (!st_getext_case(arena, 256, guard, cases[k].fil, cases[k].want))
+        rc = 1;
+    }
+    freet(arena);
+  }
+
+  /* the point of the query half: a parameterised URL types as the bare one */
+  {
+    char buf[16];
+
+    if (!is_dyntype(get_ext(buf, sizeof(buf), "x.php?id=3")) ||
+        !is_dyntype(get_ext(buf, sizeof(buf), "x.php"))) {
+      fprintf(stderr, "getext: a parameterised .php is not a dynamic type\n");
+      rc = 1;
+    }
+  }
+
+  /* every capacity against extensions straddling its bound, with and without a
+     query behind them: a one-size-fits-all bound shows up as the wrong verdict
+     on the small ones */
+  for (c = 0; c < sizeof(caps) / sizeof(caps[0]); c++) {
+    const size_t cap = caps[c];
+    const size_t maxext = cap + guard;
+    char *arena = malloct(cap + guard);
+    char *fil = malloct(5 + maxext + sizeof(query));
+    char *want = malloct(maxext + 1);
+
+    assertf(arena != NULL && fil != NULL && want != NULL);
+    for (k = 1; k <= maxext; k++) {
+      size_t i;
+
+      /* bytes that vary, or a copy taken from the wrong offset would match */
+      memcpy(fil, "/d/f.", 5);
+      for (i = 0; i < k; i++)
+        fil[5 + i] = (char) ('a' + i % 26);
+      fil[5 + k] = '\0';
+      memcpy(want, fil + 5, k + 1);
+      if (k >= cap) /* k characters plus the NUL do not fit */
+        want[0] = '\0';
+      if (!st_getext_case(arena, cap, guard, fil, want))
+        rc = 1;
+      memcpy(fil + 5 + k, query, sizeof(query));
+      if (!st_getext_case(arena, cap, guard, fil, want))
+        rc = 1;
+    }
+    freet(arena);
+    freet(fil);
+    freet(want);
+  }
+
+  printf("getext self-test %s\n", rc == 0 ? "OK" : "FAILED");
+  return rc;
 }
 
 static int st_savename(httrackp *opt, int argc, char **argv) {
@@ -3490,7 +3607,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   memset(&probe, 0, sizeof(probe));
-  memset(probe.canary, ST_SAVENAME_POISON, sizeof(probe.canary));
+  memset(probe.canary, ST_POISON, sizeof(probe.canary));
   strcpybuff(afs->af.adr, adr);
   if (filpad > 0) {
     /* '*' stands for filpad bytes: a link longer than argv can carry, argv
@@ -3651,7 +3768,7 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
 
     snprintf(label, sizeof(label), "savename-addstr: '%s' at dsize %d",
              cases[k].add, (int) cases[k].dsize);
-    memset(buf, ST_SAVENAME_POISON, sizeof(buf));
+    memset(buf, ST_POISON, sizeof(buf));
     memcpy(buf, cases[k].seed, seedlen + 1);
     url_savename_addstr(buf, cases[k].dsize, cases[k].add);
     if (strcmp(buf, cases[k].want) != 0) {
@@ -3674,7 +3791,7 @@ static int st_savename_addstr(httrackp *opt, int argc, char **argv) {
 
     snprintf(label, sizeof(label), "savename-addstr: long link at dsize %d",
              (int) dsize);
-    memset(big, ST_SAVENAME_POISON, sizeof(big));
+    memset(big, ST_POISON, sizeof(big));
     big[0] = '\0';
     memset(src, 'a', sizeof(src) - 1);
     src[sizeof(src) - 1] = '\0';
@@ -3735,7 +3852,7 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
 
     snprintf(label, sizeof(label), "savename-addtail: '%s%s' at dsize %d",
              cases[k].sep, cases[k].add, (int) cases[k].dsize);
-    memset(buf, ST_SAVENAME_POISON, sizeof(buf));
+    memset(buf, ST_POISON, sizeof(buf));
     memcpy(buf, cases[k].seed, seedlen + 1);
     url_savename_addtail(buf, cases[k].dsize, cases[k].sep, cases[k].add);
     if (strcmp(buf, cases[k].want) != 0) {
@@ -3754,7 +3871,7 @@ static int st_savename_addtail(httrackp *opt, int argc, char **argv) {
     char BIGSTK big[HTS_URLMAXSIZE * 2 + ST_SAVENAME_CANARY];
     const size_t dsize = HTS_URLMAXSIZE * 2;
 
-    memset(big, ST_SAVENAME_POISON, sizeof(big));
+    memset(big, ST_POISON, sizeof(big));
     memset(big, 'a', dsize - 1);
     big[dsize - 1] = '\0';
     url_savename_addtail(big, dsize, ".", "html");
@@ -12760,6 +12877,9 @@ static const struct selftest_entry {
      "Content-Range parse integer safety", st_crange},
     {"xfread-limit", "", "in-memory receive buffer size bound",
      st_xfread_limit},
+    {"getext", "",
+     "extension parsing stops at the query and inside the buffer (#1433)",
+     st_getext},
     {"savename", "<fil> <content-type> [key=value ...]",
      "local save-name for a URL", st_savename},
     {"savename-addstr", "",
