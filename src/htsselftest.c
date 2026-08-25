@@ -4812,6 +4812,11 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
 #define REFUSES(word, next)                                                    \
   assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used, warn,    \
                              sizeof(warn)) == NULL)
+/* accepted, whatever it expands to: -N's template gluing is #1418's to settle
+ */
+#define ACCEPTS(word, next)                                                    \
+  assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used, warn,    \
+                             sizeof(warn)) != NULL)
 
   /* -I0 has always disabled the index; now the long form can say it too */
   EXPANDS("-I0", "--index=0", NULL);
@@ -4896,10 +4901,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-P proxy:8080", "--proxy", "proxy:8080");
   EXPANDS("+*.gif", "--allow", "*.gif");
 
-  /* #1426: a "param" value the short form cannot read is refused on every row,
-     instead of being glued on to leave the option at its default while its
-     characters spell more short options. Both directions, table-wide: -N is
-     out, being the one param row that also reads a user template. */
+  /* #1426, both directions and table-wide: -N is out, reading a template too */
   for (i = 0; optalias_value(i)[0] != '\0'; i++) {
     const int p = optalias_find(optalias_value(i));
     char word[HTS_CDLMAXSIZE], want[HTS_CDLMAXSIZE];
@@ -4928,12 +4930,18 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   }
   assertf(params >= 27); /* the rows the issue enumerates were all walked */
 
-  /* what the short forms read beyond a digit run: -m takes N,N2 and -%c a
-     rate with a decimal point */
+  /* the separator -m and -%c read besides digits, anchored to one occurrence
+     with a digit after it: 1.2.3 otherwise reached maxconn as 1.2 */
   EXPANDS("-m,5000", "--max-files=,5000", NULL);
   EXPANDS("-m100,5000", "--max-files=100,5000", NULL);
   EXPANDS("-%c0.5", "--connection-per-second=0.5", NULL);
+  EXPANDS("-%c.5", "--connection-per-second=.5", NULL);
+  REFUSES("--connection-per-second=1.2.3", NULL);
+  REFUSES("--connection-per-second=0.", NULL);
   REFUSES("--max-files=,", NULL);
+  REFUSES("--max-files=100,", NULL);
+  REFUSES("--max-files=,,,5", NULL);
+  REFUSES("--max-files=1,2,3", NULL);
   REFUSES("--sockets=8,4", NULL);
   REFUSES("--sockets=0.5", NULL);
   REFUSES("--advanced-maxlinks=99999999999999999999", NULL);
@@ -4941,6 +4949,13 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   REFUSES("--sockets=8I0", NULL);
   /* an empty value is the bare short form, as it has always been */
   EXPANDS("-c", "--sockets=", NULL);
+
+  /* the exemption: --structure is the param row that also reads a template,
+     which the rule above must not refuse (glued or detached) */
+  ACCEPTS("--structure=%h%p/%n%q.%t", NULL);
+  ACCEPTS("--structure=%n.%t", NULL);
+  ACCEPTS("--structure", "%h%p/%n%q.%t");
+  EXPANDS("-N1", "--structure=1", NULL);
 
   /* invariant: every name's bare long form still emits its short form, and a
      param name still demands its own value. A duplicate name (test, continue)
@@ -4962,6 +4977,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
 #undef EXPANDS
 #undef WARNS
 #undef REFUSES
+#undef ACCEPTS
 
   printf("optalias self-test OK\n");
   return 0;

@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# A "param" option takes a number. A value its short form cannot read used to be
-# glued on anyway, leaving the option at its default while the leftover
-# characters spelled more short options: --long-names=yes wrote DOS 8.3 names
-# and --sockets=8I0 mirrored without a top index, both exit 0 (#1426).
+# A "param" option takes a number, and used to have any other value glued onto
+# its short form regardless: --long-names=yes wrote DOS 8.3 names and
+# --sockets=8I0 mirrored with no top index, both exit 0 (#1426).
 
 set -euo pipefail
 
@@ -27,10 +26,11 @@ crawl() {
         >"${tmp}/log" 2>&1 || RC=$?
 }
 
-# Basenames of the mirror, so the check reads what was written rather than a
+# Basenames of the mirror, so the checks read what was written rather than a
 # path this host may spell differently (macOS $TMPDIR, Windows ':' -> '_').
 saved() { find "${out}" -type f | sed 's|.*/||'; }
 has_name() { grep -Fqx "$1" <<<"$(saved)"; }
+has_cache() { test -n "$(find "${out}/hts-cache" -type f 2>/dev/null)"; }
 
 # The discriminator, proven on the two spellings that ask for each layout:
 # long names keep page.html, DOS 8.3 truncates it to PAGE.HTM.
@@ -77,6 +77,11 @@ refused --robots=yes
 refused --max-files=none
 # a detached value is the same value: --depth ate the URL and mirrored nothing
 refused --depth "file://${tmp}/page.html"
+# the separator -m and -%c read is one occurrence with a digit after it, or the
+# value converts short: 1.2.3 reached maxconn as 1.2, and 100, died downstream
+refused --connection-per-second=1.2.3
+refused --max-files=100,
+refused --max-files=,,,5
 
 # The message names the option that was typed. --cache=OFF used to report
 # "Option O needs [...] a path", -O being reached out of the middle of OFF.
@@ -87,24 +92,35 @@ grep -q 'Option --cache does not take the value OFF' "${tmp}/log" ||
 # Negative control: the values these rows do take still run, and say nothing.
 accepted --long-names=1
 has_name page.html || fail_dump "--long-names=1 lost its long names" "${tmp}/log"
-accepted --long-names=on
-accepted --long-names=off
 accepted --sockets=8
 # ...and it keeps the top index that --sockets=8I0 lost
 has_name index.html || fail_dump "--sockets=8 wrote no top index" "${tmp}/log"
 accepted --depth=2
-accepted --cache=0
 accepted --robots=1
 accepted --max-files=100
 accepted --sockets 8
+accepted --long-names=on
+accepted --long-names=off
 # what the short forms read beyond a digit run: -m takes N,N2, -%c a rate
 accepted --max-files=,5000
 accepted --max-files=100,5000
 accepted --connection-per-second=0.5
 
-# --structure is the param row that also reads a user template, and keeps it.
+# on/off is a mapping, not merely an accepted spelling: off is -C0, which writes
+# no cache, and on is the bare -C, which does.
+accepted --cache=off
+! has_cache || fail_dump "--cache=off still wrote a cache" "${tmp}/log"
+accepted --cache=on
+has_cache || fail_dump "--cache=on wrote no cache" "${tmp}/log"
+accepted --cache=0
+! has_cache || fail_dump "--cache=0 still wrote a cache" "${tmp}/log"
+
+# --structure is exempt, being the param row that also reads a user template.
+# The glued long form does not apply that template yet (#1418); what the
+# exemption owes here is that the rule above does not refuse it.
 accepted --structure=1
 crawl --structure=%h%p/%n%q.%t
-assert_eq 0 "${RC}" "--structure template exited"
+! grep -q 'does not take the value' "${tmp}/log" ||
+    fail_dump "--structure template refused" "${tmp}/log"
 
 exit 0
