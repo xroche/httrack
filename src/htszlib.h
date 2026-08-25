@@ -46,7 +46,8 @@ Please visit our Website: http://www.httrack.com
 #ifdef HTS_INTERNAL_BYTECODE
 /* Inflate filename into newfile (gzip, zlib or raw deflate); decoded size, or
    -1 on a corrupt/truncated stream, an over-budget body, or an I/O failure. A
-   body provably in no deflate framing is copied verbatim. */
+   body provably in no deflate framing is copied verbatim. On -1, errno is the
+   local failure's, and 0 when the coded body was the problem. */
 extern int hts_zunpack(const char *filename, const char *newfile);
 /* Inflate the head of a gzip/zlib stream, out_len max; 0 if undecodable */
 extern size_t hts_zhead(const void *in, size_t in_len, void *out,
@@ -58,6 +59,8 @@ extern const char *hts_get_zerror(int err);
    (#630). `append` takes the zipOpen2_64 APPEND_STATUS_* values. */
 extern unzFile hts_unzOpen_utf8(const char *path);
 extern zipFile hts_zipOpen_utf8(const char *path, int append);
+/* The table both open with, for a caller that overrides one entry. */
+extern void hts_zip_filefunc64(zlib_filefunc64_def *ff);
 #endif
 
 #endif

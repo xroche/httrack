@@ -10,5 +10,5 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-out=$(httrack -O /dev/null -#test=direnum "$dir")
-assert_match "direnum:.*OK" "$out"
+selftest_queue_base_lengths head "direnum: enumerated 2 non-ASCII leaves" direnum "$dir"
+selftest_run_queued

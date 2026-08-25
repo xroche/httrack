@@ -1,0 +1,37 @@
+#!/bin/bash
+#
+# A ZIP backend with no truncate entry can only rewind an abandoned member, and
+# has to report that instead of ZIP_OK (#1402): the tail it leaves behind hides
+# the central directory from every reader once it outgrows their backscan.
+
+set -eu
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_zipnotrunc.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+assert_selftest "zip-abandon-notrunc: OK" zip-abandon-notrunc "$tmp/"
+
+# Grade both archives with a reader that is not minizip: its own backscan is
+# what the leftover tail hides the directory from.
+if py=$(find_python); then
+    "$py" - "$tmp/zip-notrunc-ref.zip" "$tmp/zip-notrunc.zip" <<'EOF'
+import os
+import sys
+import zipfile
+
+ref, kept = sys.argv[1], sys.argv[2]
+with zipfile.ZipFile(ref) as z:
+    assert z.namelist() == ["before.bin", "after1.bin", "after2.bin"], z.namelist()
+    assert z.testzip() is None, ref
+try:
+    with zipfile.ZipFile(kept) as z:
+        raise AssertionError("%s still opens: %s" % (kept, z.namelist()))
+except zipfile.BadZipFile:
+    pass
+assert os.path.getsize(kept) > os.path.getsize(ref), (kept, ref)
+EOF
+else
+    echo "python3 not found: the independent zip reader is skipped"
+fi

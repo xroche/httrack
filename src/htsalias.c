@@ -51,6 +51,7 @@ Please visit our Website: http://www.httrack.com
   --sockets 8       --cache off
                     --nocache
   -c8               -C0
+  --wide-mirror     --tiny-mirror     (--mirror at --wide/--tiny's count)
   in config file:
   sockets=8         cache=0
   set sockets 8     cache off
@@ -66,9 +67,11 @@ Please visit our Website: http://www.httrack.com
   param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
+  paramn : glues like param what -N reads glued (1, 1L0, on/off), detaches a %-carrying template, refuses the rest
 
   A name may appear twice; the FIRST row wins, for the expansion and the help
-  text. Later rows exist so a reverse lookup by short option finds a name.
+  text. Later rows exist so a reverse lookup by short option finds a name, and
+  that lookup takes the first row too, so -N's class is "structure"'s.
 */
 const char *hts_optalias[][4] = {
   /*   {"","","",""}, */
@@ -109,7 +112,7 @@ const char *hts_optalias[][4] = {
   {"language", "-%l", "param1", ""}, {"lang", "-%l", "param1", ""},
   {"accept", "-%a", "param1", ""},
   {"headers", "-%X", "param1", ""},
-  {"structure", "-N", "param", ""},
+  {"structure", "-N", "paramn", ""},
   {"user-structure", "-N", "param1", ""},
   {"long-names", "-L", "param", ""},
   {"keep-links", "-K", "param", ""},
@@ -332,6 +335,39 @@ static hts_boolean optparam_missing(int argc, const char *const *argv,
   return HTS_TRUE;
 }
 
+/* The short form the --wide-/--tiny- prefix glues onto the alias it prefixes,
+   read from the --wide/--tiny row itself so the two cannot drift ("c32"). */
+static const char *optalias_prefix_count(const char *name) {
+  const int pos = optalias_find(name);
+
+  return pos >= 0 && hts_optalias[pos][1][0] == '-' ? hts_optalias[pos][1] + 1
+                                                    : "";
+}
+
+/* What a --wide-/--tiny- prefix does where the count cannot be glued on.
+   0: apply the alias without the count and warn. 1: refuse the option. */
+#define OPTALIAS_PREFIX_STRICT 0
+
+/* Whether the alias expands to a plain cluster a count can be glued onto
+   (-w -> -wc32). The rest is refused rather than glued blind: a value sharing
+   the word (-N <template>, -c8) or holding it alone (-O <path>), a long form,
+   the -% and -# families (-%r plus a c is the -%rc of --warc-cdx), a cluster
+   already carrying -c, and -h, which the caller matches as a whole word. */
+static hts_boolean optalias_clusters(const char *type, const char *command) {
+  size_t i;
+
+  if (strcmp(type, "single") != 0 && strcmp(type, "onoff") != 0 &&
+      strcmp(type, "level") != 0)
+    return HTS_FALSE;
+  if (command[0] != '-' || command[1] == '\0' || strcmp(command, "-h") == 0)
+    return HTS_FALSE;
+  for (i = 1; command[i] != '\0'; i++) {
+    if (command[i] == 'c' || !isalnum((unsigned char) command[i]))
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
 /* Suffix the short form takes for a value ("0", "2", or none), or NULL when
    the class refuses it: onoff reads 0/1 only, level reads a number. */
 static const char *optalias_suffix(const char *type, const char *value) {
@@ -356,12 +392,41 @@ static const char *optalias_suffix(const char *type, const char *value) {
   return NULL;
 }
 
+/* A bare digit run short enough for -N to read it as a preset number. */
+static hts_boolean optalias_is_digits(const char *value) {
+  size_t i;
+
+  for (i = 0; value[i] != '\0'; i++) {
+    if (!isdigit((unsigned char) value[i]))
+      return HTS_FALSE;
+  }
+  return i != 0 && i <= HTS_SAVENAME_PRESET_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Whether a "paramn" value glues onto the short form the way "param" does: a
+   preset, on/off, or a preset trailed by more short options (-N1L0). A path
+   separator or an extension dot marks a user template instead, which no option
+   cluster carries and which only reaches the engine detached (#1380). */
+static hts_boolean optalias_paramn_glues(const char *value) {
+  size_t i;
+
+  if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
+    return HTS_TRUE;
+  for (i = 0; isdigit((unsigned char) value[i]); i++) {
+  }
+  if (i == 0 || i > HTS_SAVENAME_PRESET_MAX_DIGITS)
+    return HTS_FALSE;
+  return strchr(value + i, '/') == NULL && strchr(value + i, '.') == NULL
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
 /*
   Check for alias in command-line
   argc,argv     as in main()
   n_arg         argument position
   return_argv   a char[2][] where to put result
-  return_error  buffer in case of syntax error
+  return_error  the syntax error, or a warning the caller shows and carries on
 
   return value: number of arguments treated (0 if error)
 */
@@ -382,6 +447,7 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 
       /* */
       char *position;
+      const char *addname = NULL;
       int need_param = 1;
       hts_boolean negated = HTS_FALSE;
 
@@ -406,12 +472,15 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       }
       /* --sockets 8 */
       else {
-        if (strncmp(argv[n_arg] + 2, "wide-", 5) == 0) {
-          strcpybuff(addcommand, "c32");
-          strcpybuff(command, strchr(argv[n_arg] + 2, '-') + 1);
-        } else if (strncmp(argv[n_arg] + 2, "tiny-", 5) == 0) {
-          strcpybuff(addcommand, "c1");
-          strcpybuff(command, strchr(argv[n_arg] + 2, '-') + 1);
+        /* --wide-mirror is --mirror carrying --wide's connection count */
+        if (strncmp(argv[n_arg] + 2, "wide-", 5) == 0)
+          addname = "wide";
+        else if (strncmp(argv[n_arg] + 2, "tiny-", 5) == 0)
+          addname = "tiny";
+        if (addname != NULL) {
+          strlcpybuff(addcommand, optalias_prefix_count(addname),
+                      sizeof(addcommand));
+          strcpybuff(command, argv[n_arg] + 7);
         } else
           strcpybuff(command, argv[n_arg] + 2);
         need_param = 2;
@@ -422,6 +491,27 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       if (pos >= 0) {
         /* Copy real name */
         strcpybuff(command, hts_optalias[pos][1]);
+        /* Say so where the expansion cannot carry the prefix, rather than
+           drop the count in silence */
+        if (addcommand[0] != '\0' &&
+            !optalias_clusters(hts_optalias[pos][2], command)) {
+#if OPTALIAS_PREFIX_STRICT
+          slprintfbuff_clip(return_error, return_error_size,
+                            "Syntax error:\n\tThe %s- prefix does not apply to "
+                            "--%s: write --%s --%s instead\n",
+                            addname, hts_optalias[pos][0], addname,
+                            hts_optalias[pos][0]);
+          return 0;
+#else
+          slprintfbuff_clip(return_error, return_error_size,
+                            "Warning: the %s- prefix cannot add its connection "
+                            "count to --%s, so --%s runs without it; write "
+                            "--%s --%s instead",
+                            addname, hts_optalias[pos][0], hts_optalias[pos][0],
+                            addname, hts_optalias[pos][0]);
+          addcommand[0] = '\0';
+#endif
+        }
         /* With parameters? */
         if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
           /* Copy parameters? */
@@ -445,10 +535,25 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         else
           need_param = 1;
 
+        /* A template with no % maps every URL onto one local name, so
+           --structure=flat is a typo rather than a template. --user-structure
+           still takes such a value verbatim. */
+        if (strcmp(hts_optalias[pos][2], "paramn") == 0 && param[0] != '\0' &&
+            !optalias_paramn_glues(param) && strchr(param, '%') == NULL) {
+          slprintfbuff_clip(return_error, return_error_size,
+                            "Syntax error:\n\tOption --%s does not take the "
+                            "value %s\n\t%s\n",
+                            hts_optalias[pos][0], param,
+                            _NOT_NULL(optalias_help(hts_optalias[pos][0])));
+          return 0;
+        }
+
         /* Final result */
 
-        /* Must be alone (-P /tmp) */
-        if (strcmp(hts_optalias[pos][2], "param1") == 0) {
+        /* Must be alone (-P /tmp), or a paramn value -N cannot take glued */
+        if (strcmp(hts_optalias[pos][2], "param1") == 0 ||
+            (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
+             !optalias_paramn_glues(param))) {
           strlcpybuff(return_argv[0], command, return_argv_size);
           strlcpybuff(return_argv[1], param, return_argv_size);
           *return_argc = 2;     /* 2 parameters returned */
@@ -493,6 +598,8 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
             }
             strlcatbuff(return_argv[0], suffix, return_argv_size);
           }
+          /* --wide-mirror: -w with the count clustered onto it (-wc32) */
+          strlcatbuff(return_argv[0], addcommand, return_argv_size);
           *return_argc = 1;     /* 1 parameter returned */
         }
       } else {
@@ -508,6 +615,15 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     int pos;
 
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
+      /* -N 1 is preset 1; anything else stays detached, since a template may
+         legitimately open with a digit (-N 2col/%n.%t) */
+      if (strcmp(hts_optalias[pos][2], "paramn") == 0 && n_arg + 1 < argc &&
+          optalias_is_digits(argv[n_arg + 1])) {
+        strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
+        strlcatbuff(return_argv[0], argv[n_arg + 1], return_argv_size);
+        *return_argc = 1;
+        return 2;
+      }
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
         if (optparam_missing(argc, argv, n_arg, argv[n_arg])) {
@@ -734,6 +850,8 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
             if (!result) {
               printf("%s\n", return_error);
             } else {
+              if (return_error[0] != '\0')
+                fprintf(stderr, "* %s\n", return_error);
               /* Insert the option and its parameter after the ones already
                  inserted, so that the file order is preserved */
               if (!cmdl_ins(cmd, tmp_argv[2], insert_after) ||

@@ -50,6 +50,8 @@ Please visit our Website: http://www.httrack.com
 /* Note: utf-8 */
 int hts_zunpack(const char *filename, const char *newfile) {
   int ret = -1;
+  /* a local failure's errno, 0 when the coded body was the problem */
+  int io_errno = 0;
 
   if (filename != NULL && newfile != NULL && filename[0] && newfile[0]) {
     char catbuff[CATBUFF_SIZE];
@@ -82,6 +84,7 @@ int hts_zunpack(const char *filename, const char *newfile) {
         if (attempt > 0) {
           /* rewind input; reopening fpout "wb" discards the partial output */
           if (fseek(in, 0, SEEK_SET) != 0) {
+            io_errno = errno;
             env_error = HTS_TRUE;
             break;
           }
@@ -89,6 +92,7 @@ int hts_zunpack(const char *filename, const char *newfile) {
         }
         fpout = FOPEN(fconv(catbuff, sizeof(catbuff), newfile), "wb");
         if (fpout == NULL) {
+          io_errno = errno;
           env_error = HTS_TRUE;
           break;
         }
@@ -131,6 +135,7 @@ int hts_zunpack(const char *filename, const char *newfile) {
                 break;
               }
               if (produced > 0 && !hts_fwrite_exact(outbuf, produced, fpout)) {
+                io_errno = errno;
                 env_error = HTS_TRUE;
                 ok = HTS_FALSE;
                 break;
@@ -144,7 +149,12 @@ int hts_zunpack(const char *filename, const char *newfile) {
             ret = (int) size;
         }
         inflateEnd(&strm);
-        fclose(fpout);
+        /* stdio may still hold the tail, so the close is a write of its own */
+        if (fclose(fpout) != 0) {
+          io_errno = errno;
+          env_error = HTS_TRUE;
+          ret = -1;
+        }
       }
       /* keep a mislabeled identity body verbatim only when provably not
          deflate; truncation or a local failure must keep failing (#47) */
@@ -158,6 +168,7 @@ int hts_zunpack(const char *filename, const char *newfile) {
 
           while ((navail = fread(inbuf, 1, sizeof(inbuf), in)) > 0) {
             if (!hts_fwrite_exact(inbuf, navail, fpout)) {
+              io_errno = errno;
               size = -1;
               break;
             }
@@ -166,12 +177,16 @@ int hts_zunpack(const char *filename, const char *newfile) {
           if (size >= 0 && !ferror(in))
             ret = size;
         }
-        if (fpout != NULL)
-          fclose(fpout);
+        if (fpout != NULL && fclose(fpout) != 0) {
+          io_errno = errno;
+          ret = -1;
+        }
       }
       fclose(in);
     }
   }
+  if (ret < 0)
+    errno = io_errno; /* the cleanup above clobbered it */
   return ret;
 }
 
@@ -292,18 +307,21 @@ static voidpf ZCALLBACK hts_zip_fopen_utf8(voidpf opaque, const void *filename,
   return (voidpf) FOPEN((const char *) filename, mode_fopen);
 }
 
+void hts_zip_filefunc64(zlib_filefunc64_def *ff) {
+  fill_fopen64_filefunc(ff);
+  ff->zopen64_file = hts_zip_fopen_utf8;
+}
+
 unzFile hts_unzOpen_utf8(const char *path) {
   zlib_filefunc64_def ff;
 
-  fill_fopen64_filefunc(&ff);
-  ff.zopen64_file = hts_zip_fopen_utf8;
+  hts_zip_filefunc64(&ff);
   return unzOpen2_64(path, &ff);
 }
 
 zipFile hts_zipOpen_utf8(const char *path, int append) {
   zlib_filefunc64_def ff;
 
-  fill_fopen64_filefunc(&ff);
-  ff.zopen64_file = hts_zip_fopen_utf8;
+  hts_zip_filefunc64(&ff);
   return zipOpen2_64(path, append, NULL, &ff);
 }

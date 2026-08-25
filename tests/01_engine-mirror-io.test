@@ -11,5 +11,5 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-out=$(httrack -O /dev/null -#test=mirrorio "$dir")
-grep -q "mirrorio:.*OK" <<<"$out"
+selftest_queue_base_lengths tail "-char non-ASCII path: OK" mirrorio "$dir"
+selftest_run_queued

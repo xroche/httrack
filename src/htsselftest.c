@@ -1270,6 +1270,8 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   static const char *const utf8 = "caf\xC3\xA9 \xE2\x82\xAC"; /* "café €" */
   const UINT cp = GetACP();
   const int len = (int) strlen(utf8);
+  /* the engine blocks best-fit; UTF-8 is the only ACP that check exempts */
+  const DWORD flags = cp == CP_UTF8 ? 0 : WC_NO_BEST_FIT_CHARS;
   WCHAR wide[64], round[64];
   char want[64];
   char *sys, *back, *part;
@@ -1281,12 +1283,11 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   wn = MultiByteToWideChar(CP_UTF8, 0, utf8, len, wide,
                            (int) (sizeof(wide) / sizeof(wide[0])));
   assertf(wn > 0);
-  n = WideCharToMultiByte(cp, 0, wide, wn, want, (int) sizeof(want) - 1, NULL,
-                          NULL);
+  n = WideCharToMultiByte(cp, flags, wide, wn, want, (int) sizeof(want) - 1,
+                          NULL, NULL);
   assertf(n > 0);
   want[n] = '\0';
-  /* the ACP holds the string only if its bytes decode back to the same UTF-16;
-     lpUsedDefaultChar would miss a best-fit mapping (é to a bare e) */
+  /* the ACP holds it only if those bytes decode back to the same UTF-16 */
   lossless =
       MultiByteToWideChar(cp, 0, want, n, round,
                           (int) (sizeof(round) / sizeof(round[0]))) == wn &&
@@ -1314,6 +1315,115 @@ static int st_syscharset(httrackp *opt, int argc, char **argv) {
   freet(sys);
   printf("syscharset: acp=%u %s: OK\n", (unsigned) cp,
          lossless ? "round-trip" : "one-way");
+  return 0;
+#else
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  return 77; /* WIN32-only entry point */
+#endif
+}
+
+/* Best-fit defeated the strict converter: CP932 lacks U+00A5 and quietly gave
+   back a path separator for it. */
+static int st_nobestfit(httrackp *opt, int argc, char **argv) {
+#ifdef _WIN32
+  /* internal, not in htscharset.h: ties cp below to cs by name, not by guess */
+  extern UINT hts_getCodepage(const char *name);
+  static const char *const yen = "\xC2\xA5";      /* U+00A5 */
+  static const char *const micro = "\xC2\xB5";    /* U+00B5, best-fit 83 CA */
+  static const char *const hira = "\xE3\x81\x82"; /* U+3042, CP932 82 A0 */
+  /* yen + micro + hira + ASCII: a best-fit-shorter, a best-fit-longer, a
+     native and an untouched code point in one string */
+  static const char *const mixed = "\xC2\xA5\xC2\xB5\xE3\x81\x82"
+                                   "A";
+  const char *const cs = "shift_jis";
+  const UINT cp = hts_getCodepage(cs);
+  BOOL usedDefault = TRUE;
+  BOOL gotCpInfo;
+  CPINFO cpi;
+  WCHAR wide[4];
+  char raw[8];
+  char *s;
+  int wn, n;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  assertf(cp == 932);
+  if (!IsValidCodePage(cp)) {
+    printf("nobestfit: CP932 is not installed\n");
+    return 77;
+  }
+  /* the trap, asserted rather than assumed: left to itself the codepage hands
+     back a path separator and reports no substitution at all */
+  wn = MultiByteToWideChar(CP_UTF8, 0, yen, (int) strlen(yen), wide,
+                           (int) (sizeof(wide) / sizeof(wide[0])));
+  assertf(wn == 1);
+  n = WideCharToMultiByte(cp, 0, wide, wn, raw, (int) sizeof(raw), NULL,
+                          &usedDefault);
+  assertf(n == 1 && raw[0] == '\\' && !usedDefault);
+  /* U+00B5 best-fits to two bytes where the substitute is one, so a flag
+     carried by only one of the two calls shows up as a length disagreement */
+  wn = MultiByteToWideChar(CP_UTF8, 0, micro, (int) strlen(micro), wide,
+                           (int) (sizeof(wide) / sizeof(wide[0])));
+  assertf(wn == 1);
+  n = WideCharToMultiByte(cp, 0, wide, wn, raw, (int) sizeof(raw), NULL, NULL);
+  assertf(n == 2);
+  /* the sizing passes disagree, and the shorter one under-allocates: banning
+     best-fit sizes to the substitute but converts into room for the best-fit */
+  n = WideCharToMultiByte(cp, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0, NULL,
+                          NULL);
+  assertf(n == 1);
+  /* same disagreement, summed over 4 code points instead of 1: a flag gated
+     on wsize==1 would leave yen/micro best-fit instead of substituted here */
+  wn = MultiByteToWideChar(CP_UTF8, 0, mixed, (int) strlen(mixed), wide,
+                           (int) (sizeof(wide) / sizeof(wide[0])));
+  assertf(wn == 4);
+  n = WideCharToMultiByte(cp, 0, wide, wn, NULL, 0, NULL, NULL);
+  assertf(n == 6); /* yen 1 + micro best-fit 2 + hira 2 + 'A' 1 */
+  n = WideCharToMultiByte(cp, WC_NO_BEST_FIT_CHARS, wide, wn, NULL, 0, NULL,
+                          NULL);
+  assertf(n == 5); /* yen 1 + micro default 1 + hira 2 + 'A' 1 */
+  /* control: banning best-fit must not break what the codepage does hold */
+  s = hts_convertStringFromUTF8Strict(hira, strlen(hira), cs);
+  assertf(s != NULL);
+  assertf(strcmp(s, "\x82\xA0") == 0);
+  freet(s);
+  s = hts_convertStringFromUTF8Strict(yen, strlen(yen), cs);
+  assertf(s == NULL);
+  /* the non-strict caller still substitutes, but with the codepage's own
+     default character rather than a lookalike */
+  gotCpInfo = GetCPInfo(cp, &cpi);
+  assertf(gotCpInfo);
+  s = hts_convertStringFromUTF8(yen, strlen(yen), cs);
+  assertf(s != NULL);
+  assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
+  freet(s);
+  s = hts_convertStringFromUTF8Strict(micro, strlen(micro), cs);
+  assertf(s == NULL);
+  s = hts_convertStringFromUTF8(micro, strlen(micro), cs);
+  assertf(s != NULL);
+  assertf(s[0] == (char) cpi.DefaultChar[0] && s[1] == '\0');
+  freet(s);
+  /* the mixed string, asserted byte-exact: both mutants above would either
+     mis-size the buffer (undersized usize) or mis-gate flags (best-fit
+     leaking through for a >1 code point string), and either shows up here */
+  s = hts_convertStringFromUTF8Strict(mixed, strlen(mixed), cs);
+  assertf(s == NULL); /* yen and micro are both lossy */
+  s = hts_convertStringFromUTF8(mixed, strlen(mixed), cs);
+  assertf(s != NULL);
+  assertf(s[0] == (char) cpi.DefaultChar[0]);
+  assertf(s[1] == (char) cpi.DefaultChar[0]);
+  assertf((unsigned char) s[2] == 0x82 && (unsigned char) s[3] == 0xA0);
+  assertf(s[4] == 'A' && s[5] == '\0');
+  freet(s);
+  /* the other arm of the gate: a codepage that refuses a non-zero dwFlags must
+     still convert, so UTF-7 encodes the yen instead of failing */
+  s = hts_convertStringFromUTF8(yen, strlen(yen), "utf-7");
+  assertf(s != NULL && s[0] == '+');
+  freet(s);
+  printf("nobestfit: OK\n");
   return 0;
 #else
   (void) opt;
@@ -3322,6 +3432,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
   const char *bodyfile = "st-savename-body.tmp";
   int statuscode = HTTP_OK, status = 0;
   int filpad = 0;
+  int nosback = 0;
   int i;
 
   if (argc < 2) {
@@ -3360,6 +3471,10 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
       cached = a + 7;
     else if (strncmp(a, "filpad=", 7) == 0)
       filpad = atoi(a + 7);
+    else if (strncmp(a, "delayed=", 8) == 0) /* -%N */
+      opt->savename_delayed = (hts_savename_delayed) atoi(a + 8);
+    else if (strncmp(a, "nosback=", 8) == 0) /* as -#C: no backing at all */
+      nosback = atoi(a + 8);
     else if (strncmp(a, "userdef=", 8) == 0) { /* -N, which selects type -1 */
       StringCopy(opt->savename_userdef, a + 8);
       opt->savename_type = -1;
@@ -3441,7 +3556,7 @@ static int st_savename(httrackp *opt, int argc, char **argv) {
     cache.hashtable = (void *) coucal_new(0);
   }
 
-  sback = back_new(opt, opt->maxsoc * 32 + 1024);
+  sback = nosback ? NULL : back_new(opt, opt->maxsoc * 32 + 1024);
   /* same wiring as hts_mirror (htscore.c) */
   hash_init(opt, &hash, opt->urlhack);
   hash.liens = (const lien_url *const *const *) &opt->liens;
@@ -4013,19 +4128,15 @@ static const char *const zip_abandon_kept[] = {"before.bin", "after1.bin",
                                                "after2.bin"};
 static const char zip_abandon_body[] = "zip-abandon kept member body";
 
-/* Build `path` with the kept members, opening a `doomed`-byte member after the
+/* Fill `zf` with the kept members, opening a `doomed`-byte member after the
    first one and abandoning it mid-write (0: never open it, the reference). The
-   doomed member is stored, so its body reaches the file byte for byte. */
-static int zip_abandon_build(const char *path, size_t doomed) {
-  char catbuff[CATBUFF_SIZE];
+   doomed member is stored, so its body reaches the file byte for byte. What the
+   abandon returned lands in *abandon_err. */
+static int zip_abandon_fill(zipFile zf, size_t doomed, int *abandon_err) {
   char chunk[4096];
   zip_fileinfo fi;
-  zipFile zf = hts_zipOpen_utf8(fconv(catbuff, sizeof(catbuff), path),
-                                APPEND_STATUS_CREATE);
   size_t i;
 
-  if (zf == NULL)
-    return -1;
   memset(&fi, 0, sizeof(fi));
   memset(chunk, 'Z', sizeof(chunk));
   for (i = 0; i < sizeof(zip_abandon_kept) / sizeof(zip_abandon_kept[0]); i++) {
@@ -4051,14 +4162,41 @@ static int zip_abandon_build(const char *path, size_t doomed) {
         goto fail;
       left -= n;
     }
-    if (zipAbandonFileInZip(zf) != ZIP_OK)
-      goto fail;
+    *abandon_err = zipAbandonFileInZip(zf);
   }
-  return zipClose(zf, NULL) == ZIP_OK ? 0 : -1;
+  return 0;
 
 fail:
-  zipClose(zf, NULL);
   return -1;
+}
+
+/* zip_abandon_fill() through a private filefunc table, `truncatable` telling
+   whether it carries a truncate entry: without one, as the Win32 tables were
+   before #1402, a rollback can only rewind. */
+static int zip_abandon_build_table(const char *path, size_t doomed,
+                                   hts_boolean truncatable, int *abandon_err) {
+  char catbuff[CATBUFF_SIZE];
+  zlib_filefunc64_def ff;
+  zipFile zf;
+  int ret;
+
+  hts_zip_filefunc64(&ff);
+  if (!truncatable)
+    ff.ztruncate64_file = NULL;
+  zf = zipOpen2_64(fconv(catbuff, sizeof(catbuff), path), APPEND_STATUS_CREATE,
+                   NULL, &ff);
+  if (zf == NULL)
+    return -1;
+  ret = zip_abandon_fill(zf, doomed, abandon_err);
+  return zipClose(zf, NULL) == ZIP_OK ? ret : -1;
+}
+
+static int zip_abandon_build(const char *path, size_t doomed) {
+  int abandon_err = ZIP_OK;
+
+  if (zip_abandon_build_table(path, doomed, HTS_TRUE, &abandon_err) != 0)
+    return -1;
+  return abandon_err == ZIP_OK ? 0 : -1;
 }
 
 /* Whole file into a malloct'd buffer: binary, not terminated. */
@@ -4184,6 +4322,86 @@ static int st_zip_abandon(httrackp *opt, int argc, char **argv) {
   }
   freet(ref);
   printf("zip-abandon: %s\n", fail ? "FAIL" : "OK");
+  return fail;
+}
+
+/* A rollback that could only rewind must say so (#1402): reporting ZIP_OK for
+   it hands the caller an archive whose directory no reader finds, the very
+   damage the truncate is there to prevent. */
+static int st_zip_abandon_notrunc(httrackp *opt, int argc, char **argv) {
+  static const size_t doomed = 200000; /* a tail past unzip.c's 64KB backscan */
+  char refpath[HTS_URLMAXSIZE], path[HTS_URLMAXSIZE];
+  char *ref = NULL, *got = NULL;
+  size_t reflen = 0, gotlen = 0;
+  int abandon_err = ZIP_OK;
+  int fail = 0;
+  unzFile uf;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "zip-abandon-notrunc: needs a writable directory\n");
+    return 1;
+  }
+  fconcat(refpath, sizeof(refpath), argv[0], "zip-notrunc-ref.zip");
+  fconcat(path, sizeof(path), argv[0], "zip-notrunc.zip");
+
+  /* control: the table the cache opens with truncates, and reports ZIP_OK */
+  if (zip_abandon_build_table(refpath, doomed, HTS_TRUE, &abandon_err) != 0 ||
+      zip_abandon_slurp(refpath, &ref, &reflen) != 0 || reflen == 0) {
+    fprintf(stderr, "zip-abandon-notrunc: cannot build the reference\n");
+    freet(ref);
+    return 1;
+  }
+  freet(ref);
+  if (abandon_err != ZIP_OK) {
+    fprintf(stderr,
+            "zip-abandon-notrunc: a truncating backend returned %d, want %d\n",
+            abandon_err, ZIP_OK);
+    fail++;
+  }
+  /* a flushed-but-kept member shows up as more than a backscan of leftovers,
+     which is the size that matters, not the member's nominal one */
+  if (reflen > 65535) {
+    fprintf(stderr,
+            "zip-abandon-notrunc: the reference kept %d byte(s), so the "
+            "abandoned member was not truncated away\n",
+            (int) reflen);
+    fail++;
+  }
+
+  abandon_err = ZIP_OK;
+  if (zip_abandon_build_table(path, doomed, HTS_FALSE, &abandon_err) != 0 ||
+      zip_abandon_slurp(path, &got, &gotlen) != 0) {
+    fprintf(stderr, "zip-abandon-notrunc: cannot build '%s'\n", path);
+    freet(got);
+    return fail + 1;
+  }
+  freet(got);
+  if (abandon_err == ZIP_OK) {
+    fprintf(stderr, "zip-abandon-notrunc: a backend with no truncate reported "
+                    "the rollback as done\n");
+    fail++;
+  }
+  /* only what the member had flushed stays, and it takes more than a reader's
+     64KB backscan (unzip.c uMaxBack) to bury the directory behind it */
+  if (gotlen <= reflen + 65535) {
+    fprintf(stderr,
+            "zip-abandon-notrunc: %d byte(s) left over the reference's %d, too "
+            "few to outgrow a 64KB backscan\n",
+            (int) gotlen, (int) reflen);
+    fail++;
+  }
+  /* what the wrong return hides: the tail buries the directory written after */
+  uf = hts_unzOpen_utf8(path);
+  if (uf != NULL) {
+    fprintf(stderr,
+            "zip-abandon-notrunc: '%s' still opens, so the case proves "
+            "nothing\n",
+            path);
+    unzClose(uf);
+    fail++;
+  }
+  printf("zip-abandon-notrunc: %s\n", fail ? "FAIL" : "OK");
   return fail;
 }
 
@@ -4524,10 +4742,10 @@ static int st_stripquery(httrackp *opt, int argc, char **argv) {
 
 /* The short form optalias_check() emits for the option words, both joined by a
    space when it returns two, or NULL when it refuses them; *used counts the
-   words consumed. */
+   words consumed and warn takes the message an accepted option still drew. */
 static const char *st_optalias_expand(char *dest, size_t dest_size,
                                       const char *word, const char *next,
-                                      int *used) {
+                                      int *used, char *warn, size_t warn_size) {
   char BIGSTK out[2][HTS_CDLMAXSIZE];
   char *outv[2] = {out[0], out[1]};
   const char *argv[2];
@@ -4537,13 +4755,14 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
 
   argv[0] = word;
   argv[1] = next;
-  out[0][0] = out[1][0] = dest[0] = '\0';
+  out[0][0] = out[1][0] = dest[0] = warn[0] = '\0';
   *used = optalias_check(argc, argv, 0, &outc, outv, sizeof(out[0]), error,
                          sizeof(error));
   if (*used == 0) {
     assertf(error[0] != '\0'); /* a refusal has to say why */
     return NULL;
   }
+  strlcpybuff(warn, error, warn_size);
   assertf(outc >= 1 && outc <= 2);
   strlcpybuff(dest, out[0], dest_size);
   if (outc == 2) {
@@ -4556,7 +4775,7 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
 /* Long-option value handling (#1195): a value the option's class did not take
    was dropped, so --index=0 read back as the enabling bare --index. */
 static int st_optalias(httrackp *opt, int argc, char **argv) {
-  char got[HTS_CDLMAXSIZE * 2];
+  char got[HTS_CDLMAXSIZE * 2], warn[256];
   int i, used;
 
   (void) opt;
@@ -4568,20 +4787,31 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
     return 0;
   }
   if (argc >= 1) {
-    const char *const out = st_optalias_expand(
-        got, sizeof(got), argv[0], argc >= 2 ? argv[1] : NULL, &used);
+    const char *const out = st_optalias_expand(got, sizeof(got), argv[0],
+                                               argc >= 2 ? argv[1] : NULL,
+                                               &used, warn, sizeof(warn));
 
     printf("%s\n", out != NULL ? out : "(refused)");
     return out != NULL ? 0 : 1;
   }
 #define EXPANDS(want, word, next)                                              \
   do {                                                                         \
-    const char *const out__ =                                                  \
-        st_optalias_expand(got, sizeof(got), (word), (next), &used);           \
+    const char *const out__ = st_optalias_expand(                              \
+        got, sizeof(got), (word), (next), &used, warn, sizeof(warn));          \
     assertf(out__ != NULL && strcmp(out__, (want)) == 0);                      \
+    assertf(warn[0] == '\0');                                                  \
+  } while (0)
+/* accepted, expanding to WANT, but drawing a warning on the way */
+#define WARNS(want, word, next)                                                \
+  do {                                                                         \
+    const char *const out__ = st_optalias_expand(                              \
+        got, sizeof(got), (word), (next), &used, warn, sizeof(warn));          \
+    assertf(out__ != NULL && strcmp(out__, (want)) == 0);                      \
+    assertf(warn[0] != '\0');                                                  \
   } while (0)
 #define REFUSES(word, next)                                                    \
-  assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used) == NULL)
+  assertf(st_optalias_expand(got, sizeof(got), (word), (next), &used, warn,    \
+                             sizeof(warn)) == NULL)
 
   /* -I0 has always disabled the index; now the long form can say it too */
   EXPANDS("-I0", "--index=0", NULL);
@@ -4638,12 +4868,81 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-y0", "--no-background-on-suspend", NULL);
   EXPANDS("-%T", "--utf8-conversion", NULL);
 
+  /* the --wide-/--tiny- prefix glues the --wide/--tiny connection count onto
+     the plain clusters, and is refused wherever the glue would be misread */
+  EXPANDS("-wc32", "--wide-mirror", NULL);
+  assertf(used == 1);
+  EXPANDS("-wc1", "--tiny-mirror", NULL);
+  EXPANDS("-p0C0I0tc32", "--wide-spider", NULL);
+  EXPANDS("-qgc1", "--tiny-get", NULL);
+  EXPANDS("-Xc32", "--wide-purge-old", NULL);
+  EXPANDS("-o2c1", "--tiny-generate-errors", "2");
+  assertf(used == 2);
+  /* elsewhere the alias applies without the count, and says so */
+  WARNS("-O /tmp", "--wide-path", "/tmp"); /* the value is a word of its own */
+  WARNS("+*.gif", "--tiny-allow", "*.gif");
+  WARNS("--clean", "--wide-clean", NULL); /* a long form */
+  WARNS("-c8", "--wide-sockets", "8");    /* -c8 already: 8 or 32? */
+  WARNS("-c32", "--tiny-wide", NULL);     /* -c32 already: 32 or 1? */
+  WARNS("-N1", "--wide-structure", "1");  /* -N takes a template */
+  WARNS("-%r", "--wide-warc", NULL);      /* -%rc is --warc-cdx, not -%r -c */
+  WARNS("-#h", "--wide-version", NULL);   /* -#h is matched as a whole word */
+  WARNS("-h", "--tiny-help", NULL);
+
   /* the value-taking classes are untouched */
   EXPANDS("-C0", "--cache=0", NULL);
   EXPANDS("-C0", "--nocache", NULL);
   EXPANDS("-C2", "--cache", "2");
   EXPANDS("-P proxy:8080", "--proxy", "proxy:8080");
   EXPANDS("+*.gif", "--allow", "*.gif");
+
+  /* --structure glues a preset and detaches a template (#1380): the engine
+     reads a detached -N value as a user template whatever it holds */
+  EXPANDS("-N1", "--structure=1", NULL);
+  EXPANDS("-N100", "--structure=100", NULL);
+  EXPANDS("-N1", "--structure", "1");
+  assertf(used == 2);
+  EXPANDS("-N %h%p/%n%q.%t", "--structure=%h%p/%n%q.%t", NULL);
+  assertf(used == 1);
+  EXPANDS("-N %h%p/%n%q.%t", "--structure", "%h%p/%n%q.%t");
+  assertf(used == 2);
+  EXPANDS("-N %h%p/%n%q.%t", "--user-structure", "%h%p/%n%q.%t");
+  /* an empty value is -N "", which the engine reads as "back to the default" */
+  EXPANDS("-N ", "--structure=", NULL);
+  /* what "param" glued keeps gluing: a preset trailed by more short options,
+     and the on/off values every param row takes */
+  EXPANDS("-N1L0", "--structure=1L0", NULL);
+  EXPANDS("-N1L0", "--structure", "1L0");
+  EXPANDS("-N1%c8", "--structure=1%c8", NULL);
+  EXPANDS("-N0", "--structure=off", NULL);
+  EXPANDS("-N", "--structure=on", NULL);
+  /* a template may open with a digit, so the leading digits do not decide it */
+  EXPANDS("-N 2col/%n.%t", "--structure=2col/%n.%t", NULL);
+  EXPANDS("-N 2col/%n.%t", "--structure", "2col/%n.%t");
+  /* past 9 digits sscanf("%d") wraps onto -1, and with no % to make it a
+     template either the value has nowhere left to go */
+  EXPANDS("-N999999999", "--structure=999999999", NULL);
+  REFUSES("--structure=4294967295", NULL);
+  /* a %-free value would map every URL onto one name, so it is a typo */
+  REFUSES("--structure=OFF", NULL);
+  REFUSES("--structure=flat", NULL);
+  REFUSES("--structure", "none");
+  REFUSES("--structure=-1", NULL);
+  /* --user-structure is how to ask for such a value on purpose */
+  EXPANDS("-N flat", "--user-structure", "flat");
+  /* the short form agrees, rather than reading -N 1 as a template named 1 */
+  EXPANDS("-N1", "-N", "1");
+  assertf(used == 2);
+  EXPANDS("-N", "-N", "%h%p/%n%q.%t");
+  assertf(used == 1);
+  /* and there a bare digit run is the only thing it takes: 1L0 and an overlong
+     run stay templates, as they were before the class existed */
+  EXPANDS("-N", "-N", "2col/%n.%t");
+  assertf(used == 1);
+  EXPANDS("-N", "-N", "4294967295");
+  assertf(used == 1);
+  EXPANDS("-N", "-N", "1L0");
+  assertf(used == 1);
 
   /* invariant: every name's bare long form still emits its short form, and a
      param name still demands its own value. A duplicate name (test, continue)
@@ -4663,6 +4962,7 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   }
   assertf(i > 100); /* the table was walked, not skipped */
 #undef EXPANDS
+#undef WARNS
 #undef REFUSES
 
   printf("optalias self-test OK\n");
@@ -7032,6 +7332,62 @@ static int st_contentcodings(httrackp *opt, int argc, char **argv) {
     assertf(hts_codec_unpack(HTS_CODEC_UNSUPPORTED, inpath, outpath) < 0);
   }
   printf("contentcodings self-test OK\n");
+  return 0;
+}
+
+/* The errno contract the disk-full classification rests on: a decode that
+   cannot write leaves the write's errno, a body the decoder refuses leaves 0
+   (#1398). Both are poisoned first, so a caller that never sets errno fails. */
+static int st_codecerrno(httrackp *opt, int argc, char **argv) {
+  static const unsigned char body[] = "codec errno contract, round-tripped";
+  const size_t len = sizeof(body) - 1;
+  char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
+  FILE *fp;
+
+  (void) opt;
+  if (argc < 2) {
+    fprintf(stderr, "usage: -#test=codecerrno <dir> <doomed-out>\n");
+    return 1;
+  }
+  snprintf(inpath, sizeof(inpath), "%s/ce-in.z", argv[0]);
+  snprintf(outpath, sizeof(outpath), "%s/ce-out", argv[0]);
+  assertf(ae_write_packed(inpath, 16 + MAX_WBITS, body, len) == 0);
+  errno = ENOSPC;
+  assertf(hts_zunpack(inpath, outpath) == (int) len);
+  errno = 0;
+  assertf(hts_zunpack(inpath, argv[1]) == -1);
+  assertf(errno == ENOSPC);
+  errno = 0;
+  assertf(hts_codec_unpack(HTS_CODEC_DEFLATE, inpath, argv[1]) == -1);
+  assertf(errno == ENOSPC);
+  errno = ENOSPC;
+  assertf(hts_codec_unpack(HTS_CODEC_UNSUPPORTED, inpath, outpath) == -1);
+  assertf(errno == 0);
+  /* Past the gzip magic, so the header still parses and the identity fallback
+     stays out of it: the stream itself is what fails. */
+  fp = FOPEN(inpath, "r+b");
+  assertf(fp != NULL);
+  assertf(fseek(fp, 12, SEEK_SET) == 0);
+  assertf(hts_fwrite_exact("\xff\xff\xff\xff\xff\xff\xff\xff", 8, fp));
+  assertf(fclose(fp) == 0);
+  errno = ENOSPC;
+  assertf(hts_zunpack(inpath, outpath) == -1);
+  assertf(errno == 0);
+  errno = ENOSPC;
+  assertf(hts_codec_unpack(HTS_CODEC_DEFLATE, inpath, outpath) == -1);
+  assertf(errno == 0);
+#if HTS_USEBROTLI
+  /* and a backend of its own, where the write goes through codec_sink() */
+  assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text)) == 0);
+  errno = 0;
+  assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, argv[1]) == -1);
+  assertf(errno == ENOSPC);
+  assertf(ae_write_raw(inpath, cc_br_text, sizeof(cc_br_text) - 4) == 0);
+  errno = ENOSPC;
+  assertf(hts_codec_unpack(HTS_CODEC_BROTLI, inpath, outpath) == -1);
+  assertf(errno == 0);
+#endif
+  printf("codecerrno: write failure kept, refused stream cleared\n");
   return 0;
 }
 
@@ -10080,6 +10436,94 @@ static int st_singlefile(httrackp *opt, int argc, char **argv) {
   return sf_err;
 }
 
+// é and 中 in UTF-8: the charset axis of the long-path tests (#630).
+#define ST_NONASCII "\xC3\xA9\xE4\xB8\xAD"
+
+// mkdir path, tolerating one that already exists.
+static hts_boolean st_mkdir_at(const char *path, size_t n, const char *who) {
+  if (MKDIR(path) != 0 && errno != EEXIST) {
+    fprintf(stderr, "%s: mkdir failed at %u chars: %s\n", who, (unsigned) n,
+            strerror(errno));
+    return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+// UTF-16 units a UTF-8 run costs, which is what Windows measures MAX_PATH in.
+// A stray byte is charged short, and short only ever builds a longer path.
+static size_t st_utf16_units(const char *s, size_t n) {
+  size_t units = 0;
+
+  for (size_t i = 0; i < n; i++) {
+    const unsigned char c = (unsigned char) s[i];
+
+    if ((c & 0xC0) == 0x80) {
+      continue; /* continuation byte: charged with its lead */
+    }
+    units += c >= 0xF0 ? 2 : 1; /* outside the BMP is a surrogate pair */
+  }
+  return units;
+}
+
+// Headroom st_mkdeep keeps for one more segment plus the caller's leaf name,
+// the longest of which is direnum's "/\xE4\xB8\xAD-deux.bin".
+#define ST_LEAF_ROOM 64
+
+// Build a tree under dir whose deepest path clears MAX_PATH (260): an optional
+// non-ASCII first segment, then ASCII ones (#133). 0 on failure; *baselen is
+// where teardown must stop, and is written on every path.
+static size_t st_mkdeep(char *buf, size_t bufsize, const char *dir,
+                        const char *nseg, const char *who, size_t *baselen) {
+  // 40-char segments: each under the 255 per-component limit \\?\ can't lift.
+  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  const size_t room = bufsize - (sizeof(seg) + ST_LEAF_ROOM);
+  size_t n = (size_t) snprintf(buf, bufsize, "%s", dir);
+
+  assertf(bufsize > sizeof(seg) + ST_LEAF_ROOM);
+  if (baselen != NULL) {
+    *baselen = 0;
+  }
+  if (n >= room) {
+    goto too_long;
+  }
+  while (n > 0 && (buf[n - 1] == '/' || buf[n - 1] == '\\')) {
+    buf[--n] = '\0';
+  }
+  if (baselen != NULL) {
+    *baselen = n;
+  }
+  if (nseg != NULL) {
+    const size_t nseglen = strlen(nseg);
+
+    if (nseglen >= room - n) { /* room - n > 0 above */
+      goto too_long;
+    }
+    memcpybuff(buf + n, nseg, nseglen + 1);
+    n += nseglen;
+    if (!st_mkdir_at(buf, n, who)) {
+      return 0;
+    }
+  }
+  // Loop on the limit itself, over the whole path: an arithmetic bound landed
+  // exactly on 260 for some base lengths, a byte count on a non-ASCII base.
+  while (st_utf16_units(buf, n) <= 260) {
+    if (n >= room) {
+      goto too_long;
+    }
+    memcpybuff(buf + n, seg, sizeof(seg));
+    n += sizeof(seg) - 1;
+    if (!st_mkdir_at(buf, n, who)) {
+      return 0;
+    }
+  }
+  assertf(st_utf16_units(buf, n) > 260); /* what every caller depends on */
+  return n;
+
+too_long:
+  fprintf(stderr, "%s: base dir too long (%u chars)\n", who, (unsigned) n);
+  return 0;
+}
+
 // -#test=longpath <dir>: round-trip a >MAX_PATH (260) file through the file
 // wrappers, exercising hts_pathToUCS2's \\?\ prefixing on Windows (#133).
 static int st_longpath(httrackp *opt, int argc, char **argv) {
@@ -10089,25 +10533,14 @@ static int st_longpath(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   char path[HTS_URLMAXSIZE * 2];
-  size_t n = (size_t) snprintf(path, sizeof(path), "%s", argv[0]);
+  size_t n = st_mkdeep(path, sizeof(path), argv[0], NULL, "longpath", NULL);
 
-  while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
-    path[--n] = '\0';
-  }
-  // 40-char segments: each under the 255 per-component limit \\?\ can't lift.
-  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-  while (n + sizeof(seg) - 1 < 300) {
-    memcpybuff(path + n, seg, sizeof(seg));
-    n += sizeof(seg) - 1;
-    if (MKDIR(path) != 0 && errno != EEXIST) {
-      fprintf(stderr, "longpath: mkdir failed at %u chars: %s\n", (unsigned) n,
-              strerror(errno));
-      return 1;
-    }
+  if (n == 0) {
+    return 1;
   }
   memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
   n += sizeof("/leaf.bin") - 1;
-  assertf(n > 260); /* must exceed the limit \\?\ lifts */
+  assertf(st_utf16_units(path, n) > 260); /* the limit \\?\ lifts */
 
   static const char payload[] = "longpath-ok";
   FILE *fp = FOPEN(path, "wb");
@@ -10148,38 +10581,18 @@ static int st_mirrorio(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   char path[HTS_URLMAXSIZE * 2];
-  size_t n = (size_t) snprintf(path, sizeof(path), "%s", argv[0]);
+  size_t base = 0;
+  size_t n = st_mkdeep(path, sizeof(path), argv[0],
+                       "/" ST_NONASCII "-non-ascii-seg", "mirrorio", &base);
 
-  while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
-    path[--n] = '\0';
-  }
-  const size_t base = n; /* the caller's base dir; teardown stops here */
-  // First segment carries non-ASCII UTF-8 (é 中) to drive the charset axis
-  // (#630); ASCII 40-char segments then push the total past MAX_PATH (#133).
-  static const char nseg[] = "/\xC3\xA9\xE4\xB8\xAD-non-ascii-seg";
-  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-  memcpybuff(path + n, nseg, sizeof(nseg));
-  n += sizeof(nseg) - 1;
-  if (MKDIR(path) != 0 && errno != EEXIST) {
-    fprintf(stderr, "mirrorio: mkdir failed (non-ascii): %s\n",
-            strerror(errno));
+  if (n == 0) {
     return 1;
-  }
-  while (n + sizeof(seg) - 1 < 300) {
-    memcpybuff(path + n, seg, sizeof(seg));
-    n += sizeof(seg) - 1;
-    if (MKDIR(path) != 0 && errno != EEXIST) {
-      fprintf(stderr, "mirrorio: mkdir failed at %u chars: %s\n", (unsigned) n,
-              strerror(errno));
-      return 1;
-    }
   }
   const size_t leafdir = n;
 
   memcpybuff(path + n, "/leaf.bin", sizeof("/leaf.bin"));
   n += sizeof("/leaf.bin") - 1;
-  assertf(n > 260); /* must exceed the limit \\?\ lifts */
+  assertf(st_utf16_units(path, n) > 260); /* the limit \\?\ lifts */
 
   static const char payload[] = "mirrorio-ok";
 
@@ -10603,35 +11016,14 @@ static int st_direnum(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   char path[HTS_URLMAXSIZE * 2];
-  size_t n = (size_t) snprintf(path, sizeof(path), "%s", argv[0]);
+  size_t base = 0;
+  const size_t dirlen =
+      st_mkdeep(path, sizeof(path), argv[0], "/" ST_NONASCII "-non-ascii-seg",
+                "direnum", &base);
 
-  while (n > 0 && (path[n - 1] == '/' || path[n - 1] == '\\')) {
-    path[--n] = '\0';
-  }
-  const size_t base = n;
-  // Non-ASCII first segment + 40-char ASCII segments push the dir past
-  // MAX_PATH.
-  static const char nseg[] = "/\xC3\xA9\xE4\xB8\xAD-non-ascii-seg";
-  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-  memcpybuff(path + n, nseg, sizeof(nseg));
-  n += sizeof(nseg) - 1;
-  if (MKDIR(path) != 0 && errno != EEXIST) {
-    fprintf(stderr, "direnum: mkdir failed (non-ascii): %s\n", strerror(errno));
+  if (dirlen == 0) {
     return 1;
   }
-  while (n + sizeof(seg) - 1 < 300) {
-    memcpybuff(path + n, seg, sizeof(seg));
-    n += sizeof(seg) - 1;
-    if (MKDIR(path) != 0 && errno != EEXIST) {
-      fprintf(stderr, "direnum: mkdir failed at %u chars: %s\n", (unsigned) n,
-              strerror(errno));
-      return 1;
-    }
-  }
-  const size_t dirlen = n;
-
-  assertf(dirlen > 260); /* the enumerated directory itself exceeds MAX_PATH */
 
   // Two non-ASCII leaf files to read back by name.
   static const char *const leaves[] = {"/\xC3\xA9-un.bin",
@@ -10704,33 +11096,14 @@ static int st_cookieimport(httrackp *opt, int argc, char **argv) {
     return 1;
   }
   char dir[HTS_URLMAXSIZE * 2];
-  size_t n = (size_t) snprintf(dir, sizeof(dir), "%s", argv[0]);
+  size_t base = 0;
+  const size_t dirlen =
+      st_mkdeep(dir, sizeof(dir), argv[0], "/" ST_NONASCII "-cookie-seg",
+                "cookieimport", &base);
 
-  while (n > 0 && (dir[n - 1] == '/' || dir[n - 1] == '\\')) {
-    dir[--n] = '\0';
-  }
-  const size_t base = n;
-  static const char nseg[] = "/\xC3\xA9\xE4\xB8\xAD-cookie-seg";
-  static const char seg[] = "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-
-  memcpybuff(dir + n, nseg, sizeof(nseg));
-  n += sizeof(nseg) - 1;
-  if (MKDIR(dir) != 0 && errno != EEXIST) {
-    fprintf(stderr, "cookieimport: mkdir failed: %s\n", strerror(errno));
+  if (dirlen == 0) {
     return 1;
   }
-  while (n + sizeof(seg) - 1 < 300) {
-    memcpybuff(dir + n, seg, sizeof(seg));
-    n += sizeof(seg) - 1;
-    if (MKDIR(dir) != 0 && errno != EEXIST) {
-      fprintf(stderr, "cookieimport: mkdir failed at %u: %s\n", (unsigned) n,
-              strerror(errno));
-      return 1;
-    }
-  }
-  const size_t dirlen = n;
-
-  assertf(dirlen > 260); /* the cookie folder itself exceeds MAX_PATH */
 
   char fpath[HTS_URLMAXSIZE * 2];
   char file[HTS_URLMAXSIZE * 2];
@@ -12295,6 +12668,9 @@ static const struct selftest_entry {
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",
      st_syscharset},
+    {"nobestfit", "",
+     "no best-fit substitute when converting from UTF-8 (WIN32 only)",
+     st_nobestfit},
     {"metacharset", "<html>", "extract the <meta> charset from an HTML page",
      st_metacharset},
     {"isutf8", "<hex:..|string>", "is the string valid UTF-8 (1/0)", st_isutf8},
@@ -12434,6 +12810,9 @@ static const struct selftest_entry {
      st_zip_repair_shift},
     {"zip-abandon", "<dir>",
      "an abandoned member leaves the archive byte-identical", st_zip_abandon},
+    {"zip-abandon-notrunc", "<dir>",
+     "a rollback that could only rewind reports a failure",
+     st_zip_abandon_notrunc},
     {"dns", "", "DNS resolver/cache self-test", st_dns},
     {"dnstimeout", "", "a slow DNS resolve is bounded and holds no lock",
      st_dnstimeout},
@@ -12447,6 +12826,10 @@ static const struct selftest_entry {
      st_structcheck},
     {"filesave", "<doomed-save> <control-save>",
      "filesave() reports a failing close, errno intact", st_filesave},
+    {"codecerrno", "<dir> <doomed-out>",
+     "hts_codec_unpack() errno: kept on a failed write, cleared on a bad "
+     "stream",
+     st_codecerrno},
     {"topindex", "[dir]",
      "hts_buildtopindex charset handling of a non-ASCII project dir",
      st_topindex},

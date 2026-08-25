@@ -1285,6 +1285,98 @@ class Handler(SimpleHTTPRequestHandler):
             except OSError:
                 pass
 
+    # A body delivered in two parts, the pause splitting it across two reads:
+    # a save nobody can take then fails on the read that ends the body, where
+    # r.size has already reached totalsize.
+    def route_diskfull_splitindex(self):
+        self.send_html('\t<a href="split.bin">split</a>\n')
+
+    def route_diskfull_splitsmallindex(self):
+        self.send_html('\t<a href="splitsmall.bin">splitsmall</a>\n')
+
+    def route_diskfull_splitchunkedindex(self):
+        self.send_html('\t<a href="splitchunked.bin">splitchunked</a>\n')
+
+    def route_diskfull_split(self):
+        self.send_split(8000)
+
+    # Same shape, small enough that stdio holds the whole body: nothing fails
+    # until the save is closed.
+    def route_diskfull_splitsmall(self):
+        self.send_split(100)
+
+    # Same, chunked: the failing write lands on the read completing a chunk,
+    # where r.size reaching the chunk end is what erases the error.
+    def route_diskfull_splitchunked(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        self.wfile.write(b"1\r\nS\r\n")
+        self.wfile.flush()
+        time.sleep(1)
+        body = b"S" * 7999
+        self.wfile.write(b"%X\r\n" % len(body) + body + b"\r\n")
+        self.wfile.write(b"0\r\n\r\n")
+        self.wfile.flush()
+        self.close_connection = True
+
+    def send_split(self, total):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(total))
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        self.wfile.write(b"S")  # opens the save file; stdio holds this byte
+        self.wfile.flush()
+        time.sleep(1)
+        self.wfile.write(b"S" * (total - 1))  # the read that completes the body
+        self.wfile.flush()
+
+    # No Content-Length and no chunking: the body ends with the connection, so
+    # totalsize stays -1 and the tail leaves stdio only at the closing flush.
+    def route_diskfull_noclenindex(self):
+        self.send_html('\t<a href="noclen.bin">noclen</a>\n')
+
+    def route_diskfull_noclen(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(b"DISKFULL-NOCLEN\n" + b"N" * 84)
+        self.close_connection = True
+
+    # A gzip-coded asset never reaches the save name as it streams: it spools
+    # through ~hts-tmp/<name>.z and is decoded into place afterwards.
+    GZ_BODY = b"DISKFULL-GZ\n" + b"\x00\x01\x02\xff" * 16384
+
+    def route_diskfull_gzindex(self):
+        self.send_html(
+            '\t<a href="gz.bin">gz</a>\n\t<a href="gzpage.html">gzpage</a>\n'
+        )
+
+    def route_diskfull_gzbadindex(self):
+        self.send_html('\t<a href="gzbad.bin">gzbad</a>\n')
+
+    def route_diskfull_gz(self):
+        self.send_coded(gzip.compress(self.GZ_BODY), "application/octet-stream")
+
+    # A gzip stream that cannot be decoded: the control for the spool arms, where
+    # a stale errno would read a corrupt body as a full disk.
+    def route_diskfull_gzbad(self):
+        self.send_coded(self.bad_gzip(self.GZ_BODY), "application/octet-stream")
+
+    def route_diskfull_gzpage(self):
+        self.send_coded(
+            gzip.compress(b"<html><body><p>DISKFULL-GZPAGE</p></body></html>"),
+            "text/html",
+        )
+
     # --- a hub page that fails on the update, taking its children with it --
     # The children are only reachable through hub.html: if the engine drops
     # them from new.lst because the hub was never parsed, the purge unlinks
@@ -1406,6 +1498,125 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_bigfail_gone(self):
         self.send_raw(b"<html><body><p>BIGFAIL-GONE</p></body></html>", "text/html")
+
+    # --- a hub that is a redirect, failing on the update (#1395) ------------
+    # rtarget.html and its child reached the mirror through rhub.html alone,
+    # and the cached entry for a 301 carries no hypertext type to key on.
+    def route_redirfail_index(self):
+        links = '\t<a href="rhub.html">hub</a>\n'
+        if self.refetch_pass() <= 2:  # rgone.html leaves the site for crawl 3
+            links += '\t<a href="rgone.html">gone</a>\n'
+        self.send_html(links)
+
+    # Cuts off both attempts of crawl 2, then redirects again for crawl 3.
+    def route_redirfail_hub(self):
+        if 2 <= self.refetch_pass() <= 3:
+            self.send_cut_headers()
+        else:
+            self.send_response(301, "Moved Permanently")
+            self.send_header("Location", "/redirfail/rtarget.html")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    def route_redirfail_target(self):
+        self.send_raw(
+            b"<html><body><p>REDIRFAIL-TARGET</p>"
+            b'<a href="rchild.html">c</a></body></html>',
+            "text/html",
+        )
+
+    def route_redirfail_child(self):
+        self.send_raw(b"<html><body><p>REDIRFAIL-CHILD</p></body></html>", "text/html")
+
+    def route_redirfail_gone(self):
+        self.send_raw(b"<html><body><p>REDIRFAIL-GONE</p></body></html>", "text/html")
+
+    # --- a hub failing on two consecutive updates (#1395) ------------------
+    # Crawl 2 holds the purge on the cached page from crawl 1 and writes no
+    # entry of its own, leaving crawl 3 nothing in the cache to key on.
+    def route_twicefail_index(self):
+        self.send_html('\t<a href="thub.html">hub</a>\n\t<a href="talt.html">alt</a>\n')
+
+    def route_twicefail_hub(self):
+        if self.refetch_pass() == 1:
+            self.send_html('\t<a href="tchild.html">c</a>\n')
+        else:
+            self.send_cut_headers()
+
+    # The child's other parent, which stops linking it for crawl 3: only the
+    # hub still carries tchild.html then, and only its local copy says so.
+    def route_twicefail_alt(self):
+        links = '\t<a href="tchild.html">c</a>\n' if self.refetch_pass() <= 2 else ""
+        self.send_html(links)
+
+    def route_twicefail_child(self):
+        self.send_raw(b"<html><body><p>TWICEFAIL-CHILD</p></body></html>", "text/html")
+
+    # --- negative control: a blob that carries no links (#1395) ------------
+    # Previously mirrored and failing exactly like the hubs, but typed as a
+    # blob, so neither the cached entry nor the kept copy may hold the purge.
+    def route_binfail_index(self):
+        links = '\t<a href="binblob.bin">blob</a>\n'
+        if self.refetch_pass() <= 2:  # bingone.html leaves the site for crawl 3
+            links += '\t<a href="bingone.html">gone</a>\n'
+        self.send_html(links)
+
+    # Fails on crawls 2 and 3: the second failure has no cached entry left, so
+    # only the kept copy's name says what it was.
+    def route_binfail_blob(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(
+                b"BINFAIL-BLOB\n" + b"\x71\x72\x73\x74" * 256,
+                "application/octet-stream",
+            )
+        else:
+            self.send_cut_headers()
+
+    def route_binfail_gone(self):
+        self.send_raw(b"<html><body><p>BINFAIL-GONE</p></body></html>", "text/html")
+
+    # --- negative control: a Location on an answered blob (#1395) -----------
+    # Location: is parsed and cached whatever the status, so a 200 carrying one
+    # must not read as a redirect and hold the purge on the strength of it.
+    def route_locfail_index(self):
+        links = '\t<a href="locblob.bin">blob</a>\n'
+        if self.refetch_pass() == 1:  # locgone.html leaves the site afterwards
+            links += '\t<a href="locgone.html">gone</a>\n'
+        self.send_html(links)
+
+    def route_locfail_blob(self):
+        if self.refetch_pass() == 1:
+            self.send_raw(
+                b"LOCFAIL-BLOB\n" + b"\x71\x72\x73\x74" * 256,
+                "application/octet-stream",
+                extra_headers=[("Location", "/locfail/elsewhere.bin")],
+            )
+        else:
+            self.send_cut_headers()
+
+    def route_locfail_gone(self):
+        self.send_raw(b"<html><body><p>LOCFAIL-GONE</p></body></html>", "text/html")
+
+    # --- a hub whose savename is not its URL (#1395) ------------------------
+    # dynhub.php mirrors as dynhub.html, so the guard has to read the name the
+    # cache recorded rather than the one the URL suggests.
+    def route_dynfail_index(self):
+        links = '\t<a href="dynhub.php">hub</a>\n'
+        if self.refetch_pass() == 1:  # dyngone.html leaves the site afterwards
+            links += '\t<a href="dyngone.html">gone</a>\n'
+        self.send_html(links)
+
+    def route_dynfail_hub(self):
+        if self.refetch_pass() == 1:
+            self.send_html('\t<a href="dynchild.html">c</a>\n')
+        else:
+            self.send_cut_headers()
+
+    def route_dynfail_child(self):
+        self.send_raw(b"<html><body><p>DYNFAIL-CHILD</p></body></html>", "text/html")
+
+    def route_dynfail_gone(self):
+        self.send_raw(b"<html><body><p>DYNFAIL-GONE</p></body></html>", "text/html")
 
     # Echo what httrack advertised, so a crawl can assert the header.
     def route_codec_ae(self):
@@ -2967,6 +3178,19 @@ class Handler(SimpleHTTPRequestHandler):
         "/diskfull/chunked.bin": route_diskfull_chunked,
         "/diskfull/stallindex.html": route_diskfull_stallindex,
         "/diskfull/stall.bin": route_diskfull_stall,
+        "/diskfull/splitindex.html": route_diskfull_splitindex,
+        "/diskfull/split.bin": route_diskfull_split,
+        "/diskfull/splitsmallindex.html": route_diskfull_splitsmallindex,
+        "/diskfull/splitsmall.bin": route_diskfull_splitsmall,
+        "/diskfull/splitchunkedindex.html": route_diskfull_splitchunkedindex,
+        "/diskfull/splitchunked.bin": route_diskfull_splitchunked,
+        "/diskfull/noclenindex.html": route_diskfull_noclenindex,
+        "/diskfull/noclen.bin": route_diskfull_noclen,
+        "/diskfull/gzindex.html": route_diskfull_gzindex,
+        "/diskfull/gzbadindex.html": route_diskfull_gzbadindex,
+        "/diskfull/gz.bin": route_diskfull_gz,
+        "/diskfull/gzbad.bin": route_diskfull_gzbad,
+        "/diskfull/gzpage.html": route_diskfull_gzpage,
         "/hubfail/index.html": route_hubfail_index,
         "/hubfail/hub.html": route_hubfail_hub,
         "/hubfail/child1.html": route_hubfail_child,
@@ -2988,6 +3212,25 @@ class Handler(SimpleHTTPRequestHandler):
         "/bigfail/bighub.html": route_bigfail_hub,
         "/bigfail/bigchild.html": route_bigfail_child,
         "/bigfail/biggone.html": route_bigfail_gone,
+        "/redirfail/index.html": route_redirfail_index,
+        "/redirfail/rhub.html": route_redirfail_hub,
+        "/redirfail/rtarget.html": route_redirfail_target,
+        "/redirfail/rchild.html": route_redirfail_child,
+        "/redirfail/rgone.html": route_redirfail_gone,
+        "/twicefail/index.html": route_twicefail_index,
+        "/twicefail/thub.html": route_twicefail_hub,
+        "/twicefail/talt.html": route_twicefail_alt,
+        "/twicefail/tchild.html": route_twicefail_child,
+        "/binfail/index.html": route_binfail_index,
+        "/binfail/binblob.bin": route_binfail_blob,
+        "/binfail/bingone.html": route_binfail_gone,
+        "/locfail/index.html": route_locfail_index,
+        "/locfail/locblob.bin": route_locfail_blob,
+        "/locfail/locgone.html": route_locfail_gone,
+        "/dynfail/index.html": route_dynfail_index,
+        "/dynfail/dynhub.php": route_dynfail_hub,
+        "/dynfail/dynchild.html": route_dynfail_child,
+        "/dynfail/dyngone.html": route_dynfail_gone,
         "/ranged/asset.bin": route_ranged_asset,
         "/types/index.html": route_types_index,
         "/types/control.php": route_types,

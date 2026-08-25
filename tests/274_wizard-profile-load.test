@@ -69,7 +69,7 @@ htsserver_python - "${HTS_URL}" "${work}" <<'PY' || fail "see above"
 import re
 import sys
 
-from webtestlib import Session, textarea
+from webtestlib import Session, field, textarea
 
 s, work = Session(sys.argv[1]), sys.argv[2]
 sid = s.sid
@@ -146,9 +146,14 @@ for key, value in [("Warc", "0"), ("Wacz", "1"), ("NoExternalPages", "0")]:
     if ini.get(key) != value:
         sys.exit("%s saved back as %r, wanted %r" % (key, ini.get(key), value))
 
-# A key in the file wins over the startup default even when it holds nothing,
-# and a checkbox the wizard defaults to on is only clearable that way (#1186).
-want('--user-agent ""')
+# A key in the file wins over the startup default even when it holds nothing
+# (#1186); the box is the observable, since an empty -F now emits nothing (#1386).
+box = field(s.get("option6.html?sid=" + sid), "user")
+if box != "":
+    sys.exit("the emptied browser id came back as %r" % box)
+sent = [f for f in flags if f.startswith("--user-agent")]
+if sent:
+    sys.exit("an emptied browser id still reached the engine: %r" % sent)
 reject("--keep-alive")
 if ini.get("UserID") != "" or ini.get("KeepAlive") != "0":
     sys.exit("the cleared fields came back as %r / %r"

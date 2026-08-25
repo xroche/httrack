@@ -89,7 +89,74 @@ for bad in "$tmp/absent" "$tmp/plainfile"; do
     rc=0
     "$sh_run" "$report" -s "$cap" "$bad" >"$tmp/bad.out" 2>&1 || rc=$?
     assert_eq 2 "$rc" "collector took a log dir of $bad"
+    rc=0
+    "$sh_run" "$report" "$logs" "$bad" >"$tmp/bad.out" 2>&1 || rc=$?
+    assert_eq 2 "$rc" "collector took a trailing TEST_LOG_DIR of $bad"
 done
+
+# 4c. Each runtime's own header, isolated from every other arm -- a fixture
+# carrying two arms' markers would stay caught by the one not under test.
+hit() { # hit LABEL LINE... -- LABEL's log must be a match with today's pattern
+    label=$1
+    shift
+    dir=$tmp/hit-$label
+    mkdir -p "$dir"
+    printf '%s\n' "$@" >"$dir/finding.log"
+    "$sh_run" "$report" "$dir" >"$tmp/hit-$label.out" 2>&1 &&
+        fail "the collector missed $label: $(cat "$tmp/hit-$label.out")"
+    return 0
+}
+
+# ASan header (its own doc example), no SUMMARY line.
+hit asan '==5==ERROR: AddressSanitizer: heap-buffer-overflow on address 0x60200000eff0 at pc 0x000000455935 bp 0x7ffd7f5c1af8 sp 0x7ffd7f5c1af0' \
+    'READ of size 4 at 0x60200000eff0 thread T0'
+
+# LeakSanitizer header (clang's doc example), no SUMMARY line.
+hit leak '==23646==ERROR: LeakSanitizer: detected memory leaks' \
+    '' \
+    'Direct leak of 7 byte(s) in 1 object(s) allocated from:' \
+    '    #0 0x4af01b in operator new[](unsigned long) asan_new_delete.cc:66'
+
+# MemorySanitizer's own finding is a WARNING, not an ERROR; no SUMMARY line.
+hit msan '==29418==WARNING: MemorySanitizer: use-of-uninitialized-value' \
+    '    #0 0x4008d6 in main umr.cc:5'
+
+# ThreadSanitizer: the pattern's WARNING arm claims to cover this too.
+hit tsan 'WARNING: ThreadSanitizer: data race (pid=19219)' \
+    '  Write of size 4 at 0x7fcf47b21bc0 by thread T1:'
+
+# A SUMMARY line with no ERROR/WARNING header at all -- for example, a log
+# truncated to its tail.
+hit summary-only 'SUMMARY: AddressSanitizer: heap-buffer-overflow example.c:5 in main'
+
+# compiler-rt's signal handler is shared: a crash reports through the
+# ERROR-group, not the WARNING form above.
+hit msan-crash '==46812==ERROR: MemorySanitizer: SEGV on unknown address 0x006000000000 (pc 0xaaaac1b12dd4 bp 0xffffcba33690 sp 0xffffcba31760 T46812)' \
+    '==46812==The signal is caused by a WRITE memory access.'
+
+hit tsan-crash '==205049==ERROR: ThreadSanitizer: SEGV on unknown address 0x000000000000 (pc 0x000000490f8a bp 0x000000000000 sp 0x7f88234bf268 T205050)' \
+    '==205049==The signal is caused by a WRITE memory access.'
+
+# The bare marker a sanitizer writes before its full report, in case that
+# report itself crashes; no "ERROR:" prefix, so it pins DEADLYSIGNAL alone.
+hit deadlysignal 'AddressSanitizer:DEADLYSIGNAL'
+
+# 4d. A full report carries a header AND a SUMMARY line: only losing both
+# arms blinds it. These are the two combinations #1405 flags for `msan`, a
+# required check.
+hit leak-full '==23646==ERROR: LeakSanitizer: detected memory leaks' \
+    '' \
+    'Direct leak of 7 byte(s) in 1 object(s) allocated from:' \
+    '    #0 0x4af01b in operator new[](unsigned long) asan_new_delete.cc:66' \
+    '    #1 0x4da26f in main main.cpp:4' \
+    '' \
+    'SUMMARY: AddressSanitizer: 7 byte(s) leaked in 1 allocation(s).'
+
+hit msan-full '==29418==WARNING: MemorySanitizer: use-of-uninitialized-value' \
+    '    #0 0x4008d6 in main umr.cc:5' \
+    '    #1 0x7f0c31eaabd4 in __libc_start_main libc-start.c:287' \
+    '' \
+    'SUMMARY: MemorySanitizer: use-of-uninitialized-value umr.cc:5 in main'
 
 # 5. What the caller redirected stderr into has to be whole the moment the shim
 # exits; a tee nobody waited for left it short (#1374). Go a batch at a time,

@@ -142,3 +142,30 @@ local_crawl() {
     test "$rc" -ne 124 || fail "crawl watchdog fired after ${deadline}s"
     return "$rc"
 }
+
+# What a run reported doing to the files the previous mirror had, out of
+# hts-changes.json: assert_purged true|false OUTDIR.
+assert_purged() {
+    local want="$1" json="${2}/hts-changes.json"
+    grep -q "\"purged\": ${want}" "$json" ||
+        fail "expected \"purged\": ${want} in $(<"$json")"
+}
+
+# assert_alive FILE MARKER: still mirrored, and still the body we mirrored.
+assert_alive() {
+    test -s "$1" || fail "$1 is gone"
+    grep -q "$2" "$1" || fail "$1 no longer carries ${2}"
+}
+
+# assert_logged OUTDIR PATTERN WHAT: the premise a shape rests on, in the log.
+assert_logged() {
+    local log="${1}/hts-log.txt"
+    grep -qE "$2" "$log" || fail "${3}: $(<"$log")"
+}
+
+# assert_gave_up OUTDIR URLPATH: the link really did exhaust its retries on a
+# transport failure, not on an answered error.
+assert_gave_up() {
+    assert_logged "$1" "Error:.*\\(-[0-9]+\\).*at link .*${2}" \
+        "no transport failure gave up on ${2}"
+}

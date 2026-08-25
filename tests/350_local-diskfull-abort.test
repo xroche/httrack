@@ -4,7 +4,8 @@
 # engine retries and then purges against. /dev/full stands in, under the save
 # name each crawl is about to write: once for a body that reaches the disk as
 # it streams, once for a page and once for a file small enough that stdio holds
-# them until the close.
+# them until the close. A coded body never reaches its save name as it streams,
+# so its arm dooms the ~hts-tmp spool it lands in instead.
 
 set -euo pipefail
 
@@ -47,7 +48,7 @@ crawl_onto_full() {
     local site="${dir}/127.0.0.1_${SRV_PORT}/diskfull"
 
     shift 3
-    mkdir -p "$site"
+    mkdir -p "$(dirname "${site}/${doomed}")" # a spool name has a directory of its own
     ln -s /dev/full "${site}/${doomed}"
     # Captured on the line itself: the log read below would clobber $? first.
     local_crawl --log "${tmpdir}/log-${name}" "${common[@]}" "$@" -O "$dir" \
@@ -118,6 +119,17 @@ grep -q 'disk full or filesystem problems' <<<"$log" ||
     fail "a chunk completed by the read whose write failed passed for clean: ${log}"
 ok "the chunked path is fatal too"
 
+# --- no Content-Length and no chunking: the closing flush is the only writer --
+# totalsize stays -1, so no completion test can see this one, and glibc's later
+# fclose() returns 0 once the flush has taken the error.
+crawl_onto_full noclen noclen.bin noclenindex.html
+grep -q 'disk full or filesystem problems' <<<"$log" ||
+    fail "a full disk under a close-delimited body was not reported: ${log}"
+if grep -qF 'noclen.bin' "${tmpdir}/noclen/hts-cache/new.txt"; then
+    fail "a body that never reached the disk was recorded as mirrored"
+fi
+ok "a close-delimited body the disk refused is fatal too"
+
 # --- and it is not re-reported as a truncated download -----------------------
 # --tolerant downgrades a length mismatch to a warning instead of rewriting the
 # status, which is where a disk-cut body would be blamed on the server instead.
@@ -129,9 +141,52 @@ if grep -q 'Incorrect length' <<<"$log"; then
 fi
 ok "a length mismatch the full disk caused is not reported as one"
 
+# --- a coded body: the disk runs out under the spool, not the save name ------
+# First the contract the two arms below rest on: the decoder hands its caller
+# the write's errno, and clears it for a stream it refused.
+ln -s /dev/full "${tmpdir}/doomed-decode"
+assert_selftest "codecerrno: write failure kept, refused stream cleared" \
+    codecerrno "$tmpdir" "${tmpdir}/doomed-decode"
+
+# gz.bin streams into ~hts-tmp/gz.bin.z and is decoded into place afterwards,
+# so nothing the crawl writes to the save name can stand in for a full disk.
+crawl_onto_full gzspool '~hts-tmp/gz.bin.z' gzindex.html
+grep -q 'disk full or filesystem problems' <<<"$log" ||
+    fail "a full disk under the compressed spool was not reported: ${log}"
+ok "a full disk under a coded body's spool is fatal too"
+
+# And the other end of the same body: the decode writes ~hts-tmp/gz.bin.u before
+# renaming it into place, and a full disk there is not the stream's fault.
+crawl_onto_full gzunpack '~hts-tmp/gz.bin.u' gzindex.html
+grep -q 'disk full or filesystem problems' <<<"$log" ||
+    fail "a full disk under the decode was reported as a corrupt body: ${log}"
+ok "a full disk under a coded body's decode is fatal too"
+
+# The control that arm needs: a body that really is corrupt, on a disk with room
+# to spare, must not be read as a full disk by a leftover errno.
+gzbad="${tmpdir}/gzbad"
+local_crawl --log "${tmpdir}/log-gzbad" "${common[@]}" -O "$gzbad" \
+    "${BASEURL}/diskfull/gzbadindex.html"
+log=$(<"${gzbad}/hts-log.txt")
+grep -q 'Error when decompressing' <<<"$log" ||
+    fail "a corrupt coded body was not reported as one: ${log}"
+if grep -qE 'Mirror aborted|disk full' <<<"$log"; then
+    fail "a corrupt coded body gave up the whole mirror: ${log}"
+fi
+ok "a corrupt coded body is not read as a full disk"
+
+# The decoded page, written the same way an uncoded one is.
+crawl_onto_full gzpage gzpage.html gzindex.html
+grep -q 'Unable to write HTML file' <<<"$log" ||
+    fail "a coded page the disk refused was saved as a success: ${log}"
+grep -q 'Fatal write error, giving up' <<<"$log" ||
+    fail "the full disk did not stop the mirror on the coded page path: ${log}"
+ok "a coded page that cannot be written is fatal too"
+
 # --- a write error outside the fatal class must stay retryable ---------------
 # A pipe whose reader has gone gives EPIPE, which is about this file, not the
-# filesystem: the mirror must finish the rest rather than give up.
+# filesystem: the mirror must finish the rest rather than give up. The write
+# fails mid-body here; 355 pins the read that both completes a body and fails.
 epipe="${tmpdir}/epipe"
 epipesite="${epipe}/127.0.0.1_${SRV_PORT}/diskfull"
 mkdir -p "$epipesite"
@@ -145,6 +200,16 @@ local_crawl --log "${tmpdir}/log-epipe" "${common[@]}" --retries=0 -O "$epipe" \
     "${BASEURL}/diskfull/index.html" || epipe_rc=$?
 kill "$reader" 2>/dev/null || true
 log=$(<"${epipe}/hts-log.txt")
+grep -q 'Unable to write file .*big\.bin' <<<"$log" ||
+    fail "the broken pipe went unreported, so nothing here failed to be written: ${log}"
+grep -q 'Write error on disk' <<<"$log" ||
+    fail "the broken pipe was not reported as a write error: ${log}"
+# r.size counts bytes read, so a body our own write cut short must never be
+# reported as one the server truncated.
+if grep -q 'Incorrect length' <<<"$log"; then
+    fail "a write error was reported as a truncated download: ${log}"
+fi
+ok "a write error outside the fatal class is still reported against its file"
 if grep -q 'disk full or filesystem problems' <<<"$log"; then
     fail "a broken pipe was treated as a full disk: ${log}"
 fi

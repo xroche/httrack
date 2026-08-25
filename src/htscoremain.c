@@ -388,6 +388,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           htsmain_free();
           return -1;
         }
+        /* an option that parsed, but not as asked (a --wide-/--tiny- prefix
+           the alias cannot carry) */
+        if (tmp_error[0] != '\0')
+          fprintf(stderr, "* %s\n", tmp_error);
 
         /* Copier */
         if (!cmdl_add(&x_cmd, tmp_argv[0]) ||
@@ -1292,9 +1296,18 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   opt->savename_type = 0;       // -N "" : par défaut
               }
             } else {
-              sscanf(com + 1, "%d", &opt->savename_type);
-              while(isdigit((unsigned char) *(com + 1)))
+              /* A glued run is a preset, never userdef: sscanf("%d") past
+                 INT_MAX is negative on LP64 but INT_MAX on ILP32, so no clamp
+                 on its result is portable. */
+              const char *digits = com + 1;
+              int ndigits;
+
+              for (ndigits = 0; isdigit((unsigned char) *(com + 1)); ndigits++)
                 com++;
+              if (ndigits > 0)
+                opt->savename_type = ndigits <= HTS_SAVENAME_PRESET_MAX_DIGITS
+                                         ? atoi(digits)
+                                         : 0;
             }
             break;
           case 'L': {

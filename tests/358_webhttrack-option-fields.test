@@ -1,0 +1,179 @@
+#!/bin/bash
+#
+# The type check and the eight MIME pairs were stored and restored by the GUI
+# and never put on the command line, and a cleared browser id emitted
+# --user-agent "", which mutes the header instead of leaving the engine's own.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_optfields.XXXXXX") || fail "no tmpdir"
+csrv=
+cleanup_push htsserver_cleanup_dir "${work}"
+cleanup_push htsserver_reap_vars csrv
+
+export HOME="${work}" # no ~/.httrack.ini of the developer's in the store
+
+# data.foo is served as a binary, so only --assume foo=text/html makes the
+# engine parse it and reach deep.html.
+site="${work}/docroot"
+mkdir -p "${site}"
+printf '<html><body><a href="data.foo">d</a></body></html>\n' >"${site}/index.html"
+printf '<html><body><a href="deep.html">deep</a></body></html>\n' >"${site}/data.foo"
+printf '<html><body>deep content</body></html>\n' >"${site}/deep.html"
+
+clog="${work}/content.log"
+"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${site}" >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
+
+htsserver_start
+
+# The page that offers the pairs is the count's only source, so a ninth row
+# flows through here instead of desyncing three literals.
+pairs=$(grep -c '<input name="ext[0-9]*"' "${HTS_DISTDIR}/html/server/option11.html")
+test "${pairs}" -ge 8 || fail "option11.html offers only ${pairs} MIME pairs"
+
+out="${work}/crawl"
+htsserver_python - "${HTS_URL}" "${work}" "${cport}" "${pairs}" <<'PY' || fail "the GUI built the wrong command line (see above)"
+import html
+import re
+import sys
+
+from webtestlib import Session, textarea
+
+s, work, port = Session(sys.argv[1]), sys.argv[2], sys.argv[3]
+npairs = int(sys.argv[4])
+rc = 0
+
+
+def check(ok, what):
+    global rc
+    print(("ok: " if ok else "FAIL: ") + what)
+    if not ok:
+        rc = 1
+
+
+def cmdline():
+    return textarea(s.get("step4.html"), "command")
+
+
+# The pairs the MIME page offers. The first is the one the crawl proves;
+# the rest only have to reach the engine.
+PAIRS = [("foo", "text/html")] + [("x%d" % n, "application/x-t%d" % n)
+                                  for n in range(2, npairs + 1)]
+
+s.post("step2.html", [("path", work), ("projname", "crawl")])
+s.post("step3.html", [("urls", "http://127.0.0.1:%s/index.html" % port)])
+# robots id 1 is --robots=0: the fixture's robots.txt is not what is under test.
+s.post("option8.html", [("robots", "1")])
+s.post("option11.html", [kv for n, (e, m) in enumerate(PAIRS, 1)
+                         for kv in (("ext%d" % n, e), ("mime%d" % n, m))])
+
+# The type check: three list entries, three engine values, never off by one.
+for listid, want in (("1", "--check-type=0"), ("2", "--check-type=1"),
+                     ("3", "--check-type=2")):
+    s.post("option8.html", [("checktype", listid)])
+    got = re.findall(r"--check-type=\d", cmdline())
+    check(got == [want], "checktype %s emits %s (got %s)" % (listid, want, got))
+
+cmd = cmdline()
+for n, (e, m) in enumerate(PAIRS, 1):
+    check('--assume "%s=%s"' % (e, m) in cmd, "pair %d reaches the engine" % n)
+
+# An emptied extension has to take its MIME with it: left behind, the value is
+# a bare argv token and the engine reads whatever it spells as its own options.
+s.post("option11.html", [("ext3", ""), ("mime3", " --user-agent INJECTED")])
+cmd = cmdline()
+check("INJECTED" not in cmd, "an emptied extension drops its MIME too")
+check(len(re.findall("--assume ", cmd)) == len(PAIRS) - 1,
+      "the other pairs stay")
+s.post("option11.html", [("ext3", PAIRS[2][0]), ("mime3", PAIRS[2][1])])
+
+# The proxy line carries the same shape: a port with no host to attach to.
+s.post("option10.html", [("prox", ""), ("portprox", " -O /tmp/relocated")])
+check("/tmp/relocated" not in cmdline(), "a port with no proxy host emits nothing")
+s.post("option10.html", [("portprox", "")])
+
+# The browser id. A blank box must leave the engine's own default alone, so no
+# option at all; a filled one still has to emit it, or the flag simply died.
+s.post("option6.html", [("user", "Probe/1.0")])
+check('--user-agent "Probe/1.0"' in cmdline(), "a filled browser id is sent")
+s.post("option6.html", [("user", "")])
+check("--user-agent" not in cmdline(), "a blank browser id sends no --user-agent")
+
+if rc:
+    sys.exit(rc)
+# Start, the way the browser's button does: both textareas as rendered, with
+# the entities decoded the way the HTML parser hands them back.
+page = s.get("step4.html")
+s.post("step4.html", [("command", html.unescape(cmdline())),
+                      ("winprofile", html.unescape(textarea(page, "winprofile"))),
+                      ("command_do", "start"), ("path", work),
+                      ("projname", "crawl")])
+PY
+
+log="${out}/hts-log.txt"
+start=${SECONDS}
+while ! grep -q "HTTrack Website Copier/" "${log}" 2>/dev/null; do
+    htsserver_alive || fail "htsserver died: $(tail -n 20 "${log}" 2>/dev/null)"
+    test "$((SECONDS - start))" -lt 120 || fail_dump "the crawl did not end" "${log}"
+    poll_wait 0.2
+done
+
+# doit.log is the invocation rebuilt from argv, so it is what the engine got.
+doit="${out}/hts-cache/doit.log"
+assert_file "${doit}" "the crawl recorded no invocation"
+argv=$(head -1 "${doit}")
+grep -q -- "-u2" <<<"${argv}" || fail "the type check never reached the engine: ${argv}"
+grep -q -- "-%A foo=text/html" <<<"${argv}" ||
+    fail "the first MIME pair never reached the engine: ${argv}"
+# One token per line, so grep -c counts the flags rather than the single line.
+assume_flags=$(tr ' ' '\n' <<<"${argv}" | grep -c -- '-%A' || true)
+assert_eq "${pairs}" "${assume_flags}" "-%A flags in the recorded argv"
+! grep -q -- "-F " <<<"${argv}" || fail "a blank browser id still sent -F: ${argv}"
+
+# The rule changed the crawl, not just the argv: without it data.foo stays a
+# binary the engine never opens, so deep.html is unreachable.
+mirror="${out}/127.0.0.1_${cport}"
+assert_file "${mirror}/data.html" "--assume did not retype data.foo"
+assert_file "${mirror}/deep.html" "--assume did not make data.foo parseable"
+
+# A cold second server: reloading the saved project has to put the same flags
+# back, or the fields are still stored one way only.
+htsserver_start --home "${work}"
+htsserver_python - "${HTS_URL}" "${work}" "${pairs}" <<'PY' || fail "the reloaded profile lost its flags (see above)"
+import re
+import sys
+
+from webtestlib import Session, field, textarea
+
+s, work, npairs = Session(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+rc = 0
+
+
+def check(ok, what):
+    global rc
+    print(("ok: " if ok else "FAIL: ") + what)
+    if not ok:
+        rc = 1
+
+
+loaded = s.post("step2.html", [("path", work), ("loadprojname", "crawl")])
+check(field(loaded, "projname") == "crawl", "step2.html reloaded the project")
+cmd = textarea(s.get("step4.html"), "command")
+check("--check-type=2" in cmd, "--check-type survives the round trip")
+check(len(re.findall("--assume ", cmd)) == npairs,
+      "every --assume survives the round trip")
+check("--user-agent" not in cmd, "a reloaded blank browser id stays unsent")
+sys.exit(rc)
+PY
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "PASS"
