@@ -215,7 +215,7 @@ typedef struct sniff_src {
   const char *prev_save; /* previous run's save name (cache X-Save) */
 } sniff_src;
 
-static size_t sniff_read_head(const char *path, void *buf, size_t len) {
+size_t hts_read_file_head(const char *path, void *buf, size_t len) {
   char catbuff[CATBUFF_SIZE];
   FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "rb");
   size_t n = 0;
@@ -241,9 +241,9 @@ static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
     if (r->out != NULL)
       fflush(r->out);
     if (slot->url_sav[0] != '\0')
-      n = sniff_read_head(slot->url_sav, buf, len);
+      n = hts_read_file_head(slot->url_sav, buf, len);
     if (n == 0 && slot->tmpfile != NULL && slot->tmpfile[0] != '\0')
-      n = sniff_read_head(slot->tmpfile, buf, len);
+      n = hts_read_file_head(slot->tmpfile, buf, len);
   }
   if (n > 0 && r->compressed) {
     unsigned char raw[HTS_SNIFF_LEN];
