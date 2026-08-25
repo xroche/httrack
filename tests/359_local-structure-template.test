@@ -14,6 +14,10 @@ tmpbase=${TMPDIR:-/tmp}
 tmp=$(mktemp -d "${tmpbase%/}/httrack_structure.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${tmp}"
 
+# The engine maps what Windows forbids in a filename to '_', on every platform,
+# so a drive-letter TMPDIR lands as D_ and an 8.3 one as RUNNE_1.
+localname() { printf '%s' "$1" | tr ':~' '__'; }
+
 echo '<html><body>hello</body></html>' >"${tmp}/page.html"
 
 run() { # run ARG...
@@ -55,13 +59,13 @@ refused() { # refused WANTED-MESSAGE ARG...
 # The presets, in every spelling. 100 and 5 pin the whole value: a truncated one
 # lands back on the default layout, which "no web/page.html" cannot tell apart
 # from the option never arriving.
-default_layout="file/${tmp#/}/page.html"
+default_layout="file/$(localname "${tmp#/}")/page.html"
 layout web/page.html -N1
 layout web/page.html --structure 1
 layout web/page.html --structure=1
 layout web/html/page.html -N5
 layout web/html/page.html --structure=5
-layout "${tmp#/}/page.html" --structure=100
+layout "$(localname "${tmp#/}")/page.html" --structure=100
 layout "${default_layout}" --structure=0
 
 # A detached -N 1 used to mean a user template literally named "1", collapsing
