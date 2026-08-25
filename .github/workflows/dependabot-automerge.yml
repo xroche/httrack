@@ -1,0 +1,31 @@
+# CI already validates every pin dependabot bumps here, so auto-merge only saves the manual click.
+name: Dependabot auto-merge
+
+# pull_request_target, because a dependabot pull_request gets a read-only token.
+# Nothing from the PR is checked out or run, so the writable token stays safe.
+on: pull_request_target
+
+concurrency:
+  group: dependabot-automerge-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  # Both writes are what enabling auto-merge costs: the API call needs the pull
+  # request scope, and the merge it queues needs the contents one.
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge:
+    name: Arm auto-merge
+    if: github.repository == 'xroche/httrack' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      # Dependabot's body is a release-notes dump, so give the squash commit a body of its own.
+      - name: Enable auto-merge
+        run: gh pr merge --auto --squash --subject "$PR_TITLE (#$PR_NUMBER)" --body "" "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
