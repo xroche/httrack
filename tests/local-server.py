@@ -3146,6 +3146,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.route_ctpurge_nulls(name)
         if case == "dyn":
             return self.route_ctpurge_dyn(name)
+        if case == "twice":
+            return self.route_ctpurge_twice(name)
         ctype = self.CTPURGE_TYPES.get(case)
         target = "hub.html" if case == "page" else "blob.bin"
         if name == "index.html":
@@ -3169,6 +3171,25 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_raw(b"<html><body><p>CTPURGE-GONE</p></body></html>", "text/html")
         else:
             self.send_error(404)
+
+    # An untyped blob already wearing a page's name, failing two updates in a
+    # row: the third crawl finds no cache entry left and falls to the copy #746
+    # kept, the one arm that types the file by the name it was saved under.
+    def route_ctpurge_twice(self, name):
+        if name == "index.html":
+            links = '\t<a href="blob.html">blob</a>\n'
+            if self.refetch_pass() <= 2:  # gone.html leaves for the third crawl
+                links += '\t<a href="gone.html">gone</a>\n'
+            return self.send_html(links)
+        if name == "blob.html":
+            if self.refetch_pass() >= 2:
+                return self.send_cut_headers()
+            return self.send_raw(self.CTPURGE_BLOB, None)
+        if name == "gone.html":
+            return self.send_raw(
+                b"<html><body><p>CTPURGE-GONE</p></body></html>", "text/html"
+            )
+        self.send_error(404)
 
     # A dynamic page and a blob, both left untyped: the page must still be
     # scanned, and the blob must reach disk with its bytes intact.

@@ -83,6 +83,33 @@ ok "a blob whose type nothing declared holds nothing back, header or no header"
 blob_case octet
 ok "an explicitly typed blob behaves as it did before"
 
+# --- a blob that fails two updates in a row --------------------------------
+# The third crawl has no cache entry left and falls to the copy #746 kept, the
+# one arm that types the file by the name it was saved under. Serving the blob
+# at blob.html is what reaches it: a savename recomputed on a failed pass drops
+# the tail an undeclared type had added, and has to name a file that exists.
+out="${tmpdir}/twice"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/ctpurge/twice"
+
+local_crawl --log "${tmpdir}/twice1" "${common[@]}" -O "$out" \
+    "${BASEURL}/ctpurge/twice/index.html"
+holds_nuls "${site}/blob.html"
+test -s "${site}/gone.html" || fail "pass 1 did not mirror gone.html"
+
+for crawl in 2 3; do
+    local_crawl --log "${tmpdir}/twice${crawl}" "${common[@]}" -O "$out" --update \
+        "${BASEURL}/ctpurge/twice/index.html"
+    grep -qE "Error:.*\(-[0-9]+\).*at link .*/ctpurge/twice/blob\.html" \
+        "${out}/hts-log.txt" ||
+        fail "crawl ${crawl}: the blob re-fetch did not fail, so nothing was tested"
+done
+test -s "${site}/blob.html" || fail "the twice-failed blob lost its copy (#746)"
+test ! -e "${site}/gone.html" ||
+    fail "gone.html left the site and a blob that failed twice kept it"
+purge_says true "$out"
+ok "a blob that fails twice holds nothing back either"
+
 # --- what the html default is there for ------------------------------------
 # A dynamic page is html far more often than its extension admits, so an
 # undeclared type must keep reading as one: scanning it is what mirrors the
