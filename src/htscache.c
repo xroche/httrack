@@ -474,13 +474,18 @@ htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,
 
 htsblk cache_read_including_broken(httrackp *opt, cache_back *cache,
                                    const char *adr, const char *fil,
-                                   char *return_save) {
-  htsblk r = cache_readex(opt, cache, adr, fil, NULL, NULL, return_save, 0);
+                                   char *return_save, char *return_location) {
+  htsblk r =
+      cache_readex(opt, cache, adr, fil, NULL, return_location, return_save, 0);
 
   if (r.statuscode == -1) {
     lien_back *itemback = NULL;
 
     if (back_unserialize_ref(opt, adr, fil, &itemback) == 0) {
+      if (return_location != NULL)
+        strlcpybuff(return_location,
+                    itemback->r.location != NULL ? itemback->r.location : "",
+                    HTS_LOCATION_SIZE);
       r = itemback->r;
       /* header fields only, like cache_readex(): the entry torn down below
          owns these (#826) */
