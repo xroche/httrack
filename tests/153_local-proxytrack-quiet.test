@@ -69,10 +69,26 @@ propfind() { # port path
         "http://127.0.0.1:$1/webdav/example.com/$2"
 }
 
-# Whatever the process wrote once serving; the banner ends on the PID line. A
-# missing PID line yields nothing, which the 207 count below then fails on.
+# Whatever the process wrote once serving. The banner ends on the PID line on
+# stdout and on the loaded archive on stderr, and the sanitizer legs run the
+# engine through a shim that relays stderr from another process (#1374), so the
+# two reach this pty in either order: cut past whichever landed last.
 request_log() { # log
-    sed -n '/^PID=/,$p' "$1" | tail -n +2 | tr -d '\r'
+    tr -d '\r' <"$1" | awk '
+        /^PID=/ || /^processed: / { banner = NR }
+        { line[NR] = $0 }
+        END { for (i = banner + 1; i <= NR; i++) print line[i] }'
+}
+
+# That cut is only sound while both halves precede anything served, so wait for
+# them before issuing a request rather than sorting it out afterwards.
+wait_banner() { # log
+    local waited=0
+    until grep -q '^PID=' "$1" && grep -q '^processed: ' "$1"; do
+        test "$waited" -lt 100 || fail "proxytrack never finished its startup banner: $(<"$1")"
+        sleep 0.1
+        waited=$((waited + 1))
+    done
 }
 
 # The drainer is proxytrack's child, not this shell's, so it cannot be waited
@@ -98,6 +114,7 @@ launch_quiet() {
 }
 start_proxytrack "$dir/quiet" launch_quiet
 quietlog=$ptlog quietport=$proxyport quietpid=$ptpid ptpid=
+wait_banner "$quietlog"
 
 # Both on one connection: the access log is written before send(), and only
 # proxytrack's keep-alive loop orders anything written after it, since the
