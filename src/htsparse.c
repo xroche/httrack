@@ -51,6 +51,7 @@ Please visit our Website: http://www.httrack.com
 #include "htscharset.h"
 #include "htsencoding.h"
 #include "htssniff.h"
+#include "htsname.h"
 
 /* external modules */
 #include "htsmodules.h"
@@ -3554,8 +3555,19 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
   return strcasecmp(n_fil, pn_fil) == 0;
 }
 
+/* A copy httrack parsed as hypertext has no NUL left in it, the parse path
+   blanks them on the way to disk. One surviving proves no run read links out of
+   this file, whatever its recorded type and name claim (#1415). */
+static hts_boolean hts_mirrored_copy_is_binary(const char *save) {
+  char head[HTS_SNIFF_LEN];
+  const size_t n = hts_read_file_head(save, head, sizeof(head));
+
+  /* nothing readable reads as not-binary, so the guard still holds */
+  return memchr(head, '\0', n) != NULL ? HTS_TRUE : HTS_FALSE;
+}
+
 /* Does this link have a mirrored subtree the purge could take? Only a previous
-   run's successful fetch does; a link never mirrored endangers nothing. */
+   run's successful fetch of something that could carry links does. */
 static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
                                             const char *adr, const char *fil) {
   char BIGSTK prev_save[HTS_URLMAXSIZE * 2];
@@ -3565,7 +3577,8 @@ static hts_boolean hts_link_may_carry_links(httrackp *opt, cache_back *cache,
   prev = cache_read_including_broken(opt, cache, adr, fil, prev_save);
 
   return HTTP_IS_OK(prev.statuscode) && strnotempty(prev_save) &&
-                 is_hypertext_mime(opt, prev.contenttype, prev_save)
+                 is_hypertext_mime(opt, prev.contenttype, prev_save) &&
+                 !hts_mirrored_copy_is_binary(prev_save)
              ? HTS_TRUE
              : HTS_FALSE;
 }

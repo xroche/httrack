@@ -182,8 +182,8 @@ static void cleanEndingSpaceOrDot(char *s) {
 }
 
 /* Wire Content-Type vs URL extension: a patchable wire type wins over an
-   unspecific ext, an undeclared type keeps a non-HTML ext (#267 guard), a
-   declared disagreement is CONTESTED (sniffed below). */
+   unspecific ext, the HTS_UNKNOWN_MIME sentinel keeps a specific non-HTML ext
+   (#267 guard), a declared disagreement is CONTESTED (sniffed below). */
 typedef enum wire_verdict {
   WIRE_KEEPS_EXT,
   WIRE_WINS,
@@ -195,14 +195,15 @@ static wire_verdict wire_ext_verdict(httrackp *opt, const char *wiremime,
                                      size_t urlmime_size) {
   if (may_unknown2(opt, wiremime, file))
     return WIRE_KEEPS_EXT; /* type kept verbatim (keep-list / bogus-multiple) */
-  if (undeclared_ext_is_not_hypertext(opt, wiremime, file))
-    return WIRE_KEEPS_EXT; /* no declared type: the ext is all there is */
   urlmime[0] = '\0';
   /* type implied by the URL extension, only when confidently known (flag 0) */
   if (!get_httptype_sized(opt, urlmime, urlmime_size, file, 0))
     return WIRE_WINS; /* URL ext implies no known type */
   if (strfield2(wiremime, urlmime))
     return WIRE_KEEPS_EXT; /* agreement (no .htm->.html churn) */
+  if (!is_hypertext_mime(opt, urlmime, file) &&
+      strfield2(wiremime, HTS_UNKNOWN_MIME))
+    return WIRE_KEEPS_EXT; /* no declared type */
   return WIRE_CONTESTED;
 }
 
@@ -214,7 +215,7 @@ typedef struct sniff_src {
   const char *prev_save; /* previous run's save name (cache X-Save) */
 } sniff_src;
 
-static size_t sniff_read_head(const char *path, void *buf, size_t len) {
+size_t hts_read_file_head(const char *path, void *buf, size_t len) {
   char catbuff[CATBUFF_SIZE];
   FILE *const fp = FOPEN(fconv(catbuff, sizeof(catbuff), path), "rb");
   size_t n = 0;
@@ -240,9 +241,9 @@ static size_t sniff_slot_head(const lien_back *slot, void *buf, size_t len) {
     if (r->out != NULL)
       fflush(r->out);
     if (slot->url_sav[0] != '\0')
-      n = sniff_read_head(slot->url_sav, buf, len);
+      n = hts_read_file_head(slot->url_sav, buf, len);
     if (n == 0 && slot->tmpfile != NULL && slot->tmpfile[0] != '\0')
-      n = sniff_read_head(slot->tmpfile, buf, len);
+      n = hts_read_file_head(slot->tmpfile, buf, len);
   }
   if (n > 0 && r->compressed) {
     unsigned char raw[HTS_SNIFF_LEN];

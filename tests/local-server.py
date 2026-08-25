@@ -2989,16 +2989,47 @@ class Handler(SimpleHTTPRequestHandler):
         "page": "text/html",
     }
     CTPURGE_BLOB = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+    CTPURGE_HUB = (
+        b'<html><body><p>CTPURGE-HUB</p><a href="child.html">c</a></body></html>'
+    )
+
+    # Pages carrying NUL bytes, to pin the ratio and floor the untyped-body
+    # binary check keeps: each must still be scanned, so its child is mirrored.
+    #   few    2 NULs in a short page -- over the ratio, under the floor
+    #   many  15 NULs in ~2 KB       -- over the floor, under the ratio
+    #   typed 30 NULs, but text/html -- declared, so the check never applies
+    CTPURGE_NULLS = {"few.php": (2, 0), "many.php": (15, 1900), "typed.html": (30, 0)}
+
+    def route_ctpurge_nulls(self, name):
+        if name == "index.html":
+            return self.send_html(
+                "".join('\t<a href="%s">p</a>\n' % p for p in self.CTPURGE_NULLS)
+            )
+        if name in self.CTPURGE_NULLS:
+            nuls, pad = self.CTPURGE_NULLS[name]
+            child = "c%s.html" % name.split(".")[0]
+            body = (
+                b'<html><body><p>CTPURGE-NULL</p><a href="%s">c</a>' % child.encode()
+                + b" " * pad
+                + b"\x00" * nuls
+                + b"</body></html>"
+            )
+            return self.send_raw(body, "text/html" if name.endswith(".html") else None)
+        if name.startswith("c") and name.endswith(".html"):
+            return self.send_raw(
+                b"<html><body><p>CTPURGE-NULLCHILD</p></body></html>", "text/html"
+            )
+        self.send_error(404)
 
     def route_ctpurge(self):
         case, _, name = urlsplit(self.path).path[len("/ctpurge/") :].partition("/")
+        if case == "nulls":
+            return self.route_ctpurge_nulls(name)
+        if case == "dyn":
+            return self.route_ctpurge_dyn(name)
         ctype = self.CTPURGE_TYPES.get(case)
         target = "hub.html" if case == "page" else "blob.bin"
         if name == "index.html":
-            if case == "dyn":
-                return self.send_html(
-                    '\t<a href="hub.php">hub</a>\n\t<a href="blob.php">blob</a>\n'
-                )
             links = '\t<a href="%s">hub</a>\n' % target
             if self.refetch_pass() <= 1:  # gone.html leaves the site for crawl 2
                 links += '\t<a href="gone.html">gone</a>\n'
@@ -3008,21 +3039,9 @@ class Handler(SimpleHTTPRequestHandler):
             if self.refetch_pass() >= 2:
                 self.send_cut_headers()
             elif case == "page":
-                self.send_raw(
-                    b"<html><body><p>CTPURGE-HUB</p>"
-                    b'<a href="child.html">c</a></body></html>',
-                    ctype,
-                )
+                self.send_raw(self.CTPURGE_HUB, ctype)
             else:
                 self.send_raw(self.CTPURGE_BLOB, ctype)
-        elif name == "hub.php":  # a dynamic page the server left untyped
-            self.send_raw(
-                b"<html><body><p>CTPURGE-HUB</p>"
-                b'<a href="child.html">c</a></body></html>',
-                None,
-            )
-        elif name == "blob.php":  # ... and a blob it left untyped the same way
-            self.send_raw(self.CTPURGE_BLOB, None)
         elif name == "child.html":
             self.send_raw(
                 b"<html><body><p>CTPURGE-CHILD</p></body></html>", "text/html"
@@ -3031,6 +3050,23 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_raw(b"<html><body><p>CTPURGE-GONE</p></body></html>", "text/html")
         else:
             self.send_error(404)
+
+    # A dynamic page and a blob, both left untyped: the page must still be
+    # scanned, and the blob must reach disk with its bytes intact.
+    def route_ctpurge_dyn(self, name):
+        if name == "index.html":
+            return self.send_html(
+                '\t<a href="hub.php">hub</a>\n\t<a href="blob.php">blob</a>\n'
+            )
+        if name == "hub.php":
+            return self.send_raw(self.CTPURGE_HUB, None)
+        if name == "blob.php":
+            return self.send_raw(self.CTPURGE_BLOB, None)
+        if name == "child.html":
+            return self.send_raw(
+                b"<html><body><p>CTPURGE-CHILD</p></body></html>", "text/html"
+            )
+        self.send_error(404)
 
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
