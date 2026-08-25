@@ -2979,10 +2979,10 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             self.send_raw(self.FAKE_PNG, "image/png")
 
-
     # --- a page whose local name comes from its cached type (#1421) ---------
     # page.php answers text/html, so it mirrors as page.html. It then fails to
-    # answer on two consecutive updates, and answers again on the fourth crawl.
+    # answer on two consecutive updates, answers again on the fourth crawl, and
+    # fails again for the two the cache-prioritary arm needs.
 
     def namedrift_crawl(self):
         """Which crawl this is: the index never fails, so its fetch count is
@@ -2996,7 +2996,7 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_html(links)
 
     def route_namedrift_page(self):
-        if self.namedrift_crawl() in (2, 3):
+        if self.namedrift_crawl() in (2, 3, 5, 6):
             self.send_cut_headers()
         else:
             self.send_html('\t<a href="kid.html">kid</a>\n')
@@ -3006,6 +3006,28 @@ class Handler(SimpleHTTPRequestHandler):
 
     def route_namedrift_stale(self):
         self.send_raw(b"<html><body><p>NAMEDRIFT-STALE</p></body></html>", "text/html")
+
+    # --- two URLs whose save names collide, in flipping order (#1421) -------
+    # dupe.php answers text/html, so it wants dupe.html, which dupe.html also
+    # wants. Whichever the index lists first takes it, and the index reorders
+    # them from crawl 2 on.
+
+    def collide_crawl(self):
+        return Handler.REFETCH_SEEN.get("/collide/index.html", 1)
+
+    def route_collide_index(self):
+        n = self.refetch_pass()
+        order = ["dupe.php", "dupe.html"] if n == 1 else ["dupe.html", "dupe.php"]
+        self.send_html("".join('\t<a href="%s">d</a>\n' % u for u in order))
+
+    def route_collide_php(self):
+        if self.collide_crawl() == 1:
+            self.send_html("\t<p>COLLIDE-PHP</p>\n")
+        else:
+            self.send_cut_headers()
+
+    def route_collide_html(self):
+        self.send_raw(b"<html><body><p>COLLIDE-HTML</p></body></html>", "text/html")
 
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
@@ -3307,6 +3329,9 @@ class Handler(SimpleHTTPRequestHandler):
         "/namedrift/page.php": route_namedrift_page,
         "/namedrift/kid.html": route_namedrift_kid,
         "/namedrift/stale.html": route_namedrift_stale,
+        "/collide/index.html": route_collide_index,
+        "/collide/dupe.php": route_collide_php,
+        "/collide/dupe.html": route_collide_html,
     }
 
     # --- /big/ seeded pseudo-site ------------------------------------------

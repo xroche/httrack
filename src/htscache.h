@@ -67,7 +67,10 @@ htsblk cache_read(httrackp * opt, cache_back * cache, const char *adr,
                   const char *fil, const char *save, char *location);
 /* Re-store the previous run's entry for a link this run failed to fetch, so the
    next one recomputes the same save name: nothing else maps the URL to it
-   (#1421). `url_save` is the surviving copy, and must exist on disk. */
+   (#1421). `url_save` is the copy that survived, which the caller has just
+   checked is on disk. The entry goes back marked kept, readable only through
+   cache_read_including_broken(): it names a file, it does not stand in for a
+   fetch. */
 void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
                          const char *url_fil, const char *url_save);
 htsblk cache_read_ro(httrackp * opt, cache_back * cache, const char *adr,

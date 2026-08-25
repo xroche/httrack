@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # page.php mirrors as page.html because its cached type says hypertext. A run
-# that fails to fetch it stores no entry, so the run after it recomputes
+# that fails to fetch it stores no entry, so the run after that recomputes
 # page.php, finds no such file, and purges the live copy (#1421).
 
 set -euo pipefail
@@ -38,6 +38,39 @@ assert_gave_up() {
         fail "no transport failure gave up on ${2}: $(<"$log")"
 }
 
+# cache_headers OUTDIR URLTAIL: the header block httrack stored for every cache
+# entry whose key ends with URLTAIL, one blank-line-separated block each. The
+# block lives in the zip's local extra field, which zipfile does not expose.
+cache_headers() {
+    "${SRV_PYTHON:?}" -c '
+import struct, sys, zipfile
+
+path, tail = sys.argv[1], sys.argv[2]
+with open(path, "rb") as fp:
+    for info in zipfile.ZipFile(path).infolist():
+        if not info.filename.endswith(tail):
+            continue
+        fp.seek(info.header_offset)
+        head = struct.unpack("<IHHHHHIIIHH", fp.read(30))
+        fp.seek(head[9], 1)
+        sys.stdout.write(fp.read(head[10]).decode("latin-1").replace("\r", ""))
+        sys.stdout.write("\n")
+' "${1}/hts-cache/new.zip" "$2"
+}
+
+# assert_cached OUTDIR URLTAIL SAVETAIL: exactly one entry for that URL, naming
+# that file and marked as kept for its name alone.
+assert_cached() {
+    local blocks count
+    blocks=$(cache_headers "$1" "$2")
+    count=$(grep -c '^X-In-Cache:' <<<"$blocks" || true) # entry blocks, not lines
+    test "$count" = 1 || fail "want 1 cache entry for ${2}, got ${count}"
+    grep -q "^X-Save: .*${3}\$" <<<"$blocks" ||
+        fail "the cache entry for ${2} does not name ${3}: ${blocks}"
+    grep -q '^X-Kept: 1$' <<<"$blocks" ||
+        fail "the cache entry for ${2} is not marked kept: ${blocks}"
+}
+
 local_server_start --log "${tmpdir}/server.log"
 
 out="${tmpdir}/crawl"
@@ -59,11 +92,12 @@ local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" --update \
 assert_gave_up "$out" '/namedrift/page\.php'
 assert_alive "${site}/page.html" 'kid\.html'
 assert_alive "${site}/kid.html" NAMEDRIFT-KID
+assert_cached "$out" '/namedrift/page.php' '/namedrift/page\.html'
 assert_purged false "$out"
-ok "a first failed fetch keeps the copy and holds the purge"
+ok "a first failed fetch keeps the copy, and a record of its name"
 
-# Second consecutive failure: pass 2 stored no entry of its own, so only the
-# record it carried forward still says this page is page.html.
+# Second consecutive failure: pass 2 fetched nothing, so only the record it
+# carried forward still says this page is page.html.
 local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --update \
     "${BASEURL}/namedrift/index.html"
 assert_gave_up "$out" '/namedrift/page\.php'
@@ -71,13 +105,13 @@ assert_alive "${site}/page.html" 'kid\.html'
 assert_alive "${site}/kid.html" NAMEDRIFT-KID
 assert_alive "${site}/stale.html" NAMEDRIFT-STALE
 test ! -e "${site}/page.php" || fail "the recomputed name landed on disk"
+assert_cached "$out" '/namedrift/page.php' '/namedrift/page\.html'
 assert_purged false "$out"
 ok "a second consecutive failure keeps the name, the copy and the subtree"
 
 # The page answers again and the crawl scans the whole site: stale.html has
-# left it since this pass and must go, carried-forward record or not. A file
-# dropped during a held pass is not in its new.lst, so it can only leave on a
-# pass that purges.
+# left it since this pass and must go. A file dropped during a held pass is not
+# in that pass's new.lst, so it can only leave on a pass that purges.
 local_crawl --log "${tmpdir}/log4" "${common[@]}" -O "$out" --update \
     "${BASEURL}/namedrift/index.html"
 assert_alive "${site}/page.html" 'kid\.html'
@@ -86,3 +120,38 @@ test ! -e "${site}/stale.html" ||
     fail "stale.html left the site and a pass that scanned it all kept it"
 assert_purged true "$out"
 ok "the hold lasts the run, not the mirror"
+
+# A kept record must not stand in for a fetch. -C1 serves anything it finds in
+# the cache without asking the network, so a servable record would retire the
+# link for good: this pass has to reach the server and fail there again.
+local_crawl --log "${tmpdir}/log5" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/namedrift/index.html"
+assert_gave_up "$out" '/namedrift/page\.php'
+: >"${out}/hts-log.txt"
+local_crawl --log "${tmpdir}/log6" "${common[@]}" -O "$out" --update -C1 \
+    "${BASEURL}/namedrift/index.html"
+assert_gave_up "$out" '/namedrift/page\.php'
+assert_alive "${site}/page.html" 'kid\.html'
+ok "a cache-prioritary pass still goes to the network for the failed link"
+
+# --- the name it recomputes may be another URL's file ----------------------
+# dupe.php and dupe.html both want dupe.html; the index lists them in one order
+# for pass 1 and the other after, so the loser's name lands on the winner's
+# file. Existence at that name says nothing about whose file it is.
+out="${tmpdir}/collide"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/collide"
+
+local_crawl --log "${tmpdir}/clog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/collide/index.html"
+assert_alive "${site}/dupe.html" COLLIDE-PHP
+assert_alive "${site}/dupe-2.html" COLLIDE-HTML
+ok "pass 1 gave dupe.php the bare name and dupe.html the suffixed one"
+
+local_crawl --log "${tmpdir}/clog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/collide/index.html"
+assert_gave_up "$out" '/collide/dupe\.php'
+blocks=$(cache_headers "$out" '/collide/dupe.php')
+grep -q 'dupe-2\.html' <<<"$blocks" &&
+    fail "dupe.php's cache entry names dupe.html's file: ${blocks}"
+ok "a name the failed link no longer owns is not recorded as its own"
