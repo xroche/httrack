@@ -118,9 +118,12 @@ HTSEXT_API const char *get_ext(char *catbuff, size_t size, const char *fil) {
 
   if (last != 0 && i > last) {
     const size_t len = i - last;
+    /* len characters plus the terminator, with the untrusted len alone */
     if (len < size) {
+      /* bounded on len, so the copy stops at the '?' the loop stopped at; the
+         guard above leaves strlncatbuff's abort arm unreachable */
       catbuff[0] = '\0';
-      strncat(catbuff, &fil[last], size);
+      strlncatbuff(catbuff, &fil[last], size, len);
       return catbuff;
     }
   }
