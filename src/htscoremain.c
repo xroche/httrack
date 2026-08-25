@@ -2913,15 +2913,22 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     // Lancement du miroir
     // ------------------------------------------------------------
     opt->state._hts_in_mirror = 1;
-    if (httpmirror(url, opt) == 0) {
-      printf
-        ("Error during operation (see log file), site has not been successfully mirrored\n");
-    } else {
-      if (opt->shell) {
+    {
+      const int mirrored = httpmirror(url, opt);
+
+      if (mirrored == 0) {
+        printf("Error during operation (see log file), site has not been "
+               "successfully mirrored\n");
+      } else if (opt->shell) {
+        /* Inert: TRANSFER DONE goes to the scratch buffer, never to stdout. */
         HTT_REQUEST_START;
         HT_PRINT("TRANSFER DONE" LF);
-      HTT_REQUEST_END} else {
+        HTT_REQUEST_END
+      } else if (mirrored > 0 && opt->state.exit_xh == 0) {
         printf("Done.\n");
+      } else {
+        /* Both a -1 bailout and an exit_xh abort miss the == 0 test above. */
+        printf("Mirror not completed (see log file)\n");
       }
     }
     opt->state._hts_in_mirror = 0;

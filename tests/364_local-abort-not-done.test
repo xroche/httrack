@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# A mirror the engine gave up on must not say "Done." on stdout. /dev/full under
+# the save name stands in for the disk, the same fixture 350 aborts through.
+# Shell mode (-#S) is the other half: its end-of-mirror token has always landed
+# in a scratch buffer rather than on stdout, so both outcomes must stay silent
+# there or a front end parsing that stream sees a token it never saw before.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_notdone.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+# The engine here is a native binary and the shell is MSYS, so a symlink the
+# shell writes through as /dev/full is a plain file to the crawl.
+skip_on_windows "a native binary does not follow an MSYS symlink to /dev/full"
+# Probe the mechanism, not the node: macOS has no /dev/full and links to it
+# happily, so a write through the probe fails with ENOENT rather than ENOSPC.
+test -c /dev/full || skip "no /dev/full device"
+probe="${tmpdir}/probe"
+ln -s /dev/full "$probe" 2>/dev/null || skip "cannot symlink /dev/full"
+if printf x >"$probe" 2>/dev/null; then
+    skip "a write through /dev/full succeeds here, so it stands in for nothing"
+fi
+rm -f "$probe"
+
+common=(--quiet --disable-security-limits --robots=0 --retries=2 -c1
+    --timeout=20 "--max-time=$CRAWL_MAX_TIME")
+local_server_start --log "${tmpdir}/server.log"
+
+out='' err='' log='' rc=0
+# Mirror diskfull/index.html into a fresh $1, with big.bin pointed at /dev/full
+# when $2 is "full". Anything past $2 is extra httrack options. Leaves stdout in
+# $out, stderr in $err, the crawl log in $log and the exit status in $rc.
+crawl() {
+    local name="$1" doomed="$2"
+    local dir="${tmpdir}/${name}"
+    local site="${dir}/127.0.0.1_${SRV_PORT}/diskfull"
+
+    shift 2
+    mkdir -p "$site"
+    test "$doomed" != full || ln -s /dev/full "${site}/big.bin"
+    out="${tmpdir}/out-${name}"
+    err="${tmpdir}/err-${name}"
+    rc=0
+    run_with_timeout "$(crawl_deadline)" httrack "${common[@]}" "$@" -O "$dir" \
+        "${BASEURL}/diskfull/index.html" >"$out" 2>"$err" || rc=$?
+    test "$rc" -ne 124 || fail "the ${name} crawl wedged"
+    log=$(<"${dir}/hts-log.txt")
+}
+
+# --- a mirror that finishes still reports it --------------------------------
+crawl complete clean
+grep -q '^Done\.$' "$out" ||
+    fail_dump "a completed mirror stopped saying Done." "$out" "$err"
+if grep -q 'Mirror aborted' <<<"$log"; then
+    fail "the control crawl aborted, so it proves nothing: ${log}"
+fi
+ok "a mirror that finishes still says Done."
+
+# --- and one the full disk stopped does not ---------------------------------
+crawl aborted full
+grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
+    fail "the full disk did not abort the mirror, so nothing here was aborted: ${log}"
+if grep -q '^Done\.$' "$out"; then
+    fail_dump "an aborted mirror still claimed to be done" "$out" "$err"
+fi
+grep -q 'Mirror not completed' "$out" ||
+    fail_dump "an aborted mirror said nothing about it on stdout" "$out" "$err"
+ok "an aborted mirror does not claim to be done"
+
+# --- shell mode ends the same way for both, which is silently ---------------
+# The controls above are what make this non-vacuous: the same two crawls print
+# one of these lines when -#S is off.
+for arm in complete:clean aborted:full; do
+    crawl "shell-${arm%%:*}" "${arm##*:}" -#S
+    if grep -qE '^Done\.$|Mirror not completed|TRANSFER DONE' "$out"; then
+        fail_dump "shell mode gained an end-of-mirror token (${arm%%:*})" "$out" "$err"
+    fi
+done
+ok "shell mode still ends silently, aborted or not"
