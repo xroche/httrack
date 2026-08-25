@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# --structure=1L0 read as one value but smuggled a second option in: preset 1
+# plus the -L0 behind it. --structure=8I0 was the visible cost, mirroring with
+# no top index at exit 0. Every digits-then-tail value is refused now.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmpbase=${TMPDIR:-/tmp}
+# Slash-stripped: the engine normalizes a "//" away, failing every layout below.
+tmp=$(mktemp -d "${tmpbase%/}/httrack_ntail.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+# Our own marker, so a mirrored page is recognized by content rather than by a
+# path this host may spell differently (macOS $TMPDIR, Windows ':' -> '_').
+marker=STRUCTURE-TAIL-MARKER-370
+printf '<html><body>%s</body></html>\n' "${marker}" >"${tmp}/page.html"
+url="file://${tmp}/page.html"
+out=${tmp}/out
+
+crawl() { # crawl ARG...
+    rm -rf "${out}"
+    mkdir -p "${out}"
+    RC=0
+    httrack -O "${out}" --quiet -n "$@" >"${tmp}/log" 2>&1 || RC=$?
+}
+
+# The mirrored page, by marker: relative path, or empty if the crawl saved none.
+# The top index carries no marker, so it drops out without being named.
+marked() {
+    (cd "${out}" && grep -rlF "${marker}" . 2>/dev/null |
+        grep -v '^\./hts-cache/' | sort | tr '\n' ' ') || true
+}
+has_index() { test -e "${out}/index.html"; }
+
+refused() { # refused ARG...
+    crawl "$@" "${url}"
+    # 134 is an abort, which would read as a refusal without being one
+    { test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
+        fail_dump "$* not refused (exit ${RC})" "${tmp}/log"
+    grep -q 'does not take the value' "${tmp}/log" ||
+        fail_dump "$* refused without saying why" "${tmp}/log"
+    # a value taken as a template would exit 0, so this pins the reason too
+    test -z "$(marked)" || fail_dump "$* still mirrored: $(marked)" "${tmp}/log"
+}
+
+accepted() { # accepted WANTED-PATH ARG...
+    local want=$1
+    shift
+    crawl "$@" "${url}"
+    assert_eq 0 "${RC}" "$* exited"
+    assert_eq "${want} " "$(marked)" "$* mirrored"
+    ! grep -q 'does not take the value' "${tmp}/log" ||
+        fail_dump "$* drew a refusal" "${tmp}/log"
+}
+
+# The tails, in both spellings. Each names a real second option: L0 is 8.3
+# names, c8 a connection count, I0 the top index the crawl then never wrote.
+refused --structure=1L0
+refused --structure 1L0
+refused --structure=1c8
+refused --structure=8I0
+refused --structure 8I0
+refused --structure=1I0
+# A % in the tail is not what makes a template: --structure=1%c8 glued -%c8 on,
+# and must not fall through to a template literally named 1%c8 either.
+refused --structure=1%c8
+refused --structure 1%c8
+test ! -e "${tmp}/out/1%c8" || fail "--structure=1%c8 became a template"
+
+# The preset alone is untouched, and keeps the top index 8I0 dropped.
+accepted ./web/page.html --structure=1
+has_index || fail_dump "--structure=1 wrote no top index" "${tmp}/log"
+accepted ./web/page.html --structure 1
+accepted ./web/page.html -N1
+accepted ./web/page.html -N 1
+# leading zeros are not part of the number, so this is preset 1 too
+accepted ./web/page.html --structure=0000000001
+accepted ./web/html/page.html --structure=5
+
+# on and off are whole values rather than tails, and name the default preset.
+accepted "./file/$(printf '%s' "${tmp#/}" | tr ':~' '__')/page.html" --structure=on
+accepted "./file/$(printf '%s' "${tmp#/}" | tr ':~' '__')/page.html" --structure=off
+
+# A template still detaches, including one opening with digits, which is what
+# separates a user layout from a cluster tail: it carries a / or a dot.
+accepted ./tpl/page.html "--structure=tpl/%n.%t"
+accepted ./2col/page.html "--structure=2col/%n.%t"
+accepted ./2col/page.html --structure "2col/%n.%t"
+# ...and --user-structure is how to ask for a tail-shaped name on purpose.
+accepted ./1L0 --user-structure 1L0
+
+# The short cluster is unchanged: -N1L0 is -N1 -L0, as every short run is, and
+# 8.3 names plus the preset directory prove both halves still land.
+crawl -N1L0 "${url}"
+assert_eq 0 "${RC}" "-N1L0 exited"
+assert_eq ./WEB/PAGE.HTM "$(marked | tr -d ' ')" "-N1L0 mirrored"
+
+echo "PASS"

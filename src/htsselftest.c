@@ -4974,11 +4974,14 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N %h%p/%n%q.%t", "--user-structure", "%h%p/%n%q.%t");
   /* an empty value is -N "", which the engine reads as "back to the default" */
   EXPANDS("-N ", "--structure=", NULL);
-  /* what "param" glued keeps gluing: a preset trailed by more short options,
-     and the on/off values every param row takes */
-  EXPANDS("-N1L0", "--structure=1L0", NULL);
-  EXPANDS("-N1L0", "--structure", "1L0");
-  EXPANDS("-N1%c8", "--structure=1%c8", NULL);
+  /* a preset trailed by more short options is one value asking for two, so it
+     is refused whatever the tail holds; a % in it buys no template either */
+  REFUSES("--structure=1L0", NULL);
+  REFUSES("--structure", "1L0");
+  REFUSES("--structure=1c8", NULL);
+  REFUSES("--structure=1%c8", NULL);
+  REFUSES("--structure=8I0", NULL);
+  /* on/off are whole values rather than tails, and still map onto the preset */
   EXPANDS("-N0", "--structure=off", NULL);
   /* both name the default preset: a bare -N would take the next word, and
      with a URL there it mirrored nothing (#1434) */

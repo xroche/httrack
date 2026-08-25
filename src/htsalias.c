@@ -63,10 +63,10 @@ Please visit our Website: http://www.httrack.com
   single : no options, and a value (--index=0, --noindex) is refused
   onoff  : optional 0/1 value, whose short form takes a 0 suffix (-I0)
   level  : optional numeric value, which the short form parses (-%v2)
-  param  : this option takes a number (1, for example) and can be mixed with other options (R1C1c8); a value the short form cannot read is refused
+  param  : this option takes a number (1, for example); the short form clusters (-R1C1c8), but a long value it cannot read whole is refused
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
-  paramn : glues like param what -N reads glued (1, 1L0, on/off), detaches a %-carrying template, refuses the rest
+  paramn : glues a preset or on/off onto -N, detaches a %-carrying template, refuses the rest, a cluster tail (1L0) included
 
   A name may appear twice; the FIRST row wins, for the expansion and the help
   text. Later rows exist so a reverse lookup by short option finds a name, and
@@ -418,18 +418,22 @@ static hts_boolean optalias_is_digits(const char *value) {
   return i != 0 && optalias_digits_fit(value, i) ? HTS_TRUE : HTS_FALSE;
 }
 
-/* Whether a "paramn" value glues onto the short form the way "param" does: a
-   preset, on/off, or a preset trailed by more short options (-N1L0). A path
-   separator or an extension dot marks a user template instead, which no option
-   cluster carries and which only reaches the engine detached (#1380). */
+/* Whether a "paramn" value glues onto the short form: a preset, or on/off. */
 static hts_boolean optalias_paramn_glues(const char *value) {
-  size_t i;
-
   if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
     return HTS_TRUE;
+  return optalias_is_digits(value);
+}
+
+/* A preset carrying more short options behind it (--structure=1L0): one value
+   asking for two things. A path separator or an extension dot means a user
+   template instead (#1380). */
+static hts_boolean optalias_paramn_cluster_tail(const char *value) {
+  size_t i;
+
   for (i = 0; isdigit((unsigned char) value[i]); i++) {
   }
-  if (i == 0 || !optalias_digits_fit(value, i))
+  if (i == 0 || value[i] == '\0' || !optalias_digits_fit(value, i))
     return HTS_FALSE;
   return strchr(value + i, '/') == NULL && strchr(value + i, '.') == NULL
              ? HTS_TRUE
@@ -618,11 +622,13 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         else
           need_param = 1;
 
-        /* A template with no % maps every URL onto one local name, so
-           --structure=flat is a typo rather than a template. --user-structure
-           still takes such a value verbatim. */
+        /* A cluster tail hides a second option in one value, and a %-free
+           template maps every URL onto one name; --user-structure takes
+           both. */
         if (strcmp(hts_optalias[pos][2], "paramn") == 0 && param[0] != '\0' &&
-            !optalias_paramn_glues(param) && strchr(param, '%') == NULL) {
+            !optalias_paramn_glues(param) &&
+            (optalias_paramn_cluster_tail(param) ||
+             strchr(param, '%') == NULL)) {
           slprintfbuff_clip(
               return_error, return_error_size,
               "Syntax error:\n\tOption --%s does not take the value %s\n%s",
