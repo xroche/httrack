@@ -108,6 +108,10 @@ void url_savename_addstr(char *d, size_t dsize, const char *s);
    dsize. */
 void url_savename_addtail(char *d, size_t dsize, const char *sep,
                           const char *s);
+/* Leading len bytes of path into buf; returns how many were read (0 on any
+   failure), so a caller reading nothing decides for itself what that means. */
+size_t hts_read_file_head(const char *path, void *buf, size_t len);
+
 /* Contested wire-vs-ext verdict that a body sniff could settle (htssniff.h). */
 int hts_ext_sniff_wanted(httrackp *opt, const char *wiremime, const char *file);
 char *url_md5(char *digest_buffer, const char *fil_complete);

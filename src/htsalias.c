@@ -39,9 +39,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htslib.h"
 
+#include <errno.h>
 #include <limits.h>
-
-#define _NOT_NULL(a) ( (a!=NULL) ? (a) : "" )
 
 /*
   Aliases for command-line and config file definitions
@@ -64,7 +63,7 @@ Please visit our Website: http://www.httrack.com
   single : no options, and a value (--index=0, --noindex) is refused
   onoff  : optional 0/1 value, whose short form takes a 0 suffix (-I0)
   level  : optional numeric value, which the short form parses (-%v2)
-  param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
+  param  : this option takes a number (1, for example) and can be mixed with other options (R1C1c8); a value the short form cannot read is refused
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
   paramn : glues like param what -N reads glued (1, 1L0, on/off), detaches a %-carrying template, refuses the rest
@@ -174,7 +173,8 @@ const char *hts_optalias[][4] = {
   {"referer", "-%R", "param1", "default referer URL"},
   {"from", "-%E", "param1", "from email address"},
   {"footer", "-%F", "param1", ""},
-  {"cache", "-C", "param", "number of retries for non-fatal errors"},
+  {"cache", "-C", "param",
+   "cache mode (0 no cache, 1 read the cache first, 2 test for updates)"},
   {"store-all-in-cache", "-k", "single", ""},
   {"do-not-recatch", "-%n", "onoff", ""},
   {"do-not-log", "-Q", "single", ""},
@@ -361,38 +361,6 @@ static optparam_state optparam_check(int argc, const char *const *argv,
   return OPTPARAM_AS_OPTION;
 }
 
-/* Why the option the user wrote as SPELLING did not get the parameter REAL
-   needs, in the terms the code decided it: calling a parameter missing when one
-   was passed, or naming the internal short option, leaves the user nothing to
-   work back from, and the run dies here, before any log file exists to say
-   more. No spelling is suggested: --name=value passes an option name through
-   for the dashvalue_opt options only, and a '--' value dies unrecognized in
-   every one. */
-static void optparam_error(optparam_state state, const char *spelling,
-                           const char *real, const char *next,
-                           char *return_error, size_t return_error_size) {
-  const int pos = optreal_find(real);
-  const char *const help = pos >= 0 ? hts_optalias[pos][3] : "";
-  const char *const sep = help[0] != '\0' ? "\n\t" : "";
-
-  if (state == OPTPARAM_ABSENT)
-    slprintfbuff_clip(return_error, return_error_size,
-                      "Syntax error:\n\tOption %s needs to be followed by a "
-                      "parameter: %s <param>%s%s\n",
-                      spelling, spelling, sep, help);
-  else if (optreal_or_alias(next))
-    slprintfbuff_clip(return_error, return_error_size,
-                      "Syntax error:\n\tOption %s takes a value, and the next "
-                      "word \"%s\" names an option%s%s\n",
-                      spelling, next, sep, help);
-  else
-    slprintfbuff_clip(return_error, return_error_size,
-                      "Syntax error:\n\tOption %s takes a value, and the next "
-                      "word \"%s\" begins with '-', so it was read as the next "
-                      "option%s%s\n",
-                      spelling, next, sep, help);
-}
-
 /* The short form the --wide-/--tiny- prefix glues onto the alias it prefixes,
    read from the --wide/--tiny row itself so the two cannot drift ("c32"). */
 static const char *optalias_prefix_count(const char *name) {
@@ -426,6 +394,15 @@ static hts_boolean optalias_clusters(const char *type, const char *command) {
   return HTS_TRUE;
 }
 
+/* Whether the digit run at RUN converts to at most MAX. */
+static hts_boolean optalias_run_fits(const char *run, LLint max) {
+  LLint value;
+
+  errno = 0;
+  value = strtoll(run, NULL, 10);
+  return errno != ERANGE && value <= max ? HTS_TRUE : HTS_FALSE;
+}
+
 /* Suffix the short form takes for a value ("0", "2", or none), or NULL when
    the class refuses it: onoff reads 0/1 only, level reads a number. */
 static const char *optalias_suffix(const char *type, const char *value) {
@@ -436,12 +413,10 @@ static const char *optalias_suffix(const char *type, const char *value) {
   if (level && isdigit((unsigned char) value[0])) {
     size_t i;
 
-    /* bounded: an overlong digit run is refused, not appended */
-    for (i = 0; i < 16 && value[i] != '\0'; i++) {
-      if (!isdigit((unsigned char) value[i]))
-        return NULL;
+    for (i = 0; isdigit((unsigned char) value[i]); i++) {
     }
-    return value[i] == '\0' ? value : NULL;
+    /* a level reaches sscanf("%d") too, so bound it by what that holds */
+    return value[i] == '\0' && optalias_run_fits(value, INT_MAX) ? value : NULL;
   }
   if (strcmp(value, "0") == 0 || strcmp(value, "off") == 0)
     return "0";
@@ -450,7 +425,15 @@ static const char *optalias_suffix(const char *type, const char *value) {
   return NULL;
 }
 
-/* A bare digit run short enough for -N to read it as a preset number. */
+hts_boolean optalias_digits_fit(const char *digits, size_t len) {
+  size_t i;
+
+  for (i = 0; i < len && digits[i] == '0'; i++) {
+  }
+  return len - i <= HTS_SAVENAME_PRESET_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
+}
+
+/* A bare digit run -N reads as a preset number. */
 static hts_boolean optalias_is_digits(const char *value) {
   size_t i;
 
@@ -458,7 +441,7 @@ static hts_boolean optalias_is_digits(const char *value) {
     if (!isdigit((unsigned char) value[i]))
       return HTS_FALSE;
   }
-  return i != 0 && i <= HTS_SAVENAME_PRESET_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
+  return i != 0 && optalias_digits_fit(value, i) ? HTS_TRUE : HTS_FALSE;
 }
 
 /* Whether a "paramn" value glues onto the short form the way "param" does: a
@@ -472,11 +455,111 @@ static hts_boolean optalias_paramn_glues(const char *value) {
     return HTS_TRUE;
   for (i = 0; isdigit((unsigned char) value[i]); i++) {
   }
-  if (i == 0 || i > HTS_SAVENAME_PRESET_MAX_DIGITS)
+  if (i == 0 || !optalias_digits_fit(value, i))
     return HTS_FALSE;
   return strchr(value + i, '/') == NULL && strchr(value + i, '.') == NULL
              ? HTS_TRUE
              : HTS_FALSE;
+}
+
+/* The one separator a "param" short form reads besides digits: -m takes N,N2
+   and -%c a rate with a decimal point. */
+static char optalias_param_separator(const char *command) {
+  if (strcmp(command, "-m") == 0)
+    return ',';
+  if (strcmp(command, "-%c") == 0)
+    return '.';
+  return '\0';
+}
+
+/* The widest value the short form's own parser holds: -m, -M and -G read an
+   LLint, and -%c a float no strtoll-sized run overflows. */
+static LLint optalias_param_max(const char *command) {
+  if (strcmp(command, "-m") == 0 || strcmp(command, "-M") == 0 ||
+      strcmp(command, "-G") == 0 || strcmp(command, "-%c") == 0)
+    return INT64_MAX;
+  return INT_MAX;
+}
+
+/* Whether the short form COMMAND can read VALUE glued onto it: the on/off
+   mapping, or a number carrying at most one separator with a digit right after
+   it, each digit run within what the option's own parser holds. What it
+   converts short of, or not at all, leaves the option at a value nobody asked
+   for (--sockets=1234567890123456 asks for 1015724736 sockets) and spills the
+   tail into the cluster loop as further short options (--sockets=8I0 reaches
+   -I0). */
+static hts_boolean optalias_param_takes(const char *command,
+                                        const char *value) {
+  const char sep = optalias_param_separator(command);
+  const LLint max = optalias_param_max(command);
+  hts_boolean digit = HTS_FALSE, split = HTS_FALSE;
+  size_t i, start = 0;
+
+  if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
+    return HTS_TRUE;
+  for (i = 0;; i++) {
+    if (isdigit((unsigned char) value[i])) {
+      digit = HTS_TRUE;
+      continue;
+    }
+    /* the run just ended, if it held anything: -m and -%c carry two */
+    if (i > start && !optalias_run_fits(value + start, max))
+      return HTS_FALSE;
+    if (value[i] == '\0')
+      break;
+    if (value[i] != sep || split || !isdigit((unsigned char) value[i + 1]))
+      return HTS_FALSE;
+    split = HTS_TRUE;
+    start = i + 1;
+  }
+  return digit;
+}
+
+/* The row's help line, indented and terminated, or nothing where it has none:
+   19 param rows carry no help and the tab alone read as a truncated message. */
+static const char *optalias_help_line(char *dest, size_t dest_size,
+                                      const char *name) {
+  const char *const help = optalias_help(name);
+
+  if (help == NULL || help[0] == '\0')
+    dest[0] = '\0';
+  else
+    slprintfbuff_clip(dest, dest_size, "\t%s\n", help);
+  return dest;
+}
+
+/* Why the option the user wrote as SPELLING did not get the parameter REAL
+   needs, in the terms the code decided it: calling a parameter missing when one
+   was passed, or naming the internal short option, leaves the user nothing to
+   work back from, and the run dies here, before any log file exists to say
+   more. No spelling is suggested: --name=value passes an option name through
+   for the dashvalue_opt options only, and a '--' value dies unrecognized in
+   every one. */
+static void optparam_error(optparam_state state, const char *spelling,
+                           const char *real, const char *next,
+                           char *return_error, size_t return_error_size) {
+  const int pos = optreal_find(real);
+  char help[256];
+
+  /* by long name: optalias_help() looks the short form up in vain */
+  optalias_help_line(help, sizeof(help),
+                     pos >= 0 ? hts_optalias[pos][0] : real);
+  if (state == OPTPARAM_ABSENT)
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption %s needs to be followed by a "
+                      "parameter: %s <param>\n%s",
+                      spelling, spelling, help);
+  else if (optreal_or_alias(next))
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption %s takes a value, and the next "
+                      "word \"%s\" names an option\n%s",
+                      spelling, next, help);
+  else
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption %s takes a value, and the next "
+                      "word \"%s\" begins with '-', so it was read as the next "
+                      "option\n%s",
+                      spelling, next, help);
 }
 
 /*
@@ -502,12 +585,13 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       char command[HTS_CDLMAXSIZE];
       char param[HTS_CDLMAXSIZE];
       char addcommand[256];
+      char help[256];
 
       /* */
       char *position;
       const char *addname = NULL;
       int need_param = 1;
-      hts_boolean negated = HTS_FALSE;
+      hts_boolean negated = HTS_FALSE, detached;
 
       int pos;
 
@@ -599,20 +683,33 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
            still takes such a value verbatim. */
         if (strcmp(hts_optalias[pos][2], "paramn") == 0 && param[0] != '\0' &&
             !optalias_paramn_glues(param) && strchr(param, '%') == NULL) {
-          slprintfbuff_clip(return_error, return_error_size,
-                            "Syntax error:\n\tOption --%s does not take the "
-                            "value %s\n\t%s\n",
-                            hts_optalias[pos][0], param,
-                            _NOT_NULL(optalias_help(hts_optalias[pos][0])));
+          slprintfbuff_clip(
+              return_error, return_error_size,
+              "Syntax error:\n\tOption --%s does not take the value %s\n%s",
+              hts_optalias[pos][0], param,
+              optalias_help_line(help, sizeof(help), hts_optalias[pos][0]));
           return 0;
         }
 
         /* Final result */
 
-        /* Must be alone (-P /tmp), or a paramn value -N cannot take glued */
-        if (strcmp(hts_optalias[pos][2], "param1") == 0 ||
-            (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
-             !optalias_paramn_glues(param))) {
+        /* Alone (-P /tmp), or a paramn value -N cannot take glued */
+        detached = strcmp(hts_optalias[pos][2], "param1") == 0 ||
+                   (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
+                    !optalias_paramn_glues(param));
+
+        /* Every other class glues the value onto the short form in one
+           buffer, where strlcatbuff aborts rather than clips. */
+        if (!detached && strlen(param) >= return_argv_size - strlen(command)) {
+          slprintfbuff_clip(
+              return_error, return_error_size,
+              "Syntax error:\n\tOption --%s does not take the value %s\n%s",
+              hts_optalias[pos][0], param,
+              optalias_help_line(help, sizeof(help), hts_optalias[pos][0]));
+          return 0;
+        }
+
+        if (detached) {
           strlcpybuff(return_argv[0], command, return_argv_size);
           strlcpybuff(return_argv[1], param, return_argv_size);
           *return_argc = 2;     /* 2 parameters returned */
@@ -629,11 +726,27 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           strlcpybuff(return_argv[0], command, return_argv_size);
           /* Parameters accepted */
           if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
+            /* refuse rather than glue on a value the short form cannot
+               read (#1426); "paramn" reads a template too, and rules its
+               own values out above */
+            if (strcmp(hts_optalias[pos][2], "param") == 0 &&
+                param[0] != '\0' && !optalias_param_takes(command, param)) {
+              slprintfbuff_clip(
+                  return_error, return_error_size,
+                  "Syntax error:\n\tOption --%s does not take the "
+                  "value %s\n%s",
+                  hts_optalias[pos][0], param,
+                  optalias_help_line(help, sizeof(help), hts_optalias[pos][0]));
+              return 0;
+            }
             /* --cache=off or --index=on */
             if (strcmp(param, "off") == 0)
               strlcatbuff(return_argv[0], "0", return_argv_size);
             else if (strcmp(param, "on") == 0) {
-              // on is the default
+              /* a bare -N reads the next word as a template and would eat the
+                 URL, so "on" names the default preset instead (#1434) */
+              if (strcmp(hts_optalias[pos][2], "paramn") == 0)
+                strlcatbuff(return_argv[0], "0", return_argv_size);
             } else
               strlcatbuff(return_argv[0], param, return_argv_size);
           } else if (param[0] != '\0') {
@@ -650,9 +763,10 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
                 slprintfbuff_clip(
                     return_error, return_error_size,
                     "Syntax error:\n\tOption --%s does not take the value "
-                    "%s\n\t%s\n",
+                    "%s\n%s",
                     hts_optalias[pos][0], param,
-                    _NOT_NULL(optalias_help(hts_optalias[pos][0])));
+                    optalias_help_line(help, sizeof(help),
+                                       hts_optalias[pos][0]));
               return 0;
             }
             strlcatbuff(return_argv[0], suffix, return_argv_size);
