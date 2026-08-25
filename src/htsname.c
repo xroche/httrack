@@ -182,8 +182,8 @@ static void cleanEndingSpaceOrDot(char *s) {
 }
 
 /* Wire Content-Type vs URL extension: a patchable wire type wins over an
-   unspecific ext, the HTS_UNKNOWN_MIME sentinel keeps a specific non-HTML ext
-   (#267 guard), a declared disagreement is CONTESTED (sniffed below). */
+   unspecific ext, an undeclared type keeps a non-HTML ext (#267 guard), a
+   declared disagreement is CONTESTED (sniffed below). */
 typedef enum wire_verdict {
   WIRE_KEEPS_EXT,
   WIRE_WINS,
@@ -195,15 +195,14 @@ static wire_verdict wire_ext_verdict(httrackp *opt, const char *wiremime,
                                      size_t urlmime_size) {
   if (may_unknown2(opt, wiremime, file))
     return WIRE_KEEPS_EXT; /* type kept verbatim (keep-list / bogus-multiple) */
+  if (undeclared_ext_is_not_hypertext(opt, wiremime, file))
+    return WIRE_KEEPS_EXT; /* no declared type: the ext is all there is */
   urlmime[0] = '\0';
   /* type implied by the URL extension, only when confidently known (flag 0) */
   if (!get_httptype_sized(opt, urlmime, urlmime_size, file, 0))
     return WIRE_WINS; /* URL ext implies no known type */
   if (strfield2(wiremime, urlmime))
     return WIRE_KEEPS_EXT; /* agreement (no .htm->.html churn) */
-  if (!is_hypertext_mime(opt, urlmime, file) &&
-      strfield2(wiremime, HTS_UNKNOWN_MIME))
-    return WIRE_KEEPS_EXT; /* no declared type */
   return WIRE_CONTESTED;
 }
 

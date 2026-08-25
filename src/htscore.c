@@ -1493,7 +1493,12 @@ int httpmirror(char *url1, httrackp * opt) {
 #undef CH_ADD_RNG0
 #undef CH_ADD_RNG1
 #undef CH_ADD_RNG2
-            } else if ((nspec > r.size / 100) && (nspec > 10)) {        // too many special characters
+              /* A NUL is not html, js or css. With nothing declared on the
+                 wire the body is the only evidence there is, and the blanking
+                 below would corrupt what the server left untyped (#1415). */
+            } else if (((nspec > r.size / 100) && (nspec > 10)) ||
+                       (map[0] != 0 &&
+                        strfield2(r.contenttype, HTS_UNKNOWN_MIME))) {
               is_binary = 1;
               strcpybuff(r.contenttype, "application/octet-stream");
               hts_log_print(opt, LOG_WARNING,

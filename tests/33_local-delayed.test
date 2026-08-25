@@ -11,7 +11,7 @@ set -euo pipefail
 bash "$top_srcdir/tests/local-crawl.sh" --rerun --errors 0 \
     --found 'delayed/real.pdf' \
     --file-matches 'delayed/real.pdf' '%PDF' \
-    --found 'delayed/notype.bin.html' \
+    --found 'delayed/notype.bin' --not-found 'delayed/notype.bin.html' \
     --found 'delayed/empty.html' \
     --not-found 'delayed/noloc.html' \
     --not-found 'delayed/selfloop.html' \

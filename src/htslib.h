@@ -603,10 +603,10 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
 
 // is this MIME an hypertext MIME (text/html), html/js-style or other script/text type?
 #define HTS_HYPERTEXT_DEFAULT_MIME "text/html"
-/* Sentinel stored when the server declared no Content-Type. It is html-ish
-   for every type test (so a typeless response still parses/stores as today),
-   but the naming code (wire_patches_ext) treats it as "no declared type" and
-   keeps the URL extension. It rides the cache, so updates name consistently. */
+/* Sentinel stored when the server declared no Content-Type. It is html-ish for
+   every type test with no file name to consult (so a typeless response still
+   parses/stores as today), and a name whose extension says otherwise overrides
+   it. It rides the cache, so updates name consistently. */
 #define HTS_UNKNOWN_MIME "unknown/unknown"
 /* Map the no-declared-type sentinel back to a real type for any header or
    record we EMIT or PERSIST, so "unknown/unknown" never reaches a consumer
@@ -646,9 +646,31 @@ HTS_STATIC int strcmpnocase(const char *a, const char *b) {
 /* Library internal definictions */
 #ifdef HTS_INTERNAL_BYTECODE
 
+/* Nothing was declared on the wire, so the URL extension is the only evidence
+   there is and it decides -- unless there is none, or it names a dynamic page,
+   whose body is html far more often than the extension admits (#1415). */
+HTS_STATIC hts_boolean undeclared_ext_is_not_hypertext(httrackp *opt,
+                                                       const char *mime,
+                                                       const char *file) {
+  char ext[64]; /* nothing longer is a dynamic-page extension */
+  char guessed[256];
+
+  if (!strfield2(mime, HTS_UNKNOWN_MIME) || file == NULL || file[0] == '\0')
+    return HTS_FALSE;
+  /* -2 is "no extension at all"; gating on it also keeps get_ext() off a dot
+     sitting in a parent directory rather than in the file name. */
+  if (ishtml(opt, file) == -2 || is_dyntype(get_ext(ext, sizeof(ext), file)))
+    return HTS_FALSE;
+  guessed[0] = '\0';
+  return guess_httptype_sized(opt, guessed, sizeof(guessed), file) &&
+         !is_hypertext_mime__(guessed) && !may_be_hypertext_mime__(guessed);
+}
+
 // check if (mime, file) is hypertext
 HTS_STATIC int is_hypertext_mime(httrackp * opt, const char *mime,
                                  const char *file) {
+  if (undeclared_ext_is_not_hypertext(opt, mime, file))
+    return 0;
   if (is_hypertext_mime__(mime))
     return 1;
   if (may_unknown(opt, mime)) {

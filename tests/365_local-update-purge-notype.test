@@ -1,0 +1,95 @@
+#!/bin/bash
+#
+# A Content-Type the server never declared reads as hypertext everywhere, so a
+# blob that fails to re-fetch on --update held the purge back as if it were a
+# page (#1415). An empty header value and a missing one are the same case.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ctpurge.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1 --timeout=20 --changes)
+
+# purge_says WANT OUTDIR: what the run reported doing to the previous mirror.
+purge_says() {
+    local want="$1" json="${2}/hts-changes.json"
+    grep -q "\"purged\": ${want}" "$json" ||
+        fail "expected \"purged\": ${want} in $(<"$json")"
+}
+
+local_server_start --log "${tmpdir}/server.log"
+
+# blob_case CASE: the blob hangs up on the update, and carries no links to
+# lose, so the purge runs and the file the index dropped goes.
+blob_case() {
+    local case="$1" out="${tmpdir}/$1" site
+    mkdir -p "$out"
+    site="${out}/127.0.0.1_${SRV_PORT}/ctpurge/${case}"
+
+    local_crawl --log "${tmpdir}/${case}1" "${common[@]}" -O "$out" \
+        "${BASEURL}/ctpurge/${case}/index.html"
+    test -s "${site}/blob.bin" || fail "${case}: pass 1 did not mirror blob.bin"
+    test ! -e "${site}/blob.bin.html" ||
+        fail "${case}: an undeclared type made a page of the blob"
+    test -s "${site}/gone.html" || fail "${case}: pass 1 did not mirror gone.html"
+
+    local_crawl --log "${tmpdir}/${case}2" "${common[@]}" -O "$out" --update \
+        "${BASEURL}/ctpurge/${case}/index.html"
+    grep -qE "Error:.*\(-[0-9]+\).*at link .*/ctpurge/${case}/blob\.bin" \
+        "${out}/hts-log.txt" ||
+        fail "${case}: the blob re-fetch did not fail, so nothing was tested"
+    test -s "${site}/blob.bin" || fail "${case}: the failed blob lost its copy (#746)"
+    test ! -e "${site}/gone.html" ||
+        fail "${case}: gone.html left the site and a failing blob kept it"
+    purge_says true "$out"
+    ok "${case}: a blob whose type nothing declared holds nothing back"
+}
+
+blob_case empty
+blob_case none
+blob_case octet
+
+# --- what the html default is there for ------------------------------------
+# A dynamic page is html far more often than its extension admits, so an
+# undeclared type must keep reading as one: scanning it is what mirrors the
+# child. The blob beside it wears the same extension and is not text, and the
+# NUL-blanking that follows a parse would silently rewrite it.
+out="${tmpdir}/dyn"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/ctpurge/dyn"
+
+local_crawl --log "${tmpdir}/dyn1" "${common[@]}" -O "$out" \
+    "${BASEURL}/ctpurge/dyn/index.html"
+test -s "${site}/child.html" ||
+    fail "an undeclared type stopped a dynamic page from being scanned"
+test "$(wc -c <"${site}/blob.html")" -eq 72 ||
+    fail "the untyped blob was not mirrored whole"
+grep -qF '\0' <<<"$(od -An -c -j 8 -N 8 "${site}/blob.html")" ||
+    fail "the untyped blob was parsed as a page and had its NULs blanked"
+ok "an undeclared type still reads as a page where the name says nothing else"
+
+# --- the other direction: a page that fails keeps its subtree ---------------
+out="${tmpdir}/page"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/ctpurge/page"
+
+local_crawl --log "${tmpdir}/page1" "${common[@]}" -O "$out" \
+    "${BASEURL}/ctpurge/page/index.html"
+test -s "${site}/child.html" || fail "pass 1 did not mirror child.html"
+test -s "${site}/gone.html" || fail "pass 1 did not mirror gone.html"
+
+local_crawl --log "${tmpdir}/page2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/ctpurge/page/index.html"
+test -s "${site}/child.html" ||
+    fail "child.html was purged: its only parent failed to re-fetch"
+test -s "${site}/gone.html" ||
+    fail "the purge ran while a page that could carry links had failed"
+purge_says false "$out"
+ok "a page that fails still holds the purge back"
