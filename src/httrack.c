@@ -908,8 +908,8 @@ static void sig_doback(int blind) {     // mettre en backing
 #undef FD_ERR
 #define FD_ERR 2
 
-static size_t print_num(char *buffer, int num) {
-  size_t i, j;
+static unsigned int print_num(char *buffer, int num) {
+  unsigned int i, j;
   if (num < 0) {
     *(buffer++) = '-';
     num = -num;
@@ -931,7 +931,8 @@ static void sig_fatal(int code) {
   const char msgreport[] =
     "\nPlease report the problem at http://forum.httrack.com\n";
   char buffer[256];
-  size_t size;
+  /* MSVC's write() counts in unsigned int; this stays under buffer[256] */
+  unsigned int size;
 
   signal(code, SIG_DFL);
   signal(SIGABRT, SIG_DFL);

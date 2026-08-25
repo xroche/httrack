@@ -369,7 +369,7 @@ void hts_backtrace_altstack_release(void *stack) {
 }
 
 /* Why the report has no frames: a silent gap reads as a handler that died. */
-static void print_no_trace(int fd, const char *msg, size_t len) {
+static void print_no_trace(int fd, const char *msg, unsigned int len) {
   if (write(fd, msg, len) != len) { /* no ssize_t: this is built on MSVC too */
     /* sorry GCC */
   }

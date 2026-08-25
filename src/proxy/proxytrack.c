@@ -1564,8 +1564,9 @@ static int ICP_reply(struct sockaddr *clientAddr, int clientAddrLen, T_SOC soc,
   unsigned long int BufferSize;
   unsigned char *buffer;
 
-  if (Message_Length == 0 && Message != NULL)   /* We have to get the message size */
-    Message_Length = (unsigned int) strlen((char*) Message) + 1;        /* NULL terminated */
+  /* NUL terminated; RFC2186 caps an ICP message at 16 KB, so this fits */
+  if (Message_Length == 0 && Message != NULL)
+    Message_Length = (unsigned short) (strlen((char *) Message) + 1);
   BufferSize = 20 + Message_Length;
   buffer = malloc(BufferSize);
   if (buffer != NULL) {

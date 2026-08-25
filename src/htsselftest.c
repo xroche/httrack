@@ -8412,10 +8412,10 @@ static int st_warc(httrackp *opt, int argc, char **argv) {
           err = 1;
         seen_a_body = 1;
       }
-      if (warc_memstr((char *) rec, "Content-Encoding", hdr_len + block_len,
-                      16) != NULL ||
-          warc_memstr((char *) rec, "Transfer-Encoding", hdr_len + block_len,
-                      17) != NULL)
+      if (warc_memstr((char *) rec, "Content-Encoding",
+                      hdr_len + (size_t) block_len, 16) != NULL ||
+          warc_memstr((char *) rec, "Transfer-Encoding",
+                      hdr_len + (size_t) block_len, 17) != NULL)
         err = 1;
     }
     freet(rec);
@@ -11463,7 +11463,8 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
   (void) argv;
 
   /* no quota may fire instead of the stop, and no slot may time out */
-  opt->maxtime = opt->maxsite = 0;
+  opt->maxtime = 0;
+  opt->maxsite = 0;
   opt->timeout = 0;
   opt->state.stop = 0;
 
