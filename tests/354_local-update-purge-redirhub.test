@@ -1,0 +1,154 @@
+#!/bin/bash
+#
+# The hold #1390 put on the update purge keyed on the previous run's cache
+# entry being 2xx hypertext. A redirect hub has no such entry, and a hub
+# failing twice in a row leaves none at all, so both lost live children (#1395).
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_redirhub.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1 --timeout=20 --changes)
+
+local_server_start --log "${tmpdir}/server.log"
+
+# --- a hub that is a redirect ----------------------------------------------
+# rtarget.html and rchild.html hang below a 301 whose cache entry is stored
+# headers-only: nothing in it is 2xx, and it names no local file.
+out="${tmpdir}/redir"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/redirfail"
+
+local_crawl --log "${tmpdir}/rlog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/redirfail/index.html"
+assert_alive "${site}/rtarget.html" REDIRFAIL-TARGET
+assert_alive "${site}/rchild.html" REDIRFAIL-CHILD
+assert_alive "${site}/rgone.html" REDIRFAIL-GONE
+ok "pass 1 followed the redirect and mirrored what hangs below it"
+
+local_crawl --log "${tmpdir}/rlog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/redirfail/index.html"
+assert_gave_up "$out" '/redirfail/rhub\.html'
+assert_alive "${site}/rtarget.html" REDIRFAIL-TARGET
+assert_alive "${site}/rchild.html" REDIRFAIL-CHILD
+assert_purged false "$out"
+ok "a failed redirect hub keeps the subtree only it led to"
+
+# The hub redirects again, so this pass scans the whole site and the hold ends:
+# rgone.html is off the index and must go.
+local_crawl --log "${tmpdir}/rlog3" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/redirfail/index.html"
+assert_alive "${site}/rtarget.html" REDIRFAIL-TARGET
+assert_alive "${site}/rchild.html" REDIRFAIL-CHILD
+test ! -e "${site}/rgone.html" ||
+    fail "rgone.html left the site and a pass that scanned it all kept it"
+assert_purged true "$out"
+ok "the hold lasts the run, not the mirror"
+
+# --- a hub that fails on two consecutive updates ---------------------------
+# Pass 2 holds on the cached page from pass 1 but stores no entry of its own,
+# so pass 3 has nothing in the cache left to read.
+out="${tmpdir}/twice"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/twicefail"
+
+local_crawl --log "${tmpdir}/tlog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/twicefail/index.html"
+assert_alive "${site}/thub.html" 'tchild\.html'
+assert_alive "${site}/tchild.html" TWICEFAIL-CHILD
+ok "pass 1 mirrored the hub and the child both its parents link"
+
+local_crawl --log "${tmpdir}/tlog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/twicefail/index.html"
+assert_gave_up "$out" '/twicefail/thub\.html'
+assert_alive "${site}/tchild.html" TWICEFAIL-CHILD
+assert_purged false "$out"
+
+# talt.html stops linking the child here, so only the hub's kept copy still
+# carries it: purging now would unlink a file that is still reachable.
+local_crawl --log "${tmpdir}/tlog3" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/twicefail/index.html"
+assert_gave_up "$out" '/twicefail/thub\.html'
+grep -q 'tchild\.html' "${site}/thub.html" ||
+    fail "the kept copy of thub.html no longer links tchild.html"
+assert_alive "${site}/tchild.html" TWICEFAIL-CHILD
+assert_purged false "$out"
+ok "a second consecutive failure still holds the purge"
+
+# --- what carries no links must not hold anything --------------------------
+# Same failure, same kept copy, on a blob: neither its cached type nor the
+# name it was saved under says hypertext, on either pass.
+out="${tmpdir}/bin"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/binfail"
+
+local_crawl --log "${tmpdir}/blog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/binfail/index.html"
+assert_alive "${site}/binblob.bin" BINFAIL-BLOB
+assert_alive "${site}/bingone.html" BINFAIL-GONE
+
+local_crawl --log "${tmpdir}/blog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/binfail/index.html"
+assert_gave_up "$out" '/binfail/binblob\.bin'
+assert_alive "${site}/binblob.bin" BINFAIL-BLOB
+assert_purged true "$out"
+
+local_crawl --log "${tmpdir}/blog3" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/binfail/index.html"
+assert_gave_up "$out" '/binfail/binblob\.bin'
+assert_alive "${site}/binblob.bin" BINFAIL-BLOB
+test ! -e "${site}/bingone.html" ||
+    fail "bingone.html left the site and a failing blob kept the purge back"
+assert_purged true "$out"
+ok "a blob that failed twice keeps its own copy and nothing else"
+
+# --- a Location header on an answered blob is not a redirect ---------------
+# Location: is parsed and cached whatever the status, so reading it without
+# first checking that no usable status came back would hold on this one.
+out="${tmpdir}/loc"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/locfail"
+
+local_crawl --log "${tmpdir}/llog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/locfail/index.html"
+assert_alive "${site}/locblob.bin" LOCFAIL-BLOB
+assert_alive "${site}/locgone.html" LOCFAIL-GONE
+
+local_crawl --log "${tmpdir}/llog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/locfail/index.html"
+assert_gave_up "$out" '/locfail/locblob\.bin'
+assert_alive "${site}/locblob.bin" LOCFAIL-BLOB
+test ! -e "${site}/locgone.html" ||
+    fail "locgone.html left the site and a 200 with a Location kept the purge back"
+assert_purged true "$out"
+ok "a cached Location on an answered blob holds nothing back"
+
+# --- a hub whose savename is not the name in its URL -----------------------
+# dynhub.php is mirrored as dynhub.html, so the guard has to type it by the
+# name the cache recorded. The second consecutive failure on such a hub is a
+# separate gap: the run recomputes the savename without a cache entry to type
+# it, lands back on .php and finds no file (#1421).
+out="${tmpdir}/dyn"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/dynfail"
+
+local_crawl --log "${tmpdir}/dlog1" "${common[@]}" -O "$out" \
+    "${BASEURL}/dynfail/index.html"
+assert_alive "${site}/dynhub.html" 'dynchild\.html'
+assert_alive "${site}/dynchild.html" DYNFAIL-CHILD
+assert_alive "${site}/dyngone.html" DYNFAIL-GONE
+
+local_crawl --log "${tmpdir}/dlog2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/dynfail/index.html"
+assert_gave_up "$out" '/dynfail/dynhub\.php'
+assert_alive "${site}/dynhub.html" 'dynchild\.html'
+assert_alive "${site}/dynchild.html" DYNFAIL-CHILD
+assert_purged false "$out"
+ok "a hub saved under another name still holds its subtree"
