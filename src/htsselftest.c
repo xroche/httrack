@@ -4921,6 +4921,23 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
     EXPANDS(want, word, NULL);
     snprintf(word, sizeof(word), "--%s=on", optalias_value(i));
     EXPANDS(optreal_value(p), word, NULL);
+    /* #1437, table-wide too: the bound is the destination's magnitude, so
+       padding rides through and a run past every destination does not */
+    snprintf(word, sizeof(word), "--%s=00000000000000000002",
+             optalias_value(i));
+    snprintf(want, sizeof(want), "%s00000000000000000002", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=2147483647", optalias_value(i));
+    snprintf(want, sizeof(want), "%s2147483647", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=99999999999999999999",
+             optalias_value(i));
+    REFUSES(word, NULL);
+    /* a sign is not a digit run: -2 would spill into the cluster loop */
+    snprintf(word, sizeof(word), "--%s=-2", optalias_value(i));
+    REFUSES(word, NULL);
+    snprintf(word, sizeof(word), "--%s=+2", optalias_value(i));
+    REFUSES(word, NULL);
   }
   assertf(params >= 27); /* the rows the issue enumerates were all walked */
 
