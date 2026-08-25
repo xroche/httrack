@@ -67,9 +67,11 @@ Please visit our Website: http://www.httrack.com
   param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
+  paramn : glues like param what -N reads glued (1, 1L0, on/off), detaches a %-carrying template, refuses the rest
 
   A name may appear twice; the FIRST row wins, for the expansion and the help
-  text. Later rows exist so a reverse lookup by short option finds a name.
+  text. Later rows exist so a reverse lookup by short option finds a name, and
+  that lookup takes the first row too, so -N's class is "structure"'s.
 */
 const char *hts_optalias[][4] = {
   /*   {"","","",""}, */
@@ -110,7 +112,7 @@ const char *hts_optalias[][4] = {
   {"language", "-%l", "param1", ""}, {"lang", "-%l", "param1", ""},
   {"accept", "-%a", "param1", ""},
   {"headers", "-%X", "param1", ""},
-  {"structure", "-N", "param", ""},
+  {"structure", "-N", "paramn", ""},
   {"user-structure", "-N", "param1", ""},
   {"long-names", "-L", "param", ""},
   {"keep-links", "-K", "param", ""},
@@ -446,6 +448,35 @@ static const char *optalias_suffix(const char *type, const char *value) {
   return NULL;
 }
 
+/* A bare digit run short enough for -N to read it as a preset number. */
+static hts_boolean optalias_is_digits(const char *value) {
+  size_t i;
+
+  for (i = 0; value[i] != '\0'; i++) {
+    if (!isdigit((unsigned char) value[i]))
+      return HTS_FALSE;
+  }
+  return i != 0 && i <= HTS_SAVENAME_PRESET_MAX_DIGITS ? HTS_TRUE : HTS_FALSE;
+}
+
+/* Whether a "paramn" value glues onto the short form the way "param" does: a
+   preset, on/off, or a preset trailed by more short options (-N1L0). A path
+   separator or an extension dot marks a user template instead, which no option
+   cluster carries and which only reaches the engine detached (#1380). */
+static hts_boolean optalias_paramn_glues(const char *value) {
+  size_t i;
+
+  if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
+    return HTS_TRUE;
+  for (i = 0; isdigit((unsigned char) value[i]); i++) {
+  }
+  if (i == 0 || i > HTS_SAVENAME_PRESET_MAX_DIGITS)
+    return HTS_FALSE;
+  return strchr(value + i, '/') == NULL && strchr(value + i, '.') == NULL
+             ? HTS_TRUE
+             : HTS_FALSE;
+}
+
 /*
   Check for alias in command-line
   argc,argv     as in main()
@@ -561,10 +592,25 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         else
           need_param = 1;
 
+        /* A template with no % maps every URL onto one local name, so
+           --structure=flat is a typo rather than a template. --user-structure
+           still takes such a value verbatim. */
+        if (strcmp(hts_optalias[pos][2], "paramn") == 0 && param[0] != '\0' &&
+            !optalias_paramn_glues(param) && strchr(param, '%') == NULL) {
+          slprintfbuff_clip(return_error, return_error_size,
+                            "Syntax error:\n\tOption --%s does not take the "
+                            "value %s\n\t%s\n",
+                            hts_optalias[pos][0], param,
+                            _NOT_NULL(optalias_help(hts_optalias[pos][0])));
+          return 0;
+        }
+
         /* Final result */
 
-        /* Must be alone (-P /tmp) */
-        if (strcmp(hts_optalias[pos][2], "param1") == 0) {
+        /* Must be alone (-P /tmp), or a paramn value -N cannot take glued */
+        if (strcmp(hts_optalias[pos][2], "param1") == 0 ||
+            (strcmp(hts_optalias[pos][2], "paramn") == 0 &&
+             !optalias_paramn_glues(param))) {
           strlcpybuff(return_argv[0], command, return_argv_size);
           strlcpybuff(return_argv[1], param, return_argv_size);
           *return_argc = 2;     /* 2 parameters returned */
@@ -626,6 +672,15 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
     int pos;
 
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
+      /* -N 1 is preset 1; anything else stays detached, since a template may
+         legitimately open with a digit (-N 2col/%n.%t) */
+      if (strcmp(hts_optalias[pos][2], "paramn") == 0 && n_arg + 1 < argc &&
+          optalias_is_digits(argv[n_arg + 1])) {
+        strlcpybuff(return_argv[0], argv[n_arg], return_argv_size);
+        strlcatbuff(return_argv[0], argv[n_arg + 1], return_argv_size);
+        *return_argc = 1;
+        return 2;
+      }
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
         const optparam_state state =

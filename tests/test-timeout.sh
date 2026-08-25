@@ -67,7 +67,10 @@ test "$budget" -gt 0 || exec "$BASH" "$@"
 
 # Give the test its own TMPDIR, so the hang dump can salvage exactly this test's
 # crawl logs instead of racing (and deleting) a sibling's under "make check -j".
+# Trailing slash dropped: macOS's TMPDIR carries one, and the "//" it would
+# glue in is a path no test can compare against what the engine writes.
 tmproot=${TMPDIR:-/tmp}
+tmproot=${tmproot%/}
 if mkdir -p "$tmproot/ht.$$" 2>/dev/null; then
     TMPDIR="$tmproot/ht.$$"
     export TMPDIR
