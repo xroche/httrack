@@ -39,7 +39,9 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include "htslib.h"
 
+#include <errno.h>
 #include <limits.h>
+#include <stdint.h>
 
 /*
   Aliases for command-line and config file definitions
@@ -430,29 +432,56 @@ static char optalias_param_separator(const char *command) {
   return '\0';
 }
 
+/* The widest value the short form's own parser holds: -m, -M and -G read an
+   LLint, and -%c a float no strtoll-sized run overflows. */
+static int64_t optalias_param_max(const char *command) {
+  if (strcmp(command, "-m") == 0 || strcmp(command, "-M") == 0 ||
+      strcmp(command, "-G") == 0 || strcmp(command, "-%c") == 0)
+    return INT64_MAX;
+  return INT_MAX;
+}
+
+/* Whether the digit run at RUN converts to at most MAX. */
+static hts_boolean optalias_run_fits(const char *run, int64_t max) {
+  long long value;
+
+  errno = 0;
+  value = strtoll(run, NULL, 10);
+  return errno == 0 && value <= max ? HTS_TRUE : HTS_FALSE;
+}
+
 /* Whether the short form COMMAND can read VALUE glued onto it: the on/off
-   mapping, or a bounded number carrying at most one separator with a digit
-   right after it. What it converts short of, or not at all, leaves the option
-   at a value nobody asked for and spills the tail into the cluster loop as
-   further short options (--sockets=8I0 reaches -I0). */
+   mapping, or a number carrying at most one separator with a digit right after
+   it, each digit run within what the option's own parser holds. What it
+   converts short of, or not at all, leaves the option at a value nobody asked
+   for (--sockets=1234567890123456 asks for 1015724736 sockets) and spills the
+   tail into the cluster loop as further short options (--sockets=8I0 reaches
+   -I0). */
 static hts_boolean optalias_param_takes(const char *command,
                                         const char *value) {
   const char sep = optalias_param_separator(command);
+  const int64_t max = optalias_param_max(command);
   hts_boolean digit = HTS_FALSE, split = HTS_FALSE;
-  size_t i;
+  size_t i, run = 0;
 
   if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
     return HTS_TRUE;
-  for (i = 0; value[i] != '\0'; i++) {
-    if (isdigit((unsigned char) value[i]))
+  for (i = 0;; i++) {
+    if (isdigit((unsigned char) value[i])) {
       digit = HTS_TRUE;
-    else if (value[i] != sep || split || !isdigit((unsigned char) value[i + 1]))
+      continue;
+    }
+    /* the run just ended, if it held anything: -m and -%c carry two */
+    if (i > run && !optalias_run_fits(value + run, max))
       return HTS_FALSE;
-    else
-      split = HTS_TRUE;
+    if (value[i] == '\0')
+      break;
+    if (value[i] != sep || split || !isdigit((unsigned char) value[i + 1]))
+      return HTS_FALSE;
+    split = HTS_TRUE;
+    run = i + 1;
   }
-  /* bounded: an overlong run is refused, not appended */
-  return digit && i <= 16 ? HTS_TRUE : HTS_FALSE;
+  return digit;
 }
 
 /* The row's help line, indented and terminated, or nothing where it has none:

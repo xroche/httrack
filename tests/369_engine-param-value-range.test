@@ -1,0 +1,96 @@
+#!/bin/bash
+#
+# A "param" option's value was bounded at 16 characters rather than by
+# magnitude: --depth=0000000000000000001 was refused, while the sixteen digits
+# of --sockets=1234567890123456 reached sscanf("%d") as 1015724736 (#1437).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_paramrange.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+# The short form the alias expands to, which is what the engine's own option
+# parser then reads.
+takes() { # takes WORD EXPANSION
+    local out rc=0
+    out=$(httrack "-#test=optalias" "$1" 2>&1) || rc=$?
+    assert_eq 0 "${rc}" "$1 exited"
+    assert_eq "$2" "${out}" "$1 expanded"
+}
+
+refuses() { # refuses WORD
+    local out rc=0
+    out=$(httrack "-#test=optalias" "$1" 2>&1) || rc=$?
+    { test "${rc}" -ne 0 && test "${rc}" -ne 134; } ||
+        fail "$1 not refused (exit ${rc})"
+    grep -q 'does not take the value' <<<"${out}" ||
+        fail "$1 refused without saying why: ${out}"
+}
+
+# Padding is not a value: these all sat above the old 16-character cap.
+takes --depth=0000000000000000001 -r0000000000000000001
+takes --long-names=00000000000000001 -L00000000000000001
+takes --max-files=0000000100,0000005000 -m0000000100,0000005000
+takes --connection-per-second=00.5000000000000000 -%c00.5000000000000000
+
+# Ten digits below INT_MAX, and the two-operand forms unpadded.
+takes --advanced-maxlinks=2000000000 -#L2000000000
+takes --max-files=100,5000 -m100,5000
+takes --connection-per-second=0.5 -%c0.5
+takes --max-files=,5000 -m,5000
+# -M reads an LLint, so its bound is not the int one
+takes --max-size=9999999999999999 -M9999999999999999
+
+# The INT_MAX boundary, from both sides and through the padding.
+takes --depth=2147483647 -r2147483647
+takes --depth=00000000002147483647 -r00000000002147483647
+refuses --depth=2147483648
+refuses --depth=00000000002147483648
+
+# Out of range on an int row: each was read as some other number entirely.
+refuses --sockets=1234567890123456
+refuses --max-rate=3000000000
+refuses --timeout=99999999999
+# past strtoll itself, on the first operand and on the second
+refuses --max-size=99999999999999999999
+refuses --max-files=100,99999999999999999999
+refuses --connection-per-second=0.99999999999999999999
+
+# Controls: the structural rule the magnitude bound replaced still holds.
+refuses --sockets=8I0
+refuses --max-files=100,
+refuses --depth=none
+
+# On disk: a padded value reaches the engine as the number it spells. Long
+# names keep page.html, DOS 8.3 truncates it to PAGE.HTM.
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+out=${tmp}/out
+saved() { find "${out}" -type f | sed 's|.*/||'; }
+has_name() { grep -Fqx "$1" <<<"$(saved)"; }
+crawl() {
+    rm -rf "${out}"
+    mkdir -p "${out}"
+    RC=0
+    httrack "file://${tmp}/page.html" -O "${out}" --quiet -n "$@" \
+        >"${tmp}/log" 2>&1 || RC=$?
+}
+
+crawl --long-names=0000000000000000001
+assert_eq 0 "${RC}" "--long-names=0000000000000000001 exited"
+has_name page.html ||
+    fail_dump "padded --long-names=1 wrote no long name" "${tmp}/log"
+crawl --long-names=0000000000000000000
+assert_eq 0 "${RC}" "--long-names=0000000000000000000 exited"
+has_name PAGE.HTM ||
+    fail_dump "padded --long-names=0 wrote no 8.3 name" "${tmp}/log"
+
+crawl --sockets=1234567890123456
+test "${RC}" -ne 0 || fail_dump "--sockets=1234567890123456 mirrored" "${tmp}/log"
+! has_name page.html ||
+    fail_dump "--sockets=1234567890123456 still mirrored" "${tmp}/log"
+
+exit 0
