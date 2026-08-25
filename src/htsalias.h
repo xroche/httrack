@@ -69,6 +69,11 @@ typedef struct {
   /* per slot: the token arrived already unquoted, so the parser must not strip
      a quote pair off it again (doit.log tokens, unquoted by next_token) */
   hts_boolean *unquoted;
+  /* per slot: the token was put here as an option's parameter by something that
+     checked the pair, so the parser takes it as a value even where it begins
+     with '-' (#1425). Set by cmdl_mark_param() at the three places that know:
+     optalias_check()'s callers, and the doit.log a previous run accepted. */
+  hts_boolean *param;
   int argc;
   int capacity;
   hts_arena tokens;
@@ -93,6 +98,9 @@ hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos);
 /* cmdl_ins for a token that has already been unquoted by its reader, marking
    it so the parser leaves its quotes alone. */
 hts_boolean cmdl_ins_unquoted(cmdl_argv *cmd, const char *token, int pos);
+
+/* Mark slot pos as an option's parameter; see cmdl_argv::param. */
+void cmdl_mark_param(cmdl_argv *cmd, int pos);
 
 typedef enum {
   CMDL_FILE_MISSING, /* not found, or unreadable */

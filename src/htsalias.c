@@ -314,25 +314,51 @@ static hts_boolean optreal_or_alias(const char *token) {
          optalias_find(name + 5) >= 0;
 }
 
-/* Whether the real option OPT at ARGV[N_ARG] lacks the separate parameter it
-   needs. A strip-query key or a host-alias pattern may begin with '-' (#1179),
-   so those two take any following token that is not an option name; write
-   --strip-query=-q to hand them one that is. */
-static hts_boolean optparam_missing(int argc, const char *const *argv,
-                                    int n_arg, const char *opt) {
-  /* keep in sync with the strip-query and host-alias cases in htscoremain.c */
-  static const char *const rule_opt[] = {"-%g", "-%C", NULL};
+/* Real options whose value is user-written text, a rule or a path and may
+   legitimately begin with '-' (#1179, #1425): they take any following token
+   that does not name an option, and their --name=value form takes even one that
+   does, the escape #1179 documented for --strip-query. Every other option keeps
+   the older guess, that a leading '-' is the next option; relaxing it wholesale
+   would turn a typo into a mirror in a directory named after it. Keep the same
+   options' guards in htscoremain.c in sync, which is what a clustered (-q%A) or
+   quoted ("-%A") spelling lands on. */
+/* one row per option, so each name keeps its tag */
+/* clang-format off */
+static const char *const dashvalue_opt[] = {
+  "-%g",  /* strip-query */
+  "-%C",  /* host-alias */
+  "-%A",  /* assume */
+  "-%F",  /* footer */
+  "-%K",  /* cookies-file */
+  "-%L",  /* list */
+  "-%S",  /* urllist */
+  "-%rf", /* warc-file */
+  "-F",   /* user-agent */
+  NULL
+};
+/* clang-format on */
+
+/* How the real option OPT at ARGV[N_ARG] fares for the parameter it needs. */
+typedef enum {
+  OPTPARAM_PRESENT,  /* a value follows */
+  OPTPARAM_ABSENT,   /* nothing follows */
+  OPTPARAM_AS_OPTION /* what follows was read as the next option */
+} optparam_state;
+
+static optparam_state optparam_check(int argc, const char *const *argv,
+                                     int n_arg, const char *opt) {
   int i;
 
   if (n_arg + 1 >= argc)
-    return HTS_TRUE;
+    return OPTPARAM_ABSENT;
   if (argv[n_arg + 1][0] != '-')
-    return HTS_FALSE;
-  for (i = 0; rule_opt[i] != NULL; i++) {
-    if (strcmp(opt, rule_opt[i]) == 0)
-      return optreal_or_alias(argv[n_arg + 1]);
+    return OPTPARAM_PRESENT;
+  for (i = 0; dashvalue_opt[i] != NULL; i++) {
+    if (strcmp(opt, dashvalue_opt[i]) == 0)
+      return optreal_or_alias(argv[n_arg + 1]) ? OPTPARAM_AS_OPTION
+                                               : OPTPARAM_PRESENT;
   }
-  return HTS_TRUE;
+  return OPTPARAM_AS_OPTION;
 }
 
 /* The short form the --wide-/--tiny- prefix glues onto the alias it prefixes,
@@ -506,6 +532,40 @@ static const char *optalias_help_line(char *dest, size_t dest_size,
   return dest;
 }
 
+/* Why the option the user wrote as SPELLING did not get the parameter REAL
+   needs, in the terms the code decided it: calling a parameter missing when one
+   was passed, or naming the internal short option, leaves the user nothing to
+   work back from, and the run dies here, before any log file exists to say
+   more. No spelling is suggested: --name=value passes an option name through
+   for the dashvalue_opt options only, and a '--' value dies unrecognized in
+   every one. */
+static void optparam_error(optparam_state state, const char *spelling,
+                           const char *real, const char *next,
+                           char *return_error, size_t return_error_size) {
+  const int pos = optreal_find(real);
+  char help[256];
+
+  /* by long name: optalias_help() looks the short form up in vain */
+  optalias_help_line(help, sizeof(help),
+                     pos >= 0 ? hts_optalias[pos][0] : real);
+  if (state == OPTPARAM_ABSENT)
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption %s needs to be followed by a "
+                      "parameter: %s <param>\n%s",
+                      spelling, spelling, help);
+  else if (optreal_or_alias(next))
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption %s takes a value, and the next "
+                      "word \"%s\" names an option\n%s",
+                      spelling, next, help);
+  else
+    slprintfbuff_clip(return_error, return_error_size,
+                      "Syntax error:\n\tOption %s takes a value, and the next "
+                      "word \"%s\" begins with '-', so it was read as the next "
+                      "option\n%s",
+                      spelling, next, help);
+}
+
 /*
   Check for alias in command-line
   argc,argv     as in main()
@@ -602,13 +662,13 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
         if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
           /* Copy parameters? */
           if (need_param == 2) {
-            if (optparam_missing(argc, argv, n_arg, command)) {
-              slprintfbuff_clip(
-                  return_error, return_error_size,
-                  "Syntax error:\n\tOption %s needs to be followed by a "
-                  "parameter: %s <param>\n%s",
-                  command, command,
-                  optalias_help_line(help, sizeof(help), command));
+            const optparam_state state =
+                optparam_check(argc, argv, n_arg, command);
+
+            if (state != OPTPARAM_PRESENT) {
+              optparam_error(state, argv[n_arg], command,
+                             state == OPTPARAM_ABSENT ? "" : argv[n_arg + 1],
+                             return_error, return_error_size);
               return 0;
             }
             strcpybuff(param, argv[n_arg + 1]);
@@ -731,7 +791,6 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
 
   /* Check -O <path> */
   {
-    char help[256];
     int pos;
 
     if ((pos = optreal_find(argv[n_arg])) >= 0) {
@@ -746,13 +805,13 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
       }
       if ((strcmp(hts_optalias[pos][2], "param1") == 0)
           || (strcmp(hts_optalias[pos][2], "param0") == 0)) {
-        if (optparam_missing(argc, argv, n_arg, argv[n_arg])) {
-          slprintfbuff_clip(
-              return_error, return_error_size,
-              "Syntax error:\n\tOption %s needs to be followed by a "
-              "parameter: %s <param>\n%s",
-              argv[n_arg], argv[n_arg],
-              optalias_help_line(help, sizeof(help), argv[n_arg]));
+        const optparam_state state =
+            optparam_check(argc, argv, n_arg, argv[n_arg]);
+
+        if (state != OPTPARAM_PRESENT) {
+          optparam_error(state, argv[n_arg], argv[n_arg],
+                         state == OPTPARAM_ABSENT ? "" : argv[n_arg + 1],
+                         return_error, return_error_size);
           return 0;
         }
         /* Copy parameters */
@@ -845,6 +904,11 @@ static hts_boolean cmdl_reserve(cmdl_argv *cmd, int count) {
   if (flags == NULL) /* argv stays grown; capacity does not, so it is retried */
     return HTS_FALSE;
   cmd->unquoted = flags;
+  flags = (hts_boolean *) realloct(cmd->param,
+                                   sizeof(hts_boolean) * (size_t) capacity);
+  if (flags == NULL)
+    return HTS_FALSE;
+  cmd->param = flags;
   cmd->capacity = capacity;
   return HTS_TRUE;
 }
@@ -862,6 +926,7 @@ void cmdl_free(cmdl_argv *cmd) {
   hts_arena_free(&cmd->tokens);
   freet(cmd->argv);
   freet(cmd->unquoted);
+  freet(cmd->param);
   memset(cmd, 0, sizeof(*cmd));
 }
 
@@ -879,9 +944,11 @@ hts_boolean cmdl_ins(cmdl_argv *cmd, const char *token, int pos) {
   for (i = cmd->argc; i > pos; i--) {
     cmd->argv[i] = cmd->argv[i - 1];
     cmd->unquoted[i] = cmd->unquoted[i - 1];
+    cmd->param[i] = cmd->param[i - 1];
   }
   cmd->argv[pos] = copy;
   cmd->unquoted[pos] = HTS_FALSE;
+  cmd->param[pos] = HTS_FALSE;
   cmd->argc++;
   return HTS_TRUE;
 }
@@ -895,6 +962,11 @@ hts_boolean cmdl_ins_unquoted(cmdl_argv *cmd, const char *token, int pos) {
 
 hts_boolean cmdl_add(cmdl_argv *cmd, const char *token) {
   return cmdl_ins(cmd, token, cmd->argc);
+}
+
+void cmdl_mark_param(cmdl_argv *cmd, int pos) {
+  assertf(pos >= 0 && pos < cmd->argc);
+  cmd->param[pos] = HTS_TRUE;
 }
 
 /* Include a file to the current command line */
@@ -981,6 +1053,8 @@ cmdl_file_result optinclude_file(const char *name, cmdl_argv *cmd) {
                 fclose(fp);
                 return CMDL_FILE_NOMEM;
               }
+              if (return_argc > 1)
+                cmdl_mark_param(cmd, insert_after + 1);
               insert_after += return_argc > 1 ? 2 : 1;
             }
           }
