@@ -59,7 +59,9 @@ with open(path, "rb") as fp:
 }
 
 # assert_cached OUTDIR URLTAIL SAVETAIL: exactly one entry for that URL, naming
-# that file and marked as kept for its name alone.
+# that file, marked as kept for its name alone, and holding no payload. A kept
+# entry carries none, and one still claiming to would read back as an empty
+# page anywhere the marker is not honoured.
 assert_cached() {
     local blocks count
     blocks=$(cache_headers "$1" "$2")
@@ -69,6 +71,8 @@ assert_cached() {
         fail "the cache entry for ${2} does not name ${3}: ${blocks}"
     grep -q '^X-Kept: 1$' <<<"$blocks" ||
         fail "the cache entry for ${2} is not marked kept: ${blocks}"
+    grep -q '^X-In-Cache: 0$' <<<"$blocks" ||
+        fail "the cache entry for ${2} claims to hold a body: ${blocks}"
 }
 
 local_server_start --log "${tmpdir}/server.log"
