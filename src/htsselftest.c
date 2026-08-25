@@ -4776,7 +4776,7 @@ static const char *st_optalias_expand(char *dest, size_t dest_size,
    was dropped, so --index=0 read back as the enabling bare --index. */
 static int st_optalias(httrackp *opt, int argc, char **argv) {
   char got[HTS_CDLMAXSIZE * 2], warn[256];
-  int i, used;
+  int i, used, params = 0;
 
   (void) opt;
   /* -list gives 282 the whole table: the rows to try against the engine's
@@ -4895,6 +4895,52 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-C2", "--cache", "2");
   EXPANDS("-P proxy:8080", "--proxy", "proxy:8080");
   EXPANDS("+*.gif", "--allow", "*.gif");
+
+  /* #1426: a "param" value the short form cannot read is refused on every row,
+     instead of being glued on to leave the option at its default while its
+     characters spell more short options. Both directions, table-wide: -N is
+     out, being the one param row that also reads a user template. */
+  for (i = 0; optalias_value(i)[0] != '\0'; i++) {
+    const int p = optalias_find(optalias_value(i));
+    char word[HTS_CDLMAXSIZE], want[HTS_CDLMAXSIZE];
+
+    if (strcmp(opttype_value(p), "param") != 0 ||
+        strcmp(optreal_value(p), "-N") == 0)
+      continue;
+    params++;
+    snprintf(word, sizeof(word), "--%s=yes", optalias_value(i));
+    REFUSES(word, NULL);
+    snprintf(word, sizeof(word), "--%s=none", optalias_value(i));
+    REFUSES(word, NULL);
+    snprintf(word, sizeof(word), "--%s=OFF", optalias_value(i));
+    REFUSES(word, NULL);
+    snprintf(word, sizeof(word), "--%s", optalias_value(i));
+    REFUSES(word, "http://foo/");
+    /* control: a number, and the on/off mapping, still pass in silence */
+    snprintf(word, sizeof(word), "--%s=2", optalias_value(i));
+    snprintf(want, sizeof(want), "%s2", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=off", optalias_value(i));
+    snprintf(want, sizeof(want), "%s0", optreal_value(p));
+    EXPANDS(want, word, NULL);
+    snprintf(word, sizeof(word), "--%s=on", optalias_value(i));
+    EXPANDS(optreal_value(p), word, NULL);
+  }
+  assertf(params >= 27); /* the rows the issue enumerates were all walked */
+
+  /* what the short forms read beyond a digit run: -m takes N,N2 and -%c a
+     rate with a decimal point */
+  EXPANDS("-m,5000", "--max-files=,5000", NULL);
+  EXPANDS("-m100,5000", "--max-files=100,5000", NULL);
+  EXPANDS("-%c0.5", "--connection-per-second=0.5", NULL);
+  REFUSES("--max-files=,", NULL);
+  REFUSES("--sockets=8,4", NULL);
+  REFUSES("--sockets=0.5", NULL);
+  REFUSES("--advanced-maxlinks=99999999999999999999", NULL);
+  /* --sockets=8I0 mirrored without a top index: the tail reached -I0 */
+  REFUSES("--sockets=8I0", NULL);
+  /* an empty value is the bare short form, as it has always been */
+  EXPANDS("-c", "--sockets=", NULL);
 
   /* invariant: every name's bare long form still emits its short form, and a
      param name still demands its own value. A duplicate name (test, continue)

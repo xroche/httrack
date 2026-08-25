@@ -64,7 +64,7 @@ Please visit our Website: http://www.httrack.com
   single : no options, and a value (--index=0, --noindex) is refused
   onoff  : optional 0/1 value, whose short form takes a 0 suffix (-I0)
   level  : optional numeric value, which the short form parses (-%v2)
-  param  : this option allows a number parameter (1, for example) and can be mixed with other options (R1C1c8)
+  param  : this option takes a number (1, for example) and can be mixed with other options (R1C1c8); a value the short form cannot read is refused
   param1 : this option must be alone, and needs one distinct parameter (-P <path>)
   param0 : this option must be alone, but the parameter should be put together (+*.gif)
 
@@ -172,7 +172,8 @@ const char *hts_optalias[][4] = {
   {"referer", "-%R", "param1", "default referer URL"},
   {"from", "-%E", "param1", "from email address"},
   {"footer", "-%F", "param1", ""},
-  {"cache", "-C", "param", "number of retries for non-fatal errors"},
+  {"cache", "-C", "param",
+   "cache mode (0 no cache, 1 read the cache first, 2 test for updates)"},
   {"store-all-in-cache", "-k", "single", ""},
   {"do-not-recatch", "-%n", "onoff", ""},
   {"do-not-log", "-Q", "single", ""},
@@ -390,6 +391,38 @@ static const char *optalias_suffix(const char *type, const char *value) {
   return NULL;
 }
 
+/* Beyond a digit run, what a "param" short form's own parser also reads: -m
+   takes N,N2 and -%c a rate with a decimal point. */
+static const char *optalias_param_extra(const char *command) {
+  if (strcmp(command, "-m") == 0)
+    return ",";
+  if (strcmp(command, "-%c") == 0)
+    return ".";
+  return "";
+}
+
+/* Whether the short form COMMAND can read VALUE glued onto it: the on/off
+   mapping, or a bounded number. Anything else converts to nothing, leaving the
+   option at its default, and its characters go on to spell further short
+   options (--sockets=8I0 reaches -I0, and mirrors without a top index). */
+static hts_boolean optalias_param_takes(const char *command,
+                                        const char *value) {
+  const char *const extra = optalias_param_extra(command);
+  hts_boolean digit = HTS_FALSE;
+  size_t i;
+
+  if (strcmp(value, "on") == 0 || strcmp(value, "off") == 0)
+    return HTS_TRUE;
+  for (i = 0; value[i] != '\0'; i++) {
+    if (isdigit((unsigned char) value[i]))
+      digit = HTS_TRUE;
+    else if (strchr(extra, value[i]) == NULL)
+      return HTS_FALSE;
+  }
+  /* bounded: an overlong run is refused, not appended */
+  return digit && i <= 16 ? HTS_TRUE : HTS_FALSE;
+}
+
 /*
   Check for alias in command-line
   argc,argv     as in main()
@@ -524,6 +557,21 @@ int optalias_check(int argc, const char *const *argv, int n_arg,
           strlcpybuff(return_argv[0], command, return_argv_size);
           /* Parameters accepted */
           if (strncmp(hts_optalias[pos][2], "param", 5) == 0) {
+            /* refuse rather than glue junk on: the short form would convert
+               nothing and keep its default, and the leftover characters reach
+               the cluster loop as options nobody typed (#1426). --structure is
+               the one "param" row that also reads a user template (#1418). */
+            if (strcmp(hts_optalias[pos][2], "param") == 0 &&
+                param[0] != '\0' && strcmp(command, "-N") != 0 &&
+                !optalias_param_takes(command, param)) {
+              slprintfbuff_clip(
+                  return_error, return_error_size,
+                  "Syntax error:\n\tOption --%s does not take the "
+                  "value %s\n\t%s\n",
+                  hts_optalias[pos][0], param,
+                  _NOT_NULL(optalias_help(hts_optalias[pos][0])));
+              return 0;
+            }
             /* --cache=off or --index=on */
             if (strcmp(param, "off") == 0)
               strlcatbuff(return_argv[0], "0", return_argv_size);

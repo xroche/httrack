@@ -1,0 +1,110 @@
+#!/bin/bash
+#
+# A "param" option takes a number. A value its short form cannot read used to be
+# glued on anyway, leaving the option at its default while the leftover
+# characters spelled more short options: --long-names=yes wrote DOS 8.3 names
+# and --sockets=8I0 mirrored without a top index, both exit 0 (#1426).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_paramval.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+assert_selftest "optalias self-test OK" optalias
+
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+out=${tmp}/out
+
+crawl() {
+    rm -rf "${out}"
+    mkdir -p "${out}"
+    RC=0
+    httrack "file://${tmp}/page.html" -O "${out}" --quiet -n "$@" \
+        >"${tmp}/log" 2>&1 || RC=$?
+}
+
+# Basenames of the mirror, so the check reads what was written rather than a
+# path this host may spell differently (macOS $TMPDIR, Windows ':' -> '_').
+saved() { find "${out}" -type f | sed 's|.*/||'; }
+has_name() { grep -Fqx "$1" <<<"$(saved)"; }
+
+# The discriminator, proven on the two spellings that ask for each layout:
+# long names keep page.html, DOS 8.3 truncates it to PAGE.HTM.
+crawl --long-names=1
+assert_eq 0 "${RC}" "--long-names=1 exited"
+has_name page.html || fail_dump "--long-names=1 wrote no long name" "${tmp}/log"
+crawl --long-names=0
+assert_eq 0 "${RC}" "--long-names=0 exited"
+has_name PAGE.HTM || fail_dump "--long-names=0 wrote no 8.3 name" "${tmp}/log"
+
+refused() { # refused ARG...
+    crawl "$@"
+    # 134 is an abort, which would read as a refusal without being one
+    { test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
+        fail_dump "$* not refused (exit ${RC})" "${tmp}/log"
+    grep -q 'does not take the value' "${tmp}/log" ||
+        fail_dump "$* refused without saying why" "${tmp}/log"
+    # the mirror must not be there at all, in either layout
+    ! has_name page.html || fail_dump "$* still mirrored" "${tmp}/log"
+    ! has_name PAGE.HTM || fail_dump "$* still mirrored, in 8.3" "${tmp}/log"
+}
+
+accepted() { # accepted ARG...
+    crawl "$@"
+    assert_eq 0 "${RC}" "$* exited"
+    # either layout: bare -L is 8.3, so --long-names=on lands there too
+    has_name page.html || has_name PAGE.HTM ||
+        fail_dump "$* mirrored nothing" "${tmp}/log"
+    ! grep -q 'does not take the value' "${tmp}/log" ||
+        fail_dump "$* drew a refusal" "${tmp}/log"
+}
+
+# The headline: junk on -L wrote 8.3 names, which is what --long-names=0 means.
+for value in yes none OFF true "8I0"; do
+    refused "--long-names=${value}"
+done
+
+# ...and the same on rows reaching four other short options. --sockets=8I0 is
+# the second visible one: the I0 tail reached -I0 and dropped the top index.
+refused --sockets=8I0
+refused --depth=none
+refused --cache=OFF
+refused --robots=yes
+refused --max-files=none
+# a detached value is the same value: --depth ate the URL and mirrored nothing
+refused --depth "file://${tmp}/page.html"
+
+# The message names the option that was typed. --cache=OFF used to report
+# "Option O needs [...] a path", -O being reached out of the middle of OFF.
+crawl --cache=OFF
+grep -q 'Option --cache does not take the value OFF' "${tmp}/log" ||
+    fail_dump "--cache=OFF blamed another option" "${tmp}/log"
+
+# Negative control: the values these rows do take still run, and say nothing.
+accepted --long-names=1
+has_name page.html || fail_dump "--long-names=1 lost its long names" "${tmp}/log"
+accepted --long-names=on
+accepted --long-names=off
+accepted --sockets=8
+# ...and it keeps the top index that --sockets=8I0 lost
+has_name index.html || fail_dump "--sockets=8 wrote no top index" "${tmp}/log"
+accepted --depth=2
+accepted --cache=0
+accepted --robots=1
+accepted --max-files=100
+accepted --sockets 8
+# what the short forms read beyond a digit run: -m takes N,N2, -%c a rate
+accepted --max-files=,5000
+accepted --max-files=100,5000
+accepted --connection-per-second=0.5
+
+# --structure is the param row that also reads a user template, and keeps it.
+accepted --structure=1
+crawl --structure=%h%p/%n%q.%t
+assert_eq 0 "${RC}" "--structure template exited"
+
+exit 0
