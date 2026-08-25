@@ -235,6 +235,38 @@ int cache_zip_store_stream(zipFile zf, FILE *fp) {
   return ferror(fp) ? CACHE_ZIP_READ_ERROR : Z_OK;
 }
 
+void cache_keep_previous(httrackp *opt, cache_back *cache, const char *url_adr,
+                         const char *url_fil, const char *url_save) {
+  char BIGSTK location[HTS_LOCATION_SIZE];
+  char BIGSTK previous_save[HTS_URLMAXSIZE * 2];
+  htsblk r;
+
+  if (!opt->cache || !cache_writable(cache) || url_save == NULL ||
+      !strnotempty(url_save) || IS_DELAYED_EXT(url_save))
+    return;
+  if (cache->kept != NULL) {
+    const char *const key =
+        concat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), url_adr, url_fil);
+
+    if (coucal_read(cache->kept, key, NULL) != 0)
+      return; /* another attempt at the same link already stored it */
+    coucal_add(cache->kept, key, 1);
+  }
+  location[0] = previous_save[0] = '\0';
+  /* read-only: the entry is only being copied, not applied to the mirror */
+  r = cache_readex(opt, cache, url_adr, url_fil, url_save, location,
+                   previous_save, 1);
+  /* an entry naming no local file, a redirect above all, maps nothing */
+  if (r.statuscode > 0 && strnotempty(previous_save)) {
+    hts_log_print(opt, LOG_DEBUG, "keeping the previous cache entry for %s%s",
+                  url_adr, url_fil);
+    cache_add(opt, cache, &r, url_adr, url_fil, url_save, opt->all_in_cache,
+              StringBuff(opt->path_html_utf8));
+  }
+  if (r.adr != NULL)
+    freet(r.adr);
+}
+
 /* Ajout d'un fichier en cache */
 void cache_add(httrackp * opt, cache_back * cache, const htsblk * r,
                const char *url_adr, const char *url_fil, const char *url_save,

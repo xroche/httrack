@@ -199,6 +199,9 @@ struct cache_back {
   coucal hashtable;
   // HASH for tests (naming subsystem)
   coucal cached_tests;
+  /** URLs whose previous entry this run already carried forward (#1421), so a
+      retry of the same link does not store it again. */
+  coucal kept;
   /* optional log files */
   FILE *log;
   FILE *errlog;

@@ -2979,6 +2979,34 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             self.send_raw(self.FAKE_PNG, "image/png")
 
+
+    # --- a page whose local name comes from its cached type (#1421) ---------
+    # page.php answers text/html, so it mirrors as page.html. It then fails to
+    # answer on two consecutive updates, and answers again on the fourth crawl.
+
+    def namedrift_crawl(self):
+        """Which crawl this is: the index never fails, so its fetch count is
+        the crawl number even when a retry re-fetches the page."""
+        return Handler.REFETCH_SEEN.get("/namedrift/index.html", 1)
+
+    def route_namedrift_index(self):
+        links = '\t<a href="page.php">page</a>\n'
+        if self.refetch_pass() <= 3:  # stale.html leaves the site for crawl 4
+            links += '\t<a href="stale.html">stale</a>\n'
+        self.send_html(links)
+
+    def route_namedrift_page(self):
+        if self.namedrift_crawl() in (2, 3):
+            self.send_cut_headers()
+        else:
+            self.send_html('\t<a href="kid.html">kid</a>\n')
+
+    def route_namedrift_kid(self):
+        self.send_raw(b"<html><body><p>NAMEDRIFT-KID</p></body></html>", "text/html")
+
+    def route_namedrift_stale(self):
+        self.send_raw(b"<html><body><p>NAMEDRIFT-STALE</p></body></html>", "text/html")
+
     ROUTES = {
         "/sfmark.html": route_singlefile_mark,
         "/cookies/entrance.php": route_entrance,
@@ -3275,6 +3303,10 @@ class Handler(SimpleHTTPRequestHandler):
         "/maxrecv/r13.bin": route_maxrecv_404,
         "/maxrecv/r14.bin": route_maxrecv_404,
         "/maxrecv/r15.bin": route_maxrecv_404,
+        "/namedrift/index.html": route_namedrift_index,
+        "/namedrift/page.php": route_namedrift_page,
+        "/namedrift/kid.html": route_namedrift_kid,
+        "/namedrift/stale.html": route_namedrift_stale,
     }
 
     # --- /big/ seeded pseudo-site ------------------------------------------

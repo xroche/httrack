@@ -181,6 +181,9 @@ RUN_CALLBACK0(opt, end); \
     if (cache_tests) {                                                         \
       coucal_delete(&cache_tests);                                             \
     }                                                                          \
+    if (cache_kept) {                                                          \
+      coucal_delete(&cache_kept);                                              \
+    }                                                                          \
     if (template_header) {                                                     \
       freet(template_header);                                                  \
       template_header = NULL;                                                  \
@@ -531,6 +534,7 @@ int httpmirror(char *url1, httrackp * opt) {
   robots_wizard BIGSTK robots;  // gestion robots.txt
   coucal cache_hashtable = NULL;
   coucal cache_tests = NULL;
+  coucal cache_kept = NULL;
 
   //
   char *template_header = NULL, *template_body = NULL, *template_footer = NULL;
@@ -620,7 +624,8 @@ int httpmirror(char *url1, httrackp * opt) {
   // initialiser hash cache
   cache_hashtable = coucal_new(0);
   cache_tests = coucal_new(0);
-  if (cache_hashtable == NULL || cache_tests == NULL) {
+  cache_kept = coucal_new(0);
+  if (cache_hashtable == NULL || cache_tests == NULL || cache_kept == NULL) {
     printf("PANIC! : Not enough memory [%d]\n", __LINE__);
     filters[0] = NULL;          // uniquement a cause du warning de XH_extuninit
     XH_extuninit;
@@ -628,11 +633,14 @@ int httpmirror(char *url1, httrackp * opt) {
   }
   hts_set_hash_handler(cache_hashtable, opt);
   hts_set_hash_handler(cache_tests, opt);
+  hts_set_hash_handler(cache_kept, opt);
   coucal_set_name(cache_hashtable, "cache_hashtable");
   coucal_set_name(cache_tests, "cache_tests");
+  coucal_set_name(cache_kept, "cache_kept");
   coucal_value_is_malloc(cache_tests, 1);      /* malloc */
   cache.hashtable = (void *) cache_hashtable;   /* copy backcache hash */
   cache.cached_tests = (void *) cache_tests;    /* copy of cache_tests */
+  cache.kept = cache_kept;
 
   // effacer filters
   opt->maxfilter = maximum(opt->maxfilter, 128);

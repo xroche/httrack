@@ -1,0 +1,88 @@
+#!/bin/bash
+#
+# page.php mirrors as page.html because its cached type says hypertext. A run
+# that fails to fetch it stores no entry, so the run after it recomputes
+# page.php, finds no such file, and purges the live copy (#1421).
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_namedrift.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+common=(--quiet --disable-security-limits --robots=0 --retries=1 -c1 --timeout=20 --changes)
+
+# assert_purged WANT OUTDIR: what the run reported doing to the old files.
+assert_purged() {
+    local want="$1" json="${2}/hts-changes.json"
+    grep -q "\"purged\": ${want}" "$json" ||
+        fail "expected \"purged\": ${want} in $(<"$json")"
+}
+
+# assert_alive FILE MARKER: still mirrored, and still the body we mirrored.
+assert_alive() {
+    test -s "$1" || fail "$1 is gone"
+    grep -q "$2" "$1" || fail "$1 no longer carries ${2}"
+}
+
+# assert_gave_up OUTDIR URLPATH: the link exhausted its retries on a transport
+# failure, not on an answered error.
+assert_gave_up() {
+    local log="${1}/hts-log.txt"
+    grep -qE "Error:.*\(-[0-9]+\).*at link .*${2}" "$log" ||
+        fail "no transport failure gave up on ${2}: $(<"$log")"
+}
+
+local_server_start --log "${tmpdir}/server.log"
+
+out="${tmpdir}/crawl"
+mkdir -p "$out"
+site="${out}/127.0.0.1_${SRV_PORT}/namedrift"
+
+local_crawl --log "${tmpdir}/log1" "${common[@]}" -O "$out" \
+    "${BASEURL}/namedrift/index.html"
+assert_alive "${site}/page.html" 'kid\.html'
+assert_alive "${site}/kid.html" NAMEDRIFT-KID
+assert_alive "${site}/stale.html" NAMEDRIFT-STALE
+test ! -e "${site}/page.php" ||
+    fail "page.php kept its URL name, so this is not the shape #1421 names"
+ok "pass 1 mirrored page.php under the name its content type gave it"
+
+# The cached entry from pass 1 still names page.html here, so nothing drifts.
+local_crawl --log "${tmpdir}/log2" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/namedrift/index.html"
+assert_gave_up "$out" '/namedrift/page\.php'
+assert_alive "${site}/page.html" 'kid\.html'
+assert_alive "${site}/kid.html" NAMEDRIFT-KID
+assert_purged false "$out"
+ok "a first failed fetch keeps the copy and holds the purge"
+
+# Second consecutive failure: pass 2 stored no entry of its own, so only the
+# record it carried forward still says this page is page.html.
+local_crawl --log "${tmpdir}/log3" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/namedrift/index.html"
+assert_gave_up "$out" '/namedrift/page\.php'
+assert_alive "${site}/page.html" 'kid\.html'
+assert_alive "${site}/kid.html" NAMEDRIFT-KID
+assert_alive "${site}/stale.html" NAMEDRIFT-STALE
+test ! -e "${site}/page.php" || fail "the recomputed name landed on disk"
+assert_purged false "$out"
+ok "a second consecutive failure keeps the name, the copy and the subtree"
+
+# The page answers again and the crawl scans the whole site: stale.html has
+# left it since this pass and must go, carried-forward record or not. A file
+# dropped during a held pass is not in its new.lst, so it can only leave on a
+# pass that purges.
+local_crawl --log "${tmpdir}/log4" "${common[@]}" -O "$out" --update \
+    "${BASEURL}/namedrift/index.html"
+assert_alive "${site}/page.html" 'kid\.html'
+assert_alive "${site}/kid.html" NAMEDRIFT-KID
+test ! -e "${site}/stale.html" ||
+    fail "stale.html left the site and a pass that scanned it all kept it"
+assert_purged true "$out"
+ok "the hold lasts the run, not the mirror"
