@@ -482,7 +482,7 @@ static int look_like_xml(const char *s) {
 
 // Début de httpmirror, robot
 // url1 peut être multiple
-int httpmirror(char *url1, httrackp * opt) {
+int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
   hash_struct *const hashptr = &hash;
@@ -552,6 +552,9 @@ int httpmirror(char *url1, httrackp * opt) {
   /* per mirror, not per opt: an embedder reusing one opt would otherwise
      carry the last run's verdict and never purge again */
   opt->links_unqueued = HTS_FALSE;
+
+  /* before the first bailout below, each of which leaves it false */
+  *completed_out = HTS_FALSE;
 
   // noter heure actuelle de départ en secondes
   memset(&HTS_STAT, 0, sizeof(HTS_STAT));
@@ -829,6 +832,7 @@ int httpmirror(char *url1, httrackp * opt) {
       }
       freet(primary);
       XH_extuninit;
+      *completed_out = HTS_TRUE; /* --why answered; no mirror was asked for */
       return 1;
     }
 
@@ -2335,6 +2339,7 @@ cleanup:
   if (rollback)
     hts_cache_reconcile(opt, CACHE_RECONCILE_ROLLBACK);
 
+  *completed_out = completed;
   return retcode;
 }
 

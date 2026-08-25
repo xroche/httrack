@@ -2931,16 +2931,24 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
     // Lancement du miroir
     // ------------------------------------------------------------
     opt->state._hts_in_mirror = 1;
-    if (httpmirror(url, opt) == 0) {
-      printf
-        ("Error during operation (see log file), site has not been successfully mirrored\n");
-      exit_code = HTS_EXIT_MIRROR_ABORTED;
-    } else {
-      if (opt->shell) {
+    {
+      hts_boolean completed = HTS_FALSE;
+      const int mirrored = httpmirror(url, opt, &completed);
+
+      if (mirrored == 0) {
+        printf("Error during operation (see log file), site has not been "
+               "successfully mirrored\n");
+        exit_code = HTS_EXIT_MIRROR_ABORTED;
+      } else if (opt->shell) {
+        /* Inert: TRANSFER DONE goes to the scratch buffer, never to stdout. */
         HTT_REQUEST_START;
         HT_PRINT("TRANSFER DONE" LF);
-      HTT_REQUEST_END} else {
+        HTT_REQUEST_END
+      } else if (completed) {
         printf("Done.\n");
+      } else {
+        /* The engine's verdict, so every kind of abort reads alike. */
+        printf("Mirror not completed (see log file)\n");
       }
     }
     opt->state._hts_in_mirror = 0;

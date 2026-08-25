@@ -330,8 +330,10 @@ void hts_record_init(httrackp *opt);
 void hts_record_free(httrackp *opt);
 
 /* Run the mirror for the given start URL(s) under opt. Top-level engine entry.
- */
-int httpmirror(char *url1, httrackp * opt);
+   Returns 1 once the crawl loop ran, 0 or -1 for a bailout. *completed says
+   whether it reached the end: false for a bailout, and for any stop that cut it
+   short, however it arrived (state.stop or exit_xh). */
+int httpmirror(char *url1, httrackp *opt, hts_boolean *completed);
 
 /* Write len bytes of adr to local path s. url_adr/url_fil (may be NULL) name
    the source URL for logging/notification. */

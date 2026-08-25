@@ -1,0 +1,165 @@
+#!/bin/bash
+#
+# A mirror the engine gave up on must not say "Done." on stdout, and shell mode
+# (-#S) must stay silent whatever the outcome: its end-of-mirror token goes to a
+# scratch buffer rather than the stream a front end parses.
+# An abort reaches the engine three ways and all three are exercised: -#L makes
+# httpmirror() return -1, a full disk leaves it returning 1 with exit_xh set,
+# and a cap or a ^C raises state.stop with exit_xh untouched. Only the disk arm
+# needs /dev/full and only the ^C arm needs signals, so the rest carry Windows.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_notdone.XXXXXX")
+crawlpid=''
+kill_interrupted() { test -z "$crawlpid" || kill_tree "$crawlpid"; }
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+common=(--quiet --disable-security-limits --robots=0 --timeout=20
+    "--max-time=$CRAWL_MAX_TIME")
+# Verbose, so a request line says the ^C arm has a body in flight to interrupt.
+local_server_start --log "${tmpdir}/server.log" --env LOCAL_SERVER_VERBOSE=1
+
+out='' err='' log='' rc=0
+# Crawl $2 into a fresh ${tmpdir}/$1, with anything past $2 as extra options.
+# Leaves stdout in $out, stderr in $err, the crawl log in $log, the status in $rc.
+crawl() {
+    local name="$1" entry="$2"
+    local dir="${tmpdir}/${name}"
+
+    shift 2
+    out="${tmpdir}/out-${name}"
+    err="${tmpdir}/err-${name}"
+    rc=0
+    run_with_timeout "$(crawl_deadline)" httrack "${common[@]}" "$@" -O "$dir" \
+        "${BASEURL}/${entry}" >"$out" 2>"$err" || rc=$?
+    test "$rc" -ne 124 || fail "the ${name} crawl wedged"
+    log=$(<"${dir}/hts-log.txt")
+}
+
+# stdout must carry the one verdict that matches what the log says happened.
+assert_says() { # assert_says finished|aborted WHAT
+    if test "$1" = finished; then
+        grep -q '^Done\.$' "$out" || fail_dump "$2" "$out" "$err"
+        return 0
+    fi
+    if grep -q '^Done\.$' "$out"; then
+        fail_dump "$2" "$out" "$err"
+    fi
+    grep -q 'Mirror not completed' "$out" || fail_dump "$2" "$out" "$err"
+}
+
+# The whole point of the shell arm: neither verdict reaches the token stream.
+assert_shell_silent() { # assert_shell_silent WHAT
+    if grep -qE '^Done\.$|Mirror not completed|TRANSFER DONE' "$out"; then
+        fail_dump "$1" "$out" "$err"
+    fi
+}
+
+# --- a mirror that finishes still reports it --------------------------------
+crawl complete changes/index.html
+assert_says finished "a completed mirror stopped saying Done."
+if grep -q 'Mirror aborted\|giving up' <<<"$log"; then
+    fail "the control crawl did not finish, so it proves nothing: ${log}"
+fi
+ok "a mirror that finishes still says Done."
+
+# --- the link cap: httpmirror() returns -1, which the == 0 test never saw ----
+crawl linkcap changes/index.html -\#L4
+grep -q 'Too many URLs' <<<"$log" ||
+    fail "the link cap did not stop the crawl, so nothing here was aborted: ${log}"
+assert_says aborted "a mirror the link cap stopped still claimed to be done"
+ok "a mirror the link cap stopped does not claim to be done"
+
+# --- a full disk: httpmirror() returns 1 and only exit_xh says otherwise -----
+# The engine is a native binary under MSYS, so a symlink the shell writes
+# through as /dev/full is a plain file to the crawl. Probe the mechanism, not
+# the node: macOS has no /dev/full and links to it happily, so a write through
+# the probe fails with ENOENT rather than ENOSPC.
+disk_abort_works() {
+    local probe="${tmpdir}/probe" refused=1
+    ! is_windows || return 1
+    test -c /dev/full || return 1
+    ln -s /dev/full "$probe" 2>/dev/null || return 1
+    ! printf x >"$probe" 2>/dev/null || refused=0
+    rm -f "$probe"
+    test "$refused" -eq 1
+}
+if disk_abort_works; then
+    dir="${tmpdir}/diskfull"
+    mkdir -p "${dir}/127.0.0.1_${SRV_PORT}/diskfull"
+    ln -s /dev/full "${dir}/127.0.0.1_${SRV_PORT}/diskfull/big.bin"
+    crawl diskfull diskfull/index.html --retries=2 -c1
+    grep -q 'Mirror aborted: keeping all previously mirrored files' <<<"$log" ||
+        fail "the full disk did not abort the mirror: ${log}"
+    assert_says aborted "a mirror the full disk aborted still claimed to be done"
+    ok "a mirror the full disk aborted does not claim to be done"
+else
+    echo "note: no usable /dev/full, the exit_xh limb is not covered here"
+fi
+
+# --- a cap: state.stop, with httpmirror() returning 1 and exit_xh at 0 -------
+# --max-time is two-stage (#77/#481): the cap raises state.stop, and only an
+# overrun past the grace reaches exit_xh. slow.html sleeps 5s and the grace
+# floor is 5s, so this arm stops in the first stage every time.
+crawl maxtime abortpurge/index.html --retries=1 -c1 --timeout=0 --max-time=2
+grep -q 'giving up' <<<"$log" ||
+    fail "the time cap never fired, so nothing here was capped: ${log}"
+assert_says aborted "a mirror the time cap stopped still claimed to be done"
+ok "a mirror the time cap stopped does not claim to be done"
+
+# --- ^C: the other state.stop producer, and the one users actually hit -------
+# SIGINT goes to sig_leave (state.stop), SIGTERM to sig_finish (exit_xh): two
+# handlers, so the interrupt a user types needs its own arm.
+if is_windows; then
+    echo "note: MSYS cannot signal a native httrack.exe, the ^C arm is not covered here"
+else
+    dir="${tmpdir}/sigint"
+    out="${tmpdir}/out-sigint"
+    err="${tmpdir}/err-sigint"
+    mkdir -p "$dir"
+    httrack "${BASEURL}/trickle/index.html" -O "$dir" --quiet \
+        --disable-security-limits --robots=0 --retries=0 -c2 >"$out" 2>"$err" &
+    crawlpid=$!
+    cleanup_push kill_interrupted
+    deadline=$((SECONDS + 60))
+    until test "$(count_matching_lines 'GET /trickle/p' "$SRV_LOG")" -ge 1; do
+        test "$SECONDS" -lt "$deadline" || fail "the crawl never fetched a body to interrupt"
+        poll_wait 1
+    done
+    poll_wait 1 # a body in flight, not merely requested
+    kill -INT "$crawlpid"
+    rc=0
+    wait_bounded "$crawlpid" 60 || rc=$?
+    crawlpid=
+    test "$rc" -ne 124 || fail "the interrupted crawl never exited"
+    log=$(<"${dir}/hts-log.txt")
+    grep -q 'Exit requested' <<<"$log" ||
+        fail "the interrupt never reached the engine: ${log}"
+    assert_says aborted "an interrupted mirror still claimed to be done"
+    ok "an interrupted mirror does not claim to be done"
+fi
+
+# --- --why answers and returns without mirroring, which is not an abort -----
+crawl why changes/index.html --why "${BASEURL}/changes/index.html"
+grep -q 'no filter rule matches' "$out" ||
+    fail_dump "--why printed no verdict, so its Done. proves nothing" "$out" "$err"
+assert_says finished "--why was reported as an aborted mirror"
+ok "--why still reports Done."
+
+# --- shell mode ends the same way for both, which is silently ---------------
+# The arms above are what make this non-vacuous: the same two crawls print one
+# of these lines when -#S is off.
+crawl shell-complete changes/index.html -\#S
+assert_shell_silent "shell mode gained an end-of-mirror token (completed)"
+crawl shell-linkcap changes/index.html -\#S -\#L4
+grep -q 'Too many URLs' <<<"$log" ||
+    fail "the shell-mode crawl was not aborted, so its silence proves nothing: ${log}"
+assert_shell_silent "shell mode gained an end-of-mirror token (aborted)"
+ok "shell mode still ends silently, aborted or not"
