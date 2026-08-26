@@ -4,6 +4,40 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-24
++ New: the engine says when it gave up. A mirror abandoned on a fatal write, a full disk or an exhausted link table returns 3 (HTS_EXIT_MIRROR_ABORTED) rather than printing "Done." and exiting 0; a mirror stopped on purpose, by --max-time, --max-size or a front end, still returns 0 (#1419, #1428)
++ New: a file kept from disk instead of fetched is named in the log at the default verbosity, where the four sites that do it used to say nothing outside debug output (#1378)
++ Fixed: a script served as text/javascript, application/javascript or as an .mjs module was saved but never scanned, so every link inside it stayed out of the mirror; only the legacy application/x-javascript spelling worked (#1377)
++ Fixed: --update deleted live files in three shapes: a page that failed on its last retry took its whole subtree with it, a hub behind a redirect took what was below it, and a page named after its content type was unlinked while the index still pointed at it (#1390, #1414, #1431)
++ Fixed: an empty or absent Content-Type was read as hypertext, so an untyped blob held the update purge back as if it carried links, and an untyped PNG, PDF or ZIP reached disk with every NUL byte rewritten to a space (#1430)
++ Fixed: a failed write read as the end of the body, so a file cut short by a full disk was stored as complete and the mirror carried on (#1391, #1417)
++ Fixed: a host that failed to resolve during a connectivity outage was cached as dead for the rest of the crawl (#1392)
++ Fixed: an option value beginning with a dash, such as --assume "-foo=text/html", aborted the run before hts-log.txt existed and named an option nothing mentions (#1429)
++ Fixed: a long option's value was glued onto its short form unread, so --long-names=yes mirrored in DOS 8.3 names, --sockets=8I0 mirrored with no index, and --sockets=1234567890123456 asked for a billion connections, each at exit 0. Values are now range-checked against the parser that reads them, and --structure=on names the default layout (#1427, #1436, #1439)
++ Fixed: --structure took its template as a URL, so it mirrored with the default layout and crawled the template (#1418)
++ Fixed: --filelist and --filterlist were refused as options that take no value, while --list and --urllist worked (#1379)
++ Changed: --structure takes on, off, a preset number or a template, and refuses everything else. The cluster tails it used to accept are now errors: --structure=8I0 mirrored with no index files at exit 0, and --structure=1L0 did what it says but cannot be told apart from it. The spellings flat, none, default, yes and -1 are refused too (#1418, #1443)
++ Changed: a bare -L selects L1, the default the help and man page already name, where it used to fall through to DOS 8.3 names (#1436)
++ Fixed: --wide-mirror and the other prefixed action aliases dropped the connection count the prefix exists to add, so --wide-mirror ran at the default four connections; a prefix on an alias whose expansion cannot carry the count now warns instead of silently ignoring it (#1424)
++ Fixed: get_ext() copied past the query string and one byte past its buffer, so a parameterised URL was typed by the wrong extension (#1435)
++ Fixed: -#C faulted on the first cache entry it listed (#1412)
++ Fixed: a bracketed IPv6 authority lost its port (#1383)
++ Fixed: a bodyless 308 drew a big-file warning it had no body to earn (#1382)
++ Fixed: the WARC index recorded offsets past 2 GB wrongly, and three writers failed silently; abandoning a zip entry reported success when nothing was truncated (#1381, #1413)
++ Fixed: htsserver refused the machine's own name, advertised URLs a browser cannot open, answered any Host, decoded a malformed percent-escape to a NUL, and accepted a posted project path climbing out of its directory (#1372, #1408, #1376, #1359)
++ Changed: the loopback bind htsserver ships with is now the server's own default rather than a literal its caller passed, and --bind stays the deliberate way to widen it; the default no longer goes through the resolver, so a host with a broken getaddrinfo starts where it used to fail (#1366)
++ Fixed: WebHTTrack served the progress panel in place of the documentation and the About box from the moment a crawl started (#1445)
++ Changed: the WebHTTrack panel drops its File and Help popups, whose file:// links no browser follows from an http: page. The top bar carries one Manual link, each pane links to its own section of the guide, and About opens from the footer; browsing an older mirror stays on webhttrack browse and its desktop entry. WinHTTrack's keyboard-accelerator markers no longer show as text, so Finnish stops spelling its help link "O&hje" (#1445)
++ Fixed: WebHTTrack could not turn its cache boxes off, wrote type-check rules it never put on the command line, and turned the header off when the browser-id box was cleared (#1385, #1422)
++ Fixed: the option-error diagnostics could be overflowed by an oversized replayed token (#1356)
++ Fixed: on Windows the strict UTF-8 converter silently substituted a lookalike character instead of reporting the loss (#1410)
++ Fixed: a translated combo list with the wrong row count selected the neighbouring option, and several catalog values had lost a placeholder or broken an escape (#1400, #1375)
++ Fixed: ProxyTrack passed a cache size no reader can hold to malloc() (#1389)
++ Fixed: WinHTTrack and WebHTTrack sent the update endpoint two different language parameters (#1361)
++ Changed: the language catalogs are UTF-8 and LANGUAGE_CHARSET is gone; Greek.txt was declared ISO-8859-7 while written in cp1253 (#1407, #1403)
++ Changed: the guide's screenshots were reshot for all three interfaces, it now covers the notification prompt Android raises when a crawl starts, and the FAQ no longer answers with Windows-only paths (#1446, #1448, #1369)
++ Changed: multiple internal hardening, test and build improvements
+
 3.49-23
 + Fixed: a header typed into the extra-headers box was sent twice, since the engine wrote its own copy of the same line; the typed line now replaces the engine's where that is safe, and the engine keeps the ones a duplicate would corrupt (#1337, #1340)
 + Fixed: rebuilding the top index truncated index.html in place, so a reader who opened it mid-rebuild got a blank or partial page (#1329)

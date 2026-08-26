@@ -170,7 +170,7 @@ HTSEXT_API void htsthread_wait(void);
     3 and not 2 because hts_is_exiting() already returns 2 for a session
     that transferred nothing and was rolled back, which exits 0: the two are
     separate channels, and they are kept off each other's values so a reader
-    cannot take one for the other. Since 3.50. */
+    cannot take one for the other. Since 3.49.24. */
 #define HTS_EXIT_MIRROR_ABORTED 3
 
 /** Run a full mirror from a command-line argv (argv[0] is ignored, as in

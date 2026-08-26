@@ -53,6 +53,19 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.49.24" date="2026-08-26">
+      <description>
+        <ul>
+          <li>A mirror the engine gave up on no longer reports success</li>
+          <li>Updating a mirror no longer deletes pages the site still has</li>
+          <li>A full disk is reported instead of being read as the end of a file</li>
+          <li>Scripts are scanned for links whichever content type the server gives them</li>
+          <li>An option written as --name=value is read as it was written</li>
+          <li>WebHTTrack help and the File menu stay reachable once a crawl has started</li>
+          <li>Every language file is now stored in Unicode</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.23" date="2026-08-21">
       <description>
         <ul>
