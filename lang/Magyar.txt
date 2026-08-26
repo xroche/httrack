@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 %s és minden alatta lévő kiszolgáló tükrözése
 Ignore %s and every host below it
 %s és minden alatta lévő kiszolgáló kihagyása
+Manual
+Kézikönyv

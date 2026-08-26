@@ -25,7 +25,7 @@ done < <(find "${htmldir}" -type f \
 # A silently empty candidate list would pass the scan below proving nothing.
 test "${#pages[@]}" -ge 60 || fail "only ${#pages[@]} markup files under html/"
 listing=$(printf '%s\n' "${pages[@]}")
-for want in faq.html cache.html server/file.html server/finished.html server/help.html; do
+for want in faq.html cache.html server/index.html server/finished.html server/step2.html; do
     grep -qxF "${htmldir}/${want}" <<<"${listing}" ||
         fail "candidate list misses html/${want}: the scan cannot see the pages it is for"
 done

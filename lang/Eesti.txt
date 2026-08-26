@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Kopeeri %s ja kõik selle all olevad hostid
 Ignore %s and every host below it
 Ignoreeri %s ja kõiki selle all olevaid hoste
+Manual
+Käsiraamat

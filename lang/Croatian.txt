@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Zrcali %s i sve poslužitelje ispod njega
 Ignore %s and every host below it
 Zanemari %s i sve poslužitelje ispod njega
+Manual
+Priručnik

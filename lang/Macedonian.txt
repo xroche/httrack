@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Копирај го %s и сите хостови под него
 Ignore %s and every host below it
 Игнорирај го %s и сите хостови под него
+Manual
+Прирачник

@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 %s und alle darunter liegenden Hosts kopieren
 Ignore %s and every host below it
 %s und alle darunter liegenden Hosts ignorieren
+Manual
+Handbuch

@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Сделать зеркало %s и всех хостов под ним
 Ignore %s and every host below it
 Игнорировать %s и все хосты под ним
+Manual
+Руководство

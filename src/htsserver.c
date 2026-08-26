@@ -169,6 +169,31 @@ static int is_html(const char *file) {
   return type != NULL && strcmp(type, "text/html") == 0;
 }
 
+/* Redundant separators an unnormalized request path carries into open(). */
+static const char *skip_separators(const char *p) {
+  for (;;) {
+    if (*p == '/')
+      p++;
+    else if (p[0] == '.' && p[1] == '/')
+      p += 2;
+    else
+      return p;
+  }
+}
+
+/* A wizard pane follows the run's state; the About box does not. Match every
+   spelling that opens the same file: the path is never normalized, and on a
+   case-insensitive filesystem "/Server/" is that same directory (#1444). */
+static hts_boolean is_wizard_pane(const char *file) {
+  const char *page;
+
+  file = skip_separators(file);
+  if (strfield(file, "server/") == 0)
+    return HTS_FALSE;
+  page = skip_separators(file + 7);
+  return strcmpnocase(page, "about.html") != 0;
+}
+
 static void sig_brpipe(int code) {
   /* ignore */
 }
@@ -1611,23 +1636,17 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
             meth = 2;
           }
 
-          if (strncmp(file, "/website/", 9) == 0) {
-            virtualpath = HTS_TRUE;
-          }
+          virtualpath = strncmp(file, "/website/", 9) == 0;
 
-          /* override */
-          if (commandRunning) {
-            if (is_html(file)) {
+          /* The documentation, the About box and the mirror stay reachable
+             throughout a run; only the wizard panes follow it (#1444). */
+          if (is_html(file) && is_wizard_pane(file)) {
+            if (commandRunning) {
               file = "/server/refresh.html";
-            }
-          } else if (commandEnd && !virtualpath && !willexit) {
-            if (is_html(file)) {
+            } else if (commandEnd && !willexit) {
               file = "/server/finished.html";
             }
           }
-
-          /* the override above may have swapped a mirror path for a GUI page */
-          virtualpath = strncmp(file, "/website/", 9) == 0;
 
           if (!virtualpath) {
             if (!path_append(fsfile, sizeof(fsfile), path) ||
@@ -2666,6 +2685,18 @@ static void conv_printf(const char *from, char *to) {
       a[2] = 'b';
       a++;
     }
+  }
+  /* WinHTTrack's menus mark an accelerator with '&'; this panel renders it as
+     text, so Finnish read "O&hje". "&&" and "& " stay literal (#1444). */
+  {
+    char *r = to, *w = to;
+
+    while (*r != '\0') {
+      if (r[0] == '&' && (r[1] == '&' || (r[1] != '\0' && r[1] != ' ')))
+        r++;
+      *w++ = *r++;
+    }
+    *w = '\0';
   }
 }
 

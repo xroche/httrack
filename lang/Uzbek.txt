@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 %s va uning ostidagi barcha xostlardan nusxa olish
 Ignore %s and every host below it
 %s va uning ostidagi barcha xostlarni e'tiborsiz qoldirish
+Manual
+Qo’llanma

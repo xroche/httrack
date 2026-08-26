@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Zrcali %s in vse gostitelje pod njim
 Ignore %s and every host below it
 Prezri %s in vse gostitelje pod njim
+Manual
+Priročnik

@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 %s とその配下のすべてのホストをコピー（ミラー）
 Ignore %s and every host below it
 %s とその配下のすべてのホストを無視
+Manual
+マニュアル

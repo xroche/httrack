@@ -1050,3 +1050,5 @@ Mirror %s and every host below it
 Направи огледално копие на %s и на всички хостове под него
 Ignore %s and every host below it
 Игнорирай %s и всички хостове под него
+Manual
+Ръководство

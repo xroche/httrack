@@ -1,0 +1,225 @@
+#!/bin/bash
+#
+# The panel swapped every text/html reply for its own progress page, so the docs
+# went unreachable once a crawl started (#1444). Each link must name a real section.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+htsserver_require
+distdir=${HTS_DISTDIR}
+guide="${distdir}/html/guide.html"
+test -f "${guide}" || fail "no ${guide}"
+
+# ---- every pane points at a section the guide really has ----
+
+printf '[each pane links a guide section that exists] ..\t'
+anchors=$(grep -oh 'guide\.html#web/[a-z0-9-]*' "${distdir}"/html/server/*.html |
+    sed 's|.*#web/||' | LC_ALL=C sort -u)
+# An empty list would walk the loop below without ever reading the guide.
+found=$(count_matching_lines . <<<"${anchors}")
+test "${found}" -ge 10 || fail "only ${found} guide anchors under html/server/"
+for a in ${anchors}; do
+    tag=$(grep -m1 -o "<[^>]*id=\"${a}\"[^>]*>" "${guide}" || true)
+    test -n "${tag}" ||
+        fail "a pane links guide.html#web/${a}, which the guide has no id for"
+    # guide.css hides a section scoped to another platform, so the link would
+    # open the guide and scroll nowhere.
+    case ${tag} in
+    *data-for=*)
+        grep -q 'data-for="[^"]*web' <<<"${tag}" ||
+            fail "guide section ${a} is not shown for web: ${tag}"
+        ;;
+    esac
+done
+
+# Every page and the section it names, pinned: an id that merely exists is not
+# the right one. finished.html named step-ready, "Last checks", for years
+# (#1444). The count is compared too, so deleting a link cannot pass quietly.
+pairs=$(
+    cat <<'PAIRS'
+addurl.html step-address
+finished.html step-done
+index.html step-start
+option10.html opt-proxy
+option11.html opt-log-index-cache
+option1.html opt-links
+option2b.html opt-build
+option2.html opt-build
+option3.html opt-experts-only
+option4.html opt-flow-control
+option5.html opt-limits
+option6.html opt-browser-id
+option7.html opt-scan-rules
+option8.html opt-spider
+option9.html opt-log-index-cache
+refresh.html step-run
+step2.html step-project
+step3.html step-address
+step4.html step-ready
+PAIRS
+)
+linked=$(grep -l 'guide\.html#web/' "${distdir}"/html/server/*.html | wc -l)
+test "${linked}" -eq "$(count_matching_lines . <<<"${pairs}")" ||
+    fail "${linked} pages link the guide, the table below pins a different number"
+while read -r page anchor; do
+    grep -qF "guide.html#web/${anchor}\"" "${distdir}/html/server/${page}" ||
+        fail "${page} must link guide.html#web/${anchor}"
+done <<<"${pairs}"
+# Control: the loop proves nothing unless a wrong anchor really misses.
+! grep -qF 'id="no-such-section"' "${guide}" ||
+    fail "the control anchor exists, so the loop above cannot discriminate"
+# The step*.html stubs redirect without the platform, so no pane may name one.
+stale=$(grep -l 'href="/step[0-9]*\.html"\|/server/help\.html\|/server/file\.html' \
+    "${distdir}"/html/server/*.html || true)
+test -z "${stale}" || fail "a pane still links a retired page: ${stale}"
+printf 'ok\n'
+
+# ---- the override reaches the wizard panes and nothing else ----
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/webhttrack_help.XXXXXX") || fail "no tmpdir"
+csrv=
+cleanup_push htsserver_cleanup_dir "${work}"
+cleanup_push htsserver_reap_vars csrv
+export HOME="${work}" # not the developer's own ~/.httrack.ini
+
+clog="${work}/content.log"
+"${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
+csrv=$!
+cport=$(discover_server_port "${clog}" "${csrv}") || fail "no content server"
+
+htsserver_start
+sid=$(htsserver_sid)
+test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
+
+PANE=/server/step2.html
+IDLE='Existing project name:'
+# Derived, not hand-listed: a scoping bug in the page a hand list omits is
+# invisible. about.html is not a pane; the four tail spellings open the files
+# the first four name, since the path reaches open() unnormalized.
+PANES=$(
+    for f in "${distdir}"/html/server/*.html; do
+        case ${f##*/} in
+        about.html) ;;
+        *) printf '/server/%s\n' "${f##*/}" ;;
+        esac
+    done
+    printf '%s\n' //server/step4.html /./server/step4.html \
+        /server//step4.html /Server/step4.html
+)
+test "$(count_matching_lines . <<<"${PANES}")" -ge 20 ||
+    fail "only $(count_matching_lines . <<<"${PANES}") panes to probe"
+RUNNING='In progress:'
+DONE='Site mirroring finished!'
+
+serves() { # serves PATH MARKER WHAT
+    probe serves "$2" "$3" "$1"
+}
+
+# One python for a whole phase. A process per request is what this suite's
+# "MSYS fork failures" step counts on the Windows runners, and a pane list
+# derived from the directory grows that cost on its own.
+probe() { # probe serves|refutes MARKER WHAT PATH...
+    local mode=$1 marker=$2 what=$3
+    shift 3
+    "${HTS_PYTHON}" - "${HTS_PORT}" "${mode}" "${marker}" "${what}" "$@" \
+        <<'PROBE' || fail "${what}: probe reported above"
+import socket, sys
+
+port, mode, marker, what = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+rc = 0
+for path in sys.argv[5:]:
+    # Raw, like tests/httpclient.py: these paths carry redundant separators
+    # an HTTP library would normalise away before sending them.
+    sock = socket.create_connection(("127.0.0.1", port), 20)
+    sock.sendall(("GET %s HTTP/1.0\r\n\r\n" % path).encode())
+    reply = b""
+    while True:
+        chunk = sock.recv(65536)
+        if not chunk:
+            break
+        reply += chunk
+    sock.close()
+    body = reply.decode("utf-8", "replace")
+    if (marker in body) != (mode == "serves"):
+        verb = "did not serve" if mode == "serves" else "already serves"
+        print("FAIL: %s: %s %s %r\n%s" % (what, path, verb, marker, body[:400]))
+        rc = 1
+sys.exit(rc)
+PROBE
+}
+
+# The documentation, and the About box the footer opens: neither is wizard state.
+docs_reachable() { # docs_reachable WHAT
+    serves /guide.html 'The HTTrack interface, step by step' "$1"
+    serves /index.html 'HTTrack documentation' "$1"
+    # The exemption has to survive the same spellings the panes are matched by.
+    probe serves 'About WebHTTrack Website Copier' "$1" \
+        /server/about.html //server/about.html /server//about.html
+}
+
+panes_follow() { # panes_follow MARKER WHAT
+    # shellcheck disable=SC2086 # PANES is a deliberately split path list
+    probe serves "$1" "$2" ${PANES}
+}
+
+refutes() { # refutes PATH MARKER WHAT
+    probe refutes "$2" "$3" "$1"
+}
+
+await() { # await MARKER WHAT
+    local start=$SECONDS body
+    while :; do
+        body=$(htsserver_get "${PANE}")
+        grep -qF "$1" <<<"${body}" && return 0
+        htsserver_alive || fail "htsserver died waiting for $2"
+        test "$((SECONDS - start))" -lt 120 || fail "the panel never reached $2"
+        poll_wait 0.2
+    done
+}
+
+serves "${PANE}" "${IDLE}" 'idle'
+
+# Control, in English: LISTDEF_5 uses an ampersand as prose, not as a marker.
+serves /server/option3.html 'go up &amp; down' 'a prose ampersand'
+
+# The catalogs are WinHTTrack's, so a translator may mark a menu accelerator the
+# panel would render as text: Finnish (lang.indexes fi:28) spells Help "O&hje".
+htsserver_client --path /server/index.html --field "sid=${sid}" --field lang=28 >/dev/null
+serves /server/index.html '>Ohje</a>' 'the Finnish help link'
+refutes /server/index.html 'O&hje' 'the Finnish help link'
+htsserver_client --path /server/index.html --field "sid=${sid}" --field lang=1 >/dev/null
+serves "${PANE}" "${IDLE}" 'back in English'
+# Control: the markers asserted below are absent until a crawl sets them.
+# refresh.html is skipped, being the running pane itself.
+idle_panes=$(grep -vxF /server/refresh.html <<<"${PANES}")
+# shellcheck disable=SC2086 # deliberately split path lists
+probe refutes "${RUNNING}" 'idle' ${idle_panes}
+docs_reachable 'idle'
+
+# p0.bin dribbles for a minute on one socket, so the crawl outlives the probes.
+htsserver_client --path /server/step4.html --field "sid=${sid}" --field "path=${work}" \
+    --field projname=crawl --field winprofile=x --field command_do=start \
+    --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/p0.bin -O ${work}/crawl" \
+    >/dev/null
+await "${RUNNING}" 'a running crawl'
+
+# The panes still follow the run: without this a dropped override passes above.
+panes_follow "${RUNNING}" 'running crawl'
+docs_reachable 'running crawl'
+# The crawl ending mid-probe would make the checks above read the finished pane
+# and pass for the wrong reason, so pin the state they ran in.
+serves "${PANE}" "${RUNNING}" 'still running after the probes'
+
+htsserver_client --path /server/step4.html --field "sid=${sid}" --field command=abort >/dev/null
+await "${DONE}" 'a finished crawl'
+
+panes_follow "${DONE}" 'finished crawl'
+docs_reachable 'finished crawl'
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "PASS"

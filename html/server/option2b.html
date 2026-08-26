@@ -65,13 +65,13 @@ function str_replace(str,from,to) {
 <tr><td width="90%">
 	<h2 align="center"><em>${LANG_Q1}</em></h2>
 </td>
-${/* show help only if available */}
-${do:if-file-exists:html/index.html}
+${/* the documentation is a separate package and may be absent */}
+${do:if-file-exists:html/guide.html}
 <td>
 	<a href="/guide.html#web/opt-build" target="_blank"
-		onClick="window.open('/guide.html#web/opt-build', 'help', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
+		onClick="window.open('/guide.html#web/opt-build', 'httrack-doc', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
 			title='${html:LANG_TIPHELP}' onMouseOver="info('${js:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
-	>${LANG_TIPHELP}</a>
+	>${LANG_O5}</a>
 </td>
 ${do:end-if}
 </tr></table>
@@ -140,7 +140,8 @@ ${do:output-mode:}
 
 <table width="76%" border="0" align="center" valign="bottom" cellspacing="0" cellpadding="0">
 	<tr>
-	<td id="footer"><small><small>&copy; 1998-${date:year} Xavier Roche &amp; other contributors - Web Design: Leto Kauler.</small></small></td>
+	<td id="footer"><small><small>&copy; 1998-${date:year} Xavier Roche &amp; other contributors - Web Design: Leto Kauler. - <a href="/server/about.html" target="_blank"
+			onClick="window.open('/server/about.html', 'httrack-about', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=640, height=480'); return false">${LANG_G21}</a></small></small></td>
 	</tr>
 </table>
 
