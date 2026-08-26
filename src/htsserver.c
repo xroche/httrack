@@ -169,15 +169,29 @@ static int is_html(const char *file) {
   return type != NULL && strcmp(type, "text/html") == 0;
 }
 
-/* A wizard pane follows the run's state; the About box does not. The request
-   path reaches open() unnormalized, so "//server/x.html" must match too
-   (#1444). */
+/* Redundant separators an unnormalized request path carries into open(). */
+static const char *skip_separators(const char *p) {
+  for (;;) {
+    if (*p == '/')
+      p++;
+    else if (p[0] == '.' && p[1] == '/')
+      p += 2;
+    else
+      return p;
+  }
+}
+
+/* A wizard pane follows the run's state; the About box does not. Match every
+   spelling that opens the same file: the path is never normalized, and on a
+   case-insensitive filesystem "/Server/" is that same directory (#1444). */
 static hts_boolean is_wizard_pane(const char *file) {
-  while (*file == '/' || (file[0] == '.' && file[1] == '/'))
-    file += (*file == '/') ? 1 : 2;
-  if (strncmp(file, "server/", 7) != 0)
+  const char *page;
+
+  file = skip_separators(file);
+  if (strfield(file, "server/") == 0)
     return HTS_FALSE;
-  return strcmp(file + 7, "about.html") != 0;
+  page = skip_separators(file + 7);
+  return strcmpnocase(page, "about.html") != 0;
 }
 
 static void sig_brpipe(int code) {

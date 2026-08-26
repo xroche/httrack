@@ -81,7 +81,7 @@ IDLE='Existing project name:'
 # two spellings open the same files, since the path reaches open() unnormalized.
 PANES="/server/index.html ${PANE} /server/step3.html /server/step4.html \
     /server/addurl.html /server/option1.html //server/step4.html \
-    /./server/step4.html"
+    /./server/step4.html /server//step4.html /Server/step4.html"
 RUNNING='In progress:'
 DONE='Site mirroring finished!'
 
@@ -97,6 +97,9 @@ docs_reachable() { # docs_reachable WHAT
     serves /guide.html 'The HTTrack interface, step by step' "$1"
     serves /index.html 'HTTrack documentation' "$1"
     serves /server/about.html 'About WebHTTrack Website Copier' "$1"
+    # The exemption has to survive the same spellings the panes are matched by.
+    serves //server/about.html 'About WebHTTrack Website Copier' "$1"
+    serves /server//about.html 'About WebHTTrack Website Copier' "$1"
 }
 
 panes_follow() { # panes_follow MARKER WHAT
