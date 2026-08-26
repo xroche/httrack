@@ -20,7 +20,7 @@ anchors=$(grep -oh 'guide\.html#web/[a-z0-9-]*' "${distdir}"/html/server/*.html 
     sed 's|.*#web/||' | LC_ALL=C sort -u)
 # An empty list would walk the loop below without ever reading the guide.
 found=$(count_matching_lines . <<<"${anchors}")
-test "${found}" -ge 15 || fail "only ${found} guide anchors under html/server/"
+test "${found}" -ge 10 || fail "only ${found} guide anchors under html/server/"
 for a in ${anchors}; do
     tag=$(grep -m1 -o "<[^>]*id=\"${a}\"[^>]*>" "${guide}" || true)
     test -n "${tag}" ||
@@ -35,20 +35,39 @@ for a in ${anchors}; do
     esac
 done
 
-# The pane and its section, pinned: an id that merely exists is not the right
-# one. finished.html named step-ready, "Last checks", for years (#1444).
+# Every page and the section it names, pinned: an id that merely exists is not
+# the right one. finished.html named step-ready, "Last checks", for years
+# (#1444). The count is compared too, so deleting a link cannot pass quietly.
+pairs=$(
+    cat <<'PAIRS'
+addurl.html step-address
+finished.html step-done
+index.html step-start
+option10.html opt-proxy
+option11.html opt-log-index-cache
+option1.html opt-links
+option2b.html opt-build
+option2.html opt-build
+option3.html opt-experts-only
+option4.html opt-flow-control
+option5.html opt-limits
+option6.html opt-browser-id
+option7.html opt-scan-rules
+option8.html opt-spider
+option9.html opt-log-index-cache
+refresh.html step-run
+step2.html step-project
+step3.html step-address
+step4.html step-ready
+PAIRS
+)
+linked=$(grep -l 'guide\.html#web/' "${distdir}"/html/server/*.html | wc -l)
+test "${linked}" -eq "$(count_matching_lines . <<<"${pairs}")" ||
+    fail "${linked} pages link the guide, the table below pins a different number"
 while read -r page anchor; do
     grep -qF "guide.html#web/${anchor}\"" "${distdir}/html/server/${page}" ||
         fail "${page} must link guide.html#web/${anchor}"
-done <<'PAIRS'
-index.html step-start
-step2.html step-project
-step3.html step-address
-addurl.html step-address
-step4.html step-ready
-refresh.html step-run
-finished.html step-done
-PAIRS
+done <<<"${pairs}"
 # Control: the loop proves nothing unless a wrong anchor really misses.
 ! grep -qF 'id="no-such-section"' "${guide}" ||
     fail "the control anchor exists, so the loop above cannot discriminate"
@@ -77,11 +96,21 @@ test "${#sid}" -eq 32 || fail "no session id in the panel (got '${sid}')"
 
 PANE=/server/step2.html
 IDLE='Existing project name:'
-# Every pane, not one: a per-pane scoping bug leaves the others stale. The last
-# two spellings open the same files, since the path reaches open() unnormalized.
-PANES="/server/index.html ${PANE} /server/step3.html /server/step4.html \
-    /server/addurl.html /server/option1.html //server/step4.html \
-    /./server/step4.html /server//step4.html /Server/step4.html"
+# Derived, not hand-listed: a scoping bug in the page a hand list omits is
+# invisible. about.html is not a pane; the four tail spellings open the files
+# the first four name, since the path reaches open() unnormalized.
+PANES=$(
+    for f in "${distdir}"/html/server/*.html; do
+        case ${f##*/} in
+        about.html) ;;
+        *) printf '/server/%s\n' "${f##*/}" ;;
+        esac
+    done
+    printf '%s\n' //server/step4.html /./server/step4.html \
+        /server//step4.html /Server/step4.html
+)
+test "$(count_matching_lines . <<<"${PANES}")" -ge 20 ||
+    fail "only $(count_matching_lines . <<<"${PANES}") panes to probe"
 RUNNING='In progress:'
 DONE='Site mirroring finished!'
 
@@ -137,7 +166,10 @@ refutes /server/index.html 'O&hje' 'the Finnish help link'
 htsserver_client --path /server/index.html --field "sid=${sid}" --field lang=1 >/dev/null
 serves "${PANE}" "${IDLE}" 'back in English'
 # Control: the markers asserted below are absent until a crawl sets them.
-for p in ${PANES}; do refutes "${p}" "${RUNNING}" 'idle'; done
+for p in ${PANES}; do
+    test "${p}" != /server/refresh.html || continue # it is the running pane
+    refutes "${p}" "${RUNNING}" 'idle'
+done
 docs_reachable 'idle'
 
 # p0.bin dribbles for a minute on one socket, so the crawl outlives the probes.
