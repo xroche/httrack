@@ -115,31 +115,58 @@ RUNNING='In progress:'
 DONE='Site mirroring finished!'
 
 serves() { # serves PATH MARKER WHAT
-    local body
-    body=$(htsserver_get "$1")
-    grep -qF "$2" <<<"${body}" ||
-        fail "$3: $1 did not serve \"$2\": $(head -c 400 <<<"${body}")"
+    probe serves "$2" "$3" "$1"
+}
+
+# One python for a whole phase. A process per request is what this suite's
+# "MSYS fork failures" step counts on the Windows runners, and a pane list
+# derived from the directory grows that cost on its own.
+probe() { # probe serves|refutes MARKER WHAT PATH...
+    local mode=$1 marker=$2 what=$3
+    shift 3
+    "${HTS_PYTHON}" - "${HTS_PORT}" "${mode}" "${marker}" "${what}" "$@" \
+        <<'PROBE' || fail "${what}: probe reported above"
+import socket, sys
+
+port, mode, marker, what = int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4]
+rc = 0
+for path in sys.argv[5:]:
+    # Raw, like tests/httpclient.py: these paths carry redundant separators
+    # an HTTP library would normalise away before sending them.
+    sock = socket.create_connection(("127.0.0.1", port), 20)
+    sock.sendall(("GET %s HTTP/1.0\r\n\r\n" % path).encode())
+    reply = b""
+    while True:
+        chunk = sock.recv(65536)
+        if not chunk:
+            break
+        reply += chunk
+    sock.close()
+    body = reply.decode("utf-8", "replace")
+    if (marker in body) != (mode == "serves"):
+        verb = "did not serve" if mode == "serves" else "already serves"
+        print("FAIL: %s: %s %s %r\n%s" % (what, path, verb, marker, body[:400]))
+        rc = 1
+sys.exit(rc)
+PROBE
 }
 
 # The documentation, and the About box the footer opens: neither is wizard state.
 docs_reachable() { # docs_reachable WHAT
     serves /guide.html 'The HTTrack interface, step by step' "$1"
     serves /index.html 'HTTrack documentation' "$1"
-    serves /server/about.html 'About WebHTTrack Website Copier' "$1"
     # The exemption has to survive the same spellings the panes are matched by.
-    serves //server/about.html 'About WebHTTrack Website Copier' "$1"
-    serves /server//about.html 'About WebHTTrack Website Copier' "$1"
+    probe serves 'About WebHTTrack Website Copier' "$1" \
+        /server/about.html //server/about.html /server//about.html
 }
 
 panes_follow() { # panes_follow MARKER WHAT
-    local p
-    for p in ${PANES}; do serves "${p}" "$1" "$2"; done
+    # shellcheck disable=SC2086 # PANES is a deliberately split path list
+    probe serves "$1" "$2" ${PANES}
 }
 
 refutes() { # refutes PATH MARKER WHAT
-    local body
-    body=$(htsserver_get "$1")
-    ! grep -qF "$2" <<<"${body}" || fail "$3: $1 already serves \"$2\""
+    probe refutes "$2" "$3" "$1"
 }
 
 await() { # await MARKER WHAT
@@ -166,10 +193,10 @@ refutes /server/index.html 'O&hje' 'the Finnish help link'
 htsserver_client --path /server/index.html --field "sid=${sid}" --field lang=1 >/dev/null
 serves "${PANE}" "${IDLE}" 'back in English'
 # Control: the markers asserted below are absent until a crawl sets them.
-for p in ${PANES}; do
-    test "${p}" != /server/refresh.html || continue # it is the running pane
-    refutes "${p}" "${RUNNING}" 'idle'
-done
+# refresh.html is skipped, being the running pane itself.
+idle_panes=$(grep -vxF /server/refresh.html <<<"${PANES}")
+# shellcheck disable=SC2086 # deliberately split path lists
+probe refutes "${RUNNING}" 'idle' ${idle_panes}
 docs_reachable 'idle'
 
 # p0.bin dribbles for a minute on one socket, so the crawl outlives the probes.
