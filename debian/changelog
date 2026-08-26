@@ -1,3 +1,22 @@
+httrack (3.49.24-1) unstable; urgency=medium
+
+  * New upstream release: a mirror the engine abandoned no longer exits 0,
+    an update purge no longer deletes pages the site still has, a failed
+    write is no longer read as the end of a file, and scripts are scanned
+    for links whichever content type they are served with; full list in
+    history.txt.
+  * webhttrack: promote httrack-doc from Suggests to Recommends.  The
+    panel's help links open the guide, so without the package they open
+    nothing.
+  * Drop three unexported make variables from debian/rules (-O3 via
+    DEB_CFLAGS_MAINT_APPEND, -DNOSTRDEBUG on architectures Debian no longer
+    has, and -g3 under noopt).  None was exported, so dpkg-buildflags never
+    saw them and no build has ever used them.  The nostrip block goes with
+    them: it appended to an INSTALL_PROGRAM nothing consumes, and dh_strip
+    already honours the option.
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 26 Aug 2026 14:17:36 +0200
+
 httrack (3.49.23-1) unstable; urgency=medium
 
   * New upstream release: a header added by hand was sent twice, rebuilding
