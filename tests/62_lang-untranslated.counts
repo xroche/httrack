@@ -3,6 +3,8 @@
 # 62_lang-integrity.test wants an exact match, so translate a string rather than
 # raise a count. A true cognate is the exception: "Manual" is the Spanish,
 # Portuguese and Romanian word, not a msgid nobody got to.
+# Romanian's About blurb counts as translated on both columns while its body
+# is still English: only the credit line was fixed (#1454).
 #
 # catalog                 identical empty
 Bulgarian.txt             3         3
@@ -26,7 +28,7 @@ Norsk.txt                 5         21
 Polski.txt                6         0
 Portugues-Brasil.txt      5         0
 Portugues.txt             5         26
-Romanian.txt              6         5
+Romanian.txt              6         4
 Russian.txt               5         0
 Slovak.txt                6         18
 Slovenian.txt             7         25

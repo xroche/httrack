@@ -80,6 +80,12 @@ if probe != ["Zzz", "Armish", "Qwertson"]:
     sys.exit("the name parser reads %r out of the fixture" % (probe,))
 if named_in(authors, "Zzz"):
     sys.exit("the fixture name is in AUTHORS, so the check below cannot fail")
+dangling = lambda v: (lambda t: t == "" or t.endswith(":"))(v.split("\\r\\n")[-1].strip())
+for shape in ("body\\r\\nMANY THANKS to:", "body\\r\\n", "body\\r\\n   "):
+    if not dangling(shape):
+        sys.exit("the dangling-credit check does not see %r" % shape)
+if dangling("body\\r\\nAlin Gheorghe Miron"):
+    sys.exit("the dangling-credit check fires on a value that names someone")
 
 catalogs = sorted(glob.glob(os.path.join(top, "lang", "*.txt")))
 if len(catalogs) < 25:
@@ -127,6 +133,12 @@ for path in catalogs:
         bad.append("%s: does not carry the About blurb msgid" % base)
         continue
     read_values += 1
+    # A credit label whose name went missing still reads as a credit, and the
+    # untranslated pin cannot see it: the value is neither empty nor the msgid.
+    tail = value.split("\\r\\n")[-1].strip() if value else None
+    if tail is not None and (tail == "" or tail.endswith(":")):
+        bad.append("%s: the About blurb ends on %r, a credit label naming nobody"
+                   % (base, tail))
     for who, owners in everyone.items():
         if who in shared or base in owners:
             continue

@@ -651,7 +651,7 @@ Deconectează şa terminare
 Disconnect modem on completion
 Deconectează modemul la terminare
 \r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode, documentation and packaging: many contributors\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for English translations to:\r\nXavier Roche, Robert Lagadec
-
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode, documentation and packaging: many contributors\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for Romanian translations to:\r\nAlin Gheorghe Miron
 About WinHTTrack Website Copier
 Despre WinHTTrack Website Copier
 Please visit our Web page
