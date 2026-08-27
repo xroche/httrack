@@ -1,8 +1,7 @@
 #!/bin/bash
 #
-# One hardcoded name used to stand for every translator in the About box. The
-# credit now comes from each catalog's LANGUAGE_AUTHOR, so AUTHORS, greetings.txt
-# and html/contact.html have to keep naming whoever those catalogs name.
+# The About box credits each catalog's own LANGUAGE_AUTHOR, so AUTHORS,
+# greetings.txt and html/contact.html must name whoever those catalogs name.
 
 set -euo pipefail
 
@@ -24,26 +23,32 @@ read = lambda p: open(os.path.join(top, p), encoding="utf-8").read()
 authors, greetings, contact = read("AUTHORS"), read("greetings.txt"), read("html/contact.html")
 bad = []
 
-# The roster starts at the first section and runs to the end of greetings.txt;
-# the other two embed it verbatim, so drift is a diff rather than a re-audit.
+# One roster, held by identity: containment would pass a file that appended a
+# credit of its own.
 roster = greetings[greetings.index("Development\n"):]
-if len(roster) < 1000:
-    sys.exit("the roster parsed out of greetings.txt is only %d bytes" % len(roster))
-for name, text in (("AUTHORS", authors), ("html/contact.html", contact)):
-    if roster not in text:
-        bad.append("%s does not carry greetings.txt's roster verbatim" % name)
+if len(roster) < 1000 or "Translations\n" not in roster:
+    sys.exit("the roster parsed out of greetings.txt is %d bytes" % len(roster))
+if not authors.endswith("\n" + roster):
+    bad.append("AUTHORS does not end with greetings.txt's roster")
+pre = re.search(r"<pre>\n(.*?)</pre>", contact, re.S)
+if pre is None:
+    sys.exit("html/contact.html has no <pre> credits block")
+if pre.group(1) != greetings:
+    bad.append("html/contact.html's <pre> is not greetings.txt verbatim")
 
-# Contact groups and addresses out, what is left is the person.
+# Contact groups out, what is left is the person. A group is dropped only when
+# it holds an address: "(Armish)" is part of a name, "(a@b.c)" is not.
+CONTACT = re.compile(r"[@]|://| at |www\.")
 GROUP = re.compile(r"\([^()]*\)|\[[^\[\]]*\]|<[^<>]*>")
 DROP = re.compile(r"[@:./\\0-9]")
 
 def names(value):
+    stripped = GROUP.sub(lambda m: " " if CONTACT.search(m.group(0)) else m.group(0), value)
     out = []
-    for entry in GROUP.sub(" ", value).split("\\r\\n"):
-        for tok in re.split(r"[\s,;\"]+", entry):
-            tok = tok.strip("'.,;:")
-            if len(tok) >= 2 and not DROP.search(tok):
-                out.append(tok)
+    for tok in re.split(r"[\s,;\"()\[\]]+", stripped.replace("\\r\\n", " ")):
+        tok = tok.strip("'.,;:")
+        if len(tok) >= 3 and not DROP.search(tok):
+            out.append(tok)
     return out
 
 def field(path, key):
@@ -53,82 +58,108 @@ def field(path, key):
             return lines[i + 1]
     return None
 
-# A fixture first: a checker that never fires would pass every catalog below.
-probe = names("Zzzyx Qwertson (nobody@example.com)\\r\\n[ x@example.com ]")
-if probe != ["Zzzyx", "Qwertson"]:
+# Whole words: a substring test passes "Xa Ro" for a Greek translator, because
+# both occur inside other names.
+def named_in(text, who):
+    return re.search(r"(?<!\w)%s(?!\w)" % re.escape(who), text) is not None
+
+# The catalog's own row in the Translations block, keyed by the English name in
+# LANGUAGE_WINDOWSID, so a credit cannot land under another language.
+def row_for(label):
+    m = re.search(r"^  %s\s{2,}(.+)$" % re.escape(label), roster, re.M)
+    return m.group(1) if m else None
+
+LABEL = {"Castellano.txt": "Spanish", "Chinese-BIG5.txt": "Chinese (Traditional)",
+         "Chinese-Simplified.txt": "Chinese (Simplified)", "Macedonian.txt": "Macedonian",
+         "Portugues-Brasil.txt": "Portuguese (Brazil)", "Portugues.txt": "Portuguese",
+         "Uzbek.txt": "Uzbek"}
+
+# A parser that silently returns nothing would make every check below vacuous.
+probe = names("Zzz (Armish) Qwertson (nobody@example.com)\\r\\n[ x at example.com ]")
+if probe != ["Zzz", "Armish", "Qwertson"]:
     sys.exit("the name parser reads %r out of the fixture" % (probe,))
-if "Zzzyx" in authors:
+if named_in(authors, "Zzz"):
     sys.exit("the fixture name is in AUTHORS, so the check below cannot fail")
 
 catalogs = sorted(glob.glob(os.path.join(top, "lang", "*.txt")))
 if len(catalogs) < 25:
     sys.exit("only %d catalogs found" % len(catalogs))
-checked = 0
+
+everyone, checked = {}, 0
 for path in catalogs:
     base = os.path.basename(path)
     author = field(path, "LANGUAGE_AUTHOR")
+    wid = field(path, "LANGUAGE_WINDOWSID") or ""
     if author is None:
         bad.append("%s: no LANGUAGE_AUTHOR" % base)
         continue
-    # about.html interpolates it into a <pre> with no escaper, so markup would
-    # reach the browser as markup: Turkish shipped an <address> for years.
-    for c in "<>&":
-        if c in author or c in (field(path, "LANGUAGE_NAME") or ""):
-            bad.append("%s: LANGUAGE_NAME/AUTHOR holds %r, which the About page emits raw" % (base, c))
+    label = LABEL.get(base) or re.sub(r"\s*\(.*", "", wid)
+    row = row_for(label)
+    if row is None:
+        bad.append("%s: no \"%s\" row in the roster's Translations block" % (base, label))
+        continue
     got = names(author)
     if not got:
         bad.append("%s: no name parsed out of LANGUAGE_AUTHOR %r" % (base, author))
-    for tok in got:
+    for who in got:
         checked += 1
-        if tok not in authors:
-            bad.append("%s: LANGUAGE_AUTHOR names %r, absent from AUTHORS" % (base, tok))
-if checked < 40:
+        everyone.setdefault(who, set()).add(base)
+        if not named_in(row, who):
+            bad.append("%s: LANGUAGE_AUTHOR names %r, absent from the roster's %s row"
+                       % (base, who, label))
+if checked < 70:
     sys.exit("only %d translator names checked across %d catalogs" % (checked, len(catalogs)))
 
-# The About blurb carries the copyright line every catalog copied; a translation
-# left on its own stale year is what put 1998-2003 on screen in 2026.
+# The blurb used to thank one person in every language, and Uzbek thanked the
+# Russian translator. Names the msgid itself carries are the development credit.
 msgid = None
 for line in read("lang.def").replace("\r\n", "\n").split("\n"):
     if line.startswith("\\r\\n(Please notify us"):
         msgid = line
 if msgid is None:
     sys.exit("the About blurb is not in lang.def any more; retarget this check")
-year = re.search(r"\(C\)\s*(1998-\d{4})", msgid)
-if year is None:
-    sys.exit("no copyright stamp in the About blurb msgid: %r" % msgid)
-stamped = 0
+shared = set(names(msgid))
+read_values = 0
 for path in catalogs:
+    base = os.path.basename(path)
     value = field(path, msgid)
-    if not value:
+    if value is None:
+        bad.append("%s: does not carry the About blurb msgid" % base)
         continue
-    for stamp in re.findall(r"\(C\)\s*(1998-\d{4})", value):
-        stamped += 1
-        if stamp != year.group(1):
-            bad.append("%s: the About blurb is stamped %s, the msgid says %s"
-                       % (os.path.basename(path), stamp, year.group(1)))
-# A msgid that drifted would leave every value above unread, and say nothing.
-if stamped < len(catalogs) - 2:
-    sys.exit("only %d of %d catalogs carry a stamped About blurb" % (stamped, len(catalogs)))
+    read_values += 1
+    for who, owners in everyone.items():
+        if who in shared or base in owners:
+            continue
+        if named_in(value, who):
+            bad.append("%s: the About blurb credits %r, who translated %s"
+                       % (base, who, ", ".join(sorted(owners))))
+if read_values != len(catalogs):
+    sys.exit("read the About blurb from %d of %d catalogs" % (read_values, len(catalogs)))
 
 for line in bad:
     print(line)
 sys.exit(1 if bad else 0)
 PY
 
-# A private root, so the server reads the catalogs this checkout ships.
+# A private root, so the probe below can sit beside the shipped catalogs.
 root="${work}/root"
 mkdir -p "${root}"
 cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
 chmod -R u+w "${root}"
 
-# Names unique to one catalog, so the page must follow the language rather than
-# echo a single string: German got Robert Lagadec's name for twenty years.
-check() { # $1 = lang index, $2 = LANGUAGE_NAME, $3 = name shown, $4 = name not shown
+serve() { # $1 = tag, $2 = lang index; leaves the reply in ${reply}
     mkdir -p "${work}/h$1"
-    htsserver_start --root "${root}" --home "${work}/h$1" lang "$1"
-    local reply
+    htsserver_start --root "${root}" --home "${work}/h$1" lang "$2"
     reply=$(htsserver_get /server/about.html)
-    grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "about.html for language $1: ${reply}"
+    htsserver_stop
+    grep -q '^HTTP/1.[01] 200' <<<"${reply}" || fail "about.html for language $2: ${reply}"
+}
+
+# Names unique to one catalog, so the page must follow the language rather than
+# echo one string.
+check() { # $1 = lang index, $2 = LANGUAGE_NAME, $3 = name shown, $4 = name not shown
+    local reply
+    serve "$1" "$1"
     grep -q "$2: " <<<"${reply}" || fail "about.html for language $1 has no '$2:' credit line"
     grep -q "$3" <<<"${reply}" || fail "about.html for language $1 does not name $3"
     if grep -q "$4" <<<"${reply}"; then
@@ -138,12 +169,35 @@ check() { # $1 = lang index, $2 = LANGUAGE_NAME, $3 = name shown, $4 = name not 
     case ${reply} in
     *'${'*) fail "about.html for language $1 serves a raw token: ${reply}" ;;
     esac
-    htsserver_stop
 }
 
 check 1 English Lagadec Klueting
 check 4 Deutsch Klueting Lagadec
 check 10 Türkçe Aksoy Lagadec
+
+# The page interpolates catalog text into a <pre>, so the escaper is what stops a
+# translator's punctuation reaching the browser as markup. Both keys it reads,
+# because an escaper covering one is not enough.
+"${HTS_PYTHON}" - "${root}/lang/English.txt" <<'PY' || fail "cannot plant the markup probe"
+import sys
+path = sys.argv[1]
+lines = open(path, "rb").read().split(b"\r\n")
+for i, line in enumerate(lines):
+    if line == b"LANGUAGE_AUTHOR":
+        lines[i + 1] = b"Zzz</pre><script>alert(1)</script>"
+    elif i % 2 == 0 and line.startswith(b"\\r\\n(Please notify us"):
+        lines[i + 1] = b"Yyy</pre><script>alert(2)</script>"
+open(path, "wb").write(b"\r\n".join(lines))
+PY
+reply=''
+serve markup 1
+for planted in Zzz Yyy; do
+    grep -q "${planted}&lt;/pre&gt;&lt;script&gt;" <<<"${reply}" ||
+        fail "about.html does not escape markup out of a catalog (${planted}): ${reply}"
+    if grep -q "${planted}</pre>" <<<"${reply}"; then
+        fail "about.html serves catalog markup raw (${planted}): ${reply}"
+    fi
+done
 
 # A leaked server wedges the parallel harness behind a green log.
 htsserver_assert_reaped

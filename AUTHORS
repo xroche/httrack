@@ -4,8 +4,8 @@ Copyright (C) 1998-2026 Xavier Roche and other contributors
 Contact: Xavier Roche <roche@httrack.com>, https://www.httrack.com/
 
 A translator is named here and in their catalog's LANGUAGE_AUTHOR, which is what
-the About box shows. tests/372_credits.test keeps the two in step, so a new
-catalog entry has to be added here as well.
+the About box shows; tests/372_credits.test keeps the two in step, so add new
+entries to both.
 
 Development
   Xavier Roche            project leader, engine, Windows and Linux interfaces
@@ -40,10 +40,10 @@ Translations
   Czech                  Antonín Matějčík
   Danish                 Jesper Bramm, scootergrisen
   Dutch                  Rudi Ferrari
-  English                Xavier Roche, Robert Lagadec
+  English                Xavier Roche, Robert Lagadec, David Lawrie
   Estonian               Tõnu Virma
   Finnish                Mika Kähkönen
-  French                 Xavier Roche, Robert Lagadec
+  French                 Xavier Roche, Robert Lagadec, David Lawrie
   German                 Rainer Klueting, Bastian Gorke, Rudi Ferrari, Marcus Gaza
   Greek                  Michael Papadakis
   Hungarian              Jozsef Tamas Herczeg
@@ -58,14 +58,14 @@ Translations
   Russian                Andrei Iliev
   Slovak                 Dr. Martin Sereday
   Slovenian              Jadran Rudec, iur.
-  Spanish                Juan Pablo Barrio Lera
+  Spanish                Juan Pablo Barrio Lera (Universidad de León)
   Swedish                Staffan Ström
   Turkish                Arman (Armish) Aksoy, Ümit Solmaz, Mehmet Akif Köeoğlu
   Ukrainian              Andrij Shevchuk
   Uzbek                  Shamsiddinov Zafar
 
 Thanks to
-  Patrick Ducrot and Daniel Carré, ENSI of Caen, for their initial support
+  Patrick Ducrot and Daniel Carré, ISMRA / ENSI of Caen, for their initial support
   Russ Freeman of gipsymedia, for hints on DLL dynamic loading
   Paul DiLascia, for help with CHtmlView
   La sonothèque du Terrier, for the sound effects

@@ -650,8 +650,8 @@ Disconnect when finished
 Koppla ner förbindelsen när överföringen är klar
 Disconnect modem on completion
 Koppla ned modemet efter avslutning
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode and translations: many contributors, listed in AUTHORS\r\n\r\n(C)1998-2026 Xavier Roche and other contributors
-\r\n(Hittar du fel eller uppstår det problem, kontakta oss)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2026 Xavier Roche and other contributors
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode, documentation and packaging: many contributors\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for English translations to:\r\nXavier Roche, Robert Lagadec
+\r\n(Hittar du fel eller uppstår det problem, kontakta oss)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for Swedish translations to:\r\nStaffan Ström (staffan@fam-strom.org)
 About WinHTTrack Website Copier
 Om WinHTTrack Website Copier...
 Please visit our Web page

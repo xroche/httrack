@@ -89,8 +89,8 @@ def main():
         if args.body_file:
             open(args.body_file, "wb").write(body)
         return
-    # Bytes through: the GUI has been UTF-8 since #1407, and decoding as
-    # latin-1 re-encoded every non-ASCII reply on the way out.
+    # Bytes through: the GUI is UTF-8, and decoding as latin-1 re-encoded
+    # every non-ASCII reply.
     sys.stdout.buffer.write(out)
 
 
