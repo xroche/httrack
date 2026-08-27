@@ -9077,6 +9077,7 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
   FILE *fp;
   int err = 0;
   size_t i;
+  size_t wide = 0; /* offsets measured past what a 32-bit tell could hold */
 
   (void) opt;
   if (argc < 1) {
@@ -9095,6 +9096,15 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
     uint64_t got;
 
     if (fseeko(fp, (LLint) want, SEEK_SET) != 0) {
+      /* EFBIG: the filesystem caps file size below the offset (GNU/Hurd ext2fs)
+       */
+      if (errno == EFBIG) {
+        fprintf(stderr,
+                "warc-offset: %" PRIu64 " is past this filesystem's"
+                " file-size cap, skipped\n",
+                want);
+        continue;
+      }
       fprintf(stderr, "warc-offset: cannot seek to %" PRIu64 ": %s\n", want,
               strerror(errno));
       err = 1;
@@ -9106,9 +9116,16 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
       fprintf(stderr, "warc-offset: tell at %" PRIu64 " reported %" PRIu64 "\n",
               want, got);
       err = 1;
+    } else if (want > 2147483647ULL) {
+      wide++;
     }
   }
   fclose(fp);
+  /* fail here, or a filesystem refusing every wide offset proves nothing */
+  if (wide == 0) {
+    fprintf(stderr, "warc-offset: no offset past 2GB was measurable here\n");
+    err = 1;
+  }
   /* seeking never wrote: a several-GB file here would mean a real write */
   if (fsize_utf8(path) != 0) {
     fprintf(stderr, "warc-offset: the probe file is not empty (%" PRIu64 ")\n",
