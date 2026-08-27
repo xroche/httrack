@@ -53,11 +53,19 @@ echo "ok: the panel answers at every authority it is reachable at"
 # browsed at http://myhost.lan:8080/ presents. Dropped when another rule would
 # accept it anyway, since it would then prove nothing.
 selfname=$(htsserver_python -c 'import socket; print(socket.gethostname())')
-case $(printf '%s' "${selfname}" | tr '[:upper:]' '[:lower:]') in
-localhost) selfname='' ;;
-*[!0-9.]*) ;;
-*) selfname='' ;;
-esac
+# True for a name some other rule vouches for anyway: localhost, or anything
+# shaped like an address literal, which host_is_address() takes for whoever
+# opened the socket.
+covered_elsewhere() {
+    case $(printf '%s' "$1" | tr '[:upper:]' '[:lower:]') in
+    localhost | '') return 0 ;;
+    *[!0-9.]*) return 1 ;;
+    *) return 0 ;;
+    esac
+}
+if covered_elsewhere "${selfname}"; then
+    selfname=''
+fi
 test "${#selfname}" -lt 256 || selfname=''
 if test -n "${selfname}"; then
     # Upper-cased too: the compare is case-insensitive, as it is for localhost.
@@ -75,8 +83,11 @@ bad_hosts=("evil.example" "evil.example:${HTS_PORT}" "127.0.0.1.evil.example")
 if test -n "${selfname}"; then
     # Near-misses on every side: the match is the whole name, never part of it.
     bad_hosts+=("${selfname}.evil.example" "evil.${selfname}" "${selfname}x")
-    # A one-character name truncates to "", which the good loop above accepts.
-    test "${#selfname}" -lt 2 || bad_hosts+=("${selfname%?}")
+    # Not every truncation is a near-miss: dropping the last character of
+    # "12764103200x" leaves an address literal the server accepts by design.
+    if [ "${#selfname}" -ge 2 ] && ! covered_elsewhere "${selfname%?}"; then
+        bad_hosts+=("${selfname%?}")
+    fi
 fi
 for bad in "${bad_hosts[@]}"; do
     resp=$(post_as "${bad}")
