@@ -650,8 +650,8 @@ Disconnect when finished
 Дисконектирај се кога ќе заврши
 Disconnect modem on completion
 Дисконектирај го модемот на крај
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Ве молиме известете не за било каква грешка или проблем)\r\n\r\nDevelopment:\r\nИнтерфејс (Windows):Xavier Roche\r\nSpider:Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche и други\r\nМНОГУ БЛАГОДАРНОСТ за македонскиот превод на:\r\nАлександар Савиќ (aleks@macedonia.eu.org)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode and translations: many contributors, listed in AUTHORS\r\n\r\n(C)1998-2026 Xavier Roche and other contributors
+\r\n(Ве молиме известете не за било каква грешка или проблем)\r\n\r\nDevelopment:\r\nИнтерфејс (Windows):Xavier Roche\r\nSpider:Xavier Roche\r\n\r\n(C)1998-2026 Xavier Roche и други
 About WinHTTrack Website Copier
 За WinHTTrack Website Copier
 Please visit our Web page

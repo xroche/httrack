@@ -89,8 +89,9 @@ def main():
         if args.body_file:
             open(args.body_file, "wb").write(body)
         return
-    # The GUI is served ISO-8859-1, and a mirrored file can hold any byte.
-    sys.stdout.write(out.decode("latin-1"))
+    # Bytes through: the GUI has been UTF-8 since #1407, and decoding as
+    # latin-1 re-encoded every non-ASCII reply on the way out.
+    sys.stdout.buffer.write(out)
 
 
 main()
