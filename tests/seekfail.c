@@ -13,12 +13,19 @@
 /* The tree builds with -fvisibility=hidden, which would hide the interposer. */
 #define SHIM_EXPORT __attribute__((visibility("default")))
 
-/* glibc redirects fseeko to fseeko64 under _FILE_OFFSET_BITS=64, and the engine
-   calls whichever its own build resolved to: interpose both names. */
-#undef fseeko
+/* The engine calls whichever name its own build resolved to, so interpose both.
+   Under _FILE_OFFSET_BITS=64 glibc aliases the fseeko declaration onto
+   fseeko64, and defining both names then emits one assembler symbol twice. */
+#if defined(__GLIBC__) && defined(__USE_FILE_OFFSET64)
+#define SEEKFAIL_FSEEKO_IS_FSEEKO64
+#endif
 
+#ifndef SEEKFAIL_FSEEKO_IS_FSEEKO64
 SHIM_EXPORT int fseeko(FILE *stream, off_t offset, int whence);
+#endif
+#ifdef __GLIBC__
 SHIM_EXPORT int fseeko64(FILE *stream, int64_t offset, int whence);
+#endif
 
 static int seekfail_capped(int64_t offset) {
   const char *const cap = getenv("SEEKFAIL_CAP");
@@ -37,6 +44,7 @@ static int seekfail_capped(int64_t offset) {
   return 1;
 }
 
+#ifndef SEEKFAIL_FSEEKO_IS_FSEEKO64
 SHIM_EXPORT int fseeko(FILE *stream, off_t offset, int whence) {
   static int (*real_fseeko)(FILE *, off_t, int) = NULL;
 
@@ -52,7 +60,9 @@ SHIM_EXPORT int fseeko(FILE *stream, off_t offset, int whence) {
   }
   return real_fseeko(stream, offset, whence);
 }
+#endif
 
+#ifdef __GLIBC__
 SHIM_EXPORT int fseeko64(FILE *stream, int64_t offset, int whence) {
   static int (*real_fseeko64)(FILE *, int64_t, int) = NULL;
 
@@ -68,3 +78,4 @@ SHIM_EXPORT int fseeko64(FILE *stream, int64_t offset, int whence) {
   }
   return real_fseeko64(stream, offset, whence);
 }
+#endif
