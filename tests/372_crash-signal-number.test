@@ -17,11 +17,16 @@ command -v "${cc_argv[0]}" >/dev/null || skip "no C compiler (${cc_argv[0]})"
 work=$(mktemp -d "${TMPDIR:-/tmp}/httrack_printnum.XXXXXX")
 cleanup_push rm -rf "${work}"
 
-cflags=(-g -O0 -I"${builddir}" -I"${builddir}/src" -I"${srcdir}/src")
-if [ -n "${TEST_CPPFLAGS:-}" ]; then
-    read -r -a extra_argv <<<"${TEST_CPPFLAGS}"
-    cflags+=("${extra_argv[@]}")
-fi
+# The build's own flags first, so the sanitizer legs instrument the probe and
+# the INT_MIN case is more than decorative; -O0 after, to keep our own.
+cflags=()
+for flags in "${TEST_CFLAGS:-}" "${TEST_CPPFLAGS:-}"; do
+    if [ -n "${flags}" ]; then
+        read -r -a extra_argv <<<"${flags}"
+        cflags+=("${extra_argv[@]}")
+    fi
+done
+cflags+=(-g -O0 -I"${builddir}" -I"${builddir}/src" -I"${srcdir}/src")
 # shellcheck disable=SC2086 # DL_LIBS is a flag list; splitting is the point
 if ! "${cc_argv[@]}" "${cflags[@]}" -o "${work}/probe" \
     "${srcdir}/tests/printnumprobe.c" "${srcdir}/src/htsbacktrace.c" \

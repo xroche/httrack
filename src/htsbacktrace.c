@@ -380,7 +380,7 @@ unsigned int hts_print_num(char *buffer, int num) {
   for (i = 0; val != 0 || i == 0; i++, val /= 10) {
     buffer[i] = '0' + (val % 10);
   }
-  /* least-significant first above: swapping to i rather than i/2 undoes it all */
+  /* j stops at i/2: going to i swaps each pair twice and undoes the reversal */
   for (j = 0; j < i / 2; j++) {
     const char c = buffer[i - j - 1];
     buffer[i - j - 1] = buffer[j];
