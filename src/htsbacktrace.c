@@ -368,6 +368,28 @@ void hts_backtrace_altstack_release(void *stack) {
 #endif
 }
 
+unsigned int hts_print_num(char *buffer, int num) {
+  const int neg = num < 0;
+  /* negate in unsigned: INT_MIN has no positive counterpart */
+  unsigned int val = neg ? -(unsigned int) num : (unsigned int) num;
+  unsigned int i, j;
+
+  if (neg) {
+    *(buffer++) = '-';
+  }
+  for (i = 0; val != 0 || i == 0; i++, val /= 10) {
+    buffer[i] = '0' + (val % 10);
+  }
+  /* least-significant first above: swapping to i rather than i/2 undoes it all */
+  for (j = 0; j < i / 2; j++) {
+    const char c = buffer[i - j - 1];
+    buffer[i - j - 1] = buffer[j];
+    buffer[j] = c;
+  }
+  buffer[i] = '\0';
+  return i + (unsigned int) neg;
+}
+
 /* Why the report has no frames: a silent gap reads as a handler that died. */
 static void print_no_trace(int fd, const char *msg, unsigned int len) {
   if (write(fd, msg, len) != len) { /* no ssize_t: this is built on MSVC too */

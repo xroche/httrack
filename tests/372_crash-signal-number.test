@@ -1,0 +1,57 @@
+#!/bin/bash
+# The crash banner printed signal numbers backwards. Invisible on x86, whose
+# fatal signals are 4, 6, 7 and 11; hppa's SIGBUS is 10 and the report said 01.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir=${abs_top_srcdir:?not run under make check}
+builddir=${abs_top_builddir:?not run under make check}
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null || skip "no C compiler (${cc_argv[0]})"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/httrack_printnum.XXXXXX")
+cleanup_push rm -rf "${work}"
+
+cflags=(-g -O0 -I"${builddir}" -I"${builddir}/src" -I"${srcdir}/src")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"${TEST_CPPFLAGS}"
+    cflags+=("${extra_argv[@]}")
+fi
+# shellcheck disable=SC2086 # DL_LIBS is a flag list; splitting is the point
+if ! "${cc_argv[@]}" "${cflags[@]}" -o "${work}/probe" \
+    "${srcdir}/tests/printnumprobe.c" "${srcdir}/src/htsbacktrace.c" \
+    ${DL_LIBS:-} >"${work}/cc.log" 2>&1; then
+    head -20 "${work}/cc.log" >&2
+    # 218 pins that the crash printer builds standalone on Linux.
+    if [ "$HTS_OS" = "Linux" ]; then
+        fail "the crash printer does not build standalone"
+    fi
+    skip "the probe does not build with this toolchain"
+fi
+
+# Spread: every signal that reaches the handler on some port (hppa SIGBUS 10,
+# SIGSEGV 11), both digit parities, and INT_MIN, whose negation must not
+# overflow. printf is the oracle, so no expectation is copied from the probe.
+values=(0 1 4 6 7 8 10 11 12 20 100 101 123 1000 4321 65535
+    2147483647 -1 -7 -10 -123 -2147483648)
+
+got=$("${work}/probe" "${values[@]}")
+test "$(wc -l <<<"${got}")" -eq "${#values[@]}" ||
+    fail "the probe rendered $(wc -l <<<"${got}") of ${#values[@]} values: ${got}"
+
+want=$(for v in "${values[@]}"; do
+    text=$(printf '%d' "$v")
+    printf '%u:%s\n' "${#text}" "${text}"
+done)
+
+if [ "${got}" != "${want}" ]; then
+    printf '%s\n' "${want}" >"${work}/want"
+    printf '%s\n' "${got}" >"${work}/got"
+    diff -u "${work}/want" "${work}/got" >&2 || true
+    fail "hts_print_num() does not render what printf does"
+fi

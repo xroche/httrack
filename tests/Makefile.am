@@ -6,7 +6,7 @@ TESTS = @TESTS_LIST@
 # Committed binary fixture read by 01_zlib-cache-golden.test. List it
 # explicitly: automake does not expand wildcards in EXTRA_DIST, so a glob would
 # silently drop it from the dist tarball and break "make distcheck".
-EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c closetrack.c ftpcancel.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
+EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c altstackprobe.c nopieprobe.c printnumprobe.c closetrack.c ftpcancel.c crawl-test.sh run-all-tests.sh check-network.sh check-test-names.sh \
 	proxy-https-server.py socks5-server.py proxy-connect-server.py \
 	proxytestlib.py tls-stall-server.py warc-validate.py wacz-validate.py \
 	header-injection-server.py header-injection-check.py \

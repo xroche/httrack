@@ -908,24 +908,6 @@ static void sig_doback(int blind) {     // mettre en backing
 #undef FD_ERR
 #define FD_ERR 2
 
-static unsigned int print_num(char *buffer, int num) {
-  unsigned int i, j;
-  if (num < 0) {
-    *(buffer++) = '-';
-    num = -num;
-  }
-  for(i = 0 ; num != 0 || i == 0 ; i++, num /= 10) {
-    buffer[i] = '0' + ( num % 10 );
-  }
-  for(j = 0 ; j < i ; j++) {
-    const char c = buffer[i - j - 1];
-    buffer[i - j - 1] = buffer[j];
-    buffer[j] = c;
-  }
-  buffer[i] = '\0';
-  return i;
-}
-
 static void sig_fatal(int code) {
   const char msg[] = "\nCaught signal ";
   const char msgreport[] =
@@ -939,7 +921,7 @@ static void sig_fatal(int code) {
 
   memcpy(buffer, msg, sizeof(msg) - 1);
   size = sizeof(msg) - 1;
-  size += print_num(&buffer[size], code);
+  size += hts_print_num(&buffer[size], code);
   buffer[size++] = '\n';
   (void) (write(FD_ERR, buffer, size) == size);
   hts_print_backtrace();

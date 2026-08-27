@@ -58,4 +58,8 @@ void hts_backtrace_altstack_release(void *stack);
    has no backtrace(). */
 void hts_print_backtrace(void);
 
+/* Signal-safe decimal rendering of `num` into `buffer`, NUL-terminated;
+   returns the length written, at most 11 characters plus the NUL. */
+unsigned int hts_print_num(char *buffer, int num);
+
 #endif
