@@ -1,7 +1,6 @@
-/* fseeko() fails with EFBIG past SEEKFAIL_CAP bytes, standing in for a
-   filesystem whose file-size ceiling is low (GNU/Hurd ext2fs) in
-   351_engine-warc-cache-io.test. SEEKFAIL_ERROR=eio refuses for another
-   reason, which nothing may excuse. */
+/* fseeko() fails with EFBIG past SEEKFAIL_CAP bytes, standing in for GNU/Hurd
+   ext2fs's low file-size ceiling. SEEKFAIL_ERROR=eio refuses for an unrelated
+   reason instead, which nothing may excuse. */
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
@@ -24,8 +23,14 @@ SHIM_EXPORT int fseeko64(FILE *stream, int64_t offset, int whence);
 static int seekfail_capped(int64_t offset) {
   const char *const cap = getenv("SEEKFAIL_CAP");
   const char *const kind = getenv("SEEKFAIL_ERROR");
+  char *end;
 
-  if (cap == NULL || offset <= (int64_t) strtoll(cap, NULL, 10)) {
+  /* a cap that is not a number would otherwise read as zero and refuse
+   * everything */
+  if (cap == NULL || *cap == '\0') {
+    return 0;
+  }
+  if (offset <= (int64_t) strtoll(cap, &end, 10) || *end != '\0') {
     return 0;
   }
   errno = kind != NULL && strcmp(kind, "eio") == 0 ? EIO : EFBIG;

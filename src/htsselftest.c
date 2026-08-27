@@ -9096,8 +9096,8 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
     uint64_t got;
 
     if (fseeko(fp, (LLint) want, SEEK_SET) != 0) {
-      /* EFBIG: the filesystem caps file size below the offset (GNU/Hurd
-         ext2fs). Said out loud, and the tally below still wants a wide one. */
+      /* EFBIG: the filesystem caps file size below the offset (GNU/Hurd ext2fs)
+       */
       if (errno == EFBIG) {
         fprintf(stderr,
                 "warc-offset: %" PRIu64 " is past this filesystem's"
@@ -9121,7 +9121,7 @@ static int st_warc_offset(httrackp *opt, int argc, char **argv) {
     }
   }
   fclose(fp);
-  /* the whole point is the offsets a 32-bit signed tell cannot hold */
+  /* fail here, or a filesystem refusing every wide offset proves nothing */
   if (wide == 0) {
     fprintf(stderr, "warc-offset: no offset past 2GB was measurable here\n");
     err = 1;
