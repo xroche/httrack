@@ -15,6 +15,57 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_warccacheio.XXXXXX")
 cleanup_push rm -rf "$tmp"
 
 httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/"
+
+# A filesystem whose file-size cap sits below an offset refuses the seek with
+# EFBIG (GNU/Hurd ext2fs, which reds this test on the Debian buildd). Tolerated
+# for the case it hides, but only while a wide offset is still measurable.
+seekfail_ready() {
+    test "$HTS_OS" = Linux || return 1
+    # Only a static-only build is a legitimate absence; anything else missing
+    # would let the two legs below pass by never running.
+    if [ ! -r "${SEEKFAIL_LA:-}" ]; then
+        fail "${SEEKFAIL_LA:-\$SEEKFAIL_LA} was not built"
+    fi
+    if grep -q "^dlname=''" "$SEEKFAIL_LA"; then
+        return 1
+    fi
+    if [ ! -r "${SEEKFAIL_LIB:-}" ]; then
+        fail "${SEEKFAIL_LIB:-\$SEEKFAIL_LIB} was not built"
+    fi
+    return 0
+}
+
+if seekfail_ready; then
+    # The shim allocates nothing, so loading ahead of libasan is harmless.
+    export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
+    # Only the 1TB case refused: the rest still prove the tell is 64-bit wide.
+    rc=0
+    out=$(SEEKFAIL_CAP=1099511627774 LD_PRELOAD="$SEEKFAIL_LIB" \
+        httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/" 2>&1) || rc=$?
+    test "$rc" -eq 0 || fail "a capped filesystem must not fail warc-offset: $out"
+    grep -q "past this filesystem's file-size cap" <<<"$out" ||
+        fail "the skipped offset was not reported: $out"
+
+    # Every wide offset refused: nothing is left to measure, and swallowing that
+    # silently is what the tolerance above must not do.
+    rc=0
+    out=$(SEEKFAIL_CAP=2147483647 LD_PRELOAD="$SEEKFAIL_LIB" \
+        httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "warc-offset passed with no offset past 2GB: $out"
+    grep -q "no offset past 2GB was measurable" <<<"$out" ||
+        fail "warc-offset failed for another reason: $out"
+
+    # EFBIG is the ceiling; any other refusal is a seek that should have worked,
+    # and excusing those would hide the 32-bit off_t this selftest is about.
+    rc=0
+    out=$(SEEKFAIL_CAP=1099511627774 SEEKFAIL_ERROR=eio \
+        LD_PRELOAD="$SEEKFAIL_LIB" \
+        httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/" 2>&1) || rc=$?
+    test "$rc" -ne 0 || fail "warc-offset excused a non-EFBIG seek failure: $out"
+    grep -q "cannot seek to 1099511627775" <<<"$out" ||
+        fail "warc-offset failed for another reason: $out"
+fi
 httrack -O "$tmp/out" "-#test=cache-readfail" "$tmp/"
 httrack -O "$tmp/out" "-#test=zip-abandon" "$tmp/"
 
