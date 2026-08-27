@@ -650,8 +650,8 @@ Disconnect when finished
 Desconectar ao finalizar
 Disconnect modem on completion
 Desconectar o modem ao finalizar
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(por favor nos comunique sobre erros ou problemas)\r\n\r\nDesenvolvimento:\r\nInterface (Windows): Xavier Roche\r\nMotor: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche e outros colaboradores\r\nTraduzido para o Português-Brasil por :\r\nPaulo Neto (layoutbr@lexxa.com.br)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode, documentation and packaging: many contributors\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for English translations to:\r\nXavier Roche, Robert Lagadec
+\r\n(por favor nos comunique sobre erros ou problemas)\r\n\r\nDesenvolvimento:\r\nInterface (Windows): Xavier Roche\r\nMotor: Xavier Roche\r\n\r\n(C) Xavier Roche e outros colaboradores\r\nTraduzido para o Português-Brasil por :\r\nPaulo Neto (layoutbr@lexxa.com.br)
 About WinHTTrack Website Copier
 Sobre o WinHTTrack Website Copier
 Please visit our Web page

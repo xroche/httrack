@@ -1,108 +1,67 @@
-Informations on this project:
+HTTrack Website Copier
+Copyright (C) 1998-2026 Xavier Roche and other contributors
+https://www.httrack.com/
 
-This project has been developed by:
-Xavier Roche (xroche at httrack.com)
-  project leader
-  core engine, Windows/Linux GUI
-Yann Philippot (yphilippot at lemel.fr)
-  past contributor (java binary .class parser)
+Development
+  Xavier Roche            project leader, engine, Windows and Linux interfaces
+  Yann Philippot          Java .class parser (past contributor)
 
-With the help of:
-Leto Kauler (molotov at tasmail.com)
-  for the site/logos design
-  http://kauler.com/
-Christian Marillat (marillat.christian at wanadoo.fr)
-  for autoconf compliance and .deb package
-Fred Cohen (fc at all.net)
-  for HTTrack user's guide
-  http://all.net/
+Contributors
+  Brian 'Redbeard' Harrington    Hans Wennborg           Roman Sęk of Clearcode
+  Christopher Meng               Jack Danger Canty       Steve Mokris
+  Earl DuCaine                   James Addison           commitmaniac
+  Florian Weimer                 Jared W                 scootergrisen
+  Fredrik Fornwall               Jevon Wright            sickcodes
+  GermanAizek                    Mike7R                  tabudz
+  Giorgos Logiotatidis           Pablo Castellano        yosinn1-blip
+  Guenther Schmitz               Reto Kromer
 
-And the help of the following third party developers:
-Nicolas Benoit (nbenoit at tuxfamily.org), SDP Multimedia and Major MMS
-  for the mms plugin core routines (MMSRIP)
-  http://nbenoit.tuxfamily.org/
-Jean-loup Gailly from gzip.org
-  for the help provided with Zlib
-  http://www.zlib.net/
-Eric A. Young (eay at cryptsoft.com)
-  for SSL cryptographic material (OpenSSL)
-  http://www.openssl.org/
-Jordan Russell
-  for the Windows setup tool (Inno Setup)
-  http://www.jrsoftware.org/isinfo.php
+Documentation, artwork and packaging
+  Leto Kauler             site and logo design
+  Fred Cohen              HTTrack user's guide
+  Christian Marillat      autoconf support and the Debian package
 
-Translations written by:
-David Lawrie (dalawrie at lineone.net)
-Robert Lagadec (rlagadec at yahoo.fr)
-  for checking both English & French translations
-Juan Pablo Barrio Lera (University of León)
-  for Spanish translations
-Rainer Klueting (rk-htt at centermail.net)
-Bastian Gorke (bastiang at yahoo.com)
-Rudi Ferrari (Wyando at netcologne.de)
-Marcus Gaza (MarcusGaza at t-online.de)
-  for German translations
-Rudi Ferrari (Wyando at netcologne.de)
-  for Dutch translations
-Lukasz Jokiel (Opole University of Technology, Lukasz.Jokiel at po.opole.pl)
-  for Polish translations
-Rui Fernandes (CANTIC, ruiefe at mail.malhatlantica.pt)
-Pedro T. Pinheiro (Universidade Nova de Lisboa-FCT, ptiago at mail.iupi.pt)
-  for Portuguese translations
-Andrei Iliev (iliev at vitaplus.ru)
-  for Russian translations
-Witold Krakowski (wtkrak at netscape.net )
-  for Italian translations
-Jozsef Tamas Herczeg (hdodi at freemail.hu)
-  for Hungarian translation
-Paulo Neto (pauloneto at layoutdobrasil.com)
-  for Brazilian translation
-Brook Qin (brookqwr at sina.com) 
-   for simplified Chinese translation
-David Hing Cheong Hung (DAVEHUNG at mtr.com.hk)
-Addy Lin (addy1975 at pchome.com.tw)
-   for traditional Chinese translation
-Jesper Bramm (bramm at get2net.dk)
-   for Danish translation
-Tõnu Virma
-   for Estonian translation
-Staffan Ström (staffan at fam-strom.org)
-   for Swedish translation
-Arman (Armish) Aksoy (armish at linux-sevenler.de)
-Mehmet Akif Köeoðlu (mak at ttnet.net.tr)
-  for Turkish translation
-Aleksandar Savic (aleks at macedonia.eu.org)
-  for Macedonian translation
-Takayoshi Nakasikiryo
-  for Japanese translation
-Martin Sereday (sereday at slovanet.sk)
-  for Slovak translation
-Antonín Matìjèík (matejcik at volny.cz)
-  for Czech translation
-Andrij Shevchuk (http://programy.com.ua)
-  for Ukrainian translation
-Tobias "Spug" Langhoff (spug_enigma at hotmail.com)
-  for Norwegian translation
-Jadran Rudeciur (jrudec at email.si)
-  for Slovenian translation
-Alin Gheorghe Miron (miron.alin at personal.ro)
-  for Romanian translation
-Michael Papadakis (mikepap at freemail.gr)
-  for Greek translation
-Ilia Lindov (ilia at infomat-bg.com)
-  for Bulgarian translation
-Mika Kähkönen (mika.kahkonen at mbnet.fi)
-  for Finnish translation
+Third-party code
+  Nicolas Benoit, SDP Multimedia and Major MMS   MMS plugin core routines (MMSRIP)
+  Jean-loup Gailly and Mark Adler                Zlib
+  Eric A. Young and the OpenSSL project          SSL cryptographic material
+  Jordan Russell                                 Windows setup tool (Inno Setup)
 
-Thanks to:
-Patrick Ducrot & Daniel Carré (ENSI of Caen)
-  for their initial support
-  http://www.ducrot.org/
-  http://www.greyc.ensicaen.fr/~dcarre/
-Ensi of Caen
-  for their initial support
-  http://www.ensicaen.fr/
-La sonothèque du Terrier
-  for the sound fx :)
+Translations
+  Bulgarian              Илия Линдов (Ilia Lindov)
+  Chinese (Simplified)   Brook Qin
+  Chinese (Traditional)  David Hing Cheong Hung, Addy Lin
+  Croatian               Dominko Aždajić
+  Czech                  Antonín Matějčík
+  Danish                 Jesper Bramm, scootergrisen
+  Dutch                  Rudi Ferrari
+  English                Xavier Roche, Robert Lagadec, David Lawrie
+  Estonian               Tõnu Virma
+  Finnish                Mika Kähkönen
+  French                 Xavier Roche, Robert Lagadec, David Lawrie
+  German                 Rainer Klueting, Bastian Gorke, Rudi Ferrari, Marcus Gaza
+  Greek                  Michael Papadakis
+  Hungarian              Jozsef Tamas Herczeg
+  Italian                Witold Krakowski
+  Japanese               TAPKAL, Takayoshi Nakasikiryo
+  Macedonian             Александар Савиќ (Aleksandar Savic)
+  Norwegian              Tobias "Spug" Langhoff
+  Polish                 Lukasz Jokiel
+  Portuguese             Rui Fernandes, Pedro T. Pinheiro
+  Portuguese (Brazil)    Paulo Neto
+  Romanian               Alin Gheorghe Miron
+  Russian                Andrei Iliev
+  Slovak                 Dr. Martin Sereday
+  Slovenian              Jadran Rudec, iur.
+  Spanish                Juan Pablo Barrio Lera (Universidad de León)
+  Swedish                Staffan Ström
+  Turkish                Arman (Armish) Aksoy, Ümit Solmaz, Mehmet Akif Köeoğlu
+  Ukrainian              Andrij Shevchuk
+  Uzbek                  Shamsiddinov Zafar
 
-..and all users who are using and supporting HTTrack!
+Thanks to
+  Patrick Ducrot and Daniel Carré, ISMRA / ENSI of Caen, for their initial support
+  Russ Freeman of gipsymedia, for hints on DLL dynamic loading
+  Paul DiLascia, for help with CHtmlView
+  La sonothèque du Terrier, for the sound effects
+  and every user who uses and supports HTTrack

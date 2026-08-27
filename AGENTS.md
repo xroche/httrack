@@ -69,11 +69,11 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 - **Format only changed lines** with `git clang-format` (clang-format 19). Never
   reformat untouched code: the engine was formatted by an old tool and won't
   round-trip.
-- **Byte-safe edits.** A few tracked files carry raw ISO-8859-1 high bytes
-  (French comments): `src/htsconcat.c`, `lang/*.txt`, `html/contact.html`, and
-  the `fuzz/corpus/*` vectors. Edit those byte-wise (`perl -0pi`, `sed`), not
-  through a tool that re-encodes to UTF-8 and corrupts them. The rest of the tree
-  is UTF-8 and safe to edit normally.
+- **Byte-safe edits.** `src/htsconcat.c` carries raw ISO-8859-1 high bytes
+  (French comments) and the `fuzz/corpus/*` vectors are binary: edit those
+  byte-wise (`perl -0pi`, `sed`), not through a tool that re-encodes to UTF-8
+  and corrupts them. The rest of the tree, including `lang/*.txt` and
+  `html/contact.html`, is UTF-8 and safe to edit normally.
 
 ## Security (HTTrack parses hostile input off the network)
 - Bounds-check every copy. Overflow-safe form: put the untrusted value alone,

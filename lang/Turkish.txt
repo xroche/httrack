@@ -650,8 +650,8 @@ Disconnect when finished
 Bittiğinde bağlantıyı kes
 Disconnect modem on completion
 İşlem tamamlandığında modem bağlantısını kes
-\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nInterface (Windows): Xavier Roche\r\nSpider: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche and other contributors\r\nMANY THANKS for translation tips to:\r\nRobert Lagadec (rlagadec@yahoo.fr)
-\r\n(Lütfen bize her türlü hatayı ve problemi aktarınız)\r\n\r\nGeliştirme:\r\nArayüz (Windows): Xavier Roche\r\nAğ: Xavier Roche\r\n\r\n(C)1998-2003 Xavier Roche ve diğerleri\r\nÇeviri ipuçları için teşekkürler: \r\nRobert Lagadec (rlagadec@yahoo.fr)
+\r\n(Please notify us of any bug or problem)\r\n\r\nDevelopment:\r\nEngine and interfaces: Xavier Roche\r\nCode, documentation and packaging: many contributors\r\n\r\n(C) Xavier Roche and other contributors\r\nMANY THANKS for English translations to:\r\nXavier Roche, Robert Lagadec
+\r\n(Lütfen bize her türlü hatayı ve problemi aktarınız)\r\n\r\nGeliştirme:\r\nArayüz (Windows): Xavier Roche\r\nAğ: Xavier Roche\r\n\r\n(C) Xavier Roche ve diğerleri\r\nÇeviri ipuçları için teşekkürler: \r\nArman (Armish) Aksoy, Ümit Solmaz
 About WinHTTrack Website Copier
 WinHTTrack Website Copier Hakkında
 Please visit our Web page

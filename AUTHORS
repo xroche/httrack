@@ -1,1 +1,72 @@
-Xavier Roche <roche@httrack.com>
+HTTrack Website Copier
+Copyright (C) 1998-2026 Xavier Roche and other contributors
+
+Contact: Xavier Roche <roche@httrack.com>, https://www.httrack.com/
+
+A translator is named here and in their catalog's LANGUAGE_AUTHOR, which is what
+the About box shows; tests/372_credits.test keeps the two in step, so add new
+entries to both.
+
+Development
+  Xavier Roche            project leader, engine, Windows and Linux interfaces
+  Yann Philippot          Java .class parser (past contributor)
+
+Contributors
+  Brian 'Redbeard' Harrington    Hans Wennborg           Roman Sęk of Clearcode
+  Christopher Meng               Jack Danger Canty       Steve Mokris
+  Earl DuCaine                   James Addison           commitmaniac
+  Florian Weimer                 Jared W                 scootergrisen
+  Fredrik Fornwall               Jevon Wright            sickcodes
+  GermanAizek                    Mike7R                  tabudz
+  Giorgos Logiotatidis           Pablo Castellano        yosinn1-blip
+  Guenther Schmitz               Reto Kromer
+
+Documentation, artwork and packaging
+  Leto Kauler             site and logo design
+  Fred Cohen              HTTrack user's guide
+  Christian Marillat      autoconf support and the Debian package
+
+Third-party code
+  Nicolas Benoit, SDP Multimedia and Major MMS   MMS plugin core routines (MMSRIP)
+  Jean-loup Gailly and Mark Adler                Zlib
+  Eric A. Young and the OpenSSL project          SSL cryptographic material
+  Jordan Russell                                 Windows setup tool (Inno Setup)
+
+Translations
+  Bulgarian              Илия Линдов (Ilia Lindov)
+  Chinese (Simplified)   Brook Qin
+  Chinese (Traditional)  David Hing Cheong Hung, Addy Lin
+  Croatian               Dominko Aždajić
+  Czech                  Antonín Matějčík
+  Danish                 Jesper Bramm, scootergrisen
+  Dutch                  Rudi Ferrari
+  English                Xavier Roche, Robert Lagadec, David Lawrie
+  Estonian               Tõnu Virma
+  Finnish                Mika Kähkönen
+  French                 Xavier Roche, Robert Lagadec, David Lawrie
+  German                 Rainer Klueting, Bastian Gorke, Rudi Ferrari, Marcus Gaza
+  Greek                  Michael Papadakis
+  Hungarian              Jozsef Tamas Herczeg
+  Italian                Witold Krakowski
+  Japanese               TAPKAL, Takayoshi Nakasikiryo
+  Macedonian             Александар Савиќ (Aleksandar Savic)
+  Norwegian              Tobias "Spug" Langhoff
+  Polish                 Lukasz Jokiel
+  Portuguese             Rui Fernandes, Pedro T. Pinheiro
+  Portuguese (Brazil)    Paulo Neto
+  Romanian               Alin Gheorghe Miron
+  Russian                Andrei Iliev
+  Slovak                 Dr. Martin Sereday
+  Slovenian              Jadran Rudec, iur.
+  Spanish                Juan Pablo Barrio Lera (Universidad de León)
+  Swedish                Staffan Ström
+  Turkish                Arman (Armish) Aksoy, Ümit Solmaz, Mehmet Akif Köeoğlu
+  Ukrainian              Andrij Shevchuk
+  Uzbek                  Shamsiddinov Zafar
+
+Thanks to
+  Patrick Ducrot and Daniel Carré, ISMRA / ENSI of Caen, for their initial support
+  Russ Freeman of gipsymedia, for hints on DLL dynamic loading
+  Paul DiLascia, for help with CHtmlView
+  La sonothèque du Terrier, for the sound effects
+  and every user who uses and supports HTTrack
