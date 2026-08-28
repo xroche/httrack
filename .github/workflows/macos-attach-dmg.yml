@@ -1,0 +1,61 @@
+# Attaches on the publish event rather than on the tag push: releases are cut by hand,
+# so the tag lands up to half an hour before the release exists. macos-release.yml used
+# to wait out that gap on a macOS runner and still lose it (3.49.25 missed by 73s).
+name: attach the macOS DMG
+
+on:
+  release:
+    types: [published]
+  # Exercise the path without cutting a release.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to attach the DMG to"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  attach:
+    name: attach the DMG to the release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Attach the DMG built for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          test -n "$TAG" || { echo "::error::no tag to attach to"; exit 1; }
+
+          # A publish can still beat the build; this wait costs an ubuntu runner, not a macOS one.
+          deadline=$((SECONDS + 2700))
+          until run=$(gh run list --repo "$REPO" --workflow=macos-release.yml \
+              --branch "$TAG" --status success --json databaseId \
+              --jq '.[0].databaseId') && [ -n "$run" ]; do
+            test "$SECONDS" -lt "$deadline" || {
+              echo "::error::no successful macos-release run for $TAG after 45 min"
+              exit 1
+            }
+            sleep 30
+          done
+
+          gh run download "$run" --repo "$REPO" -n HTTrack-macos-arm64-dmg -D dmg
+
+          # Pinned to the tag, so a channel-labelled build cannot match: it carries the
+          # label where the version goes, and --clobber below would replace the real DMG.
+          set -- dmg/HTTrack-"$TAG"-macos-*.dmg
+          if test $# -ne 1 || test ! -f "$1"; then
+            echo "::error::expected one dmg/HTTrack-$TAG-macos-*.dmg, got: $*"
+            ls -l dmg >&2
+            exit 1
+          fi
+
+          gh release upload "$TAG" "$1" --repo "$REPO" --clobber
+          echo "attached $(basename "$1") to $TAG"
