@@ -1,6 +1,6 @@
 AC_PREREQ([2.71])
 
-AC_INIT([httrack], [3.49.24], [roche+packaging@httrack.com], [httrack], [https://www.httrack.com/])
+AC_INIT([httrack], [3.49.25], [roche+packaging@httrack.com], [httrack], [https://www.httrack.com/])
 AC_COPYRIGHT([
 HTTrack Website Copier, Offline Browser for Windows and Unix
 Copyright (C) 1998-2015 Xavier Roche and other contributors
@@ -29,6 +29,8 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
+# 3:18:0: revision-only bump. hts_print_num moved to htsbacktrace.c, which is not
+# in the library and whose header is not installed; no export came or went.
 # 3:17:0: revision-only bump. httrackp gained a tail field (links_unqueued) and
 # BackStatusCode two enumerators at the end (STATUSCODE_IO_FATAL, STATUSCODE_IO_ERROR);
 # no layout moved, no export came or went. This is the release that ships 3:16:0's
@@ -58,7 +60,7 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed
 # headers, so a libhttrack4 rename isn't worth it.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
-VERSION_INFO="3:17:0"
+VERSION_INFO="3:18:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 
