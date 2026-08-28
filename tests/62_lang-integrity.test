@@ -851,17 +851,22 @@ if [ -n "$undef" ]; then
     fail=1
 fi
 
-# "\r \n" renders as a break, a space, then a second break, and the space is
-# what a reader sees; the About box shows LANGUAGE_AUTHOR verbatim.
+# "\r \n" renders as a break, a space, then a second break, and the space shows.
 split_pairs() { # $1 = catalog, $2 = display name
     LC_ALL=C awk -v name="$2" '
         { sub(/\r$/, "") }
-        NR % 2 == 0 && /\\r[ \t]+\\n/ {
-            printf "%s: line %d has whitespace inside a CR/LF escape pair\n", name, NR
+        # Escaped backslashes go first, as in breaks(): the r of "C:\\r" is a path
+        # character, not a CR escape.
+        NR % 2 == 0 {
+            s = $0
+            gsub(/\\\\/, "", s)
+            if (s ~ /\\r[ \t]+\\n/)
+                printf "%s: line %d has whitespace inside a CR/LF escape pair\n", name, NR
         }
     ' "$1"
 }
-printf 'K1\nv \\r \\n\nK2\nv \\r\\n\n' >"$tmp/split.txt"
+# Line 6 is the canary: drop the backslash stripping and it fires too.
+printf 'K1\nv \\r \\n\nK2\nv \\r\\n\nK3\nC:\\\\r \\n\n' >"$tmp/split.txt"
 got=$(split_pairs "$tmp/split.txt" split.txt)
 [ "$got" = "split.txt: line 2 has whitespace inside a CR/LF escape pair" ] ||
     fail "the split-pair check misreads a known fixture: [$got]"

@@ -198,6 +198,9 @@ idle_panes=$(grep -vxF /server/refresh.html <<<"${PANES}")
 # shellcheck disable=SC2086 # deliberately split path lists
 probe refutes "${RUNNING}" 'idle' ${idle_panes}
 docs_reachable 'idle'
+# The About page renders HTTRACK_WEB, so htsglobal.h's scheme is what a reader clicks.
+serves /server/about.html 'https://www.httrack.com' 'the About link'
+refutes /server/about.html 'http://www.httrack.com' 'the About link'
 
 # p0.bin dribbles for a minute on one socket, so the crawl outlives the probes.
 htsserver_client --path /server/step4.html --field "sid=${sid}" --field "path=${work}" \
