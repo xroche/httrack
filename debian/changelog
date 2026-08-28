@@ -1,3 +1,13 @@
+httrack (3.49.25-1) unstable; urgency=medium
+
+  * New upstream release: the About box names each language's own
+    translators, a crash report prints the signal number the right way
+    round, and links to httrack.com open over https; full list in
+    history.txt.
+  * debian/control: use https for the Homepage and the snapshots URL.
+
+ -- Xavier Roche <xavier@debian.org>  Fri, 28 Aug 2026 12:12:16 +0200
+
 httrack (3.49.24-1) unstable; urgency=medium
 
   * New upstream release: a mirror the engine abandoned no longer exits 0,

@@ -53,6 +53,15 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.49.25" date="2026-08-28">
+      <description>
+        <ul>
+          <li>The About box credits the people who translated your language</li>
+          <li>A crash report prints the signal number the right way round</li>
+          <li>Links to httrack.com open over https</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.24" date="2026-08-26">
       <description>
         <ul>

@@ -4,6 +4,13 @@ HTTrack Website Copier release history:
 
 This file lists all changes and fixes that have been made for HTTrack
 
+3.49-25
++ Fixed: the crash report printed signal numbers with their digits reversed, so hppa's SIGBUS read as "Caught signal 01" (#1450)
++ Fixed: every language's About box thanked one translator on behalf of all of them, beside a copyright stamped 1998-2003. Each catalog now names its own translators, and the five that credited the wrong person name the right one (#1453, #1454, #1455)
++ Fixed: the Czech and Macedonian credit lines broke over three lines in the About box (#1457)
++ Changed: links to httrack.com in the About box, the man pages and the documentation now use https. Three links that no longer resolve are gone, and the example hosts in --help and the documentation moved to example.com, off domains someone else owns (#1457)
++ Changed: multiple internal test and build improvements (#1451, #1452, #1456)
+
 3.49-24
 + New: the engine says when it gave up. A mirror abandoned on a fatal write, a full disk or an exhausted link table returns 3 (HTS_EXIT_MIRROR_ABORTED) rather than printing "Done." and exiting 0; a mirror stopped on purpose, by --max-time, --max-size or a front end, still returns 0 (#1419, #1428)
 + New: a file kept from disk instead of fetched is named in the log at the default verbosity, where the four sites that do it used to say nothing outside debug output (#1378)
