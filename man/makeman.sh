@@ -197,17 +197,17 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 .SH AVAILABILITY
 The  most  recent released version of httrack can be found at:
-.B http://www.httrack.com
+.B https://www.httrack.com
 .SH AUTHOR
 Xavier Roche <roche@httrack.com>
 .SH "SEE ALSO"
 The
 .B HTML
 documentation (available online at
-.B http://www.httrack.com/html/
+.B https://www.httrack.com/html/
 ) contains more detailed information. Please also refer to the
 .B httrack FAQ
 (available online at
-.B http://www.httrack.com/html/faq.html
+.B https://www.httrack.com/html/faq.html
 )
 EOF

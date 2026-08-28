@@ -5,7 +5,7 @@ Macedonian
 LANGUAGE_ISO
 mk
 LANGUAGE_AUTHOR
-Александар Савиќ (aleks@macedonia.eu.org) \r \n
+Александар Савиќ (aleks@macedonia.eu.org) \r\n
 LANGUAGE_WINDOWSID
 FYRO Macedonian
 OK

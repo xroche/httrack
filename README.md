@@ -6,7 +6,7 @@
 ## About
 _Copy websites to your computer (Offline browser)_
 
-<img src="http://www.httrack.com/htsw/screenshot_w1.jpg" width="34%">
+<img src="https://www.httrack.com/htsw/screenshot_w1.jpg" width="34%">
 
 *HTTrack* is an _offline browser_ utility, allowing you to download a World Wide website from the Internet to a local directory, building recursively all directories, getting html, images, and other files from the server to your computer.
  
@@ -14,12 +14,12 @@ _Copy websites to your computer (Offline browser)_
 
 HTTrack can also update an existing mirrored site, and resume interrupted downloads. HTTrack is fully configurable, and has an integrated help system.
 
-*WinHTTrack* is the Windows 2000/XP/Vista/Seven release of HTTrack, and *WebHTTrack* the Linux/Unix/BSD release. 
+*WinHTTrack* is the Windows front end and *WebHTTrack* the one for Linux, BSD and macOS, where it also arrives with `brew install httrack` and in the release DMG. There is an [Android app](https://play.google.com/store/apps/details?id=com.httrack.android) too, and underneath all of them the `httrack` command line.
 
 ## Website
 
 *Main Website:*
-http://www.httrack.com/
+https://www.httrack.com/
 
 ## Compile trunk release
 

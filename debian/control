@@ -4,7 +4,7 @@ Maintainer: Xavier Roche <roche@httrack.com>
 Standards-Version: 4.7.4
 Build-Depends: debhelper-compat (= 14), autoconf, autoconf-archive, automake, libtool, zlib1g-dev, libssl-dev, libbrotli-dev, libzstd-dev
 Rules-Requires-Root: no
-Homepage: http://www.httrack.com
+Homepage: https://www.httrack.com
 Vcs-Git: https://github.com/xroche/httrack.git
 Vcs-Browser: https://github.com/xroche/httrack
 
@@ -51,7 +51,7 @@ Description: Copy websites to your computer, httrack with a Web interface
  interrupted downloads. WebHTTrack is fully configurable, and has an
  integrated help system.
  .
-  Snapshots: http://www.httrack.com/page/21/
+  Snapshots: https://www.httrack.com/page/21/
 
 Package: webhttrack-common
 Architecture: all

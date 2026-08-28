@@ -364,7 +364,7 @@ A: <em>On the HTTrack side, no. However, sharing, publishing or reusing copyrigh
 A: <em>Yes. The default distribution includes a DLL (Windows) or a .so (Un*X), used by the program</em>
 
 <br><br><a NAME="QG9">Q: <strong>Is there a GUI version available for Linux and Un*x?</strong></a><br>
-A: <em>Yes. It is called WebHTTrack. See the download section at <a href="http://www.httrack.com">www.httrack.com!</a></em>
+A: <em>Yes. It is called WebHTTrack. See the download section at <a href="https://www.httrack.com">www.httrack.com!</a></em>
 
 <br><br>
 <u><strong>Troubleshooting:<br>
@@ -481,7 +481,7 @@ These rules, stored in a file called robots.txt, are given by the website, to sp
 - for example, /cgi-bin or large images files.
 They are followed by default by HTTrack, as it is advised. Therefore, you may miss some files that would have been downloaded without
 these rules - check in your logs if it is the case:<br>
-<tt>Info: Note: due to www.foobar.com remote robots.txt rules, links beginning with these path will be forbidden: /cgi-bin/,/images/ (see in the options to disable this)
+<tt>Info: Note: due to www.example.com remote robots.txt rules, links beginning with these path will be forbidden: /cgi-bin/,/images/ (see in the options to disable this)
 </tt>
 <br>
 If you want to disable them, just change the corresponding option in the option list! (but only disable this option with great care, 
@@ -494,12 +494,12 @@ some restricted parts of the website might be huge or not downloadable)
 A: <em>This is generally the case for top indexes (index.html and index-2.html), isn't it?
 <br>
 This is a common issue, but that can not be easily avoided!<br>
-For example, http://www.foobar.com/ and http://www.foobar.com/index.html might be the same pages. 
-But if links in the website refers both to http://www.foobar.com/ and http://www.foobar.com/index.html, these two pages will be caught.
-And because http://www.foobar.com/ must have a name, as you may want to browse the website locally (the / would give a directory listing, NOT the index itself!),
+For example, http://www.example.com/ and http://www.example.com/index.html might be the same pages. 
+But if links in the website refers both to http://www.example.com/ and http://www.example.com/index.html, these two pages will be caught.
+And because http://www.example.com/ must have a name, as you may want to browse the website locally (the / would give a directory listing, NOT the index itself!),
 HTTrack must find one. Therefore, two index.html will be produced, one with the -2 to show that the file had to be renamed.
 <br>
-It might be a good idea to consider that http://www.foobar.com/ and http://www.foobar.com/index.html are the same links, to avoid
+It might be a good idea to consider that http://www.example.com/ and http://www.example.com/index.html are the same links, to avoid
 duplicate files, isn't it?
 NO, because the top index (/) can refer to ANY filename, and if index.html is generally the default name, index.htm can be chosen,
 or index.php3, mydog.jpg, or anything you may imagine. (some webmasters are really crazy)

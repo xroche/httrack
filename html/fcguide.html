@@ -332,13 +332,13 @@ Shortcuts:
 example: httrack www.example.com/bob/
 means:   mirror site www.example.com/bob/ and only this site
 
-example: httrack www.example.com/bob/ www.anothertest.com/mike/ +*.com/*.jpg
+example: httrack www.example.com/bob/ other.example.com/mike/ +*.com/*.jpg
 means:   mirror the two sites together (with shared links) and accept any .jpg files on .com sites
 
 example: httrack www.example.com/bob/bobby.html +* -r6
 means get all files starting from bobby.html, with 6 link-depth, and possibility of going everywhere on the web
 
-example: httrack www.example.com/bob/bobby.html --spider -P proxy.myhost.com:8080
+example: httrack www.example.com/bob/bobby.html --spider -P proxy.example.com:8080
 runs the spider on www.example.com/bob/bobby.html using a proxy
 
 example: httrack --update
@@ -1880,7 +1880,7 @@ mirroring activity. This is useful for all sorts of mirror failures.
 
 <p align=justify> The catchurl option is a small application designed to
 catch difficult pages, like sites protected via formulas.  You can see
-at http://httrack.free.fr/HelpHtml/addurl.html a Windows description of
+in <a href="addurl.html">the add-URL documentation</a> a description of
 this application.  The purpose is to create a temporary proxy, that will
 catch the user request to a page, and then store this request to
 continue the mirror. For example,

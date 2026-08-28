@@ -752,12 +752,13 @@ void help(const char *app, int more) {
   infomsg("");
   infomsg("Details: Option K");
   infomsg("  K0  foo.cgi?q=45  ->  foo4B54.html?q=45 (relative URI, default)");
-  infomsg
-    ("  K                 ->  http://www.foobar.com/folder/foo.cgi?q=45 (absolute URL)");
+  infomsg("  K                 ->  http://www.example.com/folder/foo.cgi?q=45 "
+          "(absolute URL)");
   infomsg("  K3                ->  /folder/foo.cgi?q=45 (absolute URI)");
   infomsg("  K4                ->  foo.cgi?q=45 (original URL)");
-  infomsg
-    ("  K5                ->  http://www.foobar.com/folder/foo4B54.html?q=45 (transparent proxy URL)");
+  infomsg(
+      "  K5                ->  http://www.example.com/folder/foo4B54.html?q=45 "
+      "(transparent proxy URL)");
   infomsg("");
   infomsg("Shortcuts:");
   infomsg("--mirror      <URLs> *make a mirror of site(s) (default)");
@@ -787,8 +788,8 @@ void help(const char *app, int more) {
   infomsg("example: httrack www.example.com/bob/");
   infomsg("means:   mirror site www.example.com/bob/ and only this site");
   infomsg("");
-  infomsg
-    ("example: httrack www.example.com/bob/ www.anothertest.com/mike/ +*.com/*.jpg -mime:application/*");
+  infomsg("example: httrack www.example.com/bob/ other.example.com/mike/ "
+          "+*.com/*.jpg -mime:application/*");
   infomsg
     ("means:   mirror the two sites together (with shared links) and accept any .jpg files on .com sites");
   infomsg("");
@@ -796,8 +797,8 @@ void help(const char *app, int more) {
   infomsg
     ("means get all files starting from bobby.html, with 6 link-depth, and possibility of going everywhere on the web");
   infomsg("");
-  infomsg
-    ("example: httrack www.example.com/bob/bobby.html --spider -P proxy.myhost.com:8080");
+  infomsg("example: httrack www.example.com/bob/bobby.html --spider -P "
+          "proxy.example.com:8080");
   infomsg("runs the spider on www.example.com/bob/bobby.html using a proxy");
   infomsg("");
   infomsg("example: httrack --update");
