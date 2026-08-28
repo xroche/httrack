@@ -53,6 +53,14 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.50.0" date="2026-09-01">
+      <description>
+        <ul>
+          <li>The version number moves to 3.50, matching the Windows and Android releases built on this engine</li>
+          <li>WebHTTrack itself is unchanged since 3.49.25</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.49.25" date="2026-08-28">
       <description>
         <ul>

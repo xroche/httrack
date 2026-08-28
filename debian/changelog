@@ -1,3 +1,11 @@
+httrack (3.50.0-1) unstable; urgency=medium
+
+  * New upstream release.  The version moves to 3.50 to match the Windows
+    and Android front ends built on this engine; the engine itself is
+    unchanged since 3.49.25, so this upload carries no functional change.
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 01 Sep 2026 09:00:00 +0200
+
 httrack (3.49.25-1) unstable; urgency=medium
 
   * New upstream release: the About box names each language's own
