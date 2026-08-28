@@ -19,8 +19,6 @@ jobs:
   dmg:
     name: signed DMG (macOS arm64)
     runs-on: macos-15
-    permissions:
-      contents: write   # attach the DMG to the release the tag belongs to
     steps:
       - uses: actions/checkout@v7
         with:
@@ -152,31 +150,6 @@ jobs:
           name: HTTrack-macos-arm64-dmg
           path: ${{ runner.temp }}/HTTrack-*.dmg
           if-no-files-found: error
-
-      # Releases are cut by hand, so a tag lands minutes before one exists and this
-      # step used to lose that race, leaving the DMG on the artifacts where it needs
-      # a login and expires. It waits instead. A labelled build is never attached:
-      # ref_type is 'tag' for a dispatch on a tag as much as for a push.
-      - name: Attach the DMG to the release
-        if: github.ref_type == 'tag' && !inputs.label
-        timeout-minutes: 35
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # 30 min: the publish step builds and signs a dist tarball first, and a
-          # tag pushed with no release ever coming costs only this wait.
-          deadline=$((SECONDS + 1800))
-          until gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; do
-            if test "$SECONDS" -ge "$deadline"; then
-              echo "::warning::no release $GITHUB_REF_NAME after 30 min;" \
-                   "the DMG is on this run's artifacts and will expire"
-              exit 0
-            fi
-            sleep 20
-          done
-          gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP"/HTTrack-*.dmg --clobber
-          echo "attached to release $GITHUB_REF_NAME"
 
       - name: Delete the signing keychain
         if: always()
