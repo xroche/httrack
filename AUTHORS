@@ -4,8 +4,7 @@ Copyright (C) 1998-2026 Xavier Roche and other contributors
 Contact: Xavier Roche <roche@httrack.com>, https://www.httrack.com/
 
 A translator is named here and in their catalog's LANGUAGE_AUTHOR, which is what
-the About box shows; tests/372_credits.test keeps the two in step, so add new
-entries to both.
+the About box shows, so add new entries to both.
 
 Development
   Xavier Roche            project leader, engine, Windows and Linux interfaces
