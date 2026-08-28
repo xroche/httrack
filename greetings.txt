@@ -19,6 +19,7 @@ Contributors
 Documentation, artwork and packaging
   Leto Kauler             site and logo design
   Fred Cohen              HTTrack user's guide
+  Arnaud                  Android app design advice
   Christian Marillat      autoconf support and the Debian package
 
 Third-party code
