@@ -20,6 +20,7 @@ Documentation, artwork and packaging
   Leto Kauler             site and logo design
   Fred Cohen              HTTrack user's guide
   Christian Marillat      autoconf support and the Debian package
+  Arnaud                  Android design advice
 
 Third-party code
   Nicolas Benoit, SDP Multimedia and Major MMS   MMS plugin core routines (MMSRIP)
