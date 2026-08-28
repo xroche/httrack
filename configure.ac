@@ -29,8 +29,8 @@ AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:18:0: revision-only bump. hts_print_num moved out of httrack.c so a test can
-# link it, but htsbacktrace.h is not installed and no export came or went.
+# 3:18:0: revision-only bump. hts_print_num moved to htsbacktrace.c, which is not
+# in the library and whose header is not installed; no export came or went.
 # 3:17:0: revision-only bump. httrackp gained a tail field (links_unqueued) and
 # BackStatusCode two enumerators at the end (STATUSCODE_IO_FATAL, STATUSCODE_IO_ERROR);
 # no layout moved, no export came or went. This is the release that ships 3:16:0's

@@ -6,9 +6,9 @@ This file lists all changes and fixes that have been made for HTTrack
 
 3.49-25
 + Fixed: the crash report printed signal numbers with their digits reversed, so hppa's SIGBUS read as "Caught signal 01" (#1450)
-+ Fixed: every language's About box thanked one translator on behalf of all of them, beside a copyright stamped 1998-2003. Each catalog now names its own translators, and the five that credited the wrong person name the right one (#1453, #1454, #1455)
-+ Fixed: the Czech and Macedonian credit lines broke over three lines in the About box (#1457)
-+ Changed: links to httrack.com in the About box, the man pages and the documentation now use https. Three links that no longer resolve are gone, and the example hosts in --help and the documentation moved to example.com, off domains someone else owns (#1457)
++ Fixed: five catalogs credited the wrong translator in the About box and Romanian fell back to the English list. The credit now comes from each catalog's own author field, and the box drops a copyright stamped 1998-2003 and a development line that named a single Windows interface (#1453, #1454)
++ Changed: AUTHORS, greetings.txt and the contact page carry one contributor roster (#1453, #1455)
++ Changed: links to httrack.com in the About box, the man pages and the documentation use https. Two dead documentation links are repointed and one is dropped, the example hosts in --help and the documentation moved to example.com off domains someone else owns, and the README names macOS and Android where it described a Windows 2000/XP/Vista/Seven release (#1457)
 + Changed: multiple internal test and build improvements (#1451, #1452, #1456)
 
 3.49-24
