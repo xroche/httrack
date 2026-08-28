@@ -1237,7 +1237,6 @@ HTSEXT_API char *hts_getcategory(const char *filename) {
   return StringBuffRW(categ);
 }
 
-/* Note: NOT utf-8 */
 HTSEXT_API char *hts_getcategories(char *path, int type) {
   String categ = STRING_EMPTY;
   String profiles = STRING_EMPTY;

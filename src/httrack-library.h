@@ -311,13 +311,15 @@ HTSEXT_API int hts_buildtopindex(httrackp *opt, const char *path,
 /** Scan every mirror project under @p path and return a CRLF-separated list:
     @p type==1 gives the distinct category names, any other value gives the
     project directory names. The result is heap-allocated and owned by the
-   caller (free with freet()); it may be NULL. Not UTF-8. @p path is modified in
-   place (a trailing '/' is stripped). */
+    caller (free with freet()); it may be NULL. @p path is modified in place (a
+    trailing '/' is stripped). Verbatim bytes: UTF-8, except on Windows, where
+    the ANSI codepage reaches winprofile.ini and the directory names alike. */
 HTSEXT_API char *hts_getcategories(char *path, int type);
 
 /** Read the `category=` value from a winprofile.ini file. The result is
     heap-allocated and owned by the caller (free with freet()), or NULL when the
-    file is missing or has no category line. Not UTF-8. */
+    file is missing or has no category line. Verbatim bytes: UTF-8, except on
+    Windows, where WinHTTrack still writes the local ANSI codepage. */
 HTSEXT_API char *hts_getcategory(const char *filename);
 
 /* Catch-URL */

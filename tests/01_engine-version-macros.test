@@ -11,7 +11,8 @@ h="$src/htsglobal.h"
 rc="$src/version.rc"
 ac="$top/configure.ac"
 metainfo="$top/html/server/div/com.httrack.WebHTTrack.metainfo.xml"
-for f in "$h" "$rc" "$ac" "$metainfo"; do
+vcpkg="$src/vcpkg.json"
+for f in "$h" "$rc" "$ac" "$metainfo" "$vcpkg"; do
     [ -f "$f" ] || {
         echo "cannot find $f"
         exit 1
@@ -33,14 +34,20 @@ rc_fileversion=$(sed -n 's/.*VALUE "FileVersion",[[:space:]]*"\([^"]*\)".*/\1/p'
 rc_productversion=$(sed -n 's/.*VALUE "ProductVersion",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
 rc_productname=$(sed -n 's/.*VALUE "ProductName",[[:space:]]*"\([^"]*\)".*/\1/p' "$rc")
 
-# And again in configure.ac and the AppStream metainfo.
+# And again in configure.ac, the AppStream metainfo and the vcpkg manifest.
 ac_version=$(sed -n 's/^AC_INIT(\[[^]]*\],[[:space:]]*\[\([^]]*\)\].*/\1/p' "$ac")
+# vcpkg pins major.minor only, so a patch release keeps the windows-build cache warm.
+vcpkg_version=$(sed -n 's/.*"version-string"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$vcpkg")
 # Comments dropped, one tag per line: a parked <release> or a version= on the
 # <releases> wrapper would otherwise pose as the newest entry.
 releases=$(sed 's/<!--.*-->//g' "$metainfo" | tr '<' '\n' |
     sed -n 's/^release[[:space:]][^>]*version="\([^"]*\)".*/\1/p')
 if [ -z "$ac_version" ]; then
     echo "could not read the version from $ac"
+    exit 1
+fi
+if [ -z "$vcpkg_version" ]; then
+    echo "could not read the version-string from $vcpkg"
     exit 1
 fi
 if [ -z "$releases" ]; then
@@ -101,6 +108,7 @@ while read -r f; do
 done <<<"$rc_files"
 
 check "the configure.ac AC_INIT version" "$versionid" "$ac_version"
+check "the vcpkg.json version-string" "${versionid%.*}" "$vcpkg_version"
 check "the newest metainfo release" "$versionid" "$(echo "$releases" | head -n 1)"
 
 # The check above trusts head -1, so require the list to actually descend.
@@ -123,4 +131,4 @@ case "$out" in
     ;;
 esac
 
-echo "version.rc, configure.ac and the metainfo agree with htsglobal.h: $version ($expected_numeric)"
+echo "version.rc, configure.ac, the metainfo and vcpkg.json agree with htsglobal.h: $version ($expected_numeric)"

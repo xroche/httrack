@@ -851,6 +851,28 @@ if [ -n "$undef" ]; then
     fail=1
 fi
 
+# "\r \n" renders as a break, a space, then a second break, and the space is
+# what a reader sees; the About box shows LANGUAGE_AUTHOR verbatim.
+split_pairs() { # $1 = catalog, $2 = display name
+    LC_ALL=C awk -v name="$2" '
+        { sub(/\r$/, "") }
+        NR % 2 == 0 && /\\r[ \t]+\\n/ {
+            printf "%s: line %d has whitespace inside a CR/LF escape pair\n", name, NR
+        }
+    ' "$1"
+}
+printf 'K1\nv \\r \\n\nK2\nv \\r\\n\n' >"$tmp/split.txt"
+got=$(split_pairs "$tmp/split.txt" split.txt)
+[ "$got" = "split.txt: line 2 has whitespace inside a CR/LF escape pair" ] ||
+    fail "the split-pair check misreads a known fixture: [$got]"
+for f in "$langdir"/*.txt; do
+    out=$(split_pairs "$f" "${f##*/}")
+    [ -z "$out" ] || {
+        printf '%s\n' "$out"
+        fail=1
+    }
+done
+
 [ "$fail" -eq 0 ] || exit 1
 
 echo "$nfiles language files consistent with $nkeys English msgids"

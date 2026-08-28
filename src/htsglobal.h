@@ -243,7 +243,7 @@ Please visit our Website: http://www.httrack.com
 #define HTS_DEFAULT_USER_AGENT                                                 \
   "Mozilla/5.0 (compatible; HTTrack/" HTTRACK_AFF_VERSION                      \
   "; +https://www.httrack.com/)"
-#define HTTRACK_WEB "http://www.httrack.com"
+#define HTTRACK_WEB "https://www.httrack.com"
 /* Language=%s takes the catalog basename (LANGUAGE_FILE), an ASCII identifier;
    LANGUAGE_NAME is a localized display string in a legacy codepage (#1353). */
 #define HTS_UPDATE_WEBSITE                                                     \

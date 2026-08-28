@@ -2540,7 +2540,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             if ((na + 1 >= argc) || (argv[na + 1][0] == '-')) {
               HTS_PANIC_PRINTF
                 ("Option P needs to be followed by a blank space, and a proxy proxy:port or user:id@proxy:port");
-              printf("Example: -P proxy.myhost.com:8080\n");
+              printf("Example: -P proxy.example.com:8080\n");
               htsmain_free();
               return -1;
             } else {

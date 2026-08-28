@@ -5,7 +5,7 @@ Cesky
 LANGUAGE_ISO
 cs
 LANGUAGE_AUTHOR
-Antonín Matějčík (matejcik@volny.cz) \r \n
+Antonín Matějčík (matejcik@volny.cz) \r\n
 LANGUAGE_WINDOWSID
 Czech
 OK
