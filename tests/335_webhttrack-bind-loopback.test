@@ -30,16 +30,17 @@ PY
 # A function, not a heredoc inside $(): bash 3.2 runs that one as commands.
 primary_ipv4() {
     htsserver_python - <<'PY'
-import socket
+import ipaddress, socket
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 try:
     s.connect(("192.0.2.1", 9))  # TEST-NET-1, never routed
-    ip = s.getsockname()[0]
-except OSError:
-    ip = ""
+    ip = ipaddress.ip_address(s.getsockname()[0])
+except (OSError, ValueError):
+    ip = None
 finally:
     s.close()
-print("" if ip.startswith("127.") else ip)
+# A loopback-only netns with a default route (mock's buildroot) answers 0.0.0.0.
+print("" if ip is None or ip.is_loopback or ip.is_unspecified else ip)
 PY
 }
 
