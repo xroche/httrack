@@ -26,29 +26,45 @@ except OSError as e:
 PY
 }
 
-# The primary outbound IPv4, which a UDP connect() picks without sending a byte.
+# The primary outbound IPv4, which a UDP connect() picks without sending a byte,
+# or the classification of $1 when given one, so the guard below is checkable.
 # A function, not a heredoc inside $(): bash 3.2 runs that one as commands.
-primary_ipv4() {
-    htsserver_python - <<'PY'
-import ipaddress, socket
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+primary_ipv4() { # [address]
+    htsserver_python - ${1+"$1"} <<'PY'
+import ipaddress, socket, sys
+if len(sys.argv) > 1:
+    raw = sys.argv[1]
+else:
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("192.0.2.1", 9))  # TEST-NET-1, never routed
+        raw = s.getsockname()[0]
+    except OSError:
+        raw = ""
+    finally:
+        s.close()
 try:
-    s.connect(("192.0.2.1", 9))  # TEST-NET-1, never routed
-    ip = ipaddress.ip_address(s.getsockname()[0])
-except (OSError, ValueError):
+    ip = ipaddress.ip_address(raw)
+except ValueError:
     ip = None
-finally:
-    s.close()
-# A loopback-only netns with a default route (mock's buildroot) answers 0.0.0.0.
+# 0.0.0.0 is what Fedora's mock answers: its buildroot is a loopback-only
+# namespace, but it carries a default route, so the connect above succeeds.
 print("" if ip is None or ip.is_loopback or ip.is_unspecified else ip)
 PY
 }
 
+# Taking the wildcard for an address was #1463; taking nothing would drop the
+# widening half in silence.
+for unusable in 0.0.0.0 127.0.0.1 127.9.9.9 ''; do
+    test -z "$(primary_ipv4 "${unusable}")" || fail "primary_ipv4 accepts ${unusable}"
+done
+test "$(primary_ipv4 198.51.100.7)" = 198.51.100.7 ||
+    fail "primary_ipv4 rejects a routable address"
+
 addr=$(primary_ipv4)
-test -n "${addr}" || skip "no non-loopback IPv4 address here"
 
 # Without this control a refusal below could just mean the box filters ${addr}.
-htsserver_python - "${addr}" <<'PY' || skip "cannot bind and reach ${addr} here"
+if test -n "${addr}" && ! htsserver_python - "${addr}" <<'PY'; then
 import socket, sys
 try:
     srv = socket.socket()
@@ -59,17 +75,24 @@ try:
 except OSError as e:
     sys.exit(str(e))
 PY
+    echo "cannot bind and reach ${addr} here" >&2
+    addr=
+fi
 
-port=$(htsserver_freeport)
-htsserver_start --port "${port}" --home "${work}/wide" -- --bind "${addr}"
-case ${HTS_URL} in
-*"//${addr}:"*) ;;
-*) fail "--bind ${addr} advertised ${HTS_URL}" ;;
-esac
-got=$(probe "${addr}" "${port}")
-test "${got}" = ok || fail "--bind ${addr} did not answer on ${addr} (${got})"
-echo "ok: --bind ${addr} widens the socket"
-htsserver_stop
+if test -n "${addr}"; then
+    port=$(htsserver_freeport)
+    htsserver_start --port "${port}" --home "${work}/wide" -- --bind "${addr}"
+    case ${HTS_URL} in
+    *"//${addr}:"*) ;;
+    *) fail "--bind ${addr} advertised ${HTS_URL}" ;;
+    esac
+    got=$(probe "${addr}" "${port}")
+    test "${got}" = ok || fail "--bind ${addr} did not answer on ${addr} (${got})"
+    echo "ok: --bind ${addr} widens the socket"
+    htsserver_stop
+else
+    echo "no non-loopback IPv4 here: the widening half did not run" >&2
+fi
 
 port=$(htsserver_freeport)
 htsserver_start --port "${port}" --home "${work}/default"
@@ -81,10 +104,20 @@ case ${HTS_URL} in
 esac
 got=$(probe 127.0.0.1 "${port}")
 test "${got}" = ok || fail "the default run refused 127.0.0.1 (${got})"
-got=$(probe "${addr}" "${port}")
-test "${got}" = ConnectionRefusedError ||
-    fail "the default run answers on ${addr} (${got})"
-echo "ok: the default socket is loopback-only"
+echo "ok: the default socket answers on 127.0.0.1"
+if test -n "${addr}"; then
+    got=$(probe "${addr}" "${port}")
+    test "${got}" = ConnectionRefusedError ||
+        fail "the default run answers on ${addr} (${got})"
+    # A dead server refuses too, so the refusal counts only while it is up.
+    got=$(probe 127.0.0.1 "${port}")
+    test "${got}" = ok || fail "the default run died before the refusal (${got})"
+    echo "ok: and refuses ${addr}"
+fi
+htsserver_stop
+
+# A leaked server wedges the parallel harness behind a green log.
+htsserver_assert_reaped
 
 htsserver_cleanup_dir "${work}"
 echo "PASS"
