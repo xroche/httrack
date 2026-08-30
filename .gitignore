@@ -24,6 +24,8 @@ Makefile.in
 /config.log
 /config.status
 /stamp-h1
+/htsfeatures.h
+/stamp-h2
 # src/webhttrack.in is the source; an in-tree build generates this one (#887).
 /src/webhttrack
 /src/libhttrack.pc

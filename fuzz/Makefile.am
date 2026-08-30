@@ -6,6 +6,7 @@ noinst_PROGRAMS = fuzz-charset fuzz-meta fuzz-idna fuzz-entities \
 endif
 
 AM_CPPFLAGS = \
+	-DHTS_INTERNAL_BUILD \
 	@DEFAULT_CFLAGS@ \
 	@THREADS_CFLAGS@ \
 	@V6_FLAG@ \

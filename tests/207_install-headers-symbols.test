@@ -142,9 +142,7 @@ probed=0
 leaks=()
 for h in "${headers[@]}"; do
     b=$(basename "$h")
-    # config.h first, as a consumer must: it is what turns HTS_USEOPENSSL on, and
-    # without it htsbasenet.h preprocesses its OpenSSL half away.
-    printf '#include <httrack/config.h>\n#include <httrack/%s>\n' "$b" >"$tmp/tu.c"
+    printf '#include <httrack/%s>\n' "$b" >"$tmp/tu.c"
     "${cc_argv[@]}" "${cpp_argv[@]}" -UHTS_INTERNAL_BYTECODE -E -o "$tmp/tu.i" "$tmp/tu.c" \
         2>"$tmp/cc.log" || {
         head -5 "$tmp/cc.log" >&2
@@ -154,7 +152,7 @@ for h in "${headers[@]}"; do
     while read -r sym; do
         [ -n "$sym" ] || continue
         {
-            printf '#include <httrack/config.h>\n#include <httrack/%s>\n' "$b"
+            printf '#include <httrack/%s>\n' "$b"
             probe_body "$sym"
         } >"$tmp/probe.c"
         # Undeclared means the header never put it on the consumer's surface.
