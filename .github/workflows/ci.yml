@@ -212,6 +212,50 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # Reproduces an rpm or deb buildroot: loopback alone, but carrying a default
+  # route and no resolver, where a UDP connect succeeds and names no source at
+  # all. Reading that wildcard as an address was #1463.
+  buildroot-network:
+    name: build (rpm/deb buildroot network)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev iproute2
+
+      - name: Configure
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test on the network a buildroot has
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          tools/buildroot-net.sh make check -j"$jobs"
+          # Only the widening half needs an address the namespace lacks, so a
+          # run that never reached the loopback half proves nothing.
+          cat tests/335_webhttrack-bind-loopback.log
+          grep -q 'the default socket answers on 127.0.0.1' \
+            tests/335_webhttrack-bind-loopback.log
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
   # The Ubuntu buildds run a development release every runner above is well behind.
   # That gap is what shipped 3.49.18 broken on every Ubuntu architecture but
   # riscv64, when 25.10 made uutils the default coreutils (#1042).
