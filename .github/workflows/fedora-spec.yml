@@ -84,8 +84,11 @@ jobs:
           # the only place left to read it. A %check that skipped almost
           # everything still exits 0, and a canary that green-lights an untested
           # tree is worse than none: a python3-less container passes 212.
-          grep -E '^# (TOTAL|PASS|SKIP|FAIL):' build.log
-          passed=$(sed -n 's/^# PASS: *\([0-9]*\).*/\1/p' build.log | tail -1)
+          grep -E '^# (TOTAL|PASS|SKIP|FAIL):' build.log ||
+            { echo "no testsuite summary: %check did not run" >&2; exit 1; }
+          # The largest banner, not the last: a second one would otherwise read
+          # as a collapse and red the job for the wrong reason.
+          passed=$(sed -n 's/^# PASS: *\([0-9]*\).*/\1/p' build.log | sort -n | tail -1)
           test "${passed:-0}" -ge 250 || {
             echo "only ${passed:-0} tests passed; the suite barely ran" >&2
             exit 1
