@@ -6878,9 +6878,8 @@ static int st_pathbin(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-// -#test=instpaths: the compiled-in install paths, which have to follow
-// configure's directories and not a hardcoded /usr (Termux patched them by
-// hand).
+// -#test=instpaths: the compiled-in install paths, which must follow configure
+// rather than the hardcoded /usr Termux patched by hand.
 static int st_instpaths(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;

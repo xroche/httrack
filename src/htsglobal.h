@@ -179,9 +179,9 @@ Please visit our Website: http://www.httrack.com
 
 /* Install paths and config-file names. HTTRACKRC is the per-user rc filename,
    HTTRACKCNF the system-wide config, HTTRACKDIR the shared data directory; the
-   ETC/BIN/LIB/PREFIX paths follow the directories configure was given, and fall
-   back to the literals for a build that defines none (MSVC, or a consumer
-   including this header on its own). */
+   ETC/BIN/LIB/PREFIX paths follow the directories configure was given. A build
+   that defines none (MSVC, or a consumer including this header standalone)
+   falls back to the literals. */
 #ifdef _WIN32
 #define HTS_HTTRACKRC "httrackrc"
 #else
