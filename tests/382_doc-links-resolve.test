@@ -1,0 +1,84 @@
+#!/bin/bash
+#
+# The doc pages ship in a directory whose depth is the packager's --htmldir
+# choice, so a relative link that resolves in one layout dangles in another and
+# nothing but a staged install can tell them apart.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${abs_top_builddir:?not run under make check}"
+htmlsrc="${abs_top_srcdir:?not run under make check}/html"
+htmldir=${CONFIGURED_HTMLDIR:?not run under make check}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/doclinks.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+stage=${work}/stage
+if ! env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir}" \
+    install DESTDIR="${stage}" >"${work}/install.log" 2>&1; then
+    dump_file "${work}/install.log"
+    skip "cannot stage an install, so no layout to resolve against"
+fi
+
+root=${stage}${htmldir}
+test -d "${root}" || skip "nothing staged in ${htmldir}"
+
+# Lexical and relative to the stage root: a link names a path in the shipped
+# tree, and a ".." that walks off the top has left the package.
+resolve() { # resolve DIR LINK, both relative to ${stage}
+    local rest=$1/$2 out='' part
+    while [ -n "${rest}" ]; do
+        part=${rest%%/*}
+        if [ "${part}" = "${rest}" ]; then rest=; else rest=${rest#*/}; fi
+        case ${part} in
+        '' | .) ;;
+        ..)
+            case ${out} in
+            */*) out=${out%/*} ;;
+            ?*) out= ;;
+            *) return 1 ;;
+            esac
+            ;;
+        *) out=${out:+${out}/}${part} ;;
+        esac
+    done
+    printf '%s\n' "${out}"
+}
+
+pages=0
+links=0
+bad=0
+while IFS= read -r page; do
+    rel=${page#"${root}/"}
+    # Only the html/ pages: a docdir stub such as httrack-doc.html points at the
+    # *other* directory, and the default layout collapsing the two lands it here.
+    test -e "${htmlsrc}/${rel}" || continue
+    pages=$((pages + 1))
+    dir=${page%/*}
+    dir=${dir#"${stage}/"}
+    while IFS= read -r attr; do
+        link=${attr#*[\"\']}
+        link=${link%?}
+        link=${link%%#*}
+        link=${link%%\?*}
+        case ${link} in
+        # An anchor, a server URL, a scheme: none of them name a shipped file.
+        '' | /* | *:*) continue ;;
+        esac
+        links=$((links + 1))
+        if ! target=$(resolve "${dir}" "${link}") || [ ! -e "${stage}/${target}" ]; then
+            echo "  ${page#"${stage}"}: ${link}" >&2
+            bad=$((bad + 1))
+        fi
+    done < <(LC_ALL=C grep -Eio "(href|src)[[:space:]]*=[[:space:]]*[\"'][^\"']*[\"']" "${page}" || true)
+done < <(find "${root}" -name '*.html' | LC_ALL=C sort)
+
+test "${pages}" -gt 0 || fail "no pages staged under ${htmldir}"
+# A filter that dropped everything would pass on a tree of dead links.
+test "${links}" -gt 0 || fail "no relative links found across ${pages} pages"
+test "${bad}" -eq 0 || fail "${bad} of ${links} relative links dangle in ${htmldir}"
+
+echo "${links} relative links across ${pages} pages resolve in ${htmldir}"
