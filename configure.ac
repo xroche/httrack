@@ -28,6 +28,9 @@ Please visit our Website: http://www.httrack.com
 AC_CONFIG_SRCDIR(src/httrack.c)
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS(config.h)
+# The public half of config.h: the switches the installed headers read, in a
+# header we can install without handing a consumer our PACKAGE_* and HAVE_*.
+AC_CONFIG_HEADERS([htsfeatures.h:src/htsfeatures.h.in])
 AM_INIT_AUTOMAKE([subdir-objects])
 # 3:19:0: revision-only bump for the 3.50.0 release; only the version macro moved,
 # the engine is untouched since 3.49.25.

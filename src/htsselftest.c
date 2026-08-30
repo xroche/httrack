@@ -12897,6 +12897,32 @@ static int st_ioexact(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* The library's own view of the structs HTS_INET6 and HTS_USEOPENSSL shape.
+   381 diffs it against a consumer compiled from the installed headers alone. */
+static int st_pubheaders(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+#define PUBH_SIZE(t) printf("sizeof %s = %lu\n", #t, (unsigned long) sizeof(t))
+#define PUBH_OFF(t, f)                                                         \
+  printf("offsetof %s.%s = %lu\n", #t, #f, (unsigned long) offsetof(t, f))
+  PUBH_SIZE(SOCaddr);
+  PUBH_SIZE(INTsys);
+  PUBH_SIZE(htsblk);
+  PUBH_OFF(htsblk, soc);
+  PUBH_OFF(htsblk, address);
+  PUBH_OFF(htsblk, fp);
+  PUBH_OFF(htsblk, lastmodified);
+  PUBH_OFF(htsblk, etag);
+  PUBH_OFF(htsblk, debugid);
+  PUBH_SIZE(httrackp);
+  printf("HTS_INET6 = %d\n", (int) HTS_INET6);
+  printf("HTS_USEOPENSSL = %d\n", (int) HTS_USEOPENSSL);
+#undef PUBH_SIZE
+#undef PUBH_OFF
+  return 0;
+}
+
 /* ------------------------------------------------------------ */
 /* Registry: name -> handler, with a usage hint and a one-line description. */
 /* ------------------------------------------------------------ */
@@ -12988,6 +13014,9 @@ static const struct selftest_entry {
     {"arrays", "[overflow-capa|overflow-loop]",
      "htsarrays.h growth reaches the requested room, overflow aborts",
      st_arrays},
+    {"pubheaders", "",
+     "layout of the installed structs configure's switches decide",
+     st_pubheaders},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
     {"lastchar", "",
      "last-char helpers never index before the buffer (#770, #781, #821)",

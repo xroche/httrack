@@ -3,5 +3,3 @@
 # Both are pointed hints with an empty match context, so match with '*'.
 libhttrack-dev: hardening-no-fortify-functions *
 libhttrack-dev: package-contains-documentation-outside-usr-share-doc *
-# config.h is installed as a public dev header; the package-name match is expected.
-libhttrack-dev: package-name-defined-in-config-h usr/include/httrack/config.h

@@ -124,8 +124,9 @@ else
     [ "${#declared[@]}" -ge 10 ] ||
         fail "read only ${#declared[@]} headers out of DevIncludes_DATA, the parse is wrong"
     # An entry outside src/ is a build product: it comes from the build tree or
-    # not at all. MSVC generates no config.h, which htsglobal.h includes on its
-    # POSIX branch only. Never $srcdir/src/../, which would stage a stray file.
+    # not at all. MSVC runs no configure, so the htsfeatures.h that htsglobal.h
+    # reads on its POSIX branch is absent there. Never $srcdir/src/../, which
+    # would stage a stray file.
     absent=()
     for h in "${declared[@]}"; do
         case $h in
