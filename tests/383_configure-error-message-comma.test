@@ -1,0 +1,55 @@
+#!/bin/bash
+#
+# Three AC_MSG_ERROR() calls in configure.ac passed an unquoted message
+# containing a comma, so m4 read everything after it as a second argument
+# and printed only the tail (e.g. "yes/no/auto" instead of the full
+# sentence), alongside bash errors from the mangled macro expansion.
+# Checks the full message, not just that configure fails: it fails either way.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+configure="${abs_top_srcdir:-}/configure"
+test -r "$configure" || skip "no configure script at ${configure:-<unset>}; tests/Makefile.am must export abs_top_srcdir"
+
+tmp=$(mktemp -d)
+cleanup_push rm -rf "$tmp"
+mkdir "$tmp/src"
+
+# Symlink farm, not the real srcdir: an in-tree config.status makes autoconf refuse it.
+for f in "$abs_top_srcdir"/*; do
+    case "${f##*/}" in
+    config.status | config.log | config.h | stamp-h1 | Makefile) continue ;;
+    esac
+    ln -s "$f" "$tmp/src/"
+done
+
+# run_bad NAME EXPECTED_MSG FLAG...: runs configure with FLAG..., asserts it
+# fails with EXPECTED_MSG intact and no bash error text leaking alongside.
+run_bad() {
+    local name=$1 expect=$2 log out status
+    shift 2
+    log="$tmp/$name.log"
+    mkdir "$tmp/bld-$name"
+    status=0
+    (cd "$tmp/bld-$name" && bash "$tmp/src/configure" "$@") >"$log" 2>&1 || status=$?
+    test "$status" -eq 1 || fail_dump "configure --$name exited $status, want 1" "$log"
+    out=$(<"$log")
+    grep -qF "configure: error: $expect" <<<"$out" ||
+        fail_dump "configure --$name did not print the full message '$expect'" "$log"
+    grep -qE '^[^:]*configure: line [0-9]+:' <<<"$out" &&
+        fail_dump "configure --$name leaked a bash error alongside the message" "$log"
+    return 0
+}
+
+# --disable-https skips the OpenSSL probes so the other two reach their own
+# check quickly; https itself is checked first, before any flag matters.
+run_bad https "bad value for https, expected yes/no/auto" \
+    --enable-https=maybe
+run_bad online-unit-tests "bad value for online-unit-tests, expected yes/no/auto" \
+    --disable-https --enable-online-unit-tests=maybe
+run_bad fuzzers "bad value for fuzzers, expected yes/no" \
+    --disable-https --enable-fuzzers=maybe
+
+echo "all three AC_MSG_ERROR messages reach the user intact"
