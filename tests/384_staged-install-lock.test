@@ -1,0 +1,103 @@
+#!/bin/bash
+#
+# A top-level "make install" relinks the libtest plugins inside the build tree the
+# suite shares, so two staged installs at once lose a .so. Assert the lock that
+# serialises them excludes, reclaims a dead holder's, and is taken by every test.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/installlock.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+export INSTALL_LOCK_DIR="${work}/lock"
+TESTLIB=$(cd "$(dirname "$0")" && pwd)/testlib.sh
+export TESTLIB
+export BARRIER="${work}/go"
+export SECTIONS="${work}/sections"
+workers=4
+
+# One process per worker, not a subshell: the lock is owned by a pid, and a
+# subshell inherits $$.
+worker="${work}/worker.sh"
+cat >"${worker}" <<'EOF'
+set -u
+# shellcheck source=tests/testlib.sh
+. "${TESTLIB}"
+section() {
+    printf 'IN %s\n' "$$" >>"${SECTIONS}"
+    sleep 0.5
+    printf 'OUT %s\n' "$$" >>"${SECTIONS}"
+}
+until test -e "${BARRIER}"; do sleep 0.05; done
+if test "${USE_LOCK}" = 1; then
+    with_install_lock section
+else
+    section
+fi
+EOF
+
+# Started together so their sections must overlap, then read back as a sequence:
+# with the lock every OUT follows its own IN, without it they interleave.
+run_workers() { # run_workers 0|1
+    local i p pids=()
+    rm -f "${BARRIER}" "${SECTIONS}"
+    : >"${SECTIONS}"
+    for ((i = 0; i < workers; i++)); do
+        USE_LOCK=$1 bash "${worker}" &
+        pids+=($!)
+    done
+    touch "${BARRIER}"
+    for p in "${pids[@]}"; do wait "${p}" || fail "worker ${p} failed"; done
+    test "$(lines_of "${SECTIONS}")" -eq $((workers * 2)) ||
+        fail "wanted $((workers * 2)) section lines, got $(lines_of "${SECTIONS}")"
+}
+
+serialised() {
+    awk '{ if (NR % 2) { want = ($1 == "IN"); pid = $2 }
+           else { want = ($1 == "OUT" && $2 == pid) }
+           if (!want) exit 1 }' "${SECTIONS}"
+}
+
+# The control first: a probe blind to the unlocked interleaving would pass on a
+# lock that does not lock.
+run_workers 0
+serialised &&
+    skip "${workers} unlocked sections did not overlap, so this box cannot show the race"
+ok "unlocked, the critical sections interleave"
+
+run_workers 1
+serialised || fail "the lock let two sections overlap: $(tr '\n' ' ' <"${SECTIONS}")"
+ok "the lock serialises concurrent holders"
+
+# A holder killed before its cleanup ran must not wedge the suite.
+sh -c 'exit 0' &
+dead=$!
+wait "${dead}" || true
+mkdir "${INSTALL_LOCK_DIR}"
+printf '%s\n' "${dead}" >"${INSTALL_LOCK_DIR}/pid"
+start=${SECONDS}
+with_install_lock true || fail "could not reclaim a dead holder's lock"
+test $((SECONDS - start)) -le 5 ||
+    fail "reclaiming a dead holder's lock took $((SECONDS - start))s"
+test ! -d "${INSTALL_LOCK_DIR}" || fail "the lock outlived its holder"
+ok "a dead holder's lock is reclaimed and released"
+
+# File-level, not line-level: the raw call 376 carried wrapped its DESTDIR onto
+# the next line, where a one-line pattern cannot see it.
+cd "${srcdir}/tests"
+stages_an_install() { grep -qE '^[[:space:]]*[^#[:space:]].*DESTDIR' "$1"; }
+for t in [0-9]*_*.test; do
+    stages_an_install "${t}" || continue
+    grep -q stage_install_ "${t}" ||
+        fail "${t} stages an install without stage_install_target"
+done
+echo 'make -C build install DESTDIR=/tmp/stage' >"${work}/dirty"
+if ! stages_an_install "${work}/dirty" || grep -q stage_install_ "${work}/dirty"; then
+    fail "the lint cannot see a staged install that skips the lock"
+fi
+ok "every staged install goes through the lock"

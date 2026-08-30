@@ -15,8 +15,8 @@ builddir="${abs_top_builddir:?not run under make check}"
 work=$(mktemp -d "${TMPDIR:-/tmp}/docassets.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
-make -C "${builddir}/html" install DESTDIR="${work}/inst" >"${work}/log" 2>&1 ||
-    fail "make install failed: $(tail -3 "${work}/log")"
+stage_install_target install "${work}/inst" "${work}/log" html ||
+    fail "make -C html install failed"
 make -C "${builddir}/html" distdir distdir="${work}/dist" \
     top_distdir="${work}/dist" >>"${work}/log" 2>&1 ||
     fail "make distdir failed: $(tail -3 "${work}/log")"

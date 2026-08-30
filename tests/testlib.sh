@@ -436,12 +436,64 @@ expect_ok() {
     esac
 }
 
-# Run src/ install target $1 into DESTDIR $2, logging to $3. The configured prefix
-# survives DESTDIR, so libtool will not relink the build the rest of the suite runs
-# against; MAKEFLAGS and MAKELEVEL cleared, no jobserver to hunt.
+# A staged install writes to its own DESTDIR but runs make in the ONE build tree
+# the suite shares, and a top-level "make install" relinks each libtest plugin in
+# place: two at once and one moves away the .so the other is mid-move on, leaving
+# the tree short a file make will not rebuild. mkdir is the portable atomic
+# claim, macOS having no flock(1).
+: "${INSTALL_LOCK_DIR:=${abs_top_builddir:-.}/.install-lock}"
+# Seconds. Backstop for a holder killed between its mkdir and its pid file; any
+# later death the pid check sees at once.
+: "${INSTALL_LOCK_TIMEOUT:=300}"
+
+# An unreadable pid file means the holder has yet to write it: assume alive.
+install_lock_holder_alive() {
+    local pid
+    pid=$(cat "${INSTALL_LOCK_DIR}/pid" 2>/dev/null) || return 0
+    test -n "${pid}" || return 0
+    kill -0 "${pid}" 2>/dev/null
+}
+
+# Ownership-checked: the copy cleanup_push runs later must not drop a lock some
+# other test has since taken.
+install_lock_release() {
+    test -d "${INSTALL_LOCK_DIR}" || return 0
+    test "$(cat "${INSTALL_LOCK_DIR}/pid" 2>/dev/null)" = "$$" || return 0
+    rm -rf "${INSTALL_LOCK_DIR}"
+}
+
+install_lock_acquire() {
+    local waited=0
+    until mkdir "${INSTALL_LOCK_DIR}" 2>/dev/null; do
+        if ! install_lock_holder_alive ||
+            test $((waited / 10)) -ge "${INSTALL_LOCK_TIMEOUT}"; then
+            rm -rf "${INSTALL_LOCK_DIR}"
+            waited=0
+        fi
+        sleep 0.1
+        waited=$((waited + 1))
+    done
+    printf '%s\n' "$$" >"${INSTALL_LOCK_DIR}/pid"
+    cleanup_push install_lock_release
+}
+
+# Run one command against the shared build tree, alone.
+with_install_lock() { # with_install_lock CMD ARG...
+    local rc=0
+    install_lock_acquire
+    "$@" || rc=$?
+    install_lock_release
+    return "${rc}"
+}
+
+# Run install target $1 into DESTDIR $2, logging to $3, from build directory $4
+# below the top (src/ by default). The configured prefix survives DESTDIR, so the
+# staged tree is the real layout; MAKEFLAGS and MAKELEVEL cleared, no jobserver to
+# hunt.
 stage_install_target() {
-    local target=$1 dest=$2 log=$3
-    env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir:?}/src" \
+    local target=$1 dest=$2 log=$3 dir=${4:-src}
+    with_install_lock env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" \
+        -C "${abs_top_builddir:?}/${dir}" \
         "${target}" DESTDIR="${dest}" >"${log}" 2>&1 && return 0
     cat "${log}" >&2
     return 1

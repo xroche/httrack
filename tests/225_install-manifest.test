@@ -30,11 +30,8 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/manifest.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 stage=${work}/stage
-env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir}" \
-    install DESTDIR="${stage}" >"${work}/install.log" 2>&1 || {
-    cat "${work}/install.log" >&2
+stage_install_target install "${stage}" "${work}/install.log" . ||
     fail "make install DESTDIR=${stage}"
-}
 
 # Fold the configured directories back to tokens so the pin survives any --prefix
 # or --libdir. Longest path first, so a nested directory beats the one it sits in
