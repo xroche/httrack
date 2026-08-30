@@ -1,0 +1,102 @@
+# Fedora patches files we ship before running our suite, and a patch that
+# corrupts one only surfaces when a packager reports it: the %prep iconv of
+# html/contact.html double-encoded it from 3.49.18 to #1463. This builds master
+# through their own spec so we hear it first. Their tree, so a red here can be
+# theirs to fix, which is why it blocks nothing.
+name: fedora spec canary
+
+on:
+  schedule:
+    - cron: "43 5 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rpmbuild:
+    name: rpmbuild against Fedora's spec
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    container: fedora:latest
+    steps:
+      - name: Install rpm tooling
+        run: |
+          set -euo pipefail
+          # redhat-rpm-config carries the rpmautospec macros the spec's
+          # %autorelease needs, dnf5-plugins the builddep command, and python3
+          # most of the suite. None ride the container image.
+          dnf -y install --setopt=install_weak_deps=False \
+            git-core rpm-build redhat-rpm-config dnf5-plugins python3 \
+            sudo tar gzip curl
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Fetch the spec and point it at this tree
+        run: |
+          set -euo pipefail
+          # The workspace is owned by the host runner uid and we are root here,
+          # so every git call below trips "dubious ownership" (ci.yml does the
+          # same for its container jobs).
+          git config --global --add safe.directory "*"
+          curl -fsSL -o httrack.spec \
+            https://src.fedoraproject.org/rpms/httrack/raw/rawhide/f/httrack.spec
+          ver=$(sed -n 's/.*HTTRACK_VERSIONID "\([^"]*\)".*/\1/p' src/htsglobal.h)
+          coucal=$(git -C src/coucal rev-parse HEAD)
+          test -n "$ver" && test -n "$coucal"
+          # Their pinned coucal is not what we build against, and a drift there
+          # would red this job for a reason the spec did not cause.
+          sed -i -e "s/^Version:.*/Version:        $ver/" \
+            -e "s/^%global coucal_commit .*/%global coucal_commit $coucal/" httrack.spec
+          echo "ver=$ver" >> "$GITHUB_ENV"
+
+      - name: Build the sources the spec expects
+        run: |
+          set -euo pipefail
+          mkdir -p ~/rpmbuild/SOURCES "exp/httrack-${ver}"
+          git archive HEAD | tar -x -C "exp/httrack-${ver}"
+          # %prep rmdir's the gitlink before moving coucal in, so it must exist.
+          mkdir -p "exp/httrack-${ver}/src/coucal"
+          tar czf ~/rpmbuild/SOURCES/"httrack-${ver}.tar.gz" -C exp "httrack-${ver}"
+          coucal=$(git -C src/coucal rev-parse HEAD)
+          git -C src/coucal archive --prefix="coucal-${coucal}/" HEAD |
+            gzip >~/rpmbuild/SOURCES/"coucal-${coucal}.tar.gz"
+
+      - name: Install build dependencies
+        run: dnf -y builddep --setopt=install_weak_deps=False httrack.spec
+
+      # As mock does: the suite must not run as root, or the fixtures that turn
+      # on a denied write pass for the wrong reason.
+      - name: rpmbuild, %check included
+        timeout-minutes: 60
+        run: |
+          set -euo pipefail
+          useradd -m builder
+          cp httrack.spec ~builder/
+          cp -r ~/rpmbuild ~builder/rpmbuild
+          chown -R builder ~builder
+          sudo -u builder rpmbuild -bb --nodeps ~builder/httrack.spec 2>&1 |
+            tee build.log
+          # -bb removes the build tree on success, so the suite's own banner is
+          # the only place left to read it. A %check that skipped almost
+          # everything still exits 0, and a canary that green-lights an untested
+          # tree is worse than none: a python3-less container passes 212.
+          grep -E '^# (TOTAL|PASS|SKIP|FAIL):' build.log ||
+            { echo "no testsuite summary: %check did not run" >&2; exit 1; }
+          # The largest banner, not the last: a second one would otherwise read
+          # as a collapse and red the job for the wrong reason.
+          passed=$(sed -n 's/^# PASS: *\([0-9]*\).*/\1/p' build.log | sort -n | tail -1)
+          test "${passed:-0}" -ge 250 || {
+            echo "only ${passed:-0} tests passed; the suite barely ran" >&2
+            exit 1
+          }
+
+      - name: Print the logs on failure
+        if: failure()
+        run: |
+          tail -n 200 build.log 2>/dev/null || true
+          find ~builder/rpmbuild/BUILD -name test-suite.log -exec cat {} + \
+            2>/dev/null || true
