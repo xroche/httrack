@@ -11,10 +11,29 @@ set -euo pipefail
 srcdir="${abs_top_srcdir:?not run under make check}"
 test -r "${srcdir}/configure" || skip "no configure in ${srcdir}"
 
+# The fixture symlinks a real library. macOS has kept no on-disk libz.dylib
+# since 11, so the last resort is the SDK's libz.tbd stub, which -lz accepts
+# and the macro's libz.* glob matches.
 cc=${CC:-cc}
-sys_lib=$("${cc}" -print-file-name=libz.so 2>/dev/null || true)
-test -f "${sys_lib}" || sys_lib=$("${cc}" -print-file-name=libz.a 2>/dev/null || true)
-test -f "${sys_lib}" || skip "no linkable system libz to build a fixture from"
+sys_lib=
+for name in libz.so libz.dylib libz.tbd libz.a; do
+    cand=$("${cc}" -print-file-name="${name}" 2>/dev/null || true)
+    if test -f "${cand}"; then
+        sys_lib=${cand}
+        break
+    fi
+done
+if test -z "${sys_lib}"; then
+    sdk=$(xcrun --show-sdk-path 2>/dev/null || true)
+    for name in libz.tbd libz.dylib libz.a; do
+        if test -n "${sdk}" && test -f "${sdk}/usr/lib/${name}"; then
+            sys_lib=${sdk}/usr/lib/${name}
+            break
+        fi
+    done
+fi
+test -n "${sys_lib}" ||
+    skip "${cc} and the SDK offer no libz.so/.dylib/.tbd/.a to build the fixture from"
 sys_hdr=$(printf '#include <zlib.h>\n' | "${cc}" -E -xc - 2>/dev/null |
     sed -n 's/^#[ 0-9]*"\([^"]*zlib\.h\)".*/\1/p' | head -1)
 test -f "${sys_hdr}" || skip "no system zlib.h to build a fixture from"
@@ -96,6 +115,9 @@ expect_fail() { # expect_fail DESC PREFIX
     skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 }
 
+# The subdirectory names are the fixture's own, not the host's, so every case
+# below means the same thing on a platform that has no real lib64 (macOS, and
+# this box): what they exercise is the macro's candidate order, which is shell.
 lib_only=$(fixture lib-only lib)
 lib64_only=$(fixture lib64-only lib64)
 both=$(fixture both lib lib64)
