@@ -1,8 +1,7 @@
 #!/bin/bash
-# --with-zlib=DIR must find the library where the host keeps it: a multilib
-# distribution puts the 64-bit copy in lib64 and Debian under a multiarch
-# triplet, where the DIR/lib the macro used to append holds nothing, or the
-# wrong ABI.
+# A multilib host keeps the 64-bit zlib in lib64, Debian under a multiarch
+# triplet. The DIR/lib --with-zlib=DIR used to append holds nothing there,
+# or the wrong ABI.
 
 set -euo pipefail
 
