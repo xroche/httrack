@@ -11,20 +11,24 @@ set -euo pipefail
 srcdir="${abs_top_srcdir:?not run under make check}"
 test -r "${srcdir}/configure" || skip "no configure in ${srcdir}"
 
+# $CC carries its flags on some hosts (macOS configures gcc -std=gnu23), so it
+# is an argv, never one word.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
 # The fixture symlinks a real library. macOS has kept no on-disk libz.dylib
 # since 11, so the last resort is the SDK's libz.tbd stub, which -lz accepts
 # and the macro's libz.* glob matches.
-cc=${CC:-cc}
 sys_lib=
 for name in libz.so libz.dylib libz.tbd libz.a; do
-    cand=$("${cc}" -print-file-name="${name}" 2>/dev/null || true)
+    cand=$("${cc_argv[@]}" -print-file-name="${name}") || cand=
     if test -f "${cand}"; then
         sys_lib=${cand}
         break
     fi
 done
-if test -z "${sys_lib}"; then
-    sdk=$(xcrun --show-sdk-path 2>/dev/null || true)
+if test -z "${sys_lib}" && command -v xcrun >/dev/null 2>&1; then
+    sdk=$(xcrun --show-sdk-path) || sdk=
     for name in libz.tbd libz.dylib libz.a; do
         if test -n "${sdk}" && test -f "${sdk}/usr/lib/${name}"; then
             sys_lib=${sdk}/usr/lib/${name}
@@ -33,9 +37,13 @@ if test -z "${sys_lib}"; then
     done
 fi
 test -n "${sys_lib}" ||
-    skip "${cc} and the SDK offer no libz.so/.dylib/.tbd/.a to build the fixture from"
-sys_hdr=$(printf '#include <zlib.h>\n' | "${cc}" -E -xc - 2>/dev/null |
-    sed -n 's/^#[ 0-9]*"\([^"]*zlib\.h\)".*/\1/p' | head -1)
+    skip "${cc_argv[*]} and the SDK offer no libz.so/.dylib/.tbd/.a for the fixture"
+
+cpp_out=$(printf '#include <zlib.h>\n' | "${cc_argv[@]}" -E -xc -) ||
+    skip "${cc_argv[*]} cannot preprocess a bare <zlib.h>"
+# Capture then match: piping into a truncating reader SIGPIPEs the sed upstream.
+hdrs=$(sed -n 's/^#[ 0-9]*"\([^"]*zlib\.h\)".*/\1/p' <<<"${cpp_out}")
+sys_hdr=${hdrs%%$'\n'*}
 test -f "${sys_hdr}" || skip "no system zlib.h to build a fixture from"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/zlibdir.XXXXXX") || fail "no tmpdir"
