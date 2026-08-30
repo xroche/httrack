@@ -42,7 +42,6 @@ Please visit our Website: http://www.httrack.com
 #else
 #include <utime.h>
 #endif
-#include <sys/timeb.h>
 #ifndef _WIN32
 #include <pthread.h>
 #endif

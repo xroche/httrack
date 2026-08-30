@@ -772,7 +772,8 @@ jobs:
         run: |
           set -euo pipefail
           autoreconf -fi
-          ./configure --disable-https
+          # The only leg with the example plugins off: 225 and 376 lose that direction if this job goes.
+          ./configure --disable-https --disable-example-libs
 
       - name: Build
         run: make -j"$(nproc)"

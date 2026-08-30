@@ -44,11 +44,14 @@ TESTS_ENVIRONMENT += abs_top_builddir=$(abs_top_builddir)
 TESTS_ENVIRONMENT += CONFIGURED_DATADIR=$(datadir)
 TESTS_ENVIRONMENT += CONFIGURED_LIBDIR=$(libdir)
 TESTS_ENVIRONMENT += CONFIGURED_BINDIR=$(bindir)
+TESTS_ENVIRONMENT += CONFIGURED_SYSCONFDIR=$(sysconfdir)
 # 225_install-manifest.test folds these back out of the staged paths.
 TESTS_ENVIRONMENT += CONFIGURED_MANDIR=$(mandir)
 TESTS_ENVIRONMENT += CONFIGURED_DOCDIR=$(docdir)
 TESTS_ENVIRONMENT += CONFIGURED_HTMLDIR=$(htmldir)
 TESTS_ENVIRONMENT += ORIGIN_RPATH=$(ORIGIN_RPATH)
+# 225 and 376 both read what --disable-example-libs did to the install.
+TESTS_ENVIRONMENT += EXAMPLE_LIBS=$(EXAMPLE_LIBS)
 # 222_pkgconfig-consumer.test asserts the staged .pc against these, and both
 # sides of the gate deciding whether it hands a consumer an rpath.
 TESTS_ENVIRONMENT += CONFIGURED_PREFIX=$(prefix)
@@ -64,8 +67,11 @@ TESTS_ENVIRONMENT += TEST_CPPFLAGS="$(CPPFLAGS)"
 # flags, and skips when configure found no usable level.
 TESTS_ENVIRONMENT += TEST_CFLAGS="$(CFLAGS)"
 TESTS_ENVIRONMENT += FORTIFY_SOURCE_LEVEL=$(FORTIFY_SOURCE_LEVEL)
-# 218_crash-nopie-frames.test links the crash printer, which calls dladdr().
+# 218_crash-nopie-frames.test and 372_crash-signal-number.test link the crash
+# printer standalone, which calls dladdr() and, where backtrace() itself needs
+# a library (Termux's -landroid-execinfo), BACKTRACE_LIBS too.
 TESTS_ENVIRONMENT += DL_LIBS="$(DL_LIBS)"
+TESTS_ENVIRONMENT += BACKTRACE_LIBS="$(BACKTRACE_LIBS)"
 # 207_install-headers-symbols.test links a consumer probe against it; absent on a
 # static-only build and named .dylib on macOS, where that ELF-only test skips.
 TESTS_ENVIRONMENT += HTTRACK_SHLIB=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)/libhttrack.so

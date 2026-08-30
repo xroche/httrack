@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# The doc pages ship in a directory whose depth is the packager's --htmldir
+# choice, so a relative link that resolves in one layout dangles in another and
+# nothing but a staged install can tell them apart.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${abs_top_builddir:?not run under make check}"
+htmlsrc="${abs_top_srcdir:?not run under make check}/html"
+htmldir=${CONFIGURED_HTMLDIR:?not run under make check}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/doclinks.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+stage=${work}/stage
+if ! env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir}" \
+    install DESTDIR="${stage}" >"${work}/install.log" 2>&1; then
+    dump_file "${work}/install.log"
+    skip "cannot stage an install, so no layout to resolve against"
+fi
+
+root=${stage}${htmldir}
+test -d "${root}" || skip "nothing staged in ${htmldir}"
+
+# Lexical and relative to the stage root: a link names a path in the shipped
+# tree, and a ".." that walks off the top has left the package.
+resolve() { # resolve DIR LINK, both relative to ${stage}
+    local rest=$1/$2 out='' part
+    while [ -n "${rest}" ]; do
+        part=${rest%%/*}
+        if [ "${part}" = "${rest}" ]; then rest=; else rest=${rest#*/}; fi
+        case ${part} in
+        '' | .) ;;
+        ..)
+            case ${out} in
+            */*) out=${out%/*} ;;
+            ?*) out= ;;
+            *) return 1 ;;
+            esac
+            ;;
+        *) out=${out:+${out}/}${part} ;;
+        esac
+    done
+    printf '%s\n' "${out}"
+}
+
+# history.txt, license.txt and greetings.txt sit at the repo root, so index.html
+# has to reach them with "../" for tools/doc-links.py, and that "../" is one
+# level too high once the install puts them beside it in $(htmldir).
+gaps=(
+    "index.html ../license.txt"
+    "index.html ../greetings.txt"
+)
+# history.txt is the exception: HelpHtmlroot_DATA installs it into $(docdir) as
+# well, so its "../" lands on a real file wherever docdir is htmldir's parent.
+docdir=${CONFIGURED_DOCDIR:?not run under make check}
+test "${docdir%/}" = "${htmldir%/*}" || gaps+=("index.html ../history.txt")
+
+gap_seen=()
+for i in "${!gaps[@]}"; do gap_seen[i]=; done
+
+# Index of the recorded gap for PAGE LINK, or 1 if there is none.
+gap_index() {
+    local i
+    for i in "${!gaps[@]}"; do
+        test "${gaps[i]}" != "$1 $2" || {
+            printf '%s\n' "${i}"
+            return 0
+        }
+    done
+    return 1
+}
+
+pages=0
+links=0
+bad=0
+while IFS= read -r page; do
+    rel=${page#"${root}/"}
+    # Only the html/ pages: a docdir stub such as httrack-doc.html points at the
+    # *other* directory, and the default layout collapsing the two lands it here.
+    test -e "${htmlsrc}/${rel}" || continue
+    pages=$((pages + 1))
+    dir=${page%/*}
+    dir=${dir#"${stage}/"}
+    while IFS= read -r attr; do
+        link=${attr#*[\"\']}
+        link=${link%?}
+        link=${link%%#*}
+        link=${link%%\?*}
+        case ${link} in
+        # An anchor, a server URL, a scheme: none of them name a shipped file.
+        '' | /* | *:*) continue ;;
+        esac
+        links=$((links + 1))
+        if ! target=$(resolve "${dir}" "${link}") || [ ! -e "${stage}/${target}" ]; then
+            if g=$(gap_index "${rel}" "${link}"); then
+                gap_seen[g]=dangles
+            else
+                echo "  ${page#"${stage}"}: ${link}" >&2
+                bad=$((bad + 1))
+            fi
+        elif g=$(gap_index "${rel}" "${link}"); then
+            gap_seen[g]=resolves
+        fi
+    done < <(LC_ALL=C grep -Eio "(href|src)[[:space:]]*=[[:space:]]*[\"'][^\"']*[\"']" "${page}" || true)
+done < <(find "${root}" -name '*.html' | LC_ALL=C sort)
+
+test "${pages}" -gt 0 || fail "no pages staged under ${htmldir}"
+# A filter that dropped everything would pass on a tree of dead links.
+test "${links}" -gt 0 || fail "no relative links found across ${pages} pages"
+test "${bad}" -eq 0 || fail "${bad} of ${links} relative links dangle in ${htmldir}"
+
+# A gap that stopped being one has to be deleted, not left recording a link the
+# layout now resolves.
+stale=0
+for i in "${!gaps[@]}"; do
+    case ${gap_seen[i]} in
+    dangles) continue ;;
+    resolves) echo "  ${gaps[i]}: resolves here" >&2 ;;
+    *) echo "  ${gaps[i]}: not a link on that page any more" >&2 ;;
+    esac
+    stale=$((stale + 1))
+done
+test "${stale}" -eq 0 || fail "${stale} of ${#gaps[@]} recorded gaps are out of date"
+
+echo "${links} relative links across ${pages} pages resolve in ${htmldir}, ${#gaps[@]} recorded gaps still dangle"

@@ -256,14 +256,7 @@ AS_CASE([$host_os],
 		hts_origin_ref='$ORIGIN'
 		hts_origin_ref_make='\$$ORIGIN'])
 
-hts_save_prefix=$prefix
-hts_save_exec_prefix=$exec_prefix
-test "x$prefix" = xNONE && prefix=$ac_default_prefix
-test "x$exec_prefix" = xNONE && exec_prefix=$prefix
-eval hts_libdir=\"$libdir\"
-eval hts_libdir=\"$hts_libdir\"
-prefix=$hts_save_prefix
-exec_prefix=$hts_save_exec_prefix
+HTS_EXPAND_LIBDIR
 
 # Enumerated, not read from libtool's sys_lib_dlsearch_path_spec: that one is
 # only augmented when /etc/ld.so.conf exists, so a sysroot or minimal container
@@ -426,6 +419,20 @@ AX_CHECK_ALIGNED_ACCESS_REQUIRED
 # check for various headers
 AC_CHECK_HEADERS([execinfo.h sys/ioctl.h sys/random.h])
 
+## The header can exist while backtrace() lives in another library (Termux's
+## libandroid-execinfo); only httrack links it, so keep it out of LIBS.
+BACKTRACE_LIBS=
+AS_CASE([$host_os], [linux*],
+	[AS_IF([test "x$ac_cv_header_execinfo_h" = xyes],
+		[hts_backtrace_save_libs=$LIBS
+		AC_SEARCH_LIBS([backtrace], [execinfo android-execinfo],
+			[AC_DEFINE([HAVE_BACKTRACE], [1],
+				[Define to 1 if backtrace() can be linked.])
+			AS_IF([test "x$ac_cv_search_backtrace" != "xnone required"],
+				[BACKTRACE_LIBS=$ac_cv_search_backtrace])])
+		LIBS=$hts_backtrace_save_libs])])
+AC_SUBST([BACKTRACE_LIBS])
+
 ## CSPRNG for the --single-file mark; /dev/urandom is the fallback
 AC_CHECK_FUNCS([getrandom])
 
@@ -447,7 +454,7 @@ AC_ARG_ENABLE([https],
 		AC_MSG_RESULT($https_support)
 		;;
 	*)
-		AC_MSG_ERROR(bad value for https, expected yes/no/auto)
+		AC_MSG_ERROR([bad value for https, expected yes/no/auto])
 		;;
 	esac	
 	],
@@ -590,7 +597,7 @@ AC_ARG_ENABLE([online-unit-tests],
 		AC_MSG_RESULT($enableval)
 		;;
 	*)
-		AC_MSG_ERROR(bad value for online-unit-tests, expected yes/no/auto)
+		AC_MSG_ERROR([bad value for online-unit-tests, expected yes/no/auto])
 		;;
 	esac
 	],
@@ -599,6 +606,29 @@ AC_ARG_ENABLE([online-unit-tests],
 	AC_MSG_RESULT(no)
 	])
 AC_SUBST(ONLINE_UNIT_TESTS,$online_unit_tests)
+
+## Example callback plugins (libtest/): documentation samples every distribution
+## has to un-install by hand.
+AC_MSG_CHECKING(whether to build the example callback plugins)
+AC_ARG_ENABLE([example-libs],
+	[AS_HELP_STRING([--disable-example-libs],[Do not build or install the libtest/ example callback plugins; their sources install either way @<:@default=yes@:>@])],
+	[
+	case "${enableval}" in
+	no|yes)
+		example_libs=$enableval
+		AC_MSG_RESULT($enableval)
+		;;
+	*)
+		AC_MSG_ERROR([bad value for example-libs, expected yes/no])
+		;;
+	esac
+	],
+	[
+	example_libs=yes
+	AC_MSG_RESULT(yes)
+	])
+AM_CONDITIONAL([EXAMPLE_LIBS], [test x"$example_libs" = x"yes"])
+AC_SUBST(EXAMPLE_LIBS,$example_libs)
 
 ## libFuzzer harnesses (fuzz/); requires clang
 AC_MSG_CHECKING(whether to build fuzzers)
@@ -611,7 +641,7 @@ AC_ARG_ENABLE([fuzzers],
 		AC_MSG_RESULT($enableval)
 		;;
 	*)
-		AC_MSG_ERROR(bad value for fuzzers, expected yes/no)
+		AC_MSG_ERROR([bad value for fuzzers, expected yes/no])
 		;;
 	esac
 	],

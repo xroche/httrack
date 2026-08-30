@@ -1,0 +1,81 @@
+#!/bin/bash
+#
+# The compiled-in install paths ignored --prefix and stayed on /usr, so a
+# non-/usr build looked for /etc/httrack.conf; Termux patched htsglobal.h by
+# hand for it. Each one has to be the directory configure was given.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+skip_on_windows "the install paths are POSIX-only"
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+
+prefix=${CONFIGURED_PREFIX:?not run under make check}
+sysconfdir=${CONFIGURED_SYSCONFDIR:?not run under make check}
+bindir=${CONFIGURED_BINDIR:?not run under make check}
+libdir=${CONFIGURED_LIBDIR:?not run under make check}
+datadir=${CONFIGURED_DATADIR:?not run under make check}
+
+rc=0
+out=$(httrack -O /dev/null -#test=instpaths) || rc=$?
+[ "$rc" != 77 ] || skip "no compiled-in install paths on this platform"
+[ "$rc" = 0 ] || fail "-#test=instpaths exited $rc, output: $out"
+
+value_of() { # value_of KEY
+    local line
+    line=$(grep "^$1=" <<<"$out") || fail "no $1 line in: $out"
+    printf '%s\n' "${line#"$1"=}"
+}
+
+# A directory configure was handed with a trailing slash keeps it; the macros do not.
+assert_eq "${prefix%/}" "$(value_of prefix)" "HTS_PREFIX"
+assert_eq "${sysconfdir%/}" "$(value_of etcpath)" "HTS_ETCPATH"
+assert_eq "${bindir%/}" "$(value_of binpath)" "HTS_BINPATH"
+assert_eq "${libdir%/}" "$(value_of libpath)" "HTS_LIBPATH"
+assert_eq "${sysconfdir%/}/httrack.conf" "$(value_of httrackcnf)" "HTS_HTTRACKCNF"
+# HTS_HTTRACKDIR already followed DATADIR before the fix: the control, not coverage.
+assert_eq "${datadir%/}/httrack/" "$(value_of httrackdir)" "HTS_HTTRACKDIR"
+
+# On a /usr layout the assertions above compare two coinciding strings, so the
+# unfixed header passes them. Directories no build lands on discriminate anywhere.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+cat >"$tmp/probe.c" <<'EOF'
+#include "htsglobal.h"
+hts_prefix=HTS_PREFIX
+hts_etcpath=HTS_ETCPATH
+hts_binpath=HTS_BINPATH
+hts_libpath=HTS_LIBPATH
+hts_httrackcnf=HTS_HTTRACKCNF
+hts_httrackdir=HTS_HTTRACKDIR
+EOF
+pp=$("${cc_argv[@]}" -E -I"${abs_top_srcdir:?}/src" -I"$abs_top_builddir" \
+    -DPREFIX='"/probe/pfx"' -DSYSCONFDIR='"/probe/etc"' -DBINDIR='"/probe/bin"' \
+    -DLIBDIR='"/probe/lib"' -DDATADIR='"/probe/share"' "$tmp/probe.c" 2>&1) ||
+    fail "preprocessing htsglobal.h failed: $pp"
+
+expanded() { # expanded KEY: the macro, with adjacent string literals joined
+    local line
+    line=$(grep "^hts_$1=" <<<"$pp") || fail "no hts_$1 line in the preprocessed header"
+    printf '%s\n' "${line#hts_"$1"=}" | tr -d ' "'
+}
+
+assert_eq /probe/pfx "$(expanded prefix)" "HTS_PREFIX ignores PREFIX"
+assert_eq /probe/etc "$(expanded etcpath)" "HTS_ETCPATH ignores SYSCONFDIR"
+assert_eq /probe/bin "$(expanded binpath)" "HTS_BINPATH ignores BINDIR"
+assert_eq /probe/lib "$(expanded libpath)" "HTS_LIBPATH ignores LIBDIR"
+assert_eq /probe/etc/httrack.conf "$(expanded httrackcnf)" "HTS_HTTRACKCNF ignores SYSCONFDIR"
+# Control: DATADIR was already honoured, so this failing means the probe is broken.
+assert_eq /probe/share/httrack/ "$(expanded httrackdir)" "the probe reaches the header"
+
+# The wiring itself: a -D the build never passes falls back to that same literal.
+for pair in PREFIX:prefix SYSCONFDIR:sysconfdir BINDIR:bindir LIBDIR:libdir DATADIR:datadir; do
+    grep -q -- "-D${pair%%:*}=.*\$(${pair##*:})" "$abs_top_srcdir/src/Makefile.am" ||
+        fail "src/Makefile.am does not pass -D${pair%%:*} from \$(${pair##*:})"
+done
+
+echo "install paths follow configure: prefix=${prefix} sysconfdir=${sysconfdir}"

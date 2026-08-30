@@ -5,7 +5,7 @@ ACLOCAL_AMFLAGS = -I m4
 
 EXTRA_DIST = INSTALL.Linux \
 		gpl-fr.txt license.txt greetings.txt history.txt \
-		httrack-doc.html lang.def README.md tools/mkdeb.sh \
+		httrack-doc.html lang.def README.md PACKAGING.md tools/mkdeb.sh \
 		tools/macos-app.sh tools/macos-bundle.sh tools/macos-release.sh \
 		tools/httrack-launcher.c \
 		tools/Info.plist.in tools/HTTrack.icns \
@@ -13,7 +13,8 @@ EXTRA_DIST = INSTALL.Linux \
 		winprofile-keys.tsv winprofile-escapes.tsv \
 		tools/gen-winprofile-keys.py \
 		tools/doc-chrome.py \
-		tools/ci-sanitizer-report.sh
+		tools/ci-sanitizer-report.sh \
+		tools/downstream-drift.sh
 
 # Build the signed Debian packages from a clean source export. Pass the signing
 # key and other options through DEB_FLAGS, e.g.:

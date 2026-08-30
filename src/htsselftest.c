@@ -6878,6 +6878,25 @@ static int st_pathbin(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+// -#test=instpaths: the compiled-in install paths, which must follow configure
+// rather than the hardcoded /usr Termux patched by hand.
+static int st_instpaths(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+#ifdef _WIN32
+  return 77; /* Windows defines none of these */
+#else
+  printf("prefix=%s\n", HTS_PREFIX);
+  printf("etcpath=%s\n", HTS_ETCPATH);
+  printf("binpath=%s\n", HTS_BINPATH);
+  printf("libpath=%s\n", HTS_LIBPATH);
+  printf("httrackcnf=%s\n", HTS_HTTRACKCNF);
+  printf("httrackdir=%s\n", HTS_HTTRACKDIR);
+  return 0;
+#endif
+}
+
 // hts_buildtopindex() writes a system-charset name into a charset=utf-8 doc: on
 // Windows the gifs land in a mangled twin dir (#217) and a listed name renders
 // as mojibake (#216). Both must come out utf-8. argv[0] is writable.
@@ -13142,6 +13161,8 @@ static const struct selftest_entry {
      st_datadir},
     {"pathbin", "", "print the data directory this run resolved at startup",
      st_pathbin},
+    {"instpaths", "", "print the compiled-in install paths (POSIX only)",
+     st_instpaths},
     {"inplace-escape", "", "inplace_escape_* vs escape_* equivalence self-test",
      st_inplace_escape},
     {"escape-room", "", "HT_ADD_HTMLESCAPED* reservation-factor self-test",

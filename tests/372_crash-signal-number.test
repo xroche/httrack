@@ -27,10 +27,10 @@ for flags in "${TEST_CFLAGS:-}" "${TEST_CPPFLAGS:-}"; do
     fi
 done
 cflags+=(-g -O0 -I"${builddir}" -I"${builddir}/src" -I"${srcdir}/src")
-# shellcheck disable=SC2086 # DL_LIBS is a flag list; splitting is the point
+# shellcheck disable=SC2086 # DL_LIBS/BACKTRACE_LIBS are flag lists; splitting is the point
 if ! "${cc_argv[@]}" "${cflags[@]}" -o "${work}/probe" \
     "${srcdir}/tests/printnumprobe.c" "${srcdir}/src/htsbacktrace.c" \
-    ${DL_LIBS:-} >"${work}/cc.log" 2>&1; then
+    ${DL_LIBS:-} ${BACKTRACE_LIBS:-} >"${work}/cc.log" 2>&1; then
     head -20 "${work}/cc.log" >&2
     # 218 pins that the crash printer builds standalone on Linux.
     if [ "$HTS_OS" = "Linux" ]; then
