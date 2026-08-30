@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # A CR in shipped text draws rpmlint's wrong-file-end-of-line-encoding, so every
-# rpm packager runs dos2unix over our files. The GUI catalogs are the one
-# deliberate exception, and .gitattributes is where that decision is recorded.
+# rpm packager runs dos2unix over our files.
 
 set -euo pipefail
 export LC_ALL=C
