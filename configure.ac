@@ -444,7 +444,7 @@ AC_ARG_ENABLE([https],
 		AC_MSG_RESULT($https_support)
 		;;
 	*)
-		AC_MSG_ERROR(bad value for https, expected yes/no/auto)
+		AC_MSG_ERROR([bad value for https, expected yes/no/auto])
 		;;
 	esac	
 	],
@@ -587,7 +587,7 @@ AC_ARG_ENABLE([online-unit-tests],
 		AC_MSG_RESULT($enableval)
 		;;
 	*)
-		AC_MSG_ERROR(bad value for online-unit-tests, expected yes/no/auto)
+		AC_MSG_ERROR([bad value for online-unit-tests, expected yes/no/auto])
 		;;
 	esac
 	],
@@ -608,7 +608,7 @@ AC_ARG_ENABLE([fuzzers],
 		AC_MSG_RESULT($enableval)
 		;;
 	*)
-		AC_MSG_ERROR(bad value for fuzzers, expected yes/no)
+		AC_MSG_ERROR([bad value for fuzzers, expected yes/no])
 		;;
 	esac
 	],
