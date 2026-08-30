@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# The compiled-in install paths ignored --prefix and stayed on /usr, so a
+# non-/usr build looked for /etc/httrack.conf; Termux patched htsglobal.h by
+# hand for it. Each one has to be the directory configure was given.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+prefix=${CONFIGURED_PREFIX:?not run under make check}
+sysconfdir=${CONFIGURED_SYSCONFDIR:?not run under make check}
+bindir=${CONFIGURED_BINDIR:?not run under make check}
+libdir=${CONFIGURED_LIBDIR:?not run under make check}
+datadir=${CONFIGURED_DATADIR:?not run under make check}
+
+rc=0
+out=$(httrack -O /dev/null -#test=instpaths) || rc=$?
+[ "$rc" != 77 ] || skip "no compiled-in install paths on this platform"
+[ "$rc" = 0 ] || fail "-#test=instpaths exited $rc, output: $out"
+
+value_of() { # value_of KEY
+    local line
+    line=$(grep "^$1=" <<<"$out") || fail "no $1 line in: $out"
+    printf '%s\n' "${line#"$1"=}"
+}
+
+# A directory configure was handed with a trailing slash keeps it; the macros do not.
+assert_eq "${prefix%/}" "$(value_of prefix)" "HTS_PREFIX"
+assert_eq "${sysconfdir%/}" "$(value_of etcpath)" "HTS_ETCPATH"
+assert_eq "${bindir%/}" "$(value_of binpath)" "HTS_BINPATH"
+assert_eq "${libdir%/}" "$(value_of libpath)" "HTS_LIBPATH"
+assert_eq "${sysconfdir%/}/httrack.conf" "$(value_of httrackcnf)" "HTS_HTTRACKCNF"
+assert_eq "${datadir%/}/httrack/" "$(value_of httrackdir)" "HTS_HTTRACKDIR"
+
+hardcoded() { # hardcoded KEY: what the unfixed header carried
+    case "$1" in
+    prefix) echo /usr ;;
+    etcpath) echo /etc ;;
+    binpath) echo /usr/bin ;;
+    libpath) echo /usr/lib ;;
+    *) fail "no hardcoded value for $1" ;;
+    esac
+}
+
+# An installed /usr build agrees with those literals by coincidence, and only
+# there is agreement not a finding.
+if [ "${prefix%/}" != /usr ]; then
+    for key in prefix etcpath binpath libpath; do
+        [ "$(value_of "$key")" != "$(hardcoded "$key")" ] ||
+            fail "${key} is still the hardcoded $(hardcoded "$key") under prefix ${prefix}"
+    done
+fi
+
+echo "install paths follow configure: prefix=${prefix} sysconfdir=${sysconfdir}"
