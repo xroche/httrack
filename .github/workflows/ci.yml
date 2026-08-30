@@ -170,10 +170,12 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
-  # Reproduces the buildds that refuse TEST-NET-1 instead of dropping it, where
-  # every fixture needing a stalled connect must skip rather than fail (#1108).
+  # Two networks no runner has: buildds that refuse TEST-NET-1 rather than drop
+  # it (#1108), and an rpm buildroot, where a UDP connect names no source at all
+  # and #1463 read that wildcard as an address. One job, since the build is the
+  # same and neither check is worth a second three-minute compile.
   hostile-network:
-    name: build (network refuses TEST-NET-1)
+    name: build (constrained networks)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -207,6 +209,18 @@ jobs:
           # instead, leaving the settle this leg exists to guard unrun.
           cat tests/246_engine-connect-stop.log
           grep -q 'within 500 ms' tests/246_engine-connect-stop.log
+
+      - name: Test on the network an rpm buildroot has
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          tools/buildroot-net.sh make check -j"$jobs"
+          # Only the widening half needs an address the namespace lacks, so a
+          # run that never reached the loopback half proves nothing.
+          cat tests/335_webhttrack-bind-loopback.log
+          grep -q 'the default socket answers on 127.0.0.1' \
+            tests/335_webhttrack-bind-loopback.log
 
       - name: Print the test log on failure
         if: failure()

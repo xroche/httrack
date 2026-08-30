@@ -34,7 +34,11 @@ pre = re.search(r"<pre>\n(.*?)</pre>", contact, re.S)
 if pre is None:
     sys.exit("html/contact.html has no <pre> credits block")
 if pre.group(1) != greetings:
-    bad.append("html/contact.html's <pre> is not greetings.txt verbatim")
+    got = pre.group(1)
+    at = next((i for i, (a, b) in enumerate(zip(got, greetings)) if a != b),
+              min(len(got), len(greetings)))
+    bad.append("html/contact.html's <pre> is not greetings.txt verbatim: at %d it has "
+               "%r, not %r" % (at, got[at:at + 6], greetings[at:at + 6]))
 
 # Contact groups out, what is left is the person. A group is dropped only when
 # it holds an address: "(Armish)" is part of a name, "(a@b.c)" is not.
