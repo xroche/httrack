@@ -170,10 +170,12 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
-  # Reproduces the buildds that refuse TEST-NET-1 instead of dropping it, where
-  # every fixture needing a stalled connect must skip rather than fail (#1108).
+  # Two networks no runner has: buildds that refuse TEST-NET-1 rather than drop
+  # it (#1108), and an rpm buildroot, where a UDP connect names no source at all
+  # and #1463 read that wildcard as an address. One job, since the build is the
+  # same and neither check is worth a second three-minute compile.
   hostile-network:
-    name: build (network refuses TEST-NET-1)
+    name: build (constrained networks)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -208,39 +210,7 @@ jobs:
           cat tests/246_engine-connect-stop.log
           grep -q 'within 500 ms' tests/246_engine-connect-stop.log
 
-      - name: Print the test log on failure
-        if: failure()
-        run: cat tests/test-suite.log 2>/dev/null || true
-
-  # Reproduces an rpm or deb buildroot: loopback alone, but carrying a default
-  # route and no resolver, where a UDP connect succeeds and names no source at
-  # all. Reading that wildcard as an address was #1463.
-  buildroot-network:
-    name: build (rpm/deb buildroot network)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-
-      - name: Install build dependencies
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev iproute2
-
-      - name: Configure
-        run: |
-          set -euo pipefail
-          autoreconf -fi
-          ./configure
-
-      - name: Build
-        run: make -j"$(nproc)"
-
-      - name: Test on the network a buildroot has
+      - name: Test on the network an rpm buildroot has
         timeout-minutes: 20
         run: |
           set -euo pipefail

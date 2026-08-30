@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# Runs a command on the network an rpm or deb buildroot has: loopback alone, but
-# carrying a default route, and no resolver. mock installs exactly that (its
-# condUnshareNet adds "default via 127.0.0.1"), which makes a UDP connect to any
-# address succeed and name no source, and #1463 read that 0.0.0.0 as an address.
+# Runs a command on the network an rpm buildroot has: loopback alone, with a
+# default route and no resolver. Fedora's mock builds that, and a UDP connect
+# there succeeds while naming no source, which #1463 read as an address.
+# Debian's sbuild leaves out the default route, so it lands on the skip path.
 #
 # Usage: tools/buildroot-net.sh <command> [args...]      (re-execs under sudo)
 
@@ -15,11 +15,12 @@ fail() {
 }
 
 # Second entry, inside both namespaces: mount away the resolver and drop back to
-# the invoking user, since the suite must not run as root.
-if [ "${1:-}" = "--in-namespace" ]; then
+# the invoking user, since the suite must not run as root. On an env var, not an
+# argument: as a flag, a root caller typing it by hand unmounts the real one.
+if [ -n "${BUILDROOT_NET_INNER:-}" ]; then
     mount --bind /dev/null /etc/resolv.conf
-    run_as=$2
-    shift 2
+    run_as=${BUILDROOT_NET_INNER#user=}
+    unset BUILDROOT_NET_INNER # the payload gets a clean environment
     test -n "$run_as" || exec "$@"
     exec sudo -E -u "$run_as" "$@"
 fi
@@ -39,7 +40,7 @@ ip netns add "$ns"
 ip -n "$ns" link set lo up
 ip -n "$ns" route add default via 127.0.0.1
 
-# Non-vacuity: a namespace answering with a real address, or refusing the
+# Non-vacuity: a namespace that names a real address, or that refuses the
 # connect outright, is not the regime this leg exists to cover.
 src=$(ip netns exec "$ns" python3 -c 'import socket
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -54,6 +55,6 @@ test "$src" = "0.0.0.0" ||
     fail "the namespace answers $src, not the wildcard a buildroot names"
 
 rc=0
-ip netns exec "$ns" unshare --mount --propagation private \
-    bash "$0" --in-namespace "${SUDO_USER:-}" "$@" || rc=$?
+BUILDROOT_NET_INNER="user=${SUDO_USER:-}" ip netns exec "$ns" \
+    unshare --mount --propagation private bash "$0" "$@" || rc=$?
 exit "$rc"
