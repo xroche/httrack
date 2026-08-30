@@ -1,0 +1,119 @@
+#!/bin/bash
+#
+# The installed headers must not need config.h: an autoconf consumer has one of
+# its own. What they do need is the layout switches (HTS_INET6, HTS_USEOPENSSL),
+# which htsfeatures.h carries; a downstream that just deletes the include gets a
+# consumer whose SOCaddr and htsblk differ from the library's.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+if [ -z "${abs_top_builddir:-}" ]; then
+    echo "abs_top_builddir unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+make=${MAKE:-make}
+command -v "$make" >/dev/null 2>&1 || skip "no make ($make)"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+cpp_argv=(-I"$tmp/include")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    cpp_argv+=("${extra_argv[@]}")
+fi
+
+printf '#include <stdio.h>\n' >"$tmp/tu.c"
+"${cc_argv[@]}" "${cpp_argv[@]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null ||
+    skip "${cc_argv[*]} cannot compile a bare <stdio.h>"
+
+# Same rule and file list the install uses, redirected rather than DESTDIR'd.
+env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+    DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
+    {
+        cat "$tmp/install.log" >&2
+        fail "install-DevIncludesDATA failed"
+    }
+
+inc=$tmp/include/httrack
+[ -f "$inc/htsfeatures.h" ] || fail "htsfeatures.h is not installed"
+[ ! -e "$inc/config.h" ] || fail "config.h is installed again; a consumer's own config.h collides with it"
+
+# Every config.h macro an installed header branches on has to be on the public
+# one, or the header silently takes its fallback in a consumer's build.
+config_macros() { # config_macros FILE
+    sed -n -e 's|^/\* #undef \([A-Za-z_][A-Za-z0-9_]*\).*|\1|p' \
+        -e 's|^#define \([A-Za-z_][A-Za-z0-9_]*\).*|\1|p' "$1" | sort -u
+}
+# Joins continuation lines: HAVE_VISIBILITY is read on the second line of an #if.
+conditional_idents() { # conditional_idents FILE...
+    awk '{
+        line = (cont == 1) ? line " " $0 : $0
+        cont = (line ~ /\\$/)
+        if (cont) { sub(/\\$/, "", line); next }
+        if (line !~ /^[[:space:]]*#[[:space:]]*(if|ifdef|ifndef|elif)/) next
+        sub(/^[[:space:]]*#[[:space:]]*(ifdef|ifndef|elif|if)/, "", line)
+        while (match(line, /[A-Za-z_][A-Za-z0-9_]*/)) {
+            id = substr(line, RSTART, RLENGTH)
+            if (id != "defined") print id
+            line = substr(line, RSTART + RLENGTH)
+        }
+    }' "$@" | sort -u
+}
+config_macros "$abs_top_builddir/config.h" >"$tmp/config.names"
+config_macros "$inc/htsfeatures.h" >"$tmp/public.names"
+conditional_idents "$inc"/*.h >"$tmp/read.names"
+# The parse reads nothing useful if it misses the switch this test exists for.
+grep -qx HTS_INET6 "$tmp/read.names" || fail "the #if parse found no HTS_INET6, it proves nothing"
+grep -qx HTS_INET6 "$tmp/public.names" || fail "htsfeatures.h does not carry HTS_INET6"
+missing=$(comm -12 "$tmp/config.names" "$tmp/read.names" | comm -23 - "$tmp/public.names")
+[ -z "$missing" ] ||
+    fail "installed headers branch on config.h macros htsfeatures.h omits: $(echo "$missing" | tr '\n' ' ')"
+
+# The library's own layout, printed from inside libhttrack.
+httrack -O /dev/null '-#test=pubheaders' | tr -d '\r' >"$tmp/library.out"
+grep -q '^HTS_INET6 = ' "$tmp/library.out" || fail "-#test=pubheaders printed nothing usable"
+
+probe() { # probe OUTFILE -- the consumer, seeing $tmp/include and nothing else
+    "${cc_argv[@]}" "${cpp_argv[@]}" -o "$tmp/probe" "$testdir/pubheaderlayout.c" 2>"$tmp/cc.log" || return 1
+    "$tmp/probe" | tr -d '\r' >"$1"
+}
+probe "$tmp/consumer.out" || {
+    head -10 "$tmp/cc.log" >&2
+    fail "a consumer cannot compile against the installed headers alone"
+}
+diff -u "$tmp/library.out" "$tmp/consumer.out" ||
+    fail "the installed headers lay the structs out differently from the library"
+
+# Force the layout switch to the wrong value: the probe has to notice, or none
+# of the above was measuring anything.
+chmod -R u+w "$inc"
+sed -i.bak 's|^#define HTS_INET6 .*|#define HTS_INET6 0|' "$inc/htsfeatures.h" && rm -f "$inc/htsfeatures.h.bak"
+grep -qx '#define HTS_INET6 0' "$inc/htsfeatures.h" || fail "the negative control did not rewrite HTS_INET6"
+probe "$tmp/wrong.out" || fail "the wrong-HTS_INET6 consumer did not build, so the diff below never ran"
+! diff -q "$tmp/library.out" "$tmp/wrong.out" >/dev/null ||
+    fail "HTS_INET6=0 changed no size or offset, so this test cannot see the bug it guards"
+
+# And the downstream patch itself: dropping the header and its include, which is
+# what installing config.h was buying.
+rm -f "$inc/htsfeatures.h"
+sed -i.bak '/^#include "htsfeatures.h"$/d' "$inc/htsglobal.h" && rm -f "$inc/htsglobal.h.bak"
+! grep -q '^#include "htsfeatures.h"$' "$inc/htsglobal.h" ||
+    fail "the negative control did not strip the include"
+if probe "$tmp/patched.out"; then
+    ! diff -q "$tmp/library.out" "$tmp/patched.out" >/dev/null ||
+        fail "dropping htsfeatures.h changed nothing"
+    echo "control: without htsfeatures.h a consumer disagrees with the library"
+else
+    echo "control: without htsfeatures.h a consumer no longer compiles"
+fi
+
+exit 0

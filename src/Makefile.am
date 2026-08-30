@@ -5,7 +5,7 @@ DevIncludes_DATA = \
 	htsopt.h \
 	htswrap.h \
 	htsconfig.h \
-	../config.h \
+	../htsfeatures.h \
 	htsmodules.h \
 	htsbasenet.h \
 	htsnet.h \
@@ -20,6 +20,7 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libhttrack.pc
 
 AM_CPPFLAGS = \
+	-DHTS_INTERNAL_BUILD \
 	@DEFAULT_CFLAGS@ \
 	@THREADS_CFLAGS@ \
 	@V6_FLAG@ \

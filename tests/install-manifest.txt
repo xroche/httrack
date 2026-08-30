@@ -69,12 +69,12 @@
 @DATADIR@/pixmaps/httrack16x16.xpm
 @DATADIR@/pixmaps/httrack32x32.xpm
 @DATADIR@/pixmaps/httrack48x48.xpm
-@INCLUDEDIR@/httrack/config.h
 @INCLUDEDIR@/httrack/htsarrays.h
 @INCLUDEDIR@/httrack/htsbasenet.h
 @INCLUDEDIR@/httrack/htsbauth.h
 @INCLUDEDIR@/httrack/htsconfig.h
 @INCLUDEDIR@/httrack/htsdefines.h
+@INCLUDEDIR@/httrack/htsfeatures.h
 @INCLUDEDIR@/httrack/htsglobal.h
 @INCLUDEDIR@/httrack/htsmodules.h
 @INCLUDEDIR@/httrack/htsnet.h
