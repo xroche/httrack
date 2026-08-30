@@ -50,12 +50,16 @@ resolve() { # resolve DIR LINK, both relative to ${stage}
 
 # history.txt, license.txt and greetings.txt sit at the repo root, so index.html
 # has to reach them with "../" for tools/doc-links.py, and that "../" is one
-# level too high once the install puts all four in the same directory.
+# level too high once the install puts them beside it in $(htmldir).
 gaps=(
-    "index.html ../history.txt"
     "index.html ../license.txt"
     "index.html ../greetings.txt"
 )
+# history.txt is the exception: HelpHtmlroot_DATA installs it into $(docdir) as
+# well, so its "../" lands on a real file wherever docdir is htmldir's parent.
+docdir=${CONFIGURED_DOCDIR:?not run under make check}
+test "${docdir%/}" = "${htmldir%/*}" || gaps+=("index.html ../history.txt")
+
 gap_seen=()
 for i in "${!gaps[@]}"; do gap_seen[i]=; done
 
