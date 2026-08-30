@@ -1,0 +1,150 @@
+#!/bin/bash
+# A multilib host keeps the 64-bit zlib in lib64, Debian under a multiarch
+# triplet. The DIR/lib --with-zlib=DIR used to append holds nothing there,
+# or the wrong ABI.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+test -r "${srcdir}/configure" || skip "no configure in ${srcdir}"
+
+# $CC carries its flags on some hosts (macOS configures gcc -std=gnu23), so it
+# is an argv, never one word.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+# The fixture symlinks a real library. macOS has kept no on-disk libz.dylib
+# since 11, so the last resort is the SDK's libz.tbd stub, which -lz accepts
+# and the macro's libz.* glob matches.
+sys_lib=
+for name in libz.so libz.dylib libz.tbd libz.a; do
+    cand=$("${cc_argv[@]}" -print-file-name="${name}") || cand=
+    if test -f "${cand}"; then
+        sys_lib=${cand}
+        break
+    fi
+done
+if test -z "${sys_lib}" && command -v xcrun >/dev/null 2>&1; then
+    sdk=$(xcrun --show-sdk-path) || sdk=
+    for name in libz.tbd libz.dylib libz.a; do
+        if test -n "${sdk}" && test -f "${sdk}/usr/lib/${name}"; then
+            sys_lib=${sdk}/usr/lib/${name}
+            break
+        fi
+    done
+fi
+test -n "${sys_lib}" ||
+    skip "${cc_argv[*]} and the SDK offer no libz.so/.dylib/.tbd/.a for the fixture"
+
+cpp_out=$(printf '#include <zlib.h>\n' | "${cc_argv[@]}" -E -xc -) ||
+    skip "${cc_argv[*]} cannot preprocess a bare <zlib.h>"
+# Capture then match: piping into a truncating reader SIGPIPEs the sed upstream.
+hdrs=$(sed -n 's/^#[ 0-9]*"\([^"]*zlib\.h\)".*/\1/p' <<<"${cpp_out}")
+sys_hdr=${hdrs%%$'\n'*}
+test -f "${sys_hdr}" || skip "no system zlib.h to build a fixture from"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/zlibdir.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+# automake refuses an out-of-tree configure when srcdir holds a config.status,
+# which an in-tree build leaves there; a symlink farm without that one file is
+# the same tree to configure.
+shadow=${work}/srcdir
+mkdir -p "${shadow}"
+for entry in "${srcdir}"/*; do
+    test "${entry##*/}" = config.status || ln -s "${entry}" "${shadow}/"
+done
+test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
+
+# A prefix holding a real zlib in each named subdirectory and nowhere else.
+fixture() { # fixture NAME SUBDIR...
+    local name=$1 sub
+    shift
+    mkdir -p "${work}/${name}/include"
+    ln -s "${sys_hdr}" "${work}/${name}/include/zlib.h"
+    for sub in "$@"; do
+        mkdir -p "${work}/${name}/${sub}"
+        ln -s "${sys_lib}" "${work}/${name}/${sub}/${sys_lib##*/}"
+    done
+    echo "${work}/${name}"
+}
+
+# One cache for every run: nothing cached here depends on the prefix or the
+# libdir, and a cold configure is the whole cost of this test.
+cache=${work}/config.cache
+n=0
+cases=6 # expect/expect_fail calls below, what the budget is paced against
+
+run_configure() { # run_configure DIR ARG...
+    local dir=$1
+    shift
+    mkdir -p "${dir}"
+    # zlib has nothing to do with TLS, and a keg-only openssl (brew) makes
+    # --enable-https a hard error.
+    (cd "${dir}" && bash "${shadow}/configure" --cache-file="${cache}" \
+        --enable-https=auto "$@") >"${dir}/configure.log" 2>&1
+}
+
+expect() { # expect WANT-SUBDIR REJECTED-SUBDIR DESC PREFIX ARG...
+    local want=$1 nope=$2 desc=$3 prefix=$4
+    shift 4
+    local dir line began=${SECONDS}
+    n=$((n + 1))
+    dir=${work}/build${n}
+    run_configure "${dir}" --with-zlib="${prefix}" "$@" || {
+        tail -20 "${dir}/configure.log" >&2
+        fail "${desc}: configure failed"
+    }
+    line=$(sed -n 's/^LDFLAGS = *//p' "${dir}/src/Makefile")
+    test -n "${line}" || fail "${desc}: src/Makefile carries no LDFLAGS line"
+    case " ${line} " in
+    *" -L${prefix}/${want} "*) ;;
+    *) fail "${desc}: expected -L${prefix}/${want}, got: ${line}" ;;
+    esac
+    case " ${line} " in
+    *" -L${prefix}/${nope} "*) fail "${desc}: also picked -L${prefix}/${nope}: ${line}" ;;
+    esac
+    echo "ok: ${desc} -> ${want}"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+}
+
+expect_fail() { # expect_fail DESC PREFIX
+    local desc=$1 prefix=$2 dir began=${SECONDS}
+    n=$((n + 1))
+    dir=${work}/build${n}
+    ! run_configure "${dir}" --with-zlib="${prefix}" ||
+        fail "${desc}: configure accepted a prefix with no libz under it"
+    grep -q 'no libz found' "${dir}/configure.log" ||
+        fail "${desc}: configure failed without naming the missing library"
+    echo "ok: ${desc}"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+}
+
+# The subdirectory names are the fixture's own, not the host's, so every case
+# below means the same thing on a platform that has no real lib64 (macOS, and
+# this box): what they exercise is the macro's candidate order, which is shell.
+lib_only=$(fixture lib-only lib)
+lib64_only=$(fixture lib64-only lib64)
+both=$(fixture both lib lib64)
+multiarch=$(fixture multiarch lib lib/x86_64-linux-gnu)
+headers_only=$(fixture headers-only)
+
+# The control first: a plain lib prefix must keep resolving exactly as before,
+# or every lib64 answer below could come from a macro that always says lib64.
+expect lib lib64 "a lib-only prefix resolves" "${lib_only}"
+expect lib64 lib "a lib64-only prefix resolves" "${lib64_only}"
+
+# With both populated the probe cannot decide, so these two pin the derivation
+# from the configured libdir rather than the order the candidates are tried in.
+expect lib lib64 "the default libdir picks lib" "${both}" --prefix="${work}/inst"
+expect lib64 lib "--libdir picks lib64" "${both}" \
+    --prefix="${work}/inst" --libdir="${work}/inst/lib64"
+expect lib/x86_64-linux-gnu lib "a multiarch libdir picks the triplet" "${multiarch}" \
+    --prefix="${work}/inst" --libdir="${work}/inst/lib/x86_64-linux-gnu"
+
+expect_fail "a prefix with no libz is rejected" "${headers_only}"
+
+assert_steps_ran "${cases}" "${n}"
