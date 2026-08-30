@@ -48,7 +48,7 @@ if [ "${EXAMPLE_LIBS:-yes}" = yes ]; then
     for name in ${plugins}; do
         got=$(built "${name}")
         test -n "${got}" || fail "lib${name} is missing from ${stage}${libdir}/httrack"
-        grep -q "\.so\|\.dylib" <<<"${got}" ||
+        grep -qE '\.so|\.dylib' <<<"${got}" ||
             fail "lib${name} installed no shared object: ${got}"
     done
     ok "the ten example plugins install by default"
