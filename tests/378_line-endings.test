@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# A CR in shipped text draws rpmlint's wrong-file-end-of-line-encoding, so every
+# rpm packager runs dos2unix over our files. The GUI catalogs are the one
+# deliberate exception, and .gitattributes is where that decision is recorded.
+
+set -euo pipefail
+export LC_ALL=C
+
+top="${top_srcdir:-..}"
+
+# Line endings live in the index, and a distcheck tarball unpacked inside the
+# checkout has none of its own.
+if ! command -v git >/dev/null 2>&1 ||
+    ! git -C "$top" ls-files --error-unmatch .gitattributes >/dev/null 2>&1; then
+    echo "no checkout here, so there is no index to read line endings from"
+    exit 77
+fi
+
+fail=0
+bad() {
+    echo "$*"
+    fail=1
+}
+
+keeps_crlf() {
+    case "$1" in
+    # WinHTTrack and other out-of-tree readers want the catalogs CRLF.
+    lang.def | lang/*.txt) return 0 ;;
+    # Byte-exact fuzz vectors: the CRs are part of the input.
+    fuzz/corpus/*) return 0 ;;
+    esac
+    return 1
+}
+
+# "i/<eol> w/<eol> attr/<pins>", a tab, then the path. A blob git holds as
+# binary reads i/-text, and a symlink or submodule reads i/ with nothing after.
+walked=0
+while IFS= read -r line; do
+    walked=$((walked + 1))
+    case "${line%%[[:space:]]*}" in
+    i/crlf | i/mixed) ;;
+    *) continue ;;
+    esac
+    path=${line#*$'\t'}
+    keeps_crlf "$path" ||
+        bad "$path carries CR line endings; convert it, or pin it and list it here"
+done < <(git -C "$top" ls-files --eol)
+
+# A listing that came back short would satisfy the loop vacuously.
+[ "$walked" -gt 100 ] || bad "git ls-files --eol listed only $walked entries"
+
+# -text, not eol=crlf: the latter renormalizes the blob to LF on the next add.
+pinned=0
+while read -r f; do
+    pinned=$((pinned + 1))
+    pin=$(git -C "$top" check-attr text -- "$f" | sed 's/.*: //')
+    [ "$pin" = unset ] ||
+        bad "$f is pinned text=$pin, not -text, so git may rewrite its endings"
+done < <(git -C "$top" ls-files -- lang.def 'lang/*.txt')
+[ "$pinned" -gt 20 ] || bad "only $pinned catalogs listed; the -text pin covers nothing"
+
+# Converted for the packagers; the pin is what stops a Windows checkout undoing it.
+for f in httrack-doc.html src/proxy/AUTHORS src/proxy/changelog.txt; do
+    pin=$(git -C "$top" check-attr text eol -- "$f" | sed 's/.*: //' | tr '\n' '/')
+    [ "$pin" = "set/lf/" ] ||
+        bad "$f is pinned text/eol=${pin%/}, not set/lf"
+done
+
+[ "$fail" -eq 0 ] || exit 1
+
+echo "line endings: $walked tracked entries, LF everywhere but the $pinned catalogs git is told to leave alone"

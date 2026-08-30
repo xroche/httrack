@@ -15,3 +15,17 @@ templates/*.html text eol=lf
 
 # Tab-separated data: the generator rejects a stray CR by design.
 *.tsv text eol=lf
+
+# Shipped as documentation, where a CR draws rpmlint and a packager's dos2unix.
+httrack-doc.html text eol=lf
+src/proxy/AUTHORS text eol=lf
+src/proxy/changelog.txt text eol=lf
+
+# WinHTTrack and other out-of-tree readers expect the catalogs CRLF, so git
+# must convert neither end. -text, not eol=crlf: the latter would renormalize
+# every blob to LF on the next add.
+lang.def -text
+lang/*.txt -text
+
+# Byte-exact fuzz vectors, whatever their line endings look like.
+fuzz/corpus/** -text
