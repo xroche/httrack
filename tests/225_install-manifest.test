@@ -84,7 +84,13 @@ fold() {
 # An install that staged nothing matches nothing; say that, not a 300-line diff.
 grep -qx '@BINDIR@/httrack' "${work}/actual" || fail "nothing staged under ${stage}"
 
-LC_ALL=C sort "${manifest}" >"${work}/expected"
+# The example plugins are the only thing under @LIBDIR@/httrack, so dropping
+# them keeps the rest of the manifest pinned on a --disable-example-libs build.
+if [ "${EXAMPLE_LIBS:-yes}" = yes ]; then
+    LC_ALL=C sort "${manifest}" >"${work}/expected"
+else
+    grep -v '^@LIBDIR@/httrack/' "${manifest}" | LC_ALL=C sort >"${work}/expected"
+fi
 diff -u "${work}/expected" "${work}/actual" ||
     fail "the installed file set changed; update tests/install-manifest.txt and say so in the release notes -- Fedora's %files and debian/*.files name these files"
 

@@ -597,6 +597,29 @@ AC_ARG_ENABLE([online-unit-tests],
 	])
 AC_SUBST(ONLINE_UNIT_TESTS,$online_unit_tests)
 
+## Example callback plugins (libtest/): documentation samples every distribution
+## has to un-install by hand.
+AC_MSG_CHECKING(whether to build the example callback plugins)
+AC_ARG_ENABLE([example-libs],
+	[AS_HELP_STRING([--disable-example-libs],[Do not build or install the libtest/ example callback plugins; their sources install either way @<:@default=yes@:>@])],
+	[
+	case "${enableval}" in
+	no|yes)
+		example_libs=$enableval
+		AC_MSG_RESULT($enableval)
+		;;
+	*)
+		AC_MSG_ERROR(bad value for example-libs, expected yes/no)
+		;;
+	esac
+	],
+	[
+	example_libs=yes
+	AC_MSG_RESULT(yes)
+	])
+AM_CONDITIONAL([EXAMPLE_LIBS], [test x"$example_libs" = x"yes"])
+AC_SUBST(EXAMPLE_LIBS,$example_libs)
+
 ## libFuzzer harnesses (fuzz/); requires clang
 AC_MSG_CHECKING(whether to build fuzzers)
 AC_ARG_ENABLE([fuzzers],

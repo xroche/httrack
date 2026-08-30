@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# Fedora, openSUSE, OpenBSD and Void each undo the libtest plugin install by
+# hand; --disable-example-libs does it for them, and must still install the
+# example sources, which are the part their doc packages ship.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${abs_top_builddir:?not run under make check}"
+bindir="${CONFIGURED_BINDIR:?not run under make check}"
+libdir="${CONFIGURED_LIBDIR:?not run under make check}"
+datadir="${CONFIGURED_DATADIR:?not run under make check}"
+
+case "$HTS_OS" in
+Linux | Darwin) ;;
+*) skip "the plugin install layout is checked on Linux and macOS only" ;;
+esac
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/examplelibs.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+stage=${work}/stage
+env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir}" \
+    install DESTDIR="${stage}" >"${work}/install.log" 2>&1 ||
+    fail_dump "make install DESTDIR=${stage}" "${work}/install.log"
+
+# An install that staged nothing has no plugins either, and would read as a pass.
+test -r "${stage}${bindir%/}/httrack" || fail "nothing staged under ${stage}"
+
+plugins="baselinks changecontent contentfilter displayheader filename filename2
+    filenameiisbug listlinks log simple"
+
+# The sources are the useful half and are not gated: assert them either way.
+examples=${stage}${datadir%/}/httrack/libtest
+for name in ${plugins}; do
+    assert_file "${examples}/callbacks-example-${name}.c" "example source"
+done
+assert_file "${examples}/readme.txt" "example readme"
+
+# Any name libtool may give the built plugin, so a hit is a build product and not
+# just the directory being there.
+built() { ls "${stage}${libdir%/}/httrack/lib$1."* 2>/dev/null || true; }
+
+if [ "${EXAMPLE_LIBS:-yes}" = yes ]; then
+    for name in ${plugins}; do
+        got=$(built "${name}")
+        test -n "${got}" || fail "lib${name} is missing from ${stage}${libdir}/httrack"
+        grep -q "\.so\|\.dylib" <<<"${got}" ||
+            fail "lib${name} installed no shared object: ${got}"
+    done
+    ok "the ten example plugins install by default"
+else
+    for name in ${plugins}; do
+        got=$(built "${name}")
+        test -z "${got}" ||
+            fail "--disable-example-libs still installed lib${name}: ${got}"
+    done
+    ok "--disable-example-libs installs no plugin, the example sources stay"
+fi

@@ -27,7 +27,8 @@ AM_LDFLAGS = \
 	-L../src \
 	@LIBC_FORCE_LINK@
 
-# Examples
+# Examples; --disable-example-libs keeps the sources above and drops these.
+if EXAMPLE_LIBS
 libbaselinks_la_SOURCES =  callbacks-example-baselinks.c
 libbaselinks_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) $(top_builddir)/src/libhttrack.la
 libbaselinks_la_LDFLAGS = $(AM_LDFLAGS) -version-info 1:0:0
@@ -59,3 +60,4 @@ libsimple_la_SOURCES =  callbacks-example-simple.c
 libsimple_la_LIBADD = $(THREADS_LIBS) $(SOCKET_LIBS) $(top_builddir)/src/libhttrack.la
 libsimple_la_LDFLAGS = $(AM_LDFLAGS) -version-info 1:0:0
 pkglib_LTLIBRARIES = libbaselinks.la libchangecontent.la libcontentfilter.la libdisplayheader.la libfilename2.la libfilename.la libfilenameiisbug.la liblistlinks.la liblog.la libsimple.la
+endif
