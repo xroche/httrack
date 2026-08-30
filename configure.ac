@@ -423,6 +423,20 @@ AX_CHECK_ALIGNED_ACCESS_REQUIRED
 # check for various headers
 AC_CHECK_HEADERS([execinfo.h sys/ioctl.h sys/random.h])
 
+## The header can exist while backtrace() lives in another library (Termux's
+## libandroid-execinfo); only httrack links it, so keep it out of LIBS.
+BACKTRACE_LIBS=
+AS_CASE([$host_os], [linux*],
+	[AS_IF([test "x$ac_cv_header_execinfo_h" = xyes],
+		[hts_backtrace_save_libs=$LIBS
+		AC_SEARCH_LIBS([backtrace], [execinfo android-execinfo],
+			[AC_DEFINE([HAVE_BACKTRACE], [1],
+				[Define to 1 if backtrace() can be linked.])
+			AS_IF([test "x$ac_cv_search_backtrace" != "xnone required"],
+				[BACKTRACE_LIBS=$ac_cv_search_backtrace])])
+		LIBS=$hts_backtrace_save_libs])])
+AC_SUBST([BACKTRACE_LIBS])
+
 ## CSPRNG for the --single-file mark; /dev/urandom is the fallback
 AC_CHECK_FUNCS([getrandom])
 

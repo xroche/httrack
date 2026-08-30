@@ -57,7 +57,8 @@ Please visit our Website: http://www.httrack.com
 #define USES_SIGALTSTACK
 #define BT_ALTSTACK_MIN (64 * 1024) /* floor: the report needs ~10kB */
 #endif
-#if (defined(__linux) && defined(HAVE_EXECINFO_H))
+/* HAVE_BACKTRACE means the symbol links, not just that the header exists. */
+#if (defined(__linux) && defined(HAVE_BACKTRACE))
 #include <dlfcn.h>
 #include <errno.h>
 #include <execinfo.h>
