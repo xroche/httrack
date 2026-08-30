@@ -18,7 +18,7 @@ EXTRA_DIST = INSTALL.Linux \
 
 # The suite's staged installs serialise on this; a killed holder leaves it behind.
 clean-local:
-	-rm -f $(builddir)/.install-lock $(builddir)/.install-lock.breaker
+	-rm -f $(builddir)/.install-lock
 
 # Build the signed Debian packages from a clean source export. Pass the signing
 # key and other options through DEB_FLAGS, e.g.:

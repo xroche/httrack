@@ -439,15 +439,16 @@ expect_ok() {
 # A staged install writes to its own DESTDIR but runs make in the ONE build tree
 # the suite shares, and a top-level "make install" relinks each libtest plugin in
 # place: two at once and one moves away the .so the other is mid-move on, leaving
-# the tree short a file make will not rebuild. The lock is one file holding its
-# owner's pid; macOS has no flock(1).
+# the tree short a file make will not rebuild. The lock is one file naming the pid
+# that holds it; macOS has no flock(1).
 : "${INSTALL_LOCK:=${abs_top_builddir:-.}/.install-lock}"
 # Seconds one holder may keep the lock before a waiter calls the run broken. Per
 # holder, not per wait: a queue of legitimate installs is not a fault.
 : "${INSTALL_LOCK_TIMEOUT:=300}"
-# Seconds the lock may sit empty, which spans only its creation and the write of
-# the pid into it. Longer than that and nobody is coming back for it.
-: "${INSTALL_LOCK_ORPHAN:=10}"
+# Seconds a lock must go on naming nobody alive before a waiter reports it stale.
+# A holder that exits normally takes its lock with it well inside this, so the
+# wait is what tells a released lock from an abandoned one.
+: "${INSTALL_LOCK_STALE:=10}"
 
 # $1's pid into $INSTALL_LOCK_PID, empty when the file is absent or still being
 # written: a $(cat) here would fork on every poll tick (#795). The 2> comes first,
@@ -457,37 +458,16 @@ install_lock_read_pid() { # install_lock_read_pid LOCKFILE
     read -r INSTALL_LOCK_PID 2>/dev/null <"$1" || true
 }
 
-# Create lock $1 naming $2 as its owner, or fail because it exists. noclobber is
+# Create the lock naming $1 as its owner, or fail because it exists. noclobber is
 # O_EXCL, so the file and the identity of who holds it arrive in one step: a lock
 # claimed first and stamped afterwards can be stamped by the wrong process.
-install_lock_stamp() { # install_lock_stamp LOCKFILE PID
+install_lock_stamp() { # install_lock_stamp PID
     local had_c='' rc=0
     case $- in *C*) had_c=1 ;; esac
     set -C
-    printf '%s\n' "$2" 2>/dev/null >"$1" || rc=1
+    printf '%s\n' "$1" 2>/dev/null >"${INSTALL_LOCK}" || rc=1
     test -n "${had_c}" || set +C
     return "${rc}"
-}
-
-# Take the lock from $1, already proven dead. Only the breaker's holder may remove
-# the lock, so the read that judges the owner and the removal cannot be split by a
-# second reclaimer: nothing deletes a lock it has not itself just read as that
-# corpse, and a dead pid cannot come back to change it.
-install_lock_reclaim() { # install_lock_reclaim DEAD-PID
-    local breaker="${INSTALL_LOCK}.breaker"
-    if ! install_lock_stamp "${breaker}" "$$"; then
-        # Three statements long, so a breaker whose owner is gone was abandoned.
-        install_lock_read_pid "${breaker}"
-        if test -n "${INSTALL_LOCK_PID}" && ! kill -0 "${INSTALL_LOCK_PID}" 2>/dev/null; then
-            rm -f "${breaker}"
-        fi
-        return 0
-    fi
-    install_lock_read_pid "${INSTALL_LOCK}"
-    if test "${INSTALL_LOCK_PID}" = "$1"; then
-        rm -f "${INSTALL_LOCK}"
-    fi
-    rm -f "${breaker}"
 }
 
 install_lock_release() {
@@ -498,22 +478,27 @@ install_lock_release() {
     rm -f "${INSTALL_LOCK}"
 }
 
-# Non-zero, with a reason, when the tree cannot be handed over safely: a waiter
-# that forces its way past a live holder is the very collision this serialises.
+# Non-zero, with a reason, rather than any waiter deciding whose lock it is to
+# delete: only the process named inside one removes it, and that process is alive
+# for as long as it runs. An abandoned lock therefore survives, and is reported to
+# be cleared by hand -- reclaiming it automatically was three rounds of putting
+# two installs in the tree at once, because "remove the thing I judged" is not
+# something rm and mv can express: both name a path, not the file that was read.
 install_lock_acquire() {
     local held_by=- since=$SECONDS
-    until install_lock_stamp "${INSTALL_LOCK}" "$$"; do
+    until install_lock_stamp "$$"; do
         install_lock_read_pid "${INSTALL_LOCK}"
         if test "${INSTALL_LOCK_PID}" != "${held_by}"; then
             held_by=${INSTALL_LOCK_PID}
             since=$SECONDS
         fi
-        if test -n "${held_by}" && ! kill -0 "${held_by}" 2>/dev/null; then
-            install_lock_reclaim "${held_by}"
-        elif test -z "${held_by}" &&
-            test "$((SECONDS - since))" -ge "${INSTALL_LOCK_ORPHAN}"; then
-            install_lock_reclaim ""
-        elif test "$((SECONDS - since))" -ge "${INSTALL_LOCK_TIMEOUT}"; then
+        if test "$((SECONDS - since))" -ge "${INSTALL_LOCK_STALE}" &&
+            { test -z "${held_by}" || ! kill -0 "${held_by}" 2>/dev/null; }; then
+            echo "install lock: ${INSTALL_LOCK} names ${held_by:-nobody}, which is gone;" \
+                "a killed holder left it behind, so remove it to run staged installs again" >&2
+            return 1
+        fi
+        if test "$((SECONDS - since))" -ge "${INSTALL_LOCK_TIMEOUT}"; then
             echo "install lock: ${INSTALL_LOCK} held by ${held_by:-nobody}" \
                 "for ${INSTALL_LOCK_TIMEOUT}s" >&2
             return 1

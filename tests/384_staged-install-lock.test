@@ -18,25 +18,47 @@ export TESTLIB
 work=$(mktemp -d "${TMPDIR:-/tmp}/installlock.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
-# Every make install in the suite goes through the helper. Whole logical lines
-# with the quoted text removed, so a continuation cannot hide the target and a
-# helper named inside a message cannot vouch for the line it sits on.
+# Every make install in the suite goes through the helper. Candidates are judged
+# on the whole logical line, quotes included, so a command wrapped in a string
+# cannot hide; only the vouching name is looked for outside the quotes, or a
+# helper named in a failure message would speak for the line it sits on.
 lint=${work}/lint.awk
 cat >"${lint}" <<'AWK'
+BEGIN {
+    TARGET = "(^|[^[:alnum:]_./-])([i]nstall(-[A-Za-z0-9]+)*|[D]ESTDIR)([^[:alnum:]_.-]|$)"
+    MAKEISH = "(^|[^[:alnum:]_])(make|MAKE|gmake)([^[:alnum:]_]|$)|-C[[:space:]]"
+    HELPER = "run_with_install_lock|stage_install_target|stage_install_exec"
+}
 function scrub(s) {
     gsub(/"[^"]*"/, "", s)
     gsub(/'[^']*'/, "", s)
     return s
 }
+# A line whose only commands report is about an install, not one. What such a
+# message runs in a substitution of its own is not looked at.
+function is_message(t,   n, i, a) {
+    gsub(/[0-9]*[<>]+&?[0-9]*/, " ", t)
+    gsub(/[|&;(){}]/, " ", t)
+    n = split(t, a, /[[:space:]]+/)
+    for (i = 1; i <= n; i++) {
+        if (a[i] == "")
+            continue
+        if (a[i] !~ /^(fail|fail_dump|skip|ok|echo|printf|dump_file)$/)
+            return 0
+    }
+    return 1
+}
 function check(s,   t) {
-    if (s ~ /^[[:space:]]*#/)
+    if (s ~ /^[[:space:]]*#/ || s !~ TARGET)
+        return
+    # An install target alone is someone else's package manager.
+    if (s !~ MAKEISH && s !~ HELPER)
         return
     t = scrub(s)
-    # [i]nstall, so this pattern does not read as an install itself.
-    if (t !~ /(^|[^[:alnum:]_.\/-])([i]nstall(-[A-Za-z0-9]+)?|[D]ESTDIR)([^[:alnum:]_.-]|$)/)
+    if (is_message(t))
         return
     calls++
-    if (t ~ /run_with_install_lock|stage_install_target|stage_install_exec/)
+    if (t ~ HELPER)
         return
     bad++
     print FILENAME ":" FNR ": " s
@@ -52,14 +74,16 @@ totals_of() { sed -n 's/^TOTALS //p' <<<"$1"; }
 offenders_of() { grep -v '^TOTALS ' <<<"$1" || true; }
 
 cd "${srcdir}/tests"
-files=(*.sh)
+files=(*.sh *.py)
 # shfmt reads a leading [0-9] glob as an array index, so add it after.
 for f in [0-9]*_*.test; do files+=("${f}"); done
 test "${#files[@]}" -ge 9 || fail "the lint found only ${#files[@]} files to scan"
-case " ${files[*]} " in
-*" testlib.sh "*) ;;
-*) fail "the lint no longer reaches the .sh helpers, where an install can hide" ;;
-esac
+for must in testlib.sh local-server.py; do
+    case " ${files[*]} " in
+    *" ${must} "*) ;;
+    *) fail "the lint no longer reaches ${must}, where an install can hide" ;;
+    esac
+done
 
 report=$(lint_files "${files[@]}")
 read -r calls bad <<<"$(totals_of "${report}")"
@@ -71,7 +95,7 @@ test "${bad}" -eq 0 || {
 test "${calls}" -ge 10 || fail "the lint saw only ${calls} such lines, the suite has more"
 ok "${calls} staged-install lines, all through the lock"
 
-# Five ways to skip the lock, four of them invisible to a file-level grep.
+# Ways to skip the lock, all but the first invisible to a file-level grep.
 dirty=${work}/dirty
 mkdir -p "${dirty}"
 printf '%s\n' 'env make -C build install DESTDIR=/tmp/s >log 2>&1' >"${dirty}/raw.test"
@@ -81,11 +105,27 @@ printf '%s\n' 'make -C build install prefix=/tmp/p' >"${dirty}/noDESTDIR.test"
 printf '%s\n' 'do_install() { make -C build install-exec DESTDIR=/tmp/s; }' >"${dirty}/helper.sh"
 printf '%s\n' 'make -C build install DESTDIR=/tmp/s || fail "use run_with_install_lock"' \
     >"${dirty}/named-in-a-message.test"
+printf '%s\n' 'make -C build install-exec-am DESTDIR=/tmp/s' >"${dirty}/two-hyphens.test"
+printf '%s\n' 'sh -c "make -C build install DESTDIR=/tmp/s"' >"${dirty}/in-quotes.test"
+printf '%s\n' '"make" -C build "install" prefix=/tmp/p' >"${dirty}/quoted-target.test"
+printf '%s\n' 'subprocess.run(["make", "-C", "build", "install"], check=True)' >"${dirty}/from.py"
 for f in "${dirty}"/*; do
     read -r _ bad <<<"$(totals_of "$(lint_files "${f}")")"
     test "${bad}" -ge 1 || fail "the lint cannot see the install in $(basename "${f}")"
 done
-ok "the lint sees a raw, a second, a DESTDIR-less, a helper-file and a vouched install"
+ok "the lint sees $(find "${dirty}" -type f | lines_of /dev/stdin) ways to skip it"
+
+# And leaves alone what only talks about one: a lint that reds on apt-get would
+# be turned off the day it is pointed at tools/.
+clean=${work}/clean
+mkdir -p "${clean}"
+printf '%s\n' 'sudo apt-get install -y shellcheck shfmt' >"${clean}/package.sh"
+printf '%s\n' 'fail "make install DESTDIR=/tmp/s"' >"${clean}/message.sh"
+for f in "${clean}"/*; do
+    read -r _ bad <<<"$(totals_of "$(lint_files "${f}")")"
+    test "${bad}" -eq 0 || fail "the lint reds on $(basename "${f}"), which runs no install"
+done
+ok "the lint leaves a package install and a failure message alone"
 
 cd "${work}"
 export INSTALL_LOCK="${work}/lock"
@@ -95,7 +135,7 @@ export SECTION_SECS=0.25
 workers=8
 rounds=3
 export BARRIER_POLL=0.05
-reclaim_budget=10
+stale_budget=10
 
 # One process per worker, not a subshell: the lock is owned by a pid, and a
 # subshell inherits $$.
@@ -133,15 +173,11 @@ run_workers() { # run_workers 0|1
         fail "wanted $((workers * 2)) section lines, got $(lines_of "${SECTIONS}")"
 }
 
-# $1 is a pid whose IN has no OUT, or empty. Every other section must close before
-# the next one opens.
-serialised() { # serialised [KILLED-PID]
-    awk -v killed="${1:-}" '
-        $2 == killed { next }
-        { seen++
-          if (seen % 2) { want = ($1 == "IN"); pid = $2 }
-          else { want = ($1 == "OUT" && $2 == pid) }
-          if (!want) exit 1 }' "${SECTIONS}"
+# Every section must close before the next one opens.
+serialised() {
+    awk '{ if (NR % 2) { want = ($1 == "IN"); pid = $2 }
+           else { want = ($1 == "OUT" && $2 == pid) }
+           if (!want) exit 1 }' "${SECTIONS}"
 }
 
 # The control first, and never gated behind the lint above: a probe blind to the
@@ -157,40 +193,41 @@ for ((round = 1; round <= rounds; round++)); do
 done
 ok "the lock serialises ${workers} holders, ${rounds} rounds"
 
-# Directly: a reclaim whose judgement went stale must leave the lock alone, since
-# by then it names a live holder. Nothing here races, so it holds on every box.
-install_lock_stamp "${INSTALL_LOCK}" "$$" || fail "could not stamp a lock to defend"
-install_lock_reclaim 999999
-install_lock_read_pid "${INSTALL_LOCK}"
-test "${INSTALL_LOCK_PID}" = "$$" ||
-    fail "reclaim removed a lock it had not proven was the corpse it judged"
-rm -f "${INSTALL_LOCK}"
-ok "a reclaim acting on a stale judgement leaves the live lock alone"
-
-# A holder killed under the harness leaves a lock nobody will release. Exactly one
-# of the waiters may reclaim it: a check-then-act reclaim hands it to all of them,
-# and the losers must not evict whoever won. Repeated, since it is a race.
+# A holder killed outright leaves a lock nobody is allowed to remove, since only
+# the process named inside one removes it. Every waiter must refuse and name the
+# file, none may enter, and the lock must still be there afterwards: each of the
+# three reclaim designs tried here handed that lock to two waiters at once.
 for ((round = 1; round <= rounds; round++)); do
-    rm -f "${BARRIER}"
+    rm -f "${BARRIER}" "${work}/stale.log"
     : >"${SECTIONS}"
     touch "${BARRIER}"
     USE_LOCK=1 HOLD=1 bash "${worker}" &
     corpse=$!
     start=${SECONDS}
     until test "$(lines_of "${SECTIONS}")" -ge 1; do
-        test $((SECONDS - start)) -lt "${reclaim_budget}" || fail "the corpse never took the lock"
+        test $((SECONDS - start)) -lt "${stale_budget}" || fail "the corpse never took the lock"
         sleep "${BARRIER_POLL}"
     done
     kill -9 "${corpse}" 2>/dev/null || true
     wait "${corpse}" 2>/dev/null || true
-    start=${SECONDS}
-    run_workers 1
-    test $((SECONDS - start)) -lt "${reclaim_budget}" ||
-        fail "round ${round}: reclaiming a dead holder's lock took $((SECONDS - start))s"
-    serialised "${corpse}" ||
-        fail "round ${round}: the dead holder's lock went to more than one waiter: $(tr '\n' ' ' <"${SECTIONS}")"
+    pids=()
+    for ((i = 0; i < workers; i++)); do
+        USE_LOCK=1 INSTALL_LOCK_STALE=1 bash "${worker}" 2>>"${work}/stale.log" &
+        pids+=($!)
+    done
+    for p in "${pids[@]}"; do
+        wait "${p}" && fail "round ${round}: a waiter took the lock a killed holder left"
+    done
+    test "$(lines_of "${SECTIONS}")" -eq 1 ||
+        fail "round ${round}: a waiter ran its section anyway: $(tr '\n' ' ' <"${SECTIONS}")"
+    install_lock_read_pid "${INSTALL_LOCK}"
+    test "${INSTALL_LOCK_PID}" = "${corpse}" ||
+        fail "round ${round}: the stale lock was removed, pid is now [${INSTALL_LOCK_PID}]"
+    grep -q "${INSTALL_LOCK}" "${work}/stale.log" ||
+        fail "round ${round}: the refusal does not name the file to remove"
+    rm -f "${INSTALL_LOCK}"
 done
-ok "a dead holder's lock is reclaimed once, by one waiter, ${rounds} rounds"
+ok "a lock left by a killed holder is refused and named, never taken, ${rounds} rounds"
 
 # A live holder is never evicted: past the deadline the waiter fails the run rather
 # than install alongside it.
@@ -201,13 +238,13 @@ USE_LOCK=1 SECTION_SECS=4 bash "${worker}" &
 holder=$!
 start=${SECONDS}
 until test "$(lines_of "${SECTIONS}")" -ge 1; do
-    test $((SECONDS - start)) -lt "${reclaim_budget}" || fail "the holder never took the lock"
+    test $((SECONDS - start)) -lt "${stale_budget}" || fail "the holder never took the lock"
     sleep "${BARRIER_POLL}"
 done
 start=${SECONDS}
 INSTALL_LOCK_TIMEOUT=1 run_with_install_lock touch "${work}/ran" 2>"${work}/backstop.log" &&
     fail "a waiter walked in on a live holder"
-test $((SECONDS - start)) -lt "${reclaim_budget}" || fail "the deadline never fired"
+test $((SECONDS - start)) -lt "${stale_budget}" || fail "the deadline never fired"
 # The command must not run either: an acquire failure the wrapper drops is an
 # install with no lock at all.
 test ! -e "${work}/ran" || fail "the command ran without the lock"
