@@ -1,0 +1,77 @@
+# Fedora patches files we ship before running our suite, and a patch that
+# corrupts one only surfaces when a packager reports it: the %prep iconv of
+# html/contact.html double-encoded it from 3.49.18 to #1463. This builds master
+# through their own spec so we hear it first. Their tree, so a red here can be
+# theirs to fix, which is why it blocks nothing.
+name: fedora spec canary
+
+on:
+  schedule:
+    - cron: "43 5 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rpmbuild:
+    name: rpmbuild against Fedora's spec
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    container: fedora:latest
+    steps:
+      - name: Install rpm tooling
+        run: |
+          set -euo pipefail
+          dnf -y install --setopt=install_weak_deps=False \
+            git-core rpm-build dnf-plugins-core sudo tar gzip curl
+
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Fetch the spec and point it at this tree
+        run: |
+          set -euo pipefail
+          curl -fsSL -o httrack.spec \
+            https://src.fedoraproject.org/rpms/httrack/raw/rawhide/f/httrack.spec
+          ver=$(sed -n 's/.*HTTRACK_VERSIONID "\([^"]*\)".*/\1/p' src/htsglobal.h)
+          coucal=$(git -C src/coucal rev-parse HEAD)
+          test -n "$ver" && test -n "$coucal"
+          # Their pinned coucal is not what we build against, and a drift there
+          # would red this job for a reason the spec did not cause.
+          sed -i -e "s/^Version:.*/Version:        $ver/" \
+            -e "s/^%global coucal_commit .*/%global coucal_commit $coucal/" httrack.spec
+          echo "ver=$ver" >> "$GITHUB_ENV"
+
+      - name: Build the sources the spec expects
+        run: |
+          set -euo pipefail
+          mkdir -p ~/rpmbuild/SOURCES "exp/httrack-${ver}"
+          git archive HEAD | tar -x -C "exp/httrack-${ver}"
+          # GitHub's archive leaves the gitlink as an empty directory, and %prep
+          # rmdir's it before moving coucal in.
+          mkdir -p "exp/httrack-${ver}/src/coucal"
+          tar czf ~/rpmbuild/SOURCES/"httrack-${ver}.tar.gz" -C exp "httrack-${ver}"
+          coucal=$(git -C src/coucal rev-parse HEAD)
+          git -C src/coucal archive --prefix="coucal-${coucal}/" HEAD |
+            gzip >~/rpmbuild/SOURCES/"coucal-${coucal}.tar.gz"
+
+      - name: Install build dependencies
+        run: dnf -y builddep --setopt=install_weak_deps=False httrack.spec
+
+      # As mock does: the suite must not run as root, or the fixtures that turn
+      # on a denied write pass for the wrong reason.
+      - name: rpmbuild, %check included
+        run: |
+          set -euo pipefail
+          useradd -m builder
+          cp httrack.spec ~builder/
+          cp -r ~/rpmbuild ~builder/rpmbuild
+          chown -R builder ~builder
+          sudo -u builder rpmbuild -bb --nodeps ~builder/httrack.spec
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat ~builder/rpmbuild/BUILD/*/tests/test-suite.log 2>/dev/null || true
