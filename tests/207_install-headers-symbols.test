@@ -83,7 +83,8 @@ links "$pos" || {
 
 # Override the install dir rather than DESTDIR: same rule and file list, no
 # prefix guessing. Empty MAKEFLAGS, or the sub-make hunts a jobserver it lacks.
-env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+run_with_install_lock env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" \
+    install-DevIncludesDATA \
     DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
     {
         cat "$tmp/install.log" >&2

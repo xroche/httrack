@@ -17,9 +17,7 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/doclinks.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 stage=${work}/stage
-if ! env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir}" \
-    install DESTDIR="${stage}" >"${work}/install.log" 2>&1; then
-    dump_file "${work}/install.log"
+if ! stage_install_target install "${stage}" "${work}/install.log" .; then
     skip "cannot stage an install, so no layout to resolve against"
 fi
 

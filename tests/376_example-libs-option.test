@@ -23,9 +23,8 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/examplelibs.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
 stage=${work}/stage
-env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" -C "${abs_top_builddir}" \
-    install DESTDIR="${stage}" >"${work}/install.log" 2>&1 ||
-    fail_dump "make install DESTDIR=${stage}" "${work}/install.log"
+stage_install_target install "${stage}" "${work}/install.log" . ||
+    fail "make install DESTDIR=${stage}"
 
 # An install that staged nothing has no plugins either, and would read as a pass.
 test -r "${stage}${bindir%/}/httrack" || fail "nothing staged under ${stage}"

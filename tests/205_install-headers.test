@@ -48,7 +48,8 @@ fi
 # Override the install dir rather than use DESTDIR: same rule and file list, no
 # guessing at the prefix. Empty MAKEFLAGS, or the sub-make reaches for a
 # jobserver the test driver did not hand it.
-env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+run_with_install_lock env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" \
+    install-DevIncludesDATA \
     DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
     {
         cat "$tmp/install.log" >&2

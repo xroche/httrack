@@ -36,7 +36,8 @@ printf '#include <stdio.h>\n' >"$tmp/tu.c"
     skip "${cc_argv[*]} cannot compile a bare <stdio.h>"
 
 # Same rule and file list the install uses, redirected rather than DESTDIR'd.
-env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+run_with_install_lock env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" \
+    install-DevIncludesDATA \
     DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
     {
         cat "$tmp/install.log" >&2
