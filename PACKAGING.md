@@ -50,17 +50,17 @@ counts rather than the exit status. There are over 400 tests; a run reporting a
 couple of hundred is one that mostly skipped.
 
 A buildroot's network is not a builder's. Fedora's mock gives loopback and a
-default route with no resolver, where a UDP connect succeeds and names no source
-address. Debian's sbuild leaves out the default route, so the same connect fails
-outright. `tools/buildroot-net.sh <command>` reproduces the mock shape, and our
-CI runs the whole suite under it. Failures land in `tests/test-suite.log` and in
-a per-test `tests/NNN_*.log`.
+default route with no resolver, where a UDP `connect()` succeeds but returns no
+source address. Debian's sbuild leaves out the default route, so the same
+connect fails outright. `tools/buildroot-net.sh <command>` reproduces the mock
+shape, and our CI runs the whole suite under it. Failures land in
+`tests/test-suite.log` and in a per-test `tests/NNN_*.log`.
 
 ## When you need a patch
 
 Send it upstream, even when you have already applied it locally. A patch carried
-in a recipe is a bug report we never received: we cannot fix or keep working what
-we cannot see, and it breaks at your next version bump, in your build.
+in a recipe is a bug report we never received: we cannot fix a bug we never hear
+about, and it breaks at your next version bump, in your build.
 
 Issues go to <https://github.com/xroche/httrack/issues>, security reports to
 [SECURITY.md](SECURITY.md). We build master through Fedora's spec on a schedule
