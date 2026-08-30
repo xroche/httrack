@@ -95,7 +95,11 @@ scan() {
 }
 
 ## the tree itself
-mapfile -t sources < <(find "$src" -path "$src/coucal" -prune -o -name '*.[ch]' -print | sort)
+# macOS's bash 3.2 has no mapfile, and a pipe would append inside a subshell.
+sources=()
+while IFS= read -r file; do sources+=("$file"); done < <(
+    find "$src" -path "$src/coucal" -prune -o -name '*.[ch]' -print | sort
+)
 [ "${#sources[@]}" -gt 0 ] || fail "no sources under $src"
 found=$(scan "${sources[@]}")
 
