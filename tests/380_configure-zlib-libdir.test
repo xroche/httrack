@@ -1,0 +1,121 @@
+#!/bin/bash
+# --with-zlib=DIR must find the library where the host keeps it: a multilib
+# distribution puts the 64-bit copy in lib64 and Debian under a multiarch
+# triplet, where the DIR/lib the macro used to append holds nothing, or the
+# wrong ABI.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+test -r "${srcdir}/configure" || skip "no configure in ${srcdir}"
+
+cc=${CC:-cc}
+sys_lib=$("${cc}" -print-file-name=libz.so 2>/dev/null || true)
+test -f "${sys_lib}" || sys_lib=$("${cc}" -print-file-name=libz.a 2>/dev/null || true)
+test -f "${sys_lib}" || skip "no linkable system libz to build a fixture from"
+sys_hdr=$(printf '#include <zlib.h>\n' | "${cc}" -E -xc - 2>/dev/null |
+    sed -n 's/^#[ 0-9]*"\([^"]*zlib\.h\)".*/\1/p' | head -1)
+test -f "${sys_hdr}" || skip "no system zlib.h to build a fixture from"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/zlibdir.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+# automake refuses an out-of-tree configure when srcdir holds a config.status,
+# which an in-tree build leaves there; a symlink farm without that one file is
+# the same tree to configure.
+shadow=${work}/srcdir
+mkdir -p "${shadow}"
+for entry in "${srcdir}"/*; do
+    test "${entry##*/}" = config.status || ln -s "${entry}" "${shadow}/"
+done
+test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
+
+# A prefix holding a real zlib in each named subdirectory and nowhere else.
+fixture() { # fixture NAME SUBDIR...
+    local name=$1 sub
+    shift
+    mkdir -p "${work}/${name}/include"
+    ln -s "${sys_hdr}" "${work}/${name}/include/zlib.h"
+    for sub in "$@"; do
+        mkdir -p "${work}/${name}/${sub}"
+        ln -s "${sys_lib}" "${work}/${name}/${sub}/${sys_lib##*/}"
+    done
+    echo "${work}/${name}"
+}
+
+# One cache for every run: nothing cached here depends on the prefix or the
+# libdir, and a cold configure is the whole cost of this test.
+cache=${work}/config.cache
+n=0
+cases=6 # expect/expect_fail calls below, what the budget is paced against
+
+run_configure() { # run_configure DIR ARG...
+    local dir=$1
+    shift
+    mkdir -p "${dir}"
+    # zlib has nothing to do with TLS, and a keg-only openssl (brew) makes
+    # --enable-https a hard error.
+    (cd "${dir}" && bash "${shadow}/configure" --cache-file="${cache}" \
+        --enable-https=auto "$@") >"${dir}/configure.log" 2>&1
+}
+
+expect() { # expect WANT-SUBDIR REJECTED-SUBDIR DESC PREFIX ARG...
+    local want=$1 nope=$2 desc=$3 prefix=$4
+    shift 4
+    local dir line began=${SECONDS}
+    n=$((n + 1))
+    dir=${work}/build${n}
+    run_configure "${dir}" --with-zlib="${prefix}" "$@" || {
+        tail -20 "${dir}/configure.log" >&2
+        fail "${desc}: configure failed"
+    }
+    line=$(sed -n 's/^LDFLAGS = *//p' "${dir}/src/Makefile")
+    test -n "${line}" || fail "${desc}: src/Makefile carries no LDFLAGS line"
+    case " ${line} " in
+    *" -L${prefix}/${want} "*) ;;
+    *) fail "${desc}: expected -L${prefix}/${want}, got: ${line}" ;;
+    esac
+    case " ${line} " in
+    *" -L${prefix}/${nope} "*) fail "${desc}: also picked -L${prefix}/${nope}: ${line}" ;;
+    esac
+    echo "ok: ${desc} -> ${want}"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+}
+
+expect_fail() { # expect_fail DESC PREFIX
+    local desc=$1 prefix=$2 dir began=${SECONDS}
+    n=$((n + 1))
+    dir=${work}/build${n}
+    ! run_configure "${dir}" --with-zlib="${prefix}" ||
+        fail "${desc}: configure accepted a prefix with no libz under it"
+    grep -q 'no libz found' "${dir}/configure.log" ||
+        fail "${desc}: configure failed without naming the missing library"
+    echo "ok: ${desc}"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+}
+
+lib_only=$(fixture lib-only lib)
+lib64_only=$(fixture lib64-only lib64)
+both=$(fixture both lib lib64)
+multiarch=$(fixture multiarch lib lib/x86_64-linux-gnu)
+headers_only=$(fixture headers-only)
+
+# The control first: a plain lib prefix must keep resolving exactly as before,
+# or every lib64 answer below could come from a macro that always says lib64.
+expect lib lib64 "a lib-only prefix resolves" "${lib_only}"
+expect lib64 lib "a lib64-only prefix resolves" "${lib64_only}"
+
+# With both populated the probe cannot decide, so these two pin the derivation
+# from the configured libdir rather than the order the candidates are tried in.
+expect lib lib64 "the default libdir picks lib" "${both}" --prefix="${work}/inst"
+expect lib64 lib "--libdir picks lib64" "${both}" \
+    --prefix="${work}/inst" --libdir="${work}/inst/lib64"
+expect lib/x86_64-linux-gnu lib "a multiarch libdir picks the triplet" "${multiarch}" \
+    --prefix="${work}/inst" --libdir="${work}/inst/lib/x86_64-linux-gnu"
+
+expect_fail "a prefix with no libz is rejected" "${headers_only}"
+
+assert_steps_ran "${cases}" "${n}"

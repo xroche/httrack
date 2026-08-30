@@ -253,14 +253,7 @@ AS_CASE([$host_os],
 		hts_origin_ref='$ORIGIN'
 		hts_origin_ref_make='\$$ORIGIN'])
 
-hts_save_prefix=$prefix
-hts_save_exec_prefix=$exec_prefix
-test "x$prefix" = xNONE && prefix=$ac_default_prefix
-test "x$exec_prefix" = xNONE && exec_prefix=$prefix
-eval hts_libdir=\"$libdir\"
-eval hts_libdir=\"$hts_libdir\"
-prefix=$hts_save_prefix
-exec_prefix=$hts_save_exec_prefix
+HTS_EXPAND_LIBDIR
 
 # Enumerated, not read from libtool's sys_lib_dlsearch_path_spec: that one is
 # only augmented when /etc/ld.so.conf exists, so a sysroot or minimal container
