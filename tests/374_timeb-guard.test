@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# <sys/timeb.h> is gone from Android's bionic, and no CI leg compiles against a
-# libc that lacks it, so only a source lint can keep an unguarded include out.
+# Android's bionic dropped <sys/timeb.h>.
+# No CI leg builds against a libc lacking it, so only a source lint can catch it.
 
 set -euo pipefail
 
@@ -10,35 +10,86 @@ set -euo pipefail
 
 src="${abs_top_srcdir:-${testdir}/..}/src"
 
-# Prints "OK|BAD <file>:<line>" per include; BAD means no enclosing _WIN32 arm.
+# Prints "OK|BAD <file>:<line>" for every <sys/timeb.h> include, "struct timeb" and
+# ftime() call. BAD means no enclosing arm proves _WIN32 is defined, and anything the
+# grammar cannot prove reads BAD: a redundant guard costs a line, a missed one costs
+# the Android build. One false BAD is left in on purpose: an "#if 0" arm is dead
+# rather than Windows-only, and nobody guards a header that way.
 scan() {
-    awk '
-    function winlike(s) { return s ~ /(_WIN32|WIN32|_MSC_VER)/ }
-    FNR == 1 { d = 0 }
-    /^[ \t]*#[ \t]*if/ {
-        d++
-        cond = $0; sub(/^[ \t]*#[ \t]*/, "", cond)
-        pos[d] = 0; inv[d] = 0
-        if (cond ~ /^ifdef[ \t]/ && winlike(cond)) pos[d] = 1
-        else if (cond ~ /^ifndef[ \t]/ && winlike(cond)) inv[d] = 1
-        else if (cond ~ /![ \t]*defined/ && winlike(cond)) inv[d] = 1
-        else if (cond ~ /defined/ && winlike(cond)) pos[d] = 1
-        w[d] = pos[d]
-        next
+    LC_ALL=C awk '
+    # One record per open #if level, indexed by depth:
+    #   win_arm[depth]      the arm open right now is reachable only when a Windows
+    #                       macro is defined, so anything inside it is guarded
+    #   else_is_win[depth]  the level opened on exactly !WINDOWS, which is what makes
+    #                       its facing #else (and any #elif) Windows-only
+    BEGIN {
+        # Anchored end to end, so a decorated term ("== 0", a trailing paren,
+        # HAVE_WIN32API_JUNK) matches nothing and proves nothing.
+        win = "(_WIN32|WIN32|_WIN64|_MSC_VER)"
+        is_win = "^(defined[ ]*\\([ ]*" win "[ ]*\\)|defined[ ]+" win "|" win ")$"
+        is_not_win = "^![ ]*(defined[ ]*\\([ ]*" win "[ ]*\\)|defined[ ]+" win "|" win ")$"
+        # ftime( must not match strftime(, and _ftime() is the Windows spelling.
+        uses_timeb = "(^|[^A-Za-z_0-9])(struct[ ]+timeb|ftime[ ]*\\()"
     }
-    /^[ \t]*#[ \t]*elif/ {
-        if (d > 0) { pos[d] = 0; inv[d] = 0; w[d] = winlike($0) && $0 !~ /![ \t]*defined/ }
-        next
+
+    # Comment text decides nothing; an unterminated /* carries over to the next line.
+    function uncomment(s,   out, block_at, eol_at) {
+        out = ""
+        while (s != "") {
+            if (in_comment) {
+                if (match(s, /\*\//)) { s = substr(s, RSTART + 2); in_comment = 0 }
+                else return out
+            } else {
+                block_at = index(s, "/*"); eol_at = index(s, "//")
+                if (block_at > 0 && (eol_at == 0 || block_at < eol_at)) {
+                    out = out substr(s, 1, block_at - 1) " "
+                    s = substr(s, block_at + 2); in_comment = 1
+                } else if (eol_at > 0) return out substr(s, 1, eol_at - 1)
+                else return out s
+            }
+        }
+        return out
     }
-    /^[ \t]*#[ \t]*else/ {
-        if (d > 0) { if (pos[d]) w[d] = 0; else if (inv[d]) w[d] = 1 }
-        next
+
+    function squeeze(s) { gsub(/[ \t]+/, " ", s); sub(/^ /, "", s); sub(/ $/, "", s); return s }
+
+    # Does this condition, on its own, prove a Windows macro is defined?
+    # A disjunction proves nothing about either side, so only && chains qualify.
+    function opens_win(cond,   n, term, i) {
+        if (cond ~ /\|\|/) return 0
+        n = split(cond, term, "&&")
+        for (i = 1; i <= n; i++) if (squeeze(term[i]) ~ is_win) return 1
+        return 0
     }
-    /^[ \t]*#[ \t]*endif/ { if (d > 0) d--; next }
-    /^[ \t]*#[ \t]*include[ \t]*[<"]sys\/timeb\.h[>"]/ {
-        g = 0
-        for (i = 1; i <= d; i++) if (w[i]) g = 1
-        print (g ? "OK " : "BAD ") FILENAME ":" FNR
+
+    FNR == 1 { depth = 0; in_comment = 0; pending = "" }
+
+    {
+        line = uncomment($0)
+        if (line ~ /\\[ \t]*$/) { sub(/\\[ \t]*$/, " ", line); pending = pending line; next }
+        line = pending line; pending = ""
+        hit = 0
+
+        if (line ~ /^[ \t]*#/) {
+            sub(/^[ \t]*#[ \t]*/, "", line)
+            if (match(line, /^[a-z]+/)) {
+                kw = substr(line, 1, RLENGTH); arg = squeeze(substr(line, RLENGTH + 1))
+                if (kw == "if")          { depth++; win_arm[depth] = opens_win(arg); else_is_win[depth] = (arg ~ is_not_win) }
+                else if (kw == "ifdef")  { depth++; win_arm[depth] = (arg ~ is_win); else_is_win[depth] = 0 }
+                else if (kw == "ifndef") { depth++; win_arm[depth] = 0;              else_is_win[depth] = (arg ~ is_win) }
+                else if (kw == "elif")   { if (depth) win_arm[depth] = opens_win(arg) || else_is_win[depth] }
+                else if (kw == "else")   { if (depth) win_arm[depth] = else_is_win[depth] }
+                else if (kw == "endif")  { if (depth) depth-- }
+                else if (kw == "include" && arg ~ /^[<"]sys\/timeb\.h[>"]/) hit = 1
+            }
+        } else if (line ~ uses_timeb) hit = 1
+
+        if (hit) {
+            guarded = 0
+            for (i = 1; i <= depth; i++) if (win_arm[i]) guarded = 1
+            verdict = guarded ? "OK " : "BAD "
+            print verdict FILENAME ":" FNR
+        }
     }
     ' "$@"
 }
@@ -49,33 +100,49 @@ mapfile -t sources < <(find "$src" -path "$src/coucal" -prune -o -name '*.[ch]' 
 found=$(scan "${sources[@]}")
 
 # A scanner that matched nothing would report a clean tree just as well.
-[ -n "$found" ] || fail "the scan found no <sys/timeb.h> at all; htslib.c has one"
+[ -n "$found" ] || fail "the scan found no timeb use at all; htslib.c has three"
 
 bad=$(grep '^BAD ' <<<"$found" || true)
-[ -z "$bad" ] || fail "unguarded <sys/timeb.h>, which bionic does not ship:
+[ -z "$bad" ] || fail "unguarded timeb use, which bionic does not ship:
 $bad"
 
 ## controls, one per way the scanner could go blind
 work=$(mktemp -d "${TMPDIR:-/tmp}/timeb.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "$work"
 
+# control <name> <want> <body>...; one file per body, all scanned in one awk run.
 control() {
-    local name=$1 want=$2 body=$3 f="${work}/${1}.h" got
-    printf '%s\n' "$body" >"$f"
-    got=$(scan "$f" | cut -d' ' -f1)
+    local name=$1 want=$2 got i=0 files=()
+    shift 2
+    for body; do
+        i=$((i + 1))
+        printf '%s\n' "$body" >"${work}/${name}.${i}.h"
+        files+=("${work}/${name}.${i}.h")
+    done
+    got=$(scan "${files[@]}" | cut -d' ' -f1)
     [ "$got" = "$want" ] || fail "control $name: scanner said '$got', wanted '$want'"
 }
 
+# an include with nothing above it, and the one arm shape that guards it
 control bare BAD '#include <sys/timeb.h>'
-control ifdef OK '#ifdef _WIN32
+control nested OK '#ifdef _WIN32
+#if HAVE_FOO
+#include <sys/timeb.h>
+#endif
+#endif'
+control msc_ver OK '#ifdef _MSC_VER
 #include <sys/timeb.h>
 #endif'
+
+# #else flips the verdict, and only for a level that opened on !WINDOWS
 control ifndef_else OK '#ifndef _WIN32
 #include <sys/time.h>
 #else
 #include <sys/timeb.h>
 #endif'
-control ifndef BAD '#ifndef _WIN32
+control not_defined_else OK '#if !defined(_WIN32)
+#include <sys/time.h>
+#else
 #include <sys/timeb.h>
 #endif'
 control ifdef_else BAD '#ifdef _WIN32
@@ -83,17 +150,89 @@ control ifdef_else BAD '#ifdef _WIN32
 #else
 #include <sys/timeb.h>
 #endif'
-control nested OK '#ifdef _WIN32
-#if HAVE_FOO
+
+# #elif opens an arm of its own, and leaves the level polarity #else answers to
+control elif_win OK '#ifdef HAVE_FOO
+#include <foo.h>
+#elif defined(_WIN32)
 #include <sys/timeb.h>
-#endif
 #endif'
+control elif_else BAD '#ifdef HAVE_FOO
+#include <foo.h>
+#elif defined(_WIN32)
+#include <windows.h>
+#else
+#include <sys/timeb.h>
+#endif'
+control ifndef_elif_else OK '#ifndef _WIN32
+#include <sys/time.h>
+#elif HAVE_FOO
+#include <foo.h>
+#else
+#include <sys/timeb.h>
+#endif'
+control unknown_else BAD '#ifdef HAVE_FOO
+#include <foo.h>
+#else
+#include <sys/timeb.h>
+#endif'
+
+# a condition that does not prove _WIN32 is defined, however much it mentions it
+control or_compound BAD '#if defined(_WIN32) || defined(__CYGWIN__)
+#include <sys/timeb.h>
+#endif'
+control or_binds_looser BAD '#if defined(__CYGWIN__) || defined(FOO) && defined(_WIN32)
+#include <sys/timeb.h>
+#endif'
+control not_win_and BAD '#if !defined(FOO) && defined(_WIN32)
+#include <windows.h>
+#else
+#include <sys/timeb.h>
+#endif'
+control compare_zero BAD '#if defined(_WIN32) == 0
+#include <sys/timeb.h>
+#endif'
+control substring BAD '#ifdef HAVE_WIN32API_JUNK
+#include <sys/timeb.h>
+#endif'
+control macro_prefix BAD '#ifdef _WIN32_LEAN_AND_MEAN
+#include <sys/timeb.h>
+#endif'
+control macro_suffix BAD '#ifdef MY_OWN_WIN32
+#include <sys/timeb.h>
+#endif'
+control comment_text BAD '#ifdef HAVE_FOO /* not _WIN32 */
+#include <sys/timeb.h>
+#endif'
+
+# shapes the scanner must not lose track of
+control bare_macro OK '#if _WIN32
+#include <sys/timeb.h>
+#endif'
+control continuation OK '#if defined(HAVE_FOO) && \
+    defined(_WIN32)
+#include <sys/timeb.h>
+#endif'
+control commented_out '' '/*
+#include <sys/timeb.h>
+*/'
 control after_endif BAD '#ifdef _WIN32
 #include <windows.h>
 #endif
 #include <sys/timeb.h>'
-control not_defined BAD '#if defined(HAVE_TIMEB)
-#include <sys/timeb.h>
-#endif'
+control spelling 'BAD
+BAD' "$(printf '#\tinclude\t<sys/timeb.h>\n#  include <sys/timeb.h>')"
 
-echo "OK: every <sys/timeb.h> in src/ sits behind a _WIN32 arm"
+# depth must not leak from one file into the next: the tree scan is one awk run.
+control two_files BAD '#ifdef _WIN32
+#include <windows.h>' '#include <sys/timeb.h>'
+
+# the type and the call, not just the include
+control struct_use BAD 'struct timeb B;'
+control ftime_use BAD 'ftime(&B);'
+control struct_guarded OK '#ifdef _WIN32
+struct timeb B;
+#endif'
+control strftime_is_not_ftime '' 'strftime(s, 250, "%H:%M:%S", &tmv);'
+
+echo "OK: every timeb use in src/ sits behind a _WIN32 arm"
