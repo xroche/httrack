@@ -1,0 +1,41 @@
+# Fifteen distributions carry recipes for us, and each encodes assumptions about
+# our tree: a patch's context, a path a sed rewrites, a string an ebuild greps
+# for before editing it. Nothing tells us when one stops holding, so the
+# packager finds out at their next version bump and we hear about it as a bug.
+# Gentoo's src_prepare dies today on a grep of m4/check_zlib.m4 that we
+# rewrote. Their files, so a finding here is usually theirs to fix, which is why
+# it blocks nothing.
+name: downstream drift canary
+
+on:
+  schedule:
+    - cron: "17 6 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: downstream recipes against this tree
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install autotools
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            autoconf automake libtool autoconf-archive
+
+      # Termux patches Makefile.in, which is a build product here.
+      - name: Generate the files a downstream patches
+        run: ./bootstrap
+
+      - name: Check the live recipes
+        run: tools/downstream-drift.sh
