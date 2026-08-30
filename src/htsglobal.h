@@ -179,23 +179,40 @@ Please visit our Website: http://www.httrack.com
 
 /* Install paths and config-file names. HTTRACKRC is the per-user rc filename,
    HTTRACKCNF the system-wide config, HTTRACKDIR the shared data directory; the
-   ETC/BIN/LIB/PREFIX paths are the defaults these derive from when not set by
-   the build. */
+   ETC/BIN/LIB/PREFIX paths follow the directories configure was given. A build
+   that defines none (MSVC, or a consumer including this header standalone)
+   falls back to the literals. */
 #ifdef _WIN32
 #define HTS_HTTRACKRC "httrackrc"
 #else
 
 #ifndef HTS_ETCPATH
+#ifdef SYSCONFDIR
+#define HTS_ETCPATH SYSCONFDIR
+#else
 #define HTS_ETCPATH "/etc"
 #endif
+#endif
 #ifndef HTS_BINPATH
+#ifdef BINDIR
+#define HTS_BINPATH BINDIR
+#else
 #define HTS_BINPATH "/usr/bin"
 #endif
+#endif
 #ifndef HTS_LIBPATH
+#ifdef LIBDIR
+#define HTS_LIBPATH LIBDIR
+#else
 #define HTS_LIBPATH "/usr/lib"
 #endif
+#endif
 #ifndef HTS_PREFIX
+#ifdef PREFIX
+#define HTS_PREFIX PREFIX
+#else
 #define HTS_PREFIX "/usr"
+#endif
 #endif
 
 #define HTS_HTTRACKRC ".httrackrc"
