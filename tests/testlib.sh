@@ -439,48 +439,94 @@ expect_ok() {
 # A staged install writes to its own DESTDIR but runs make in the ONE build tree
 # the suite shares, and a top-level "make install" relinks each libtest plugin in
 # place: two at once and one moves away the .so the other is mid-move on, leaving
-# the tree short a file make will not rebuild. mkdir is the portable atomic
-# claim, macOS having no flock(1).
-: "${INSTALL_LOCK_DIR:=${abs_top_builddir:-.}/.install-lock}"
-# Seconds. Backstop for a holder killed between its mkdir and its pid file; any
-# later death the pid check sees at once.
+# the tree short a file make will not rebuild. The lock is one file holding its
+# owner's pid; macOS has no flock(1).
+: "${INSTALL_LOCK:=${abs_top_builddir:-.}/.install-lock}"
+# Seconds one holder may keep the lock before a waiter calls the run broken. Per
+# holder, not per wait: a queue of legitimate installs is not a fault.
 : "${INSTALL_LOCK_TIMEOUT:=300}"
+# Seconds the lock may sit empty, which spans only its creation and the write of
+# the pid into it. Longer than that and nobody is coming back for it.
+: "${INSTALL_LOCK_ORPHAN:=10}"
 
-# An unreadable pid file means the holder has yet to write it: assume alive.
-install_lock_holder_alive() {
-    local pid
-    pid=$(cat "${INSTALL_LOCK_DIR}/pid" 2>/dev/null) || return 0
-    test -n "${pid}" || return 0
-    kill -0 "${pid}" 2>/dev/null
+# $1's pid into $INSTALL_LOCK_PID, empty when the file is absent or still being
+# written: a $(cat) here would fork on every poll tick (#795). The 2> comes first,
+# or the failing input redirection still reports a missing file.
+install_lock_read_pid() { # install_lock_read_pid LOCKFILE
+    INSTALL_LOCK_PID=
+    read -r INSTALL_LOCK_PID 2>/dev/null <"$1" || true
 }
 
-# Ownership-checked: the copy cleanup_push runs later must not drop a lock some
-# other test has since taken.
-install_lock_release() {
-    test -d "${INSTALL_LOCK_DIR}" || return 0
-    test "$(cat "${INSTALL_LOCK_DIR}/pid" 2>/dev/null)" = "$$" || return 0
-    rm -rf "${INSTALL_LOCK_DIR}"
+# Create lock $1 naming $2 as its owner, or fail because it exists. noclobber is
+# O_EXCL, so the file and the identity of who holds it arrive in one step: a lock
+# claimed first and stamped afterwards can be stamped by the wrong process.
+install_lock_stamp() { # install_lock_stamp LOCKFILE PID
+    local had_c='' rc=0
+    case $- in *C*) had_c=1 ;; esac
+    set -C
+    printf '%s\n' "$2" 2>/dev/null >"$1" || rc=1
+    test -n "${had_c}" || set +C
+    return "${rc}"
 }
 
-install_lock_acquire() {
-    local waited=0
-    until mkdir "${INSTALL_LOCK_DIR}" 2>/dev/null; do
-        if ! install_lock_holder_alive ||
-            test $((waited / 10)) -ge "${INSTALL_LOCK_TIMEOUT}"; then
-            rm -rf "${INSTALL_LOCK_DIR}"
-            waited=0
+# Take the lock from $1, already proven dead. Only the breaker's holder may remove
+# the lock, so the read that judges the owner and the removal cannot be split by a
+# second reclaimer: nothing deletes a lock it has not itself just read as that
+# corpse, and a dead pid cannot come back to change it.
+install_lock_reclaim() { # install_lock_reclaim DEAD-PID
+    local breaker="${INSTALL_LOCK}.breaker"
+    if ! install_lock_stamp "${breaker}" "$$"; then
+        # Three statements long, so a breaker whose owner is gone was abandoned.
+        install_lock_read_pid "${breaker}"
+        if test -n "${INSTALL_LOCK_PID}" && ! kill -0 "${INSTALL_LOCK_PID}" 2>/dev/null; then
+            rm -f "${breaker}"
         fi
-        sleep 0.1
-        waited=$((waited + 1))
+        return 0
+    fi
+    install_lock_read_pid "${INSTALL_LOCK}"
+    if test "${INSTALL_LOCK_PID}" = "$1"; then
+        rm -f "${INSTALL_LOCK}"
+    fi
+    rm -f "${breaker}"
+}
+
+install_lock_release() {
+    install_lock_read_pid "${INSTALL_LOCK}"
+    # cleanup_push replays this at exit and must not drop a lock some other test
+    # has since taken.
+    test "${INSTALL_LOCK_PID}" = "$$" || return 0
+    rm -f "${INSTALL_LOCK}"
+}
+
+# Non-zero, with a reason, when the tree cannot be handed over safely: a waiter
+# that forces its way past a live holder is the very collision this serialises.
+install_lock_acquire() {
+    local held_by=- since=$SECONDS
+    until install_lock_stamp "${INSTALL_LOCK}" "$$"; do
+        install_lock_read_pid "${INSTALL_LOCK}"
+        if test "${INSTALL_LOCK_PID}" != "${held_by}"; then
+            held_by=${INSTALL_LOCK_PID}
+            since=$SECONDS
+        fi
+        if test -n "${held_by}" && ! kill -0 "${held_by}" 2>/dev/null; then
+            install_lock_reclaim "${held_by}"
+        elif test -z "${held_by}" &&
+            test "$((SECONDS - since))" -ge "${INSTALL_LOCK_ORPHAN}"; then
+            install_lock_reclaim ""
+        elif test "$((SECONDS - since))" -ge "${INSTALL_LOCK_TIMEOUT}"; then
+            echo "install lock: ${INSTALL_LOCK} held by ${held_by:-nobody}" \
+                "for ${INSTALL_LOCK_TIMEOUT}s" >&2
+            return 1
+        fi
+        poll_wait 1
     done
-    printf '%s\n' "$$" >"${INSTALL_LOCK_DIR}/pid"
     cleanup_push install_lock_release
 }
 
 # Run one command against the shared build tree, alone.
-with_install_lock() { # with_install_lock CMD ARG...
+run_with_install_lock() { # run_with_install_lock CMD ARG...
     local rc=0
-    install_lock_acquire
+    install_lock_acquire || return 1
     "$@" || rc=$?
     install_lock_release
     return "${rc}"
@@ -492,10 +538,10 @@ with_install_lock() { # with_install_lock CMD ARG...
 # hunt.
 stage_install_target() {
     local target=$1 dest=$2 log=$3 dir=${4:-src}
-    with_install_lock env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" \
+    run_with_install_lock env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" \
         -C "${abs_top_builddir:?}/${dir}" \
         "${target}" DESTDIR="${dest}" >"${log}" 2>&1 && return 0
-    cat "${log}" >&2
+    dump_file "${log}"
     return 1
 }
 

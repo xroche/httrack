@@ -16,6 +16,10 @@ EXTRA_DIST = INSTALL.Linux \
 		tools/ci-sanitizer-report.sh \
 		tools/downstream-drift.sh
 
+# The suite's staged installs serialise on this; a killed holder leaves it behind.
+clean-local:
+	-rm -f $(builddir)/.install-lock $(builddir)/.install-lock.breaker
+
 # Build the signed Debian packages from a clean source export. Pass the signing
 # key and other options through DEB_FLAGS, e.g.:
 #   make deb DEB_FLAGS="--key BB71C7E6CB1AD8FAF53FE42A60C3AA7180598EFB"

@@ -47,7 +47,8 @@ if ! "${cc_argv[@]}" ${cpp_argv[@]+"${cpp_argv[@]}"} -fsyntax-only "$tmp/tu.c" 2
     exit 77
 fi
 
-env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" install-DevIncludesDATA \
+run_with_install_lock env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" \
+    install-DevIncludesDATA \
     DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
     {
         cat "$tmp/install.log" >&2

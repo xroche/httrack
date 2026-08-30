@@ -2,7 +2,8 @@
 #
 # A top-level "make install" relinks the libtest plugins inside the build tree the
 # suite shares, so two staged installs at once lose a .so. Assert the lock that
-# serialises them excludes, reclaims a dead holder's, and is taken by every test.
+# serialises them excludes, hands a dead holder's lock to exactly one waiter,
+# refuses to take a live one's, and is taken by every install in the suite.
 
 set -euo pipefail
 
@@ -10,32 +11,107 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 srcdir="${abs_top_srcdir:?not run under make check}"
+# Resolved before any cd: $0 is relative under the test driver.
+TESTLIB=$(cd "$(dirname "$0")" && pwd)/testlib.sh
+export TESTLIB
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/installlock.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
-export INSTALL_LOCK_DIR="${work}/lock"
-TESTLIB=$(cd "$(dirname "$0")" && pwd)/testlib.sh
-export TESTLIB
+# Every make install in the suite goes through the helper. Whole logical lines
+# with the quoted text removed, so a continuation cannot hide the target and a
+# helper named inside a message cannot vouch for the line it sits on.
+lint=${work}/lint.awk
+cat >"${lint}" <<'AWK'
+function scrub(s) {
+    gsub(/"[^"]*"/, "", s)
+    gsub(/'[^']*'/, "", s)
+    return s
+}
+function check(s,   t) {
+    if (s ~ /^[[:space:]]*#/)
+        return
+    t = scrub(s)
+    # [i]nstall, so this pattern does not read as an install itself.
+    if (t !~ /(^|[^[:alnum:]_.\/-])([i]nstall(-[A-Za-z0-9]+)?|[D]ESTDIR)([^[:alnum:]_.-]|$)/)
+        return
+    calls++
+    if (t ~ /run_with_install_lock|stage_install_target|stage_install_exec/)
+        return
+    bad++
+    print FILENAME ":" FNR ": " s
+}
+{ line = line $0 }
+/\\$/ { sub(/\\[[:space:]]*$/, "", line); next }
+{ check(line); line = "" }
+END { print "TOTALS " calls+0 " " bad+0 }
+AWK
+
+lint_files() { awk -f "${lint}" "$@"; }
+totals_of() { sed -n 's/^TOTALS //p' <<<"$1"; }
+offenders_of() { grep -v '^TOTALS ' <<<"$1" || true; }
+
+cd "${srcdir}/tests"
+files=(*.sh)
+# shfmt reads a leading [0-9] glob as an array index, so add it after.
+for f in [0-9]*_*.test; do files+=("${f}"); done
+test "${#files[@]}" -ge 9 || fail "the lint found only ${#files[@]} files to scan"
+case " ${files[*]} " in
+*" testlib.sh "*) ;;
+*) fail "the lint no longer reaches the .sh helpers, where an install can hide" ;;
+esac
+
+report=$(lint_files "${files[@]}")
+read -r calls bad <<<"$(totals_of "${report}")"
+test "${bad}" -eq 0 || {
+    offenders_of "${report}" >&2
+    fail "the lines above run a build-tree make outside the lock"
+}
+# An empty candidate list would satisfy the line above without reading anything.
+test "${calls}" -ge 10 || fail "the lint saw only ${calls} such lines, the suite has more"
+ok "${calls} staged-install lines, all through the lock"
+
+# Five ways to skip the lock, four of them invisible to a file-level grep.
+dirty=${work}/dirty
+mkdir -p "${dirty}"
+printf '%s\n' 'env make -C build install DESTDIR=/tmp/s >log 2>&1' >"${dirty}/raw.test"
+printf '%s\n' 'stage_install_target install /tmp/s /tmp/l .' \
+    'make -C build install DESTDIR=/tmp/s' >"${dirty}/second.test"
+printf '%s\n' 'make -C build install prefix=/tmp/p' >"${dirty}/noDESTDIR.test"
+printf '%s\n' 'do_install() { make -C build install-exec DESTDIR=/tmp/s; }' >"${dirty}/helper.sh"
+printf '%s\n' 'make -C build install DESTDIR=/tmp/s || fail "use run_with_install_lock"' \
+    >"${dirty}/named-in-a-message.test"
+for f in "${dirty}"/*; do
+    read -r _ bad <<<"$(totals_of "$(lint_files "${f}")")"
+    test "${bad}" -ge 1 || fail "the lint cannot see the install in $(basename "${f}")"
+done
+ok "the lint sees a raw, a second, a DESTDIR-less, a helper-file and a vouched install"
+
+cd "${work}"
+export INSTALL_LOCK="${work}/lock"
 export BARRIER="${work}/go"
 export SECTIONS="${work}/sections"
-workers=4
+export SECTION_SECS=0.25
+workers=8
+rounds=3
+export BARRIER_POLL=0.05
+reclaim_budget=10
 
 # One process per worker, not a subshell: the lock is owned by a pid, and a
 # subshell inherits $$.
 worker="${work}/worker.sh"
 cat >"${worker}" <<'EOF'
 set -u
-# shellcheck source=tests/testlib.sh
 . "${TESTLIB}"
 section() {
     printf 'IN %s\n' "$$" >>"${SECTIONS}"
-    sleep 0.5
+    test -z "${HOLD:-}" || while :; do poll_wait 1; done
+    sleep "${SECTION_SECS}"
     printf 'OUT %s\n' "$$" >>"${SECTIONS}"
 }
-until test -e "${BARRIER}"; do sleep 0.05; done
+until test -e "${BARRIER}"; do sleep "${BARRIER_POLL}"; done
 if test "${USE_LOCK}" = 1; then
-    with_install_lock section
+    run_with_install_lock section || exit 1
 else
     section
 fi
@@ -45,59 +121,99 @@ EOF
 # with the lock every OUT follows its own IN, without it they interleave.
 run_workers() { # run_workers 0|1
     local i p pids=()
-    rm -f "${BARRIER}" "${SECTIONS}"
+    rm -f "${BARRIER}"
     : >"${SECTIONS}"
     for ((i = 0; i < workers; i++)); do
         USE_LOCK=$1 bash "${worker}" &
         pids+=($!)
     done
     touch "${BARRIER}"
-    for p in "${pids[@]}"; do wait "${p}" || fail "worker ${p} failed"; done
+    for p in "${pids[@]}"; do wait "${p}" || fail "a worker failed to take the lock"; done
     test "$(lines_of "${SECTIONS}")" -eq $((workers * 2)) ||
         fail "wanted $((workers * 2)) section lines, got $(lines_of "${SECTIONS}")"
 }
 
-serialised() {
-    awk '{ if (NR % 2) { want = ($1 == "IN"); pid = $2 }
-           else { want = ($1 == "OUT" && $2 == pid) }
-           if (!want) exit 1 }' "${SECTIONS}"
+# $1 is a pid whose IN has no OUT, or empty. Every other section must close before
+# the next one opens.
+serialised() { # serialised [KILLED-PID]
+    awk -v killed="${1:-}" '
+        $2 == killed { next }
+        { seen++
+          if (seen % 2) { want = ($1 == "IN"); pid = $2 }
+          else { want = ($1 == "OUT" && $2 == pid) }
+          if (!want) exit 1 }' "${SECTIONS}"
 }
 
-# The control first: a probe blind to the unlocked interleaving would pass on a
-# lock that does not lock.
+# The control first, and never gated behind the lint above: a probe blind to the
+# unlocked interleaving would pass on a lock that does not lock.
 run_workers 0
 serialised &&
     skip "${workers} unlocked sections did not overlap, so this box cannot show the race"
-ok "unlocked, the critical sections interleave"
+ok "unlocked, ${workers} critical sections interleave"
 
-run_workers 1
-serialised || fail "the lock let two sections overlap: $(tr '\n' ' ' <"${SECTIONS}")"
-ok "the lock serialises concurrent holders"
-
-# A holder killed before its cleanup ran must not wedge the suite.
-sh -c 'exit 0' &
-dead=$!
-wait "${dead}" || true
-mkdir "${INSTALL_LOCK_DIR}"
-printf '%s\n' "${dead}" >"${INSTALL_LOCK_DIR}/pid"
-start=${SECONDS}
-with_install_lock true || fail "could not reclaim a dead holder's lock"
-test $((SECONDS - start)) -le 5 ||
-    fail "reclaiming a dead holder's lock took $((SECONDS - start))s"
-test ! -d "${INSTALL_LOCK_DIR}" || fail "the lock outlived its holder"
-ok "a dead holder's lock is reclaimed and released"
-
-# File-level, not line-level: the raw call 376 carried wrapped its DESTDIR onto
-# the next line, where a one-line pattern cannot see it.
-cd "${srcdir}/tests"
-stages_an_install() { grep -qE '^[[:space:]]*[^#[:space:]].*DESTDIR' "$1"; }
-for t in [0-9]*_*.test; do
-    stages_an_install "${t}" || continue
-    grep -q stage_install_ "${t}" ||
-        fail "${t} stages an install without stage_install_target"
+for ((round = 1; round <= rounds; round++)); do
+    run_workers 1
+    serialised || fail "round ${round}: the lock let two sections overlap: $(tr '\n' ' ' <"${SECTIONS}")"
 done
-echo 'make -C build install DESTDIR=/tmp/stage' >"${work}/dirty"
-if ! stages_an_install "${work}/dirty" || grep -q stage_install_ "${work}/dirty"; then
-    fail "the lint cannot see a staged install that skips the lock"
-fi
-ok "every staged install goes through the lock"
+ok "the lock serialises ${workers} holders, ${rounds} rounds"
+
+# Directly: a reclaim whose judgement went stale must leave the lock alone, since
+# by then it names a live holder. Nothing here races, so it holds on every box.
+install_lock_stamp "${INSTALL_LOCK}" "$$" || fail "could not stamp a lock to defend"
+install_lock_reclaim 999999
+install_lock_read_pid "${INSTALL_LOCK}"
+test "${INSTALL_LOCK_PID}" = "$$" ||
+    fail "reclaim removed a lock it had not proven was the corpse it judged"
+rm -f "${INSTALL_LOCK}"
+ok "a reclaim acting on a stale judgement leaves the live lock alone"
+
+# A holder killed under the harness leaves a lock nobody will release. Exactly one
+# of the waiters may reclaim it: a check-then-act reclaim hands it to all of them,
+# and the losers must not evict whoever won. Repeated, since it is a race.
+for ((round = 1; round <= rounds; round++)); do
+    rm -f "${BARRIER}"
+    : >"${SECTIONS}"
+    touch "${BARRIER}"
+    USE_LOCK=1 HOLD=1 bash "${worker}" &
+    corpse=$!
+    start=${SECONDS}
+    until test "$(lines_of "${SECTIONS}")" -ge 1; do
+        test $((SECONDS - start)) -lt "${reclaim_budget}" || fail "the corpse never took the lock"
+        sleep "${BARRIER_POLL}"
+    done
+    kill -9 "${corpse}" 2>/dev/null || true
+    wait "${corpse}" 2>/dev/null || true
+    start=${SECONDS}
+    run_workers 1
+    test $((SECONDS - start)) -lt "${reclaim_budget}" ||
+        fail "round ${round}: reclaiming a dead holder's lock took $((SECONDS - start))s"
+    serialised "${corpse}" ||
+        fail "round ${round}: the dead holder's lock went to more than one waiter: $(tr '\n' ' ' <"${SECTIONS}")"
+done
+ok "a dead holder's lock is reclaimed once, by one waiter, ${rounds} rounds"
+
+# A live holder is never evicted: past the deadline the waiter fails the run rather
+# than install alongside it.
+rm -f "${BARRIER}"
+: >"${SECTIONS}"
+touch "${BARRIER}"
+USE_LOCK=1 SECTION_SECS=4 bash "${worker}" &
+holder=$!
+start=${SECONDS}
+until test "$(lines_of "${SECTIONS}")" -ge 1; do
+    test $((SECONDS - start)) -lt "${reclaim_budget}" || fail "the holder never took the lock"
+    sleep "${BARRIER_POLL}"
+done
+start=${SECONDS}
+INSTALL_LOCK_TIMEOUT=1 run_with_install_lock touch "${work}/ran" 2>"${work}/backstop.log" &&
+    fail "a waiter walked in on a live holder"
+test $((SECONDS - start)) -lt "${reclaim_budget}" || fail "the deadline never fired"
+# The command must not run either: an acquire failure the wrapper drops is an
+# install with no lock at all.
+test ! -e "${work}/ran" || fail "the command ran without the lock"
+install_lock_read_pid "${INSTALL_LOCK}"
+test "${INSTALL_LOCK_PID}" = "${holder}" ||
+    fail "the live holder's lock was taken: pid is now [${INSTALL_LOCK_PID}]"
+wait "${holder}" || fail "the live holder did not finish"
+serialised || fail "the live holder's section was not clean"
+ok "past the deadline a waiter fails instead of evicting a live holder"
