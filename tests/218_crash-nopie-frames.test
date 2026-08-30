@@ -37,8 +37,8 @@ sources=("${srcdir}/tests/nopieprobe.c" "${srcdir}/src/htsbacktrace.c")
 build() { # $1 output binary, rest extra flags
     local bin=$1
     shift
-    # shellcheck disable=SC2086 # DL_LIBS is a flag list; splitting is the point
-    "${cc_argv[@]}" "${cflags[@]}" "$@" -o "${bin}" "${sources[@]}" ${DL_LIBS:-} \
+    # shellcheck disable=SC2086 # DL_LIBS/BACKTRACE_LIBS are flag lists; splitting is the point
+    "${cc_argv[@]}" "${cflags[@]}" "$@" -o "${bin}" "${sources[@]}" ${DL_LIBS:-} ${BACKTRACE_LIBS:-} \
         >"${work}/cc.log" 2>&1
 }
 

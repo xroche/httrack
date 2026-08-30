@@ -38,7 +38,7 @@ bin_PROGRAMS = proxytrack httrack htsserver
 
 httrack_SOURCES = httrack.c htsbacktrace.c htsbacktrace.h
 # $(DL_LIBS): dladdr() in the crash handler, still in libdl on pre-2.34 glibc.
-httrack_LDADD = $(THREADS_LIBS) $(DL_LIBS) libhttrack.la
+httrack_LDADD = $(THREADS_LIBS) $(DL_LIBS) $(BACKTRACE_LIBS) libhttrack.la
 htsserver_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS) libhttrack.la
 proxytrack_LDADD = $(THREADS_LIBS) $(SOCKET_LIBS)
 

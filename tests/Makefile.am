@@ -66,8 +66,11 @@ TESTS_ENVIRONMENT += TEST_CPPFLAGS="$(CPPFLAGS)"
 # flags, and skips when configure found no usable level.
 TESTS_ENVIRONMENT += TEST_CFLAGS="$(CFLAGS)"
 TESTS_ENVIRONMENT += FORTIFY_SOURCE_LEVEL=$(FORTIFY_SOURCE_LEVEL)
-# 218_crash-nopie-frames.test links the crash printer, which calls dladdr().
+# 218_crash-nopie-frames.test and 372_crash-signal-number.test link the crash
+# printer standalone, which calls dladdr() and, where backtrace() itself needs
+# a library (Termux's -landroid-execinfo), BACKTRACE_LIBS too.
 TESTS_ENVIRONMENT += DL_LIBS="$(DL_LIBS)"
+TESTS_ENVIRONMENT += BACKTRACE_LIBS="$(BACKTRACE_LIBS)"
 # 207_install-headers-symbols.test links a consumer probe against it; absent on a
 # static-only build and named .dylib on macOS, where that ELF-only test skips.
 TESTS_ENVIRONMENT += HTTRACK_SHLIB=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)/libhttrack.so
