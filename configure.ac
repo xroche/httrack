@@ -609,7 +609,7 @@ AC_ARG_ENABLE([example-libs],
 		AC_MSG_RESULT($enableval)
 		;;
 	*)
-		AC_MSG_ERROR(bad value for example-libs, expected yes/no)
+		AC_MSG_ERROR([bad value for example-libs, expected yes/no])
 		;;
 	esac
 	],

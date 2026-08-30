@@ -53,10 +53,10 @@ if [ "${EXAMPLE_LIBS:-yes}" = yes ]; then
     done
     ok "the ten example plugins install by default"
 else
-    for name in ${plugins}; do
-        got=$(built "${name}")
-        test -z "${got}" ||
-            fail "--disable-example-libs still installed lib${name}: ${got}"
-    done
+    # The whole directory, not the ten names: the flag must not carry off a
+    # neighbour, and nothing else installs there today.
+    left=$(find "${stage}${libdir%/}/httrack" \( -type f -o -type l \) 2>/dev/null || true)
+    test -z "${left}" ||
+        fail "--disable-example-libs left this under ${libdir}/httrack: ${left}"
     ok "--disable-example-libs installs no plugin, the example sources stay"
 fi

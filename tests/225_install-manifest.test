@@ -84,12 +84,20 @@ fold() {
 # An install that staged nothing matches nothing; say that, not a 300-line diff.
 grep -qx '@BINDIR@/httrack' "${work}/actual" || fail "nothing staged under ${stage}"
 
-# The example plugins are the only thing under @LIBDIR@/httrack, so dropping
-# them keeps the rest of the manifest pinned on a --disable-example-libs build.
+# Named one by one, not by their directory: dropping all of @LIBDIR@/httrack
+# would unpin whatever else lands there, and a removal would then go unseen.
+plugins='baselinks|changecontent|contentfilter|displayheader|filename|filename2'
+plugins=${plugins}'|filenameiisbug|listlinks|log|simple'
+plugin_re="^@LIBDIR@/httrack/lib(${plugins})\\.so(\\.[0-9][0-9]*(\\.@revision@)?)?$"
+
 if [ "${EXAMPLE_LIBS:-yes}" = yes ]; then
     LC_ALL=C sort "${manifest}" >"${work}/expected"
 else
-    grep -v '^@LIBDIR@/httrack/' "${manifest}" | LC_ALL=C sort >"${work}/expected"
+    LC_ALL=C grep -Ev "${plugin_re}" "${manifest}" | LC_ALL=C sort >"${work}/expected"
+    # Ten plugins, three names each; a rename would silently match fewer.
+    dropped=$(($(lines_of "${manifest}") - $(lines_of "${work}/expected")))
+    test "${dropped}" -eq 30 ||
+        fail "expected 30 example plugin lines in ${manifest}, matched ${dropped}"
 fi
 diff -u "${work}/expected" "${work}/actual" ||
     fail "the installed file set changed; update tests/install-manifest.txt and say so in the release notes -- Fedora's %files and debian/*.files name these files"
