@@ -30,11 +30,9 @@ Please visit our Website: http://www.httrack.com
 /* ------------------------------------------------------------ */
 
 /** @file htsfeatures.h
- *  The subset of configure's private config.h that the installed headers read.
- *  HTS_INET6 and HTS_USEOPENSSL pick struct members, so a consumer left to
- *  guess them lays SOCaddr and htsblk out differently from the library it
- *  links against. Generated into the build directory; config.h itself stays
- *  private, since an autoconf consumer has a config.h of its own. */
+ *  The subset of config.h the installed headers need. HTS_INET6 and
+ *  HTS_USEOPENSSL fix SOCaddr/htsblk layout: a consumer that guesses them wrong
+ *  desyncs from the library it links against. */
 
 #ifndef HTTRACK_FEATURES_DEFH
 #define HTTRACK_FEATURES_DEFH
@@ -55,8 +53,10 @@ Please visit our Website: http://www.httrack.com
 /* Set when the platform declares in_addr_t, which htsnet.h then leaves alone. */
 #undef HTS_DO_NOT_REDEFINE_in_addr_t
 
-/* Replacement for a missing in_port_t, used by the SOCaddr accessors. */
+/* Replacements for the socket types a platform may not declare; htsnet.h uses
+   in_port_t in the SOCaddr accessors. */
 #undef in_port_t
+#undef sa_family_t
 
 /* setuid() available; its absence defines HTS_DO_NOT_USE_UID (htsglobal.h). */
 #undef SETUID
