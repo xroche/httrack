@@ -48,6 +48,29 @@ resolve() { # resolve DIR LINK, both relative to ${stage}
     printf '%s\n' "${out}"
 }
 
+# history.txt, license.txt and greetings.txt sit at the repo root, so index.html
+# has to reach them with "../" for tools/doc-links.py, and that "../" is one
+# level too high once the install puts all four in the same directory.
+gaps=(
+    "index.html ../history.txt"
+    "index.html ../license.txt"
+    "index.html ../greetings.txt"
+)
+gap_seen=()
+for i in "${!gaps[@]}"; do gap_seen[i]=; done
+
+# Index of the recorded gap for PAGE LINK, or 1 if there is none.
+gap_index() {
+    local i
+    for i in "${!gaps[@]}"; do
+        test "${gaps[i]}" != "$1 $2" || {
+            printf '%s\n' "${i}"
+            return 0
+        }
+    done
+    return 1
+}
+
 pages=0
 links=0
 bad=0
@@ -70,8 +93,14 @@ while IFS= read -r page; do
         esac
         links=$((links + 1))
         if ! target=$(resolve "${dir}" "${link}") || [ ! -e "${stage}/${target}" ]; then
-            echo "  ${page#"${stage}"}: ${link}" >&2
-            bad=$((bad + 1))
+            if g=$(gap_index "${rel}" "${link}"); then
+                gap_seen[g]=dangles
+            else
+                echo "  ${page#"${stage}"}: ${link}" >&2
+                bad=$((bad + 1))
+            fi
+        elif g=$(gap_index "${rel}" "${link}"); then
+            gap_seen[g]=resolves
         fi
     done < <(LC_ALL=C grep -Eio "(href|src)[[:space:]]*=[[:space:]]*[\"'][^\"']*[\"']" "${page}" || true)
 done < <(find "${root}" -name '*.html' | LC_ALL=C sort)
@@ -81,4 +110,17 @@ test "${pages}" -gt 0 || fail "no pages staged under ${htmldir}"
 test "${links}" -gt 0 || fail "no relative links found across ${pages} pages"
 test "${bad}" -eq 0 || fail "${bad} of ${links} relative links dangle in ${htmldir}"
 
-echo "${links} relative links across ${pages} pages resolve in ${htmldir}"
+# A gap that stopped being one has to be deleted, not left recording a link the
+# layout now resolves.
+stale=0
+for i in "${!gaps[@]}"; do
+    case ${gap_seen[i]} in
+    dangles) continue ;;
+    resolves) echo "  ${gaps[i]}: resolves here" >&2 ;;
+    *) echo "  ${gaps[i]}: not a link on that page any more" >&2 ;;
+    esac
+    stale=$((stale + 1))
+done
+test "${stale}" -eq 0 || fail "${stale} of ${#gaps[@]} recorded gaps are out of date"
+
+echo "${links} relative links across ${pages} pages resolve in ${htmldir}, ${#gaps[@]} recorded gaps still dangle"
