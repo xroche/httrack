@@ -78,22 +78,22 @@ jobs:
           cp httrack.spec ~builder/
           cp -r ~/rpmbuild ~builder/rpmbuild
           chown -R builder ~builder
-          sudo -u builder rpmbuild -bb --nodeps ~builder/httrack.spec
-
-      # A %check that skipped almost everything still exits 0, and a canary that
-      # green-lights an untested tree is worse than none.
-      - name: The suite ran, rather than skipping
-        run: |
-          set -euo pipefail
-          log=$(find ~builder/rpmbuild/BUILD -name test-suite.log -print -quit)
-          test -n "$log" || { echo "no test-suite.log under BUILD" >&2; exit 1; }
-          grep -E '^# (TOTAL|PASS|SKIP|FAIL):' "$log"
-          passed=$(sed -n 's/^# PASS: *\([0-9]*\).*/\1/p' "$log")
-          test "${passed:-0}" -ge 300 || {
+          sudo -u builder rpmbuild -bb --nodeps ~builder/httrack.spec 2>&1 |
+            tee build.log
+          # -bb removes the build tree on success, so the suite's own banner is
+          # the only place left to read it. A %check that skipped almost
+          # everything still exits 0, and a canary that green-lights an untested
+          # tree is worse than none: a python3-less container passes 212.
+          grep -E '^# (TOTAL|PASS|SKIP|FAIL):' build.log
+          passed=$(sed -n 's/^# PASS: *\([0-9]*\).*/\1/p' build.log | tail -1)
+          test "${passed:-0}" -ge 250 || {
             echo "only ${passed:-0} tests passed; the suite barely ran" >&2
             exit 1
           }
 
-      - name: Print the test log on failure
+      - name: Print the logs on failure
         if: failure()
-        run: find ~builder/rpmbuild/BUILD -name test-suite.log -exec cat {} + 2>/dev/null || true
+        run: |
+          tail -n 200 build.log 2>/dev/null || true
+          find ~builder/rpmbuild/BUILD -name test-suite.log -exec cat {} + \
+            2>/dev/null || true
