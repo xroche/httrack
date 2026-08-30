@@ -18,10 +18,12 @@ export TESTLIB
 work=$(mktemp -d "${TMPDIR:-/tmp}/installlock.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
-# Every make install in the suite goes through the helper. Candidates are judged
-# on the whole logical line, quotes included, so a command wrapped in a string
-# cannot hide; only the vouching name is looked for outside the quotes, or a
-# helper named in a failure message would speak for the line it sits on.
+# Every make install in the suite goes through the helper, deliberately wider than
+# the relink race: a data target cannot relink, but "which targets can" is a
+# libtool argument at every new test, and serialising a header copy costs nothing.
+# Candidates are judged on the whole logical line, quotes included, so a command
+# wrapped in a string cannot hide; only the vouching name is looked for outside
+# the quotes, or a helper named in a failure message would speak for its line.
 lint=${work}/lint.awk
 cat >"${lint}" <<'AWK'
 BEGIN {
@@ -89,7 +91,7 @@ report=$(lint_files "${files[@]}")
 read -r calls bad <<<"$(totals_of "${report}")"
 test "${bad}" -eq 0 || {
     offenders_of "${report}" >&2
-    fail "the lines above run a build-tree make outside the lock"
+    fail "the lines above run a build-tree make outside the lock; every install target takes it, relinking or not"
 }
 # An empty candidate list would satisfy the line above without reading anything.
 test "${calls}" -ge 10 || fail "the lint saw only ${calls} such lines, the suite has more"
