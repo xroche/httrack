@@ -26,6 +26,7 @@ AM_CPPFLAGS = \
 	@LFS_FLAG@ \
 	-DPREFIX=\""$(prefix)"\" \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \
+	-DBINDIR=\""$(bindir)"\" \
 	-DDATADIR=\""$(datadir)"\" \
 	-DLIBDIR=\""$(libdir)"\" \
 	-I"$(abs_srcdir)" \

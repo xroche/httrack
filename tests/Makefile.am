@@ -44,6 +44,7 @@ TESTS_ENVIRONMENT += abs_top_builddir=$(abs_top_builddir)
 TESTS_ENVIRONMENT += CONFIGURED_DATADIR=$(datadir)
 TESTS_ENVIRONMENT += CONFIGURED_LIBDIR=$(libdir)
 TESTS_ENVIRONMENT += CONFIGURED_BINDIR=$(bindir)
+TESTS_ENVIRONMENT += CONFIGURED_SYSCONFDIR=$(sysconfdir)
 # 225_install-manifest.test folds these back out of the staged paths.
 TESTS_ENVIRONMENT += CONFIGURED_MANDIR=$(mandir)
 TESTS_ENVIRONMENT += CONFIGURED_DOCDIR=$(docdir)

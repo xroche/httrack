@@ -504,7 +504,9 @@ echo "ran=$((pass + fail + skip + lost)) pass=$pass fail=$fail skip=$skip lost=$
 # ftp-deadhost-interrupt, ftp-sigterm, abort-purge, signal-receive and
 # ftp-stop-window need that same signal (deadhost's --timeout half runs as 245,
 # abort-purge's --max-time half as 268);
-# close-once interposes close() through LD_PRELOAD, which MSYS has no equivalent for.
+# close-once interposes close() through LD_PRELOAD, which MSYS has no equivalent for;
+# engine-install-paths reads the compiled-in POSIX install paths, which this job
+# has no equivalent of.
 expected_skips="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 100_local-purge-longpath.test
@@ -530,7 +532,8 @@ expected_skips="01_engine-footer-overflow.test
 288_testlib-holdport.test
 350_local-diskfull-abort.test
 352_engine-filesave-diskfull.test
-355_local-write-error-not-eof.test"
+355_local-write-error-not-eof.test
+377_engine-install-paths.test"
 # First, or the deadline reads as an unexplained shortfall in the gates below.
 [ "$deadline" -eq 0 ] || {
     echo "::error::suite did not finish within ${suite_deadline}s"
