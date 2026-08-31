@@ -7,8 +7,8 @@ httrack (3.50.0-1) unstable; urgency=medium
     changelog already provides, and leave the .txt files the manual links
     uncompressed.
   * The installed headers no longer include autoconf's config.h, which used
-    to collide with a consumer's own; the switches they read moved to a
-    generated htsfeatures.h.
+    to collide with a consumer's own.  Drop the now unused
+    package-name-defined-in-config-h override from libhttrack-dev.
 
  -- Xavier Roche <xavier@debian.org>  Tue, 01 Sep 2026 09:00:00 +0200
 
