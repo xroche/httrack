@@ -23,12 +23,11 @@ if ! stage_install_target install "${stage}" "${work}/install.log" .; then
 fi
 
 docdir=${CONFIGURED_DOCDIR:?not run under make check}
-# One walk over both directories: httrack-doc.html links into the pages' one and
-# they link back out, so a root holding one half cannot see either link.
-root=${stage}${htmldir}
-case ${htmldir}/ in "${docdir%/}"/*) root=${stage}${docdir} ;; esac
-tree=${root#"${stage}"}
-test -d "${root}" || skip "nothing staged in ${tree}"
+# httrack-doc.html and the pages link into each other's directory, so both are
+# walked whatever --htmldir made of the two. sort -u collapses the nested case.
+tree=${htmldir}
+test "${docdir%/}" = "${htmldir%/}" || tree="${docdir} and ${htmldir}"
+test -d "${stage}${htmldir}" || skip "nothing staged in ${htmldir}"
 
 # Lexical and relative to the stage root: a link names a path in the shipped
 # tree, and a ".." that walks off the top has left the package.
@@ -52,11 +51,11 @@ resolve() { # resolve DIR LINK, both relative to ${stage}
     printf '%s\n' "${out}"
 }
 
-# The links the shipped layout resolves and another --htmldir strands, recorded
-# so a packager's own choice reports as a known gap rather than as a failure.
+# Links that the shipped layout resolves but another --htmldir strands are
+# recorded, so a packager's choice reports a known gap rather than a failure.
 gaps=()
-# index.html reaches history.txt, license.txt and greetings.txt with "../", the
-# $(docdir) they install into, as long as htmldir sits directly below it.
+# index.html reaches history.txt, license.txt and greetings.txt with "../",
+# which is the $(docdir) they install into while htmldir sits directly below it.
 if test "${docdir%/}" != "${htmldir%/*}"; then
     gaps=(
         "index.html ../license.txt"
@@ -69,15 +68,13 @@ if test "${htmldir%/}" != "${docdir%/}/html"; then
     gaps+=("httrack-doc.html html/index.html")
 fi
 
-# Every expansion carries the `[@]+` guard: on bash 3.2 an empty-array expansion
-# under `set -u` is fatal, and the default layout leaves this one empty.
 gap_seen=()
-for i in ${gaps[@]+"${!gaps[@]}"}; do gap_seen[i]=; done
+for ((i = 0; i < ${#gaps[@]}; i++)); do gap_seen[i]=; done
 
 # Index of the recorded gap for PAGE LINK, or 1 if there is none.
 gap_index() {
     local i
-    for i in ${gaps[@]+"${!gaps[@]}"}; do
+    for ((i = 0; i < ${#gaps[@]}; i++)); do
         test "${gaps[i]}" != "$1 $2" || {
             printf '%s\n' "${i}"
             return 0
@@ -90,9 +87,17 @@ pages=0
 links=0
 bad=0
 while IFS= read -r page; do
-    rel=${page#"${root}/"}
-    # Only pages of ours, which come from two source directories.
-    test -e "${htmlsrc}/${rel}" || test -e "${srcroot}/${rel}" || continue
+    # Name the page by the source file it was installed from, so a staged tree
+    # nobody recognises fails here instead of being skipped into a vacuous pass.
+    relh=${page#"${stage}${htmldir%/}/"}
+    reld=${page#"${stage}${docdir%/}/"}
+    if test -e "${htmlsrc}/${relh}"; then
+        rel=${relh}
+    elif test -e "${srcroot}/${reld}"; then
+        rel=${reld}
+    else
+        fail "staged page ${page#"${stage}"} came from no source file"
+    fi
     pages=$((pages + 1))
     dir=${page%/*}
     dir=${dir#"${stage}/"}
@@ -117,7 +122,10 @@ while IFS= read -r page; do
             gap_seen[g]=resolves
         fi
     done < <(LC_ALL=C grep -Eio "(href|src)[[:space:]]*=[[:space:]]*[\"'][^\"']*[\"']" "${page}" || true)
-done < <(find "${root}" -name '*.html' | LC_ALL=C sort)
+done < <({
+    find "${stage}${htmldir}" -name '*.html'
+    find "${stage}${docdir}" -name '*.html'
+} 2>/dev/null | LC_ALL=C sort -u)
 
 test "${pages}" -gt 0 || fail "no pages staged under ${tree}"
 # A filter that dropped everything would pass on a tree of dead links.
@@ -127,7 +135,7 @@ test "${bad}" -eq 0 || fail "${bad} of ${links} relative links dangle in ${tree}
 # A gap that stopped being one has to be deleted, not left recording a link the
 # layout now resolves.
 stale=0
-for i in ${gaps[@]+"${!gaps[@]}"}; do
+for ((i = 0; i < ${#gaps[@]}; i++)); do
     case ${gap_seen[i]} in
     dangles) continue ;;
     resolves) echo "  ${gaps[i]}: resolves here" >&2 ;;

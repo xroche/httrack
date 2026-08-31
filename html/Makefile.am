@@ -22,7 +22,7 @@ MetaInfodir = $(datadir)/metainfo
 # the build dir and stays unexpanded (breaking "make") in an out-of-tree build.
 # Explicit filenames (e.g. ../history.txt, div/search.sh) resolve via VPATH and
 # need no prefix.
-# In $(docdir), one level above the pages, which is where their "../" points.
+# They install into $(docdir), one level above the pages that link to them.
 HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt ../greetings.txt ../license.txt
 HelpHtml_DATA = $(srcdir)/*.html $(srcdir)/*.js $(srcdir)/*.css
 HelpHtmldiv_DATA = div/search.sh

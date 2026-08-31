@@ -48,20 +48,17 @@ install: build
 	dh_auto_install --destdir=$(CURDIR)/debian/httrack
 	##$(MAKE) install DESTDIR=$(CURDIR)/debian/httrack
 
-	# place html files (doc, webhttrack files)
+	# Debian inverts our layout: the pages are real under /usr/share/httrack and
+	# /usr/share/doc/httrack/html is the symlink. httrack-doc.html and the three
+	# text files already sit in docdir, so only the pages move.
 
 	# remove symlink created by html/Makefile's install-data-hook
 	rm $(CURDIR)/debian/httrack/usr/share/httrack/html
-	# and put back in place data
-	mv $(CURDIR)/debian/httrack/usr/share/doc/httrack \
+	mv $(CURDIR)/debian/httrack/usr/share/doc/httrack/html \
 		$(CURDIR)/debian/httrack/usr/share/httrack/html
 	# create symlink on the other side
-	mkdir $(CURDIR)/debian/httrack/usr/share/doc/httrack
 	ln -s ../../httrack/html \
 		$(CURDIR)/debian/httrack/usr/share/doc/httrack/html
-	# and put in place the two outer files
-	mv $(CURDIR)/debian/httrack/usr/share/httrack/html/httrack-doc.html \
-		$(CURDIR)/debian/httrack/usr/share/doc/httrack/httrack-doc.html
 
 	# remove *.la (https://wiki.debian.org/ReleaseGoals/LAFileRemoval)
 	rm -f $(CURDIR)/debian/httrack/usr/lib/$(DEB_HOST_MULTIARCH)/*.la
