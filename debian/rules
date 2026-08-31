@@ -49,8 +49,8 @@ install: build
 	##$(MAKE) install DESTDIR=$(CURDIR)/debian/httrack
 
 	# Debian inverts our layout: the pages are real under /usr/share/httrack and
-	# /usr/share/doc/httrack/html is the symlink. httrack-doc.html and the text
-	# files already sit in docdir, so only the pages move.
+	# /usr/share/doc/httrack/html is the symlink. httrack-doc.html, license.txt
+	# and greetings.txt already sit in docdir, so only the pages move.
 
 	# remove symlink created by html/Makefile's install-data-hook
 	rm $(CURDIR)/debian/httrack/usr/share/httrack/html
@@ -59,8 +59,7 @@ install: build
 	# create symlink on the other side
 	ln -s ../../httrack/html \
 		$(CURDIR)/debian/httrack/usr/share/doc/httrack/html
-	# dh_installchangelogs already ships history.txt as the changelog, so the
-	# copy the manual links to would be the same file twice in one doc tree.
+	# dh_installchangelogs already ships this as changelog.gz (duplicate-changelog-files).
 	rm $(CURDIR)/debian/httrack/usr/share/doc/httrack/history.txt
 
 	# remove *.la (https://wiki.debian.org/ReleaseGoals/LAFileRemoval)
