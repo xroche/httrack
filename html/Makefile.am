@@ -5,7 +5,6 @@ HelpHtmlimgdir = $(HelpHtmldir)/img
 HelpHtmldivdir = $(HelpHtmldir)/div
 HelpHtmlimagesdir = $(HelpHtmldir)/images
 HelpHtmlfontsdir = $(HelpHtmldir)/fonts
-HelpHtmlTxtdir = $(HelpHtmldir)
 WebHtmldir = $(HelpHtmldir)/server
 WebHtmlimagesdir = $(HelpHtmldir)/server/images
 WebPixmapdir = $(datadir)/pixmaps
@@ -23,14 +22,14 @@ MetaInfodir = $(datadir)/metainfo
 # the build dir and stays unexpanded (breaking "make") in an out-of-tree build.
 # Explicit filenames (e.g. ../history.txt, div/search.sh) resolve via VPATH and
 # need no prefix.
-HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt
+# They install into $(docdir), one level above the pages that link to them.
+HelpHtmlroot_DATA = ../httrack-doc.html ../history.txt ../greetings.txt ../license.txt
 HelpHtml_DATA = $(srcdir)/*.html $(srcdir)/*.js $(srcdir)/*.css
 HelpHtmldiv_DATA = div/search.sh
 HelpHtmlimg_DATA  = $(srcdir)/img/*
 HelpHtmlimages_DATA = $(srcdir)/images/*
 # doc.css reaches the woff2 by a relative URL, so it installs beside the pages.
 HelpHtmlfonts_DATA = $(srcdir)/fonts/*
-HelpHtmlTxt_DATA = ../greetings.txt ../history.txt ../license.txt
 WebHtml_DATA = $(srcdir)/server/*.html $(srcdir)/server/*.js $(srcdir)/server/*.css
 WebHtmlimages_DATA = $(srcdir)/server/images/*
 # Generated from the brand master by gen/export.py. Asserted by tests/160.

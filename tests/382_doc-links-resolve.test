@@ -10,7 +10,8 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 : "${abs_top_builddir:?not run under make check}"
-htmlsrc="${abs_top_srcdir:?not run under make check}/html"
+srcroot=${abs_top_srcdir:?not run under make check}
+htmlsrc=${srcroot}/html
 htmldir=${CONFIGURED_HTMLDIR:?not run under make check}
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/doclinks.XXXXXX") || fail "no tmpdir"
@@ -21,8 +22,12 @@ if ! stage_install_target install "${stage}" "${work}/install.log" .; then
     skip "cannot stage an install, so no layout to resolve against"
 fi
 
-root=${stage}${htmldir}
-test -d "${root}" || skip "nothing staged in ${htmldir}"
+docdir=${CONFIGURED_DOCDIR:?not run under make check}
+# httrack-doc.html and the pages link into each other's directory, so both are
+# walked whatever --htmldir made of the two. sort -u collapses the nested case.
+tree=${htmldir}
+test "${docdir%/}" = "${htmldir%/}" || tree="${docdir} and ${htmldir}"
+test -d "${stage}${htmldir}" || skip "nothing staged in ${htmldir}"
 
 # Lexical and relative to the stage root: a link names a path in the shipped
 # tree, and a ".." that walks off the top has left the package.
@@ -46,25 +51,30 @@ resolve() { # resolve DIR LINK, both relative to ${stage}
     printf '%s\n' "${out}"
 }
 
-# history.txt, license.txt and greetings.txt sit at the repo root, so index.html
-# has to reach them with "../" for tools/doc-links.py, and that "../" is one
-# level too high once the install puts them beside it in $(htmldir).
-gaps=(
-    "index.html ../license.txt"
-    "index.html ../greetings.txt"
-)
-# history.txt is the exception: HelpHtmlroot_DATA installs it into $(docdir) as
-# well, so its "../" lands on a real file wherever docdir is htmldir's parent.
-docdir=${CONFIGURED_DOCDIR:?not run under make check}
-test "${docdir%/}" = "${htmldir%/*}" || gaps+=("index.html ../history.txt")
+# Links that the shipped layout resolves but another --htmldir strands are
+# recorded, so a packager's choice reports a known gap rather than a failure.
+gaps=()
+# index.html reaches history.txt, license.txt and greetings.txt with "../",
+# which is the $(docdir) they install into while htmldir sits directly below it.
+if test "${docdir%/}" != "${htmldir%/*}"; then
+    gaps=(
+        "index.html ../license.txt"
+        "index.html ../greetings.txt"
+        "index.html ../history.txt"
+    )
+fi
+# httrack-doc.html reaches the pages under the name they carry in the source tree.
+if test "${htmldir%/}" != "${docdir%/}/html"; then
+    gaps+=("httrack-doc.html html/index.html")
+fi
 
 gap_seen=()
-for i in "${!gaps[@]}"; do gap_seen[i]=; done
+for ((i = 0; i < ${#gaps[@]}; i++)); do gap_seen[i]=; done
 
 # Index of the recorded gap for PAGE LINK, or 1 if there is none.
 gap_index() {
     local i
-    for i in "${!gaps[@]}"; do
+    for ((i = 0; i < ${#gaps[@]}; i++)); do
         test "${gaps[i]}" != "$1 $2" || {
             printf '%s\n' "${i}"
             return 0
@@ -77,10 +87,17 @@ pages=0
 links=0
 bad=0
 while IFS= read -r page; do
-    rel=${page#"${root}/"}
-    # Only the html/ pages: a docdir stub such as httrack-doc.html points at the
-    # *other* directory, and the default layout collapsing the two lands it here.
-    test -e "${htmlsrc}/${rel}" || continue
+    # Name the page by the source file it was installed from, so a staged tree
+    # nobody recognises fails here instead of being skipped into a vacuous pass.
+    relh=${page#"${stage}${htmldir%/}/"}
+    reld=${page#"${stage}${docdir%/}/"}
+    if test -e "${htmlsrc}/${relh}"; then
+        rel=${relh}
+    elif test -e "${srcroot}/${reld}"; then
+        rel=${reld}
+    else
+        fail "staged page ${page#"${stage}"} came from no source file"
+    fi
     pages=$((pages + 1))
     dir=${page%/*}
     dir=${dir#"${stage}/"}
@@ -105,17 +122,20 @@ while IFS= read -r page; do
             gap_seen[g]=resolves
         fi
     done < <(LC_ALL=C grep -Eio "(href|src)[[:space:]]*=[[:space:]]*[\"'][^\"']*[\"']" "${page}" || true)
-done < <(find "${root}" -name '*.html' | LC_ALL=C sort)
+done < <({
+    find "${stage}${htmldir}" -name '*.html'
+    find "${stage}${docdir}" -name '*.html'
+} 2>/dev/null | LC_ALL=C sort -u)
 
-test "${pages}" -gt 0 || fail "no pages staged under ${htmldir}"
+test "${pages}" -gt 0 || fail "no pages staged under ${tree}"
 # A filter that dropped everything would pass on a tree of dead links.
 test "${links}" -gt 0 || fail "no relative links found across ${pages} pages"
-test "${bad}" -eq 0 || fail "${bad} of ${links} relative links dangle in ${htmldir}"
+test "${bad}" -eq 0 || fail "${bad} of ${links} relative links dangle in ${tree}"
 
 # A gap that stopped being one has to be deleted, not left recording a link the
 # layout now resolves.
 stale=0
-for i in "${!gaps[@]}"; do
+for ((i = 0; i < ${#gaps[@]}; i++)); do
     case ${gap_seen[i]} in
     dangles) continue ;;
     resolves) echo "  ${gaps[i]}: resolves here" >&2 ;;
@@ -125,4 +145,4 @@ for i in "${!gaps[@]}"; do
 done
 test "${stale}" -eq 0 || fail "${stale} of ${#gaps[@]} recorded gaps are out of date"
 
-echo "${links} relative links across ${pages} pages resolve in ${htmldir}, ${#gaps[@]} recorded gaps still dangle"
+echo "${links} relative links across ${pages} pages resolve in ${tree}, ${#gaps[@]} recorded gaps still dangle"
