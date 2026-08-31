@@ -692,6 +692,10 @@ AC_SUBST([FUZZ_CORPUS_LIST])
 AC_MSG_RESULT([$hts_ncorpus])
 test "$hts_ncorpus" -gt 0 || AC_MSG_ERROR([no fuzz corpus file matched fuzz/corpus/*/*])
 
+# The doc pages reach license.txt and its neighbours with "../", so htmldir defaults
+# one level below $(docdir), where those install. A --htmldir naming a path wins.
+AS_IF([test "x$htmldir" = 'x${docdir}'], [htmldir='${docdir}/html'])
+
 # Final output
 AC_CONFIG_FILES([
 Makefile

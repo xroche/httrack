@@ -31,6 +31,10 @@ somebody has to move at every bump.
   binary-relative rpath when `libdir` is a system one. A distribution build gets
   none, so there is no libtool line to sed out.
 - `--enable-fuzzers` builds the fuzz harnesses under clang. Not for a package.
+- `--htmldir` defaults to `$(docdir)/html` rather than autoconf's `$(docdir)`.
+  The pages link `../license.txt`, `../greetings.txt` and `../history.txt`, which
+  install into `$(docdir)`, so a layout that puts the pages anywhere else strands
+  those three.
 
 ## Do not re-encode the tree
 

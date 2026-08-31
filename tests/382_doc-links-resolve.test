@@ -10,7 +10,8 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 : "${abs_top_builddir:?not run under make check}"
-htmlsrc="${abs_top_srcdir:?not run under make check}/html"
+srcroot=${abs_top_srcdir:?not run under make check}
+htmlsrc=${srcroot}/html
 htmldir=${CONFIGURED_HTMLDIR:?not run under make check}
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/doclinks.XXXXXX") || fail "no tmpdir"
@@ -21,8 +22,13 @@ if ! stage_install_target install "${stage}" "${work}/install.log" .; then
     skip "cannot stage an install, so no layout to resolve against"
 fi
 
+docdir=${CONFIGURED_DOCDIR:?not run under make check}
+# One walk over both directories: httrack-doc.html links into the pages' one and
+# they link back out, so a root holding one half cannot see either link.
 root=${stage}${htmldir}
-test -d "${root}" || skip "nothing staged in ${htmldir}"
+case ${htmldir}/ in "${docdir%/}"/*) root=${stage}${docdir} ;; esac
+tree=${root#"${stage}"}
+test -d "${root}" || skip "nothing staged in ${tree}"
 
 # Lexical and relative to the stage root: a link names a path in the shipped
 # tree, and a ".." that walks off the top has left the package.
@@ -46,25 +52,32 @@ resolve() { # resolve DIR LINK, both relative to ${stage}
     printf '%s\n' "${out}"
 }
 
-# history.txt, license.txt and greetings.txt sit at the repo root, so index.html
-# has to reach them with "../" for tools/doc-links.py, and that "../" is one
-# level too high once the install puts them beside it in $(htmldir).
-gaps=(
-    "index.html ../license.txt"
-    "index.html ../greetings.txt"
-)
-# history.txt is the exception: HelpHtmlroot_DATA installs it into $(docdir) as
-# well, so its "../" lands on a real file wherever docdir is htmldir's parent.
-docdir=${CONFIGURED_DOCDIR:?not run under make check}
-test "${docdir%/}" = "${htmldir%/*}" || gaps+=("index.html ../history.txt")
+# The links the shipped layout resolves and another --htmldir strands, recorded
+# so a packager's own choice reports as a known gap rather than as a failure.
+gaps=()
+# index.html reaches history.txt, license.txt and greetings.txt with "../", the
+# $(docdir) they install into, as long as htmldir sits directly below it.
+if test "${docdir%/}" != "${htmldir%/*}"; then
+    gaps=(
+        "index.html ../license.txt"
+        "index.html ../greetings.txt"
+        "index.html ../history.txt"
+    )
+fi
+# httrack-doc.html reaches the pages under the name they carry in the source tree.
+if test "${htmldir%/}" != "${docdir%/}/html"; then
+    gaps+=("httrack-doc.html html/index.html")
+fi
 
+# Every expansion carries the `[@]+` guard: on bash 3.2 an empty-array expansion
+# under `set -u` is fatal, and the default layout leaves this one empty.
 gap_seen=()
-for i in "${!gaps[@]}"; do gap_seen[i]=; done
+for i in ${gaps[@]+"${!gaps[@]}"}; do gap_seen[i]=; done
 
 # Index of the recorded gap for PAGE LINK, or 1 if there is none.
 gap_index() {
     local i
-    for i in "${!gaps[@]}"; do
+    for i in ${gaps[@]+"${!gaps[@]}"}; do
         test "${gaps[i]}" != "$1 $2" || {
             printf '%s\n' "${i}"
             return 0
@@ -78,9 +91,8 @@ links=0
 bad=0
 while IFS= read -r page; do
     rel=${page#"${root}/"}
-    # Only the html/ pages: a docdir stub such as httrack-doc.html points at the
-    # *other* directory, and the default layout collapsing the two lands it here.
-    test -e "${htmlsrc}/${rel}" || continue
+    # Only pages of ours, which come from two source directories.
+    test -e "${htmlsrc}/${rel}" || test -e "${srcroot}/${rel}" || continue
     pages=$((pages + 1))
     dir=${page%/*}
     dir=${dir#"${stage}/"}
@@ -107,15 +119,15 @@ while IFS= read -r page; do
     done < <(LC_ALL=C grep -Eio "(href|src)[[:space:]]*=[[:space:]]*[\"'][^\"']*[\"']" "${page}" || true)
 done < <(find "${root}" -name '*.html' | LC_ALL=C sort)
 
-test "${pages}" -gt 0 || fail "no pages staged under ${htmldir}"
+test "${pages}" -gt 0 || fail "no pages staged under ${tree}"
 # A filter that dropped everything would pass on a tree of dead links.
 test "${links}" -gt 0 || fail "no relative links found across ${pages} pages"
-test "${bad}" -eq 0 || fail "${bad} of ${links} relative links dangle in ${htmldir}"
+test "${bad}" -eq 0 || fail "${bad} of ${links} relative links dangle in ${tree}"
 
 # A gap that stopped being one has to be deleted, not left recording a link the
 # layout now resolves.
 stale=0
-for i in "${!gaps[@]}"; do
+for i in ${gaps[@]+"${!gaps[@]}"}; do
     case ${gap_seen[i]} in
     dangles) continue ;;
     resolves) echo "  ${gaps[i]}: resolves here" >&2 ;;
@@ -125,4 +137,4 @@ for i in "${!gaps[@]}"; do
 done
 test "${stale}" -eq 0 || fail "${stale} of ${#gaps[@]} recorded gaps are out of date"
 
-echo "${links} relative links across ${pages} pages resolve in ${htmldir}, ${#gaps[@]} recorded gaps still dangle"
+echo "${links} relative links across ${pages} pages resolve in ${tree}, ${#gaps[@]} recorded gaps still dangle"
