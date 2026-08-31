@@ -6,7 +6,15 @@ This file lists all changes and fixes that have been made for HTTrack
 
 3.50-0
 + New: this is the engine the Windows and Android front ends ship on. WinHTTrack had not been released since 3.49-2 in May 2017, so a Windows user coming from it gets everything listed under 3.49-3 to 3.49-25 below in one step. The largest of those: HTTPS against modern servers, SOCKS5 and CONNECT proxies, Brotli and Zstandard, files past 2 GB, Windows paths past 260 characters, accented and non-Latin project names and paths, WARC output, --sitemap, --single-file, --changes and --host-alias, and an --update that keeps a good local copy when the server answers with an error
-+ Changed: the engine is unchanged since 3.49-25. This release moves the version string, not behaviour
++ New: --disable-example-libs skips the ten example plugins four distributions used to un-install by hand (#1470)
++ Changed: the compiled-in /etc, /usr/bin and /usr/lib follow the configure directories, so a build with its own --prefix reads its own httrack.conf (#1469)
++ Changed: the installed headers no longer include autoconf's config.h, which collided with a consumer's own. The switches they read come from a generated htsfeatures.h (#1473)
++ Changed: --htmldir defaults to $(docdir)/html, so the manual's links to the release notes, the licence and the greetings resolve where it is installed (#1477)
++ Changed: shipped text files carry LF, so rpm packagers no longer dos2unix them (#1468)
++ Fixed: an Android or Termux build no longer needs hand-patching for backtrace() and a sys/timeb.h that bionic dropped (#1466, #1467)
++ Fixed: --with-zlib=DIR looked for the library in DIR/lib and nowhere else (#1472)
++ Fixed: three configure option checks truncated their error message at a comma (#1475)
++ Changed: multiple internal documentation, test and build improvements (#1462, #1464, #1465, #1471, #1474, #1476)
 
 3.49-25
 + Fixed: the crash report printed signal numbers with their digits reversed, so hppa's SIGBUS read as "Caught signal 01" (#1450)

@@ -32,8 +32,9 @@ AC_CONFIG_HEADERS(config.h)
 # header we can install without handing a consumer our PACKAGE_* and HAVE_*.
 AC_CONFIG_HEADERS([htsfeatures.h:src/htsfeatures.h.in])
 AM_INIT_AUTOMAKE([subdir-objects])
-# 3:19:0: revision-only bump for the 3.50.0 release; only the version macro moved,
-# the engine is untouched since 3.49.25.
+# 3:19:0: revision-only bump for the 3.50.0 release. config.h left the installed
+# header set for htsfeatures.h, which carries the same macro values. No installed
+# struct changed layout and no export came or went.
 # 3:18:0: revision-only bump. hts_print_num moved to htsbacktrace.c, which is not
 # in the library and whose header is not installed; no export came or went.
 # 3:17:0: revision-only bump. httrackp gained a tail field (links_unqueued) and
