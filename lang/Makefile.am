@@ -12,11 +12,22 @@ EXTRA_DIST = $(lang_DATA) $(langroot_DATA)
 # link is relative: an absolute $(htmldir) dangles under DESTDIR or relocation (#885).
 # Making $(htmldir) first decides whether a link is wanted. Where it is the link
 # path, or under it, a real directory lands there and the branch below leaves it
-# alone. Comparing spellings would miss that, since configure keeps a "//".
+# alone.
+#
+# Both paths are folded before they are compared, because a user's "//", "/." or
+# trailing "/" survives into the Makefile and the kernel ignores all three. An
+# unfolded pair fails the prefix test and leaves the link absolute, which is the
+# dangling link #885 fixed. A trailing slash is left for $${data%/} to take, which
+# also turns a $(datadir) of "/" into the empty prefix the compare needs.
 install-data-hook:
-	@rel='$(htmldir)'; \
-	case '$(htmldir)' in \
-		'$(datadir)'/*) rel="../$${rel#$(datadir)/}" ;; \
+	@fold() { printf '%s\n' "$$1" | \
+		sed -e 's|//*|/|g' -e ':a' -e 's|/\./|/|g' -e 'ta' -e 's|/\.$$|/|'; }; \
+	html=`fold '$(htmldir)'`; \
+	data=`fold '$(datadir)'`; \
+	root=$${data%/}; \
+	rel="$$html"; \
+	case "$$html" in \
+		"$$root"/*) rel="../$${html#"$$root"/}" ;; \
 	esac; \
 	link='$(DESTDIR)$(langrootdir)/html'; \
 	if test -L "$$link"; then rm -f "$$link" || exit 1; fi; \
