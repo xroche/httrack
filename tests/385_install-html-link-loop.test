@@ -73,6 +73,10 @@ link_target root-datadir "${docs}" ../usr/share/doc/httrack/html /
 glob_data='/usr/sh[a]re'
 link_target glob-in-datadir "${glob_data}/doc/httrack/html" "${docs_rel}" "${glob_data}"
 
+# htmldir naming the data dir itself relativizes only when it carries the trailing
+# slash, because the chop needs a "/" to cut on.
+link_target datadir-as-htmldir "${data}/" ../
+
 # htmldir outside the data dir keeps an absolute target, since the chop only
 # relativizes under it. That target does not survive staging, so this pins a
 # limitation rather than a good outcome. A chop ignoring the "/" fails here.
