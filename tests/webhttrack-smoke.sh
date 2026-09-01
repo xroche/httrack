@@ -13,20 +13,28 @@ test -x "$wht" || {
 
 browserstub="$prefix/bin/x-www-browser"
 work="$(mktemp -d)"
-# webhttrack backgrounds htsserver, which outlives it; reap any stray one (scoped
-# to this prefix) so a lingering server can never hold the CI step open.
-# The stub browsers below block, and each records its pid, so nothing this script
-# started can hold the CI step open once it returns.
-cleanup() {
-    set +e
-    pkill -f "$prefix/bin/htsserver" 2>/dev/null
+whpid=""
+
+# Kill the htsserver the launcher $whpid spawned. It carries "--ppid <launcher>", and
+# matching that rather than an installed path is what reaches the .app, whose argv[0]
+# runs through Contents/MacOS/.. instead.
+kill_server() {
+    test -n "$whpid" || return 1
+    pkill -f "ppid $whpid "
+}
+# htsserver outlives the launcher and the stub browsers below block, so nothing this
+# script started may be left holding the CI step open.
+teardown() {
+    kill_server 2>/dev/null
     kill "$whpid" 2>/dev/null
     for f in "$work"/*.pid; do
         kill -9 "$(cat "$f" 2>/dev/null)" 2>/dev/null
     done
     rm -rf "$work" "$browserstub" "$prefix/bin/open"
 }
-trap cleanup EXIT
+# Inline "set +e", the shape 103_teardown-status pins: a failing teardown under
+# errexit would otherwise become the verdict (#773).
+trap 'set +e; teardown' EXIT
 export HOME="$work/home"
 mkdir -p "$HOME/websites"
 marker="$work/marker"
@@ -162,7 +170,7 @@ done
 # (not a blocking wait, which could hang on macOS); SIGKILL if it ignores TERM.
 echo "tearing down"
 kill "$whpid" 2>/dev/null || true
-if pkill -f "$prefix/bin/htsserver" 2>/dev/null; then
+if kill_server 2>/dev/null; then
     echo "reaped a lingering htsserver"
 else
     echo "no lingering htsserver"
@@ -246,7 +254,7 @@ wait_gone() {
 # End the session the way closing the last UI window does. A no-match means the server
 # had already gone and the reap was never put under test.
 end_session() {
-    pkill -f "$prefix/bin/htsserver" || {
+    kill_server || {
         echo "no htsserver to end the session with; the reap went untested" >&2
         exit 1
     }
