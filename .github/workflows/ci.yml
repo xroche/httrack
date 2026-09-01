@@ -87,7 +87,8 @@ jobs:
           # a missing decoder would silently drop the coding from Accept-Encoding
           grep -q "define HTS_USEBROTLI 1" config.h
           grep -q "define HTS_USEZSTD 1" config.h
-          # losing this would make every crash test skip, and the suite stay green
+          # losing either would make every crash test skip, and the suite stay green
+          grep -q "define HAVE_BACKTRACE 1" config.h
           grep -q "define HAVE_SPAWN_H 1" config.h
 
       - name: Build
