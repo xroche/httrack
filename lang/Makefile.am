@@ -10,10 +10,9 @@ EXTRA_DIST = $(lang_DATA) $(langroot_DATA)
 
 # webhttrack and htsserver reach the served UI through $(langrootdir)/html, so the
 # link is relative: an absolute $(htmldir) dangles under DESTDIR or relocation (#885).
-# Making $(htmldir) first is what decides whether a link is wanted at all. Where it
-# is the link path, or under it, a real directory lands there and the link would
-# point at itself. The filesystem answers that, where comparing the two spellings
-# does not: configure keeps a "//" or a "/./" the kernel folds away.
+# Making $(htmldir) first decides whether a link is wanted. Where it is the link
+# path, or under it, a real directory lands there and the branch below leaves it
+# alone. Comparing spellings would miss that, since configure keeps a "//".
 install-data-hook:
 	@rel='$(htmldir)'; \
 	case '$(htmldir)' in \
