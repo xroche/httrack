@@ -29,16 +29,10 @@ hook() {
         fail "${name}: lang install-data failed for htmldir=${htmldir}"
 }
 
-# The staged link the hook writes, which follows the case's own datadir.
+# Each case's link lands under its own datadir, so derive the staged path from it.
 link_at() {
-    local name=$1 datadir=${2:-${data}}
+    local name=$1 datadir=$2
     printf '%s' "${work}/${name}${datadir}/httrack/html"
-}
-
-linked() {
-    local name=$1 htmldir=$2 datadir=${3:-${data}}
-    hook "${name}" "${htmldir}" "${datadir}"
-    test -L "$(link_at "${name}" "${datadir}")" || fail "${name}: no link was created"
 }
 
 not_linked() {
@@ -48,35 +42,40 @@ not_linked() {
     test ! -L "${at}" || fail "${name}: got a link to $(readlink "${at}")"
 }
 
-# Where the link must point. It is relative whenever htmldir sits under datadir,
-# so an install can be staged or moved (#885).
+# The link must be relative whenever htmldir sits under datadir, so that an
+# install can be staged or moved (#885).
 link_target() {
-    local name=$1 htmldir=$2 want=$3 datadir=${4:-${data}} got
-    linked "${name}" "${htmldir}" "${datadir}"
-    got=$(readlink "$(link_at "${name}" "${datadir}")")
+    local name=$1 htmldir=$2 want=$3 datadir=${4:-${data}} at got
+    hook "${name}" "${htmldir}" "${datadir}"
+    at=$(link_at "${name}" "${datadir}")
+    test -L "${at}" || fail "${name}: no link was created"
+    got=$(readlink "${at}")
     test "${got}" = "${want}" || fail "${name}: link reads ${got}, want ${want}"
 }
 
 link_target default "${docs}" "${docs_rel}"
 
-# Spellings of those same two directories that configure keeps and the kernel
-# ignores, on either side of the compare. Unfolded, the prefix test fails and
-# the link is left absolute, pointing at the build host's own tree rather than
-# into the staged one.
+# A user can spell those same two directories in ways configure keeps and the
+# kernel ignores, on either side of the compare. Unfolded, the prefix test fails
+# and the link is left absolute, pointing at the build host's own tree rather
+# than into the staged one.
 link_target doubled-slash "${docs}" "${docs_rel}" /usr//share
 link_target dot-component "${docs}" "${docs_rel}" /usr/./share
 link_target trailing-slash "${docs}" "${docs_rel}" /usr/share/
 link_target trailing-dot "${docs}" "${docs_rel}" /usr/share/.
 link_target dotted-htmldir /usr/./share/doc/httrack/html "${docs_rel}"
+# A datadir of "/" would make the prefix pattern "//*", which matches nothing.
+link_target root-datadir "${docs}" ../usr/share/doc/httrack/html /
 
 # The chop strips the datadir back off, and must treat it as text there too. Left
-# as a glob, a datadir carrying "[" matches the case yet strips nothing, and the
+# as a glob, a datadir carrying "[" matches the branch yet strips nothing, so the
 # whole absolute path ends up behind "../".
 glob_data='/usr/sh[a]re'
 link_target glob-in-datadir "${glob_data}/doc/httrack/html" "${docs_rel}" "${glob_data}"
 
-# htmldir outside datadir has no relative spelling. A chop ignoring the "/"
-# boundary would claim this one and mangle it instead of leaving it alone.
+# htmldir outside the data dir keeps an absolute target, since the chop only
+# relativizes under it. That target does not survive staging, so this pins a
+# limitation rather than a good outcome. A chop ignoring the "/" fails here.
 link_target outside-datadir /usr/sharefoo/html /usr/sharefoo/html
 
 # htmldir is the package directory itself, so the link can only point at its own
@@ -86,8 +85,8 @@ link_target package-dir "${data}/httrack" ../httrack
 # Neighbours of the link path. Without these the assertions below would pass on
 # a hook that stopped linking, or on one that skipped every htmldir under
 # $(datadir)/httrack.
-linked sibling-of-link "${link}foo"
-linked under-package-dir "${data}/httrack/doc"
+link_target sibling-of-link "${link}foo" ../httrack/htmlfoo
+link_target under-package-dir "${data}/httrack/doc" ../httrack/doc
 
 # htmldir at the link path (--docdir=$(datadir)/httrack), and one level under it
 # (Termux's --docdir=$(datadir)/httrack/html).
