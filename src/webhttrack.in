@@ -11,10 +11,12 @@ if test -n "${BROWSER}"; then
     SRCHBROWSEREXE=(xdg-open sensible-browser "${SRCHBROWSEREXE[@]}")
 fi
 # Patch for Darwin/Mac by Ross Williams
+DARWIN=
 if test "$(uname -s)" == "Darwin"; then
-    # Darwin's 'open -W' launches the default browser and waits for it to quit.
-    # Keep it only as a fallback so a configured $BROWSER still wins the search.
-    BROWSEREXEFALLBACK="/usr/bin/open -W"
+    # Darwin ships no browser command: open hands the URL to the default browser.
+    # Last in the list, so a configured $BROWSER still wins the search.
+    SRCHBROWSEREXE+=(open)
+    DARWIN=1
 fi
 BINWD=$(dirname "$0")
 SRCHPATH=("$BINWD" /usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack /opt/local/bin /sw/bin "${HOME}/usr/bin" "${HOME}/bin")
@@ -105,8 +107,15 @@ for i in "${SRCHBROWSEREXE[@]}"; do
     done
     test -n "$BROWSEREXE" && break
 done
-test -n "$BROWSEREXE" || BROWSEREXE="${BROWSEREXEFALLBACK}"
 test -n "$BROWSEREXE" || ! log "Could not find any suitable browser" || exit 1
+
+# open returns as soon as the browser is up, and wait_for_session would then end the
+# session at once, so ask it to wait. It outlives the session in exchange.
+REAPBROWSER=
+if test -n "${DARWIN}" && test "$(basename "${BROWSEREXE}")" = open; then
+    BROWSEREXE="${BROWSEREXE} -W"
+    REAPBROWSER=1
+fi
 
 # "browse" command
 if test "$1" = "browse"; then
@@ -144,6 +153,18 @@ while ! test -n "$SRVURL"; do
     test -n "$SRVURL" || sleep 1
 done
 
+# Darwin's open -W returns only when the browser itself quits, so it outlives the
+# session, and LaunchServices keeps the bundle -- and its bouncing Dock icon -- alive
+# on that orphan until the user force-quits it.
+function reap_browser {
+    test -n "${REAPBROWSER}" || return 0
+    test -n "${BROWSERPID}" || return 0
+    # BROWSERPID is the subshell around launch_browser; open is its child.
+    pkill -P "${BROWSERPID}" 2>/dev/null
+    kill "${BROWSERPID}" 2>/dev/null
+    return 0
+}
+
 # Cleanup function
 # shellcheck disable=SC2120 # $1 is an optional "signal caught" marker; bare calls are intentional
 function cleanup {
@@ -152,6 +173,7 @@ function cleanup {
     test -n "$1" && test -f "${TMPSRVFILE}" && SRVPID=$(grep -E PID= "${TMPSRVFILE}" | cut -f2- -d=)
     test -n "${SRVPID}" && kill -9 "${SRVPID}"
     test -f "${TMPSRVFILE}" && rm "${TMPSRVFILE}"
+    reap_browser
     test -n "$1" && log "..Done"
     return 0
 }

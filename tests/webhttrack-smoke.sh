@@ -15,7 +15,7 @@ browserstub="$prefix/bin/x-www-browser"
 work="$(mktemp -d)"
 # webhttrack backgrounds htsserver, which outlives it; reap any stray one (scoped
 # to this prefix) so a lingering server can never hold the CI step open.
-trap 'set +e; pkill -f "$prefix/bin/htsserver" 2>/dev/null || true; rm -rf "$work" "$browserstub"' EXIT
+trap 'set +e; pkill -f "$prefix/bin/htsserver" 2>/dev/null || true; rm -rf "$work" "$browserstub" "$prefix/bin/open"' EXIT
 export HOME="$work/home"
 mkdir -p "$HOME/websites"
 marker="$work/marker"
@@ -79,7 +79,7 @@ echo "install tree is relocatable"
 stubdir="$work/bin"
 mkdir -p "$stubdir"
 
-# On Darwin webhttrack hardcodes "open -W", which launches a real GUI browser and
+# On Darwin webhttrack falls back to "open -W", which launches a real GUI browser and
 # blocks headless. Shadow uname so it takes the generic path and picks the stub
 # browser below; htsserver and webhttrack's path resolution still run for real.
 cat >"$stubdir/uname" <<'EOF'
@@ -167,9 +167,76 @@ cat "$work/webhttrack.log" 2>/dev/null || true
 echo "--- end ---"
 echo "marker=[$(cat "$marker" 2>/dev/null || echo NONE)]"
 
-if test "$(cat "$marker" 2>/dev/null || true)" = PASS; then
-    echo "webhttrack smoke: PASS"
-else
+test "$(cat "$marker" 2>/dev/null || true)" = PASS || {
     echo "webhttrack smoke: FAIL" >&2
     exit 1
-fi
+}
+echo "webhttrack smoke: PASS"
+
+# The browser helper must not outlive the session: Darwin's "open -W" returns only
+# once the browser itself quits, and LaunchServices keeps the bundle, and its
+# bouncing Dock icon, alive on that orphan until the user force-quits it. Darwin
+# only, because everywhere else a real browser is found ahead of open in the list.
+rm -f "$stubdir/uname"
+test "$(uname -s)" = Darwin || {
+    echo "not Darwin: skipping the browser-helper check"
+    exit 0
+}
+
+# $prefix/bin heads webhttrack's own search path, so this shadows /usr/bin/open and
+# no real browser is launched. It records the pid it blocks under, which is what the
+# check below waits on.
+rm -f "$browserstub"
+openstub="$prefix/bin/open"
+openargs="$work/open.args"
+openpid="$work/open.pid"
+cat >"$openstub" <<EOF
+#!/bin/bash
+echo "\$@" >"$openargs"
+echo \$\$ >"$openpid"
+exec sleep 600
+EOF
+chmod +x "$openstub"
+
+echo "launching webhttrack against the open helper"
+"$wht" </dev/null >"$work/webhttrack-helper.log" 2>&1 &
+whpid2=$!
+for i in $(seq 1 45); do
+    test -s "$openpid" && {
+        echo "helper started after ${i}s"
+        break
+    }
+    kill -0 "$whpid2" 2>/dev/null || break
+    sleep 1
+done
+test -s "$openpid" || {
+    echo "webhttrack never ran the open helper; its log follows" >&2
+    cat "$work/webhttrack-helper.log" >&2
+    exit 1
+}
+# -W is what makes open wait, and therefore what makes reaping necessary.
+case "$(cat "$openargs")" in
+*-W*) ;;
+*)
+    echo "open helper got [$(cat "$openargs")], expected -W" >&2
+    exit 1
+    ;;
+esac
+
+# End the session the way closing the UI does, then give webhttrack its own teardown.
+helper=$(cat "$openpid")
+pkill -f "$prefix/bin/htsserver" || true
+for _ in $(seq 1 30); do
+    kill -0 "$whpid2" 2>/dev/null || break
+    sleep 1
+done
+for _ in $(seq 1 10); do
+    kill -0 "$helper" 2>/dev/null || break
+    sleep 1
+done
+kill -0 "$helper" 2>/dev/null && {
+    kill -9 "$helper" 2>/dev/null || true
+    echo "the browser helper ($helper) outlived the session" >&2
+    exit 1
+}
+echo "browser helper reaped with the session"
