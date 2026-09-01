@@ -479,7 +479,7 @@ esac
 # A stalled crawl is necessarily inside httpmirror, so these frames must appear.
 # Matching "httrack" alone would pass on the process list above.
 # Naming them needs the symbolizer, which a build without <spawn.h> cannot run.
-if build_has_symbolizer; then
+if build_names_frames; then
     grep -qE '\b(back_wait|httpmirror|hts_main_internal)\b' "$out" ||
         fail "the stack names no engine frame"
 fi

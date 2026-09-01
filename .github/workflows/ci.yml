@@ -87,6 +87,8 @@ jobs:
           # a missing decoder would silently drop the coding from Accept-Encoding
           grep -q "define HTS_USEBROTLI 1" config.h
           grep -q "define HTS_USEZSTD 1" config.h
+          # losing this would make every crash test skip, and the suite stay green
+          grep -q "define HAVE_SPAWN_H 1" config.h
 
       - name: Build
         run: make -j"$(nproc)"
@@ -831,7 +833,7 @@ jobs:
 
   # Termux's cell: bionic before API 28 links backtrace() (libandroid-execinfo)
   # but ships no <spawn.h>, so the symbolizer the backtrace block pulls in is a
-  # hard build break there. Also runs the suite with frame naming compiled out.
+  # hard build break there. The suite also runs with frame naming compiled out.
   no-spawn:
     name: build (spawn.h hidden)
     runs-on: ubuntu-24.04

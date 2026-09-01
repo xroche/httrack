@@ -555,9 +555,13 @@ declared_header_count() {
     declared_headers | awk 'END { print NR + 0 }'
 }
 
-# A build without <spawn.h> (bionic before API 28) cannot name frames.
-build_has_symbolizer() {
-    grep -q '^#define HAVE_SPAWN_H ' "${abs_top_builddir:?}/config.h"
+# The same condition htsbacktrace.c compiles USES_SYMBOLIZER on. A build without
+# <spawn.h> (bionic before API 28) prints frames as module+offset and stops.
+build_names_frames() {
+    local conf="${abs_top_builddir:?}/config.h"
+    test -r "${conf}" || fail "no config.h at ${conf}"
+    grep -q '^#define HAVE_BACKTRACE ' "${conf}" &&
+        grep -q '^#define HAVE_SPAWN_H ' "${conf}"
 }
 
 is_windows() {
