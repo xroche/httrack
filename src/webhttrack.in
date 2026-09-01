@@ -12,9 +12,9 @@ if test -n "${BROWSER}"; then
 fi
 # Patch for Darwin/Mac by Ross Williams
 if test "$(uname -s)" == "Darwin"; then
-    # Darwin's 'open -W' launches the default browser and waits for it to quit.
-    # Keep it only as a fallback so a configured $BROWSER still wins the search.
-    BROWSEREXEFALLBACK="/usr/bin/open -W"
+    # open hands the URL to Darwin's default browser. It goes last so a configured
+    # $BROWSER still wins the search.
+    SRCHBROWSEREXE+=(open)
 fi
 BINWD=$(dirname "$0")
 SRCHPATH=("$BINWD" /usr/local/bin /usr/share/bin /usr/bin /usr/lib/httrack /usr/local/lib/httrack /usr/local/share/httrack /opt/local/bin /sw/bin "${HOME}/usr/bin" "${HOME}/bin")
@@ -105,8 +105,15 @@ for i in "${SRCHBROWSEREXE[@]}"; do
     done
     test -n "$BROWSEREXE" && break
 done
-test -n "$BROWSEREXE" || BROWSEREXE="${BROWSEREXEFALLBACK}"
 test -n "$BROWSEREXE" || ! log "Could not find any suitable browser" || exit 1
+
+# Without -W, open returns as soon as the browser is up and wait_for_session would end
+# the session there and then. Only Darwin puts open in the list above.
+BROWSERWAITS=
+if test "$(basename "${BROWSEREXE}")" = open; then
+    BROWSEREXE="${BROWSEREXE} -W"
+    BROWSERWAITS=1
+fi
 
 # "browse" command
 if test "$1" = "browse"; then
@@ -144,6 +151,18 @@ while ! test -n "$SRVURL"; do
     test -n "$SRVURL" || sleep 1
 done
 
+# open -W blocks until the browser itself quits, so an unreaped one keeps the bundle
+# registered with LaunchServices and its Dock icon up until the user force-quits it.
+function reap_browser {
+    test -n "${BROWSERWAITS}" || return 0
+    # A dead pid may already have been reused, so signalling it would hit a stranger.
+    kill -0 "${BROWSERPID}" 2>/dev/null || return 0
+    # BROWSERPID names the launch_browser subshell, whose child is open.
+    pkill -P "${BROWSERPID}" 2>/dev/null
+    kill "${BROWSERPID}" 2>/dev/null
+    return 0
+}
+
 # Cleanup function
 # shellcheck disable=SC2120 # $1 is an optional "signal caught" marker; bare calls are intentional
 function cleanup {
@@ -152,6 +171,7 @@ function cleanup {
     test -n "$1" && test -f "${TMPSRVFILE}" && SRVPID=$(grep -E PID= "${TMPSRVFILE}" | cut -f2- -d=)
     test -n "${SRVPID}" && kill -9 "${SRVPID}"
     test -f "${TMPSRVFILE}" && rm "${TMPSRVFILE}"
+    reap_browser
     test -n "$1" && log "..Done"
     return 0
 }
