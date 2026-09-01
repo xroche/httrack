@@ -21,6 +21,7 @@ fi
 if ! command -v addr2line >/dev/null && ! command -v llvm-symbolizer >/dev/null; then
     skip "no symbolizer installed"
 fi
+build_names_frames || skip "built without <spawn.h>, so frames stay module+offset"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/httrack_argv0.XXXXXX") || exit 1
 cleanup_push rm -rf "${work}"

@@ -558,6 +558,15 @@ declared_header_count() {
     declared_headers | awk 'END { print NR + 0 }'
 }
 
+# The same condition htsbacktrace.c compiles USES_SYMBOLIZER on. A build without
+# <spawn.h> (bionic before API 28) prints frames as module+offset and stops.
+build_names_frames() {
+    local conf="${abs_top_builddir:?}/config.h"
+    test -r "${conf}" || fail "no config.h at ${conf}"
+    grep -q '^#define HAVE_BACKTRACE ' "${conf}" &&
+        grep -q '^#define HAVE_SPAWN_H ' "${conf}"
+}
+
 is_windows() {
     if test -z "${IS_WINDOWS:-}"; then
         case "$HTS_OS" in

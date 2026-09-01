@@ -87,6 +87,9 @@ jobs:
           # a missing decoder would silently drop the coding from Accept-Encoding
           grep -q "define HTS_USEBROTLI 1" config.h
           grep -q "define HTS_USEZSTD 1" config.h
+          # losing either would make every crash test skip, and the suite stay green
+          grep -q "define HAVE_BACKTRACE 1" config.h
+          grep -q "define HAVE_SPAWN_H 1" config.h
 
       - name: Build
         run: make -j"$(nproc)"
@@ -815,6 +818,47 @@ jobs:
           # A libc without getrandom() at all would pass this job vacuously.
           grep -q "define HAVE_GETRANDOM 1" config.h
           ! grep -q "define HAVE_SYS_RANDOM_H" config.h
+
+      - name: Build
+        run: make -j"$(nproc)"
+
+      - name: Test
+        timeout-minutes: 20
+        run: |
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          make check -j"$jobs"
+
+      - name: Print the test log on failure
+        if: failure()
+        run: cat tests/test-suite.log 2>/dev/null || true
+
+  # Termux's cell: bionic before API 28 links backtrace() (libandroid-execinfo)
+  # but ships no <spawn.h>, so the symbolizer the backtrace block pulls in is a
+  # hard build break there. The suite also runs with frame naming compiled out.
+  no-spawn:
+    name: build (spawn.h hidden)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev
+
+      - name: Configure (spawn.h hidden from configure)
+        run: |
+          set -euo pipefail
+          autoreconf -fi
+          ./configure ac_cv_header_spawn_h=no
+          # A build with no backtrace() at all would pass this job vacuously.
+          grep -q "define HAVE_BACKTRACE 1" config.h
+          ! grep -q "define HAVE_SPAWN_H" config.h
 
       - name: Build
         run: make -j"$(nproc)"
