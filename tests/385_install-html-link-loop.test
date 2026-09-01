@@ -58,6 +58,20 @@ not_linked under-link-path "${link}/html"
 # The same path as at-link-path, spelled the way configure keeps --datadir=/usr//share.
 not_linked unfolded-datadir "${link}" /usr//share
 
+# A datadir the user spelled with "//" or "/." names the same directory, so the
+# link must still come out relative. An unfolded compare leaves it absolute,
+# pointing at the build host's own tree rather than into the staged one.
+stays_relative() {
+    local name=$1 datadir=$2 got
+    linked "${name}" "${data}/doc/httrack/html" "${datadir}"
+    got=$(readlink "${work}/${name}${link}")
+    test "${got}" = "../doc/httrack/html" ||
+        fail "datadir=${datadir} gave ${got}, want ../doc/httrack/html"
+}
+
+stays_relative doubled-slash /usr//share
+stays_relative dot-component /usr/./share
+
 # An upgrade over the absolute link older installs left (#885): it must be
 # replaced, not kept because it happens to resolve.
 stale=${work}/upgrade${link}

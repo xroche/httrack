@@ -12,11 +12,20 @@ EXTRA_DIST = $(lang_DATA) $(langroot_DATA)
 # link is relative: an absolute $(htmldir) dangles under DESTDIR or relocation (#885).
 # Making $(htmldir) first decides whether a link is wanted. Where it is the link
 # path, or under it, a real directory lands there and the branch below leaves it
-# alone. Comparing spellings would miss that, since configure keeps a "//".
+# alone.
+#
+# Both paths are folded before they are compared, because configure keeps the "//"
+# and "/." a user typed and the kernel does not. An unfolded pair fails the prefix
+# test and leaves the link absolute, which is the dangling #885 fixed.
 install-data-hook:
-	@rel='$(htmldir)'; \
-	case '$(htmldir)' in \
-		'$(datadir)'/*) rel="../$${rel#$(datadir)/}" ;; \
+	@fold() { printf '%s\n' "$$1" | \
+		sed -e 's|//*|/|g' -e ':a' -e 's|/\./|/|g' -e 'ta' -e 's|/\.$$||'; }; \
+	html=`fold '$(htmldir)'`; \
+	data=`fold '$(datadir)'`; \
+	root=`fold '$(langrootdir)'`; \
+	rel="$$html"; \
+	case "$$html" in \
+		"$$data"/*) rel="../$${html#$$data/}" ;; \
 	esac; \
 	link='$(DESTDIR)$(langrootdir)/html'; \
 	if test -L "$$link"; then rm -f "$$link" || exit 1; fi; \
@@ -24,6 +33,8 @@ install-data-hook:
 	if test -e "$$link"; then \
 		echo "$$link exists and is not a symlink, leaving it alone" >&2; \
 	else \
+		test "$$html" != "$$root" || echo "$(htmldir) is the package directory," \
+			"so $(langrootdir)/html can only loop back to it" >&2; \
 		echo " $(LN_S) $$rel $$link"; \
 		$(LN_S) "$$rel" "$$link"; \
 	fi
