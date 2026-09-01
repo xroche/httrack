@@ -1,0 +1,50 @@
+#!/bin/bash
+# A --docdir under $(datadir)/httrack put the served-UI link inside its own
+# target, and install-HelpHtmlDATA then died on the ELOOP.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${abs_top_builddir:?not run under make check}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/htmllink.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+data=/usr/share
+link=${data}/httrack/html
+
+# The hook alone: html/ installs the pages, and this never runs it.
+run_hook() {
+    local dest=$1 html=$2
+    mkdir -p "${dest}${data}/httrack"
+    run_with_install_lock env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" \
+        -C "${abs_top_builddir}/lang" install-data-hook \
+        DESTDIR="${dest}" datadir="${data}" htmldir="${html}" \
+        >"${dest}.log" 2>&1 && return 0
+    dump_file "${dest}.log"
+    fail "install-data-hook failed for htmldir=${html}"
+}
+
+# Control: the default layout still gets its link, so the assertions below
+# cannot pass on a hook that stopped linking at all.
+out=${work}/default
+run_hook "${out}" "${data}/doc/httrack/html"
+test -L "${out}${link}" || fail "the default layout got no link"
+got=$(readlink "${out}${link}")
+test "${got}" = "../doc/httrack/html" || fail "the link reads ${got}, want ../doc/httrack/html"
+
+# htmldir at the link path (--docdir=$(datadir)/httrack) and one level under it
+# (Termux's --docdir=$(datadir)/httrack/html).
+i=0
+for html in "${link}" "${link}/html"; do
+    i=$((i + 1))
+    out=${work}/under${i}
+    run_hook "${out}" "${html}"
+    test ! -L "${out}${link}" || fail "htmldir=${html} got a link to $(readlink "${out}${link}")"
+    # What install-HelpHtmlDATA does next, and what used to fail with ELOOP.
+    mkdir -p "${out}${html}" || fail "htmldir=${html} is not creatable"
+done
+
+echo "the served-UI link never contains itself"
