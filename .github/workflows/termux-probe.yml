@@ -106,3 +106,45 @@ jobs:
             termux-packages/output/
             termux-packages/build.log
           if-no-files-found: warn
+
+  # Can Termux move today, on the released 3.50.0, with neither fix? Only by
+  # steering configure around both: no execinfo.h so <spawn.h> is never reached,
+  # and a docdir outside $(datadir)/httrack so the link cannot contain itself.
+  released:
+    name: released 3.50.0, workarounds only
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+
+      - name: Clone termux-packages
+        run: git clone --depth 1 https://github.com/termux/termux-packages.git
+
+      - name: Recipe for the released tarball
+        working-directory: termux-packages
+        run: |
+          set -euo pipefail
+          rm packages/httrack/html-Makefile.in.patch \
+             packages/httrack/htsglobal.h.patch \
+             packages/httrack/src-htsbacktrace.c.patch \
+             packages/httrack/src-Makefile.in.patch \
+             packages/httrack/src-proxy-proxytrack.h.patch
+          sed -i 's/^TERMUX_PKG_VERSION=.*$/TERMUX_PKG_VERSION="3.50.0"/' packages/httrack/build.sh
+          sed -i 's/^TERMUX_PKG_SHA256=.*$/TERMUX_PKG_SHA256=9511ebf352eb0b6fb958afafaaf29eb76736440eaf9746006b03e38b1335503e/' packages/httrack/build.sh
+          sed -i 's|^--docdir=.*$|ac_cv_header_execinfo_h=no|' packages/httrack/build.sh
+          sed -i 's/^TERMUX_PKG_DEPENDS=.*$/TERMUX_PKG_DEPENDS="httrack-data, libiconv, openssl, zlib"/' packages/httrack/build.sh
+          cat packages/httrack/build.sh
+
+      - name: Build for aarch64
+        working-directory: termux-packages
+        run: ./scripts/run-docker.sh ./build-package.sh -a aarch64 -I httrack
+
+      - name: What landed in the package
+        working-directory: termux-packages
+        run: |
+          set -euo pipefail
+          ls -l output/
+          for d in output/*.deb; do
+              echo "=== $d ==="
+              dpkg-deb -c "$d"
+          done
