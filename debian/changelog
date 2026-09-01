@@ -1,3 +1,13 @@
+httrack (3.50.0-2) unstable; urgency=medium
+
+  * Rebuild with a changelog timestamp that precedes the build.  The 3.50.0-1
+    entry was stamped two hours ahead of its buildd run, so SOURCE_DATE_EPOCH
+    clamped nothing there and clamped everything on a rebuild.  That made the
+    binaries unreproducible on all four tested architectures.  The source is
+    unchanged.
+
+ -- Xavier Roche <xavier@debian.org>  Tue, 01 Sep 2026 14:06:23 +0200
+
 httrack (3.50.0-1) unstable; urgency=medium
 
   * New upstream release.  The version moves to 3.50 to match the Windows
