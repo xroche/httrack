@@ -39,6 +39,8 @@ Please visit our Website: http://www.httrack.com
 #include "htsio.h"
 #include "htszlib.h"
 
+#include <limits.h>
+
 #if HTS_USEBROTLI
 #include <brotli/decode.h>
 #endif
