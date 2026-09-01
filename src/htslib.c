@@ -72,6 +72,7 @@ Please visit our Website: http://www.httrack.com
 #include <stdarg.h>
 
 #include <ctype.h>
+#include <stdint.h>
 #include <string.h>
 #include <time.h>
 #include <stdarg.h>

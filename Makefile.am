@@ -13,6 +13,7 @@ EXTRA_DIST = INSTALL.Linux \
 		winprofile-keys.tsv winprofile-escapes.tsv \
 		tools/gen-winprofile-keys.py \
 		tools/doc-chrome.py \
+		tools/check-includes.py \
 		tools/ci-sanitizer-report.sh \
 		tools/downstream-drift.sh
 

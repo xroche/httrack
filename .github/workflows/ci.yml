@@ -1052,6 +1052,11 @@ jobs:
       - name: fuzz corpus list
         run: bash fuzz/check-corpus-list.sh
 
+      # A macro borrowed from another header builds only where that header is
+      # present (#1481).
+      - name: standard includes
+        run: python3 tools/check-includes.py
+
       # MSBuild rejects a malformed .vcxproj with a bare MSB4025 and no build, so
       # catch it here in seconds rather than on a Windows runner minutes in.
       - name: XML well-formedness (MSBuild project files)

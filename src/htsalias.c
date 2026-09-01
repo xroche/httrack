@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 
 #include <errno.h>
 #include <limits.h>
+#include <stdint.h>
 
 /*
   Aliases for command-line and config file definitions

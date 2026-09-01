@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsthread.h"
+#include <stdint.h>
 #include <time.h>
 /* END specific definitions */
 
