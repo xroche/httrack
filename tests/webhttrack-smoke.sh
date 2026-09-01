@@ -15,7 +15,18 @@ browserstub="$prefix/bin/x-www-browser"
 work="$(mktemp -d)"
 # webhttrack backgrounds htsserver, which outlives it; reap any stray one (scoped
 # to this prefix) so a lingering server can never hold the CI step open.
-trap 'set +e; pkill -f "$prefix/bin/htsserver" 2>/dev/null || true; rm -rf "$work" "$browserstub" "$prefix/bin/open"' EXIT
+# The stub browsers below block, and each records its pid, so nothing this script
+# started can hold the CI step open once it returns.
+cleanup() {
+    set +e
+    pkill -f "$prefix/bin/htsserver" 2>/dev/null
+    kill "$whpid" 2>/dev/null
+    for f in "$work"/*.pid; do
+        kill -9 "$(cat "$f" 2>/dev/null)" 2>/dev/null
+    done
+    rm -rf "$work" "$browserstub" "$prefix/bin/open"
+}
+trap cleanup EXIT
 export HOME="$work/home"
 mkdir -p "$HOME/websites"
 marker="$work/marker"
@@ -80,8 +91,8 @@ stubdir="$work/bin"
 mkdir -p "$stubdir"
 
 # On Darwin webhttrack falls back to "open -W", which launches a real GUI browser and
-# blocks headless. Shadow uname so it takes the generic path and picks the stub
-# browser below; htsserver and webhttrack's path resolution still run for real.
+# blocks headless. Shadow uname so it takes the generic path and picks the stub browser
+# below. The rest, htsserver included, still runs for real.
 cat >"$stubdir/uname" <<'EOF'
 #!/bin/bash
 [ "${1:-}" = "-s" ] && {
@@ -173,70 +184,135 @@ test "$(cat "$marker" 2>/dev/null || true)" = PASS || {
 }
 echo "webhttrack smoke: PASS"
 
-# The browser helper must not outlive the session: Darwin's "open -W" returns only
-# once the browser itself quits, and LaunchServices keeps the bundle, and its
-# bouncing Dock icon, alive on that orphan until the user force-quits it. Darwin
-# only, because everywhere else a real browser is found ahead of open in the list.
+# The browser helper must not outlive the session: Darwin's open -W blocks until the
+# browser itself quits, and an unreaped one keeps the bundle registered with
+# LaunchServices, so its Dock icon stays up until the user force-quits it. Darwin only,
+# because everywhere else a real browser is found ahead of open in webhttrack's list.
 rm -f "$stubdir/uname"
 test "$(uname -s)" = Darwin || {
     echo "not Darwin: skipping the browser-helper check"
     exit 0
 }
 
-# $prefix/bin heads webhttrack's own search path, so this shadows /usr/bin/open and
-# no real browser is launched. It records the pid it blocks under, which is what the
-# check below waits on.
+# A browser stub that blocks the way open -W does, recording its argv one word per line
+# in $2 and the pid it blocks under in $3. exec, so that pid is the one still alive.
+mkhelper() {
+    cat >"$1" <<EOF
+#!/bin/bash
+printf '%s\n' "\$@" >"$2"
+echo \$\$ >"$3"
+exec sleep 600
+EOF
+    chmod +x "$1"
+}
+
+# Run webhttrack and wait for the stub recording into $1 to block. Sets whpid and helper.
+launch_and_wait() {
+    local pidfile=$1 log=$2 i
+    rm -f "$pidfile"
+    "$wht" </dev/null >"$log" 2>&1 &
+    whpid=$!
+    for i in $(seq 1 45); do
+        test -s "$pidfile" && {
+            echo "the browser stub blocked after ${i}s"
+            break
+        }
+        kill -0 "$whpid" 2>/dev/null || {
+            echo "webhttrack exited on its own after ${i}s"
+            break
+        }
+        sleep 1
+    done
+    test -s "$pidfile" || {
+        echo "no browser stub ever blocked; webhttrack's log follows" >&2
+        cat "$log" >&2
+        exit 1
+    }
+    helper=$(cat "$pidfile")
+}
+
+# Poll for $1 to go away, up to $2 seconds. Signals are asynchronous, so the helper can
+# outlive the launcher that reaped it by a moment.
+wait_gone() {
+    local pid=$1 n=$2
+    while test "$n" -gt 0; do
+        kill -0 "$pid" 2>/dev/null || return 0
+        n=$((n - 1))
+        sleep 1
+    done
+    return 1
+}
+
+# End the session the way closing the last UI window does. A no-match means the server
+# had already gone and the reap was never put under test.
+end_session() {
+    pkill -f "$prefix/bin/htsserver" || {
+        echo "no htsserver to end the session with; the reap went untested" >&2
+        exit 1
+    }
+    wait_gone "$whpid" 30 || {
+        echo "webhttrack did not exit when the session ended" >&2
+        exit 1
+    }
+}
+
+# $prefix/bin heads webhttrack's search path, so this shadows /usr/bin/open. The PATH is
+# the one launchd hands an app opened from Finder, which is why the shipped bundle finds
+# no browser and reaches open at all.
 rm -f "$browserstub"
 openstub="$prefix/bin/open"
 openargs="$work/open.args"
 openpid="$work/open.pid"
-cat >"$openstub" <<EOF
-#!/bin/bash
-echo "\$@" >"$openargs"
-echo \$\$ >"$openpid"
-exec sleep 600
-EOF
-chmod +x "$openstub"
+mkhelper "$openstub" "$openargs" "$openpid"
+export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 
-echo "launching webhttrack against the open helper"
-"$wht" </dev/null >"$work/webhttrack-helper.log" 2>&1 &
-whpid2=$!
-for i in $(seq 1 45); do
-    test -s "$openpid" && {
-        echo "helper started after ${i}s"
-        break
-    }
-    kill -0 "$whpid2" 2>/dev/null || break
-    sleep 1
-done
-test -s "$openpid" || {
-    echo "webhttrack never ran the open helper; its log follows" >&2
-    cat "$work/webhttrack-helper.log" >&2
+echo "case 1: the session ends, the helper goes with it"
+launch_and_wait "$openpid" "$work/helper1.log"
+# A whole line, because a URL carrying the letters would satisfy a substring match.
+grep -qxF -- -W "$openargs" || {
+    echo "open got [$(tr '\n' ' ' <"$openargs")], expected -W" >&2
     exit 1
 }
-# -W is what makes open wait, and therefore what makes reaping necessary.
-case "$(cat "$openargs")" in
-*-W*) ;;
-*)
-    echo "open helper got [$(cat "$openargs")], expected -W" >&2
+kill -0 "$helper" 2>/dev/null || {
+    echo "the helper was reaped before the session ended" >&2
     exit 1
-    ;;
-esac
-
-# End the session the way closing the UI does, then give webhttrack its own teardown.
-helper=$(cat "$openpid")
-pkill -f "$prefix/bin/htsserver" || true
-for _ in $(seq 1 30); do
-    kill -0 "$whpid2" 2>/dev/null || break
-    sleep 1
-done
-for _ in $(seq 1 10); do
-    kill -0 "$helper" 2>/dev/null || break
-    sleep 1
-done
-kill -0 "$helper" 2>/dev/null && {
-    kill -9 "$helper" 2>/dev/null || true
+}
+end_session
+wait_gone "$helper" 10 || {
     echo "the browser helper ($helper) outlived the session" >&2
     exit 1
 }
 echo "browser helper reaped with the session"
+
+# A user quitting the Dock icon arrives here, not on the path above.
+echo "case 2: a signal ends the session, the helper still goes"
+launch_and_wait "$openpid" "$work/helper2.log"
+kill "$whpid"
+wait_gone "$whpid" 30 || {
+    echo "webhttrack did not exit on SIGTERM" >&2
+    exit 1
+}
+wait_gone "$helper" 10 || {
+    echo "the browser helper ($helper) survived the signal path" >&2
+    exit 1
+}
+echo "browser helper reaped on the signal path"
+
+# x-www-browser heads webhttrack's browser list, so it is chosen over open here. Reaping
+# is for the helper we asked to wait, never for a browser the user is reading in.
+echo "case 3: a real browser is left alone"
+browserargs="$work/browser.args"
+browserpid="$work/browser.pid"
+mkhelper "$browserstub" "$browserargs" "$browserpid"
+launch_and_wait "$browserpid" "$work/helper3.log"
+browser=$helper
+grep -qxF -- -W "$browserargs" && {
+    echo "the browser got -W, which belongs to open alone" >&2
+    exit 1
+}
+end_session
+kill -0 "$browser" 2>/dev/null || {
+    echo "the user's browser ($browser) was reaped with the session" >&2
+    exit 1
+}
+echo "a real browser is left running"
