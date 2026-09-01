@@ -1,0 +1,105 @@
+# Throwaway probe: build termux/termux-packages' httrack recipe against a 3.50.0
+# tarball carrying the <spawn.h> fix. The control keeps their six patches and
+# must fail the way termux/termux-packages#30858 does.
+name: termux-probe
+
+on:
+  push:
+    branches: [termux-probe]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: [control, candidate]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          df -h /
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - name: make dist
+        run: |
+          set -euo pipefail
+          ./bootstrap
+          ./configure
+          make dist
+          ls -l httrack-*.tar.gz
+
+      - name: Clone termux-packages
+        run: |
+          git clone --depth 1 https://github.com/termux/termux-packages.git
+          git -C termux-packages log --oneline -1
+
+      - name: Point the recipe at our tarball
+        run: |
+          set -euo pipefail
+          cp httrack-3.50.0.tar.gz termux-packages/
+          cd termux-packages
+          sum=$(sha256sum httrack-3.50.0.tar.gz | cut -d' ' -f1)
+          sed -i 's/^TERMUX_PKG_VERSION=.*$/TERMUX_PKG_VERSION="3.50.0"/' packages/httrack/build.sh
+          sed -i "s|^TERMUX_PKG_SRCURL=.*$|TERMUX_PKG_SRCURL=file:///home/builder/termux-packages/httrack-3.50.0.tar.gz|" packages/httrack/build.sh
+          sed -i "s/^TERMUX_PKG_SHA256=.*$/TERMUX_PKG_SHA256=$sum/" packages/httrack/build.sh
+          cat packages/httrack/build.sh
+
+      - name: Drop the five retired patches
+        if: matrix.leg == 'candidate'
+        working-directory: termux-packages
+        run: |
+          set -euo pipefail
+          rm packages/httrack/html-Makefile.in.patch \
+             packages/httrack/htsglobal.h.patch \
+             packages/httrack/src-htsbacktrace.c.patch \
+             packages/httrack/src-Makefile.in.patch \
+             packages/httrack/src-proxy-proxytrack.h.patch
+          ls packages/httrack/
+
+      - name: Build for aarch64
+        working-directory: termux-packages
+        run: |
+          set -euo pipefail
+          rc=0
+          ./scripts/run-docker.sh ./build-package.sh -a aarch64 -I httrack 2>&1 | tee build.log || rc=${PIPESTATUS[0]}
+          if [ "${{ matrix.leg }}" = control ]; then
+              test "$rc" -ne 0 || { echo "control built, so it no longer reproduces #30858"; exit 1; }
+              grep -q 'html/Makefile.in.rej' build.log ||
+                  { echo "control failed, but not on html-Makefile.in.patch"; exit 1; }
+              echo "control reproduced #30858"
+          else
+              test "$rc" -eq 0 || exit "$rc"
+          fi
+
+      - name: What landed in the package
+        if: matrix.leg == 'candidate'
+        working-directory: termux-packages
+        run: |
+          set -euo pipefail
+          ls -l output/
+          for d in output/*.deb; do
+              echo "=== $d ==="
+              dpkg-deb -c "$d"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: termux-${{ matrix.leg }}
+          path: |
+            termux-packages/output/
+            termux-packages/build.log
+          if-no-files-found: warn
