@@ -57,11 +57,14 @@ jobs:
           sed -i "s/^TERMUX_PKG_SHA256=.*$/TERMUX_PKG_SHA256=$sum/" packages/httrack/build.sh
           cat packages/httrack/build.sh
 
-      - name: Drop the five retired patches
+      - name: Drop the five retired patches, and fix docdir
         if: matrix.leg == 'candidate'
         working-directory: termux-packages
         run: |
           set -euo pipefail
+          # htmldir defaults to $docdir/html since #1477, so the old value buried
+          # the pages one level below where htsserver looks for them.
+          sed -i 's|^--docdir=.*$|--docdir=$TERMUX_PREFIX/share/httrack|' packages/httrack/build.sh
           rm packages/httrack/html-Makefile.in.patch \
              packages/httrack/htsglobal.h.patch \
              packages/httrack/src-htsbacktrace.c.patch \
