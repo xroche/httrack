@@ -10,20 +10,18 @@ EXTRA_DIST = $(lang_DATA) $(langroot_DATA)
 
 # webhttrack and htsserver reach the served UI through $(langrootdir)/html, so the
 # link is relative: an absolute $(htmldir) dangles under DESTDIR or relocation (#885).
-# An htmldir at or under that path would make the link contain itself, an ELOOP the
-# next install rule dies on, so it is skipped there.
+# Making $(htmldir) first is what decides whether a link is wanted at all. Where it
+# is the link path, or under it, a real directory lands there and the link would
+# point at itself. The filesystem answers that, where comparing the two spellings
+# does not: configure keeps a "//" or a "/./" the kernel folds away.
 install-data-hook:
 	@rel='$(htmldir)'; \
 	case '$(htmldir)' in \
 		'$(datadir)'/*) rel="../$${rel#$(datadir)/}" ;; \
 	esac; \
 	link='$(DESTDIR)$(langrootdir)/html'; \
-	case '$(htmldir)/' in \
-		'$(langrootdir)/html/'*) \
-			echo "$(htmldir) installs at or under $(langrootdir)/html, so no link" >&2; \
-			exit 0 ;; \
-	esac; \
 	if test -L "$$link"; then rm -f "$$link" || exit 1; fi; \
+	$(MKDIR_P) '$(DESTDIR)$(htmldir)' || exit 1; \
 	if test -e "$$link"; then \
 		echo "$$link exists and is not a symlink, leaving it alone" >&2; \
 	else \

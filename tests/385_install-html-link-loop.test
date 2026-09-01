@@ -1,6 +1,6 @@
 #!/bin/bash
-# A --docdir under $(datadir)/httrack put the served-UI link inside its own
-# target, and install-HelpHtmlDATA then died on the ELOOP.
+# The served-UI link must never point inside its own target: a --docdir under
+# $(datadir)/httrack used to make one, and install-HelpHtmlDATA then hit ELOOP.
 
 set -euo pipefail
 
@@ -15,36 +15,45 @@ cleanup_push rm -rf "${work}"
 data=/usr/share
 link=${data}/httrack/html
 
-# The hook alone: html/ installs the pages, and this never runs it.
-run_hook() {
-    local dest=$1 html=$2
-    mkdir -p "${dest}${data}/httrack"
-    run_with_install_lock env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" \
-        -C "${abs_top_builddir}/lang" install-data-hook \
-        DESTDIR="${dest}" datadir="${data}" htmldir="${html}" \
-        >"${dest}.log" 2>&1 && return 0
-    dump_file "${dest}.log"
-    fail "install-data-hook failed for htmldir=${html}"
+# One staged layout per call, under $work/$name, named for what it proves. lang's
+# own data install is what creates the link's parent directory.
+hook() {
+    local name=$1 htmldir=$2 datadir=${3:-${data}}
+    stage_install_target install-data "${work}/${name}" \
+        "${work}/${name}.log" lang datadir="${datadir}" htmldir="${htmldir}" ||
+        fail "${name}: lang install-data failed for htmldir=${htmldir}"
 }
 
-# Control: the default layout still gets its link, so the assertions below
-# cannot pass on a hook that stopped linking at all.
-out=${work}/default
-run_hook "${out}" "${data}/doc/httrack/html"
-test -L "${out}${link}" || fail "the default layout got no link"
-got=$(readlink "${out}${link}")
+linked() {
+    hook "$@"
+    test -L "${work}/$1${link}" || fail "$1: no link was created"
+}
+
+not_linked() {
+    local name=$1 htmldir=$2
+    hook "$@"
+    test ! -L "${work}/${name}${link}" ||
+        fail "${name}: got a link to $(readlink "${work}/${name}${link}")"
+    # install-HelpHtmlDATA does this next, and it used to fail with ELOOP.
+    mkdir -p "${work}/${name}${htmldir}" || fail "${name}: htmldir is not creatable"
+}
+
+# The default layout, and the relative target #885 asks for.
+linked default "${data}/doc/httrack/html"
+got=$(readlink "${work}/default${link}")
 test "${got}" = "../doc/httrack/html" || fail "the link reads ${got}, want ../doc/httrack/html"
 
-# htmldir at the link path (--docdir=$(datadir)/httrack) and one level under it
+# Neighbours of the link path. Without these the assertions below would pass on
+# a hook that stopped linking, or on one that skipped every htmldir under
+# $(datadir)/httrack.
+linked sibling-of-link "${link}foo"
+linked under-package-dir "${data}/httrack/doc"
+
+# htmldir at the link path (--docdir=$(datadir)/httrack), and one level under it
 # (Termux's --docdir=$(datadir)/httrack/html).
-i=0
-for html in "${link}" "${link}/html"; do
-    i=$((i + 1))
-    out=${work}/under${i}
-    run_hook "${out}" "${html}"
-    test ! -L "${out}${link}" || fail "htmldir=${html} got a link to $(readlink "${out}${link}")"
-    # What install-HelpHtmlDATA does next, and what used to fail with ELOOP.
-    mkdir -p "${out}${html}" || fail "htmldir=${html} is not creatable"
-done
+not_linked at-link-path "${link}"
+not_linked under-link-path "${link}/html"
+# The same path as at-link-path, spelled the way configure keeps --datadir=/usr//share.
+not_linked unfolded-datadir "${link}" /usr//share
 
 echo "the served-UI link never contains itself"
