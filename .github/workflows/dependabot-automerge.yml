@@ -6,7 +6,8 @@ name: Dependabot auto-merge
 on: pull_request_target
 
 concurrency:
-  group: dependabot-automerge-${{ github.ref }}
+  # Keyed per PR: github.ref is the base branch on pull_request_target, so one group would hold them all.
+  group: dependabot-automerge-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
@@ -18,7 +19,12 @@ permissions:
 jobs:
   automerge:
     name: Arm auto-merge
-    if: github.repository == 'xroche/httrack' && github.actor == 'dependabot[bot]'
+    # The PR's author, never github.actor: on a synchronize the actor is whoever pushed, so a
+    # fork-side Dependabot push on someone else's PR passes an actor check.
+    if: >-
+      github.repository == 'xroche/httrack'
+      && github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
     steps:
       # Dependabot's body is a release-notes dump, so give the squash commit a body of its own.
