@@ -20,7 +20,8 @@ jobs:
   automerge:
     name: Arm auto-merge
     # Checks the PR's author, not github.actor, because on a synchronize the actor is whoever
-    # pushed, including a fork's own Dependabot.
+    # pushed, including a fork's own Dependabot. The head-repo clause has no witness while
+    # only Dependabot's own PRs pass the author check, and is kept for if that ever loosens.
     if: >-
       github.repository == 'xroche/httrack'
       && github.event.pull_request.user.login == 'dependabot[bot]'
