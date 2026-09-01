@@ -59,18 +59,19 @@ Please visit our Website: http://www.httrack.com
 #endif
 /* HAVE_BACKTRACE means the symbol links, not just that the header exists. */
 #if (defined(__linux) && defined(HAVE_BACKTRACE))
+#include <execinfo.h>
+#include <signal.h>
+#define USES_BACKTRACE
+/* Frame naming needs posix_spawn(), absent before bionic API 28. Everything
+   below serves it, so a build without the header asks for none of it. */
+#ifdef HAVE_SPAWN_H
 #include <dlfcn.h>
 #include <errno.h>
-#include <execinfo.h>
 #include <link.h>
-#include <signal.h>
+#include <spawn.h>
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#define USES_BACKTRACE
-/* Frame naming needs posix_spawn(), absent before bionic API 28. */
-#ifdef HAVE_SPAWN_H
-#include <spawn.h>
 #define USES_SYMBOLIZER
 #endif
 #endif
