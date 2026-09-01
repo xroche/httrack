@@ -555,6 +555,11 @@ declared_header_count() {
     declared_headers | awk 'END { print NR + 0 }'
 }
 
+# A build without <spawn.h> (bionic before API 28) cannot name frames.
+build_has_symbolizer() {
+    grep -q '^#define HAVE_SPAWN_H ' "${abs_top_builddir:?}/config.h"
+}
+
 is_windows() {
     if test -z "${IS_WINDOWS:-}"; then
         case "$HTS_OS" in

@@ -15,6 +15,7 @@ if [ "$HTS_OS" != "Linux" ]; then
     exit 77
 fi
 require_httrack
+build_has_symbolizer || skip "this build has no <spawn.h> symbolizer"
 # A wedged httrack still catches SIGTERM and only sets a flag, hence -s KILL.
 command -v timeout >/dev/null || fail "no timeout(1): a hang would never end here"
 

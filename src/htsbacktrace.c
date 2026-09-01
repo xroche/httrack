@@ -64,11 +64,15 @@ Please visit our Website: http://www.httrack.com
 #include <execinfo.h>
 #include <link.h>
 #include <signal.h>
-#include <spawn.h>
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #define USES_BACKTRACE
+/* Frame naming needs posix_spawn(), absent before bionic API 28. */
+#ifdef HAVE_SPAWN_H
+#include <spawn.h>
+#define USES_SYMBOLIZER
+#endif
 #endif
 
 #ifdef _WIN32
@@ -77,7 +81,7 @@ Please visit our Website: http://www.httrack.com
 #define BT_REPORT_FD STDERR_FILENO
 #endif
 
-#ifdef USES_BACKTRACE
+#ifdef USES_SYMBOLIZER
 #define BT_MAX_FRAMES 64  /* frames we try to name */
 #define BT_MAX_MODULES 8  /* distinct modules, one child each */
 #define BT_HEX_SIZE 19    /* "0x" + 16 nibbles + NUL */
@@ -305,6 +309,7 @@ void hts_backtrace_init(void) {
 #ifdef USES_BACKTRACE
   void *frame[1];
 
+#ifdef USES_SYMBOLIZER
   symbolize_crash =
       getenv("HTTRACK_NO_SYMBOLIZE") == NULL ? HTS_TRUE : HTS_FALSE;
   if (symbolize_crash && posix_spawn_file_actions_init(&spawn_actions) == 0 &&
@@ -312,6 +317,7 @@ void hts_backtrace_init(void) {
                                        STDOUT_FILENO) == 0)
     spawn_redirect = &spawn_actions; /* both symbolizers write on stdout */
   find_main_object();
+#endif
   /* Pay for the unwinder now: glibc's first backtrace() dlopen()s libgcc_s,
      which allocates and takes the loader lock the crashing thread may hold. */
   (void) backtrace(frame, 1);
@@ -403,17 +409,21 @@ void hts_print_backtrace(void) {
   void *stack[256];
   const int size = backtrace(stack, sizeof(stack) / sizeof(stack[0]));
 
+#ifdef USES_SYMBOLIZER
   /* A fault inside the handler lands back here: symbolizing twice interleaves
      two traces on the report fd and spends a second budget. */
   static volatile sig_atomic_t entered = 0;
+#endif
 
   if (size != 0) {
     backtrace_symbols_fd(stack, size, BT_REPORT_FD);
+#ifdef USES_SYMBOLIZER
     if (symbolize_crash && entered == 0) {
       entered = 1;
       symbolize_backtrace(stack, size);
       entered = 0;
     }
+#endif
   } else {
     /* An empty trace means the build carries no unwind tables. */
     const char msg[] = "No stack trace available: unwinding failed\n";

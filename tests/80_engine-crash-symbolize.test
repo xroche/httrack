@@ -43,6 +43,7 @@ esac
 grep -q "$rawframe" "$out" ||
     fail_dump "raw module+offset frames are gone:" "$out"
 
+build_has_symbolizer || skip "this build has no <spawn.h> symbolizer"
 command -v addr2line >/dev/null || skip "addr2line not installed"
 
 # Control: resolve the same frames ourselves, so a stripped build cannot turn
