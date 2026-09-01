@@ -14,18 +14,19 @@ EXTRA_DIST = $(lang_DATA) $(langroot_DATA)
 # path, or under it, a real directory lands there and the branch below leaves it
 # alone.
 #
-# Both paths are folded before they are compared, because configure keeps the "//"
-# and "/." a user typed and the kernel does not. An unfolded pair fails the prefix
-# test and leaves the link absolute, which is the dangling #885 fixed.
+# Both paths are folded before they are compared, because a user's "//", "/." or
+# trailing "/" survives into the Makefile and the kernel ignores all three. An
+# unfolded pair fails the prefix test and leaves the link absolute, which is the
+# dangling #885 fixed.
 install-data-hook:
 	@fold() { printf '%s\n' "$$1" | \
-		sed -e 's|//*|/|g' -e ':a' -e 's|/\./|/|g' -e 'ta' -e 's|/\.$$||'; }; \
+		sed -e 's|//*|/|g' -e ':a' -e 's|/\./|/|g' -e 'ta' \
+			-e 's|/\.$$|/|' -e 's|\(.\)/$$|\1|'; }; \
 	html=`fold '$(htmldir)'`; \
 	data=`fold '$(datadir)'`; \
-	root=`fold '$(langrootdir)'`; \
 	rel="$$html"; \
 	case "$$html" in \
-		"$$data"/*) rel="../$${html#$$data/}" ;; \
+		"$$data"/*) rel="../$${html#"$$data"/}" ;; \
 	esac; \
 	link='$(DESTDIR)$(langrootdir)/html'; \
 	if test -L "$$link"; then rm -f "$$link" || exit 1; fi; \
@@ -33,8 +34,6 @@ install-data-hook:
 	if test -e "$$link"; then \
 		echo "$$link exists and is not a symlink, leaving it alone" >&2; \
 	else \
-		test "$$html" != "$$root" || echo "$(htmldir) is the package directory," \
-			"so $(langrootdir)/html can only loop back to it" >&2; \
 		echo " $(LN_S) $$rel $$link"; \
 		$(LN_S) "$$rel" "$$link"; \
 	fi

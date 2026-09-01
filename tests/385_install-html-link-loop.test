@@ -17,6 +17,8 @@ cleanup_push rm -rf "${work}"
 # build was configured for does not matter.
 data=/usr/share
 link=${data}/httrack/html
+docs=${data}/doc/httrack/html
+docs_rel=../doc/httrack/html
 
 # One staged layout per call, under $work/$name. lang's own data install is what
 # creates the link's parent directory.
@@ -27,23 +29,59 @@ hook() {
         fail "${name}: lang install-data failed for htmldir=${htmldir}"
 }
 
+# The staged link the hook writes, which follows the case's own datadir.
+link_at() {
+    local name=$1 datadir=${2:-${data}}
+    printf '%s' "${work}/${name}${datadir}/httrack/html"
+}
+
 linked() {
     local name=$1 htmldir=$2 datadir=${3:-${data}}
     hook "${name}" "${htmldir}" "${datadir}"
-    test -L "${work}/${name}${link}" || fail "${name}: no link was created"
+    test -L "$(link_at "${name}" "${datadir}")" || fail "${name}: no link was created"
 }
 
 not_linked() {
-    local name=$1 htmldir=$2 datadir=${3:-${data}}
+    local name=$1 htmldir=$2 datadir=${3:-${data}} at
+    at=$(link_at "${name}" "${datadir}")
     hook "${name}" "${htmldir}" "${datadir}"
-    test ! -L "${work}/${name}${link}" ||
-        fail "${name}: got a link to $(readlink "${work}/${name}${link}")"
+    test ! -L "${at}" || fail "${name}: got a link to $(readlink "${at}")"
 }
 
-# The default layout, and the relative target #885 asks for.
-linked default "${data}/doc/httrack/html"
-got=$(readlink "${work}/default${link}")
-test "${got}" = "../doc/httrack/html" || fail "the link reads ${got}, want ../doc/httrack/html"
+# Where the link must point. It is relative whenever htmldir sits under datadir,
+# so an install can be staged or moved (#885).
+link_target() {
+    local name=$1 htmldir=$2 want=$3 datadir=${4:-${data}} got
+    linked "${name}" "${htmldir}" "${datadir}"
+    got=$(readlink "$(link_at "${name}" "${datadir}")")
+    test "${got}" = "${want}" || fail "${name}: link reads ${got}, want ${want}"
+}
+
+link_target default "${docs}" "${docs_rel}"
+
+# Spellings of those same two directories that configure keeps and the kernel
+# ignores, on either side of the compare. Unfolded, the prefix test fails and
+# the link is left absolute, pointing at the build host's own tree rather than
+# into the staged one.
+link_target doubled-slash "${docs}" "${docs_rel}" /usr//share
+link_target dot-component "${docs}" "${docs_rel}" /usr/./share
+link_target trailing-slash "${docs}" "${docs_rel}" /usr/share/
+link_target trailing-dot "${docs}" "${docs_rel}" /usr/share/.
+link_target dotted-htmldir /usr/./share/doc/httrack/html "${docs_rel}"
+
+# The chop strips the datadir back off, and must treat it as text there too. Left
+# as a glob, a datadir carrying "[" matches the case yet strips nothing, and the
+# whole absolute path ends up behind "../".
+glob_data='/usr/sh[a]re'
+link_target glob-in-datadir "${glob_data}/doc/httrack/html" "${docs_rel}" "${glob_data}"
+
+# htmldir outside datadir has no relative spelling. A chop ignoring the "/"
+# boundary would claim this one and mangle it instead of leaving it alone.
+link_target outside-datadir /usr/sharefoo/html /usr/sharefoo/html
+
+# htmldir is the package directory itself, so the link can only point at its own
+# parent. Refusing to make it would leave webhttrack with no served UI (#885).
+link_target package-dir "${data}/httrack" ../httrack
 
 # Neighbours of the link path. Without these the assertions below would pass on
 # a hook that stopped linking, or on one that skipped every htmldir under
@@ -58,35 +96,19 @@ not_linked under-link-path "${link}/html"
 # The same path as at-link-path, spelled the way configure keeps --datadir=/usr//share.
 not_linked unfolded-datadir "${link}" /usr//share
 
-# A datadir the user spelled with "//" or "/." names the same directory, so the
-# link must still come out relative. An unfolded compare leaves it absolute,
-# pointing at the build host's own tree rather than into the staged one.
-stays_relative() {
-    local name=$1 datadir=$2 got
-    linked "${name}" "${data}/doc/httrack/html" "${datadir}"
-    got=$(readlink "${work}/${name}${link}")
-    test "${got}" = "../doc/httrack/html" ||
-        fail "datadir=${datadir} gave ${got}, want ../doc/httrack/html"
-}
-
-stays_relative doubled-slash /usr//share
-stays_relative dot-component /usr/./share
-
 # An upgrade over the absolute link older installs left (#885): it must be
 # replaced, not kept because it happens to resolve.
 stale=${work}/upgrade${link}
-mkdir -p "$(dirname "${stale}")" "${work}/upgrade${data}/doc/httrack/html"
-ln -s "${data}/doc/httrack/html" "${stale}"
-linked upgrade "${data}/doc/httrack/html"
-got=$(readlink "${stale}")
-test "${got}" = "../doc/httrack/html" || fail "the stale absolute link survived as ${got}"
+mkdir -p "$(dirname "${stale}")" "${work}/upgrade${docs}"
+ln -s "${docs}" "${stale}"
+link_target upgrade "${docs}" "${docs_rel}"
 
 # Anything else already sitting there is left alone, and the install still
 # succeeds. Only a symlink is ours to replace.
 squatter=${work}/squatter${link}
 mkdir -p "$(dirname "${squatter}")"
 echo keep-me >"${squatter}"
-hook squatter "${data}/doc/httrack/html" "${data}"
+hook squatter "${docs}" "${data}"
 test "$(cat "${squatter}")" = keep-me || fail "the file at the link path was not left alone"
 
 echo "the served-UI link never contains itself"
