@@ -1,0 +1,78 @@
+#!/bin/bash
+# The served-UI link must never point inside its own target. A --docdir under
+# $(datadir)/httrack used to make one, and install-HelpHtmlDATA then hit ELOOP.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${abs_top_builddir:?not run under make check}"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/htmllink.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+# lang's hook links $(langrootdir)/html, which is $(datadir)/httrack/html, to
+# whatever $(htmldir) holds. Both are overridden per case, so the layout this
+# build was configured for does not matter.
+data=/usr/share
+link=${data}/httrack/html
+
+# One staged layout per call, under $work/$name. lang's own data install is what
+# creates the link's parent directory.
+hook() {
+    local name=$1 htmldir=$2 datadir=$3
+    stage_install_target install-data "${work}/${name}" \
+        "${work}/${name}.log" lang datadir="${datadir}" htmldir="${htmldir}" ||
+        fail "${name}: lang install-data failed for htmldir=${htmldir}"
+}
+
+linked() {
+    local name=$1 htmldir=$2 datadir=${3:-${data}}
+    hook "${name}" "${htmldir}" "${datadir}"
+    test -L "${work}/${name}${link}" || fail "${name}: no link was created"
+}
+
+not_linked() {
+    local name=$1 htmldir=$2 datadir=${3:-${data}}
+    hook "${name}" "${htmldir}" "${datadir}"
+    test ! -L "${work}/${name}${link}" ||
+        fail "${name}: got a link to $(readlink "${work}/${name}${link}")"
+}
+
+# The default layout, and the relative target #885 asks for.
+linked default "${data}/doc/httrack/html"
+got=$(readlink "${work}/default${link}")
+test "${got}" = "../doc/httrack/html" || fail "the link reads ${got}, want ../doc/httrack/html"
+
+# Neighbours of the link path. Without these the assertions below would pass on
+# a hook that stopped linking, or on one that skipped every htmldir under
+# $(datadir)/httrack.
+linked sibling-of-link "${link}foo"
+linked under-package-dir "${data}/httrack/doc"
+
+# htmldir at the link path (--docdir=$(datadir)/httrack), and one level under it
+# (Termux's --docdir=$(datadir)/httrack/html).
+not_linked at-link-path "${link}"
+not_linked under-link-path "${link}/html"
+# The same path as at-link-path, spelled the way configure keeps --datadir=/usr//share.
+not_linked unfolded-datadir "${link}" /usr//share
+
+# An upgrade over the absolute link older installs left (#885): it must be
+# replaced, not kept because it happens to resolve.
+stale=${work}/upgrade${link}
+mkdir -p "$(dirname "${stale}")" "${work}/upgrade${data}/doc/httrack/html"
+ln -s "${data}/doc/httrack/html" "${stale}"
+linked upgrade "${data}/doc/httrack/html"
+got=$(readlink "${stale}")
+test "${got}" = "../doc/httrack/html" || fail "the stale absolute link survived as ${got}"
+
+# Anything else already sitting there is left alone, and the install still
+# succeeds. Only a symlink is ours to replace.
+squatter=${work}/squatter${link}
+mkdir -p "$(dirname "${squatter}")"
+echo keep-me >"${squatter}"
+hook squatter "${data}/doc/httrack/html" "${data}"
+test "$(cat "${squatter}")" = keep-me || fail "the file at the link path was not left alone"
+
+echo "the served-UI link never contains itself"

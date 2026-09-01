@@ -521,11 +521,14 @@ run_with_install_lock() { # run_with_install_lock CMD ARG...
 # below the top (src/ by default). The configured prefix survives DESTDIR, so the
 # staged tree is the real layout; MAKEFLAGS and MAKELEVEL cleared, no jobserver to
 # hunt.
+# Trailing VAR=value arguments reach make, for a caller staging a layout its own
+# build was not configured for.
 stage_install_target() {
     local target=$1 dest=$2 log=$3 dir=${4:-src}
+    shift $(($# < 4 ? $# : 4))
     run_with_install_lock env -u MAKEFLAGS -u MAKELEVEL "${MAKE:-make}" \
         -C "${abs_top_builddir:?}/${dir}" \
-        "${target}" DESTDIR="${dest}" >"${log}" 2>&1 && return 0
+        "${target}" DESTDIR="${dest}" "$@" >"${log}" 2>&1 && return 0
     dump_file "${log}"
     return 1
 }

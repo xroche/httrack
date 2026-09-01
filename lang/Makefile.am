@@ -10,6 +10,9 @@ EXTRA_DIST = $(lang_DATA) $(langroot_DATA)
 
 # webhttrack and htsserver reach the served UI through $(langrootdir)/html, so the
 # link is relative: an absolute $(htmldir) dangles under DESTDIR or relocation (#885).
+# Making $(htmldir) first decides whether a link is wanted. Where it is the link
+# path, or under it, a real directory lands there and the branch below leaves it
+# alone. Comparing spellings would miss that, since configure keeps a "//".
 install-data-hook:
 	@rel='$(htmldir)'; \
 	case '$(htmldir)' in \
@@ -17,6 +20,7 @@ install-data-hook:
 	esac; \
 	link='$(DESTDIR)$(langrootdir)/html'; \
 	if test -L "$$link"; then rm -f "$$link" || exit 1; fi; \
+	$(MKDIR_P) '$(DESTDIR)$(htmldir)' || exit 1; \
 	if test -e "$$link"; then \
 		echo "$$link exists and is not a symlink, leaving it alone" >&2; \
 	else \
