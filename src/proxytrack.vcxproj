@@ -100,6 +100,7 @@
     <ClCompile Include="proxy\proxytrack.c" />
     <ClCompile Include="proxy\store.c" />
     <ClCompile Include="htsurlport.c" />
+    <ClCompile Include="htsdate.c" />
     <ClCompile Include="htsnet.c" />
     <ClCompile Include="coucal\coucal.c" />
     <ClCompile Include="htsmd5.c" />

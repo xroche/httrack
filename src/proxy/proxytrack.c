@@ -617,106 +617,14 @@ static void proxytrack_add_DAV_Item(String * item, String * buff,
 }
 
 /* Convert a RFC822 time to time_t */
+/* The RFC822 date of a cache entry as a time_t, or 0 if it does not parse.
+   The fields are GMT, so timegm() and never mktime() (#1491). */
 static time_t get_time_rfc822(const char *s) {
   struct tm result;
 
-  /* */
-  char months[] = "jan feb mar apr may jun jul aug sep oct nov dec";
-  char str[256];
-  char *a;
-  int i;
-
-  /* */
-  int result_mm = -1;
-  int result_dd = -1;
-  int result_n1 = -1;
-  int result_n2 = -1;
-  int result_n3 = -1;
-  int result_n4 = -1;
-
-  /* */
-
-  if ((int) strlen(s) > 200)
+  if (convert_time_rfc822(&result, s) == NULL)
     return (time_t) 0;
-  for(i = 0; s[i] != 0; i++) {
-    if (s[i] >= 'A' && s[i] <= 'Z')
-      str[i] = s[i] + ('a' - 'A');
-    else
-      str[i] = s[i];
-  }
-  str[i] = 0;
-  /* éliminer :,- */
-  while((a = strchr(str, '-')))
-    *a = ' ';
-  while((a = strchr(str, ':')))
-    *a = ' ';
-  while((a = strchr(str, ',')))
-    *a = ' ';
-  /* tokeniser */
-  a = str;
-  while(*a) {
-    char *first, *last;
-    char tok[256];
-
-    /* découper mot */
-    while(*a == ' ')
-      a++;                      /* sauter espaces */
-    first = a;
-    while((*a) && (*a != ' '))
-      a++;
-    last = a;
-    tok[0] = '\0';
-    if (first != last) {
-      char *pos;
-
-      strncat(tok, first, (int) (last - first));
-      /* analyser */
-      if ((pos = strstr(months, tok))) {        /* month always in letters */
-        result_mm = ((int) (pos - months)) / 4;
-      } else {
-        int number;
-
-        if (sscanf(tok, "%d", &number) == 1) {  /* number token */
-          if (result_dd < 0)    /* day always first number */
-            result_dd = number;
-          else if (result_n1 < 0)
-            result_n1 = number;
-          else if (result_n2 < 0)
-            result_n2 = number;
-          else if (result_n3 < 0)
-            result_n3 = number;
-          else if (result_n4 < 0)
-            result_n4 = number;
-        }                       /* sinon, bruit de fond(+1GMT for exampel) */
-      }
-    }
-  }
-  if ((result_n1 >= 0) && (result_mm >= 0) && (result_dd >= 0)
-      && (result_n2 >= 0) && (result_n3 >= 0) && (result_n4 >= 0)) {
-    if (result_n4 >= 1000) {    /* Sun Nov  6 08:49:37 1994 */
-      result.tm_year = result_n4 - 1900;
-      result.tm_hour = result_n1;
-      result.tm_min = result_n2;
-      result.tm_sec = max(result_n3, 0);
-    } else {                    /* Sun, 06 Nov 1994 08:49:37 GMT or Sunday, 06-Nov-94 08:49:37 GMT */
-      result.tm_hour = result_n2;
-      result.tm_min = result_n3;
-      result.tm_sec = max(result_n4, 0);
-      if (result_n1 <= 50)      /* 00 means 2000 */
-        result.tm_year = result_n1 + 100;
-      else if (result_n1 < 1000)        /* 99 means 1999 */
-        result.tm_year = result_n1;
-      else                      /* 2000 */
-        result.tm_year = result_n1 - 1900;
-    }
-    result.tm_isdst = 0;        /* assume GMT */
-    result.tm_yday = -1;        /* don't know */
-    result.tm_wday = -1;        /* don't know */
-    result.tm_mon = result_mm;
-    result.tm_mday = result_dd;
-    return timegm(&result);
-  }
-  return (time_t) 0;
+  return timegm(&result);
 }
 
 static PT_Element proxytrack_process_DAV_Request(PT_Indexes indexes,
