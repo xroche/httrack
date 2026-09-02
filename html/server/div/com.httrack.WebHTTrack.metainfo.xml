@@ -53,6 +53,15 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.50.1" date="2026-09-02">
+      <description>
+        <ul>
+          <li>A bug-fix release with no new features. A mirroring run behaves exactly as 3.50.0 did</li>
+          <li>Quitting WebHTTrack on macOS no longer leaves its icon bouncing in the Dock</li>
+          <li>In a packaged install, the Help link in these pages reaches the manual again</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.50.0" date="2026-09-01">
       <description>
         <ul>

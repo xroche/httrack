@@ -1,3 +1,9 @@
+httrack (3.50.1-1) unstable; urgency=medium
+
+  * New upstream release, bug fixes only.  Full list in history.txt.
+
+ -- Xavier Roche <xavier@debian.org>  Wed, 02 Sep 2026 15:00:26 +0200
+
 httrack (3.50.0-2) unstable; urgency=medium
 
   * Rebuild with a changelog timestamp that precedes the build.  The 3.50.0-1
