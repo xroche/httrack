@@ -53,6 +53,14 @@
   <content_rating type="oars-1.1"/>
   <!-- Newest first; tests/01_engine-version-macros.test enforces it. -->
   <releases>
+    <release version="3.50.1" date="2026-09-02">
+      <description>
+        <ul>
+          <li>Quitting WebHTTrack on macOS no longer leaves its icon bouncing in the Dock</li>
+          <li>Fixes in the mirror engine and in ProxyTrack, two of them for faults another machine on the network could trigger</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.50.0" date="2026-09-01">
       <description>
         <ul>
