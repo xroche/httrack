@@ -61,6 +61,7 @@ typedef struct lien_adrfilsave lien_adrfilsave;
 
 /* définitions globales */
 #include "htsglobal.h"
+#include "htsdate.h"
 #include "htsurlport.h"
 
 /* basic net definitions */
@@ -353,7 +354,6 @@ void time_local_rfc822(char *s);
 /* Current UTC time as "YYYY-MM-DDThh:mm:ssZ". */
 void hts_now_iso8601(char out[32]);
 
-struct tm *convert_time_rfc822(struct tm *buffer, const char *s);
 int set_filetime(const char *file, struct tm *tm_time);
 int set_filetime_rfc822(const char *file, const char *date);
 /* File mtime as a UTC time_t, or (time_t) -1 if it can not be read. */
