@@ -5,7 +5,7 @@
 # Gentoo's src_prepare dies today on a grep of m4/check_zlib.m4 that we
 # rewrote. Their files, so a finding here is usually theirs to fix, which is why
 # it blocks nothing.
-name: downstream drift canary
+name: distro packaging recipes against this tree
 
 on:
   schedule:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   drift:
-    name: downstream recipes against this tree
+    name: check the Gentoo, FreeBSD, OpenBSD and Termux recipes
     # Scheduled workflows run per-fork independently; skip anywhere but upstream.
     if: github.repository == 'xroche/httrack'
     runs-on: ubuntu-24.04

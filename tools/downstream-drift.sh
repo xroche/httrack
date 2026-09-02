@@ -33,8 +33,10 @@ acknowledged=(
     openbsd-patch-src_minizip_ioapi_h
     openbsd-patch-src_webhttrack
     termux-html-Makefile.in.patch
+    termux-htsglobal.h.patch # the install paths follow --prefix since #1469
     termux-src-Makefile.in.patch
     termux-src-htsbacktrace.c.patch
+    termux-src-proxy-proxytrack.h.patch # the sys/timeb.h include went away with #1467
     termux-store.c.patch
 )
 
@@ -132,6 +134,12 @@ if [ ! -f "$top/src/Makefile.in" ] || [ ! -f "$top/html/Makefile.in" ]; then
     die "run ./bootstrap first: the generated files Termux patches are missing"
 fi
 
+# Whoever reads a failed run has none of this context, so state it up front.
+echo "Gentoo, FreeBSD, OpenBSD and Termux each patch this tree to build it."
+echo "Their live recipes, re-checked below: ok = the recipe still fits, known ="
+echo "a mismatch already reported to its packager, DRIFT = a new one."
+echo
+
 ### Gentoo -- www-client/httrack, read through the GitHub mirror because
 ### gitweb.gentoo.org has no stable raw URL for a version-numbered ebuild.
 gentoo_raw=https://raw.githubusercontent.com/gentoo-mirror/gentoo/master/www-client/httrack
@@ -198,9 +206,10 @@ echo
 test "$checks" -ge 21 || die "only $checks checks ran; the table lost some"
 
 if [ "$drift" -ne 0 ]; then
-    echo "Downstream assumptions our tree no longer meets are listed above."
-    echo "Tell the packager, then add the id to \$acknowledged so this stays red"
-    echo "only for what is new."
+    echo "A DRIFT line above is a packaging recipe that no longer fits this tree,"
+    echo "so that distribution breaks at its next version bump. The recipe is"
+    echo "theirs and so is the fix: tell the packager, then add the id to"
+    echo "\$acknowledged in this script so a later run reds only for what is new."
     exit 1
 fi
 echo "$checks checks, no new drift; $known_hits are findings already known"
