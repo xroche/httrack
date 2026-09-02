@@ -64,6 +64,7 @@ jobs:
           # and the canary then passes without having built this tree at all.
           grep -qx "TERMUX_PKG_VERSION=\"$ver\"" "$recipe"
           grep -qx "TERMUX_PKG_SRCURL=$url" "$recipe"
+          echo "url=$url" >> "$GITHUB_ENV"
 
       # Their patches are applied verbatim: one that no longer applies to our
       # master is a finding, not something to route around.
@@ -72,12 +73,14 @@ jobs:
         run: |
           set -euo pipefail
           cd termux-packages
-          # -I pulls their prebuilt dependencies rather than building the world,
-          # which is how their own CI invokes it.
+          # -I is how their own CI invokes it.
           ./scripts/run-docker.sh ./build-package.sh -I -a aarch64 httrack 2>&1 |
             tee "$GITHUB_WORKSPACE/build.log"
-          ls output/httrack_*_aarch64.deb ||
+          test -f "output/httrack_${ver}_aarch64.deb" ||
             { echo "build-package.sh exited 0 with no package" >&2; exit 1; }
+          # An override of termux_step_get_source would ignore our URL, past both greps.
+          grep -qF "source from '$url'" "$GITHUB_WORKSPACE/build.log" ||
+            { echo "their downloader never announced our tarball" >&2; exit 1; }
 
       - name: Name the step that died
         if: failure()
@@ -88,4 +91,4 @@ jobs:
           # elf-cleaner buries the last of these phase markers under 400 lines.
           grep -nE '^(Downloading|Applying patch:|Building|ERROR:|make.*\*\*\*)' \
             "$GITHUB_WORKSPACE/build.log" | tail -20 || true
-          grep -v '^termux-elf-cleaner:' "$GITHUB_WORKSPACE/build.log" | tail -60
+          grep -v '^termux-elf-cleaner:' "$GITHUB_WORKSPACE/build.log" | tail -60 || true
