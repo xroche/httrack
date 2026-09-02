@@ -1546,7 +1546,9 @@ static int proxytrack_start_ICP(PT_Indexes indexes, T_SOC soc) {
         unsigned int Request_Number = READ_NET32(&buffer[4]); /* Session ID */
         unsigned char *Payload = &buffer[20];
 
-        buffer[bufferSize] = '\0';      /* Ensure payload is NULL terminated */
+        /* Terminate at the datagram, not at the buffer: the payload's strlen()
+           otherwise runs into the previous one and the reply echoes it back. */
+        memset(&buffer[n], 0, (size_t) (bufferSize + 1 - n));
         if (Message_Length <= bufferSize - 20) {
           if (Opcode >= ICP_OP_MIN && Opcode <= ICP_OP_MAX) {
             if (Version == 2) {

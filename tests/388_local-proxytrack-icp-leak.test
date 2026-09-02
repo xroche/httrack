@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# An ICP reply echoes the queried URL back. proxytrack terminated the receive
+# buffer at its end rather than at the datagram, so a query whose URL runs to
+# the last byte took its terminator from whatever the previous datagram left,
+# and the reply carried that other client's bytes back (#1493).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr"
+printf 'hello' >"$dir/body"
+{
+    arc_filedesc
+    arc_record http://example.com/page.html text/html 200 "$dir/hdr" "$dir/body"
+} >"$dir/in.arc"
+
+launch_proxytrack() {
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" >"$ptlog" 2>&1 &
+    ptpid=$!
+}
+start_proxytrack "$dir/pt" launch_proxytrack
+
+"$python" - "$icpport" <<'PY' || fail_dump "the ICP reply carried the previous datagram's bytes" "$ptlog"
+import socket, struct, sys
+
+port = int(sys.argv[1])
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.settimeout(10)
+
+# ICP header: opcode, version, message length, request number, 12 more bytes.
+# The payload's first four bytes are the requester address; the URL follows.
+def query(url):
+    payload = b"\x00" * 4 + url  # no terminator: the datagram ends with the URL
+    return struct.pack("!BBHI", 1, 2, 20 + len(payload), 0x1234) + b"\x00" * 12 + payload
+
+secret = b"S" * 4096
+sock.sendto(b"\x01\x02" + secret, ("127.0.0.1", port))
+try:
+    sock.recvfrom(65535)  # drain its reply, so the next recv is ours
+except socket.timeout:
+    pass
+
+sock.sendto(query(b"http://example.com/page.html"), ("127.0.0.1", port))
+try:
+    reply, _ = sock.recvfrom(65535)
+except socket.timeout:
+    print("no ICP reply", file=sys.stderr)
+    sys.exit(1)
+
+echoed = reply[20:].split(b"\x00")[0]
+if echoed != b"http://example.com/page.html":
+    print("echoed %d bytes, %d of them from the previous datagram: %r"
+          % (len(echoed), echoed.count(b"S"), echoed[:64]), file=sys.stderr)
+    sys.exit(1)
+PY
+
+echo "OK: an unterminated ICP query echoes its own URL and nothing else"
