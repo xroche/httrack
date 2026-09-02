@@ -2099,24 +2099,11 @@ static int getDigit4(const char *const pos) {
     getDigit(pos[2]) * 10 + getDigit(pos[3]);
 }
 
-static time_t getGMT(struct tm *tm) {   /* hey, time_t is local! */
-  time_t t = mktime(tm);
+static time_t getGMT(struct tm *tm) {
+  time_t t = timegm(tm);
 
   if (t != (time_t) - 1 && t != (time_t) 0) {
-    /* BSD does not have static "timezone" declared */
-#if (defined(BSD) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD_kernel__))
-    time_t now = time(NULL);
-    struct tm nowtm;
-    time_t timezone;
-
-    if (!hts_localtime(now, &nowtm))
-      return (time_t) -1;
-    timezone = -nowtm.tm_gmtoff;
-#elif defined(_MSC_VER)
-    /* MSVC spells it _timezone */
-    const time_t timezone = _timezone;
-#endif
-    return (time_t) (t - timezone);
+    return t;
   }
   return (time_t) - 1;
 }
