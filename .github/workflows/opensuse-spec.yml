@@ -1,0 +1,101 @@
+# openSUSE names every installed file in an explicit %files list and deletes the
+# installed config.h before packaging, so a file we add or move breaks their
+# build where a glob-based spec absorbs it. Their spec is on 3.49.2, which makes
+# that list the oldest statement anyone holds about our install layout. Their
+# tree, so a red here can be theirs to fix, which is why it blocks nothing.
+name: opensuse spec canary
+
+on:
+  schedule:
+    - cron: "07 6 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rpmbuild:
+    name: rpmbuild against openSUSE Factory's spec
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: httrack
+
+      - name: Install autotools
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      # Generated on the host, so the container consumes the same bytes a
+      # packager downloads rather than a tarball Tumbleweed's autotools rebuilt.
+      - name: Build the tarball a packager would get
+        run: |
+          set -euo pipefail
+          cd httrack
+          ./bootstrap
+          ./configure
+          make dist
+          ver=$(sed -n 's/.*HTTRACK_VERSIONID "\([^"]*\)".*/\1/p' src/htsglobal.h)
+          test -f "httrack-$ver.tar.gz"
+          echo "ver=$ver" >> "$GITHUB_ENV"
+
+      - name: Fetch their spec and point it at this tree
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          cd work
+          curl -fsSL --retry 3 -o httrack.spec \
+            https://api.opensuse.org/public/source/openSUSE:Factory/httrack/httrack.spec
+          cp "$GITHUB_WORKSPACE/httrack/httrack-$ver.tar.gz" .
+          # Their %files globs the soname, which they still hold at 2.
+          info=$(sed -n 's/^VERSION_INFO="\([^"]*\)".*/\1/p' \
+            "$GITHUB_WORKSPACE/httrack/configure.ac")
+          so=$(( ${info%%:*} - ${info##*:} ))
+          test "$so" -gt 0
+          # Patch0 rewrites DEFAULT_CFLAGS in a 2014 generated configure at -p0,
+          # so keeping it would red this on the patch rather than on the build.
+          sed -i -e "s/^Version:.*/Version:        $ver/" \
+            -e "s/^%define so_ver .*/%define so_ver $so/" \
+            -e "/^Patch0:/d" httrack.spec
+          # A sed that matched nothing leaves the recipe on 3.49.2, and the
+          # canary then passes without having built this tree at all.
+          grep -qx "Version:        $ver" httrack.spec
+          grep -qx "%define so_ver $so" httrack.spec
+          ! grep -q "^Patch0:" httrack.spec
+
+      - name: rpmbuild, then install what it produced
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          cat >work/canary.sh <<'EOF'
+          set -eu
+          zypper --non-interactive --gpg-auto-import-keys refresh
+          # The image is published from a newer snapshot than the mirror it
+          # points at, so installing anything against it is a partial upgrade.
+          zypper --non-interactive dup
+          # gcc and make are rpm's implicit build deps, which no spec declares.
+          zypper --non-interactive install rpm-build gcc make
+          zypper --non-interactive install $(rpmspec -q --buildrequires /work/httrack.spec)
+          src=$(rpm --eval %_sourcedir)  # /usr/src/packages here, not ~/rpmbuild
+          mkdir -p "$src"
+          cp /work/httrack-*.tar.gz "$src/"
+          rpmbuild -bb /work/httrack.spec
+          # Installing and running it is the assertion: an %install that
+          # packaged nothing runnable still leaves rpmbuild exiting 0.
+          zypper --non-interactive install --allow-unsigned-rpm \
+            "$(rpm --eval %_rpmdir)"/*/*.rpm
+          httrack --version
+          EOF
+          docker run --rm -v "$PWD/work:/work" opensuse/tumbleweed \
+            sh /work/canary.sh 2>&1 | tee build.log
+
+      - name: Print the log on failure
+        if: failure()
+        run: tail -n 120 build.log 2>/dev/null || true

@@ -1,0 +1,101 @@
+# Arch builds us with the newest gcc, glibc and openssl any downstream uses, so
+# a header that moved or a warning that became an error surfaces here first.
+# 3.50.0 shipped a missing spawn.h (#1487) and an install that looped on an
+# ordinary --docdir (#1488), and both were visible only from a downstream
+# build. Their PKGBUILD has no check(), so this proves the compile and the
+# install rather than the suite. Their tree, so a red here can be theirs to
+# fix, which is why it blocks nothing.
+name: arch makepkg canary
+
+on:
+  schedule:
+    - cron: "19 4 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  makepkg:
+    name: makepkg against Arch's PKGBUILD
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: httrack
+
+      - name: Install autotools
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      # Generated on the host, so the container consumes the same bytes a
+      # packager downloads rather than a tarball Arch's autotools rebuilt.
+      - name: Build the tarball a packager would get
+        run: |
+          set -euo pipefail
+          cd httrack
+          ./bootstrap
+          ./configure
+          make dist
+          ver=$(sed -n 's/.*HTTRACK_VERSIONID "\([^"]*\)".*/\1/p' src/htsglobal.h)
+          test -f "httrack-$ver.tar.gz"
+          echo "ver=$ver" >> "$GITHUB_ENV"
+
+      - name: Fetch their PKGBUILD and point it at that tarball
+        run: |
+          set -euo pipefail
+          mkdir -p work/pkg
+          cd work/pkg
+          curl -fsSL --retry 3 -o PKGBUILD \
+            https://gitlab.archlinux.org/archlinux/packaging/packages/httrack/-/raw/main/PKGBUILD
+          cp "$GITHUB_WORKSPACE/httrack/httrack-$ver.tar.gz" .
+          sha=$(sha256sum "httrack-$ver.tar.gz" | cut -d' ' -f1)
+          # Their source= brace-expands to the tarball plus its detached
+          # signature, and an unreleased tree has neither a URL nor an .asc.
+          sed -i -e "s/^pkgver=.*/pkgver=$ver/" \
+            -e 's|^source=(.*|source=(${pkgname}-${pkgver}.tar.gz)|' \
+            -e "/^sha256sums=/,/)\$/c\\sha256sums=('$sha')" PKGBUILD
+          # A sed that matched nothing leaves the recipe on the released
+          # tarball, and the canary then passes without building this tree.
+          grep -qx "pkgver=$ver" PKGBUILD
+          grep -qx 'source=(${pkgname}-${pkgver}.tar.gz)' PKGBUILD
+          grep -qx "sha256sums=('$sha')" PKGBUILD
+
+      - name: makepkg, then install what it produced
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          cat >work/canary.sh <<'EOF'
+          set -eu
+          # The image is a weekly snapshot, so anything installed against it
+          # without a refresh is a partial upgrade. Keyring first, or the
+          # refreshed packages fail their signature check.
+          pacman -Sy --noconfirm --needed archlinux-keyring
+          pacman -Su --noconfirm
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/builder
+          chmod 0440 /etc/sudoers.d/builder
+          cp -r /work/pkg /home/builder/pkg
+          chown -R builder:builder /home/builder/pkg
+          # makepkg refuses to run as root, and -s shells out to sudo pacman.
+          su - builder -c 'cd ~/pkg && makepkg -s --noconfirm'
+          # Installing and running it is the assertion: makepkg exiting 0
+          # having packaged nothing runnable is what this canary is here for.
+          pkg=$(find /home/builder/pkg -name 'httrack-[0-9]*.pkg.tar.*')
+          test -n "$pkg"
+          pacman -U --noconfirm "$pkg"
+          httrack --version
+          EOF
+          docker run --rm -v "$PWD/work:/work" archlinux:base-devel \
+            sh /work/canary.sh 2>&1 | tee build.log
+
+      - name: Print the log on failure
+        if: failure()
+        run: tail -n 120 build.log 2>/dev/null || true
