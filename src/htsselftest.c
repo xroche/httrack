@@ -5825,15 +5825,19 @@ static void st_addrport_longest(SOCaddr *addr, int family, unsigned int port) {
 }
 
 /* The formatter proxytrack's getip() relies on (#1493). */
-static void st_addrport_case(int family, const char *expected) {
+static void st_addrport_case(int family, unsigned int port,
+                             const char *expected) {
   const size_t guard = 16;
+  const size_t reserved = sizeof(":65535") - 1;
   const size_t full = SOCADDR_INETNTOA_PORT_SIZE;
   char *arena = malloct(full + guard);
+  char wantport[8];
   SOCaddr addr;
   size_t size;
 
   assertf(arena != NULL);
-  st_addrport_longest(&addr, family, 65535);
+  st_addrport_longest(&addr, family, port);
+  snprintf(wantport, sizeof(wantport), ":%u", port);
 
   /* the declared capacity holds the longest host AND the longest port */
   memset(arena, 'Z', full + guard);
@@ -5844,11 +5848,21 @@ static void st_addrport_case(int family, const char *expected) {
   /* no capacity is written past, and none silently drops the port, which is
      what a host let loose on the whole buffer does */
   for (size = 1; size <= full; size++) {
+    const hts_boolean ok = SOCaddr_inetntoa_port(arena, size, addr);
+
     memset(arena, 'Z', full + guard);
     (void) SOCaddr_inetntoa_port(arena, size, addr);
+    /* before strlen, or a run with no terminator reads off the allocation */
+    assertf(memchr(arena, '\0', size) != NULL);
     assertf(strlen(arena) < size);
     assertf(st_addrport_intact(arena + size, full + guard - size));
-    assertf(size <= sizeof(":65535") - 1 || strstr(arena, ":65535") != NULL);
+    if (size <= reserved) {
+      /* too small for the port at all: refuse, rather than clip it to "6553" */
+      assertf(!ok);
+      assertf(arena[0] == '\0');
+    } else {
+      assertf(strstr(arena, wantport) != NULL);
+    }
   }
   freet(arena);
 }
@@ -5857,9 +5871,14 @@ static int st_addrport(httrackp *opt, int argc, char **argv) {
   (void) opt;
   (void) argc;
   (void) argv;
-  st_addrport_case(AF_INET, "255.255.255.255:65535");
+  st_addrport_case(AF_INET, 65535, "255.255.255.255:65535");
+  /* 65535 is byte-swap invariant, so a dropped ntohs() needs this one */
+  st_addrport_case(AF_INET, 8080, "255.255.255.255:8080");
 #if HTS_INET6 != 0
-  st_addrport_case(AF_INET6, "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff:65535");
+  st_addrport_case(AF_INET6, 65535,
+                   "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff:65535");
+  st_addrport_case(AF_INET6, 8080,
+                   "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff:8080");
 #endif
   printf("addrport self-test OK\n");
   return 0;

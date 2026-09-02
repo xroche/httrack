@@ -1,11 +1,10 @@
 #!/bin/bash
 #
+# ProxyTrack logs its peers as "host:port" and sized that buffer for the host
+# alone, so a full-form IPv6 client ran the port past the end of it (#1493).
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
-
-# ProxyTrack logs its peers as "host:port" and sized that buffer for the host
-# alone, so a full-form IPv6 client ran the port past the end of it (#1493).
 
 assert_selftest "addrport self-test OK" addrport
