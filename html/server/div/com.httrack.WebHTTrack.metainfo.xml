@@ -56,8 +56,9 @@
     <release version="3.50.1" date="2026-09-02">
       <description>
         <ul>
+          <li>A bug-fix release with no new features. A mirroring run behaves exactly as 3.50.0 did</li>
           <li>Quitting WebHTTrack on macOS no longer leaves its icon bouncing in the Dock</li>
-          <li>Fixes in the mirror engine and in ProxyTrack, two of them for faults another machine on the network could trigger</li>
+          <li>In a packaged install, the Help link in these pages reaches the manual again</li>
         </ul>
       </description>
     </release>

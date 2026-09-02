@@ -1,10 +1,6 @@
 httrack (3.50.1-1) unstable; urgency=medium
 
-  * New upstream release.  Bug fixes only: two faults in proxytrack that
-    anything able to reach its ICP port could trigger, cached dates read as
-    local time, a make install that failed with ELOOP under some --docdir
-    values, and the macOS Dock icon left bouncing after WebHTTrack quit.
-    Full list in history.txt.
+  * New upstream release, bug fixes only.  Full list in history.txt.
 
  -- Xavier Roche <xavier@debian.org>  Wed, 02 Sep 2026 15:00:26 +0200
 
