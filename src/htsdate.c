@@ -37,8 +37,8 @@ Please visit our Website: http://www.httrack.com
 
 #include <string.h>
 
-/* Not hts_lowcase(), which lives in the library proxytrack does not link. */
-static void lowcase_(char *s) {
+/* hts_lowcase() lives in the library proxytrack does not link. */
+static void lowcase(char *s) {
   size_t i;
 
   for (i = 0; s[i] != '\0'; i++)
@@ -51,6 +51,8 @@ struct tm *convert_time_rfc822(struct tm *result, const char *s) {
   char str[256];
   char *a;
 
+  /* The numbers in order of appearance, dd first. n1..n4 are then year, hour,
+     min, sec, or hour, min, sec, year when n4 is four digits. */
   int result_mm = -1;
   int result_dd = -1;
   int result_n1 = -1;
@@ -61,8 +63,8 @@ struct tm *convert_time_rfc822(struct tm *result, const char *s) {
   if ((int) strlen(s) > 200)
     return NULL;
   strcpybuff(str, s);
-  lowcase_(str);
-  /* drop the separators */
+  lowcase(str);
+
   while ((a = strchr(str, '-')))
     *a = ' ';
   while ((a = strchr(str, ':')))
@@ -75,9 +77,8 @@ struct tm *convert_time_rfc822(struct tm *result, const char *s) {
     char *first, *last;
     char tok[256];
 
-    /* cut one word out */
     while (*a == ' ')
-      a++; /* skip spaces */
+      a++;
     first = a;
     while ((*a) && (*a != ' '))
       a++;

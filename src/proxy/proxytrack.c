@@ -616,7 +616,6 @@ static void proxytrack_add_DAV_Item(String * item, String * buff,
   }
 }
 
-/* Convert a RFC822 time to time_t */
 /* The RFC822 date of a cache entry as a time_t, or 0 if it does not parse.
    The fields are GMT, so timegm() and never mktime() (#1491). */
 static time_t get_time_rfc822(const char *s) {
