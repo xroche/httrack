@@ -207,9 +207,9 @@ test "$checks" -ge 21 || die "only $checks checks ran; the table lost some"
 
 if [ "$drift" -ne 0 ]; then
     echo "A DRIFT line above is a packaging recipe that no longer fits this tree,"
-    echo "so that distribution breaks at its next version bump. The recipe is"
-    echo "theirs and so is the fix: tell the packager, then add the id to"
-    echo "\$acknowledged in this script so a later run reds only for what is new."
+    echo "so the distribution breaks at its next version bump. The recipe is theirs"
+    echo "and so is the fix. Tell the packager, then add the id to \$acknowledged"
+    echo "in this script so a later run reds only for what is new."
     exit 1
 fi
 echo "$checks checks, no new drift; $known_hits are findings already known"
