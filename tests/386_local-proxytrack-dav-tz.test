@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # A WebDAV listing dates each entry in GMT, so the server's timezone must not
-# move it. proxytrack read both dates with mktime(), which reads a struct tm as
-# local time.
+# shift it.
 
 set -euo pipefail
 
