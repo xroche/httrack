@@ -714,7 +714,7 @@ static time_t get_time_rfc822(const char *s) {
     result.tm_wday = -1;        /* don't know */
     result.tm_mon = result_mm;
     result.tm_mday = result_dd;
-    return mktime(&result);
+    return timegm(&result);
   }
   return (time_t) 0;
 }

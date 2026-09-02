@@ -1,0 +1,67 @@
+#!/bin/bash
+#
+# A WebDAV listing dates each entry in GMT, so the server's timezone must not
+# shift it.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
+
+python=$(find_python) || skip "python3 missing"
+command -v curl >/dev/null 2>&1 || skip "curl missing"
+
+# POSIX form needs no tzdata, and its sign is inverted, so this means UTC+5:30.
+# A half-hour offset also catches an implementation that rounds to whole hours.
+TZ=IST-5:30
+export TZ
+offset=$("$python" -c 'import time; print(time.strftime("%z", time.localtime(0)))')
+test "$offset" = "+0530" ||
+    skip "the host ignored TZ=IST-5:30 (localtime(0) is $offset), so a shift would be invisible"
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+printf 'hello' >"$dir/body"
+{
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n'
+    printf 'Last-Modified: Sun, 06 Nov 1994 08:49:37 GMT\r\n'
+    printf 'Content-Length: 5\r\n\r\n'
+} >"$dir/hdr-dated"
+# No Last-Modified, so the listing falls back to the ARC record's own date.
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 5\r\n\r\n' >"$dir/hdr-undated"
+{
+    arc_filedesc
+    arc_record http://example.com/dated.html text/html 200 "$dir/hdr-dated" "$dir/body"
+    # a record begins on the newline following the previous one's data
+    printf '\n'
+    arc_record http://example.com/undated.html text/html 200 "$dir/hdr-undated" "$dir/body"
+} >"$dir/in.arc"
+
+launch_proxytrack() {
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$dir/in.arc" >"$ptlog" 2>&1 &
+    ptpid=$!
+}
+start_proxytrack "$dir/pt" launch_proxytrack
+
+# --max-time: an unbounded read here would wedge the runner rather than fail
+curl -s --max-time 30 -X PROPFIND -H "Depth: 1" \
+    "http://127.0.0.1:$proxyport/webdav/example.com/" >"$dir/resp.xml"
+
+# One entry listed twice would pass both greps below, so pin the count.
+test "$(count_matching_lines '<response ' "$dir/resp.xml")" -eq 3 ||
+    fail_dump "expected the root and its two entries" "$dir/resp.xml"
+
+grep -q '<getlastmodified>Sun, 06 Nov 1994 08:49:37 GMT</getlastmodified>' "$dir/resp.xml" ||
+    fail_dump "the entry's Last-Modified was shifted by the server's timezone" "$dir/resp.xml"
+grep -q '<getlastmodified>Wed, 01 Jan 2025 00:00:00 GMT</getlastmodified>' "$dir/resp.xml" ||
+    fail_dump "the ARC record date was shifted by the server's timezone" "$dir/resp.xml"
+
+echo "OK: a WebDAV listing dates both entries in GMT on a UTC+5:30 host"
