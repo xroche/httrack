@@ -1146,15 +1146,21 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               ZIP_READFIELD_STRING(line, value, "X-Save", previous_save_,
                                    sizeof(previous_save_));
               if (line[0] != '\0') {
-                int len = r->headers ? ((int) strlen(r->headers)) : 0;
-                int nlen =
-                  (int) (strlen(line) + 2 + strlen(value) + sizeof("\r\n") + 1);
-                r->headers = realloc(r->headers, len + nlen);
-                r->headers[len] = '\0';
-                strcat(r->headers, line);
-                strcat(r->headers, ": ");
-                strcat(r->headers, value);
-                strcat(r->headers, "\r\n");
+                const int len = r->headers ? ((int) strlen(r->headers)) : 0;
+                /* one byte more than the four appends below write */
+                const int nlen = (int) (strlen(line) + 2 + strlen(value) +
+                                        sizeof("\r\n") + 1);
+                char *const grown = realloct(r->headers, len + nlen);
+
+                /* keep the headers read so far rather than losing them */
+                if (grown != NULL) {
+                  r->headers = grown;
+                  r->headers[len] = '\0';
+                  strcat(r->headers, line);
+                  strcat(r->headers, ": ");
+                  strcat(r->headers, value);
+                  strcat(r->headers, "\r\n");
+                }
               }
             }
           } while (offset < readSizeHeader && !lineEof);
@@ -2331,15 +2337,21 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
               HTTP_READFIELD_STRING(line, value, "Content-Disposition",
                                     r->cdispo, sizeof(r->cdispo));
               if (line[0] != '\0') {
-                int len = r->headers ? ((int) strlen(r->headers)) : 0;
-                int nlen =
-                  (int) (strlen(line) + 2 + strlen(value) + sizeof("\r\n") + 1);
-                r->headers = realloc(r->headers, len + nlen);
-                r->headers[len] = '\0';
-                strcat(r->headers, line);
-                strcat(r->headers, ": ");
-                strcat(r->headers, value);
-                strcat(r->headers, "\r\n");
+                const int len = r->headers ? ((int) strlen(r->headers)) : 0;
+                /* one byte more than the four appends below write */
+                const int nlen = (int) (strlen(line) + 2 + strlen(value) +
+                                        sizeof("\r\n") + 1);
+                char *const grown = realloct(r->headers, len + nlen);
+
+                /* keep the headers read so far rather than losing them */
+                if (grown != NULL) {
+                  r->headers = grown;
+                  r->headers[len] = '\0';
+                  strcat(r->headers, line);
+                  strcat(r->headers, ": ");
+                  strcat(r->headers, value);
+                  strcat(r->headers, "\r\n");
+                }
               }
             }
           }

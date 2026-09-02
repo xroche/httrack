@@ -309,6 +309,30 @@ HTSNET_API void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
 #define SOCaddr_inetntoa(namebuf, namebuflen, ss)                              \
   SOCaddr_inetntoa_(namebuf, namebuflen, &(ss), __FILE__, __LINE__)
 
+/** Capacity for the numeric host of a SOCaddr: the longest IPv6 text, plus the
+    scope id getnameinfo needs room for even though SOCaddr_inetntoa strips
+    it. */
+#define SOCADDR_INETNTOA_SIZE                                                  \
+  sizeof("ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255%4294967295")
+
+/** Capacity for "host:port". The host alone can fill whatever it is given, so
+    the port needs room of its own on top of it. */
+#define SOCADDR_INETNTOA_PORT_SIZE                                             \
+  (SOCADDR_INETNTOA_SIZE + sizeof(":65535") - 1)
+
+/** Write "host:port" for ss into namebuf (capacity namebuflen), capping the
+    host so the port always fits. Clips instead of aborting, because the address
+    is a peer's. HTS_FALSE when namebuflen had no room for the port; a caller
+    sizing on SOCADDR_INETNTOA_PORT_SIZE cannot see that. Out of line for the
+    same reason SOCaddr_inetntoa_ is. */
+HTSNET_API hts_boolean SOCaddr_inetntoa_port_(char *namebuf, size_t namebuflen,
+                                              SOCaddr *const ss,
+                                              const char *file, const int line);
+
+/** "host:port" of ss into namebuf (capacity namebuflen). */
+#define SOCaddr_inetntoa_port(namebuf, namebuflen, ss)                         \
+  SOCaddr_inetntoa_port_(namebuf, namebuflen, &(ss), __FILE__, __LINE__)
+
 /** Single-char family tag: '1' for IPv4, '2' otherwise (used in the cache). */
 #define SOCaddr_getproto(ss)                                                   \
   (SOCaddr_size(ss) == sizeof(struct sockaddr_in) ? '1' : '2')

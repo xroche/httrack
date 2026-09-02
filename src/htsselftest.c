@@ -5793,6 +5793,97 @@ static int st_scantoken(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Is the guard still the poison the case wrote? Poison, not zero: a stray
+   terminator would read as untouched. */
+static hts_boolean st_addrport_intact(const char *p, size_t n) {
+  size_t i;
+
+  for (i = 0; i < n; i++) {
+    if (p[i] != 'Z')
+      return HTS_FALSE;
+  }
+  return HTS_TRUE;
+}
+
+/* The longest text its family has: 255.255.255.255, or the IPv6 address
+   inet_ntop cannot compress. */
+static void st_addrport_longest(SOCaddr *addr, int family, unsigned int port) {
+  (void) family;
+  memset(addr, 0, sizeof(*addr));
+#if HTS_INET6 != 0
+  if (family == AF_INET6) {
+    addr->m_addr.in6.sin6_family = AF_INET6;
+    memset(&addr->m_addr.in6.sin6_addr, 0xff,
+           sizeof(addr->m_addr.in6.sin6_addr));
+  } else
+#endif
+  {
+    addr->m_addr.in.sin_family = AF_INET;
+    memset(&addr->m_addr.in.sin_addr, 0xff, sizeof(addr->m_addr.in.sin_addr));
+  }
+  SOCaddr_initport(*addr, port);
+}
+
+/* The formatter proxytrack's getip() relies on (#1493). */
+static void st_addrport_case(int family, unsigned int port,
+                             const char *expected) {
+  const size_t guard = 16;
+  const size_t reserved = sizeof(":65535") - 1;
+  const size_t full = SOCADDR_INETNTOA_PORT_SIZE;
+  char *arena = malloct(full + guard);
+  char wantport[8];
+  SOCaddr addr;
+  size_t size;
+
+  assertf(arena != NULL);
+  st_addrport_longest(&addr, family, port);
+  snprintf(wantport, sizeof(wantport), ":%u", port);
+
+  /* the declared capacity holds the longest host AND the longest port */
+  memset(arena, 'Z', full + guard);
+  assertf(SOCaddr_inetntoa_port(arena, full, addr));
+  assertf(strcmp(arena, expected) == 0);
+  assertf(st_addrport_intact(arena + full, guard));
+
+  /* no capacity is written past, and none silently drops the port, which is
+     what a host let loose on the whole buffer does */
+  for (size = 1; size <= full; size++) {
+    const hts_boolean ok = SOCaddr_inetntoa_port(arena, size, addr);
+
+    memset(arena, 'Z', full + guard);
+    (void) SOCaddr_inetntoa_port(arena, size, addr);
+    /* before strlen, or a run with no terminator reads off the allocation */
+    assertf(memchr(arena, '\0', size) != NULL);
+    assertf(strlen(arena) < size);
+    assertf(st_addrport_intact(arena + size, full + guard - size));
+    if (size <= reserved) {
+      /* too small for the port at all: refuse, rather than clip it to "6553" */
+      assertf(!ok);
+      assertf(arena[0] == '\0');
+    } else {
+      assertf(strstr(arena, wantport) != NULL);
+    }
+  }
+  freet(arena);
+}
+
+static int st_addrport(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  st_addrport_case(AF_INET, 65535, "255.255.255.255:65535");
+  /* 65535 is byte-swap invariant, so a dropped ntohs() needs this one */
+  st_addrport_case(AF_INET, 8080, "255.255.255.255:8080");
+#if HTS_INET6 != 0
+  st_addrport_case(AF_INET6, 65535,
+                   "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff:65535");
+  st_addrport_case(AF_INET6, 8080,
+                   "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff:8080");
+#endif
+  printf("addrport self-test OK\n");
+  return 0;
+}
+
 /* The pattern answer n owes (adr, fil): a second implementation of the builder,
    with no bound of its own, to compare it against. */
 static void wizardfilter_want(htsbuff *w, int n, const char *adr,
@@ -12954,6 +13045,9 @@ static const struct selftest_entry {
     {"scantoken", "",
      "option-string token copy is bounded and reports a refusal (#1271)",
      st_scantoken},
+    {"addrport", "",
+     "\"host:port\" of a peer address is bounded and complete (#1493)",
+     st_addrport},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",
