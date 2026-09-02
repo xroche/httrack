@@ -50,3 +50,21 @@ HTSNET_API void SOCaddr_inetntoa_(char *namebuf, size_t namebuflen,
     namebuf[0] = '\0';
   }
 }
+
+HTSNET_API hts_boolean SOCaddr_inetntoa_port_(char *namebuf, size_t namebuflen,
+                                              SOCaddr *const ss,
+                                              const char *file,
+                                              const int line) {
+  const size_t reserved = sizeof(":65535") - 1;
+  size_t used;
+
+  assertf_(namebuf != NULL && namebuflen != 0, file, line);
+  namebuf[0] = '\0';
+  if (namebuflen <= reserved)
+    return HTS_FALSE;
+  SOCaddr_inetntoa_(namebuf, namebuflen - reserved, ss, file, line);
+  used = strlen(namebuf);
+  return slcatprintfbuff(
+      namebuf, namebuflen, &used, ":%u",
+      (unsigned int) ntohs(*SOCaddr_sinport_(ss, file, line)));
+}

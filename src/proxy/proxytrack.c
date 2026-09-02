@@ -253,21 +253,13 @@ static int gethost(const char *hostname, SOCaddr * server) {
 
 static String getip(SOCaddr * server) {
   String s = STRING_EMPTY;
-
-#if HTS_INET6==0
-  unsigned int sizeMax = sizeof("999.999.999.999:65535");
-#else
-  unsigned int sizeMax = sizeof("ffff:ffff:ffff:ffff:ffff:ffff:ffff:65535");
-#endif
-  char *dotted = malloc(sizeMax + 1);
-  unsigned short port = ntohs(SOCaddr_sinport(*server));
+  char *dotted = malloct(SOCADDR_INETNTOA_PORT_SIZE);
 
   if (dotted == NULL) {
     proxytrack_print_log(CRITICAL, "memory exhausted");
     return s;
   }
-  SOCaddr_inetntoa(dotted, sizeMax, *server);
-  sprintf(dotted + strlen(dotted), ":%d", port);
+  SOCaddr_inetntoa_port(dotted, SOCADDR_INETNTOA_PORT_SIZE, *server);
   StringAttach(&s, &dotted);
   return s;
 }
