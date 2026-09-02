@@ -5,7 +5,7 @@
 # Gentoo's src_prepare dies today on a grep of m4/check_zlib.m4 that we
 # rewrote. Their files, so a finding here is usually theirs to fix, which is why
 # it blocks nothing.
-name: distro packaging recipes against this tree
+name: distro packaging recipe canary
 
 on:
   schedule:

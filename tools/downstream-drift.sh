@@ -135,9 +135,9 @@ if [ ! -f "$top/src/Makefile.in" ] || [ ! -f "$top/html/Makefile.in" ]; then
 fi
 
 # Whoever reads a failed run has none of this context, so state it up front.
-echo "Gentoo, FreeBSD, OpenBSD and Termux each patch this tree to build it."
-echo "Their live recipes, re-checked below: ok = the recipe still fits, known ="
-echo "a mismatch already reported to its packager, DRIFT = a new one."
+echo "Gentoo, FreeBSD, OpenBSD and Termux each patch this tree to build it. Their"
+echo "live recipes, re-checked below: ok = still fits, known = a mismatch already"
+echo "reported to its packager, DRIFT = a new one."
 echo
 
 ### Gentoo -- www-client/httrack, read through the GitHub mirror because
