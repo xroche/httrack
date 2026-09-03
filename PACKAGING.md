@@ -24,7 +24,8 @@ somebody has to move at every bump.
   required, not optional: the cache and the WARC output are zip containers.
 - `--with-brotli[=DIR]`, `--with-zstd[=DIR]` select the `br` and `zstd` content
   codings, `--enable-backtrace` selects symbolic crash traces on Linux, and
-  `--with-iconv` links a separate GNU libiconv. All four default to `auto`. See
+  `--with-iconv[=DIR]` converts charsets with `iconv()`. All four default to
+  `auto`. See
   [the optional dependencies are automagic](#the-optional-dependencies-are-automagic).
 - `--disable-auto-features` turns those four defaults into `no`. Pass it.
 - `--enable-https=yes|no|auto` selects OpenSSL. On by default.
@@ -47,10 +48,12 @@ that does not pin them records no choice and links what it finds. Both flags hav
 carried that default since 3.49-13 (#556). Two more defaults work the same way.
 `--enable-backtrace` selects the symbolic stack trace httrack prints on a crash,
 and picks up libexecinfo where the C library has no `backtrace()`.
-`--with-iconv` links a separate GNU libiconv, which is not the charset support
-itself, because httrack calls `iconv()` either way. It is the second
-implementation, and on musl and the BSDs it converts charsets the C library
-refuses, so a builder that happened to have it shipped a binary decoding more.
+`--with-iconv` converts charsets with `iconv()`, taking a separate GNU libiconv
+where the C library has none, and `--without-iconv` falls back to the codepage
+tables built into the binary. Those tables cover the common single-byte
+codepages and convert to UTF-8 only, so a build without `iconv()` reads fewer
+charsets than one with it. Keep `--with-iconv` unless you want the smaller,
+dependency-free conversion on purpose.
 
 Pin it, either way:
 
@@ -71,7 +74,8 @@ one switch that moves every `auto` default at once, the autotools spelling of
 meson's `auto_features=disabled`:
 
 ```
-./configure --disable-auto-features --with-brotli --with-zstd --enable-backtrace
+./configure --disable-auto-features \
+    --with-brotli --with-zstd --enable-backtrace --with-iconv
 ```
 
 Everything you pass beside it still wins, and fails loudly when its library is
@@ -82,8 +86,7 @@ whatever the builder has installed, so the line above names all four this build
 takes. zlib and OpenSSL are not among them, because both are required and both
 already fail the build when they are missing. A feature the switch turned off
 reports as `no (auto-features off)`, which is how you tell it apart from a probe
-that looked and found nothing. Our own `debian/rules` passes the line above, and
-takes no libiconv because glibc has `iconv()`.
+that looked and found nothing. Our own `debian/rules` passes exactly that line.
 
 The switch moves features, not build tools, so one thing is still yours to pin.
 `pkg-config` decides nothing about the binary and everything about the installed

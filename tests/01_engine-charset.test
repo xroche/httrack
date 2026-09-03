@@ -6,6 +6,8 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+have_feature iconv || skip "built without iconv, so only the codepage tables convert"
+
 # charset -> UTF-8 conversion (hts_convertStringToUTF8).
 # -#test=charset <charset> <string> prints the string re-decoded from <charset> as UTF-8.
 conv() { selftest_queue "$3" charset "$1" "$2"; }

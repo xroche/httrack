@@ -20,6 +20,7 @@ configure-stamp:
 	# dropped Build-Depends FTBFSs instead of shipping a binary that decodes less.
 	dh_auto_configure -- --disable-online-unit-tests \
 		--disable-auto-features --with-brotli --with-zstd --enable-backtrace \
+		--with-iconv \
 		$(shell dpkg-buildflags --export=configure)
 
 	touch configure-stamp

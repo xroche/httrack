@@ -588,39 +588,79 @@ AC_CHECK_LIB(socket, socket, [SOCKET_LIBS="-lnsl -lsocket"
 AC_DEFINE(LIBSOCKET, 1,[Check for libsocket])], AC_MSG_RESULT([not necessary]))
 AC_SUBST(SOCKET_LIBS)
 
-### A separate GNU libiconv, not the charset support: htscharset.c calls iconv()
-### either way, and where a musl or BSD libc has the narrower one, this decides
-### which charsets convert.
+### Charset conversion: iconv(), or the built-in codepage tables
+## HTS_USEICONV 0 is a configuration htscharset.c already supports, so "off" is
+## the htscodepages.h fallback rather than a missing library. GNU libiconv's
+## header renames iconv_open unless LIBICONV_PLUG is defined, so a bare symbol
+## probe can say yes where the compiler would not; link what the header gives us.
 AC_ARG_WITH([iconv],
-	[AS_HELP_STRING([--with-iconv@<:@=yes/no/auto@:>@],[Link a separate GNU libiconv beside the C library @<:@default=auto@:>@])],
-	[
-	case "${withval}" in
-	no|yes|auto)
-		iconv_want=$withval
-		iconv_asked=yes
-		;;
-	*)
-		AC_MSG_ERROR([bad value for iconv, expected yes/no/auto])
-		;;
-	esac
-	],
-	[
-	iconv_want=$hts_feature_default
-	iconv_asked=no
-	])
-ICONV_LIBS=
+	[AS_HELP_STRING([--with-iconv@<:@=DIR@:>@],[Convert charsets with iconv() rather than the built-in tables @<:@default=auto@:>@])],
+	[iconv_want=$withval
+	iconv_asked=yes], [iconv_want=$hts_feature_default
+	iconv_asked=no])
+ICONV_LIBS=""
 iconv_have=no
-AS_IF([test x"$iconv_want" != x"no"],
-	[AC_CHECK_LIB(iconv, iconv, [iconv_have=yes
-	ICONV_LIBS="-liconv"
-	AC_DEFINE(LIBICONV, 1,[Check for libiconv])])
-	AS_IF([test x"$iconv_have" = x"no" && test x"$iconv_want" = x"yes"],
-		[AC_MSG_ERROR([iconv requested but no separate libiconv found])])])
-AC_MSG_CHECKING([whether to link a separate libiconv])
+if test "$iconv_want" != "no"; then
+	iconv_old_cppflags="$CPPFLAGS"
+	iconv_old_ldflags="$LDFLAGS"
+	iconv_old_libs="$LIBS"
+	iconv_libdir=
+	if test "$iconv_want" != "yes" -a "$iconv_want" != "auto"; then
+		# An explicit prefix is authoritative: if the header is not under
+		# it, error rather than silently pick a system copy.
+		if test ! -f "$iconv_want/include/iconv.h"; then
+			AC_MSG_ERROR([iconv requested at $iconv_want but $iconv_want/include/iconv.h is missing])
+		fi
+		HTS_FIND_LIBDIR([$iconv_want], [libiconv.*])
+		if test -z "$hts_found_libdir"; then
+			AC_MSG_ERROR([iconv requested at $iconv_want but no libiconv found in any of: $hts_libdir_subdirs])
+		fi
+		iconv_libdir=$hts_found_libdir
+		CPPFLAGS="$CPPFLAGS -I$iconv_want/include"
+		LDFLAGS="$LDFLAGS -L$iconv_libdir"
+	fi
+	m4_define([HTS_ICONV_PROG],
+		[AC_LANG_PROGRAM([[#include <iconv.h>]],
+			[[iconv_t cd = iconv_open("UTF-8", "ISO-8859-1");
+			return cd == (iconv_t) -1;]])])
+	AC_MSG_CHECKING([for a linkable iconv_open])
+	AC_LINK_IFELSE([HTS_ICONV_PROG],
+		[iconv_have=yes
+		AC_MSG_RESULT([yes])],
+		[LIBS="$LIBS -liconv"
+		AC_LINK_IFELSE([HTS_ICONV_PROG],
+			[iconv_have=yes
+			ICONV_LIBS="-liconv"
+			AC_DEFINE(LIBICONV, 1,[Check for libiconv])
+			AC_MSG_RESULT([yes, in -liconv])],
+			[AC_MSG_RESULT([no])])])
+	CPPFLAGS="$iconv_old_cppflags"
+	LDFLAGS="$iconv_old_ldflags"
+	LIBS="$iconv_old_libs"
+	if test "$iconv_have" = "yes"; then
+		if test -n "$iconv_libdir"; then
+			ICONV_LIBS="-L$iconv_libdir $ICONV_LIBS"
+			# The rest of configure still needs the header path.
+			CPPFLAGS="$CPPFLAGS -I$iconv_want/include"
+		fi
+	elif test "$iconv_want" != "auto"; then
+		AC_MSG_ERROR([iconv requested but no iconv.h with a linkable iconv_open])
+	fi
+fi
+AC_MSG_CHECKING([whether to convert charsets with iconv])
 dnl Name who decided: "auto" is the build environment's answer, not the packager's.
-AS_IF([test x"$iconv_want" = x"auto"], [AC_MSG_RESULT([$iconv_have (auto)])],
-	[test x"$iconv_asked" = x"no"], [AC_MSG_RESULT([$iconv_have (auto-features off)])],
-	[AC_MSG_RESULT([$iconv_have (requested)])])
+if test "$iconv_want" = "auto"; then
+	AC_MSG_RESULT([$iconv_have (auto)])
+elif test "$iconv_asked" = "no"; then
+	AC_MSG_RESULT([$iconv_have (auto-features off)])
+else
+	AC_MSG_RESULT([$iconv_have (requested)])
+fi
+if test "$iconv_have" = "yes"; then
+	AC_DEFINE([HTS_USEICONV], [1], [Define to 0 to convert charsets with the built-in codepage tables instead of iconv()])
+else
+	AC_DEFINE([HTS_USEICONV], [0], [Define to 0 to convert charsets with the built-in codepage tables instead of iconv()])
+fi
 AC_SUBST(ICONV_LIBS)
 
 ### Check for dlsym

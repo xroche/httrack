@@ -31,25 +31,57 @@ for entry in "${srcdir}"/*; do
 done
 test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
 
-# feature_line NAME: the "checking whether to ..." text configure prints.
-feature_line() {
+features="brotli zstd backtrace iconv"
+
+# The "checking whether to ..." text configure prints for a feature.
+feature_line() { # feature_line NAME
     case $1 in
     brotli) echo "whether to enable the brotli content coding" ;;
     zstd) echo "whether to enable the zstd content coding" ;;
     backtrace) echo "whether to enable symbolic crash traces" ;;
-    iconv) echo "whether to link a separate libiconv" ;;
+    iconv) echo "whether to convert charsets with iconv" ;;
     *) fail "unknown feature $1" ;;
     esac
 }
-
-# feature_flag NAME: how a packager asks for it explicitly.
-feature_flag() {
+# How a packager asks for it explicitly.
+feature_flag() { # feature_flag NAME
     case $1 in
     brotli) echo "--with-brotli" ;;
     zstd) echo "--with-zstd" ;;
     backtrace) echo "--enable-backtrace" ;;
     iconv) echo "--with-iconv" ;;
     *) fail "unknown feature $1" ;;
+    esac
+}
+# The macro it sets in config.h.
+feature_macro() { # feature_macro NAME
+    case $1 in
+    brotli) echo "HTS_USEBROTLI" ;;
+    zstd) echo "HTS_USEZSTD" ;;
+    backtrace) echo "HAVE_BACKTRACE" ;;
+    iconv) echo "HTS_USEICONV" ;;
+    esac
+}
+# The link variable src/Makefile substitutes, or "" where it adds none.
+feature_libs() { # feature_libs NAME
+    case $1 in
+    brotli) echo "BROTLI_LIBS" ;;
+    zstd) echo "ZSTD_LIBS" ;;
+    backtrace) echo "BACKTRACE_LIBS" ;;
+    esac
+}
+# Whether the macro must also reach the installed htsfeatures.h.
+feature_public() { # feature_public NAME
+    case $1 in
+    brotli | zstd) return 0 ;;
+    *) return 1 ;;
+    esac
+}
+# What libhttrack.pc must name when it is on, or "" where it names nothing.
+feature_pc() { # feature_pc NAME
+    case $1 in
+    brotli) echo "brotlidec" ;;
+    zstd) echo "zstd" ;;
     esac
 }
 
@@ -78,95 +110,82 @@ run_configure() { # run_configure DIR ARG...
     return "${rc}"
 }
 
-# Deleting the switch outright must not leave a libless host green, and the skip
-# below is reached before any run that would have named the missing flag.
+# assert_state DIR NAME on|off: everything DIR's generated files must say about
+# NAME in that state. Absolute, because two runs of an equally broken tree agree
+# with each other and prove nothing.
+assert_state() { # assert_state DIR NAME on|off
+    local dir=$1 f=$2 want=$3 macro libs pc line value
+    macro=$(feature_macro "${f}")
+    libs=$(feature_libs "${f}")
+    pc=$(feature_pc "${f}")
+    value=$(test "${want}" = on && echo 1 || echo 0)
+
+    # HAVE_BACKTRACE is defined or absent; the rest are defined to 1 or 0.
+    if test "${f}" = backtrace; then
+        if test "${want}" = on; then
+            grep -q '^#define HAVE_BACKTRACE 1$' "${dir}/config.h" ||
+                fail_dump "${f}: config.h does not define HAVE_BACKTRACE" "${dir}/config.h"
+        else
+            ! grep -q '^#define HAVE_BACKTRACE' "${dir}/config.h" ||
+                fail_dump "${f}: config.h still defines HAVE_BACKTRACE" "${dir}/config.h"
+        fi
+    else
+        grep -q "^#define ${macro} ${value}\$" "${dir}/config.h" ||
+            fail_dump "${f}: config.h does not define ${macro} to ${value}" "${dir}/config.h"
+    fi
+
+    # The installed header a consumer of libhttrack compiles against. config.h
+    # is not installed and cannot stand in for it.
+    if feature_public "${f}"; then
+        grep -q "^#define ${macro} ${value}\$" "${dir}/htsfeatures.h" ||
+            fail_dump "${f}: htsfeatures.h does not carry ${macro} ${value}" \
+                "${dir}/htsfeatures.h"
+    fi
+
+    # A macro left at 1 beside an emptied link line is an unresolved symbol at
+    # link time, so the "on" half is asserted as loudly as the "off" half.
+    if test -n "${libs}"; then
+        line=$(sed -n "s/^${libs} = *//p" "${dir}/src/Makefile")
+        if test "${want}" = off; then
+            test -z "${line}" || fail "${f}: ${libs} still links '${line}'"
+        elif test "${f}" != backtrace; then
+            # backtrace() is in libc on glibc, where nothing is linked for it.
+            test -n "${line}" || fail "${f}: ${libs} is empty with the feature on"
+        fi
+    fi
+
+    # The .pc is installed too, and it reaches its dependencies by a path that
+    # neither config.h nor src/Makefile passes through.
+    if test -n "${pc}"; then
+        if test "${want}" = off; then
+            ! grep -qE "^(Requires|Libs)\\.private:.*${pc}" "${dir}/src/libhttrack.pc" ||
+                fail_dump "${f}: libhttrack.pc still names ${pc}" "${dir}/src/libhttrack.pc"
+        else
+            grep -qE "^(Requires|Libs)\\.private:.*${pc}" "${dir}/src/libhttrack.pc" ||
+                fail_dump "${f}: libhttrack.pc does not name ${pc}" "${dir}/src/libhttrack.pc"
+        fi
+    fi
+}
+
+n=0
+planned=6 # steps below; the last one needs the libraries to be installed
+
+# Deleting or renaming the switch must not leave any host green, so the flags
+# are checked before the first run and before any skip.
 help=$(bash "${shadow}/configure" --help) || fail "configure --help failed"
-for flag in --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv; do
+for flag in --disable-auto-features $(for f in ${features}; do feature_flag "${f}"; done); do
     grep -q -e "${flag}" <<<"${help}" || fail "configure --help does not offer ${flag}"
 done
 
-n=0
-cases=5 # configure runs below, what the budget is paced against
-
-began=${SECONDS}
+# The cheap, host-independent steps run first: a slow leg that runs out of
+# budget later still covers what the switch means.
 n=$((n + 1))
-run_configure "${work}/control" ||
-    fail_dump "the control configure failed" "${work}/control/configure.log"
-
-# What this host can discriminate. A builder without the libraries cannot tell
-# the switch from the status quo, so it has nothing to prove here.
-on=()
-for f in brotli zstd backtrace iconv; do
-    test "$(verdict "${work}/control" "${f}")" = "yes (auto)" || continue
-    on+=("${f}")
-done
-test "${#on[@]}" -gt 0 ||
-    skip "nothing is auto-enabled here, so the switch cannot be told from the default"
-echo "ok: auto-enabled on this host: ${on[*]}"
-skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
-
-began=${SECONDS}
-n=$((n + 1))
-run_configure "${work}/off" --disable-auto-features ||
-    fail_dump "--disable-auto-features was rejected" "${work}/off/configure.log"
-for f in "${on[@]}"; do
-    got=$(verdict "${work}/off" "${f}")
-    test "${got}" = "no (auto-features off)" ||
-        fail_dump "${f}: expected 'no (auto-features off)', got '${got}'" "${work}/off/configure.log"
-done
-# The log is a report, not the build. Read what the compiler and the linker get.
-for f in "${on[@]}"; do
-    case ${f} in
-    brotli | zstd)
-        up=$(echo "${f}" | tr '[:lower:]' '[:upper:]')
-        line=$(sed -n "s/^${up}_LIBS = *//p" "${work}/off/src/Makefile")
-        test -z "${line}" || fail "${f}: ${up}_LIBS still links '${line}'"
-        grep -q "^#define HTS_USE${up} 0\$" "${work}/off/config.h" ||
-            fail_dump "${f}: config.h does not define HTS_USE${up} to 0" "${work}/off/config.h"
-        ;;
-    backtrace)
-        ! grep -q '^#define HAVE_BACKTRACE' "${work}/off/config.h" ||
-            fail_dump "backtrace: config.h still defines HAVE_BACKTRACE" "${work}/off/config.h"
-        line=$(sed -n 's/^BACKTRACE_LIBS = *//p' "${work}/off/src/Makefile")
-        test -z "${line}" || fail "backtrace: BACKTRACE_LIBS still links '${line}'"
-        ;;
-    iconv)
-        ! grep -q '^#define LIBICONV' "${work}/off/config.h" ||
-            fail_dump "iconv: config.h still defines LIBICONV" "${work}/off/config.h"
-        # An extra DT_NEEDED on libhttrack, and an extra shlibs dependency.
-        line=$(sed -n 's/^ICONV_LIBS = *//p' "${work}/off/src/Makefile")
-        test -z "${line}" || fail "iconv: ICONV_LIBS still links '${line}'"
-        ;;
-    esac
-done
-echo "ok: the switch turns off every feature the builder would have decided"
-skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
-
-began=${SECONDS}
-n=$((n + 1))
-flags=()
-for f in "${on[@]}"; do
-    flags+=("$(feature_flag "${f}")")
-done
-run_configure "${work}/asked" --disable-auto-features "${flags[@]}" ||
-    fail_dump "the switch rejected the flags beside it" "${work}/asked/configure.log"
-for f in "${on[@]}"; do
-    got=$(verdict "${work}/asked" "${f}")
-    test "${got}" = "yes (requested)" ||
-        fail_dump "${f}: expected 'yes (requested)', got '${got}'" "${work}/asked/configure.log"
-done
-# Naming every feature back must land on the default build exactly, or the switch
-# has a side effect nobody asked for. config.h alone is not enough: a macro left
-# at 1 beside an emptied *_LIBS is an unresolved-symbol link, and htsfeatures.h
-# is the copy a consumer of the installed headers compiles against.
-for gen in config.h htsfeatures.h src/Makefile; do
-    sed "s|${work}/control|@BUILDDIR@|g" "${work}/control/${gen}" >"${work}/gen-control"
-    sed "s|${work}/asked|@BUILDDIR@|g" "${work}/asked/${gen}" >"${work}/gen-asked"
-    diff -u "${work}/gen-control" "${work}/gen-asked" ||
-        fail "asking for each feature back does not reproduce the default ${gen}"
-done
-echo "ok: an explicit flag still wins, and reproduces the default build"
-skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+# A value the switch does not understand must not read as one of the two it does.
+! run_configure "${work}/bogus" --enable-auto-features=maybe ||
+    fail_dump "--enable-auto-features=maybe was accepted" "${work}/bogus/configure.log"
+grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
+    fail_dump "configure refused the value without saying which flag" "${work}/bogus/configure.log"
+echo "ok: a value that is neither yes nor no is refused"
 
 n=$((n + 1))
 # The switch must not turn a library the packager named into a silent drop (#1502).
@@ -178,11 +197,84 @@ grep -q 'brotli requested at' "${work}/reject/configure.log" ||
 echo "ok: an explicit prefix with no library still fails the build"
 
 n=$((n + 1))
-# A value the switch does not understand must not read as one of the two it does.
-! run_configure "${work}/bogus" --enable-auto-features=maybe ||
-    fail_dump "--enable-auto-features=maybe was accepted" "${work}/bogus/configure.log"
-grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
-    fail_dump "configure refused the value without saying which flag" "${work}/bogus/configure.log"
-echo "ok: a value that is neither yes nor no is refused"
+# backtrace() is implemented for Linux alone, so --enable-backtrace has to stay a
+# notice off it: a recipe passes one flag list for every architecture it builds,
+# and hurd and the BSDs must not FTBFS on it. Cross-configuring reaches that arm
+# from a Linux runner.
+run_configure "${work}/foreign" --host=x86_64-unknown-freebsd14 --enable-backtrace || true
+got=$(verdict "${work}/foreign" backtrace)
+case ${got} in
+"no (not implemented on freebsd"*)
+    echo "ok: an explicit --enable-backtrace off Linux is a notice, not an error"
+    ;;
+"") skip "the cross-configure stopped before reaching the backtrace verdict" ;;
+*) fail_dump "a foreign host answered '${got}' rather than declining backtrace" \
+    "${work}/foreign/configure.log" ;;
+esac
 
-assert_steps_ran "${cases}" "${n}"
+began=${SECONDS}
+n=$((n + 1))
+run_configure "${work}/off" --disable-auto-features ||
+    fail_dump "--disable-auto-features was rejected" "${work}/off/configure.log"
+for f in ${features}; do
+    got=$(verdict "${work}/off" "${f}")
+    case ${got} in
+    "no (auto-features off)" | "no (not implemented on "*) ;;
+    *) fail_dump "${f}: expected 'no (auto-features off)', got '${got}'" \
+        "${work}/off/configure.log" ;;
+    esac
+    assert_state "${work}/off" "${f}" off
+done
+echo "ok: the switch turns every feature off, whatever the host has installed"
+skip_if_out_of_budget "$((planned - n))" "$((SECONDS - began))"
+
+began=${SECONDS}
+n=$((n + 1))
+run_configure "${work}/control" ||
+    fail_dump "the control configure failed" "${work}/control/configure.log"
+# Renaming a "checking whether to" string would silently empty this list and
+# leave every feature unchecked, so an unreadable verdict fails rather than
+# counting as absent. Only yes versus no is the host's to decide.
+on=""
+for f in ${features}; do
+    got=$(verdict "${work}/control" "${f}")
+    case ${got} in
+    "yes (auto)") on="${on} ${f}" ;;
+    "no (auto)" | "no (not implemented on "*) ;;
+    *) fail_dump "${f}: the default run answered '${got}', which is no auto verdict" \
+        "${work}/control/configure.log" ;;
+    esac
+done
+echo "ok: every feature answers the default run; auto-enabled here:${on:- none}"
+skip_if_out_of_budget "$((planned - n))" "$((SECONDS - began))"
+
+if test -z "${on}"; then
+    planned=$((planned - 1))
+    echo "nothing is auto-enabled here, so no feature can be asked back on" >&2
+else
+    n=$((n + 1))
+    flags=""
+    for f in ${on}; do
+        flags="${flags} $(feature_flag "${f}")"
+    done
+    # shellcheck disable=SC2086 # a deliberately split flag list
+    run_configure "${work}/asked" --disable-auto-features ${flags} ||
+        fail_dump "the switch rejected the flags beside it" "${work}/asked/configure.log"
+    for f in ${on}; do
+        got=$(verdict "${work}/asked" "${f}")
+        test "${got}" = "yes (requested)" ||
+            fail_dump "${f}: expected 'yes (requested)', got '${got}'" "${work}/asked/configure.log"
+        assert_state "${work}/asked" "${f}" on
+    done
+    # And it must land on the default build exactly, or the switch has a side
+    # effect on something outside the feature list.
+    for gen in config.h htsfeatures.h src/Makefile src/libhttrack.pc; do
+        sed "s|${work}/control|@BUILDDIR@|g" "${work}/control/${gen}" >"${work}/gen-control"
+        sed "s|${work}/asked|@BUILDDIR@|g" "${work}/asked/${gen}" >"${work}/gen-asked"
+        diff -u "${work}/gen-control" "${work}/gen-asked" ||
+            fail "asking for each feature back does not reproduce the default ${gen}"
+    done
+    echo "ok: an explicit flag still wins, and reproduces the default build"
+fi
+
+assert_steps_ran "${planned}" "${n}"

@@ -412,6 +412,18 @@ require_httrack() {
     command -v httrack >/dev/null || fail "could not find httrack"
 }
 
+# have_feature NAME: is this binary's optional feature NAME on? Asks the binary,
+# because --disable-auto-features turns off features the platform still has.
+HTS_FEATURES=
+have_feature() {
+    if test -z "${HTS_FEATURES}"; then
+        HTS_FEATURES=$(httrack -#test=features 2>/dev/null) ||
+            fail "httrack -#test=features failed"
+        test -n "${HTS_FEATURES}" || fail "httrack -#test=features said nothing"
+    fi
+    grep -q "^$1 1\$" <<<"${HTS_FEATURES}"
+}
+
 # Longest surviving run of char $2 in file $1, or 0: the length a field was
 # clipped to, read back out of a binary artifact.
 runlen() {

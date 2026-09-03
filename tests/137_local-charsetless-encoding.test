@@ -19,6 +19,7 @@ mkdir "${tmpdir}/docroot"
 local_server_start --root "${tmpdir}/docroot"
 
 require_httrack
+have_feature iconv || skip "built without iconv, so only the codepage tables convert"
 
 # One crawl per variant: the generated top index carries the seed page's title.
 for variant in u8 l1 declared gb2312 l1decl; do
