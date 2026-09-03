@@ -95,7 +95,8 @@ static HTS_UNUSED void log_abort_(const char *msg, const char *file, int line) {
   fflush(stderr);
 }
 
-static HTS_UNUSED void abortf_(const char *exp, const char *file, int line) {
+static HTS_NORETURN HTS_UNUSED void abortf_(const char *exp, const char *file,
+                                            int line) {
 #ifdef HTSSAFE_ABORT_FUNCTION
   HTSSAFE_ABORT_FUNCTION(exp, file, line);
 #endif
