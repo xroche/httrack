@@ -216,6 +216,16 @@ test "$nlink" -gt 0 || fail "scanned no symlinks at all, the check proved nothin
 test -d "$app/Contents/Resources/share/httrack/html/server" ||
     fail "Contents/Resources/share/httrack/html/server missing"
 
+# The panes reach the manual through this link, and cp -R above keeps it relative.
+# A target outside Resources would 404 on every machine but this one.
+docdir=$(cd "$app/Contents/Resources/share/httrack/html/doc" 2>/dev/null && pwd -P) ||
+    fail "Contents/Resources/share/httrack/html/doc does not resolve"
+case "$docdir" in
+"$appreal"/*) ;;
+*) fail "the documentation link escapes the bundle to $docdir" ;;
+esac
+test -f "$docdir/html/guide.html" || fail "$docdir holds no html/guide.html"
+
 # A downloaded bundle resolves against macOS and itself; neither the staging prefix nor Homebrew is on the user's machine (#901).
 nmach=0
 machos

@@ -1,6 +1,6 @@
 #!/bin/bash
-# The served-UI link must never point inside its own target. A --docdir under
-# $(datadir)/httrack used to make one, and install-HelpHtmlDATA then hit ELOOP.
+# The documentation link must never point inside its own target. A --docdir at or
+# above the served root makes one, and htsserver then answers /doc/doc/doc/...
 
 set -euo pipefail
 
@@ -12,41 +12,41 @@ set -euo pipefail
 work=$(mktemp -d "${TMPDIR:-/tmp}/htmllink.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
-# lang's hook links $(langrootdir)/html, which is $(datadir)/httrack/html, to
-# whatever $(htmldir) holds. Both are overridden per case, so the layout this
-# build was configured for does not matter.
+# lang's hook links $(datadir)/httrack/html/doc to whatever $(docdir) holds. Both
+# are overridden per case, so the layout this build was configured for does not
+# matter.
 data=/usr/share
-link=${data}/httrack/html
-docs=${data}/doc/httrack/html
-docs_rel=../doc/httrack/html
+served=${data}/httrack/html
+docs=${data}/doc/httrack
+docs_rel=../../doc/httrack
 
 # One staged layout per call, under $work/$name. lang's own data install is what
 # creates the link's parent directory.
 hook() {
-    local name=$1 htmldir=$2 datadir=$3
+    local name=$1 docdir=$2 datadir=$3
     stage_install_target install-data "${work}/${name}" \
-        "${work}/${name}.log" lang datadir="${datadir}" htmldir="${htmldir}" ||
-        fail "${name}: lang install-data failed for htmldir=${htmldir}"
+        "${work}/${name}.log" lang datadir="${datadir}" docdir="${docdir}" ||
+        fail "${name}: lang install-data failed for docdir=${docdir}"
 }
 
 # Each case's link lands under its own datadir, so derive the staged path from it.
 link_at() {
     local name=$1 datadir=$2
-    printf '%s' "${work}/${name}${datadir}/httrack/html"
+    printf '%s' "${work}/${name}${datadir}/httrack/html/doc"
 }
 
 not_linked() {
-    local name=$1 htmldir=$2 datadir=${3:-${data}} at
+    local name=$1 docdir=$2 datadir=${3:-${data}} at
     at=$(link_at "${name}" "${datadir}")
-    hook "${name}" "${htmldir}" "${datadir}"
+    hook "${name}" "${docdir}" "${datadir}"
     test ! -L "${at}" || fail "${name}: got a link to $(readlink "${at}")"
 }
 
-# The link must be relative whenever htmldir sits under datadir, so that an
+# The link must be relative whenever docdir sits under datadir, so that an
 # install can be staged or moved (#885).
 link_target() {
-    local name=$1 htmldir=$2 want=$3 datadir=${4:-${data}} at got
-    hook "${name}" "${htmldir}" "${datadir}"
+    local name=$1 docdir=$2 want=$3 datadir=${4:-${data}} at got
+    hook "${name}" "${docdir}" "${datadir}"
     at=$(link_at "${name}" "${datadir}")
     test -L "${at}" || fail "${name}: no link was created"
     got=$(readlink "${at}")
@@ -54,6 +54,11 @@ link_target() {
 }
 
 link_target default "${docs}" "${docs_rel}"
+
+# The served root itself is a real directory now: the UI is installed there and
+# must survive a build that strips the documentation.
+test ! -L "${work}/default${served}" || fail "the served root is still a symlink"
+test -d "${work}/default${served}" || fail "the served root is not a directory"
 
 # A user can spell those same two directories in ways configure keeps and the
 # kernel ignores, on either side of the compare. Unfolded, the prefix test fails
@@ -63,55 +68,68 @@ link_target doubled-slash "${docs}" "${docs_rel}" /usr//share
 link_target dot-component "${docs}" "${docs_rel}" /usr/./share
 link_target trailing-slash "${docs}" "${docs_rel}" /usr/share/
 link_target trailing-dot "${docs}" "${docs_rel}" /usr/share/.
-link_target dotted-htmldir /usr/./share/doc/httrack/html "${docs_rel}"
+link_target dotted-docdir /usr/./share/doc/httrack "${docs_rel}"
 # A datadir of "/" would make the prefix pattern "//*", which matches nothing.
-link_target root-datadir "${docs}" ../usr/share/doc/httrack/html /
+link_target root-datadir "${docs}" ../../usr/share/doc/httrack /
 
 # The chop strips the datadir back off, and must treat it as text there too. Left
 # as a glob, a datadir carrying "[" matches the branch yet strips nothing, so the
-# whole absolute path ends up behind "../".
+# whole absolute path ends up behind "../../".
 glob_data='/usr/sh[a]re'
-link_target glob-in-datadir "${glob_data}/doc/httrack/html" "${docs_rel}" "${glob_data}"
+link_target glob-in-datadir "${glob_data}/doc/httrack" "${docs_rel}" "${glob_data}"
 
-# htmldir naming the data dir itself relativizes only when it carries the trailing
-# slash, because the chop needs a "/" to cut on.
-link_target datadir-as-htmldir "${data}/" ../
+# docdir naming the data dir itself relativizes only when it carries the trailing
+# slash, because the chop needs a "/" to cut on. It is refused all the same, being
+# an ancestor of the link.
+not_linked datadir-as-docdir "${data}/"
 
-# htmldir outside the data dir keeps an absolute target, since the chop only
+# docdir outside the data dir keeps an absolute target, since the chop only
 # relativizes under it. That target does not survive staging, so this pins a
 # limitation rather than a good outcome. A chop ignoring the "/" fails here.
-link_target outside-datadir /usr/sharefoo/html /usr/sharefoo/html
+link_target outside-datadir /usr/sharefoo/doc /usr/sharefoo/doc
 
-# htmldir is the package directory itself, so the link can only point at its own
-# parent. Refusing to make it would leave webhttrack with no served UI (#885).
-link_target package-dir "${data}/httrack" ../httrack
+# Neighbours of the link path and of the served root. Without these the
+# assertions below would pass on a hook that stopped linking, or on one that
+# skipped every docdir under $(datadir)/httrack.
+link_target sibling-of-link "${served}/docfoo" ../../httrack/html/docfoo
+link_target sibling-of-served "${served}foo" ../../httrack/htmlfoo
+link_target under-package-dir "${data}/httrack/doc" ../../httrack/doc
 
-# Neighbours of the link path. Without these the assertions below would pass on
-# a hook that stopped linking, or on one that skipped every htmldir under
-# $(datadir)/httrack.
-link_target sibling-of-link "${link}foo" ../httrack/htmlfoo
-link_target under-package-dir "${data}/httrack/doc" ../httrack/doc
-
-# htmldir at the link path (--docdir=$(datadir)/httrack), and one level under it
-# (Termux's --docdir=$(datadir)/httrack/html).
-not_linked at-link-path "${link}"
-not_linked under-link-path "${link}/html"
+# docdir at the link path (--docdir=$(datadir)/httrack/html/doc), and one level
+# under it: a real directory lands there, and the hook leaves it alone.
+not_linked at-link-path "${served}/doc"
+not_linked under-link-path "${served}/doc/pages"
 # The same path as at-link-path, spelled the way configure keeps --datadir=/usr//share.
-not_linked unfolded-datadir "${link}" /usr//share
+not_linked unfolded-datadir "${served}/doc" /usr//share
+
+# Every ancestor of the link. Making the directory first cannot catch these: the
+# link path stays free, so only the ancestor test refuses them. Each would serve
+# /doc/doc/doc/... to a browser following the panes' Help link.
+not_linked at-served-root "${served}"
+not_linked at-package-dir "${data}/httrack"
+not_linked at-datadir "${data}"
 
 # An upgrade over the absolute link older installs left (#885): it must be
 # replaced, not kept because it happens to resolve.
-stale=${work}/upgrade${link}
+stale=${work}/upgrade${served}/doc
 mkdir -p "$(dirname "${stale}")" "${work}/upgrade${docs}"
 ln -s "${docs}" "${stale}"
 link_target upgrade "${docs}" "${docs_rel}"
 
+# Before this layout the served root was itself the symlink. Left in place, the
+# UI would install into $(docdir) again and vanish with a doc strip.
+older=${work}/older-layout${served}
+mkdir -p "$(dirname "${older}")" "${work}/older-layout${docs}/html"
+ln -s ../doc/httrack/html "${older}"
+link_target older-layout "${docs}" "${docs_rel}"
+test ! -L "${older}" || fail "the pre-3.51 served-root symlink was kept"
+
 # Anything else already sitting there is left alone, and the install still
 # succeeds. Only a symlink is ours to replace.
-squatter=${work}/squatter${link}
+squatter=${work}/squatter${served}/doc
 mkdir -p "$(dirname "${squatter}")"
 echo keep-me >"${squatter}"
 hook squatter "${docs}" "${data}"
 test "$(cat "${squatter}")" = keep-me || fail "the file at the link path was not left alone"
 
-echo "the served-UI link never contains itself"
+echo "the documentation link never contains itself"

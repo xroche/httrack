@@ -6901,10 +6901,13 @@ static void datadir_expect(const char *selfpath, const char *builtin,
 // silently falling back to the built-in ones (#894). argv[0] is writable.
 static int st_datadir(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
+  char probe[HTS_URLMAXSIZE];
+  char untouched[HTS_URLMAXSIZE];
   char self[HTS_URLMAXSIZE];
   char expect[HTS_URLMAXSIZE * 2];
   char installed[HTS_URLMAXSIZE];
   char gone[HTS_URLMAXSIZE];
+  size_t selflen;
   /* Each holds a templates/index-header.html, the file path_bin is read for.
      nest/ keeps the flat case away from the installed share/httrack above. */
   static const char *const dirs[] = {"share/httrack", "bin", "nest/flat"};
@@ -6916,8 +6919,21 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
   /* argv[0] is a fallback: what the engine actually resolves from is this. */
   assertf(hts_self_path(path, sizeof(path)) != NULL);
   assertf(fexist(path));
-  /* Too small for any real path, so the truncation guard must refuse. */
-  assertf(hts_self_path(path, 2) == NULL);
+  /* A buffer the path does not fit in must refuse rather than clip. A refusal
+     empties the buffer and writes nothing past the size it was given. */
+  selflen = strlen(path);
+  assertf(selflen < sizeof(probe));
+  memset(untouched, 'X', sizeof(untouched));
+  /* A zero size has nothing to empty, so it refuses without writing at all. */
+  memset(probe, 'X', sizeof(probe));
+  assertf(hts_self_path(probe, 0) == NULL);
+  assertf(memcmp(probe, untouched, sizeof(probe)) == 0);
+  for (i = 1; i <= selflen; i++) {
+    memset(probe, 'X', sizeof(probe));
+    assertf(hts_self_path(probe, i) == NULL);
+    assertf(memcmp(probe + i, untouched, sizeof(probe) - i) == 0);
+    assertf(probe[0] == '\0');
+  }
 
   for (i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
     FILE *fp;

@@ -40,6 +40,23 @@ somebody has to move at every bump.
   install into `$(docdir)`, so a layout that puts the pages anywhere else strands
   those three.
 
+## Everything under $(docdir) is safe to strip
+
+`$(docdir)` holds documentation and nothing else. `rpm --excludedocs`, Portage's
+`nodoc`, FreeBSD's `DOCS=off` and an automatic `-doc` split all work with no path
+override, no `%doc` exception and no symlink fixup on your side.
+
+The WebHTTrack interface htsserver serves is runtime, so it installs under
+`$(datadir)/httrack/html/server`. Beside it, `$(datadir)/httrack/html/doc` is a
+relative symlink to `$(docdir)`, which is how the panes' Help links reach the
+manual. Stripping the documentation leaves that link dangling, htsserver answers
+404, and the panes hide the links they would have carried. Ship the symlink with
+the interface or with the documentation, whichever your split prefers.
+
+Older releases installed the interface under `$(docdir)` and made
+`$(datadir)/httrack/html` the symlink, which is what several recipes carried a
+path override or a `%files` exception for. Drop yours.
+
 ## The optional dependencies are automagic
 
 `--with-brotli` and `--with-zstd` default to `auto`, so the `br` and `zstd`

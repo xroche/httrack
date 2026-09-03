@@ -207,6 +207,9 @@ root="${work}/root"
 mkdir -p "${root}"
 cp -R "${distdir}/html" "${distdir}/lang" "${distdir}/lang.def" "${root}/"
 chmod -R u+w "${root}"
+# The install reaches the documentation through this link, and a pane hides its
+# Help tooltip when the file behind it is missing.
+ln -s .. "${root}/html/doc"
 # CRLF line pairs, English key then translation; \\ \n \t are read back as one
 # backslash, a newline and a tab, and \203 is a raw shift-jis lead byte.
 # Anything left undefined falls back to English.

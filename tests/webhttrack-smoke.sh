@@ -66,9 +66,22 @@ test -n "$langdef" || {
     echo "no lang.def under $prefix" >&2
     exit 1
 }
-htmllink="$(dirname "$langdef")/html"
-test -L "$htmllink" || {
-    echo "no data symlink beside $langdef" >&2
+# The served UI is runtime, so it is real files beside the catalogs. A symlink
+# here is the older layout, where a package stripping $(docdir) took the UI too.
+htmldir="$(dirname "$langdef")/html"
+test ! -L "$htmldir" || {
+    echo "the served root $htmldir is a symlink to $(readlink "$htmldir")" >&2
+    exit 1
+}
+test -f "$htmldir/server/index.html" || {
+    echo "no served UI at $htmldir/server" >&2
+    exit 1
+}
+# The manual is documentation, so the UI reaches it through this link. It may
+# dangle where a package strips the docs, but it may not be missing.
+doclink="$htmldir/doc"
+test -L "$doclink" || {
+    echo "no documentation link at $doclink" >&2
     exit 1
 }
 
@@ -77,20 +90,25 @@ test -L "$htmllink" || {
 reloc="$work/reloc"
 cp -R "$prefix" "$reloc"
 relocreal=$(cd "$reloc" && pwd -P)
-htmlreal=$(cd "$reloc${htmllink#"$prefix"}" 2>/dev/null && pwd -P) || {
-    echo "relocated tree: the data link does not resolve" >&2
+docreal=$(cd "$reloc${doclink#"$prefix"}" 2>/dev/null && pwd -P) || {
+    echo "relocated tree: the documentation link does not resolve" >&2
     exit 1
 }
-case "$htmlreal" in
+case "$docreal" in
 "$relocreal"/*) ;;
 *)
-    echo "relocated tree: link escapes to $htmlreal" >&2
+    echo "relocated tree: link escapes to $docreal" >&2
     exit 1
     ;;
 esac
-# Resolving is not enough: it must land on the served UI, not just any directory.
-test -d "$htmlreal/server" || {
-    echo "relocated tree: $htmlreal has no server/" >&2
+# Resolving is not enough: it must land on the manual the panes link, and the UI
+# must have travelled as real files rather than through the link.
+test -f "$docreal/html/guide.html" || {
+    echo "relocated tree: $docreal holds no html/guide.html" >&2
+    exit 1
+}
+test -f "$reloc${htmldir#"$prefix"}/server/index.html" || {
+    echo "relocated tree: the served UI did not travel" >&2
     exit 1
 }
 echo "install tree is relocatable"

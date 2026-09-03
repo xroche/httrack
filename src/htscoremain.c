@@ -58,6 +58,16 @@ Please visit our Website: http://www.httrack.com
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
+/* These BSDs name the running binary through sysctl, which needs no /proc.
+   OpenBSD has no equivalent and stays on argv[0]. */
+#if defined(HAVE_SYS_SYSCTL_H) &&                                              \
+    (defined(__FreeBSD__) || defined(__DragonFly__) || defined(__NetBSD__))
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#ifdef KERN_PROC_PATHNAME
+#define HTS_SELF_PATH_SYSCTL 1
+#endif
+#endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -92,25 +102,52 @@ static int datadir_has_templates(const char *dir) {
 /* htsbacktrace.c copies the Linux branch: it is program-side and cannot reach
    this hidden symbol, so a fix here belongs there too (#997). */
 const char *hts_self_path(char *dst, size_t dstsize) {
+  /* No byte to write a terminator into, and readlink() below would otherwise
+     be handed dstsize - 1 as SIZE_MAX. */
+  if (dstsize == 0)
+    return NULL;
 #if defined(_WIN32)
   const DWORD n = GetModuleFileNameA(NULL, dst, (DWORD) dstsize);
 
   /* Pre-Win8 returns nSize on truncation without terminating: a full buffer
      is a failure, not a path. */
-  return (n > 0 && (size_t) n < dstsize) ? dst : NULL;
+  if (n > 0 && (size_t) n < dstsize)
+    return dst;
 #elif defined(__APPLE__)
   uint32_t n = (uint32_t) dstsize;
 
-  return _NSGetExecutablePath(dst, &n) == 0 ? dst : NULL;
+  if (_NSGetExecutablePath(dst, &n) == 0)
+    return dst;
+#elif defined(HTS_SELF_PATH_SYSCTL)
+  /* FreeBSD and DragonFly put the pid last, NetBSD puts it third, and 9 is the
+     pathname on DragonFly but KERN_PROC_SV_NAME on FreeBSD (#1506). */
+#if defined(__NetBSD__)
+  int mib[4] = {CTL_KERN, KERN_PROC_ARGS, -1, KERN_PROC_PATHNAME};
+#else
+  int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+#endif
+  size_t n = dstsize;
+
+  /* All three report strlen + 1, so 1 is the empty path and dst[n - 1] is the
+     kernel's own terminator. */
+  if (sysctl(mib, 4, dst, &n, NULL, 0) == 0 && n > 1 && n <= dstsize &&
+      dst[n - 1] == '\0')
+    return dst;
 #else
   /* Linux; anywhere else this is simply absent and argv[0] has to do. */
   const ssize_t n = readlink("/proc/self/exe", dst, dstsize - 1);
 
-  if (n <= 0 || (size_t) n >= dstsize - 1)
-    return NULL;
-  dst[n] = '\0';
-  return dst;
+  if (n > 0 && (size_t) n < dstsize - 1) {
+    dst[n] = '\0';
+    return dst;
+  }
 #endif
+  /* GetModuleFileNameA() and sysctl() both copy a clipped path into dst before
+     they report the clipping, and Windows terminates that copy, so a refusal
+     would otherwise read back as a shorter path. Emptying dst covers it, and
+     the other two arms share the exit so a fifth cannot forget the contract. */
+  dst[0] = '\0';
+  return NULL;
 }
 
 /* Directory part of path, trailing '/' kept, or NULL when it carries none: a
