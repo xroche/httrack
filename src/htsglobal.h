@@ -368,6 +368,16 @@ typedef int hts_tristate;
 #define HTS_DEPRECATED(msg)
 #endif
 
+/* Never returns; placed before the declaration, where GCC/Clang and MSVC both
+   accept it. */
+#if defined(__GNUC__)
+#define HTS_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define HTS_NORETURN __declspec(noreturn)
+#else
+#define HTS_NORETURN
+#endif
+
 /* LLint/TStamp: signed exact-width 64-bit; -1 is a sentinel engine-wide. */
 typedef int64_t LLint;
 typedef int64_t TStamp;
