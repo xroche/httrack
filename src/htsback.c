@@ -547,6 +547,41 @@ int back_selftest_slot_swap(void) {
     freet(back.r.headers);
   }
 
+  /* A ready table is a file, so its size headers are hostile input. */
+  {
+    /* SIZE_MAX wrapped the guard byte's allocation to zero, and 16 is a
+       well-formed header of the wrong struct size, whose slot must be freed.
+       A merely huge size is left out, since ASan aborts on it. */
+    const size_t bad[] = {(size_t) -1, 16};
+    size_t c;
+
+    for (c = 0; c < sizeof(bad) / sizeof(bad[0]); c++) {
+      FILE *const cfp = tmpfile();
+      lien_back *copy = NULL;
+      char pad[16];
+
+      memset(pad, 0, sizeof(pad));
+      if (cfp == NULL || fwrite(&bad[c], sizeof(bad[c]), 1, cfp) != 1 ||
+          (bad[c] == sizeof(pad) &&
+           fwrite(pad, 1, sizeof(pad), cfp) != sizeof(pad)) ||
+          fseek(cfp, 0, SEEK_SET) != 0) {
+        fprintf(stderr, "backswap: could not stage a bad size header\n");
+        err = 1;
+      } else if (back_unserialize(cfp, &copy) == 0) {
+        fprintf(stderr, "backswap: a %lu-byte size header unserialized\n",
+                (unsigned long) bad[c]);
+        err = 1;
+        back_clear_entry(copy);
+        freet(copy);
+      } else if (copy != NULL) {
+        fprintf(stderr, "backswap: a rejected size header kept a slot\n");
+        err = 1;
+      }
+      if (cfp != NULL)
+        fclose(cfp);
+    }
+  }
+
   printf("backswap self-test: %s\n", err ? "FAIL" : "OK");
   return err;
 }
@@ -1509,6 +1544,9 @@ static int back_data_unserialize(FILE * fp, void **str, size_t * size) {
   if (hts_fread_exact(size, sizeof(*size), fp)) {
     if (*size == 0)             /* serialized NULL ptr */
       return 0;
+    /* Untrusted, and the guard byte's extra byte must not wrap the size. */
+    if (*size > SIZE_MAX - 1)
+      return 1; /* error */
     *str = malloct(*size + 1);
     if (*str == NULL)
       return 1;                 /* error */
