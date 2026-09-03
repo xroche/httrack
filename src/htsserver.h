@@ -84,8 +84,7 @@ extern coucal NewLangList;
 
 extern httrackp *global_opt;
 
-/* Spaces: CR,LF,TAB,FF */
-#define  is_space(c)      ( ((c)==' ') || ((c)=='\"') || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11) || ((c)=='\'') )
+/* Duplicates of htslib.h's, which htsweb.c does not include. */
 #define  is_realspace(c)  ( ((c)==' ')                || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11)                )
 #define  is_taborspace(c) ( ((c)==' ')                                          || ((c)==9)                             )
 #define  is_quote(c)      (               ((c)=='\"')                                                    || ((c)=='\'') )

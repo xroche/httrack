@@ -713,16 +713,17 @@ char *hts_convertStringFromUTF8Strict(const char *s, size_t size,
 #define strncasecmp(a,b,n) strnicmp(a,b,n)
 #endif
 
-static int is_space(char c) {
+/* Whitespace for the <meta> charset prescan: SPACE, TAB, CR, LF. */
+static int is_html_space(char c) {
   return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
-static int is_space_or_equal(char c) {
-  return is_space(c) || c == '=';
+static int is_html_space_or_equal(char c) {
+  return is_html_space(c) || c == '=';
 }
 
-static int is_space_or_equal_or_quote(char c) {
-  return is_space_or_equal(c) || c == '"' || c == '\'';
+static int is_html_space_or_equal_or_quote(char c) {
+  return is_html_space_or_equal(c) || c == '"' || c == '\'';
 }
 
 size_t hts_stringLengthUTF8(const char *s) {
@@ -772,14 +773,15 @@ static char *charset_from_content(const char *s, size_t len) {
   size_t i;
 
   for (i = 0; i + 7 < len; i++) {
-    if ((i == 0 || is_space(s[i - 1]) || s[i - 1] == ';') &&
-        strncasecmp(&s[i], "charset", 7) == 0 && is_space_or_equal(s[i + 7])) {
+    if ((i == 0 || is_html_space(s[i - 1]) || s[i - 1] == ';') &&
+        strncasecmp(&s[i], "charset", 7) == 0 &&
+        is_html_space_or_equal(s[i + 7])) {
       size_t j, val;
 
-      for (j = i + 7; j < len && is_space_or_equal_or_quote(s[j]); j++)
+      for (j = i + 7; j < len && is_html_space_or_equal_or_quote(s[j]); j++)
         ;
       for (val = j; j < len && s[j] != '"' && s[j] != '\'' && s[j] != ';' &&
-                    !is_space(s[j]);
+                    !is_html_space(s[j]);
            j++)
         ;
       if (j != val) {
@@ -802,26 +804,26 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
     size_t equiv_len = 0, content_len = 0;
 
     if (html[i] != '<' || strncasecmp(&html[i + 1], "meta", 4) != 0 ||
-        !is_space(html[i + 5])) {
+        !is_html_space(html[i + 5])) {
       continue;
     }
     /* Attribute scan, strictly bounded by size. */
     for (j = i + 6; j < size && html[j] != '>';) {
       size_t name, name_len, val = 0, val_len = 0;
 
-      if (is_space(html[j]) || html[j] == '/') {
+      if (is_html_space(html[j]) || html[j] == '/') {
         j++;
         continue;
       }
       for (name = j; j < size && html[j] != '=' && html[j] != '>' &&
-                     html[j] != '/' && !is_space(html[j]);
+                     html[j] != '/' && !is_html_space(html[j]);
            j++)
         ;
       name_len = j - name;
-      for (; j < size && is_space(html[j]); j++)
+      for (; j < size && is_html_space(html[j]); j++)
         ;
       if (j < size && html[j] == '=') {
-        for (j++; j < size && is_space(html[j]); j++)
+        for (j++; j < size && is_html_space(html[j]); j++)
           ;
         if (j < size && (html[j] == '"' || html[j] == '\'')) {
           const char quote = html[j++];
@@ -834,7 +836,8 @@ char *hts_getCharsetFromMeta(const char *html, size_t size) {
         } else {
           /* unquoted: ends at whitespace or '>' only (HTML5 prescan); '/'
              belongs to the value except as the tail of a self-close */
-          for (val = j; j < size && !is_space(html[j]) && html[j] != '>'; j++)
+          for (val = j; j < size && !is_html_space(html[j]) && html[j] != '>';
+               j++)
             ;
           val_len = j - val;
           if (val_len != 0 && j < size && html[j] == '>' &&
