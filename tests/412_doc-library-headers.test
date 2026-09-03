@@ -30,11 +30,18 @@ parse_installed() { # parse_installed <makefile>
 }
 
 # Project headers a .c includes, either bracket style, indented or not: a name
-# is ours when src/ or the file's own directory holds it.
+# is ours when src/ or the file's own directory holds it. A "#if 0" block is
+# dropped first, since the compiler never sees what it names.
 parse_includes() { # parse_includes <c file>
     local here
     here=$(dirname "$1")
-    grep -oE '^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"][A-Za-z0-9._-]+\.h[">]' "$1" |
+    awk '
+        /^[[:space:]]*#[[:space:]]*if[[:space:]]+0[[:space:]]*$/ { if (!d) { d = 1; n = 0; next } }
+        d && /^[[:space:]]*#[[:space:]]*(if|ifdef|ifndef)\>/ { n++ }
+        d && /^[[:space:]]*#[[:space:]]*endif\>/ { if (n == 0) { d = 0; next } ; n-- }
+        !d
+    ' "$1" |
+        grep -oE '^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"][A-Za-z0-9._-]+\.h[">]' |
         sed 's,^[^<"]*[<"],,; s,[">].*,,' | sort -u |
         while read -r h; do
             if test -e "${srcdir}/src/${h}" || test -e "${here}/${h}"; then
@@ -60,9 +67,15 @@ cat >"${fixture}/probe.c" <<'FIX'
 #include <stdio.h>
   #include "htsbase.h"
 #include <htslib.h>
+#if 0
+#ifdef NEVER
+#include "htsname.h"
+#endif
+#include "htscache.h"
+#endif
 FIX
 same_set "$(parse_includes "${fixture}/probe.c")" 'htsbase.h
-htslib.h' || fail "parse_includes misses an indented or bracketed project include"
+htslib.h' || fail "parse_includes misreads an indented, bracketed or #if 0 include"
 
 installed=$(parse_installed "${makefile}")
 grep -qx 'httrack-library.h' <<<"${installed}" ||
