@@ -222,6 +222,15 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   } \
 } while(0)
 
+/* Scan a decimal option argument into an option field. "%d" writes an int,
+   and an enum field is one byte under -fshort-enums, so never aim it there. */
+#define scanOptInt(arg, field)                                                 \
+  do {                                                                         \
+    int value_;                                                                \
+    if (sscanf((arg), "%d", &value_) == 1)                                     \
+      (field) = value_;                                                        \
+  } while (0)
+
 HTSEXT_API int hts_main(int argc, char **argv) {
   httrackp *opt = hts_create_opt();
   int ret = hts_main2(argc, argv, opt);
@@ -1167,7 +1176,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           case 'K':
             opt->urlmode = HTS_URLMODE_ABSOLUTE;
             if (isdigit((unsigned char) *(com + 1))) {
-              sscanf(com + 1, "%d", (int *) &opt->urlmode);
+              scanOptInt(com + 1, opt->urlmode);
               if (opt->urlmode == HTS_URLMODE_ABSOLUTE) { // in fact K0 ==> K2
                 // and K ==> K0
                 opt->urlmode = HTS_URLMODE_RELATIVE;
@@ -1284,7 +1293,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             break;
             //
           case 'b':
-            sscanf(com + 1, "%d", (int *) &opt->accept_cookie);
+            scanOptInt(com + 1, opt->accept_cookie);
             while(isdigit((unsigned char) *(com + 1)))
               com++;
             break;
@@ -1348,7 +1357,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           } break;
           case 's':
             if (isdigit((unsigned char) *(com + 1))) {
-              sscanf(com + 1, "%d", (int *) &opt->robots);
+              scanOptInt(com + 1, opt->robots);
               while(isdigit((unsigned char) *(com + 1)))
                 com++;
             } else
@@ -1358,19 +1367,19 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
 #endif
             break;
           case 'o':
-            sscanf(com + 1, "%d", (int *) &opt->errpage);
+            scanOptInt(com + 1, opt->errpage);
             while(isdigit((unsigned char) *(com + 1)))
               com++;
             break;
           case 'u':
-            sscanf(com + 1, "%d", (int *) &opt->check_type);
+            scanOptInt(com + 1, opt->check_type);
             while(isdigit((unsigned char) *(com + 1)))
               com++;
             break;
             //
           case 'C':
             if (isdigit((unsigned char) *(com + 1))) {
-              sscanf(com + 1, "%d", (int *) &opt->cache);
+              scanOptInt(com + 1, opt->cache);
               while(isdigit((unsigned char) *(com + 1)))
                 com++;
             } else
@@ -1440,7 +1449,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'I':
                 opt->kindex = 1;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  sscanf(com + 1, "%d", (int *) &opt->kindex);
+                  scanOptInt(com + 1, opt->kindex);
                   while(isdigit((unsigned char) *(com + 1)))
                     com++;
                 }
@@ -1538,7 +1547,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'v':
                 opt->verbosedisplay = HTS_VERBOSE_FULL;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  sscanf(com + 1, "%d", (int *) &opt->verbosedisplay);
+                  scanOptInt(com + 1, opt->verbosedisplay);
                   while(isdigit((unsigned char) *(com + 1)))
                     com++;
                 }
@@ -1553,7 +1562,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'N':
                 opt->savename_delayed = HTS_SAVENAME_DELAYED_HARD;
                 if (isdigit((unsigned char) *(com + 1))) {
-                  sscanf(com + 1, "%d", (int *) &opt->savename_delayed);
+                  scanOptInt(com + 1, opt->savename_delayed);
                   while(isdigit((unsigned char) *(com + 1)))
                     com++;
                 }

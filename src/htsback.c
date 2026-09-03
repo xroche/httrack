@@ -456,6 +456,97 @@ int back_selftest_slot_swap(void) {
     }
   }
 
+  /* Each buffer travels through a void *, so a truncated file must still come
+     back as a NULL slot with nothing leaked. */
+  {
+    static const char body[] = "truncated body";
+    static const char hdrs[] = "HTTP/1.1 200 OK\r\nX: 1\r\n";
+    const size_t head = sizeof(size_t);
+    char *whole = NULL;
+    long whole_len = 0;
+    FILE *fp = tmpfile();
+
+    memset(&back, 0, sizeof(back));
+    back.status = STATUS_READY;
+    strcpybuff(back.url_sav, "/tmp/httrack-selftest.bin");
+    back.r.size = (LLint) sizeof(body) - 1;
+    back.r.adr = strdupt(body);
+    back.r.headers = strdupt(hdrs);
+    if (fp == NULL || back_serialize(fp, &back) != 0 ||
+        (whole_len = ftell(fp)) <= 0 || fseek(fp, 0, SEEK_SET) != 0) {
+      fprintf(stderr, "backswap: could not serialize a slot with headers\n");
+      err = 1;
+    } else {
+      whole = malloct((size_t) whole_len);
+      if (whole == NULL ||
+          fread(whole, 1, (size_t) whole_len, fp) != (size_t) whole_len) {
+        fprintf(stderr, "backswap: could not read the serialized slot back\n");
+        err = 1;
+        whole_len = 0;
+      }
+    }
+    if (fp != NULL)
+      fclose(fp);
+
+    if (whole_len > 0) {
+      /* Cuts at each boundary the reader stops on: the leading size, the
+         struct, the body's size and bytes, then the headers. */
+      const long cuts[] = {1,
+                           (long) head,
+                           (long) (head + sizeof(lien_back)) - 1,
+                           (long) (head + sizeof(lien_back)),
+                           (long) (head + sizeof(lien_back) + head) + 1,
+                           whole_len - 1,
+                           whole_len};
+      size_t c;
+
+      for (c = 0; c < sizeof(cuts) / sizeof(cuts[0]); c++) {
+        const long cut = cuts[c];
+        const hts_boolean complete = cut == whole_len;
+        lien_back *copy = NULL;
+        FILE *cfp;
+
+        if (cut <= 0 || cut > whole_len)
+          continue;
+        cfp = tmpfile();
+        if (cfp == NULL ||
+            fwrite(whole, 1, (size_t) cut, cfp) != (size_t) cut ||
+            fseek(cfp, 0, SEEK_SET) != 0) {
+          fprintf(stderr, "backswap: could not stage a %ld-byte slot\n", cut);
+          err = 1;
+        } else if (back_unserialize(cfp, &copy) == 0) {
+          if (!complete) {
+            fprintf(stderr, "backswap: %ld of %ld bytes unserialized anyway\n",
+                    cut, whole_len);
+            err = 1;
+          } else if (copy->r.headers == NULL ||
+                     strcmp(copy->r.headers, hdrs) != 0) {
+            fprintf(stderr,
+                    "backswap: the slot came back without its headers\n");
+            err = 1;
+          }
+          back_clear_entry(copy);
+          freet(copy);
+        } else {
+          if (complete) {
+            fprintf(stderr, "backswap: the whole slot failed to unserialize\n");
+            err = 1;
+          }
+          if (copy != NULL) {
+            fprintf(stderr, "backswap: a failed unserialize kept a slot\n");
+            err = 1;
+          }
+        }
+        if (cfp != NULL)
+          fclose(cfp);
+      }
+    }
+    if (whole != NULL)
+      freet(whole);
+    freet(back.r.adr);
+    freet(back.r.headers);
+  }
+
   printf("backswap self-test: %s\n", err ? "FAIL" : "OK");
   return err;
 }
@@ -1411,6 +1502,8 @@ static int back_string_serialize(FILE * fp, const char *str) {
   return back_data_serialize(fp, str, size);
 }
 
+/* Stores the buffer through a void *, never the caller's own pointer type,
+   and sets it on the error paths too so the caller can free it. */
 static int back_data_unserialize(FILE * fp, void **str, size_t * size) {
   *str = NULL;
   if (hts_fread_exact(size, sizeof(*size), fp)) {
@@ -1428,8 +1521,11 @@ static int back_data_unserialize(FILE * fp, void **str, size_t * size) {
 
 static int back_string_unserialize(FILE * fp, char **str) {
   size_t dummy;
+  void *data;
+  const int err = back_data_unserialize(fp, &data, &dummy);
 
-  return back_data_unserialize(fp, (void **) str, &dummy);
+  *str = (char *) data;
+  return err;
 }
 
 int back_serialize(FILE * fp, const lien_back * src) {
@@ -1443,11 +1539,14 @@ int back_serialize(FILE * fp, const lien_back * src) {
 
 int back_unserialize(FILE * fp, lien_back ** dst) {
   size_t size;
+  void *data;
+  int err;
 
   *dst = NULL;
   errno = 0;
-  if (back_data_unserialize(fp, (void **) dst, &size) == 0
-      && size == sizeof(lien_back)) {
+  err = back_data_unserialize(fp, &data, &size);
+  *dst = (lien_back *) data;
+  if (err == 0 && size == sizeof(lien_back)) {
     (*dst)->tmpfile = NULL;
     (*dst)->chunk_adr = NULL;
     (*dst)->r.adr = NULL;
@@ -1462,16 +1561,22 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
 #if HTS_USEOPENSSL
     (*dst)->r.ssl_con = NULL;
 #endif
-    if (back_data_unserialize(fp, (void **) &(*dst)->r.adr, &size) == 0) {
-      /* A bodyless slot already wrote its bytes to url_sav (FTP, direct to
-         disk); zeroing r.size makes the writer blank that file (#797). */
-      if ((*dst)->r.adr != NULL)
-        (*dst)->r.size = size;
-      (*dst)->r.headers = NULL;
-      if (back_string_unserialize(fp, &(*dst)->r.headers) == 0)
-        return 0;               /* ok */
-      if ((*dst)->r.headers != NULL)
-        freet((*dst)->r.headers);
+    {
+      void *adr;
+      const int adr_err = back_data_unserialize(fp, &adr, &size);
+
+      (*dst)->r.adr = (char *) adr;
+      if (adr_err == 0) {
+        /* A bodyless slot already wrote its bytes to url_sav (FTP, direct to
+           disk); zeroing r.size makes the writer blank that file (#797). */
+        if ((*dst)->r.adr != NULL)
+          (*dst)->r.size = size;
+        (*dst)->r.headers = NULL;
+        if (back_string_unserialize(fp, &(*dst)->r.headers) == 0)
+          return 0; /* ok */
+        if ((*dst)->r.headers != NULL)
+          freet((*dst)->r.headers);
+      }
     }
     if ((*dst)->r.adr != NULL)
       freet((*dst)->r.adr);

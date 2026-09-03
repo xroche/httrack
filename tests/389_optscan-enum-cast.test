@@ -1,0 +1,28 @@
+#!/bin/bash
+#
+# "%d" always writes an int, and an enum-typed option field is one byte wide
+# under -fshort-enums, so a scan aimed straight at the field through a cast
+# overwrites three bytes of its neighbours. scanOptInt() scans an int instead.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+[ -n "${abs_top_srcdir:-}" ] || skip "abs_top_srcdir unset, no automake environment"
+src="$abs_top_srcdir/src/htscoremain.c"
+test -r "$src" || fail "no $src"
+
+pattern='sscanf[^;]*\([a-z][a-z ]*\*\)[ 	]*&opt->'
+
+# The pattern's silence means nothing until it has matched a known-bad line.
+bad='              sscanf(com + 1, "%d", (int *) &opt->urlmode);'
+grep -qE "$pattern" <<<"$bad" || fail "the pattern cannot match a known-bad line"
+
+found=$(grep -nE "$pattern" "$src" || true)
+[ -z "$found" ] || fail "option scan writing through a cast pointer in $src:
+$found"
+
+grep -q 'scanOptInt' "$src" || fail "scanOptInt() has left $src"
+
+echo "optscan: no option scan in htscoremain.c writes through a cast pointer"
