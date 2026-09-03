@@ -2253,6 +2253,7 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="file.bin">file</a>\n'
             '\t<a href="always.bin">alwaysbin</a>\n'
             '\t<a href="hostile.html">hostile</a>\n'
+            '\t<a href="huge.html">huge</a>\n'
             '\t<a href="reset.bin">reset</a>\n'
         )
 
@@ -2323,6 +2324,25 @@ class Handler(SimpleHTTPRequestHandler):
             return
         try:
             self.wfile.write(b"80000000\r\n")
+            self.wfile.flush()
+        except OSError:
+            pass
+        self.close_connection = True
+
+    # A chunk-size line of exactly INT32_MAX: legal as an int, and the one value
+    # http_xfread1() refuses, so the chunk path must not buy the 2 GiB realloc
+    # that only the next read would refuse.
+    def route_chunktrunc_huge(self):
+        self.protocol_version = "HTTP/1.1"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Transfer-Encoding", "chunked")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        if self.command == "HEAD":
+            return
+        try:
+            self.wfile.write(b"7fffffff\r\n")
             self.wfile.flush()
         except OSError:
             pass
@@ -3478,6 +3498,7 @@ class Handler(SimpleHTTPRequestHandler):
         "/chunktrunc/always.bin": route_chunktrunc_alwaysbin,
         "/chunktrunc/stay.html": route_chunktrunc_stay,
         "/chunktrunc/hostile.html": route_chunktrunc_hostile,
+        "/chunktrunc/huge.html": route_chunktrunc_huge,
         "/chunktrunc/reset.bin": route_chunktrunc_reset,
         "/chunktrail/index.html": route_chunktrail_index,
         "/chunktrail/one.html": route_chunktrail_one,

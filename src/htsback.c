@@ -974,6 +974,17 @@ static void back_report_write_failure(httrackp *opt, lien_back *const back) {
   }
 }
 
+hts_boolean back_set_decoded_size(htsblk *r, LLint size) {
+  if (!r->is_write && !hts_inmem_size_fits(size)) {
+    r->statuscode = STATUSCODE_INVALID;
+    strcpybuff(r->msg, "Decompressed content too large");
+    deleteaddr(r);
+    return HTS_FALSE;
+  }
+  r->size = r->totalsize = size;
+  return HTS_TRUE;
+}
+
 // objet (lien) téléchargé ou transféré depuis le cache
 //
 // fermer les paramètres de transfert,
@@ -1101,15 +1112,19 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
                     deleteaddr(&back[p].r);
                 } else if ((size = hts_codec_unpack(codec, back[p].tmpfile,
                                                     unpacked)) >= 0) {
-                  back[p].r.size = back[p].r.totalsize = size;
-                  if (back[p].r.is_write) {
+                  const hts_boolean sized =
+                      back_set_decoded_size(&back[p].r, size);
+
+                  if (sized && back[p].r.is_write) {
                     /* Sample the previous copy now: the rename below replaces
                        it, and file_notify() only fires once it is gone. */
                     hts_changes_notify(
                         opt, back[p].url_adr, back[p].url_fil, back[p].url_sav,
                         HTS_TRUE, back[p].r.notmodified ? HTS_TRUE : HTS_FALSE);
                   }
-                  if (!back[p].r.is_write) {
+                  if (!sized) {
+                    UNLINK(unpacked);
+                  } else if (!back[p].r.is_write) {
                     // fichier -> mémoire ; le fichier est écrit plus tard
                     deleteaddr(&back[p].r);
                     back[p].r.adr = readfile_utf8(unpacked);
@@ -3923,11 +3938,10 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                         back[i].chunk_blocksize = -1;   /* ending */
                       back[i].r.totalsize += chunk_size;        // noter taille
                       if (back[i].r.adr != NULL || !back[i].r.is_write) {       // Not to disk
-                        // totalsize sums attacker-declared chunk sizes; past
-                        // 2GB the (size_t) cast below truncates on 32-bit and
-                        // under-allocates. Mark the chunk invalid so the shared
-                        // error path tears the transfer down.
-                        if (back[i].r.totalsize > INT32_MAX) {
+                        /* A wider bound here buys the realloc that only the
+                           next read would refuse; an invalid chunk tears the
+                           transfer down. */
+                        if (!hts_inmem_size_fits(back[i].r.totalsize)) {
                           hts_log_print(opt, LOG_WARNING,
                                         "Chunked resource too large for %s%s",
                                         back[i].url_adr, back[i].url_fil);

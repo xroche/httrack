@@ -17,6 +17,8 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --log-found 'truncated chunked transfer.*chunktrunc/always\.html' \
     --log-found 'Truncated chunked transfer.*after 2 retries.*chunktrunc/always\.html' \
     --log-found 'Interrupted transfer.*chunktrunc/reset\.bin' \
+    --log-found 'Chunked resource too large for .*chunktrunc/huge\.html' \
+    --not-found 'chunktrunc/huge.html' \
     --log-not-found 'runcated chunked transfer.*chunktrunc/(page|stay|file|reset|hostile)' \
     --not-found 'chunktrunc/always.html' \
     --found 'chunktrunc/always.bin' \
@@ -32,13 +34,17 @@ bash "$top_srcdir/tests/local-crawl.sh" \
 
 # --update: page.html and file.bin come back cut, hostile.html comes back with a
 # 0x80000000 chunk-size line (rejected outright, since as an int it is INT_MIN
-# and would otherwise reach realloc sign-extended), stay.html is the control.
+# and would otherwise reach realloc sign-extended), huge.html with 0x7fffffff
+# (legal as an int, and the size http_xfread1() refuses), stay.html is the
+# control.
 bash "$top_srcdir/tests/local-crawl.sh" \
     --rerun-args '--update' \
     --log-found 'truncated chunked transfer.*chunktrunc/page\.html' \
     --log-found 'truncated chunked transfer.*chunktrunc/file\.bin' \
     --log-found 'truncated chunked transfer.*chunktrunc/hostile\.html' \
     --log-found 'Illegal chunk \(80000000\) for .*chunktrunc/hostile\.html' \
+    --log-found 'Chunked resource too large for .*chunktrunc/huge\.html' \
+    --cache-not-found '/chunktrunc/huge.html' \
     --log-not-found 'not enough memory \(-' \
     --file-matches 'chunktrunc/page.html' 'CHUNKTRUNC-PAGE-V1' \
     --file-not-matches 'chunktrunc/page.html' 'CHUNKTRUNC-PAGE-V2' \

@@ -1964,6 +1964,10 @@ static void classify_write_error(htsblk *r) {
   strcpybuff(r->msg, "Write error on disk");
 }
 
+hts_boolean hts_inmem_size_fits(LLint size) {
+  return size >= 0 && size < INT32_MAX ? HTS_TRUE : HTS_FALSE;
+}
+
 // Read one block: bufl is a byte count, or one of the HTS_XFREAD_* line modes.
 // Note: the +1 in the mallocs is the trailing NUL appended to the data.
 LLint http_xfread1(htsblk * r, int bufl) {
@@ -1976,11 +1980,10 @@ LLint http_xfread1(htsblk * r, int bufl) {
 
   if (bufl > 0) {
     if (!r->is_write) {         // stocker en mémoire
-      // In-memory content must fit a 32-bit index (allocs below add 1, reads
-      // use int offsets): reject a hostile Content-Length or endless stream.
+      // Reject a hostile Content-Length, or an endless stream.
       const LLint inmem_want =
           (r->totalsize >= 0) ? r->totalsize : (r->size + bufl);
-      if (inmem_want >= INT32_MAX) {
+      if (!hts_inmem_size_fits(inmem_want)) {
         r->statuscode = STATUSCODE_INVALID;
         strcpybuff(r->msg, "In-memory content too large");
         return READ_ERROR;
