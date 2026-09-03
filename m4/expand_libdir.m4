@@ -18,22 +18,30 @@ exec_prefix=$hts_save_exec_prefix
 
 dnl @synopsis HTS_MULTIARCH_SUBDIR()
 dnl
-dnl Set hts_multiarch_subdir to the lib/TRIPLET a Debian or Ubuntu host keeps
-dnl its libraries under, empty on any other layout. gcc and clang print the
-dnl triplet only where that layout is in use, and the compiler is the one that
-dnl knows the target, so a cross build gets the triplet it is building for.
+dnl Set hts_multiarch_subdir to the lib/TRIPLET Debian and Ubuntu keep their
+dnl libraries under, empty on any other layout. The compiler is asked rather
+dnl than $host, because only the compiler knows what a cross or -m32 build
+dnl targets, and $host names the machine configure runs on.
 
 AC_DEFUN([HTS_MULTIARCH_SUBDIR], [
 AC_REQUIRE([AC_PROG_CC])
 AC_CACHE_CHECK([the multiarch library subdirectory], [hts_cv_multiarch_subdir], [
 hts_cv_multiarch_subdir=none
-hts_multiarch_triplet=`$CC -print-multiarch 2>/dev/null`
-# A compiler that does not know the option can answer on stdout, so accept
-# the reply only when it spells a single path component.
-case $hts_multiarch_triplet in
-"") ;;
+hts_multiarch_name=`$CC -print-multiarch 2>/dev/null`
+if test -z "$hts_multiarch_name"; then
+	# clang rejects -print-multiarch, but resolves libc in that same directory.
+	hts_multiarch_libc=`$CC -print-file-name=libc.so 2>/dev/null`
+	case $hts_multiarch_libc in
+	*/*)
+		hts_multiarch_name=${hts_multiarch_libc%/*}
+		hts_multiarch_name=${hts_multiarch_name##*/}
+		;;
+	esac
+fi
+# A triplet always spells an ABI, which is what tells it from a plain lib dir.
+case $hts_multiarch_name in
 *[[!-a-zA-Z0-9_.]]*) ;;
-*) hts_cv_multiarch_subdir=lib/$hts_multiarch_triplet ;;
+*-*) hts_cv_multiarch_subdir=lib/$hts_multiarch_name ;;
 esac
 ])
 if test "x$hts_cv_multiarch_subdir" = xnone; then
