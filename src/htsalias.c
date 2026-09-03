@@ -220,7 +220,6 @@ const char *hts_optalias[][4] = {
   {"go-everywhere", "-e", "single", "go everywhere on the web - DEPRECATED"},
 
   /* Badly documented */
-  {"debug-testfilters", "-#0", "param1", "debug: test filters"},
   {"advanced-flushlogs", "-#f", "single", ""},
   {"advanced-maxfilters", "-#F", "param", "maximum number of scan rules"},
   {"version", "-#h", "single", ""},
@@ -235,7 +234,7 @@ const char *hts_optalias[][4] = {
   {"fast-engine", "-#X", "onoff", "Enable fast routines"},
   {"debug-overflows", "-#X0", "single", "Attempt to detect buffer overflows"},
   {"debug-cache", "-#C", "param1", "List files in the cache"},
-  {"extract-cache", "-#C", "level", "Extract meta-data"},
+  {"extract-cache", "-#E", "single", "Extract meta-data"},
   {"debug-parsing", "-#d", "single", "debug: test parser"},
   {"repair-cache", "-#R", "single", "repair the damaged cache ZIP file"},
     {"repair", "-#R", "single", ""},
@@ -283,7 +282,7 @@ const char *hts_optalias[][4] = {
    "update HTTrack Website Copier"},
   {"clean", "--clean", "single", "clean up log files and cache"},
   {"tide", "--clean", "single", "clean up log files and cache"},
-  {"autotest", "-#T", "single", ""},
+  {"autotest", "-#t", "single", ""},
   /* */
 
   {"", "", "", ""}
