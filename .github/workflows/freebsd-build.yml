@@ -1,0 +1,111 @@
+# No CI leg of ours builds against a BSD libc, and macOS is not close enough:
+# a header a platform does not carry only shows up where somebody builds it,
+# which is how the missing spawn.h of #1487 reached a packager first. This is a
+# plain configure/make/make check of master in a FreeBSD VM, deliberately not
+# their ports tree, whose drift tools/downstream-drift.sh already reports. The
+# VM is amd64, so this says nothing about a 32-bit size_t and linux-i386 stays
+# our only width guard. It blocks nothing.
+name: freebsd build canary
+
+on:
+  schedule:
+    - cron: "53 4 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freebsd:
+    name: configure, make and make check on FreeBSD
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      # Pinned to a sha, not to v1.5.5: the repository allow-list accepts any
+      # version of this action and the publisher moves its tags.
+      - name: Build and test inside a FreeBSD VM
+        uses: vmactions/freebsd-vm@f0552d3b69211736abd97f02ff3d4674c56b73b1 # v1.5.5
+        with:
+          release: "14.3"
+          # Nothing downstream of the VM reads the build tree.
+          copyback: false
+          prepare: |
+            pkg install -y autoconf automake libtool autoconf-archive \
+              gmake bash python3
+            # Tests recurse into plain "make", and BSD make rejects the -j that
+            # GNU make hands down in MAKEFLAGS.
+            ln -sf /usr/local/bin/gmake /usr/local/bin/make
+            pw useradd -n builder -m -s /bin/sh
+          # Runs under FreeBSD /bin/sh, so no bashisms and no pipefail here.
+          run: |
+            set -eu
+            # The action runs this as root, and a fixture asserting a denied
+            # write then passes for the wrong reason.
+            chown -R builder .
+            cat >build.sh <<'SH'
+            set -eu
+            jobs=$(( $(sysctl -n hw.ncpu) * 2 ))
+            ./bootstrap
+            ./configure
+            make -j"$jobs"
+            # The suite is judged below; a compile break is judged here.
+            make check -j"$jobs" >check.log 2>&1 || true
+            SH
+            if ! su -l builder -c "cd '$PWD' && sh build.sh"; then
+              tail -n 40 check.log 2>/dev/null || true
+              exit 1
+            fi
+            # A suite that ran nothing exits 0, and a canary green-lighting an
+            # untested tree is worse than none.
+            passed=$(sed -n 's/^# PASS: *\([0-9]*\).*/\1/p' check.log | sort -n | tail -1)
+            total=$(sed -n 's/^# TOTAL: *\([0-9]*\).*/\1/p' check.log | sort -n | tail -1)
+            echo "testsuite: ${passed:-0} passed of ${total:-0}"
+            if [ "${passed:-0}" -lt 350 ]; then
+              echo "only ${passed:-0} tests passed; the suite barely ran" >&2
+              cat tests/test-suite.log 2>/dev/null || true
+              exit 1
+            fi
+            # Gaps this canary found on its first runs, not regressions:
+            # hts_self_path returns NULL here (144, 215), configure emits no
+            # binary-relative rpath (195), and 89, 139, 258 and 349 each turn on
+            # another libc difference. Each must still fail, checked below.
+            known="89_webhttrack-error-overflow 139_local-query-charref \
+            144_engine-datadir 195_install-relocate 215_engine-datadir-ospath \
+            258_crawllib 349_sanitizer-stderr-capture"
+            # A dead proxy reports a receive error rather than a connect one
+            # here, and only sometimes, so this name carries no staleness check.
+            flaky="56_local-proxy-noleak"
+            fails=$(sed -n 's/^FAIL: \(.*\)\.test$/\1/p' check.log | sort -u |
+              tr '\n' ' ')
+            rc=0
+            for t in $fails; do
+              case " $known $flaky " in
+              *" $t "*) echo "known FreeBSD gap: $t" ;;
+              *)
+                echo "new FreeBSD failure: $t" >&2
+                rc=1
+                ;;
+              esac
+            done
+            # An entry that outlives the gap tells the next reader that seven
+            # things are broken when six are. It reds rather than warns, because
+            # nobody reads a warning in a weekly job.
+            for t in $known; do
+              case " $fails " in
+              *" $t "*) ;;
+              *)
+                echo "$t passes on FreeBSD now: drop it from known" >&2
+                rc=1
+                ;;
+              esac
+            done
+            if [ "$rc" -ne 0 ]; then
+              cat tests/test-suite.log 2>/dev/null || true
+              exit 1
+            fi
