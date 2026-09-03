@@ -26,6 +26,9 @@ conv 'iso-8859-1' 'café' 'cafÃ©'
 # case that actually exercises the cp1252 table (the 0x80-0x9F range).
 conv 'windows-1252' 'hex:80' '€'
 
+# IBM850 is the IANA name for the cp850 table, as windows-1252 is for cp1252.
+conv 'ibm850' 'hex:80' 'Ç'
+
 # pure ASCII is charset-invariant
 conv 'us-ascii' 'hello' 'hello'
 
@@ -37,6 +40,12 @@ assert_eq "" "$(httrack -O /dev/null -#test=charset 'no-such-charset-xyz' 'café
 # malformed UTF-8 (lone continuation byte, truncated lead byte) must not crash
 runs 'utf-8' 'hex:80'
 runs 'utf-8' 'hex:c3'
+
+# A leading NUL used to store the terminator through a pointer the loop had
+# never allocated. The non-ASCII byte is what makes these reach the tables at
+# all, because an all-ASCII string is copied without consulting them.
+runs 'windows-1252' 'hex:0080'
+runs 'ibm850' 'hex:0080'
 
 # hts_getCharsetFromMeta: <meta> charset extraction, HTML5 and legacy forms.
 # -#test=metacharset <html> prints the charset, or "(none)".

@@ -423,18 +423,71 @@ AX_CHECK_ALIGNED_ACCESS_REQUIRED
 # check for various headers
 AC_CHECK_HEADERS([execinfo.h spawn.h sys/ioctl.h sys/random.h sys/sysctl.h])
 
+### Where an optional feature's default comes from (meson's auto_features)
+AC_MSG_CHECKING([whether to probe for optional features nobody asked for])
+AC_ARG_ENABLE([auto-features],
+	[AS_HELP_STRING([--disable-auto-features],
+		[Default every optional feature to no rather than probing for it; an explicit --with-FEATURE or --enable-FEATURE still wins @<:@default=yes@:>@])],
+	[
+	case "${enableval}" in
+	no|yes)
+		auto_features=$enableval
+		AC_MSG_RESULT($enableval)
+		;;
+	*)
+		AC_MSG_ERROR([bad value for auto-features, expected yes/no])
+		;;
+	esac
+	],
+	[
+	auto_features=yes
+	AC_MSG_RESULT(yes)
+	])
+# What an optional feature's own flag falls back to when it is not passed.
+AS_IF([test x"$auto_features" = x"no"],
+	[hts_feature_default=no], [hts_feature_default=auto])
+
 ## The header can exist while backtrace() lives in another library (Termux's
 ## libandroid-execinfo); only httrack links it, so keep it out of LIBS.
+AC_ARG_ENABLE([backtrace],
+	[AS_HELP_STRING([--enable-backtrace=@<:@yes/no/auto@:>@],[Print a symbolic stack trace on a crash, on Linux @<:@default=auto@:>@])],
+	[
+	case "${enableval}" in
+	no|yes|auto)
+		backtrace_want=$enableval
+		backtrace_asked=yes
+		;;
+	*)
+		AC_MSG_ERROR([bad value for backtrace, expected yes/no/auto])
+		;;
+	esac
+	],
+	[
+	backtrace_want=$hts_feature_default
+	backtrace_asked=no
+	])
 BACKTRACE_LIBS=
-AS_CASE([$host_os], [linux*],
+backtrace_have=no
+AS_CASE([$host_os], [linux*], [backtrace_platform=yes], [backtrace_platform=no])
+AS_IF([test x"$backtrace_want" != x"no" && test x"$backtrace_platform" = x"yes"],
 	[AS_IF([test "x$ac_cv_header_execinfo_h" = xyes],
 		[hts_backtrace_save_libs=$LIBS
 		AC_SEARCH_LIBS([backtrace], [execinfo android-execinfo],
-			[AC_DEFINE([HAVE_BACKTRACE], [1],
+			[backtrace_have=yes
+			AC_DEFINE([HAVE_BACKTRACE], [1],
 				[Define to 1 if backtrace() can be linked.])
 			AS_IF([test "x$ac_cv_search_backtrace" != "xnone required"],
 				[BACKTRACE_LIBS=$ac_cv_search_backtrace])])
-		LIBS=$hts_backtrace_save_libs])])
+		LIBS=$hts_backtrace_save_libs])
+	AS_IF([test x"$backtrace_have" = x"no" && test x"$backtrace_want" = x"yes"],
+		[AC_MSG_ERROR([backtrace requested but no execinfo.h or no linkable backtrace()])])])
+AC_MSG_CHECKING([whether to enable symbolic crash traces])
+dnl Name who decided: "auto" is the build environment's answer, not the packager's.
+AS_IF([test x"$backtrace_platform" = x"no"],
+	[AC_MSG_RESULT([no (not implemented on $host_os)])],
+	[test x"$backtrace_want" = x"auto"], [AC_MSG_RESULT([$backtrace_have (auto)])],
+	[test x"$backtrace_asked" = x"no"], [AC_MSG_RESULT([$backtrace_have (auto-features off)])],
+	[AC_MSG_RESULT([$backtrace_have (requested)])])
 AC_SUBST([BACKTRACE_LIBS])
 
 ## CSPRNG for the --single-file mark; /dev/urandom is the fallback
@@ -535,9 +588,79 @@ AC_CHECK_LIB(socket, socket, [SOCKET_LIBS="-lnsl -lsocket"
 AC_DEFINE(LIBSOCKET, 1,[Check for libsocket])], AC_MSG_RESULT([not necessary]))
 AC_SUBST(SOCKET_LIBS)
 
-### Check for iconv
-AC_CHECK_LIB(iconv, iconv, [ICONV_LIBS="-liconv"
-AC_DEFINE(LIBICONV, 1,[Check for libiconv])], AC_MSG_RESULT([not necessary]))
+### Charset conversion: iconv(), or the built-in codepage tables
+## HTS_USEICONV 0 is a configuration htscharset.c already supports, so "off" is
+## the htscodepages.h fallback rather than a missing library. GNU libiconv's
+## header renames iconv_open unless LIBICONV_PLUG is defined, so a bare symbol
+## probe can say yes where the compiler would not; link what the header gives us.
+AC_ARG_WITH([iconv],
+	[AS_HELP_STRING([--with-iconv@<:@=DIR@:>@],[Convert charsets with iconv() rather than the built-in tables @<:@default=auto@:>@])],
+	[iconv_want=$withval
+	iconv_asked=yes], [iconv_want=$hts_feature_default
+	iconv_asked=no])
+ICONV_LIBS=""
+iconv_have=no
+if test "$iconv_want" != "no"; then
+	iconv_old_cppflags="$CPPFLAGS"
+	iconv_old_ldflags="$LDFLAGS"
+	iconv_old_libs="$LIBS"
+	iconv_libdir=
+	if test "$iconv_want" != "yes" -a "$iconv_want" != "auto"; then
+		# An explicit prefix is authoritative: if the header is not under
+		# it, error rather than silently pick a system copy.
+		if test ! -f "$iconv_want/include/iconv.h"; then
+			AC_MSG_ERROR([iconv requested at $iconv_want but $iconv_want/include/iconv.h is missing])
+		fi
+		HTS_FIND_LIBDIR([$iconv_want], [libiconv.*])
+		if test -z "$hts_found_libdir"; then
+			AC_MSG_ERROR([iconv requested at $iconv_want but no libiconv found in any of: $hts_libdir_subdirs])
+		fi
+		iconv_libdir=$hts_found_libdir
+		CPPFLAGS="$CPPFLAGS -I$iconv_want/include"
+		LDFLAGS="$LDFLAGS -L$iconv_libdir"
+	fi
+	m4_define([HTS_ICONV_PROG],
+		[AC_LANG_PROGRAM([[#include <iconv.h>]],
+			[[iconv_t cd = iconv_open("UTF-8", "ISO-8859-1");
+			return cd == (iconv_t) -1;]])])
+	AC_MSG_CHECKING([for a linkable iconv_open])
+	AC_LINK_IFELSE([HTS_ICONV_PROG],
+		[iconv_have=yes
+		AC_MSG_RESULT([yes])],
+		[LIBS="$LIBS -liconv"
+		AC_LINK_IFELSE([HTS_ICONV_PROG],
+			[iconv_have=yes
+			ICONV_LIBS="-liconv"
+			AC_DEFINE(LIBICONV, 1,[Check for libiconv])
+			AC_MSG_RESULT([yes, in -liconv])],
+			[AC_MSG_RESULT([no])])])
+	CPPFLAGS="$iconv_old_cppflags"
+	LDFLAGS="$iconv_old_ldflags"
+	LIBS="$iconv_old_libs"
+	if test "$iconv_have" = "yes"; then
+		if test -n "$iconv_libdir"; then
+			ICONV_LIBS="-L$iconv_libdir $ICONV_LIBS"
+			# The rest of configure still needs the header path.
+			CPPFLAGS="$CPPFLAGS -I$iconv_want/include"
+		fi
+	elif test "$iconv_want" != "auto"; then
+		AC_MSG_ERROR([iconv requested but no iconv.h with a linkable iconv_open])
+	fi
+fi
+AC_MSG_CHECKING([whether to convert charsets with iconv])
+dnl Name who decided: "auto" is the build environment's answer, not the packager's.
+if test "$iconv_want" = "auto"; then
+	AC_MSG_RESULT([$iconv_have (auto)])
+elif test "$iconv_asked" = "no"; then
+	AC_MSG_RESULT([$iconv_have (auto-features off)])
+else
+	AC_MSG_RESULT([$iconv_have (requested)])
+fi
+if test "$iconv_have" = "yes"; then
+	AC_DEFINE([HTS_USEICONV], [1], [Define to 0 to convert charsets with the built-in codepage tables instead of iconv()])
+else
+	AC_DEFINE([HTS_USEICONV], [0], [Define to 0 to convert charsets with the built-in codepage tables instead of iconv()])
+fi
 AC_SUBST(ICONV_LIBS)
 
 ### Check for dlsym
@@ -556,6 +679,8 @@ fi
 # dependency's own .pc gets right (and which alone carries the -L an
 # out-of-the-way prefix needs), so name the module wherever one is installed.
 # Dependents first: pkg-config emits Requires.private after Libs.private.
+# Absent the tool every dependency falls back to Libs.private, so the builder
+# decides the installed .pc; a recipe wanting a stable one build-depends on it.
 AC_ARG_VAR([PKG_CONFIG], [path to the pkg-config utility])
 AC_PATH_TOOL([PKG_CONFIG], [pkg-config], [false])
 PKGCONFIG_REQUIRES_PRIVATE=

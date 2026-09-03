@@ -21,6 +21,9 @@ MINGW* | MSYS* | CYGWIN*)
 *) traced=0 ;;
 esac
 require_httrack
+# --disable-auto-features drops backtrace() on Linux too, and only the trace
+# text below needs it; the sigaltstack half still applies.
+test "${traced}" -eq 0 || have_feature backtrace || traced=0
 
 # Dies from a caught fault, running the report to its end. The handler finishes
 # in abort(), so the shell sees SIGABRT (134); 139 is the kernel killing us.

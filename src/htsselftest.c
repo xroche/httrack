@@ -1243,6 +1243,27 @@ static int st_assumemime(httrackp *opt, int argc, char **argv) {
 
 static size_t st_decode_body(const char *arg, char *buf, size_t size);
 
+/* What the build's optional features came out as, so a test gates on the binary
+   rather than on the platform it guessed from. */
+static int st_features(httrackp *opt, int argc, char **argv) {
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  printf("brotli %d\n", HTS_USEBROTLI ? 1 : 0);
+  printf("zstd %d\n", HTS_USEZSTD ? 1 : 0);
+#if (defined(__linux) && defined(HAVE_BACKTRACE))
+  printf("backtrace 1\n");
+#else
+  printf("backtrace 0\n");
+#endif
+#if (defined(HTS_USEICONV) && (HTS_USEICONV == 0))
+  printf("iconv 0\n");
+#else
+  printf("iconv 1\n");
+#endif
+  return 0;
+}
+
 static int st_charset(httrackp *opt, int argc, char **argv) {
   char buf[512];
   size_t len;
@@ -7622,13 +7643,17 @@ static const unsigned char cc_br_bomb[] = {0x9b, 0xff, 0xff, 0x3f, 0x00,
                                            0x72, 0xef, 0x7f, 0x00};
 #endif
 
+#if HTS_USEBROTLI || HTS_USEZSTD
 static const unsigned char cc_text[] =
     "content codings: HTTrack decodes gzip, brotli and zstd bodies alike.";
+#endif
 
 /* Content codings: br and zstd decode, junk tokens stay identity, a coding we
    can not undo fails the fetch, and a bomb never lands on disk. */
 static int st_contentcodings(httrackp *opt, int argc, char **argv) {
+#if HTS_USEBROTLI || HTS_USEZSTD
   const size_t tlen = sizeof(cc_text) - 1;
+#endif
   char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
 
   (void) opt;
@@ -13092,6 +13117,7 @@ static const struct selftest_entry {
     {"mime", "<filename>", "MIME type for a filename", st_mime},
     {"assumemime", "[128|256|1024]",
      "--assume value clipped to each MIME destination", st_assumemime},
+    {"features", "", "which optional features this build has", st_features},
     {"charset", "<charset> <hex:..|string>",
      "convert a string to UTF-8 from a charset", st_charset},
     {"syscharset", "", "UTF-8 <-> system codepage conversion (WIN32 only)",

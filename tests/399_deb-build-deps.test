@@ -1,0 +1,116 @@
+#!/bin/bash
+#
+# debian/control's Build-Depends and the deb job's apt list are two hand-kept
+# copies of one set, and the job installs by name rather than from the control
+# file, so a new build dependency reds it on dpkg-checkbuilddeps (#1509).
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+control="$top/debian/control"
+workflow="$top/.github/workflows/ci.yml"
+
+if ! test -r "$control"; then
+    test -d "$top/debian" && fail "$control is gone but $top/debian is not"
+    echo "note: no debian/ under $top (dist tarball), the audit did not run" >&2
+    exit 0
+fi
+if ! test -r "$workflow"; then
+    test -d "$top/.github" && fail "$workflow is gone but $top/.github is not"
+    echo "note: no .github under $top (dist tarball), the audit did not run" >&2
+    exit 0
+fi
+
+py=$(find_python || true)
+if test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
+    echo "note: no python3 with PyYAML here, the audit did not run" >&2
+    exit 0
+fi
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+# The job is read out of the parsed workflow, so reformatting it moves no verdict.
+cat >"$tmp/deps.py" <<'PY'
+import re
+import sys
+
+import yaml
+
+# debhelper-compat is a virtual package the real one provides.
+PROVIDER = {"debhelper-compat": "debhelper"}
+
+
+def declared(path):
+    field = []
+    inside = False
+    for line in open(path, encoding="utf-8"):
+        if inside and line[:1] in (" ", "\t"):
+            field.append(line)
+            continue
+        inside = line.startswith("Build-Depends:")
+        if not inside:
+            if field:
+                break
+            continue
+        field.append(line.split(":", 1)[1])
+    names = []
+    for dep in " ".join(field).split(","):
+        alts = []
+        for alt in dep.split("|"):
+            alt = re.sub(r"\([^)]*\)|\[[^]]*\]|<[^>]*>", " ", alt).strip()
+            alt = alt.split(":")[0]
+            if alt:
+                alts.append(PROVIDER.get(alt, alt))
+        if alts:
+            names.append(alts)
+    return names
+
+
+def installed(path, job):
+    steps = yaml.safe_load(open(path, encoding="utf-8"))["jobs"][job]["steps"]
+    pkgs = set()
+    for step in steps:
+        run = step.get("run", "").replace("\\\n", " ")
+        for line in run.splitlines():
+            head, sep, tail = line.partition("apt-get install")
+            if not sep:
+                continue
+            for word in tail.split():
+                if word.startswith("-"):
+                    continue
+                if word in ("&&", "||", ";", "|", ">/dev/null"):
+                    break
+                pkgs.add(word)
+    return pkgs
+
+
+control, workflow, job = sys.argv[1:4]
+want = declared(control)
+have = installed(workflow, job)
+# A parse that came back empty would call any list complete.
+if len(want) < 5 or len(have) < 5:
+    sys.exit("parsed %d build-depends and %d installed packages" % (len(want), len(have)))
+missing = [alts[0] for alts in want if not set(alts) & have]
+print(" ".join(missing))
+PY
+
+audit() { # audit CONTROL WORKFLOW
+    "$py" "$tmp/deps.py" "$1" "$2" deb
+}
+
+said=$(audit "$control" "$workflow") || fail "the audit did not run: $said"
+test -z "$said" ||
+    fail "the deb job installs no $said, which debian/control build-depends on"
+
+# Both halves of the comparison, or a silent parse failure reads as agreement.
+sed 's/^\(Build-Depends:.*\)$/\1, httrack-no-such-dep/' "$control" >"$tmp/control"
+said=$(audit "$tmp/control" "$workflow") || fail "the audit did not run: $said"
+assert_eq "httrack-no-such-dep" "$said" "an undeclared-in-CI dependency"
+
+sed 's/^\( *\)pkgconf \(debhelper\)/\1\2/' "$workflow" >"$tmp/ci.yml"
+said=$(audit "$control" "$tmp/ci.yml") || fail "the audit did not run: $said"
+assert_eq "pkgconf" "$said" "a dependency dropped from the deb job"

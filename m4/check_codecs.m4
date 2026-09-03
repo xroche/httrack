@@ -5,7 +5,8 @@ dnl Look for libbrotlidec and libzstd, the decoders for the "br" and "zstd"
 dnl HTTP content codings. Both are optional: a missing library only drops the
 dnl coding from Accept-Encoding. --with-brotli=DIR / --with-zstd=DIR point at a
 dnl prefix; --without-brotli / --without-zstd disable the coding; the default
-dnl is to use the library when it is found.
+dnl is to use the library when it is found, unless --disable-auto-features asked
+dnl for every unrequested optional feature to default to no.
 dnl
 dnl Define HTS_USEBROTLI / HTS_USEZSTD to 1 or 0, and substitute BROTLI_LIBS /
 dnl ZSTD_LIBS.
@@ -15,7 +16,9 @@ AC_DEFUN([CHECK_CODEC], [
 AC_REQUIRE([HTS_EXPAND_LIBDIR])
 AC_ARG_WITH([$1],
 	[AS_HELP_STRING([--with-$1@<:@=DIR@:>@],[Enable the $1 content coding @<:@default=auto@:>@])],
-	[codec_want=$withval], [codec_want=auto])
+	[codec_want=$withval
+	codec_asked=yes], [codec_want=$hts_feature_default
+	codec_asked=no])
 $2_LIBS=""
 codec_have=no
 if test "$codec_want" != "no"; then
@@ -56,6 +59,8 @@ AC_MSG_CHECKING([whether to enable the $1 content coding])
 dnl Name who decided: "auto" is the build environment's answer, not the packager's.
 if test "$codec_want" = "auto"; then
 	AC_MSG_RESULT([$codec_have (auto)])
+elif test "$codec_asked" = "no"; then
+	AC_MSG_RESULT([$codec_have (auto-features off)])
 else
 	AC_MSG_RESULT([$codec_have (requested)])
 fi

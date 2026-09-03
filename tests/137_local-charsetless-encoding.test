@@ -27,6 +27,8 @@ for variant in u8 l1 declared gb2312 l1decl; do
 done
 
 # Byte-level assertions in python: portable, and the shell cannot mangle them.
+have_feature iconv && hts_have_iconv=1 || hts_have_iconv=0
+export hts_have_iconv
 "$python" - "$tmpdir" "$SRV_PORT" <<'PY'
 import os
 import sys
@@ -67,10 +69,14 @@ check("declared UTF-8 title untouched",
       "Café-declared".encode() in rd("declared", "index.html"))
 
 # Both titles below are valid UTF-8 already, and must still be decoded from the
-# charset the page declares.
-gb = rd("gb2312", "index.html")
-check("declared gb2312 title decoded", "图片-gb".encode() in gb)
-check("declared gb2312 title not left raw", "图片".encode("gb2312") + b"-gb" not in gb)
+# charset the page declares. gb2312 is multi-byte, which no 256-entry codepage
+# table can hold, so only an iconv build converts it.
+if os.environ["hts_have_iconv"] == "1":
+    gb = rd("gb2312", "index.html")
+    check("declared gb2312 title decoded", "图片-gb".encode() in gb)
+    check("declared gb2312 title not left raw", "图片".encode("gb2312") + b"-gb" not in gb)
+else:
+    print("[declared gb2312 title] ..\tSKIPPED (built without iconv)")
 l1d = rd("l1decl", "index.html")
 check("declared Latin-1 title decoded", "Ã©-l1d".encode() in l1d)
 check("declared Latin-1 title not left raw", "Ã©".encode("latin-1") + b"-l1d" not in l1d)

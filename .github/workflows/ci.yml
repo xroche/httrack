@@ -791,6 +791,76 @@ jobs:
         if: failure()
         run: cat tests/test-suite.log 2>/dev/null || true
 
+  # --disable-auto-features is what a distribution recipe passes, and nothing
+  # else builds a tree with an optional feature off. The second configure turns
+  # off iconv alone: with every feature sharing one value, a test reading the
+  # wrong one still agrees with the right one.
+  auto-features:
+    name: build (--disable-auto-features, then iconv alone off)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev libbrotli-dev libzstd-dev pkg-config
+
+      - name: Bootstrap
+        run: autoreconf -fi
+
+      - name: Every optional feature off
+        run: |
+          set -euo pipefail
+          mkdir -p ../bld-off
+          cd ../bld-off
+          bash "$GITHUB_WORKSPACE/configure" --disable-auto-features
+          make -j"$(nproc)"
+          # The libraries are installed above, so "off" here is the switch's
+          # doing and not the runner's.
+          got=$(./src/httrack -#test=features | tr '\n' ' ')
+          echo "features: $got"
+          case " $got " in
+          *" brotli 0 "*" iconv 0 "*) ;;
+          *) echo "expected every feature off, got: $got"; exit 1 ;;
+          esac
+
+      - name: Test, every optional feature off
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          make -C ../bld-off check -j"$jobs" ||
+            { cat ../bld-off/tests/test-suite.log 2>/dev/null; exit 1; }
+
+      - name: iconv alone off
+        run: |
+          set -euo pipefail
+          mkdir -p ../bld-mixed
+          cd ../bld-mixed
+          bash "$GITHUB_WORKSPACE/configure" --without-iconv
+          make -j"$(nproc)"
+          got=$(./src/httrack -#test=features | tr '\n' ' ')
+          echo "features: $got"
+          # The point of this configuration: the four values are not all equal.
+          case " $got " in
+          *" brotli 1 "*" iconv 0 "*) ;;
+          *) echo "expected brotli on and iconv off, got: $got"; exit 1 ;;
+          esac
+
+      - name: Test, iconv alone off
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          jobs=$(( $(nproc) * 2 )); [ "$jobs" -le 16 ] || jobs=16
+          make -C ../bld-mixed check -j"$jobs" ||
+            { cat ../bld-mixed/tests/test-suite.log 2>/dev/null; exit 1; }
+
   # The cell of #1139: a libc exporting getrandom() without shipping
   # <sys/random.h>. Nothing else reaches it, and it is a hard build break when
   # the call is not gated on the header. It also runs the /dev/urandom fallback.
@@ -926,7 +996,7 @@ jobs:
             ca-certificates git \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
-            debhelper devscripts lintian fakeroot
+            pkgconf debhelper devscripts lintian fakeroot
 
       - uses: actions/checkout@v7
         with:

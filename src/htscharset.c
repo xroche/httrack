@@ -503,41 +503,88 @@ HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv) {
 #else
 #include "htscodepages.h"
 
-/* decode from a codepage to UTF-8 */
-static char* hts_codepageToUTF8(const char *codepage, const char *s) {
-  /* find the given codepage */
-  size_t i;
-  for(i = 0 ; table_mappings[i].name != NULL
-      && !hts_equalsAlphanum(table_mappings[i].name, codepage) ; i++) ;
+/* The tables are keyed "cp1252", but IANA, HTTP headers and <meta charset>
+   spell the same codepages "windows-1252" and "IBM850". */
+static int hts_equalsCodepageName(const char *table_name, const char *label) {
+  static const char *const prefixes[] = {"windows", "ibm", NULL};
+  size_t p, i;
 
-  /* found ; decode */
-  if (table_mappings[i].name != NULL) {
-    size_t j, k;
-    char *dest = NULL;
-    size_t capa = 0;
+#define LOWER(C) (((C) >= 'A' && (C) <= 'Z') ? ((C) + 'a' - 'A') : (C))
+  if (hts_equalsAlphanum(table_name, label)) {
+    return 1;
+  }
+  if (LOWER(table_name[0]) != 'c' || LOWER(table_name[1]) != 'p') {
+    return 0;
+  }
+  /* "cp" then whatever followed the prefix; hts_equalsAlphanum drops the
+     separator, so "windows-1252" and "windows1252" both reach "cp1252". */
+  for (p = 0; prefixes[p] != NULL; p++) {
+    for (i = 0; prefixes[p][i] != '\0' && LOWER(label[i]) == prefixes[p][i];
+         i++)
+      ;
+    if (prefixes[p][i] == '\0' &&
+        hts_equalsAlphanum(&table_name[2], &label[i])) {
+      return 1;
+    }
+  }
+#undef LOWER
+  return 0;
+}
+
+/* Decode size bytes of a codepage to a NUL-terminated UTF-8 string, or NULL
+   when no table names that codepage. */
+static char *hts_codepageToUTF8(const char *codepage, const char *s,
+                                size_t size) {
+  size_t i, j, k, capa;
+  char *dest;
+
+  for (i = 0; table_mappings[i].name != NULL &&
+              !hts_equalsCodepageName(table_mappings[i].name, codepage);
+       i++)
+    ;
+  if (table_mappings[i].name == NULL) {
+    return NULL;
+  }
+
 #define MAX_UTF 8
-    for(j = 0, k = 0 ; s[j] != '\0' ; j++) {
-      const unsigned char c = (unsigned char) s[j];
-      const hts_UCS4 uc = table_mappings[i].table[c];
-      const size_t max = k + MAX_UTF;
-      if (capa < max) {
-        for(capa = 16 ; capa < max ; capa <<= 1) ;
-        dest = realloc(dest, capa);
-        if (dest == NULL) {
+  /* Allocated before the loop: an empty input writes the terminator too. */
+  capa = 16;
+  dest = malloct(capa);
+  if (dest == NULL) {
+    return NULL;
+  }
+  for (j = 0, k = 0; j < size; j++) {
+    const unsigned char c = (unsigned char) s[j];
+    const hts_UCS4 uc = table_mappings[i].table[c];
+    const size_t max = k + MAX_UTF;
+
+    /* Room for the code point and for the terminator past it. */
+    if (capa <= max) {
+      char *grown;
+      /* From a non-zero floor: doubling a zero capacity never progresses. */
+      size_t want = capa > 16 ? capa : 16;
+
+      while (want <= max) {
+        if (want > (size_t) -1 / 2) {
+          freet(dest);
           return NULL;
         }
+        want <<= 1;
       }
-      if (dest != NULL) {
-        const size_t len = hts_writeUTF8(uc, &dest[k], MAX_UTF);
-        k += len;
-        assertf(k < capa);
+      grown = realloct(dest, want);
+      if (grown == NULL) {
+        freet(dest);
+        return NULL;
       }
+      dest = grown;
+      capa = want;
     }
-    dest[k] = '\0';
-    return dest;
-#undef MAX_UTF
+    k += hts_writeUTF8(uc, &dest[k], MAX_UTF);
+    assertf(k < capa);
   }
-  return NULL;
+  dest[k] = '\0';
+  return dest;
+#undef MAX_UTF
 }
 #endif
 
@@ -613,7 +660,7 @@ static char *hts_convertStringCharset(const char *s, size_t size,
 #else
   /* Limited codepage decoding support only. */
   if (hts_isCharsetUTF8(to)) {
-    return hts_codepageToUTF8(from, s);
+    return hts_codepageToUTF8(from, s, size);
   }
 #endif
 
