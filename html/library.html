@@ -25,6 +25,11 @@
 <div class="wrap">
 
 <nav class="toc" aria-label="Documentation">
+	<h2>On this page</h2>
+	<ul>
+		<li><a href="#headers">The headers an install gives you</a></li>
+		<li><a href="#examples">Worked examples</a></li>
+	</ul>
 	<h2>Start here</h2>
 	<ul>
 		<li><a href="guide.html">Interface guide</a></li>
@@ -61,12 +66,47 @@
 
 <br>
 
-All library prototypes are available in the <tt>httrack-library.h<tt> file.<br>
-You may also want to check the <tt>httrack.c</tt> and <tt>httrack.h<tt> files to get an example of use of this library.
+Every library prototype is declared in <tt>httrack-library.h</tt>. Build against it with
+<tt>pkg-config --cflags --libs libhttrack</tt>, which adds <tt>$(includedir)/httrack</tt> to the
+include path and links <tt>-lhttrack</tt>.
 
 <br><br>
 
+<h3 id="headers">The headers an install gives you</h3>
 
+<p>Installing the library puts these headers in <tt>$(includedir)/httrack</tt>, and no others:</p>
+
+<ul>
+<li><tt>httrack-library.h</tt></li>
+<li><tt>htsglobal.h</tt></li>
+<li><tt>htsopt.h</tt></li>
+<li><tt>htswrap.h</tt></li>
+<li><tt>htsconfig.h</tt></li>
+<li><tt>htsfeatures.h</tt></li>
+<li><tt>htsmodules.h</tt></li>
+<li><tt>htsbasenet.h</tt></li>
+<li><tt>htsnet.h</tt></li>
+<li><tt>htsbauth.h</tt></li>
+<li><tt>htsdefines.h</tt></li>
+<li><tt>htsstrings.h</tt></li>
+<li><tt>htsarrays.h</tt></li>
+<li><tt>htssafe.h</tt></li>
+</ul>
+
+<p>Every other header under <tt>src/</tt> is engine-internal, so a file that includes one of them
+compiles only inside the source tree.</p>
+
+<h3 id="examples">Worked examples</h3>
+
+<p>The examples install next to the library, in <tt>$(datadir)/httrack/libtest</tt>, and they
+include nothing but the headers above. <tt>example-main.c</tt> drives a whole mirror from a
+program, and each <tt>callbacks-example-*.c</tt> file shows one callback. The
+<a href="plug.html">callbacks page</a> documents the hooks themselves.</p>
+
+<p>The command-line front end <tt>src/httrack.c</tt> is not one of them. It ships in the source
+tarball only, and it includes engine-internal headers (<tt>htsbase.h</tt>, <tt>httrack.h</tt>,
+<tt>htslib.h</tt>, <tt>htscharset.h</tt>, <tt>htsbacktrace.h</tt> and <tt>htsthread.h</tt>) that an
+install does not carry.</p>
 
 <br><br>
 
