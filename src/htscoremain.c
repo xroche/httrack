@@ -113,7 +113,8 @@ const char *hts_self_path(char *dst, size_t dstsize) {
 
   return _NSGetExecutablePath(dst, &n) == 0 ? dst : NULL;
 #elif defined(HTS_SELF_PATH_SYSCTL)
-  /* FreeBSD and DragonFly put the pid last, NetBSD puts it third (#1506). */
+  /* FreeBSD and DragonFly put the pid last, NetBSD puts it third, and 9 is the
+     pathname on DragonFly but KERN_PROC_SV_NAME on FreeBSD (#1506). */
 #if defined(__NetBSD__)
   int mib[4] = {CTL_KERN, KERN_PROC_ARGS, -1, KERN_PROC_PATHNAME};
 #else
@@ -121,14 +122,16 @@ const char *hts_self_path(char *dst, size_t dstsize) {
 #endif
   size_t n = dstsize;
 
-  if (sysctl(mib, 4, dst, &n, NULL, 0) != 0)
-    return NULL;
-  /* n counts the kernel's terminator, so 1 is the empty path, and a length
-     reaching the buffer end is a truncation rather than a path. */
-  if (n <= 1 || n >= dstsize)
-    return NULL;
-  dst[n] = '\0'; /* the kernel need not terminate it */
-  return dst;
+  /* All three report strlen + 1, so 1 is the empty path and dst[n - 1] is the
+     kernel's own terminator. */
+  if (sysctl(mib, 4, dst, &n, NULL, 0) == 0 && n > 1 && n <= dstsize &&
+      dst[n - 1] == '\0')
+    return dst;
+  /* Unlike readlink(), sysctl() copies what fits before it reports ENOMEM, so
+     a refusal must not hand the caller that prefix. */
+  if (dstsize != 0)
+    dst[0] = '\0';
+  return NULL;
 #else
   /* Linux; anywhere else this is simply absent and argv[0] has to do. */
   const ssize_t n = readlink("/proc/self/exe", dst, dstsize - 1);

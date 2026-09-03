@@ -6881,6 +6881,7 @@ static void datadir_expect(const char *selfpath, const char *builtin,
 static int st_datadir(httrackp *opt, int argc, char **argv) {
   char path[HTS_URLMAXSIZE];
   char probe[HTS_URLMAXSIZE];
+  char untouched[HTS_URLMAXSIZE];
   char self[HTS_URLMAXSIZE];
   char expect[HTS_URLMAXSIZE * 2];
   char installed[HTS_URLMAXSIZE];
@@ -6897,14 +6898,16 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
   /* argv[0] is a fallback: what the engine actually resolves from is this. */
   assertf(hts_self_path(path, sizeof(path)) != NULL);
   assertf(fexist(path));
-  /* A buffer the path does not fit in must refuse rather than clip, and must
-     not write past the size it was given. */
+  /* A buffer the path does not fit in must refuse rather than clip. A refusal
+     leaves no shorter path behind and writes nothing past the size given. */
   selflen = strlen(path);
   assertf(selflen < sizeof(probe));
+  memset(untouched, 'X', sizeof(untouched));
   for (i = 1; i <= selflen; i++) {
     memset(probe, 'X', sizeof(probe));
     assertf(hts_self_path(probe, i) == NULL);
-    assertf(probe[i] == 'X');
+    assertf(memcmp(probe + i, untouched, sizeof(probe) - i) == 0);
+    assertf(memchr(probe + 1, '\0', i - 1) == NULL);
   }
 
   for (i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {
