@@ -1220,7 +1220,9 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
       if (!headRequest) {
         dataSize = StringLength(output);
-        if (dataSize == 0 && element != NULL) {
+        /* the send below skips a refused body, so announcing its length
+           would desync a kept-alive peer */
+        if (dataSize == 0 && element != NULL && element->adr != NULL) {
           dataSize = element->size;
         }
       }

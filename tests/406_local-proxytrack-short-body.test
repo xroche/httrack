@@ -1,0 +1,177 @@
+#!/bin/bash
+#
+# A cache entry whose X-Size exceeds the on-disk body it names left the tail of
+# the allocated buffer uninitialised, and both consumers shipped element->size
+# bytes whatever the read error said: the ARC writer onto disk, the proxy to
+# the client.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+# glibc fills a fresh allocation with PERTURB ^ 0xff, so leaked bytes read 0x5a
+# ('Z') rather than the zeros a fresh page would hand out for free
+export MALLOC_PERTURB_=165
+leak_run=$(printf 'Z%.0s' $(seq 1 64))
+# ... on the allocators that honour it; elsewhere the length checks carry the test
+poison=$("$python" -c 'import ctypes
+libc = ctypes.CDLL(None)
+libc.malloc.restype = ctypes.c_void_p
+print(ctypes.string_at(libc.malloc(1 << 16), 8).hex())')
+
+BODY='<html>hello</html>'
+DECLARED=4096
+url=http://example.com/page.html
+
+# X-Save is relative to the cache's grandparent, so keep HTTrack's own layout
+mkdir -p "$dir/m/hts-cache"
+zip="$dir/m/hts-cache/new.zip"
+printf '%s' "$BODY" >"$dir/m/body.html"
+
+# X-In-Cache: 0 leaves the body on disk, the path that sizes its buffer from the
+# header and fills it from a file that may be shorter
+craft() { # craft X-SIZE
+    "$python" - "$zip" "$1" <<'EOF'
+import sys, zipfile
+
+meta = (
+    "X-In-Cache: 0\r\n"
+    "X-StatusCode: 200\r\n"
+    "X-StatusMessage: ok\r\n"
+    "X-Size: %s\r\n"
+    "Content-Type: text/html\r\n"
+    "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n"
+    "X-Save: body.html\r\n" % sys.argv[2]
+).encode()
+zi = zipfile.ZipInfo("example.com/page.html")
+zi.compress_type = zipfile.ZIP_STORED
+zi.extra = meta
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr(zi, b"")
+EOF
+}
+
+no_leak() { # no_leak FILE WHAT
+    test "$poison" = 5a5a5a5a5a5a5a5a || return 0
+    if grep -qaF "$leak_run" "$1"; then
+        fail "$2 carried a run of uninitialised heap"
+    fi
+}
+
+# Consumer 1: the ARC writer.
+craft "${#BODY}"
+proxytrack --convert "$dir/honest.arc" "$zip" >/dev/null 2>&1 ||
+    fail "proxytrack died converting an honest cache"
+# control: a fix that dropped every disk-held body would pass the rest
+grep -qaF "$BODY" "$dir/honest.arc" || fail "an honest X-Size lost the body"
+grep -qa "Content-length: ${#BODY}" "$dir/honest.arc" ||
+    fail "an honest X-Size was not announced as ${#BODY} bytes"
+
+craft "$DECLARED"
+proxytrack --convert "$dir/short.arc" "$zip" >/dev/null 2>&1 ||
+    fail "proxytrack died converting a cache whose body is short"
+if grep -qa "Content-length: $DECLARED" "$dir/short.arc"; then
+    fail "the ARC writer stored $DECLARED bytes of a ${#BODY}-byte body"
+fi
+grep -qa 'Content-length: 0' "$dir/short.arc" ||
+    fail "the ARC writer kept a body it could not fill"
+no_leak "$dir/short.arc" "the ARC writer"
+
+# Consumer 2: the reply to the client.
+launch_proxytrack() {
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$zip" >"$ptlog" 2>&1 &
+    ptpid=$!
+}
+start_proxytrack "$dir/pt" launch_proxytrack
+
+"$python" - "$proxyport" "$url" "$dir/reply" <<'EOF' || fail_dump "the proxy reply is not what its headers announced" "$ptlog"
+import socket, sys
+
+port, url, out = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+sock = socket.create_connection(("127.0.0.1", port), 10)
+sock.settimeout(10)
+sock.sendall(
+    ("GET %s HTTP/1.1\r\nHost: example.com\r\n\r\n" % url).encode()
+)
+reply = b""
+try:
+    while True:
+        chunk = sock.recv(65536)
+        if not chunk:
+            break
+        reply += chunk
+except socket.timeout:
+    pass
+open(out, "wb").write(reply)
+
+head, _, body = reply.partition(b"\r\n\r\n")
+for line in head.split(b"\r\n"):
+    if line.lower().startswith(b"content-length:"):
+        announced = int(line.split(b":")[1])
+        break
+else:
+    sys.exit("no Content-length in %r" % head)
+if announced != len(body):
+    sys.exit("announced %d bytes, sent %d" % (announced, len(body)))
+EOF
+no_leak "$dir/reply" "the proxy reply"
+
+# The pre-3.31 .ndx reader is a second copy of the same allocate-then-fill, and
+# proxytrack is the only thing left that reads that format.
+mkdir -p "$dir/n/hts-cache"
+printf '%s' "$BODY" >"$dir/n/body.html"
+
+craft_ndx() { # craft_ndx SIZE
+    "$python" - "$dir/n/hts-cache" "$1" <<'EOF'
+import os, sys
+
+d, declared = sys.argv[1], sys.argv[2]
+
+def field(s):  # every .dat field is its byte length, a newline, then the bytes
+    b = s.encode()
+    return ("%d\n" % len(b)).encode() + b
+
+record = b"".join(
+    field(v)
+    for v in (
+        "200", declared, "OK", "text/html", "",  # status, size, msg, type, charset
+        "Wed, 01 Jan 2025 00:00:00 GMT", "", "", "",  # date, etag, location, cdispo
+        "", "", "body.html", "HTS", declared,  # addr, uri, save, integrity, size
+    )
+)
+# a negative offset is what puts the body on disk, so leave byte 0 unused
+open(os.path.join(d, "c.dat"), "wb").write(b"\n" + record)
+# the header is length-prefixed like the .dat; the entry walk then eats one
+# line before reading each url/uri/offset triple
+header = field("CACHE-1.4") + field("Wed, 01 Jan 2025 00:00:00 GMT")
+open(os.path.join(d, "c.ndx"), "wb").write(
+    header + b"eaten\nexample.com/page.html\n\n-1\n"
+)
+EOF
+}
+
+craft_ndx "${#BODY}"
+proxytrack --convert "$dir/ndx-honest.arc" "$dir/n/hts-cache/c.ndx" >/dev/null 2>&1 ||
+    fail "proxytrack died converting an honest .ndx cache"
+grep -qaF "$BODY" "$dir/ndx-honest.arc" || fail "an honest .ndx size lost the body"
+
+craft_ndx "$DECLARED"
+proxytrack --convert "$dir/ndx.arc" "$dir/n/hts-cache/c.ndx" >/dev/null 2>&1 ||
+    fail "proxytrack died converting an .ndx cache whose body is short"
+if grep -qa "Content-length: $DECLARED" "$dir/ndx.arc"; then
+    fail "the .ndx reader kept $DECLARED bytes of a ${#BODY}-byte body"
+fi
+no_leak "$dir/ndx.arc" "the .ndx reader"
+
+echo "OK: neither consumer emitted a byte the cache body did not hold"
