@@ -3106,13 +3106,14 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
 
   /* Given a file at or past the bound, the reader must refuse on the stat that
      would size its own allocation, so nothing appended after a caller's own
-     check can carry the body past it. */
-  if (argc >= 1) {
+     check can carry the body past it. The second file is the control: a bound
+     that refuses everything reads the same as one that works. */
+  for (i = 0; (int) i < argc && i < 2; i++) {
     LLint got = -1;
-    char *adr = readfile2_inmem(argv[0], &got);
+    char *adr = readfile2_inmem(argv[i], &got);
 
-    printf("bigfile: adr=%s size=" LLintP "\n", adr != NULL ? "alloc" : "null",
-           got);
+    printf("%s: adr=%s size=" LLintP "\n", i == 0 ? "bigfile" : "smallfile",
+           adr != NULL ? "alloc" : "null", got);
     freet(adr);
   }
   return 0;
@@ -13275,8 +13276,8 @@ static const struct selftest_entry {
      "binput() consumes a clipped line whole (#1294)", st_binputline},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
-    {"xfread-limit", "[oversized-file]", "in-memory receive buffer size bound",
-     st_xfread_limit},
+    {"xfread-limit", "[oversized-file small-file]",
+     "in-memory receive buffer size bound", st_xfread_limit},
     {"getext", "",
      "extension parsing stops at the query and inside the buffer (#1433)",
      st_getext},
