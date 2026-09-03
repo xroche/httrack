@@ -62,16 +62,16 @@ families=(01_engine- 01_zlib- 11_crawl- 53_local-proxytrack- 62_lang- 74_local-w
 
 # Every extension, not just .test: the count files 62_lang-integrity.test pins
 # carry a number too, so a glob of *.test alone cannot see one squatting.
-# An in-tree build puts automake's own NNN_name.log and NNN_name.trs in this
-# same directory, and those are output rather than a name anyone chose, so
-# reading them made every test a duplicate of itself. Only the output is
-# skipped: a .log with no .test of its own name is a file claiming that number,
-# which is the thing being rejected here.
+# A file is this build's own output when a test of the same stem sits beside
+# it, which is how an in-tree build's NNN_name.log and NNN_name.trs read as a
+# duplicate of the test they belong to. Stated that way rather than as a list
+# of extensions, which automake or a future test could extend without saying.
+# Anything else keeps its claim on the number, a stray .log included.
 shopt -s nullglob
 numbered=""
 for f in "$testdir"/[0-9]*_*; do
     [ -f "$f" ] || continue
-    case $f in *.log | *.trs) [ ! -e "${f%.*}.test" ] || continue ;; esac
+    case $f in *.test) ;; *) [ ! -e "${f%.*}.test" ] || continue ;; esac
     name=${f##*/}
     digits=${name%%_*}
     case $digits in *[!0-9]*) continue ;; esac
