@@ -75,8 +75,12 @@ meta '<meta http-equiv="refresh" content="0; url=x.html">' '(none)'
 meta '<body charset="utf-8">' '(none)'
 meta '<meta charset="">' '(none)'
 
-# The prescan's whitespace is SPACE, TAB, CR, LF. These pin the four characters
-# where htslib.h's wider is_space() macro would answer differently.
+# The prescan's whitespace is SPACE, TAB, CR, LF, and nothing else. TAB, CR and
+# LF need the batch path, which carries them where argv rewrites them to a space.
+TAB=$(printf '\011')
+meta "<meta${TAB}charset=\"utf-8\">" 'utf-8'
+meta "<meta${SELFTEST_CR}charset=\"utf-8\">" 'utf-8'
+meta "<meta${TESTLIB_NL}charset=\"utf-8\">" 'utf-8'
 VT=$(printf '\013')
 FF=$(printf '\014')
 meta "<meta${VT}charset=\"utf-8\">" '(none)'
