@@ -1247,9 +1247,9 @@ int url_savename(lien_adrfilsave *const afs,
   //
   // Structure originale
   else if (opt->savename_type % 100 == 0) {
-    /* recopier www.. */
     if (opt->savename_type != 100) {
-      if (((opt->savename_type / 1000) % 2) == 0) {     // >1000 signifie "pas de www/"
+      // an odd thousands digit drops the host directory
+      if (((opt->savename_type / 1000) % 2) == 0) {
         DECLARE_ADR(final_adr);
 
         // adresse url
@@ -1293,8 +1293,9 @@ int url_savename(lien_adrfilsave *const afs,
   //
   // Structure html/image
   else {
-    // dossier "web" ou "www.xxx" ?
-    if (((opt->savename_type / 1000) % 2) == 0) {       // >1000 signifie "pas de www/"
+    // an odd thousands digit drops the top directory
+    if (((opt->savename_type / 1000) % 2) == 0) {
+      // an odd hundreds digit names it after the host rather than "web"
       if ((opt->savename_type / 100) % 2) {
         DECLARE_ADR(final_adr);
 

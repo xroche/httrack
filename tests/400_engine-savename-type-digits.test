@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# -N's digits are read by PARITY, not by threshold: an odd thousands digit drops
+# the top directory, an odd hundreds digit names it after the host rather than
+# "web", and % 100 picks the tree. Every documented preset stays under 2000, so a
+# "greater than 1000" reading of the same test passes the whole man page.
+want() { # want SAVE TYPE FIL CONTENT-TYPE
+    selftest_queue "savename: /dev/null/$1" savename "$3" "$4" "type=$2"
+}
+
+# Site structure ignores the hundreds digit; only the literal 100 drops the host.
+want 'www.example.com/dir/page.html' 0 /dir/page.html text/html
+want 'dir/page.html' 100 /dir/page.html text/html
+want 'www.example.com/dir/page.html' 300 /dir/page.html text/html
+want 'dir/page.html' 1000 /dir/page.html text/html
+want 'www.example.com/dir/page.html' 2000 /dir/page.html text/html
+want 'dir/page.html' 1100 /dir/page.html text/html
+
+# The web/html/images trees read both digits.
+want 'web/images/pic.gif' 1 /dir/pic.gif image/gif
+want 'www.example.com/images/pic.gif' 101 /dir/pic.gif image/gif
+want 'images/pic.gif' 1001 /dir/pic.gif image/gif
+want 'www.example.com/images/pic.gif' 2101 /dir/pic.gif image/gif
+want 'web/images/pic.gif' 201 /dir/pic.gif image/gif
+want 'images/pic.gif' 3001 /dir/pic.gif image/gif
+want 'web/gif/pic.gif' 4 /dir/pic.gif image/gif
+
+selftest_run_queued
