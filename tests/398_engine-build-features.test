@@ -1,0 +1,72 @@
+#!/bin/bash
+# -#test=features is what every other test gates on, so a wrong answer there does
+# not fail anything: it makes cases vanish into a skip. Pin the reporter against
+# the config.h the binary was built from, and against one conversion only a real
+# iconv can do.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+require_httrack
+
+builddir="${abs_top_builddir:?not run under make check}"
+config="${builddir}/config.h"
+test -r "${config}" || skip "no config.h in ${builddir}"
+
+report=$(httrack -#test=features) || fail "httrack -#test=features failed"
+test -n "${report}" || fail "httrack -#test=features said nothing"
+
+# macro_is CONFIG MACRO VALUE: does config.h define MACRO to VALUE?
+macro_is() {
+    grep -q "^#define $2 $3\$" "$1"
+}
+
+# want_feature NAME: 1 or 0, derived from config.h rather than from the report.
+want_feature() {
+    case $1 in
+    brotli) macro_is "${config}" HTS_USEBROTLI 1 && echo 1 || echo 0 ;;
+    zstd) macro_is "${config}" HTS_USEZSTD 1 && echo 1 || echo 0 ;;
+    # htsbacktrace.c needs __linux as well as the macro.
+    backtrace)
+        if test "${HTS_OS}" = Linux && macro_is "${config}" HAVE_BACKTRACE 1; then
+            echo 1
+        else
+            echo 0
+        fi
+        ;;
+    # Absent, or defined to anything but 0, means iconv is compiled in.
+    iconv) macro_is "${config}" HTS_USEICONV 0 && echo 0 || echo 1 ;;
+    *) fail "unknown feature $1" ;;
+    esac
+}
+
+for f in brotli zstd backtrace iconv; do
+    got=$(sed -n "s/^${f} //p" <<<"${report}")
+    test -n "${got}" || fail_dump "-#test=features reports nothing for ${f}" /dev/null
+    want=$(want_feature "${f}")
+    test "${got}" = "${want}" ||
+        fail "-#test=features says ${f} ${got}, config.h says ${want}"
+    echo "ok: ${f} reported as ${got}, matching config.h"
+done
+
+# config.h and the report can agree and both be wrong about the binary, so one
+# feature is also checked against behaviour. gb2312 is multi-byte, which no
+# 256-entry codepage table holds, so it converts only where iconv is linked.
+euro=$(httrack -#test=charset gb2312 hex:c4e3 2>/dev/null) || euro=
+if have_feature iconv; then
+    test -n "${euro}" ||
+        fail "iconv is reported on, but gb2312 did not convert"
+    echo "ok: gb2312 converts, which only iconv does"
+else
+    test -z "${euro}" ||
+        fail "iconv is reported off, but gb2312 converted anyway"
+    echo "ok: gb2312 does not convert, as a tables-only build cannot"
+fi
+
+# windows-1252 is the spelling HTTP headers use for the cp1252 table, and the
+# fallback used to miss it, so it is the case a tables-only build must still do.
+got=$(httrack -#test=charset windows-1252 hex:80 2>/dev/null) || got=
+test "${got}" = "€" || fail "windows-1252 0x80 gave '${got}', expected the euro sign"
+echo "ok: windows-1252 resolves to the cp1252 table"

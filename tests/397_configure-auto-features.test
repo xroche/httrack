@@ -168,7 +168,50 @@ assert_state() { # assert_state DIR NAME on|off
 }
 
 n=0
-planned=6 # steps below; the last one needs the libraries to be installed
+planned=7 # steps below; the last one needs the libraries to be installed
+
+# A GNU-libiconv-shaped prefix: a header that renames iconv_open the way the
+# real one does away from LIBICONV_PLUG, and a library under a subdirectory the
+# bare prefix does not name. Both halves matter, because a probe that declares
+# the symbol itself agrees where the compiler would not, and a -L naming the
+# prefix rather than the libdir resolves to nothing.
+# Prints the prefix, or fails when this host cannot build a shared library.
+iconv_fixture() { # iconv_fixture SUBDIR
+    local prefix=${work}/iconvdir lib ext=so
+    lib=${prefix}/$1
+    test "${HTS_OS}" != Darwin || ext=dylib
+    mkdir -p "${prefix}/include" "${lib}"
+    cat >"${prefix}/include/iconv.h" <<'HDR'
+#ifndef HTS_FAKE_ICONV_H
+#define HTS_FAKE_ICONV_H
+#include <stddef.h>
+typedef void *iconv_t;
+#define iconv_open libiconv_open
+#define iconv libiconv
+#define iconv_close libiconv_close
+extern iconv_t iconv_open(const char *to, const char *from);
+extern size_t iconv(iconv_t cd, char **in, size_t *il, char **out, size_t *ol);
+extern int iconv_close(iconv_t cd);
+#endif
+HDR
+    cat >"${work}/fakeiconv.c" <<'SRC'
+#include <stddef.h>
+typedef void *iconv_t;
+iconv_t libiconv_open(const char *to, const char *from) {
+    (void) to;
+    (void) from;
+    return (iconv_t) 0;
+}
+size_t libiconv(iconv_t cd, char **in, size_t *il, char **out, size_t *ol) {
+    (void) cd; (void) in; (void) il; (void) out; (void) ol;
+    return 0;
+}
+int libiconv_close(iconv_t cd) { (void) cd; return 0; }
+SRC
+    "${cc_argv[@]}" -shared -fPIC -o "${lib}/libiconv.${ext}" "${work}/fakeiconv.c" \
+        >/dev/null 2>&1 || return 1
+    echo "${prefix}"
+}
 
 # Deleting or renaming the switch must not leave any host green, so the flags
 # are checked before the first run and before any skip.
@@ -211,6 +254,45 @@ case ${got} in
 *) fail_dump "a foreign host answered '${got}' rather than declining backtrace" \
     "${work}/foreign/configure.log" ;;
 esac
+
+n=$((n + 1))
+# --with-iconv=DIR is the form a keg-only or ports prefix needs, and the one arm
+# of HTS_FIND_LIBDIR the codec test does not reach. The subdirectory is the
+# fixture's own, so this means the same thing on a host with no real lib64.
+if prefix=$(iconv_fixture lib64); then
+    run_configure "${work}/icdir" --disable-auto-features --with-iconv="${prefix}" ||
+        fail_dump "--with-iconv at a prefix with a renaming header failed" \
+            "${work}/icdir/configure.log"
+    got=$(verdict "${work}/icdir" iconv)
+    test "${got}" = "yes (requested)" ||
+        fail_dump "--with-iconv=DIR answered '${got}'" "${work}/icdir/configure.log"
+    line=$(sed -n 's/^ICONV_LIBS = *//p' "${work}/icdir/src/Makefile")
+    case " ${line} " in
+    *" -L${prefix}/lib64 "*) ;;
+    *) fail "ICONV_LIBS did not name the fixture's lib64: '${line}'" ;;
+    esac
+    case " ${line} " in
+    *" -liconv "*) ;;
+    *) fail "ICONV_LIBS resolved a renaming header without -liconv: '${line}'" ;;
+    esac
+    # The bare prefix is what the old codec code emitted, and it holds no library.
+    case " ${line} " in
+    *" -L${prefix} "*) fail "ICONV_LIBS named the bare prefix: '${line}'" ;;
+    esac
+
+    # A prefix carrying the header and no library must say where it looked.
+    rm -rf "${prefix:?}/lib64"
+    ! run_configure "${work}/icdir-nolib" --with-iconv="${prefix}" ||
+        fail_dump "a prefix with no libiconv was accepted" "${work}/icdir-nolib/configure.log"
+    grep -q 'no libiconv found in any of' "${work}/icdir-nolib/configure.log" ||
+        fail_dump "configure rejected the prefix without naming the directories it tried" \
+            "${work}/icdir-nolib/configure.log"
+    echo "ok: --with-iconv=DIR resolves the libdir, links the renaming header, and reports a miss"
+else
+    planned=$((planned - 1))
+    n=$((n - 1))
+    echo "no shared library from ${cc_argv[0]}, so the iconv prefix case is skipped" >&2
+fi
 
 began=${SECONDS}
 n=$((n + 1))

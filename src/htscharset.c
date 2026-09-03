@@ -503,12 +503,38 @@ HTSEXT_API void hts_argv_utf8(int *pargc, char ***pargv) {
 #else
 #include "htscodepages.h"
 
+/* The tables are keyed "cp1252", but IANA, HTTP headers and <meta charset> all
+   spell it "windows-1252", which hts_equalsAlphanum does not fold together. */
+static int hts_equalsCodepageName(const char *name, const char *codepage) {
+  static const char windows[] = "windows";
+  size_t i;
+
+  if (hts_equalsAlphanum(name, codepage)) {
+    return 1;
+  }
+#define LOWER(C) (((C) >= 'A' && (C) <= 'Z') ? ((C) + 'a' - 'A') : (C))
+  for (i = 0; windows[i] != '\0'; i++) {
+    if (LOWER(codepage[i]) != windows[i]) {
+      return 0;
+    }
+  }
+  /* "cp" then whatever followed "windows"; hts_equalsAlphanum drops the
+     separator, so "windows-1252" and "windows1252" both reach "cp1252". */
+  if (LOWER(name[0]) != 'c' || LOWER(name[1]) != 'p') {
+    return 0;
+  }
+#undef LOWER
+  return hts_equalsAlphanum(&name[2], &codepage[i]);
+}
+
 /* decode from a codepage to UTF-8 */
 static char* hts_codepageToUTF8(const char *codepage, const char *s) {
   /* find the given codepage */
   size_t i;
-  for(i = 0 ; table_mappings[i].name != NULL
-      && !hts_equalsAlphanum(table_mappings[i].name, codepage) ; i++) ;
+  for (i = 0; table_mappings[i].name != NULL &&
+              !hts_equalsCodepageName(table_mappings[i].name, codepage);
+       i++)
+    ;
 
   /* found ; decode */
   if (table_mappings[i].name != NULL) {

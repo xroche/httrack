@@ -50,9 +50,11 @@ carried that default since 3.49-13 (#556). Two more defaults work the same way.
 and picks up libexecinfo where the C library has no `backtrace()`.
 `--with-iconv` converts charsets with `iconv()`, taking a separate GNU libiconv
 where the C library has none, and `--without-iconv` falls back to the codepage
-tables built into the binary. Those tables cover the common single-byte
-codepages and convert to UTF-8 only, so a build without `iconv()` reads fewer
-charsets than one with it. Keep `--with-iconv` unless you want the smaller,
+tables built into the binary. Those tables are single-byte and convert to UTF-8
+only, so a build without `iconv()` reads the ISO 8859 and `windows-125x` family
+and nothing else. It cannot read a multi-byte charset such as `gb2312`,
+`shift_jis` or `euc-jp`, and it cannot write a mirrored URL back out in the
+page's own charset. Keep `--with-iconv` unless you want the smaller,
 dependency-free conversion on purpose.
 
 Pin it, either way:
