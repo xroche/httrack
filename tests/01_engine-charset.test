@@ -41,12 +41,11 @@ assert_eq "" "$(httrack -O /dev/null -#test=charset 'no-such-charset-xyz' 'café
 runs 'utf-8' 'hex:80'
 runs 'utf-8' 'hex:c3'
 
-# A leading NUL is where the codepage tables used to store their terminator
-# through a pointer they had never allocated, because the loop that allocates
-# it stops at the first NUL rather than at the caller's length.
+# A leading NUL used to store the terminator through a pointer the loop had
+# never allocated. The non-ASCII byte is what makes these reach the tables at
+# all, because an all-ASCII string is copied without consulting them.
 runs 'windows-1252' 'hex:0080'
-runs 'windows-1252' 'hex:00'
-runs 'ibm850' 'hex:00'
+runs 'ibm850' 'hex:0080'
 
 # hts_getCharsetFromMeta: <meta> charset extraction, HTML5 and legacy forms.
 # -#test=metacharset <html> prints the charset, or "(none)".
