@@ -1,0 +1,40 @@
+# Every canary that feeds a downstream recipe hands it the tarball we publish,
+# built here rather than by the container's own autotools.
+name: release tarball
+description: Build the make dist tarball a packager downloads, from a checked-out tree.
+
+inputs:
+  path:
+    description: Directory holding the checkout
+    required: false
+    default: httrack
+
+outputs:
+  version:
+    description: HTTRACK_VERSIONID the tarball was built from
+    value: ${{ steps.dist.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install autotools
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+        sudo apt-get install -y --no-install-recommends \
+          build-essential autoconf automake libtool autoconf-archive \
+          zlib1g-dev libssl-dev
+
+    - name: Build the tarball a packager would get
+      id: dist
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      run: |
+        set -euo pipefail
+        ./bootstrap
+        ./configure
+        make dist
+        ver=$(sed -n 's/.*HTTRACK_VERSIONID "\([^"]*\)".*/\1/p' src/htsglobal.h)
+        test -f "httrack-$ver.tar.gz"
+        echo "version=$ver" >>"$GITHUB_OUTPUT"
