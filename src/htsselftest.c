@@ -6903,6 +6903,10 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
   selflen = strlen(path);
   assertf(selflen < sizeof(probe));
   memset(untouched, 'X', sizeof(untouched));
+  /* A zero size has nothing to empty, so it refuses without writing at all. */
+  memset(probe, 'X', sizeof(probe));
+  assertf(hts_self_path(probe, 0) == NULL);
+  assertf(memcmp(probe, untouched, sizeof(probe)) == 0);
   for (i = 1; i <= selflen; i++) {
     memset(probe, 'X', sizeof(probe));
     assertf(hts_self_path(probe, i) == NULL);

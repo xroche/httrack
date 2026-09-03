@@ -102,6 +102,10 @@ static int datadir_has_templates(const char *dir) {
 /* htsbacktrace.c copies the Linux branch: it is program-side and cannot reach
    this hidden symbol, so a fix here belongs there too (#997). */
 const char *hts_self_path(char *dst, size_t dstsize) {
+  /* No byte to write a terminator into, and readlink() below would otherwise
+     be handed dstsize - 1 as SIZE_MAX. */
+  if (dstsize == 0)
+    return NULL;
 #if defined(_WIN32)
   const DWORD n = GetModuleFileNameA(NULL, dst, (DWORD) dstsize);
 
@@ -142,8 +146,7 @@ const char *hts_self_path(char *dst, size_t dstsize) {
      they report the clipping, and Windows terminates that copy, so a refusal
      would otherwise read back as a shorter path. Emptying dst covers it, and
      the other two arms share the exit so a fifth cannot forget the contract. */
-  if (dstsize != 0)
-    dst[0] = '\0';
+  dst[0] = '\0';
   return NULL;
 }
 
