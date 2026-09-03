@@ -109,9 +109,11 @@ const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
 
 /* The class a reference in this context may inline as, or 0 to leave it alone.
    tag_name points just past the '<' of the enclosing start tag, or NULL when
-   there is none (inside a stylesheet or a script); attr at the attribute name.
+   there is none (inside a stylesheet or a script); attr at the attribute name,
+   which body, the first byte of the document, bounds from below.
    Everything htsparse detects is inlinable unless it names a page. */
-char singlefile_ref_class(const char *tag_name, const char *attr);
+char singlefile_ref_class(const char *tag_name, const char *attr,
+                          const char *body);
 
 /* Rewrite every HTML page the mirror produced, then strip the marks left in
    the assets. No-op unless opt->single_file; call once the tree is final,

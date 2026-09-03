@@ -580,6 +580,10 @@ HTS_INLINE int rech_tageq(const char* adr,const char* s) {
   return 0;
 }
 */
+HTS_INLINE char html_prevc(const char *adr, const char *start) {
+  return adr > start ? adr[-1] : ' ';
+}
+
 // Deuxième partie
 HTS_INLINE int __rech_tageq(const char *adr, const char *s) {
   int p;

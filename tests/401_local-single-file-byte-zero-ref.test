@@ -1,0 +1,54 @@
+#!/bin/bash
+# A stylesheet whose first byte already opens a url() reference: --single-file
+# classified it by reading the byte in front of the document. Only a sanitizer
+# sees that read, so this test reds on the ASan leg and inlines everywhere.
+set -e
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+python=$(find_python) || skip "python3 not found"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_sf0.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+doc="${tmpdir}/doc"
+mkdir -p "$doc"
+cat >"${doc}/index.html" <<'HTML'
+<html><head><link rel="stylesheet" href="first.css"></head><body></body></html>
+HTML
+printf 'url(pixel.svg)\n' >"${doc}/first.css"
+printf '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>\n' \
+    >"${doc}/pixel.svg"
+
+local_server_start --root "$doc"
+require_httrack
+
+out="${tmpdir}/crawl"
+mkdir "$out"
+local_crawl --log "${tmpdir}/log" -O "$out" --quiet --disable-security-limits \
+    --robots=0 --timeout=30 --retries=0 --single-file "${BASEURL}/index.html"
+
+page="${out}/127.0.0.1_${SRV_PORT}/index.html"
+test -f "$page" || fail "no mirrored page at $page"
+
+printf '[stylesheet inlined] ..\t'
+"$python" - "$page" "${tmpdir}/got.css" <<'PY' || fail "no inlined stylesheet"
+import base64, re, sys
+html = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
+m = re.search(r"data:text/css;base64,([A-Za-z0-9+/=]*)", html)
+if m is None:
+    sys.exit(1)
+open(sys.argv[2], "wb").write(base64.b64decode(m.group(1)))
+PY
+echo OK
+
+# The reference at offset 0 is what the classifier used to mishandle, so it is
+# the one that has to come back inlined.
+printf '[reference at offset 0 followed] ..\t'
+grep -q 'url(data:image/svg+xml;base64,' "${tmpdir}/got.css" ||
+    fail "the url() opening the stylesheet was not inlined"
+echo OK

@@ -268,12 +268,6 @@ static const char *html_inline_safe(const char *src, char *dst, size_t size) {
   return dst;
 }
 
-/* Byte before html, or a space sentinel at the buffer start where html[-1]
-   would underflow; space reads as the word boundary the guards want there. */
-static HTS_INLINE char html_prevc(const char *html, const char *start) {
-  return html > start ? html[-1] : ' ';
-}
-
 /* Drop a redirect Location's #fragment: a UA anchor, never part of the fetched
  * resource (#204). */
 static void url_drop_fragment(char *const url) {
@@ -3124,7 +3118,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                               (opt->single_file && sf_may_mark && !in_media &&
                                p_type == 0 && !p_searchMETAURL &&
                                (sf_tag != NULL || sf_tagless_body))
-                                  ? singlefile_ref_class(sf_tag, tag_attr_start)
+                                  ? singlefile_ref_class(sf_tag, tag_attr_start,
+                                                         r->adr)
                                   : 0;
                           const size_t sf_start = TypedArraySize(output_buffer);
 
