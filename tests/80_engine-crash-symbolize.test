@@ -69,6 +69,11 @@ if ! grep -qE 'st_strsafe|strcpy_safe_' "$oracle"; then
     echo "parsed $(wc -l <"$frames") frames, resolved ${resolved} of them to a file" >&2
     dump_file "$out"
     dump_file "$oracle"
+    # Under qemu-user the trace stops at the vdso trampoline, so the engine
+    # frames are missing rather than unnamed: say which of the two it is.
+    if grep -q 'sigreturn' "$out"; then
+        skip "the unwinder stopped at the signal frame, so no engine frame reached the trace"
+    fi
     skip "addr2line names no hidden symbol in this build"
 fi
 
