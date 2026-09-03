@@ -36,7 +36,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsrandom.h"
 
 #ifdef _WIN32
-#include <windows.h>
+#include "htswin32.h"
 #else
 #include <errno.h>
 #include <stdio.h>

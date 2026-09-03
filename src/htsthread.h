@@ -37,9 +37,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef _WIN32
 #include <pthread.h>
 #endif
-#ifdef _WIN32
-#include "windows.h"
-#endif
+#include "htswin32.h"
 #ifndef USE_BEGINTHREAD
 #error needs USE_BEGINTHREAD
 #endif
