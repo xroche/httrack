@@ -58,13 +58,14 @@ check() {
 
 # iso-8859-1 fallback: € is unrepresentable (named and numeric alike), é is not.
 # The codepage tables convert to UTF-8 only, so a build without iconv cannot put
-# é back as a Latin-1 byte and escapes it like the €.
-tables_only=()
-have_feature iconv ||
-    tables_only=('a=%26%238364%3B&b=%26%238364%3B&c=%26%23233%3B&d=x')
-check "charset-less page" qnone 4 \
-    'a=%26%238364%3B&b=%26%238364%3B&c=%e9&d=x' \
-    ${tables_only[@]+"${tables_only[@]}"}
+# é back as a Latin-1 byte and escapes it like the €. One answer is right per
+# build: offering both as acceptable would stop telling the two apart.
+if have_feature iconv; then
+    want_none='a=%26%238364%3B&b=%26%238364%3B&c=%e9&d=x'
+else
+    want_none='a=%26%238364%3B&b=%26%238364%3B&c=%26%23233%3B&d=x'
+fi
+check "charset-less page" qnone 4 "${want_none}"
 # Control: utf-8 represents both, so they go out as their encoded bytes.
 check "declared utf-8 page" qutf8 4 \
     'a=%e2%82%ac&b=%e2%82%ac&c=%c3%a9&d=x'

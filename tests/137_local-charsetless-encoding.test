@@ -75,6 +75,8 @@ if os.environ["hts_have_iconv"] == "1":
     gb = rd("gb2312", "index.html")
     check("declared gb2312 title decoded", "图片-gb".encode() in gb)
     check("declared gb2312 title not left raw", "图片".encode("gb2312") + b"-gb" not in gb)
+else:
+    print("[declared gb2312 title] ..\tSKIPPED (built without iconv)")
 l1d = rd("l1decl", "index.html")
 check("declared Latin-1 title decoded", "Ã©-l1d".encode() in l1d)
 check("declared Latin-1 title not left raw", "Ã©".encode("latin-1") + b"-l1d" not in l1d)

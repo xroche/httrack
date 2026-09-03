@@ -42,26 +42,38 @@ want_feature() {
     esac
 }
 
-for f in brotli zstd backtrace iconv; do
+known="brotli zstd backtrace iconv"
+for f in ${known}; do
     got=$(sed -n "s/^${f} //p" <<<"${report}")
-    test -n "${got}" || fail_dump "-#test=features reports nothing for ${f}" /dev/null
+    test -n "${got}" || fail "-#test=features reports nothing for ${f}"
     want=$(want_feature "${f}")
     test "${got}" = "${want}" ||
         fail "-#test=features says ${f} ${got}, config.h says ${want}"
     echo "ok: ${f} reported as ${got}, matching config.h"
 done
 
+# A line this test does not know about is a feature nothing here checks, and
+# have_feature will gate on it the moment a test asks. Fail rather than drift.
+while read -r name value; do
+    case " ${known} " in
+    *" ${name} "*) ;;
+    *) fail "-#test=features reports '${name} ${value}', which no test checks" ;;
+    esac
+done <<<"${report}"
+echo "ok: the report carries no feature this test does not check"
+
 # config.h and the report can agree and both be wrong about the binary, so one
 # feature is also checked against behaviour. gb2312 is multi-byte, which no
 # 256-entry codepage table holds, so it converts only where iconv is linked.
-euro=$(httrack -#test=charset gb2312 hex:c4e3 2>/dev/null) || euro=
+ni=$(httrack -#test=charset gb2312 hex:c4e3 2>/dev/null) || ni=
 if have_feature iconv; then
-    test -n "${euro}" ||
-        fail "iconv is reported on, but gb2312 did not convert"
-    echo "ok: gb2312 converts, which only iconv does"
+    # The value, not just its presence: a wrong non-empty answer is still wrong.
+    test "${ni}" = "你" ||
+        fail "iconv is reported on, but gb2312 0xc4e3 gave '${ni}', expected 你"
+    echo "ok: gb2312 converts to 你, which only iconv does"
 else
-    test -z "${euro}" ||
-        fail "iconv is reported off, but gb2312 converted anyway"
+    test -z "${ni}" ||
+        fail "iconv is reported off, but gb2312 converted to '${ni}'"
     echo "ok: gb2312 does not convert, as a tables-only build cannot"
 fi
 
