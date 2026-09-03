@@ -535,7 +535,6 @@ void *hts_get_callback(t_hts_htmlcheck_callbacks * callbacks,
 #define PATH_SEPARATOR '/'
 #endif
 
-/* Spaces: CR,LF,TAB,FF */
 #define  is_space(c)      ( ((c)==' ') || ((c)=='\"') || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11) || ((c)=='\'') )
 #define  is_realspace(c)  ( ((c)==' ')                || ((c)==10) || ((c)==13) || ((c)==9) || ((c)==12) || ((c)==11)                )
 #define  is_taborspace(c) ( ((c)==' ')                                          || ((c)==9)                             )

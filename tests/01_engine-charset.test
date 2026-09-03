@@ -75,6 +75,18 @@ meta '<meta http-equiv="refresh" content="0; url=x.html">' '(none)'
 meta '<body charset="utf-8">' '(none)'
 meta '<meta charset="">' '(none)'
 
+# The prescan's whitespace is SPACE, TAB, CR, LF. These pin the four characters
+# where htslib.h's wider is_space() macro would answer differently.
+VT=$(printf '\013')
+FF=$(printf '\014')
+meta "<meta${VT}charset=\"utf-8\">" '(none)'
+meta "<meta${FF}charset=\"utf-8\">" '(none)'
+meta "<meta http-equiv=\"Content-Type\"${VT}content=\"text/html; charset=utf-8\">" '(none)'
+meta "<meta http-equiv=\"Content-Type\" content=\"text/html;${FF}charset=utf-8\">" '(none)'
+# a quote inside an unquoted value is a value byte, not a terminator
+meta '<meta charset=ut"f8>' 'ut"f8'
+meta "<meta charset=ut'f8>" "ut'f8"
+
 # hostile truncations: no crash, no match
 meta '<meta charset="utf-8' '(none)'
 meta '<meta charset=' '(none)'
