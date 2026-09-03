@@ -8,6 +8,8 @@
 name: alpine abuild canary
 
 on:
+  push:
+    branches: [distro-build-canaries]  # TEMP
   schedule:
     - cron: "31 5 * * 5"
   workflow_dispatch:
@@ -27,45 +29,35 @@ jobs:
           submodules: recursive
           path: httrack
 
-      - name: Install autotools
-        run: |
-          set -euo pipefail
-          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
-          sudo apt-get install -y --no-install-recommends \
-            build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev
-
-      # Generated on the host, so the container consumes the same bytes a
-      # packager downloads rather than a tarball Alpine's autotools rebuilt.
-      - name: Build the tarball a packager would get
-        run: |
-          set -euo pipefail
-          cd httrack
-          ./bootstrap
-          ./configure
-          make dist
-          ver=$(sed -n 's/.*HTTRACK_VERSIONID "\([^"]*\)".*/\1/p' src/htsglobal.h)
-          test -f "httrack-$ver.tar.gz"
-          echo "ver=$ver" >> "$GITHUB_ENV"
+      - uses: ./httrack/.github/actions/dist-tarball
+        id: dist
 
       - name: Fetch their APKBUILD and point it at that tarball
+        env:
+          ver: ${{ steps.dist.outputs.version }}
         run: |
           set -euo pipefail
-          # httrack sits in testing/, not community/. Their GitLab answers a runner
-          # with a 418, so read the same file from cgit.
+          # httrack sits in testing/, not community/. Their GitLab answers a
+          # runner with a 418, so read the same file from cgit.
           mkdir -p work/aports/testing/httrack
           cd work/aports/testing/httrack
           curl -fsSL --retry 3 -o APKBUILD \
             https://git.alpinelinux.org/aports/plain/testing/httrack/APKBUILD
           cp "$GITHUB_WORKSPACE/httrack/httrack-$ver.tar.gz" .
+          sha=$(sha512sum "httrack-$ver.tar.gz" | cut -d' ' -f1)
           # abuild resolves a bare filename in source= against the APKBUILD's
-          # own directory, and abuild checksum then re-signs it below.
+          # own directory. Pinning the sum here rather than letting abuild
+          # checksum regenerate it is what makes abuild verify our bytes, and
+          # what reds a source entry naming anything else.
           sed -i -e "s/^pkgver=.*/pkgver=$ver/" \
-            -e 's|^source=.*|source="httrack-$pkgver.tar.gz"|' APKBUILD
+            -e 's|^source=.*|source="httrack-$pkgver.tar.gz"|' \
+            -e "/^sha512sums=\"/,/^\"\$/c\\sha512sums=\"$sha  httrack-$ver.tar.gz\"" \
+            APKBUILD
           # A sed that matched nothing leaves the recipe on the released
           # tarball, and the canary then passes without building this tree.
           grep -qx "pkgver=$ver" APKBUILD
           grep -qx 'source="httrack-$pkgver.tar.gz"' APKBUILD
+          grep -qx "sha512sums=\"$sha  httrack-$ver.tar.gz\"" APKBUILD
 
       - name: abuild, then install what it produced
         timeout-minutes: 30
@@ -73,8 +65,8 @@ jobs:
           set -euo pipefail
           cat >work/canary.sh <<'EOF'
           set -eu
-          # abuild resolves makedepends through its own apk call, which needs the
-          # index --no-cache would have thrown away.
+          # abuild resolves makedepends through its own apk call, which needs
+          # the index --no-cache would have thrown away.
           apk update
           apk add alpine-sdk
           adduser -D builder
@@ -84,23 +76,16 @@ jobs:
           # abuild refuses to run as root, and REPODEST is unset in the image.
           su - builder -c 'abuild-keygen -a -n &&
             echo "REPODEST=$HOME/packages" >>$HOME/.abuild/abuild.conf'
-          # abuild indexes and verifies what it just signed, so the fresh key
-          # has to be trusted before the build reaches that step.
+          # abuild indexes and verifies what it just signed.
           cp /home/builder/.abuild/*.rsa.pub /etc/apk/keys/
-          su - builder -c 'cd ~/aports/testing/httrack &&
-            abuild checksum && abuild -r'
+          su - builder -c 'cd ~/aports/testing/httrack && abuild -r'
           # Installing and running it is the assertion: abuild exiting 0 having
           # packaged nothing runnable is the failure this canary is here for.
-          pkg=$(find /home/builder/packages -name 'httrack-[0-9]*.apk')
-          test -n "$pkg"
-          # Their httrack depends on the httrack-doc subpackage, so it installs
-          # from the signed index rather than from the one file.
-          apk add --repository /home/builder/packages/testing httrack
+          set -- /home/builder/packages/testing/x86_64/httrack-[0-9]*.apk
+          test "$#" -eq 1
+          # The file we just built, with the httrack-doc subpackage it depends
+          # on resolved out of the signed index beside it.
+          apk add --repository /home/builder/packages/testing "$1"
           httrack --version
           EOF
-          docker run --rm -v "$PWD/work:/work" alpine:latest \
-            sh /work/canary.sh 2>&1 | tee build.log
-
-      - name: Print the log on failure
-        if: failure()
-        run: tail -n 120 build.log 2>/dev/null || true
+          docker run --rm -v "$PWD/work:/work" alpine:latest sh /work/canary.sh

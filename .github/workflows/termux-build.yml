@@ -26,26 +26,12 @@ jobs:
           submodules: recursive
           path: httrack
 
-      - name: Install autotools
-        run: |
-          set -euo pipefail
-          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
-          sudo apt-get install -y --no-install-recommends \
-            build-essential autoconf automake libtool autoconf-archive \
-            zlib1g-dev libssl-dev
-
-      - name: Build the tarball a packager would get
-        run: |
-          set -euo pipefail
-          cd httrack
-          ./bootstrap
-          ./configure
-          make dist
-          ver=$(sed -n 's/.*HTTRACK_VERSIONID "\([^"]*\)".*/\1/p' src/htsglobal.h)
-          test -f "httrack-$ver.tar.gz"
-          echo "ver=$ver" >> "$GITHUB_ENV"
+      - uses: ./httrack/.github/actions/dist-tarball
+        id: dist
 
       - name: Fetch their recipe and point it at that tarball
+        env:
+          ver: ${{ steps.dist.outputs.version }}
         run: |
           set -euo pipefail
           git clone --depth 1 https://github.com/termux/termux-packages
