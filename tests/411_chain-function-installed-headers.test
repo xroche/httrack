@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# html/plug.html plugs callbacks with CHAIN_FUNCTION() and html/library.html
+# sends the reader to httrack-library.h, so that header must carry the types the
+# macro expands to. 205 compiles each installed header alone, which reaches no
+# macro body.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+skip_on_emulated "a header self-sufficiency check cannot vary by target"
+
+# Unset means no automake run (the Windows job runs the scripts directly), so
+# there is no install rule to drive.
+if [ -z "${abs_top_builddir:-}" ]; then
+    echo "abs_top_builddir unset, no automake environment, skipping" >&2
+    exit 77
+fi
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+
+# CC carries flags on some legs ("gcc -m32", "ccache gcc"), so split it.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+make=${MAKE:-make}
+command -v "$make" >/dev/null 2>&1 || skip "no make ($make)"
+
+fixture="$testdir/chainplug.c"
+[ -f "$fixture" ] || fail "$fixture is missing"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+# Seeding the array keeps it non-empty, which bash 3.2 needs under set -u.
+base_argv=(-I"$tmp")
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    base_argv+=("${extra_argv[@]}")
+fi
+
+# Positive control: a compiler that cannot build a bare libc TU would otherwise
+# blame the header.
+printf '#include <stdio.h>\n' >"$tmp/tu.c"
+if ! "${cc_argv[@]}" "${base_argv[@]}" -fsyntax-only "$tmp/tu.c" 2>"$tmp/cc.log"; then
+    head -5 "$tmp/cc.log" >&2
+    echo "${cc_argv[*]} cannot compile a bare <stdio.h>, skipping" >&2
+    exit 77
+fi
+
+# Override the install dir rather than use DESTDIR: same rule and file list, no
+# guessing at the prefix. Empty MAKEFLAGS, or the sub-make reaches for a
+# jobserver the test driver did not hand it.
+run_with_install_lock env MAKEFLAGS= MFLAGS= "$make" -C "$abs_top_builddir/src" \
+    install-DevIncludesDATA \
+    DevIncludesdir="$tmp/include/httrack" >"$tmp/install.log" 2>&1 ||
+    {
+        cat "$tmp/install.log" >&2
+        fail "install-DevIncludesDATA failed"
+    }
+[ -f "$tmp/include/httrack/httrack-library.h" ] || fail "httrack-library.h was not installed"
+
+# Vacuity control: a stray -I into the source tree would hide the failure.
+if "${cc_argv[@]}" "${base_argv[@]}" -fsyntax-only "$fixture" 2>/dev/null; then
+    fail "httrack-library.h resolves without the staged include path, this proves nothing"
+fi
+
+if ! "${cc_argv[@]}" "${base_argv[@]}" -I"$tmp/include/httrack" \
+    -c -o "$tmp/plug.o" "$fixture" 2>"$tmp/cc.log"; then
+    head -20 "$tmp/cc.log" >&2
+    fail "the documented CHAIN_FUNCTION() plugin does not compile against the installed headers"
+fi
+
+exit 0
