@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# html/library.html tells an integrator which headers an install carries and
-# which of src/httrack.c's it does not. Both lists are copies of build-system
-# facts, so pin them to their sources.
+# html/library.html tells an integrator which headers an install carries, which
+# of src/httrack.c's it does not, and that the libtest examples stay inside
+# what an install carries. All three are copies of build-system facts.
 
 set -euo pipefail
 
@@ -22,14 +22,52 @@ same_set() { # same_set <list A> <list B>: newline-separated, order-insensitive
     diff <(sort <<<"$1") <(sort <<<"$2") >/dev/null
 }
 
-# The DevIncludes_DATA continuation block, one basename per line.
-installed=$(sed -n '/^DevIncludes_DATA[[:space:]]*=/,/[^\\]$/p' "${makefile}" |
-    sed 's/^DevIncludes_DATA[[:space:]]*=//; s/\\$//' | tr -s ' \t' '\n' |
-    sed 's,.*/,,' | grep '\.h$' | sort -u)
+# Every DevIncludes_DATA assignment and its continuations, one basename a line.
+parse_installed() { # parse_installed <makefile>
+    sed -n '/DevIncludes_DATA[[:space:]]*[+:]*=/,/[^\\]$/p' "$1" |
+        sed 's/^[[:space:]]*DevIncludes_DATA[[:space:]]*[+:]*=//; s/\\$//' |
+        tr -s ' \t' '\n' | sed 's,.*/,,' | grep '\.h$' | sort -u
+}
+
+# Project headers a .c includes, either bracket style, indented or not: a name
+# is ours when src/ or the file's own directory holds it.
+parse_includes() { # parse_includes <c file>
+    local here
+    here=$(dirname "$1")
+    grep -oE '^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"][A-Za-z0-9._-]+\.h[">]' "$1" |
+        sed 's,^[^<"]*[<"],,; s,[">].*,,' | sort -u |
+        while read -r h; do
+            if test -e "${srcdir}/src/${h}" || test -e "${here}/${h}"; then
+                echo "${h}"
+            fi
+        done
+}
+
+# Controls: both parsers must see the spellings a future edit may use, or they
+# stop guarding without failing.
+fixture=$(mktemp -d "${TMPDIR:-/tmp}/doclib.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${fixture}"
+cat >"${fixture}/Makefile.am" <<'FIX'
+DevIncludes_DATA = \
+	one.h \
+	../two.h
+DevIncludes_DATA += three.h
+FIX
+same_set "$(parse_installed "${fixture}/Makefile.am")" 'one.h
+two.h
+three.h' || fail "parse_installed misses a += or a ../ spelling"
+cat >"${fixture}/probe.c" <<'FIX'
+#include <stdio.h>
+  #include "htsbase.h"
+#include <htslib.h>
+FIX
+same_set "$(parse_includes "${fixture}/probe.c")" 'htsbase.h
+htslib.h' || fail "parse_includes misses an indented or bracketed project include"
+
+installed=$(parse_installed "${makefile}")
 grep -qx 'httrack-library.h' <<<"${installed}" ||
     fail "parsed no DevIncludes_DATA list out of ${makefile}"
 
-# Control: the comparison must be able to say no.
 if same_set "${installed}" "${installed}
 nosuch.h"; then
     fail "same_set() ignores an extra name; the checks below prove nothing"
@@ -49,8 +87,7 @@ same_set "${installed}" "${listed}" || {
 }
 
 # What src/httrack.c includes and an install does not carry.
-internal=$(grep -o '^#include "[a-z0-9.-]*\.h"' "${frontend}" |
-    sed 's,.*"\(.*\)",\1,' | sort -u | comm -23 - <(printf '%s\n' "${installed}"))
+internal=$(parse_includes "${frontend}" | comm -23 - <(printf '%s\n' "${installed}"))
 test -n "${internal}" || fail "parsed no private includes out of ${frontend}"
 
 quoted=$(sed -n '/engine-internal headers (/,/install does not carry/p' "${page}" |
@@ -63,5 +100,18 @@ same_set "${internal}" "${quoted}" || {
     diff <(sort <<<"${internal}") <(sort <<<"${quoted}") >&2 || true
     fail "${page} is out of date"
 }
+
+# The page sends the reader to libtest, claiming those files stay inside what an
+# install carries. libtest ships its own sources too, so they count as carried.
+carried=$(
+    printf '%s\n' "${installed}"
+    (cd "${srcdir}/libtest" && ls ./*.h) | sed 's,.*/,,'
+)
+carried=$(sort -u <<<"${carried}")
+for c in "${srcdir}"/libtest/*.c; do
+    stray=$(parse_includes "${c}" | comm -23 - <(printf '%s\n' "${carried}"))
+    test -z "${stray}" ||
+        fail "${c} includes ${stray//$'\n'/ }, which no install carries"
+done
 
 exit 0
