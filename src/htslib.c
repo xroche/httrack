@@ -6477,9 +6477,7 @@ HTSEXT_API size_t hts_sizeof_opt(void) {
   return sizeof(httrackp);
 }
 
-/* The loop below walks the callback table as a flat array of slots, and the
-   runtime assert cannot see either failure: a truncating division always
-   divides back, so pin that the last slot really does end the struct. */
+/* The runtime assert below cannot see a same-sized non-callback member. */
 HTS_STATIC_ASSERT(offsetof(t_hts_htmlcheck_callbacks, extsavename) +
                           sizeof(t_hts_htmlcheck_callbacks_item) ==
                       sizeof(t_hts_htmlcheck_callbacks),
