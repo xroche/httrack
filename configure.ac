@@ -423,14 +423,11 @@ AX_CHECK_ALIGNED_ACCESS_REQUIRED
 # check for various headers
 AC_CHECK_HEADERS([execinfo.h spawn.h sys/ioctl.h sys/random.h])
 
-### Where an optional feature's default comes from
-# meson calls this auto_features. A distribution wants the recipe to decide
-# which optional dependencies a build takes, not whatever the builder happens
-# to have installed; every "auto" default here is one such lottery.
+### Where an optional feature's default comes from (meson's auto_features)
 AC_MSG_CHECKING([whether to probe for optional features nobody asked for])
 AC_ARG_ENABLE([auto-features],
 	[AS_HELP_STRING([--disable-auto-features],
-		[Default every optional feature to no rather than probing for it; --with-brotli, --with-zstd and --enable-backtrace still win @<:@default=yes@:>@])],
+		[Default every optional feature to no rather than probing for it; an explicit --with-FEATURE or --enable-FEATURE still wins @<:@default=yes@:>@])],
 	[
 	case "${enableval}" in
 	no|yes)
@@ -450,10 +447,8 @@ AC_ARG_ENABLE([auto-features],
 AS_IF([test x"$auto_features" = x"no"],
 	[hts_feature_default=no], [hts_feature_default=auto])
 
-## Symbolic crash traces. The header can exist while backtrace() lives in another
-## library (Termux's libandroid-execinfo); only httrack links it, so keep it out
-## of LIBS. Implemented for Linux alone, so no value of the flag reaches a probe
-## anywhere else.
+## The header can exist while backtrace() lives in another library (Termux's
+## libandroid-execinfo); only httrack links it, so keep it out of LIBS.
 AC_ARG_ENABLE([backtrace],
 	[AS_HELP_STRING([--enable-backtrace=@<:@yes/no/auto@:>@],[Print a symbolic stack trace on a crash, on Linux @<:@default=auto@:>@])],
 	[
@@ -593,9 +588,39 @@ AC_CHECK_LIB(socket, socket, [SOCKET_LIBS="-lnsl -lsocket"
 AC_DEFINE(LIBSOCKET, 1,[Check for libsocket])], AC_MSG_RESULT([not necessary]))
 AC_SUBST(SOCKET_LIBS)
 
-### Check for iconv
-AC_CHECK_LIB(iconv, iconv, [ICONV_LIBS="-liconv"
-AC_DEFINE(LIBICONV, 1,[Check for libiconv])], AC_MSG_RESULT([not necessary]))
+### A separate GNU libiconv, not the charset support: htscharset.c calls iconv()
+### either way, and where a musl or BSD libc has the narrower one, this decides
+### which charsets convert.
+AC_ARG_WITH([iconv],
+	[AS_HELP_STRING([--with-iconv@<:@=yes/no/auto@:>@],[Link a separate GNU libiconv beside the C library @<:@default=auto@:>@])],
+	[
+	case "${withval}" in
+	no|yes|auto)
+		iconv_want=$withval
+		iconv_asked=yes
+		;;
+	*)
+		AC_MSG_ERROR([bad value for iconv, expected yes/no/auto])
+		;;
+	esac
+	],
+	[
+	iconv_want=$hts_feature_default
+	iconv_asked=no
+	])
+ICONV_LIBS=
+iconv_have=no
+AS_IF([test x"$iconv_want" != x"no"],
+	[AC_CHECK_LIB(iconv, iconv, [iconv_have=yes
+	ICONV_LIBS="-liconv"
+	AC_DEFINE(LIBICONV, 1,[Check for libiconv])])
+	AS_IF([test x"$iconv_have" = x"no" && test x"$iconv_want" = x"yes"],
+		[AC_MSG_ERROR([iconv requested but no separate libiconv found])])])
+AC_MSG_CHECKING([whether to link a separate libiconv])
+dnl Name who decided: "auto" is the build environment's answer, not the packager's.
+AS_IF([test x"$iconv_want" = x"auto"], [AC_MSG_RESULT([$iconv_have (auto)])],
+	[test x"$iconv_asked" = x"no"], [AC_MSG_RESULT([$iconv_have (auto-features off)])],
+	[AC_MSG_RESULT([$iconv_have (requested)])])
 AC_SUBST(ICONV_LIBS)
 
 ### Check for dlsym
@@ -614,6 +639,8 @@ fi
 # dependency's own .pc gets right (and which alone carries the -L an
 # out-of-the-way prefix needs), so name the module wherever one is installed.
 # Dependents first: pkg-config emits Requires.private after Libs.private.
+# Absent the tool every dependency falls back to Libs.private, so the builder
+# decides the installed .pc; a recipe wanting a stable one build-depends on it.
 AC_ARG_VAR([PKG_CONFIG], [path to the pkg-config utility])
 AC_PATH_TOOL([PKG_CONFIG], [pkg-config], [false])
 PKGCONFIG_REQUIRES_PRIVATE=

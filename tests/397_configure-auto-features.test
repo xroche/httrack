@@ -37,6 +37,7 @@ feature_line() {
     brotli) echo "whether to enable the brotli content coding" ;;
     zstd) echo "whether to enable the zstd content coding" ;;
     backtrace) echo "whether to enable symbolic crash traces" ;;
+    iconv) echo "whether to link a separate libiconv" ;;
     *) fail "unknown feature $1" ;;
     esac
 }
@@ -47,6 +48,7 @@ feature_flag() {
     brotli) echo "--with-brotli" ;;
     zstd) echo "--with-zstd" ;;
     backtrace) echo "--enable-backtrace" ;;
+    iconv) echo "--with-iconv" ;;
     *) fail "unknown feature $1" ;;
     esac
 }
@@ -61,17 +63,30 @@ verdict() {
 # No --cache-file: the probes cache as ac_cv_lib_brotlidec_* and friends, so one
 # cache shared across runs replays the first run's answer and nothing is probed.
 run_configure() { # run_configure DIR ARG...
-    local dir=$1
+    local dir=$1 rc=0
     shift
     mkdir -p "${dir}"
     # A keg-only openssl (brew) makes --enable-https a hard error, and TLS is
     # not one of the features this switch moves.
     (cd "${dir}" && bash "${shadow}/configure" --enable-https=auto "$@") \
-        >"${dir}/configure.log" 2>&1
+        >"${dir}/configure.log" 2>&1 || rc=$?
+    # autoconf only warns about a flag it does not know, so a run that lost one
+    # would otherwise report the status quo as a pass.
+    if test "${rc}" -eq 0 && grep -q 'unrecognized options' "${dir}/configure.log"; then
+        fail_dump "configure did not recognise every flag it was given" "${dir}/configure.log"
+    fi
+    return "${rc}"
 }
 
+# Deleting the switch outright must not leave a libless host green, and the skip
+# below is reached before any run that would have named the missing flag.
+help=$(bash "${shadow}/configure" --help) || fail "configure --help failed"
+for flag in --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv; do
+    grep -q -e "${flag}" <<<"${help}" || fail "configure --help does not offer ${flag}"
+done
+
 n=0
-cases=4 # configure runs below, what the budget is paced against
+cases=5 # configure runs below, what the budget is paced against
 
 began=${SECONDS}
 n=$((n + 1))
@@ -81,7 +96,7 @@ run_configure "${work}/control" ||
 # What this host can discriminate. A builder without the libraries cannot tell
 # the switch from the status quo, so it has nothing to prove here.
 on=()
-for f in brotli zstd backtrace; do
+for f in brotli zstd backtrace iconv; do
     test "$(verdict "${work}/control" "${f}")" = "yes (auto)" || continue
     on+=("${f}")
 done
@@ -115,6 +130,13 @@ for f in "${on[@]}"; do
         line=$(sed -n 's/^BACKTRACE_LIBS = *//p' "${work}/off/src/Makefile")
         test -z "${line}" || fail "backtrace: BACKTRACE_LIBS still links '${line}'"
         ;;
+    iconv)
+        ! grep -q '^#define LIBICONV' "${work}/off/config.h" ||
+            fail_dump "iconv: config.h still defines LIBICONV" "${work}/off/config.h"
+        # An extra DT_NEEDED on libhttrack, and an extra shlibs dependency.
+        line=$(sed -n 's/^ICONV_LIBS = *//p' "${work}/off/src/Makefile")
+        test -z "${line}" || fail "iconv: ICONV_LIBS still links '${line}'"
+        ;;
     esac
 done
 echo "ok: the switch turns off every feature the builder would have decided"
@@ -134,10 +156,15 @@ for f in "${on[@]}"; do
         fail_dump "${f}: expected 'yes (requested)', got '${got}'" "${work}/asked/configure.log"
 done
 # Naming every feature back must land on the default build exactly, or the switch
-# has a side effect nobody asked for. Rejecting the off state is not enough: a
-# switch that also dropped, say, HTS_LFS would pass every check above.
-diff -u "${work}/control/config.h" "${work}/asked/config.h" ||
-    fail "asking for each feature back does not reproduce the default config.h"
+# has a side effect nobody asked for. config.h alone is not enough: a macro left
+# at 1 beside an emptied *_LIBS is an unresolved-symbol link, and htsfeatures.h
+# is the copy a consumer of the installed headers compiles against.
+for gen in config.h htsfeatures.h src/Makefile; do
+    sed "s|${work}/control|@BUILDDIR@|g" "${work}/control/${gen}" >"${work}/gen-control"
+    sed "s|${work}/asked|@BUILDDIR@|g" "${work}/asked/${gen}" >"${work}/gen-asked"
+    diff -u "${work}/gen-control" "${work}/gen-asked" ||
+        fail "asking for each feature back does not reproduce the default ${gen}"
+done
 echo "ok: an explicit flag still wins, and reproduces the default build"
 skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 
@@ -149,5 +176,13 @@ mkdir -p "${work}/empty"
 grep -q 'brotli requested at' "${work}/reject/configure.log" ||
     fail_dump "configure failed without naming the prefix it was given" "${work}/reject/configure.log"
 echo "ok: an explicit prefix with no library still fails the build"
+
+n=$((n + 1))
+# A value the switch does not understand must not read as one of the two it does.
+! run_configure "${work}/bogus" --enable-auto-features=maybe ||
+    fail_dump "--enable-auto-features=maybe was accepted" "${work}/bogus/configure.log"
+grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
+    fail_dump "configure refused the value without saying which flag" "${work}/bogus/configure.log"
+echo "ok: a value that is neither yes nor no is refused"
 
 assert_steps_ran "${cases}" "${n}"

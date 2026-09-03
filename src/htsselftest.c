@@ -7606,13 +7606,17 @@ static const unsigned char cc_br_bomb[] = {0x9b, 0xff, 0xff, 0x3f, 0x00,
                                            0x72, 0xef, 0x7f, 0x00};
 #endif
 
+#if HTS_USEBROTLI || HTS_USEZSTD
 static const unsigned char cc_text[] =
     "content codings: HTTrack decodes gzip, brotli and zstd bodies alike.";
+#endif
 
 /* Content codings: br and zstd decode, junk tokens stay identity, a coding we
    can not undo fails the fetch, and a bomb never lands on disk. */
 static int st_contentcodings(httrackp *opt, int argc, char **argv) {
+#if HTS_USEBROTLI || HTS_USEZSTD
   const size_t tlen = sizeof(cc_text) - 1;
+#endif
   char inpath[HTS_URLMAXSIZE], outpath[HTS_URLMAXSIZE];
 
   (void) opt;

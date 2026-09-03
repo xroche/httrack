@@ -23,10 +23,10 @@ somebody has to move at every bump.
 - `--with-zlib=DIR` points at a non-standard zlib prefix. zlib itself is
   required, not optional: the cache and the WARC output are zip containers.
 - `--with-brotli[=DIR]`, `--with-zstd[=DIR]` select the `br` and `zstd` content
-  codings, and `--enable-backtrace` selects symbolic crash traces on Linux. All
-  three default to `auto`. See
-  [brotli and zstd are automagic](#brotli-and-zstd-are-automagic).
-- `--disable-auto-features` turns those three defaults into `no`. Pass it.
+  codings, `--enable-backtrace` selects symbolic crash traces on Linux, and
+  `--with-iconv` links a separate GNU libiconv. All four default to `auto`. See
+  [the optional dependencies are automagic](#the-optional-dependencies-are-automagic).
+- `--disable-auto-features` turns those four defaults into `no`. Pass it.
 - `--enable-https=yes|no|auto` selects OpenSSL. On by default.
 - `--enable-online-unit-tests` is off by default, and `make check` reaches the
   network only when it is on. Nothing to pass.
@@ -39,14 +39,18 @@ somebody has to move at every bump.
   install into `$(docdir)`, so a layout that puts the pages anywhere else strands
   those three.
 
-## brotli and zstd are automagic
+## The optional dependencies are automagic
 
 `--with-brotli` and `--with-zstd` default to `auto`, so the `br` and `zstd`
 content codings follow whatever happens to be installed on the builder. A recipe
 that does not pin them records no choice and links what it finds. Both flags have
-carried that default since 3.49-13 (#556). `--enable-backtrace`, which selects
-the symbolic stack trace httrack prints on a crash, defaults to `auto` too and
-picks up libexecinfo where the C library has no `backtrace()`.
+carried that default since 3.49-13 (#556). Two more defaults work the same way.
+`--enable-backtrace` selects the symbolic stack trace httrack prints on a crash,
+and picks up libexecinfo where the C library has no `backtrace()`.
+`--with-iconv` links a separate GNU libiconv, which is not the charset support
+itself, because httrack calls `iconv()` either way. It is the second
+implementation, and on musl and the BSDs it converts charsets the C library
+refuses, so a builder that happened to have it shipped a binary decoding more.
 
 Pin it, either way:
 
@@ -61,22 +65,33 @@ build dependencies beside them. Either way configure reports the answer as
 `checking whether to enable the brotli content coding... yes (auto)`, where
 `(auto)` means the build environment decided and `(requested)` means you did.
 
-Naming three flags only works while three is the number, and a release that adds
-a fourth optional dependency would slip past a recipe pinned this way. So there
-is one switch that moves every `auto` default at once, the autotools spelling of
+Naming four flags only works while four is the number, and a release that adds a
+fifth optional dependency would slip past a recipe pinned this way. So there is
+one switch that moves every `auto` default at once, the autotools spelling of
 meson's `auto_features=disabled`:
 
 ```
 ./configure --disable-auto-features --with-brotli --with-zstd --enable-backtrace
 ```
 
-Everything you pass beside it still wins, and still fails loudly when its library
-is absent. Everything you leave out is off, whatever the builder has installed,
-so the line above is the complete list of what this build takes. A feature the
-switch turned off reports as `no (auto-features off)`, which is how you tell it
-apart from a probe that looked and found nothing. `--enable-https` is not
-affected, because it defaults to `yes` rather than `auto` and a missing OpenSSL
-already fails the build. Our own `debian/rules` passes the line above.
+Everything you pass beside it still wins, and fails loudly when its library is
+absent. The one exception is `--enable-backtrace` away from Linux, which reports
+`no (not implemented on <host>)` and carries on, so a recipe can pass it for
+every architecture it builds. Every optional feature you leave out is off,
+whatever the builder has installed, so the line above names all four this build
+takes. zlib and OpenSSL are not among them, because both are required and both
+already fail the build when they are missing. A feature the switch turned off
+reports as `no (auto-features off)`, which is how you tell it apart from a probe
+that looked and found nothing. Our own `debian/rules` passes the line above, and
+takes no libiconv because glibc has `iconv()`.
+
+The switch moves features, not build tools, so one thing is still yours to pin.
+`pkg-config` decides nothing about the binary and everything about the installed
+`libhttrack.pc`: with it, a codec reaches a consumer as `Requires.private:
+libbrotlidec libzstd`, and without it as `Libs.private: -lbrotlidec -lzstd`.
+The second form drops the `-L` an out-of-the-way prefix needs and orders nothing
+for a static link, so build-depend on `pkg-config` rather than letting the
+chroot decide. Ours does.
 
 ## Do not re-encode the tree
 
