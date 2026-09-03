@@ -40,8 +40,8 @@ somebody has to move at every bump.
 
 `--with-brotli` and `--with-zstd` default to `auto`, so the `br` and `zstd`
 content codings follow whatever happens to be installed on the builder. A recipe
-that does not pin them records no choice and links what it finds. This is new at
-3.50, and several distributions have already built with a codec set nobody picked.
+that does not pin them records no choice and links what it finds. Both flags have
+carried that default since 3.49-13 (#556).
 
 Pin it, either way:
 

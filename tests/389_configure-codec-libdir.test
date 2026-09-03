@@ -145,8 +145,7 @@ expect_fail() { # expect_fail CODEC LIB DESC PREFIX
 }
 
 # The subdirectory names are the fixture's own, not the host's, so every case
-# below means the same thing on a platform with no real lib64: what they
-# exercise is the macro's candidate order, which is shell.
+# below means the same thing on a platform that has no real lib64.
 br_lib=$(fixture br-lib brotli lib)
 br_lib64=$(fixture br-lib64 brotli lib64)
 br_both=$(fixture br-both brotli lib lib64)
