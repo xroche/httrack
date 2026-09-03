@@ -1,0 +1,227 @@
+#!/bin/bash
+# --with-brotli=DIR and --with-zstd=DIR used to append DIR/lib and nothing else.
+# A multilib host keeps the 64-bit copy in lib64, Debian under a multiarch
+# triplet, so that -L named a directory that does not exist and the link quietly
+# took the system copy while configure reported the coding as enabled.
+
+# TEST_TIMEOUT_AT_LEAST: 900
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+test -r "${srcdir}/configure" || skip "no configure in ${srcdir}"
+
+# $CC carries its flags on some hosts (macOS configures gcc -std=gnu23), so it
+# is an argv, never one word.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+# find_lib NAME...: print the first system library the compiler resolves.
+find_lib() {
+    local name cand
+    for name in "$@"; do
+        cand=$("${cc_argv[@]}" -print-file-name="${name}") || cand=
+        if test -f "${cand}"; then
+            echo "${cand}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# find_hdr HEADER: print the system path <HEADER> resolves to.
+find_hdr() {
+    local out
+    out=$(printf '#include <%s>\n' "$1" | "${cc_argv[@]}" -E -xc -) || return 1
+    # Capture then match: piping into a truncating reader SIGPIPEs the cc upstream.
+    out=$(sed -n "s|^#[ 0-9]*\"\([^\"]*$1\)\".*|\1|p" <<<"${out}")
+    out=${out%%$'\n'*}
+    test -f "${out}" || return 1
+    echo "${out}"
+}
+
+brotli_dec=$(find_lib libbrotlidec.so libbrotlidec.dylib libbrotlidec.tbd libbrotlidec.a) ||
+    skip "no system libbrotlidec to build a fixture from"
+brotli_com=$(find_lib libbrotlicommon.so libbrotlicommon.dylib libbrotlicommon.tbd libbrotlicommon.a) ||
+    skip "no system libbrotlicommon to build a fixture from"
+zstd_lib=$(find_lib libzstd.so libzstd.dylib libzstd.tbd libzstd.a) ||
+    skip "no system libzstd to build a fixture from"
+brotli_hdr=$(find_hdr brotli/decode.h) || skip "no system brotli/decode.h"
+zstd_hdr=$(find_hdr zstd.h) || skip "no system zstd.h"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/codecdir.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+# automake refuses an out-of-tree configure when srcdir holds a config.status,
+# which an in-tree build leaves there; a symlink farm without that one file is
+# the same tree to configure.
+shadow=${work}/srcdir
+mkdir -p "${shadow}"
+for entry in "${srcdir}"/*; do
+    test "${entry##*/}" = config.status || ln -s "${entry}" "${shadow}/"
+done
+test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
+
+# put_lib CODEC DIR: drop one codec's libraries into DIR.
+put_lib() {
+    local lib
+    case $1 in
+    brotli) for lib in "${brotli_dec}" "${brotli_com}"; do ln -sf "${lib}" "$2/${lib##*/}"; done ;;
+    zstd) ln -sf "${zstd_lib}" "$2/${zstd_lib##*/}" ;;
+    esac
+}
+
+# fixture NAME HDR-CODEC LIB-CODEC SUBDIR...: a prefix carrying HDR-CODEC's
+# header under include/ and LIB-CODEC's libraries in each named subdirectory,
+# and nothing else. Naming the two separately is what lets a fixture hold the
+# wrong library, which no lib-only or empty prefix can express.
+fixture() {
+    local name=$1 hdr=$2 lib=$3 sub
+    shift 3
+    mkdir -p "${work}/${name}/include"
+    case ${hdr} in
+    brotli)
+        mkdir -p "${work}/${name}/include/brotli"
+        ln -sf "${brotli_hdr}" "${work}/${name}/include/brotli/decode.h"
+        ;;
+    zstd) ln -sf "${zstd_hdr}" "${work}/${name}/include/zstd.h" ;;
+    esac
+    for sub in "$@"; do
+        mkdir -p "${work}/${name}/${sub}"
+        test "${lib}" = none || put_lib "${lib}" "${work}/${name}/${sub}"
+    done
+    echo "${work}/${name}"
+}
+
+n=0
+cases=8 # expect/expect_fail calls below, what the budget is paced against
+
+# No --cache-file: the codec probes cache as ac_cv_lib_brotlidec_* and
+# ac_cv_header_zstd_h, so one cache shared across cases replays the first
+# case's answer and no later case probes anything.
+run_configure() { # run_configure DIR ARG...
+    local dir=$1
+    shift
+    mkdir -p "${dir}"
+    # A keg-only openssl (brew) makes --enable-https a hard error, and TLS has
+    # nothing to do with the content codings.
+    (cd "${dir}" && bash "${shadow}/configure" --enable-https=auto "$@") \
+        >"${dir}/configure.log" 2>&1
+}
+
+# codec_facts CODEC: set lib, var and other for the codec under test.
+codec_facts() {
+    case $1 in
+    brotli)
+        lib=brotlidec
+        var=BROTLI_LIBS
+        other=zstd
+        ;;
+    zstd)
+        lib=zstd
+        var=ZSTD_LIBS
+        other=brotli
+        ;;
+    *) fail "unknown codec $1" ;;
+    esac
+}
+
+expect() { # expect CODEC WANT-SUBDIR REJECTED-SUBDIR DESC PREFIX ARG...
+    local codec=$1 want=$2 nope=$3 desc=$4 prefix=$5
+    shift 5
+    local lib var other dir line probe began=${SECONDS}
+    codec_facts "${codec}"
+    n=$((n + 1))
+    dir=${work}/build${n}
+    run_configure "${dir}" --with-"${codec}"="${prefix}" "$@" ||
+        fail_dump "${desc}: configure failed" "${dir}/configure.log"
+
+    line=$(sed -n "s/^${var} = *//p" "${dir}/src/Makefile")
+    test -n "${line}" || fail_dump "${desc}: src/Makefile carries no ${var} line" "${dir}/configure.log"
+    case " ${line} " in
+    *" -L${prefix}/${want} "*) ;;
+    *) fail "${desc}: expected -L${prefix}/${want} in ${var}, got: ${line}" ;;
+    esac
+    case " ${line} " in
+    *" -L${prefix}/${nope} "*) fail "${desc}: ${var} also picked -L${prefix}/${nope}: ${line}" ;;
+    esac
+    # The whole bug: the emitted -L named a directory that was not there.
+    test -d "${prefix}/${want}" || fail "${desc}: -L${prefix}/${want} does not exist"
+
+    # The emitted flag is not the probe. Detection linking under the old
+    # unresolved path while only the flag is fixed would pass every check
+    # above, so read the link command configure actually ran.
+    probe=$(grep -e '-o conftest' "${dir}/config.log" | grep -e "-l${lib}" || true)
+    probe=$(tr '\n' ' ' <<<"${probe}")
+    test -n "${probe}" || fail_dump "${desc}: config.log has no -l${lib} link probe" "${dir}/config.log"
+    case " ${probe} " in
+    *" -L${prefix}/${want} "*) ;;
+    *) fail "${desc}: the -l${lib} probe did not link under -L${prefix}/${want}: ${probe}" ;;
+    esac
+    case " ${probe} " in
+    *" -L${prefix}/${nope} "*) fail "${desc}: the -l${lib} probe linked under -L${prefix}/${nope}: ${probe}" ;;
+    esac
+
+    # PACKAGING.md quotes this qualifier as the packager's confirmation of who
+    # chose, so both halves of it are pinned here, in one run that has both.
+    grep -q "the ${codec} content coding\.\.\. yes (requested)" "${dir}/configure.log" ||
+        fail_dump "${desc}: an explicit --with-${codec} was not reported as (requested)" "${dir}/configure.log"
+    grep -qE "the ${other} content coding\.\.\. (yes|no) \(auto\)" "${dir}/configure.log" ||
+        fail_dump "${desc}: the unrequested ${other} coding was not reported as (auto)" "${dir}/configure.log"
+
+    echo "ok: ${desc} -> ${want}"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+}
+
+expect_fail() { # expect_fail CODEC DESC PREFIX
+    local codec=$1 desc=$2 prefix=$3 lib var other dir began=${SECONDS}
+    codec_facts "${codec}"
+    n=$((n + 1))
+    dir=${work}/build${n}
+    ! run_configure "${dir}" --with-"${codec}"="${prefix}" ||
+        fail_dump "${desc}: configure accepted a prefix with no lib${lib} under it" "${dir}/configure.log"
+    grep -q "no lib${lib} found" "${dir}/configure.log" ||
+        fail_dump "${desc}: configure failed without naming the missing library" "${dir}/configure.log"
+    echo "ok: ${desc}"
+    skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+}
+
+# The subdirectory names are the fixture's own, not the host's, so every case
+# below means the same thing on a platform that has no real lib64.
+br_lib=$(fixture br-lib brotli brotli lib)
+br_lib64=$(fixture br-lib64 brotli brotli lib64)
+br_both=$(fixture br-both brotli brotli lib lib64)
+br_multiarch=$(fixture br-multiarch brotli brotli lib lib/x86_64-linux-gnu)
+br_headers=$(fixture br-headers brotli none)
+br_wrong=$(fixture br-wrong brotli zstd lib64)
+zs_lib64=$(fixture zs-lib64 zstd zstd lib64)
+
+# The control first: a plain lib prefix must keep resolving exactly as before,
+# or every lib64 answer below could come from a macro that always says lib64.
+expect brotli lib lib64 "a lib-only brotli prefix resolves" "${br_lib}"
+expect brotli lib64 lib "a lib64-only brotli prefix resolves" "${br_lib64}"
+
+# With both populated the probe cannot decide, so these three pin the
+# derivation from the configured libdir rather than the order the candidates
+# are tried in. The triplet is the case the macro's comment names for Debian.
+expect brotli lib lib64 "the default libdir picks lib" "${br_both}" \
+    --prefix="${work}/inst"
+expect brotli lib64 lib "--libdir picks lib64" "${br_both}" \
+    --prefix="${work}/inst" --libdir="${work}/inst/lib64"
+expect brotli lib/x86_64-linux-gnu lib "a multiarch libdir picks the triplet" \
+    "${br_multiarch}" --prefix="${work}/inst" --libdir="${work}/inst/lib/x86_64-linux-gnu"
+
+# zstd goes through the same macro with its own library name, so one case is
+# enough to show the glob is parameterised and not hardcoded to brotli.
+expect zstd lib64 lib "a lib64-only zstd prefix resolves" "${zs_lib64}"
+
+expect_fail brotli "a prefix with no libbrotlidec is rejected" "${br_headers}"
+# A prefix whose lib64 holds some other library must be rejected too: matching
+# any lib*.* there would resolve to a directory with no decoder in it, and the
+# link would fall back to the system copy that this whole macro exists to avoid.
+expect_fail brotli "a prefix whose lib64 holds the wrong library is rejected" "${br_wrong}"
+
+assert_steps_ran "${cases}" "${n}"

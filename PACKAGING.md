@@ -22,8 +22,8 @@ somebody has to move at every bump.
 
 - `--with-zlib=DIR` points at a non-standard zlib prefix. zlib itself is
   required, not optional: the cache and the WARC output are zip containers.
-- `--with-brotli[=DIR]`, `--with-zstd[=DIR]`: the `br` and `zstd` content
-  codings, used when the library is found, dropped by `--without-`.
+- `--with-brotli[=DIR]`, `--with-zstd[=DIR]` select the `br` and `zstd` content
+  codings. See [brotli and zstd are automagic](#brotli-and-zstd-are-automagic).
 - `--enable-https=yes|no|auto` selects OpenSSL. On by default.
 - `--enable-online-unit-tests` is off by default, and `make check` reaches the
   network only when it is on. Nothing to pass.
@@ -35,6 +35,26 @@ somebody has to move at every bump.
   The pages link `../license.txt`, `../greetings.txt` and `../history.txt`, which
   install into `$(docdir)`, so a layout that puts the pages anywhere else strands
   those three.
+
+## brotli and zstd are automagic
+
+`--with-brotli` and `--with-zstd` default to `auto`, so the `br` and `zstd`
+content codings follow whatever happens to be installed on the builder. A recipe
+that does not pin them records no choice and links what it finds. Both flags have
+carried that default since 3.49-13 (#556).
+
+Pin it, either way:
+
+```
+./configure --with-brotli    --with-zstd
+./configure --without-brotli --without-zstd
+```
+
+The `--with-` forms are hard requirements, so configure fails when the library is
+missing instead of dropping the coding. Add the development packages to your
+build dependencies beside them. Either way configure reports the answer as
+`checking whether to enable the brotli content coding... yes (auto)`, where
+`(auto)` means the build environment decided and `(requested)` means you did.
 
 ## Do not re-encode the tree
 
