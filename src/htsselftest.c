@@ -6899,7 +6899,7 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
   assertf(hts_self_path(path, sizeof(path)) != NULL);
   assertf(fexist(path));
   /* A buffer the path does not fit in must refuse rather than clip. A refusal
-     leaves no shorter path behind and writes nothing past the size given. */
+     empties the buffer and writes nothing past the size it was given. */
   selflen = strlen(path);
   assertf(selflen < sizeof(probe));
   memset(untouched, 'X', sizeof(untouched));
@@ -6907,7 +6907,7 @@ static int st_datadir(httrackp *opt, int argc, char **argv) {
     memset(probe, 'X', sizeof(probe));
     assertf(hts_self_path(probe, i) == NULL);
     assertf(memcmp(probe + i, untouched, sizeof(probe) - i) == 0);
-    assertf(memchr(probe + 1, '\0', i - 1) == NULL);
+    assertf(probe[0] == '\0');
   }
 
   for (i = 0; i < sizeof(dirs) / sizeof(dirs[0]); i++) {

@@ -107,11 +107,13 @@ const char *hts_self_path(char *dst, size_t dstsize) {
 
   /* Pre-Win8 returns nSize on truncation without terminating: a full buffer
      is a failure, not a path. */
-  return (n > 0 && (size_t) n < dstsize) ? dst : NULL;
+  if (n > 0 && (size_t) n < dstsize)
+    return dst;
 #elif defined(__APPLE__)
   uint32_t n = (uint32_t) dstsize;
 
-  return _NSGetExecutablePath(dst, &n) == 0 ? dst : NULL;
+  if (_NSGetExecutablePath(dst, &n) == 0)
+    return dst;
 #elif defined(HTS_SELF_PATH_SYSCTL)
   /* FreeBSD and DragonFly put the pid last, NetBSD puts it third, and 9 is the
      pathname on DragonFly but KERN_PROC_SV_NAME on FreeBSD (#1506). */
@@ -127,20 +129,22 @@ const char *hts_self_path(char *dst, size_t dstsize) {
   if (sysctl(mib, 4, dst, &n, NULL, 0) == 0 && n > 1 && n <= dstsize &&
       dst[n - 1] == '\0')
     return dst;
-  /* Unlike readlink(), sysctl() copies what fits before it reports ENOMEM, so
-     a refusal must not hand the caller that prefix. */
-  if (dstsize != 0)
-    dst[0] = '\0';
-  return NULL;
 #else
   /* Linux; anywhere else this is simply absent and argv[0] has to do. */
   const ssize_t n = readlink("/proc/self/exe", dst, dstsize - 1);
 
-  if (n <= 0 || (size_t) n >= dstsize - 1)
-    return NULL;
-  dst[n] = '\0';
-  return dst;
+  if (n > 0 && (size_t) n < dstsize - 1) {
+    dst[n] = '\0';
+    return dst;
+  }
 #endif
+  /* GetModuleFileNameA() and sysctl() both copy a clipped path into dst before
+     they report the clipping, and Windows terminates that copy, so a refusal
+     would otherwise read back as a shorter path. Emptying dst covers it, and
+     the other two arms share the exit so a fifth cannot forget the contract. */
+  if (dstsize != 0)
+    dst[0] = '\0';
+  return NULL;
 }
 
 /* Directory part of path, trailing '/' kept, or NULL when it carries none: a
