@@ -6477,6 +6477,14 @@ HTSEXT_API size_t hts_sizeof_opt(void) {
   return sizeof(httrackp);
 }
 
+/* The loop below walks the callback table as a flat array of slots, and the
+   runtime assert cannot see either failure: a truncating division always
+   divides back, so pin that the last slot really does end the struct. */
+HTS_STATIC_ASSERT(offsetof(t_hts_htmlcheck_callbacks, extsavename) +
+                          sizeof(t_hts_htmlcheck_callbacks_item) ==
+                      sizeof(t_hts_htmlcheck_callbacks),
+                  callbacks_are_a_flat_slot_array);
+
 HTSEXT_API void hts_free_opt(httrackp * opt) {
   if (opt != NULL) {
     /* An FTP worker reads opt for its whole run, and not every caller drains
