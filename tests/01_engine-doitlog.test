@@ -6,7 +6,7 @@
 # argument into the command line through cmdl_ins() (the token-block builder).
 # That path is distinct from the rc-file one in 01_engine-rcfile.test
 # (htsalias.c) and from the url-on-command-line update in
-# 02_update-cache.test, and nothing else exercises it. Two properties:
+# 394_update-cache.test, and nothing else exercises it. Two properties:
 #   1. A multi-token reprise re-mirrors cleanly: every token (the url and each
 #      option) survives the back-to-back packing, so the no-url run reproduces
 #      the file set with no errors. A packing/bound bug corrupts a later token

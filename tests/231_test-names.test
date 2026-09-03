@@ -58,6 +58,43 @@ control directory 'not a regular file' 'mkdir 99_dir.test'
 control dangling 'not a regular file' 'ln -s nowhere 99_dangling.test'
 control empty 'no test matched' 'rm 00_kept.test'
 
+# A number claimed twice, and the two ways a claim can hide: a leading zero
+# makes 0389 a different string from 389, and a count file carries a number
+# without ending in .test. The family list must still let 01_engine- share one.
+control dup 'claimed by more than one test' ': >389_a.test; : >389_b.test'
+control dupzero 'claimed by more than one test' ': >389_a.test; : >0389_b.test'
+control dupext 'claimed by more than one test' ': >389_a.test; : >389_b.counts'
+# .data, so a checker that grew an allowlist of .test and .counts fails here
+# rather than passing as if it read every extension.
+control dupany 'claimed by more than one test' ': >389_a.test; : >389_b.data'
+# The exemption is by family name. Exempting the number instead would let two
+# unrelated tests share 01 with 01_engine-, which is the accident, not a family.
+control dupnumber 'claimed by more than one test' ': >01_bogus-one.test; : >01_bogus-two.test'
+# A .log with no .test of its own name is a file claiming that number, so the
+# build-output skip must not swallow it.
+control duplog 'claimed by more than one test' ': >389_a.test; : >389_b.log'
+ok_dir="${work}/family"
+mkdir -p "$ok_dir"
+: >"${ok_dir}/01_engine-one.test"
+: >"${ok_dir}/01_engine-two.test"
+: >"${ok_dir}/01_zlib-one.test"
+: >"${ok_dir}/62_lang-integrity.test"
+: >"${ok_dir}/62_lang-untranslated.counts"
+out=$(bash "$checker" "$ok_dir" 2>&1) ||
+    fail "the checker rejected a documented family: $out"
+
+# An in-tree build drops automake's own .log and .trs beside the tests, and
+# reading them makes every test a duplicate of itself.
+built_dir="${work}/built"
+mkdir -p "$built_dir"
+for stem in 00_kept 389_a; do
+    : >"${built_dir}/${stem}.test"
+    : >"${built_dir}/${stem}.log"
+    : >"${built_dir}/${stem}.trs"
+done
+out=$(bash "$checker" "$built_dir" 2>&1) ||
+    fail "the checker read its own build output as a duplicate: $out"
+
 # A git that answers with an error must report that the oracle did not run, not
 # read as "nothing tracked". Stubbed rather than dropped from PATH, which the
 # checker's other tools need.
