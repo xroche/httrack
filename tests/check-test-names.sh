@@ -49,7 +49,7 @@ shopt -u nocaseglob nullglob
 #   01_engine-           the self-test bucket AGENTS.md documents, ~70 members
 #   01_zlib-             "group zlib-dependent self-tests under 01_zlib-*" (#460)
 #   11_crawl-            five crawl tests the original author added over 2013-2014
-#   53_local-proxytrack- #701 took #572's prefix rather than a free number
+#   53_local-proxytrack- #701 took #572's prefix twelve days later, not a free number
 #   62_lang-             one test plus the two count files it pins
 #   74_local-warc-       one author, two WARC PRs half an hour apart one night,
 #                        so the shared prefix was a choice and not a collision
@@ -64,12 +64,14 @@ families=(01_engine- 01_zlib- 11_crawl- 53_local-proxytrack- 62_lang- 74_local-w
 # carry a number too, so a glob of *.test alone cannot see one squatting.
 # An in-tree build puts automake's own NNN_name.log and NNN_name.trs in this
 # same directory, and those are output rather than a name anyone chose, so
-# reading them made every test a duplicate of itself.
+# reading them made every test a duplicate of itself. Only the output is
+# skipped: a .log with no .test of its own name is a file claiming that number,
+# which is the thing being rejected here.
 shopt -s nullglob
 numbered=""
 for f in "$testdir"/[0-9]*_*; do
     [ -f "$f" ] || continue
-    case $f in *.log | *.trs) continue ;; esac
+    case $f in *.log | *.trs) [ ! -e "${f%.*}.test" ] || continue ;; esac
     name=${f##*/}
     digits=${name%%_*}
     case $digits in *[!0-9]*) continue ;; esac
@@ -89,7 +91,7 @@ shopt -u nullglob
 for n in $(printf '%s' "$numbered" | cut -d' ' -f1 | sort -n | uniq -d); do
     group=$(printf '%s' "$numbered" | awk -v n="$n" '$1 == n')
     # A family may share its number; anything else in there is squatting on it.
-    if grep -qv ' yes ' <<<"$group"; then
+    if [ -n "$(awk '$2 != "yes"' <<<"$group")" ]; then
         bad "number $n is claimed by more than one test: $(
             awk '{printf "%s ", $3}' <<<"$group"
         )"

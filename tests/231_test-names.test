@@ -70,6 +70,9 @@ control dupany 'claimed by more than one test' ': >389_a.test; : >389_b.data'
 # The exemption is by family name. Exempting the number instead would let two
 # unrelated tests share 01 with 01_engine-, which is the accident, not a family.
 control dupnumber 'claimed by more than one test' ': >01_bogus-one.test; : >01_bogus-two.test'
+# A .log with no .test of its own name is a file claiming that number, so the
+# build-output skip must not swallow it.
+control duplog 'claimed by more than one test' ': >389_a.test; : >389_b.log'
 ok_dir="${work}/family"
 mkdir -p "$ok_dir"
 : >"${ok_dir}/01_engine-one.test"
