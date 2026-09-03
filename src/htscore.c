@@ -485,13 +485,6 @@ static int look_like_xml(const char *s) {
 
 // Début de httpmirror, robot
 // url1 peut être multiple
-/* Load a local body back into memory for parsing. Refuses a file too large for
-   the int indexes downstream, one of which htsparse divides by, and reads
-   nothing in that case. Note: NOT utf-8. */
-static char *readfile_for_parsing(const char *file, LLint *size) {
-  return hts_inmem_size_fits(fsize(file)) ? readfile2(file, size) : NULL;
-}
-
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
@@ -1375,7 +1368,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           )  \
         { \
           is_loaded_from_file = 1; \
-          r.adr = readfile_for_parsing(savename(), &r.size); \
+          r.adr = readfile2_inmem(savename(), &r.size); \
           if (r.adr != NULL) { \
             hts_log_print(opt, LOG_INFO, "File successfully loaded for parsing: %s%s (%d bytes)",urladr(),urlfil(),(int)r.size); \
           } else { \

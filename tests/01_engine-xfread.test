@@ -7,10 +7,31 @@ set -euo pipefail
 # 32-bit index (hostile Content-Length, or an endless stream) rather than
 # allocate it, while still accepting a normal small size. The same bound has to
 # hold on the two paths that fill r->adr without going through that guard: a
-# chunk stream (see 130_local-chunked-truncated.test) and a decoded content
-# coding. -#test=xfread-limit drives all of them.
+# chunk stream (see 130_local-chunked-truncated.test), a decoded content coding,
+# and a local file read back for parsing. -#test=xfread-limit drives all of them.
 
-out="$(httrack -O /dev/null -#test=xfread-limit)"
+# The file is sparse, so only a build missing the bound reads its 2 GiB.
+bigdir=
+cleanup() {
+    test -z "$bigdir" || rm -rf "$bigdir"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT TERM
+
+big=
+if command -v truncate >/dev/null 2>&1; then
+    bigdir=$(mktemp -d ./xfread-big.XXXXXX)
+    if truncate -s 2147483647 "$bigdir/f" 2>/dev/null &&
+        test "$(du -k "$bigdir/f" | cut -f1)" -le 1024; then
+        big=$bigdir/f
+    else
+        rm -rf "$bigdir"
+        bigdir=
+    fi
+fi
+test -n "$big" || echo "no sparse file here: skipping the oversized-file case"
+
+out="$(httrack -O /dev/null -#test=xfread-limit ${big:+"$big"})"
 fail() {
     echo "FAIL $1: $out"
     exit 1
@@ -46,3 +67,8 @@ done
 has 'decode_mem_max: ok=0 body=dropped size=64 code=-1 msg=Decompressed content too large'
 has 'decode_mem_ok: ok=1 body=kept size=2147483646 code=0 msg='
 has 'decode_disk_max: ok=1 body=kept size=2147483647 code=0 msg='
+
+# size= must stay at the self-test's own -1: a refusal writes neither.
+if test -n "$big"; then
+    has 'bigfile: adr=null size=-1'
+fi

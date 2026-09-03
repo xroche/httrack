@@ -3033,8 +3033,6 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
   size_t i;
 
   (void) opt;
-  (void) argc;
-  (void) argv;
 
   // Content-Length just over 2 GiB.
   memset(&r, 0, sizeof(r));
@@ -3105,6 +3103,18 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
   st_decode_size_case("decode_mem_max", 0, (LLint) INT32_MAX);
   st_decode_size_case("decode_mem_ok", 0, (LLint) INT32_MAX - 1);
   st_decode_size_case("decode_disk_max", 1, (LLint) INT32_MAX);
+
+  /* Given a file at or past the bound, the reader must refuse on the stat that
+     would size its own allocation, so nothing appended after a caller's own
+     check can carry the body past it. */
+  if (argc >= 1) {
+    LLint got = -1;
+    char *adr = readfile2_inmem(argv[0], &got);
+
+    printf("bigfile: adr=%s size=" LLintP "\n", adr != NULL ? "alloc" : "null",
+           got);
+    freet(adr);
+  }
   return 0;
 }
 
@@ -13265,7 +13275,7 @@ static const struct selftest_entry {
      "binput() consumes a clipped line whole (#1294)", st_binputline},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
-    {"xfread-limit", "", "in-memory receive buffer size bound",
+    {"xfread-limit", "[oversized-file]", "in-memory receive buffer size bound",
      st_xfread_limit},
     {"getext", "",
      "extension parsing stops at the query and inside the buffer (#1433)",
