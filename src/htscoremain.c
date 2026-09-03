@@ -58,6 +58,16 @@ Please visit our Website: http://www.httrack.com
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
+/* These BSDs name the running binary through sysctl, which needs no /proc.
+   OpenBSD has no equivalent and stays on argv[0]. */
+#if defined(HAVE_SYS_SYSCTL_H) &&                                              \
+    (defined(__FreeBSD__) || defined(__DragonFly__) || defined(__NetBSD__))
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#ifdef KERN_PROC_PATHNAME
+#define HTS_SELF_PATH_SYSCTL 1
+#endif
+#endif
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -102,6 +112,23 @@ const char *hts_self_path(char *dst, size_t dstsize) {
   uint32_t n = (uint32_t) dstsize;
 
   return _NSGetExecutablePath(dst, &n) == 0 ? dst : NULL;
+#elif defined(HTS_SELF_PATH_SYSCTL)
+  /* FreeBSD and DragonFly put the pid last, NetBSD puts it third (#1506). */
+#if defined(__NetBSD__)
+  int mib[4] = {CTL_KERN, KERN_PROC_ARGS, -1, KERN_PROC_PATHNAME};
+#else
+  int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1};
+#endif
+  size_t n = dstsize;
+
+  if (sysctl(mib, 4, dst, &n, NULL, 0) != 0)
+    return NULL;
+  /* n counts the kernel's terminator, so 1 is the empty path, and a length
+     reaching the buffer end is a truncation rather than a path. */
+  if (n <= 1 || n >= dstsize)
+    return NULL;
+  dst[n] = '\0'; /* the kernel need not terminate it */
+  return dst;
 #else
   /* Linux; anywhere else this is simply absent and argv[0] has to do. */
   const ssize_t n = readlink("/proc/self/exe", dst, dstsize - 1);
