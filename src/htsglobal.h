@@ -368,8 +368,8 @@ typedef int hts_tristate;
 #define HTS_DEPRECATED(msg)
 #endif
 
-/* Marks a function that never returns, before the declaration so the GCC/Clang
-   attribute and the MSVC __declspec both sit where they are accepted. */
+/* Never returns; placed before the declaration, where GCC/Clang and MSVC both
+   accept it. */
 #if defined(__GNUC__)
 #define HTS_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
