@@ -50,15 +50,27 @@ command -v addr2line >/dev/null || skip "addr2line not installed"
 # the assertion below into a vacuous pass. Second form: glibc drops the "+0x"
 # when the load bias is zero, and the bracketed address is then the file one.
 oracle="${tmpdir}/oracle"
+frames="${tmpdir}/frames"
 sed -n -e 's/^\([^(]*\)(+\(0x[0-9a-f]*\)).*$/\1 \2/p' \
-    -e 's/^\([^(]*\)() \[\(0x[0-9a-f]*\)\].*$/\1 \2/p' "$out" |
-    while read -r mod off; do
-        # The main program is reported as argv[0], a bare name off PATH (#889).
-        test -f "$mod" || mod=$(command -v "$mod" 2>/dev/null) || continue
-        test -f "$mod" || continue
-        addr2line -Cfip -e "$mod" "$off" 2>/dev/null || true
-    done >"$oracle"
-grep -qE 'st_strsafe|strcpy_safe_' "$oracle" || skip "addr2line names no hidden symbol in this build"
+    -e 's/^\([^(]*\)() \[\(0x[0-9a-f]*\)\].*$/\1 \2/p' "$out" >"$frames"
+# Read from the file, not a pipe: a subshell would lose the count below.
+resolved=0
+: >"$oracle"
+while read -r mod off; do
+    # The main program is reported as argv[0], a bare name off PATH (#889).
+    test -f "$mod" || mod=$(command -v "$mod" 2>/dev/null) || continue
+    test -f "$mod" || continue
+    resolved=$((resolved + 1))
+    addr2line -Cfip -e "$mod" "$off" 2>/dev/null >>"$oracle" || true
+done <"$frames"
+if ! grep -qE 'st_strsafe|strcpy_safe_' "$oracle"; then
+    # Which stage came up empty, because the skip alone names no suspect and
+    # this is the form the emulated s390x leg has been reporting.
+    echo "parsed $(wc -l <"$frames") frames, resolved ${resolved} of them to a file" >&2
+    dump_file "$out"
+    dump_file "$oracle"
+    skip "addr2line names no hidden symbol in this build"
+fi
 
 # The payload. Dropping the raw frames first is what makes it specific: both
 # names are static, so .dynsym could never have carried them. Not anchored on
