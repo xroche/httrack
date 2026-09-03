@@ -52,6 +52,16 @@ zstd_lib=$(find_lib libzstd.so libzstd.dylib libzstd.tbd libzstd.a) ||
 brotli_hdr=$(find_hdr brotli/decode.h) || skip "no system brotli/decode.h"
 zstd_hdr=$(find_hdr zstd.h) || skip "no system zstd.h"
 
+# Gate on the layout, never on the probe under test, so the cases run wherever
+# the bug can occur. Where the system put a library is what the layout means.
+host_triplet=${brotli_dec%/*}
+host_triplet=${host_triplet##*/}
+case ${host_triplet} in
+*[!-a-zA-Z0-9_.]*) host_triplet= ;;
+*-*) ;;
+*) host_triplet= ;;
+esac
+
 work=$(mktemp -d "${TMPDIR:-/tmp}/codecdir.XXXXXX") || fail "no tmpdir"
 cleanup_push rm -rf "${work}"
 
@@ -98,6 +108,7 @@ fixture() {
 
 n=0
 cases=8 # expect/expect_fail calls below, what the budget is paced against
+test -z "${host_triplet}" || cases=$((cases + 3))
 
 # No --cache-file: the codec probes cache as ac_cv_lib_brotlidec_* and
 # ac_cv_header_zstd_h, so one cache shared across cases replays the first
@@ -213,6 +224,22 @@ expect brotli lib64 lib "--libdir picks lib64" "${br_both}" \
     --prefix="${work}/inst" --libdir="${work}/inst/lib64"
 expect brotli lib/x86_64-linux-gnu lib "a multiarch libdir picks the triplet" \
     "${br_multiarch}" --prefix="${work}/inst" --libdir="${work}/inst/lib/x86_64-linux-gnu"
+
+# That case only proves --libdir is honoured, and a packager passing
+# --with-brotli=/usr gives no --libdir at all.
+if test -n "${host_triplet}"; then
+    br_host=$(fixture br-host brotli brotli "lib/${host_triplet}")
+    expect brotli "lib/${host_triplet}" lib "the triplet is searched without --libdir" \
+        "${br_host}"
+    # Pin the triplet behind both names ahead of it, because a reorder swaps
+    # which library gets linked and breaks no build.
+    br_host_lib=$(fixture br-host-lib brotli brotli lib "lib/${host_triplet}")
+    expect brotli lib "lib/${host_triplet}" "lib outranks the triplet among the guesses" \
+        "${br_host_lib}" --prefix="${work}/inst" --libdir="${work}/inst/lib64"
+    br_host_lib64=$(fixture br-host-lib64 brotli brotli lib64 "lib/${host_triplet}")
+    expect brotli lib64 "lib/${host_triplet}" "lib64 outranks the triplet too" \
+        "${br_host_lib64}"
+fi
 
 # zstd goes through the same macro with its own library name, so one case is
 # enough to show the glob is parameterised and not hardcoded to brotli.
