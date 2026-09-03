@@ -1,0 +1,94 @@
+# Termux is the harshest consumer we have: bionic, a cross-compile, API level 24
+# and a stripped sysroot. 3.50.0 shipped a missing spawn.h (#1487) and an install
+# that looped on an ordinary --docdir (#1488), and our own CI saw neither, so a
+# packager reported both. This builds master through their recipe instead of the
+# released tarball. Their tree, so a red here can be theirs to fix, which is why
+# it blocks nothing.
+name: termux build canary
+
+on:
+  schedule:
+    - cron: "29 4 * * 4"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  termux:
+    name: build-package.sh against Termux's recipe
+    # Scheduled workflows run per-fork independently; skip anywhere but upstream.
+    if: github.repository == 'xroche/httrack'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: httrack
+
+      - name: Install autotools
+        run: |
+          set -euo pipefail
+          sudo apt-get update || true  # a third-party source in the runner image can 403 (#1097)
+          sudo apt-get install -y --no-install-recommends \
+            build-essential autoconf automake libtool autoconf-archive \
+            zlib1g-dev libssl-dev
+
+      - name: Build the tarball a packager would get
+        run: |
+          set -euo pipefail
+          cd httrack
+          ./bootstrap
+          ./configure
+          make dist
+          ver=$(sed -n 's/.*HTTRACK_VERSIONID "\([^"]*\)".*/\1/p' src/htsglobal.h)
+          test -f "httrack-$ver.tar.gz"
+          echo "ver=$ver" >> "$GITHUB_ENV"
+
+      - name: Fetch their recipe and point it at that tarball
+        run: |
+          set -euo pipefail
+          git clone --depth 1 https://github.com/termux/termux-packages
+          echo "recipe from termux-packages $(git -C termux-packages rev-parse HEAD)"
+          mkdir termux-packages/httrack-canary
+          cp "httrack/httrack-$ver.tar.gz" termux-packages/httrack-canary/
+          # run-docker.sh mounts the checkout at this path, and their downloader
+          # reads a file:// URL straight off disk.
+          url="file:///home/builder/termux-packages/httrack-canary/httrack-$ver.tar.gz"
+          sha=$(sha256sum "httrack/httrack-$ver.tar.gz" | cut -d' ' -f1)
+          recipe=termux-packages/packages/httrack/build.sh
+          sed -i -e "s|^TERMUX_PKG_VERSION=.*|TERMUX_PKG_VERSION=\"$ver\"|" \
+            -e "s|^TERMUX_PKG_SRCURL=.*|TERMUX_PKG_SRCURL=$url|" \
+            -e "s|^TERMUX_PKG_SHA256=.*|TERMUX_PKG_SHA256=$sha|" "$recipe"
+          # A sed that matched nothing leaves the recipe on the released tarball,
+          # and the canary then passes without having built this tree at all.
+          grep -qx "TERMUX_PKG_VERSION=\"$ver\"" "$recipe"
+          grep -qx "TERMUX_PKG_SRCURL=$url" "$recipe"
+          echo "url=$url" >> "$GITHUB_ENV"
+
+      # Their patches are applied verbatim: one that no longer applies to our
+      # master is a finding, not something to route around.
+      - name: build-package.sh, aarch64
+        timeout-minutes: 60
+        run: |
+          set -euo pipefail
+          cd termux-packages
+          # -I is how their own CI invokes it.
+          ./scripts/run-docker.sh ./build-package.sh -I -a aarch64 httrack 2>&1 |
+            tee "$GITHUB_WORKSPACE/build.log"
+          test -f "output/httrack_${ver}_aarch64.deb" ||
+            { echo "build-package.sh exited 0 with no package" >&2; exit 1; }
+          # An override of termux_step_get_source would ignore our URL, past both greps.
+          grep -qF "source from '$url'" "$GITHUB_WORKSPACE/build.log" ||
+            { echo "their downloader never announced our tarball" >&2; exit 1; }
+
+      - name: Name the step that died
+        if: failure()
+        run: |
+          set -euo pipefail
+          # An earlier step failing leaves no log at all.
+          test -f "$GITHUB_WORKSPACE/build.log" || exit 0
+          # elf-cleaner buries the last of these phase markers under 400 lines.
+          grep -nE '^(Downloading|Applying patch:|Building|ERROR:|make.*\*\*\*)' \
+            "$GITHUB_WORKSPACE/build.log" | tail -20 || true
+          grep -v '^termux-elf-cleaner:' "$GITHUB_WORKSPACE/build.log" | tail -60 || true
