@@ -1,5 +1,5 @@
---- zip.h.orig	2024-01-27 14:07:18.636193212 +0100
-+++ zip.h	2024-01-27 14:10:04.104643731 +0100
+--- zip.h.orig	2026-09-03 22:29:36.862585755 +0200
++++ zip.h	2026-09-03 22:38:26.836034035 +0200
 @@ -75,6 +75,9 @@
  #define ZIP_PARAMERROR                  (-102)
  #define ZIP_BADZIPFILE                  (-103)
@@ -35,3 +35,29 @@
  extern int ZEXPORT zipCloseFileInZipRaw(zipFile file,
                                          uLong uncompressed_size,
                                          uLong crc32);
+@@ -338,25 +354,6 @@
+   Close the zipfile
+ */
+ 
+-
+-extern int ZEXPORT zipRemoveExtraInfoBlock(char* pData, int* dataLen, short sHeader);
+-/*
+-  zipRemoveExtraInfoBlock -  Added by Mathias Svensson
+-
+-  Remove extra information block from a extra information data for the local file header or central directory header
+-
+-  It is needed to remove ZIP64 extra information blocks when before data is written if using RAW mode.
+-
+-  0x0001 is the signature header for the ZIP64 extra information blocks
+-
+-  usage.
+-                        Remove ZIP64 Extra information from a central director extra field data
+-              zipRemoveExtraInfoBlock(pCenDirExtraFieldData, &nCenDirExtraFieldDataLen, 0x0001);
+-
+-                        Remove ZIP64 Extra information from a Local File Header extra field data
+-        zipRemoveExtraInfoBlock(pLocalHeaderExtraFieldData, &nLocalHeaderExtraFieldDataLen, 0x0001);
+-*/
+-
+ #ifdef __cplusplus
+ }
+ #endif
