@@ -223,19 +223,25 @@ static hts_boolean sf_denied(const char *tag_name, const char *attr) {
   return HTS_FALSE;
 }
 
-char singlefile_ref_class(const char *tag_name, const char *attr) {
+char singlefile_ref_class(const char *tag_name, const char *attr,
+                          const char *body) {
+  char prevc;
+
   if (attr == NULL)
     return 0;
   if (sf_denied(tag_name, attr))
     return 0;
+  prevc = html_prevc(attr, body);
   if (tag_name == NULL) {
     /* A stylesheet or a script body: only @import names another stylesheet. */
-    return rech_tageq(attr, "import") != 0 ? SINGLEFILE_CLASS_CSS
-                                           : SINGLEFILE_CLASS_ANY;
+    return rech_tageq_at(attr, prevc, "import") != 0 ? SINGLEFILE_CLASS_CSS
+                                                     : SINGLEFILE_CLASS_ANY;
   }
-  if (hts_cmp_tag_token(tag_name, "script") && rech_tageq(attr, "src") != 0)
+  if (hts_cmp_tag_token(tag_name, "script") &&
+      rech_tageq_at(attr, prevc, "src") != 0)
     return SINGLEFILE_CLASS_JS;
-  if (hts_cmp_tag_token(tag_name, "link") && rech_tageq(attr, "href") != 0) {
+  if (hts_cmp_tag_token(tag_name, "link") &&
+      rech_tageq_at(attr, prevc, "href") != 0) {
     const int rel = sf_rel_is_stylesheet(tag_name);
 
     /* No rel names nothing the browser would load, so it stays a link. */
