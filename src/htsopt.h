@@ -448,7 +448,16 @@ struct httrackp {
   t_proxy proxy;     /**< proxy configuration */
   hts_savename_83
       savename_83;   /**< saved-name length layout (long/DOS/ISO9660) */
-  int savename_type; /**< saved-name layout (original tree, flat, ...) */
+  /** Saved-name layout preset (-N), or -1 for the savename_userdef template.
+      `% 100` picks the tree: 0 site structure, 1 and 2 split off images/ and
+      html/, 4 and 5 split by extension, 99 gives random names, and every
+      other value keeps the file name alone. An odd hundreds digit names the
+      top directory after the host rather than "web", and an odd thousands
+      digit drops that top directory. Site structure has no "web", so it
+      reads no hundreds digit beyond the literal 100, which drops the host
+      directory. -1 is also the only value spared the forced ".html" on an
+      extensionless name. */
+  int savename_type;
   String
       savename_userdef; /**< user-defined name template (e.g. %h%p/%n%q.%t) */
   hts_savename_delayed savename_delayed; /**< delayed type-check policy */
