@@ -24,11 +24,15 @@ cleanup_push cleanup
 # ('Z') rather than the zeros a fresh page would hand out for free
 export MALLOC_PERTURB_=165
 leak_run=$(printf 'Z%.0s' $(seq 1 64))
-# ... where the allocator honours it; the length assertions carry the rest
+# ... where the allocator honours it, which Windows has no way to ask; the
+# length assertions carry the test everywhere else
 poison=$("$python" -c 'import ctypes
-libc = ctypes.CDLL(None)
-libc.malloc.restype = ctypes.c_void_p
-print(ctypes.string_at(libc.malloc(1 << 16), 8).hex())')
+try:
+    libc = ctypes.CDLL(None)
+    libc.malloc.restype = ctypes.c_void_p
+    print(ctypes.string_at(libc.malloc(1 << 16), 8).hex())
+except Exception:
+    print("unavailable")')
 
 BODY='<html>hello</html>'
 DECLARED=4096
