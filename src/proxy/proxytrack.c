@@ -820,6 +820,12 @@ static PT_Element proxytrack_process_HTTP_List(PT_Indexes indexes,
   return NULL;
 }
 
+/* Bytes the reply may take from an element: the send skips a body the reader
+   refused, and announcing one would desync a kept-alive peer. */
+static size_t element_body_size(const PT_Element element) {
+  return (element != NULL && element->adr != NULL) ? element->size : 0;
+}
+
 static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
   int timeout = 30;
   int buffer_size = 32768;
@@ -1220,10 +1226,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
 
       if (!headRequest) {
         dataSize = StringLength(output);
-        /* the send below skips a refused body, so announcing its length
-           would desync a kept-alive peer */
-        if (dataSize == 0 && element != NULL && element->adr != NULL) {
-          dataSize = element->size;
+        if (dataSize == 0) {
+          dataSize = element_body_size(element);
         }
       }
       sprintf(tmp, "%d", (int) dataSize);
@@ -1248,9 +1252,8 @@ static void proxytrack_process_HTTP(PT_Indexes indexes, T_SOC soc_c) {
     /* Logging */
     {
       const char *contentType = "text/html";
-      size_t size =
-        StringLength(output) ? StringLength(output) : (element ? element->
-                                                       size : 0);
+      size_t size = StringLength(output) ? StringLength(output)
+                                         : element_body_size(element);
       /* */
       String ip = STRING_EMPTY;
       SOCaddr serverClient;

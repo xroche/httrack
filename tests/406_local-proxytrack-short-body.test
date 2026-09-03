@@ -1,9 +1,9 @@
 #!/bin/bash
 #
-# A cache entry whose X-Size exceeds the on-disk body it names left the tail of
-# the allocated buffer uninitialised, and both consumers shipped element->size
-# bytes whatever the read error said: the ARC writer onto disk, the proxy to
-# the client.
+# A cache entry whose declared size exceeds the on-disk body it names left the
+# tail of the allocated buffer uninitialised, and both consumers shipped that
+# declared count whatever the read error said: the ARC writer onto disk, the
+# proxy to the client.
 
 set -euo pipefail
 
@@ -24,7 +24,7 @@ cleanup_push cleanup
 # ('Z') rather than the zeros a fresh page would hand out for free
 export MALLOC_PERTURB_=165
 leak_run=$(printf 'Z%.0s' $(seq 1 64))
-# ... on the allocators that honour it; elsewhere the length checks carry the test
+# ... where the allocator honours it; the length assertions carry the rest
 poison=$("$python" -c 'import ctypes
 libc = ctypes.CDLL(None)
 libc.malloc.restype = ctypes.c_void_p
@@ -32,17 +32,19 @@ print(ctypes.string_at(libc.malloc(1 << 16), 8).hex())')
 
 BODY='<html>hello</html>'
 DECLARED=4096
-url=http://example.com/page.html
+short_url=http://example.com/page.html
+honest_url=http://example.com/ok.html
 
 # X-Save is relative to the cache's grandparent, so keep HTTrack's own layout
 mkdir -p "$dir/m/hts-cache"
-zip="$dir/m/hts-cache/new.zip"
 printf '%s' "$BODY" >"$dir/m/body.html"
+short=$dir/m/hts-cache/short.zip
+honest=$dir/m/hts-cache/honest.zip
 
 # X-In-Cache: 0 leaves the body on disk, the path that sizes its buffer from the
 # header and fills it from a file that may be shorter
-craft() { # craft X-SIZE
-    "$python" - "$zip" "$1" <<'EOF'
+craft() { # craft ZIP URL SIZE
+    "$python" - "$@" <<'EOF'
 import sys, zipfile
 
 meta = (
@@ -52,14 +54,27 @@ meta = (
     "X-Size: %s\r\n"
     "Content-Type: text/html\r\n"
     "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n"
-    "X-Save: body.html\r\n" % sys.argv[2]
+    "X-Save: body.html\r\n" % sys.argv[3]
 ).encode()
-zi = zipfile.ZipInfo("example.com/page.html")
+zi = zipfile.ZipInfo(sys.argv[2].replace("http://", ""))
 zi.compress_type = zipfile.ZIP_STORED
 zi.extra = meta
 with zipfile.ZipFile(sys.argv[1], "w") as z:
     z.writestr(zi, b"")
 EOF
+}
+
+# The stored entry, so an assertion cannot pass on an archive that dropped it.
+record() { # record ARC URL
+    grep -qa "^$2 " "$1" || fail "$1 holds no record for $2"
+}
+
+# Largest body length any record in $1 announces, so a leak of any size fails.
+announced() { # announced ARC
+    local n
+    n=$(sed -n 's/^Content-length: \([0-9][0-9]*\).*/\1/p' "$1" | sort -n | tail -1)
+    test -n "$n" || fail "$1 announces no body length"
+    echo "$n"
 }
 
 no_leak() { # no_leak FILE WHAT
@@ -70,61 +85,76 @@ no_leak() { # no_leak FILE WHAT
 }
 
 # Consumer 1: the ARC writer.
-craft "${#BODY}"
-proxytrack --convert "$dir/honest.arc" "$zip" >/dev/null 2>&1 ||
+craft "$honest" "$honest_url" "${#BODY}"
+proxytrack --convert "$dir/honest.arc" "$honest" >/dev/null 2>&1 ||
     fail "proxytrack died converting an honest cache"
 # control: a fix that dropped every disk-held body would pass the rest
-grep -qaF "$BODY" "$dir/honest.arc" || fail "an honest X-Size lost the body"
-grep -qa "Content-length: ${#BODY}" "$dir/honest.arc" ||
-    fail "an honest X-Size was not announced as ${#BODY} bytes"
+record "$dir/honest.arc" "$honest_url"
+grep -qaF "$BODY" "$dir/honest.arc" || fail "an honest declared size lost the body"
+test "$(announced "$dir/honest.arc")" = "${#BODY}" ||
+    fail "an honest declared size was not announced as ${#BODY} bytes"
 
-craft "$DECLARED"
-proxytrack --convert "$dir/short.arc" "$zip" >/dev/null 2>&1 ||
+craft "$short" "$short_url" "$DECLARED"
+proxytrack --convert "$dir/short.arc" "$short" >/dev/null 2>&1 ||
     fail "proxytrack died converting a cache whose body is short"
-if grep -qa "Content-length: $DECLARED" "$dir/short.arc"; then
-    fail "the ARC writer stored $DECLARED bytes of a ${#BODY}-byte body"
-fi
-grep -qa 'Content-length: 0' "$dir/short.arc" ||
-    fail "the ARC writer kept a body it could not fill"
+record "$dir/short.arc" "$short_url"
+test "$(announced "$dir/short.arc")" -le "${#BODY}" ||
+    fail "the ARC writer stored more than the ${#BODY} bytes the file held"
 no_leak "$dir/short.arc" "the ARC writer"
 
 # Consumer 2: the reply to the client.
 launch_proxytrack() {
-    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$zip" >"$ptlog" 2>&1 &
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" "$honest" "$short" \
+        >"$ptlog" 2>&1 &
     ptpid=$!
 }
 start_proxytrack "$dir/pt" launch_proxytrack
 
-"$python" - "$proxyport" "$url" "$dir/reply" <<'EOF' || fail_dump "the proxy reply is not what its headers announced" "$ptlog"
+# The honest URL first: it proves the proxy serves these entries at all, so the
+# short one's assertions cannot pass on a 404.
+"$python" - "$proxyport" "$honest_url" "$short_url" "$dir/reply" "$BODY" <<'EOF' ||
 import socket, sys
 
-port, url, out = int(sys.argv[1]), sys.argv[2], sys.argv[3]
-sock = socket.create_connection(("127.0.0.1", port), 10)
-sock.settimeout(10)
-sock.sendall(
-    ("GET %s HTTP/1.1\r\nHost: example.com\r\n\r\n" % url).encode()
+port, honest_url, short_url, out, body = (
+    int(sys.argv[1]), sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5].encode()
 )
-reply = b""
-try:
-    while True:
-        chunk = sock.recv(65536)
-        if not chunk:
-            break
-        reply += chunk
-except socket.timeout:
-    pass
-open(out, "wb").write(reply)
 
-head, _, body = reply.partition(b"\r\n\r\n")
-for line in head.split(b"\r\n"):
-    if line.lower().startswith(b"content-length:"):
-        announced = int(line.split(b":")[1])
-        break
-else:
+def get(url):
+    sock = socket.create_connection(("127.0.0.1", port), 10)
+    sock.settimeout(10)
+    sock.sendall(("GET %s HTTP/1.1\r\nHost: example.com\r\n\r\n" % url).encode())
+    reply = b""
+    try:
+        while True:
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            reply += chunk
+    except socket.timeout:
+        pass
+    head, _, payload = reply.partition(b"\r\n\r\n")
+    for line in head.split(b"\r\n"):
+        if line.lower().startswith(b"content-length:"):
+            return reply, head, payload, int(line.split(b":")[1])
     sys.exit("no Content-length in %r" % head)
-if announced != len(body):
-    sys.exit("announced %d bytes, sent %d" % (announced, len(body)))
+
+reply, head, payload, announced = get(honest_url)
+if payload != body:
+    sys.exit("the honest entry served %r, not the file's bytes" % payload[:64])
+if announced != len(payload):
+    sys.exit("the honest entry announced %d bytes, sent %d" % (announced, len(payload)))
+
+reply, head, payload, announced = get(short_url)
+open(out, "wb").write(reply)
+# the cache entry's own header, so a 404 error page cannot stand in for it
+if b"Last-Modified: Wed, 01 Jan 2025" not in head:
+    sys.exit("the short entry was not served: %r" % head)
+if announced != len(payload):
+    sys.exit("the short entry announced %d bytes, sent %d" % (announced, len(payload)))
+if announced > len(body):
+    sys.exit("the short entry sent %d bytes of a %d-byte file" % (announced, len(body)))
 EOF
+    fail_dump "the proxy reply is not what its headers announced" "$ptlog"
 no_leak "$dir/reply" "the proxy reply"
 
 # The pre-3.31 .ndx reader is a second copy of the same allocate-then-fill, and
@@ -164,14 +194,15 @@ EOF
 craft_ndx "${#BODY}"
 proxytrack --convert "$dir/ndx-honest.arc" "$dir/n/hts-cache/c.ndx" >/dev/null 2>&1 ||
     fail "proxytrack died converting an honest .ndx cache"
+record "$dir/ndx-honest.arc" "$short_url"
 grep -qaF "$BODY" "$dir/ndx-honest.arc" || fail "an honest .ndx size lost the body"
 
 craft_ndx "$DECLARED"
 proxytrack --convert "$dir/ndx.arc" "$dir/n/hts-cache/c.ndx" >/dev/null 2>&1 ||
     fail "proxytrack died converting an .ndx cache whose body is short"
-if grep -qa "Content-length: $DECLARED" "$dir/ndx.arc"; then
-    fail "the .ndx reader kept $DECLARED bytes of a ${#BODY}-byte body"
-fi
+record "$dir/ndx.arc" "$short_url"
+test "$(announced "$dir/ndx.arc")" -le "${#BODY}" ||
+    fail "the .ndx reader kept more than the ${#BODY} bytes the file held"
 no_leak "$dir/ndx.arc" "the .ndx reader"
 
 echo "OK: neither consumer emitted a byte the cache body did not hold"
