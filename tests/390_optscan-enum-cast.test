@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# "%d" writes an int, and an enum-typed option field is one byte wide under
+# -fshort-enums, so a scan aimed at the field through a cast writes past it.
+# scanOptInt() scans its own int. htscoremain.c holds every option scan today.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+[ -n "${abs_top_srcdir:-}" ] || skip "abs_top_srcdir unset, no automake environment"
+src="$abs_top_srcdir/src/htscoremain.c"
+test -r "$src" || fail "no $src"
+
+pattern='sscanf[^;]*\([a-z_][a-z_ ]*\*\)[ 	]*&opt->'
+
+# The pattern's silence means nothing until it has matched a known-bad line.
+# The typedef spelling is the likelier one to be written next.
+for bad in 'sscanf(com + 1, "%d", (int *) &opt->urlmode);' \
+    'sscanf(com + 1, "%d", (hts_urlmode *) &opt->urlmode);'; do
+    grep -qE "$pattern" <<<"$bad" || fail "the pattern cannot match: $bad"
+done
+
+found=$(grep -nE "$pattern" "$src" || true)
+[ -z "$found" ] || fail "option scan writing through a cast pointer in $src:
+$found"
+
+grep -q 'scanOptInt' "$src" || fail "scanOptInt() has left $src"
+
+echo "optscan: no option scan in htscoremain.c writes through a cast pointer"

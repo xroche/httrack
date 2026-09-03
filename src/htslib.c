@@ -6477,6 +6477,12 @@ HTSEXT_API size_t hts_sizeof_opt(void) {
   return sizeof(httrackp);
 }
 
+/* The runtime assert below cannot see a same-sized non-callback member. */
+HTS_STATIC_ASSERT(offsetof(t_hts_htmlcheck_callbacks, extsavename) +
+                          sizeof(t_hts_htmlcheck_callbacks_item) ==
+                      sizeof(t_hts_htmlcheck_callbacks),
+                  callbacks_are_a_flat_slot_array);
+
 HTSEXT_API void hts_free_opt(httrackp * opt) {
   if (opt != NULL) {
     /* An FTP worker reads opt for its whole run, and not every caller drains
