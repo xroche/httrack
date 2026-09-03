@@ -56,6 +56,8 @@ jobs:
       # master is a finding, not something to route around.
       - name: build-package.sh, aarch64
         timeout-minutes: 60
+        env:
+          ver: ${{ steps.dist.outputs.version }}
         run: |
           set -euo pipefail
           cd termux-packages
