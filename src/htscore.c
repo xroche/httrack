@@ -485,6 +485,13 @@ static int look_like_xml(const char *s) {
 
 // Début de httpmirror, robot
 // url1 peut être multiple
+/* Load a local body back into memory for parsing. Refuses a file too large for
+   the int indexes downstream, one of which htsparse divides by, and reads
+   nothing in that case. Note: NOT utf-8. */
+static char *readfile_for_parsing(const char *file, LLint *size) {
+  return hts_inmem_size_fits(fsize(file)) ? readfile2(file, size) : NULL;
+}
+
 int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
   char *primary = NULL;         // première page, contenant les liens à scanner
   hash_struct hash;             // système de hachage, accélère la recherche dans les liens
@@ -1356,6 +1363,8 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
         }
 
         /* Load file if necessary and decode. */
+        /* clang-format off: an edit realigns all backslashes, churning the macro. */
+        /* clang-format off */
 #define LOAD_IN_MEMORY_IF_NECESSARY() do { \
         if (  \
           may_be_hypertext_mime(opt,r.contenttype, urlfil())   /* Is HTML or Js, .. */ \
@@ -1366,7 +1375,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
           )  \
         { \
           is_loaded_from_file = 1; \
-          r.adr = readfile2(savename(), &r.size); \
+          r.adr = readfile_for_parsing(savename(), &r.size); \
           if (r.adr != NULL) { \
             hts_log_print(opt, LOG_INFO, "File successfully loaded for parsing: %s%s (%d bytes)",urladr(),urlfil(),(int)r.size); \
           } else { \
@@ -1376,6 +1385,7 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 } while(0)
         /* Load file and decode if necessary, before content-binary check. (3.43) */
         LOAD_IN_MEMORY_IF_NECESSARY();
+        /* clang-format on */
 
         // ------------------------------------
         // BOGUS MIME TYPE HACK II (the revenge)
