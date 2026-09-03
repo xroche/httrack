@@ -7,7 +7,8 @@ on:
     branches: [master]
   pull_request:
   schedule:
-    # Weekly re-scan of master so new/updated queries land without a push.
+    # Weekly re-scan, guarded below. The analyzer is pinned by the action tag,
+    # so a query update arrives as a dependabot push and is scanned by it.
     - cron: "17 4 * * 1"
 
 permissions:
@@ -18,8 +19,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Only the cron reaches here, and only to ask whether master moved since the
+  # last one: CodeQL reads this tree and a pinned analyzer, nothing that drifts
+  # on its own. The distro canaries watch a downstream recipe and must never
+  # take this guard, since a quiet week is when that recipe moves.
+  freshness:
+    name: has the tree moved?
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      needed: ${{ steps.guard.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: guard
+        run: tools/scheduled-run-needed.sh --event "${{ github.event_name }}"
+
   analyze:
     name: analyze (c-cpp)
+    needs: freshness
+    # Skipped, failed or empty all mean the guard did not answer, and only a
+    # spoken 'false' stops the scan. `!cancelled()` is what lets the analysis
+    # run at all on a push or a pull request, where freshness never starts.
+    if: ${{ !cancelled() && needs.freshness.outputs.needed != 'false' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read

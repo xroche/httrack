@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# tools/scheduled-run-needed.sh stops a weekly job whose answer only this tree
+# decides. A guard seen to skip and never seen to run would suppress the work
+# it guards, so both directions are checked here, plus the two ways it must
+# fail open (the dispatch button, and a tree whose date it cannot read).
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+guard="${abs_top_srcdir:-}/tools/scheduled-run-needed.sh"
+test -r "$guard" || skip "no ${guard:-<unset>}; tests/Makefile.am must export abs_top_srcdir"
+command -v git >/dev/null || skip "no git to date a commit with"
+
+tmp=$(mktemp -d)
+cleanup_push rm -rf "$tmp"
+
+# run_guard AGE_DAYS EVENT [ARG...]: one repository whose head commit is
+# AGE_DAYS old, answered for EVENT. Prints the guard's stdout.
+run_guard() {
+    local age=$1 event=$2 repo when
+    shift 2
+    repo="$tmp/r$age-$event-$#"
+    git init -q "$repo"
+    when=$(($(date +%s) - age * 86400))
+    (
+        cd "$repo"
+        git config user.email t@example.invalid
+        git config user.name t
+        : >f
+        git add f
+        GIT_AUTHOR_DATE="@$when +0000" GIT_COMMITTER_DATE="@$when +0000" \
+            git commit -qm "aged $age days"
+        GITHUB_EVENT_NAME="$event" sh "$guard" "$@"
+    )
+}
+
+got=$(run_guard 30 schedule)
+assert_match 'needed=false' "$got" "a 30-day-old tree on the cron"
+assert_match 'age_days=30' "$got" "the run log must say how old the tree is"
+assert_match 'skipped: the tree has not moved' "$got" "the skip must say why"
+
+got=$(run_guard 2 schedule)
+assert_match 'needed=true' "$got" "a 2-day-old tree on the cron"
+
+# The window is a threshold, not the cron period: a slower job passes its own.
+got=$(run_guard 30 schedule --max-age-days 60)
+assert_match 'needed=true' "$got" "a 30-day-old tree under a 60-day window"
+
+# Forcing a run is how anyone investigates the job.
+got=$(run_guard 30 workflow_dispatch)
+assert_match 'needed=true' "$got" "the button on a stale tree"
+
+# No repository at all: the guard must stand aside rather than fail.
+status=0
+out=$(cd "$tmp" && GITHUB_EVENT_NAME=schedule sh "$guard" 2>&1) || status=$?
+assert_eq 0 "$status" "the guard must not exit non-zero outside a repository"
+assert_match 'needed=true' "$out" "an unreadable commit date"
+
+ok "the scheduled-run guard skips a stale tree and runs on every other input"
