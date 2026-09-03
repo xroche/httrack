@@ -8,8 +8,6 @@
 name: alpine abuild canary
 
 on:
-  push:
-    branches: [distro-build-canaries]  # TEMP
   schedule:
     - cron: "31 5 * * 5"
   workflow_dispatch:

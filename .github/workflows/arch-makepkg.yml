@@ -8,8 +8,6 @@
 name: arch makepkg canary
 
 on:
-  push:
-    branches: [distro-build-canaries]  # TEMP
   schedule:
     - cron: "19 4 * * 6"
   workflow_dispatch:
