@@ -23,7 +23,10 @@ somebody has to move at every bump.
 - `--with-zlib=DIR` points at a non-standard zlib prefix. zlib itself is
   required, not optional: the cache and the WARC output are zip containers.
 - `--with-brotli[=DIR]`, `--with-zstd[=DIR]` select the `br` and `zstd` content
-  codings. See [brotli and zstd are automagic](#brotli-and-zstd-are-automagic).
+  codings, and `--enable-backtrace` selects symbolic crash traces on Linux. All
+  three default to `auto`. See
+  [brotli and zstd are automagic](#brotli-and-zstd-are-automagic).
+- `--disable-auto-features` turns those three defaults into `no`. Pass it.
 - `--enable-https=yes|no|auto` selects OpenSSL. On by default.
 - `--enable-online-unit-tests` is off by default, and `make check` reaches the
   network only when it is on. Nothing to pass.
@@ -41,7 +44,9 @@ somebody has to move at every bump.
 `--with-brotli` and `--with-zstd` default to `auto`, so the `br` and `zstd`
 content codings follow whatever happens to be installed on the builder. A recipe
 that does not pin them records no choice and links what it finds. Both flags have
-carried that default since 3.49-13 (#556).
+carried that default since 3.49-13 (#556). `--enable-backtrace`, which selects
+the symbolic stack trace httrack prints on a crash, defaults to `auto` too and
+picks up libexecinfo where the C library has no `backtrace()`.
 
 Pin it, either way:
 
@@ -55,6 +60,23 @@ missing instead of dropping the coding. Add the development packages to your
 build dependencies beside them. Either way configure reports the answer as
 `checking whether to enable the brotli content coding... yes (auto)`, where
 `(auto)` means the build environment decided and `(requested)` means you did.
+
+Naming three flags only works while three is the number, and a release that adds
+a fourth optional dependency would slip past a recipe pinned this way. So there
+is one switch that moves every `auto` default at once, the autotools spelling of
+meson's `auto_features=disabled`:
+
+```
+./configure --disable-auto-features --with-brotli --with-zstd --enable-backtrace
+```
+
+Everything you pass beside it still wins, and still fails loudly when its library
+is absent. Everything you leave out is off, whatever the builder has installed,
+so the line above is the complete list of what this build takes. A feature the
+switch turned off reports as `no (auto-features off)`, which is how you tell it
+apart from a probe that looked and found nothing. `--enable-https` is not
+affected, because it defaults to `yes` rather than `auto` and a missing OpenSSL
+already fails the build. Our own `debian/rules` passes the line above.
 
 ## Do not re-encode the tree
 

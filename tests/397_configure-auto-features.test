@@ -1,0 +1,153 @@
+#!/bin/bash
+# Every optional feature defaulted to "auto", so the same source built a
+# different binary on each distribution: Gentoo linked both codecs off a recipe
+# naming neither, and Void would have shipped both off. --disable-auto-features
+# moves those defaults to no and leaves an explicit flag alone.
+
+# TEST_TIMEOUT_AT_LEAST: 900
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+test -r "${srcdir}/configure" || skip "no configure in ${srcdir}"
+
+# $CC carries its flags on some hosts, so it is an argv, never one word.
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/autofeat.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+# automake refuses an out-of-tree configure when srcdir holds a config.status,
+# which an in-tree build leaves there; a symlink farm without that one file is
+# the same tree to configure.
+shadow=${work}/srcdir
+mkdir -p "${shadow}"
+for entry in "${srcdir}"/*; do
+    test "${entry##*/}" = config.status || ln -s "${entry}" "${shadow}/"
+done
+test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
+
+# feature_line NAME: the "checking whether to ..." text configure prints.
+feature_line() {
+    case $1 in
+    brotli) echo "whether to enable the brotli content coding" ;;
+    zstd) echo "whether to enable the zstd content coding" ;;
+    backtrace) echo "whether to enable symbolic crash traces" ;;
+    *) fail "unknown feature $1" ;;
+    esac
+}
+
+# feature_flag NAME: how a packager asks for it explicitly.
+feature_flag() {
+    case $1 in
+    brotli) echo "--with-brotli" ;;
+    zstd) echo "--with-zstd" ;;
+    backtrace) echo "--enable-backtrace" ;;
+    *) fail "unknown feature $1" ;;
+    esac
+}
+
+# verdict DIR NAME: the qualified answer, e.g. "yes (auto)".
+verdict() {
+    local text
+    text=$(feature_line "$2")
+    sed -n "s/^checking ${text}\\.\\.\\. //p" "$1/configure.log" | tail -1
+}
+
+# No --cache-file: the probes cache as ac_cv_lib_brotlidec_* and friends, so one
+# cache shared across runs replays the first run's answer and nothing is probed.
+run_configure() { # run_configure DIR ARG...
+    local dir=$1
+    shift
+    mkdir -p "${dir}"
+    # A keg-only openssl (brew) makes --enable-https a hard error, and TLS is
+    # not one of the features this switch moves.
+    (cd "${dir}" && bash "${shadow}/configure" --enable-https=auto "$@") \
+        >"${dir}/configure.log" 2>&1
+}
+
+n=0
+cases=4 # configure runs below, what the budget is paced against
+
+began=${SECONDS}
+n=$((n + 1))
+run_configure "${work}/control" ||
+    fail_dump "the control configure failed" "${work}/control/configure.log"
+
+# What this host can discriminate. A builder without the libraries cannot tell
+# the switch from the status quo, so it has nothing to prove here.
+on=()
+for f in brotli zstd backtrace; do
+    test "$(verdict "${work}/control" "${f}")" = "yes (auto)" || continue
+    on+=("${f}")
+done
+test "${#on[@]}" -gt 0 ||
+    skip "nothing is auto-enabled here, so the switch cannot be told from the default"
+echo "ok: auto-enabled on this host: ${on[*]}"
+skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+
+began=${SECONDS}
+n=$((n + 1))
+run_configure "${work}/off" --disable-auto-features ||
+    fail_dump "--disable-auto-features was rejected" "${work}/off/configure.log"
+for f in "${on[@]}"; do
+    got=$(verdict "${work}/off" "${f}")
+    test "${got}" = "no (auto-features off)" ||
+        fail_dump "${f}: expected 'no (auto-features off)', got '${got}'" "${work}/off/configure.log"
+done
+# The log is a report, not the build. Read what the compiler and the linker get.
+for f in "${on[@]}"; do
+    case ${f} in
+    brotli | zstd)
+        up=$(echo "${f}" | tr '[:lower:]' '[:upper:]')
+        line=$(sed -n "s/^${up}_LIBS = *//p" "${work}/off/src/Makefile")
+        test -z "${line}" || fail "${f}: ${up}_LIBS still links '${line}'"
+        grep -q "^#define HTS_USE${up} 0\$" "${work}/off/config.h" ||
+            fail_dump "${f}: config.h does not define HTS_USE${up} to 0" "${work}/off/config.h"
+        ;;
+    backtrace)
+        ! grep -q '^#define HAVE_BACKTRACE' "${work}/off/config.h" ||
+            fail_dump "backtrace: config.h still defines HAVE_BACKTRACE" "${work}/off/config.h"
+        line=$(sed -n 's/^BACKTRACE_LIBS = *//p' "${work}/off/src/Makefile")
+        test -z "${line}" || fail "backtrace: BACKTRACE_LIBS still links '${line}'"
+        ;;
+    esac
+done
+echo "ok: the switch turns off every feature the builder would have decided"
+skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+
+began=${SECONDS}
+n=$((n + 1))
+flags=()
+for f in "${on[@]}"; do
+    flags+=("$(feature_flag "${f}")")
+done
+run_configure "${work}/asked" --disable-auto-features "${flags[@]}" ||
+    fail_dump "the switch rejected the flags beside it" "${work}/asked/configure.log"
+for f in "${on[@]}"; do
+    got=$(verdict "${work}/asked" "${f}")
+    test "${got}" = "yes (requested)" ||
+        fail_dump "${f}: expected 'yes (requested)', got '${got}'" "${work}/asked/configure.log"
+done
+# Naming every feature back must land on the default build exactly, or the switch
+# has a side effect nobody asked for. Rejecting the off state is not enough: a
+# switch that also dropped, say, HTS_LFS would pass every check above.
+diff -u "${work}/control/config.h" "${work}/asked/config.h" ||
+    fail "asking for each feature back does not reproduce the default config.h"
+echo "ok: an explicit flag still wins, and reproduces the default build"
+skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
+
+n=$((n + 1))
+# The switch must not turn a library the packager named into a silent drop (#1502).
+mkdir -p "${work}/empty"
+! run_configure "${work}/reject" --disable-auto-features --with-brotli="${work}/empty" ||
+    fail_dump "an explicit --with-brotli at an empty prefix was accepted" "${work}/reject/configure.log"
+grep -q 'brotli requested at' "${work}/reject/configure.log" ||
+    fail_dump "configure failed without naming the prefix it was given" "${work}/reject/configure.log"
+echo "ok: an explicit prefix with no library still fails the build"
+
+assert_steps_ran "${cases}" "${n}"

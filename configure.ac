@@ -423,18 +423,76 @@ AX_CHECK_ALIGNED_ACCESS_REQUIRED
 # check for various headers
 AC_CHECK_HEADERS([execinfo.h spawn.h sys/ioctl.h sys/random.h])
 
-## The header can exist while backtrace() lives in another library (Termux's
-## libandroid-execinfo); only httrack links it, so keep it out of LIBS.
+### Where an optional feature's default comes from
+# meson calls this auto_features. A distribution wants the recipe to decide
+# which optional dependencies a build takes, not whatever the builder happens
+# to have installed; every "auto" default here is one such lottery.
+AC_MSG_CHECKING([whether to probe for optional features nobody asked for])
+AC_ARG_ENABLE([auto-features],
+	[AS_HELP_STRING([--disable-auto-features],
+		[Default every optional feature to no rather than probing for it; --with-brotli, --with-zstd and --enable-backtrace still win @<:@default=yes@:>@])],
+	[
+	case "${enableval}" in
+	no|yes)
+		auto_features=$enableval
+		AC_MSG_RESULT($enableval)
+		;;
+	*)
+		AC_MSG_ERROR([bad value for auto-features, expected yes/no])
+		;;
+	esac
+	],
+	[
+	auto_features=yes
+	AC_MSG_RESULT(yes)
+	])
+# What an optional feature's own flag falls back to when it is not passed.
+AS_IF([test x"$auto_features" = x"no"],
+	[hts_feature_default=no], [hts_feature_default=auto])
+
+## Symbolic crash traces. The header can exist while backtrace() lives in another
+## library (Termux's libandroid-execinfo); only httrack links it, so keep it out
+## of LIBS. Implemented for Linux alone, so no value of the flag reaches a probe
+## anywhere else.
+AC_ARG_ENABLE([backtrace],
+	[AS_HELP_STRING([--enable-backtrace=@<:@yes/no/auto@:>@],[Print a symbolic stack trace on a crash, on Linux @<:@default=auto@:>@])],
+	[
+	case "${enableval}" in
+	no|yes|auto)
+		backtrace_want=$enableval
+		backtrace_asked=yes
+		;;
+	*)
+		AC_MSG_ERROR([bad value for backtrace, expected yes/no/auto])
+		;;
+	esac
+	],
+	[
+	backtrace_want=$hts_feature_default
+	backtrace_asked=no
+	])
 BACKTRACE_LIBS=
-AS_CASE([$host_os], [linux*],
+backtrace_have=no
+AS_CASE([$host_os], [linux*], [backtrace_platform=yes], [backtrace_platform=no])
+AS_IF([test x"$backtrace_want" != x"no" && test x"$backtrace_platform" = x"yes"],
 	[AS_IF([test "x$ac_cv_header_execinfo_h" = xyes],
 		[hts_backtrace_save_libs=$LIBS
 		AC_SEARCH_LIBS([backtrace], [execinfo android-execinfo],
-			[AC_DEFINE([HAVE_BACKTRACE], [1],
+			[backtrace_have=yes
+			AC_DEFINE([HAVE_BACKTRACE], [1],
 				[Define to 1 if backtrace() can be linked.])
 			AS_IF([test "x$ac_cv_search_backtrace" != "xnone required"],
 				[BACKTRACE_LIBS=$ac_cv_search_backtrace])])
-		LIBS=$hts_backtrace_save_libs])])
+		LIBS=$hts_backtrace_save_libs])
+	AS_IF([test x"$backtrace_have" = x"no" && test x"$backtrace_want" = x"yes"],
+		[AC_MSG_ERROR([backtrace requested but no execinfo.h or no linkable backtrace()])])])
+AC_MSG_CHECKING([whether to enable symbolic crash traces])
+dnl Name who decided: "auto" is the build environment's answer, not the packager's.
+AS_IF([test x"$backtrace_platform" = x"no"],
+	[AC_MSG_RESULT([no (not implemented on $host_os)])],
+	[test x"$backtrace_want" = x"auto"], [AC_MSG_RESULT([$backtrace_have (auto)])],
+	[test x"$backtrace_asked" = x"no"], [AC_MSG_RESULT([$backtrace_have (auto-features off)])],
+	[AC_MSG_RESULT([$backtrace_have (requested)])])
 AC_SUBST([BACKTRACE_LIBS])
 
 ## CSPRNG for the --single-file mark; /dev/urandom is the fallback
