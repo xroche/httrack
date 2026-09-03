@@ -1007,11 +1007,11 @@ local int Write_LocalFileHeader(zip64_internal* zi, const char* filename, uInt s
 
 /*
  NOTE.
- When writing RAW the ZIP64 extended information in extrafield_local and extrafield_global needs to be stripped
- before calling this function it can be done with zipRemoveExtraInfoBlock
+ When writing RAW the ZIP64 extended information in extrafield_local and
+ extrafield_global needs to be stripped before calling this function.
 
- It is not done here because then we need to realloc a new buffer since parameters are 'const' and I want to minimize
- unnecessary allocations.
+ It is not done here because then we need to realloc a new buffer since
+ parameters are 'const' and I want to minimize unnecessary allocations.
  */
 extern int ZEXPORT zipOpenNewFileInZip4_64(zipFile file, const char* filename, const zip_fileinfo* zipfi,
                                            const void* extrafield_local, uInt size_extrafield_local,
@@ -1949,61 +1949,4 @@ extern int ZEXPORT zipClose(zipFile file, const char* global_comment) {
     free(zi);
 
     return err;
-}
-
-extern int ZEXPORT zipRemoveExtraInfoBlock(char* pData, int* dataLen, short sHeader) {
-  char* p = pData;
-  int size = 0;
-  char* pNewHeader;
-  char* pTmp;
-  short header;
-  short dataSize;
-
-  int retVal = ZIP_OK;
-
-  if(pData == NULL || dataLen == NULL || *dataLen < 4)
-    return ZIP_PARAMERROR;
-
-  pNewHeader = (char*)ALLOC((unsigned)*dataLen);
-  pTmp = pNewHeader;
-
-  while(p < (pData + *dataLen))
-  {
-    header = *(short*)p;
-    dataSize = *(((short*)p)+1);
-
-    if( header == sHeader ) // Header found.
-    {
-      p += dataSize + 4; // skip it. do not copy to temp buffer
-    }
-    else
-    {
-      // Extra Info block should not be removed, So copy it to the temp buffer.
-      memcpy(pTmp, p, dataSize + 4);
-      p += dataSize + 4;
-      size += dataSize + 4;
-    }
-
-  }
-
-  if(size < *dataLen)
-  {
-    // clean old extra info block.
-    memset(pData,0, *dataLen);
-
-    // copy the new extra info block over the old
-    if(size > 0)
-      memcpy(pData, pNewHeader, size);
-
-    // set the new extra info size
-    *dataLen = size;
-
-    retVal = ZIP_OK;
-  }
-  else
-    retVal = ZIP_ERRNO;
-
-  free(pNewHeader);
-
-  return retVal;
 }

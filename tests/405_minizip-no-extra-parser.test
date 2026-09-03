@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# zipRemoveExtraInfoBlock parsed a ZIP extra field with no bound on its declared
+# block size, and nothing called it. A vendor bump would restore it silently.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dead=zipRemoveExtraInfoBlock
+# Same translation unit, so a bump that restores one restores both.
+control=zipClose
+
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+[ -f "$abs_top_builddir/src/Makefile" ] || fail "$abs_top_builddir/src is not configured"
+
+nm=${NM:-nm}
+command -v "$nm" >/dev/null 2>&1 || skip "no nm ($nm)"
+
+tmp=$(mktemp -d) || exit 1
+cleanup_push rm -rf "$tmp"
+
+targets=()
+[ -f "${HTTRACK_SHLIB:-/nonexistent}" ] && targets+=("$HTTRACK_SHLIB")
+while IFS= read -r o; do
+    targets+=("$o")
+done < <(find "$abs_top_builddir/src" -name '*.o' -print 2>/dev/null | sort)
+
+[ "${#targets[@]}" -gt 0 ] || skip "no built objects or library under $abs_top_builddir/src"
+
+: >"$tmp/defined"
+readable=0
+for t in "${targets[@]}"; do
+    "$nm" --defined-only "$t" >"$tmp/one.raw" 2>/dev/null || continue
+    readable=$((readable + 1))
+    awk -v f="$t" 'NF >= 2 { print f, $NF }' "$tmp/one.raw" >>"$tmp/defined"
+done
+
+[ "$readable" -gt 0 ] || skip "$nm read none of the ${#targets[@]} built products"
+
+# Without this the whole test passes on an empty or stripped symbol table.
+ctl=$(awk -v s="$control" '$2 == s { print $1 }' "$tmp/defined" | sort -u)
+[ -n "$ctl" ] || skip "$control is absent too, so the probe over $readable products is blind"
+
+hits=$(awk -v s="$dead" '$2 == s { print $1 }' "$tmp/defined" | sort -u)
+if [ -n "$hits" ]; then
+    echo "$hits" >&2
+    fail "$dead is back in the build; it is an unbounded ZIP extra-field parser with no caller"
+fi
+
+echo "PASS: $dead defined in none of $readable built products ($control found in $(echo "$ctl" | wc -l))"
