@@ -58,6 +58,22 @@ control directory 'not a regular file' 'mkdir 99_dir.test'
 control dangling 'not a regular file' 'ln -s nowhere 99_dangling.test'
 control empty 'no test matched' 'rm 00_kept.test'
 
+# A number claimed twice, and the two ways a claim can hide: a leading zero
+# makes 0389 a different string from 389, and a count file carries a number
+# without ending in .test. The family list must still let 01_engine- share one.
+control dup 'claimed by more than one test' ': >389_a.test; : >389_b.test'
+control dupzero 'claimed by more than one test' ': >389_a.test; : >0389_b.test'
+control dupext 'claimed by more than one test' ': >389_a.test; : >389_b.counts'
+ok_dir="${work}/family"
+mkdir -p "$ok_dir"
+: >"${ok_dir}/01_engine-one.test"
+: >"${ok_dir}/01_engine-two.test"
+: >"${ok_dir}/01_zlib-one.test"
+: >"${ok_dir}/62_lang-integrity.test"
+: >"${ok_dir}/62_lang-untranslated.counts"
+out=$(bash "$checker" "$ok_dir" 2>&1) ||
+    fail "the checker rejected a documented family: $out"
+
 # A git that answers with an error must report that the oracle did not run, not
 # read as "nothing tracked". Stubbed rather than dropped from PATH, which the
 # checker's other tools need.
