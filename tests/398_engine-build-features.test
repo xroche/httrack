@@ -11,7 +11,8 @@ set -euo pipefail
 
 require_httrack
 
-builddir="${abs_top_builddir:?not run under make check}"
+[ -n "${abs_top_builddir:-}" ] || skip "abs_top_builddir unset, no automake environment"
+builddir="${abs_top_builddir}"
 config="${builddir}/config.h"
 test -r "${config}" || skip "no config.h in ${builddir}"
 

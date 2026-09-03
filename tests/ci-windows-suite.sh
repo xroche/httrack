@@ -506,7 +506,9 @@ echo "ran=$((pass + fail + skip + lost)) pass=$pass fail=$fail skip=$skip lost=$
 # abort-purge's --max-time half as 268);
 # close-once interposes close() through LD_PRELOAD, which MSYS has no equivalent for;
 # engine-install-paths reads the compiled-in POSIX install paths, which this job
-# has no equivalent of.
+# has no equivalent of;
+# build-features compares the feature reporter against the automake config.h,
+# which the MSVC build does not produce.
 expected_skips="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 100_local-purge-longpath.test
@@ -533,7 +535,8 @@ expected_skips="01_engine-footer-overflow.test
 350_local-diskfull-abort.test
 352_engine-filesave-diskfull.test
 355_local-write-error-not-eof.test
-377_engine-install-paths.test"
+377_engine-install-paths.test
+398_engine-build-features.test"
 # First, or the deadline reads as an unexplained shortfall in the gates below.
 [ "$deadline" -eq 0 ] || {
     echo "::error::suite did not finish within ${suite_deadline}s"
