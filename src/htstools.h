@@ -71,8 +71,8 @@ int link_has_authority(const char *lien);
 int link_has_authorization(const char *lien);
 void long_to_83(int mode, char *n83, size_t n83size, char *save);
 void longfile_to_83(int mode, char *n83, size_t n83size, char *save);
-/* Byte before adr, or a space sentinel at the buffer start where adr[-1] would
-   underflow; space reads as the word boundary the tag guards want there. */
+/* Byte before adr, or a space where adr[-1] would underflow, because the tag
+   guards read a space as a word boundary. */
 HTS_INLINE char html_prevc(const char *adr, const char *start);
 HTS_INLINE int __rech_tageq(const char *adr, const char *s);
 HTS_INLINE int __rech_tageqbegdigits(const char *adr, const char *s);
@@ -111,8 +111,7 @@ const char *hts_footer_field_list(char *buffer, size_t size);
 int hts_footer_format(char *buffer, size_t size, const char *footer,
                       const char *const values[HTS_FOOTER_FIELD_COUNT]);
 
-/* prevc is the byte before adr; a token that may open a buffer takes it from
-   html_prevc rather than from adr[-1]. */
+/* prevc is the byte before adr, normally from html_prevc. */
 #define rech_tageq_at(adr, prevc, s)                                           \
   ((((prevc) == '<') || (is_space(prevc)))                                     \
        ? ((streql(*(adr), *(s))) ? (__rech_tageq((adr), (s))) : 0)             \

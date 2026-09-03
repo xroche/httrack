@@ -231,7 +231,6 @@ char singlefile_ref_class(const char *tag_name, const char *attr,
     return 0;
   if (sf_denied(tag_name, attr))
     return 0;
-  /* A reference opening the document has no predecessor to read. */
   prevc = html_prevc(attr, body);
   if (tag_name == NULL) {
     /* A stylesheet or a script body: only @import names another stylesheet. */

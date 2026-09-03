@@ -110,7 +110,7 @@ const char *singlefile_mark(httrackp *opt, char *buf, size_t bufsize, char cls,
 /* The class a reference in this context may inline as, or 0 to leave it alone.
    tag_name points just past the '<' of the enclosing start tag, or NULL when
    there is none (inside a stylesheet or a script); attr at the attribute name,
-   which body, the first byte of the document, bounds from below.
+   and body at the document's first byte, which bounds every read.
    Everything htsparse detects is inlinable unless it names a page. */
 char singlefile_ref_class(const char *tag_name, const char *attr,
                           const char *body);
