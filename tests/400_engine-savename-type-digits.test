@@ -30,4 +30,16 @@ want 'web/images/pic.gif' 201 /dir/pic.gif image/gif
 want 'images/pic.gif' 3001 /dir/pic.gif image/gif
 want 'web/gif/pic.gif' 4 /dir/pic.gif image/gif
 
+# 3 is not a split of its own: it lands on the same default as every residue
+# the presets never name.
+want 'web/pic.gif' 3 /dir/pic.gif image/gif
+want 'web/pic.gif' 42 /dir/pic.gif image/gif
+# 10 also pins the selector's modulus: under `% 10` it would be a site structure.
+want 'web/pic.gif' 10 /dir/pic.gif image/gif
+
+# An extensionless name gets .html forced on, except under the -N template.
+want 'web/noext.html' 3 /dir/noext text/html
+selftest_queue 'savename: /dev/null/www.example.com/dir/noext' savename \
+    /dir/noext text/html type=-1 'userdef=%h%p/%n'
+
 selftest_run_queued
