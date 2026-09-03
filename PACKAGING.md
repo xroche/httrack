@@ -112,8 +112,8 @@ The switch moves features, not build tools, so one thing is still yours to pin.
 `libhttrack.pc`: with it, a codec reaches a consumer as `Requires.private:
 libbrotlidec libzstd`, and without it as `Libs.private: -lbrotlidec -lzstd`.
 The second form drops the `-L` an out-of-the-way prefix needs and orders nothing
-for a static link, so build-depend on `pkg-config` rather than letting the
-chroot decide. Ours does.
+for a static link, so build-depend on `pkg-config` (`pkgconf` on Debian, where
+the old name is transitional) rather than letting the chroot decide. Ours does.
 
 ## Do not re-encode the tree
 

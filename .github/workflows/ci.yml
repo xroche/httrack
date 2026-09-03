@@ -996,7 +996,7 @@ jobs:
             ca-certificates git \
             build-essential autoconf automake libtool autoconf-archive \
             zlib1g-dev libssl-dev libbrotli-dev libzstd-dev \
-            debhelper devscripts lintian fakeroot
+            pkgconf debhelper devscripts lintian fakeroot
 
       - uses: actions/checkout@v7
         with:
