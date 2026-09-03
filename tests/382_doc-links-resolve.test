@@ -32,7 +32,9 @@ tree=${htmldir}
 test "${docdir%/}" = "${htmldir%/}" || tree="${docdir} and ${htmldir}"
 test "${uidir%/}" = "${htmldir%/}" || tree="${tree} and ${uidir}"
 test -d "${stage}${htmldir}" || skip "nothing staged in ${htmldir}"
-test -d "${stage}${uidir}/server" || skip "no served UI staged in ${uidir}"
+# Unconditional, whatever --htmldir and --docdir say, so an absent one is the
+# regression this arm exists for rather than a layout to skip past.
+test -d "${stage}${uidir}/server" || fail "no served UI staged in ${uidir}"
 
 # Lexical and relative to the stage root: a link names a path in the shipped
 # tree, and a ".." that walks off the top has left the package.

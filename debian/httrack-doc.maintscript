@@ -1,0 +1,3 @@
+# 3.50.1-1 shipped this path as a symlink, and dpkg-maintscript-helper(1) wants
+# the prepared version with "~". 3.50.1-2~ also sorts below a 3.50.2-1 upload.
+symlink_to_dir /usr/share/doc/httrack/html ../../httrack/html 3.50.1-2~

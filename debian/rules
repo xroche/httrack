@@ -84,7 +84,8 @@ binary-indep: build install
 	dh_installdocs -i
 	dh_installchangelogs -i history.txt
 	dh_link -i
-	# -X.txt: the manual links greetings.txt and license.txt by name.
+	# -X.txt: the manual links greetings.txt, license.txt and fonts/OFL.txt by
+	# name, and the last two are over dh_compress's 4k threshold.
 	dh_compress -i -X.txt
 	dh_fixperms -i
 	dh_installdeb -i
