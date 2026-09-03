@@ -23,11 +23,16 @@ if ! stage_install_target install "${stage}" "${work}/install.log" .; then
 fi
 
 docdir=${CONFIGURED_DOCDIR:?not run under make check}
+# The served UI installs under $(datadir), not under $(docdir), so a walk of the
+# documentation alone would never read it.
+uidir=${CONFIGURED_DATADIR:?not run under make check}/httrack/html
 # httrack-doc.html and the pages link into each other's directory, so both are
 # walked whatever --htmldir made of the two. sort -u collapses the nested case.
 tree=${htmldir}
 test "${docdir%/}" = "${htmldir%/}" || tree="${docdir} and ${htmldir}"
+test "${uidir%/}" = "${htmldir%/}" || tree="${tree} and ${uidir}"
 test -d "${stage}${htmldir}" || skip "nothing staged in ${htmldir}"
+test -d "${stage}${uidir}/server" || skip "no served UI staged in ${uidir}"
 
 # Lexical and relative to the stage root: a link names a path in the shipped
 # tree, and a ".." that walks off the top has left the package.
@@ -91,10 +96,13 @@ while IFS= read -r page; do
     # nobody recognises fails here instead of being skipped into a vacuous pass.
     relh=${page#"${stage}${htmldir%/}/"}
     reld=${page#"${stage}${docdir%/}/"}
+    relu=${page#"${stage}${uidir%/}/"}
     if test -e "${htmlsrc}/${relh}"; then
         rel=${relh}
     elif test -e "${srcroot}/${reld}"; then
         rel=${reld}
+    elif test -e "${htmlsrc}/${relu}"; then
+        rel=${relu}
     else
         fail "staged page ${page#"${stage}"} came from no source file"
     fi
@@ -125,6 +133,7 @@ while IFS= read -r page; do
 done < <({
     find "${stage}${htmldir}" -name '*.html'
     find "${stage}${docdir}" -name '*.html'
+    find "${stage}${uidir}" -name '*.html'
 } 2>/dev/null | LC_ALL=C sort -u)
 
 test "${pages}" -gt 0 || fail "no pages staged under ${tree}"

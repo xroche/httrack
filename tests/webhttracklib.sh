@@ -11,6 +11,7 @@ HTS_BG_PIDS=()
 HTS_SRV_PIDS=()
 HTS_REAPED_PIDS=()
 HTS_TMP_LOGS=()
+HTS_TMP_DIRS=()
 
 HTS_CR=$(printf '\r')
 
@@ -41,6 +42,27 @@ htsserver_announced() {
     done <"${HTS_LOG}"
 }
 
+# The install reaches the documentation through $(datadir)/httrack/html/doc,
+# which the source tree has no counterpart for, so the panes' Help links dangle
+# when the source root is served. $HTS_DISTROOT is the source tree with that one
+# link added, built once per test. It is a superset of the shipped layout rather
+# than a model of it: test 396 serves a staged install for the real shape.
+htsserver_distroot() {
+    test -z "${HTS_DISTROOT:-}" || return 0
+    local root entry
+    root=$(mktemp -d "${TMPDIR:-/tmp}/htsdist.XXXXXX") || fail "no tmpdir"
+    HTS_TMP_DIRS+=("${root}")
+    mkdir -p "${root}/html" || fail "no ${root}/html"
+    for entry in "${HTS_DISTDIR}"/*; do
+        test "${entry##*/}" = html || ln -s "${entry}" "${root}/${entry##*/}"
+    done
+    for entry in "${HTS_DISTDIR}"/html/*; do
+        ln -s "${entry}" "${root}/html/${entry##*/}"
+    done
+    ln -s "${HTS_DISTDIR}" "${root}/html/doc"
+    HTS_DISTROOT=${root}
+}
+
 # The server process; reads htsserver_start's locals and its background stdout.
 htsserver_exec() {
     # htsserver keeps SIGTERM ignored across its exec, so only -9 reaps it.
@@ -54,7 +76,7 @@ htsserver_exec() {
 # announcement. Sets HTS_URL, HTS_PORT, HTS_LOG, HTS_BGPID and HTS_PID (the
 # server's own pid, which Windows does not announce). Options, ahead of any
 # htsserver argument:
-#   --root DIR       tree to serve (default: the dist root)
+#   --root DIR       tree to serve (default: $HTS_DISTROOT)
 #   --home DIR       $HOME for the server, so no ~/.httrack.ini leaks in
 #   --log FILE       where the announcement lands (default: a temp file)
 #   --port N         a port already picked, to keep the fork out of a window the
@@ -63,7 +85,7 @@ htsserver_exec() {
 #   --write-limit N  ulimit -f N; the log rides a pipe, which the cap spares
 # shellcheck disable=SC2120 # most callers need no htsserver argument
 htsserver_start() {
-    local root=${HTS_DISTDIR} home='' log='' wlimit='' port=''
+    local root='' home='' log='' wlimit='' port=''
     while test $# -gt 0; do
         case $1 in
         --root)
@@ -93,6 +115,10 @@ htsserver_start() {
         *) break ;;
         esac
     done
+    if test -z "${root}"; then
+        htsserver_distroot
+        root=${HTS_DISTROOT}
+    fi
 
     # freeport hands back a port it has already released, so a neighbour can take
     # it before the server binds: redraw and retry, as start_proxytrack does.
@@ -171,6 +197,10 @@ htsserver_cleanup() {
     htsserver_stop
     rm -f ${HTS_TMP_LOGS[@]+"${HTS_TMP_LOGS[@]}"}
     HTS_TMP_LOGS=()
+    # Symlinks only, so this never reaches the source tree they point into.
+    rm -rf ${HTS_TMP_DIRS[@]+"${HTS_TMP_DIRS[@]}"}
+    HTS_TMP_DIRS=()
+    HTS_DISTROOT=
 }
 
 # Teardown for a test that owns a work dir: htsserver holds ${HOME} under it, so

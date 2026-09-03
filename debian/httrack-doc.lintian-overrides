@@ -1,7 +1,7 @@
-# httrack ships its HTML manual under /usr/share/httrack/html by design, with
-# /usr/share/doc/httrack/html symlinking into it and the bundled license beside
-# that symlink (see debian/rules). These are pointed hints whose match context
-# is empty, so the path lives in the display pointer, not the override -- match
+# httrack ships its HTML manual under /usr/share/doc/httrack/html with the
+# bundled license beside it, and links that tree into the served UI at
+# /usr/share/httrack/html/doc. These are pointed hints whose match context is
+# empty, so the path lives in the display pointer, not the override -- match
 # with '*'.
 httrack-doc: extra-license-file *
 httrack-doc: package-contains-documentation-outside-usr-share-doc *

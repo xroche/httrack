@@ -1,0 +1,143 @@
+#!/bin/bash
+#
+# The served UI is runtime, and every packaging system treats $(docdir) as
+# removable documentation. Installed there, "rpm --excludedocs", Portage's nodoc
+# and FreeBSD's DOCS=off take the whole WebHTTrack interface away with the manual.
+
+set -euo pipefail
+
+# shellcheck source=tests/webhttracklib.sh
+. "${0%"${0##*/}"}./webhttracklib.sh"
+
+: "${abs_top_builddir:?not run under make check}"
+htsserver_require
+
+datadir=${CONFIGURED_DATADIR:?not run under make check}
+docdir=${CONFIGURED_DOCDIR:?not run under make check}
+bindir=${CONFIGURED_BINDIR:?not run under make check}
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/uidocdir.XXXXXX") || fail "no tmpdir"
+cleanup_push htsserver_cleanup_dir "${work}"
+
+stage=${work}/stage
+if ! stage_install_target install "${stage}" "${work}/install.log" .; then
+    skip "cannot stage an install, so no layout to serve"
+fi
+
+served=${stage}${datadir}/httrack
+docs=${stage}${docdir}
+
+# ---- the UI installs under $(datadir), the documentation stays put ----
+
+test -f "${served}/html/server/index.html" ||
+    fail "no served UI under ${datadir}/httrack/html/server"
+test ! -e "${docs}/html/server" ||
+    fail "the UI is installed under ${docdir} again"
+test -f "${docs}/html/guide.html" || fail "the guide left ${docdir}"
+test -f "${docs}/license.txt" || fail "license.txt left ${docdir}"
+
+test -L "${served}/html/doc" || fail "no documentation link at ${datadir}/httrack/html/doc"
+test -f "${served}/html/doc/html/guide.html" ||
+    fail "the documentation link does not reach the pages"
+# Relative, or DESTDIR and any later relocation strand it (#885).
+case $(readlink "${served}/html/doc") in
+/*) fail "the documentation link is absolute" ;;
+esac
+
+# ---- webhttrack accepts the tree, with and without the documentation ----
+
+# webhttrack searches its own directory before $PATH, so a stub named after the
+# first candidate wins. "browse" hands a file:// URL to it and returns, which
+# reaches the tree checks without starting a server.
+test -x "${stage}${bindir}/htsserver" ||
+    skip "the staged tree is not executable here, so webhttrack finds nothing"
+test "${bindir%/*}/share" = "${datadir%/}" ||
+    skip "webhttrack looks beside its own bindir, which this layout does not put ${datadir} at"
+printf '#!/bin/sh\nexit 0\n' >"${stage}${bindir}/x-www-browser"
+chmod +x "${stage}${bindir}/x-www-browser"
+mkdir -p "${work}/home"
+
+webhttrack_browse() { # webhttrack_browse; the log lands in $work/browse.log
+    HOME="${work}/home" BROWSER='' bash "${stage}${bindir}/webhttrack" browse \
+        >"${work}/browse.log" 2>&1
+}
+
+webhttrack_browse || {
+    dump_file "${work}/browse.log"
+    fail "webhttrack refused a complete tree"
+}
+
+# ---- the UI still serves once the documentation is gone ----
+
+htsserver_start --root "${served}"
+
+serves() { # serves PATH MARKER WHAT
+    local body
+    body=$(htsserver_get "$1")
+    grep -q '^HTTP/1.0 200 OK' <<<"${body}" ||
+        fail "$3: $1 answered $(firstline "${body}")"
+    grep -qF "$2" <<<"${body}" || fail "$3: $1 served without ${2}"
+}
+
+absent() { # absent PATH WHAT
+    local body
+    body=$(htsserver_get "$1")
+    grep -q '^HTTP/1.0 404' <<<"${body}" ||
+        fail "$2: $1 answered $(firstline "${body}") rather than 404"
+}
+
+serves /server/index.html 'name="sid"' 'a complete tree'
+serves /doc/html/guide.html 'The HTTrack interface, step by step' 'a complete tree'
+serves /doc/html/index.html 'HTTrack documentation' 'a complete tree'
+# index.html reaches these three with "../", which nothing resolved before the
+# doc link existed: htsserver's root held the pages and not their parent.
+serves /doc/license.txt 'GNU GENERAL PUBLIC LICENSE' 'a complete tree'
+serves /doc/greetings.txt 'HTTrack' 'a complete tree'
+serves /doc/history.txt 'HTTrack' 'a complete tree'
+# Control: the assertions above prove nothing unless a missing page really 404s.
+absent /doc/html/no-such-page.html 'a complete tree'
+
+# Read out of the rendered panel rather than hardcoded: a pane still linking the
+# documentation where it used to sit would 404 for a user and pass every
+# assertion above. /website/ needs a mirror, and /server/ is the panel itself.
+panel=$(htsserver_get /server/index.html)
+links=$(grep -o 'href="/[^"]*"' <<<"${panel}" |
+    sed -e 's|^href="||' -e 's|"$||' -e 's|#.*||' |
+    grep -vE '^/(website|server)/' | LC_ALL=C sort -u) || true
+test "$(count_matching_lines . <<<"${links}")" -ge 2 ||
+    fail "the panel links fewer than two documentation pages"
+for link in ${links}; do
+    serves "${link}" '<' 'a link the panel renders'
+done
+
+rm -rf "${docs}"
+test -L "${served}/html/doc" || fail "the documentation link went with the docs"
+
+# Cold, as a package with the documentation stripped starts: the panel, its
+# stylesheet and its images are what has to survive.
+htsserver_stop
+htsserver_start --root "${served}"
+serves /server/index.html 'name="sid"' 'stripped documentation'
+serves /server/style.css 'bg_rings.svg' 'stripped documentation'
+serves /server/images/bg_rings.svg '<svg' 'stripped documentation'
+serves /server/option3.html 'go up &amp; down' 'stripped documentation'
+# The dangling link is a 404, not a hang or a served directory.
+absent /doc/html/guide.html 'stripped documentation'
+absent /doc/license.txt 'stripped documentation'
+
+webhttrack_browse || {
+    dump_file "${work}/browse.log"
+    fail "webhttrack refused a tree whose documentation was stripped"
+}
+
+# Control: webhttrack does still refuse a tree with no served UI, so the two
+# runs above are not passing on a check that stopped firing.
+rm -rf "${served}/html"
+if webhttrack_browse; then fail "webhttrack accepted a tree with no served UI"; fi
+grep -qE 'Could not find .*/html$' "${work}/browse.log" ||
+    fail "webhttrack failed for some other reason: $(cat "${work}/browse.log")"
+
+htsserver_cleanup
+htsserver_assert_reaped
+
+echo "the served UI survives a documentation strip"

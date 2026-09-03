@@ -71,10 +71,10 @@ function no_refresh() {
 	<tr>
 	<td width="90%" id="subTitle">${LANG_OSFWB}</td>
 ${/* the documentation is a separate package and may be absent */}
-${do:if-file-exists:html/index.html}
+${do:if-file-exists:html/doc/html/index.html}
 	<td id="subTitle" align="right">
-		<a href="/index.html" target="_blank"
-			onClick="window.open('/index.html', 'httrack-doc', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
+		<a href="/doc/html/index.html" target="_blank"
+			onClick="window.open('/doc/html/index.html', 'httrack-doc', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
 			title='${html:LANG_MANUAL}' onMouseOver="info('${js:LANG_MANUAL}'); return true" onMouseOut="info('&nbsp;'); return true"
 			style="color:#FFFFFF"
 		>
@@ -99,10 +99,10 @@ ${do:end-if}
 <tr><td width="90%">
 	<h2 align="center"><em>${LANG_H20}</em></h2>
 </td>
-${do:if-file-exists:html/guide.html}
+${do:if-file-exists:html/doc/html/guide.html}
 <td>
-	<a href="/guide.html#web/step-run" target="_blank"
-		onClick="window.open('/guide.html#web/step-run', 'httrack-doc', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
+	<a href="/doc/html/guide.html#web/step-run" target="_blank"
+		onClick="window.open('/doc/html/guide.html#web/step-run', 'httrack-doc', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
 			title='${html:LANG_TIPHELP}' onMouseOver="info('${js:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>${LANG_O5}</a>
 </td>

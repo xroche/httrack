@@ -153,8 +153,10 @@ PROBE
 
 # The documentation, and the About box the footer opens: neither is wizard state.
 docs_reachable() { # docs_reachable WHAT
-    serves /guide.html 'The HTTrack interface, step by step' "$1"
-    serves /index.html 'HTTrack documentation' "$1"
+    serves /doc/html/guide.html 'The HTTrack interface, step by step' "$1"
+    serves /doc/html/index.html 'HTTrack documentation' "$1"
+    # index.html reaches it with "../", which only the "doc" link resolves.
+    serves /doc/license.txt 'GNU GENERAL PUBLIC LICENSE' "$1"
     # The exemption has to survive the same spellings the panes are matched by.
     probe serves 'About WebHTTrack Website Copier' "$1" \
         /server/about.html //server/about.html /server//about.html

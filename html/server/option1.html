@@ -56,10 +56,10 @@ function info(str) {
 	<h2 align="center"><em>${LANG_O2} - ${LANG_IOPT1}</em></h2>
 </td>
 ${/* the documentation is a separate package and may be absent */}
-${do:if-file-exists:html/guide.html}
+${do:if-file-exists:html/doc/html/guide.html}
 <td>
-	<a href="/guide.html#web/opt-links" target="_blank"
-		onClick="window.open('/guide.html#web/opt-links', 'httrack-doc', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
+	<a href="/doc/html/guide.html#web/opt-links" target="_blank"
+		onClick="window.open('/doc/html/guide.html#web/opt-links', 'httrack-doc', 'toolbar=no, location=no, directories=no, status=yes, menubar=no, scrollbars=yes, resizable=yes, width=980, height=760'); return false"
 			title='${html:LANG_TIPHELP}' onMouseOver="info('${js:LANG_TIPHELP}'); return true" onMouseOut="info('&nbsp;'); return true"
 	>${LANG_O5}</a>
 </td>

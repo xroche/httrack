@@ -5,8 +5,10 @@ HelpHtmlimgdir = $(HelpHtmldir)/img
 HelpHtmldivdir = $(HelpHtmldir)/div
 HelpHtmlimagesdir = $(HelpHtmldir)/images
 HelpHtmlfontsdir = $(HelpHtmldir)/fonts
-WebHtmldir = $(HelpHtmldir)/server
-WebHtmlimagesdir = $(HelpHtmldir)/server/images
+# The served UI is runtime, not documentation, so it installs under $(datadir):
+# every packaging system treats $(docdir) as strippable.
+WebHtmldir = $(datadir)/httrack/html/server
+WebHtmlimagesdir = $(WebHtmldir)/images
 WebPixmapdir = $(datadir)/pixmaps
 WebIcon16x16dir = $(datadir)/icons/hicolor/16x16/apps
 WebIcon32x32dir = $(datadir)/icons/hicolor/32x32/apps
