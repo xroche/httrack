@@ -2175,9 +2175,11 @@ static hts_boolean arcPastRecordEnd(FILE *file, long int end) {
    the same long line differently. */
 #define ARC_LINE_MAX ((int) sizeof(((PT_Index__Arc) NULL)->line) - 2)
 
-/* Bytes linput() never returns, wherever they sit on the line. */
+/* Bytes this reader's own linput(), the one in proxytrack.h rather than the one
+   in htslib.c, never returns wherever they sit on the line. NUL is among them,
+   so a record line carrying one is indexed and served all the same. */
 static hts_boolean arcDroppedByte(char c) {
-  return (c == 9 || c == 12 || c == 13) ? HTS_TRUE : HTS_FALSE;
+  return (c == 0 || c == 9 || c == 12 || c == 13) ? HTS_TRUE : HTS_FALSE;
 }
 
 /* Length of the digit run filling the field at pos, or -1 for anything else. */

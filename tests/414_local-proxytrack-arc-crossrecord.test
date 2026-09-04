@@ -205,14 +205,15 @@ def head(b):
     return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n" % len(b)
 
 
-def archive(host, victim_line, pad=b" " * 64, at_eof=False):
+def archive(host, victim_line, pad=b" " * 64, at_eof=False, vdata=None):
     kept = b"KEPTPAGE"
     greedy = b"GREEDYPAGE"
     victim = b"VICTIM-" + host + b"\n" + b"x" * 32
     # no Content-Length on the greedy record, so its declared length is the only
     # bound the read has and the whole lie is served
     gdata = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + greedy
-    vdata = head(victim) + victim
+    if vdata is None:
+        vdata = head(victim) + victim
     line = victim_line % len(vdata)
     tail = pad + b"\n" + (line.rstrip(b"\n") if at_eof else line + vdata)
     declared = len(gdata) + len(tail)
@@ -255,6 +256,23 @@ cases = {
     # five fields on a scheme the reader never serves, so only the shape sees it
     b"gopher": archive(b"gopher", b"gopher://gopher/victim.html 0.0.0.0 " + date
                        + b" text/html %d\n"),
+    # a scheme whose second character is a digit, which a scheme scan starting
+    # one byte off never finishes
+    b"digitscheme": archive(b"digitscheme", b"x2y:digitscheme/victim.html 0.0.0.0 "
+                            + date + b" text/html %d\n"),
+    # a length of one digit, and one carrying a 9: every other fixture here
+    # declares several digits and not one of them is a 9
+    b"len9": archive(b"len9", b"dns:len9/victim.html 0.0.0.0 " + date
+                     + b" text/html %d\n", vdata=b"VICTIMxyz"),
+    b"len19": archive(b"len19", b"dns:len19/victim.html 0.0.0.0 " + date
+                      + b" text/html %d\n", vdata=b"VICTIM-len19-bytes"),
+    # a byte linput() drops sitting INSIDE the scheme, not in front of the line
+    b"schemecr": archive(b"schemecr", b"htt\rp://schemecr/victim.html 0.0.0.0 "
+                         + date + b" text/html %d\n"),
+    # and a NUL, which this reader's own linput() drops like a TAB, so a record
+    # line carrying one is indexed and served all the same
+    b"schemenul": archive(b"schemenul", b"htt\x00p://schemenul/victim.html 0.0.0.0 "
+                          + date + b" text/html %d\n"),
     # a record line near the longest linput() will return, which a scan reading
     # fewer characters than linput() would cut short of its length field
     b"longline": archive(b"longline", b"http://longline/" + b"p" * 1960
@@ -265,6 +283,16 @@ cases = {
 }
 # and one whose record line straddles the scan's buffer
 probe = archive(b"straddle", v10 % b"straddle" + b"\n")
+# exactly as long as linput() will return, so a scan reading one character less
+# loses the length field and stops seeing the line
+LINPUT_MAX = 2046
+_vdata = b"VICTIMxyz"
+_head = b"dns:longmax/"
+_tail = b"/victim.html 0.0.0.0 " + date + b" text/html %d\n"
+_pad = LINPUT_MAX - len(_head) - len(_tail % len(_vdata)) + 1
+cases[b"longmax"] = archive(b"longmax", _head + b"q" * _pad + _tail, vdata=_vdata)
+assert len((_head + b"q" * _pad + _tail % len(_vdata)).rstrip(b"\n")) == LINPUT_MAX
+
 cases[b"strdrop"] = archive(
     b"strdrop", b"http://strdrop/victim.html" + b"\r" * 2100
     + b" 0.0.0.0 " + date + b" text/html 200 - - 0 t.arc %d\n")
@@ -395,7 +423,8 @@ grep -qaF VICTIM-honest "$dir/out.trailer" ||
 
 for class in space digit newline cr eof padline urlend urlmid later dns \
     crlf arc10 undated straddle eofline tab crb ff f3 f6 lenx lenplus \
-    strdrop gopher longline; do
+    strdrop gopher longline digitscheme len9 len19 schemecr schemenul \
+    longmax; do
     convert "$dir/$class.arc" "$dir/$class-out.arc"
     # the record before the greedy one, so an implementation that refuses the
     # whole archive cannot pass the assertion below
