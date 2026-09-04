@@ -321,6 +321,11 @@ jobs:
           # For the record when a path stops converting: this rootfs has no
           # wslpath, which is why nothing in the suite calls one.
           wsl -d httrack-suite -- sh -c 'command -v wslpath || echo "no wslpath"'
+          # An imported rootfs carries no /etc/wsl.conf, and the workspace lives
+          # on D:, so mount it if the automount did not. Harmless when it did.
+          wsl -d httrack-suite -- sh -c '
+            test -d /mnt/d || { mkdir -p /mnt/d && mount -t drvfs D: /mnt/d; }
+            echo "mounts after bring-up:"; ls -d /mnt/* 2>/dev/null || echo "  none"'
 
       - name: Run the engine test suite (offline tests, WSL2)
         if: always() && matrix.platform == 'x64'
