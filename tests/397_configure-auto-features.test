@@ -225,6 +225,9 @@ done
 # and every attempt at it lost to a continuation, a comment or a variable. Run
 # the recipe instead with every dh_* stubbed, and record what the real
 # dh_auto_configure would have been handed: make expands, the shell splits.
+# $MAKE carries its flags on some hosts, the way $CC does above.
+read -r -a make_argv <<<"${MAKE:-make}"
+
 rules_argv() { # rules_argv RULESFILE DIR
     local dir=$2 cmd
     mkdir -p "${dir}/stub"
@@ -256,9 +259,7 @@ rules_argv() { # rules_argv RULESFILE DIR
     # The first pass sets nothing, so its array is empty: expand it in the form
     # bash 3.2 accepts under set -u.
     local envs=("" "DEB_HOST_ARCH_OS=hurd DEB_HOST_ARCH=hurd-i386 DEB_BUILD_PROFILES=nocheck DEB_BUILD_OPTIONS=nocheck")
-    local pass=0 target vars make_argv
-    # $MAKE carries its flags on some hosts, the way $CC does above.
-    read -r -a make_argv <<<"${MAKE:-make}"
+    local pass=0 target vars
     for cmd in "${envs[@]}"; do
         read -r -a vars <<<"${cmd}"
         for target in build build-arch build-indep \
@@ -417,6 +418,45 @@ elif test -r "${rules}"; then
         test "${got}" = "${want}" ||
             fail "${desc}: expected [${want}], the reader said [${got:-(nothing)}]"
     }
+
+    # Two of the fixtures below turn on how make reports a recipe it could not
+    # finish, and that is not the same everywhere: the macOS leg graded as a
+    # silent short list what reds here, on either make version and any of three
+    # shells. So measure this host and require the reader to agree with it. A
+    # fixture asserting a fixed outcome there would be asserting the build
+    # machine, which is the whole defect this file exists to keep out.
+    measured() { # measured DESC <<'MUT' -- the reader must match this host
+        local desc=$1 dir got want rc=0 prc=0
+        seq=$((seq + 1))
+        dir=${work}/mut${seq}
+        mkdir -p "${dir}/probe/stub" "${dir}/probe/run"
+        sed 's/@SP@/ /' >"${dir}/rules"
+        # An independent run. Only the token grammar is shared with the reader,
+        # and the fixtures above pin that on its own.
+        # shellcheck disable=SC2016 # the probe's own expansions, not this shell's
+        printf '#!/bin/sh\nfor a; do printf "%%s\\n" "$a"; done >"%s/probe/argv"\nexit 0\n' \
+            "${dir}" >"${dir}/probe/stub/dh_auto_configure"
+        chmod +x "${dir}/probe/stub/dh_auto_configure"
+        : >"${dir}/probe/argv"
+        (cd "${dir}/probe/run" && PATH="${dir}/probe/stub:${PATH}" \
+            MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
+            "${make_argv[@]}" -s -f "${dir}/rules" build) >/dev/null 2>&1 || prc=$?
+        if test "${prc}" -ne 0; then
+            want=make-failed
+        else
+            want=$(rules_missing "${dir}/probe/argv")
+        fi
+        got=$(rules_verdict "${dir}/rules" "${dir}") || rc=$?
+        case ${rc} in
+        0) ;;
+        2) got=no-invocation ;;
+        3) got=make-failed ;;
+        *) got="verdict-error-${rc}" ;;
+        esac
+        test "${got}" = "${want}" ||
+            fail "${desc}: this make gives [${want:-(nothing)}], the reader said [${got:-(nothing)}]"
+        echo "${desc}: this make gives [${want:-nothing missing}]" >&2
+    }
     reads "" "the shape debian/rules uses today" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
@@ -470,16 +510,13 @@ WITH_ZSTD = no
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=$(WITH_ZSTD) --enable-backtrace --with-iconv
 MUT
-    reads make-failed \
-        "a comment mid-continuation, which ends the line and the build with it" <<'MUT'
+    measured "a comment mid-continuation, which ends the line" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli \
 		# --with-zstd \
 		--enable-backtrace --with-iconv
 MUT
-    # make exits 0 here: the orphan line starts with "-", which is make's own
-    # ignore-errors prefix, so the short list ships and nothing says so.
-    reads "zstd backtrace iconv" "a backslash make does not read as a continuation" <<'MUT'
+    measured "a backslash make does not read as a continuation" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli \@SP@
 		--with-zstd --enable-backtrace --with-iconv
@@ -532,7 +569,7 @@ MUT
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-example-libs=no
 MUT
-    reads make-failed "a configure run that is not dh_auto_configure" <<'MUT'
+    measured "a configure run that is not dh_auto_configure" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
 	./configure --disable-auto-features --with-brotli
@@ -559,7 +596,7 @@ build:
 override_dh_auto_configure:
 	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
 MUT
-    reads make-failed "a rules file make cannot run" <<'MUT'
+    measured "a rules file make cannot run" <<'MUT'
 build:
 	false
 MUT
