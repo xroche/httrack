@@ -64,7 +64,9 @@ grep -Eq "srcset=\"data:image/svg\\+xml;base64,${b64}#icon-set 2x\"" "$page" ||
 echo OK
 
 printf '[fragment survives inside an inlined stylesheet] ..\t'
-"$python" - "$page" "${tmpdir}/got.css" <<'PY' || fail "no inlined stylesheet"
+# nativepath: a native python cannot open the drvfs paths this shell builds.
+"$python" - "$(nativepath "$page")" "$(nativepath "${tmpdir}/got.css")" \
+    <<'PY' || fail "no inlined stylesheet"
 import base64, re, sys
 html = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
 m = re.search(r'data:text/css;base64,([A-Za-z0-9+/=]*)', html)

@@ -28,12 +28,13 @@ done
 
 # Byte-level assertions in python: portable, and the shell cannot mangle them.
 have_feature iconv && hts_have_iconv=1 || hts_have_iconv=0
-export hts_have_iconv
-"$python" - "$tmpdir" "$SRV_PORT" <<'PY'
+# nativepath: a native python cannot open the drvfs paths this shell builds.
+# iconv rides argv, not the environment: only what WSLENV names crosses.
+"$python" - "$(nativepath "$tmpdir")" "$SRV_PORT" "$hts_have_iconv" <<'PY'
 import os
 import sys
 
-tmpdir, port = sys.argv[1], sys.argv[2]
+tmpdir, port, have_iconv = sys.argv[1], sys.argv[2], sys.argv[3]
 host = "127.0.0.1_%s" % port
 # What a second Latin-1 -> UTF-8 pass turns the two bytes of "é" into.
 DOUBLE = "é".encode().decode("latin-1").encode()
@@ -71,7 +72,7 @@ check("declared UTF-8 title untouched",
 # Both titles below are valid UTF-8 already, and must still be decoded from the
 # charset the page declares. gb2312 is multi-byte, which no 256-entry codepage
 # table can hold, so only an iconv build converts it.
-if os.environ["hts_have_iconv"] == "1":
+if have_iconv == "1":
     gb = rd("gb2312", "index.html")
     check("declared gb2312 title decoded", "图片-gb".encode() in gb)
     check("declared gb2312 title not left raw", "图片".encode("gb2312") + b"-gb" not in gb)

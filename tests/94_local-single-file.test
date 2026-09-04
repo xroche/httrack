@@ -81,8 +81,9 @@ test -f "$page" || fail "no mirrored page at $page"
 # --- what must be inlined, byte for byte ------------------------------------
 # The decoder is python, not httrack, so a broken encoder cannot agree with
 # itself here.
+# nativepath: a native python cannot open the drvfs paths this shell builds.
 extract() {
-    "$python" - "$1" "$2" "$3" <<'PY'
+    "$python" - "$(nativepath "$1")" "$2" "$(nativepath "$3")" <<'PY'
 import base64, re, sys
 html = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
 m = re.search(r'data:%s;base64,([A-Za-z0-9+/=]*)' % re.escape(sys.argv[2]), html)
@@ -293,7 +294,8 @@ for bucket in ("new", "changed", "unchanged"):
             sys.exit(0)
 sys.exit("FAIL: index.html is in no bucket of the change report")
 REPORT
-reported=$("$python" "${tmpdir}/report.py" "${chg}/hts-changes.json" index.html) || exit 1
+reported=$("$python" "$(nativepath "${tmpdir}/report.py")" \
+    "$(nativepath "${chg}/hts-changes.json")" index.html) || exit 1
 onpage=$(wc -c <"$chgpage")
 test "$reported" -eq "$onpage" || fail "the report sizes the page at $reported, on disk it is $onpage"
 echo OK
@@ -311,7 +313,7 @@ else
     )
     umaskroot="${umaskdir}/127.0.0.1_$SRV_PORT"
     mode() { "$python" -c 'import os,sys
-print("%04o" % (os.stat(sys.argv[1]).st_mode & 0o777))' "$1"; }
+print("%04o" % (os.stat(sys.argv[1]).st_mode & 0o777))' "$(nativepath "$1")"; }
     pagemode=$(mode "${umaskroot}/index.html")
     assetmode=$(mode "${umaskroot}/big.svg")
     test "$pagemode" = "$assetmode" || fail "page is $pagemode, the asset beside it is $assetmode"

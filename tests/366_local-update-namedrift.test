@@ -55,7 +55,7 @@ with open(path, "rb") as fp:
         fp.seek(head[9], 1)
         sys.stdout.write(fp.read(head[10]).decode("latin-1").replace("\r", ""))
         sys.stdout.write("\n")
-' "${1}/hts-cache/new.zip" "$2"
+' "$(nativepath "${1}/hts-cache/new.zip")" "$2"
 }
 
 # assert_cached OUTDIR URLTAIL SAVETAIL: exactly one entry for that URL, naming
