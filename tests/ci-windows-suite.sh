@@ -276,10 +276,13 @@ expected_skips_msys="01_engine-footer-overflow.test
 377_engine-install-paths.test
 398_engine-build-features.test"
 
-# A copy of the msys list above: testlib.sh's suite_backend split (shell_is_msys
-# vs target_is_windows) is designed so the same tests skip under either shell.
-# A prediction, not a measurement yet — correct it from the first real wsl2 run.
-expected_skips_wsl2=$expected_skips_msys
+# Measured, not predicted: windows-build run 33927128153, both platforms alike.
+# The msys list, minus the two that a real Linux shell can run, plus the one
+# Windows python cannot: it ignores TZ=IST-5:30, so 386 guards itself out.
+expected_skips_wsl2=$(printf '%s\n' "$expected_skips_msys" |
+    grep -vxE '241_local-single-file-gui\.test|288_testlib-holdport\.test')
+expected_skips_wsl2="$expected_skips_wsl2
+386_local-proxytrack-dav-tz.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,
