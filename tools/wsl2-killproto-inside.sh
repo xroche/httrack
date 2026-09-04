@@ -60,40 +60,58 @@ wait_for_log() {
 }
 
 ########################################################################
-note "point 0: killing the Linux relay leaves the Windows process alive"
+note "point 0: what killing the Linux relay does to the Windows process"
+# The premise the harness rests on: MSYS exposes /proc/<pid>/winpid, WSL2 does
+# not, so signalling the relay is all the harness can do. Measure what that
+# actually reaps, direct child and grandchildren both.
 m0="kpmark-$(date +%s)-$RANDOM-relay"
+c0="kptag-$(date +%s)-$RANDOM-relaykid"
 out0="$repo/$m0"
 mkdir -p "$out0"
-relay=$(launch_victim "$(wslpath -w "$out0")" "kptag-$m0" 0)
+relay=$(launch_victim "$(wslpath -w "$out0")" "$c0" 2)
 echo "relay linux pid=$relay"
 if wait_for_log "$out0/log.txt"; then
     echo "victim is writing"
 else
     echo "victim never wrote a log"
 fi
+sleep 2
 if [ -e "/proc/$relay/winpid" ]; then
     echo "WINPID_PRESENT=$(cat "/proc/$relay/winpid")"
-    fail 0 "/proc/<pid>/winpid exists, MSYS route still available"
+    fail 0 "/proc/<pid>/winpid exists, the MSYS route still works here"
 else
     echo "WINPID_ABSENT (as expected under WSL2)"
 fi
-kill -9 "$relay" 2>/dev/null
+echo "before any signal:"
+before_root=$(alive_check "$m0" | sed -n 's/^MARKER_LEFT=//p' | tail -1)
+before_kids=$(alive_check "$c0" | sed -n 's/^MARKER_LEFT=//p' | tail -1)
+echo "STAGE=start root=$before_root kids=$before_kids"
+for sig in TERM KILL; do
+    kill -"$sig" "$relay" 2>/dev/null
+    sleep 3
+    r=$(alive_check "$m0" | sed -n 's/^MARKER_LEFT=//p' | tail -1)
+    k=$(alive_check "$c0" | sed -n 's/^MARKER_LEFT=//p' | tail -1)
+    echo "STAGE=after-SIG$sig root=$r kids=$k"
+done
 wait "$relay" 2>/dev/null
-sleep 2
-relay_left=$(alive_check "$m0" | sed -n 's/^MARKER_LEFT=//p' | tail -1)
-echo "after killing the relay, processes still carrying the marker: $relay_left"
-if [ "${relay_left:-0}" -gt 0 ]; then
-    pass 0 "the Windows process survives its relay, which is the bug"
+if [ "${r:-1}" -gt 0 ] || [ "${k:-1}" -gt 0 ]; then
+    pass 0 "signalling the relay leaves Windows processes behind (root=$r kids=$k)"
 else
-    fail 0 "the Windows process died with the relay (unexpected on WSL2)"
+    fail 0 "signalling the relay reaped everything, so the premise is weaker than assumed"
 fi
-kill_pids "$(helper -Mode find -Marker "$m0" 2>/dev/null | sed -n 's/^HIT=\([0-9]*\).*/\1/p' | paste -sd, -)" >/dev/null 2>&1
+kill_pids "$(helper -Mode find -Marker "$m0" | sed -n 's/^HIT=\([0-9]*\).*/\1/p' | paste -sd, -)" >/dev/null 2>&1
+kill_pids "$(helper -Mode find -Marker "$c0" | sed -n 's/^HIT=\([0-9]*\).*/\1/p' | paste -sd, -)" >/dev/null 2>&1
 sleep 1
+
+########################################################################
+note "point 0b: does the relay carry the Windows exit status back?"
+"$psh" -NoProfile -NonInteractive -Command "exit 42" >/dev/null 2>&1
+echo "INTEROP_EXIT=$? (42 means the harness can still read an exit code)"
 
 ########################################################################
 note "points 1-5: find, read, kill the tree, verify"
 mark="kpmark-$(date +%s)-$RANDOM-tree"
-childtag="kpchild-$mark"
+childtag="kptag-$(date +%s)-$RANDOM-treekid"
 outdir="$repo/$mark"
 mkdir -p "$outdir"
 outdir_win=$(wslpath -w "$outdir")
@@ -117,7 +135,7 @@ echo "WALL_MS_findslow=$(((t1 - t0) / 1000000))"
 
 # --- point 1: the marker resolves to a real Windows pid.
 note "point 1: resolve the Windows pid from the marker"
-find_out=$(helper -Mode find -Marker "$mark" 2>/dev/null)
+find_out=$(helper -Mode find -Marker "$mark")
 root_pid=$(echo "$find_out" | sed -n 's/^HIT=\([0-9]*\).*/\1/p' | head -1)
 hits=$(echo "$find_out" | grep -c '^HIT=')
 echo "hits=$hits root_pid=${root_pid:-none}"
@@ -131,7 +149,7 @@ fi
 
 # --- point 3 (collect first): the tree the kill has to take with it.
 note "point 3: descendants out of one snapshot"
-snap=$(helper -Mode snapshot -Marker "$mark" 2>/dev/null)
+snap=$(helper -Mode snapshot -Marker "$mark")
 desc_pids=$(echo "$snap" | sed -n 's/^DESC=\([0-9]*\).*/\1/p' | paste -sd, -)
 echo "descendants=${desc_pids:-none}"
 

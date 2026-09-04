@@ -28,7 +28,8 @@ switch ($Mode) {
         Write-Host ("QUERY_MS={0:F1}" -f $ms)
         foreach ($p in $procs) {
             if ($p.ProcessId -eq $PID) { Write-Host "SELF=$($p.ProcessId)"; continue }
-            Write-Host "HIT=$($p.ProcessId) PPID=$($p.ParentProcessId) NAME=$($p.Name)"
+            $c = $p.CommandLine; if ($c.Length -gt 110) { $c = $c.Substring(0, 110) }
+            Write-Host "HIT=$($p.ProcessId) PPID=$($p.ParentProcessId) NAME=$($p.Name) CMD=$c"
         }
     }
 
@@ -73,7 +74,8 @@ switch ($Mode) {
                 foreach ($c in $byParent[$k]) {
                     # A recycled pid can point at a parent younger than itself.
                     if ($c.CreationDate -and $cur.CreationDate -and $c.CreationDate -lt $cur.CreationDate) { continue }
-                    Write-Host "DESC=$($c.ProcessId) PPID=$($c.ParentProcessId) NAME=$($c.Name)"
+                    $cl = $c.CommandLine; if ($cl -and $cl.Length -gt 90) { $cl = $cl.Substring(0, 90) }
+                    Write-Host "DESC=$($c.ProcessId) PPID=$($c.ParentProcessId) NAME=$($c.Name) CMD=$cl"
                     $queue.Enqueue($c)
                 }
             }
