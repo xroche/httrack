@@ -219,65 +219,134 @@ for flag in --disable-auto-features $(for f in ${features}; do feature_flag "${f
     grep -q -e "${flag}" <<<"${help}" || fail "configure --help does not offer ${flag}"
 done
 
-# The flags the Debian build passes. --disable-auto-features makes them the whole
-# optional set, so a flag dropped here ships a package that decodes less and
-# nothing else notices.
-# Every dh_auto_configure invocation, one per line, continuations joined. Each
-# has to stand on its own: a later one overrides the first, so reading only the
-# first lets a shorter list hide behind a complete one.
+# --disable-auto-features makes the flags after it the whole optional set, so a
+# flag dropped from debian/rules ships a package that decodes less.
+# Every dh_auto_configure invocation, one line each, continuations joined. A
+# later one overrides the first, so each has to stand on its own. A "#" in a
+# recipe line is a shell comment, and it is dropped before the join while the
+# trailing backslash it may carry still continues the line.
 rules_flags() { # rules_flags FILE
-    awk '/dh_auto_configure[ \t]+--/ { want = 1; line = "" }
-         want { line = line " " $0 }
-         want && !/\\$/ { gsub(/[ \t\\]+/, " ", line); print line; want = 0 }' "$1"
+    awk '/(^|[ \t;&|(])dh_auto_configure([ \t]|$)/ { want = 1; line = "" }
+         want { t = $0; sub(/(^|[ \t])#.*$/, "", t); line = line " " t }
+         want && !/\\[ \t]*$/ { gsub(/[ \t\\]+/, " ", line); print line; want = 0 }' "$1"
 }
-# Which features a flag list does not turn on, or "". --with-X=no is autoconf's
-# spelling of --without-X, so =DIR asks for the feature and =no asks against it.
-rules_missing() { # rules_missing FLAGS
-    local flags=$1 f flag out=""
+# What the invocation passes on to configure: everything past the first bare --.
+rules_args() { # rules_args FLAGS
+    local tok seen=0 out=""
+    for tok in $1; do
+        if test "${seen}" -eq 0; then
+            test "${tok}" != -- || seen=1
+            continue
+        fi
+        out="${out} ${tok}"
+    done
+    echo "${out# }"
+}
+# Which features an argument list does not turn on, or "". Whole tokens, because
+# a substring match reads a commented-out or quoted flag as passed. --with-X=no
+# is autoconf's spelling of --without-X, and the last spelling wins as it does
+# in configure.
+rules_missing() { # rules_missing ARGS
+    local arglist=$1 f flag tok val state out=""
     for f in ${features}; do
         flag=$(feature_flag "${f}")
-        case " ${flags} " in
-        *" ${flag}=no "*) out="${out} ${f}" ;;
-        *" ${flag} "* | *" ${flag}="*) ;;
-        *) out="${out} ${f}" ;;
-        esac
+        state=off
+        for tok in ${arglist}; do
+            case ${tok} in
+            "${flag}") state=on ;;
+            "${flag}="*)
+                val=${tok#*=}
+                val=${val#[\"\']}
+                val=${val%[\"\']}
+                test "${val}" != no && state=on || state=off
+                ;;
+            esac
+        done
+        test "${state}" = on || out="${out} ${f}"
     done
+    echo "${out# }"
+}
+# Everything wrong with one rules file, or "" when every invocation asks for
+# every feature.
+rules_verdict() { # rules_verdict FILE
+    local lines flags arglist said out=""
+    lines=$(rules_flags "$1")
+    test -n "${lines}" || {
+        echo "no-invocation"
+        return
+    }
+    while read -r flags; do
+        arglist=$(rules_args "${flags}")
+        case " ${arglist} " in
+        *" --disable-auto-features "*) ;;
+        *) out="${out} no-disable-auto-features" ;;
+        esac
+        said=$(rules_missing "${arglist}")
+        test -z "${said}" || out="${out} ${said}"
+    done <<<"${lines}"
     echo "${out# }"
 }
 
 rules="${srcdir}/debian/rules"
 if test -r "${rules}"; then
     n=$((n + 1))
-    lines=$(rules_flags "${rules}")
-    test -n "${lines}" || fail "no dh_auto_configure invocation in ${rules}"
-    while read -r flags; do
-        case " ${flags} " in
-        *" --disable-auto-features "*) ;;
-        *) fail "a dh_auto_configure drops --disable-auto-features: ${flags}" ;;
-        esac
-        said=$(rules_missing "${flags}")
-        test -z "${said}" ||
-            fail "debian/rules asks for no ${said}, which --disable-auto-features then drops"
-    done <<<"${lines}"
+    said=$(rules_verdict "${rules}")
+    test -z "${said}" ||
+        fail "debian/rules does not ask for: ${said} (--disable-auto-features then drops it)"
 
-    # A reader that matched nothing would call any file complete, so put each
-    # way of losing a feature past it and require the same check to name it.
-    said=$(rules_missing "${lines//--with-zstd/}")
-    test "${said}" = zstd || fail "a dropped --with-zstd went unreported: ${said:-(silence)}"
-    said=$(rules_missing "${lines//--with-zstd/--with-zstd=no}")
-    test "${said}" = zstd || fail "--with-zstd=no went unreported: ${said:-(silence)}"
-    said=$(rules_missing "${lines//--with-zstd/--with-zstd=/opt/zstd}")
-    test -z "${said}" || fail "--with-zstd=DIR reads as a refusal: ${said}"
-    {
-        cat "${rules}"
-        printf '\tdh_auto_configure -- --disable-auto-features --with-brotli\n'
-    } >"${work}/rules"
-    said=$(rules_flags "${work}/rules" | awk 'END { print NR + 0 }')
-    test "${said}" -eq 2 || fail "a second dh_auto_configure was not read: ${said} found"
-    # The target line names dh_auto_configure without invoking it.
-    printf 'override_dh_auto_configure:\n\ttrue\n' >"${work}/rules-override"
-    said=$(rules_flags "${work}/rules-override")
-    test -z "${said}" || fail "an override target read as an invocation: ${said}"
+    # A reader that matched nothing would call any file complete, so put every
+    # way of losing a feature past it. Written out rather than sed'd from the
+    # file above: the reader is the subject, not this file's current layout.
+    all="--disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv"
+    mut=${work}/rules-mut
+    reads() { # reads WANT DESC <<'BODY' -- recipe lines
+        local want=$1 desc=$2 got
+        {
+            printf '#!/usr/bin/make -f\n\noverride_dh_auto_configure:\n'
+            cat
+        } >"${mut}"
+        got=$(rules_verdict "${mut}")
+        test "${got}" = "${want}" ||
+            fail "${desc}: expected [${want}], the reader said [${got:-(nothing)}]"
+    }
+    reads "" "the shape debian/rules uses today" <<MUT
+	dh_auto_configure -- ${all}
+MUT
+    reads zstd "a dropped --with-zstd" <<MUT
+	dh_auto_configure -- ${all/--with-zstd /}
+MUT
+    reads zstd "--with-zstd=no" <<MUT
+	dh_auto_configure -- ${all/--with-zstd /--with-zstd=no }
+MUT
+    reads zstd '--with-zstd="no"' <<MUT
+	dh_auto_configure -- ${all/--with-zstd /--with-zstd=\"no\" }
+MUT
+    reads zstd "--without-zstd" <<MUT
+	dh_auto_configure -- ${all/--with-zstd /--without-zstd }
+MUT
+    reads "" "--with-zstd=DIR, which asks for it at a prefix" <<MUT
+	dh_auto_configure -- ${all/--with-zstd /--with-zstd=/opt/zstd }
+MUT
+    reads zstd "a --with-zstd commented out mid-continuation" <<MUT
+	dh_auto_configure -- --disable-auto-features --with-brotli \\
+		# --with-zstd \\
+		--enable-backtrace --with-iconv
+MUT
+    reads "zstd backtrace iconv" "a second invocation with -- on its own line" <<MUT
+	dh_auto_configure -- ${all}
+	dh_auto_configure \\
+		-- --disable-auto-features --with-brotli
+MUT
+    reads "zstd backtrace iconv" "a second invocation behind -Bbuild" <<MUT
+	dh_auto_configure -- ${all}
+	dh_auto_configure -Bbuild -- --disable-auto-features --with-brotli
+MUT
+    reads no-disable-auto-features "a list that drops --disable-auto-features" <<MUT
+	dh_auto_configure -- ${all/--disable-auto-features /}
+MUT
+    reads no-invocation "an override target that invokes nothing" <<MUT
+	true
+MUT
     echo "ok: every dh_auto_configure in debian/rules asks for every feature by name"
 else
     planned=$((planned - 1))
@@ -295,8 +364,7 @@ grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
 echo "ok: a value that is neither yes nor no is refused"
 
 n=$((n + 1))
-# Same for a feature's own tri-state: neither an unknown value nor a bare typo
-# may fall through to a default.
+# Same for a feature's own tri-state: an unknown value must not fall through.
 ! run_configure "${work}/btbogus" --enable-backtrace=bogus ||
     fail_dump "--enable-backtrace=bogus was accepted" "${work}/btbogus/configure.log"
 grep -q 'bad value for backtrace' "${work}/btbogus/configure.log" ||
@@ -329,10 +397,8 @@ case ${got} in
 esac
 
 n=$((n + 1))
-# A bare --with-iconv is a request, so a host where iconv does not link must
-# FTBFS rather than quietly fall back to the codepage tables. The header is
-# there and the symbol is not, which is what a renaming libiconv header without
-# its library looks like.
+# A bare --with-iconv must FTBFS where iconv does not link, rather than fall
+# back to the codepage tables. The fixture has the header and not the symbol.
 mkdir -p "${work}/noiconv"
 cat >"${work}/noiconv/iconv.h" <<'HDR'
 #ifndef HTS_NOICONV_H
