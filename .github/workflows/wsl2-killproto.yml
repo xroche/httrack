@@ -1,0 +1,60 @@
+# Throwaway spike, not a check (#1228): WSL2 interop gives a Linux relay with no
+# /proc/<pid>/winpid, so the harness cannot reap the Windows exe it launched.
+# This asks whether one Win32_Process query keyed on the per-launch output
+# directory can replace winpid, and what that query costs. Delete once answered.
+name: wsl2-killproto
+
+on:
+  push:
+    branches:
+      - wsl2-killproto
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  killproto:
+    name: kill prototype (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Bring WSL2 up
+        shell: pwsh
+        run: |
+          $t = [Diagnostics.Stopwatch]::StartNew()
+          wsl.exe --update 2>&1 | Out-String
+          Write-Host "wsl --update exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
+          wsl.exe --set-default-version 2 2>&1 | Out-String
+          Write-Host "set-default-version exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
+          $tar = "$env:RUNNER_TEMP\rootfs.tar.gz"
+          Invoke-WebRequest -UseBasicParsing -OutFile $tar `
+            -Uri "https://cloud-images.ubuntu.com/wsl/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz"
+          wsl.exe --import probe "$env:RUNNER_TEMP\probe-vm" $tar --version 2 2>&1 | Out-String
+          Write-Host "import exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
+          wsl.exe -d probe -- uname -a 2>&1 | Out-String
+          Write-Host "uname exit=$LASTEXITCODE total=$($t.Elapsed.TotalSeconds)s"
+
+      - name: Prove the kill path
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $here = & wsl.exe -d probe -- wslpath -a "$($PWD.Path -replace '\\', '/')"
+          Write-Host "workspace inside the distro: $here"
+          & wsl.exe -d probe -- bash "$here/tools/wsl2-killproto-inside.sh" $here
+          Write-Host "inside exit=$LASTEXITCODE"
+
+      - name: Leftovers
+        if: always()
+        shell: pwsh
+        run: |
+          Get-CimInstance Win32_Process -Filter "CommandLine LIKE '%kpmark-%' OR CommandLine LIKE '%kpchild-%'" |
+            Select-Object ProcessId, ParentProcessId, Name, CommandLine | Format-List
