@@ -403,10 +403,8 @@ EOF
     got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 PSREC="$tmpdir/ps" \
         PATH="$pathbin:$PATH" bash "$tmpdir/cap.sh" "$marker")
     assert_eq 4242 "${got%%|*}" "the Windows pid win_capture resolved"
-    # The image half reads the relay's own argv[0], which binfmt_misc takes for
-    # the interpreter under qemu-user, shifting the program one place right
-    # (tools/emulated-suite.sh asserts that shape is what the leg runs on). So
-    # ask this host what a child's cmdline says before pinning the name.
+    # binfmt_misc leaves the interpreter in argv[0], so under qemu-user the
+    # relay's cmdline names the emulator rather than the image it runs.
     argv0_is_the_program() {
         local probe leaf=
         /bin/sh -c 'sleep 30' >/dev/null 2>&1 &

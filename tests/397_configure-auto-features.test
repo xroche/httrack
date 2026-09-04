@@ -169,11 +169,8 @@ assert_state() { # assert_state DIR NAME on|off
 n=0
 planned=10 # steps below; the last one needs the libraries to be installed
 
-# Pace the next step against the costliest one so far, not against the one just
-# run: the steps below are ordered by what they mean rather than by what they
-# cost, so a cheap neighbour would under-project the slow step after it and the
-# guard would fire instead of the skip. Under qemu-user each configure run costs
-# about thirty times what it does natively, which is what this is for (#1537).
+# Pace against the costliest step so far, never against the last one: these steps
+# are ordered by what they mean, so a cheap one under-projects the slow one after it.
 costliest=0
 pace() { # pace <seconds the step took>
     test "$1" -le "${costliest}" || costliest=$1
