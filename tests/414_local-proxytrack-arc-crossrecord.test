@@ -32,12 +32,10 @@ http_head() { # http_head CONTENT_LENGTH
 }
 
 # Three records: one the greedy record cannot reach, the greedy one, and the
-# victim page whose bytes must never leave the greedy record's URL. HOST names
-# the archive, so one proxytrack serves them all without a key clash. DECLARED
-# is the length the greedy record announces, but it stores $GREEDY_BODY whatever
-# it says, so an honest archive passes DECLARED=${#GREEDY_BODY}. PAD is the byte
-# the victim page is padded with, which is the byte a declared length lands on,
-# so each archive lands on a different class of byte.
+# victim page whose bytes must never leave the greedy record's URL. DECLARED is
+# what the greedy record announces, but it stores $GREEDY_BODY whatever it says,
+# and PAD is what the victim page is padded with, so each archive's declared
+# length lands on a different class of byte. HOST keys the archive apart.
 craft() { # craft OUT HOST DECLARED PAD
     local out=$1 host=$2 declared=$3 pad=$4
 
@@ -69,20 +67,20 @@ craft() { # craft OUT HOST DECLARED PAD
 }
 
 craft "$dir/honest.arc" honest "${#GREEDY_BODY}" ' '
-# every byte class a one-byte boundary test could mistake for a separator, the
-# newline most of all: a text page is full of them
+# every byte class a one-byte boundary test could take for a separator, and the
+# newline above all, because a text page is full of them
 craft "$dir/space.arc" space "$GREEDY_DECLARED" ' '
 craft "$dir/digit.arc" digit "$GREEDY_DECLARED" 0
 craft "$dir/newline.arc" newline "$GREEDY_DECLARED" $'\n'
 craft "$dir/cr.arc" cr "$GREEDY_DECLARED" $'\r'
 
-# an honest archive is still honest with junk stuck on the end, and refusing its
-# last record would cost a page the reader used to serve
+# junk on the end leaves an archive honest, so refusing its last record would
+# cost a page for nothing
 cp "$dir/honest.arc" "$dir/trailer.arc"
 printf 'not a record\0\0\0' >>"$dir/trailer.arc"
 
-# The body the archive $1 stores for the record whose URL is $2, walking the
-# record chain rather than trusting a length twice.
+# Walks the record chain to return the body archive $1 stores for URL $2, rather
+# than trusting a declared length twice.
 body_of() { # body_of ARC URL
     "$python" - "$1" "$2" <<'EOF'
 import sys
@@ -119,7 +117,7 @@ convert() { # convert IN OUT
         fail_dump "proxytrack died converting $1" "$dir/convert.log"
 }
 
-# The control the rest rests on: an honest chain keeps the records apart, so all
+# The control the rest rests on. An honest chain keeps the records apart, so all
 # three markers exist in the fixture and each stays under its own URL.
 convert "$dir/honest.arc" "$dir/honest-out.arc"
 stored "$dir/honest-out.arc" http://honest/kept.html "$dir/out.kept"
