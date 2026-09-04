@@ -9,7 +9,7 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-if [ "$HTS_OS" != "Linux" ]; then
+if ! target_is_linux; then
     skip "threadattr: LD_PRELOAD interposition is Linux-only here"
 fi
 # A --disable-shared build has nothing to preload; anything else missing is a

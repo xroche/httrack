@@ -51,7 +51,7 @@ fi
 test "$(wc -c <"${proj}/hts-cache/new.zip")" -eq 28 || fail "the damaged cache was replaced by the empty recovery"
 echo "OK"
 
-if [ "$HTS_OS" != "Linux" ]; then
+if ! target_is_linux; then
     echo "repair-rename: LD_PRELOAD interposition is Linux-only here, skipping"
     exit 0
 fi

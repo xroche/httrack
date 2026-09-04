@@ -631,6 +631,10 @@ target_is_windows() {
 # job control above all. A question about the binary wants target_is_windows.
 shell_is_msys() { test "$(suite_backend)" = msys; }
 
+# The binary under test is a native Linux one. The shell being Linux is not
+# enough, because the wsl2 backend drives a Windows exe from a Linux shell.
+target_is_linux() { test "$HTS_OS" = Linux && ! target_is_windows; }
+
 # Fail at source time, not at the first conversion: nativepath and posixpath are
 # always called as "$(nativepath ...)", and an exit inside a command
 # substitution ends that subshell while the test carries on with an empty

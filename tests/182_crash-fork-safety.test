@@ -10,7 +10,7 @@ ulimit -c 0 # a deliberate crash must not litter the box with cores
 
 # The spawn needs backtrace(), so Linux is necessary but not sufficient: the
 # runtime notice below is what actually rules a musl build out.
-if [ "$HTS_OS" != "Linux" ]; then
+if ! target_is_linux; then
     echo "the symbolizer spawn is Linux-only, skipping" >&2
     exit 77
 fi
