@@ -27,6 +27,7 @@ base=$(nativepath "${work}/websites")
 # key value ... as an urlencoded body.
 urlform() {
     "${HTS_PYTHON}" -c 'import sys,urllib.parse
+sys.stdout.reconfigure(newline="\n")  # a CR here would ride into the posted body
 print("&".join("%s=%s" % (k, urllib.parse.quote(v, safe=""))
                for k, v in zip(sys.argv[1::2], sys.argv[2::2])))' "$@"
 }

@@ -31,6 +31,7 @@ require_httrack
 # length must not let one leg assert the other's. Bodies come back as a length.
 server_const() { # server_const <name>
     "$python" -c 'import re, sys
+sys.stdout.reconfigure(newline="\n")  # the length below is read as a number
 src = open(sys.argv[1]).read()
 v = eval(re.search(r"^\s*%s = (.+)$" % sys.argv[2], src, re.M).group(1))
 print(v if isinstance(v, int) else len(v))' "$server" "$1"

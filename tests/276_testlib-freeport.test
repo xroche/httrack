@@ -42,7 +42,7 @@ real = socket.socket
 class Spy(real):
     def bind(self, addr):
         real.bind(self, addr)
-        with open(log, "a") as f:
+        with open(log, "a", newline="\n") as f:  # LF, for the grep -Fx below
             f.write("%s %d\n" % (socket.SocketKind(self.type).name,
                                  self.getsockname()[1]))
 

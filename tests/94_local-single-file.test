@@ -285,6 +285,7 @@ grep -q 'base64,' "$chgpage" || fail "--changes suppressed the inlining"
 # substitution at the ")" and runs the body as shell commands.
 cat >"${tmpdir}/report.py" <<'REPORT'
 import json, sys
+sys.stdout.reconfigure(newline="\n")  # the size below is compared as a number
 with open(sys.argv[1], encoding="utf-8") as fp:
     report = json.load(fp)
 for bucket in ("new", "changed", "unchanged"):

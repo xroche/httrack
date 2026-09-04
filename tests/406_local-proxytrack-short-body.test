@@ -26,7 +26,8 @@ export MALLOC_PERTURB_=165
 leak_run=$(printf 'Z%.0s' $(seq 1 64))
 # ... where the allocator honours it, which Windows has no way to ask; the
 # length assertions carry the test everywhere else
-poison=$("$python" -c 'import ctypes
+poison=$("$python" -c 'import ctypes, sys
+sys.stdout.reconfigure(newline="\n")  # the hex below is compared byte for byte
 try:
     libc = ctypes.CDLL(None)
     libc.malloc.restype = ctypes.c_void_p

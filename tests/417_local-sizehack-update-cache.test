@@ -65,8 +65,10 @@ repeat_chars 1536 Z >"${host}/diverged.bin"
 crawl update "$out" --update --sizehack
 
 log="${out}/hts-log.txt"
+# The engine logs the path it was handed, which under wsl2 is the native one.
+loghost=$(nativepath "$host")
 kept_name() { # kept_name <mirror-relative path>
-    count_matching_lines -F "Kept existing file ${host}/$1 (" "$log"
+    count_matching_lines -F "Kept existing file ${loghost}/$1 (" "$log"
 }
 
 cmp -s "${root}/leaf.html" "${host}/leaf.html" ||

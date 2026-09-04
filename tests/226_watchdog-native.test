@@ -250,6 +250,8 @@ import sys
 
 import yaml
 
+sys.stdout.reconfigure(newline="\n")  # the shell reads timeout= as a number
+
 def steps_of(wf):
     return [s for j in (wf.get("jobs") or {}).values() for s in (j.get("steps") or [])]
 
