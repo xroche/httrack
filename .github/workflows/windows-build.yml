@@ -254,45 +254,6 @@ jobs:
           bash tests/install-headers-sweep.sh --backend cl --srcdir . -- @inc
           if ($LASTEXITCODE -ne 0) { throw "the installed headers do not compile standalone and pairwise" }
 
-      # The engine ships ~90 tests and none had ever run on Windows: "make check"
-      # is Linux/macOS only. These are the offline ones, driven from Git Bash
-      # against the native httrack.exe. They subsume the self-tests this step
-      # used to run inline (codecs, cache, fsize).
-      # The *_local-* ones crawl the bundled Python server over loopback: the real
-      # TLS handshake, cache and file writer, which nothing else on Windows covers.
-      - name: Run the engine test suite (offline tests)
-        shell: bash
-        working-directory: tests
-        timeout-minutes: 45
-        env:
-          # Half of 2*nproc: MSYS fork emulation breaks first under the pressure
-          # eight in flight put on a 4-vCPU runner (#1273).
-          HTTRACK_SUITE_JOBS: 4
-          # Through the environment, never argv, which the process list exposes.
-          WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WATCHDOG_REPO: ${{ github.repository }}
-          # The PR head, not github.sha: a merge commit is garbage-collected, and
-          # these statuses are the only trace a lost runner leaves (#1228).
-          WATCHDOG_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
-          WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          # Teed: the MSYS fork failures (#1273) land on this stderr, which no
-          # later step can read back.
-          bash ./ci-windows-suite.sh \
-            "$(cygpath -u "$GITHUB_WORKSPACE")/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
-            2>&1 | tee suite-console.log
-
-      # Its own step: the watchdog can kill the suite's step before it counts,
-      # which is exactly when the count is worth having.
-      - name: Count the MSYS fork failures and the lost workers
-        if: always()
-        shell: bash
-        working-directory: tests
-        run: |
-          . ./ci-windows-suite.sh
-          ci_report_fork_failures suite-console.log
-
       # WSL2 brings up in ~35s on a hosted runner with no reboot and no
       # third-party action: the three features are already enabled on the image.
       # It buys a real Linux shell against the same native httrack.exe, where
@@ -371,6 +332,45 @@ jobs:
           export HTS_BIN="$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}"
           wsl -d httrack-suite -- sh -c 'echo "ws=[$HTS_WS] bin=[$HTS_BIN]"; test -d "$HTS_WS/tests" || { echo "::error::$HTS_WS/tests is not visible in the distro"; exit 1; }'
           wsl -d httrack-suite -- sh -c 'cd "$HTS_WS/tests" && exec bash ./ci-windows-suite.sh "$HTS_BIN"' 2>&1 | tee suite-console.log
+
+      # The engine ships ~90 tests and none had ever run on Windows: "make check"
+      # is Linux/macOS only. These are the offline ones, driven from Git Bash
+      # against the native httrack.exe. They subsume the self-tests this step
+      # used to run inline (codecs, cache, fsize).
+      # The *_local-* ones crawl the bundled Python server over loopback: the real
+      # TLS handshake, cache and file writer, which nothing else on Windows covers.
+      - name: Run the engine test suite (offline tests)
+        shell: bash
+        working-directory: tests
+        timeout-minutes: 45
+        env:
+          # Half of 2*nproc: MSYS fork emulation breaks first under the pressure
+          # eight in flight put on a 4-vCPU runner (#1273).
+          HTTRACK_SUITE_JOBS: 4
+          # Through the environment, never argv, which the process list exposes.
+          WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WATCHDOG_REPO: ${{ github.repository }}
+          # The PR head, not github.sha: a merge commit is garbage-collected, and
+          # these statuses are the only trace a lost runner leaves (#1228).
+          WATCHDOG_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
+          WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Teed: the MSYS fork failures (#1273) land on this stderr, which no
+          # later step can read back.
+          bash ./ci-windows-suite.sh \
+            "$(cygpath -u "$GITHUB_WORKSPACE")/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
+            2>&1 | tee suite-console.log
+
+      # Its own step: the watchdog can kill the suite's step before it counts,
+      # which is exactly when the count is worth having.
+      - name: Count the MSYS fork failures and the lost workers
+        if: always()
+        shell: bash
+        working-directory: tests
+        run: |
+          . ./ci-windows-suite.sh
+          ci_report_fork_failures suite-console.log
 
       - name: Upload the test logs
         if: always()
