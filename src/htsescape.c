@@ -33,9 +33,7 @@ Please visit our Website: http://www.httrack.com
 
 #include "htsescape.h"
 
-/* CR, LF or TAB, as htslib.h's is_retorsep(). Copied because htsencoding.h
-   pulls windows.h first, so including htslib.h here collides winsock.h with
-   winsock2.h. */
+/* CR, LF or TAB, as htslib.h's is_retorsep(). */
 static HTS_INLINE int hts_is_retorsep(const char c) {
   return c == 10 || c == 13 || c == 9;
 }

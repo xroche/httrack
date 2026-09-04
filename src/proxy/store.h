@@ -33,7 +33,7 @@ Please visit our Website: http://www.httrack.com
 #ifndef _WIN32
 #include <pthread.h>
 #else
-#include "windows.h"
+#include "../htswin32.h"
 #endif
 
 /* Proxy */

@@ -52,6 +52,10 @@ Please visit our Website: http://www.httrack.com
 #ifndef HTTRACK_DEFLIB
 #define HTTRACK_DEFLIB
 
+/* CHAIN_FUNCTION() below dereferences httrackp and t_hts_callbackarg. */
+#include "htsdefines.h"
+#include "htsopt.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -101,8 +105,7 @@ typedef struct hts_stat_struct hts_stat_struct;
 typedef void (*htsErrorCallback)(const char *msg, const char *file, int line);
 #endif
 
-/* Helpers for plugging callbacks
-requires: htsdefines.h */
+/* Helpers for plugging callbacks */
 
 /**
  * Install callback FUNCTION into OPT->callbacks_fun->MEMBER, chaining it ahead

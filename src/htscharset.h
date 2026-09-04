@@ -37,9 +37,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsglobal.h"
 #include <stdlib.h>
 #include <string.h>
-#ifdef _WIN32
-#include <windows.h>
-#endif
+#include "htswin32.h"
 
 /** UCS4 type. **/
 typedef unsigned int hts_UCS4;

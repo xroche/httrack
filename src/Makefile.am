@@ -94,7 +94,7 @@ libhttrack_la_SOURCES =  htscore.c htsparse.c htsback.c htscache.c \
 	htsfilters.h htsftp.h htsglobal.h htshash.h coucal/coucal.h \
 	htshelp.h htsindex.h htsio.h htslib.h htsurlport.h htsmd5.h \
 	htsmodules.h htsname.h htsnet.h htssniff.h \
-	htsopt.h htsrobots.h htsthread.h  \
+	htsopt.h htsrobots.h htsthread.h htswin32.h  \
 	htscrashtest.h htstools.h htsrandom.h htswizard.h htswrap.h htscodec.h htswarc.h htschanges.h htssinglefile.h htssitemap.h htsproxy.h htszlib.h  \
 	htsstrings.h htsarrays.h htsarena.h httrack-library.h \
 	htscharset.h punycode.h htsencoding.h htsescape.h \

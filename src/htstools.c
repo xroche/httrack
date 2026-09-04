@@ -43,7 +43,7 @@ Please visit our Website: http://www.httrack.com
 #include "htsescape.h"
 #include "htscharset.h"
 #ifdef _WIN32
-#include "windows.h"
+#include "htswin32.h"
 #include <io.h> /* _isatty */
 #else
 #include <dirent.h>
