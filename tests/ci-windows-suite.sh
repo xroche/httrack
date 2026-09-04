@@ -343,7 +343,7 @@ if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
     # The Linux view, not the native one: a WSL2 shell cannot mktemp into a
     # drive-letter path. Tests hand the engine drvfs paths and the shim above
     # translates them, which is why RUNNER_TEMP has to stay on a Windows volume.
-    TMPDIR="$(wslpath -u "$RUNNER_TEMP")"
+    TMPDIR="$(drvfs_path -u "$RUNNER_TEMP")"
 else
     export MSYS_NO_PATHCONV=1
     export MSYS2_ARG_CONV_EXCL='*'

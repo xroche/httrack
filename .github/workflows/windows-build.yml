@@ -318,6 +318,9 @@ jobs:
           # A distro that answers is the only proof the import is usable.
           wsl -d httrack-suite -- uname -a
           if ($LASTEXITCODE -ne 0) { throw "the imported distro does not run" }
+          # For the record when a path stops converting: this rootfs has no
+          # wslpath, which is why nothing in the suite calls one.
+          wsl -d httrack-suite -- sh -c 'command -v wslpath || echo "no wslpath"'
 
       - name: Run the engine test suite (offline tests, WSL2)
         if: always() && matrix.platform == 'x64'
@@ -343,12 +346,19 @@ jobs:
           export WSLENV='HTTRACK_SUITE_BACKEND:HTTRACK_SUITE_JOBS:RUNNER_TEMP:WATCHDOG_TOKEN:WATCHDOG_REPO:WATCHDOG_SHA:WATCHDOG_CONTEXT:WATCHDOG_URL:GITHUB_STEP_SUMMARY/p'
           export HTTRACK_SUITE_BACKEND=wsl2
 <<<<<<< HEAD
+<<<<<<< HEAD
           ws=$(wslpath -u "$GITHUB_WORKSPACE")
 =======
           # Each converter runs on its own side: cygpath is MSYS's, wslpath is
           # the distro's. Forward slashes first, because a backslash does not
           # survive the trip in and wslpath saw "D:ahttrackhttrack".
           ws=$(wsl -d httrack-suite -- wslpath -u "$(cygpath -m "$GITHUB_WORKSPACE")")
+=======
+          # Mapped here rather than by wslpath, which a bare imported rootfs
+          # does not ship: `wsl -- wslpath` answers ERROR_PATH_NOT_FOUND. MSYS
+          # gives /d/a/..., and drvfs mounts the same volume at /mnt/d/a/...
+          ws=/mnt$(cygpath -u "$GITHUB_WORKSPACE")
+>>>>>>> origin/wsl2-suite
           case "$ws" in
           /mnt/*) ;;
           *)
@@ -356,7 +366,10 @@ jobs:
             exit 1
             ;;
           esac
+<<<<<<< HEAD
 >>>>>>> origin/master
+=======
+>>>>>>> origin/wsl2-suite
           wsl -d httrack-suite --cd "$ws/tests" -- \
             bash ./ci-windows-suite.sh \
             "$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}" \

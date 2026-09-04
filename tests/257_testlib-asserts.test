@@ -214,15 +214,14 @@ Darwin no
 EOF
 ok "an explicit HTS_OS still classifies, with uname unreadable"
 
-# Stub both path tools: testlib refuses to load under wsl2 without wslpath.
+# cygpath is the only converter the suite still shells out to, because wsl2
+# maps drvfs in-shell.
 mkdir "$tmpdir/pathbin"
-for t in cygpath wslpath; do
-    cat >"$tmpdir/pathbin/$t" <<EOF
+cat >"$tmpdir/pathbin/cygpath" <<'CGEOF'
 #!/bin/sh
-printf '$t %s %s\n' "\$1" "\$2"
-EOF
-    chmod +x "$tmpdir/pathbin/$t"
-done
+printf 'cygpath %s %s\n' "$1" "$2"
+CGEOF
+chmod +x "$tmpdir/pathbin/cygpath"
 pathbin=$(posixpath "$tmpdir/pathbin")
 
 ## The wsl2 backend is the case where the two predicates part company: a Linux
@@ -261,45 +260,43 @@ no win=no msys=no
 EOF
 ok "the IS_WINDOWS override still reaches both predicates"
 
-## path_convert picks its tool from the backend, never from uname: cygpath is
-# MSYS's and wslpath is WSL2's, and they take the same -m and -u.
+## path_convert converts in-shell under wsl2 and shells out to cygpath under
+# msys. A bare imported rootfs has no wslpath, so nothing may depend on one.
+cat >"$tmpdir/pathbin/cygpath" <<'CPEOF'
+#!/bin/sh
+printf 'cygpath %s %s\n' "$1" "$2"
+CPEOF
+chmod +x "$tmpdir/pathbin/cygpath"
 cat >"$tmpdir/pc.sh" <<EOF
 set -euo pipefail
 . "$testdir/testlib.sh"
-printf '%s|%s\n' "\$(nativepath /x)" "\$(posixpath /y)"
+printf '%s|%s\n' "\$(nativepath "\$1")" "\$(posixpath "\$2")"
 EOF
+pathbin=$(posixpath "$tmpdir/pathbin")
 while read -r backend want; do
-    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND="$backend" \
-        PATH="$pathbin:$PATH" bash "$tmpdir/pc.sh")
+    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND="$backend" PATH="$pathbin:$PATH" \
+        bash "$tmpdir/pc.sh" /mnt/d/a/out 'D:/a/in')
     test "$got" = "$want" || fail "backend=$backend converted to [$got], want [$want]"
 done <<'EOF'
-msys cygpath -m /x|cygpath -u /y
-wsl2 wslpath -m /x|wslpath -u /y
-posix /x|/y
+wsl2 D:/a/out|/mnt/d/a/in
+msys cygpath -m /mnt/d/a/out|cygpath -u D:/a/in
+posix /mnt/d/a/out|D:/a/in
 EOF
 ok "nativepath and posixpath dispatch on the backend"
 
-# A missing cygpath has always fallen through to the path unchanged. A missing
-# wslpath must not, and the refusal has to land when testlib is sourced: by the
-# time nativepath runs it is inside "$(...)", where an exit ends the subshell
-# and the test carries on with an empty path.
-rc=0
-out=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 bash "$tmpdir/pc.sh" 2>&1) || rc=$?
-test "$rc" -ne 0 || fail "wsl2 with no wslpath passed the path through as [$out]"
-case "$out" in
-*"|"*) fail "wsl2 with no wslpath still reached the conversion: $out" ;;
-esac
-case "$out" in
-*"no wslpath"*) ;;
-*) fail "wsl2 with no wslpath failed without naming the cause: $out" ;;
-esac
-if command -v cygpath >/dev/null 2>&1; then
-    echo "a real cygpath is on PATH, so its absence cannot be staged here" >&2
-else
-    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=msys bash "$tmpdir/pc.sh")
-    test "$got" = "/x|/y" || fail "msys with no cygpath gave [$got], want the paths unchanged"
-fi
-ok "a missing wslpath is fatal where a missing cygpath is not"
+# The mapping's edges: a path with no drive to name, and one already in the
+# form asked for, both come back untouched rather than mangled.
+while read -r flag given want; do
+    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 bash -c \
+        ". \"$testdir/testlib.sh\"; drvfs_path $flag '$given'")
+    test "$got" = "$want" || fail "drvfs_path $flag $given gave [$got], want [$want]"
+done <<'EOF'
+-u /already/posix /already/posix
+-u c:/lower /mnt/c/lower
+-m /mnt/e/x E:/x
+-m /no/drive/here /no/drive/here
+EOF
+ok "the drvfs mapping leaves alone what it cannot name a drive for"
 
 ## win_marker picks the string that tells one launch from another. WSL2 has no
 # /proc/<pid>/winpid, so a wrong pick here kills a stranger or nothing at all.
@@ -345,13 +342,7 @@ else
 #!/bin/sh
 printf '%s\n' "$@"
 TOOLEOF
-    # A wslpath that really converts, so the assertion below is about the shim.
-    cat >"$tmpdir/shimbin/wslpath" <<'WPEOF'
-#!/bin/sh
-d=$(printf '%s' "$2" | cut -c6)
-printf '%s:%s\n' "$(printf '%s' "$d" | tr '[:lower:]' '[:upper:]')" "$(printf '%s' "$2" | cut -c7-)"
-WPEOF
-    chmod +x "$tmpdir/shimbin/faketool" "$tmpdir/shimbin/faketool.exe" "$tmpdir/shimbin/wslpath"
+    chmod +x "$tmpdir/shimbin/faketool" "$tmpdir/shimbin/faketool.exe"
     got=$(PATH="$tmpdir/shimbin:$PATH" bash "$tmpdir/shimbin/faketool" /mnt/c/x/y -q plain | tr '\n' ' ')
     assert_eq "C:/x/y -q plain " "$got" "what the shim handed the exe"
     ok "the wsl2 shim names the .exe and converts only its drvfs arguments"
