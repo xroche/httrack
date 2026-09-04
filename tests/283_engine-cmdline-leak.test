@@ -53,3 +53,58 @@ bail() { # bail LABEL WANT_RE ARG...
 
 bail 'a rule the grammar refuses' 'Invalid host-alias rule' --host-alias nope
 bail 'an option that does not exist' 'Unknown option' --no-such-option
+
+# The two exits above expand htsmain_free(). Ten more leave hts_main_internal
+# without expanding it, so the same block leaks. Nine of those are driveable
+# from a command line; the tenth, an aborted mirror reported before the crawl,
+# needs a tty, because a non-tty run sets opt->quiet and skips the branch.
+
+# One stored entry and no central directory, which unzRepair rebuilds.
+zip_one_entry() { # zip_one_entry FILE
+    printf 'PK\003\004\024\000\000\000\000\000\000\000\041\000\000\000\000\000\004\000\000\000\004\000\000\000\001\000\000\000xdata' >"$1"
+}
+
+# An end-of-central-directory record alone: opens, holds nothing.
+zip_empty() { # zip_empty FILE
+    printf 'PK\005\006\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000' >"$1"
+}
+
+early() { # early LABEL DIR WANT_RC WANT_RE ARG...
+    local label=$1 dir=$2 want_rc=$3 want=$4
+    shift 4
+    rm -f "$tmp/asan".*
+    printf '[%s] ..\t' "$label"
+    local out rc=0
+    out=$(ASAN_OPTIONS="${asan_base}:log_path=$tmp/asan" \
+        httrack -O "$dir" "$@" "$url" 2>&1) || rc=$?
+    # Teeth: the message pins the handler and the status pins which return ran,
+    # while the missing sign-off proves the run never reached the exit that frees.
+    assert_match "$want" "$out" "$label"
+    assert_eq "$want_rc" "$rc" "$label exit status"
+    if [[ $out =~ Thanks\ for\ using ]]; then
+        fail "$label: reached the end of the run, not the early exit"
+    fi
+    report=$(cat "$tmp/asan".* 2>/dev/null || true)
+    test -z "$report" || {
+        echo "FAIL: $label leaked"
+        echo "$report"
+        exit 1
+    }
+    echo "OK"
+}
+
+for d in noc emptyzip onezip; do
+    mkdir -p "$tmp/$d/hts-cache"
+done
+zip_empty "$tmp/emptyzip/hts-cache/new.zip"
+zip_one_entry "$tmp/onezip/hts-cache/new.zip"
+
+early 'version, before the option switch' "$tmp/noc" 0 'HTTrack version' -#h
+early 'version, from the option switch' "$tmp/noc" 0 'HTTrack version' -q#h
+early 'autocheck' "$tmp/noc" 0 'AUTOCHECK OK' -#t
+early 'cache listing' "$tmp/noc" 0 'No cache entry found' -#C '*'
+early 'meta-data, no cache' "$tmp/noc" 1 'error extracting meta-data' -#E
+early 'meta-data extracted' "$tmp/emptyzip" 0 'successfully extracted meta-data' -#E
+early 'repair, no cache' "$tmp/noc" 1 'no cache found in' -#R
+early 'repair, nothing to recover' "$tmp/emptyzip" 1 'repaired cache holds no entry' -#R
+early 'repair, one entry back' "$tmp/onezip" 0 'recovered in 1 entries' -#R
