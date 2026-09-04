@@ -109,33 +109,11 @@ jobs:
           bin=$(type -P true)
           start=$SECONDS
           for _ in $(seq 500); do "$bin"; done
-          echo "MSYS: 500 spawns in $((SECONDS - start))s"
+          echo "msys-fork: 500 spawns in $((SECONDS - start))s"
 
-      - name: Process creation, WSL2
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          wsl.exe -d probe -- bash -lc 'start=$SECONDS; for i in $(seq 500); do /bin/true; done; echo "WSL2: 500 spawns in $((SECONDS - start))s"' 2>&1 | Out-String
-
-      # A harness in Linux still has to launch httrack.exe, and that crossing is
-      # the cost MSYS does not pay.
-      - name: Interop spawn of a Windows exe from WSL2
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          wsl.exe -d probe -- bash -lc 'start=$SECONDS; for i in $(seq 100); do /mnt/c/Windows/System32/cmd.exe /c exit; done; echo "interop: 100 spawns in $((SECONDS - start))s"' 2>&1 | Out-String
-
-      # The crawl tests write and then read back a mirror, so the 9p cost lands
-      # on every assertion, not only on the build.
-      - name: File IO on /mnt/c from WSL2
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          wsl.exe -d probe -- bash -lc 'cd /mnt/c/Users/runneradmin 2>/dev/null || cd /mnt/c; mkdir -p probe-io && cd probe-io; start=$SECONDS; for i in $(seq 300); do echo x > f$i; done; sync; echo "9p: 300 files in $((SECONDS - start))s"; start=$SECONDS; cat f* > /dev/null; echo "9p: read back in $((SECONDS - start))s"; rm -f f*' 2>&1 | Out-String
-
-      # Two directions, because which one works decides where the test server
-      # can live: httrack.exe is a Windows process either way.
-      - name: Loopback across the boundary
+      # Every measurement inside the distro runs from a file: pwsh mangles a
+      # quoted bash -c string, and the first spike lost four numbers to it.
+      - name: Measure inside WSL2
         continue-on-error: true
         shell: pwsh
         run: |
@@ -146,7 +124,7 @@ jobs:
           $out = "$env:RUNNER_TEMP\server.out"
           Start-Process -FilePath python -ArgumentList @("tests/local-server.py", "--root", $root) `
             -PassThru -RedirectStandardOutput $out -RedirectStandardError "$env:RUNNER_TEMP\server.err" | Out-Null
-          $port = $null
+          $port = ""
           foreach ($i in 1..60) {
             if (Test-Path $out) {
               $m = Select-String -Path $out -Pattern '^PORT (\d+)' | Select-Object -First 1
@@ -155,16 +133,26 @@ jobs:
             Start-Sleep -Milliseconds 500
           }
           Write-Host "windows-side server port=$port"
-          Write-Host "== linux client -> windows server, over 127.0.0.1 =="
-          wsl.exe -d probe -- bash -lc "curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://127.0.0.1:$port/" 2>&1 | Out-String
-          Write-Host "== linux client -> windows server, over the host IP =="
-          wsl.exe -d probe -- bash -lc "ip route show default | awk '{print \$3}' | head -1 | xargs -I{} curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://{}:$port/" 2>&1 | Out-String
-          Write-Host "== windows client -> linux server, over 127.0.0.1 (localhostForwarding) =="
-          $job = Start-Job { wsl.exe -d probe -- bash -lc 'cd /tmp && python3 -m http.server 8099 --bind 0.0.0.0' }
-          Start-Sleep -Seconds 8
-          try {
-            (Invoke-WebRequest -Uri "http://127.0.0.1:8099/" -UseBasicParsing -TimeoutSec 5).StatusCode
-          } catch {
-            Write-Host "windows -> linux failed: $_"
+          $here = & wsl.exe -d probe -- wslpath -a "$($PWD.Path -replace '\\', '/')"
+          Write-Host "workspace inside the distro: $here"
+          & wsl.exe -d probe -- bash "$here/tools/wsl2-spike-inside.sh" $port
+
+      # The other direction, because it decides where the test server can live.
+      - name: Windows client to a WSL2 listener
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          Start-Process -FilePath wsl.exe `
+            -ArgumentList @("-d", "probe", "--", "python3", "-m", "http.server", "8099", "--bind", "0.0.0.0") `
+            -PassThru | Out-Null
+          Start-Sleep -Seconds 10
+          foreach ($target in @("127.0.0.1", "localhost")) {
+            try {
+              $r = Invoke-WebRequest -Uri "http://${target}:8099/" -UseBasicParsing -TimeoutSec 5
+              Write-Host "windows-to-wsl2 via ${target}: $($r.StatusCode)"
+            } catch {
+              Write-Host "windows-to-wsl2 via ${target}: failed"
+            }
           }
-          Stop-Job $job -ErrorAction SilentlyContinue
+          & wsl.exe -d probe -- ip -4 addr show eth0
