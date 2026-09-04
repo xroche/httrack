@@ -279,6 +279,76 @@ got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=msys bash "$tmpdir/pc.sh")
 test "$got" = "/x|/y" || fail "msys with no cygpath gave [$got], want the paths unchanged"
 ok "a missing wslpath is fatal where a missing cygpath is not"
 
+## win_marker picks the string that tells one launch from another. WSL2 has no
+# /proc/<pid>/winpid, so a wrong pick here kills a stranger or nothing at all.
+mkcmdline() { # mkcmdline FILE ARG...
+    local f=$1
+    shift
+    : >"$f"
+    for a in "$@"; do printf '%s\0' "$a" >>"$f"; done
+}
+mkcmdline "$tmpdir/cl" httrack.exe -O "C:/t/httrack_local.AbCdEf" "http://x/" -q
+assert_eq "C:/t/httrack_local.AbCdEf" "$(win_marker "$tmpdir/cl")" "the output directory"
+
+# argv[0] is the same exe for every concurrent test, so it can never be it.
+mkcmdline "$tmpdir/cl" "C:/a/very/long/path/to/httrack.exe" -q
+assert_eq "" "$(win_marker "$tmpdir/cl")" "argv[0] alone"
+
+# Nothing distinctive is "unknown", which every caller already handles.
+mkcmdline "$tmpdir/cl" httrack.exe -q -O out
+assert_eq "" "$(win_marker "$tmpdir/cl")" "only short arguments"
+assert_eq "" "$(win_marker "$tmpdir/nosuchfile")" "no cmdline at all"
+ok "win_marker picks the launch's own output directory, never argv[0]"
+
+## The tool names differ by backend: bare under MSYS, .exe under WSL2, where the
+# PATH is Linux's and interop resolves only a real filename.
+while read -r backend want; do
+    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND="$backend" PATH="$pathbin:$PATH" \
+        bash -c ". \"$testdir/testlib.sh\"; win_tool taskkill; win_tool tasklist" | tr '\n' ' ')
+    test "$got" = "$want " || fail "backend=$backend named [$got], want [$want]"
+done <<'EOF'
+msys taskkill tasklist
+wsl2 taskkill.exe tasklist.exe
+posix taskkill tasklist
+EOF
+ok "taskkill and tasklist take their .exe only under wsl2"
+
+## win_capture under wsl2 has no /proc/<pid>/winpid to read. It takes the
+# relay's own cmdline instead and asks Windows which process carries it.
+cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
+#!/bin/sh
+printf '%s\n' "${HTS_WIN_MARKER:-}" >"$PSREC.env"
+printf '%s\n' "$*" >"$PSREC.argv"
+echo 4242
+PSEOF
+chmod +x "$tmpdir/pathbin/powershell.exe"
+cat >"$tmpdir/cap.sh" <<EOF
+set -euo pipefail
+. "$testdir/testlib.sh"
+/bin/sh -c 'sleep 30' "\$1" &
+v=\$!
+# Until the exec lands, the cmdline still names the forking shell: the same race
+# the MSYS winpid read has, and the reason win_capture is not for a fresh job.
+for _ in \$(seq 200); do
+    test "\$(win_marker "/proc/\$v/cmdline")" != "\$1" || break
+    sleep 0.01
+done
+win_capture "\$v"
+printf '%s|%s\n' "\$WIN_PID" "\$WIN_IMAGE"
+kill "\$v" 2>/dev/null || true
+EOF
+marker="/mnt/c/t/httrack_local.ZzUnique1"
+got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 PSREC="$tmpdir/ps" \
+    PATH="$pathbin:$PATH" bash "$tmpdir/cap.sh" "$marker")
+assert_eq "4242|sh" "$got" "the Windows pid and image win_capture resolved"
+assert_eq "$marker" "$(cat "$tmpdir/ps.env")" "the marker powershell received"
+# In the environment, never on the command line: a marker passed as an argument
+# puts it on the querying process's own cmdline, which then matches itself.
+case "$(cat "$tmpdir/ps.argv")" in
+*"$marker"*) fail "the marker rode powershell's argv: $(cat "$tmpdir/ps.argv")" ;;
+esac
+ok "win_capture resolves the Windows pid by marker, passed out of band"
+
 # Unshimmed: a guard that fires only on the broken path is half a guard.
 case "$(uname -s)" in
 MINGW* | MSYS* | CYGWIN*) want=yes ;;

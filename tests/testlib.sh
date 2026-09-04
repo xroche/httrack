@@ -894,8 +894,52 @@ dump_crawl_logs() {
     done
 }
 
+# taskkill and tasklist answer to their bare names under MSYS. Under WSL2 the
+# PATH is Linux's and interop resolves only a real filename, so they need .exe.
+# Dispatched rather than always suffixed, to leave the MSYS path untouched.
+win_tool() { # win_tool taskkill|tasklist
+    case "$(suite_backend)" in
+    wsl2) printf '%s.exe\n' "$1" ;;
+    *) printf '%s\n' "$1" ;;
+    esac
+}
+
+# The substring identifying ONE launch among every Windows process on the host.
+# WSL2 has no /proc/<pid>/winpid, so all that is left is what the relay was
+# started with, and the exe's path is shared by every concurrent test. The
+# longest argument is the test's own output directory, which is unique per
+# launch and longer than any flag. Empty when nothing is distinctive enough,
+# which the callers already treat as "unknown" (#1228).
+win_marker() { # win_marker <path to a NUL-separated cmdline>
+    test -r "$1" || return 0
+    tr '\0' '\n' <"$1" 2>/dev/null |
+        awk 'NR > 1 && length($0) >= 8 && length($0) > length(best) { best = $0 }
+             END { if (best != "") print best }'
+}
+
+# The Windows PID of the process carrying $1 on its command line, empty unless
+# exactly one matches: naming a stranger is as good as naming nobody (#1228).
+# The marker travels in the environment, not in the argument list, so this query
+# cannot match itself the way the same marker on its own command line would.
+win_pid_by_marker() { # win_pid_by_marker <marker>
+    test -n "$1" || return 0
+    # shellcheck disable=SC2016 # the $ below are PowerShell's, not the shell's
+    HTS_WIN_MARKER=$1 WSLENV=HTS_WIN_MARKER powershell.exe -NoProfile \
+        -NonInteractive -Command '
+        $m = $env:HTS_WIN_MARKER
+        $p = @(Get-CimInstance Win32_Process | Where-Object {
+            $_.ProcessId -ne $PID -and $_.CommandLine -and
+            $_.CommandLine.Contains($m) })
+        if ($p.Count -eq 1) { $p[0].ProcessId }' 2>/dev/null |
+        tr -cd '0-9'
+}
+
 # The Windows PID behind an MSYS pid, empty when unknown.
 win_pid() {
+    if test "$(suite_backend)" = wsl2; then
+        win_pid_by_marker "$(win_marker "/proc/$1/cmdline")"
+        return 0
+    fi
     if test -r "/proc/$1/winpid"; then
         cat "/proc/$1/winpid" 2>/dev/null || true
     fi
@@ -909,6 +953,16 @@ win_pid() {
 win_capture() { # win_capture <pid>
     WIN_PID='' WIN_IMAGE=''
     target_is_windows || return 0
+    if test "$(suite_backend)" = wsl2; then
+        # The relay's own cmdline, which is the Windows process's: read while it
+        # is alive for the same reason winpid is, since a dead relay has none.
+        local marker
+        marker=$(win_marker "/proc/$1/cmdline")
+        WIN_PID=$(win_pid_by_marker "$marker")
+        { read -r -d '' WIN_IMAGE <"/proc/$1/cmdline"; } 2>/dev/null || true
+        WIN_IMAGE=${WIN_IMAGE##*[\\/]}
+        return 0
+    fi
     # Unguarded reads: a missing file leaves the empty value set above, and read
     # reports EOF on an unterminated line having already assigned it.
     { read -r WIN_PID <"/proc/$1/winpid"; } 2>/dev/null || true
@@ -920,7 +974,7 @@ win_capture() { # win_capture <pid>
 # Whether Windows PID $1 runs image $2. Both columns at once, since either alone
 # answers for a recycled PID, and case-folded as the proclib.sh matchers are.
 win_pid_runs() { # win_pid_runs <winpid> <image>
-    tasklist 2>/dev/null |
+    "$(win_tool tasklist)" 2>/dev/null |
         awk -v p="$1" -v i="$2" 'tolower($1) == tolower(i) && $2 == p { f = 1 } END { exit !f }'
 }
 
@@ -932,7 +986,7 @@ kill_pid() {
         local winpid
         winpid=$(win_pid "$pid")
         if test -n "$winpid"; then
-            taskkill /F /PID "$winpid" >/dev/null 2>&1 || true
+            "$(win_tool taskkill)" /F /PID "$winpid" >/dev/null 2>&1 || true
         fi
         return 0
     fi
@@ -959,12 +1013,12 @@ kill_tree() {
             winpid=
         fi
         if test -n "$winpid"; then
-            taskkill /F /T /PID "$winpid" >/dev/null 2>&1 || true
+            "$(win_tool taskkill)" /F /T /PID "$winpid" >/dev/null 2>&1 || true
         # Last resort, so it is opt-in: it kills every engine and every python on
         # the host, siblings of a parallel run included (HTTRACK_EXCLUSIVE_HOST).
         elif test -n "${HTTRACK_EXCLUSIVE_HOST:-}"; then
             taskkill_engines
-            taskkill /F /IM python.exe >/dev/null 2>&1 || true
+            "$(win_tool taskkill)" /F /IM python.exe >/dev/null 2>&1 || true
         fi
         return 0
     fi
