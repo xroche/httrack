@@ -1,9 +1,9 @@
 #!/bin/bash
 #
 # A test that bails out at "exit 0" because a prerequisite is missing reports
-# PASS, so a host that cannot run it goes green having asserted nothing: 399 did
-# exactly that wherever PyYAML was absent. 77 is automake's skip, and this
-# refuses the idiom coming back.
+# PASS, so the host that cannot run it is the one reading green. 399 did that
+# wherever PyYAML was absent. 77 is automake's skip, and this refuses the idiom
+# coming back.
 
 set -euo pipefail
 
@@ -14,9 +14,8 @@ top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_vacskip.XXXXXX")
 cleanup_push rm -rf "$tmp"
 
-# Reports every "exit 0" a test can reach before it has run anything that could
-# have failed it. An early bail-out past a real assertion is honest: the test
-# did prove something, and only the leg behind the gate is lost.
+# Reports every "exit 0" a test can reach before anything that could have failed
+# it. A bail-out past a real assertion is honest, so it is not reported.
 cat >"$tmp/scan.awk" <<'AWK'
 # Per file, or the first file's assertions vouch for every file behind it.
 FNR == 1 { eff = 0; heredoc = ""; dashed = 0; depth = 0; infunc = 0; split("", opened) }

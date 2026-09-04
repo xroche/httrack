@@ -26,8 +26,8 @@ cleanup_push rm -rf "$tmp"
 # The MSVC step stages DevIncludes_DATA out of the source tree rather than
 # through the install rule 269 drives, so nothing else exercises that half.
 read -r -a cc_argv <<<"${CC:-cc}"
-# Both halves are gated on a prerequisite, so count what ran: neither leg here
-# leaves nothing but two file-existence checks behind a pass.
+# Both halves are gated, so count them: with neither run, only two
+# file-existence checks stand behind the pass.
 staged=0
 if ! command -v "${cc_argv[0]}" >/dev/null 2>&1; then
     echo "note: no C compiler (${cc_argv[0]}), the staging path was not driven" >&2
