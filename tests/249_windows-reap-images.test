@@ -18,6 +18,7 @@ cleanup_push rm -rf "$tmp"
 # is pinned on every host and an MSYS run cannot taskkill this shell.
 IS_WINDOWS=yes
 taskkill() { printf '%s\n' "$*" >>"$tmp/killed"; }
+# shellcheck disable=SC2317 # called as "$(win_exe tasklist)", not by name
 tasklist() { printf 'proxytrack.exe   4242 Console\n'; }
 win_pid() { :; }
 
@@ -123,6 +124,7 @@ done
 if grep -qxF '/F /IM python.exe' "$tmp/killed"; then fail "the reap killed an unrelated python.exe"; fi
 
 # Near misses, not an idle host, are what a widened image matcher lets through.
+# shellcheck disable=SC2317 # called as "$(win_exe tasklist)", not by name
 tasklist() {
     printf 'System Idle Process              0 Services\n'
     printf 'notepad-httrack-notes.exe      77 Console\n'

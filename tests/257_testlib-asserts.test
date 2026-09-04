@@ -282,9 +282,18 @@ ok "nativepath and posixpath dispatch on the backend"
 # A missing cygpath has always fallen through to the path unchanged. A missing
 # wslpath must not, and the refusal has to land when testlib is sourced: by the
 # time nativepath runs it is inside "$(...)", where an exit ends the subshell
-# and the test carries on with an empty path.
+# and the test carries on with an empty path. A real MSYS runner ships a real
+# cygpath, so PATH must drop it here or this exercises conversion, not absence.
+nocygpath=
+oldifs=$IFS
+IFS=:
+for d in $PATH; do
+    test -x "$d/cygpath" -o -x "$d/cygpath.exe" ||
+        nocygpath="${nocygpath:+$nocygpath:}$d"
+done
+IFS=$oldifs
 rc=0
-out=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 bash "$tmpdir/pc.sh" 2>&1) || rc=$?
+out=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 PATH="$nocygpath" bash "$tmpdir/pc.sh" 2>&1) || rc=$?
 test "$rc" -ne 0 || fail "wsl2 with no wslpath passed the path through as [$out]"
 case "$out" in
 *"|"*) fail "wsl2 with no wslpath still reached the conversion: $out" ;;
@@ -293,7 +302,7 @@ case "$out" in
 *"no wslpath"*) ;;
 *) fail "wsl2 with no wslpath failed without naming the cause: $out" ;;
 esac
-got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=msys bash "$tmpdir/pc.sh")
+got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=msys PATH="$nocygpath" bash "$tmpdir/pc.sh")
 test "$got" = "/x|/y" || fail "msys with no cygpath gave [$got], want the paths unchanged"
 ok "a missing wslpath is fatal where a missing cygpath is not"
 
@@ -344,7 +353,10 @@ ok "a Windows executable takes its .exe only under wsl2"
 # Real interop passes a variable only when WSLENV names it, so the stub refuses
 # to see one that is not listed. Without this, dropping WSLENV changes nothing
 # here and everything on a runner.
-cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
+# The relay's own /proc/<pid>/cmdline is what carries the marker, so this needs
+# a real procfs; Darwin and other /proc-less hosts have nothing to read here.
+if test -d /proc; then
+    cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
 #!/bin/sh
 case ":${WSLENV:-}:" in
 *:HTS_WIN_MARKER:*) printf '%s\n' "${HTS_WIN_MARKER:-}" >"$PSREC.env" ;;
@@ -353,8 +365,8 @@ esac
 printf '%s\n' "$*" >"$PSREC.argv"
 echo 4242
 PSEOF
-chmod +x "$tmpdir/pathbin/powershell.exe"
-cat >"$tmpdir/cap.sh" <<EOF
+    chmod +x "$tmpdir/pathbin/powershell.exe"
+    cat >"$tmpdir/cap.sh" <<EOF
 set -euo pipefail
 . "$testdir/testlib.sh"
 # The marker goes in argv[1], where win_marker's argv[0] skip still finds it.
@@ -366,17 +378,18 @@ win_capture "\$v"
 printf '%s|%s\n' "\$WIN_PID" "\$WIN_IMAGE"
 kill "\$v" 2>/dev/null || true
 EOF
-marker="/mnt/c/t/httrack_local.ZzUnique1"
-got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 PSREC="$tmpdir/ps" \
-    PATH="$pathbin:$PATH" bash "$tmpdir/cap.sh" "$marker")
-assert_eq "4242|sh" "$got" "the Windows pid and image win_capture resolved"
-assert_eq "$marker" "$(cat "$tmpdir/ps.env")" "the marker powershell received"
-# In the environment, never on the command line: a marker passed as an argument
-# puts it on the querying process's own cmdline, which then matches itself.
-case "$(cat "$tmpdir/ps.argv")" in
-*"$marker"*) fail "the marker rode powershell's argv: $(cat "$tmpdir/ps.argv")" ;;
-esac
-ok "win_capture resolves the Windows pid by marker, passed out of band"
+    marker="/mnt/c/t/httrack_local.ZzUnique1"
+    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 PSREC="$tmpdir/ps" \
+        PATH="$pathbin:$PATH" bash "$tmpdir/cap.sh" "$marker")
+    assert_eq "4242|sh" "$got" "the Windows pid and image win_capture resolved"
+    assert_eq "$marker" "$(cat "$tmpdir/ps.env")" "the marker powershell received"
+    # In the environment, never on the command line: a marker passed as an argument
+    # puts it on the querying process's own cmdline, which then matches itself.
+    case "$(cat "$tmpdir/ps.argv")" in
+    *"$marker"*) fail "the marker rode powershell's argv: $(cat "$tmpdir/ps.argv")" ;;
+    esac
+    ok "win_capture resolves the Windows pid by marker, passed out of band"
+fi
 
 # Unshimmed: a guard that fires only on the broken path is half a guard.
 case "$(uname -s)" in
