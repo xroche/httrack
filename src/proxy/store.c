@@ -2169,6 +2169,17 @@ static hts_boolean arcPastRecordEnd(FILE *file, long int end) {
   return (end >= 0 && ftell(file) > end) ? HTS_TRUE : HTS_FALSE;
 }
 
+/* Characters linput() returns for one line at most, given the size the walk
+   passes it: one below the buffer it is handed, which is itself one below the
+   field. Matching it exactly is what keeps the scan and the walk from reading
+   the same long line differently. */
+#define ARC_LINE_MAX ((int) sizeof(((PT_Index__Arc) NULL)->line) - 2)
+
+/* Bytes linput() never returns, wherever they sit on the line. */
+static hts_boolean arcDroppedByte(char c) {
+  return (c == 9 || c == 12 || c == 13) ? HTS_TRUE : HTS_FALSE;
+}
+
 /* Length of the digit run filling the field at pos, or -1 for anything else. */
 static int arcDigitField(const char *pos) {
   int i;
@@ -2179,14 +2190,15 @@ static int arcDigitField(const char *pos) {
 }
 
 /* A scheme, an address, a date, a MIME type and a length, in five fields
-   (arc 1.0) or ten (arc 1.1). The count and the trailing length are what tell a
-   record line from a sentence quoting a URL. */
+   (arc 1.0) or ten (arc 1.1). Trailing spaces do not count, because one of them
+   is the whole difference on an otherwise ordinary line. */
 static hts_boolean arcHasRecordShape(const char *line) {
   const char *pos;
   int fields = 1;
+  int last;
   int i;
 
-  if (!isalpha((unsigned char) line[0])) /* every scheme opens with a letter */
+  if (!isalpha((unsigned char) line[0]))
     return HTS_FALSE;
   for (i = 0; line[i] != ':'; i++) {
     if (!isalnum((unsigned char) line[i]) && line[i] != '+' && line[i] != '-' &&
@@ -2195,7 +2207,11 @@ static hts_boolean arcHasRecordShape(const char *line) {
   }
   if (line[i + 1] == '\0' || line[i + 1] == ARC_SP)
     return HTS_FALSE;
-  for (; line[i] != '\0'; i++) {
+  for (last = i; line[i] != '\0'; i++) {
+    if (line[i] != ARC_SP)
+      last = i;
+  }
+  for (i = 0; i < last; i++) {
     if (line[i] == ARC_SP)
       fields++;
   }
@@ -2205,67 +2221,70 @@ static hts_boolean arcHasRecordShape(const char *line) {
   return (pos != NULL && arcDigitField(pos) > 0) ? HTS_TRUE : HTS_FALSE;
 }
 
-/* A dated line is a record whatever its scheme, so a record this reader never
-   serves, such as the "dns:" ones Heritrix writes one of per host, still marks
-   where the record before it ends. */
+/* PT_LoadCache__Arc indexes a record on getArcLength() and a scheme it can
+   serve, so the scan below has to accept at least that much: a record this
+   reader will hand out under its own URL must never be invisible to it. The
+   shape arm adds the records it will not serve, such as the one "dns:" per host
+   Heritrix writes, which bound their neighbour all the same. */
 static hts_boolean arcIsRecordLine(const char *line) {
-  const char *pos;
-
-  if (!arcHasRecordShape(line))
-    return HTS_FALSE;
-  if (PT_CompatibleScheme(line))
+  if (PT_CompatibleScheme(line) && getArcLength(line) >= 0)
     return HTS_TRUE;
-  pos = getArcField(line, 2);
-  return (pos != NULL && arcDigitField(pos) == 14) ? HTS_TRUE : HTS_FALSE;
+  return arcHasRecordShape(line);
 }
 
-/* linput() drops these, so a line read raw must too or the two disagree. */
-static void arcDropLinputBytes(char *line) {
-  int i, j;
+/* Could this raw span open a record line? Every one names a scheme, so the
+   first field has to reach a ':' through scheme characters alone, and that
+   turns away almost every line of an archived page before it is copied. */
+static hts_boolean arcMayOpenRecord(const char *raw, size_t len) {
+  size_t i;
 
-  for (i = j = 0; line[i] != '\0'; i++) {
-    if (line[i] != 13 && line[i] != 9 && line[i] != 12)
-      line[j++] = line[i];
+  for (i = 0; i < len && arcDroppedByte(raw[i]); i++)
+    ;
+  if (i == len || !isalpha((unsigned char) raw[i]))
+    return HTS_FALSE;
+  for (; i < len; i++) {
+    if (raw[i] == ':')
+      return HTS_TRUE;
+    if (arcDroppedByte(raw[i]))
+      continue;
+    if (!isalnum((unsigned char) raw[i]) && raw[i] != '+' && raw[i] != '-' &&
+        raw[i] != '.')
+      return HTS_FALSE;
   }
-  line[j] = '\0';
+  return HTS_FALSE;
 }
 
-/* Two bytes turn away nearly every line of a page before it is parsed. */
-static hts_boolean arcScannedLineIsRecord(char *line, size_t len) {
-  while (len > 0 &&
-         (line[len - 1] == 13 || line[len - 1] == 9 || line[len - 1] == 12))
-    len--;
-  if (len == 0 || !isalpha((unsigned char) line[0]) ||
-      !isdigit((unsigned char) line[len - 1]))
-    return HTS_FALSE;
-  arcDropLinputBytes(line);
-  return arcIsRecordLine(line);
+/* Append what linput() would have kept of a raw span, to the same cap. */
+static size_t arcAppendLine(char *line, size_t len, const char *raw,
+                            size_t rawlen) {
+  size_t i;
+
+  for (i = 0; i < rawlen && len < (size_t) ARC_LINE_MAX; i++) {
+    if (!arcDroppedByte(raw[i]))
+      line[len++] = raw[i];
+  }
+  line[len] = '\0';
+  return len;
 }
 
-/* Whether a record starts where the file is left, one separator away. */
-static hts_boolean arcNextRecordFollows(PT_Index__Arc index) {
-  if (fgetc(index->file) != 0x0a)
-    return HTS_FALSE;
-  index->line[0] = '\0';
-  (void) linput(index->file, index->line, sizeof(index->line) - 1);
-  return arcIsRecordLine(index->line);
-}
-
-/* Whether a record starts anywhere in [from, to], the bytes the declared length
-   hands the reader. A line counts by where it STARTS, because an end landing
-   inside the next record's own line still serves the front of that line. */
+/* Reads the record's declared data from where the file already sits, and
+   answers whether a record starts inside it. A line counts by where it STARTS,
+   because a declared end landing inside the next record's own line still serves
+   the front of that line. Reading forward rather than seeking back is what
+   keeps an archive of small records from being read many times over: the walk
+   has to cross these bytes anyway. */
 static hts_boolean arcDataHoldsARecord(PT_Index__Arc index, long int from,
                                        long int to) {
   char buffer[32768];
-  char line[2048];
+  char line[ARC_LINE_MAX + 1];
   long int base = from; /* offset buffer[0] was read from */
-  long int lineStart = from;
   size_t lineLen = 0;
 
-  if (from > to || fseek(index->file, from, SEEK_SET) != 0)
-    return HTS_TRUE;
-  for (;;) {
-    const size_t got = fread(buffer, 1, sizeof(buffer), index->file);
+  while (base < to) {
+    const long int left = to - base;
+    size_t want =
+        (left < (long int) sizeof(buffer)) ? (size_t) left : sizeof(buffer);
+    const size_t got = fread(buffer, 1, want, index->file);
     size_t i = 0;
 
     while (i < got) {
@@ -2273,71 +2292,33 @@ static hts_boolean arcDataHoldsARecord(PT_Index__Arc index, long int from,
       const size_t chunk = (nl != NULL) ? (size_t) (nl - &buffer[i]) : got - i;
 
       if (lineLen == 0 && nl != NULL) {
-        /* the whole line is in the buffer, so test it where it lies */
-        *nl = '\0';
-        if (arcScannedLineIsRecord(&buffer[i], chunk))
-          return HTS_TRUE;
-        *nl = 0x0a;
-      } else {
-        if (lineLen < sizeof(line) - 1) {
-          size_t copy = sizeof(line) - 1 - lineLen;
-
-          if (copy > chunk)
-            copy = chunk;
-          memcpy(&line[lineLen], &buffer[i], copy);
-          lineLen += copy;
-        }
-        if (nl != NULL) {
-          line[lineLen] = '\0';
-          if (arcScannedLineIsRecord(line, lineLen))
+        /* the whole line is in the buffer, so weigh it before copying it out */
+        if (arcMayOpenRecord(&buffer[i], chunk)) {
+          (void) arcAppendLine(line, 0, &buffer[i], chunk);
+          if (arcIsRecordLine(line))
             return HTS_TRUE;
         }
+      } else {
+        lineLen = arcAppendLine(line, lineLen, &buffer[i], chunk);
+        if (nl != NULL && arcMayOpenRecord(line, lineLen) &&
+            arcIsRecordLine(line))
+          return HTS_TRUE;
       }
       i += chunk;
       if (nl == NULL)
         break;
       i++;
-      lineStart = base + (long int) i;
       lineLen = 0;
-      if (lineStart > to)
-        return HTS_FALSE;
     }
     base += (long int) got;
-    if (got < sizeof(buffer)) /* short read: end of file */
-      break;
-    /* nothing past the first sizeof(line) bytes can change the verdict */
-    if (base > to && lineLen == sizeof(line) - 1)
+    if (got < want) /* short read: end of file */
       break;
   }
-  line[lineLen] = '\0';
-  return arcScannedLineIsRecord(line, lineLen);
-}
-
-enum {
-  ARC_RECORD_CLEAN,  /* the declared data ends where the next record starts */
-  ARC_RECORD_GREEDY, /* it swallows a record, but the next one is reachable */
-  ARC_RECORD_BROKEN  /* nothing usable follows */
-};
-
-/* A record's declared data must end where the next record starts, or the reader
-   hands out the neighbour's bytes under this record's URL. A record following
-   the declared end proves nothing, because the length is the attacker's to pick
-   and any later record will do, so the data itself is asked instead. */
-static int arcRecordVerdict(PT_Index__Arc index, long int from) {
-  const long int to = ftell(index->file);
-  hts_boolean greedy, followed;
-
-  if (to < 0)
-    return ARC_RECORD_BROKEN;
-  greedy = arcDataHoldsARecord(index, from, to);
-  if (fseek(index->file, to, SEEK_SET) != 0)
-    return ARC_RECORD_BROKEN;
-  if (!greedy)
-    return ARC_RECORD_CLEAN;
-  followed = arcNextRecordFollows(index);
-  if (fseek(index->file, to, SEEK_SET) != 0)
-    return ARC_RECORD_BROKEN;
-  return followed ? ARC_RECORD_GREEDY : ARC_RECORD_BROKEN;
+  /* the last line of the data, which the separator rather than a newline ends
+   */
+  if (lineLen != 0 && arcMayOpenRecord(line, lineLen))
+    return arcIsRecordLine(line);
+  return HTS_FALSE;
 }
 
 int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
@@ -2395,26 +2376,34 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
               }
               if (*filenameIndex != 0) {
                 const long int dataStart = ftell(index->file);
-                int verdict;
+                long int dataEnd;
 
-                if (skipArcData(index->file, index->line) != 0) {
+                /* the declared length is untrusted, so it stands alone here */
+                if (dataStart < 0 || length > LONG_MAX - dataStart) {
                   fprintf(stderr,
                           "Corrupted cache data entry #%d (truncated file?), aborting read"
                           LF, (int) entries);
                   break;
                 }
-                verdict = arcRecordVerdict(index, dataStart);
-                if (verdict != ARC_RECORD_CLEAN) {
+                dataEnd = dataStart + length;
+                if (arcDataHoldsARecord(index, dataStart, dataEnd)) {
                   fprintf(stderr,
                           "Cache data entry #%d reaches into the next record,"
                           " skipped" LF,
                           (int) entries);
-                  /* the record is dropped, not the archive: a page holding a
-                     line of this shape is rare but real, and stopping here
-                     would cost every record left in the file */
-                  if (verdict == ARC_RECORD_BROKEN)
+                  /* the record is dropped, not the archive: the walk picks up
+                     at the declared end and judges what it finds there the way
+                     it judges every other record */
+                  if (fseek(index->file, dataEnd, SEEK_SET) != 0)
                     break;
                   continue;
+                }
+                if (fseek(index->file, dataEnd, SEEK_SET) != 0) {
+                  fprintf(stderr,
+                          "Corrupted cache data entry #%d (truncated file?), "
+                          "aborting read" LF,
+                          (int) entries);
+                  break;
                 }
                 /*fprintf(stdout, "adding %s [%d]\n", filenameIndex, (int)fpos); */
                 if (PT_CompatibleScheme(index->filenameIndexBuff)) {

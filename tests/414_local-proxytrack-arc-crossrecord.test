@@ -181,10 +181,7 @@ chain "$dir/quoting.arc" "$dir/quoting.body"
     printf 'http://not-a-record\n'
     printf 'three fields 5\n'
     printf 'http://neg a b c d e f g -5\n'
-    printf 'dns:q.example 1.2.3.4 2025 text/dns 4\n'
-    printf 'http://q/r 1.2.3.4 %s text/html 200 4\n' "$ARC_DATE"
     printf 'http://q/r 1.2.3.4 %s text/html v4\n' "$ARC_DATE"
-    printf 'http://q/r 1.2.3.4 %s text/html 4x4\n' "$ARC_DATE"
     printf 'x: 1.2.3.4 %s text/html 4\n' "$ARC_DATE"
     printf 'a/b:c 1.2.3.4 %s text/html 4\n' "$ARC_DATE"
     printf 'NEARMISS\n'
@@ -235,17 +232,42 @@ v10 = b"http://%s/victim.html 0.0.0.0 " + date + b" text/html 200 - - 0 t.arc %%
 cases = {
     # a writer ending its record lines with CRLF: linput() drops the CR
     b"crlf": archive(b"crlf", (v10 % b"crlf") + b"\r\n"),
+    # one byte linput() drops, in front of an ordinary record line: a scan that
+    # weighs the raw bytes reads the line as page text and hands it out
+    b"tab": archive(b"tab", b"\t" + (v10 % b"tab") + b"\n"),
+    b"crb": archive(b"crb", b"\r" + (v10 % b"crb") + b"\n"),
+    b"ff": archive(b"ff", b"\x0c" + (v10 % b"ff") + b"\n"),
+    # the shapes PT_LoadCache__Arc indexes and serves: three fields, and a
+    # length sscanf() takes but a digit run does not
+    b"f3": archive(b"f3", b"http://f3/victim.html 0.0.0.0 %d\n"),
+    b"f6": archive(b"f6", b"http://f6/victim.html 0.0.0.0 " + date
+                   + b" text/html 200 %d\n"),
+    b"lenx": archive(b"lenx", b"http://lenx/victim.html 0.0.0.0 " + date
+                     + b" text/html %dx\n"),
+    b"lenplus": archive(b"lenplus", b"http://lenplus/victim.html 0.0.0.0 " + date
+                        + b" text/html 200 - - 0 t.arc +%d\n"),
     # arc 1.0, five fields
     b"arc10": archive(b"arc10", b"http://arc10/victim.html 1.2.3.4 " + date
                       + b" text/html %d\n"),
     # a date this reader cannot use, on a scheme it serves
     b"undated": archive(b"undated", b"http://undated/victim.html 1.2.3.4 20250101"
                         b" text/html 200 - - 0 t.arc %d\n"),
+    # five fields on a scheme the reader never serves, so only the shape sees it
+    b"gopher": archive(b"gopher", b"gopher://gopher/victim.html 0.0.0.0 " + date
+                       + b" text/html %d\n"),
+    # a record line near the longest linput() will return, which a scan reading
+    # fewer characters than linput() would cut short of its length field
+    b"longline": archive(b"longline", b"http://longline/" + b"p" * 1960
+                         + b"/victim.html 0.0.0.0 " + date
+                         + b" text/html 200 - - 0 t.arc %d\n"),
     # a record line closing the file, which has no newline of its own
     b"eofline": archive(b"eofline", v10 % b"eofline" + b"\n", at_eof=True),
 }
 # and one whose record line straddles the scan's buffer
 probe = archive(b"straddle", v10 % b"straddle" + b"\n")
+cases[b"strdrop"] = archive(
+    b"strdrop", b"http://strdrop/victim.html" + b"\r" * 2100
+    + b" 0.0.0.0 " + date + b" text/html 200 - - 0 t.arc %d\n")
 lead = probe.index(b"\nhttp://straddle/greedy.html")
 gdata = probe.index(b"\n", lead + 1) + 1
 victim = probe.index(b"http://straddle/victim.html", gdata)
@@ -254,6 +276,41 @@ cases[b"straddle"] = archive(
     pad=b" " * (64 + SCAN_BUFFER - 8 - (victim - gdata)))
 for host, data in cases.items():
     open("%s/%s.arc" % (d, host.decode()), "wb").write(data)
+
+
+# Refusing the greedy record leaves the walk at its declared end, where the
+# record line can be anything the loader accepts. None of these may cost the
+# records stored after it.
+def resync(host, midline):
+    kept = b"KEPTPAGE"
+    greedy = b"GREEDYPAGE"
+    victim = b"VICTIM-" + host
+    gdata = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + greedy
+    vdata = head(victim) + victim
+    vline = b"http://%s/victim.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n" % (
+        host, date, len(vdata))
+    mid = b"MIDD"
+    tail = head(b"TAILPAGE") + b"TAILPAGE"
+    out = b"filedesc://t.arc 0.0.0.0 " + date + b" text/plain 200 - - 0 t.arc 9\n"
+    out += b"2 0 test\n\n\n"
+    out += b"http://%s/greedy.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n" % (
+        host, date, len(gdata) + 1 + len(vline) + len(vdata))
+    out += gdata + b"\n" + vline + vdata
+    out += b"\n" + (midline % len(mid)) + mid
+    out += b"\n" + b"http://%s/tail.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n" % (
+        host, date, len(tail)) + tail
+    return out
+
+
+for host, midline in (
+    # a trailing space, which turns five fields into six for anything counting
+    (b"trailsp", b"http://trailsp/m.html 0.0.0.0 " + date + b" text/html %d \n"),
+    # three fields, which no shape test can take and the loader indexes anyway
+    (b"mid3", b"http://mid3/m.html 0.0.0.0 %d\n"),
+    # and a scheme this reader never serves, dated as the format asks
+    (b"midgopher", b"gopher://midgopher/m 0.0.0.0 " + date + b" text/html %d\n"),
+):
+    open("%s/%s.arc" % (d, host.decode()), "wb").write(resync(host, midline))
 
 
 # Two honest-looking records the loader has no reason to refuse, where the bound
@@ -337,7 +394,8 @@ grep -qaF VICTIM-honest "$dir/out.trailer" ||
     fail "an archive with junk after its last record lost that record"
 
 for class in space digit newline cr eof padline urlend urlmid later dns \
-    crlf arc10 undated straddle eofline; do
+    crlf arc10 undated straddle eofline tab crb ff f3 f6 lenx lenplus \
+    strdrop gopher longline; do
     convert "$dir/$class.arc" "$dir/$class-out.arc"
     # the record before the greedy one, so an implementation that refuses the
     # whole archive cannot pass the assertion below
@@ -369,6 +427,18 @@ for page in page1 page2; do
     stored "$dir/quoting-out.arc" "http://chain/$page.html" "$dir/quoting.$page"
     grep -qaF CHAIN- "$dir/quoting.$page" ||
         fail "a page quoting a record line cost the archive $page"
+done
+
+for class in trailsp mid3 midgopher; do
+    convert "$dir/$class.arc" "$dir/$class-out.arc"
+    stored "$dir/$class-out.arc" "http://$class/tail.html" "$dir/$class.tail"
+    grep -qaF TAILPAGE "$dir/$class.tail" ||
+        fail "refusing one record cost the archive the records after it"
+    if body_of "$dir/$class-out.arc" "http://$class/greedy.html" \
+        >"$dir/$class.greedy" 2>/dev/null; then
+        grep -qaF "VICTIM-$class" "$dir/$class.greedy" &&
+            fail_dump "the greedy record carried its neighbour" "$dir/$class.greedy"
+    fi
 done
 
 for class in overlong shorthdr; do
