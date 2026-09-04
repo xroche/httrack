@@ -167,7 +167,15 @@ trap 'rm -f "$mach" "$nlog"; rm -rf "$stage"' EXIT
 ditto "$app" "$stage/$(basename "$app")"
 ln -s /Applications "$stage/Applications"
 rm -f "$dmg"
-hdiutil create -volname "HTTrack $name" -srcfolder "$stage" -fs HFS+ -format UDZO "$dmg"
+# hdiutil attaches the image while it fills it, and that attach loses a race with a
+# previous run's helper often enough to lose a release build, so retry a few times.
+attempt=1
+until hdiutil create -volname "HTTrack $name" -srcfolder "$stage" -fs HFS+ -format UDZO "$dmg"; do
+    test "$attempt" -lt 4 || fail "hdiutil could not create $dmg"
+    attempt=$((attempt + 1))
+    rm -f "$dmg"
+    sleep 3
+done
 sign "$dmg"
 
 if [ "$skip_notarize" -eq 0 ]; then
