@@ -14,7 +14,7 @@ dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
 # each field fills binput's own bound, so together they run one past line[]
-"$python" - "$dir/foo.ndx" <<'EOF'
+"$python" - "$(nativepath "$dir/foo.ndx")" <<'EOF'
 import sys
 
 with open(sys.argv[1], "w") as f:

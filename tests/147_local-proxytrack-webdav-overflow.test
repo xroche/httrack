@@ -12,7 +12,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./arclib.sh"
 
 python=$(find_python) || skip "python3 missing"
-command -v curl >/dev/null 2>&1 || skip "curl missing"
+curl=$(find_curl) || skip "curl missing"
 
 dir=$(mktemp -d)
 ptpid=
@@ -40,7 +40,7 @@ launch_proxytrack() {
 start_proxytrack "$dir/pt" launch_proxytrack
 
 propfind() {
-    curl -s -i --max-time 30 -X PROPFIND -H "Depth: 0" \
+    "$curl" -s -i --max-time 30 -X PROPFIND -H "Depth: 0" \
         "http://127.0.0.1:$proxyport/webdav/x/$1"
 }
 
@@ -69,7 +69,7 @@ grep -q "<href>/webdav/x/$plain</href>" <<<"$resp" || fail "a 900-byte path did 
 # item URL from the prefix and the child name. A child directory is enumerated
 # with a trailing '/' that has to come back off, or its name is lost and the
 # entry lists as the folder's default document.
-resp=$(curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
+resp=$("$curl" -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
     "http://127.0.0.1:$proxyport/webdav/example.com/") ||
     fail_dump "proxytrack died on a Depth: 1 listing" "$ptlog"
 grep -q '^HTTP/1\.[01] 207 ' <<<"$resp" ||

@@ -11,7 +11,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./arclib.sh"
 
 python=$(find_python) || skip "python3 missing"
-command -v curl >/dev/null 2>&1 || skip "curl missing"
+curl=$(find_curl) || skip "curl missing"
 
 # POSIX form needs no tzdata, and its sign is inverted, so this means UTC+5:30.
 # A half-hour offset also catches an implementation that rounds to whole hours.
@@ -52,7 +52,7 @@ launch_proxytrack() {
 start_proxytrack "$dir/pt" launch_proxytrack
 
 # --max-time: an unbounded read here would wedge the runner rather than fail
-curl -s --max-time 30 -X PROPFIND -H "Depth: 1" \
+"$curl" -s --max-time 30 -X PROPFIND -H "Depth: 1" \
     "http://127.0.0.1:$proxyport/webdav/example.com/" >"$dir/resp.xml"
 
 # One entry listed twice would pass both greps below, so pin the count.
