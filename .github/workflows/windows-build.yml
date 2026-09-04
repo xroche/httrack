@@ -342,7 +342,21 @@ jobs:
           # itself for the two views it needs.
           export WSLENV='HTTRACK_SUITE_BACKEND:HTTRACK_SUITE_JOBS:RUNNER_TEMP:WATCHDOG_TOKEN:WATCHDOG_REPO:WATCHDOG_SHA:WATCHDOG_CONTEXT:WATCHDOG_URL:GITHUB_STEP_SUMMARY/p'
           export HTTRACK_SUITE_BACKEND=wsl2
+<<<<<<< HEAD
           ws=$(wslpath -u "$GITHUB_WORKSPACE")
+=======
+          # Each converter runs on its own side: cygpath is MSYS's, wslpath is
+          # the distro's. Forward slashes first, because a backslash does not
+          # survive the trip in and wslpath saw "D:ahttrackhttrack".
+          ws=$(wsl -d httrack-suite -- wslpath -u "$(cygpath -m "$GITHUB_WORKSPACE")")
+          case "$ws" in
+          /mnt/*) ;;
+          *)
+            echo "::error::the workspace did not convert to a drvfs path: $ws"
+            exit 1
+            ;;
+          esac
+>>>>>>> origin/master
           wsl -d httrack-suite --cd "$ws/tests" -- \
             bash ./ci-windows-suite.sh \
             "$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
