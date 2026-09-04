@@ -10,8 +10,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 if [ "$HTS_OS" != "Linux" ]; then
-    echo "threadattr: LD_PRELOAD interposition is Linux-only here, skipping"
-    exit 0
+    skip "threadattr: LD_PRELOAD interposition is Linux-only here"
 fi
 # A --disable-shared build has nothing to preload; anything else missing is a
 # build problem, not a skip, or the leg would pass vacuously.
@@ -20,8 +19,7 @@ if [ ! -r "${THREADATTRFAIL_LA:-}" ]; then
     exit 1
 fi
 if grep -q "^dlname=''" "$THREADATTRFAIL_LA"; then
-    echo "threadattr: static-only build, skipping"
-    exit 0
+    skip "threadattr: static-only build, nothing to preload"
 fi
 if [ ! -r "${THREADATTRFAIL_LIB:-}" ]; then
     echo "threadattr: ${THREADATTRFAIL_LIB:-\$THREADATTRFAIL_LIB} was not built" >&2

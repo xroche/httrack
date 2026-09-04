@@ -1702,7 +1702,7 @@ regularly (not buffered)
 </pre>
 
 <p align=justify> Use if if you want to use more than the maximum
-default number of filters, that is, 500 filters: -#F2000 for 2,000 filters
+default number of filters, that is, 200 filters: -#F2000 for 2,000 filters
 
 <pre>
  #h  Version info
@@ -2601,7 +2601,7 @@ allow that.
 <p align=justify><b>Q: How can I remove these annoying <b>&lt;!--
 Mirrored from...  --&gt;</b> from html files? </b>
 
-<p align=justify> A: Use the footer option (-&F, or see the WinHTTrack
+<p align=justify> A: Use the footer option (-%F, or see the WinHTTrack
 options)
 
 <p align=justify><b>Q: Do I have to select between ascii/binary transfer
@@ -2639,9 +2639,11 @@ files? </b>
 <p align=justify> A: Yes.  See the build options (-N, or see the
 WinHTTrack options)
 
-<p align=justify><b>Q: If there any SOCKS support? </b>
+<p align=justify><b>Q: Is there any SOCKS support? </b>
 
-<p align=justify> A: Not yet!
+<p align=justify> A: Yes.  HTTrack supports SOCKS5 and HTTP CONNECT
+proxies: <tt>-P socks5://host:port</tt> or <tt>-P connect://host:port</tt>.
+For an authenticated proxy, add <tt>user:pass@</tt> before the host.
 
 <p align=justify><b>Q: What's this hts-cache directory? Can I remove it?
 </b>

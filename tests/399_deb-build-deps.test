@@ -15,19 +15,16 @@ workflow="$top/.github/workflows/ci.yml"
 
 if ! test -r "$control"; then
     test -d "$top/debian" && fail "$control is gone but $top/debian is not"
-    echo "note: no debian/ under $top (dist tarball), the audit did not run" >&2
-    exit 0
+    skip "no debian/ under $top (dist tarball), so the audit has nothing to read"
 fi
 if ! test -r "$workflow"; then
     test -d "$top/.github" && fail "$workflow is gone but $top/.github is not"
-    echo "note: no .github under $top (dist tarball), the audit did not run" >&2
-    exit 0
+    skip "no .github under $top (dist tarball), so the audit has nothing to read"
 fi
 
 py=$(find_python || true)
 if test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
-    echo "note: no python3 with PyYAML here, the audit did not run" >&2
-    exit 0
+    skip "no python3 with PyYAML here, so the workflow cannot be parsed"
 fi
 
 tmp=$(mktemp -d) || exit 1

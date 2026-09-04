@@ -70,11 +70,10 @@ feature_libs() { # feature_libs NAME
     backtrace) echo "BACKTRACE_LIBS" ;;
     esac
 }
-# Whether the macro must also reach the installed htsfeatures.h.
+# Whether the macro must also reach the installed htsfeatures.h, or "".
 feature_public() { # feature_public NAME
     case $1 in
-    brotli | zstd) return 0 ;;
-    *) return 1 ;;
+    brotli | zstd) echo yes ;;
     esac
 }
 # What libhttrack.pc must name when it is on, or "" where it names nothing.
@@ -136,7 +135,7 @@ assert_state() { # assert_state DIR NAME on|off
 
     # The installed header a consumer of libhttrack compiles against. config.h
     # is not installed and cannot stand in for it.
-    if feature_public "${f}"; then
+    if test -n "$(feature_public "${f}")"; then
         grep -q "^#define ${macro} ${value}\$" "${dir}/htsfeatures.h" ||
             fail_dump "${f}: htsfeatures.h does not carry ${macro} ${value}" \
                 "${dir}/htsfeatures.h"
@@ -168,7 +167,7 @@ assert_state() { # assert_state DIR NAME on|off
 }
 
 n=0
-planned=7 # steps below; the last one needs the libraries to be installed
+planned=10 # steps below; the last one needs the libraries to be installed
 
 # A GNU-libiconv-shaped prefix: a header that renames iconv_open the way the
 # real one does away from LIBICONV_PLUG, and a library under a subdirectory the
@@ -220,6 +219,393 @@ for flag in --disable-auto-features $(for f in ${features}; do feature_flag "${f
     grep -q -e "${flag}" <<<"${help}" || fail "configure --help does not offer ${flag}"
 done
 
+# --disable-auto-features makes the flags after it the whole optional set, so a
+# flag dropped from debian/rules ships a package that decodes less.
+# Reading that list out of the file means parsing make and the shell at once,
+# and every attempt at it lost to a continuation, a comment or a variable. Run
+# the recipe instead with every dh_* stubbed, and record what the real
+# dh_auto_configure would have been handed: make expands, the shell splits.
+# $MAKE carries its flags on some hosts, the way $CC does above.
+read -r -a make_argv <<<"${MAKE:-make}"
+
+rules_argv() { # rules_argv RULESFILE DIR
+    local dir=$2 cmd
+    mkdir -p "${dir}/stub"
+    # Every dh_* the file names, so one added later cannot run for real here.
+    # The digits matter: dh_md5sums and dh_python3 both carry one.
+    {
+        echo dh
+        command grep -o 'dh_[a-z0-9_]*' "$1"
+    } | sort -u >"${dir}/dh-names"
+    while IFS= read -r cmd; do
+        printf '#!/bin/sh\nexit 0\n' >"${dir}/stub/${cmd}"
+        chmod +x "${dir}/stub/${cmd}"
+    done <"${dir}/dh-names"
+    # One file per invocation, since a second one overrides the first.
+    # shellcheck disable=SC2016 # the shim's own expansions, not this shell's
+    printf '#!/bin/sh\nn=$(cat "%s/n" 2>/dev/null || echo 0)\nn=$((n + 1))\necho "$n" >"%s/n"\nfor a; do printf "%%s\\n" "$a"; done >"%s/argv.$n"\nexit 0\n' \
+        "${dir}" "${dir}" "${dir}" >"${dir}/stub/dh_auto_configure"
+    chmod +x "${dir}/stub/dh_auto_configure"
+    : >"${dir}/make.log"
+    : >"${dir}/failed"
+    # Every target the build phase reaches, not just "build": dpkg-buildpackage
+    # runs build-arch for an arch:any package, and a dh-driven file keeps its
+    # flags in an override or an execute_ hook. A configure hidden in binary or
+    # install is out of reach, because those recipes move files no scratch tree
+    # has and stop before their own dh_auto_configure line.
+    # Each pass gets its own directory, or the stamp files the first one leaves
+    # make the rest no-ops. The foreign environment is a sample and not a
+    # proof: it catches a flag behind the conditional a porting fix reaches for.
+    # The first pass sets nothing, so its array is empty: expand it in the form
+    # bash 3.2 accepts under set -u.
+    local envs=("" "DEB_HOST_ARCH_OS=hurd DEB_HOST_ARCH=hurd-i386 DEB_BUILD_PROFILES=nocheck DEB_BUILD_OPTIONS=nocheck")
+    local pass=0 target vars
+    for cmd in "${envs[@]}"; do
+        read -r -a vars <<<"${cmd}"
+        for target in build build-arch build-indep \
+            override_dh_auto_configure override_dh_auto_configure-arch \
+            override_dh_auto_configure-indep \
+            execute_before_dh_auto_configure execute_after_dh_auto_configure; do
+            command grep -q "^${target}:" "$1" || continue
+            pass=$((pass + 1))
+            mkdir -p "${dir}/run.${pass}"
+            # Unset the outer make's jobserver, or the inner one warns.
+            (cd "${dir}/run.${pass}" && PATH="${dir}/stub:${PATH}" \
+                MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
+                env ${vars[@]+"${vars[@]}"} "${make_argv[@]}" -s -f "$1" "${target}") \
+                >>"${dir}/make.log" 2>&1 || echo "${target}" >>"${dir}/failed"
+        done
+    done
+}
+# Which features one recorded argv does not turn on, or "". "no" is autoconf for
+# --without-X, and "auto" hands the decision back to the build machine, which is
+# the lottery --disable-auto-features exists to end.
+rules_missing() { # rules_missing ARGVFILE
+    local f flag neg tok val state seen out=""
+    for f in ${features}; do
+        flag=$(feature_flag "${f}")
+        # --without-X and --disable-X are the flag's own off switch, and a later
+        # one beats the --with-X in front of it.
+        neg=${flag/--with-/--without-}
+        test "${neg}" != "${flag}" || neg=${flag/--enable-/--disable-}
+        state=off
+        seen=0
+        while IFS= read -r tok; do
+            if test "${seen}" -eq 0; then
+                test "${tok}" != -- || seen=1
+                continue
+            fi
+            case ${tok} in
+            "${neg}") state=off ;;
+            "${flag}") state=on ;;
+            "${flag}="*)
+                val=${tok#*=}
+                case ${val} in
+                no | auto | "") state=off ;;
+                *) state=on ;;
+                esac
+                ;;
+            esac
+        done <"$1"
+        test "${state}" = on || out="${out} ${f}"
+    done
+    echo "${out# }"
+}
+# Off switches the four features above do not cover, one per token, or "".
+# --disable-https ships a package with no TLS, and no amount of checking the
+# auto features would see it. A new one here is a decision, so record it.
+rules_turned_off() { # rules_turned_off ARGVFILE
+    local tok seen=0 out=""
+    while IFS= read -r tok; do
+        if test "${seen}" -eq 0; then
+            test "${tok}" != -- || seen=1
+            continue
+        fi
+        case ${tok} in
+        --disable-auto-features | --enable-auto-features=no) ;;
+        --disable-online-unit-tests | --enable-online-unit-tests=no) ;;
+        --without-brotli | --without-zstd | --without-iconv | --disable-backtrace) ;;
+        --with-brotli=no | --with-zstd=no | --with-iconv=no | --enable-backtrace=no) ;;
+        --disable-* | --without-* | --enable-*=no | --with-*=no)
+            out="${out} turns-off:${tok}"
+            ;;
+        esac
+    done <"$1"
+    echo "${out# }"
+}
+
+# Everything wrong with one rules file, or "" when every dh_auto_configure it
+# runs asks for every feature. Not being able to grade the file is a STATUS and
+# never a word in that list: printed as one it reads as a feature name, and the
+# caller cannot tell the two apart. 2 is nothing to grade, 3 is a pass make
+# could not finish.
+rules_verdict() { # rules_verdict RULESFILE DIR
+    local argv said off dir=$2 out=""
+    rules_argv "$1" "${dir}"
+    set -- "${dir}"/argv.*
+    # A recipe configuring through something other than dh_auto_configure dies
+    # here rather than being read, so a failed pass outranks what was recorded.
+    test ! -s "${dir}/failed" || return 3
+    test -e "$1" || return 2
+    for argv in "$@"; do
+        # --enable-auto-features=no is the same switch spelled the other way.
+        off=$(command grep -c -x -e --disable-auto-features -e --enable-auto-features=no "${argv}" || true)
+        test "${off}" -gt 0 || out="${out} no-disable-auto-features"
+        said=$(rules_missing "${argv}")
+        test -z "${said}" || out="${out} ${said}"
+        said=$(rules_turned_off "${argv}")
+        test -z "${said}" || out="${out} ${said}"
+    done
+    # Two environments and up to four targets record the same file, so the same
+    # verdict comes back several times. Report each once, first seen first.
+    test -n "${out}" || {
+        echo ""
+        return
+    }
+    # shellcheck disable=SC2086 # the splitting is what makes it a list
+    printf '%s\n' ${out} |
+        awk '!seen[$0]++ { printf "%s%s", sep, $0; sep = " " } END { print "" }'
+}
+
+rules="${srcdir}/debian/rules"
+# Running the recipe is how the flags are read, so a host with no make cannot
+# read them. The other nine steps still run.
+if test -r "${rules}" && ! command -v "${MAKE:-make}" >/dev/null 2>&1; then
+    planned=$((planned - 1))
+    echo "no ${MAKE:-make} here, so debian/rules was not run" >&2
+elif test -r "${rules}"; then
+    n=$((n + 1))
+    rc=0
+    said=$(rules_verdict "${rules}" "${work}/rules-real") || rc=$?
+    case ${rc} in
+    0) test -z "${said}" ||
+        fail_dump "debian/rules does not ask for: ${said}" "${work}/rules-real/make.log" ;;
+    2) fail_dump "debian/rules runs no dh_auto_configure" "${work}/rules-real/make.log" ;;
+    *) fail_dump "make could not run debian/rules" "${work}/rules-real/make.log" ;;
+    esac
+
+    # A reader that recorded nothing would call any file complete, so put every
+    # way of losing a feature past it. Every fixture is literal text under a
+    # quoted here-doc: built by expansion, one of them came out with an escaped
+    # quote under bash 3.2 and read as passed on the macOS leg alone.
+    seq=0
+    reads() { # reads WANT DESC <<'MUT' -- a whole makefile with a build target
+        local want=$1 desc=$2 got dir rc
+        seq=$((seq + 1))
+        dir=${work}/mut${seq}
+        mkdir -p "${dir}"
+        # @SP@ is a trailing space one fixture needs. Written literally, an
+        # editor or a whitespace lint would take it and the fixture would pass
+        # for the wrong reason.
+        sed 's/@SP@/ /' >"${dir}/rules"
+        rc=0
+        got=$(rules_verdict "${dir}/rules" "${dir}") || rc=$?
+        case ${rc} in
+        0)
+            # The list is feature names only. A status word reaching it would
+            # be printed as one, which is how the macOS leg got told that
+            # debian/rules "does not ask for: make-failed".
+            case " ${got} " in
+            *" make-failed "* | *" no-invocation "*)
+                fail "${desc}: a status word reached the feature list: ${got}"
+                ;;
+            esac
+            ;;
+        2) got=no-invocation ;;
+        3) got=make-failed ;;
+        *) got="verdict-error-${rc}" ;;
+        esac
+        test "${got}" = "${want}" ||
+            fail "${desc}: expected [${want}], the reader said [${got:-(nothing)}]"
+    }
+
+    # Two of the fixtures below turn on how make reports a recipe it could not
+    # finish, and that is not the same everywhere: the macOS leg graded as a
+    # silent short list what reds here, on either make version and any of three
+    # shells. So measure this host and require the reader to agree with it. A
+    # fixture asserting a fixed outcome there would be asserting the build
+    # machine, which is the whole defect this file exists to keep out.
+    measured() { # measured DESC <<'MUT' -- the reader must match this host
+        local desc=$1 dir got want rc=0 prc=0
+        seq=$((seq + 1))
+        dir=${work}/mut${seq}
+        mkdir -p "${dir}/probe/stub" "${dir}/probe/run"
+        sed 's/@SP@/ /' >"${dir}/rules"
+        # An independent run. Only the token grammar is shared with the reader,
+        # and the fixtures above pin that on its own.
+        # shellcheck disable=SC2016 # the probe's own expansions, not this shell's
+        printf '#!/bin/sh\nfor a; do printf "%%s\\n" "$a"; done >"%s/probe/argv"\nexit 0\n' \
+            "${dir}" >"${dir}/probe/stub/dh_auto_configure"
+        chmod +x "${dir}/probe/stub/dh_auto_configure"
+        : >"${dir}/probe/argv"
+        (cd "${dir}/probe/run" && PATH="${dir}/probe/stub:${PATH}" \
+            MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
+            "${make_argv[@]}" -s -f "${dir}/rules" build) >/dev/null 2>&1 || prc=$?
+        if test "${prc}" -ne 0; then
+            want=make-failed
+        else
+            want=$(rules_missing "${dir}/probe/argv")
+        fi
+        got=$(rules_verdict "${dir}/rules" "${dir}") || rc=$?
+        case ${rc} in
+        0) ;;
+        2) got=no-invocation ;;
+        3) got=make-failed ;;
+        *) got="verdict-error-${rc}" ;;
+        esac
+        test "${got}" = "${want}" ||
+            fail "${desc}: this make gives [${want:-(nothing)}], the reader said [${got:-(nothing)}]"
+        echo "${desc}: this make gives [${want:-nothing missing}]" >&2
+    }
+    reads "" "the shape debian/rules uses today" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    reads zstd "a dropped --with-zstd" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --enable-backtrace --with-iconv
+MUT
+    reads zstd "--with-zstd=no" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=no --enable-backtrace --with-iconv
+MUT
+    reads zstd "--with-zstd='no', which the shell unquotes" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd='no' --enable-backtrace --with-iconv
+MUT
+    reads zstd '--with-zstd="no", which the shell unquotes too' <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd="no" --enable-backtrace --with-iconv
+MUT
+    reads zstd "--with-zstd then --without-zstd, where the last one wins" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --without-zstd
+MUT
+    reads backtrace "--enable-backtrace then --disable-backtrace" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --disable-backtrace
+MUT
+    reads brotli "--with-brotli then --without-brotli" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --without-brotli
+MUT
+    reads "" "--without-zstd then --with-zstd, where the last one wins too" <<'MUT'
+build:
+	dh_auto_configure -- --without-zstd --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    reads zstd "--without-zstd" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --without-zstd --enable-backtrace --with-iconv
+MUT
+    reads zstd "--with-zstd=auto, which hands the choice back to the buildd" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=auto --enable-backtrace --with-iconv
+MUT
+    reads "" "--with-zstd=DIR, which asks for it at a prefix" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=/opt/zstd --enable-backtrace --with-iconv
+MUT
+    reads zstd "a value behind a make variable" <<'MUT'
+WITH_ZSTD = no
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=$(WITH_ZSTD) --enable-backtrace --with-iconv
+MUT
+    measured "a comment mid-continuation, which ends the line" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli \
+		# --with-zstd \
+		--enable-backtrace --with-iconv
+MUT
+    measured "a backslash make does not read as a continuation" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli \@SP@
+		--with-zstd --enable-backtrace --with-iconv
+MUT
+    reads "zstd backtrace iconv" "a fallback invocation that never runs" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli || \
+		dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    reads "zstd backtrace iconv" "a second invocation that overrides the first" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	dh_auto_configure -- --disable-auto-features --with-brotli
+MUT
+    reads "" "a quoted # in a value, which is not a comment" <<'MUT'
+build:
+	dh_auto_configure -- CPPFLAGS="-DTAG=' #7 '" --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    reads "" "--enable-auto-features=no, the same switch spelled the other way" <<'MUT'
+build:
+	dh_auto_configure -- --enable-auto-features=no --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    reads no-disable-auto-features "a list that turns neither switch off" <<'MUT'
+build:
+	dh_auto_configure -- --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    reads turns-off:--disable-https "an off switch outside the four features" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --disable-https
+MUT
+    reads zstd "a flag behind an architecture conditional" <<'MUT'
+ZSTD = --with-zstd
+ifeq ($(DEB_HOST_ARCH_OS),hurd)
+ZSTD =
+endif
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli $(ZSTD) --enable-backtrace --with-iconv
+MUT
+    reads "zstd backtrace iconv" "build-arch, which is what a buildd runs" <<'MUT'
+build:
+	true
+build-arch:
+	dh_auto_configure -- --disable-auto-features --with-brotli
+MUT
+    reads turns-off:--enable-https=no "an off switch spelled as a value" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-https=no
+MUT
+    reads turns-off:--enable-example-libs=no "another feature turned off by value" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-example-libs=no
+MUT
+    measured "a configure run that is not dh_auto_configure" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	./configure --disable-auto-features --with-brotli
+MUT
+    reads "zstd backtrace iconv" "execute_after_dh_auto_configure, which debhelper runs" <<'MUT'
+build:
+	true
+execute_after_dh_auto_configure:
+	dh_auto_configure -- --disable-auto-features --with-brotli
+MUT
+    reads "" "an arch-only override, which debhelper runs in place of the plain one" <<'MUT'
+build:
+	dh $@
+override_dh_auto_configure-arch:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    reads no-invocation "a build target that configures nothing" <<'MUT'
+build:
+	true
+MUT
+    reads "" "the dh sequencer, whose flags sit in an override target" <<'MUT'
+build:
+	dh $@
+override_dh_auto_configure:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    measured "a rules file make cannot run" <<'MUT'
+build:
+	false
+MUT
+    echo "ok: every dh_auto_configure debian/rules runs asks for every feature"
+else
+    planned=$((planned - 1))
+    echo "no debian/rules under ${srcdir}, so the packaging flag list is not read" >&2
+fi
+
 # The cheap, host-independent steps run first: a slow leg that runs out of
 # budget later still covers what the switch means.
 n=$((n + 1))
@@ -229,6 +615,14 @@ n=$((n + 1))
 grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
     fail_dump "configure refused the value without saying which flag" "${work}/bogus/configure.log"
 echo "ok: a value that is neither yes nor no is refused"
+
+n=$((n + 1))
+# Same for a feature's own tri-state: an unknown value must not fall through.
+! run_configure "${work}/btbogus" --enable-backtrace=bogus ||
+    fail_dump "--enable-backtrace=bogus was accepted" "${work}/btbogus/configure.log"
+grep -q 'bad value for backtrace' "${work}/btbogus/configure.log" ||
+    fail_dump "configure refused the value without saying which flag" "${work}/btbogus/configure.log"
+echo "ok: an unknown --enable-backtrace value is refused"
 
 n=$((n + 1))
 # The switch must not turn a library the packager named into a silent drop (#1502).
@@ -254,6 +648,32 @@ case ${got} in
 *) fail_dump "a foreign host answered '${got}' rather than declining backtrace" \
     "${work}/foreign/configure.log" ;;
 esac
+
+n=$((n + 1))
+# A bare --with-iconv must FTBFS where iconv does not link, rather than fall
+# back to the codepage tables. The fixture has the header and not the symbol.
+mkdir -p "${work}/noiconv"
+cat >"${work}/noiconv/iconv.h" <<'HDR'
+#ifndef HTS_NOICONV_H
+#define HTS_NOICONV_H
+#include <stddef.h>
+typedef void *iconv_t;
+#define iconv_open hts_absent_iconv_open
+#define iconv hts_absent_iconv
+#define iconv_close hts_absent_iconv_close
+extern iconv_t iconv_open(const char *to, const char *from);
+extern size_t iconv(iconv_t cd, char **in, size_t *il, char **out, size_t *ol);
+extern int iconv_close(iconv_t cd);
+#endif
+HDR
+! run_configure "${work}/ic-bare" --with-iconv "CPPFLAGS=-I${work}/noiconv ${CPPFLAGS:-}" ||
+    fail_dump "a bare --with-iconv was accepted where iconv_open does not link" \
+        "${work}/ic-bare/configure.log"
+grep -q 'iconv requested but no iconv.h with a linkable iconv_open' \
+    "${work}/ic-bare/configure.log" ||
+    fail_dump "configure failed without saying that iconv was the request" \
+        "${work}/ic-bare/configure.log"
+echo "ok: a bare --with-iconv fails the build rather than falling back"
 
 n=$((n + 1))
 # --with-iconv=DIR is the form a keg-only or ports prefix needs, and the one arm

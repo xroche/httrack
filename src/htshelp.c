@@ -515,8 +515,8 @@ void help(const char *app, int more) {
   infomsg("  cN number of multiple connections (*c4)");
   infomsg("  TN timeout, number of seconds after a non-responding link is"
           " shutdown; also bounds host name resolution");
-  infomsg
-    ("  RN number of retries, in case of timeout or non-fatal errors (*R1)");
+  infomsg(
+      "  RN number of retries, in case of timeout or non-fatal errors (*R2)");
   infomsg
     ("  JN traffic jam control, minimum transfert rate (bytes/seconds) tolerated for a link");
   infomsg
@@ -641,8 +641,8 @@ void help(const char *app, int more) {
   infomsg("  z  log - extra infos");
   infomsg("  Z  log - debug");
   infomsg("  v  log on screen");
-  infomsg("  f *log in files");
-  infomsg("  f2 one single log file");
+  infomsg("  f  log in files");
+  infomsg("  f2 *one single log file");
   infomsg("  I *make an index (I0 don't make)");
   infomsg(" %i  make a top index for a project folder (* %i0 don't make)");
   infomsg(" %I  make an searchable index for this mirror (* %I0 don't make)");
