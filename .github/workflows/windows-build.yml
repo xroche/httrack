@@ -345,20 +345,10 @@ jobs:
           # itself for the two views it needs.
           export WSLENV='HTTRACK_SUITE_BACKEND:HTTRACK_SUITE_JOBS:RUNNER_TEMP:WATCHDOG_TOKEN:WATCHDOG_REPO:WATCHDOG_SHA:WATCHDOG_CONTEXT:WATCHDOG_URL:GITHUB_STEP_SUMMARY/p'
           export HTTRACK_SUITE_BACKEND=wsl2
-<<<<<<< HEAD
-<<<<<<< HEAD
-          ws=$(wslpath -u "$GITHUB_WORKSPACE")
-=======
-          # Each converter runs on its own side: cygpath is MSYS's, wslpath is
-          # the distro's. Forward slashes first, because a backslash does not
-          # survive the trip in and wslpath saw "D:ahttrackhttrack".
-          ws=$(wsl -d httrack-suite -- wslpath -u "$(cygpath -m "$GITHUB_WORKSPACE")")
-=======
           # Mapped here rather than by wslpath, which a bare imported rootfs
           # does not ship: `wsl -- wslpath` answers ERROR_PATH_NOT_FOUND. MSYS
           # gives /d/a/..., and drvfs mounts the same volume at /mnt/d/a/...
           ws=/mnt$(cygpath -u "$GITHUB_WORKSPACE")
->>>>>>> origin/wsl2-suite
           case "$ws" in
           /mnt/*) ;;
           *)
@@ -366,10 +356,6 @@ jobs:
             exit 1
             ;;
           esac
-<<<<<<< HEAD
->>>>>>> origin/master
-=======
->>>>>>> origin/wsl2-suite
           wsl -d httrack-suite --cd "$ws/tests" -- \
             bash ./ci-windows-suite.sh \
             "$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
