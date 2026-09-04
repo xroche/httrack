@@ -4318,18 +4318,26 @@ void back_wait(struct_back * sback, httrackp * opt, cache_back * cache,
                     // If the size is the same, and the option has been set, we assume
                     // that the file is identical - and therefore let's break the connection
                     if (back[i].is_update) {    // mise à jour
-                      if (back[i].r.statuscode == HTTP_OK && !back[i].testmode) {       // 'OK'
+                      // only a file stored verbatim, as in the two blocks below
+                      if (back[i].r.statuscode == HTTP_OK &&
+                          !back[i].testmode &&
+                          !is_hypertext_mime(opt, back[i].r.contenttype,
+                                             back[i].url_fil) &&
+                          strnotempty(back[i].url_sav)) {
                         htsblk r = cache_read(opt, cache, back[i].url_adr, back[i].url_fil, NULL, NULL);        // lire entrée cache
 
                         if (r.statuscode == HTTP_OK) {  // OK pas d'erreur cache
                           LLint len1, len2;
+                          const LLint ondisk = fsize_utf8(back[i].url_sav);
 
                           len1 = r.totalsize;
                           len2 = back[i].r.totalsize;
                           if (r.size > 0)
                             len1 = r.size;
                           if (len1 >= 0) {
-                            if (len1 == len2) { // tailles identiques
+                            // the cache size records a past fetch, so the
+                            // copy on disk has to still agree with it
+                            if (len1 == len2 && ondisk == len2) {
                               back[i].r.statuscode = HTTP_NOT_MODIFIED; // forcer NOT MODIFIED
                               deletehttp(&back[i].r);
                               back[i].r.soc = INVALID_SOCKET;

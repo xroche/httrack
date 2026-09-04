@@ -1,0 +1,89 @@
+#!/bin/bash
+# --sizehack on an update decided from the cache index alone, where its three
+# siblings ask the copy on disk and refuse hypertext. So an HTML page was kept
+# whenever its length held, and a file the disk no longer held at the recorded
+# size was dropped from the mirror instead of re-fetched.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_417.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+require_httrack
+
+root="${tmpdir}/root"
+mkdir -p "$root"
+cat >"${root}/index.html" <<'HTML'
+<html><body>
+<a href="leaf.html">leaf</a>
+<a href="keep.bin">keep</a>
+<a href="diverged.bin">diverged</a>
+</body></html>
+HTML
+
+# Both versions of every body have the same length, so only the sizehack can
+# decide. The mtime moves so the server answers 200 rather than a real 304,
+# which is the lying-server case the option exists for.
+write_site() { # write_site <marker char> <touch stamp>
+    printf '<html><body><p>%s</p></body></html>\n' "$1$1$1$1$1" >"${root}/leaf.html"
+    repeat_chars 1024 "$1" >"${root}/keep.bin"
+    repeat_chars 1024 "$1" >"${root}/diverged.bin"
+    touch -t "$2" "${root}"/*
+}
+
+crawl() { # crawl <label> <outdir> [httrack args...]
+    local label=$1 out=$2
+    shift 2
+    # No footer, so leaf.html lands byte-identical: an HTML page whose on-disk
+    # length equals the announced one needs the mime guard, not a size source.
+    local_crawl --log "${tmpdir}/crawl-${label}.log" \
+        "${BASEURL}/index.html" -O "$out" --quiet --robots=0 --timeout=30 \
+        -%N0 -%F '' "$@" || fail "$label: crawl failed"
+}
+
+write_site A 202001010000
+local_server_start --root "$root"
+
+out="${tmpdir}/out"
+crawl ref "$out"
+host="${out}/127.0.0.1_${SRV_PORT}"
+for f in leaf.html keep.bin diverged.bin; do
+    assert_file "${host}/$f" "reference mirror"
+done
+cmp -s "${root}/leaf.html" "${host}/leaf.html" ||
+    fail "leaf.html was rewritten on disk, so the HTML arm proves nothing"
+cp "${host}/keep.bin" "${tmpdir}/keep-v1.bin"
+
+write_site B 202501010000
+# What the cache recorded for diverged.bin is no longer what the mirror holds.
+repeat_chars 1536 Z >"${host}/diverged.bin"
+crawl update "$out" --update --sizehack
+
+log="${out}/hts-log.txt"
+kept_name() { # kept_name <mirror-relative path>
+    count_matching_lines -F "Kept existing file ${host}/$1 (" "$log"
+}
+
+cmp -s "${root}/leaf.html" "${host}/leaf.html" ||
+    fail "leaf.html kept its cached body: $(cat "${host}/leaf.html")"
+test "$(kept_name leaf.html)" -eq 0 || fail "leaf.html is reported as kept"
+ok "an HTML page of unchanged length is re-fetched"
+
+assert_file "${host}/diverged.bin" "update mirror"
+cmp -s "${root}/diverged.bin" "${host}/diverged.bin" ||
+    fail "diverged.bin is $(size_of "${host}/diverged.bin") bytes, not the served copy"
+test "$(kept_name diverged.bin)" -eq 0 || fail "diverged.bin is reported as kept"
+ok "a mirrored file that drifted from the cache is re-fetched, not dropped"
+
+# The control: with the disk, the cache and the response all agreeing, the
+# shortcut must still fire, or the two arms above pass on a disabled option.
+cmp -s "${tmpdir}/keep-v1.bin" "${host}/keep.bin" ||
+    fail "keep.bin was re-fetched, so the sizehack shortcut is gone"
+test "$(kept_name keep.bin)" -ge 1 || fail "no log line names keep.bin as kept:
+$(grep -a 'Kept existing' "$log" || true)"
+ok "an unchanged-size data file still takes the shortcut"
