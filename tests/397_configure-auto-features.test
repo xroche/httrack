@@ -245,9 +245,11 @@ rules_argv() { # rules_argv RULESFILE DIR
     chmod +x "${dir}/stub/dh_auto_configure"
     : >"${dir}/make.log"
     : >"${dir}/failed"
-    # Every target a build reaches, not just "build": dpkg-buildpackage runs
-    # build-arch for an arch:any package, and a dh-driven file keeps its flags
-    # in an override target that "build" reaches only through dh itself.
+    # Every target the build phase reaches, not just "build": dpkg-buildpackage
+    # runs build-arch for an arch:any package, and a dh-driven file keeps its
+    # flags in an override or an execute_ hook. A configure hidden in binary or
+    # install is out of reach, because those recipes move files no scratch tree
+    # has and stop before their own dh_auto_configure line.
     # Each pass gets its own directory, or the stamp files the first one leaves
     # make the rest no-ops. The foreign environment is a sample and not a
     # proof: it catches a flag behind the conditional a porting fix reaches for.
