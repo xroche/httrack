@@ -357,6 +357,13 @@ jobs:
           # Through the environment, not argv: `wsl -- sh -c '...' _ "$ws"`
           # delivered an empty $1, which is what the path error naming no path
           # was. WSLENV already carries everything else this step needs.
+          # The bring-up is continue-on-error, so a failed import reaches here as
+          # "There is no distribution with the supplied name" and exit 127, which
+          # names neither the step that failed nor why. wsl -l writes UTF-16.
+          wsl -l -q | tr -d '\0\r' | grep -qx httrack-suite || {
+            echo "::error::no httrack-suite distro: the Bring up WSL2 step did not finish"
+            exit 1
+          }
           export HTS_WS="$ws"
           export HTS_BIN="$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}"
           wsl -d httrack-suite -- sh -c 'echo "ws=[$HTS_WS] bin=[$HTS_BIN]"; test -d "$HTS_WS/tests" || { echo "::error::$HTS_WS/tests is not visible in the distro"; exit 1; }'
