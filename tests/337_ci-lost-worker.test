@@ -153,10 +153,10 @@ share=$tmp/share
 mkdir -p "$share"
 export POOLSHARE=$share
 
-# The 23 the driver pins as expected skips, so a stub run can reach the gates past
-# the skip-set compare instead of stopping on it.
-expected_skips=$(sed -n '/^expected_skips="/,/"$/p' "$testdir/ci-windows-suite.sh" |
-    sed -e 's/^expected_skips="//' -e 's/"$//')
+# The 29 the driver pins as msys's expected skips (the default backend here), so
+# a stub run can reach the gates past the skip-set compare instead of stopping on it.
+expected_skips=$(sed -n '/^expected_skips_msys="/,/"$/p' "$testdir/ci-windows-suite.sh" |
+    sed -e 's/^expected_skips_msys="//' -e 's/"$//')
 nskip=$(count_matching_lines . <<<"$expected_skips")
 test "$nskip" -ge 1 || fail "read no expected skips out of the driver"
 # 91 passing stubs clear its floor of 90, and the lost one passes in the control leg.
