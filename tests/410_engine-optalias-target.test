@@ -1,0 +1,76 @@
+#!/bin/bash
+#
+# Three alias rows named the option next to the one they mean: --extract-cache
+# listed the cache (-#C) instead of extracting its meta-data, --autotest ran a
+# whole mirror (-#T) instead of the autocheck, and --debug-testfilters still
+# named -#0, which went with the single-letter self-tests (#427).
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_aliastarget.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${tmp}"
+
+assert_selftest "optalias self-test OK" optalias
+
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+url="file://${tmp}/page.html"
+log=${tmp}/log
+
+run() { # run OUT ARG...
+    out=${tmp}/$1
+    shift
+    mkdir -p "${out}"
+    RC=0
+    httrack -O "${out}" "$@" >"${log}" 2>&1 || RC=$?
+}
+
+# --autotest is -#t, which prints one line and mirrors nothing.
+run autotest "${url}" --quiet -n --autotest
+assert_eq 0 "${RC}" "--autotest exited"
+grep -q 'AUTOCHECK OK' "${log}" || fail_dump "--autotest ran no autocheck" "${log}"
+! mirror_has_name "${out}" page.html ||
+    fail_dump "--autotest mirrored the URL" "${log}"
+
+# ...where -#T, the neighbour it used to reach, mirrors and says nothing.
+run xfrstats "${url}" --quiet -n --debug-xfrstats
+assert_eq 0 "${RC}" "--debug-xfrstats exited"
+mirror_has_name "${out}" page.html ||
+    fail_dump "--debug-xfrstats mirrored nothing" "${log}"
+! grep -q 'AUTOCHECK' "${log}" ||
+    fail_dump "--debug-xfrstats ran the autocheck" "${log}"
+
+# --extract-cache is -#E, which writes hts-cache/meta.zip beside the cache.
+run extract "${url}" --quiet -n
+assert_eq 0 "${RC}" "the mirror feeding --extract-cache exited"
+run extract --extract-cache
+assert_eq 0 "${RC}" "--extract-cache exited"
+grep -q 'extracted meta-data' "${log}" ||
+    fail_dump "--extract-cache extracted nothing" "${log}"
+assert_file "${out}/hts-cache/meta.zip" "--extract-cache"
+
+# ...where -#C, the neighbour it used to reach, only reads the cache.
+run debugcache "${url}" --quiet -n
+assert_eq 0 "${RC}" "the mirror feeding --debug-cache exited"
+run debugcache --debug-cache '*'
+assert_eq 0 "${RC}" "--debug-cache exited"
+grep -q 'cache entry' "${log}" || fail_dump "--debug-cache listed nothing" "${log}"
+test ! -f "${out}/hts-cache/meta.zip" ||
+    fail_dump "--debug-cache extracted the meta-data" "${log}"
+
+# --debug-testfilters named an option the engine dropped, so -#0 reported
+# itself unrecognized and the two filter words were mirrored as URLs.
+run testfilters --debug-testfilters '*.gif' 'foo.gif'
+# 134 is an abort, which would read as a refusal without being one
+{ test "${RC}" -ne 0 && test "${RC}" -ne 134; } ||
+    fail_dump "--debug-testfilters was accepted (exit ${RC})" "${log}"
+grep -q 'Unknown option: debug-testfilters' "${log}" ||
+    fail_dump "--debug-testfilters refused without saying why" "${log}"
+! grep -q 'not recognized' "${log}" ||
+    fail_dump "--debug-testfilters still reaches the engine's option switch" "${log}"
+
+ok "the -# alias rows reach the option they name"
+exit 0

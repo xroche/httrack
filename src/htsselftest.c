@@ -5307,6 +5307,21 @@ static int st_optalias(httrackp *opt, int argc, char **argv) {
   EXPANDS("-N", "-N", "1L0");
   assertf(used == 1);
 
+  /* a -# row means the arm its name and help name, not a neighbour: -#C lists
+     the cache where -#E extracts its meta-data, -#T logs transfer ops where
+     -#t is the autocheck, and -#0 went with the single-letter tests (#427) */
+  EXPANDS("-#E", "--extract-cache", NULL);
+  EXPANDS("-#C *.gif", "--debug-cache", "*.gif");
+  EXPANDS("-#t", "--autotest", NULL);
+  EXPANDS("-#T", "--debug-xfrstats", NULL);
+  REFUSES("--debug-testfilters", NULL);
+  REFUSES("--extract-cache=1", NULL);
+  /* and the reverse lookup the generated help prints takes the first row */
+  assertf(strcmp(optalias_value(optreal_find("-#E")), "extract-cache") == 0);
+  assertf(strcmp(optalias_value(optreal_find("-#C")), "debug-cache") == 0);
+  assertf(strcmp(optalias_value(optreal_find("-#t")), "autotest") == 0);
+  assertf(strcmp(optalias_value(optreal_find("-#T")), "debug-xfrstats") == 0);
+
   /* invariant: every name's bare long form still emits its short form, and a
      param name still demands its own value. A duplicate name (test, continue)
      resolves to its first row */
