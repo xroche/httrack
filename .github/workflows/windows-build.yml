@@ -254,6 +254,14 @@ jobs:
           bash tests/install-headers-sweep.sh --backend cl --srcdir . -- @inc
           if ($LASTEXITCODE -ne 0) { throw "the installed headers do not compile standalone and pairwise" }
 
+      - name: Restore the WSL rootfs
+        id: wslrootfs
+        if: always()
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}\wsl-rootfs.tar.gz
+          key: wsl-rootfs-jammy-amd64-v1
+
       # WSL2 brings up in ~35s on a hosted runner with no reboot and no
       # third-party action: the three features are already enabled on the image.
       # It buys a real Linux shell against the same native httrack.exe, where
@@ -272,8 +280,22 @@ jobs:
           $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
           # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
           # jammy asset is named after its release, not "wsl.rootfs".
-          Invoke-WebRequest -UseBasicParsing -OutFile $root `
-            "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
+          # Cached above, because this host has answered 403 on a good URL and
+          # a whole leg then rests on one third-party request. Three tries with
+          # a pause, so a transient does not cost the round either.
+          if (Test-Path $root) {
+            Write-Host "rootfs restored from cache, $((Get-Item $root).Length) bytes"
+          } else {
+            $url = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
+            for ($i = 1; $i -le 3; $i++) {
+              try { Invoke-WebRequest -UseBasicParsing -OutFile $root $url; break }
+              catch {
+                Write-Host "rootfs download attempt $i failed: $($_.Exception.Message)"
+                if ($i -eq 3) { throw }
+                Start-Sleep -Seconds (5 * $i)
+              }
+            }
+          }
           wsl --import httrack-suite "$env:RUNNER_TEMP\wsl-distro" $root --version 2
           if ($LASTEXITCODE -ne 0) { throw "wsl --import failed" }
           # A distro that answers is the only proof the import is usable.
@@ -285,6 +307,13 @@ jobs:
           # Recorded because a path error naming no path sent this looking in
           # the wrong place: the automount is there, /mnt/c and /mnt/d included.
           wsl -d httrack-suite -- sh -c 'echo mounts:; ls -d /mnt/*'
+
+      - name: Save the WSL rootfs
+        if: always() && steps.wslrootfs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}\wsl-rootfs.tar.gz
+          key: wsl-rootfs-jammy-amd64-v1
 
       - name: Run the engine test suite (offline tests, WSL2)
         if: always()

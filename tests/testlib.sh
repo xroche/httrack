@@ -225,10 +225,29 @@ selftest_queue_mode() { # selftest_queue_mode exact|lines|tail|head WANT NAME [A
 # pipe: printf is a builtin, so this costs no fork of its own. Args travel on
 # stdin because the engine parses argv before it reaches the self-test dispatch,
 # and would take a case's '-*' for one of its own filters.
+# The queued arguments, NUL-separated, for -#test=batch to read back. This file
+# stands in for the command line, so a drvfs path in it needs the translation
+# the shim gives a real argument: the engine reads the file itself and the shim
+# never sees it. Left alone under the other backends, where the paths the tests
+# build are already native.
+selftest_write_argv() {
+    local a
+    if test "$(suite_backend)" != wsl2; then
+        printf '%s\0' "${SELFTEST_ARGV[@]}"
+        return 0
+    fi
+    for a in "${SELFTEST_ARGV[@]}"; do
+        case $a in
+        /mnt/[A-Za-z]/*) printf '%s\0' "$(drvfs_path -m "$a")" ;;
+        *) printf '%s\0' "$a" ;;
+        esac
+    done
+}
+
 selftest_run_queued() {
     local n=${#SELFTEST_WANT[@]} out rest got want rc=0 i
     test "$n" -gt 0 || return 0
-    printf '%s\0' "${SELFTEST_ARGV[@]}" >"$SELFTEST_SCRIPT" ||
+    selftest_write_argv >"$SELFTEST_SCRIPT" ||
         fail "cannot write $SELFTEST_SCRIPT"
     # By path, not by name: make check's ../src is relative, so resolving it from
     # anywhere else finds an installed httrack and grades the wrong binary.
