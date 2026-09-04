@@ -15,7 +15,7 @@ out=
 
 fail_dump_var out
 
-if is_windows; then
+if target_is_windows; then
     skip "no backtrace() on Windows"
 fi
 if ! command -v addr2line >/dev/null && ! command -v llvm-symbolizer >/dev/null; then

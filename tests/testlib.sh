@@ -62,9 +62,9 @@ skip() {
     exit 77
 }
 
-# Guard form, so a bare `is_windows && skip ...` cannot end an errexit test that
-# is merely not on Windows.
-skip_on_windows() { ! is_windows || skip "$*"; }
+# Guard form, so a bare `target_is_windows && skip ...` cannot end an errexit
+# test that is merely not on Windows.
+skip_on_windows() { ! target_is_windows || skip "$*"; }
 
 # Set by tools/emulated-suite.sh, which interprets every instruction it runs.
 is_emulated() { [ -n "${EMULATED_ARCH:-}" ]; }
@@ -339,24 +339,33 @@ find_python() {
     return 1
 }
 
-# Native form of a path: a non-MSYS binary cannot resolve Git Bash's /d/a/... ones.
-nativepath() {
-    if is_windows && command -v cygpath >/dev/null 2>&1; then
-        cygpath -m "$1"
+# cygpath under MSYS, wslpath under WSL2. They take the same -m and -u, so the
+# two callers below differ only in the flag. A missing tool falls through to the
+# path unchanged, which is how this has always behaved under MSYS; the wsl2
+# backend instead refuses to start without wslpath, see the guard further down.
+path_convert() { # path_convert -m|-u PATH
+    local tool
+    case "$(suite_backend)" in
+    msys) tool=cygpath ;;
+    wsl2) tool=wslpath ;;
+    *)
+        printf '%s\n' "$2"
+        return 0
+        ;;
+    esac
+    if command -v "$tool" >/dev/null 2>&1; then
+        "$tool" "$1" "$2"
     else
-        printf '%s\n' "$1"
+        printf '%s\n' "$2"
     fi
 }
 
+# Native form of a path: a non-MSYS binary cannot resolve Git Bash's /d/a/... ones.
+nativepath() { path_convert -m "$1"; }
+
 # POSIX form of a path. Anything MSYS splits on a colon needs it, a PATH entry
 # below the drive-letter TMPDIR above all.
-posixpath() {
-    if is_windows && command -v cygpath >/dev/null 2>&1; then
-        cygpath -u "$1"
-    else
-        printf '%s\n' "$1"
-    fi
-}
+posixpath() { path_convert -u "$1"; }
 
 # Key before cert in $1/both.pem, the single path load_cert_chain() takes.
 make_tls_pem() {
@@ -579,16 +588,55 @@ build_names_frames() {
         grep -q '^#define HAVE_SPAWN_H ' "${conf}"
 }
 
-is_windows() {
-    if test -z "${IS_WINDOWS:-}"; then
+# Which harness drives the tests: `msys` for an MSYS/Git Bash shell, `wsl2` for
+# a Linux shell reaching the same native .exe over interop, `posix` otherwise.
+# Only msys is sniffable, because a wsl2 shell answers `Linux` exactly like a
+# native one, so the driver sets the variable and an unset one means posix.
+suite_backend() {
+    test -z "${HTTRACK_SUITE_BACKEND:-}" || {
+        printf '%s\n' "$HTTRACK_SUITE_BACKEND"
+        return 0
+    }
+    # IS_WINDOWS is the override this file has always honoured, and before the
+    # split it answered both questions at once, so it names a backend and not
+    # just the binary's platform. Resolved on every call rather than cached,
+    # because a test sets it after sourcing us (249_windows-reap-images.test).
+    case "${IS_WINDOWS:-}" in
+    yes) printf 'msys\n' ;;
+    no) printf 'posix\n' ;;
+    *)
         case "$HTS_OS" in
-        MINGW* | MSYS* | CYGWIN*) IS_WINDOWS=yes ;;
+        MINGW* | MSYS* | CYGWIN*) printf 'msys\n' ;;
+        *) printf 'posix\n' ;;
+        esac
+        ;;
+    esac
+}
+
+# Is the program under test a native Windows executable? This is what almost
+# every caller of the old is_windows() was asking, and it stays true under the
+# wsl2 backend even though the shell there is Linux.
+target_is_windows() {
+    if test -z "${IS_WINDOWS:-}"; then
+        case "$(suite_backend)" in
+        msys | wsl2) IS_WINDOWS=yes ;;
         *) IS_WINDOWS=no ;;
         esac
         export IS_WINDOWS
     fi
     test "$IS_WINDOWS" = yes
 }
+
+# Is this shell MSYS/Git Bash? Ask only about the shell's own quirks, its broken
+# job control above all. A question about the binary wants target_is_windows.
+shell_is_msys() { test "$(suite_backend)" = msys; }
+
+# Fail at source time, not at the first conversion: nativepath and posixpath are
+# always called as "$(nativepath ...)", and an exit inside a command
+# substitution ends that subshell while the test carries on with an empty
+# string. A Linux path handed to httrack.exe fails far from here.
+test "$(suite_backend)" != wsl2 || command -v wslpath >/dev/null 2>&1 ||
+    fail "no wslpath under the wsl2 backend, so no path would reach httrack.exe"
 
 # Open the timer fd poll_wait reads from: a fifo held open read-write, so there is
 # always a writer and a read blocks to its own timeout instead of seeing EOF. fd 9
@@ -601,7 +649,7 @@ poll_open() {
     # Not under MSYS: its fifos are emulated, and the leg whose stability #795 is
     # about is no place to discover how its select() behaves. That tick is a whole
     # second anyway, so there is little to win.
-    is_windows && return 0
+    shell_is_msys && return 0
     # Unique: $$ is the same in every subshell, and the loser of a race on one name
     # opens a path that is gone.
     f=$(mktemp -u "${TMPDIR:-/tmp}/.httrack-poll.XXXXXX" 2>/dev/null) || return 0
@@ -664,7 +712,7 @@ stop_server() {
     win_capture "$1"
     winpid=$WIN_PID winimage=$WIN_IMAGE
     kill "$1" 2>/dev/null || true
-    if is_windows; then kill_tree "$1" "$winpid" "$winimage"; fi
+    if target_is_windows; then kill_tree "$1" "$winpid" "$winimage"; fi
     reap_bounded "$1" || true
     return 0
 }
@@ -856,8 +904,45 @@ dump_crawl_logs() {
     done
 }
 
+# The substring identifying ONE launch among every Windows process on the host.
+# WSL2 has no /proc/<pid>/winpid, so all that is left is what the relay was
+# started with. Skip argv[0], the same exe for every concurrent test, and skip
+# the flags: local-crawl.sh passes a --user-agent every concurrent crawl shares,
+# and it is LONGER than the output directory. What is left is per-launch,
+# because the output directory and the URL's port are both per-test. Empty when
+# nothing is distinctive enough, which the callers treat as "unknown" (#1228).
+win_marker() { # win_marker <path to a NUL-separated cmdline>
+    test -r "$1" || return 0
+    tr '\0' '\n' <"$1" 2>/dev/null |
+        awk 'NR == 1 { next }
+             /^-/ { next }
+             length($0) >= 8 && length($0) > length(best) { best = $0 }
+             END { if (best != "") print best }'
+}
+
+# The Windows PID of the process carrying $1 on its command line, empty unless
+# exactly one matches: naming a stranger is as good as naming nobody (#1228).
+# The marker travels in the environment, not in the argument list, so this query
+# cannot match itself the way the same marker on its own command line would.
+win_pid_by_marker() { # win_pid_by_marker <marker>
+    test -n "$1" || return 0
+    # shellcheck disable=SC2016 # the $ below are PowerShell's, not the shell's
+    HTS_WIN_MARKER=$1 WSLENV=HTS_WIN_MARKER powershell.exe -NoProfile \
+        -NonInteractive -Command '
+        $m = $env:HTS_WIN_MARKER
+        $p = @(Get-CimInstance Win32_Process | Where-Object {
+            $_.ProcessId -ne $PID -and $_.CommandLine -and
+            $_.CommandLine.Contains($m) })
+        if ($p.Count -eq 1) { $p[0].ProcessId }' 2>/dev/null |
+        tr -cd '0-9'
+}
+
 # The Windows PID behind an MSYS pid, empty when unknown.
 win_pid() {
+    if test "$(suite_backend)" = wsl2; then
+        win_pid_by_marker "$(win_marker "/proc/$1/cmdline")"
+        return 0
+    fi
     if test -r "/proc/$1/winpid"; then
         cat "/proc/$1/winpid" 2>/dev/null || true
     fi
@@ -870,7 +955,17 @@ win_pid() {
 # Assigned rather than echoed, a command substitution being a fork (#795).
 win_capture() { # win_capture <pid>
     WIN_PID='' WIN_IMAGE=''
-    is_windows || return 0
+    target_is_windows || return 0
+    if test "$(suite_backend)" = wsl2; then
+        # The relay's own cmdline, which is the Windows process's: read while it
+        # is alive for the same reason winpid is, since a dead relay has none.
+        local marker
+        marker=$(win_marker "/proc/$1/cmdline")
+        WIN_PID=$(win_pid_by_marker "$marker")
+        { read -r -d '' WIN_IMAGE <"/proc/$1/cmdline"; } 2>/dev/null || true
+        WIN_IMAGE=${WIN_IMAGE##*[\\/]}
+        return 0
+    fi
     # Unguarded reads: a missing file leaves the empty value set above, and read
     # reports EOF on an unterminated line having already assigned it.
     { read -r WIN_PID <"/proc/$1/winpid"; } 2>/dev/null || true
@@ -890,7 +985,7 @@ win_pid_runs() { # win_pid_runs <winpid> <image>
 # tree cannot rely on kill_tree, whose taskkill is then a grandchild of it (#953).
 kill_pid() {
     local pid=$1
-    if is_windows; then
+    if target_is_windows; then
         local winpid
         winpid=$(win_pid "$pid")
         if test -n "$winpid"; then
@@ -914,7 +1009,7 @@ kill_pid() {
 # looking, and naming a stranger is as good as naming nobody (#1228).
 kill_tree() {
     local pid=$1 winpid=${2:-} image=${3:-}
-    if is_windows; then
+    if target_is_windows; then
         test -n "$winpid" || winpid=$(win_pid "$pid")
         if test -n "$winpid" && test -n "$image" && ! win_pid_runs "$winpid" "$image"; then
             printf '::warning::pid %s no longer runs %s, not killing it\n' "$winpid" "$image"
@@ -928,11 +1023,17 @@ kill_tree() {
             taskkill_engines
             taskkill /F /IM python.exe >/dev/null 2>&1 || true
         fi
+        # Not a fallback under wsl2 but the other half of the job: the shell
+        # there is Linux, so $pid is often a process that never had a Windows
+        # counterpart for taskkill to find, a backgrounded test bash above all.
+        if test "$(suite_backend)" = wsl2; then
+            kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+        fi
         return 0
     fi
-    # No caller puts $pid in its own group on Windows (set -m is skipped there),
-    # so -"$pid" here would target whatever real group $pid's number collides
-    # with -- possibly the harness's own -- and taskkill above already reaped it.
+    # Under msys no caller puts $pid in its own group (set -m is skipped there),
+    # so -"$pid" would target whatever real group that number collides with,
+    # possibly the harness's own, and the taskkill above already reaped it.
     kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
 }
 
@@ -1046,17 +1147,17 @@ run_with_timeout() {
     shift
     local had_m=
     case "$-" in *m*) had_m=1 ;; esac
-    is_windows || set -m # own process group, so kill_tree can signal the group
+    shell_is_msys || set -m # own process group, so kill_tree can signal the group
     case $stdin in
     '') "$@" & ;;
     closed) "$@" <&- & ;;
     *) "$@" <"$stdin" & ;;
     esac
     local pid=$!
-    test -n "$had_m" || is_windows || set +m
+    test -n "$had_m" || shell_is_msys || set +m
     # Read while the job is certainly alive: by kill time /proc/<pid>/winpid is gone.
     local winpid=''
-    ! is_windows || winpid=$(win_pid "$pid")
+    ! target_is_windows || winpid=$(win_pid "$pid")
     local start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
         if test "$((SECONDS - start))" -gt "$secs"; then

@@ -293,6 +293,71 @@ jobs:
           . ./ci-windows-suite.sh
           ci_report_fork_failures suite-console.log
 
+      # WSL2 brings up in ~35s on a hosted runner with no reboot and no
+      # third-party action: the three features are already enabled on the image.
+      # It buys a real Linux shell against the same native httrack.exe, where
+      # MSYS's fork emulation is what breaks first under load (#1273).
+      - name: Bring up WSL2
+        if: always() && matrix.platform == 'x64'
+        # Non-gating like the suite step it feeds: this runs inside a job whose
+        # context `Protect master` requires, so a flaky import must not red it.
+        continue-on-error: true
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          wsl --update
+          if ($LASTEXITCODE -ne 0) { throw "wsl --update failed" }
+          wsl --set-default-version 2
+          $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
+          # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
+          # jammy asset is named after its release, not "wsl.rootfs".
+          Invoke-WebRequest -UseBasicParsing -OutFile $root `
+            "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
+          wsl --import httrack-suite "$env:RUNNER_TEMP\wsl-distro" $root --version 2
+          if ($LASTEXITCODE -ne 0) { throw "wsl --import failed" }
+          # A distro that answers is the only proof the import is usable.
+          wsl -d httrack-suite -- uname -a
+          if ($LASTEXITCODE -ne 0) { throw "the imported distro does not run" }
+
+      - name: Run the engine test suite (offline tests, WSL2)
+        if: always() && matrix.platform == 'x64'
+        # The harness is new: a red here must not gate the job until it has a
+        # few days of history to read it against. Flip this once it has.
+        continue-on-error: true
+        shell: bash
+        working-directory: tests
+        # 45 like the msys step, and 226_watchdog-native.test enforces it: the
+        # suite's own 1500s deadline plus the watchdog's 900s does not fit in less.
+        timeout-minutes: 45
+        env:
+          HTTRACK_SUITE_JOBS: 4
+          WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WATCHDOG_REPO: ${{ github.repository }}
+          WATCHDOG_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          WATCHDOG_CONTEXT: windows-suite-wsl2 (${{ matrix.platform }}, ${{ matrix.configuration }})
+          WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # /p translates a value as a path on the way in; RUNNER_TEMP goes over
+          # untranslated, since the driver takes the Windows form and converts it
+          # itself for the two views it needs.
+          export WSLENV='HTTRACK_SUITE_BACKEND:HTTRACK_SUITE_JOBS:RUNNER_TEMP:WATCHDOG_TOKEN:WATCHDOG_REPO:WATCHDOG_SHA:WATCHDOG_CONTEXT:WATCHDOG_URL:GITHUB_STEP_SUMMARY/p'
+          export HTTRACK_SUITE_BACKEND=wsl2
+          # Each converter runs on its own side: cygpath is MSYS's, wslpath is
+          # the distro's. Forward slashes first, because a backslash does not
+          # survive the trip in and wslpath saw "D:ahttrackhttrack".
+          ws=$(wsl -d httrack-suite -- wslpath -u "$(cygpath -m "$GITHUB_WORKSPACE")")
+          case "$ws" in
+          /mnt/*) ;;
+          *)
+            echo "::error::the workspace did not convert to a drvfs path: $ws"
+            exit 1
+            ;;
+          esac
+          wsl -d httrack-suite --cd "$ws/tests" -- \
+            bash ./ci-windows-suite.sh \
+            "$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
+            2>&1 | tee suite-console.log
+
       - name: Upload the test logs
         if: always()
         uses: actions/upload-artifact@v7

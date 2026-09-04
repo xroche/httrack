@@ -11,7 +11,7 @@ set -eu
 
 # The fixtures carry the raw bytes the requests decode back to, which NTFS
 # refuses.
-! is_windows || ! echo "control bytes are illegal in a Windows filename" >&2 ||
+! target_is_windows || ! echo "control bytes are illegal in a Windows filename" >&2 ||
     exit 77
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_982.XXXXXX") || exit 1

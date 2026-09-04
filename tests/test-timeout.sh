@@ -77,15 +77,19 @@ if mkdir -p "$tmproot/ht.$$" 2>/dev/null; then
     trap 'rm -rf "$TMPDIR" 2>/dev/null || true' EXIT
 fi
 
+# Two questions, and they part company under the wsl2 backend: the shell there is
+# Linux while the binary under test is still a native .exe.
+msys_shell=
+shell_is_msys && msys_shell=1
 windows=
-is_windows && windows=1
+target_is_windows && windows=1
 
 had_m=
 case "$-" in *m*) had_m=1 ;; esac
-test -n "$windows" || set -m # own process group, so kill_tree can signal the group
+test -n "$msys_shell" || set -m # own process group, so kill_tree can signal the group
 "$BASH" "$@" &
 pid=$!
-test -n "$had_m" || test -n "$windows" || set +m
+test -n "$had_m" || test -n "$msys_shell" || set +m
 # Read while the test is certainly alive: by kill time /proc/<pid>/winpid is gone.
 winpid=''
 test -z "$windows" || winpid=$(win_pid "$pid")
@@ -94,7 +98,7 @@ test -z "$windows" || winpid=$(win_pid "$pid")
 # have to signal across process groups, which MSYS cannot do. The interval is the
 # latency this adds to every healthy test; the ceiling only matters where poll_wait
 # has to fall back to a forked sleep, which under MSYS costs tens of milliseconds.
-if test -n "$windows"; then
+if test -n "$msys_shell"; then
     tick=1
 else
     tick=0.1

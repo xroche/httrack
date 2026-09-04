@@ -15,6 +15,7 @@ EXTRA_DIST = $(TESTS) renamefail.c unlinkfail.c threadattrfail.c nobacktrace.c a
 	webhttracklib.sh httpclient.py webtestlib.py crawllib.sh arclib.sh \
 	guide-image-check.py \
 	ci-windows-suite.sh ci-windows-watchdog.ps1 install-headers-sweep.sh \
+	wsl2-exe-shim.sh \
 	server.crt server.key \
 	server-root/simple/basic.html server-root/simple/link.html \
 	server-root/stripquery/index.html server-root/stripquery/a.html \

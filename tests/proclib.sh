@@ -97,7 +97,7 @@ proc_snapshot() {
 # host). Read-only: it never signals anything.
 list_stray_processes() {
     local pgid=${1:-0} mode=${2:-group}
-    if is_windows; then
+    if target_is_windows; then
         # No process groups here, so every mode gives the same host-wide list. No
         # slash switches: without MSYS_NO_PATHCONV a /fi would be rewritten to a
         # path. Plain output is Image Name + PID, which is all we need.
@@ -130,7 +130,7 @@ list_stray_processes() {
 # own, and tasklist alone cannot tell that one from a leaked fixture server.
 reap_leftover_processes() {
     local label=${1:-} left
-    if is_windows; then
+    if target_is_windows; then
         left=$(tasklist 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE" || true)
     else
         left=$(list_stray_processes 0 named | awk 'NR > 1')
@@ -138,7 +138,7 @@ reap_leftover_processes() {
     test -n "$left" || return 0
     printf '::warning::%s left processes behind\n' "$label"
     printf '%s\n' "$left"
-    if is_windows; then
+    if target_is_windows; then
         taskkill_engines
     else
         printf '%s\n' "$left" | awk '{ print $1 }' |
@@ -252,7 +252,7 @@ dump_windows_stacks() {
 dump_hang_diagnostics() {
     local pid=$1 label=${2:-?} secs=${3:-?}
     printf '\n===== TIMEOUT: %s exceeded its %ss budget =====\n' "$label" "$secs"
-    if is_windows; then
+    if target_is_windows; then
         printf -- '--- still running ---\n'
         list_stray_processes 0 group
         printf -- '--- stacks (via cdb) ---\n'

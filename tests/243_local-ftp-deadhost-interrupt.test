@@ -10,7 +10,7 @@ set -euo pipefail
 
 python=$(find_python) || skip "python3 not found"
 require_httrack
-! is_windows || ! echo "MSYS cannot signal a native httrack.exe; skipping" >&2 ||
+! target_is_windows || ! echo "MSYS cannot signal a native httrack.exe; skipping" >&2 ||
     exit 77
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_ftpint.XXXXXX")
