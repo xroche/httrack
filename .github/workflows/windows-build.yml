@@ -306,9 +306,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "wsl --update failed" }
           wsl --set-default-version 2
           $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
-          # jammy, not noble: the noble rootfs asset 404s as of 2026-09.
+          # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
+          # jammy asset is named after its release, not "wsl.rootfs".
           Invoke-WebRequest -UseBasicParsing -OutFile $root `
-            "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-wsl.rootfs.tar.gz"
+            "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
           wsl --import httrack-suite "$env:RUNNER_TEMP\wsl-distro" $root --version 2
           if ($LASTEXITCODE -ne 0) { throw "wsl --import failed" }
           # A distro that answers is the only proof the import is usable.
