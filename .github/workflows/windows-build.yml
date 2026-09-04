@@ -356,9 +356,17 @@ jobs:
             exit 1
             ;;
           esac
-          wsl -d httrack-suite --cd "$ws/tests" -- \
-            bash ./ci-windows-suite.sh \
-            "$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
+          # Say what the distro can actually see before using it: the failure
+          # this replaces was a bare Wsl/ERROR_PATH_NOT_FOUND naming nothing.
+          wsl -d httrack-suite -- sh -c '
+            echo "mounts:"; ls -d /mnt/* 2>/dev/null || echo "  none"
+            test -d "$1" || { echo "::error::$1 is not visible in the distro"; exit 1; }
+            test -d "$1/tests" || { echo "::error::$1/tests is missing"; exit 1; }' \
+            _ "$ws"
+          # cd inside the distro rather than with --cd, so a missing directory
+          # is a shell error that names it.
+          wsl -d httrack-suite -- sh -c 'cd "$1/tests" && exec bash ./ci-windows-suite.sh "$2"' \
+            _ "$ws" "$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
             2>&1 | tee suite-console.log
 
       - name: Upload the test logs
