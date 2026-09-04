@@ -299,6 +299,9 @@ jobs:
       # MSYS's fork emulation is what breaks first under load (#1273).
       - name: Bring up WSL2
         if: matrix.platform == 'x64'
+        # Non-gating like the suite step it feeds: this runs inside a job whose
+        # context `Protect master` requires, so a flaky import must not red it.
+        continue-on-error: true
         shell: pwsh
         timeout-minutes: 15
         run: |
