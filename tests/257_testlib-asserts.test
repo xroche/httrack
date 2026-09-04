@@ -355,7 +355,10 @@ ok "the wsl2 shim names the .exe and converts only its drvfs arguments"
 # Real interop passes a variable only when WSLENV names it, so the stub refuses
 # to see one that is not listed. Without this, dropping WSLENV changes nothing
 # here and everything on a runner.
-cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
+# The relay's own /proc/<pid>/cmdline is what carries the marker, so this needs
+# a real procfs; Darwin and other /proc-less hosts have nothing to read here.
+if test -d /proc; then
+    cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
 #!/bin/sh
 case ":${WSLENV:-}:" in
 *:HTS_WIN_MARKER:*) printf '%s\n' "${HTS_WIN_MARKER:-}" >"$PSREC.env" ;;
@@ -364,8 +367,8 @@ esac
 printf '%s\n' "$*" >"$PSREC.argv"
 echo 4242
 PSEOF
-chmod +x "$tmpdir/pathbin/powershell.exe"
-cat >"$tmpdir/cap.sh" <<EOF
+    chmod +x "$tmpdir/pathbin/powershell.exe"
+    cat >"$tmpdir/cap.sh" <<EOF
 set -euo pipefail
 . "$testdir/testlib.sh"
 # The marker goes in argv[1], where win_marker's argv[0] skip still finds it.
@@ -377,10 +380,7 @@ win_capture "\$v"
 printf '%s|%s\n' "\$WIN_PID" "\$WIN_IMAGE"
 kill "\$v" 2>/dev/null || true
 EOF
-marker="/mnt/c/t/httrack_local.ZzUnique1"
-if ! test -r /proc/self/cmdline; then
-    echo "no /proc here, so the relay's cmdline cannot be read" >&2
-else
+    marker="/mnt/c/t/httrack_local.ZzUnique1"
     got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 PSREC="$tmpdir/ps" \
         PATH="$pathbin:$PATH" bash "$tmpdir/cap.sh" "$marker")
     assert_eq "4242|sh" "$got" "the Windows pid and image win_capture resolved"
@@ -390,8 +390,8 @@ else
     case "$(cat "$tmpdir/ps.argv")" in
     *"$marker"*) fail "the marker rode powershell's argv: $(cat "$tmpdir/ps.argv")" ;;
     esac
+    ok "win_capture resolves the Windows pid by marker, passed out of band"
 fi
-ok "win_capture resolves the Windows pid by marker, passed out of band"
 
 # Unshimmed: a guard that fires only on the broken path is half a guard.
 case "$(uname -s)" in
