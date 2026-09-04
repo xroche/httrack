@@ -229,7 +229,8 @@ rules_argv() { # rules_argv RULESFILE DIR
     local dir=$2 cmd
     mkdir -p "${dir}/stub"
     # Every dh_* the file names, so one added later cannot run for real here.
-    command grep -o 'dh_[a-z_]*' "$1" | sort -u >"${dir}/dh-names"
+    # The digits matter: dh_md5sums and dh_python3 both carry one.
+    command grep -o 'dh_[a-z0-9_]*' "$1" | sort -u >"${dir}/dh-names"
     while IFS= read -r cmd; do
         printf '#!/bin/sh\nexit 0\n' >"${dir}/stub/${cmd}"
         chmod +x "${dir}/stub/${cmd}"
@@ -240,16 +241,28 @@ rules_argv() { # rules_argv RULESFILE DIR
         "${dir}" "${dir}" "${dir}" >"${dir}/stub/dh_auto_configure"
     chmod +x "${dir}/stub/dh_auto_configure"
     # Unset the outer make's jobserver, or the inner one warns and drops -j.
-    (cd "${dir}" && PATH="${dir}/stub:${PATH}" MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
-        ${MAKE:-make} -s -f "$1" build) >"${dir}/make.log" 2>&1
+    run_rules() { # run_rules TARGET
+        (cd "${dir}" && PATH="${dir}/stub:${PATH}" MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
+            ${MAKE:-make} -s -f "$1" "$2") >>"${dir}/make.log" 2>&1 || true
+    }
+    : >"${dir}/make.log"
+    run_rules "$1" build
+    # A rules file driven by the dh sequencer keeps its flags in an override
+    # target, which "build" reaches only through dh itself.
+    ! command grep -q '^override_dh_auto_configure:' "$1" ||
+        run_rules "$1" override_dh_auto_configure
 }
 # Which features one recorded argv does not turn on, or "". "no" is autoconf for
 # --without-X, and "auto" hands the decision back to the build machine, which is
 # the lottery --disable-auto-features exists to end.
 rules_missing() { # rules_missing ARGVFILE
-    local f flag tok val state seen out=""
+    local f flag neg tok val state seen out=""
     for f in ${features}; do
         flag=$(feature_flag "${f}")
+        # --without-X and --disable-X are the flag's own off switch, and a later
+        # one beats the --with-X in front of it.
+        neg=${flag/--with-/--without-}
+        test "${neg}" != "${flag}" || neg=${flag/--enable-/--disable-}
         state=off
         seen=0
         while IFS= read -r tok; do
@@ -258,6 +271,7 @@ rules_missing() { # rules_missing ARGVFILE
                 continue
             fi
             case ${tok} in
+            "${neg}") state=off ;;
             "${flag}") state=on ;;
             "${flag}="*)
                 val=${tok#*=}
@@ -275,10 +289,16 @@ rules_missing() { # rules_missing ARGVFILE
 # Everything wrong with one rules file, or "" when every dh_auto_configure it
 # runs asks for every feature.
 rules_verdict() { # rules_verdict RULESFILE DIR
-    local argv said off out=""
-    rules_argv "$1" "$2"
-    set -- "$2"/argv.*
+    local argv said off dir=$2 out=""
+    rules_argv "$1" "${dir}"
+    set -- "${dir}"/argv.*
     test -e "$1" || {
+        # Say which: a file make could not run is not a file that configures
+        # nothing, and only one of the two is the packaging bug.
+        test ! -s "${dir}/make.log" || {
+            echo "make-failed"
+            return
+        }
         echo "no-invocation"
         return
     }
@@ -309,7 +329,10 @@ if test -r "${rules}"; then
         seq=$((seq + 1))
         dir=${work}/mut${seq}
         mkdir -p "${dir}"
-        cat >"${dir}/rules"
+        # @SP@ is a trailing space one fixture needs. Written literally, an
+        # editor or a whitespace lint would take it and the fixture would pass
+        # for the wrong reason.
+        sed 's/@SP@/ /' >"${dir}/rules"
         got=$(rules_verdict "${dir}/rules" "${dir}")
         test "${got}" = "${want}" ||
             fail "${desc}: expected [${want}], the reader said [${got:-(nothing)}]"
@@ -333,6 +356,22 @@ MUT
     reads zstd '--with-zstd="no", which the shell unquotes too' <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd="no" --enable-backtrace --with-iconv
+MUT
+    reads zstd "--with-zstd then --without-zstd, where the last one wins" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --without-zstd
+MUT
+    reads backtrace "--enable-backtrace then --disable-backtrace" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --disable-backtrace
+MUT
+    reads brotli "--with-brotli then --without-brotli" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --without-brotli
+MUT
+    reads "" "--without-zstd then --with-zstd, where the last one wins too" <<'MUT'
+build:
+	dh_auto_configure -- --without-zstd --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
 MUT
     reads zstd "--without-zstd" <<'MUT'
 build:
@@ -359,7 +398,7 @@ build:
 MUT
     reads "zstd backtrace iconv" "a backslash make does not read as a continuation" <<'MUT'
 build:
-	dh_auto_configure -- --disable-auto-features --with-brotli \ 
+	dh_auto_configure -- --disable-auto-features --with-brotli \@SP@
 		--with-zstd --enable-backtrace --with-iconv
 MUT
     reads "zstd backtrace iconv" "a fallback invocation that never runs" <<'MUT'
@@ -387,6 +426,16 @@ MUT
     reads no-invocation "a build target that configures nothing" <<'MUT'
 build:
 	true
+MUT
+    reads "" "the dh sequencer, whose flags sit in an override target" <<'MUT'
+build:
+	dh $@
+override_dh_auto_configure:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    reads make-failed "a rules file make cannot run" <<'MUT'
+build:
+	false
 MUT
     echo "ok: every dh_auto_configure debian/rules runs asks for every feature"
 else
