@@ -375,7 +375,11 @@ fi
 # Needs a real procfs to read the relay's cmdline from, and a shell that can
 # execute the fake powershell.exe below. MSYS can do neither: it has no /proc
 # entry to read here and it hands anything named .exe to Windows as a binary.
-if test -d /proc && ! shell_is_msys; then
+# And a procfs that names the program, because under qemu-user's binfmt handler
+# every cmdline reads s390x-binfmt-P instead, this shell's own included.
+self_argv0=
+{ read -r -d '' self_argv0 </proc/self/cmdline; } 2>/dev/null || true
+if test -d /proc && ! shell_is_msys && test "${self_argv0##*/}" = "${BASH##*/}"; then
     cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
 #!/bin/sh
 case ":${WSLENV:-}:" in
@@ -411,7 +415,7 @@ EOF
     esac
     ok "win_capture resolves the Windows pid by marker, passed out of band"
 else
-    echo "no procfs, or a shell that cannot run a script named .exe" >&2
+    echo "procfs missing or renamed by an emulator, or a shell that cannot run a script named .exe" >&2
 fi
 
 # Unshimmed: a guard that fires only on the broken path is half a guard.
