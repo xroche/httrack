@@ -223,7 +223,25 @@ ci_suite_heartbeat() {
 # Explicit now that this is a script; GitHub's "shell: bash" gave the step both.
 set -euo pipefail
 bin=${1:?usage: ci-windows-suite.sh <bindir>}
+# The shell decides the default: this script drives the suite from MSYS today
+# and from a WSL2 distro on the second leg, where the workflow sets it. Nothing
+# can sniff wsl2, since that shell answers Linux like any other.
+export HTTRACK_SUITE_BACKEND=${HTTRACK_SUITE_BACKEND:-msys}
 export PATH="$bin:$PATH"
+
+# WSL2 needs the engines under the bare names the tests use, and needs their
+# drvfs arguments translated on the way to a native exe. One shim per engine
+# does both; see tests/wsl2-exe-shim.sh.
+if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
+    shimdir=$PWD/.wsl2-shims
+    rm -rf "$shimdir"
+    mkdir -p "$shimdir"
+    for e in $ENGINE_EXES; do
+        ln -s "$testdir/wsl2-exe-shim.sh" "$shimdir/$e"
+    done
+    export PATH="$shimdir:$PATH"
+fi
+
 command -v httrack >/dev/null || {
     echo "::error::no httrack.exe in $bin"
     exit 1
@@ -238,9 +256,16 @@ unset WATCHDOG_TOKEN
 # POSIX path, and a URL path is shaped exactly like one: "/a/b.html"
 # reached the engine as "C:/Program Files/Git/a/b.html". Switch that
 # off, and hand the tests a TMPDIR that is already a Windows path.
-export MSYS_NO_PATHCONV=1
-export MSYS2_ARG_CONV_EXCL='*'
-TMPDIR="$(cygpath -m "$RUNNER_TEMP")"
+if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
+    # The Linux view, not the native one: a WSL2 shell cannot mktemp into a
+    # drive-letter path. Tests hand the engine drvfs paths and the shim above
+    # translates them, which is why RUNNER_TEMP has to stay on a Windows volume.
+    TMPDIR="$(wslpath -u "$RUNNER_TEMP")"
+else
+    export MSYS_NO_PATHCONV=1
+    export MSYS2_ARG_CONV_EXCL='*'
+    TMPDIR="$(cygpath -m "$RUNNER_TEMP")"
+fi
 export TMPDIR
 
 # Mirror what configure hands the suite. LC_ALL sets the codeset MSYS maps

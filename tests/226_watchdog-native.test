@@ -307,7 +307,9 @@ def audit(wf):
         if (s.get("with") or {}).get("persist-credentials") is not False:
             bad.append("a checkout persists the job token for the whole job")
     jobs, found = suite_jobs(wf), suite_steps(wf)
-    if len(jobs) != 1 or len(found) != 1:
+    # One job, but a step per backend: each drives the same suite from a
+    # different shell and each posts its own status, so all of them are audited.
+    if len(jobs) != 1 or not found:
         bad.append("%d jobs and %d steps run the suite, cannot tell which is watched" % (len(jobs), len(found)))
         return bad
     perms = perms_of(wf, jobs[0])
@@ -315,21 +317,23 @@ def audit(wf):
         bad.append("the suite job cannot post a commit status: statuses is %r" % perms.get("statuses"))
     if perms.get("contents") != "read":
         bad.append("contents: read was dropped from the suite job")
-    env = found[0].get("env") or {}
-    for v, want in WANT_ENV.items():
-        if env.get(v) != want:
-            bad.append("%s is %r, want %r" % (v, env.get(v), want))
-    # Both axes, or the matrix legs overwrite each other's status.
-    for axis in ("matrix.platform", "matrix.configuration"):
-        if axis not in str(env.get("WATCHDOG_CONTEXT") or ""):
-            bad.append("WATCHDOG_CONTEXT does not name %s" % axis)
-    if "github.run_id" not in str(env.get("WATCHDOG_URL") or ""):
-        bad.append("WATCHDOG_URL does not link the run being watched")
-    cap = found[0].get("timeout-minutes")
-    if not isinstance(cap, int):
-        bad.append("the suite step has no timeout-minutes of its own")
-    else:
-        print("timeout=%d" % cap)
+    for step in found:
+        env = step.get("env") or {}
+        where = str(step.get("name") or "?")
+        for v, want in WANT_ENV.items():
+            if env.get(v) != want:
+                bad.append("%s: %s is %r, want %r" % (where, v, env.get(v), want))
+        # Every axis, or the matrix legs overwrite each other's status.
+        for axis in ("matrix.platform", "matrix.configuration", "matrix.backend"):
+            if axis not in str(env.get("WATCHDOG_CONTEXT") or ""):
+                bad.append("%s: WATCHDOG_CONTEXT does not name %s" % (where, axis))
+        if "github.run_id" not in str(env.get("WATCHDOG_URL") or ""):
+            bad.append("%s: WATCHDOG_URL does not link the run being watched" % where)
+        cap = step.get("timeout-minutes")
+        if not isinstance(cap, int):
+            bad.append("%s: the suite step has no timeout-minutes of its own" % where)
+        else:
+            print("timeout=%d" % cap)
     return bad
 
 def mutate(wf, kind):
@@ -365,7 +369,9 @@ else:
 PY
     said=$("$py" "$tmp/wf.py" audit "$workflow") || fail "the workflow audit did not run: $said"
     grep -q '^BAD ' <<<"$said" && fail "$(grep '^BAD ' <<<"$said" | sed 's/^BAD //')"
-    cap=$(($(sed -n 's/^timeout=//p' <<<"$said") * 60))
+    # The tightest of the backends' step budgets: the watchdog has to fit inside
+    # whichever ends first. sed rather than head, which would SIGPIPE the sort.
+    cap=$(($(sed -n 's/^timeout=//p' <<<"$said" | sort -n | sed -n 1p) * 60))
 
     # One control per key, or an audit that stopped looking at one would ride on
     # another still firing. "none" round-trips the file through the parser, which
