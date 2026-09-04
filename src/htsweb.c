@@ -590,7 +590,6 @@ static int help_server(char *dest_path, int defaultPort, const char *bindAddr) {
 
 /* CALLBACK FUNCTIONS */
 
-/* Initialize the Winsock */
 void __cdecl htsshow_init(t_hts_callbackarg * carg) {
 }
 void __cdecl htsshow_uninit(t_hts_callbackarg * carg) {
