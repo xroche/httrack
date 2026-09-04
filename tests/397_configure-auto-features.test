@@ -169,6 +169,17 @@ assert_state() { # assert_state DIR NAME on|off
 n=0
 planned=10 # steps below; the last one needs the libraries to be installed
 
+# Pace the next step against the costliest one so far, not against the one just
+# run: the steps below are ordered by what they mean rather than by what they
+# cost, so a cheap neighbour would under-project the slow step after it and the
+# guard would fire instead of the skip. Under qemu-user each configure run costs
+# about thirty times what it does natively, which is what this is for (#1537).
+costliest=0
+pace() { # pace <seconds the step took>
+    test "$1" -le "${costliest}" || costliest=$1
+    skip_if_out_of_budget "$((planned - n))" "${costliest}"
+}
+
 # A GNU-libiconv-shaped prefix: a header that renames iconv_open the way the
 # real one does away from LIBICONV_PLUG, and a library under a subdirectory the
 # bare prefix does not name. Both halves matter, because a probe that declares
@@ -374,6 +385,7 @@ if test -r "${rules}" && ! command -v "${MAKE:-make}" >/dev/null 2>&1; then
     planned=$((planned - 1))
     echo "no ${MAKE:-make} here, so debian/rules was not run" >&2
 elif test -r "${rules}"; then
+    began=${SECONDS}
     n=$((n + 1))
     rc=0
     said=$(rules_verdict "${rules}" "${work}/rules-real") || rc=$?
@@ -601,6 +613,7 @@ build:
 	false
 MUT
     echo "ok: every dh_auto_configure debian/rules runs asks for every feature"
+    pace "$((SECONDS - began))"
 else
     planned=$((planned - 1))
     echo "no debian/rules under ${srcdir}, so the packaging flag list is not read" >&2
@@ -608,6 +621,7 @@ fi
 
 # The cheap, host-independent steps run first: a slow leg that runs out of
 # budget later still covers what the switch means.
+began=${SECONDS}
 n=$((n + 1))
 # A value the switch does not understand must not read as one of the two it does.
 ! run_configure "${work}/bogus" --enable-auto-features=maybe ||
@@ -615,7 +629,9 @@ n=$((n + 1))
 grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
     fail_dump "configure refused the value without saying which flag" "${work}/bogus/configure.log"
 echo "ok: a value that is neither yes nor no is refused"
+pace "$((SECONDS - began))"
 
+began=${SECONDS}
 n=$((n + 1))
 # Same for a feature's own tri-state: an unknown value must not fall through.
 ! run_configure "${work}/btbogus" --enable-backtrace=bogus ||
@@ -623,7 +639,9 @@ n=$((n + 1))
 grep -q 'bad value for backtrace' "${work}/btbogus/configure.log" ||
     fail_dump "configure refused the value without saying which flag" "${work}/btbogus/configure.log"
 echo "ok: an unknown --enable-backtrace value is refused"
+pace "$((SECONDS - began))"
 
+began=${SECONDS}
 n=$((n + 1))
 # The switch must not turn a library the packager named into a silent drop (#1502).
 mkdir -p "${work}/empty"
@@ -632,7 +650,9 @@ mkdir -p "${work}/empty"
 grep -q 'brotli requested at' "${work}/reject/configure.log" ||
     fail_dump "configure failed without naming the prefix it was given" "${work}/reject/configure.log"
 echo "ok: an explicit prefix with no library still fails the build"
+pace "$((SECONDS - began))"
 
+began=${SECONDS}
 n=$((n + 1))
 # backtrace() is implemented for Linux alone, so --enable-backtrace has to stay a
 # notice off it: a recipe passes one flag list for every architecture it builds,
@@ -648,7 +668,9 @@ case ${got} in
 *) fail_dump "a foreign host answered '${got}' rather than declining backtrace" \
     "${work}/foreign/configure.log" ;;
 esac
+pace "$((SECONDS - began))"
 
+began=${SECONDS}
 n=$((n + 1))
 # A bare --with-iconv must FTBFS where iconv does not link, rather than fall
 # back to the codepage tables. The fixture has the header and not the symbol.
@@ -674,7 +696,9 @@ grep -q 'iconv requested but no iconv.h with a linkable iconv_open' \
     fail_dump "configure failed without saying that iconv was the request" \
         "${work}/ic-bare/configure.log"
 echo "ok: a bare --with-iconv fails the build rather than falling back"
+pace "$((SECONDS - began))"
 
+began=${SECONDS}
 n=$((n + 1))
 # --with-iconv=DIR is the form a keg-only or ports prefix needs, and the one arm
 # of HTS_FIND_LIBDIR the codec test does not reach. The subdirectory is the
@@ -713,6 +737,7 @@ else
     n=$((n - 1))
     echo "no shared library from ${cc_argv[0]}, so the iconv prefix case is skipped" >&2
 fi
+pace "$((SECONDS - began))"
 
 began=${SECONDS}
 n=$((n + 1))
@@ -728,7 +753,7 @@ for f in ${features}; do
     assert_state "${work}/off" "${f}" off
 done
 echo "ok: the switch turns every feature off, whatever the host has installed"
-skip_if_out_of_budget "$((planned - n))" "$((SECONDS - began))"
+pace "$((SECONDS - began))"
 
 began=${SECONDS}
 n=$((n + 1))
@@ -748,7 +773,7 @@ for f in ${features}; do
     esac
 done
 echo "ok: every feature answers the default run; auto-enabled here:${on:- none}"
-skip_if_out_of_budget "$((planned - n))" "$((SECONDS - began))"
+pace "$((SECONDS - began))"
 
 if test -z "${on}"; then
     planned=$((planned - 1))
