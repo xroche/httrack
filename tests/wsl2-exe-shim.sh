@@ -20,5 +20,4 @@ for a in "$@"; do
     esac
 done
 
-# The +"..." guard keeps an argument-less call alive under set -u on bash 4.3.
-exec "$(basename "$0").exe" ${args[@]+"${args[@]}"}
+exec "$(basename "$0").exe" "${args[@]}"

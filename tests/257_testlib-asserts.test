@@ -229,19 +229,37 @@ pathbin=$(posixpath "$tmpdir/pathbin")
 # shell driving a native .exe. Nothing sniffs it, so the driver sets it, and a
 # backend the shell cannot guess must still outrank what uname says.
 # shellcheck disable=SC2016
-printf 'set -euo pipefail\n. "%s/testlib.sh"\nif target_is_windows; then printf A; else printf a; fi\nif shell_is_msys; then printf B; else printf b; fi\n' \
-    "$testdir" >"$tmpdir/split.sh"
+cat >"$tmpdir/split.sh" <<EOF
+set -euo pipefail
+. "$testdir/testlib.sh"
+target_is_windows && w=yes || w=no
+shell_is_msys && m=yes || m=no
+printf 'win=%s msys=%s\\n' "\$w" "\$m"
+EOF
 while read -r backend os want; do
     got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND="$backend" HTS_OS="$os" \
         PATH="$shim:$pathbin:$PATH" bash "$tmpdir/split.sh")
-    test "$got" = "$want" ||
-        fail "backend=$backend HTS_OS=$os gave [$got], want [$want] (upper=true)"
+    test "$got" = "$want" || fail "backend=$backend HTS_OS=$os gave [$got], want [$want]"
 done <<'EOF'
-wsl2 Linux Ab
-msys MINGW64_NT-10.0 AB
-posix Linux ab
+wsl2 Linux win=yes msys=no
+msys MINGW64_NT-10.0 win=yes msys=yes
+posix Linux win=no msys=no
 EOF
 ok "under wsl2 the binary is Windows while the shell is not"
+
+# IS_WINDOWS is how a non-Windows host forces the Windows paths on
+# (249_windows-reap-images.test). It predates the split and answered both
+# questions at once, so it must still answer both. It is also set AFTER testlib
+# is sourced, which is why nothing may cache the backend it implies.
+while read -r override want; do
+    got=$(env -u HTTRACK_SUITE_BACKEND IS_WINDOWS="$override" HTS_OS=Linux \
+        PATH="$shim:$pathbin:$PATH" bash "$tmpdir/split.sh")
+    test "$got" = "$want" || fail "IS_WINDOWS=$override gave [$got], want [$want]"
+done <<'EOF'
+yes win=yes msys=yes
+no win=no msys=no
+EOF
+ok "the IS_WINDOWS override still reaches both predicates"
 
 ## path_convert picks its tool from the backend, never from uname: cygpath is
 # MSYS's and wslpath is WSL2's, and they take the same -m and -u.
@@ -298,6 +316,13 @@ assert_eq "" "$(win_marker "$tmpdir/cl")" "argv[0] alone"
 mkcmdline "$tmpdir/cl" httrack.exe -q -O out
 assert_eq "" "$(win_marker "$tmpdir/cl")" "only short arguments"
 assert_eq "" "$(win_marker "$tmpdir/nosuchfile")" "no cmdline at all"
+# The real crawl shape, which is where the naive "longest argument" rule broke:
+# local-crawl.sh gives every concurrent crawl the same --user-agent, and it is
+# longer than the output directory, so the marker named all of them at once.
+mkcmdline "$tmpdir/cl" httrack.exe -O "C:/t/httrack_local.AbCdEf" \
+    "--user-agent=httrack 3.50.1 local (Linux 7.0.0-22-generic x86_64)" \
+    "http://127.0.0.1:41917/" -q
+assert_eq "C:/t/httrack_local.AbCdEf" "$(win_marker "$tmpdir/cl")" "a shared --user-agent"
 ok "win_marker picks the launch's own output directory, never argv[0]"
 
 ## An executable's name differs by backend: bare under MSYS, which resolves it
@@ -316,9 +341,15 @@ ok "a Windows executable takes its .exe only under wsl2"
 
 ## win_capture under wsl2 has no /proc/<pid>/winpid to read. It takes the
 # relay's own cmdline instead and asks Windows which process carries it.
+# Real interop passes a variable only when WSLENV names it, so the stub refuses
+# to see one that is not listed. Without this, dropping WSLENV changes nothing
+# here and everything on a runner.
 cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
 #!/bin/sh
-printf '%s\n' "${HTS_WIN_MARKER:-}" >"$PSREC.env"
+case ":${WSLENV:-}:" in
+*:HTS_WIN_MARKER:*) printf '%s\n' "${HTS_WIN_MARKER:-}" >"$PSREC.env" ;;
+*) : >"$PSREC.env" ;;
+esac
 printf '%s\n' "$*" >"$PSREC.argv"
 echo 4242
 PSEOF
@@ -326,14 +357,11 @@ chmod +x "$tmpdir/pathbin/powershell.exe"
 cat >"$tmpdir/cap.sh" <<EOF
 set -euo pipefail
 . "$testdir/testlib.sh"
+# The marker goes in argv[1], where win_marker's argv[0] skip still finds it.
 /bin/sh -c 'sleep 30' "\$1" &
 v=\$!
-# Until the exec lands, the cmdline still names the forking shell: the same race
-# the MSYS winpid read has, and the reason win_capture is not for a fresh job.
-for _ in \$(seq 200); do
-    test "\$(win_marker "/proc/\$v/cmdline")" != "\$1" || break
-    sleep 0.01
-done
+test "\$(win_marker "/proc/\$v/cmdline")" = "\$1" ||
+    echo "the relay's cmdline does not carry the marker" >&2
 win_capture "\$v"
 printf '%s|%s\n' "\$WIN_PID" "\$WIN_IMAGE"
 kill "\$v" 2>/dev/null || true

@@ -593,14 +593,24 @@ build_names_frames() {
 # Only msys is sniffable, because a wsl2 shell answers `Linux` exactly like a
 # native one, so the driver sets the variable and an unset one means posix.
 suite_backend() {
-    if test -z "${HTTRACK_SUITE_BACKEND:-}"; then
+    test -z "${HTTRACK_SUITE_BACKEND:-}" || {
+        printf '%s\n' "$HTTRACK_SUITE_BACKEND"
+        return 0
+    }
+    # IS_WINDOWS is the override this file has always honoured, and before the
+    # split it answered both questions at once, so it names a backend and not
+    # just the binary's platform. Resolved on every call rather than cached,
+    # because a test sets it after sourcing us (249_windows-reap-images.test).
+    case "${IS_WINDOWS:-}" in
+    yes) printf 'msys\n' ;;
+    no) printf 'posix\n' ;;
+    *)
         case "$HTS_OS" in
-        MINGW* | MSYS* | CYGWIN*) HTTRACK_SUITE_BACKEND=msys ;;
-        *) HTTRACK_SUITE_BACKEND=posix ;;
+        MINGW* | MSYS* | CYGWIN*) printf 'msys\n' ;;
+        *) printf 'posix\n' ;;
         esac
-        export HTTRACK_SUITE_BACKEND
-    fi
-    printf '%s\n' "$HTTRACK_SUITE_BACKEND"
+        ;;
+    esac
 }
 
 # Is the program under test a native Windows executable? This is what almost
@@ -906,14 +916,17 @@ win_exe() { # win_exe NAME
 
 # The substring identifying ONE launch among every Windows process on the host.
 # WSL2 has no /proc/<pid>/winpid, so all that is left is what the relay was
-# started with, and the exe's path is shared by every concurrent test. The
-# longest argument is the test's own output directory, which is unique per
-# launch and longer than any flag. Empty when nothing is distinctive enough,
-# which the callers already treat as "unknown" (#1228).
+# started with. Skip argv[0], the same exe for every concurrent test, and skip
+# the flags: local-crawl.sh passes a --user-agent every concurrent crawl shares,
+# and it is LONGER than the output directory. What is left is per-launch,
+# because the output directory and the URL's port are both per-test. Empty when
+# nothing is distinctive enough, which the callers treat as "unknown" (#1228).
 win_marker() { # win_marker <path to a NUL-separated cmdline>
     test -r "$1" || return 0
     tr '\0' '\n' <"$1" 2>/dev/null |
-        awk 'NR > 1 && length($0) >= 8 && length($0) > length(best) { best = $0 }
+        awk 'NR == 1 { next }
+             /^-/ { next }
+             length($0) >= 8 && length($0) > length(best) { best = $0 }
              END { if (best != "") print best }'
 }
 
@@ -1020,11 +1033,17 @@ kill_tree() {
             taskkill_engines
             "$(win_exe taskkill)" /F /IM python.exe >/dev/null 2>&1 || true
         fi
+        # Not a fallback under wsl2 but the other half of the job: the shell
+        # there is Linux, so $pid is often a process that never had a Windows
+        # counterpart for taskkill to find, a backgrounded test bash above all.
+        if test "$(suite_backend)" = wsl2; then
+            kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+        fi
         return 0
     fi
-    # No caller puts $pid in its own group on Windows (set -m is skipped there),
-    # so -"$pid" here would target whatever real group $pid's number collides
-    # with -- possibly the harness's own -- and taskkill above already reaped it.
+    # Under msys no caller puts $pid in its own group (set -m is skipped there),
+    # so -"$pid" would target whatever real group that number collides with,
+    # possibly the harness's own, and the taskkill above already reaped it.
     kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
 }
 

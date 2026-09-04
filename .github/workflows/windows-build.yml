@@ -31,14 +31,6 @@ jobs:
       matrix:
         platform: [x64, Win32]
         configuration: [Release]
-        # Which shell drives the suite against the same native httrack.exe.
-        # Win32 runs msys only: the second backend is about the harness, not
-        # about the engine's word size, so a third leg would buy nothing and
-        # every added Windows job is a job the runner can kill (#1228).
-        backend: [msys, wsl2]
-        exclude:
-          - platform: Win32
-            backend: wsl2
     # No repo-wide cap: #1213 added one against runner starvation, which #1228
     # later measured out. The step timeouts stay as they are, sized by 226
     # against the suite watchdog, not against how long a job takes.
@@ -269,7 +261,6 @@ jobs:
       # The *_local-* ones crawl the bundled Python server over loopback: the real
       # TLS handshake, cache and file writer, which nothing else on Windows covers.
       - name: Run the engine test suite (offline tests)
-        if: matrix.backend == 'msys'
         shell: bash
         working-directory: tests
         timeout-minutes: 45
@@ -283,7 +274,7 @@ jobs:
           # The PR head, not github.sha: a merge commit is garbage-collected, and
           # these statuses are the only trace a lost runner leaves (#1228).
           WATCHDOG_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }}, ${{ matrix.backend }})
+          WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }})
           WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           # Teed: the MSYS fork failures (#1273) land on this stderr, which no
@@ -295,7 +286,7 @@ jobs:
       # Its own step: the watchdog can kill the suite's step before it counts,
       # which is exactly when the count is worth having.
       - name: Count the MSYS fork failures and the lost workers
-        if: always() && matrix.backend == 'msys'
+        if: always()
         shell: bash
         working-directory: tests
         run: |
@@ -307,7 +298,7 @@ jobs:
       # It buys a real Linux shell against the same native httrack.exe, where
       # MSYS's fork emulation is what breaks first under load (#1273).
       - name: Bring up WSL2
-        if: matrix.backend == 'wsl2'
+        if: matrix.platform == 'x64'
         shell: pwsh
         timeout-minutes: 15
         run: |
@@ -325,19 +316,21 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "the imported distro does not run" }
 
       - name: Run the engine test suite (offline tests, WSL2)
-        if: matrix.backend == 'wsl2'
+        if: matrix.platform == 'x64'
         # The harness is new: a red here must not gate the job until it has a
         # few days of history to read it against. Flip this once it has.
         continue-on-error: true
         shell: bash
         working-directory: tests
+        # 45 like the msys step, and 226_watchdog-native.test enforces it: the
+        # suite's own 1500s deadline plus the watchdog's 900s does not fit in less.
         timeout-minutes: 45
         env:
           HTTRACK_SUITE_JOBS: 4
           WATCHDOG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WATCHDOG_REPO: ${{ github.repository }}
           WATCHDOG_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          WATCHDOG_CONTEXT: windows-suite (${{ matrix.platform }}, ${{ matrix.configuration }}, ${{ matrix.backend }})
+          WATCHDOG_CONTEXT: windows-suite-wsl2 (${{ matrix.platform }}, ${{ matrix.configuration }})
           WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           # /p translates a value as a path on the way in; RUNNER_TEMP goes over
@@ -355,7 +348,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: engine-tests-${{ matrix.platform }}-${{ matrix.configuration }}-${{ matrix.backend }}
+          name: engine-tests-${{ matrix.platform }}-${{ matrix.configuration }}
           path: tests/*.log
           if-no-files-found: warn
 
@@ -363,6 +356,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: msbuild-${{ matrix.platform }}-${{ matrix.configuration }}-${{ matrix.backend }}
+          name: msbuild-${{ matrix.platform }}-${{ matrix.configuration }}
           path: msbuild-*.log
           if-no-files-found: ignore

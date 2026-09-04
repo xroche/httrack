@@ -324,7 +324,7 @@ def audit(wf):
             if env.get(v) != want:
                 bad.append("%s: %s is %r, want %r" % (where, v, env.get(v), want))
         # Every axis, or the matrix legs overwrite each other's status.
-        for axis in ("matrix.platform", "matrix.configuration", "matrix.backend"):
+        for axis in ("matrix.platform", "matrix.configuration"):
             if axis not in str(env.get("WATCHDOG_CONTEXT") or ""):
                 bad.append("%s: WATCHDOG_CONTEXT does not name %s" % (where, axis))
         if "github.run_id" not in str(env.get("WATCHDOG_URL") or ""):
@@ -334,6 +334,11 @@ def audit(wf):
             bad.append("%s: the suite step has no timeout-minutes of its own" % where)
         else:
             print("timeout=%d" % cap)
+    # The steps run in one job and each posts its own status, so a shared
+    # context makes whichever finishes last overwrite the other's verdict.
+    ctxs = [str((s.get("env") or {}).get("WATCHDOG_CONTEXT") or "") for s in found]
+    if len(set(ctxs)) != len(ctxs):
+        bad.append("two suite steps share a WATCHDOG_CONTEXT: %r" % ctxs)
     return bad
 
 def mutate(wf, kind):
@@ -350,6 +355,13 @@ def mutate(wf, kind):
         suite_steps(wf)[0]["env"]["WATCHDOG_TOKEN"] = "${{ secrets.WATCHDOG_PAT }}"
     elif kind == "sha":
         suite_steps(wf)[0]["env"]["WATCHDOG_SHA"] = "${{ github.sha }}"
+    elif kind == "lastenv":
+        suite_steps(wf)[-1]["env"]["WATCHDOG_TOKEN"] = "literal"
+    elif kind == "sharedcontext":
+        suite_steps(wf)[-1]["env"]["WATCHDOG_CONTEXT"] = \
+            suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"]
+    elif kind == "lasttimeout":
+        suite_steps(wf)[-1].pop("timeout-minutes", None)
     elif kind == "context":
         suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"] = "windows-suite"
     elif kind == "url":
@@ -379,7 +391,9 @@ PY
     for m in none:'' perm:'cannot post' jobperm:'cannot post' creds:'persists the job token' \
         env:'WATCHDOG_TOKEN is' token:'WATCHDOG_TOKEN is' sha:'WATCHDOG_SHA is' \
         context:'does not name matrix.platform' url:'does not link the run' \
-        cap:'no timeout-minutes of its own'; do
+        cap:'no timeout-minutes of its own' lastenv:'WATCHDOG_TOKEN is' \
+        sharedcontext:'share a WATCHDOG_CONTEXT' \
+        lasttimeout:'no timeout-minutes of its own'; do
         "$py" "$tmp/wf.py" mutate "$workflow" "${m%%:*}" >"$tmp/wf.yml"
         said=$("$py" "$tmp/wf.py" audit "$tmp/wf.yml") ||
             fail "the workflow audit did not run on the ${m%%:*} control: $said"

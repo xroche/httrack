@@ -33,11 +33,12 @@ fi
 test "$rc" -eq 124 || fail "hang reported $rc, want 124"
 test "$((SECONDS - start))" -lt 15 || fail "watchdog fired late"
 
-# The native descendant tree is really dead, not orphaned. On Windows an outer
-# MSYS bash with a native ping grandchild is the exact case signals can't reap;
-# on POSIX a surviving grandchild would touch the marker after we stop waiting.
+# The native descendant tree is really dead, not orphaned. The Windows arm reads
+# /proc/<pid>/winpid, which only MSYS has, so it asks about that shell and not
+# about the binary; on POSIX a surviving grandchild would touch the marker after
+# we stop waiting.
 rc=0
-if target_is_windows; then
+if shell_is_msys; then
     # Existence by exact Windows PID, not a global ping.exe count: the timing
     # sub-test above leaves a still-dying ping that a count would race.
     alive() { win_pid_runs "$1" ping.exe; }
@@ -100,7 +101,7 @@ fi
     start=$SECONDS
     rc=0
     if target_is_windows; then
-        run_with_timeout 3 ping -n 60 127.0.0.1 || rc=$?
+        run_with_timeout 3 "$(win_exe ping)" -n 60 127.0.0.1 || rc=$?
     else
         run_with_timeout 3 sleep 60 || rc=$?
     fi
