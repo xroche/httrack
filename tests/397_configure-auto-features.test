@@ -228,17 +228,20 @@ done
 rules_argv() { # rules_argv RULESFILE DIR
     local dir=$2 cmd
     mkdir -p "${dir}/stub"
-    for cmd in dh_testdir dh_testroot dh_autoreconf dh_auto_build dh_auto_test; do
+    # Every dh_* the file names, so one added later cannot run for real here.
+    command grep -o 'dh_[a-z_]*' "$1" | sort -u >"${dir}/dh-names"
+    while IFS= read -r cmd; do
         printf '#!/bin/sh\nexit 0\n' >"${dir}/stub/${cmd}"
         chmod +x "${dir}/stub/${cmd}"
-    done
+    done <"${dir}/dh-names"
     # One file per invocation, since a second one overrides the first.
     # shellcheck disable=SC2016 # the shim's own expansions, not this shell's
     printf '#!/bin/sh\nn=$(cat "%s/n" 2>/dev/null || echo 0)\nn=$((n + 1))\necho "$n" >"%s/n"\nfor a; do printf "%%s\\n" "$a"; done >"%s/argv.$n"\nexit 0\n' \
         "${dir}" "${dir}" "${dir}" >"${dir}/stub/dh_auto_configure"
     chmod +x "${dir}/stub/dh_auto_configure"
-    (cd "${dir}" && PATH="${dir}/stub:${PATH}" ${MAKE:-make} -s -f "$1" build) \
-        >"${dir}/make.log" 2>&1
+    # Unset the outer make's jobserver, or the inner one warns and drops -j.
+    (cd "${dir}" && PATH="${dir}/stub:${PATH}" MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
+        ${MAKE:-make} -s -f "$1" build) >"${dir}/make.log" 2>&1
 }
 # Which features one recorded argv does not turn on, or "". "no" is autoconf for
 # --without-X, and "auto" hands the decision back to the build machine, which is
