@@ -360,9 +360,13 @@ TOOLEOF
 
     # The shim spells the mapping again because it runs as its own process, so
     # the two copies have to agree or a fix lands in one and not the other.
-    for a in /mnt/c/x/y /mnt/D/up 'C:/already' /no/drive -q; do
+    for a in /mnt/c/x/y /mnt/D/up 'C:/already' /no/drive -q file:///mnt/d/s/i.html; do
         viashim=$(PATH="$tmpdir/shimbin:$PATH" bash "$tmpdir/shimbin/faketool" "$a")
-        assert_eq "$(drvfs_path -m "$a")" "$viashim" "the shim and drvfs_path on $a"
+        case $a in
+        file://*) want="file://$(drvfs_path -m "${a#file://}")" ;;
+        *) want=$(drvfs_path -m "$a") ;;
+        esac
+        assert_eq "$want" "$viashim" "the shim and drvfs_path on $a"
     done
     ok "the shim's own copy of the mapping agrees with drvfs_path"
 fi

@@ -239,6 +239,7 @@ selftest_write_argv() {
     for a in "${SELFTEST_ARGV[@]}"; do
         case $a in
         /mnt/[A-Za-z]/*) printf '%s\0' "$(drvfs_path -m "$a")" ;;
+        file:///mnt/[A-Za-z]/*) printf 'file://%s\0' "$(drvfs_path -m "${a#file://}")" ;;
         *) printf '%s\0' "$a" ;;
         esac
     done

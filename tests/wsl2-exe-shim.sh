@@ -14,12 +14,20 @@ set -uo pipefail
 # The same drvfs mapping testlib.sh does, spelled again because this runs as its
 # own process inside the distro, and because a bare rootfs ships no wslpath.
 args=()
+rest=
 for a in "$@"; do
     case "$a" in
     # A drvfs absolute path, which no URL and no option ever looks like.
     /mnt/[A-Za-z]/*)
         drive=$(printf '%s' "$a" | cut -c6 | tr '[:lower:]' '[:upper:]')
         args+=("$drive:$(printf '%s' "$a" | cut -c7-)")
+        ;;
+    # A file:// URL built from one of those paths. MSYS produced file://D:/...
+    # here, because its own TMPDIR was already a drive-letter path.
+    file:///mnt/[A-Za-z]/*)
+        rest=${a#file://}
+        drive=$(printf '%s' "$rest" | cut -c6 | tr '[:lower:]' '[:upper:]')
+        args+=("file://$drive:$(printf '%s' "$rest" | cut -c7-)")
         ;;
     *) args+=("$a") ;;
     esac
