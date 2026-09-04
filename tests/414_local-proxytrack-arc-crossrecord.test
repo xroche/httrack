@@ -1,8 +1,6 @@
 #!/bin/bash
 #
-# An .arc record's declared length is what bounds the read that fills its body,
-# and the file size is the only other bound. A length reaching past the record's
-# own bytes therefore serves the following record's page under this record's URL.
+# A record's declared length must not reach past its own bytes into the next.
 
 set -euo pipefail
 
@@ -23,35 +21,65 @@ cleanup() {
 }
 cleanup_push cleanup
 
-FIRST_BODY=FIRSTPAGE_00000000
-NEXT_PAD=4988
+KEPT_BODY=KEPTPAGE
+GREEDY_BODY=GREEDYPAGE_0000000
+VICTIM_PAD=4988
+# reaches well past $GREEDY_BODY, into the victim page's padding
+GREEDY_DECLARED=4096
 
-# HOST names the archive, so one proxytrack can serve both without a key clash.
-# DECLARED is what the first record announces; it stores $FIRST_BODY whatever it
-# says, so an honest archive passes DECLARED=${#FIRST_BODY}.
-craft() { # craft OUT HOST DECLARED
-    local out=$1 host=$2 declared=$3 h1=$dir/h1 b1=$dir/b1 h2=$dir/h2 b2=$dir/b2
+http_head() { # http_head CONTENT_LENGTH
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' "$1"
+}
 
-    printf '%s' "$FIRST_BODY" >"$b1"
-    # padded with spaces, so the byte the overlapping length lands on is the
-    # one a boundary test loose enough to take whitespace would accept
-    printf 'NEXT-%s%*s' "$host" "$NEXT_PAD" '' >"$b2"
-    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' \
-        "$declared" >"$h1"
-    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' \
-        "$(wc -c <"$b2")" >"$h2"
+# Three records: one the greedy record cannot reach, the greedy one, and the
+# victim page whose bytes must never leave the greedy record's URL. HOST names
+# the archive, so one proxytrack serves them all without a key clash. DECLARED
+# is the length the greedy record announces, but it stores $GREEDY_BODY whatever
+# it says, so an honest archive passes DECLARED=${#GREEDY_BODY}. PAD is the byte
+# the victim page is padded with, which is the byte a declared length lands on,
+# so each archive lands on a different class of byte.
+craft() { # craft OUT HOST DECLARED PAD
+    local out=$1 host=$2 declared=$3 pad=$4
+
+    printf '%s' "$KEPT_BODY" >"$dir/kept.body"
+    http_head "${#KEPT_BODY}" >"$dir/kept.head"
+    printf '%s' "$GREEDY_BODY" >"$dir/greedy.body"
+    http_head "$declared" >"$dir/greedy.head"
+    {
+        printf 'VICTIM-%s\n' "$host"
+        # a page may hold a line that looks like half of a record header, and
+        # neither half alone may cost it its place in the archive
+        printf 'http://not-a-record\n'
+        printf 'three fields 5\n'
+        printf '%*s' "$VICTIM_PAD" '' | tr ' ' "$pad"
+    } >"$dir/victim.body"
+    http_head "$(wc -c <"$dir/victim.body")" >"$dir/victim.head"
     {
         arc_filedesc
-        printf 'http://%s/first.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n' \
-            "$host" "$ARC_DATE" "$(($(wc -c <"$h1") + declared))"
-        cat "$h1" "$b1"
+        arc_record "http://$host/kept.html" text/html 200 \
+            "$dir/kept.head" "$dir/kept.body"
+        printf '\n' # the separator opening each record after the first
+        arc_record "http://$host/greedy.html" text/html 200 \
+            "$dir/greedy.head" "$dir/greedy.body" \
+            "$(($(wc -c <"$dir/greedy.head") + declared))"
         printf '\n'
-        arc_record "http://$host/second.html" text/html 200 "$h2" "$b2"
+        arc_record "http://$host/victim.html" text/html 200 \
+            "$dir/victim.head" "$dir/victim.body"
     } >"$out"
 }
 
-craft "$dir/honest.arc" honest "${#FIRST_BODY}"
-craft "$dir/overlap.arc" overlap 4096
+craft "$dir/honest.arc" honest "${#GREEDY_BODY}" ' '
+# every byte class a one-byte boundary test could mistake for a separator, the
+# newline most of all: a text page is full of them
+craft "$dir/space.arc" space "$GREEDY_DECLARED" ' '
+craft "$dir/digit.arc" digit "$GREEDY_DECLARED" 0
+craft "$dir/newline.arc" newline "$GREEDY_DECLARED" $'\n'
+craft "$dir/cr.arc" cr "$GREEDY_DECLARED" $'\r'
+
+# an honest archive is still honest with junk stuck on the end, and refusing its
+# last record would cost a page the reader used to serve
+cp "$dir/honest.arc" "$dir/trailer.arc"
+printf 'not a record\0\0\0' >>"$dir/trailer.arc"
 
 # The body the archive $1 stores for the record whose URL is $2, walking the
 # record chain rather than trusting a length twice.
@@ -77,51 +105,107 @@ sys.exit("no record for %s" % sys.argv[2])
 EOF
 }
 
+stored() { # stored ARC URL FILE
+    body_of "$1" "$2" >"$3" || fail "$1 holds no record for $2"
+}
+
+is_body() { # is_body FILE TEXT WHAT
+    test "$(cat "$1")" = "$2" || fail_dump "$3" "$1"
+}
+
 # Consumer 1: the ARC writer, reading one archive and writing another.
 convert() { # convert IN OUT
     proxytrack --convert "$2" "$1" >"$dir/convert.log" 2>&1 ||
         fail_dump "proxytrack died converting $1" "$dir/convert.log"
 }
 
-# The control the whole test rests on: an honest chain keeps the two records
-# apart, so both markers exist in the fixture and each stays under its own URL.
+# The control the rest rests on: an honest chain keeps the records apart, so all
+# three markers exist in the fixture and each stays under its own URL.
 convert "$dir/honest.arc" "$dir/honest-out.arc"
-body_of "$dir/honest-out.arc" http://honest/first.html >"$dir/first.body"
-test "$(cat "$dir/first.body")" = "$FIRST_BODY" ||
-    fail_dump "the honest archive lost the first record's body" "$dir/first.body"
-body_of "$dir/honest-out.arc" http://honest/second.html >"$dir/second.body"
-grep -qaF NEXT-honest "$dir/second.body" ||
-    fail "the honest archive lost the second record"
+stored "$dir/honest-out.arc" http://honest/kept.html "$dir/out.kept"
+is_body "$dir/out.kept" "$KEPT_BODY" "the honest archive lost its first record"
+stored "$dir/honest-out.arc" http://honest/greedy.html "$dir/out.greedy"
+is_body "$dir/out.greedy" "$GREEDY_BODY" \
+    "an honest declared length lost the record's body"
+stored "$dir/honest-out.arc" http://honest/victim.html "$dir/out.victim"
+grep -qaF VICTIM-honest "$dir/out.victim" ||
+    fail "the honest archive lost its last record"
 
-convert "$dir/overlap.arc" "$dir/overlap-out.arc"
-# Either the record is refused or it is clipped to its own bytes; what it may
-# never carry is the page stored after it.
-if body_of "$dir/overlap-out.arc" http://overlap/first.html >"$dir/overlap.body" 2>/dev/null; then
-    if grep -qaF NEXT-overlap "$dir/overlap.body"; then
-        fail_dump "the ARC writer stored the next record under the first record's URL" \
-            "$dir/overlap.body"
+convert "$dir/trailer.arc" "$dir/trailer-out.arc"
+stored "$dir/trailer-out.arc" http://honest/victim.html "$dir/out.trailer"
+grep -qaF VICTIM-honest "$dir/out.trailer" ||
+    fail "an archive with junk after its last record lost that record"
+
+for class in space digit newline cr; do
+    convert "$dir/$class.arc" "$dir/$class-out.arc"
+    # the record before the greedy one, so an implementation that refuses the
+    # whole archive cannot pass the assertion below
+    stored "$dir/$class-out.arc" "http://$class/kept.html" "$dir/$class.kept"
+    is_body "$dir/$class.kept" "$KEPT_BODY" \
+        "a $class-padded archive lost the record before the greedy one"
+    # Either the greedy record is refused or it is clipped to its own bytes.
+    # What it may never carry is the page stored after it.
+    if body_of "$dir/$class-out.arc" "http://$class/greedy.html" \
+        >"$dir/$class.greedy" 2>"$dir/$class.err"; then
+        grep -qaF "VICTIM-$class" "$dir/$class.greedy" &&
+            fail_dump "the ARC writer stored the victim page under the greedy URL" \
+                "$dir/$class.greedy"
+    else
+        grep -qa "no record for" "$dir/$class.err" ||
+            fail_dump "reading the $class archive back failed" "$dir/$class.err"
     fi
-fi
+done
+
+# A header block with no blank line of its own runs into the next record's meta
+# line, so the fields the reader keeps come from the record after it.
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/first' >"$dir/hdr.head"
+: >"$dir/hdr.empty"
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/next\r\nLocation: http://elsewhere/\r\nContent-Length: 5\r\n\r\n' >"$dir/next.head"
+printf 'BODY2' >"$dir/next.body"
+{
+    arc_filedesc
+    arc_record http://hdr/first.html text/html 200 "$dir/hdr.head" "$dir/hdr.empty"
+    printf '\n'
+    arc_record http://hdr/next.html text/html 200 "$dir/next.head" "$dir/next.body"
+} >"$dir/hdr.arc"
+
+convert "$dir/hdr.arc" "$dir/hdr-out.arc"
+"$python" - "$dir/hdr-out.arc" <<'EOF' || fail_dump "a record kept the next record's headers" "$dir/hdr-out.arc"
+import sys
+
+out = open(sys.argv[1], "rb").read().decode("latin-1")
+start = out.find("\nhttp://hdr/first.html ")
+if start < 0:
+    sys.exit("the unterminated record vanished from the archive")
+end = out.find("\nhttp://", start + 1)
+first = out[start:] if end < 0 else out[start:end]
+for field in ("text/next", "http://elsewhere/"):
+    if field in first:
+        sys.exit("%r reached the record stored before the one that declared it" % field)
+if "text/next" not in out or "http://elsewhere/" not in out:
+    sys.exit("the fixture lost the fields it exists to track")
+EOF
 
 # Consumer 2: the reply to a client.
 launch_proxytrack() {
     proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" \
-        "$dir/honest.arc" "$dir/overlap.arc" >"$ptlog" 2>&1 &
+        "$dir/honest.arc" "$dir/space.arc" "$dir/digit.arc" \
+        "$dir/newline.arc" "$dir/cr.arc" >"$ptlog" 2>&1 &
     ptpid=$!
 }
 start_proxytrack "$dir/pt" launch_proxytrack
 
-"$python" - "$proxyport" "$FIRST_BODY" <<'EOF' ||
+"$python" - "$proxyport" "$GREEDY_BODY" <<'EOF' ||
 import socket, sys
 
-port, first = int(sys.argv[1]), sys.argv[2].encode()
+port, honest_body = int(sys.argv[1]), sys.argv[2].encode()
 
 
 def get(host):
     sock = socket.create_connection(("127.0.0.1", port), 10)
     sock.settimeout(10)
     sock.sendall(
-        ("GET http://%s/first.html HTTP/1.1\r\nHost: %s\r\n\r\n" % (host, host)).encode()
+        ("GET http://%s/greedy.html HTTP/1.1\r\nHost: %s\r\n\r\n" % (host, host)).encode()
     )
     reply = b""
     try:
@@ -132,16 +216,23 @@ def get(host):
             reply += chunk
     except socket.timeout:
         pass
+    # the status line, so an empty or truncated reply cannot read as a pass
+    if not reply.startswith(b"HTTP/"):
+        sys.exit("%s answered %r, which is no reply at all" % (host, reply[:64]))
     return reply.partition(b"\r\n\r\n")[2]
 
 
 payload = get("honest")
-if payload != first:
-    sys.exit("the honest record served %r, not its own %d bytes" % (payload[:64], len(first)))
+if payload != honest_body:
+    sys.exit(
+        "the honest record served %r, not its own %d bytes"
+        % (payload[:64], len(honest_body))
+    )
 
-payload = get("overlap")
-if b"NEXT-overlap" in payload:
-    sys.exit("the overlapping record served the next page: %r" % payload[:200])
+for host in ("space", "digit", "newline", "cr"):
+    payload = get(host)
+    if ("VICTIM-%s" % host).encode() in payload:
+        sys.exit("the %s archive served the victim page: %r" % (host, payload[:200]))
 EOF
     fail_dump "a record's reply carried bytes from outside it" "$ptlog"
 

@@ -2101,22 +2101,6 @@ static int skipArcData(FILE * file, const char *line) {
   return -1;
 }
 
-/* A record's declared data must end where the next record's separator sits, or
-   the reader hands out the neighbour's bytes under this record's URL. */
-static hts_boolean atArcRecordBoundary(FILE *file) {
-  const long int pos = ftell(file);
-  int c;
-
-  if (pos < 0)
-    return HTS_FALSE;
-  c = fgetc(file);
-  if (fseek(file, pos, SEEK_SET) != 0)
-    return HTS_FALSE;
-  /* EOF closes the last record, and a length past it is the truncated archive
-     the read-time bound already refuses */
-  return (c == 0x0a || c == EOF) ? HTS_TRUE : HTS_FALSE;
-}
-
 static int getDigit(const char digit) {
   return (int) (digit - '0');
 }
@@ -2181,6 +2165,57 @@ static int PT_CompatibleScheme(const char *url) {
           || str_begins(url, "file:"));
 }
 
+static hts_boolean arcPastRecordEnd(FILE *file, long int end) {
+  return (end >= 0 && ftell(file) > end) ? HTS_TRUE : HTS_FALSE;
+}
+
+static hts_boolean arcIsRecordLine(const char *line) {
+  return PT_CompatibleScheme(line) && getArcLength(line) >= 0;
+}
+
+/* Nothing follows the last record, so the end of the file separates it too. */
+static hts_boolean arcNextRecordStartsHere(PT_Index__Arc index) {
+  const int c = fgetc(index->file);
+
+  if (c == EOF)
+    return feof(index->file) ? HTS_TRUE : HTS_FALSE;
+  if (c != 0x0a)
+    return HTS_FALSE;
+  index->line[0] = '\0';
+  (void) linput(index->file, index->line, sizeof(index->line) - 1);
+  return arcIsRecordLine(index->line);
+}
+
+/* Only a record inside a record's own data proves the declared length lied.
+   Junk after the last one makes an archive untidy, not dishonest. */
+static hts_boolean arcDataHoldsARecord(PT_Index__Arc index, long int from,
+                                       long int to) {
+  if (fseek(index->file, from, SEEK_SET) != 0)
+    return HTS_TRUE;
+  while (ftell(index->file) < to) {
+    index->line[0] = '\0';
+    (void) linput(index->file, index->line, sizeof(index->line) - 1);
+    if (feof(index->file))
+      break;
+    if (ftell(index->file) <= to && arcIsRecordLine(index->line))
+      return HTS_TRUE;
+  }
+  return HTS_FALSE;
+}
+
+/* A record's declared data must end where the next record starts, or the reader
+   hands out the neighbour's bytes under this record's URL. */
+static hts_boolean arcRecordEndsCleanly(PT_Index__Arc index, long int from) {
+  const long int to = ftell(index->file);
+  hts_boolean clean;
+
+  if (to < 0)
+    return HTS_FALSE;
+  clean =
+      arcNextRecordStartsHere(index) || !arcDataHoldsARecord(index, from, to);
+  return (fseek(index->file, to, SEEK_SET) == 0) ? clean : HTS_FALSE;
+}
+
 int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
   if (index_ != NULL && filename != NULL) {
     PT_Index__Arc index = &index_->slots.formatArc;
@@ -2235,8 +2270,10 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
                 filenameIndex += 7;
               }
               if (*filenameIndex != 0) {
+                const long int dataStart = ftell(index->file);
+
                 if (skipArcData(index->file, index->line) != 0 ||
-                    !atArcRecordBoundary(index->file)) {
+                    !arcRecordEndsCleanly(index, dataStart)) {
                   fprintf(stderr,
                           "Corrupted cache data entry #%d (truncated file?), aborting read"
                           LF, (int) entries);
@@ -2330,11 +2367,14 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
       if (skipArcNl(index->file) == 0 && readArcURLRecord(index) == 0) {
         long int fposMeta = ftell(index->file);
         int dataLength = getArcLength(index->line);
+        /* a line reaching past this belongs to the record stored after it */
+        const long int fposEnd = dataLength >= 0 ? fposMeta + dataLength : -1;
         const char *pos;
 
         /* Read HTTP headers */
         /* HTTP/1.1 404 Not Found */
-        if (linput(index->file, index->line, sizeof(index->line) - 1)) {
+        if (linput(index->file, index->line, sizeof(index->line) - 1) &&
+            !arcPastRecordEnd(index->file, fposEnd)) {
           if ((pos = getArcField(index->line, 1)) != NULL) {
             if (sscanf(pos, "%d", &r->statuscode) != 1) {
               r->statuscode = STATUSCODE_INVALID;
@@ -2349,6 +2389,8 @@ static PT_Element PT_ReadCache__Arc_u(PT_Index index_, const char *url,
             char *const line = index->line;
             char *value = strchr(line, ':');
 
+            if (arcPastRecordEnd(index->file, fposEnd))
+              break;
             if (value != NULL) {
               *value = '\0';
               for(value++; *value == ' ' || *value == '\t'; value++) ;
