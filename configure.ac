@@ -701,6 +701,44 @@ AS_CASE([" $OPENSSL_LIBS "],
 hts_pc_dep "$hts_pc_openssl" "$OPENSSL_LIBS"
 hts_pc_dep libbrotlidec "$BROTLI_LIBS"
 hts_pc_dep libzstd "$ZSTD_LIBS"
+
+# An installed header includes <openssl/ssl.h>, so a consumer needs that include
+# path, and outside Requires.private nothing else in the .pc carries it.
+PKGCONFIG_SSL_CFLAGS=
+case " $PKGCONFIG_REQUIRES_PRIVATE " in
+*" openssl "*) ;;
+*)
+	case " $OPENSSL_LIBS " in
+	*" -lssl "*)
+		AC_MSG_CHECKING([whether libhttrack.pc must name the OpenSSL include path])
+		hts_pc_ssl_save_cppflags=$CPPFLAGS
+		CPPFLAGS=
+		AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <openssl/ssl.h>]])],
+			[hts_pc_ssl_default=yes], [hts_pc_ssl_default=no])
+		CPPFLAGS=$hts_pc_ssl_save_cppflags
+		if test x"$hts_pc_ssl_default" = x"yes"; then
+			AC_MSG_RESULT([no, the compiler finds it unaided])
+		else
+			for hts_pc_ssl_flag in $CPPFLAGS; do
+				case $hts_pc_ssl_flag in
+				-I*)
+					test -r "${hts_pc_ssl_flag#-I}/openssl/ssl.h" || continue
+					PKGCONFIG_SSL_CFLAGS=$hts_pc_ssl_flag
+					break
+					;;
+				esac
+			done
+			if test -n "$PKGCONFIG_SSL_CFLAGS"; then
+				AC_MSG_RESULT([$PKGCONFIG_SSL_CFLAGS])
+			else
+				AC_MSG_RESULT([yes, but no -I in CPPFLAGS holds it])
+			fi
+		fi
+		;;
+	esac
+	;;
+esac
+AC_SUBST([PKGCONFIG_SSL_CFLAGS])
 AC_SUBST([PKGCONFIG_REQUIRES_PRIVATE])
 AC_SUBST([PKGCONFIG_LIBS_PRIVATE])
 

@@ -9,7 +9,7 @@ URL: @PACKAGE_URL@
 Version: @PACKAGE_VERSION@
 # Flat, as the installed headers and the libtest examples include each other; same
 # flags libtest itself builds with. config.h, not these, carries the ABI gating.
-Cflags: -I${includedir}/httrack @V6_FLAG@ @LFS_FLAG@
+Cflags: -I${includedir}/httrack @V6_FLAG@ @LFS_FLAG@ @PKGCONFIG_SSL_CFLAGS@
 # Carries its own leading space, and is empty wherever configure gates the rpath off (#978).
 Libs: -L${libdir} -lhttrack@PKGCONFIG_RPATH_LDFLAG@
 # Ordered for an archive link: a library ahead of the ones it uses.
