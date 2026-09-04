@@ -102,7 +102,7 @@ list_stray_processes() {
         # slash switches: without MSYS_NO_PATHCONV a /fi would be rewritten to a
         # path. Plain output is Image Name + PID, which is all we need.
         test "$mode" != others || return 0
-        "$(win_exe tasklist)" 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE|^python" || true
+        tasklist 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE|^python" || true
     else
         # Fields 6 and 7 are the command and its first argument (the interpreter
         # and its script, for the Python fixtures).
@@ -131,7 +131,7 @@ list_stray_processes() {
 reap_leftover_processes() {
     local label=${1:-} left
     if target_is_windows; then
-        left=$("$(win_exe tasklist)" 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE" || true)
+        left=$(tasklist 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE" || true)
     else
         left=$(list_stray_processes 0 named | awk 'NR > 1')
     fi
@@ -234,7 +234,7 @@ dump_windows_stacks() {
         printf 'no stack: cdb.exe is not in the SDK Debuggers directories or on PATH\n'
         return 0
     fi
-    for p in $("$(win_exe tasklist)" 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE" | awk '{print $2}'); do
+    for p in $(tasklist 2>/dev/null | grep -Ei "$ENGINE_IMAGE_RE" | awk '{print $2}'); do
         found=1
         printf -- '--- cdb stack of pid %s ---\n' "$p"
         # Bounded, so a debugger that wedges cannot become the new hang. "qd"

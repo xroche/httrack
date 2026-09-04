@@ -293,8 +293,12 @@ case "$out" in
 *"no wslpath"*) ;;
 *) fail "wsl2 with no wslpath failed without naming the cause: $out" ;;
 esac
-got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=msys bash "$tmpdir/pc.sh")
-test "$got" = "/x|/y" || fail "msys with no cygpath gave [$got], want the paths unchanged"
+if command -v cygpath >/dev/null 2>&1; then
+    echo "a real cygpath is on PATH, so its absence cannot be staged here" >&2
+else
+    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=msys bash "$tmpdir/pc.sh")
+    test "$got" = "/x|/y" || fail "msys with no cygpath gave [$got], want the paths unchanged"
+fi
 ok "a missing wslpath is fatal where a missing cygpath is not"
 
 ## win_marker picks the string that tells one launch from another. WSL2 has no
@@ -325,19 +329,26 @@ mkcmdline "$tmpdir/cl" httrack.exe -O "C:/t/httrack_local.AbCdEf" \
 assert_eq "C:/t/httrack_local.AbCdEf" "$(win_marker "$tmpdir/cl")" "a shared --user-agent"
 ok "win_marker picks the launch's own output directory, never argv[0]"
 
-## An executable's name differs by backend: bare under MSYS, which resolves it
-# to the .exe itself, and suffixed under WSL2, whose PATH matches exactly. A
-# bare "ping" there is WSL's own Linux one, whose -n means something else.
-while read -r backend want; do
-    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND="$backend" PATH="$pathbin:$PATH" \
-        bash -c ". \"$testdir/testlib.sh\"; win_exe taskkill; win_exe ping" | tr '\n' ' ')
-    test "$got" = "$want " || fail "backend=$backend named [$got], want [$want]"
-done <<'EOF'
-msys taskkill ping
-wsl2 taskkill.exe ping.exe
-posix taskkill ping
-EOF
-ok "a Windows executable takes its .exe only under wsl2"
+## The wsl2 PATH shim, which is what lets the tests keep naming a Windows
+# program bare there, and what turns a drvfs argument into one a native exe can
+# open. Copied rather than linked, as the driver does, since this tree may sit
+# on a mount that refuses to execute it.
+mkdir "$tmpdir/shimbin"
+cp "$testdir/wsl2-exe-shim.sh" "$tmpdir/shimbin/faketool"
+cat >"$tmpdir/shimbin/faketool.exe" <<'TOOLEOF'
+#!/bin/sh
+printf '%s\n' "$@"
+TOOLEOF
+# A wslpath that really converts, so the assertion below is about the shim.
+cat >"$tmpdir/shimbin/wslpath" <<'WPEOF'
+#!/bin/sh
+d=$(printf '%s' "$2" | cut -c6)
+printf '%s:%s\n' "$(printf '%s' "$d" | tr '[:lower:]' '[:upper:]')" "$(printf '%s' "$2" | cut -c7-)"
+WPEOF
+chmod +x "$tmpdir/shimbin/faketool" "$tmpdir/shimbin/faketool.exe" "$tmpdir/shimbin/wslpath"
+got=$(PATH="$tmpdir/shimbin:$PATH" bash "$tmpdir/shimbin/faketool" /mnt/c/x/y -q plain | tr '\n' ' ')
+assert_eq "C:/x/y -q plain " "$got" "what the shim handed the exe"
+ok "the wsl2 shim names the .exe and converts only its drvfs arguments"
 
 ## win_capture under wsl2 has no /proc/<pid>/winpid to read. It takes the
 # relay's own cmdline instead and asks Windows which process carries it.
@@ -367,15 +378,19 @@ printf '%s|%s\n' "\$WIN_PID" "\$WIN_IMAGE"
 kill "\$v" 2>/dev/null || true
 EOF
 marker="/mnt/c/t/httrack_local.ZzUnique1"
-got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 PSREC="$tmpdir/ps" \
-    PATH="$pathbin:$PATH" bash "$tmpdir/cap.sh" "$marker")
-assert_eq "4242|sh" "$got" "the Windows pid and image win_capture resolved"
-assert_eq "$marker" "$(cat "$tmpdir/ps.env")" "the marker powershell received"
-# In the environment, never on the command line: a marker passed as an argument
-# puts it on the querying process's own cmdline, which then matches itself.
-case "$(cat "$tmpdir/ps.argv")" in
-*"$marker"*) fail "the marker rode powershell's argv: $(cat "$tmpdir/ps.argv")" ;;
-esac
+if ! test -r /proc/self/cmdline; then
+    echo "no /proc here, so the relay's cmdline cannot be read" >&2
+else
+    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 PSREC="$tmpdir/ps" \
+        PATH="$pathbin:$PATH" bash "$tmpdir/cap.sh" "$marker")
+    assert_eq "4242|sh" "$got" "the Windows pid and image win_capture resolved"
+    assert_eq "$marker" "$(cat "$tmpdir/ps.env")" "the marker powershell received"
+    # In the environment, never on the command line: a marker passed as an argument
+    # puts it on the querying process's own cmdline, which then matches itself.
+    case "$(cat "$tmpdir/ps.argv")" in
+    *"$marker"*) fail "the marker rode powershell's argv: $(cat "$tmpdir/ps.argv")" ;;
+    esac
+fi
 ok "win_capture resolves the Windows pid by marker, passed out of band"
 
 # Unshimmed: a guard that fires only on the broken path is half a guard.

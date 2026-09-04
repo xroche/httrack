@@ -229,15 +229,18 @@ bin=${1:?usage: ci-windows-suite.sh <bindir>}
 export HTTRACK_SUITE_BACKEND=${HTTRACK_SUITE_BACKEND:-msys}
 export PATH="$bin:$PATH"
 
-# WSL2 needs the engines under the bare names the tests use, and needs their
-# drvfs arguments translated on the way to a native exe. One shim per engine
-# does both; see tests/wsl2-exe-shim.sh.
+# WSL2 resolves a filename exactly, so every Windows program the tests name bare
+# needs one, and a drvfs argument means nothing to a native exe. One shim per
+# name does both; see tests/wsl2-exe-shim.sh. MSYS needs none of it, which is
+# why the tests keep saying `httrack` and `taskkill` on both backends.
 if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
     shimdir=$PWD/.wsl2-shims
     rm -rf "$shimdir"
     mkdir -p "$shimdir"
-    for e in $ENGINE_EXES; do
-        ln -s "$testdir/wsl2-exe-shim.sh" "$shimdir/$e"
+    # Copied, not linked: the checkout's own mount may refuse to execute it.
+    for e in $ENGINE_EXES taskkill tasklist ping; do
+        cp "$testdir/wsl2-exe-shim.sh" "$shimdir/$e"
+        chmod +x "$shimdir/$e"
     done
     export PATH="$shimdir:$PATH"
 fi
