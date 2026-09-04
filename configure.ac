@@ -719,19 +719,39 @@ case " $PKGCONFIG_REQUIRES_PRIVATE " in
 		if test x"$hts_pc_ssl_default" = x"yes"; then
 			AC_MSG_RESULT([no, the compiler finds it unaided])
 		else
+			hts_pc_ssl_await=
+			hts_pc_ssl_dir=
 			for hts_pc_ssl_flag in $CPPFLAGS; do
-				case $hts_pc_ssl_flag in
-				-I*)
-					test -r "${hts_pc_ssl_flag#-I}/openssl/ssl.h" || continue
-					PKGCONFIG_SSL_CFLAGS=$hts_pc_ssl_flag
-					break
-					;;
+				if test -n "$hts_pc_ssl_await"; then
+					hts_pc_ssl_dir=$hts_pc_ssl_flag
+					hts_pc_ssl_await=
+				else
+					case $hts_pc_ssl_flag in
+					-I | -isystem | -idirafter)
+						hts_pc_ssl_await=yes
+						continue
+						;;
+					-I*) hts_pc_ssl_dir=${hts_pc_ssl_flag#-I} ;;
+					-isystem*) hts_pc_ssl_dir=${hts_pc_ssl_flag#-isystem} ;;
+					-idirafter*) hts_pc_ssl_dir=${hts_pc_ssl_flag#-idirafter} ;;
+					*) continue ;;
+					esac
+				fi
+				# A relative path in an installed .pc resolves against
+				# whatever directory the consumer happens to build in.
+				case $hts_pc_ssl_dir in
+				/*) ;;
+				*) continue ;;
 				esac
+				test -r "$hts_pc_ssl_dir/openssl/ssl.h" || continue
+				PKGCONFIG_SSL_CFLAGS=" -I$hts_pc_ssl_dir"
+				break
 			done
 			if test -n "$PKGCONFIG_SSL_CFLAGS"; then
-				AC_MSG_RESULT([$PKGCONFIG_SSL_CFLAGS])
+				AC_MSG_RESULT([$hts_pc_ssl_dir])
 			else
-				AC_MSG_RESULT([yes, but no -I in CPPFLAGS holds it])
+				AC_MSG_RESULT([yes, but no absolute include flag holds it])
+				AC_MSG_WARN([libhttrack.pc will not tell a consumer where <openssl/ssl.h> is])
 			fi
 		fi
 		;;
