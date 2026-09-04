@@ -766,6 +766,13 @@ void PT_Element_Delete(PT_Element * pentry) {
   }
 }
 
+/* Both consumers emit element->size bytes whatever the status code, so a
+   partly-filled body would ship its uninitialised tail. */
+static void PT_Element_DropBody(PT_Element entry) {
+  free(entry->adr);
+  entry->adr = NULL;
+}
+
 PT_Element PT_ReadIndex(PT_Indexes indexes, const char *url, int flags) {
   if (indexes != NULL) {
     intptr_t index_id;
@@ -1256,12 +1263,14 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                             !hts_fread_exact(r->adr, r->size, fp)) {
                           int last_errno = errno;
 
+                          PT_Element_DropBody(r);
                           r->statuscode = STATUSCODE_INVALID;
                           PT_Element_failf(r,
                                            "Read error in cache disk data: %s",
                                            strerror(last_errno));
+                        } else {
+                          r->adr[r->size] = '\0';
                         }
-                        r->adr[r->size] = '\0';
                       } else {
                         r->statuscode = STATUSCODE_INVALID;
                         strcpybuff(r->msg,
@@ -1286,8 +1295,7 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                   r->adr = (char *) malloc(r->size + 1);
                   if (r->adr != NULL) {
                     if (unzReadCurrentFile(index->zFile, r->adr, (unsigned int) r->size) != r->size) {  // erreur
-                      free(r->adr);
-                      r->adr = NULL;
+                      PT_Element_DropBody(r);
                       r->statuscode = STATUSCODE_INVALID;
                       strcpybuff(r->msg, "Cache Read Error : Read Data");
                     } else
@@ -1927,10 +1935,12 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                 r->adr = cache_alloc_body(r->size);
                 if (r->adr != NULL) {
                   if (r->size > 0 && !hts_fread_exact(r->adr, r->size, fp)) {
+                    PT_Element_DropBody(r);
                     r->statuscode = STATUSCODE_INVALID;
                     strcpybuff(r->msg, "Read error in cache disk data");
+                  } else {
+                    r->adr[r->size] = '\0';
                   }
-                  r->adr[r->size] = '\0';
                 } else {
                   r->statuscode = STATUSCODE_INVALID;
                   strcpybuff(r->msg,
@@ -1948,8 +1958,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
               r->adr = cache_alloc_body(r->size);
               if (r->adr != NULL) {
                 if (!hts_fread_exact(r->adr, r->size, cache->dat)) { // erreur
-                  free(r->adr);
-                  r->adr = NULL;
+                  PT_Element_DropBody(r);
                   r->statuscode = STATUSCODE_INVALID;
                   strcpybuff(r->msg, "Cache Read Error : Read Data");
                 } else
