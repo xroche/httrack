@@ -46,7 +46,7 @@ sleeps() { wc -l <"$tmp/sleeps" | tr -d ' '; }
 # lost the whole point. The override counts as opting out too, or the escape hatch
 # for a host whose fd tick misbehaves would red the suite it exists to rescue.
 canfifo=
-if test -z "${HTTRACK_POLL_SLEEP:-}" && ! is_windows && mkfifo "$tmp/probe" 2>/dev/null; then
+if test -z "${HTTRACK_POLL_SLEEP:-}" && ! shell_is_msys && mkfifo "$tmp/probe" 2>/dev/null; then
     canfifo=1
 fi
 (

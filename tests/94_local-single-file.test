@@ -300,7 +300,7 @@ echo OK
 
 printf '[the rewritten page keeps the mirror file mode] ..\t'
 # The rewrite spools to a temp and renames, bypassing the engine's chmod.
-if is_windows; then
+if target_is_windows; then
     echo "SKIP (no POSIX file modes)"
 else
     umaskdir="${tmpdir}/umask"

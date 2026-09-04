@@ -51,10 +51,10 @@ web_accepted() {
     # where a 3s kill landed mid-resolve, before the URL= line ever printed.
     local had_m=
     case "$-" in *m*) had_m=1 ;; esac
-    is_windows || set -m
+    shell_is_msys || set -m
     htsserver "$tmp" --port "$port" >"$tmp/web.log" 2>&1 &
     local pid=$!
-    test -n "$had_m" || is_windows || set +m
+    test -n "$had_m" || shell_is_msys || set +m
     local waited=0
     until grep -qE "^URL=http://.*:$port/|couldn't set the port number|Unable to initialize a temporary server" "$tmp/web.log"; do
         test "$waited" -lt 20 || break

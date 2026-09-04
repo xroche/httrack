@@ -84,7 +84,7 @@ rejects 'lines' selftest_queue_lines 'a.gif is only one line' mime a.gif
 # The CR half of lines mode needs an interior CRLF, which off Windows only a
 # case that emits one can give. On Windows text mode doubles that injected CR,
 # so there the coverage comes from 311 and mime, whose CRLFs are text mode's own.
-if ! is_windows; then
+if ! target_is_windows; then
     selftest_queue_lines 'A
 B' charset iso-8859-1 hex:410d0a42
     # A CR on the last line takes the trailing-strip branch, not that one.

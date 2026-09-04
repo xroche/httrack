@@ -82,7 +82,7 @@ grep -q "own process tree" "$out" || fail "no process list in the diagnostics"
 # that log takes the silence of a dump for a wedge. Only a slow dump tells the two
 # orderings apart, and the dump's own ps is what this makes slow.
 realps=$(command -v ps) || realps= # the emulated buildds ship without one
-if is_windows || test -z "$realps"; then
+if target_is_windows || test -z "$realps"; then
     echo "note: no slow ps to build here, the announcement ordering is not measured"
 else
     rm -f "$tmp/ps-used"
@@ -276,7 +276,7 @@ done
 
 # --- the process lists survive a host with no ps ----------------------------
 # Fedora's build root ships no procps, and the guard then named nothing (#1021).
-if ! is_windows && test -r /proc/self/stat; then
+if ! target_is_windows && test -r /proc/self/stat; then
     mkdir -p "$tmp/nops"
     printf '#!/bin/sh\nexit 127\n' >"$tmp/nops/ps"
     chmod +x "$tmp/nops/ps"
@@ -401,7 +401,7 @@ fi
 # --- an emulated buildd hides the engine behind its binfmt interpreter -------
 # Two cases the process above cannot carry: a wrapper, and an emulator given a
 # disk image instead of a program. No runner has qemu-user, so synthesize them.
-if ! is_windows; then
+if ! target_is_windows; then
     (
         # shellcheck disable=SC2317 # reached through the two matchers below
         ps_snapshot() {
@@ -431,7 +431,7 @@ fi
 # The whole point of the dump: name the frame the engine is stuck in. Windows has
 # neither half (MSYS signals do not reach a native httrack.exe, and that build has
 # no backtrace()), so only assert it where the machinery exists.
-if is_windows; then
+if target_is_windows; then
     echo "suite timeout OK (no stack capture on Windows)"
     exit 0
 fi

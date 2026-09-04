@@ -90,7 +90,7 @@ ok "cleanup_push traps no signal unknown to this test"
 # covering TERM alone passes a TERM-only check.
 # INT and QUIT never arrive on either Windows runner; TERM and HUP do.
 sigs=("${trapped[@]}")
-! is_windows || sigs=(TERM HUP)
+! target_is_windows || sigs=(TERM HUP)
 
 # Every leg is reported rather than the first to break: they fail one platform at
 # a time, and the elapsed time tells a signal never delivered from one ignored.

@@ -97,7 +97,7 @@ test "$(mime_of "$dir/out.arc" example.com/a.html)" = audio/midi ||
 long=$(printf '%3000s' '' | tr ' ' 'x')
 convert "$dir/$long.ndx" "over-long .ndx name"
 
-if is_windows; then
+if target_is_windows; then
     echo "deep paths need a POSIX filesystem; index name half only" >&2
     exit 0
 fi

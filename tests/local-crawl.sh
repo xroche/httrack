@@ -745,7 +745,7 @@ while test "$i" -lt "${#audit[@]}"; do
     --file-mode)
         path="${audit[$((i + 1))]}"
         i=$((i + 2))
-        if is_windows; then
+        if target_is_windows; then
             # No POSIX modes, and the engine only chmods #ifndef _WIN32.
             info "checking ${path} mode"
             result "SKIP (no POSIX modes)"

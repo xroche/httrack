@@ -84,7 +84,7 @@ ok "a mirror the link cap stopped does not claim to be done"
 # the probe fails with ENOENT rather than ENOSPC.
 disk_abort_works() {
     local probe="${tmpdir}/probe" refused=1
-    ! is_windows || return 1
+    ! target_is_windows || return 1
     test -c /dev/full || return 1
     ln -s /dev/full "$probe" 2>/dev/null || return 1
     ! printf x >"$probe" 2>/dev/null || refused=0
@@ -117,7 +117,7 @@ ok "a mirror the time cap stopped does not claim to be done"
 # --- ^C: the other state.stop producer, and the one users actually hit -------
 # SIGINT goes to sig_leave (state.stop), SIGTERM to sig_finish (exit_xh): two
 # handlers, so the interrupt a user types needs its own arm.
-if is_windows; then
+if target_is_windows; then
     echo "note: MSYS cannot signal a native httrack.exe, the ^C arm is not covered here"
 else
     dir="${tmpdir}/sigint"
