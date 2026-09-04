@@ -339,24 +339,33 @@ find_python() {
     return 1
 }
 
-# Native form of a path: a non-MSYS binary cannot resolve Git Bash's /d/a/... ones.
-nativepath() {
-    if target_is_windows && command -v cygpath >/dev/null 2>&1; then
-        cygpath -m "$1"
+# cygpath under MSYS, wslpath under WSL2. They take the same -m and -u, so the
+# two callers below differ only in the flag. A missing tool falls through to the
+# path unchanged, which is how this has always behaved under MSYS; the wsl2
+# backend instead refuses to start without wslpath, see the guard further down.
+path_convert() { # path_convert -m|-u PATH
+    local tool
+    case "$(suite_backend)" in
+    msys) tool=cygpath ;;
+    wsl2) tool=wslpath ;;
+    *)
+        printf '%s\n' "$2"
+        return 0
+        ;;
+    esac
+    if command -v "$tool" >/dev/null 2>&1; then
+        "$tool" "$1" "$2"
     else
-        printf '%s\n' "$1"
+        printf '%s\n' "$2"
     fi
 }
 
+# Native form of a path: a non-MSYS binary cannot resolve Git Bash's /d/a/... ones.
+nativepath() { path_convert -m "$1"; }
+
 # POSIX form of a path. Anything MSYS splits on a colon needs it, a PATH entry
 # below the drive-letter TMPDIR above all.
-posixpath() {
-    if target_is_windows && command -v cygpath >/dev/null 2>&1; then
-        cygpath -u "$1"
-    else
-        printf '%s\n' "$1"
-    fi
-}
+posixpath() { path_convert -u "$1"; }
 
 # Key before cert in $1/both.pem, the single path load_cert_chain() takes.
 make_tls_pem() {
@@ -611,6 +620,13 @@ target_is_windows() {
 # Is this shell MSYS/Git Bash? Ask only about the shell's own quirks, its broken
 # job control above all. A question about the binary wants target_is_windows.
 shell_is_msys() { test "$(suite_backend)" = msys; }
+
+# Fail at source time, not at the first conversion: nativepath and posixpath are
+# always called as "$(nativepath ...)", and an exit inside a command
+# substitution ends that subshell while the test carries on with an empty
+# string. A Linux path handed to httrack.exe fails far from here.
+test "$(suite_backend)" != wsl2 || command -v wslpath >/dev/null 2>&1 ||
+    fail "no wslpath under the wsl2 backend, so no path would reach httrack.exe"
 
 # Open the timer fd poll_wait reads from: a fifo held open read-write, so there is
 # always a writer and a read blocks to its own timeout instead of seeing EOF. fd 9

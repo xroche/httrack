@@ -214,6 +214,17 @@ Darwin no
 EOF
 ok "an explicit HTS_OS still classifies, with uname unreadable"
 
+# Stub both path tools: testlib refuses to load under wsl2 without wslpath.
+mkdir "$tmpdir/pathbin"
+for t in cygpath wslpath; do
+    cat >"$tmpdir/pathbin/$t" <<EOF
+#!/bin/sh
+printf '$t %s %s\n' "\$1" "\$2"
+EOF
+    chmod +x "$tmpdir/pathbin/$t"
+done
+pathbin=$(posixpath "$tmpdir/pathbin")
+
 ## The wsl2 backend is the case where the two predicates part company: a Linux
 # shell driving a native .exe. Nothing sniffs it, so the driver sets it, and a
 # backend the shell cannot guess must still outrank what uname says.
@@ -222,7 +233,7 @@ printf 'set -euo pipefail\n. "%s/testlib.sh"\nif target_is_windows; then printf 
     "$testdir" >"$tmpdir/split.sh"
 while read -r backend os want; do
     got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND="$backend" HTS_OS="$os" \
-        PATH="$shim:$PATH" bash "$tmpdir/split.sh")
+        PATH="$shim:$pathbin:$PATH" bash "$tmpdir/split.sh")
     test "$got" = "$want" ||
         fail "backend=$backend HTS_OS=$os gave [$got], want [$want] (upper=true)"
 done <<'EOF'
@@ -231,6 +242,42 @@ msys MINGW64_NT-10.0 AB
 posix Linux ab
 EOF
 ok "under wsl2 the binary is Windows while the shell is not"
+
+## path_convert picks its tool from the backend, never from uname: cygpath is
+# MSYS's and wslpath is WSL2's, and they take the same -m and -u.
+cat >"$tmpdir/pc.sh" <<EOF
+set -euo pipefail
+. "$testdir/testlib.sh"
+printf '%s|%s\n' "\$(nativepath /x)" "\$(posixpath /y)"
+EOF
+while read -r backend want; do
+    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND="$backend" \
+        PATH="$pathbin:$PATH" bash "$tmpdir/pc.sh")
+    test "$got" = "$want" || fail "backend=$backend converted to [$got], want [$want]"
+done <<'EOF'
+msys cygpath -m /x|cygpath -u /y
+wsl2 wslpath -m /x|wslpath -u /y
+posix /x|/y
+EOF
+ok "nativepath and posixpath dispatch on the backend"
+
+# A missing cygpath has always fallen through to the path unchanged. A missing
+# wslpath must not, and the refusal has to land when testlib is sourced: by the
+# time nativepath runs it is inside "$(...)", where an exit ends the subshell
+# and the test carries on with an empty path.
+rc=0
+out=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 bash "$tmpdir/pc.sh" 2>&1) || rc=$?
+test "$rc" -ne 0 || fail "wsl2 with no wslpath passed the path through as [$out]"
+case "$out" in
+*"|"*) fail "wsl2 with no wslpath still reached the conversion: $out" ;;
+esac
+case "$out" in
+*"no wslpath"*) ;;
+*) fail "wsl2 with no wslpath failed without naming the cause: $out" ;;
+esac
+got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=msys bash "$tmpdir/pc.sh")
+test "$got" = "/x|/y" || fail "msys with no cygpath gave [$got], want the paths unchanged"
+ok "a missing wslpath is fatal where a missing cygpath is not"
 
 # Unshimmed: a guard that fires only on the broken path is half a guard.
 case "$(uname -s)" in
