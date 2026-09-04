@@ -435,9 +435,11 @@ else
     echo "no procfs, or a shell that cannot run a script named .exe" >&2
 fi
 
-# Unshimmed: a guard that fires only on the broken path is half a guard.
-case "$(uname -s)" in
-MINGW* | MSYS* | CYGWIN*) want=yes ;;
+# Unshimmed: a guard that fires only on the broken path is half a guard. The
+# backend decides, not uname: under wsl2 the shell answers Linux while the
+# binary is a Windows exe, which is the whole point of the split.
+case "$(suite_backend)" in
+msys | wsl2) want=yes ;;
 *) want=no ;;
 esac
 got=$(env -u IS_WINDOWS bash "$tmpdir/win.sh")

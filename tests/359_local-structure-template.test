@@ -16,7 +16,9 @@ cleanup_push rm -rf "${tmp}"
 
 # The engine maps what Windows forbids in a filename to '_', on every platform,
 # so a drive-letter TMPDIR lands as D_ and an 8.3 one as RUNNE_1.
-localname() { printf '%s' "$1" | tr ':~' '__'; }
+# From the path the ENGINE saw: under wsl2 the shell holds /mnt/d/... while the
+# shim hands over D:/..., and it is the drive colon that becomes the '_'.
+localname() { printf '%s' "$(nativepath "$1")" | tr ':~' '__'; }
 
 echo '<html><body>hello</body></html>' >"${tmp}/page.html"
 
