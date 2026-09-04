@@ -2441,6 +2441,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                             (hasFilter) ? " for '" : "",
                             (hasFilter) ? filter : "", (hasFilter) ? "'" : "");
                   }
+                  if (cache.zipInput != NULL)
+                    unzClose(cache.zipInput);
                   coucal_delete(&cache_hashtable);
                   htsmain_free();
                   return 0;
