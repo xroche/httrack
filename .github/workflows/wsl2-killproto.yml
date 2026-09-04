@@ -35,9 +35,21 @@ jobs:
           Write-Host "wsl --update exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
           wsl.exe --set-default-version 2 2>&1 | Out-String
           Write-Host "set-default-version exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
+          # cloud-images prunes the per-release rootfs asset, so try a list.
           $tar = "$env:RUNNER_TEMP\rootfs.tar.gz"
-          Invoke-WebRequest -UseBasicParsing -OutFile $tar `
-            -Uri "https://cloud-images.ubuntu.com/wsl/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz"
+          $urls = @(
+            "https://cloud-images.ubuntu.com/wsl/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz",
+            "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
+          )
+          $got = $false
+          foreach ($u in $urls) {
+            try {
+              Invoke-WebRequest -UseBasicParsing -OutFile $tar -Uri $u
+              Write-Host "rootfs from $u : $((Get-Item $tar).Length) bytes at $($t.Elapsed.TotalSeconds)s"
+              $got = $true; break
+            } catch { Write-Host "no rootfs at $u" }
+          }
+          if (-not $got) { throw "no rootfs could be downloaded" }
           wsl.exe --import probe "$env:RUNNER_TEMP\probe-vm" $tar --version 2 2>&1 | Out-String
           Write-Host "import exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
           wsl.exe -d probe -- uname -a 2>&1 | Out-String
