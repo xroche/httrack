@@ -49,7 +49,7 @@ honest=$dir/m/hts-cache/honest.zip
 # X-In-Cache: 0 leaves the body on disk, the path that sizes its buffer from the
 # header and fills it from a file that may be shorter
 craft() { # craft ZIP URL SIZE
-    "$python" - "$@" <<'EOF'
+    "$python" - "$(nativepath "$1")" "$2" "$3" <<'EOF'
 import sys, zipfile
 
 meta = (
@@ -117,7 +117,7 @@ start_proxytrack "$dir/pt" launch_proxytrack
 
 # The honest URL first: it proves the proxy serves these entries at all, so the
 # short one's assertions cannot pass on a 404.
-"$python" - "$proxyport" "$honest_url" "$short_url" "$dir/reply" "$BODY" <<'EOF' ||
+"$python" - "$proxyport" "$honest_url" "$short_url" "$(nativepath "$dir/reply")" "$BODY" <<'EOF' ||
 import socket, sys
 
 port, honest_url, short_url, out, body = (
@@ -168,7 +168,7 @@ mkdir -p "$dir/n/hts-cache"
 printf '%s' "$BODY" >"$dir/n/body.html"
 
 craft_ndx() { # craft_ndx SIZE
-    "$python" - "$dir/n/hts-cache" "$1" <<'EOF'
+    "$python" - "$(nativepath "$dir/n/hts-cache")" "$1" <<'EOF'
 import os, sys
 
 d, declared = sys.argv[1], sys.argv[2]

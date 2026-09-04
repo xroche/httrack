@@ -381,6 +381,15 @@ find_python() {
     return 1
 }
 
+# curl, or empty. Windows-side under wsl2 for the same reason python is: the
+# distro's 127.0.0.1 is its own loopback, and the engine listens on Windows's.
+find_curl() {
+    local c=curl
+    test "$(suite_backend)" != wsl2 || c=curl.exe
+    command -v "$c" >/dev/null 2>&1 || return 1
+    printf '%s\n' "$c"
+}
+
 # WSL2's own drvfs mapping, done here rather than with wslpath, which a bare
 # imported rootfs does not ship: `wsl -- wslpath` answers ERROR_PATH_NOT_FOUND.
 # Only drvfs paths ever cross this boundary, since the suite keeps its files on
