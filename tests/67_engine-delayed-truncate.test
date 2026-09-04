@@ -22,23 +22,20 @@ cd "$scratch"
 hexseg=$(printf 'a1b2c3d4e5f60718%.0s' {1..8}) # 128 hex chars
 
 # engine ceiling is the Windows MAX_PATH on Windows, the save buffer elsewhere
-case "$HTS_OS" in
-MINGW* | MSYS* | CYGWIN*)
+if target_is_windows; then
     ceil=236
     outdir=/dev/null
     deep="/d1$(printf 'a%.0s' {1..40})/d2$(printf 'b%.0s' {1..40})"
     deep="$deep/d3$(printf 'c%.0s' {1..40})/d4$(printf 'd%.0s' {1..40})"
     long="$deep/$(printf 'z%.0s' {1..90})"
     hexpath="$deep/$hexseg"
-    ;;
-*)
+else
     # overrun the save-buffer ceiling with a long dir + long name
     ceil=$((1024 * 2 - 64)) # HTS_URLMAXSIZE*2 - HTS_PATH_TAIL_RESERVE
     outdir="$scratch/$(printf 'D%.0s' $(seq 1 $((1000 - ${#scratch}))))"
     long="/d1/$(printf 'z%.0s' $(seq 1 985))"
     hexpath="/d1/$(printf 'y%.0s' $(seq 1 850))/$hexseg"
-    ;;
-esac
+fi
 
 run() {
     "$httrack_bin" -O "$outdir" -#test=savename "$@" | sed -n 's/^savename: //p'

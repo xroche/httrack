@@ -11,11 +11,16 @@
 # one the Windows side really carries.
 set -uo pipefail
 
+# The same drvfs mapping testlib.sh does, spelled again because this runs as its
+# own process inside the distro, and because a bare rootfs ships no wslpath.
 args=()
 for a in "$@"; do
     case "$a" in
     # A drvfs absolute path, which no URL and no option ever looks like.
-    /mnt/[a-z]/*) args+=("$(wslpath -m "$a")") ;;
+    /mnt/[A-Za-z]/*)
+        drive=$(printf '%s' "$a" | cut -c6 | tr '[:lower:]' '[:upper:]')
+        args+=("$drive:$(printf '%s' "$a" | cut -c7-)")
+        ;;
     *) args+=("$a") ;;
     esac
 done

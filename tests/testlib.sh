@@ -329,8 +329,15 @@ run_cleanups() {
 # Python 3 interpreter, or empty: Windows only installs python.exe, and a bare
 # "python" may be 2.x or the Store stub.
 find_python() {
-    local py
-    for py in "${PYTHON:-}" python3 python; do
+    local py names='python3 python'
+    # Windows-side under wsl2, which is what keeps the fixture servers and
+    # httrack.exe on one side of the boundary: no socket crosses it, and the
+    # paths handed to them stay the native ones nativepath already produces.
+    # A Linux python3 sitting in the distro would take the same arguments and
+    # fail to open every one of them.
+    test "$(suite_backend)" != wsl2 || names='python3.exe python.exe'
+    # shellcheck disable=SC2086 # the split is what makes it a candidate list
+    for py in "${PYTHON:-}" $names; do
         test -n "$py" || continue
         "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null || continue
         printf '%s\n' "$py"
@@ -339,22 +346,54 @@ find_python() {
     return 1
 }
 
-# cygpath under MSYS, wslpath under WSL2. They take the same -m and -u, so the
-# two callers below differ only in the flag. A missing tool falls through to the
-# path unchanged, which is how this has always behaved under MSYS; the wsl2
-# backend instead refuses to start without wslpath, see the guard further down.
+# WSL2's own drvfs mapping, done here rather than with wslpath, which a bare
+# imported rootfs does not ship: `wsl -- wslpath` answers ERROR_PATH_NOT_FOUND.
+# Only drvfs paths ever cross this boundary, since the suite keeps its files on
+# a Windows volume, so the two-way mapping is the whole of it.
+drvfs_path() { # drvfs_path -m|-u PATH
+    local p=$2 drive rest
+    case "$1" in
+    -u)
+        # C:/foo, C:\foo -> /mnt/c/foo. Already POSIX: leave it be.
+        case "$p" in
+        [A-Za-z]:[/\\]*)
+            drive=$(printf '%s' "${p%%:*}" | tr '[:upper:]' '[:lower:]')
+            rest=${p#?:}
+            printf '/mnt/%s%s\n' "$drive" "$(printf '%s' "$rest" | tr '\134' '/')"
+            ;;
+        *) printf '%s\n' "$p" ;;
+        esac
+        ;;
+    -m)
+        # /mnt/c/foo -> C:/foo. Anything else has no drive to name.
+        case "$p" in
+        /mnt/[A-Za-z]/*)
+            drive=$(printf '%s' "$p" | cut -c6 | tr '[:lower:]' '[:upper:]')
+            printf '%s:%s\n' "$drive" "$(printf '%s' "$p" | cut -c7-)"
+            ;;
+        *) printf '%s\n' "$p" ;;
+        esac
+        ;;
+    *) fail "drvfs_path: unknown direction $1" ;;
+    esac
+}
+
+# cygpath under MSYS, the mapping above under WSL2. A missing cygpath falls
+# through to the path unchanged, which is how this has always behaved.
 path_convert() { # path_convert -m|-u PATH
-    local tool
     case "$(suite_backend)" in
-    msys) tool=cygpath ;;
-    wsl2) tool=wslpath ;;
+    wsl2)
+        drvfs_path "$1" "$2"
+        return 0
+        ;;
+    msys) ;;
     *)
         printf '%s\n' "$2"
         return 0
         ;;
     esac
-    if command -v "$tool" >/dev/null 2>&1; then
-        "$tool" "$1" "$2"
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath "$1" "$2"
     else
         printf '%s\n' "$2"
     fi
@@ -631,12 +670,9 @@ target_is_windows() {
 # job control above all. A question about the binary wants target_is_windows.
 shell_is_msys() { test "$(suite_backend)" = msys; }
 
-# Fail at source time, not at the first conversion: nativepath and posixpath are
-# always called as "$(nativepath ...)", and an exit inside a command
-# substitution ends that subshell while the test carries on with an empty
-# string. A Linux path handed to httrack.exe fails far from here.
-test "$(suite_backend)" != wsl2 || command -v wslpath >/dev/null 2>&1 ||
-    fail "no wslpath under the wsl2 backend, so no path would reach httrack.exe"
+# The binary under test is a native Linux one. The shell being Linux is not
+# enough, because the wsl2 backend drives a Windows exe from a Linux shell.
+target_is_linux() { test "$HTS_OS" = Linux && ! target_is_windows; }
 
 # Open the timer fd poll_wait reads from: a fifo held open read-write, so there is
 # always a writer and a read blocks to its own timeout instead of seeing EOF. fd 9

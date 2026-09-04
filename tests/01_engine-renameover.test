@@ -12,17 +12,18 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-case "$HTS_OS" in
-MINGW* | MSYS_NT*) want=fallback ;; # native rename() refuses an existing target
-*) want=clobber ;;
-esac
+if target_is_windows; then
+    want=fallback # native rename() refuses an existing target
+else
+    want=clobber
+fi
 
 out=$(httrack -O /dev/null -#test=renameover "$dir")
 assert_match "renameover: OK" "$out"
 assert_match "renameover: regime $want" "$out"
 assert_match "renameover: restore back" "$out"
 
-if [ "$HTS_OS" != "Linux" ]; then
+if ! target_is_linux; then
     echo "renameover: LD_PRELOAD interposition is Linux-only here, skipping"
     exit 0
 fi

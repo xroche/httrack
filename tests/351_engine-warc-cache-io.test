@@ -19,7 +19,7 @@ httrack -O "$tmp/out" "-#test=warc-offset" "$tmp/"
 # EFBIG means the filesystem's cap sits below the offset (GNU/Hurd ext2fs), and
 # is tolerated only while some offset past 2GB still succeeds.
 seekfail_ready() {
-    if [ "$HTS_OS" != Linux ]; then
+    if ! target_is_linux; then
         echo "LD_PRELOAD interposition is Linux-only here, skipping the cap legs" >&2
         return 1
     fi

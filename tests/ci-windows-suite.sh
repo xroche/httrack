@@ -216,6 +216,86 @@ ci_suite_heartbeat() {
     done
 }
 
+# Every gate here exits 77, so an all-skipped suite would report green having
+# tested nothing: pin the skips, and floor the passes in case the glob empties.
+# One name per line, so two branches each appending one don't collide on the
+# same line; compared as a sorted set below, so glob discovery order can't
+# cause a false mismatch either.
+# footer-overflow and purge-longpath skip on Windows (need a path past MAX_PATH);
+# webdav-default and proxytrack-quiet read proxytrack's console through a pty,
+# which Windows Python does not build;
+# badmtime needs a filesystem that stores an mtime past gmtime's range;
+# single-file-gui and holdport drive htsserver, which this job does not build;
+# update-304-leak and cmdline-leak need a LeakSanitizer build, which MSVC has no
+# equivalent of;
+# crash-symbolize and backtrace-empty need backtrace(), which Windows has no
+# equivalent of;
+# string-oom drives a helper binary that only the automake build produces;
+# datadir-ospath copies the unwrapped binary the automake build leaves in .libs,
+# and needs the loader variable libtool picked, neither of which this job has;
+# link-control-bytes names its fixtures with the raw control bytes the requests
+# decode back to, which NTFS refuses;
+# memresume, repaircache and resume-recovery interrupt pass 1 with a signal
+# MSYS cannot deliver to a native exe;
+# ftp-deadhost-interrupt, ftp-sigterm, abort-purge, signal-receive and
+# ftp-stop-window need that same signal (deadhost's --timeout half runs as 245,
+# abort-purge's --max-time half as 268);
+# close-once and threadattr-leak interpose through LD_PRELOAD, which MSYS has no
+# equivalent for, and this job sets neither interposer's path;
+# engine-install-paths reads the compiled-in POSIX install paths, which this job
+# has no equivalent of;
+# build-features compares the feature reporter against the automake config.h,
+# which the MSVC build does not produce.
+expected_skips_msys="01_engine-footer-overflow.test
+253_local-ftp-close-once.test
+113_engine-threadattr-leak.test
+100_local-purge-longpath.test
+158_local-link-control-bytes.test
+114_local-update-304-leak.test
+283_engine-cmdline-leak.test
+120_local-proxytrack-webdav-default.test
+143_engine-backtrace-empty.test
+152_engine-string-oom.test
+153_local-proxytrack-quiet.test
+215_engine-datadir-ospath.test
+243_local-ftp-deadhost-interrupt.test
+255_local-ftp-sigterm.test
+261_local-abort-purge.test
+262_local-signal-receive.test
+263_local-ftp-stop-window.test
+235_local-resume-recovery.test
+48_local-crange-memresume.test
+71_local-crange-repaircache.test
+80_engine-crash-symbolize.test
+88_local-proxytrack-badmtime.test
+241_local-single-file-gui.test
+288_testlib-holdport.test
+350_local-diskfull-abort.test
+352_engine-filesave-diskfull.test
+355_local-write-error-not-eof.test
+377_engine-install-paths.test
+398_engine-build-features.test"
+
+# A copy of the msys list above: testlib.sh's suite_backend split (shell_is_msys
+# vs target_is_windows) is designed so the same tests skip under either shell.
+# A prediction, not a measurement yet — correct it from the first real wsl2 run.
+expected_skips_wsl2=$expected_skips_msys
+
+# Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
+# there is none: an unknown backend must never fall back to an empty list,
+# which would make any skip look expected.
+ci_skip_list=''
+ci_expected_skips_for_backend() {
+    case "$1" in
+    msys) ci_skip_list=$expected_skips_msys ;;
+    wsl2) ci_skip_list=$expected_skips_wsl2 ;;
+    *)
+        echo "::error::no expected-skip list for backend '$1'"
+        return 1
+        ;;
+    esac
+}
+
 # Only a direct run drives a suite. Asked of the shell, not derived from $0,
 # which a caller can set to this very path (172_ci-windows-driver.test).
 (return 0 2>/dev/null) && return 0
@@ -263,7 +343,7 @@ if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
     # The Linux view, not the native one: a WSL2 shell cannot mktemp into a
     # drive-letter path. Tests hand the engine drvfs paths and the shim above
     # translates them, which is why RUNNER_TEMP has to stay on a Windows volume.
-    TMPDIR="$(wslpath -u "$RUNNER_TEMP")"
+    TMPDIR="$(drvfs_path -u "$RUNNER_TEMP")"
 else
     export MSYS_NO_PATHCONV=1
     export MSYS2_ARG_CONV_EXCL='*'
@@ -510,63 +590,12 @@ echo "ran=$((pass + fail + skip + lost)) pass=$pass fail=$fail skip=$skip lost=$
 
 # Every gate here exits 77, so an all-skipped suite would report green having
 # tested nothing: pin the skips, and floor the passes in case the glob empties.
-# One name per line, so two branches each appending one don't collide on the
-# same line; compared as a sorted set below, so glob discovery order can't
-# cause a false mismatch either.
-# footer-overflow and purge-longpath skip on Windows (need a path past MAX_PATH);
-# webdav-default and proxytrack-quiet read proxytrack's console through a pty,
-# which Windows Python does not build;
-# badmtime needs a filesystem that stores an mtime past gmtime's range;
-# single-file-gui and holdport drive htsserver, which this job does not build;
-# update-304-leak and cmdline-leak need a LeakSanitizer build, which MSVC has no
-# equivalent of;
-# crash-symbolize and backtrace-empty need backtrace(), which Windows has no
-# equivalent of;
-# string-oom drives a helper binary that only the automake build produces;
-# datadir-ospath copies the unwrapped binary the automake build leaves in .libs,
-# and needs the loader variable libtool picked, neither of which this job has;
-# link-control-bytes names its fixtures with the raw control bytes the requests
-# decode back to, which NTFS refuses;
-# memresume, repaircache and resume-recovery interrupt pass 1 with a signal
-# MSYS cannot deliver to a native exe;
-# ftp-deadhost-interrupt, ftp-sigterm, abort-purge, signal-receive and
-# ftp-stop-window need that same signal (deadhost's --timeout half runs as 245,
-# abort-purge's --max-time half as 268);
-# close-once and threadattr-leak interpose through LD_PRELOAD, which MSYS has no
-# equivalent for, and this job sets neither interposer's path;
-# engine-install-paths reads the compiled-in POSIX install paths, which this job
-# has no equivalent of;
-# build-features compares the feature reporter against the automake config.h,
-# which the MSVC build does not produce.
-expected_skips="01_engine-footer-overflow.test
-253_local-ftp-close-once.test
-113_engine-threadattr-leak.test
-100_local-purge-longpath.test
-158_local-link-control-bytes.test
-114_local-update-304-leak.test
-283_engine-cmdline-leak.test
-120_local-proxytrack-webdav-default.test
-143_engine-backtrace-empty.test
-152_engine-string-oom.test
-153_local-proxytrack-quiet.test
-215_engine-datadir-ospath.test
-243_local-ftp-deadhost-interrupt.test
-255_local-ftp-sigterm.test
-261_local-abort-purge.test
-262_local-signal-receive.test
-263_local-ftp-stop-window.test
-235_local-resume-recovery.test
-48_local-crange-memresume.test
-71_local-crange-repaircache.test
-80_engine-crash-symbolize.test
-88_local-proxytrack-badmtime.test
-241_local-single-file-gui.test
-288_testlib-holdport.test
-350_local-diskfull-abort.test
-352_engine-filesave-diskfull.test
-355_local-write-error-not-eof.test
-377_engine-install-paths.test
-398_engine-build-features.test"
+# The pinned lists (per-entry reasons above ci_expected_skips_for_backend) are
+# compared as a sorted set below, so glob discovery order can't cause a false
+# mismatch, and picked by backend, since a skip tied to the MSYS shell need not
+# hold under wsl2, which drives the same .exe from a different shell.
+ci_expected_skips_for_backend "$HTTRACK_SUITE_BACKEND" || exit 1
+expected_skips=$ci_skip_list
 # First, or the deadline reads as an unexplained shortfall in the gates below.
 [ "$deadline" -eq 0 ] || {
     echo "::error::suite did not finish within ${suite_deadline}s"

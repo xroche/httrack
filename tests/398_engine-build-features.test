@@ -31,7 +31,7 @@ want_feature() {
     zstd) macro_is "${config}" HTS_USEZSTD 1 && echo 1 || echo 0 ;;
     # htsbacktrace.c needs __linux as well as the macro.
     backtrace)
-        if test "${HTS_OS}" = Linux && macro_is "${config}" HAVE_BACKTRACE 1; then
+        if target_is_linux && macro_is "${config}" HAVE_BACKTRACE 1; then
             echo 1
         else
             echo 0

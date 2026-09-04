@@ -10,14 +10,14 @@ set -euo pipefail
 
 ulimit -c 0 # a deliberate crash must not litter the box with cores
 
-case "$HTS_OS" in
-Linux) traced=1 ;;
-MINGW* | MSYS* | CYGWIN*)
+if target_is_windows; then
     echo "no sigaltstack on Windows, skipping" >&2
     exit 77
-    ;;
+fi
 # sigaltstack() is POSIX, so the fix applies; only the trace text below is
 # gated on Linux + execinfo.h (USES_BACKTRACE in htsbacktrace.c).
+case "$HTS_OS" in
+Linux) traced=1 ;;
 *) traced=0 ;;
 esac
 require_httrack

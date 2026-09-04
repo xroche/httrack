@@ -1,0 +1,95 @@
+#!/bin/bash
+#
+# ci-windows-suite.sh's skip ratchet picks its pinned list by HTTRACK_SUITE_BACKEND
+# (ci_expected_skips_for_backend): wsl2 must read its own list, not msys's, and an
+# unrecognised backend must error loudly rather than fall back to an empty one,
+# which would make any skip look expected.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# Before the driver is sourced: with these set, anything it starts posts a commit
+# status on whatever the surrounding shell was last looking at.
+unset WATCHDOG_TOKEN WATCHDOG_REPO WATCHDOG_SHA WATCHDOG_URL
+# shellcheck source=tests/ci-windows-suite.sh
+. "$testdir/ci-windows-suite.sh"
+
+# --- selection follows HTTRACK_SUITE_BACKEND --------------------------------
+
+ci_skip_list=''
+ci_expected_skips_for_backend msys || fail "msys was rejected as an unknown backend"
+test "$ci_skip_list" = "$expected_skips_msys" || fail "msys did not select its own list"
+
+ci_skip_list=''
+ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown backend"
+test "$ci_skip_list" = "$expected_skips_wsl2" || fail "wsl2 did not select its own list"
+
+# The two lists agree today (wsl2's is a copy, not yet a measurement), so equal
+# output alone can't tell "read the right variable" from "always read msys".
+# Diverge them here so a wrong selection becomes visible.
+expected_skips_wsl2="99_sentinel-only.test"
+ci_skip_list=''
+ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown backend"
+test "$ci_skip_list" = "99_sentinel-only.test" ||
+    fail "wsl2 selected [$ci_skip_list], want the diverged wsl2 list"
+
+# --- an unknown backend errors loudly, never falls back to an empty list ----
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_skipbackend.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+ci_skip_list=unset-marker
+# Called here, not in $( ), or the assignment it must not make happens in a
+# subshell and this cannot fail whatever the selector does.
+rc=0
+ci_expected_skips_for_backend bogus >"$tmp/bogus.err" 2>&1 || rc=$?
+test "$rc" -ne 0 || fail "an unknown backend was accepted"
+grep -q "::error::no expected-skip list for backend 'bogus'" "$tmp/bogus.err" ||
+    fail "the unknown backend was not reported: $(cat "$tmp/bogus.err")"
+test "$ci_skip_list" = unset-marker || fail "an unknown backend touched ci_skip_list: [$ci_skip_list]"
+
+ok "the selector reads the pinned list per backend and refuses an unknown one"
+
+# --- mutant: wsl2 quietly reusing msys's list must be caught ----------------
+
+cp "$testdir/ci-windows-suite.sh" "$testdir/testlib.sh" "$testdir/proclib.sh" "$tmp/"
+chmod u+w "$tmp"/*.sh # distcheck's srcdir is read-only, and cp carries that over
+
+# shellcheck disable=SC2016 # sed's own pattern/replacement, not this shell's
+sed 's/wsl2) ci_skip_list=\$expected_skips_wsl2 ;;/wsl2) ci_skip_list=\$expected_skips_msys ;;/' \
+    "$tmp/ci-windows-suite.sh" >"$tmp/reuse-mutant.sh"
+cmp -s "$tmp/ci-windows-suite.sh" "$tmp/reuse-mutant.sh" &&
+    fail "the wsl2-reuses-msys mutant changed nothing, so it proves nothing"
+mv "$tmp/reuse-mutant.sh" "$tmp/ci-windows-suite.sh"
+
+(
+    # shellcheck source=/dev/null
+    . "$tmp/ci-windows-suite.sh"
+    expected_skips_wsl2="99_sentinel-only.test"
+    ci_skip_list=''
+    ci_expected_skips_for_backend wsl2
+    printf '%s' "$ci_skip_list"
+) >"$tmp/reuse-mutant.out"
+test "$(<"$tmp/reuse-mutant.out")" != "99_sentinel-only.test" ||
+    fail "the wsl2-reuses-msys mutant still picked the diverged wsl2 list: undetected"
+
+# --- mutant: an unknown backend silently falling back to an empty list ------
+
+sed '/echo "::error::no expected-skip list for backend/d; /^        return 1$/d' \
+    "$testdir/ci-windows-suite.sh" >"$tmp/empty-mutant.sh"
+cmp -s "$testdir/ci-windows-suite.sh" "$tmp/empty-mutant.sh" &&
+    fail "the empty-fallback mutant changed nothing, so it proves nothing"
+
+(
+    # shellcheck source=/dev/null
+    . "$tmp/empty-mutant.sh"
+    ci_skip_list=''
+    if ci_expected_skips_for_backend bogus; then rc=0; else rc=1; fi
+    printf 'rc=%s list=[%s]' "$rc" "$ci_skip_list"
+) >"$tmp/empty-mutant.out"
+grep -q '^rc=0 list=\[\]$' "$tmp/empty-mutant.out" ||
+    fail "the empty-fallback mutant did not silently accept an unknown backend: $(<"$tmp/empty-mutant.out")"
+
+echo "ci-windows skip-backend ratchet OK"
