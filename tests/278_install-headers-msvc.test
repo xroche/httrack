@@ -26,6 +26,9 @@ cleanup_push rm -rf "$tmp"
 # The MSVC step stages DevIncludes_DATA out of the source tree rather than
 # through the install rule 269 drives, so nothing else exercises that half.
 read -r -a cc_argv <<<"${CC:-cc}"
+# Both halves are gated on a prerequisite, so count what ran: neither leg here
+# leaves nothing but two file-existence checks behind a pass.
+staged=0
 if ! command -v "${cc_argv[0]}" >/dev/null 2>&1; then
     echo "note: no C compiler (${cc_argv[0]}), the staging path was not driven" >&2
 else
@@ -59,15 +62,20 @@ else
     # one entry outside src/ -- falls out of its set and nowhere else's.
     selftest "$((declared - 1))"
     [ -z "${abs_top_builddir:-}" ] || selftest "$declared" --builddir "$abs_top_builddir"
+    staged=1
 fi
 
 py=$(find_python || true)
 if ! test -r "$workflow"; then
     test -d "$top/.github" && fail "$workflow is gone but $top/.github is not"
+    test "$staged" -eq 1 ||
+        skip "no .github under $top and no C compiler, so neither half can run"
     echo "note: no .github under $top (dist tarball), the workflow audit did not run" >&2
     exit 0
 fi
 if test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
+    test "$staged" -eq 1 ||
+        skip "no python3 with PyYAML and no C compiler, so neither half can run"
     echo "note: no python3 with PyYAML here, the workflow audit did not run" >&2
     exit 0
 fi
