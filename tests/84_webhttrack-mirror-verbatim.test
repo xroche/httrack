@@ -71,18 +71,20 @@ htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" 
     --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/ -O ${work}/crawl" \
     >/dev/null
 
+# command_do=start saves the profile before it starts the engine, and the save alone
+# creates the project directory, so only the pane proves a crawl is really running.
 start=$SECONDS
-while test ! -d "${work}/crawl"; do
-    test "$((SECONDS - start))" -lt 60 || fail "the crawl never created its project"
+while :; do
+    htsserver_client --path /server/index.html >"${work}/pane.txt"
+    if grep -qF 'In progress:' "${work}/pane.txt"; then
+        break
+    fi
+    test "$((SECONDS - start))" -lt 60 ||
+        fail "the crawl never showed as running: $(<"${HTS_LOG}")"
     poll_wait 0.2
 done
+test -d "${work}/crawl" || fail "the crawl is running but created no project"
 cp "${mirror}" "${work}/crawl/hostile.html"
-
-# The finished state already served /website/, so a crawl that ended early would
-# make the check below pass on the unfixed server too.
-htsserver_client --path /server/index.html >"${work}/pane.txt"
-grep -qF 'In progress:' "${work}/pane.txt" ||
-    fail "the crawl ended before the probe, so this proves nothing"
 
 htsserver_client --path /website/hostile.html --head-file "${hdr}" --body-file "${body}"
 grep -q '^HTTP/1\.0 200 ' "${hdr}" ||
