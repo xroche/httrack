@@ -377,16 +377,26 @@ for class in overlong shorthdr; do
     "$python" - "$dir/$class-out.arc" "http://$class/a.html" <<'EOF' ||
 import sys
 
-out = open(sys.argv[1], "rb").read().decode("latin-1")
-start = out.find("\n" + sys.argv[2] + " ")
-if start < 0:
+# by declared length, because the leak this looks for starts with a record line
+# and a search for the next one would cut the block short of it
+data = open(sys.argv[1], "rb").read()
+pos = data.index(b"\n") + 1
+pos += int(data[:pos].split()[-1]) + 1
+record = None
+while pos < len(data):
+    if data[pos : pos + 1] != b"\n":
+        break
+    eol = data.index(b"\n", pos + 1)
+    length = int(data[pos + 1 : eol].split()[-1])
+    if data[pos + 1 : eol].split()[0].decode() == sys.argv[2]:
+        record = data[eol + 1 : eol + 1 + length]
+    pos = eol + 1 + length
+if record is None:
     sys.exit("the record the reader had to bound vanished from the archive")
-end = out.find("\nhttp://", start + 1)
-first = out[start:] if end < 0 else out[start:end]
-for field in ("NEXTTYPE", "NEXTLOC", "NEXTBODY", "NEXTMSG"):
-    if field in first:
+for field in (b"NEXTTYPE", b"NEXTLOC", b"NEXTBODY", b"NEXTMSG"):
+    if field in record:
         sys.exit("%r reached the record stored before the one that declared it" % field)
-if "NEXTTYPE" not in out:
+if b"NEXTTYPE" not in data:
     sys.exit("the fixture lost the fields it exists to track")
 EOF
         fail_dump "a record served the bytes of the record after it" \
