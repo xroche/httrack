@@ -33,7 +33,9 @@ craft() { # craft OUT HOST DECLARED
     local out=$1 host=$2 declared=$3 h1=$dir/h1 b1=$dir/b1 h2=$dir/h2 b2=$dir/b2
 
     printf '%s' "$FIRST_BODY" >"$b1"
-    printf 'NEXT-%s%0*d' "$host" "$NEXT_PAD" 0 >"$b2"
+    # padded with spaces, so the byte the overlapping length lands on is the
+    # one a boundary test loose enough to take whitespace would accept
+    printf 'NEXT-%s%*s' "$host" "$NEXT_PAD" '' >"$b2"
     printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' \
         "$declared" >"$h1"
     printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' \

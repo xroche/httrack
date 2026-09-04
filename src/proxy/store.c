@@ -2103,19 +2103,18 @@ static int skipArcData(FILE * file, const char *line) {
 
 /* A record's declared data must end where the next record's separator sits, or
    the reader hands out the neighbour's bytes under this record's URL. */
-static hts_boolean atArcRecordBoundary(FILE *file, long int fileSize) {
+static hts_boolean atArcRecordBoundary(FILE *file) {
   const long int pos = ftell(file);
   int c;
 
   if (pos < 0)
     return HTS_FALSE;
-  /* past the end is the truncated archive the read-time bound refuses */
-  if (pos >= fileSize)
-    return HTS_TRUE;
   c = fgetc(file);
   if (fseek(file, pos, SEEK_SET) != 0)
     return HTS_FALSE;
-  return c == 0x0a ? HTS_TRUE : HTS_FALSE;
+  /* EOF closes the last record, and a length past it is the truncated archive
+     the read-time bound already refuses */
+  return (c == 0x0a || c == EOF) ? HTS_TRUE : HTS_FALSE;
 }
 
 static int getDigit(const char digit) {
@@ -2237,7 +2236,7 @@ int PT_LoadCache__Arc(PT_Index index_, const char *filename) {
               }
               if (*filenameIndex != 0) {
                 if (skipArcData(index->file, index->line) != 0 ||
-                    !atArcRecordBoundary(index->file, index->fileSize)) {
+                    !atArcRecordBoundary(index->file)) {
                   fprintf(stderr,
                           "Corrupted cache data entry #%d (truncated file?), aborting read"
                           LF, (int) entries);
