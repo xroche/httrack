@@ -257,6 +257,10 @@ int hts_extract_meta(const char *path) {
     unzClose(zFile);
     return 1;
   }
+  if (zFileOut != NULL)
+    zipClose(zFileOut, NULL);
+  if (zFile != NULL)
+    unzClose(zFile);
   return 0;
 }
 

@@ -232,13 +232,10 @@ static void cmdl_print_args(httrackp *opt, const cmdl_argv *cmd) {
   }
 }
 
-/* Every expansion is followed by a return, so nothing reads the command line
-   after this releases it. */
+/* Both halves NULL what they release, so a second expansion is a no-op. */
 #define htsmain_free()                                                         \
   do {                                                                         \
-    if (url != NULL) {                                                         \
-      free(url);                                                               \
-    }                                                                          \
+    freet(url);                                                                \
     cmdl_free(&x_cmd);                                                         \
   } while (0)
 
@@ -477,6 +474,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             } else if (strcmp(tmp_argv[0], "-#h") == 0) {
               printf("HTTrack version " HTTRACK_VERSION "%s\n",
                      hts_get_version_info(opt));
+              htsmain_free();
               return 0;
             } else {
               if (strncmp(tmp_argv[0], "--", 2)) { /* not a long option */
@@ -733,6 +731,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
           fprintf(opt->log,
                   "Please restart HTTrack with --continue (-iC1) option to override this message!\n");
         }
+        htsmain_free();
         return 0;
       }
     }
@@ -2442,15 +2441,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                             (hasFilter) ? " for '" : "",
                             (hasFilter) ? filter : "", (hasFilter) ? "'" : "");
                   }
+                  if (cache.zipInput != NULL)
+                    unzClose(cache.zipInput);
+                  coucal_delete(&cache_hashtable);
+                  htsmain_free();
                   return 0;
                 }
                 break;
               case 'E':        // extract cache
                 if (!hts_extract_meta(StringBuff(opt->path_log))) {
                   fprintf(stderr, "* error extracting meta-data\n");
+                  htsmain_free();
                   return 1;
                 }
                 fprintf(stderr, "* successfully extracted meta-data\n");
+                htsmain_free();
                 return 0;
                 break;
               case 'X':
@@ -2484,18 +2489,21 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                             fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                     StringBuff(opt->path_log),
                                     "hts-cache/new.zip"));
+                    htsmain_free();
                     return 1;
                   }
                   fprintf(stderr, "Cache: trying to repair %s\n", name);
                   why = cache_repair(opt, name, &repaired, &repairedBytes);
                   if (why != NULL) {
                     fprintf(stderr, "Cache: %s\n", why);
+                    htsmain_free();
                     return 1;
                   }
                   fprintf(
                       stderr,
                       "Cache: %d bytes successfully recovered in %d entries\n",
                       (int) repairedBytes, (int) repaired);
+                  htsmain_free();
                 }
                 return 0;
                 break;
@@ -2508,6 +2516,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               case 'h':
                 printf("HTTrack version " HTTRACK_VERSION "%s\n",
                        hts_get_version_info(opt));
+                htsmain_free();
                 return 0;
                 break;
               case 'p':        /* opt->aff_progress=1; deprecated */
@@ -2567,6 +2576,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                 /* autotest */
               case 't':        /* not yet implemented */
                 fprintf(stderr, "** AUTOCHECK OK\n");
+                htsmain_free();
                 return 0;
                 break;
 

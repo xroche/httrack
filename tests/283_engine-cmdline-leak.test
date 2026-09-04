@@ -32,6 +32,15 @@ asan_base="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=1:abort_on_error=0:exitco
 # The port is never dialled: each run aborts while still parsing options.
 url='http://127.0.0.1:1/'
 
+no_leak() { # no_leak LABEL
+    report=$(cat "$tmp/asan".* 2>/dev/null || true)
+    test -z "$report" || {
+        echo "FAIL: $1 leaked"
+        echo "$report"
+        exit 1
+    }
+}
+
 bail() { # bail LABEL WANT_RE ARG...
     local label=$1 want=$2
     shift 2
@@ -42,14 +51,123 @@ bail() { # bail LABEL WANT_RE ARG...
     # Teeth: a run that never reached the early exit would report clean without
     # exercising the leak.
     assert_match "$want" "$out" "$label"
-    report=$(cat "$tmp/asan".* 2>/dev/null || true)
-    test -z "$report" || {
-        echo "FAIL: $label leaked"
-        echo "$report"
-        exit 1
-    }
+    no_leak "$label"
     echo "OK"
 }
 
 bail 'a rule the grammar refuses' 'Invalid host-alias rule' --host-alias nope
 bail 'an option that does not exist' 'Unknown option' --no-such-option
+
+# The two exits above expand htsmain_free(). Ten more leave hts_main_internal
+# without expanding it, so the same block leaks. Some of those paths drop a
+# handle of their own on top of it.
+
+# One stored entry and no central directory, which unzRepair rebuilds.
+zip_one_entry() { # zip_one_entry FILE
+    printf 'PK\003\004\024\000\000\000\000\000\000\000\041\000\000\000\000\000\004\000\000\000\004\000\000\000\001\000\000\000xdata' >"$1"
+}
+
+# An end-of-central-directory record alone: opens, holds nothing.
+zip_empty() { # zip_empty FILE
+    printf 'PK\005\006\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000' >"$1"
+}
+
+early() { # early LABEL DIR WANT_RC WANT_RE ARG...
+    local label=$1 dir=$2 want_rc=$3 want=$4
+    shift 4
+    rm -f "$tmp/asan".*
+    printf '[%s] ..\t' "$label"
+    # $out stays global, so a case can add an assertion of its own.
+    local rc=0
+    out=$(ASAN_OPTIONS="${asan_base}:log_path=$tmp/asan" \
+        httrack -O "$dir" "$@" "$url" 2>&1) || rc=$?
+    # Teeth: the message pins the handler and the status pins which return ran,
+    # while the missing sign-off proves the run never reached the exit that frees.
+    assert_match "$want" "$out" "$label"
+    assert_eq "$want_rc" "$rc" "$label exit status"
+    if [[ $out =~ Thanks\ for\ using ]]; then
+        fail "$label: reached the end of the run, not the early exit"
+    fi
+    no_leak "$label"
+    echo "OK"
+}
+
+for d in noc emptyzip onezip; do
+    mkdir -p "$tmp/$d/hts-cache"
+done
+zip_empty "$tmp/emptyzip/hts-cache/new.zip"
+zip_one_entry "$tmp/onezip/hts-cache/new.zip"
+
+early 'version, before the option switch' "$tmp/noc" 0 'HTTrack version' -#h
+early 'version, from the option switch' "$tmp/noc" 0 'HTTrack version' -q#h
+early 'autocheck' "$tmp/noc" 0 'AUTOCHECK OK' -#t
+early 'meta-data, no cache' "$tmp/noc" 1 'error extracting meta-data' -#E
+early 'meta-data extracted' "$tmp/emptyzip" 0 'successfully extracted meta-data' -#E
+early 'repair, no cache' "$tmp/noc" 1 'no cache found in' -#R
+early 'repair, nothing to recover' "$tmp/emptyzip" 1 'repaired cache holds no entry' -#R
+early 'repair, one entry back' "$tmp/onezip" 0 'recovered in 1 entries' -#R
+
+# -#R above left $tmp/onezip holding an archive minizip wrote, so cache_init
+# opens it here. An empty directory would make this case prove nothing.
+early 'cache listing' "$tmp/onezip" 0 'No cache entry found' -#C '*'
+assert_match 'Corrupted cache entry' "$out" 'cache listing opened the cache'
+
+# hts_extract_meta() holds the cache open and the meta-data file it writes, and
+# the no-cache case above leaves only the second one open. Refusing the write
+# makes the first the handle that has to be closed.
+d=$tmp/nometa
+mkdir -p "$d/hts-cache"
+zip_empty "$d/hts-cache/new.zip"
+chmod 555 "$d/hts-cache"
+if : 2>/dev/null >"$d/hts-cache/.writable"; then
+    rm -f "$d/hts-cache/.writable"
+    chmod 755 "$d/hts-cache"
+    echo "the cache dir stayed writable, skipping the refused-output case" >&2
+else
+    early 'meta-data, output refused' "$d" 1 'error extracting meta-data' -#E
+    test ! -e "$d/hts-cache/meta.zip" ||
+        fail 'meta-data, output refused: the meta-data file was written anyway'
+    chmod 755 "$d/hts-cache"
+fi
+
+# Only a run on a terminal reports an aborted mirror, because htscoremain.c sets
+# opt->quiet when stdout is not one. script(1) hands a terminal over, and its two
+# spellings do not overlap, so probe each with a command only a terminal passes.
+tty_form=
+for form in linux bsd; do
+    rm -f "$tmp/ttyprobe"
+    case $form in
+    linux) script -qec 'test -t 1 && echo TTYOK' "$tmp/ttyprobe" >/dev/null 2>&1 || true ;;
+    bsd) script -q "$tmp/ttyprobe" /bin/sh -c 'test -t 1 && echo TTYOK' >/dev/null 2>&1 || true ;;
+    esac
+    if grep -q TTYOK "$tmp/ttyprobe" 2>/dev/null; then
+        tty_form=$form
+        break
+    fi
+done
+
+if [ -z "$tty_form" ]; then
+    echo "no script(1) hands over a terminal here, skipping the aborted-mirror case" >&2
+else
+    d=$tmp/aborted
+    mkdir -p "$d/hts-cache"
+    : >"$d/hts-in_progress.lock"
+    : >"$d/hts-cache/old.dat"
+    : >"$d/hts-cache/old.ndx"
+    rm -f "$tmp/asan".*
+    printf '[%s] ..\t' 'aborted mirror'
+    cmd="ASAN_OPTIONS='${asan_base}:log_path=$tmp/asan' '$(httrack_path)' -O '$d' '$url'"
+    case $tty_form in
+    linux) script -qec "$cmd" "$d/typescript" >/dev/null 2>&1 || true ;;
+    bsd) script -q "$d/typescript" /bin/sh -c "$cmd" >/dev/null 2>&1 || true ;;
+    esac
+    # BSD script(1) reports its own status, not the command's, so the notice and
+    # the missing sign-off carry the teeth here.
+    out=$(cat "$d/typescript")
+    assert_match 'aborted mirror has been detected' "$out" 'aborted mirror'
+    if [[ $out =~ Thanks\ for\ using ]]; then
+        fail 'aborted mirror: reached the end of the run, not the early exit'
+    fi
+    no_leak 'aborted mirror'
+    echo "OK"
+fi
