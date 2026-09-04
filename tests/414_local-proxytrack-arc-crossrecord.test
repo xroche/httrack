@@ -39,35 +39,46 @@ http_head() { # http_head CONTENT_LENGTH
 # on a different class of byte. HOST keys the archive apart.
 craft() { # craft OUT HOST DECLARED PAD [VICTIM_SCHEME] [LEAD]
     local out=$1 host=$2 declared=$3 pad=$4 scheme=${5:-http://} lead=${6:-yes}
-    local length
+    local length reach
 
     printf '%s' "$KEPT_BODY" >"$dir/kept.body"
     http_head "${#KEPT_BODY}" >"$dir/kept.head"
     printf '%s' "$GREEDY_BODY" >"$dir/greedy.body"
-    if test "$declared" = eof; then
-        # no Content-Length, so the archive length is all the read is bounded by
-        printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n' >"$dir/greedy.head"
-    else
-        http_head "$declared" >"$dir/greedy.head"
-    fi
+    case $declared in
+    # no Content-Length, so the archive length is all the read is bounded by
+    eof | padline | urlend) printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n' >"$dir/greedy.head" ;;
+    *) http_head "$declared" >"$dir/greedy.head" ;;
+    esac
     {
         printf 'VICTIM-%s\n' "$host"
-        # a page may hold a line that looks like half of a record header, and
-        # neither half alone may cost it its place in the archive
+        # a page may hold a line that looks like part of a record header, and no
+        # part alone may cost it its place in the archive
         printf 'http://not-a-record\n'
         printf 'three fields 5\n'
-        printf '%*s' "$VICTIM_PAD" '' | tr ' ' "$pad"
-    } >"$dir/victim.body"
+        printf 'http://neg a b c d e f g -5\n'
+    } >"$dir/victim.prefix"
+    if test "$pad" = lines; then
+        awk -v n="$((VICTIM_PAD / 8))" 'BEGIN { while (n-- > 0) print "padline" }' \
+            >"$dir/victim.pad"
+    else
+        printf '%*s' "$VICTIM_PAD" '' | tr ' ' "$pad" >"$dir/victim.pad"
+    fi
+    cat "$dir/victim.prefix" "$dir/victim.pad" >"$dir/victim.body"
     http_head "$(wc -c <"$dir/victim.body")" >"$dir/victim.head"
     arc_record "$scheme$host/victim.html" text/html 200 \
         "$dir/victim.head" "$dir/victim.body" >"$dir/victim.rec"
-    if test "$declared" = eof; then
-        length=$(wc -c <"$dir/greedy.head")
-        length=$((length + $(wc -c <"$dir/greedy.body") + 1))
-        length=$((length + $(wc -c <"$dir/victim.rec")))
-    else
-        length=$(($(wc -c <"$dir/greedy.head") + declared))
-    fi
+    # the bytes from the greedy record's data to the victim record's own data
+    reach=$(($(wc -c <"$dir/greedy.head") + $(wc -c <"$dir/greedy.body") + 1))
+    reach=$((reach + $(wc -c <"$dir/victim.rec") - $(wc -c <"$dir/victim.body")))
+    case $declared in
+    eof) length=$((reach + $(wc -c <"$dir/victim.body"))) ;;
+    # stopping on the newline that ends the first padding line, so the byte
+    # after it opens a line that is not a record
+    padline) length=$((reach + $(wc -c <"$dir/victim.prefix") + 7)) ;;
+    # stopping on the last byte of the victim's own record line
+    urlend) length=$reach ;;
+    *) length=$(($(wc -c <"$dir/greedy.head") + declared)) ;;
+    esac
     {
         arc_filedesc
         if test "$lead" = yes; then
@@ -95,6 +106,12 @@ craft "$dir/eof.arc" eof eof ' '
 # the same lie told by the archive's first record, which a check counting from
 # the second one never sees
 craft "$dir/nolead.arc" nolead "$GREEDY_DECLARED" ' ' http:// no
+# and a length stopping on a newline that opens a line, so a check content to
+# find any line there rather than a record's own header takes it
+craft "$dir/padline.arc" padline padline lines
+# and one stopping on the last byte of the record it swallowed, which an
+# off-by-one in the scan stops counting
+craft "$dir/urlend.arc" urlend urlend ' '
 
 # junk on the end leaves an archive honest, so refusing its last record would
 # cost a page for nothing
@@ -156,7 +173,7 @@ stored "$dir/trailer-out.arc" http://honest/victim.html "$dir/out.trailer"
 grep -qaF VICTIM-honest "$dir/out.trailer" ||
     fail "an archive with junk after its last record lost that record"
 
-for class in space digit newline cr eof; do
+for class in space digit newline cr eof padline urlend; do
     convert "$dir/$class.arc" "$dir/$class-out.arc"
     # the record before the greedy one, so an implementation that refuses the
     # whole archive cannot pass the assertion below
@@ -167,9 +184,10 @@ for class in space digit newline cr eof; do
     # What it may never carry is the page stored after it.
     if body_of "$dir/$class-out.arc" "http://$class/greedy.html" \
         >"$dir/$class.greedy" 2>"$dir/$class.err"; then
-        grep -qaF "VICTIM-$class" "$dir/$class.greedy" &&
-            fail_dump "the ARC writer stored the victim page under the greedy URL" \
-                "$dir/$class.greedy"
+        for leak in "VICTIM-$class" /victim.html; do
+            grep -qaF "$leak" "$dir/$class.greedy" &&
+                fail_dump "the greedy record carried $leak" "$dir/$class.greedy"
+        done
     else
         grep -qa "no record for" "$dir/$class.err" ||
             fail_dump "reading the $class archive back failed" "$dir/$class.err"
@@ -225,7 +243,7 @@ launch_proxytrack() {
     proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" \
         "$dir/honest.arc" "$dir/space.arc" "$dir/digit.arc" \
         "$dir/newline.arc" "$dir/cr.arc" "$dir/eof.arc" \
-        "$dir/nolead.arc" >"$ptlog" 2>&1 &
+        "$dir/nolead.arc" "$dir/padline.arc" "$dir/urlend.arc" >"$ptlog" 2>&1 &
     ptpid=$!
 }
 start_proxytrack "$dir/pt" launch_proxytrack
@@ -264,7 +282,7 @@ if payload != honest_body:
         % (payload[:64], len(honest_body))
     )
 
-for host in ("space", "digit", "newline", "cr", "eof", "nolead"):
+for host in ("space", "digit", "newline", "cr", "eof", "nolead", "padline", "urlend"):
     payload = get(host)
     if ("VICTIM-%s" % host).encode() in payload:
         sys.exit("the %s archive served the victim page: %r" % (host, payload[:200]))
