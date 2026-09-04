@@ -222,18 +222,22 @@ done
 # The flags the Debian build passes. --disable-auto-features makes them the whole
 # optional set, so a flag dropped here ships a package that decodes less and
 # nothing else notices.
+# Every dh_auto_configure invocation, one per line, continuations joined. Each
+# has to stand on its own: a later one overrides the first, so reading only the
+# first lets a shorter list hide behind a complete one.
 rules_flags() { # rules_flags FILE
-    awk '/dh_auto_configure/ { want = 1 }
+    awk '/dh_auto_configure[ \t]+--/ { want = 1; line = "" }
          want { line = line " " $0 }
-         want && !/\\$/ { gsub(/[ \t\\]+/, " ", line); print line; exit }' "$1"
+         want && !/\\$/ { gsub(/[ \t\\]+/, " ", line); print line; want = 0 }' "$1"
 }
-# Which of the features the file does not ask for, or "".
+# Which features a flag list does not turn on, or "". --with-X=no is autoconf's
+# spelling of --without-X, so =DIR asks for the feature and =no asks against it.
 rules_missing() { # rules_missing FLAGS
     local flags=$1 f flag out=""
     for f in ${features}; do
         flag=$(feature_flag "${f}")
-        # The =DIR form asks for it too.
         case " ${flags} " in
+        *" ${flag}=no "*) out="${out} ${f}" ;;
         *" ${flag} "* | *" ${flag}="*) ;;
         *) out="${out} ${f}" ;;
         esac
@@ -244,20 +248,37 @@ rules_missing() { # rules_missing FLAGS
 rules="${srcdir}/debian/rules"
 if test -r "${rules}"; then
     n=$((n + 1))
-    flags=$(rules_flags "${rules}")
-    case " ${flags} " in
-    *" --disable-auto-features "*) ;;
-    *) fail "debian/rules no longer passes --disable-auto-features: ${flags}" ;;
-    esac
-    said=$(rules_missing "${flags}")
-    test -z "${said}" ||
-        fail "debian/rules asks for no ${said}, which --disable-auto-features then drops"
-    # A reader that matched nothing would call any file complete, so drop one
-    # flag and require the same check to name it.
-    said=$(rules_missing "${flags//--with-zstd/}")
-    test "${said}" = zstd ||
-        fail "dropping --with-zstd went unreported: ${said:-(silence)}"
-    echo "ok: debian/rules still asks for every optional feature by name"
+    lines=$(rules_flags "${rules}")
+    test -n "${lines}" || fail "no dh_auto_configure invocation in ${rules}"
+    while read -r flags; do
+        case " ${flags} " in
+        *" --disable-auto-features "*) ;;
+        *) fail "a dh_auto_configure drops --disable-auto-features: ${flags}" ;;
+        esac
+        said=$(rules_missing "${flags}")
+        test -z "${said}" ||
+            fail "debian/rules asks for no ${said}, which --disable-auto-features then drops"
+    done <<<"${lines}"
+
+    # A reader that matched nothing would call any file complete, so put each
+    # way of losing a feature past it and require the same check to name it.
+    said=$(rules_missing "${lines//--with-zstd/}")
+    test "${said}" = zstd || fail "a dropped --with-zstd went unreported: ${said:-(silence)}"
+    said=$(rules_missing "${lines//--with-zstd/--with-zstd=no}")
+    test "${said}" = zstd || fail "--with-zstd=no went unreported: ${said:-(silence)}"
+    said=$(rules_missing "${lines//--with-zstd/--with-zstd=/opt/zstd}")
+    test -z "${said}" || fail "--with-zstd=DIR reads as a refusal: ${said}"
+    {
+        cat "${rules}"
+        printf '\tdh_auto_configure -- --disable-auto-features --with-brotli\n'
+    } >"${work}/rules"
+    said=$(rules_flags "${work}/rules" | awk 'END { print NR + 0 }')
+    test "${said}" -eq 2 || fail "a second dh_auto_configure was not read: ${said} found"
+    # The target line names dh_auto_configure without invoking it.
+    printf 'override_dh_auto_configure:\n\ttrue\n' >"${work}/rules-override"
+    said=$(rules_flags "${work}/rules-override")
+    test -z "${said}" || fail "an override target read as an invocation: ${said}"
+    echo "ok: every dh_auto_configure in debian/rules asks for every feature by name"
 else
     planned=$((planned - 1))
     echo "no debian/rules under ${srcdir}, so the packaging flag list is not read" >&2
@@ -326,7 +347,7 @@ extern size_t iconv(iconv_t cd, char **in, size_t *il, char **out, size_t *ol);
 extern int iconv_close(iconv_t cd);
 #endif
 HDR
-! run_configure "${work}/ic-bare" --with-iconv "CPPFLAGS=-I${work}/noiconv" ||
+! run_configure "${work}/ic-bare" --with-iconv "CPPFLAGS=-I${work}/noiconv ${CPPFLAGS:-}" ||
     fail_dump "a bare --with-iconv was accepted where iconv_open does not link" \
         "${work}/ic-bare/configure.log"
 grep -q 'iconv requested but no iconv.h with a linkable iconv_open' \
