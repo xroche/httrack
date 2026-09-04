@@ -1,0 +1,146 @@
+# Which half of the suite's workload provokes the runner kill (#1228): MSYS
+# process creation, loopback socket churn, or only the two together. Three
+# synthetic arms, no engine and no build, each spending the same event budget on
+# a different kind of event. The live windows-build suite is the positive
+# control at ~5% of uncensored jobs, so this workflow does not rerun it.
+name: windows-kill-probe
+
+on:
+  # Hourly: the effect being measured is a few percent, so the sample size is
+  # the whole design.
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+    inputs:
+      events:
+        description: "Event budget per arm"
+        default: "24000"
+      seconds:
+        description: "Wall-clock budget per arm"
+        default: "600"
+  # A PR touching the probe runs it at a smoke dose, to prove the arms spend
+  # anything at all before an hourly cron starts trusting them.
+  pull_request:
+    paths:
+      - ".github/workflows/windows-kill-probe.yml"
+      - "tools/kill-probe-arm.sh"
+      - "tools/kill-probe-report.sh"
+
+permissions:
+  contents: read
+
+# Not cancel-in-progress: a superseded run is a sample, and a cancelled job is
+# censored exposure that has to be dropped from the census (#1228).
+concurrency:
+  group: windows-kill-probe-${{ github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  window:
+    name: experiment window
+    runs-on: ubuntu-24.04
+    outputs:
+      open: ${{ steps.check.outputs.open }}
+    steps:
+      # An hourly cron nobody remembers is the failure mode here, so the arms
+      # stop themselves. Move the date to extend the experiment.
+      - id: check
+        env:
+          PROBE_UNTIL: "2026-10-06"
+        run: |
+          set -euo pipefail
+          today=$(date -u +%F)
+          if [[ "$today" > "$PROBE_UNTIL" ]]; then
+            echo "the probe window closed on $PROBE_UNTIL"
+            echo "open=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "open=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  probe:
+    name: probe (${{ matrix.arm }})
+    needs: window
+    if: needs.window.outputs.open == 'true'
+    runs-on: windows-2022
+    # Well past the dose: a job that outlives this is the wedge under study, and
+    # the runner's own 45-minute step cap is what times it out.
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        # forks: MSYS process creation alone. sockets: loopback connections
+        # alone, made from pwsh so no MSYS process exists. both: one process and
+        # one connection per iteration, the suite's own shape.
+        arm: [forks, sockets, both]
+    env:
+      PROBE_EVENTS: ${{ github.event_name == 'pull_request' && '400' || inputs.events || '24000' }}
+      PROBE_SECONDS: ${{ github.event_name == 'pull_request' && '60' || inputs.seconds || '600' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # The suite's own server, so the connection the arm makes is the one the
+      # crawl tests make.
+      - name: Start the loopback server
+        if: matrix.arm != 'forks'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $root = "$env:RUNNER_TEMP\probe-root"
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          Set-Content -Path "$root\index.html" -Value "<html><body>probe</body></html>"
+          $out = "$env:RUNNER_TEMP\server.out"
+          Start-Process -FilePath python `
+            -ArgumentList @("tests/local-server.py", "--root", $root) `
+            -PassThru -RedirectStandardOutput $out `
+            -RedirectStandardError "$env:RUNNER_TEMP\server.err" | Out-Null
+          $port = $null
+          foreach ($i in 1..60) {
+            if (Test-Path $out) {
+              $m = Select-String -Path $out -Pattern '^PORT (\d+)' | Select-Object -First 1
+              if ($m) { $port = $m.Matches[0].Groups[1].Value; break }
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not $port) { throw "the loopback server never announced a port" }
+          "PROBE_PORT=$port" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Spend the dose
+        if: matrix.arm != 'sockets'
+        shell: bash
+        run: |
+          bash tools/kill-probe-arm.sh "${{ matrix.arm }}" \
+            "$PROBE_EVENTS" "$PROBE_SECONDS" "${PROBE_PORT:-}"
+
+      # pwsh, so the connections come from a native process and the MSYS fork
+      # path is absent. Paced, unlike the bash arms: nothing here throttles the
+      # loop, and a flat-out run would exhaust the ephemeral range and measure
+      # its own port starvation instead of the runner.
+      - name: Spend the dose (sockets)
+        if: matrix.arm == 'sockets'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $budget = [int]$env:PROBE_EVENTS
+          $rate = 40
+          $deadline = (Get-Date).AddSeconds([int]$env:PROBE_SECONDS)
+          $req = [Text.Encoding]::ASCII.GetBytes("GET / HTTP/1.0`r`nHost: 127.0.0.1`r`n`r`n")
+          $began = Get-Date
+          $conns = 0
+          $errors = 0
+          while ($conns -lt $budget -and (Get-Date) -lt $deadline) {
+            try {
+              $c = [Net.Sockets.TcpClient]::new("127.0.0.1", [int]$env:PROBE_PORT)
+              $s = $c.GetStream()
+              $s.Write($req, 0, $req.Length)
+              $s.ReadByte() | Out-Null
+              $c.Close()
+            } catch { $errors++ }
+            $conns++
+            $ahead = $conns / $rate - ((Get-Date) - $began).TotalSeconds
+            if ($ahead -gt 0) { Start-Sleep -Milliseconds ([int]($ahead * 1000)) }
+          }
+          $elapsed = [int]((Get-Date) - $began).TotalSeconds
+          "arm=sockets procs=0 conns=$conns errors=$errors elapsed=${elapsed}s"
+          if ($errors -gt $budget / 20) { throw "$errors of $conns connections failed: dose not delivered" }
