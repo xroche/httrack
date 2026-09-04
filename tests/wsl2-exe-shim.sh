@@ -33,4 +33,13 @@ for a in "$@"; do
     esac
 done
 
+# A Windows process started from here sees only the variables WSLENV names,
+# where under MSYS it inherited the whole environment. Tests rely on that: one
+# sets HOME inline to pin ~ expansion. So name them all, minus the ones WSL owns
+# or that mean nothing to a native exe.
+bridged=$(compgen -e |
+    grep -vxE 'PATH|WSLENV|_|SHLVL|PWD|OLDPWD|HOSTTYPE|IFS|LS_COLORS|TERM' |
+    paste -sd: -)
+test -z "$bridged" || export WSLENV="${WSLENV:+$WSLENV:}$bridged"
+
 exec "$(basename "$0").exe" "${args[@]}"
