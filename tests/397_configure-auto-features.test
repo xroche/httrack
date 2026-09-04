@@ -240,17 +240,30 @@ rules_argv() { # rules_argv RULESFILE DIR
     printf '#!/bin/sh\nn=$(cat "%s/n" 2>/dev/null || echo 0)\nn=$((n + 1))\necho "$n" >"%s/n"\nfor a; do printf "%%s\\n" "$a"; done >"%s/argv.$n"\nexit 0\n' \
         "${dir}" "${dir}" "${dir}" >"${dir}/stub/dh_auto_configure"
     chmod +x "${dir}/stub/dh_auto_configure"
-    # Unset the outer make's jobserver, or the inner one warns and drops -j.
-    run_rules() { # run_rules TARGET
-        (cd "${dir}" && PATH="${dir}/stub:${PATH}" MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
-            ${MAKE:-make} -s -f "$1" "$2") >>"${dir}/make.log" 2>&1 || true
-    }
     : >"${dir}/make.log"
-    run_rules "$1" build
-    # A rules file driven by the dh sequencer keeps its flags in an override
-    # target, which "build" reaches only through dh itself.
-    ! command grep -q '^override_dh_auto_configure:' "$1" ||
-        run_rules "$1" override_dh_auto_configure
+    # Every target a build reaches, not just "build": dpkg-buildpackage runs
+    # build-arch for an arch:any package, and a dh-driven file keeps its flags
+    # in an override target that "build" reaches only through dh itself.
+    # Each pass gets its own directory, or the stamp files the first one leaves
+    # make the rest no-ops. The foreign environment is a sample and not a
+    # proof: it catches a flag behind the conditional a porting fix reaches for.
+    local envs=("" "DEB_HOST_ARCH_OS=hurd DEB_HOST_ARCH=hurd-i386 DEB_BUILD_PROFILES=nocheck DEB_BUILD_OPTIONS=nocheck")
+    local pass=0 target vars make_argv
+    # $MAKE carries its flags on some hosts, the way $CC does above.
+    read -r -a make_argv <<<"${MAKE:-make}"
+    for cmd in "${envs[@]}"; do
+        read -r -a vars <<<"${cmd}"
+        for target in build build-arch build-indep override_dh_auto_configure; do
+            command grep -q "^${target}:" "$1" || continue
+            pass=$((pass + 1))
+            mkdir -p "${dir}/run.${pass}"
+            # Unset the outer make's jobserver, or the inner one warns.
+            (cd "${dir}/run.${pass}" && PATH="${dir}/stub:${PATH}" \
+                MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
+                env "${vars[@]}" "${make_argv[@]}" -s -f "$1" "${target}") \
+                >>"${dir}/make.log" 2>&1 || true
+        done
+    done
 }
 # Which features one recorded argv does not turn on, or "". "no" is autoconf for
 # --without-X, and "auto" hands the decision back to the build machine, which is
@@ -286,6 +299,25 @@ rules_missing() { # rules_missing ARGVFILE
     done
     echo "${out# }"
 }
+# Off switches the four features above do not cover, one per token, or "".
+# --disable-https ships a package with no TLS, and no amount of checking the
+# auto features would see it. A new one here is a decision, so record it.
+rules_turned_off() { # rules_turned_off ARGVFILE
+    local tok seen=0 out=""
+    while IFS= read -r tok; do
+        if test "${seen}" -eq 0; then
+            test "${tok}" != -- || seen=1
+            continue
+        fi
+        case ${tok} in
+        --disable-auto-features | --disable-online-unit-tests) ;;
+        --without-brotli | --without-zstd | --without-iconv | --disable-backtrace) ;;
+        --disable-* | --without-*) out="${out} turns-off:${tok}" ;;
+        esac
+    done <"$1"
+    echo "${out# }"
+}
+
 # Everything wrong with one rules file, or "" when every dh_auto_configure it
 # runs asks for every feature.
 rules_verdict() { # rules_verdict RULESFILE DIR
@@ -308,8 +340,18 @@ rules_verdict() { # rules_verdict RULESFILE DIR
         test "${off}" -gt 0 || out="${out} no-disable-auto-features"
         said=$(rules_missing "${argv}")
         test -z "${said}" || out="${out} ${said}"
+        said=$(rules_turned_off "${argv}")
+        test -z "${said}" || out="${out} ${said}"
     done
-    echo "${out# }"
+    # Two environments and up to four targets record the same file, so the same
+    # verdict comes back several times. Report each once, first seen first.
+    test -n "${out}" || {
+        echo ""
+        return
+    }
+    # shellcheck disable=SC2086 # the splitting is what makes it a list
+    printf '%s\n' ${out} |
+        awk '!seen[$0]++ { printf "%s%s", sep, $0; sep = " " } END { print "" }'
 }
 
 rules="${srcdir}/debian/rules"
@@ -422,6 +464,24 @@ MUT
     reads no-disable-auto-features "a list that turns neither switch off" <<'MUT'
 build:
 	dh_auto_configure -- --with-brotli --with-zstd --enable-backtrace --with-iconv
+MUT
+    reads turns-off:--disable-https "an off switch outside the four features" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --disable-https
+MUT
+    reads zstd "a flag behind an architecture conditional" <<'MUT'
+ZSTD = --with-zstd
+ifeq ($(DEB_HOST_ARCH_OS),hurd)
+ZSTD =
+endif
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli $(ZSTD) --enable-backtrace --with-iconv
+MUT
+    reads "zstd backtrace iconv" "build-arch, which is what a buildd runs" <<'MUT'
+build:
+	true
+build-arch:
+	dh_auto_configure -- --disable-auto-features --with-brotli
 MUT
     reads no-invocation "a build target that configures nothing" <<'MUT'
 build:
