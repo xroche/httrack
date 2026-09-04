@@ -1013,7 +1013,12 @@ static htsblk cache_readex_new(httrackp *opt, cache_back *cache,
           r.statuscode = STATUSCODE_INVALID;
           strcpybuff(r.msg, "Cache Read Error : Read Header Data");
         }
-        unzCloseCurrentFile((unzFile) cache->zipInput);
+        /* minizip reports a CRC mismatch only here, once the member is read. */
+        if (unzCloseCurrentFile((unzFile) cache->zipInput) != Z_OK &&
+            r.statuscode != STATUSCODE_INVALID) {
+          r.statuscode = STATUSCODE_INVALID;
+          strcpybuff(r.msg, "Cache Read Error : CRC");
+        }
       } else {
         r.statuscode = STATUSCODE_INVALID;
         strcpybuff(r.msg, "Cache Read Error : Open File");

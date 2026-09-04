@@ -1567,6 +1567,38 @@ static void corrupt_victim_body(httrackp *opt) {
   freet(data);
 }
 
+/* Flip the victim's stored CRC in both headers, which must agree or the open
+   fails before anything inflates. */
+static void corrupt_victim_crc(httrackp *opt) {
+  LLint fsz = 0;
+  char *data = readfile2(reconcile_st_path(opt, "hts-cache/new.zip"), &fsz);
+  const size_t n = (size_t) fsz;
+  size_t k, local = 0, central = 0, hits = 0;
+  FILE *fp;
+
+  assertf(data != NULL);
+  for (k = 0; k + 4 <= n; k++) {
+    if (memcmp(data + k, "PK\x03\x04", 4) == 0 && ++hits == 2)
+      local = k + 14;
+  }
+  assertf(hits == 2);
+  hits = 0;
+  for (k = 0; k + 4 <= n; k++) {
+    if (memcmp(data + k, "PK\x01\x02", 4) == 0 && ++hits == 2)
+      central = k + 16;
+  }
+  assertf(hits == 2);
+  assertf(local != 0 && local + 4 <= n && central != 0 && central + 4 <= n);
+  /* Not zeroed: an empty member's real CRC is 0, so 0 could match by luck. */
+  memset(data + local, 0x5A, 4);
+  memset(data + central, 0x5A, 4);
+  fp = fopen(reconcile_st_path(opt, "hts-cache/new.zip"), "wb");
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(data, n, fp));
+  fclose(fp);
+  freet(data);
+}
+
 /* Read the corrupt /victim.html and, in the SAME read session, the intact
    /canary.html: the victim must be rejected (wantmsg pins which path) and the
    canary must still decode byte-exact, proving one bad entry never taints a
@@ -1713,6 +1745,11 @@ int cache_corruption_selftest(httrackp *opt, const char *dir) {
   corrupt_victim_body(opt);
   failures += corrupt_expect_victim(opt, "Cache Read Error : Read Data",
                                     "garbled deflate stream");
+
+  corrupt_build(opt);
+  corrupt_victim_crc(opt);
+  failures += corrupt_expect_victim(opt, "Cache Read Error : CRC",
+                                    "body inflates, CRC does not match");
 
   /* A corrupt cache can hold a field wider than ours. Clipping keeps the
      entry; aborting would take the crawl down. Overwrite the placeholder Etag
