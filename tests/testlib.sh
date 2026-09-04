@@ -1037,7 +1037,7 @@ ENGINE_EXES='httrack proxytrack htsserver webhttrack'
 taskkill_engines() {
     local e
     for e in $ENGINE_EXES; do
-        taskkill /F /IM "$e.exe" >/dev/null 2>&1 || true
+        "$(win_tool taskkill)" /F /IM "$e.exe" >/dev/null 2>&1 || true
     done
 }
 
