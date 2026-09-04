@@ -253,6 +253,8 @@ rules_argv() { # rules_argv RULESFILE DIR
     # Each pass gets its own directory, or the stamp files the first one leaves
     # make the rest no-ops. The foreign environment is a sample and not a
     # proof: it catches a flag behind the conditional a porting fix reaches for.
+    # The first pass sets nothing, so its array is empty: expand it in the form
+    # bash 3.2 accepts under set -u.
     local envs=("" "DEB_HOST_ARCH_OS=hurd DEB_HOST_ARCH=hurd-i386 DEB_BUILD_PROFILES=nocheck DEB_BUILD_OPTIONS=nocheck")
     local pass=0 target vars make_argv
     # $MAKE carries its flags on some hosts, the way $CC does above.
@@ -269,7 +271,7 @@ rules_argv() { # rules_argv RULESFILE DIR
             # Unset the outer make's jobserver, or the inner one warns.
             (cd "${dir}/run.${pass}" && PATH="${dir}/stub:${PATH}" \
                 MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
-                env "${vars[@]}" "${make_argv[@]}" -s -f "$1" "${target}") \
+                env ${vars[@]+"${vars[@]}"} "${make_argv[@]}" -s -f "$1" "${target}") \
                 >>"${dir}/make.log" 2>&1 || echo "${target}" >>"${dir}/failed"
         done
     done
@@ -332,24 +334,18 @@ rules_turned_off() { # rules_turned_off ARGVFILE
 }
 
 # Everything wrong with one rules file, or "" when every dh_auto_configure it
-# runs asks for every feature.
+# runs asks for every feature. Not being able to grade the file is a STATUS and
+# never a word in that list: printed as one it reads as a feature name, and the
+# caller cannot tell the two apart. 2 is nothing to grade, 3 is a pass make
+# could not finish.
 rules_verdict() { # rules_verdict RULESFILE DIR
     local argv said off dir=$2 out=""
     rules_argv "$1" "${dir}"
     set -- "${dir}"/argv.*
-    # A pass that failed is a finding on its own: a recipe configuring through
-    # something other than dh_auto_configure dies here rather than being read.
-    test ! -s "${dir}/failed" || out="make-failed"
-    test -e "$1" || {
-        # Say which: a file make could not run is not a file that configures
-        # nothing, and only one of the two is the packaging bug.
-        test -z "${out}" || {
-            echo "make-failed"
-            return
-        }
-        echo "no-invocation"
-        return
-    }
+    # A recipe configuring through something other than dh_auto_configure dies
+    # here rather than being read, so a failed pass outranks what was recorded.
+    test ! -s "${dir}/failed" || return 3
+    test -e "$1" || return 2
     for argv in "$@"; do
         # --enable-auto-features=no is the same switch spelled the other way.
         off=$(command grep -c -x -e --disable-auto-features -e --enable-auto-features=no "${argv}" || true)
@@ -371,11 +367,21 @@ rules_verdict() { # rules_verdict RULESFILE DIR
 }
 
 rules="${srcdir}/debian/rules"
-if test -r "${rules}"; then
+# Running the recipe is how the flags are read, so a host with no make cannot
+# read them. The other nine steps still run.
+if test -r "${rules}" && ! command -v "${MAKE:-make}" >/dev/null 2>&1; then
+    planned=$((planned - 1))
+    echo "no ${MAKE:-make} here, so debian/rules was not run" >&2
+elif test -r "${rules}"; then
     n=$((n + 1))
-    said=$(rules_verdict "${rules}" "${work}/rules-real")
-    test -z "${said}" ||
-        fail_dump "debian/rules does not ask for: ${said}" "${work}/rules-real/make.log"
+    rc=0
+    said=$(rules_verdict "${rules}" "${work}/rules-real") || rc=$?
+    case ${rc} in
+    0) test -z "${said}" ||
+        fail_dump "debian/rules does not ask for: ${said}" "${work}/rules-real/make.log" ;;
+    2) fail_dump "debian/rules runs no dh_auto_configure" "${work}/rules-real/make.log" ;;
+    *) fail_dump "make could not run debian/rules" "${work}/rules-real/make.log" ;;
+    esac
 
     # A reader that recorded nothing would call any file complete, so put every
     # way of losing a feature past it. Every fixture is literal text under a
@@ -383,7 +389,7 @@ if test -r "${rules}"; then
     # quote under bash 3.2 and read as passed on the macOS leg alone.
     seq=0
     reads() { # reads WANT DESC <<'MUT' -- a whole makefile with a build target
-        local want=$1 desc=$2 got dir
+        local want=$1 desc=$2 got dir rc
         seq=$((seq + 1))
         dir=${work}/mut${seq}
         mkdir -p "${dir}"
@@ -391,7 +397,23 @@ if test -r "${rules}"; then
         # editor or a whitespace lint would take it and the fixture would pass
         # for the wrong reason.
         sed 's/@SP@/ /' >"${dir}/rules"
-        got=$(rules_verdict "${dir}/rules" "${dir}")
+        rc=0
+        got=$(rules_verdict "${dir}/rules" "${dir}") || rc=$?
+        case ${rc} in
+        0)
+            # The list is feature names only. A status word reaching it would
+            # be printed as one, which is how the macOS leg got told that
+            # debian/rules "does not ask for: make-failed".
+            case " ${got} " in
+            *" make-failed "* | *" no-invocation "*)
+                fail "${desc}: a status word reached the feature list: ${got}"
+                ;;
+            esac
+            ;;
+        2) got=no-invocation ;;
+        3) got=make-failed ;;
+        *) got="verdict-error-${rc}" ;;
+        esac
         test "${got}" = "${want}" ||
             fail "${desc}: expected [${want}], the reader said [${got:-(nothing)}]"
     }
@@ -448,7 +470,7 @@ WITH_ZSTD = no
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=$(WITH_ZSTD) --enable-backtrace --with-iconv
 MUT
-    reads "make-failed zstd backtrace iconv" \
+    reads make-failed \
         "a comment mid-continuation, which ends the line and the build with it" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli \
