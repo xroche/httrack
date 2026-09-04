@@ -14,6 +14,10 @@ if [ -z "$arm" ] || [ -z "$events" ] || [ -z "$seconds" ]; then
 fi
 
 testdir=$(cd "$(dirname "${BASH_SOURCE[0]}")/../tests" && pwd)
+# For find_python only. Sourcing testlib defines functions and sets variables,
+# and installs no trap.
+# shellcheck source=tests/testlib.sh
+. "$testdir/testlib.sh"
 srvpid=
 srvlog=
 
@@ -26,11 +30,22 @@ trap cleanup EXIT
 # The server lives in this process, not in an earlier step: a background process
 # on a Windows runner does not survive the step that started it.
 start_server() {
-    local root=$TMPDIR/probe-root port
-    srvlog=$TMPDIR/probe-server.log
+    local root port tmp
+    # RUNNER_TEMP is where the workflow collects the logs, and Git Bash leaves
+    # TMPDIR unset, which errexit turns into a failure before anything runs.
+    tmp=${RUNNER_TEMP:-${TMPDIR:-/tmp}}
+    command -v cygpath >/dev/null 2>&1 && tmp=$(cygpath -u "$tmp")
+    root=$tmp/probe-root
+    srvlog=$tmp/probe-server.log
     mkdir -p "$root"
     echo '<html>probe</html>' >"$root/index.html"
-    python "$testdir/local-server.py" --root "$root" >"$srvlog" 2>&1 &
+    local py
+    py=$(find_python) || {
+        echo "no python3: the combined arm has no server to connect to" >&2
+        exit 1
+    }
+    "$py" "$(nativepath "$testdir/local-server.py")" --root "$(nativepath "$root")" \
+        >"$srvlog" 2>&1 &
     srvpid=$!
     for _ in $(seq 60); do
         port=$(sed -n 's/^PORT \([0-9][0-9]*\).*/\1/p' "$srvlog" | head -1)
