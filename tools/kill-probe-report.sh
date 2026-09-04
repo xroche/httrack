@@ -1,9 +1,7 @@
 #!/bin/bash
 #
-# Census for the Windows runner-kill probe (#1228): the kill rate per arm, with
-# the live windows-build suite as the positive control. A run of the probe that
-# shows no kill in the control arm measures nothing, so the control is printed
-# beside the arms rather than remembered.
+# Kill-rate census per arm (#1228), with windows-build as the control, because a
+# window whose control shows no kill measures nothing.
 set -euo pipefail
 
 repo=xroche/httrack
@@ -31,15 +29,17 @@ done
     'import datetime; print(datetime.date.today() - datetime.timedelta(days=7))')
 
 # filter=all, or a rerun hides the killed attempt and the census reads ~40% low
-# (#1228). A killed job keeps no log and no artifact, so the step records are
-# the whole evidence: the runner dies mid-step, leaving that step's conclusion
-# null where a test failure leaves "failure".
+# (#1228). A killed job keeps no log and no artifact, so the step records are the
+# whole evidence: the runner dies mid-step, leaving that step's conclusion null
+# where a test failure leaves "failure". $2 is the event filter, which keeps the
+# probe's smoke-dose PR jobs out of its scheduled full-dose census.
 census() {
-    local wf=$1 runs id
+    local wf=$1 event=${2:-} runs id filter=()
+    test -n "$event" && filter=(-f "event=$event")
     # A 404 is the probe before its first run, not an error worth losing the
     # control row over.
     runs=$(gh api --paginate -X GET "repos/$repo/actions/workflows/$wf/runs" \
-        -f "created=>=$since" -f per_page=100 \
+        -f "created=>=$since" -f per_page=100 "${filter[@]}" \
         -q '.workflow_runs[] | select(.status == "completed") | .id') || {
         echo "no runs of $wf in $repo" >&2
         return 0
@@ -51,6 +51,9 @@ census() {
     done
 }
 
+# Columns: job name, conclusion, count of steps the runner never finished. A kill
+# is a job that did not succeed and left a step unfinished; a cancelled job is
+# censored exposure, so it counts in neither column.
 # Wilson, not the normal approximation: at a handful of kills in a few dozen
 # jobs the latter puts the bound below zero and reads as certainty.
 report() {
@@ -76,6 +79,6 @@ report() {
 echo "window: $since .. today, repo $repo"
 echo
 {
-    census windows-kill-probe.yml
+    census windows-kill-probe.yml schedule
     census windows-build.yml
 } | report
