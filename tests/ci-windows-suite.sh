@@ -340,6 +340,12 @@ unset WATCHDOG_TOKEN
 # reached the engine as "C:/Program Files/Git/a/b.html". Switch that
 # off, and hand the tests a TMPDIR that is already a Windows path.
 if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
+    # A Linux shell does not fold the CRLF that Windows text-mode stdout
+    # produces, the way MSYS does, so ask the engine for the bytes it wrote.
+    # WSLENV is what carries it outward to a Windows process; the workflow's own
+    # WSLENV runs the other way and cannot help here.
+    export HTS_BINARY_STDIO=1
+    export WSLENV="${WSLENV:+$WSLENV:}HTS_BINARY_STDIO"
     # The Linux view, not the native one: a WSL2 shell cannot mktemp into a
     # drive-letter path. Tests hand the engine drvfs paths and the shim above
     # translates them, which is why RUNNER_TEMP has to stay on a Windows volume.
