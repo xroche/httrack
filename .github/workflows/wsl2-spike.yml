@@ -1,0 +1,170 @@
+# Feasibility spike, not a check: can the Windows suite run its harness under
+# WSL2 instead of MSYS, and what would that cost per job? Answers four questions
+# with numbers rather than opinions: does WSL2 come up on a hosted runner at all
+# and in how long, how fast does each layer create processes, what does calling a
+# Windows exe from Linux cost, and does the loopback the crawl tests need still
+# work across the boundary. Delete once the answer is written down.
+name: wsl2-spike
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/wsl2-spike.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    name: wsl2 spike (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Every step below reports and continues: a spike that stops at the first
+      # unsupported thing answers one question instead of eight.
+      - name: What the image ships
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Write-Host "== windows build =="
+          (Get-CimInstance Win32_OperatingSystem).Caption
+          [Environment]::OSVersion.Version.ToString()
+          Write-Host "== wsl.exe present? =="
+          Get-Command wsl.exe -ErrorAction SilentlyContinue | Format-List Source, Version
+          Write-Host "== wsl --version =="
+          wsl.exe --version 2>&1 | Out-String
+          Write-Host "== wsl --status =="
+          wsl.exe --status 2>&1 | Out-String
+          Write-Host "== distros =="
+          wsl.exe -l -v 2>&1 | Out-String
+          Write-Host "== optional features =="
+          foreach ($f in "Microsoft-Windows-Subsystem-Linux", "VirtualMachinePlatform", "HypervisorPlatform") {
+            $s = (Get-WindowsOptionalFeature -Online -FeatureName $f -ErrorAction SilentlyContinue).State
+            Write-Host "$f = $s"
+          }
+          Write-Host "== nested virtualisation =="
+          (Get-CimInstance Win32_Processor).VirtualizationFirmwareEnabled
+          (Get-CimInstance Win32_ComputerSystem).HypervisorPresent
+
+      # The reboot is the blocker runner-images#10563 was closed on, so time it
+      # and see whether it is still one.
+      - name: Enable the WSL2 platform
+        id: enable
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $t = [Diagnostics.Stopwatch]::StartNew()
+          dism.exe /online /enable-feature /featurename:VirtualMachinePlatform /all /norestart
+          Write-Host "VirtualMachinePlatform exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
+          dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart
+          Write-Host "WSL feature exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
+          wsl.exe --install --no-distribution 2>&1 | Out-String
+          Write-Host "wsl --install exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
+          wsl.exe --update 2>&1 | Out-String
+          Write-Host "wsl --update exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
+          wsl.exe --set-default-version 2 2>&1 | Out-String
+          Write-Host "set-default-version 2 exit=$LASTEXITCODE total=$($t.Elapsed.TotalSeconds)s"
+
+      # --import off a rootfs tarball, not the Store: an image the runner cannot
+      # reach from an unauthenticated job is not a plan.
+      - name: Import a distro
+        id: distro
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $t = [Diagnostics.Stopwatch]::StartNew()
+          $tar = "$env:RUNNER_TEMP\rootfs.tar.gz"
+          $url = "https://cloud-images.ubuntu.com/wsl/noble/current/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz"
+          try {
+            Invoke-WebRequest -Uri $url -OutFile $tar -UseBasicParsing
+          } catch {
+            Write-Host "rootfs download failed: $_"
+            $url = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64-root.tar.xz"
+            $tar = "$env:RUNNER_TEMP\rootfs.tar.xz"
+            Invoke-WebRequest -Uri $url -OutFile $tar -UseBasicParsing
+          }
+          Write-Host "rootfs $((Get-Item $tar).Length) bytes in $($t.Elapsed.TotalSeconds)s"
+          wsl.exe --import probe "$env:RUNNER_TEMP\probe-vm" $tar --version 2 2>&1 | Out-String
+          Write-Host "import exit=$LASTEXITCODE at $($t.Elapsed.TotalSeconds)s"
+          wsl.exe -d probe -- uname -a 2>&1 | Out-String
+          Write-Host "uname exit=$LASTEXITCODE total=$($t.Elapsed.TotalSeconds)s"
+          wsl.exe -l -v 2>&1 | Out-String
+
+      # The number the whole question turns on: MSYS emulates fork, Linux does
+      # not, and the suite spends its budget on process creation (#1228).
+      - name: Process creation, MSYS
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -eu
+          bin=$(type -P true)
+          start=$SECONDS
+          for _ in $(seq 500); do "$bin"; done
+          echo "MSYS: 500 spawns in $((SECONDS - start))s"
+
+      - name: Process creation, WSL2
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          wsl.exe -d probe -- bash -lc 'start=$SECONDS; for i in $(seq 500); do /bin/true; done; echo "WSL2: 500 spawns in $((SECONDS - start))s"' 2>&1 | Out-String
+
+      # A harness in Linux still has to launch httrack.exe, and that crossing is
+      # the cost MSYS does not pay.
+      - name: Interop spawn of a Windows exe from WSL2
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          wsl.exe -d probe -- bash -lc 'start=$SECONDS; for i in $(seq 100); do /mnt/c/Windows/System32/cmd.exe /c exit; done; echo "interop: 100 spawns in $((SECONDS - start))s"' 2>&1 | Out-String
+
+      # The crawl tests write and then read back a mirror, so the 9p cost lands
+      # on every assertion, not only on the build.
+      - name: File IO on /mnt/c from WSL2
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          wsl.exe -d probe -- bash -lc 'cd /mnt/c/Users/runneradmin 2>/dev/null || cd /mnt/c; mkdir -p probe-io && cd probe-io; start=$SECONDS; for i in $(seq 300); do echo x > f$i; done; sync; echo "9p: 300 files in $((SECONDS - start))s"; start=$SECONDS; cat f* > /dev/null; echo "9p: read back in $((SECONDS - start))s"; rm -f f*' 2>&1 | Out-String
+
+      # Two directions, because which one works decides where the test server
+      # can live: httrack.exe is a Windows process either way.
+      - name: Loopback across the boundary
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $root = "$env:RUNNER_TEMP\probe-root"
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          Set-Content -Path "$root\index.html" -Value "<html>probe</html>"
+          $out = "$env:RUNNER_TEMP\server.out"
+          Start-Process -FilePath python -ArgumentList @("tests/local-server.py", "--root", $root) `
+            -PassThru -RedirectStandardOutput $out -RedirectStandardError "$env:RUNNER_TEMP\server.err" | Out-Null
+          $port = $null
+          foreach ($i in 1..60) {
+            if (Test-Path $out) {
+              $m = Select-String -Path $out -Pattern '^PORT (\d+)' | Select-Object -First 1
+              if ($m) { $port = $m.Matches[0].Groups[1].Value; break }
+            }
+            Start-Sleep -Milliseconds 500
+          }
+          Write-Host "windows-side server port=$port"
+          Write-Host "== linux client -> windows server, over 127.0.0.1 =="
+          wsl.exe -d probe -- bash -lc "curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://127.0.0.1:$port/" 2>&1 | Out-String
+          Write-Host "== linux client -> windows server, over the host IP =="
+          wsl.exe -d probe -- bash -lc "ip route show default | awk '{print \$3}' | head -1 | xargs -I{} curl -s -o /dev/null -w '%{http_code}\n' --max-time 5 http://{}:$port/" 2>&1 | Out-String
+          Write-Host "== windows client -> linux server, over 127.0.0.1 (localhostForwarding) =="
+          $job = Start-Job { wsl.exe -d probe -- bash -lc 'cd /tmp && python3 -m http.server 8099 --bind 0.0.0.0' }
+          Start-Sleep -Seconds 8
+          try {
+            (Invoke-WebRequest -Uri "http://127.0.0.1:8099/" -UseBasicParsing -TimeoutSec 5).StatusCode
+          } catch {
+            Write-Host "windows -> linux failed: $_"
+          }
+          Stop-Job $job -ErrorAction SilentlyContinue
