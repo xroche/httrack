@@ -484,6 +484,11 @@ char *readfile(const char *fil);
 
 char *readfile2(const char *fil, LLint * size);
 
+/* readfile2() refusing a body too large for the int indexes downstream, on the
+   same stat that sizes the read: a caller checking the size itself would leave
+   a window for the file to grow. NULL when it does not fit. */
+char *readfile2_inmem(const char *fil, LLint *size);
+
 char *readfile_utf8(const char *fil);
 
 char *readfile2_utf8(const char *fil, LLint *size);

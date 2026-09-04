@@ -1418,14 +1418,18 @@ char *readfile(const char *fil) {
 }
 
 /* Note: NOT utf-8 */
-char *readfile2(const char *fil, LLint * size) {
+static char *readfile_gen(const char *fil, LLint *size, hts_boolean inmem) {
   char *adr = NULL;
   char catbuff[CATBUFF_SIZE];
   const LLint len = fsize(fil);
 
   /* a size too large for size_t (32-bit Windows/i386) must fail closed: it
-     would wrap malloct() short while fread() still read the untruncated len */
-  const size_t buflen = len >= 0 ? llint_to_size_t(len) : (size_t) -1;
+     would wrap malloct() short while fread() still read the untruncated len.
+     This one stat also decides the in-memory bound, so nothing appended
+     between a caller's check and the read can carry the body past it. */
+  const size_t buflen = len >= 0 && (!inmem || hts_inmem_size_fits(len))
+                            ? llint_to_size_t(len)
+                            : (size_t) -1;
 
   if (buflen != (size_t) -1) { // exists, and is addressable
     FILE *fp;
@@ -1447,6 +1451,16 @@ char *readfile2(const char *fil, LLint * size) {
     }
   }
   return adr;
+}
+
+/* Note: NOT utf-8 */
+char *readfile2(const char *fil, LLint *size) {
+  return readfile_gen(fil, size, HTS_FALSE);
+}
+
+/* Note: NOT utf-8 */
+char *readfile2_inmem(const char *fil, LLint *size) {
+  return readfile_gen(fil, size, HTS_TRUE);
 }
 
 /* Note: utf-8 */

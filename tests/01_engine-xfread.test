@@ -5,27 +5,73 @@ set -euo pipefail
 
 # http_xfread1 must refuse an in-memory receive buffer that would exceed a
 # 32-bit index (hostile Content-Length, or an endless stream) rather than
-# allocate it, while still accepting a normal small size. -#test=xfread-limit
-# drives both refusal paths and the accept path.
+# allocate it, while still accepting a normal small size. The same bound has to
+# hold on the two paths that fill r->adr without going through that guard: a
+# chunk stream (see 130_local-chunked-truncated.test), a decoded content coding,
+# and a local file read back for parsing. -#test=xfread-limit drives all of them.
 
-out="$(httrack -O /dev/null -#test=xfread-limit)"
-# Match with here-strings, not `echo | grep -q`: under pipefail the early grep
-# exit SIGPIPEs echo and fails the pipeline even when the pattern matched.
-for case in bylen bygrow; do
-    grep -q "${case}: refused=1 adr=null msg=In-memory content too large" <<<"$out" || {
-        echo "FAIL ${case}: $out"
-        exit 1
-    }
-done
+# The file is sparse, so only a build missing the bound reads its 2 GiB.
+bigdir=
+cleanup() {
+    test -z "$bigdir" || rm -rf "$bigdir"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT TERM
 
-# Exactly INT32_MAX must be refused too (the reallocs add 1).
-grep -q 'boundary: msg=In-memory content too large' <<<"$out" || {
-    echo "FAIL boundary: $out"
+big=
+if command -v truncate >/dev/null 2>&1; then
+    bigdir=$(mktemp -d ./xfread-big.XXXXXX)
+    if truncate -s 2147483647 "$bigdir/f" 2>/dev/null &&
+        test "$(du -k "$bigdir/f" | cut -f1)" -le 1024; then
+        big=$bigdir/f
+        printf 'SMALLFILE-BODY' >"$bigdir/s"
+    else
+        rm -rf "$bigdir"
+        bigdir=
+    fi
+fi
+test -n "$big" || echo "no sparse file here: skipping the oversized-file case"
+
+out="$(httrack -O /dev/null -#test=xfread-limit ${big:+"$big" "$bigdir/s"})"
+fail() {
+    echo "FAIL $1: $out"
     exit 1
 }
+# Match with here-strings, not `echo | grep -q`: under pipefail the early grep
+# exit SIGPIPEs echo and fails the pipeline even when the pattern matched.
+has() {
+    grep -qxF "$1" <<<"$out" || fail "$1"
+}
 
-# The guard must NOT fire for a legitimate small size.
-if grep -q 'accept: msg=In-memory content too large' <<<"$out"; then
-    echo "FAIL accept (guard fired on a legit size): $out"
-    exit 1
+# adr= and code= are read after the call, so a guard that allocates before
+# refusing, or one that only fires on the first allocation, shows up here.
+for case in bylen bylen4g bygrow boundary; do
+    has "${case}: refused=1 adr=null code=-1 msg=In-memory content too large"
+done
+# grown enters holding a buffer: the guard runs per call, and keeps that buffer.
+has 'grown: refused=1 adr=kept code=-1 msg=In-memory content too large'
+
+# Controls. Both refuse on the invalid socket rather than on the guard, which
+# the empty msg and the untouched statuscode are what prove.
+has 'accept: refused=1 adr=alloc code=0 msg='
+has 'accept_grow: refused=1 adr=alloc code=0 msg='
+
+# The bound itself, shared with the chunk and decode paths.
+for expect in 'fits(0)=1' 'fits(1000)=1' 'fits(2147483646)=1' \
+    'fits(2147483647)=0' 'fits(2147483648)=0' 'fits(-1)=0'; do
+    has "$expect"
+done
+
+# A decoded body is capped at INT_MAX inclusive, so the size the receive guard
+# refuses is reachable through a content coding: refuse it, and drop the coded
+# bytes rather than commit them as the page. Only the in-memory path is bound.
+has 'decode_mem_max: ok=0 body=dropped size=64 code=-1 msg=Decompressed content too large'
+has 'decode_mem_ok: ok=1 body=kept size=2147483646 code=0 msg='
+has 'decode_disk_max: ok=1 body=kept size=2147483647 code=0 msg='
+
+# size= must stay at the self-test's own -1: a refusal writes neither. The
+# small file is the control, so a bound that refuses everything still dies.
+if test -n "$big"; then
+    has 'bigfile: adr=null size=-1'
+    has 'smallfile: adr=alloc size=14'
 fi

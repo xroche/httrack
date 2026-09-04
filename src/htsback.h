@@ -142,6 +142,11 @@ int back_finalize(httrackp * opt, cache_back * cache, struct_back * sback,
    deliberately passing the resource over? Only the latter may be purged, so
    this also decides whether the previous copy survives the update (#746). */
 hts_boolean back_transfer_failed(const int statuscode);
+/* Commit a decoded body size onto r, refusing in memory what http_xfread1()
+   refuses: hts_codec_maxout() caps at INT_MAX inclusive, so the one size the
+   receive guard rejects is reachable through a content coding. A refusal
+   classes and names r, drops its still-coded body, and returns HTS_FALSE. */
+hts_boolean back_set_decoded_size(htsblk *r, LLint size);
 /* Move the previous copy of back->url_sav to back->tmpfile so back_finalize()
    can put it back when the re-fetch fails (#77 follow-up). Call right before
    truncating url_sav; tmpfile stays NULL when there is nothing to save. */

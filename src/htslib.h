@@ -297,6 +297,10 @@ void treatfirstline(htsblk * retour, const char *rcvd);
 #define HTS_XFREAD_LINE_BLOCK 0 /* lines up to a blank one (header/trailer) */
 #define HTS_XFREAD_LINE (-1)    /* one line, stopping at the first LF */
 LLint http_xfread1(htsblk * r, int bufl);
+/* Does an in-memory body of this size fit? r->adr is indexed with an int
+   downstream and its allocations add a trailing NUL, so every producer of
+   r->size must refuse where http_xfread1() does. */
+hts_boolean hts_inmem_size_fits(LLint size);
 /* Cached resolver: fill out[0..count-1] with up to max addresses for iadr (in
    resolver order), returning the count (0 = does not resolve, negative-cached).
    Resolves once per host; later calls read the DNS cache. Must hold no lock

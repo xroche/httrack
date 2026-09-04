@@ -3000,36 +3000,82 @@ static int st_headerfield(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* Drive one http_xfread1 call. entered is the buffer the case came in with, so
+   a guard that allocates before refusing shows up. */
+static void st_xfread_case(const char *name, htsblk *r, int bufl,
+                           const char *entered) {
+  /* Separate statements: as printf arguments a compiler may sample r->adr
+     before the call, where no allocation can show. */
+  const LLint ret = http_xfread1(r, bufl);
+  const char *const adr = r->adr;
+  const int code = r->statuscode;
+  const char *state;
+
+  if (adr == NULL)
+    state = "null";
+  else if (adr == entered)
+    state = "kept";
+  else
+    state = "alloc";
+  printf("%s: refused=%d adr=%s code=%d msg=%s\n", name,
+         ret == READ_ERROR ? 1 : 0, state, code, r->msg);
+}
+
+/* Drive back_set_decoded_size() on a slot still holding its coded body. */
+static void st_decode_size_case(const char *name, int is_write, LLint size) {
+  htsblk r;
+  hts_boolean ok;
+  const char *state;
+  LLint committed;
+
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.is_write = (short int) is_write;
+  r.adr = (char *) malloct(64);
+  r.size = 64;
+  ok = back_set_decoded_size(&r, size);
+  state = r.adr != NULL ? "kept" : "dropped";
+  committed = r.size;
+  printf("%s: ok=%d body=%s size=" LLintP " code=%d msg=%s\n", name,
+         ok == HTS_TRUE ? 1 : 0, state, committed, r.statuscode, r.msg);
+  freet(r.adr);
+}
+
 /* http_xfread1 must refuse an in-memory buffer whose size would exceed a 32-bit
    index (hostile Content-Length or endless stream) rather than allocate it.
-   The guard returns before any socket read, so no real connection is needed. */
+   The guard returns before any socket read, so no real connection is needed.
+   The same bound must hold on the two paths that fill r->adr without it: a
+   chunk stream, and a decoded content coding. */
 static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
+  static const LLint sizes[] = {
+      0, 1000, (LLint) INT32_MAX - 1, (LLint) INT32_MAX, (LLint) INT32_MAX + 1,
+      -1};
   htsblk r;
+  size_t i;
 
   (void) opt;
-  (void) argc;
-  (void) argv;
 
   // Content-Length just over 2 GiB.
   memset(&r, 0, sizeof(r));
   r.soc = INVALID_SOCKET;
   r.totalsize = (LLint) INT32_MAX + 1;
-  printf("bylen: refused=%d adr=%s msg=%s\n",
-         http_xfread1(&r, 8192) == READ_ERROR, r.adr != NULL ? "alloc" : "null",
-         r.msg);
-  if (r.adr != NULL)
-    freet(r.adr);
+  st_xfread_case("bylen", &r, 8192, NULL);
+  freet(r.adr);
+
+  // 4 GiB: truncated to an int this length reads as 0.
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = (LLint) 1 << 32;
+  st_xfread_case("bylen4g", &r, 8192, NULL);
+  freet(r.adr);
 
   // Unknown length, buffer already at the limit: the next read would exceed it.
   memset(&r, 0, sizeof(r));
   r.soc = INVALID_SOCKET;
   r.totalsize = -1;
   r.size = (LLint) INT32_MAX;
-  printf("bygrow: refused=%d adr=%s msg=%s\n",
-         http_xfread1(&r, 8192) == READ_ERROR, r.adr != NULL ? "alloc" : "null",
-         r.msg);
-  if (r.adr != NULL)
-    freet(r.adr);
+  st_xfread_case("bygrow", &r, 8192, NULL);
+  freet(r.adr);
 
   // Exactly at the 2 GiB index (size + bufl == INT32_MAX): must also be
   // refused, since the reallocs below add 1 (a `> INT32_MAX` check would let
@@ -3038,18 +3084,59 @@ static int st_xfread_limit(httrackp *opt, int argc, char **argv) {
   r.soc = INVALID_SOCKET;
   r.totalsize = -1;
   r.size = (LLint) INT32_MAX - 8192;
-  http_xfread1(&r, 8192);
-  printf("boundary: msg=%s\n", r.msg);
+  st_xfread_case("boundary", &r, 8192, NULL);
+  freet(r.adr);
 
-  // A legitimate small size must NOT be refused by the guard (the read then
-  // fails on the invalid socket, but the size-too-large msg must not be set).
+  /* Same size, entering with a buffer already held: the guard runs per call,
+     not on the first allocation only, or the realloc it lets through takes an
+     int that has already wrapped negative. */
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = -1;
+  r.size = (LLint) INT32_MAX - 8192;
+  r.adr = (char *) malloct(64);
+  r.adr[0] = '\0';
+  st_xfread_case("grown", &r, 8192, r.adr);
+  freet(r.adr);
+
+  // A legitimate small size must NOT be refused, and must still be allocated.
   memset(&r, 0, sizeof(r));
   r.soc = INVALID_SOCKET;
   r.totalsize = 1000;
-  http_xfread1(&r, 8192);
-  printf("accept: msg=%s\n", r.msg);
-  if (r.adr != NULL)
-    freet(r.adr);
+  st_xfread_case("accept", &r, 8192, NULL);
+  freet(r.adr);
+
+  /* Control for the unknown-length arm: an undeclared length is not itself a
+     reason to refuse, only the size the stream has reached. */
+  memset(&r, 0, sizeof(r));
+  r.soc = INVALID_SOCKET;
+  r.totalsize = -1;
+  st_xfread_case("accept_grow", &r, 8192, NULL);
+  freet(r.adr);
+
+  // The bound itself, which the chunk and decode paths share.
+  for (i = 0; i < sizeof(sizes) / sizeof(sizes[0]); i++)
+    printf("fits(" LLintP ")=%d\n", sizes[i],
+           hts_inmem_size_fits(sizes[i]) ? 1 : 0);
+
+  /* hts_codec_maxout() caps a decoded body at INT_MAX inclusive, so a content
+     coding reaches this with the one size the receive guard refuses. */
+  st_decode_size_case("decode_mem_max", 0, (LLint) INT32_MAX);
+  st_decode_size_case("decode_mem_ok", 0, (LLint) INT32_MAX - 1);
+  st_decode_size_case("decode_disk_max", 1, (LLint) INT32_MAX);
+
+  /* Given a file at or past the bound, the reader must refuse on the stat that
+     would size its own allocation, so nothing appended after a caller's own
+     check can carry the body past it. The second file is the control: a bound
+     that refuses everything reads the same as one that works. */
+  for (i = 0; (int) i < argc && i < 2; i++) {
+    LLint got = -1;
+    char *adr = readfile2_inmem(argv[i], &got);
+
+    printf("%s: adr=%s size=" LLintP "\n", i == 0 ? "bigfile" : "smallfile",
+           adr != NULL ? "alloc" : "null", got);
+    freet(adr);
+  }
   return 0;
 }
 
@@ -13215,8 +13302,8 @@ static const struct selftest_entry {
      "binput() consumes a clipped line whole (#1294)", st_binputline},
     {"crange", "<raw-content-range-line> ...",
      "Content-Range parse integer safety", st_crange},
-    {"xfread-limit", "", "in-memory receive buffer size bound",
-     st_xfread_limit},
+    {"xfread-limit", "[oversized-file small-file]",
+     "in-memory receive buffer size bound", st_xfread_limit},
     {"getext", "",
      "extension parsing stops at the query and inside the buffer (#1433)",
      st_getext},
