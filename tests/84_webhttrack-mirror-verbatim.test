@@ -71,10 +71,8 @@ htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" 
     --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/ -O ${work}/crawl" \
     >/dev/null
 
-# The finished state already served /website/, so the probe below has to happen
-# while the crawl runs, or it passes on the unfixed server too. Wait on the pane
-# rather than on the project directory: command_do=start saves the profile first,
-# and the save alone creates that directory, so it appears before the engine runs.
+# command_do=start saves the profile before it starts the engine, and the save alone
+# creates the project directory, so only the pane proves a crawl is really running.
 start=$SECONDS
 while :; do
     htsserver_client --path /server/index.html >"${work}/pane.txt"
