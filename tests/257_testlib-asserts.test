@@ -333,22 +333,29 @@ ok "win_marker picks the launch's own output directory, never argv[0]"
 # program bare there, and what turns a drvfs argument into one a native exe can
 # open. Copied rather than linked, as the driver does, since this tree may sit
 # on a mount that refuses to execute it.
-mkdir "$tmpdir/shimbin"
-cp "$testdir/wsl2-exe-shim.sh" "$tmpdir/shimbin/faketool"
-cat >"$tmpdir/shimbin/faketool.exe" <<'TOOLEOF'
+# Not under MSYS, which needs no shim (it resolves a bare name to the .exe
+# itself) and cannot run this fixture anyway, because a shell script named .exe
+# is handed to Windows as a PE binary and fails with 127.
+if shell_is_msys; then
+    echo "MSYS resolves the .exe itself, so it runs no shim" >&2
+else
+    mkdir "$tmpdir/shimbin"
+    cp "$testdir/wsl2-exe-shim.sh" "$tmpdir/shimbin/faketool"
+    cat >"$tmpdir/shimbin/faketool.exe" <<'TOOLEOF'
 #!/bin/sh
 printf '%s\n' "$@"
 TOOLEOF
-# A wslpath that really converts, so the assertion below is about the shim.
-cat >"$tmpdir/shimbin/wslpath" <<'WPEOF'
+    # A wslpath that really converts, so the assertion below is about the shim.
+    cat >"$tmpdir/shimbin/wslpath" <<'WPEOF'
 #!/bin/sh
 d=$(printf '%s' "$2" | cut -c6)
 printf '%s:%s\n' "$(printf '%s' "$d" | tr '[:lower:]' '[:upper:]')" "$(printf '%s' "$2" | cut -c7-)"
 WPEOF
-chmod +x "$tmpdir/shimbin/faketool" "$tmpdir/shimbin/faketool.exe" "$tmpdir/shimbin/wslpath"
-got=$(PATH="$tmpdir/shimbin:$PATH" bash "$tmpdir/shimbin/faketool" /mnt/c/x/y -q plain | tr '\n' ' ')
-assert_eq "C:/x/y -q plain " "$got" "what the shim handed the exe"
-ok "the wsl2 shim names the .exe and converts only its drvfs arguments"
+    chmod +x "$tmpdir/shimbin/faketool" "$tmpdir/shimbin/faketool.exe" "$tmpdir/shimbin/wslpath"
+    got=$(PATH="$tmpdir/shimbin:$PATH" bash "$tmpdir/shimbin/faketool" /mnt/c/x/y -q plain | tr '\n' ' ')
+    assert_eq "C:/x/y -q plain " "$got" "what the shim handed the exe"
+    ok "the wsl2 shim names the .exe and converts only its drvfs arguments"
+fi
 
 ## win_capture under wsl2 has no /proc/<pid>/winpid to read. It takes the
 # relay's own cmdline instead and asks Windows which process carries it.
