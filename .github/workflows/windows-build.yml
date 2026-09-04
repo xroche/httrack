@@ -343,6 +343,11 @@ jobs:
           WATCHDOG_CONTEXT: windows-suite-wsl2 (${{ matrix.platform }}, ${{ matrix.configuration }})
           WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          # Git Bash rewrites anything shaped like a POSIX path on its way to a
+          # native exe, and wsl.exe is one: /mnt/d/... reached the distro as
+          # "C:/Program Files/Git/mnt/d/...". The driver sets these for the same
+          # reason on its own side.
+          export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
           # /p translates a value as a path on the way in; RUNNER_TEMP goes over
           # untranslated, since the driver takes the Windows form and converts it
           # itself for the two views it needs.
