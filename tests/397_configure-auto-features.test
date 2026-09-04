@@ -230,7 +230,10 @@ rules_argv() { # rules_argv RULESFILE DIR
     mkdir -p "${dir}/stub"
     # Every dh_* the file names, so one added later cannot run for real here.
     # The digits matter: dh_md5sums and dh_python3 both carry one.
-    command grep -o 'dh_[a-z0-9_]*' "$1" | sort -u >"${dir}/dh-names"
+    {
+        echo dh
+        command grep -o 'dh_[a-z0-9_]*' "$1"
+    } | sort -u >"${dir}/dh-names"
     while IFS= read -r cmd; do
         printf '#!/bin/sh\nexit 0\n' >"${dir}/stub/${cmd}"
         chmod +x "${dir}/stub/${cmd}"
@@ -241,6 +244,7 @@ rules_argv() { # rules_argv RULESFILE DIR
         "${dir}" "${dir}" "${dir}" >"${dir}/stub/dh_auto_configure"
     chmod +x "${dir}/stub/dh_auto_configure"
     : >"${dir}/make.log"
+    : >"${dir}/failed"
     # Every target a build reaches, not just "build": dpkg-buildpackage runs
     # build-arch for an arch:any package, and a dh-driven file keeps its flags
     # in an override target that "build" reaches only through dh itself.
@@ -253,7 +257,10 @@ rules_argv() { # rules_argv RULESFILE DIR
     read -r -a make_argv <<<"${MAKE:-make}"
     for cmd in "${envs[@]}"; do
         read -r -a vars <<<"${cmd}"
-        for target in build build-arch build-indep override_dh_auto_configure; do
+        for target in build build-arch build-indep \
+            override_dh_auto_configure override_dh_auto_configure-arch \
+            override_dh_auto_configure-indep \
+            execute_before_dh_auto_configure execute_after_dh_auto_configure; do
             command grep -q "^${target}:" "$1" || continue
             pass=$((pass + 1))
             mkdir -p "${dir}/run.${pass}"
@@ -261,7 +268,7 @@ rules_argv() { # rules_argv RULESFILE DIR
             (cd "${dir}/run.${pass}" && PATH="${dir}/stub:${PATH}" \
                 MAKEFLAGS='' MFLAGS='' MAKELEVEL='' \
                 env "${vars[@]}" "${make_argv[@]}" -s -f "$1" "${target}") \
-                >>"${dir}/make.log" 2>&1 || true
+                >>"${dir}/make.log" 2>&1 || echo "${target}" >>"${dir}/failed"
         done
     done
 }
@@ -310,9 +317,13 @@ rules_turned_off() { # rules_turned_off ARGVFILE
             continue
         fi
         case ${tok} in
-        --disable-auto-features | --disable-online-unit-tests) ;;
+        --disable-auto-features | --enable-auto-features=no) ;;
+        --disable-online-unit-tests | --enable-online-unit-tests=no) ;;
         --without-brotli | --without-zstd | --without-iconv | --disable-backtrace) ;;
-        --disable-* | --without-*) out="${out} turns-off:${tok}" ;;
+        --with-brotli=no | --with-zstd=no | --with-iconv=no | --enable-backtrace=no) ;;
+        --disable-* | --without-* | --enable-*=no | --with-*=no)
+            out="${out} turns-off:${tok}"
+            ;;
         esac
     done <"$1"
     echo "${out# }"
@@ -324,10 +335,13 @@ rules_verdict() { # rules_verdict RULESFILE DIR
     local argv said off dir=$2 out=""
     rules_argv "$1" "${dir}"
     set -- "${dir}"/argv.*
+    # A pass that failed is a finding on its own: a recipe configuring through
+    # something other than dh_auto_configure dies here rather than being read.
+    test ! -s "${dir}/failed" || out="make-failed"
     test -e "$1" || {
         # Say which: a file make could not run is not a file that configures
         # nothing, and only one of the two is the packaging bug.
-        test ! -s "${dir}/make.log" || {
+        test -z "${out}" || {
             echo "make-failed"
             return
         }
@@ -432,12 +446,15 @@ WITH_ZSTD = no
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd=$(WITH_ZSTD) --enable-backtrace --with-iconv
 MUT
-    reads "zstd backtrace iconv" "a comment mid-continuation, which runs to the line's end" <<'MUT'
+    reads "make-failed zstd backtrace iconv" \
+        "a comment mid-continuation, which ends the line and the build with it" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli \
 		# --with-zstd \
 		--enable-backtrace --with-iconv
 MUT
+    # make exits 0 here: the orphan line starts with "-", which is make's own
+    # ignore-errors prefix, so the short list ships and nothing says so.
     reads "zstd backtrace iconv" "a backslash make does not read as a continuation" <<'MUT'
 build:
 	dh_auto_configure -- --disable-auto-features --with-brotli \@SP@
@@ -482,6 +499,31 @@ build:
 	true
 build-arch:
 	dh_auto_configure -- --disable-auto-features --with-brotli
+MUT
+    reads turns-off:--enable-https=no "an off switch spelled as a value" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-https=no
+MUT
+    reads turns-off:--enable-example-libs=no "another feature turned off by value" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv --enable-example-libs=no
+MUT
+    reads make-failed "a configure run that is not dh_auto_configure" <<'MUT'
+build:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
+	./configure --disable-auto-features --with-brotli
+MUT
+    reads "zstd backtrace iconv" "execute_after_dh_auto_configure, which debhelper runs" <<'MUT'
+build:
+	true
+execute_after_dh_auto_configure:
+	dh_auto_configure -- --disable-auto-features --with-brotli
+MUT
+    reads "" "an arch-only override, which debhelper runs in place of the plain one" <<'MUT'
+build:
+	dh $@
+override_dh_auto_configure-arch:
+	dh_auto_configure -- --disable-auto-features --with-brotli --with-zstd --enable-backtrace --with-iconv
 MUT
     reads no-invocation "a build target that configures nothing" <<'MUT'
 build:
