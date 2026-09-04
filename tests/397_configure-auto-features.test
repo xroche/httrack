@@ -70,11 +70,10 @@ feature_libs() { # feature_libs NAME
     backtrace) echo "BACKTRACE_LIBS" ;;
     esac
 }
-# Whether the macro must also reach the installed htsfeatures.h.
+# Whether the macro must also reach the installed htsfeatures.h, or "".
 feature_public() { # feature_public NAME
     case $1 in
-    brotli | zstd) return 0 ;;
-    *) return 1 ;;
+    brotli | zstd) echo yes ;;
     esac
 }
 # What libhttrack.pc must name when it is on, or "" where it names nothing.
@@ -136,7 +135,7 @@ assert_state() { # assert_state DIR NAME on|off
 
     # The installed header a consumer of libhttrack compiles against. config.h
     # is not installed and cannot stand in for it.
-    if feature_public "${f}"; then
+    if test -n "$(feature_public "${f}")"; then
         grep -q "^#define ${macro} ${value}\$" "${dir}/htsfeatures.h" ||
             fail_dump "${f}: htsfeatures.h does not carry ${macro} ${value}" \
                 "${dir}/htsfeatures.h"
@@ -168,7 +167,7 @@ assert_state() { # assert_state DIR NAME on|off
 }
 
 n=0
-planned=7 # steps below; the last one needs the libraries to be installed
+planned=10 # steps below; the last one needs the libraries to be installed
 
 # A GNU-libiconv-shaped prefix: a header that renames iconv_open the way the
 # real one does away from LIBICONV_PLUG, and a library under a subdirectory the
@@ -220,6 +219,50 @@ for flag in --disable-auto-features $(for f in ${features}; do feature_flag "${f
     grep -q -e "${flag}" <<<"${help}" || fail "configure --help does not offer ${flag}"
 done
 
+# The flags the Debian build passes. --disable-auto-features makes them the whole
+# optional set, so a flag dropped here ships a package that decodes less and
+# nothing else notices.
+rules_flags() { # rules_flags FILE
+    awk '/dh_auto_configure/ { want = 1 }
+         want { line = line " " $0 }
+         want && !/\\$/ { gsub(/[ \t\\]+/, " ", line); print line; exit }' "$1"
+}
+# Which of the features the file does not ask for, or "".
+rules_missing() { # rules_missing FLAGS
+    local flags=$1 f flag out=""
+    for f in ${features}; do
+        flag=$(feature_flag "${f}")
+        # The =DIR form asks for it too.
+        case " ${flags} " in
+        *" ${flag} "* | *" ${flag}="*) ;;
+        *) out="${out} ${f}" ;;
+        esac
+    done
+    echo "${out# }"
+}
+
+rules="${srcdir}/debian/rules"
+if test -r "${rules}"; then
+    n=$((n + 1))
+    flags=$(rules_flags "${rules}")
+    case " ${flags} " in
+    *" --disable-auto-features "*) ;;
+    *) fail "debian/rules no longer passes --disable-auto-features: ${flags}" ;;
+    esac
+    said=$(rules_missing "${flags}")
+    test -z "${said}" ||
+        fail "debian/rules asks for no ${said}, which --disable-auto-features then drops"
+    # A reader that matched nothing would call any file complete, so drop one
+    # flag and require the same check to name it.
+    said=$(rules_missing "${flags//--with-zstd/}")
+    test "${said}" = zstd ||
+        fail "dropping --with-zstd went unreported: ${said:-(silence)}"
+    echo "ok: debian/rules still asks for every optional feature by name"
+else
+    planned=$((planned - 1))
+    echo "no debian/rules under ${srcdir}, so the packaging flag list is not read" >&2
+fi
+
 # The cheap, host-independent steps run first: a slow leg that runs out of
 # budget later still covers what the switch means.
 n=$((n + 1))
@@ -229,6 +272,15 @@ n=$((n + 1))
 grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
     fail_dump "configure refused the value without saying which flag" "${work}/bogus/configure.log"
 echo "ok: a value that is neither yes nor no is refused"
+
+n=$((n + 1))
+# Same for a feature's own tri-state: neither an unknown value nor a bare typo
+# may fall through to a default.
+! run_configure "${work}/btbogus" --enable-backtrace=bogus ||
+    fail_dump "--enable-backtrace=bogus was accepted" "${work}/btbogus/configure.log"
+grep -q 'bad value for backtrace' "${work}/btbogus/configure.log" ||
+    fail_dump "configure refused the value without saying which flag" "${work}/btbogus/configure.log"
+echo "ok: an unknown --enable-backtrace value is refused"
 
 n=$((n + 1))
 # The switch must not turn a library the packager named into a silent drop (#1502).
@@ -254,6 +306,34 @@ case ${got} in
 *) fail_dump "a foreign host answered '${got}' rather than declining backtrace" \
     "${work}/foreign/configure.log" ;;
 esac
+
+n=$((n + 1))
+# A bare --with-iconv is a request, so a host where iconv does not link must
+# FTBFS rather than quietly fall back to the codepage tables. The header is
+# there and the symbol is not, which is what a renaming libiconv header without
+# its library looks like.
+mkdir -p "${work}/noiconv"
+cat >"${work}/noiconv/iconv.h" <<'HDR'
+#ifndef HTS_NOICONV_H
+#define HTS_NOICONV_H
+#include <stddef.h>
+typedef void *iconv_t;
+#define iconv_open hts_absent_iconv_open
+#define iconv hts_absent_iconv
+#define iconv_close hts_absent_iconv_close
+extern iconv_t iconv_open(const char *to, const char *from);
+extern size_t iconv(iconv_t cd, char **in, size_t *il, char **out, size_t *ol);
+extern int iconv_close(iconv_t cd);
+#endif
+HDR
+! run_configure "${work}/ic-bare" --with-iconv "CPPFLAGS=-I${work}/noiconv" ||
+    fail_dump "a bare --with-iconv was accepted where iconv_open does not link" \
+        "${work}/ic-bare/configure.log"
+grep -q 'iconv requested but no iconv.h with a linkable iconv_open' \
+    "${work}/ic-bare/configure.log" ||
+    fail_dump "configure failed without saying that iconv was the request" \
+        "${work}/ic-bare/configure.log"
+echo "ok: a bare --with-iconv fails the build rather than falling back"
 
 n=$((n + 1))
 # --with-iconv=DIR is the form a keg-only or ports prefix needs, and the one arm
