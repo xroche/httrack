@@ -20,8 +20,7 @@ if [ ! -r "${CLOSETRACK_LA:-}" ]; then
     exit 1
 fi
 if grep -q "^dlname=''" "$CLOSETRACK_LA"; then
-    echo "close-once: static-only build, skipping"
-    exit 0
+    skip "close-once: static-only build, nothing to preload"
 fi
 for lib in "${CLOSETRACK_LIB:-}" "${FTPCANCEL_LIB:-}"; do
     test -r "$lib" || fail "close-once: ${lib:-an interposer} was not built"

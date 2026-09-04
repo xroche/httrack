@@ -1,0 +1,184 @@
+#!/bin/bash
+#
+# A test that bails out at "exit 0" because a prerequisite is missing reports
+# PASS, so the host that cannot run it is the one reading green. 399 did that
+# wherever PyYAML was absent. 77 is automake's skip, and this refuses the idiom
+# coming back.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_vacskip.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+# Reports every "exit 0" a test can reach before anything that could have failed
+# it. A bail-out past a real assertion is honest, so it is not reported.
+cat >"$tmp/scan.awk" <<'AWK'
+# Per file, or the first file's assertions vouch for every file behind it.
+FNR == 1 { eff = 0; heredoc = ""; dashed = 0; depth = 0; infunc = 0; split("", opened) }
+{
+    line = $0
+    # A here-doc body is data, not code, and stubs written into one say exit 0.
+    if (heredoc != "") {
+        if (line ~ (dashed ? "^[ \t]*" heredoc "[ \t]*$" : "^" heredoc "[ \t]*$")) heredoc = ""
+        next
+    }
+    # Comments go first, or a "<<" inside one opens a here-doc that eats the file.
+    sub(/(^|[ \t])#.*$/, "", line)
+    if (match(line, /<<-?[ \t]*\\?['"]?[A-Za-z_][A-Za-z0-9_]*['"]?[ \t]*($|[|&;>])/)) {
+        w = substr(line, RSTART, RLENGTH)
+        dashed = (w ~ /^<<-/)
+        gsub(/^<<-?[ \t]*|[\\'"]|[ \t]*[|&;>]*[ \t]*$/, "", w)
+        heredoc = w
+    }
+    # A function body does not run where it is written, so an exit 0 in one is
+    # not a bail-out. Its lines still count toward what the file can assert.
+    isfunc = (line ~ /^[A-Za-z_][A-Za-z0-9_]*\(\)[ \t]*\{/)
+    if (isfunc) infunc = (line !~ /\}[ \t]*$/)
+    else if (infunc && line ~ /^\}/) infunc = 0
+    # What ran inside the guard is part of the guard, not evidence the subject
+    # was exercised: an "if" or a "case" remembers the tally it opened with.
+    if (line ~ /^[ \t]*(if|case)[ \t]/) { depth++; opened[depth] = eff }
+    if (line ~ /(^|[ \t;])(fi|esac)([ \t;]|$)/ && depth > 0) depth--
+    if (!infunc && !isfunc && line ~ /(^|[ \t;&|(])exit[ \t]+0[ \t]*([;)}&|].*)?$/ && line !~ /printf|trap|echo/) {
+        before = eff
+        if (depth > 0 && (depth in opened)) before = opened[depth]
+        if (!before) print FILENAME ":" FNR ": exit 0 reports PASS with nothing asserted yet; use skip"
+    }
+    if (line ~ /(^|[ \t;&|(]|then |else |do )(fail|fail_dump|skip|skip_on_windows|skip_on_emulated|skip_if_out_of_budget|assert_[a-z_]+|expect_ok|ok|require_httrack|selftest_run_queued|mirror_has_name|crash_report|local_crawl)([ \t]|$)/) eff = 1
+    if (line ~ /(^|[ \t;&|(=$])(httrack|htsserver|proxytrack)[ \t"]/) eff = 1
+    if (line ~ /local-crawl\.sh|crawl-test\.sh|install-headers-sweep\.sh/) eff = 1
+    if (line ~ /\|\|[ \t]*exit[ \t]+1/) eff = 1
+}
+AWK
+
+scan() { awk -f "$tmp/scan.awk" "$@"; }
+
+mkfixture() { # mkfixture NAME <<FIX ... FIX
+    {
+        printf '#!/bin/bash\nset -euo pipefail\n'
+        cat
+    } >"$tmp/$1"
+}
+
+# Controls, before the tree: a scanner blind to the shape calls anything clean.
+# The fixtures are written from here-docs, which the scanner skips, so this file
+# stays its own first subject.
+
+# Each of these bails out having asserted nothing, in a spelling the tree uses
+# somewhere, and every one must be reported.
+mkfixture brace.test <<'FIX'
+command -v python3 >/dev/null || { exit 0; }
+assert_eq 1 1 "the subject"
+FIX
+mkfixture case.test <<'FIX'
+case "$HTS_OS" in
+Linux) ;;
+*) exit 0 ;;
+esac
+assert_eq 1 1 "the subject"
+FIX
+mkfixture trailing.test <<'FIX'
+if [ -z "${Y:-}" ]; then
+    exit 0 # nothing to check off Linux
+fi
+assert_eq 1 1 "the subject"
+FIX
+mkfixture oneline.test <<'FIX'
+if [ -n "${V:-}" ]; then :; fi
+if [ -z "${Y:-}" ]; then
+    exit 0
+fi
+assert_eq 1 1 "the subject"
+FIX
+mkfixture shift.test <<'FIX'
+mask=$((1 << 16))
+if [ -z "${Y:-}" ]; then
+    exit 0
+fi
+assert_eq 1 1 "the subject"
+FIX
+mkfixture mention.test <<'FIX'
+# the shim below is written from a <<EOF here-doc
+if [ -z "${Y:-}" ]; then
+    exit 0
+fi
+assert_eq 1 1 "the subject"
+FIX
+
+# Each of these is honest, and none may be reported.
+mkfixture skips.test <<'FIX'
+if [ "$HTS_OS" != Linux ]; then
+    skip "not Linux"
+fi
+assert_eq 1 1 "the subject"
+FIX
+mkfixture late.test <<'FIX'
+assert_eq 1 1 "the first half"
+if [ "$HTS_OS" != Linux ]; then
+    echo "not Linux, the second half is skipped"
+    exit 0
+fi
+assert_eq 2 2 "the second half"
+FIX
+mkfixture stub.test <<'FIX'
+cat >"$d/shim" <<\EOF
+#!/bin/sh
+exit 0
+EOF
+assert_eq 1 1 "the subject"
+FIX
+mkfixture indented.test <<'FIX'
+cat >"$d/shim" <<'EOF'
+#!/bin/sh
+    EOF
+exit 0
+EOF
+assert_eq 1 1 "the subject"
+FIX
+mkfixture piped.test <<'FIX'
+"$py" - "$a" <<'PYX' | tr -d '\\r'
+import sys
+sys.exit(0)
+PYX
+assert_eq 1 1 "the subject"
+FIX
+mkfixture helper.test <<'FIX'
+finish() { rm -rf "$tmp"; exit 0; }
+teardown() {
+    rm -rf "$tmp"
+    exit 0
+}
+assert_eq 1 1 "the subject"
+FIX
+
+for bug in brace case trailing oneline shift mention; do
+    said=$(scan "$tmp/$bug.test") || fail "the scanner exited nonzero: $said"
+    # The line too: a report naming the file alone would not point at the bail-out.
+    want=$(awk '/exit 0/ { print NR; exit }' "$tmp/$bug.test")
+    grep -q "$bug\\.test:${want}:" <<<"$said" ||
+        fail "$bug.test bails out at line ${want} and went unreported: ${said:-(silence)}"
+done
+for clean in skips late stub indented piped helper; do
+    said=$(scan "$tmp/$clean.test") || fail "the scanner exited nonzero: $said"
+    test -z "$said" || fail "$clean.test is not the defect but was reported: $said"
+done
+ok "the scanner separates a vacuous bail-out from an honest one"
+
+# The whole tree goes through one awk, so the tally has to start over per file:
+# carried across, the first file's assertions vouch for every file behind it and
+# the scan below reports nothing whatever it is fed.
+said=$(scan "$tmp/late.test" "$tmp/brace.test") || fail "the scanner exited nonzero: $said"
+grep -q 'brace\.test:' <<<"$said" ||
+    fail "a file scanned after an asserting one went unreported: ${said:-(silence)}"
+ok "the scanner starts each file over"
+
+# The tree itself. Read out of the source dir, so a stale build dir cannot hide
+# a test that was added since it was configured.
+found=$(cd "$top/tests" && scan [0-9]*_*.test) || fail "the scan failed: $found"
+test -z "$found" || fail "these tests would report PASS having asserted nothing:
+$found"
+ok "no test in tests/ turns a missing prerequisite into a pass"
