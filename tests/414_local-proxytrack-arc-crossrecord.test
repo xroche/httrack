@@ -1,0 +1,146 @@
+#!/bin/bash
+#
+# An .arc record's declared length is what bounds the read that fills its body,
+# and the file size is the only other bound. A length reaching past the record's
+# own bytes therefore serves the following record's page under this record's URL.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
+
+export LC_ALL=C
+
+python=$(find_python) || skip "python3 missing"
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+FIRST_BODY=FIRSTPAGE_00000000
+NEXT_PAD=4988
+
+# HOST names the archive, so one proxytrack can serve both without a key clash.
+# DECLARED is what the first record announces; it stores $FIRST_BODY whatever it
+# says, so an honest archive passes DECLARED=${#FIRST_BODY}.
+craft() { # craft OUT HOST DECLARED
+    local out=$1 host=$2 declared=$3 h1=$dir/h1 b1=$dir/b1 h2=$dir/h2 b2=$dir/b2
+
+    printf '%s' "$FIRST_BODY" >"$b1"
+    printf 'NEXT-%s%0*d' "$host" "$NEXT_PAD" 0 >"$b2"
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' \
+        "$declared" >"$h1"
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' \
+        "$(wc -c <"$b2")" >"$h2"
+    {
+        arc_filedesc
+        printf 'http://%s/first.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n' \
+            "$host" "$ARC_DATE" "$(($(wc -c <"$h1") + declared))"
+        cat "$h1" "$b1"
+        printf '\n'
+        arc_record "http://$host/second.html" text/html 200 "$h2" "$b2"
+    } >"$out"
+}
+
+craft "$dir/honest.arc" honest "${#FIRST_BODY}"
+craft "$dir/overlap.arc" overlap 4096
+
+# The body the archive $1 stores for the record whose URL is $2, walking the
+# record chain rather than trusting a length twice.
+body_of() { # body_of ARC URL
+    "$python" - "$1" "$2" <<'EOF'
+import sys
+
+data = open(sys.argv[1], "rb").read()
+pos = data.index(b"\n") + 1  # the filedesc line
+pos += int(data[:pos].split()[-1]) + 1  # its declared block, then the blank line
+while pos < len(data):
+    if data[pos : pos + 1] != b"\n":
+        break
+    eol = data.index(b"\n", pos + 1)
+    line = data[pos + 1 : eol].split()
+    length = int(line[-1])
+    if line[0].decode() == sys.argv[2]:
+        record = data[eol + 1 : eol + 1 + length]
+        sys.stdout.buffer.write(record.partition(b"\r\n\r\n")[2])
+        sys.exit(0)
+    pos = eol + 1 + length
+sys.exit("no record for %s" % sys.argv[2])
+EOF
+}
+
+# Consumer 1: the ARC writer, reading one archive and writing another.
+convert() { # convert IN OUT
+    proxytrack --convert "$2" "$1" >"$dir/convert.log" 2>&1 ||
+        fail_dump "proxytrack died converting $1" "$dir/convert.log"
+}
+
+# The control the whole test rests on: an honest chain keeps the two records
+# apart, so both markers exist in the fixture and each stays under its own URL.
+convert "$dir/honest.arc" "$dir/honest-out.arc"
+body_of "$dir/honest-out.arc" http://honest/first.html >"$dir/first.body"
+test "$(cat "$dir/first.body")" = "$FIRST_BODY" ||
+    fail_dump "the honest archive lost the first record's body" "$dir/first.body"
+body_of "$dir/honest-out.arc" http://honest/second.html >"$dir/second.body"
+grep -qaF NEXT-honest "$dir/second.body" ||
+    fail "the honest archive lost the second record"
+
+convert "$dir/overlap.arc" "$dir/overlap-out.arc"
+# Either the record is refused or it is clipped to its own bytes; what it may
+# never carry is the page stored after it.
+if body_of "$dir/overlap-out.arc" http://overlap/first.html >"$dir/overlap.body" 2>/dev/null; then
+    if grep -qaF NEXT-overlap "$dir/overlap.body"; then
+        fail_dump "the ARC writer stored the next record under the first record's URL" \
+            "$dir/overlap.body"
+    fi
+fi
+
+# Consumer 2: the reply to a client.
+launch_proxytrack() {
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" \
+        "$dir/honest.arc" "$dir/overlap.arc" >"$ptlog" 2>&1 &
+    ptpid=$!
+}
+start_proxytrack "$dir/pt" launch_proxytrack
+
+"$python" - "$proxyport" "$FIRST_BODY" <<'EOF' ||
+import socket, sys
+
+port, first = int(sys.argv[1]), sys.argv[2].encode()
+
+
+def get(host):
+    sock = socket.create_connection(("127.0.0.1", port), 10)
+    sock.settimeout(10)
+    sock.sendall(
+        ("GET http://%s/first.html HTTP/1.1\r\nHost: %s\r\n\r\n" % (host, host)).encode()
+    )
+    reply = b""
+    try:
+        while True:
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            reply += chunk
+    except socket.timeout:
+        pass
+    return reply.partition(b"\r\n\r\n")[2]
+
+
+payload = get("honest")
+if payload != first:
+    sys.exit("the honest record served %r, not its own %d bytes" % (payload[:64], len(first)))
+
+payload = get("overlap")
+if b"NEXT-overlap" in payload:
+    sys.exit("the overlapping record served the next page: %r" % payload[:200])
+EOF
+    fail_dump "a record's reply carried bytes from outside it" "$ptlog"
+
+echo "OK: no consumer read an .arc record past its own bytes"
