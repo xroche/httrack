@@ -329,8 +329,15 @@ run_cleanups() {
 # Python 3 interpreter, or empty: Windows only installs python.exe, and a bare
 # "python" may be 2.x or the Store stub.
 find_python() {
-    local py
-    for py in "${PYTHON:-}" python3 python; do
+    local py names='python3 python'
+    # Windows-side under wsl2, which is what keeps the fixture servers and
+    # httrack.exe on one side of the boundary: no socket crosses it, and the
+    # paths handed to them stay the native ones nativepath already produces.
+    # A Linux python3 sitting in the distro would take the same arguments and
+    # fail to open every one of them.
+    test "$(suite_backend)" != wsl2 || names='python3.exe python.exe'
+    # shellcheck disable=SC2086 # the split is what makes it a candidate list
+    for py in "${PYTHON:-}" $names; do
         test -n "$py" || continue
         "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null || continue
         printf '%s\n' "$py"
@@ -367,6 +374,7 @@ drvfs_path() { # drvfs_path -m|-u PATH
         *) printf '%s\n' "$p" ;;
         esac
         ;;
+    *) fail "drvfs_path: unknown direction $1" ;;
     esac
 }
 

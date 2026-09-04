@@ -350,7 +350,7 @@ jobs:
           # gives /d/a/..., and drvfs mounts the same volume at /mnt/d/a/...
           ws=/mnt$(cygpath -u "$GITHUB_WORKSPACE")
           case "$ws" in
-          /mnt/*) ;;
+          /mnt/[a-z]/*) ;;
           *)
             echo "::error::the workspace did not convert to a drvfs path: $ws"
             exit 1

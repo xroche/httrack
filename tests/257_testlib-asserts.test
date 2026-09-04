@@ -233,16 +233,17 @@ set -euo pipefail
 . "$testdir/testlib.sh"
 target_is_windows && w=yes || w=no
 shell_is_msys && m=yes || m=no
-printf 'win=%s msys=%s\\n' "\$w" "\$m"
+target_is_linux && l=yes || l=no
+printf 'win=%s msys=%s linux=%s\\n' "\$w" "\$m" "\$l"
 EOF
 while read -r backend os want; do
     got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND="$backend" HTS_OS="$os" \
         PATH="$shim:$pathbin:$PATH" bash "$tmpdir/split.sh")
     test "$got" = "$want" || fail "backend=$backend HTS_OS=$os gave [$got], want [$want]"
 done <<'EOF'
-wsl2 Linux win=yes msys=no
-msys MINGW64_NT-10.0 win=yes msys=yes
-posix Linux win=no msys=no
+wsl2 Linux win=yes msys=no linux=no
+msys MINGW64_NT-10.0 win=yes msys=yes linux=no
+posix Linux win=no msys=no linux=yes
 EOF
 ok "under wsl2 the binary is Windows while the shell is not"
 
@@ -255,8 +256,8 @@ while read -r override want; do
         PATH="$shim:$pathbin:$PATH" bash "$tmpdir/split.sh")
     test "$got" = "$want" || fail "IS_WINDOWS=$override gave [$got], want [$want]"
 done <<'EOF'
-yes win=yes msys=yes
-no win=no msys=no
+yes win=yes msys=yes linux=no
+no win=no msys=no linux=yes
 EOF
 ok "the IS_WINDOWS override still reaches both predicates"
 
@@ -295,6 +296,16 @@ done <<'EOF'
 -u c:/lower /mnt/c/lower
 -m /mnt/e/x E:/x
 -m /no/drive/here /no/drive/here
+EOF
+# RUNNER_TEMP reaches the driver as a backslash path, so that form is the one
+# the suite actually converts.
+while read -r given want; do
+    got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 bash -c \
+        ". \"$testdir/testlib.sh\"; drvfs_path -u '$given'")
+    test "$got" = "$want" || fail "drvfs_path -u $given gave [$got], want [$want]"
+done <<'EOF'
+D:\a\b /mnt/d/a/b
+D:/a\b /mnt/d/a/b
 EOF
 ok "the drvfs mapping leaves alone what it cannot name a drive for"
 
@@ -346,6 +357,14 @@ TOOLEOF
     got=$(PATH="$tmpdir/shimbin:$PATH" bash "$tmpdir/shimbin/faketool" /mnt/c/x/y -q plain | tr '\n' ' ')
     assert_eq "C:/x/y -q plain " "$got" "what the shim handed the exe"
     ok "the wsl2 shim names the .exe and converts only its drvfs arguments"
+
+    # The shim spells the mapping again because it runs as its own process, so
+    # the two copies have to agree or a fix lands in one and not the other.
+    for a in /mnt/c/x/y /mnt/D/up 'C:/already' /no/drive -q; do
+        viashim=$(PATH="$tmpdir/shimbin:$PATH" bash "$tmpdir/shimbin/faketool" "$a")
+        assert_eq "$(drvfs_path -m "$a")" "$viashim" "the shim and drvfs_path on $a"
+    done
+    ok "the shim's own copy of the mapping agrees with drvfs_path"
 fi
 
 ## win_capture under wsl2 has no /proc/<pid>/winpid to read. It takes the
@@ -364,7 +383,8 @@ case ":${WSLENV:-}:" in
 *) : >"$PSREC.env" ;;
 esac
 printf '%s\n' "$*" >"$PSREC.argv"
-echo 4242
+# CRLF, as the real powershell.exe emits: the caller strips it.
+printf '4242\r\n'
 PSEOF
     chmod +x "$tmpdir/pathbin/powershell.exe"
     cat >"$tmpdir/cap.sh" <<EOF

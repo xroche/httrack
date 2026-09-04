@@ -37,18 +37,23 @@ test "$ci_skip_list" = "99_sentinel-only.test" ||
 
 # --- an unknown backend errors loudly, never falls back to an empty list ----
 
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_skipbackend.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
 ci_skip_list=unset-marker
-out=$(ci_expected_skips_for_backend bogus 2>&1) && fail "an unknown backend was accepted"
-grep -q "::error::no expected-skip list for backend 'bogus'" <<<"$out" ||
-    fail "the unknown backend was not reported: $out"
+# Called here, not in $( ), or the assignment it must not make happens in a
+# subshell and this cannot fail whatever the selector does.
+rc=0
+ci_expected_skips_for_backend bogus >"$tmp/bogus.err" 2>&1 || rc=$?
+test "$rc" -ne 0 || fail "an unknown backend was accepted"
+grep -q "::error::no expected-skip list for backend 'bogus'" "$tmp/bogus.err" ||
+    fail "the unknown backend was not reported: $(cat "$tmp/bogus.err")"
 test "$ci_skip_list" = unset-marker || fail "an unknown backend touched ci_skip_list: [$ci_skip_list]"
 
 ok "the selector reads the pinned list per backend and refuses an unknown one"
 
 # --- mutant: wsl2 quietly reusing msys's list must be caught ----------------
 
-tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_skipbackend.XXXXXX")
-cleanup_push rm -rf "$tmp"
 cp "$testdir/ci-windows-suite.sh" "$testdir/testlib.sh" "$testdir/proclib.sh" "$tmp/"
 chmod u+w "$tmp"/*.sh # distcheck's srcdir is read-only, and cp carries that over
 

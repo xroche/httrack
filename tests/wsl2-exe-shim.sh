@@ -17,7 +17,7 @@ args=()
 for a in "$@"; do
     case "$a" in
     # A drvfs absolute path, which no URL and no option ever looks like.
-    /mnt/[a-z]/*)
+    /mnt/[A-Za-z]/*)
         drive=$(printf '%s' "$a" | cut -c6 | tr '[:lower:]' '[:upper:]')
         args+=("$drive:$(printf '%s' "$a" | cut -c7-)")
         ;;
