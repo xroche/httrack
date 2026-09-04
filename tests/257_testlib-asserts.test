@@ -300,18 +300,19 @@ assert_eq "" "$(win_marker "$tmpdir/cl")" "only short arguments"
 assert_eq "" "$(win_marker "$tmpdir/nosuchfile")" "no cmdline at all"
 ok "win_marker picks the launch's own output directory, never argv[0]"
 
-## The tool names differ by backend: bare under MSYS, .exe under WSL2, where the
-# PATH is Linux's and interop resolves only a real filename.
+## An executable's name differs by backend: bare under MSYS, which resolves it
+# to the .exe itself, and suffixed under WSL2, whose PATH matches exactly. A
+# bare "ping" there is WSL's own Linux one, whose -n means something else.
 while read -r backend want; do
     got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND="$backend" PATH="$pathbin:$PATH" \
-        bash -c ". \"$testdir/testlib.sh\"; win_tool taskkill; win_tool tasklist" | tr '\n' ' ')
+        bash -c ". \"$testdir/testlib.sh\"; win_exe taskkill; win_exe ping" | tr '\n' ' ')
     test "$got" = "$want " || fail "backend=$backend named [$got], want [$want]"
 done <<'EOF'
-msys taskkill tasklist
-wsl2 taskkill.exe tasklist.exe
-posix taskkill tasklist
+msys taskkill ping
+wsl2 taskkill.exe ping.exe
+posix taskkill ping
 EOF
-ok "taskkill and tasklist take their .exe only under wsl2"
+ok "a Windows executable takes its .exe only under wsl2"
 
 ## win_capture under wsl2 has no /proc/<pid>/winpid to read. It takes the
 # relay's own cmdline instead and asks Windows which process carries it.

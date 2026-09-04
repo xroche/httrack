@@ -26,7 +26,7 @@ test "$rc" -eq 7 || fail "exit 7 reported $rc"
 start=$SECONDS
 rc=0
 if target_is_windows; then
-    run_with_timeout 2 ping -n 30 127.0.0.1 || rc=$?
+    run_with_timeout 2 "$(win_exe ping)" -n 30 127.0.0.1 || rc=$?
 else
     run_with_timeout 2 sleep 30 || rc=$?
 fi
@@ -43,7 +43,7 @@ if target_is_windows; then
     alive() { win_pid_runs "$1" ping.exe; }
     # alive() is a conjunction now, and one that never matches would call every
     # survivor reaped. Prove it fires on a live ping, reached the same way.
-    ping -n 20 127.0.0.1 >/dev/null 2>&1 &
+    "$(win_exe ping)" -n 20 127.0.0.1 >/dev/null 2>&1 &
     cpid=$!
     cw=$(cat "/proc/$cpid/winpid" 2>/dev/null)
     test -n "$cw" || fail "could not read a live ping's Windows PID"

@@ -894,10 +894,10 @@ dump_crawl_logs() {
     done
 }
 
-# taskkill and tasklist answer to their bare names under MSYS. Under WSL2 the
-# PATH is Linux's and interop resolves only a real filename, so they need .exe.
-# Dispatched rather than always suffixed, to leave the MSYS path untouched.
-win_tool() { # win_tool taskkill|tasklist
+# The name a Windows executable answers to here. MSYS resolves a bare name to
+# its .exe; WSL2's PATH is Linux's and matches the filename exactly, so there it
+# needs the suffix. Dispatched rather than always suffixed, to leave MSYS alone.
+win_exe() { # win_exe NAME
     case "$(suite_backend)" in
     wsl2) printf '%s.exe\n' "$1" ;;
     *) printf '%s\n' "$1" ;;
@@ -974,7 +974,7 @@ win_capture() { # win_capture <pid>
 # Whether Windows PID $1 runs image $2. Both columns at once, since either alone
 # answers for a recycled PID, and case-folded as the proclib.sh matchers are.
 win_pid_runs() { # win_pid_runs <winpid> <image>
-    "$(win_tool tasklist)" 2>/dev/null |
+    "$(win_exe tasklist)" 2>/dev/null |
         awk -v p="$1" -v i="$2" 'tolower($1) == tolower(i) && $2 == p { f = 1 } END { exit !f }'
 }
 
@@ -986,7 +986,7 @@ kill_pid() {
         local winpid
         winpid=$(win_pid "$pid")
         if test -n "$winpid"; then
-            "$(win_tool taskkill)" /F /PID "$winpid" >/dev/null 2>&1 || true
+            "$(win_exe taskkill)" /F /PID "$winpid" >/dev/null 2>&1 || true
         fi
         return 0
     fi
@@ -1013,12 +1013,12 @@ kill_tree() {
             winpid=
         fi
         if test -n "$winpid"; then
-            "$(win_tool taskkill)" /F /T /PID "$winpid" >/dev/null 2>&1 || true
+            "$(win_exe taskkill)" /F /T /PID "$winpid" >/dev/null 2>&1 || true
         # Last resort, so it is opt-in: it kills every engine and every python on
         # the host, siblings of a parallel run included (HTTRACK_EXCLUSIVE_HOST).
         elif test -n "${HTTRACK_EXCLUSIVE_HOST:-}"; then
             taskkill_engines
-            "$(win_tool taskkill)" /F /IM python.exe >/dev/null 2>&1 || true
+            "$(win_exe taskkill)" /F /IM python.exe >/dev/null 2>&1 || true
         fi
         return 0
     fi
@@ -1037,7 +1037,7 @@ ENGINE_EXES='httrack proxytrack htsserver webhttrack'
 taskkill_engines() {
     local e
     for e in $ENGINE_EXES; do
-        "$(win_tool taskkill)" /F /IM "$e.exe" >/dev/null 2>&1 || true
+        "$(win_exe taskkill)" /F /IM "$e.exe" >/dev/null 2>&1 || true
     done
 }
 
