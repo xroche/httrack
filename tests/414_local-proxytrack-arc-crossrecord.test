@@ -33,16 +33,23 @@ http_head() { # http_head CONTENT_LENGTH
 
 # Three records: one the greedy record cannot reach, the greedy one, and the
 # victim page whose bytes must never leave the greedy record's URL. DECLARED is
-# what the greedy record announces, but it stores $GREEDY_BODY whatever it says,
-# and PAD is what the victim page is padded with, so each archive's declared
-# length lands on a different class of byte. HOST keys the archive apart.
-craft() { # craft OUT HOST DECLARED PAD
-    local out=$1 host=$2 declared=$3 pad=$4
+# the body length the greedy record announces, or "eof" for a record reaching
+# the last byte of the file, but it stores $GREEDY_BODY whatever it says. PAD is
+# what the victim page is padded with, so each archive's declared length lands
+# on a different class of byte. HOST keys the archive apart.
+craft() { # craft OUT HOST DECLARED PAD [VICTIM_SCHEME] [LEAD]
+    local out=$1 host=$2 declared=$3 pad=$4 scheme=${5:-http://} lead=${6:-yes}
+    local length
 
     printf '%s' "$KEPT_BODY" >"$dir/kept.body"
     http_head "${#KEPT_BODY}" >"$dir/kept.head"
     printf '%s' "$GREEDY_BODY" >"$dir/greedy.body"
-    http_head "$declared" >"$dir/greedy.head"
+    if test "$declared" = eof; then
+        # no Content-Length, so the archive length is all the read is bounded by
+        printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n' >"$dir/greedy.head"
+    else
+        http_head "$declared" >"$dir/greedy.head"
+    fi
     {
         printf 'VICTIM-%s\n' "$host"
         # a page may hold a line that looks like half of a record header, and
@@ -52,17 +59,26 @@ craft() { # craft OUT HOST DECLARED PAD
         printf '%*s' "$VICTIM_PAD" '' | tr ' ' "$pad"
     } >"$dir/victim.body"
     http_head "$(wc -c <"$dir/victim.body")" >"$dir/victim.head"
+    arc_record "$scheme$host/victim.html" text/html 200 \
+        "$dir/victim.head" "$dir/victim.body" >"$dir/victim.rec"
+    if test "$declared" = eof; then
+        length=$(wc -c <"$dir/greedy.head")
+        length=$((length + $(wc -c <"$dir/greedy.body") + 1))
+        length=$((length + $(wc -c <"$dir/victim.rec")))
+    else
+        length=$(($(wc -c <"$dir/greedy.head") + declared))
+    fi
     {
         arc_filedesc
-        arc_record "http://$host/kept.html" text/html 200 \
-            "$dir/kept.head" "$dir/kept.body"
-        printf '\n' # the separator opening each record after the first
+        if test "$lead" = yes; then
+            arc_record "http://$host/kept.html" text/html 200 \
+                "$dir/kept.head" "$dir/kept.body"
+            printf '\n' # the separator opening each record after the first
+        fi
         arc_record "http://$host/greedy.html" text/html 200 \
-            "$dir/greedy.head" "$dir/greedy.body" \
-            "$(($(wc -c <"$dir/greedy.head") + declared))"
+            "$dir/greedy.head" "$dir/greedy.body" "$length"
         printf '\n'
-        arc_record "http://$host/victim.html" text/html 200 \
-            "$dir/victim.head" "$dir/victim.body"
+        cat "$dir/victim.rec"
     } >"$out"
 }
 
@@ -71,8 +87,14 @@ craft "$dir/honest.arc" honest "${#GREEDY_BODY}" ' '
 # newline above all, because a text page is full of them
 craft "$dir/space.arc" space "$GREEDY_DECLARED" ' '
 craft "$dir/digit.arc" digit "$GREEDY_DECLARED" 0
-craft "$dir/newline.arc" newline "$GREEDY_DECLARED" $'\n'
+craft "$dir/newline.arc" newline "$GREEDY_DECLARED" $'\n' ftp://
 craft "$dir/cr.arc" cr "$GREEDY_DECLARED" $'\r'
+# and the length an attacker aligns to the last byte of the file, where there is
+# no next record to compare against
+craft "$dir/eof.arc" eof eof ' '
+# the same lie told by the archive's first record, which a check counting from
+# the second one never sees
+craft "$dir/nolead.arc" nolead "$GREEDY_DECLARED" ' ' http:// no
 
 # junk on the end leaves an archive honest, so refusing its last record would
 # cost a page for nothing
@@ -134,7 +156,7 @@ stored "$dir/trailer-out.arc" http://honest/victim.html "$dir/out.trailer"
 grep -qaF VICTIM-honest "$dir/out.trailer" ||
     fail "an archive with junk after its last record lost that record"
 
-for class in space digit newline cr; do
+for class in space digit newline cr eof; do
     convert "$dir/$class.arc" "$dir/$class-out.arc"
     # the record before the greedy one, so an implementation that refuses the
     # whole archive cannot pass the assertion below
@@ -154,15 +176,27 @@ for class in space digit newline cr; do
     fi
 done
 
+convert "$dir/nolead.arc" "$dir/nolead-out.arc"
+if body_of "$dir/nolead-out.arc" http://nolead/greedy.html >"$dir/nolead.greedy" 2>&1; then
+    grep -qaF VICTIM-nolead "$dir/nolead.greedy" &&
+        fail_dump "a lie in the archive's first record went unchecked" \
+            "$dir/nolead.greedy"
+fi
+
 # A header block with no blank line of its own runs into the next record's meta
 # line, so the fields the reader keeps come from the record after it.
 printf 'HTTP/1.1 200 OK\r\nContent-Type: text/first' >"$dir/hdr.head"
 : >"$dir/hdr.empty"
 printf 'HTTP/1.1 200 OK\r\nContent-Type: text/next\r\nLocation: http://elsewhere/\r\nContent-Length: 5\r\n\r\n' >"$dir/next.head"
 printf 'BODY2' >"$dir/next.body"
+# and a block whose own last line ends on the record's last byte, which the
+# bound must keep
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/tight\r\n' >"$dir/tight.head"
 {
     arc_filedesc
     arc_record http://hdr/first.html text/html 200 "$dir/hdr.head" "$dir/hdr.empty"
+    printf '\n'
+    arc_record http://hdr/tight.html text/html 200 "$dir/tight.head" "$dir/hdr.empty"
     printf '\n'
     arc_record http://hdr/next.html text/html 200 "$dir/next.head" "$dir/next.body"
 } >"$dir/hdr.arc"
@@ -177,18 +211,21 @@ if start < 0:
     sys.exit("the unterminated record vanished from the archive")
 end = out.find("\nhttp://", start + 1)
 first = out[start:] if end < 0 else out[start:end]
-for field in ("text/next", "http://elsewhere/"):
+for field in ("text/tight", "text/next", "http://elsewhere/"):
     if field in first:
         sys.exit("%r reached the record stored before the one that declared it" % field)
 if "text/next" not in out or "http://elsewhere/" not in out:
     sys.exit("the fixture lost the fields it exists to track")
+if "text/tight" not in out:
+    sys.exit("a header line ending on the record's last byte was dropped")
 EOF
 
 # Consumer 2: the reply to a client.
 launch_proxytrack() {
     proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" \
         "$dir/honest.arc" "$dir/space.arc" "$dir/digit.arc" \
-        "$dir/newline.arc" "$dir/cr.arc" >"$ptlog" 2>&1 &
+        "$dir/newline.arc" "$dir/cr.arc" "$dir/eof.arc" \
+        "$dir/nolead.arc" >"$ptlog" 2>&1 &
     ptpid=$!
 }
 start_proxytrack "$dir/pt" launch_proxytrack
@@ -227,7 +264,7 @@ if payload != honest_body:
         % (payload[:64], len(honest_body))
     )
 
-for host in ("space", "digit", "newline", "cr"):
+for host in ("space", "digit", "newline", "cr", "eof", "nolead"):
     payload = get(host)
     if ("VICTIM-%s" % host).encode() in payload:
         sys.exit("the %s archive served the victim page: %r" % (host, payload[:200]))

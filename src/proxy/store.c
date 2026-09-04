@@ -2173,13 +2173,10 @@ static hts_boolean arcIsRecordLine(const char *line) {
   return PT_CompatibleScheme(line) && getArcLength(line) >= 0;
 }
 
-/* Nothing follows the last record, so the end of the file separates it too. */
-static hts_boolean arcNextRecordStartsHere(PT_Index__Arc index) {
-  const int c = fgetc(index->file);
-
-  if (c == EOF)
-    return feof(index->file) ? HTS_TRUE : HTS_FALSE;
-  if (c != 0x0a)
+/* The end of the file is not an answer here, because aligning a greedy length
+   to it is how a record hides from this test. Its own data is asked instead. */
+static hts_boolean arcNextRecordFollows(PT_Index__Arc index) {
+  if (fgetc(index->file) != 0x0a)
     return HTS_FALSE;
   index->line[0] = '\0';
   (void) linput(index->file, index->line, sizeof(index->line) - 1);
@@ -2211,8 +2208,7 @@ static hts_boolean arcRecordEndsCleanly(PT_Index__Arc index, long int from) {
 
   if (to < 0)
     return HTS_FALSE;
-  clean =
-      arcNextRecordStartsHere(index) || !arcDataHoldsARecord(index, from, to);
+  clean = arcNextRecordFollows(index) || !arcDataHoldsARecord(index, from, to);
   return (fseek(index->file, to, SEEK_SET) == 0) ? clean : HTS_FALSE;
 }
 
