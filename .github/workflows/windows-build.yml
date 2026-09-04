@@ -321,11 +321,9 @@ jobs:
           # For the record when a path stops converting: this rootfs has no
           # wslpath, which is why nothing in the suite calls one.
           wsl -d httrack-suite -- sh -c 'command -v wslpath || echo "no wslpath"'
-          # An imported rootfs carries no /etc/wsl.conf, and the workspace lives
-          # on D:, so mount it if the automount did not. Harmless when it did.
-          wsl -d httrack-suite -- sh -c '
-            test -d /mnt/d || { mkdir -p /mnt/d && mount -t drvfs D: /mnt/d; }
-            echo "mounts after bring-up:"; ls -d /mnt/* 2>/dev/null || echo "  none"'
+          # Recorded because a path error naming no path sent this looking in
+          # the wrong place: the automount is there, /mnt/c and /mnt/d included.
+          wsl -d httrack-suite -- sh -c 'echo mounts:; ls -d /mnt/*'
 
       - name: Run the engine test suite (offline tests, WSL2)
         if: always() && matrix.platform == 'x64'
@@ -348,7 +346,7 @@ jobs:
           # /p translates a value as a path on the way in; RUNNER_TEMP goes over
           # untranslated, since the driver takes the Windows form and converts it
           # itself for the two views it needs.
-          export WSLENV='HTTRACK_SUITE_BACKEND:HTTRACK_SUITE_JOBS:RUNNER_TEMP:WATCHDOG_TOKEN:WATCHDOG_REPO:WATCHDOG_SHA:WATCHDOG_CONTEXT:WATCHDOG_URL:GITHUB_STEP_SUMMARY/p'
+          export WSLENV='HTTRACK_SUITE_BACKEND:HTTRACK_SUITE_JOBS:RUNNER_TEMP:WATCHDOG_TOKEN:WATCHDOG_REPO:WATCHDOG_SHA:WATCHDOG_CONTEXT:WATCHDOG_URL:GITHUB_STEP_SUMMARY/p:HTS_WS:HTS_BIN'
           export HTTRACK_SUITE_BACKEND=wsl2
           # Mapped here rather than by wslpath, which a bare imported rootfs
           # does not ship: `wsl -- wslpath` answers ERROR_PATH_NOT_FOUND. MSYS
@@ -361,18 +359,13 @@ jobs:
             exit 1
             ;;
           esac
-          # Say what the distro can actually see before using it: the failure
-          # this replaces was a bare Wsl/ERROR_PATH_NOT_FOUND naming nothing.
-          wsl -d httrack-suite -- sh -c '
-            echo "mounts:"; ls -d /mnt/* 2>/dev/null || echo "  none"
-            test -d "$1" || { echo "::error::$1 is not visible in the distro"; exit 1; }
-            test -d "$1/tests" || { echo "::error::$1/tests is missing"; exit 1; }' \
-            _ "$ws"
-          # cd inside the distro rather than with --cd, so a missing directory
-          # is a shell error that names it.
-          wsl -d httrack-suite -- sh -c 'cd "$1/tests" && exec bash ./ci-windows-suite.sh "$2"' \
-            _ "$ws" "$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
-            2>&1 | tee suite-console.log
+          # Through the environment, not argv: `wsl -- sh -c '...' _ "$ws"`
+          # delivered an empty $1, which is what the path error naming no path
+          # was. WSLENV already carries everything else this step needs.
+          export HTS_WS="$ws"
+          export HTS_BIN="$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}"
+          wsl -d httrack-suite -- sh -c 'echo "ws=[$HTS_WS] bin=[$HTS_BIN]"; test -d "$HTS_WS/tests" || { echo "::error::$HTS_WS/tests is not visible in the distro"; exit 1; }'
+          wsl -d httrack-suite -- sh -c 'cd "$HTS_WS/tests" && exec bash ./ci-windows-suite.sh "$HTS_BIN"' 2>&1 | tee suite-console.log
 
       - name: Upload the test logs
         if: always()
