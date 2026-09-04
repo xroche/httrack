@@ -102,10 +102,30 @@ assert_steps_ran() { # assert_steps_ran WANT GOT
 
 # Run engine self-test NAME: stdout must equal WANT, status must be 0 (which a
 # `test "$(...)" = ...` cannot see). expect_ok takes a command, for a real -O.
+# Trailing newlines and CRs off a captured run. Windows stdout is text mode, so
+# the engine ends every line CRLF; MSYS eats the pair and a Linux shell under
+# wsl2 does not, which would make the two backends disagree on every comparison.
+# Interior CRs are lines mode's business.
+# Into STRIPPED, not echoed: macOS drives this under bash 3.2, which has no
+# namerefs, and a command substitution is a fork (#795).
+STRIPPED=
+strip_trailing_eol() { # strip_trailing_eol TEXT
+    STRIPPED=$1
+    while :; do
+        case $STRIPPED in
+        *"$TESTLIB_NL") STRIPPED=${STRIPPED%"$TESTLIB_NL"} ;;
+        *"$SELFTEST_CR") STRIPPED=${STRIPPED%"$SELFTEST_CR"} ;;
+        *) break ;;
+        esac
+    done
+}
+
 assert_selftest() { # assert_selftest WANT NAME [ARGS...]
     local want=$1 name=$2 got rc=0
     shift 2
     got=$(httrack -O /dev/null "-#test=$name" "$@") || rc=$?
+    strip_trailing_eol "$got"
+    got=$STRIPPED
     test "$rc" -eq 0 || fail "-#test=$name $*: exited $rc, output: $got"
     test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
 }
@@ -233,13 +253,8 @@ selftest_run_queued() {
         # so every case ends CRLF there and MSYS eats the pair. Stripping the
         # run rather than one terminator keeps the two platforms saying the
         # same thing. Interior CRs are lines mode's business.
-        while :; do
-            case $got in
-            *"$TESTLIB_NL") got=${got%"$TESTLIB_NL"} ;;
-            *"$SELFTEST_CR") got=${got%"$SELFTEST_CR"} ;;
-            *) break ;;
-            esac
-        done
+        strip_trailing_eol "$got"
+        got=$STRIPPED
         test "${SELFTEST_MODE[i]}" != lines ||
             got=${got//"$SELFTEST_CR$TESTLIB_NL"/"$TESTLIB_NL"}
         want=${SELFTEST_WANT[i]}
