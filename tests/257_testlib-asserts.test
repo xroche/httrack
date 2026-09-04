@@ -402,7 +402,29 @@ EOF
     marker="/mnt/c/t/httrack_local.ZzUnique1"
     got=$(env -u IS_WINDOWS HTTRACK_SUITE_BACKEND=wsl2 PSREC="$tmpdir/ps" \
         PATH="$pathbin:$PATH" bash "$tmpdir/cap.sh" "$marker")
-    assert_eq "4242|sh" "$got" "the Windows pid and image win_capture resolved"
+    assert_eq 4242 "${got%%|*}" "the Windows pid win_capture resolved"
+    # binfmt_misc leaves the interpreter in argv[0], so under qemu-user the
+    # relay's cmdline names the emulator rather than the image it runs.
+    argv0_is_the_program() {
+        local probe leaf=
+        /bin/sh -c 'sleep 30' >/dev/null 2>&1 &
+        probe=$!
+        # The fork precedes the exec, so the first read can still answer bash.
+        for _ in $(seq 20); do
+            { read -r -d '' leaf <"/proc/$probe/cmdline"; } 2>/dev/null || leaf=
+            case "${leaf##*[\\/]}" in sh | qemu-* | *-binfmt*) break ;; esac
+            poll_wait 0.2
+        done
+        kill "$probe" 2>/dev/null || true
+        wait "$probe" 2>/dev/null || true
+        test "${leaf##*[\\/]}" = sh
+    }
+    if argv0_is_the_program; then
+        assert_eq sh "${got#*|}" "the image win_capture resolved"
+    else
+        echo "this host hands argv[0] to a binfmt interpreter, so the relay's" \
+            "cmdline cannot name the image; the pid half still ran" >&2
+    fi
     assert_eq "$marker" "$(cat "$tmpdir/ps.env")" "the marker powershell received"
     # In the environment, never on the command line: a marker passed as an argument
     # puts it on the querying process's own cmdline, which then matches itself.
