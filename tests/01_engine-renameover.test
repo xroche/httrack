@@ -12,10 +12,11 @@ set -euo pipefail
 dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
-case "$HTS_OS" in
-MINGW* | MSYS_NT*) want=fallback ;; # native rename() refuses an existing target
-*) want=clobber ;;
-esac
+if target_is_windows; then
+    want=fallback # native rename() refuses an existing target
+else
+    want=clobber
+fi
 
 out=$(httrack -O /dev/null -#test=renameover "$dir")
 assert_match "renameover: OK" "$out"

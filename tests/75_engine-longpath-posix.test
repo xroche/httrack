@@ -21,8 +21,7 @@ deep="/a/$(printf 'b%.0s' {1..100})/c/$(printf 'd%.0s' {1..100})"
 out="$("$httrack_bin" -O /dev/null -#test=savename "$deep/$seg.html" text/html |
     sed -n 's/^savename: //p')"
 
-case "$HTS_OS" in
-MINGW* | MSYS* | CYGWIN*)
+if target_is_windows; then
     # Windows still caps at MAX_PATH: the distinctive tail is cut
     case "$out" in
     *"$seg"*)
@@ -30,8 +29,7 @@ MINGW* | MSYS* | CYGWIN*)
         exit 1
         ;;
     esac
-    ;;
-*)
+else
     # POSIX: the full name survives, no hashing
     case "$out" in
     *"$seg"*) ;;
@@ -60,8 +58,7 @@ MINGW* | MSYS* | CYGWIN*)
         echo "FAIL: multibyte name not bounded (len=${#mb})"
         exit 1
     fi
-    ;;
-esac
+fi
 
 # #852: with the directories eating the budget, the final segment was bounded
 # by the whole path alone, so the cut took its extension with it. Vacuous on

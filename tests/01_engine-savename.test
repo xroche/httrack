@@ -155,14 +155,11 @@ assert_eq 'evil name .html' "${out##*/}" 'control bytes in a fil'
 # #133: oversized names are capped only on Windows, where the name takes the
 # same 48-char clamp as a directory segment and keeps its extension across the
 # cut (#852); elsewhere the platform PATH_MAX leaves a 300-char name whole.
-case "$HTS_OS" in
-MINGW* | MSYS* | CYGWIN*)
+if target_is_windows; then
     name "/$(printf 'a%.0s' {1..300}).php" 'text/html' "$(printf 'a%.0s' {1..43}).html"
-    ;;
-*)
+else
     name "/$(printf 'a%.0s' {1..300}).php" 'text/html' "$(printf 'a%.0s' {1..300}).html"
-    ;;
-esac
+fi
 
 # #774: the engine owns hts-cache/ and hts-tmp/ inside the mirror, so a URL must
 # never be able to name one; a site serving them gets the /nul -> nul_ treatment.
