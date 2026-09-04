@@ -362,9 +362,10 @@ fi
 # Real interop passes a variable only when WSLENV names it, so the stub refuses
 # to see one that is not listed. Without this, dropping WSLENV changes nothing
 # here and everything on a runner.
-# The relay's own /proc/<pid>/cmdline is what carries the marker, so this needs
-# a real procfs; Darwin and other /proc-less hosts have nothing to read here.
-if test -d /proc; then
+# Needs a real procfs to read the relay's cmdline from, and a shell that can
+# execute the fake powershell.exe below. MSYS can do neither: it has no /proc
+# entry to read here and it hands anything named .exe to Windows as a binary.
+if test -d /proc && ! shell_is_msys; then
     cat >"$tmpdir/pathbin/powershell.exe" <<'PSEOF'
 #!/bin/sh
 case ":${WSLENV:-}:" in
@@ -398,6 +399,8 @@ EOF
     *"$marker"*) fail "the marker rode powershell's argv: $(cat "$tmpdir/ps.argv")" ;;
     esac
     ok "win_capture resolves the Windows pid by marker, passed out of band"
+else
+    echo "no procfs, or a shell that cannot run a script named .exe" >&2
 fi
 
 # Unshimmed: a guard that fires only on the broken path is half a guard.

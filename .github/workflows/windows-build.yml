@@ -342,7 +342,9 @@ jobs:
           # itself for the two views it needs.
           export WSLENV='HTTRACK_SUITE_BACKEND:HTTRACK_SUITE_JOBS:RUNNER_TEMP:WATCHDOG_TOKEN:WATCHDOG_REPO:WATCHDOG_SHA:WATCHDOG_CONTEXT:WATCHDOG_URL:GITHUB_STEP_SUMMARY/p'
           export HTTRACK_SUITE_BACKEND=wsl2
-          ws=$(wslpath -u "$GITHUB_WORKSPACE")
+          # wslpath lives inside the distro: this step's shell is Git Bash,
+          # on the Windows side, where the name does not exist at all.
+          ws=$(wsl -d httrack-suite -- wslpath -u "$GITHUB_WORKSPACE")
           wsl -d httrack-suite --cd "$ws/tests" -- \
             bash ./ci-windows-suite.sh \
             "$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
