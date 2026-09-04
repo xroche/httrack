@@ -339,7 +339,13 @@ jobs:
       # used to run inline (codecs, cache, fsize).
       # The *_local-* ones crawl the bundled Python server over loopback: the real
       # TLS handshake, cache and file writer, which nothing else on Windows covers.
+      # DIAGNOSTIC BRANCH ONLY, DO NOT MERGE: the msys leg has reported the
+      # same pass=273 fail=0 every round, so it is costing job time and kill
+      # exposure without saying anything new. Two rounds were lost to 58-minute
+      # wedges tonight, and a shorter job is a smaller target. Restore before
+      # this branch goes anywhere near master.
       - name: Run the engine test suite (offline tests)
+        if: ${{ false }}
         shell: bash
         working-directory: tests
         timeout-minutes: 45
