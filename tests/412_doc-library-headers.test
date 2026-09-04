@@ -1,0 +1,130 @@
+#!/bin/bash
+#
+# html/library.html tells an integrator which headers an install carries, which
+# of src/httrack.c's it does not, and that the libtest examples stay inside
+# what an install carries. All three are copies of build-system facts.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir=${abs_top_srcdir:?not run under make check}
+page=${srcdir}/html/library.html
+makefile=${srcdir}/src/Makefile.am
+frontend=${srcdir}/src/httrack.c
+
+for f in "${page}" "${makefile}" "${frontend}"; do
+    test -r "${f}" || fail "no ${f}"
+done
+
+same_set() { # same_set <list A> <list B>: newline-separated, order-insensitive
+    diff <(sort <<<"$1") <(sort <<<"$2") >/dev/null
+}
+
+# Every DevIncludes_DATA assignment and its continuations, one basename a line.
+parse_installed() { # parse_installed <makefile>
+    sed -n '/DevIncludes_DATA[[:space:]]*[+:]*=/,/[^\\]$/p' "$1" |
+        sed 's/^[[:space:]]*DevIncludes_DATA[[:space:]]*[+:]*=//; s/\\$//' |
+        tr -s ' \t' '\n' | sed 's,.*/,,' | grep '\.h$' | sort -u
+}
+
+# Project headers a .c includes, either bracket style, indented or not: a name
+# is ours when src/ or the file's own directory holds it. A "#if 0" block is
+# dropped first, since the compiler never sees what it names.
+parse_includes() { # parse_includes <c file>
+    local here
+    here=$(dirname "$1")
+    awk '
+        /^[[:space:]]*#[[:space:]]*if[[:space:]]+0[[:space:]]*$/ { if (!d) { d = 1; n = 0; next } }
+        d && /^[[:space:]]*#[[:space:]]*(if|ifdef|ifndef)\>/ { n++ }
+        d && /^[[:space:]]*#[[:space:]]*endif\>/ { if (n == 0) { d = 0; next } ; n-- }
+        !d
+    ' "$1" |
+        grep -oE '^[[:space:]]*#[[:space:]]*include[[:space:]]*[<"][A-Za-z0-9._-]+\.h[">]' |
+        sed 's,^[^<"]*[<"],,; s,[">].*,,' | sort -u |
+        while read -r h; do
+            if test -e "${srcdir}/src/${h}" || test -e "${here}/${h}"; then
+                echo "${h}"
+            fi
+        done
+}
+
+# Controls: both parsers must see the spellings a future edit may use, or they
+# stop guarding without failing.
+fixture=$(mktemp -d "${TMPDIR:-/tmp}/doclib.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${fixture}"
+cat >"${fixture}/Makefile.am" <<'FIX'
+DevIncludes_DATA = \
+	one.h \
+	../two.h
+DevIncludes_DATA += three.h
+FIX
+same_set "$(parse_installed "${fixture}/Makefile.am")" 'one.h
+two.h
+three.h' || fail "parse_installed misses a += or a ../ spelling"
+cat >"${fixture}/probe.c" <<'FIX'
+#include <stdio.h>
+  #include "htsbase.h"
+#include <htslib.h>
+#if 0
+#ifdef NEVER
+#include "htsname.h"
+#endif
+#include "htscache.h"
+#endif
+FIX
+same_set "$(parse_includes "${fixture}/probe.c")" 'htsbase.h
+htslib.h' || fail "parse_includes misreads an indented, bracketed or #if 0 include"
+
+installed=$(parse_installed "${makefile}")
+grep -qx 'httrack-library.h' <<<"${installed}" ||
+    fail "parsed no DevIncludes_DATA list out of ${makefile}"
+
+if same_set "${installed}" "${installed}
+nosuch.h"; then
+    fail "same_set() ignores an extra name; the checks below prove nothing"
+fi
+
+# <li><tt>name.h</tt></li> under the headers section.
+listed=$(sed -n '/<h3 id="headers">/,/<h3 id="examples">/p' "${page}" |
+    grep -o '<li><tt>[a-z0-9.-]*\.h</tt></li>' |
+    sed 's,.*<tt>,,; s,</tt>.*,,' | sort -u)
+test -n "${listed}" || fail "parsed no header list out of ${page}"
+
+same_set "${installed}" "${listed}" || {
+    echo "${page} lists different headers than DevIncludes_DATA." >&2
+    echo "Left is src/Makefile.am, right is the page:" >&2
+    diff <(sort <<<"${installed}") <(sort <<<"${listed}") >&2 || true
+    fail "${page} is out of date"
+}
+
+# What src/httrack.c includes and an install does not carry.
+internal=$(parse_includes "${frontend}" | comm -23 - <(printf '%s\n' "${installed}"))
+test -n "${internal}" || fail "parsed no private includes out of ${frontend}"
+
+quoted=$(sed -n '/engine-internal headers (/,/install does not carry/p' "${page}" |
+    grep -o '<tt>[a-z0-9.-]*\.h</tt>' | sed 's,</*tt>,,g' | sort -u)
+test -n "${quoted}" || fail "parsed no private-include list out of ${page}"
+
+same_set "${internal}" "${quoted}" || {
+    echo "${page} names different private includes than ${frontend}." >&2
+    echo "Left is httrack.c, right is the page:" >&2
+    diff <(sort <<<"${internal}") <(sort <<<"${quoted}") >&2 || true
+    fail "${page} is out of date"
+}
+
+# The page sends the reader to libtest, claiming those files stay inside what an
+# install carries. libtest ships its own sources too, so they count as carried.
+carried=$(
+    printf '%s\n' "${installed}"
+    (cd "${srcdir}/libtest" && ls ./*.h) | sed 's,.*/,,'
+)
+carried=$(sort -u <<<"${carried}")
+for c in "${srcdir}"/libtest/*.c; do
+    stray=$(parse_includes "${c}" | comm -23 - <(printf '%s\n' "${carried}"))
+    test -z "${stray}" ||
+        fail "${c} includes ${stray//$'\n'/ }, which no install carries"
+done
+
+exit 0
