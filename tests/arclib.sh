@@ -18,8 +18,9 @@ arc_filedesc() { # arc_filedesc [LEN]
 
 # One record: the header line, then HDRFILE and BODYFILE verbatim. The declared
 # length counts BYTES, so a body outside ASCII still declares its true length.
-arc_record() { # arc_record URL MIME STATUS HDRFILE BODYFILE
+# DECLARED overrides that count, for a fixture whose record must lie about it.
+arc_record() { # arc_record URL MIME STATUS HDRFILE BODYFILE [DECLARED]
     printf '%s 0.0.0.0 %s %s %s - - 0 t.arc %d\n' "$1" "$ARC_DATE" "$2" "$3" \
-        "$(($(wc -c <"$4") + $(wc -c <"$5")))"
+        "${6:-$(($(wc -c <"$4") + $(wc -c <"$5")))}"
     cat "$4" "$5"
 }

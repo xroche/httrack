@@ -1,0 +1,627 @@
+#!/bin/bash
+#
+# A record's declared length must not reach past its own bytes into the next.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/arclib.sh
+. "${0%"${0##*/}"}./arclib.sh"
+
+export LC_ALL=C
+
+python=$(find_python) || skip "python3 missing"
+
+dir=$(mktemp -d)
+ptpid=
+cleanup() {
+    stop_server "$ptpid"
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+KEPT_BODY=KEPTPAGE
+GREEDY_BODY=GREEDYPAGE_0000000
+VICTIM_PAD=4988
+# reaches well past $GREEDY_BODY, into the victim page's padding
+GREEDY_DECLARED=4096
+
+http_head() { # http_head CONTENT_LENGTH
+    printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n' "$1"
+}
+
+# Three records: one the greedy record cannot reach, the greedy one, and the
+# victim page whose bytes must never leave the greedy record's URL. TAIL adds a
+# fourth after the victim. DECLARED is the body length the greedy record
+# announces, or "eof" for a record reaching the last byte the victim holds, but
+# it stores $GREEDY_BODY whatever it says. PAD is
+# what the victim page is padded with, so each archive's declared length lands
+# on a different class of byte. HOST keys the archive apart.
+craft() { # craft OUT HOST DECLARED PAD [VICTIM_SCHEME] [LEAD] [TAIL]
+    local out=$1 host=$2 declared=$3 pad=$4 scheme=${5:-http://} lead=${6:-yes}
+    local tail=${7:-no}
+    local length line reach
+
+    printf '%s' "$KEPT_BODY" >"$dir/kept.body"
+    http_head "${#KEPT_BODY}" >"$dir/kept.head"
+    printf '%s' "$GREEDY_BODY" >"$dir/greedy.body"
+    case $declared in
+    # no Content-Length, so the archive length is all the read is bounded by
+    eof | padline | urlend | urlmid) printf 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n' >"$dir/greedy.head" ;;
+    *) http_head "$declared" >"$dir/greedy.head" ;;
+    esac
+    {
+        printf 'VICTIM-%s\n' "$host"
+        # a page may hold a line that looks like part of a record header, and no
+        # part alone may cost it its place in the archive
+        printf 'http://not-a-record\n'
+        printf 'three fields 5\n'
+        printf 'http://neg a b c d e f g -5\n'
+    } >"$dir/victim.prefix"
+    if test "$pad" = lines; then
+        awk -v n="$((VICTIM_PAD / 8))" 'BEGIN { while (n-- > 0) print "padline" }' \
+            >"$dir/victim.pad"
+    else
+        printf '%*s' "$VICTIM_PAD" '' | tr ' ' "$pad" >"$dir/victim.pad"
+    fi
+    cat "$dir/victim.prefix" "$dir/victim.pad" >"$dir/victim.body"
+    http_head "$(wc -c <"$dir/victim.body")" >"$dir/victim.head"
+    arc_record "$scheme$host/victim.html" text/html 200 \
+        "$dir/victim.head" "$dir/victim.body" >"$dir/victim.rec"
+    # the bytes from the greedy record's data to the victim record's own line,
+    # then on to the victim's data
+    line=$(($(wc -c <"$dir/greedy.head") + $(wc -c <"$dir/greedy.body") + 1))
+    reach=$((line + $(wc -c <"$dir/victim.rec") - $(wc -c <"$dir/victim.body")))
+    case $declared in
+    eof) length=$((reach + $(wc -c <"$dir/victim.body"))) ;;
+    # stopping on the newline that ends the first padding line, so the byte
+    # after it opens a line that is not a record
+    padline) length=$((reach + $(wc -c <"$dir/victim.prefix") + 7)) ;;
+    # stopping where the victim's data begins, so the victim's own record line
+    # ends exactly on the greedy record's last byte
+    urlend) length=$reach ;;
+    # stopping inside that record line, which a scan counting a line by where it
+    # ENDS never sees, and the front of the line goes out with the body
+    urlmid) length=$((line + ($(wc -c <"$dir/victim.rec") - $(wc -c <"$dir/victim.head") - $(wc -c <"$dir/victim.body")) / 2)) ;;
+    *) length=$(($(wc -c <"$dir/greedy.head") + declared)) ;;
+    esac
+    {
+        arc_filedesc
+        if test "$lead" = yes; then
+            arc_record "http://$host/kept.html" text/html 200 \
+                "$dir/kept.head" "$dir/kept.body"
+            printf '\n' # the separator opening each record after the first
+        fi
+        arc_record "http://$host/greedy.html" text/html 200 \
+            "$dir/greedy.head" "$dir/greedy.body" "$length"
+        printf '\n'
+        cat "$dir/victim.rec"
+        if test "$tail" = yes; then
+            printf 'TAIL-%s\n' "$host" >"$dir/tail.body"
+            http_head "$(wc -c <"$dir/tail.body")" >"$dir/tail.head"
+            printf '\n'
+            arc_record "http://$host/tail.html" text/html 200 \
+                "$dir/tail.head" "$dir/tail.body"
+        fi
+    } >"$out"
+}
+
+craft "$dir/honest.arc" honest "${#GREEDY_BODY}" ' '
+# every byte class a one-byte boundary test could take for a separator, and the
+# newline above all, because a text page is full of them
+craft "$dir/space.arc" space "$GREEDY_DECLARED" ' '
+craft "$dir/digit.arc" digit "$GREEDY_DECLARED" 0
+craft "$dir/newline.arc" newline "$GREEDY_DECLARED" $'\n' ftp://
+craft "$dir/cr.arc" cr "$GREEDY_DECLARED" $'\r'
+# and the length an attacker aligns to the last byte of the file, where there is
+# no next record to compare against
+craft "$dir/eof.arc" eof eof ' '
+# the same lie told by the archive's first record, which a check counting from
+# the second one never sees
+craft "$dir/nolead.arc" nolead "$GREEDY_DECLARED" ' ' http:// no
+# and a length stopping on a newline that opens a line, so a check content to
+# find any line there rather than a record's own header takes it
+craft "$dir/padline.arc" padline padline lines
+# and one stopping on the last byte of the record it swallowed, which an
+# off-by-one in the scan stops counting
+craft "$dir/urlend.arc" urlend urlend ' '
+# and one stopping inside that record's line, so the line the scan must catch
+# is one that ENDS outside the greedy record
+craft "$dir/urlmid.arc" urlmid urlmid ' '
+# The lie the declared length is FOR: it ends exactly where a record starts, so
+# a check that accepts on "a record follows" passes it while a whole page inside
+# goes out under the greedy record's URL. The tail record says whether the walk
+# survives the refusal.
+craft "$dir/later.arc" later eof ' ' http:// yes yes
+# A scheme this reader never serves still marks where the record before it ends.
+# Heritrix writes one "dns:" record per host, so an archive without this is the
+# common case, not the corner one.
+craft "$dir/dns.arc" dns "$GREEDY_DECLARED" ' ' dns:
+
+# junk on the end leaves an archive honest, so refusing its last record would
+# cost a page for nothing
+cp "$dir/honest.arc" "$dir/trailer.arc"
+printf 'not a record\0\0\0' >>"$dir/trailer.arc"
+
+# A page carrying a line of the right shape is refused, and that is the price of
+# the check. What it may not cost is the records after it: an archive from a
+# crawler that writes one such page keeps everything else it holds.
+chain() { # chain OUT FIRST_BODY_FILE [DNS]
+    local out=$1 first=$2 dns=${3:-no}
+    local i
+
+    http_head "$(wc -c <"$first")" >"$dir/chain.head"
+    {
+        arc_filedesc
+        arc_record http://chain/first.html text/html 200 "$dir/chain.head" "$first"
+        if test "$dns" = yes; then
+            printf 'q.example.\t3600\tIN\tA\t1.2.3.4\n' >"$dir/chain.dns"
+            : >"$dir/chain.nobody"
+            printf '\n'
+            arc_record dns:q.example text/dns 200 "$dir/chain.dns" "$dir/chain.nobody"
+        fi
+        for i in 1 2; do
+            printf 'CHAIN-%d\n' "$i" >"$dir/chain$i.body"
+            http_head "$(wc -c <"$dir/chain$i.body")" >"$dir/chain$i.head"
+            printf '\n'
+            arc_record "http://chain/page$i.html" text/html 200 \
+                "$dir/chain$i.head" "$dir/chain$i.body"
+        done
+    } >"$out"
+}
+
+# a real record line, quoted by the page that holds it
+printf 'see http://x/y for details\nhttp://q/r 1.2.3.4 %s text/html 200 - - 0 t.arc 7\nend\n' \
+    "$ARC_DATE" >"$dir/quoting.body"
+chain "$dir/quoting.arc" "$dir/quoting.body"
+# and the near misses a looser shape would take for one, each of which would
+# cost this page its place in the archive
+{
+    printf 'http://not-a-record\n'
+    printf 'three fields 5\n'
+    printf 'http://neg a b c d e f g -5\n'
+    printf 'http://q/r 1.2.3.4 %s text/html v4\n' "$ARC_DATE"
+    printf 'x: 1.2.3.4 %s text/html 4\n' "$ARC_DATE"
+    printf 'a/b:c 1.2.3.4 %s text/html 4\n' "$ARC_DATE"
+    printf 'NEARMISS\n'
+} >"$dir/nearmiss.body"
+chain "$dir/nearmiss.arc" "$dir/nearmiss.body"
+# and the same page with a Heritrix "dns:" record between it and the rest, the
+# record whose scheme decides whether the walk can go on at all
+chain "$dir/dnschain.arc" "$dir/quoting.body" yes
+
+# The record lines a scan has to recognise or place exactly, each in an archive
+# whose greedy record swallows it. A miss here is a page served under another
+# page's URL, so these are the shapes an archive in the wild actually carries.
+"$python" - "$dir" "$ARC_DATE" <<'EOF' || fail "could not craft the shape fixtures"
+import sys
+
+d, date = sys.argv[1], sys.argv[2].encode()
+SCAN_BUFFER = 32768  # mirrors the buffer arcDataHoldsARecord() reads through
+
+
+def head(b):
+    return b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n" % len(b)
+
+
+def archive(host, victim_line, pad=b" " * 64, at_eof=False, vdata=None):
+    kept = b"KEPTPAGE"
+    greedy = b"GREEDYPAGE"
+    victim = b"VICTIM-" + host + b"\n" + b"x" * 32
+    # no Content-Length on the greedy record, so its declared length is the only
+    # bound the read has and the whole lie is served
+    gdata = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + greedy
+    if vdata is None:
+        vdata = head(victim) + victim
+    line = victim_line % len(vdata)
+    tail = pad + b"\n" + (line.rstrip(b"\n") if at_eof else line + vdata)
+    declared = len(gdata) + len(tail)
+    out = b"filedesc://t.arc 0.0.0.0 " + date + b" text/plain 200 - - 0 t.arc 9\n"
+    out += b"2 0 test\n\n\n"
+    for name, data, length in ((b"kept", head(kept) + kept, None),
+                               (b"greedy", gdata + tail, declared)):
+        if name == b"greedy":
+            out += b"\n"
+        out += b"http://%s/%s.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n" % (
+            host, name, date, len(data) if length is None else length)
+        out += data
+    return out
+
+
+v10 = b"http://%s/victim.html 0.0.0.0 " + date + b" text/html 200 - - 0 t.arc %%d"
+cases = {
+    # a writer ending its record lines with CRLF: linput() drops the CR
+    b"crlf": archive(b"crlf", (v10 % b"crlf") + b"\r\n"),
+    # one byte linput() drops, in front of an ordinary record line: a scan that
+    # weighs the raw bytes reads the line as page text and hands it out
+    b"tab": archive(b"tab", b"\t" + (v10 % b"tab") + b"\n"),
+    b"crb": archive(b"crb", b"\r" + (v10 % b"crb") + b"\n"),
+    b"ff": archive(b"ff", b"\x0c" + (v10 % b"ff") + b"\n"),
+    # the shapes PT_LoadCache__Arc indexes and serves: three fields, and a
+    # length sscanf() takes but a digit run does not
+    b"f3": archive(b"f3", b"http://f3/victim.html 0.0.0.0 %d\n"),
+    b"f6": archive(b"f6", b"http://f6/victim.html 0.0.0.0 " + date
+                   + b" text/html 200 %d\n"),
+    b"lenx": archive(b"lenx", b"http://lenx/victim.html 0.0.0.0 " + date
+                     + b" text/html %dx\n"),
+    b"lenplus": archive(b"lenplus", b"http://lenplus/victim.html 0.0.0.0 " + date
+                        + b" text/html 200 - - 0 t.arc +%d\n"),
+    # arc 1.0, five fields
+    b"arc10": archive(b"arc10", b"http://arc10/victim.html 1.2.3.4 " + date
+                      + b" text/html %d\n"),
+    # a date this reader cannot use, on a scheme it serves
+    b"undated": archive(b"undated", b"http://undated/victim.html 1.2.3.4 20250101"
+                        b" text/html 200 - - 0 t.arc %d\n"),
+    # five fields on a scheme the reader never serves, so only the shape sees it
+    b"gopher": archive(b"gopher", b"gopher://gopher/victim.html 0.0.0.0 " + date
+                       + b" text/html %d\n"),
+    # a scheme whose second character is a digit, which a scheme scan starting
+    # one byte off never finishes
+    b"digitscheme": archive(b"digitscheme", b"x2y:digitscheme/victim.html 0.0.0.0 "
+                            + date + b" text/html %d\n"),
+    # a length of one digit, and one carrying a 9: every other fixture here
+    # declares several digits and not one of them is a 9
+    b"len9": archive(b"len9", b"dns:len9/victim.html 0.0.0.0 " + date
+                     + b" text/html %d\n", vdata=b"VICTIMxyz"),
+    b"len19": archive(b"len19", b"dns:len19/victim.html 0.0.0.0 " + date
+                      + b" text/html %d\n", vdata=b"VICTIM-len19-bytes"),
+    # a byte linput() drops sitting INSIDE the scheme, not in front of the line
+    b"schemecr": archive(b"schemecr", b"htt\rp://schemecr/victim.html 0.0.0.0 "
+                         + date + b" text/html %d\n"),
+    # and a NUL, which this reader's own linput() drops like a TAB, so a record
+    # line carrying one is indexed and served all the same
+    b"schemenul": archive(b"schemenul", b"htt\x00p://schemenul/victim.html 0.0.0.0 "
+                          + date + b" text/html %d\n"),
+    # a record line near the longest linput() will return, which a scan reading
+    # fewer characters than linput() would cut short of its length field
+    b"longline": archive(b"longline", b"http://longline/" + b"p" * 1960
+                         + b"/victim.html 0.0.0.0 " + date
+                         + b" text/html 200 - - 0 t.arc %d\n"),
+    # a record line closing the file, which has no newline of its own
+    b"eofline": archive(b"eofline", v10 % b"eofline" + b"\n", at_eof=True),
+}
+# and one whose record line straddles the scan's buffer
+probe = archive(b"straddle", v10 % b"straddle" + b"\n")
+# exactly as long as linput() will return, so a scan reading one character less
+# loses the length field and stops seeing the line
+LINPUT_MAX = 2046
+_vdata = b"VICTIMxyz"
+_head = b"dns:longmax/"
+_tail = b"/victim.html 0.0.0.0 " + date + b" text/html %d\n"
+_pad = LINPUT_MAX - len(_head) - len(_tail % len(_vdata)) + 1
+cases[b"longmax"] = archive(b"longmax", _head + b"q" * _pad + _tail, vdata=_vdata)
+assert len((_head + b"q" * _pad + _tail % len(_vdata)).rstrip(b"\n")) == LINPUT_MAX
+
+cases[b"strdrop"] = archive(
+    b"strdrop", b"http://strdrop/victim.html" + b"\r" * 2100
+    + b" 0.0.0.0 " + date + b" text/html 200 - - 0 t.arc %d\n")
+lead = probe.index(b"\nhttp://straddle/greedy.html")
+gdata = probe.index(b"\n", lead + 1) + 1
+victim = probe.index(b"http://straddle/victim.html", gdata)
+cases[b"straddle"] = archive(
+    b"straddle", v10 % b"straddle" + b"\n",
+    pad=b" " * (64 + SCAN_BUFFER - 8 - (victim - gdata)))
+for host, data in cases.items():
+    open("%s/%s.arc" % (d, host.decode()), "wb").write(data)
+
+
+# Refusing the greedy record leaves the walk at its declared end, where the
+# record line can be anything the loader accepts. None of these may cost the
+# records stored after it.
+def resync(host, midline):
+    kept = b"KEPTPAGE"
+    greedy = b"GREEDYPAGE"
+    victim = b"VICTIM-" + host
+    gdata = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n" + greedy
+    vdata = head(victim) + victim
+    vline = b"http://%s/victim.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n" % (
+        host, date, len(vdata))
+    mid = b"MIDD"
+    tail = head(b"TAILPAGE") + b"TAILPAGE"
+    out = b"filedesc://t.arc 0.0.0.0 " + date + b" text/plain 200 - - 0 t.arc 9\n"
+    out += b"2 0 test\n\n\n"
+    out += b"http://%s/greedy.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n" % (
+        host, date, len(gdata) + 1 + len(vline) + len(vdata))
+    out += gdata + b"\n" + vline + vdata
+    out += b"\n" + (midline % len(mid)) + mid
+    out += b"\n" + b"http://%s/tail.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n" % (
+        host, date, len(tail)) + tail
+    return out
+
+
+for host, midline in (
+    # a trailing space, which turns five fields into six for anything counting
+    (b"trailsp", b"http://trailsp/m.html 0.0.0.0 " + date + b" text/html %d \n"),
+    # three fields, which no shape test can take and the loader indexes anyway
+    (b"mid3", b"http://mid3/m.html 0.0.0.0 %d\n"),
+    # and a scheme this reader never serves, dated as the format asks
+    (b"midgopher", b"gopher://midgopher/m 0.0.0.0 " + date + b" text/html %d\n"),
+):
+    open("%s/%s.arc" % (d, host.decode()), "wb").write(resync(host, midline))
+
+
+# Two honest-looking records the loader has no reason to refuse, where the bound
+# the READER puts on its own read is all that keeps the record after them out.
+def pair(host, adata, bdata):
+    out = b"filedesc://t.arc 0.0.0.0 " + date + b" text/plain 200 - - 0 t.arc 9\n"
+    out += b"2 0 test\n\n\n"
+    for name, data in ((b"a", adata), (b"b", bdata)):
+        if name == b"b":
+            out += b"\n"
+        out += b"http://%s/%s.html 0.0.0.0 %s text/html 200 - - 0 t.arc %d\n" % (
+            host, name, date, len(data))
+        out += data
+    return out
+
+
+nxt = (b"HTTP/1.1 418 NEXTMSG\r\nContent-Type: text/NEXTTYPE\r\n"
+       b"Location: http://NEXTLOC/\r\nContent-Length: 9\r\n\r\nNEXTBODY\n")
+# a Content-Length larger than the record's own archive length
+open(d + "/overlong.arc", "wb").write(pair(
+    b"overlong",
+    b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 4096\r\n\r\nA-BODY",
+    nxt + b"x" * 4096))
+# and a record whose data ends inside its own status line
+open(d + "/shorthdr.arc", "wb").write(pair(b"shorthdr", b"HTTP/", nxt))
+EOF
+
+# Walks the record chain to return the body archive $1 stores for URL $2, rather
+# than trusting a declared length twice.
+body_of() { # body_of ARC URL
+    "$python" - "$1" "$2" <<'EOF'
+import sys
+
+data = open(sys.argv[1], "rb").read()
+pos = data.index(b"\n") + 1  # the filedesc line
+pos += int(data[:pos].split()[-1]) + 1  # its declared block, then the blank line
+while pos < len(data):
+    if data[pos : pos + 1] != b"\n":
+        break
+    eol = data.index(b"\n", pos + 1)
+    line = data[pos + 1 : eol].split()
+    length = int(line[-1])
+    if line[0].decode() == sys.argv[2]:
+        record = data[eol + 1 : eol + 1 + length]
+        sys.stdout.buffer.write(record.partition(b"\r\n\r\n")[2])
+        sys.exit(0)
+    pos = eol + 1 + length
+sys.exit("no record for %s" % sys.argv[2])
+EOF
+}
+
+stored() { # stored ARC URL FILE
+    body_of "$1" "$2" >"$3" || fail "$1 holds no record for $2"
+}
+
+is_body() { # is_body FILE TEXT WHAT
+    test "$(cat "$1")" = "$2" || fail_dump "$3" "$1"
+}
+
+# Consumer 1: the ARC writer, reading one archive and writing another.
+convert() { # convert IN OUT
+    proxytrack --convert "$2" "$1" >"$dir/convert.log" 2>&1 ||
+        fail_dump "proxytrack died converting $1" "$dir/convert.log"
+}
+
+# The control the rest rests on. An honest chain keeps the records apart, so all
+# three markers exist in the fixture and each stays under its own URL.
+convert "$dir/honest.arc" "$dir/honest-out.arc"
+stored "$dir/honest-out.arc" http://honest/kept.html "$dir/out.kept"
+is_body "$dir/out.kept" "$KEPT_BODY" "the honest archive lost its first record"
+stored "$dir/honest-out.arc" http://honest/greedy.html "$dir/out.greedy"
+is_body "$dir/out.greedy" "$GREEDY_BODY" \
+    "an honest declared length lost the record's body"
+stored "$dir/honest-out.arc" http://honest/victim.html "$dir/out.victim"
+grep -qaF VICTIM-honest "$dir/out.victim" ||
+    fail "the honest archive lost its last record"
+
+convert "$dir/trailer.arc" "$dir/trailer-out.arc"
+stored "$dir/trailer-out.arc" http://honest/victim.html "$dir/out.trailer"
+grep -qaF VICTIM-honest "$dir/out.trailer" ||
+    fail "an archive with junk after its last record lost that record"
+
+for class in space digit newline cr eof padline urlend urlmid later dns \
+    crlf arc10 undated straddle eofline tab crb ff f3 f6 lenx lenplus \
+    strdrop gopher longline digitscheme len9 len19 schemecr schemenul \
+    longmax; do
+    convert "$dir/$class.arc" "$dir/$class-out.arc"
+    # the record before the greedy one, so an implementation that refuses the
+    # whole archive cannot pass the assertion below
+    stored "$dir/$class-out.arc" "http://$class/kept.html" "$dir/$class.kept"
+    is_body "$dir/$class.kept" "$KEPT_BODY" \
+        "a $class-padded archive lost the record before the greedy one"
+    # Either the greedy record is refused or it is clipped to its own bytes.
+    # What it may never carry is the page stored after it.
+    if body_of "$dir/$class-out.arc" "http://$class/greedy.html" \
+        >"$dir/$class.greedy" 2>"$dir/$class.err"; then
+        for leak in "VICTIM-$class" victim.html; do
+            grep -qaF "$leak" "$dir/$class.greedy" &&
+                fail_dump "the greedy record carried $leak" "$dir/$class.greedy"
+        done
+    else
+        grep -qa "no record for" "$dir/$class.err" ||
+            fail_dump "reading the $class archive back failed" "$dir/$class.err"
+    fi
+done
+
+# The tail record, which exists to say that refusing the greedy record did not
+# also drop everything stored after the page it swallowed.
+stored "$dir/later-out.arc" http://later/tail.html "$dir/later.tail"
+grep -qaF TAIL-later "$dir/later.tail" ||
+    fail "refusing one record cost the archive the records after it"
+
+convert "$dir/quoting.arc" "$dir/quoting-out.arc"
+for page in page1 page2; do
+    stored "$dir/quoting-out.arc" "http://chain/$page.html" "$dir/quoting.$page"
+    grep -qaF CHAIN- "$dir/quoting.$page" ||
+        fail "a page quoting a record line cost the archive $page"
+done
+
+for class in trailsp mid3 midgopher; do
+    convert "$dir/$class.arc" "$dir/$class-out.arc"
+    stored "$dir/$class-out.arc" "http://$class/tail.html" "$dir/$class.tail"
+    grep -qaF TAILPAGE "$dir/$class.tail" ||
+        fail "refusing one record cost the archive the records after it"
+    if body_of "$dir/$class-out.arc" "http://$class/greedy.html" \
+        >"$dir/$class.greedy" 2>/dev/null; then
+        grep -qaF "VICTIM-$class" "$dir/$class.greedy" &&
+            fail_dump "the greedy record carried its neighbour" "$dir/$class.greedy"
+    fi
+done
+
+for class in overlong shorthdr; do
+    convert "$dir/$class.arc" "$dir/$class-out.arc"
+    # the record is kept, so what is asserted is the bytes it carries
+    "$python" - "$dir/$class-out.arc" "http://$class/a.html" <<'EOF' ||
+import sys
+
+# by declared length, because the leak this looks for starts with a record line
+# and a search for the next one would cut the block short of it
+data = open(sys.argv[1], "rb").read()
+pos = data.index(b"\n") + 1
+pos += int(data[:pos].split()[-1]) + 1
+record = None
+while pos < len(data):
+    if data[pos : pos + 1] != b"\n":
+        break
+    eol = data.index(b"\n", pos + 1)
+    length = int(data[pos + 1 : eol].split()[-1])
+    if data[pos + 1 : eol].split()[0].decode() == sys.argv[2]:
+        record = data[eol + 1 : eol + 1 + length]
+    pos = eol + 1 + length
+if record is None:
+    sys.exit("the record the reader had to bound vanished from the archive")
+for field in (b"NEXTTYPE", b"NEXTLOC", b"NEXTBODY", b"NEXTMSG"):
+    if field in record:
+        sys.exit("%r reached the record stored before the one that declared it" % field)
+if b"NEXTTYPE" not in data:
+    sys.exit("the fixture lost the fields it exists to track")
+EOF
+        fail_dump "a record served the bytes of the record after it" \
+            "$dir/$class-out.arc"
+done
+
+convert "$dir/dnschain.arc" "$dir/dnschain-out.arc"
+for page in page1 page2; do
+    stored "$dir/dnschain-out.arc" "http://chain/$page.html" "$dir/dnschain.$page"
+    grep -qaF CHAIN- "$dir/dnschain.$page" ||
+        fail "a dns: record between two pages cost the archive $page"
+done
+
+convert "$dir/nearmiss.arc" "$dir/nearmiss-out.arc"
+stored "$dir/nearmiss-out.arc" http://chain/first.html "$dir/nearmiss.first"
+grep -qaF NEARMISS "$dir/nearmiss.first" ||
+    fail "a page holding no record line was refused all the same"
+
+convert "$dir/nolead.arc" "$dir/nolead-out.arc"
+if body_of "$dir/nolead-out.arc" http://nolead/greedy.html >"$dir/nolead.greedy" 2>&1; then
+    grep -qaF VICTIM-nolead "$dir/nolead.greedy" &&
+        fail_dump "a lie in the archive's first record went unchecked" \
+            "$dir/nolead.greedy"
+fi
+
+# A header block with no blank line of its own runs into the next record's meta
+# line, so the fields the reader keeps come from the record after it.
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/first' >"$dir/hdr.head"
+: >"$dir/hdr.empty"
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/next\r\nLocation: http://elsewhere/\r\nContent-Length: 5\r\n\r\n' >"$dir/next.head"
+printf 'BODY2' >"$dir/next.body"
+# and a block whose own last line ends on the record's last byte, which the
+# bound must keep
+printf 'HTTP/1.1 200 OK\r\nContent-Type: text/tight\r\n' >"$dir/tight.head"
+{
+    arc_filedesc
+    arc_record http://hdr/first.html text/html 200 "$dir/hdr.head" "$dir/hdr.empty"
+    printf '\n'
+    arc_record http://hdr/tight.html text/html 200 "$dir/tight.head" "$dir/hdr.empty"
+    printf '\n'
+    arc_record http://hdr/next.html text/html 200 "$dir/next.head" "$dir/next.body"
+} >"$dir/hdr.arc"
+
+convert "$dir/hdr.arc" "$dir/hdr-out.arc"
+"$python" - "$dir/hdr-out.arc" <<'EOF' || fail_dump "a record kept the next record's headers" "$dir/hdr-out.arc"
+import sys
+
+out = open(sys.argv[1], "rb").read().decode("latin-1")
+start = out.find("\nhttp://hdr/first.html ")
+if start < 0:
+    sys.exit("the unterminated record vanished from the archive")
+end = out.find("\nhttp://", start + 1)
+first = out[start:] if end < 0 else out[start:end]
+for field in ("text/tight", "text/next", "http://elsewhere/"):
+    if field in first:
+        sys.exit("%r reached the record stored before the one that declared it" % field)
+if "text/next" not in out or "http://elsewhere/" not in out:
+    sys.exit("the fixture lost the fields it exists to track")
+if "text/tight" not in out:
+    sys.exit("a header line ending on the record's last byte was dropped")
+EOF
+
+# Consumer 2: the reply to a client.
+launch_proxytrack() {
+    proxytrack "127.0.0.1:$proxyport" "127.0.0.1:$icpport" \
+        "$dir/honest.arc" "$dir/space.arc" "$dir/digit.arc" \
+        "$dir/newline.arc" "$dir/cr.arc" "$dir/eof.arc" \
+        "$dir/nolead.arc" "$dir/padline.arc" "$dir/urlend.arc" \
+        "$dir/urlmid.arc" "$dir/later.arc" "$dir/dns.arc" >"$ptlog" 2>&1 &
+    ptpid=$!
+}
+start_proxytrack "$dir/pt" launch_proxytrack
+
+"$python" - "$proxyport" "$GREEDY_BODY" <<'EOF' ||
+import socket, sys
+
+port, honest_body = int(sys.argv[1]), sys.argv[2].encode()
+
+
+def get(host):
+    sock = socket.create_connection(("127.0.0.1", port), 10)
+    sock.settimeout(10)
+    sock.sendall(
+        ("GET http://%s/greedy.html HTTP/1.1\r\nHost: %s\r\n\r\n" % (host, host)).encode()
+    )
+    reply = b""
+    want = None
+    try:
+        while True:
+            # the reply is read to its own declared length: proxytrack keeps the
+            # connection open, so draining to EOF costs the socket timeout
+            if want is None and b"\r\n\r\n" in reply:
+                head = reply.partition(b"\r\n\r\n")[0].lower()
+                for line in head.split(b"\r\n"):
+                    if line.startswith(b"content-length:"):
+                        want = int(line.split(b":")[1])
+            if want is not None and len(reply.partition(b"\r\n\r\n")[2]) >= want:
+                break
+            chunk = sock.recv(65536)
+            if not chunk:
+                break
+            reply += chunk
+    except socket.timeout:
+        pass
+    sock.close()
+    # the status line, so an empty or truncated reply cannot read as a pass
+    if not reply.startswith(b"HTTP/"):
+        sys.exit("%s answered %r, which is no reply at all" % (host, reply[:64]))
+    if want is None:
+        sys.exit("%s answered without a length: %r" % (host, reply[:120]))
+    return reply.partition(b"\r\n\r\n")[2]
+
+
+payload = get("honest")
+if payload != honest_body:
+    sys.exit(
+        "the honest record served %r, not its own %d bytes"
+        % (payload[:64], len(honest_body))
+    )
+
+for host in ("space", "digit", "newline", "cr", "eof", "nolead", "padline", "urlend",
+             "urlmid", "later", "dns"):
+    payload = get(host)
+    if ("VICTIM-%s" % host).encode() in payload:
+        sys.exit("the %s archive served the victim page: %r" % (host, payload[:200]))
+EOF
+    fail_dump "a record's reply carried bytes from outside it" "$ptlog"
+
+echo "OK: no consumer read an .arc record past its own bytes"
