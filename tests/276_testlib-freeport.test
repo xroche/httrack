@@ -15,6 +15,9 @@ python=$real_python # freeport reads it from here
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_freeport.XXXXXX")
 cleanup_push rm -rf "$tmpdir"
 typelog="$tmpdir/socktypes"
+# One file, two names: python is a native exe under wsl2 and cannot open the
+# drvfs path this shell reads it back through. A no-op on the other backends.
+typelog_native=$(nativepath "$typelog")
 
 bindable() { # bindable PROTO PORT
     "$real_python" -c 'import socket, sys
@@ -46,7 +49,7 @@ class Spy(real):
 
 socket.socket = Spy
 sys.argv = sys.argv[2:]
-exec(code)' "$typelog" "$script" ${1+"$@"}
+exec(code)' "$typelog_native" "$script" ${1+"$@"}
 }
 
 # Every socket reports one port, so the redraw freeport does on a collision runs
