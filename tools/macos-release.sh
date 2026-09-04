@@ -168,7 +168,7 @@ ditto "$app" "$stage/$(basename "$app")"
 ln -s /Applications "$stage/Applications"
 rm -f "$dmg"
 # hdiutil attaches the image while it fills it, and that attach loses a race with a
-# previous run's helper often enough to lose a release build, so retry on EBUSY.
+# previous run's helper often enough to lose a release build, so retry a few times.
 attempt=1
 until hdiutil create -volname "HTTrack $name" -srcfolder "$stage" -fs HFS+ -format UDZO "$dmg"; do
     test "$attempt" -lt 4 || fail "hdiutil could not create $dmg"
