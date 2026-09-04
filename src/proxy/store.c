@@ -1253,7 +1253,15 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
               if (!dataincache) {
                 /* Read in memory from cache */
                 if (flags & FETCH_BODY) {
-                  if (strnotempty(previous_save)) {
+                  if (!strnotempty(previous_save)) {
+                    r->statuscode = STATUSCODE_INVALID;
+                    strcpybuff(r->msg, "Cached file name is invalid");
+                  } else if (r->size >= INT_MAX) {
+                    /* Read whole into memory: htscache.c's own limit, past
+                       which r->size + 1 wraps to zero on a 32-bit size_t. */
+                    r->statuscode = STATUSCODE_INVALID;
+                    strcpybuff(r->msg, "Cache Read Error : Bad Size");
+                  } else {
                     FILE *fp = fopen(file_convert(catbuff, sizeof(catbuff), previous_save), "rb");
 
                     if (fp != NULL) {
@@ -1284,9 +1292,6 @@ static PT_Element PT_ReadCache__New_u(PT_Index index_, const char *url,
                           file_convert(catbuff, sizeof(catbuff),
                                        previous_save));
                     }
-                  } else {
-                    r->statuscode = STATUSCODE_INVALID;
-                    strcpybuff(r->msg, "Cached file name is invalid");
                   }
                 }
               } else {

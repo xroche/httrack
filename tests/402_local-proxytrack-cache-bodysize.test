@@ -1,0 +1,76 @@
+#!/bin/bash
+# X-Size: 4294967295 made malloc(size + 1) wrap to malloc(0) where size_t is 32
+# bits, and the disk-held body then filled that zero-length region.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+python=$(find_python) || skip "python3 missing"
+
+# X-Save is relative to the cache's grandparent, so keep HTTrack's own layout
+mkdir -p "$dir/m/hts-cache"
+zip="$dir/m/hts-cache/new.zip"
+BODY='<html>hello</html>'
+printf '%s' "$BODY" >"$dir/m/body.html"
+
+bad_size='Bad Size' # the reader's verdict on a size it refuses
+
+# X-In-Cache: 0 leaves the body on disk, which is the path that allocates it
+craft() { # craft X-SIZE
+    "$python" - "$zip" "$1" <<'EOF'
+import sys, zipfile
+
+meta = (
+    "X-In-Cache: 0\r\n"
+    "X-StatusCode: 200\r\n"
+    "X-StatusMessage: ok\r\n"
+    "X-Size: %s\r\n"
+    "Content-Type: text/html\r\n"
+    "Last-Modified: Wed, 01 Jan 2025 00:00:00 GMT\r\n"
+    "X-Save: body.html\r\n" % sys.argv[2]
+).encode()
+zi = zipfile.ZipInfo("example.com/page.html")
+zi.compress_type = zipfile.ZIP_STORED
+zi.extra = meta
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr(zi, b"")
+EOF
+}
+
+read_back() { # read_back X-SIZE
+    craft "$1"
+    proxytrack --convert "$dir/out.arc" "$zip" >/dev/null 2>&1 ||
+        fail "proxytrack died reading a cache declaring X-Size: $1"
+}
+
+# control: without it a fix that refused every disk-held body would pass
+read_back "${#BODY}"
+grep -qaF "$BODY" "$dir/out.arc" || fail "an honest X-Size lost the body"
+if grep -qa "$bad_size" "$dir/out.arc"; then
+    fail "an honest X-Size was refused"
+fi
+
+# The limit itself, one past it, a value between, and the SIZE_MAX whose + 1
+# wraps to zero on a 32-bit size_t: a guard hardcoded to the wrapping value
+# alone passes on that one and fails on the rest.
+for value in 2147483647 2147483648 3000000000 4294967295; do
+    read_back "$value"
+    grep -qa "$bad_size" "$dir/out.arc" ||
+        fail "an on-disk X-Size of $value was accepted"
+    if grep -qaF "$BODY" "$dir/out.arc"; then
+        fail "an on-disk X-Size of $value still returned a body"
+    fi
+done
+
+# a size the reader can hold is not this gate's business, even when the file is
+# far shorter: refusing it here would hide a fix that just dropped mismatches
+read_back 4096
+if grep -qa "$bad_size" "$dir/out.arc"; then
+    fail "a holdable X-Size larger than the file was called a bad size"
+fi
+
+exit 0
