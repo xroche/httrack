@@ -23,7 +23,7 @@ assert_match "renameover: OK" "$out"
 assert_match "renameover: regime $want" "$out"
 assert_match "renameover: restore back" "$out"
 
-if [ "$HTS_OS" != "Linux" ]; then
+if ! target_is_linux; then
     echo "renameover: LD_PRELOAD interposition is Linux-only here, skipping"
     exit 0
 fi
