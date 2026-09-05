@@ -2347,7 +2347,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               default:{
                   char s[HTS_CDLMAXSIZE + 256];
 
-                  sprintf(s, "invalid option %%%c\n", *com);
+                  sprintf(s, "invalid option @%c\n", *com);
                   HTS_PANIC_PRINTF(s);
                   htsmain_free();
                   return -1;
