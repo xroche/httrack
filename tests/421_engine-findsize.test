@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # hts_findgetsize64() carries a size past the 32-bit wrap where the deprecated
-# int form can only report -1 ('httrack -#test=findsize <dir>'). 5GB, sparse.
+# int form can only report -1 ('httrack -#test=findsize <dir>'). Sparse: 5GB, and
+# 6GB for the low dword's sign bit.
 
 set -euo pipefail
 # shellcheck source=tests/testlib.sh
@@ -14,9 +15,9 @@ rc=0
 out=$(httrack -#test=findsize "$dir") || rc=$?
 echo "$out"
 
-# 77 = platform can't host the 5GB probe (EFBIG/ENOSPC); skip, don't fail.
+# 77 = platform can't host the sparse probes (EFBIG/ENOSPC); skip, don't fail.
 [ "$rc" = 77 ] && exit 77
 [ "$rc" = 0 ] || exit "$rc"
 
-want="findsize: width=8 big=5368709120,-1 small=1234,1234"
+want="findsize: width=8 big=5368709120,-1 signbit=6442450944,-1 small=1234,1234"
 test "$out" == "$want" || fail "unexpected size report (want '$want')"
