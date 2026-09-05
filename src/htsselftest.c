@@ -2294,6 +2294,12 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* The handler below pins the enumerator NAME; these pin the NUMBERS, which are
+   ABI in the installed htsopt.h and are what -C prints. */
+HTS_STATIC_ASSERT(HTS_CACHE_NONE == 0, cache_none_is_0);
+HTS_STATIC_ASSERT(HTS_CACHE_PRIORITY == 1, cache_priority_is_1);
+HTS_STATIC_ASSERT(HTS_CACHE_TEST_UPDATE == 2, cache_test_update_is_2);
+
 /* -C's own default (no -C given) is C1 cache-priority, not the C2 test-update
    the man page and this enum's comment claimed for a long time. */
 static int st_cachedefault(httrackp *opt, int argc, char **argv) {
