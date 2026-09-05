@@ -263,9 +263,6 @@ jobs:
           key: wsl-rootfs-jammy-amd64-v1
 
       - name: Run the engine test suite (offline tests)
-        # Kept as the control that separates a wsl2 flake from a real
-        # regression, but the WSL2 step is what gates the job now.
-        continue-on-error: true
         shell: bash
         working-directory: tests
         timeout-minutes: 45
@@ -394,7 +391,10 @@ jobs:
           # The bring-up is continue-on-error, so a failed import reaches here as
           # "There is no distribution with the supplied name" and exit 127, which
           # names neither the step that failed nor why. wsl -l writes UTF-16.
-          wsl -l -q | tr -d '\0\r' | grep -qx httrack-suite || {
+          # Captured, not piped into grep -q: grep exits on the match, tr
+          # takes SIGPIPE, and pipefail would red a step whose distro was there.
+          distros=$(wsl -l -q | tr -d '\0\r')
+          grep -qx httrack-suite <<<"$distros" || {
             echo "::error::no httrack-suite distro: the Bring up WSL2 step did not finish"
             exit 1
           }
