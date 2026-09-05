@@ -1910,7 +1910,7 @@ static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
     return HTS_FALSE;
   }
   /* A bodyless slot already wrote its bytes to url_sav (FTP, direct to disk);
-     keeping the recorded r.size makes the writer blank that file (#797). */
+     zeroing r.size makes the writer blank that file (#797). */
   if (dst->r.adr != NULL)
     dst->r.size = (LLint) body;
   return HTS_TRUE;

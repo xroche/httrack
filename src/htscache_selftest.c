@@ -2981,12 +2981,47 @@ static unsigned char *ref_st_oversize(const char *field, size_t len,
   return out;
 }
 
-/* r.crange is the canary for an overflow of r.cdispo: the reader fills it
-   earlier in the stream and never touches it again, so a stray byte or stray
-   terminator past cdispo survives to the assertion. */
-HTS_STATIC_ASSERT(offsetof(htsblk, crange) ==
-                      offsetof(htsblk, cdispo) + sizeof(((htsblk *) 0)->cdispo),
-                  ref_crange_follows_cdispo);
+/* Everything between r.cdispo and r.req: the ABI's padding, then crange,
+   crange_start, crange_end and debugid. The reader fills the crange fields
+   earlier in the stream and never returns to them, so a stray write past
+   cdispo is still there at the assertion. The span makes no claim about which
+   field the byte lands in, which is what the cross legs need: 32-bit hppa,
+   armhf and powerpc pad between cdispo and crange where x86-64 does not. */
+#define REF_TAIL_FROM                                                          \
+  (offsetof(htsblk, cdispo) + sizeof(((htsblk *) 0)->cdispo))
+#define REF_TAIL_TO offsetof(htsblk, req)
+
+/* The image the span must hold: the three values the record carried, the rest
+   zero as calloct left it. Built rather than taken from a second read, which a
+   stray write would corrupt the same way and so hide. Nothing here can see a
+   stray terminator landing in the padding, which is zero either way; the
+   clipped length below is what catches that one, on every architecture. */
+static int ref_st_tail(const lien_back *back) {
+  const size_t len = REF_TAIL_TO - REF_TAIL_FROM;
+  const char *const got = (const char *) &back->r + REF_TAIL_FROM;
+  const LLint value[] = {REF_ST_CRANGE, REF_ST_CRANGE_START, REF_ST_CRANGE_END};
+  const size_t at[] = {offsetof(htsblk, crange) - REF_TAIL_FROM,
+                       offsetof(htsblk, crange_start) - REF_TAIL_FROM,
+                       offsetof(htsblk, crange_end) - REF_TAIL_FROM};
+  char *want = calloct(1, len);
+  int fail = 0;
+  size_t i;
+
+  for (i = 0; i < sizeof(at) / sizeof(at[0]); i++)
+    memcpy(want + at[i], &value[i], sizeof(value[i]));
+  for (i = 0; i < len; i++) {
+    if (got[i] != want[i]) {
+      fprintf(stderr,
+              "%s: byte %d past r.cdispo reads 0x%02x, expected 0x%02x\n",
+              selftest_tag, (int) (REF_TAIL_FROM + i), (unsigned char) got[i],
+              (unsigned char) want[i]);
+      fail = 1;
+      break;
+    }
+  }
+  freet(want);
+  return fail;
+}
 
 int ref_portable_selftest(httrackp *opt, const char *dir) {
   int fail = 0;
@@ -3171,7 +3206,7 @@ int ref_portable_selftest(httrackp *opt, const char *dir) {
   }
 
   /* a length past its destination clips, the reader stays in step with the
-     stream, and the field the reader already filled next door is untouched */
+     stream, and nothing beyond the destination moves */
   {
     size_t size;
     unsigned char *bad = ref_st_oversize("cdispo", 3000, &size);
@@ -3188,17 +3223,15 @@ int ref_portable_selftest(httrackp *opt, const char *dir) {
                 selftest_tag, (int) strlen(back->r.cdispo), back->r.cdispo);
         fail++;
       }
-      fail += ref_st_int(back->r.crange, REF_ST_CRANGE, "crange canary");
-      fail += ref_st_int(back->r.crange_start, REF_ST_CRANGE_START,
-                         "crange_start canary");
-      fail += ref_st_int(back->r.crange_end, REF_ST_CRANGE_END,
-                         "crange_end canary");
+      fail += ref_st_tail(back);
       if (back->r.headers == NULL ||
           strcmp(back->r.headers, REF_ST_HEADERS) != 0) {
         fprintf(stderr, "%s: the clip lost the reader's place in the stream\n",
                 selftest_tag);
         fail++;
       }
+    }
+    if (back != NULL) {
       back_clear_entry(back);
       freet(back);
     }
