@@ -1,0 +1,197 @@
+#!/bin/bash
+# A .dat field declaring more bytes than the file holds used to abort
+# proxytrack ("fread_cache_failed"). A cache is untrusted input, so a record
+# that does not read back must be refused, not taken down the process.
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+BODY='<html>hello</html>'
+refused='Truncated or corrupt cache record' # the reader's verdict
+
+# One .ndx entry pointing at offset 0 of a .dat, then a .dat per case. The
+# last case needs a .dat past 2 GB and is written sparse; the verdict says
+# whether the filesystem kept it that way.
+sparse=$(
+    "$python" - "$(nativepath "$dir")" <<'PYEOF'
+import os
+import sys
+
+DATE = b"Mon, 01 Jan 2025 00:00:00 GMT"
+BODY = b"<html>hello</html>"
+out = sys.argv[1]
+
+
+def field(value):
+    return b"%d\n%s" % (len(value), value)
+
+
+# statuscode, size, msg, contenttype, charset, last-modified, etag, location,
+# content-disposition, adr, fil, save, headers, the "HTS" integrity marker,
+# then the size the body actually follows with
+FIELDS = [b"200", b"0", b"OK", b"text/html", b"UTF-8", DATE, b"", b"", b"",
+          b"www.example.com", b"/index.html", b"", b"", b"HTS",
+          b"%d" % len(BODY)]
+
+# cache_brstr takes the magic and the date as length-prefixed values; the entry
+# walk then skips one line before reading host, file and offset. A negative
+# offset means the body is on disk rather than in the .dat.
+NDX = b"9\nCACHE-1.5%s\nx\nwww.example.com\n/index.html\n%%d\n" % field(DATE)
+
+
+def write(name, dat, pos=0):
+    os.makedirs(os.path.dirname(os.path.join(out, name)), exist_ok=True)
+    with open(os.path.join(out, name + ".ndx"), "wb") as f:
+        f.write(NDX % pos)
+    with open(os.path.join(out, name + ".dat"), "wb") as f:
+        f.write(dat)
+
+
+parts = [field(f) for f in FIELDS]
+write("good", b"".join(parts) + BODY)
+
+# Cut inside every field in turn: a fix bounding only the field the fuzzer
+# reached would still abort on the others.
+at = 0
+for i, part in enumerate(parts):
+    at += len(part)
+    write("cut%d" % i, b"".join(parts)[: at - len(FIELDS[i]) // 2])
+
+# A length the file cannot satisfy, in fields of three different capacities
+# and spanning the reader's own bound
+for name, i, length in (("hugemsg", 2, 30000), ("hugetype", 3, 30000),
+                        ("hugehdrs", 12, 30000), ("overmsg", 2, 32769),
+                        ("negtype", 3, -5), ("junktype", 3, None)):
+    bad = list(parts)
+    bad[i] = b"junk\n" if length is None else b"%d\n" % length
+    write(name, b"".join(bad) + BODY)
+
+# a body larger than the .dat, which must be refused before it is allocated
+big = list(parts)
+big[14] = field(b"2000000000")
+write("hugebody", b"".join(big) + BODY)
+
+# A body the .dat really is long enough to hold, declared at the format's own
+# ceiling: only a cap on the declared size refuses this one.
+over = list(parts)
+over[14] = field(b"2147483647")
+write("overbody", b"".join(over) + BODY)
+# the same fixture carrying an honest body, to find out whether this build can
+# size a .dat that large at all
+write("overprobe", b"".join(parts) + BODY)
+
+# Extend one, and keep going only while the file stays a hole: a filesystem
+# that allocates it (or a stat that cannot say, as on Windows) gets neither.
+BIG = 2 ** 31 + 8192
+dat = os.path.join(out, "overbody.dat")
+with open(dat, "r+b") as f:
+    f.truncate(BIG)
+st = os.stat(dat)
+sparse = hasattr(st, "st_blocks") and st.st_blocks * 512 < 1024 * 1024
+if sparse:
+    with open(os.path.join(out, "overprobe.dat"), "r+b") as f:
+        f.truncate(BIG)
+else:
+    with open(dat, "r+b") as f:
+        f.truncate(len(b"".join(parts)) + len(BODY))
+
+# The other body path: a negative offset leaves the bytes in a file beside the
+# cache, named by the "save" field, and the same two bounds apply there. That
+# name resolves against the cache's grandparent, so keep HTTrack's own layout.
+os.makedirs(os.path.join(out, "m", "hts-cache"), exist_ok=True)
+with open(os.path.join(out, "m", "body.bin"), "wb") as f:
+    f.write(BODY)
+for name, declared in (("diskgood", len(BODY)), ("diskbig", 4096),
+                       ("diskover", 2147483647)):
+    disk = list(FIELDS)
+    disk[11] = b"body.bin"
+    disk[14] = b"%d" % declared
+    write("m/hts-cache/" + name, b"\0" * 8 + b"".join(field(f) for f in disk),
+          pos=-8)
+
+print("sparse" if sparse else "dense")
+PYEOF
+)
+
+convert() { # convert NAME
+    local rc=0
+    proxytrack --convert "$dir/$1.arc" "$dir/$1.ndx" >"$dir/$1.log" 2>&1 || rc=$?
+    test "$rc" -lt 128 ||
+        fail_dump "proxytrack died on $1.dat with SIG$(kill -l $((rc - 128)))" "$dir/$1.log"
+    test "$rc" = 0 || fail_dump "proxytrack failed ($rc) on $1.dat" "$dir/$1.log"
+}
+
+# Control: without it a fix refusing every legacy record passes everything below
+convert good
+grep -qaF "$BODY" "$dir/good.arc" || fail_dump "an intact record lost its body" "$dir/good.log"
+if grep -qaF "$refused" "$dir/good.log"; then
+    fail_dump "an intact record was refused" "$dir/good.log"
+fi
+
+for name in cut0 cut1 cut2 cut3 cut4 cut5 cut6 cut7 cut8 cut9 cut10 cut11 \
+    cut12 cut13 cut14 hugemsg hugetype hugehdrs overmsg negtype junktype; do
+    convert "$name"
+    grep -qaF "$refused" "$dir/$name.log" ||
+        fail_dump "$name.dat was read rather than refused" "$dir/$name.log"
+    if grep -qaF "$BODY" "$dir/$name.arc"; then
+        fail_dump "$name.dat still yielded a body" "$dir/$name.log"
+    fi
+done
+
+# The header of this one reads back whole, so it is the body allocation alone
+# that must refuse the declared size before demanding 2 GB for it.
+convert hugebody
+grep -qa 'Cache Read Error : Bad Size' "$dir/hugebody.arc" ||
+    fail_dump "a body larger than the .dat was accepted" "$dir/hugebody.log"
+if grep -qaF "$BODY" "$dir/hugebody.arc"; then
+    fail_dump "a body larger than the .dat still came back" "$dir/hugebody.log"
+fi
+
+# Here the .dat is long enough, so the bytes-remaining bound passes it and the
+# declared size is refused on the format's ceiling alone. Without that ceiling
+# the allocator refuses it instead, and reports a bad size as a memory failure.
+#
+# A build whose long int is 32 bits cannot size a .dat that large: filesize()
+# wraps it negative and the record is refused before the ceiling is consulted,
+# so the case has nothing to observe there. The probe carries an honest body
+# and its verdict says which of the two this build is; a third answer is a
+# regression, not a reason to skip.
+if test "$sparse" != sparse; then
+    echo "no sparse files here; skipping the 2 GB .dat case" >&2
+else
+    convert overprobe
+    if grep -qaF "$BODY" "$dir/overprobe.arc"; then
+        convert overbody
+        grep -qa 'Cache Read Error : Bad Size' "$dir/overbody.arc" ||
+            fail_dump "a body declared at the format ceiling was not refused" "$dir/overbody.log"
+        if grep -qaF "$BODY" "$dir/overbody.arc"; then
+            fail_dump "a body declared at the format ceiling still came back" "$dir/overbody.log"
+        fi
+    elif grep -qaF "$refused" "$dir/overprobe.log"; then
+        echo "long int cannot size a 2 GB .dat here; skipping the ceiling case" >&2
+    else
+        fail_dump "the 2 GB .dat probe neither read nor refused its record" "$dir/overprobe.log"
+    fi
+fi
+
+# The sibling allocation, for a body held in a file beside the cache. Its
+# control comes first: bounding this one must not drop an honest entry.
+convert m/hts-cache/diskgood
+grep -qaF "$BODY" "$dir/m/hts-cache/diskgood.arc" ||
+    fail_dump "an on-disk body of the declared size was lost" "$dir/m/hts-cache/diskgood.log"
+for name in m/hts-cache/diskbig m/hts-cache/diskover; do
+    convert "$name"
+    grep -qa 'Cache Read Error : Bad Size' "$dir/$name.arc" ||
+        fail_dump "$name declared more than its file holds and was accepted" "$dir/$name.log"
+    if grep -qaF "$BODY" "$dir/$name.arc"; then
+        fail_dump "$name still returned a body" "$dir/$name.log"
+    fi
+done
+
+exit 0

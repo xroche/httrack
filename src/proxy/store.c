@@ -188,6 +188,7 @@ struct _PT_Index__Old {
   char filenameDat[1024];
   char filenameNdx[1024];
   FILE *dat, *ndx;
+  long int datSize; /* bound for the lengths read out of the .dat */
   PT_Mutex fileLock;
   int version;
   char lastmodified[1024];
@@ -1475,6 +1476,10 @@ static int PT_SaveCache__New(PT_Indexes indexes, const char *filename) {
 /* Old HTTrack cache (dat/ndx) format                           */
 /* ------------------------------------------------------------ */
 
+/* Largest field the legacy format ever carried; past it the length is
+   corruption */
+#define CACHE_FIELD_MAXSIZE 32768
+
 static int cache_brstr(char *adr, char *s, size_t s_size) {
   int i;
   int off;
@@ -1487,7 +1492,7 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
     return off;
   }
   /* an empty/non-numeric field leaves i unset: treat as length 0 */
-  if (sscanf(buff, "%d", &i) != 1 || i < 0 || i > 32768)
+  if (sscanf(buff, "%d", &i) != 1 || i < 0 || i > CACHE_FIELD_MAXSIZE)
     i = 0;
   if (i > 0) {
     /* a corrupt cache may declare a length past the buffer end; bound the copy
@@ -1504,52 +1509,79 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   return off;
 }
 
-static void cache_rstr(FILE *fp, char *s, size_t s_size) {
-  INTsys i = 0;
-  char buff[256 + 4];
+/** Would reading n bytes at the current offset stay inside the .dat? A size
+    the host could not report is refused rather than waived: filesize() answers
+    in a long int, so a 32-bit build handed a .dat past 2 GB reads back a value
+    that bounds nothing. **/
+static hts_boolean cache_fits(FILE *fp, long int datSize, size_t n) {
+  const long int at = ftell(fp);
 
-  linput(fp, buff, 256);
-  /* an unmatched sscanf leaves i untouched: length 0, not a stack value */
-  if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > 32768)
-    i = 0;
-  if (i > 0) {
-    /* store at most s_size-1 bytes, but consume all i bytes so the next field
-       stays aligned when a tampered cache declares more than the destination
-       holds */
-    const size_t want = (size_t) i;
-    const size_t store = want < s_size ? want : s_size - 1;
-
-    if (!hts_fread_exact(s, store, fp)) {
-      assertf(! "fread_cache_failed");
-    }
-    if (want > store && fseek(fp, (long) (want - store), SEEK_CUR) != 0) {
-      assertf(!"fseek_cache_failed");
-    }
-    s[store] = '\0';
-  } else {
-    s[0] = '\0';
-  }
+  if (at < 0 || datSize < 0)
+    return HTS_FALSE;
+  return at <= datSize && n <= (size_t) (datSize - at) ? HTS_TRUE : HTS_FALSE;
 }
 
-static char *cache_rstr_addr(FILE * fp) {
+/** Read a field's length prefix. HTS_FALSE on a truncated line, an unparseable
+    or out-of-range length, or one running past the end of the file: the record
+    is unreadable, and refusing it is the only way to keep the fields after it
+    aligned. **/
+static hts_boolean cache_rlen(FILE *fp, long int datSize, size_t *len) {
   INTsys i = 0;
-  char *addr = NULL;
   char buff[256 + 4];
 
+  *len = 0;
   linput(fp, buff, 256);
-  /* an unmatched sscanf leaves i untouched: length 0, not a stack value */
-  if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > 32768)
-    i = 0;
-  if (i > 0) {
-    addr = malloc((size_t) i + 1);
-    if (addr != NULL) {
-      if (!hts_fread_exact(addr, (size_t) i, fp)) {
-        assertf(! "fread_cache_failed");
-      }
-      *(addr + i) = '\0';
-    }
+  if (sscanf(buff, INTsysP, &i) != 1 || i < 0 || i > CACHE_FIELD_MAXSIZE)
+    return HTS_FALSE;
+  if (!cache_fits(fp, datSize, (size_t) i))
+    return HTS_FALSE;
+  *len = (size_t) i;
+  return HTS_TRUE;
+}
+
+/** Read one length-prefixed field into s. HTS_FALSE leaves s empty and the
+    stream at an unknown offset, so the caller must drop the whole record. **/
+static hts_boolean cache_rstr(FILE *fp, char *s, size_t s_size,
+                              long int datSize) {
+  size_t want;
+
+  s[0] = '\0';
+  if (!cache_rlen(fp, datSize, &want))
+    return HTS_FALSE;
+  if (want != 0) {
+    /* store at most s_size-1 bytes, but consume all of them so the next field
+       stays aligned when a cache declares more than the destination holds */
+    const size_t store = want < s_size ? want : s_size - 1;
+
+    if (!hts_fread_exact(s, store, fp))
+      return HTS_FALSE;
+    if (want > store && fseek(fp, (long) (want - store), SEEK_CUR) != 0)
+      return HTS_FALSE;
+    s[store] = '\0';
   }
-  return addr;
+  return HTS_TRUE;
+}
+
+/** Read one length-prefixed field into a fresh buffer the caller owns, NULL
+    for an empty field. HTS_FALSE on a refused record, *out left NULL. **/
+static hts_boolean cache_rstr_addr(FILE *fp, long int datSize, char **out) {
+  size_t want;
+  char *addr;
+
+  *out = NULL;
+  if (!cache_rlen(fp, datSize, &want))
+    return HTS_FALSE;
+  if (want == 0)
+    return HTS_TRUE;
+  if ((addr = malloct(want + 1)) == NULL)
+    return HTS_FALSE;
+  if (!hts_fread_exact(addr, want, fp)) {
+    freet(addr);
+    return HTS_FALSE;
+  }
+  addr[want] = '\0';
+  *out = addr;
+  return HTS_TRUE;
 }
 
 /* Allocate n+1 bytes for an n-byte cache body, rejecting a hostile/corrupt
@@ -1557,27 +1589,33 @@ static char *cache_rstr_addr(FILE * fp) {
 static char *cache_alloc_body(size_t n) {
   if (n >= (size_t) INT32_MAX)
     return NULL;
-  return (char *) malloc(n + 1);
+  return (char *) malloct(n + 1);
 }
 
-static void cache_rint(FILE * fp, int *i) {
+/** Read a length-prefixed decimal field. HTS_FALSE also on a non-numeric one,
+    which is corruption the caller must not carry into the record. **/
+static hts_boolean cache_rint(FILE *fp, long int datSize, int *i) {
   char s[256];
 
-  cache_rstr(fp, s, sizeof(s));
-  if (sscanf(s, "%d", i) != 1)
-    *i = 0;
+  *i = 0;
+  if (!cache_rstr(fp, s, sizeof(s), datSize))
+    return HTS_FALSE;
+  return sscanf(s, "%d", i) == 1 ? HTS_TRUE : HTS_FALSE;
 }
 
-static void cache_rLLint(FILE * fp, unsigned long *i) {
+/** Same, for a size field: a negative value is refused rather than wrapped,
+    since cast to unsigned it would shrink a later body allocation. **/
+static hts_boolean cache_rLLint(FILE *fp, long int datSize, unsigned long *i) {
   int l;
   char s[256];
 
-  cache_rstr(fp, s, sizeof(s));
-  /* reject a non-numeric or negative field: a negative length cast to unsigned
-     would wrap a later malloc(size+1) to a tiny buffer */
+  *i = 0;
+  if (!cache_rstr(fp, s, sizeof(s), datSize))
+    return HTS_FALSE;
   if (sscanf(s, "%d", &l) != 1 || l < 0)
-    l = 0;
+    return HTS_FALSE;
   *i = (unsigned long) l;
+  return HTS_TRUE;
 }
 
 static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
@@ -1610,13 +1648,17 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
       strcatbuff(cache->filenameNdx, ".ndx");
     }
     ndxSize = filesize(cache->filenameNdx);
+    cache->datSize = filesize(cache->filenameDat);
     cache->timestamp = file_timestamp(cache->filenameDat);
     cache->dat = fopen(cache->filenameDat, "rb");
     cache->ndx = fopen(cache->filenameNdx, "rb");
     if (cache->dat != NULL && cache->ndx != NULL && ndxSize > 0) {
-      char *use = malloc(ndxSize + 1);
+      char *use = malloct((size_t) ndxSize + 1);
 
-      if (hts_fread_exact(use, (size_t) ndxSize, cache->ndx)) {
+      /* the index is the whole file read at once: a short read refuses it */
+      if (use == NULL || !hts_fread_exact(use, (size_t) ndxSize, cache->ndx)) {
+        freet(use);
+      } else {
         char firstline[256];
         char *a = use;
 
@@ -1631,14 +1673,12 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
             } else {
               fclose(cache->dat);
               cache->dat = NULL;
-              free(use);
-              use = NULL;
+              freet(use);
             }
           } else { // non supporté
             fclose(cache->dat);
             cache->dat = NULL;
-            free(use);
-            use = NULL;
+            freet(use);
           }
           /* */
         } else {                // Vieille version du cache
@@ -1697,8 +1737,7 @@ static int PT_LoadCache__Old(PT_Index index_, const char *filename) {
             }
           }
           /* Not needed anymore! */
-          free(use);
-          use = NULL;
+          freet(use);
           return 1;
         }
       }
@@ -1774,9 +1813,12 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
   hash_pos_return = coucal_read(cache->hash, url, &hash_pos);
 
   if (hash_pos_return) {
-    int pos = (int) hash_pos;   /* simply */
+    const int pos = (int) hash_pos; /* simply */
+    /* the sign flags "body on disk", so the offset is the magnitude; INT_MIN
+       has no positive counterpart and is therefore not one */
+    const long int offset = pos == INT_MIN ? -1 : (pos > 0 ? pos : -pos);
 
-    if (fseek(cache->dat, (pos > 0) ? pos : (-pos), SEEK_SET) == 0) {
+    if (offset >= 0 && fseek(cache->dat, offset, SEEK_SET) == 0) {
       /* Importer cache1.0 */
       if (cache->version == 0) {
         OLD_htsblk old_r;
@@ -1826,45 +1868,46 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
         /* */
         /* Cache 1.1 */
       } else {
+        const long int datSize = cache->datSize;
         char check[256];
-        unsigned long size_read;
-        unsigned long int size_;
+        unsigned long size_read = 0;
+        unsigned long int size_ = 0;
 
         check[0] = '\0';
-        //
-        cache_rint(cache->dat, &r->statuscode);
-        cache_rLLint(cache->dat, &size_);
-        r->size = (size_t) size_;
-        cache_rstr(cache->dat, r->msg, sizeof(r->msg));
-        cache_rstr(cache->dat, r->contenttype, sizeof(r->contenttype));
-        if (cache->version >= 3)
-          cache_rstr(cache->dat, r->charset, sizeof(r->charset));
-        cache_rstr(cache->dat, r->lastmodified, sizeof(r->lastmodified));
-        cache_rstr(cache->dat, r->etag, sizeof(r->etag));
-        cache_rstr(cache->dat, r->location, sizeof(location_default));
-        if (cache->version >= 2)
-          cache_rstr(cache->dat, r->cdispo, sizeof(r->cdispo));
-        if (cache->version >= 4) {
-          cache_rstr(cache->dat, previous_save_, sizeof(previous_save_)); // adr
-          cache_rstr(cache->dat, previous_save_, sizeof(previous_save_)); // fil
-          previous_save[0] = '\0';
-          cache_rstr(cache->dat, previous_save_,
-                     sizeof(previous_save_)); // save
-        }
-        if (cache->version >= 5) {
-          r->headers = cache_rstr_addr(cache->dat);
-        }
-        //
-        cache_rstr(cache->dat, check, sizeof(check));
-        if (strcmp(check, "HTS") == 0) {        /* intégrité OK */
+        /* the fields are consecutive, so the first one that does not read
+           leaves every later one at the wrong offset: refuse the record
+           rather than serve fields decoded from the wrong bytes */
+        if (cache_rint(cache->dat, datSize, &r->statuscode) &&
+            cache_rLLint(cache->dat, datSize, &size_) &&
+            cache_rstr(cache->dat, r->msg, sizeof(r->msg), datSize) &&
+            cache_rstr(cache->dat, r->contenttype, sizeof(r->contenttype),
+                       datSize) &&
+            (cache->version < 3 ||
+             cache_rstr(cache->dat, r->charset, sizeof(r->charset), datSize)) &&
+            cache_rstr(cache->dat, r->lastmodified, sizeof(r->lastmodified),
+                       datSize) &&
+            cache_rstr(cache->dat, r->etag, sizeof(r->etag), datSize) &&
+            cache_rstr(cache->dat, r->location, sizeof(location_default),
+                       datSize) &&
+            (cache->version < 2 ||
+             cache_rstr(cache->dat, r->cdispo, sizeof(r->cdispo), datSize)) &&
+            (cache->version < 4 ||
+             (cache_rstr(cache->dat, previous_save_, sizeof(previous_save_),
+                         datSize) && // adr
+              cache_rstr(cache->dat, previous_save_, sizeof(previous_save_),
+                         datSize) && // fil
+              cache_rstr(cache->dat, previous_save_, sizeof(previous_save_),
+                         datSize))) && // save
+            (cache->version < 5 ||
+             cache_rstr_addr(cache->dat, datSize, &r->headers)) &&
+            cache_rstr(cache->dat, check, sizeof(check), datSize) &&
+            strcmp(check, "HTS") == 0 && /* intégrité OK */
+            cache_rLLint(cache->dat, datSize, &size_read)) {
           ok = 1;
         }
-        cache_rLLint(cache->dat, &size_read);   /* lire size pour être sûr de la taille déclarée (réécrire) */
-        if (size_read > 0) {    /* si inscrite ici */
-          r->size = size_read;
-        } else {                /* pas de données directement dans le cache, fichier présent? */
-          r->size = 0;
-        }
+        /* size_read is the authoritative one when written here; without it the
+           body lives in a separate file */
+        r->size = ok ? (size_t) size_read : 0;
       }
 
       /* Check destination filename */
@@ -1937,19 +1980,23 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
               FILE *fp = fopen(previous_save, "rb");
 
               if (fp != NULL) {
-                r->adr = cache_alloc_body(r->size);
-                if (r->adr != NULL) {
-                  if (r->size > 0 && !hts_fread_exact(r->adr, r->size, fp)) {
-                    PT_Element_DropBody(r);
-                    r->statuscode = STATUSCODE_INVALID;
-                    strcpybuff(r->msg, "Read error in cache disk data");
-                  } else {
-                    r->adr[r->size] = '\0';
-                  }
-                } else {
+                /* same two bounds as a .dat-held body: the format's ceiling,
+                   then the file the bytes have to come out of */
+                if (r->size >= (size_t) INT_MAX ||
+                    !cache_fits(fp, filesize(previous_save), r->size)) {
+                  r->statuscode = STATUSCODE_INVALID;
+                  strcpybuff(r->msg, "Cache Read Error : Bad Size");
+                } else if ((r->adr = cache_alloc_body(r->size)) == NULL) {
                   r->statuscode = STATUSCODE_INVALID;
                   strcpybuff(r->msg,
                              "Read error (memory exhausted) from cache");
+                } else if (r->size > 0 &&
+                           !hts_fread_exact(r->adr, r->size, fp)) {
+                  PT_Element_DropBody(r);
+                  r->statuscode = STATUSCODE_INVALID;
+                  strcpybuff(r->msg, "Read error in cache disk data");
+                } else {
+                  r->adr[r->size] = '\0';
                 }
                 fclose(fp);
               } else {
@@ -1960,17 +2007,24 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
           } else {
             // lire fichier (d'un coup)
             if (flags & FETCH_BODY) {
-              r->adr = cache_alloc_body(r->size);
-              if (r->adr != NULL) {
-                if (!hts_fread_exact(r->adr, r->size, cache->dat)) { // erreur
-                  PT_Element_DropBody(r);
-                  r->statuscode = STATUSCODE_INVALID;
-                  strcpybuff(r->msg, "Cache Read Error : Read Data");
-                } else
-                  r->adr[r->size] = '\0';
-              } else {          // erreur
+              /* The size field is a 32-bit signed decimal, so INT_MAX is the
+                 format's own ceiling, the one the zip reader above takes too.
+                 Past that the body must still fit in the bytes left of the
+                 .dat, which catches corruption before the allocation rather
+                 than on the failing read. */
+              if (r->size >= (size_t) INT_MAX ||
+                  !cache_fits(cache->dat, cache->datSize, r->size)) {
+                r->statuscode = STATUSCODE_INVALID;
+                strcpybuff(r->msg, "Cache Read Error : Bad Size");
+              } else if ((r->adr = cache_alloc_body(r->size)) == NULL) {
                 r->statuscode = STATUSCODE_INVALID;
                 strcpybuff(r->msg, "Cache Memory Error");
+              } else if (!hts_fread_exact(r->adr, r->size, cache->dat)) {
+                PT_Element_DropBody(r);
+                r->statuscode = STATUSCODE_INVALID;
+                strcpybuff(r->msg, "Cache Read Error : Read Data");
+              } else {
+                r->adr[r->size] = '\0';
               }
             }
           }
@@ -1981,6 +2035,7 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
       } else {                  // erreur
         r->statuscode = STATUSCODE_INVALID;
         strcpybuff(r->msg, "Cache Read Error : Read Header");
+        fprintf(stderr, "Truncated or corrupt cache record for %s" LF, url);
       }
     } else {
       r->statuscode = STATUSCODE_INVALID;
