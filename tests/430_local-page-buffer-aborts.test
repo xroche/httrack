@@ -28,7 +28,9 @@ pad=$(printf '%2048s' '')
 cat >"${doc}/index.html" <<'HTML'
 <html><body><a href="applet.html">a</a><a href="offhost.html">o</a>
 <a href="cp1252.html">c</a><a href="cp1252-2040.html">q</a>
-<a href="cp1252-2043.html">b</a></body></html>
+<a href="cp1252-2043.html">b</a><a href="cp1252-2031.html">k</a>
+<a href="cp1252-2032.html">l</a><a href="cp1252-query.html">y</a>
+</body></html>
 HTML
 printf '<html><body><applet code%s="x.class"></applet></body></html>\n' "$pad" \
     >"${doc}/applet.html"
@@ -54,6 +56,19 @@ open(os.path.join(sys.argv[1], "cp1252-2040.html"), "wb").write(
     head + b'<a href="' + b"\x80" * 680 + b'">q</a></body></html>\n')
 open(os.path.join(sys.argv[1], "cp1252-2043.html"), "wb").write(
     head + b'<base href="' + b"\x80" * 681 + b'"></body></html>\n')
+# The two that straddle the threshold: 677 quotes make 2031 and an ASCII byte
+# in front makes 2032. A link this long cannot be mirrored on any platform, a
+# save-path check drops it far earlier, so what the pair pins is which side of
+# the PARSE guard each lands on.
+open(os.path.join(sys.argv[1], "cp1252-2031.html"), "wb").write(
+    head + b'<a href="' + b"\x80" * 677 + b'">k</a></body></html>\n')
+open(os.path.join(sys.argv[1], "cp1252-2032.html"), "wb").write(
+    head + b'<a href="a' + b"\x80" * 677 + b'">l</a></body></html>\n')
+# A converted path at the ceiling plus a query, which is appended after it: the
+# base tag is what makes a later stage prepend a scheme to the result.
+open(os.path.join(sys.argv[1], "cp1252-query.html"), "wb").write(
+    head + b'<base href="' + b"\x80" * 677 + b'?' + b"q" * 12 +
+    b'"></body></html>\n')
 # str path, so Windows names it through the wide API rather than a codepage.
 open(os.path.join(sys.argv[1], "\u201cs\u201d.html"), "wb").write(
     b"<html><body>SHORTCONVERTED</body></html>\n")
@@ -142,15 +157,40 @@ echo OK
 
 # Each length selects a different destination, so each fixture has to survive.
 printf '[every converted length survives] ..\t'
-for page in cp1252-2040.html cp1252-2043.html; do
+for page in cp1252-2040.html cp1252-2043.html cp1252-query.html; do
     test -s "${host}/${page}" || fail "$page is not mirrored"
 done
 test "$(grep -c 'Link is too long after charset conversion' "${out}/hts-log.txt")" -ge 3 ||
     fail "not every over-long conversion was refused: $(cat "${out}/hts-log.txt")"
 echo OK
 
+# One byte apart, so the guard cannot drift without one of the two firing. The
+# refusal names the link as it arrived, before conversion, which is what tells
+# the two fixtures apart.
+printf '[the threshold sits between 2031 and 2032] ..\t'
+"$python" - "$(nativepath "${out}/hts-log.txt")" <<'PY' || fail "the conversion guard moved"
+import sys
+
+log = open(sys.argv[1], "rb").read()
+tag = b"Link is too long after charset conversion: "
+run = b"\x80" * 677
+if tag + run + b"\n" in log:
+    sys.stderr.write("2031 was refused: the guard is a byte too tight\n")
+    sys.exit(1)
+if tag + b"a" + run + b"\n" not in log:
+    sys.stderr.write("2032 was accepted: the guard is a byte too loose\n")
+    sys.exit(1)
+PY
+echo OK
+
 # The append site is its own bug, reachable whenever a caller has that much
 # room left, so it is pinned away from the crawl as well.
 printf '[escape append tolerates a pointer-sized remainder] ..\t'
 assert_selftest "escape-append-room self-test OK" escape-append-room
+echo OK
+
+# Its consumers rebuild "http://" + adr + "/" + fil from what it returns, so
+# every arm owes them the same ceiling. The query arm did not keep it.
+printf '[every relative-url arm bounds the path it builds] ..\t'
+assert_selftest "identrel self-test OK" identrel
 echo OK

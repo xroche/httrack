@@ -2483,6 +2483,40 @@ static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
 
 /* Split a URL into (adr, fil), or print "error" if rejected. A second arg pads
    the URL with that many 'a's to reach lengths a CLI arg can't. */
+/* Every ident_url_relatif() arm has to keep fil under HTS_URLMAXSIZE, because
+   callers rebuild "http://" + adr + "/" + fil into a buffer sized from that. */
+static int st_identrel(httrackp *opt, int argc, char **argv) {
+  static const char *const heads[] = {"?", "r", "/", ""};
+  const size_t nheads = sizeof(heads) / sizeof(heads[0]);
+  char BIGSTK origin[HTS_URLMAXSIZE * 2];
+  char BIGSTK lien[HTS_URLMAXSIZE * 2];
+  lien_adrfil af;
+  size_t k, pad;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* origin_fil just under the ceiling its own entry test allows */
+  origin[0] = '/';
+  memset(origin + 1, 'o', HTS_URLMAXSIZE - 3);
+  origin[HTS_URLMAXSIZE - 2] = '\0';
+  for (k = 0; k < nheads; k++) {
+    const size_t head = strlen(heads[k]);
+
+    for (pad = 0; head + pad + 2 < HTS_URLMAXSIZE; pad += 97) {
+      memcpy(lien, heads[k], head);
+      memset(lien + head, 'q', pad);
+      lien[head + pad] = '\0';
+      if (ident_url_relatif(lien, "www.example.com", origin, &af) >= 0) {
+        assertf(strlen(af.adr) < HTS_URLMAXSIZE);
+        assertf(strlen(af.fil) < HTS_URLMAXSIZE);
+      }
+    }
+  }
+  printf("identrel self-test OK\n");
+  return 0;
+}
+
 static int st_identurl(httrackp *opt, int argc, char **argv) {
   lien_adrfil af;
   char *url;
@@ -13502,6 +13536,8 @@ static const struct selftest_entry {
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
     {"identurl", "<url>", "split an absolute URL into (adr, fil)", st_identurl},
+    {"identrel", "", "every relative-URL arm bounds the path it builds",
+     st_identrel},
     {"toport", "<url>...", "port separator found in a URL authority",
      st_toport},
     {"ftpaddr", "<url-address>...", "host/port the FTP path splits out",

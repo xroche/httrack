@@ -2248,12 +2248,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   // leaving the encoding as-is (unlike the file part)
                   // and copy back query
                   {
+                    const size_t cap = sizeof(lien) - HTS_LINK_TAIL_ROOM;
                     const size_t used = strlen(lien);
 
                     // the append grows the query too, and clips silently on
                     // overflow: drop, or we fetch a query nobody wrote (#982)
-                    if (append_escape_check_url(query, lien, sizeof(lien)) >=
-                        sizeof(lien) - used) {
+                    if (used >= cap || append_escape_check_url(
+                                           query, lien, cap) >= cap - used) {
                       error = 1;
                       hts_log_print(opt, LOG_DEBUG,
                                     "link rejected (query does not fit) %s",
@@ -2381,6 +2382,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                       if (ident_url_relatif(lien, urladr(), urlfil(), &af2) < 0) {
                         error = 1;
+                      } else if (strlen(af2.adr) + strlen(af2.fil) >=
+                                 sizeof(lien) - HTS_LINK_TAIL_ROOM -
+                                     sizeof("http:///")) {
+                        /* the rebuild below is unbounded in the two of them */
+                        error = 1;
+                        hts_log_print(opt, LOG_WARNING,
+                                      "Link is too long once resolved: %s",
+                                      lien);
                       } else {
                         strcpybuff(lien, "http://");
                         strcatbuff(lien, af2.adr);
