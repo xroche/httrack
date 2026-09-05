@@ -84,8 +84,8 @@ local_server_start() {
     SRV_LOG=$log
     : >"$SRV_LOG"
 
-    # local-server.py is native under wsl2 and skips the PATH shim: only what
-    # WSLENV names crosses, and a path in a value has to be native too.
+    # local-server.py runs native under wsl2: the shim never converts a path
+    # inside a value, and find_python's .exe fallback goes round it entirely.
     local wslenv=() names='' e
     if test "$(suite_backend)" = wsl2 && test ${#envs[@]} -gt 0; then
         for e in "${!envs[@]}"; do
