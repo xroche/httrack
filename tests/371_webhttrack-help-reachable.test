@@ -100,11 +100,12 @@ IDLE='Existing project name:'
 # invisible. about.html is not a pane; the four tail spellings open the files
 # the first four name, since the path reaches open() unnormalized.
 PANES=$(
+    # An if, not a case: bash 3.2 cannot parse a case inside a command
+    # substitution, and the syntax error read as a pass, so this test was
+    # vacuous on macOS.
     for f in "${distdir}"/html/server/*.html; do
-        case ${f##*/} in
-        about.html) ;;
-        *) printf '/server/%s\n' "${f##*/}" ;;
-        esac
+        test "${f##*/}" != about.html || continue
+        printf '/server/%s\n' "${f##*/}"
     done
     printf '%s\n' //server/step4.html /./server/step4.html \
         /server//step4.html /Server/step4.html

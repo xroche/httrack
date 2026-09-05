@@ -27,8 +27,12 @@ test "$(printf '%s\n' "${written}" | wc -l)" -ge 30 ||
     fail "only $(printf '%s\n' "${written}" | wc -l) ztest keys in step4.html"
 test "${written}" = "${listed}" ||
     fail "$(diff <(echo "${written}") <(echo "${listed}"))"
-! command grep -q '^ProxyType=[$]{ztest:' "${distdir}/html/server/step4.html" ||
+# The match is read out of a substitution, not tested directly: under bash 3.2
+# errexit kills the script whenever a command-prefixed builtin returns non-zero,
+# in a condition as much as anywhere else, and a grep that finds nothing does.
+if test -n "$(command grep -l '^ProxyType=[$]{ztest:' "${distdir}/html/server/step4.html" || true)"; then
     fail "ProxyType is a ztest key now, so the exception hides drift"
+fi
 echo OK
 
 htsserver_require
