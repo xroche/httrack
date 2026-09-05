@@ -245,7 +245,9 @@ ci_suite_heartbeat() {
 # engine-install-paths reads the compiled-in POSIX install paths, which this job
 # has no equivalent of;
 # build-features compares the feature reporter against the automake config.h,
-# which the MSVC build does not produce.
+# which the MSVC build does not produce;
+# engine-wizard-eof drives the wizard through a pty, and Windows builds Python
+# with neither pty nor os.fork.
 expected_skips_msys="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
@@ -274,7 +276,8 @@ expected_skips_msys="01_engine-footer-overflow.test
 352_engine-filesave-diskfull.test
 355_local-write-error-not-eof.test
 377_engine-install-paths.test
-398_engine-build-features.test"
+398_engine-build-features.test
+424_engine-wizard-eof.test"
 
 # A copy of the msys list above: testlib.sh's suite_backend split (shell_is_msys
 # vs target_is_windows) is designed so the same tests skip under either shell.
