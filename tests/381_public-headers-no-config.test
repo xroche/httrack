@@ -28,7 +28,7 @@ cleanup_push rm -rf "$tmp"
 cpp_argv=(-I"$tmp/include")
 if [ -n "${TEST_CPPFLAGS:-}" ]; then
     read -r -a extra_argv <<<"$TEST_CPPFLAGS"
-    cpp_argv+=(${extra_argv[@]+"${extra_argv[@]}"})
+    cpp_argv+=("${extra_argv[@]}")
 fi
 
 printf '#include <stdio.h>\n' >"$tmp/tu.c"

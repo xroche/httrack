@@ -33,7 +33,7 @@ cleanup_push rm -rf "$tmp"
 cpp_argv=(-I"$tmp/include")
 if [ -n "${TEST_CPPFLAGS:-}" ]; then
     read -r -a extra_argv <<<"$TEST_CPPFLAGS"
-    cpp_argv+=(${extra_argv[@]+"${extra_argv[@]}"})
+    cpp_argv+=("${extra_argv[@]}")
 fi
 # Snapshot before the C-only flag below is appended; the C++ leg reuses this.
 base_cpp_argv=("${cpp_argv[@]}")

@@ -36,7 +36,7 @@ cleanup_push rm -rf "$tmp"
 base_argv=(-I"$tmp")
 if [ -n "${TEST_CPPFLAGS:-}" ]; then
     read -r -a extra_argv <<<"$TEST_CPPFLAGS"
-    base_argv+=(${extra_argv[@]+"${extra_argv[@]}"})
+    base_argv+=("${extra_argv[@]}")
 fi
 
 # Positive control: a compiler that cannot build a bare libc TU would otherwise

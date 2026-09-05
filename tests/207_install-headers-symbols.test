@@ -48,7 +48,7 @@ n_hidden=$(wc -l <"$tmp/hidden")
 cpp_argv=(-I"$tmp/include")
 if [ -n "${TEST_CPPFLAGS:-}" ]; then
     read -r -a extra_argv <<<"$TEST_CPPFLAGS"
-    cpp_argv+=(${extra_argv[@]+"${extra_argv[@]}"})
+    cpp_argv+=("${extra_argv[@]}")
 fi
 
 # volatile, or the compiler folds "address of a known symbol is non-null" to 1
@@ -111,7 +111,7 @@ for suffix in lto_priv constprop isra part cold llvm; do
         canaries+=("$sym")
     fi
 done
-# A read loop, not mapfile: macOS runs the suite under bash 3.2, which has none.
+# A read loop, not mapfile: bash 3.2 has none, and BASH_SHELL may be one.
 sorted=()
 while read -r sym; do
     sorted+=("$sym")
