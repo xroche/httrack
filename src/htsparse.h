@@ -133,11 +133,12 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
                                        const char *moved_fil);
 
 /*
-  Should the mirror stop now? True only for an abort request file the engine
-  could also delete, so a lock it cannot remove never fires again on the next
-  poll. Takes the file when it answers true.
+  Take a pending stop request, deleting the request file, and answer whether the
+  mirror must now stop. True only for a request newer than this run's own
+  hts-in_progress.lock and deletable, so neither one inherited from an earlier
+  run nor one the engine cannot remove ever stops this mirror.
 */
-hts_boolean hts_abort_request_taken(httrackp *opt);
+hts_boolean hts_take_abort_request(httrackp *opt);
 
 /*
   Process user intercations: pause, add link, delete link..

@@ -4024,9 +4024,23 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
 
 }
 
-hts_boolean hts_abort_request_taken(httrackp *opt) {
+/* Modification time of NAME in the output directory, (time_t) -1 if absent. */
+static time_t hts_lock_time(httrackp *opt, const char *name) {
+  return get_filetime(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_log), name));
+}
+
+hts_boolean hts_take_abort_request(httrackp *opt) {
+  time_t asked, started;
+
   if (!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                            StringBuff(opt->path_log), HTS_ABORT_LOCKNAME)))
+    return HTS_FALSE;
+  /* A request no newer than this run's own progress lock was aimed at an
+     earlier mirror, so it neither stops this one nor is ours to delete. */
+  asked = hts_lock_time(opt, HTS_ABORT_LOCKNAME);
+  started = hts_lock_time(opt, "hts-in_progress.lock");
+  if (asked == (time_t) -1 || started == (time_t) -1 || asked <= started)
     return HTS_FALSE;
   UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                  StringBuff(opt->path_log), HTS_ABORT_LOCKNAME));
@@ -4053,7 +4067,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
 #endif
 
   /* Windows has no cross-process SIGTERM: a stop request arrives as a file. */
-  if (hts_abort_request_taken(opt)) {
+  if (hts_take_abort_request(opt)) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
     *stre->exit_xh_ = 1;
     XH_uninit;
@@ -4221,7 +4235,7 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
       }
       /* Read here as well, or a mirror down to its last socket sees no stop
          request until the transfer it waits on has ended. */
-      if (hts_abort_request_taken(opt)) {
+      if (hts_take_abort_request(opt)) {
         hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
         *stre->exit_xh_ = 1;
       }
