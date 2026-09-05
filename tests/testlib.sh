@@ -1210,9 +1210,31 @@ budget_left() {
 # and a bare `wait` then blocks the watchdog itself forever, so the timeout it was
 # about to report is never printed and the whole suite wedges silently.
 REAP_GRACE=${REAP_GRACE:-10}
+
+# Has pid $1 died and not yet been collected? A killed process answers kill -0
+# until a parent waits on it, and a caller that is not that parent never can: the
+# reap falls to whoever inherits the orphan, prompt on a workstation and not on a
+# Debian buildd, where it reddened 250 twice. The state is the honest question, so
+# ask ps by its POSIX keyword, then /proc where a build root has no procps
+# (#1021). A host that answers neither way keeps waiting, as before.
+pid_is_zombie() { # pid_is_zombie PID
+    local st
+    st=$(ps -o state= -p "$1" 2>/dev/null) || st=
+    if test -z "$st"; then
+        { read -r st <"/proc/$1/stat"; } 2>/dev/null || return 1
+        st=${st##*') '}
+        st=${st%% *}
+    fi
+    case $st in
+    Z*) return 0 ;;
+    esac
+    return 1
+}
+
 reap_bounded() {
     local pid=$1 start=$SECONDS
     while kill -0 "$pid" 2>/dev/null; do
+        if pid_is_zombie "$pid"; then break; fi
         test "$((SECONDS - start))" -le "$REAP_GRACE" || return 1
         poll_wait 1
     done
