@@ -28,6 +28,7 @@
 #                             requires the payload digest when the file emits any
 import base64
 import hashlib
+import re
 import sys
 import zlib
 
@@ -51,6 +52,32 @@ def field(header, name):
         if line.lower().startswith(name.lower() + b":"):
             return line.split(b":", 1)[1].strip()
     return None
+
+
+# WARC/1.1 (ISO 28500:2017) 5.2-5.5 make WARC-Record-ID, Content-Length,
+# WARC-Date and WARC-Type mandatory on every record; 5.12 makes
+# WARC-Target-URI mandatory for the types below and optional elsewhere.
+URI_TYPES = (
+    b"request",
+    b"response",
+    b"resource",
+    b"revisit",
+    b"conversion",
+    b"continuation",
+)
+# 5.4: a UTC W3C-ISO8601 timestamp, with the fractional seconds 1.1 allows.
+DATE_RE = re.compile(rb"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$")
+# 5.2: an absolute URI in angle brackets, globally unique.
+ID_RE = re.compile(rb"^<[A-Za-z][A-Za-z0-9+.\-]*:[^<>\s]+>$")
+
+
+def mandatory(header, name, total):
+    """Return a mandatory field, or exit. field() answers None when the field is
+    absent and b"" when it is present but empty, and both violate the spec."""
+    value = field(header, name)
+    if not value:
+        sys.exit("record %d: missing mandatory %s" % (total, name.decode()))
+    return value
 
 
 def opt_values(argv, name):
@@ -145,9 +172,9 @@ def main():
             sys.exit("record %d: no header terminator" % total)
         hdr_end = sep + 4
         header = rec[:sep]
-        cl = field(header, b"Content-Length")
-        if cl is None:
-            sys.exit("record %d: no Content-Length" % total)
+        cl = mandatory(header, b"Content-Length", total)
+        if not cl.isdigit():
+            sys.exit("record %d: non-numeric Content-Length %r" % (total, cl))
         block_len = int(cl)
         if hdr_end + block_len + 4 != len(rec):
             sys.exit(
@@ -156,8 +183,22 @@ def main():
             )
         if rec[hdr_end + block_len :] != b"\r\n\r\n":
             sys.exit("record %d: missing \\r\\n\\r\\n trailer" % total)
-        wtype = field(header, b"WARC-Type")
+        wtype = mandatory(header, b"WARC-Type", total)
+        rec_id = mandatory(header, b"WARC-Record-ID", total)
+        if not ID_RE.match(rec_id):
+            sys.exit(
+                "record %d: WARC-Record-ID %r is not <absolute-URI>" % (total, rec_id)
+            )
+        wdate = mandatory(header, b"WARC-Date", total)
+        if not DATE_RE.match(wdate):
+            sys.exit(
+                "record %d: WARC-Date %r is not a UTC ISO8601 stamp" % (total, wdate)
+            )
         uri = field(header, b"WARC-Target-URI") or b""
+        if wtype in URI_TYPES and not uri:
+            sys.exit(
+                "record %d: %s record has no WARC-Target-URI" % (total, wtype.decode())
+            )
         if wtype in (b"response", b"revisit", b"resource"):
             for sub in no_record:
                 if sub.encode() in uri:
@@ -229,7 +270,7 @@ def main():
                         "revisit for %s does not carry the 304 it stands for: %r"
                         % (shown, block.split(b"\r\n", 1)[0])
                     )
-                exchanges.append((shown, field(header, b"WARC-Record-ID")))
+                exchanges.append((shown, rec_id))
         elif wtype == b"request":
             conc = field(header, b"WARC-Concurrent-To")
             if conc is not None:
