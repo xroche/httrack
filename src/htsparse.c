@@ -4036,8 +4036,9 @@ hts_boolean hts_take_abort_request(httrackp *opt) {
   if (!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                            StringBuff(opt->path_log), HTS_ABORT_LOCKNAME)))
     return HTS_FALSE;
-  /* A request no newer than this run's own progress lock was aimed at an
-     earlier mirror, so it neither stops this one nor is ours to delete. */
+  /* A request no newer than this run's progress lock was aimed at an earlier
+     mirror, so it neither stops this one nor is ours to delete. Whole seconds
+     everywhere, so a clock stepping back makes the file inert meanwhile. */
   asked = hts_lock_time(opt, HTS_ABORT_LOCKNAME);
   started = hts_lock_time(opt, "hts-in_progress.lock");
   if (asked == (time_t) -1 || started == (time_t) -1 || asked <= started)
