@@ -74,6 +74,14 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   byte-wise (`perl -0pi`, `sed`), not through a tool that re-encodes to UTF-8
   and corrupts them. The rest of the tree, including `lang/*.txt` and
   `html/contact.html`, is UTF-8 and safe to edit normally.
+- **Never add a matrix axis to `windows-build.yml`.** The `libhttrack` job has no
+  `name:`, so GitHub builds each status context from the job id plus the matrix
+  values. That yields `libhttrack (x64, Release)` and `libhttrack (Win32,
+  Release)`, and the `Protect master` ruleset requires both by name. A third axis
+  renames them, so both stop reporting on every open PR in the repo, not only the
+  one that added the axis. Give a new Windows leg its own job with a pinned
+  `name:`, or add a step to the existing job. `437_ci-windows-contexts.test`
+  fails on any such rename.
 
 ## Security (HTTrack parses hostile input off the network)
 - Bounds-check every copy. Overflow-safe form: put the untrusted value alone,

@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# windows-build.yml's job names generate the two status contexts the branch
+# ruleset requires by name, so any edit that renames them stops both from
+# reporting on every open PR, not just the one that made the edit.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+wf="$top_srcdir/.github/workflows/windows-build.yml"
+test -r "$wf" || fail "no $wf"
+
+# The contexts named in the "Protect master" ruleset, pinned rather than derived,
+# because one file compared against itself proves nothing.
+want='libhttrack (Win32, Release)
+libhttrack (x64, Release)'
+
+# What GitHub will call the job's legs: the job id (a job with an explicit
+# name: uses that instead), then the matrix values in declaration order.
+contexts() { # contexts <workflow>
+    awk '
+        /^jobs:/ { injobs = 1; next }
+        !injobs { next }
+        /^  [A-Za-z0-9_-]+:/ {
+            injob = ($0 ~ /^  libhttrack:/)
+            if (injob) { sub(/:.*/, ""); sub(/^  /, ""); id = $0 }
+            next
+        }
+        !injob { next }
+        /^    name:/ { bad = 1; print "ERR: the job carries an explicit name:"; exit 1 }
+        /^      matrix:/ { inmatrix = 1; next }
+        inmatrix && /^        [A-Za-z0-9_-]+: *\[/ {
+            sub(/^[^[]*\[/, ""); sub(/\].*/, "")
+            gsub(/ /, "")
+            n++; axis[n] = $0
+            next
+        }
+        inmatrix && /^      [A-Za-z0-9_-]+:/ { inmatrix = 0 }
+        END {
+            if (bad) exit 1
+            if (!id) { print "ERR: no libhttrack job"; exit 1 }
+            if (!n) { print "ERR: no matrix axes"; exit 1 }
+            # Cross-product, left axis slowest, which is the order GitHub uses.
+            out[1] = ""
+            count = 1
+            for (i = 1; i <= n; i++) {
+                m = split(axis[i], v, ",")
+                k = 0
+                for (c = 1; c <= count; c++)
+                    for (j = 1; j <= m; j++)
+                        next_out[++k] = (out[c] == "" ? v[j] : out[c] ", " v[j])
+                for (c = 1; c <= k; c++) out[c] = next_out[c]
+                count = k
+            }
+            for (c = 1; c <= count; c++) print id " (" out[c] ")"
+        }
+    ' "$1"
+}
+
+# Not piped into sort, because a failing parse would hand its status to sort.
+got=$(contexts "$wf") || fail "windows-build.yml could not be read: $got"
+got=$(sort <<<"$got")
+test "$got" = "$want" || fail "windows-build.yml generates:
+$got
+but the ruleset requires:
+$want
+An added matrix axis or a job rename stops BOTH required contexts from
+reporting on every open PR. Give a new leg its own job with a pinned name:."
+
+# The mutant this exists to catch: a third axis, which renames both legs.
+mut=$(mktemp "${TMPDIR:-/tmp}/httrack_wf.XXXXXX")
+cleanup_push rm -f "$mut"
+sed 's/^        configuration: \[Release\]/&\n        toolset: [v143]/' "$wf" >"$mut"
+cmp -s "$wf" "$mut" && fail "the added-axis mutant changed nothing, so it proves nothing"
+mutgot=$(contexts "$mut") || fail "the added-axis mutant broke the parse: $mutgot"
+mutgot=$(sort <<<"$mutgot")
+test "$mutgot" != "$want" || fail "a third matrix axis left the contexts unchanged: $mutgot"
+
+# And the other half of the same break: an explicit job name.
+sed 's/^  libhttrack:/&\n    name: windows/' "$wf" >"$mut"
+contexts "$mut" >/dev/null 2>&1 && fail "an explicit job name: went unreported"
+
+echo "windows-build contexts OK ($(printf '%s' "$got" | count_matching_lines .) required, both generated)"
