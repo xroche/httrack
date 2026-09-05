@@ -1509,16 +1509,15 @@ static int cache_brstr(char *adr, char *s, size_t s_size) {
   return off;
 }
 
-/** Would reading n bytes at the current offset stay inside the .dat? A file
-    whose size is unknown (datSize negative) bounds nothing, and the read then
-    refuses on its own. **/
+/** Would reading n bytes at the current offset stay inside the .dat? A size
+    the host could not report is refused rather than waived: filesize() answers
+    in a long int, so a 32-bit build handed a .dat past 2 GB reads back a value
+    that bounds nothing. **/
 static hts_boolean cache_fits(FILE *fp, long int datSize, size_t n) {
   const long int at = ftell(fp);
 
-  if (at < 0)
+  if (at < 0 || datSize < 0)
     return HTS_FALSE;
-  if (datSize < 0)
-    return HTS_TRUE;
   return at <= datSize && n <= (size_t) (datSize - at) ? HTS_TRUE : HTS_FALSE;
 }
 
@@ -1981,7 +1980,13 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
               FILE *fp = fopen(previous_save, "rb");
 
               if (fp != NULL) {
-                r->adr = cache_alloc_body(r->size);
+                /* same two bounds as a .dat-held body: the format's ceiling,
+                   then the file the bytes have to come out of */
+                const hts_boolean fits =
+                    r->size < (size_t) INT_MAX &&
+                    cache_fits(fp, filesize(previous_save), r->size);
+
+                r->adr = fits ? cache_alloc_body(r->size) : NULL;
                 if (r->adr != NULL) {
                   if (r->size > 0 && !hts_fread_exact(r->adr, r->size, fp)) {
                     PT_Element_DropBody(r);
@@ -1993,7 +1998,8 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                 } else {
                   r->statuscode = STATUSCODE_INVALID;
                   strcpybuff(r->msg,
-                             "Read error (memory exhausted) from cache");
+                             fits ? "Read error (memory exhausted) from cache"
+                                  : "Cache Read Error : Bad Size");
                 }
                 fclose(fp);
               } else {
@@ -2004,9 +2010,13 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
           } else {
             // lire fichier (d'un coup)
             if (flags & FETCH_BODY) {
-              /* a body larger than the bytes left of the .dat is corruption;
-                 catch it before the allocation, not on the failing read */
+              /* The size field is a 32-bit signed decimal, so INT_MAX is the
+                 format's own ceiling, the one the zip reader above takes too.
+                 Past that the body must still fit in the bytes left of the
+                 .dat, which catches corruption before the allocation rather
+                 than on the failing read. */
               const hts_boolean fits =
+                  r->size < (size_t) INT_MAX &&
                   cache_fits(cache->dat, cache->datSize, r->size);
 
               r->adr = fits ? cache_alloc_body(r->size) : NULL;

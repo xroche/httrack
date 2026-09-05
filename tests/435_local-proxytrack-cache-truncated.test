@@ -15,8 +15,11 @@ cleanup_push rm -rf "$dir"
 BODY='<html>hello</html>'
 refused='Truncated or corrupt cache record' # the reader's verdict
 
-# One .ndx entry pointing at offset 0 of a .dat, then a .dat per case.
-"$python" - "$(nativepath "$dir")" <<'PYEOF'
+# One .ndx entry pointing at offset 0 of a .dat, then a .dat per case. The
+# last case needs a .dat past 2 GB and is written sparse; the verdict says
+# whether the filesystem kept it that way.
+sparse=$(
+    "$python" - "$(nativepath "$dir")" <<'PYEOF'
 import os
 import sys
 
@@ -37,13 +40,15 @@ FIELDS = [b"200", b"0", b"OK", b"text/html", b"UTF-8", DATE, b"", b"", b"",
           b"%d" % len(BODY)]
 
 # cache_brstr takes the magic and the date as length-prefixed values; the entry
-# walk then skips one line before reading host, file and offset
-NDX = b"9\nCACHE-1.5%s\nx\nwww.example.com\n/index.html\n0\n" % field(DATE)
+# walk then skips one line before reading host, file and offset. A negative
+# offset means the body is on disk rather than in the .dat.
+NDX = b"9\nCACHE-1.5%s\nx\nwww.example.com\n/index.html\n%%d\n" % field(DATE)
 
 
-def write(name, dat):
+def write(name, dat, pos=0):
+    os.makedirs(os.path.dirname(os.path.join(out, name)), exist_ok=True)
     with open(os.path.join(out, name + ".ndx"), "wb") as f:
-        f.write(NDX)
+        f.write(NDX % pos)
     with open(os.path.join(out, name + ".dat"), "wb") as f:
         f.write(dat)
 
@@ -71,7 +76,33 @@ for name, i, length in (("hugemsg", 2, 30000), ("hugetype", 3, 30000),
 big = list(parts)
 big[14] = field(b"2000000000")
 write("hugebody", b"".join(big) + BODY)
+
+# A body the .dat really is long enough to hold, declared at the format's own
+# ceiling: only a cap on the declared size refuses this one.
+over = list(parts)
+over[14] = field(b"2147483647")
+write("overbody", b"".join(over) + BODY)
+dat = os.path.join(out, "overbody.dat")
+with open(dat, "r+b") as f:
+    f.truncate(2 ** 31 + 8192)
+
+# The other body path: a negative offset leaves the bytes in a file beside the
+# cache, named by the "save" field, and the same two bounds apply there. That
+# name resolves against the cache's grandparent, so keep HTTrack's own layout.
+os.makedirs(os.path.join(out, "m", "hts-cache"), exist_ok=True)
+with open(os.path.join(out, "m", "body.bin"), "wb") as f:
+    f.write(BODY)
+for name, declared in (("diskgood", len(BODY)), ("diskbig", 4096),
+                       ("diskover", 2147483647)):
+    disk = list(FIELDS)
+    disk[11] = b"body.bin"
+    disk[14] = b"%d" % declared
+    write("m/hts-cache/" + name, b"\0" * 8 + b"".join(field(f) for f in disk),
+          pos=-8)
+
+print("sparse" if os.stat(dat).st_blocks * 512 < 1024 * 1024 else "dense")
 PYEOF
+)
 
 convert() { # convert NAME
     local rc=0
@@ -106,5 +137,33 @@ grep -qa 'Cache Read Error : Bad Size' "$dir/hugebody.arc" ||
 if grep -qaF "$BODY" "$dir/hugebody.arc"; then
     fail_dump "a body larger than the .dat still came back" "$dir/hugebody.log"
 fi
+
+# Here the .dat is long enough, so the bytes-remaining bound passes it and the
+# declared size is refused on the format's ceiling alone. Without that ceiling
+# the allocator refuses it instead, and reports a bad size as a memory failure.
+if test "$sparse" != sparse; then
+    echo "no sparse files here; skipping the 2 GB .dat case" >&2
+else
+    convert overbody
+    grep -qa 'Cache Read Error : Bad Size' "$dir/overbody.arc" ||
+        fail_dump "a body declared at the format ceiling was not refused" "$dir/overbody.log"
+    if grep -qaF "$BODY" "$dir/overbody.arc"; then
+        fail_dump "a body declared at the format ceiling still came back" "$dir/overbody.log"
+    fi
+fi
+
+# The sibling allocation, for a body held in a file beside the cache. Its
+# control comes first: bounding this one must not drop an honest entry.
+convert m/hts-cache/diskgood
+grep -qaF "$BODY" "$dir/m/hts-cache/diskgood.arc" ||
+    fail_dump "an on-disk body of the declared size was lost" "$dir/m/hts-cache/diskgood.log"
+for name in m/hts-cache/diskbig m/hts-cache/diskover; do
+    convert "$name"
+    grep -qa 'Cache Read Error : Bad Size' "$dir/$name.arc" ||
+        fail_dump "$name declared more than its file holds and was accepted" "$dir/$name.log"
+    if grep -qaF "$BODY" "$dir/$name.arc"; then
+        fail_dump "$name still returned a body" "$dir/$name.log"
+    fi
+done
 
 exit 0
