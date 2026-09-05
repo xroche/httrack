@@ -44,12 +44,16 @@ savedhtml() {
     find "$1" -type f -path '*/file/*' -name index.html -print -quit
 }
 
+# An absolute URL inside a fixture names a path the ENGINE resolves, so it must
+# be the native form: under wsl2 the shell holds /mnt/d/... and the engine D:/... .
+fileurl() { printf 'file://%s' "$(nativepath "$1")"; }
+
 # srcset on <img> and <source> (#235, #236): every candidate captured and
 # rewritten, descriptors preserved, following attributes left intact.
 site="$tmp/srcset"
 mkdir -p "$site"
 for f in a b c d e f g h i j v dz; do gif "$site/$f.gif"; done
-# unquoted heredoc: $site expands in the absolute-URL candidate
+# unquoted heredoc: the absolute-URL candidate below is expanded here
 cat >"$site/index.html" <<EOF
 <html><body>
 <img src="a.gif" srcset="b.gif 480w, c.gif 800w">
@@ -58,7 +62,7 @@ cat >"$site/index.html" <<EOF
 <img srcset="g.gif 2x" alt="trailing attr after srcset">
 <img srcset="  h.gif   2x ,  i.gif  ">
 <video><source src="v.gif"></video>
-<img srcset="file://$site/j.gif 2x">
+<img srcset="$(fileurl "$site")/j.gif 2x">
 <img srcset="data:image/gif;base64,R0lGODlhAQABAAAAACw= 1x, dz.gif 2x">
 <img srcset="">
 <a href="a.gif">plain link still works</a>
@@ -113,14 +117,14 @@ mkdir -p "$site2"
 for f in xl ibg ibgs cex cexd cexs tt; do gif "$site2/$f.gif"; done
 cat >"$site2/index.html" <<EOF
 <html><head><style>
-.a { background-image: url(file://$site2/cex.gif); }
-.b { background-image: url("file://$site2/cexd.gif"); }
-.c { background-image: url('file://$site2/cexs.gif'); }
+.a { background-image: url($(fileurl "$site2")/cex.gif); }
+.b { background-image: url("$(fileurl "$site2")/cexd.gif"); }
+.c { background-image: url('$(fileurl "$site2")/cexs.gif'); }
 </style></head><body>
-<a xlink:href="file://$site2/xl.gif">xlink:href (#298)</a>
-<div style="background-image:url(file://$site2/ibg.gif)"></div>
-<div style="background-image:url('file://$site2/ibgs.gif')"></div>
-<span title="file://$site2/tt.gif">excluded attribute</span>
+<a xlink:href="$(fileurl "$site2")/xl.gif">xlink:href (#298)</a>
+<div style="background-image:url($(fileurl "$site2")/ibg.gif)"></div>
+<div style="background-image:url('$(fileurl "$site2")/ibgs.gif')"></div>
+<span title="$(fileurl "$site2")/tt.gif">excluded attribute</span>
 </body></html>
 EOF
 out2="$tmp/attrs-out"
@@ -160,10 +164,10 @@ site3="$tmp/xmlns"
 mkdir -p "$site3"
 for f in ns og rdfs real; do gif "$site3/$f.gif"; done
 cat >"$site3/index.html" <<EOF
-<html xmlns="file://$site3/ns.gif"><body>
-<svg xmlns:og="file://$site3/og.gif"></svg>
-<div class="c" xmlns:rdfs="file://$site3/rdfs.gif"></div>
-<a href="file://$site3/real.gif">real link</a>
+<html xmlns="$(fileurl "$site3")/ns.gif"><body>
+<svg xmlns:og="$(fileurl "$site3")/og.gif"></svg>
+<div class="c" xmlns:rdfs="$(fileurl "$site3")/rdfs.gif"></div>
+<a href="$(fileurl "$site3")/real.gif">real link</a>
 </body></html>
 EOF
 out3="$tmp/xmlns-out"
@@ -244,7 +248,7 @@ var x = new XMLHttpRequest();
 x.open("GET", "ajax_info.txt");
 var y = new XMLHttpRequest();
 y.open("Post", "submit.cgi");
-window.open("file://$site7/winopen.gif");
+window.open("$(fileurl "$site7")/winopen.gif");
 </script></body></html>
 EOF
 out7="$tmp/xhropen-out"
@@ -360,11 +364,11 @@ for f in pre post mid spdata handler handler2 jsdecoy jsdecoy2 nodecoy \
     spalt glalt spxml jtail1 jtail2 textdecoy tagdecoy phantom; do gif "$site11/$f.gif"; done
 cat >"$site11/index.html" <<EOF
 <html><body>
-<img data-pre="file://$site11/pre.gif">
+<img data-pre="$(fileurl "$site11")/pre.gif">
 <script>var x = 1;</script>
-<img data-post="file://$site11/post.gif">
-<img data-mid="file://$site11/mid.gif" alt="mid-tag attr, no delimiter after">
-<img data-sp = "file://$site11/spdata.gif" q=1>
+<img data-post="$(fileurl "$site11")/post.gif">
+<img data-mid="$(fileurl "$site11")/mid.gif" alt="mid-tag attr, no delimiter after">
+<img data-sp = "$(fileurl "$site11")/spdata.gif" q=1>
 <img alt="nodecoy.gif" src="pre.gif">
 <img alt = "spalt.gif" id=x>
 <img src="pre.gif"alt="glalt.gif" id=x>
@@ -373,9 +377,9 @@ cat >"$site11/index.html" <<EOF
 <p>t = "textdecoy.gif" q</p>
 <img ="tagdecoy.gif" q>
 <a onclick='q = 1; "h1'>x</a>
-<img data-h1="file://$site11/handler.gif">
+<img data-h1="$(fileurl "$site11")/handler.gif">
 <a onclick='w = 1; "h2>x</a>
-<img data-h2="file://$site11/handler2.gif">
+<img data-h2="$(fileurl "$site11")/handler2.gif">
 <script>var s; s = 1; "jsdecoy.gif";</script>
 <script>var s2 = "jsdecoy2.gif" x;</script>
 <script>var f = "</script>
