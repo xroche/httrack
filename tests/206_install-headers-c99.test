@@ -191,6 +191,12 @@ else
     done
 fi
 
+# The loops above are only meaningful if this compiler rejects a missing include.
+printf '#include "no-such-header-972.h"\n' >"$tmp/tu.c"
+if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=${stds[0]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
+    fail "${cc_argv[*]} accepted a missing include, the checks above proved nothing"
+fi
+
 # The installed headers must also compile as C++ (#1002). -fsyntax-only never
 # runs g++'s -Wunused-function pass, so this leg always does a real -c compile.
 cxx=""
@@ -251,11 +257,5 @@ else
         fail "the C++ compile loop skipped units"
 fi
 [ "$bad" -eq 0 ] || fail "installed headers do not compile as C++"
-
-# The loops above are only meaningful if this compiler rejects a missing include.
-printf '#include "no-such-header-972.h"\n' >"$tmp/tu.c"
-if "${cc_argv[@]}" "${cpp_argv[@]}" "-std=${stds[0]}" -fsyntax-only "$tmp/tu.c" 2>/dev/null; then
-    fail "${cc_argv[*]} accepted a missing include, the checks above proved nothing"
-fi
 
 exit 0
