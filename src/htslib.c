@@ -5937,6 +5937,7 @@ HTSEXT_API const char* hts_version(void) {
   return HTTRACK_VERSIONID;
 }
 
+#if HTS_USEOPENSSL
 static int ssl_vulnerable(const char *version) {
 #ifdef _WIN32
   static const char *const match = "OpenSSL 1.0.1";
@@ -5950,6 +5951,7 @@ static int ssl_vulnerable(const char *version) {
 #endif
   return 0;
 }
+#endif
 
 /* user abort callback */
 htsErrorCallback htsCallbackErr = NULL;

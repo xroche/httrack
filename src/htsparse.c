@@ -2500,7 +2500,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     afs.af.adr[0] = '\0';      // erreur
                     if (reponse == -2) {
                       hts_log_print(opt, LOG_WARNING,
-                                    "Link %s not caught (unknown protocol)",
+                                    "Link %s not caught (protocol not "
+                                    "supported by this build)",
                                     lien);
                     } else {
                       hts_log_print(opt, LOG_DEBUG,
