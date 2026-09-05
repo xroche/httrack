@@ -1,0 +1,14 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# opt->cache (-C) defaults to C1 cache-priority (htslib.c), while the man
+# page, --help and the hts_cachemode enum comment all claimed C2 test-update
+# was the default. Guards the code side so a future default change forces the
+# docs to move with it.
+assert_selftest "cache-default: OK" cachedefault
+
+exit 0

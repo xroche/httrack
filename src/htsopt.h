@@ -310,9 +310,10 @@ typedef enum hts_urlmode {
 #define HTS_DEF_DEFSTRUCT_hts_cachemode
 
 typedef enum hts_cachemode {
-  HTS_CACHE_NONE = 0,       /**< no cache */
-  HTS_CACHE_PRIORITY = 1,   /**< cache takes priority over the network */
-  HTS_CACHE_TEST_UPDATE = 2 /**< check for update before reuse (default) */
+  HTS_CACHE_NONE = 0, /**< no cache */
+  HTS_CACHE_PRIORITY =
+      1, /**< cache takes priority over the network (default) */
+  HTS_CACHE_TEST_UPDATE = 2 /**< check for update before reuse */
 } hts_cachemode;
 #endif
 

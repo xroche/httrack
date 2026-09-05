@@ -2294,6 +2294,22 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+/* -C's own default (no -C given) is C1 cache-priority, not the C2 test-update
+   the man page and this enum's comment claimed for a long time. */
+static int st_cachedefault(httrackp *opt, int argc, char **argv) {
+  httrackp *const fresh = hts_create_opt();
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  if (fresh->cache != HTS_CACHE_PRIORITY)
+    err = 1;
+  hts_free_opt(fresh);
+  printf("cache-default: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_pause(httrackp *opt, int argc, char **argv) {
   int err = 0, i, seen_low = 0, seen_high = 0;
 
@@ -13257,6 +13273,8 @@ static const struct selftest_entry {
      "layout of the installed structs configure's switches decide",
      st_pubheaders},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
+    {"cachedefault", "", "-C default is C1 cache-priority, not C2",
+     st_cachedefault},
     {"lastchar", "",
      "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
