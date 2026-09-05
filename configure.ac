@@ -519,11 +519,9 @@ AC_ARG_ENABLE([https],
 	https_support=yes
 	AC_MSG_RESULT($https_support)
 	])
-AC_SUBST(HTTPS_SUPPORT,$https_support)
-
 # Probe OpenSSL ?
+https_have=no
 if test x"$https_support" = x"no"; then
-AC_MSG_NOTICE([disabling https support])
 AC_DEFINE(HTS_USEOPENSSL, 0)
 else
 SAVE_LIBS=$LIBS
@@ -537,19 +535,28 @@ AC_CHECK_LIB(ssl, SSL_CTX_new,
 	[
 	# -lssl first: an archive link needs it ahead of the -lcrypto it uses.
 	OPENSSL_LIBS="-lssl $OPENSSL_LIBS"
+	https_have=yes
 	AC_DEFINE(HTS_USEOPENSSL, 1, [Check for OpenSSL])
 	],
 	[
-	if test x"$https_support" = x"yes"; then
-	AC_MSG_ERROR([not available])
-	else
-	AC_MSG_RESULT([not available])
-	fi
+	# Nothing here links libcrypto on its own, so drop the half we found.
+	OPENSSL_LIBS=
+	AS_IF([test x"$https_support" = x"yes"],
+		[AC_MSG_ERROR([no linkable libssl. Install the OpenSSL development files, or pass --disable-https to build without https])],
+		dnl Define it to 0: htsglobal.h defaults an undefined
+		dnl HTS_USEOPENSSL back to 1 and the link then fails on every SSL symbol.
+		[AC_DEFINE(HTS_USEOPENSSL, 0)])
 	]
 	)
 LIBS=$SAVE_LIBS
-AC_SUBST(OPENSSL_LIBS)
 fi
+AC_SUBST(OPENSSL_LIBS)
+AC_MSG_CHECKING([whether https support is enabled])
+dnl Name who decided: "auto" is the build machine's answer, not the packager's.
+AS_IF([test x"$https_support" = x"auto"],
+	[AC_MSG_RESULT([$https_have (auto)])],
+	[AC_MSG_RESULT([$https_have (requested)])])
+AC_SUBST(HTTPS_SUPPORT,$https_have)
 
 ### Support IPv6
 V6_SUPPORT=no
@@ -693,10 +700,10 @@ hts_pc_dep() { # hts_pc_dep <module or empty> <link line>
 		PKGCONFIG_LIBS_PRIVATE="${PKGCONFIG_LIBS_PRIVATE:+$PKGCONFIG_LIBS_PRIVATE }$2"
 	fi
 }
-# Whichever half of OpenSSL was actually found; https=auto can settle for libcrypto.
+# OpenSSL is all or nothing: a build with https links -lssl and -lcrypto, and a
+# build without links neither.
 AS_CASE([" $OPENSSL_LIBS "],
 	[*" -lssl "*], [hts_pc_openssl=openssl],
-	[*" -lcrypto "*], [hts_pc_openssl=libcrypto],
 	[hts_pc_openssl=])
 hts_pc_dep "$hts_pc_openssl" "$OPENSSL_LIBS"
 hts_pc_dep libbrotlidec "$BROTLI_LIBS"

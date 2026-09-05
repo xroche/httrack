@@ -2644,13 +2644,19 @@ int back_add(struct_back *sback, httrackp *opt, cache_back *cache,
 #endif
           return 0;
         }
-      }
+      } else if (strfield(back[p].url_adr, "https://")) {
 #if HTS_USEOPENSSL
-      else if (strfield(back[p].url_adr, "https://")) {     // let's rock
-        back[p].r.ssl = 1;
+        back[p].r.ssl = 1; // let's rock
         back[p].r.ssl_con = NULL;
-      }
+#else
+        // Transferring it would mean a cleartext request to an https URL.
+        back[p].r.statuscode = STATUSCODE_NON_FATAL;
+        strcpybuff(back[p].r.msg, "https:// is not supported by this build");
+        back[p].status = STATUS_READY;
+        back_set_finished(opt, sback, p);
+        return 0;
 #endif
+      }
 
       if (!back_trylive(opt, cache, sback, p)) {
 #if HTS_XGETHOST

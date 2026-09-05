@@ -302,7 +302,7 @@ int main(int argc, char *argv[]) {
 #ifdef HTS_INET6
   smallserver_setkey("INET6", "1");
 #endif
-#ifdef HTS_USEOPENSSL
+#if HTS_USEOPENSSL
   smallserver_setkey("USEOPENSSL", "1");
 #endif
 #ifdef HTS_DLOPEN

@@ -104,6 +104,13 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       scheme = 1;
   }
 
+#if !HTS_USEOPENSSL
+  // Drop every https link: the relative arm below strips "https:" and refetches
+  // it from the origin host in the clear.
+  if (strfield(lien, "https:"))
+    return -2;
+#endif
+
   // filtrer les parazites (mailto & cie)
   // scheme+authority (//)
   if ((strfield(lien, "http://"))       // scheme+//
@@ -122,17 +129,13 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     } else {
       ok = -2;                  // non supporté
     }
-#if HTS_USEOPENSSL
   } else if (strfield(lien, "https://")) {
-    // Note: ftp:foobar.gif is not valid
     if (ident_url_absolute(lien, adrfil) == -1) {
       ok = -1;                // erreur URL
     }
-#endif
-  } else if ((scheme) && ((!strfield(lien, "http:"))
-                          && (!strfield(lien, "https:"))
-                          && (!strfield(lien, "ftp:"))
-             )) {
+  } else if ((scheme) &&
+             ((!strfield(lien, "http:")) && (!strfield(lien, "https:")) &&
+              (!strfield(lien, "ftp:")))) {
     ok = -1;                    // unknown scheme
   } else {                      // c'est un lien relatif
     // On forme l'URL complète à partie de l'url actuelle
@@ -211,7 +214,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     } else
       ok = -1;
 
-  }                             // test news: etc.
+  } // test news: etc.
 
   // case insensitive pour adresse
   {
