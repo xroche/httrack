@@ -922,15 +922,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             strlcpybuff(argv[i] + 1, "#P", strlen(argv[i] + 1) + 1);
             //
           } else if (strfield2(argv[i] + 2, "updatehttrack")) {
-#ifdef _WIN32
+            /* Never implemented anywhere, and refusing it stops the untouched
+               string being re-walked as the cluster -u -p -d -a -t -e -h, whose
+               h exits 0 with an empty mirror. */
             char s[HTS_CDLMAXSIZE + 256];
 
-            slprintfbuff_clip(s, sizeof(s), "%s not available in this version",
-                              argv[i]);
+            slprintfbuff_clip(s, sizeof(s), "%s is not implemented", argv[i]);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
-#endif
           }
           //
           else {
