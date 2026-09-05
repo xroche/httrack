@@ -25,41 +25,110 @@ would dishonor our work and waste the many hours we have spent on it.
 Please visit our Website: http://www.httrack.com
 */
 
-/* Fuzz the cache-index (.ndx) parser: a corrupt or truncated index must not
-   walk the length-prefixed cache_brstr/cache_binput scan past the buffer.
-   Mirrors the -#C cache-listing scan (htscoremain.c). */
+/* Fuzz the legacy .ndx/.dat cache reader, which is proxytrack's (store.c) and
+   is now the only one left: #1551 moved -#C off the .ndx onto the ZIP index,
+   and htscache.c's cache_brstr/cache_binput have had no caller since. The
+   loader walks length-prefixed index entries and seeks the .dat on offsets read
+   out of them, so both files come from the input:
+
+     bytes 0..1   big-endian length of the .ndx part
+     then         the .ndx, then the rest as the .dat
+
+   PT_SaveCache() then reads every entry the loader indexed back out. */
 #include "fuzz.h"
-#include "htscache.h"
-#include "htslib.h"
+
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "coucal.h"
+#include "proxy/store.h"
+
+/* A cache pair past this size says nothing a smaller one cannot. */
+#define FUZZ_NDX_MAXSIZE (1024 * 1024)
+
+static char ndx_dir[256];
+static char ndx_in[sizeof(ndx_dir) + sizeof("/in.ndx")];
+static char ndx_dat[sizeof(ndx_dir) + sizeof("/in.dat")];
+static char ndx_out[sizeof(ndx_dir) + sizeof("/out.arc")];
+
+static void fuzz_ndx_cleanup(void) {
+  (void) unlink(ndx_in);
+  (void) unlink(ndx_dat);
+  (void) unlink(ndx_out);
+  (void) rmdir(ndx_dir);
+}
+
+/* proxytrack's main() installs one; without it coucal logs stats per free */
+static void fuzz_ndx_coucal_log(coucal_opaque arg, coucal_loglevel level,
+                                const char *format, va_list args) {
+  (void) arg;
+  (void) level;
+  (void) format;
+  (void) args;
+}
+
+/* PT_GetType() picks the format from the extension, so the names decide it */
+static int fuzz_ndx_setup(void) {
+  if (ndx_in[0] == '\0') {
+    const char *const tmp = getenv("TMPDIR");
+
+    coucal_set_global_assert_handler(fuzz_ndx_coucal_log, NULL);
+
+    snprintf(ndx_dir, sizeof(ndx_dir), "%s/fuzz-cachendx-XXXXXX",
+             tmp != NULL && *tmp != '\0' ? tmp : "/tmp");
+    if (mkdtemp(ndx_dir) == NULL) {
+      return -1;
+    }
+    snprintf(ndx_in, sizeof(ndx_in), "%s/in.ndx", ndx_dir);
+    snprintf(ndx_dat, sizeof(ndx_dat), "%s/in.dat", ndx_dir);
+    snprintf(ndx_out, sizeof(ndx_out), "%s/out.arc", ndx_dir);
+    atexit(fuzz_ndx_cleanup);
+  }
+  return 0;
+}
+
+static hts_boolean fuzz_ndx_write(const char *path, const uint8_t *data,
+                                  size_t size) {
+  FILE *const fp = fopen(path, "wb");
+  hts_boolean written;
+
+  if (fp == NULL) {
+    return HTS_FALSE;
+  }
+  written = fwrite(data, 1, size, fp) == size ? HTS_TRUE : HTS_FALSE;
+  if (fclose(fp) != 0) {
+    return HTS_FALSE;
+  }
+  return written;
+}
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  char *buf = fuzz_strdup(data, size);
-  const char *const end = buf + size;
-  char firstline[256];
-  char *a = buf;
+  PT_Indexes indexes;
+  size_t ndxSize;
 
-  /* header: two length-prefixed fields (version, last-modified) */
-  a += cache_brstr(a, firstline, sizeof(firstline));
-  a += cache_brstr(a, firstline, sizeof(firstline));
-
-  /* body: newline-delimited host/file/position triples; the length-prefixed
-     scan must stay inside the buffer */
-  while (a != NULL && a < end) {
-    char BIGSTK line[HTS_URLMAXSIZE * 2];
-    char linepos[256];
-    int pos;
-
-    a = strchr(a + 1, '\n');
-    if (a == NULL)
-      break;
-    a++;
-    a += cache_binput(a, end, line, HTS_URLMAXSIZE);
-    a += cache_binput(a, end, line + strlen(line), HTS_URLMAXSIZE);
-    a += cache_binput(a, end, linepos, 200);
-    sscanf(linepos, "%d", &pos);
-    (void) pos;
+  if (size < 2 || size > FUZZ_NDX_MAXSIZE || fuzz_ndx_setup() != 0) {
+    return 0;
+  }
+  ndxSize = ((size_t) data[0] << 8) | data[1];
+  data += 2, size -= 2;
+  if (ndxSize > size) {
+    ndxSize = size;
+  }
+  /* the loader wants both files present, so an empty .dat is still written */
+  if (!fuzz_ndx_write(ndx_in, data, ndxSize) ||
+      !fuzz_ndx_write(ndx_dat, data + ndxSize, size - ndxSize)) {
+    return 0;
   }
 
-  freet(buf);
+  indexes = PT_New();
+  if (indexes != NULL) {
+    if (PT_AddIndex(indexes, ndx_in) > 0) {
+      /* the writer reads every indexed entry back through the .dat */
+      (void) PT_SaveCache(indexes, ndx_out);
+    }
+    PT_Delete(indexes);
+  }
   return 0;
 }
