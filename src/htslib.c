@@ -1368,21 +1368,27 @@ void treatfirstline(htsblk * retour, const char *rcvd) {
       if (*a != '\0') {
         while((*a == ' ') || (*a == 10) || (*a == 13) || (*a == 9))
           a++;                  // épurer espaces
-        if ((*a >= '0') && (*a <= '9')) {
-          sscanf(a, "%d", &(retour->statuscode));
+        /* RFC 9110 15: exactly three digits. sscanf("%d") range-checks
+           nothing and glibc wraps, so "4294967496" would read as a 200. */
+        if (a[0] >= '0' && a[0] <= '9' && a[1] >= '0' && a[1] <= '9' &&
+            a[2] >= '0' && a[2] <= '9' && (a[3] < '0' || a[3] > '9')) {
+          retour->statuscode =
+              (a[0] - '0') * 100 + (a[1] - '0') * 10 + (a[2] - '0');
           // sauter 200
           while((*a != ' ') && (*a != '\0') && (*a != 10) && (*a != 13)
                 && (*a != 9))
             a++;
           while((*a == ' ') || (*a == 10) || (*a == 13) || (*a == 9))
             a++;                // épurer espaces
-          if ((strlen(a) > 1) && (strlen(a) < 64))      // message retour
-            strcpybuff(retour->msg, a);
+          /* A lone CR does not end the line the reader stopped at, so a phrase
+             kept as-is would write the log's own field separators. */
+          if ((strlen(a) > 1) && (strlen(a) < 64) && hts_is_control_free(a))
+            strcpybuff(retour->msg, a); // message retour
           else
             infostatuscode(retour->msg, retour->statuscode);
           // type MIME par défaut2
           strcpybuff(retour->contenttype, HTS_UNKNOWN_MIME);
-        } else {                // pas de code!
+        } else { // pas de code!
           retour->statuscode = STATUSCODE_INVALID;
           strcpybuff(retour->msg, "Unknown response structure");
         }
