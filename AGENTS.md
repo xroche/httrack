@@ -7,15 +7,16 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 - Fresh clone first: `git submodule update --init src/coucal`
 - `./bootstrap` (regenerates `configure` via `autoreconf`; needs autoconf,
   automake, libtool), then `bash configure && make -j"$(nproc)" && make check
-  -j"$(nproc)"`. Always pass `-j` to `make check`: the suite runs under
+  -j16`. Always pass `-j` to `make check`: the suite runs under
   automake's parallel harness and each crawl test binds its own ephemeral-port
   server, so `-j` never contends and a multi-minute serial run drops to
   seconds. A new `.test` added to `$(TESTS)` is scheduled onto a free worker
   automatically; only a test slower than the current longest raises the floor.
-  On a few-core Linux box, `-j` at 2x the core count is faster still: the tests
-  spend much of their wall time asleep (server trickles, httrack self-pacing),
-  so an idle core covers a sleeping one. CI uses `min(2*cores, 16)` on every
-  platform, macOS included: the test server raises its listen backlog
+  The right width is not a core count. Tests mostly sleep, waiting on a server
+  trickle or httrack's own pacing, so an idle core covers a sleeping one.
+  Measured on 4 cores, `-j8` takes 245s and `-j16` 161s, so CI passes a flat 16
+  through the `CHECK_JOBS` variable in `ci.yml`.
+  That includes macOS, because the test server raises its listen backlog
   (`request_queue_size`) so macOS/BSD don't drop connections under a parallel
   `-c16` bigcrawl the way Python's default backlog of 5 did.
   Or run `sh build.sh` to do bootstrap + configure + make in one shot.
