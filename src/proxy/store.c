@@ -1982,24 +1982,21 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
               if (fp != NULL) {
                 /* same two bounds as a .dat-held body: the format's ceiling,
                    then the file the bytes have to come out of */
-                const hts_boolean fits =
-                    r->size < (size_t) INT_MAX &&
-                    cache_fits(fp, filesize(previous_save), r->size);
-
-                r->adr = fits ? cache_alloc_body(r->size) : NULL;
-                if (r->adr != NULL) {
-                  if (r->size > 0 && !hts_fread_exact(r->adr, r->size, fp)) {
-                    PT_Element_DropBody(r);
-                    r->statuscode = STATUSCODE_INVALID;
-                    strcpybuff(r->msg, "Read error in cache disk data");
-                  } else {
-                    r->adr[r->size] = '\0';
-                  }
-                } else {
+                if (r->size >= (size_t) INT_MAX ||
+                    !cache_fits(fp, filesize(previous_save), r->size)) {
+                  r->statuscode = STATUSCODE_INVALID;
+                  strcpybuff(r->msg, "Cache Read Error : Bad Size");
+                } else if ((r->adr = cache_alloc_body(r->size)) == NULL) {
                   r->statuscode = STATUSCODE_INVALID;
                   strcpybuff(r->msg,
-                             fits ? "Read error (memory exhausted) from cache"
-                                  : "Cache Read Error : Bad Size");
+                             "Read error (memory exhausted) from cache");
+                } else if (r->size > 0 &&
+                           !hts_fread_exact(r->adr, r->size, fp)) {
+                  PT_Element_DropBody(r);
+                  r->statuscode = STATUSCODE_INVALID;
+                  strcpybuff(r->msg, "Read error in cache disk data");
+                } else {
+                  r->adr[r->size] = '\0';
                 }
                 fclose(fp);
               } else {
@@ -2015,22 +2012,19 @@ static PT_Element PT_ReadCache__Old_u(PT_Index index_, const char *url,
                  Past that the body must still fit in the bytes left of the
                  .dat, which catches corruption before the allocation rather
                  than on the failing read. */
-              const hts_boolean fits =
-                  r->size < (size_t) INT_MAX &&
-                  cache_fits(cache->dat, cache->datSize, r->size);
-
-              r->adr = fits ? cache_alloc_body(r->size) : NULL;
-              if (r->adr != NULL) {
-                if (!hts_fread_exact(r->adr, r->size, cache->dat)) { // erreur
-                  PT_Element_DropBody(r);
-                  r->statuscode = STATUSCODE_INVALID;
-                  strcpybuff(r->msg, "Cache Read Error : Read Data");
-                } else
-                  r->adr[r->size] = '\0';
-              } else {          // erreur
+              if (r->size >= (size_t) INT_MAX ||
+                  !cache_fits(cache->dat, cache->datSize, r->size)) {
                 r->statuscode = STATUSCODE_INVALID;
-                strcpybuff(r->msg, fits ? "Cache Memory Error"
-                                        : "Cache Read Error : Bad Size");
+                strcpybuff(r->msg, "Cache Read Error : Bad Size");
+              } else if ((r->adr = cache_alloc_body(r->size)) == NULL) {
+                r->statuscode = STATUSCODE_INVALID;
+                strcpybuff(r->msg, "Cache Memory Error");
+              } else if (!hts_fread_exact(r->adr, r->size, cache->dat)) {
+                PT_Element_DropBody(r);
+                r->statuscode = STATUSCODE_INVALID;
+                strcpybuff(r->msg, "Cache Read Error : Read Data");
+              } else {
+                r->adr[r->size] = '\0';
               }
             }
           }
