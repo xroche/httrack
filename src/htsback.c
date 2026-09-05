@@ -1659,20 +1659,11 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
    and scheduling state mean nothing in another process, and come back zeroed.
  */
 
-#define REF_MAGIC "HTSREF1\n"
-#define REF_MAGIC_SIZE 8
-#define REF_VERSION 1
-
 /* No pre-3.50.2 file can be taken for one of these: it opened with a
    host-native size_t holding sizeof(lien_back), which leaves a zero byte among
    the first eight for every word size and byte order, and the magic has none.
  */
 HTS_STATIC_ASSERT(sizeof(lien_back) < 0x10000, ref_magic_unambiguous);
-
-/* Caps a declared length must clear: one response's header block, and a body
-   only an in-memory transfer ever carries. */
-#define REF_MAX_STR (1024 * 1024)
-#define REF_MAX_BLOB ((uint64_t) 1024 * 1024 * 1024)
 
 static hts_boolean ref_put_u32(FILE *fp, uint32_t v) {
   unsigned char b[4];
@@ -1759,7 +1750,7 @@ static hts_boolean ref_get_short(FILE *fp, short int *v) {
 static hts_boolean ref_put_str(FILE *fp, const char *str) {
   const size_t len = str != NULL ? strlen(str) : 0;
 
-  if (len > REF_MAX_STR)
+  if (len > HTS_REF_MAX_STR)
     return HTS_FALSE;
   return ref_put_u32(fp, (uint32_t) len) &&
          (len == 0 || hts_fwrite_exact(str, len, fp));
@@ -1774,7 +1765,7 @@ static hts_boolean ref_get_str(FILE *fp, char *dst, size_t size) {
 
   assertf(size != 0);
   dst[0] = '\0';
-  if (!ref_get_u32(fp, &len) || len > REF_MAX_STR)
+  if (!ref_get_u32(fp, &len) || len > HTS_REF_MAX_STR)
     return HTS_FALSE;
   while (len != 0) {
     const size_t n =
@@ -1800,7 +1791,7 @@ static hts_boolean ref_get_heapstr(FILE *fp, char **dst) {
   char *buf;
 
   *dst = NULL;
-  if (!ref_get_u32(fp, &len) || len > REF_MAX_STR)
+  if (!ref_get_u32(fp, &len) || len > HTS_REF_MAX_STR)
     return HTS_FALSE;
   if (len == 0) /* a serialized NULL */
     return HTS_TRUE;
@@ -1817,7 +1808,7 @@ static hts_boolean ref_get_heapstr(FILE *fp, char **dst) {
 }
 
 static hts_boolean ref_put_blob(FILE *fp, const void *data, uint64_t len) {
-  if (len > REF_MAX_BLOB)
+  if (len > HTS_REF_MAX_BLOB)
     return HTS_FALSE;
   return ref_put_u64(fp, len) &&
          (len == 0 || hts_fwrite_exact(data, (size_t) len, fp));
@@ -1834,7 +1825,7 @@ static hts_boolean ref_get_blob(FILE *fp, char **dst, uint64_t *len) {
   if (size == 0) /* a serialized NULL */
     return HTS_TRUE;
   /* the guard byte must not wrap the allocation on a 32-bit size_t */
-  if (size > REF_MAX_BLOB || size > (uint64_t) (SIZE_MAX - 1))
+  if (size > HTS_REF_MAX_BLOB || size > (uint64_t) (SIZE_MAX - 1))
     return HTS_FALSE;
   buf = malloct((size_t) size + 1);
   if (buf == NULL)
@@ -1856,8 +1847,8 @@ static hts_boolean ref_put_record(FILE *fp, const lien_back *src) {
   const uint64_t body =
       src->r.adr != NULL && src->r.size > 0 ? (uint64_t) src->r.size : 0;
 
-  return hts_fwrite_exact(REF_MAGIC, REF_MAGIC_SIZE, fp) &&
-         ref_put_u32(fp, REF_VERSION) && ref_put_str(fp, src->url_adr) &&
+  return hts_fwrite_exact(HTS_REF_MAGIC, HTS_REF_MAGIC_SIZE, fp) &&
+         ref_put_u32(fp, HTS_REF_VERSION) && ref_put_str(fp, src->url_adr) &&
          ref_put_str(fp, src->url_fil) && ref_put_str(fp, src->url_sav) &&
          ref_put_str(fp, src->referer_adr) &&
          ref_put_str(fp, src->referer_fil) &&
@@ -1880,14 +1871,14 @@ static hts_boolean ref_put_record(FILE *fp, const lien_back *src) {
 
 /* Fills an entry whose in-memory scaffolding the caller already zeroed. */
 static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
-  char magic[REF_MAGIC_SIZE];
+  char magic[HTS_REF_MAGIC_SIZE];
   uint32_t version;
   uint64_t body;
 
   if (!hts_fread_exact(magic, sizeof(magic), fp) ||
-      memcmp(magic, REF_MAGIC, REF_MAGIC_SIZE) != 0)
+      memcmp(magic, HTS_REF_MAGIC, HTS_REF_MAGIC_SIZE) != 0)
     return HTS_FALSE; /* a pre-3.50.2 blit, or not a reference */
-  if (!ref_get_u32(fp, &version) || version != REF_VERSION)
+  if (!ref_get_u32(fp, &version) || version != HTS_REF_VERSION)
     return HTS_FALSE;
   if (!ref_get_str(fp, dst->url_adr, sizeof(dst->url_adr)) ||
       !ref_get_str(fp, dst->url_fil, sizeof(dst->url_fil)) ||
