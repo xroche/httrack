@@ -63,7 +63,8 @@ extern "C" {
 #endif
 #include <assert.h>
 
-/* Compiler-portability attribute macros (no-ops on non-GCC). HTS_INLINE comes from htsglobal.h. */
+/* Compiler-portability attribute macros (no-ops on non-GCC). HTS_INLINE comes
+ * from htsglobal.h. */
 #ifndef HTS_UNUSED
 #ifdef __GNUC__
 #define HTS_UNUSED __attribute__ ((unused))
