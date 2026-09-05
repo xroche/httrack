@@ -4704,6 +4704,18 @@ static int st_cache_legacy(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+static int st_ref_portable(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  if (argc < 1) {
+    fprintf(stderr, "ref-portable: needs a directory\n");
+    return 1;
+  }
+  err = ref_portable_selftest(opt, argv[0]);
+  printf("ref-portable: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 static int st_reconcile(httrackp *opt, int argc, char **argv) {
   int err;
 
@@ -13353,6 +13365,9 @@ static const struct selftest_entry {
      st_reconcile},
     {"cache-legacy", "<dir>", "pre-3.31 legacy cache refusal self-test",
      st_cache_legacy},
+    {"ref-portable", "<dir>",
+     "the .ref resume state is host-independent, and refuses a legacy one",
+     st_ref_portable},
     {"cache-corrupt", "<dir>", "cache read-side corruption self-test",
      st_cache_corrupt},
     {"cache-readfail", "<dir>",

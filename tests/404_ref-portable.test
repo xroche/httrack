@@ -1,0 +1,42 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+: "${top_srcdir:=..}"
+
+# A mirror interrupted on one machine is resumed by whatever build picks it up,
+# so the .ref resume state must decode the same bytes everywhere. The self-test
+# assembles a record from a field table, pins the bytes in both directions, and
+# refuses a pre-3.50.2 host-native blit, a wrong magic, a truncation and an
+# over-cap length.
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest 'ref-portable: OK' ref-portable "$dir"
+
+# On a little-endian host, writing a uint32_t or uint64_t through memcpy emits
+# the same bytes as the explicit shifts, so no run of the engine can tell the
+# two apart here. Refuse the host-native form at the source instead.
+src="$top_srcdir/src/htsback.c"
+test -r "$src" || fail "cannot read $src"
+codec=$(sed -n '/--- the .ref resume state/,/^int back_serialize_ref(/p' "$src")
+test -n "$codec" || fail "the .ref codec block moved; this check reads nothing"
+
+if grep -qE 'hts_f(read|write)_exact\(&' <<<"$codec"; then
+    fail "the .ref codec hands an object's own storage to the stream"
+fi
+
+for shift in \
+    'v >> 8' \
+    'v >> 24' \
+    'v >> \(8 \* i\)' \
+    'b\[3\] << 24' \
+    'b\[i\] << \(8 \* i\)'; do
+    grep -qE "$shift" <<<"$codec" ||
+        fail "the .ref codec no longer spells out the byte order ($shift)"
+done
