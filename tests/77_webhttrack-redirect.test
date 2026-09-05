@@ -72,8 +72,11 @@ test "$(grep -c '^HTTP/1\.' <<<"${resp}")" -eq 1 ||
 htsserver_start
 alias_state=$(probe_alias "${HTS_PORT}")
 htsserver_stop
+# The alias is what tells a loopback-only socket from a wildcard one, so
+# without it the listen-address assertions below cannot fail.
+unobserved=""
 if test "${alias_state}" = unusable; then
-    echo "no 127.0.0.2 alias; skipping the listen-address assertions" >&2
+    unobserved="no 127.0.0.2 alias here"
 else
     test "${alias_state}" = free ||
         fail "default listen address is not loopback-only (127.0.0.2:${HTS_PORT} taken)"
@@ -95,4 +98,5 @@ run_with_timeout 15 htsserver "${HTS_DISTDIR}/" --bind "" >"${bindlog}" 2>&1 || 
 grep -q -- "--bind needs an address" "${bindlog}" ||
     fail "empty --bind not refused: $(<"${bindlog}")"
 
+test -z "${unobserved}" || skip "${unobserved}: the listen-address half never ran"
 echo "PASS"

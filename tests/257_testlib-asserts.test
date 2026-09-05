@@ -360,11 +360,32 @@ TOOLEOF
 
     # The shim spells the mapping again because it runs as its own process, so
     # the two copies have to agree or a fix lands in one and not the other.
-    for a in /mnt/c/x/y /mnt/D/up 'C:/already' /no/drive -q; do
+    for a in /mnt/c/x/y /mnt/D/up 'C:/already' /no/drive -q file:///mnt/d/s/i.html; do
         viashim=$(PATH="$tmpdir/shimbin:$PATH" bash "$tmpdir/shimbin/faketool" "$a")
-        assert_eq "$(drvfs_path -m "$a")" "$viashim" "the shim and drvfs_path on $a"
+        case $a in
+        file://*) want="file://$(drvfs_path -m "${a#file://}")" ;;
+        *) want=$(drvfs_path -m "$a") ;;
+        esac
+        assert_eq "$want" "$viashim" "the shim and drvfs_path on $a"
     done
     ok "the shim's own copy of the mapping agrees with drvfs_path"
+
+    # Only what WSLENV names crosses to a Windows process, and MSYS handed over
+    # the whole environment, so the shim has to name what the caller set.
+    cat >"$tmpdir/shimbin/faketool.exe" <<'ENVEOF'
+#!/bin/sh
+printf '%s\n' "${WSLENV:-}"
+ENVEOF
+    chmod +x "$tmpdir/shimbin/faketool.exe"
+    seen=$(HTS_PINNED=yes PATH="$tmpdir/shimbin:$PATH" bash "$tmpdir/shimbin/faketool")
+    case ":$seen:" in
+    *:HTS_PINNED:*) ;;
+    *) fail "the shim did not bridge HTS_PINNED across WSLENV: [$seen]" ;;
+    esac
+    case ":$seen:" in
+    *:PATH:*) fail "the shim bridged PATH, which WSL owns: [$seen]" ;;
+    esac
+    ok "the shim names the caller's variables in WSLENV, and not PATH"
 fi
 
 ## win_capture under wsl2 has no /proc/<pid>/winpid to read. It takes the
@@ -436,9 +457,11 @@ else
     echo "no procfs, or a shell that cannot run a script named .exe" >&2
 fi
 
-# Unshimmed: a guard that fires only on the broken path is half a guard.
-case "$(uname -s)" in
-MINGW* | MSYS* | CYGWIN*) want=yes ;;
+# Unshimmed: a guard that fires only on the broken path is half a guard. The
+# backend decides, not uname: under wsl2 the shell answers Linux while the
+# binary is a Windows exe, which is the whole point of the split.
+case "$(suite_backend)" in
+msys | wsl2) want=yes ;;
 *) want=no ;;
 esac
 got=$(env -u IS_WINDOWS bash "$tmpdir/win.sh")

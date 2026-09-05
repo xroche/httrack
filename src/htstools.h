@@ -147,6 +147,8 @@ HTSEXT_API int hts_findclose(find_handle find);
 
 //
 HTSEXT_API char *hts_findgetname(find_handle find);
+HTSEXT_API LLint hts_findgetsize64(find_handle find);
+HTS_DEPRECATED("use hts_findgetsize64(find)")
 HTSEXT_API int hts_findgetsize(find_handle find);
 HTSEXT_API hts_boolean hts_findisdir(find_handle find);
 HTSEXT_API hts_boolean hts_findisfile(find_handle find);

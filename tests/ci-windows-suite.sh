@@ -245,7 +245,9 @@ ci_suite_heartbeat() {
 # engine-install-paths reads the compiled-in POSIX install paths, which this job
 # has no equivalent of;
 # build-features compares the feature reporter against the automake config.h,
-# which the MSVC build does not produce.
+# which the MSVC build does not produce;
+# engine-wizard-eof drives the wizard through a pty, and Windows builds Python
+# with neither pty nor os.fork.
 expected_skips_msys="01_engine-footer-overflow.test
 253_local-ftp-close-once.test
 113_engine-threadattr-leak.test
@@ -274,12 +276,19 @@ expected_skips_msys="01_engine-footer-overflow.test
 352_engine-filesave-diskfull.test
 355_local-write-error-not-eof.test
 377_engine-install-paths.test
-398_engine-build-features.test"
+398_engine-build-features.test
+424_engine-wizard-eof.test"
 
-# A copy of the msys list above: testlib.sh's suite_backend split (shell_is_msys
-# vs target_is_windows) is designed so the same tests skip under either shell.
-# A prediction, not a measurement yet — correct it from the first real wsl2 run.
-expected_skips_wsl2=$expected_skips_msys
+# Measured, not predicted: windows-build run 33927128153, both platforms alike.
+# The msys list plus what the Linux shell cannot do to a native process:
+# 294: the wizard's feof||ferror arm never fires on a stdin the Linux shell owns
+# across interop, so it spins to the watchdog; 296 passes with a real answer
+# file, which places the fault at EOF and closed stdin rather than the wizard.
+# 24: no graceful stop crosses the boundary, so pass 1 cannot be interrupted in
+# the state the resume needs. Each of these three skips itself, in the test.
+expected_skips_wsl2="$expected_skips_msys
+294_local-wizard-eof.test
+24_local-resume-overlap.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,
@@ -318,7 +327,14 @@ if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
     rm -rf "$shimdir"
     mkdir -p "$shimdir"
     # Copied, not linked: the checkout's own mount may refuse to execute it.
-    for e in $ENGINE_EXES taskkill tasklist ping; do
+    # python too: the tests invoke it directly, so without a shim it gets no
+    # environment bridge and no path translation, which is what hid TZ from 386.
+    for e in $ENGINE_EXES taskkill tasklist ping python3 python; do
+        # No shim for an engine this build never produced: `command -v` is how
+        # 241 and 288 find htsserver, and a shim answers for a missing exe.
+        case " $ENGINE_EXES " in *" $e "*) test -f "$bin/$e.exe" || continue ;; esac
+        # And no shim for an interpreter this runner does not have.
+        case $e in python3 | python) command -v "$e.exe" >/dev/null 2>&1 || continue ;; esac
         cp "$testdir/wsl2-exe-shim.sh" "$shimdir/$e"
         chmod +x "$shimdir/$e"
     done
@@ -340,6 +356,12 @@ unset WATCHDOG_TOKEN
 # reached the engine as "C:/Program Files/Git/a/b.html". Switch that
 # off, and hand the tests a TMPDIR that is already a Windows path.
 if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
+    # A Linux shell does not fold the CRLF that Windows text-mode stdout
+    # produces, the way MSYS does, so ask the engine for the bytes it wrote.
+    # WSLENV is what carries it outward to a Windows process; the workflow's own
+    # WSLENV runs the other way and cannot help here.
+    export HTS_BINARY_STDIO=1
+    export WSLENV="${WSLENV:+$WSLENV:}HTS_BINARY_STDIO"
     # The Linux view, not the native one: a WSL2 shell cannot mktemp into a
     # drive-letter path. Tests hand the engine drvfs paths and the shim above
     # translates them, which is why RUNNER_TEMP has to stay on a Windows volume.

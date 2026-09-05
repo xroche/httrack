@@ -53,6 +53,19 @@ Please visit our Website: http://www.httrack.com
 #endif
 /* END specific definitions */
 
+/* configure names the host triplet; MSVC has no config.h to carry one. */
+#ifndef HTS_PLATFORM_NAME
+#if defined(_M_ARM64)
+#define HTS_PLATFORM_NAME "windows-arm64"
+#elif defined(_M_AMD64)
+#define HTS_PLATFORM_NAME "windows-x64"
+#elif defined(_M_IX86)
+#define HTS_PLATFORM_NAME "windows-x86"
+#else
+#define HTS_PLATFORM_NAME "unknown"
+#endif
+#endif
+
 #define waitkey if (more) { char s[4]; printf("\nMORE.. q to quit\n"); linput(stdin,s,4); if (strcmp(s,"q")==0) quit=1; else printf("Page %d\n\n",++m); }
 void infomsg(const char *msg) {
   int l = 0;
@@ -183,16 +196,7 @@ void help_wizard(httrackp * opt) {
   printf("Note: You are running the commandline version,\n");
   printf("run 'WinHTTrack.exe' to get the GUI version.\n");
 #endif
-#ifdef HTTRACK_AFF_WARNING
-  printf("NOTE: " HTTRACK_AFF_WARNING "\n");
-#endif
-#ifdef HTS_PLATFORM_NAME
-#if USE_BEGINTHREAD
   printf("[compiled: " HTS_PLATFORM_NAME " - MT]\n");
-#else
-  printf("[compiled: " HTS_PLATFORM_NAME "]\n");
-#endif
-#endif
   printf("To see the option list, enter a blank line or try httrack --help\n");
   //
   // Project name
@@ -201,8 +205,15 @@ void help_wizard(httrackp * opt) {
     printf("Enter project name :");
     fflush(stdout);
     linput(stdin, projname, 250);
-    if (strnotempty(projname) == 0)
+    if (strnotempty(projname) == 0) {
+      /* linput() reports neither EOF nor error, so the retry loop would spin */
+      if (feof(stdin) || ferror(stdin)) {
+        printf("\nNo project name given, aborting\n");
+        freet(buffers);
+        return;
+      }
       help("httrack", 1);
+    }
   }
   //
   // Path
@@ -471,9 +482,6 @@ void help(const char *app, int more) {
             "HTTrack version " HTTRACK_VERSION "%s",
             hts_is_available());
     infomsg(info);
-#ifdef HTTRACK_AFF_WARNING
-    infomsg("NOTE: " HTTRACK_AFF_WARNING);
-#endif
     snprintf(info, sizeof(info),
             "\tusage: %s <URLs> [-option] [+<URL_FILTER>] [-<URL_FILTER>] [+<mime:MIME_FILTER>] [-<mime:MIME_FILTER>]",
             app);
@@ -624,8 +632,8 @@ void help(const char *app, int more) {
   infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"");
   infomsg("");
   infomsg("Log, index, cache");
-  infomsg
-    ("  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before)");
+  infomsg("  C  create/use a cache for updates and retries (C0 no cache,* C1 "
+          "cache is prioritary,C2 test update before)");
   infomsg("  k  store all files in cache (not useful if files on disk)");
   infomsg(" %r  write an ISO-28500 WARC/1.1 archive; --warc-file NAME sets the "
           "output name, --warc-max-size N rotates segments past N bytes, "
@@ -817,8 +825,6 @@ void help(const char *app, int more) {
            "Copyright (C) 1998-%s Xavier Roche and other contributors",
            &__DATE__[7]);
   infomsg(info);
-#ifdef HTS_PLATFORM_NAME
   infomsg("[compiled: " HTS_PLATFORM_NAME "]");
-#endif
   infomsg(NULL);
 }

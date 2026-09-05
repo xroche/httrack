@@ -13,13 +13,26 @@ set -euo pipefail
 src="$abs_top_srcdir/src/htscoremain.c"
 test -r "$src" || fail "no $src"
 
-pattern='sscanf[^;]*\([a-z_][a-z_ ]*\*\)[ 	]*&opt->'
+# The type name carries digits (uint8_t, int32_t) as readily as it carries
+# letters, and a class without them silently exempts the fixed-width spellings.
+pattern='sscanf[^;]*\([[:alpha:]_][[:alnum:]_ ]*\*\)[ 	]*&opt->'
 
 # The pattern's silence means nothing until it has matched a known-bad line.
-# The typedef spelling is the likelier one to be written next.
+# Every spelling a cast is likely to be written in, the fixed-width ones
+# included: those are the ones the first version of this class could not match.
 for bad in 'sscanf(com + 1, "%d", (int *) &opt->urlmode);' \
-    'sscanf(com + 1, "%d", (hts_urlmode *) &opt->urlmode);'; do
+    'sscanf(com + 1, "%d", (hts_urlmode *) &opt->urlmode);' \
+    'sscanf(com + 1, "%d", (uint8_t *) &opt->urlmode);' \
+    'sscanf(com + 1, "%d", (int32_t *) &opt->urlmode);' \
+    'sscanf(com + 1, "%d", (unsigned int *) &opt->urlmode);'; do
     grep -qE "$pattern" <<<"$bad" || fail "the pattern cannot match: $bad"
+done
+
+# And a pattern matching everything would be just as silent, so pin the two
+# forms that must stay clear: the direct scan and scanOptInt().
+for good in 'sscanf(com + 1, "%d", &opt->urlmode);' \
+    'scanOptInt(com + 1, &opt->urlmode);'; do
+    grep -qE "$pattern" <<<"$good" && fail "the pattern matches a good line: $good"
 done
 
 found=$(grep -nE "$pattern" "$src" || true)

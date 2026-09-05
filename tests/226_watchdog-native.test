@@ -126,7 +126,12 @@ printf '#!/bin/sh\nn=0\nwhile test ! -e race-go && test "$n" -lt 100; do sleep 0
 # shellcheck disable=SC2016 # $$ is the stub's own, expanded when it runs
 printf '#!/bin/sh\necho $$ >mute.pid\nexec sleep 60\n' >"$bin/mutestub"
 chmod +x "$bin/argvstub" "$bin/deadstub" "$bin/racestub" "$bin/mutestub"
-usestub() { cp "$bin/$1" "$bin/pwsh" && cp "$bin/$1" "$bin/powershell.exe"; }
+usestub() {
+    cp "$bin/$1" "$bin/pwsh" || return 1
+    # Not powershell.exe under wsl2: win_pid_by_marker runs it, so the kill this
+    # leg drives would re-enter the stub. The driver picks pwsh either way.
+    test "$(suite_backend)" = wsl2 || cp "$bin/$1" "$bin/powershell.exe"
+}
 usestub argvstub
 
 if test -x "$bin/pwsh"; then
@@ -232,7 +237,7 @@ if test -x "$bin/pwsh"; then
     grep -qx -- "$(nativepath "$posixtmp/progress.log")" "$posixtmp/argv" ||
         fail "the launch did not pass the progress log"
 else
-    echo "note: $tmp is noexec, the driver wiring was not driven"
+    skip "$tmp is noexec, the stub bindir cannot be run"
 fi
 
 py=$(find_python || true)
@@ -249,6 +254,8 @@ import re
 import sys
 
 import yaml
+
+sys.stdout.reconfigure(newline="\n")  # the shell reads timeout= as a number
 
 def steps_of(wf):
     return [s for j in (wf.get("jobs") or {}).values() for s in (j.get("steps") or [])]
@@ -379,7 +386,11 @@ else:
     for b in audit(wf):
         print("BAD " + b)
 PY
-    said=$("$py" "$tmp/wf.py" audit "$workflow") || fail "the workflow audit did not run: $said"
+    # Native form: under wsl2 find_python answers a Windows interpreter, which
+    # cannot open the drvfs names this shell builds.
+    wfpy=$(nativepath "$tmp/wf.py")
+    said=$("$py" "$wfpy" audit "$(nativepath "$workflow")") ||
+        fail "the workflow audit did not run: $said"
     grep -q '^BAD ' <<<"$said" && fail "$(grep '^BAD ' <<<"$said" | sed 's/^BAD //')"
     # The tightest of the backends' step budgets: the watchdog has to fit inside
     # whichever ends first. sed rather than head, which would SIGPIPE the sort.
@@ -394,8 +405,8 @@ PY
         cap:'no timeout-minutes of its own' lastenv:'WATCHDOG_TOKEN is' \
         sharedcontext:'share a WATCHDOG_CONTEXT' \
         lasttimeout:'no timeout-minutes of its own'; do
-        "$py" "$tmp/wf.py" mutate "$workflow" "${m%%:*}" >"$tmp/wf.yml"
-        said=$("$py" "$tmp/wf.py" audit "$tmp/wf.yml") ||
+        "$py" "$wfpy" mutate "$(nativepath "$workflow")" "${m%%:*}" >"$tmp/wf.yml"
+        said=$("$py" "$wfpy" audit "$(nativepath "$tmp/wf.yml")") ||
             fail "the workflow audit did not run on the ${m%%:*} control: $said"
         if test -z "${m#*:}"; then
             grep -q '^BAD ' <<<"$said" && fail "a reformatted workflow fails the audit: $said"
@@ -506,7 +517,7 @@ sink_start() {
     : >"$sinklog"
     # Its own log: a leg's command substitution would else wait on the pipe the
     # sink inherited for as long as the sink lives.
-    "$py" "$sink" "$1" "$posts" >"$sinklog" 2>&1 &
+    "$py" "$(nativepath "$sink")" "$1" "$(nativepath "$posts")" >"$sinklog" 2>&1 &
     sinkpid=$!
     # Where the teardown can find it: sink_start runs in a subshell of its own.
     echo "$sinkpid" >"$sinkpidfile"

@@ -110,8 +110,21 @@ int back_searchlive(httrackp * opt, struct_back * sback, const char *search_addr
 void back_connxfr(htsblk * src, htsblk * dst);
 void back_move(lien_back * src, lien_back * dst);
 void back_copy_static(const lien_back * src, lien_back * dst);
+/* The .ref record's framing, shared with the self-test that pins it. */
+#define HTS_REF_MAGIC "HTSREF1\n"
+#define HTS_REF_MAGIC_SIZE 8
+#define HTS_REF_VERSION 1
+/* Caps a declared length must clear: one response's header block, and a body
+   only an in-memory transfer ever carries. */
+#define HTS_REF_MAX_STR (1024 * 1024)
+#define HTS_REF_MAX_BLOB ((uint64_t) 1024 * 1024 * 1024)
+
+/* In-process slot spool: host-native, and meaningful only inside the run that
+   wrote it. */
 int back_serialize(FILE * fp, const lien_back * src);
 int back_unserialize(FILE * fp, lien_back ** dst);
+/* Resume state that outlives the run, so a portable little-endian record; a
+   file in any other shape is refused rather than misread. */
 int back_serialize_ref(httrackp * opt, const lien_back * src);
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst);

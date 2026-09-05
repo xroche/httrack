@@ -13,7 +13,7 @@ dir=$(mktemp -d)
 cleanup_push rm -rf "$dir"
 
 rc=0
-"$python" - "$dir/in.zip" <<'EOF' || rc=$?
+"$python" - "$(nativepath "$dir/in.zip")" <<'EOF' || rc=$?
 import os, sys, zipfile
 
 body = b"hello world"

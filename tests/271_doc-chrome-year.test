@@ -26,14 +26,12 @@ chmod -R u+w "${work}"
 chrome="${work}/tools/doc-chrome.py"
 page="${work}/html/index.html"
 
-later=2027
-epoch=$(python3 -c \
-    "import datetime;print(int(datetime.datetime(${later},7,1,tzinfo=datetime.timezone.utc).timestamp()))")
-
 shipped=$(grep -o '&copy; 1998-[0-9]\{4\}' "${page}" | head -1 | grep -o '[0-9]\{4\}$')
 test -n "${shipped}" || fail "no footer copyright year in ${page}"
-# Everything below compares the two, so an equal pair would pass vacuously.
-test "${shipped}" -ne "${later}" || fail "tree already ships ${later}"
+# Derived, not pinned: a literal pair goes red the January the tree ships it.
+later=$((shipped + 1))
+epoch=$(python3 -c \
+    "import datetime;print(int(datetime.datetime(${later},7,1,tzinfo=datetime.timezone.utc).timestamp()))")
 
 pristine="${work}/pristine"
 cp -a "${work}/html" "${pristine}"
@@ -44,9 +42,9 @@ SOURCE_DATE_EPOCH="${epoch}" python3 "${chrome}" --check >/dev/null 2>&1 ||
     fail "--check rejects a footer year of ${shipped} when the generator is at ${later}"
 
 # A drifted footer must still fail, or the line above passes for the wrong reason.
-python3 - "${page}" <<'EOF'
+python3 - "${page}" "${shipped}" <<'EOF'
 import re, sys
-path = sys.argv[1]
+path, shipped = sys.argv[1], sys.argv[2]
 text = open(path, encoding="utf-8").read()
 out = re.sub(r'\n\t<a href="https://endsoftwarepatents[^\n]*\n', "\n", text)
 assert out != text, "chicklet anchor not found"
@@ -58,11 +56,12 @@ fi
 restore
 
 # The mask is [0-9], not \d, which also matches Arabic-Indic and fullwidth digits.
-python3 - "${page}" <<'EOF'
+python3 - "${page}" "${shipped}" <<'EOF'
 import sys
-path = sys.argv[1]
+path, shipped = sys.argv[1], sys.argv[2]
 text = open(path, encoding="utf-8").read()
-out = text.replace("1998-2026", "1998-٢٠٢٦", 1)
+arabic = shipped.translate(str.maketrans("0123456789", "٠١٢٣٤٥٦٧٨٩"))
+out = text.replace("1998-" + shipped, "1998-" + arabic, 1)
 assert out != text, "no footer year to replace"
 open(path, "w", encoding="utf-8").write(out)
 EOF

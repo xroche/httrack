@@ -13,6 +13,11 @@ testdir=$(cd "$(dirname "$0")" && pwd)
 tmpbase=${TMPDIR:-/tmp}
 # Slash-stripped: the engine normalizes a "//" away, failing every layout below.
 tmp=$(mktemp -d "${tmpbase%/}/httrack_ntail.XXXXXX") || fail "no tmpdir"
+
+# The mirror name the engine builds from a path: its leading slash goes, and
+# what Windows forbids becomes '_'. Taken from the path the engine saw, since
+# under wsl2 the shell holds /mnt/d/... while the shim hands over D:/...
+localname() { printf '%s' "$(nativepath "$1")" | sed 's|^/||' | tr ':~' '__'; }
 cleanup_push rm -rf "${tmp}"
 
 # Our own marker, so a mirrored page is recognized by content rather than by a
@@ -83,8 +88,8 @@ accepted ./web/page.html --structure=0000000001
 accepted ./web/html/page.html --structure=5
 
 # on and off are whole values rather than tails, and name the default preset.
-accepted "./file/$(printf '%s' "${tmp#/}" | tr ':~' '__')/page.html" --structure=on
-accepted "./file/$(printf '%s' "${tmp#/}" | tr ':~' '__')/page.html" --structure=off
+accepted "./file/$(localname "$tmp")/page.html" --structure=on
+accepted "./file/$(localname "$tmp")/page.html" --structure=off
 
 # A template still detaches, including one opening with digits, which is what
 # separates a user layout from a cluster tail: it carries a / or a dot.

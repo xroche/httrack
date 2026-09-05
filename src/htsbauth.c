@@ -500,7 +500,7 @@ int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *a
       /* fin de la chaine */
       while(chain->next)
         chain = chain->next;
-      chain->next = (bauth_chain *) calloc(sizeof(bauth_chain), 1);
+      chain->next = (bauth_chain *) calloct(sizeof(bauth_chain), 1);
       if (chain->next) {
         chain = chain->next;
         chain->next = NULL;
@@ -511,6 +511,21 @@ int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *a
     }
   }
   return 0;
+}
+
+/* Release the heap tail of the list; the head node is embedded in the jar. */
+void bauth_free(t_cookie *cookie) {
+  if (cookie != NULL) {
+    bauth_chain *chain = cookie->auth.next;
+
+    cookie->auth.next = NULL;
+    while (chain != NULL) {
+      bauth_chain *const next = chain->next;
+
+      freet(chain);
+      chain = next;
+    }
+  }
 }
 
 /* tester adr et fil, et retourner authentification si nécessaire */

@@ -1061,7 +1061,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   int retour = 0;
   int willexit = 0;
   int buffer_size = 32768;
-  char *buffer = (char *) malloc(buffer_size);
+  char *buffer = (char *) malloct(buffer_size);
   String headers = STRING_EMPTY;
   String output = STRING_EMPTY;
   String tmpbuff = STRING_EMPTY;
@@ -1082,6 +1082,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   if (!htslang_load(NULL, 0, path)) {
     fprintf(stderr, "unable to find lang.def and/or lang/ strings in %s\n",
             path);
+    freet(buffer);
     return 0;
   }
   LANG_T(path, 0);
@@ -2361,8 +2362,7 @@ int smallserver(T_SOC soc, char *url, char *method, char *data, char *path) {
   StringFree(profile);
   StringFree(website);
 
-  if (buffer)
-    free(buffer);
+  freet(buffer);
 
   if (commandReturnMsg)
     free(commandReturnMsg);

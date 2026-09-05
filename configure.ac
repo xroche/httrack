@@ -32,6 +32,9 @@ AC_CONFIG_HEADERS(config.h)
 # header we can install without handing a consumer our PACKAGE_* and HAVE_*.
 AC_CONFIG_HEADERS([htsfeatures.h:src/htsfeatures.h.in])
 AM_INIT_AUTOMAKE([subdir-objects])
+# 3:21:0: revision-only bump. hts_findgetsize64() arrived beside hts_findgetsize(),
+# which stays exported with the same signature; no installed struct moved and
+# nothing went away.
 # 3:20:0: revision-only bump. #1495 added an export (SOCaddr_inetntoa_port_) beside
 # SOCaddr_inetntoa_, the same shape as 3:11:0; no installed struct moved and nothing
 # went away.
@@ -69,7 +72,7 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed
 # headers, so a libhttrack4 rename isn't worth it.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
-VERSION_INFO="3:20:0"
+VERSION_INFO="3:21:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -385,12 +388,10 @@ AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
 AC_SUBST([AM_CFLAGS])
 
 ### Check for platform
-#case $host in
-#AIX) AC_DEFINE(HTS_PLATFORM, 1, [Defined to build under AIX]);;
-#*-solaris*) AC_DEFINE(HTS_PLATFORM, 2, [Defined to build under solaris]);;
-#*-linux-gnu | *-irix6*) AC_DEFINE(HTS_PLATFORM, 3, [Defined to build under Linux]);;
-#*) AC_DEFINE(HTS_PLATFORM, 3, [Default value used]);;
-#esac
+dnl htshelp.c prints this, so a bug report names the build it came from. The
+dnl hand-written Makefile.in that used to supply it went away with autoconf.
+AC_DEFINE_UNQUOTED([HTS_PLATFORM_NAME], ["$host"],
+	[Canonical host triplet, printed by --help])
 
 ### Probe long long size for 64-bit integer support. SIZEOF_LONG is not probed:
 ### it varies by architecture and would break Multi-Arch co-installation of
@@ -519,11 +520,9 @@ AC_ARG_ENABLE([https],
 	https_support=yes
 	AC_MSG_RESULT($https_support)
 	])
-AC_SUBST(HTTPS_SUPPORT,$https_support)
-
 # Probe OpenSSL ?
+https_have=no
 if test x"$https_support" = x"no"; then
-AC_MSG_NOTICE([disabling https support])
 AC_DEFINE(HTS_USEOPENSSL, 0)
 else
 SAVE_LIBS=$LIBS
@@ -537,26 +536,70 @@ AC_CHECK_LIB(ssl, SSL_CTX_new,
 	[
 	# -lssl first: an archive link needs it ahead of the -lcrypto it uses.
 	OPENSSL_LIBS="-lssl $OPENSSL_LIBS"
+	https_have=yes
 	AC_DEFINE(HTS_USEOPENSSL, 1, [Check for OpenSSL])
 	],
 	[
-	if test x"$https_support" = x"yes"; then
-	AC_MSG_ERROR([not available])
-	else
-	AC_MSG_RESULT([not available])
-	fi
+	# Nothing here links libcrypto on its own, so drop the half we found.
+	OPENSSL_LIBS=
+	AS_IF([test x"$https_support" = x"yes"],
+		[AC_MSG_ERROR([no linkable libssl. Install the OpenSSL development files, or pass --disable-https to build without https])],
+		dnl Define it to 0: htsglobal.h defaults an undefined
+		dnl HTS_USEOPENSSL back to 1 and the link then fails on every SSL symbol.
+		[AC_DEFINE(HTS_USEOPENSSL, 0)])
 	]
 	)
 LIBS=$SAVE_LIBS
-AC_SUBST(OPENSSL_LIBS)
 fi
+AC_SUBST(OPENSSL_LIBS)
+AC_MSG_CHECKING([whether https support is enabled])
+dnl Name who decided: "auto" is the build machine's answer, not the packager's.
+AS_IF([test x"$https_support" = x"auto"],
+	[AC_MSG_RESULT([$https_have (auto)])],
+	[AC_MSG_RESULT([$https_have (requested)])])
+AC_SUBST(HTTPS_SUPPORT,$https_have)
 
 ### Support IPv6
+# HTS_INET6 picks the SOCaddr arm in the installed htsnet.h, so a probe that
+# nobody can override lets two builds of one version ship different layouts.
+# Not wired to --disable-auto-features: getaddrinfo is a libc function, not an
+# optional dependency, and defaulting it off would move that layout.
+AC_MSG_CHECKING(whether to enable IPv6 support)
+AC_ARG_ENABLE([ipv6],
+	[AS_HELP_STRING([--enable-ipv6=@<:@yes/no/auto@:>@],[Enable IPv6 support @<:@default=auto@:>@])],
+	[
+	case "${enableval}" in
+	no|yes|auto)
+		ipv6_support=$enableval
+		AC_MSG_RESULT($ipv6_support)
+		;;
+	*)
+		AC_MSG_ERROR([bad value for ipv6, expected yes/no/auto])
+		;;
+	esac
+	],
+	[
+	ipv6_support=auto
+	AC_MSG_RESULT($ipv6_support)
+	])
 V6_SUPPORT=no
-AC_CHECK_LIB(c, getaddrinfo, [V6_FLAG="-DINET6"
-V6_SUPPORT=yes
-AC_DEFINE(HTS_INET6, 1, [Check for IPv6])], AC_MSG_WARN([*** IPv6 not found IPv6 compatibility disabled]))
+dnl Define it either way: htsglobal.h defaults an undefined HTS_INET6, so the
+dnl installed htsfeatures.h would not say which layout the library was built with.
+AS_IF([test x"$ipv6_support" = x"no"],
+	[AC_DEFINE(HTS_INET6, 0)],
+	[AC_CHECK_LIB(c, getaddrinfo,
+		[V6_FLAG="-DINET6"
+		V6_SUPPORT=yes
+		AC_DEFINE(HTS_INET6, 1, [Check for IPv6])],
+		[AS_IF([test x"$ipv6_support" = x"yes"],
+			[AC_MSG_ERROR([no getaddrinfo in libc. Pass --disable-ipv6 to build without IPv6])],
+			[AC_DEFINE(HTS_INET6, 0)])])])
 AC_SUBST(V6_FLAG)
+AC_MSG_CHECKING([whether IPv6 support is enabled])
+dnl Name who decided: "auto" is the build machine's answer, not the packager's.
+AS_IF([test x"$ipv6_support" = x"auto"],
+	[AC_MSG_RESULT([$V6_SUPPORT (auto)])],
+	[AC_MSG_RESULT([$V6_SUPPORT (requested)])])
 AC_SUBST(V6_SUPPORT)
 
 ### Check for LFS
@@ -693,10 +736,10 @@ hts_pc_dep() { # hts_pc_dep <module or empty> <link line>
 		PKGCONFIG_LIBS_PRIVATE="${PKGCONFIG_LIBS_PRIVATE:+$PKGCONFIG_LIBS_PRIVATE }$2"
 	fi
 }
-# Whichever half of OpenSSL was actually found; https=auto can settle for libcrypto.
+# OpenSSL is all or nothing: a build with https links -lssl and -lcrypto, and a
+# build without links neither.
 AS_CASE([" $OPENSSL_LIBS "],
 	[*" -lssl "*], [hts_pc_openssl=openssl],
-	[*" -lcrypto "*], [hts_pc_openssl=libcrypto],
 	[hts_pc_openssl=])
 hts_pc_dep "$hts_pc_openssl" "$OPENSSL_LIBS"
 hts_pc_dep libbrotlidec "$BROTLI_LIBS"

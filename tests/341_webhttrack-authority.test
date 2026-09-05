@@ -52,7 +52,9 @@ echo "ok: the panel answers at every authority it is reachable at"
 # The name this host answers to, which is what `htsserver --bind <lan ip>`
 # browsed at http://myhost.lan:8080/ presents. Dropped when another rule would
 # accept it anyway, since it would then prove nothing.
-selfname=$(htsserver_python -c 'import socket; print(socket.gethostname())')
+selfname=$(htsserver_python -c 'import socket, sys
+sys.stdout.reconfigure(newline="\n")  # this name goes out in a Host header
+print(socket.gethostname())')
 # True for a name some other rule vouches for anyway: localhost, or anything
 # shaped like an address literal, which host_is_address() takes for whoever
 # opened the socket.
@@ -140,7 +142,9 @@ test "${got}" = 200 || fail "--bind 0.0.0.0 advertised ${HTS_URL}, which answere
 echo "ok: a wildcard bind advertises a loopback URL"
 htsserver_stop
 
-if htsserver_python - <<'PY'; then
+# The build has to speak IPv6 as well as the host: an IPv4-only httrack cannot
+# bind ::1 at all.
+if test "${V6_SUPPORT:-yes}" != no && htsserver_python - <<'PY'; then
 import socket, sys
 
 try:
@@ -180,7 +184,7 @@ RESOLVES
         echo "skipped the pointed-here control: no ip6-localhost apart from the PTR"
     fi
 else
-    echo "skipped the IPv6 advert: no ::1 here"
+    echo "skipped the IPv6 advert: this build or this host has no ::1"
 fi
 
 cleanup

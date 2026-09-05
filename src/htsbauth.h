@@ -112,6 +112,10 @@ int bauth_add(t_cookie *cookie, const char *adr, const char *fil,
     caller must not free it. */
 char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
 
+/** Drop every stored credential, leaving the jar's embedded head empty. Safe on
+    a NULL jar and on a jar already freed; the jar itself is not released. */
+void bauth_free(t_cookie *cookie);
+
 /** Build the auth lookup key (host + path, query string stripped, truncated at
     the last '/') from adr and fil into prefix; returns prefix. Caller must
     supply a buffer of HTS_URLMAXSIZE * 2 bytes. */

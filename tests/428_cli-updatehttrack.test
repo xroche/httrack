@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# --updatehttrack was recognised and then left in argv, so the main option loop
+# re-read it letter by letter as -u -p -d -a -t -e -h and the h printed the
+# usage and returned 0. A script could not tell that nothing had been mirrored.
+
+set -euo pipefail
+
+testdir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=tests/testlib.sh
+. "${testdir}/testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_updopt.XXXXXX") || fail "no tmpdir"
+cleanup() {
+    rm -rf "${tmp}"
+}
+trap 'set +e; cleanup' EXIT
+trap 'set +e; cleanup; exit 1' HUP INT QUIT TERM
+
+require_httrack
+echo '<html><body>hello</body></html>' >"${tmp}/page.html"
+mirrored="${tmp}/out/file${tmp}/page.html"
+usage_marker='with options listed below'
+
+crawl() { # crawl ARG...
+    rm -rf "${tmp}/out"
+    mkdir -p "${tmp}/out"
+    RC=0
+    httrack "file://${tmp}/page.html" -O "${tmp}/out" --quiet "$@" \
+        >"${tmp}/run.log" 2>&1 || RC=$?
+    LOG=$(cat "${tmp}/run.log")
+}
+
+# The fixture mirrors, so an empty mirror below means the option stopped it and
+# not that nothing was reachable.
+crawl
+assert_eq 0 "${RC}" "plain crawl exited"
+assert_file "${mirrored}" "plain crawl"
+assert_eq 0 "$(count_matching_lines "${usage_marker}" "${tmp}/run.log")" \
+    "plain crawl printed the usage"
+
+# -h is what the cluster's last letter reached, and it is also the control that
+# the marker fires at all.
+crawl -h
+assert_eq 1 "$(count_matching_lines "${usage_marker}" "${tmp}/run.log")" \
+    "-h printed the usage"
+ok "the fixture mirrors, and the usage marker fires on -h"
+
+# The bug's whole signature: usage on stdout, exit 0, nothing mirrored.
+crawl --updatehttrack
+test "${RC}" -ne 0 ||
+    fail "--updatehttrack exited 0, mirroring $(mirror_names "${tmp}/out")"
+test ! -f "${mirrored}" ||
+    fail "--updatehttrack mirrored ${mirrored}, so it ran as a crawl"
+assert_eq 0 "$(count_matching_lines "${usage_marker}" "${tmp}/run.log")" \
+    "--updatehttrack printed the usage"
+grep -qF -- '--updatehttrack' <<<"${LOG}" ||
+    fail "--updatehttrack failed without naming itself: ${LOG}"
+ok "--updatehttrack is refused instead of walked as a cluster"
+
+# Its neighbours in the same else-chain neutralize or rewrite argv, so the
+# refusal must not have cost them their crawl.
+crawl --clean
+assert_eq 0 "${RC}" "--clean exited"
+assert_file "${mirrored}" "--clean"
+ok "--clean still mirrors after erasing the cache"

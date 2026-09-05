@@ -101,6 +101,7 @@ def main():
     lock = threading.Lock()
     seq = [0]
     with open(sys.argv[1], "wb") as logf:
+        sys.stdout.reconfigure(newline="\n")  # the launcher parses PORT, CRLF breaks it
         print("PORT %d" % port, flush=True)
         while True:
             conn, _ = srv.accept()

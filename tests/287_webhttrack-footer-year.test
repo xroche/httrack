@@ -41,13 +41,15 @@ printf '%s\n' 'year=[${date:year}] unknown=[${date:month}] longer=[${date:yearly
 # One hour before New Year UTC, read 14 hours east of it: gmtime says 2019 and
 # localtime says 2020, so the reply names which one ran.
 pinned=2019
+# chr(10) rather than a nested "\n", which would end the shell string: both
+# numbers below are read as numbers.
 epoch=$("${HTS_PYTHON}" -c \
-    "import datetime;print(int(datetime.datetime(${pinned},12,31,23,tzinfo=datetime.timezone.utc).timestamp()))")
+    "import datetime,sys;sys.stdout.reconfigure(newline=chr(10));print(int(datetime.datetime(${pinned},12,31,23,tzinfo=datetime.timezone.utc).timestamp()))")
 export TZ=XXX-14
 
 # The server shares this libc: where the offset is ignored the two agree, and
 # the assertion below passes without seeing anything.
-local_year=$("${HTS_PYTHON}" -c "import time;print(time.localtime(${epoch}).tm_year)")
+local_year=$("${HTS_PYTHON}" -c "import sys,time;sys.stdout.reconfigure(newline=chr(10));print(time.localtime(${epoch}).tm_year)")
 test "${local_year}" -eq $((pinned + 1)) || skip "TZ=${TZ} is not honored here"
 
 # Pinned first: a year hardcoded in C would pass every clock check below.

@@ -19,7 +19,7 @@ import threading
 # python3 -P (PYTHONSAFEPATH) drops the script's own directory from sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from proxytestlib import bind_ephemeral, pipe  # noqa: E402
+from proxytestlib import bind_ephemeral, logfile, pipe  # noqa: E402
 
 # The one name the proxy answers for; a .invalid TLD never resolves (RFC 6761),
 # so a locally-resolving client could not reach us -- success proves remote DNS.
@@ -38,7 +38,7 @@ def make_origin(logdir):
         protocol_version = "HTTP/1.1"
 
         def do_GET(self):
-            with open(os.path.join(logdir, ORIGIN_LOG), "a") as handle:
+            with logfile(logdir, ORIGIN_LOG) as handle:
                 handle.write(
                     "REQUEST %s %s %s\n"
                     % (self.command, self.path, self.request_version)
@@ -92,7 +92,7 @@ def recvn(conn, n):
 
 
 def log(logdir, line):
-    with open(os.path.join(logdir, SOCKS_LOG), "a") as handle:
+    with logfile(logdir, SOCKS_LOG) as handle:
         handle.write(line + "\n")
 
 

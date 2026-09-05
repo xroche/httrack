@@ -58,6 +58,8 @@ server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
 tmpdir=$(mktemp -d)
 serverpid=
 wire=$tmpdir/wire
+# One file, two names: the native python cannot open the drvfs path read below.
+wire_native=$(nativepath "$wire")
 nreq=0
 
 cleanup() {
@@ -127,7 +129,7 @@ assert_same_but() { # assert_same_but TAG RE
     diff "$base" "$got" || fail "$1: the request outside $2 differs from the box-free one"
 }
 
-"$python" "$server" "$wire" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
+"$python" "$server" "$wire_native" >"$tmpdir/server.out" 2>"$tmpdir/server.err" &
 serverpid=$!
 port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
 

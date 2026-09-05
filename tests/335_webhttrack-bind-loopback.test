@@ -18,6 +18,7 @@ cleanup_push htsserver_cleanup_dir "${work}"
 probe() { # $1 = host, $2 = port
     htsserver_python - "$1" "$2" <<'PY'
 import socket, sys
+sys.stdout.reconfigure(newline="\n")  # the word below is compared byte for byte
 try:
     socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=5).close()
     print("ok")
@@ -32,6 +33,7 @@ PY
 primary_ipv4() { # [address]
     htsserver_python - ${1+"$1"} <<'PY'
 import ipaddress, socket, sys
+sys.stdout.reconfigure(newline="\n")  # an empty answer must stay empty for test -z
 if len(sys.argv) > 1:
     raw = sys.argv[1]
 else:
@@ -62,6 +64,9 @@ test "$(primary_ipv4 198.51.100.7)" = 198.51.100.7 ||
     fail "primary_ipv4 rejects a routable address"
 
 addr=$(primary_ipv4)
+# The off-loopback half is the one a wildcard bind would fail. Without an
+# address to try it from, nothing below can see that, so the run skips.
+unobserved=""
 
 # Without this control a refusal below could just mean the box filters ${addr}.
 if test -n "${addr}" && ! htsserver_python - "${addr}" <<'PY'; then
@@ -91,7 +96,7 @@ if test -n "${addr}"; then
     echo "ok: --bind ${addr} widens the socket"
     htsserver_stop
 else
-    echo "no non-loopback IPv4 here: the widening half did not run" >&2
+    unobserved="no non-loopback IPv4 here"
 fi
 
 port=$(htsserver_freeport)
@@ -120,4 +125,5 @@ htsserver_stop
 htsserver_assert_reaped
 
 htsserver_cleanup_dir "${work}"
+test -z "${unobserved}" || skip "${unobserved}: the off-loopback half never ran"
 echo "PASS"

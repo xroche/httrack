@@ -46,8 +46,9 @@ want='/F /IM htsserver.exe
 /F /IM httrack.exe
 /F /IM proxytrack.exe
 /F /IM python.exe
+/F /IM python3.exe
 /F /IM webhttrack.exe'
-got=$(sort "$tmp/killed")
+got=$(LC_ALL=C sort "$tmp/killed")
 test "$got" = "$want" || fail "kill_tree without a winpid ran: $got"
 # The defect itself: whatever the matcher reports as an engine, the kill names.
 for e in $ENGINE_EXES; do
@@ -91,7 +92,7 @@ test ! -s "$tmp/killed" || fail "a pid tasklist does not list was killed: $(<"$t
 # resort still applies: skipping it too would leave the engines running.
 : >"$tmp/killed"
 HTTRACK_EXCLUSIVE_HOST=1 kill_tree 99 4242 python.exe >/dev/null
-got=$(sort "$tmp/killed")
+got=$(LC_ALL=C sort "$tmp/killed")
 test "$got" = "$want" || fail "an unverified pid skipped the last-resort sweep: $got"
 
 # Graded on the order, since only a winpid read while the target lived names it.

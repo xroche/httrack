@@ -37,7 +37,9 @@ for t in $gated; do
     # Only check-network.sh emits this, and only once it has actually run. The
     # "skipping online unit tests" banner prints on the broken path too, so
     # matching that instead would assert nothing.
-    command grep -q 'online tests are disabled' <<<"$out" ||
+    # Read out of a substitution: under bash 3.2 errexit kills the script whenever a
+    # command-prefixed builtin returns non-zero, in a condition as much as anywhere.
+    test -n "$(command grep -l 'online tests are disabled' <<<"$out" || true)" ||
         fail "$t skipped without the gate's reason, got: $out"
 done
 
@@ -45,7 +47,8 @@ done
 
 out=$(cd "$work" && ONLINE_UNIT_TESTS=no bash "$testdir/check-network.sh" 2>&1) && rc=0 || rc=$?
 test "$rc" -eq 1 || fail "check-network.sh exited $rc with the flag off, expected 1"
-command grep -q 'online tests are disabled' <<<"$out" || fail "check-network.sh gave no reason: $out"
+test -n "$(command grep -l 'online tests are disabled' <<<"$out" || true)" ||
+    fail "check-network.sh gave no reason: $out"
 
 out=$(cd "$work" && ONLINE_UNIT_TESTS=yes bash "$testdir/check-network.sh" 2>&1) && rc=0 || rc=$?
 test "$rc" -eq 0 || fail "check-network.sh exited $rc with the flag on, expected 0: $out"

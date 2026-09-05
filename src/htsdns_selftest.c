@@ -699,4 +699,9 @@ int dns_selftests(httrackp *opt) {
   return 0; /* resolver seam only exists in the IPv6 build */
 }
 
+int dns_timeout_selftests(httrackp *opt) {
+  (void) opt;
+  return 0;
+}
+
 #endif

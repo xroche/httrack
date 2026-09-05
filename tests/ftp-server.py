@@ -242,7 +242,8 @@ def main():
     ap.add_argument("--mute", action="store_true")
     args = ap.parse_args()
 
-    logfp = open(args.log, "a", encoding="utf-8") if args.log else None
+    # newline="\n": the shell greps these lines and Windows text mode adds a CR.
+    logfp = open(args.log, "a", encoding="utf-8", newline="\n") if args.log else None
     log_lock = threading.Lock()
 
     def log(line):

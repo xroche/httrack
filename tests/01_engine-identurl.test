@@ -19,10 +19,38 @@ split 'file:///etc/hostname' 'adr=file:// fil=/etc/hostname'
 # empty-path file:// used to read one byte past the URL (p[1] with *p=0)
 split 'file://' 'adr=file:// fil=//'
 
-# a root-relative path is copied whole into fil[HTS_URLMAXSIZE*2], so a URL at
-# the buffer size is the tightest overflow; it must be rejected, not abort.
+# ident_url_absolute() rejects a URL of HTS_URLMAXSIZE*2 bytes or more before
+# anything is copied into fil[HTS_URLMAXSIZE*2]. Read the constant out of the
+# header so the cases below stay ON the boundary if it ever moves.
+urlmaxsize=$(sed -n \
+    's/^#define HTS_URLMAXSIZE[[:space:]][[:space:]]*\([0-9][0-9]*\).*/\1/p' \
+    "${top_srcdir:-..}/src/htsglobal.h")
+case $urlmaxsize in '' | *[!0-9]*) fail "cannot read HTS_URLMAXSIZE" ;; esac
+limit=$((urlmaxsize * 2))
+
 split_pad() { selftest_queue "$3" identurl "$1" "$2"; }
-split_pad '/' 2047 'error' # 1 + 2047 = 2048 = HTS_URLMAXSIZE*2
+
+# One byte under the limit, exactly on it, one byte over. The accepted case pins
+# the whole string it yields: on its own, 'error' at the limit is satisfied by
+# any URL the parser refuses for an unrelated reason, and by a guard that starts
+# rejecting a kilobyte early.
+boundary() { # boundary BASE WANT-ADR
+    local base=$1 adr=$2
+    local pad=$((limit - 1 - ${#base}))
+    split_pad "$base" "$pad" "$adr fil=/$(repeat_chars "$pad")"
+    split_pad "$base" "$((pad + 1))" 'error'
+    split_pad "$base" "$((pad + 2))" 'error'
+}
+
+# http:// meets a second bound on fil[] further down; file:// meets none, so
+# there the top guard is all that stands between the path and an abort inside
+# strcatbuff().
+boundary 'http://h/' 'adr=h'
+boundary 'file:///' 'adr=file://'
+
+# A root-relative URL carries no host, so it is refused at every length and says
+# nothing about the guard.
+split_pad '/' "$((limit - 1))" 'error'
 split_pad 'http://h/' 3000 'error'
 
 selftest_run_queued

@@ -88,9 +88,10 @@ ok "cleanup_push traps no signal unknown to this test"
 # trap, so it would drain the stack too, but leaves 128+n -- asserting "non-zero"
 # would hold with no signal trap at all. Each signal is sent, since a trap
 # covering TERM alone passes a TERM-only check.
-# INT and QUIT never arrive on either Windows runner; TERM and HUP do.
+# MSYS bash never delivers INT or QUIT to a script; TERM and HUP arrive. The
+# question is about the shell, so a real Linux shell under wsl2 keeps all four.
 sigs=("${trapped[@]}")
-! target_is_windows || sigs=(TERM HUP)
+! shell_is_msys || sigs=(TERM HUP)
 
 # Every leg is reported rather than the first to break: they fail one platform at
 # a time, and the elapsed time tells a signal never delivered from one ignored.
