@@ -36,7 +36,6 @@ last_dir=
 
 # The two rejections below give up early, and projecting a full configure off one
 # of them is how the s390x leg ran into its budget instead of skipping.
-pace_init
 
 # Seeding the cache variable is the answer a host without getaddrinfo gives, and
 # AC_CHECK_LIB takes the same action-if-not-found branch either way. "have"

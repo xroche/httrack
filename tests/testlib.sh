@@ -1194,10 +1194,9 @@ skip_if_out_of_budget() { # skip_if_out_of_budget <steps left> <seconds the last
     exit 77
 }
 
-# The costliest step pace() has seen. pace_init resets it, so one shell sourcing
-# this for two tests cannot let the first one's timing pace the second.
+# The costliest step pace() has seen. Each test is its own process, so loading
+# this is the reset.
 PACE_COSTLIEST=0
-pace_init() { PACE_COSTLIEST=0; }
 
 # skip_if_out_of_budget against the costliest step so far rather than the last
 # one: a caller orders its steps by what they mean, so a cheap one projects a

@@ -169,8 +169,6 @@ assert_state() { # assert_state DIR NAME on|off
 n=0
 planned=10 # steps below; the last one needs the libraries to be installed
 
-pace_init
-
 # A GNU-libiconv-shaped prefix: a header that renames iconv_open the way the
 # real one does away from LIBICONV_PLUG, and a library under a subdirectory the
 # bare prefix does not name. Both halves matter, because a probe that declares
