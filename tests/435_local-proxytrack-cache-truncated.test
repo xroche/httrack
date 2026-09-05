@@ -82,9 +82,24 @@ write("hugebody", b"".join(big) + BODY)
 over = list(parts)
 over[14] = field(b"2147483647")
 write("overbody", b"".join(over) + BODY)
+# the same fixture carrying an honest body, to find out whether this build can
+# size a .dat that large at all
+write("overprobe", b"".join(parts) + BODY)
+
+# Extend one, and keep going only while the file stays a hole: a filesystem
+# that allocates it (or a stat that cannot say, as on Windows) gets neither.
+BIG = 2 ** 31 + 8192
 dat = os.path.join(out, "overbody.dat")
 with open(dat, "r+b") as f:
-    f.truncate(2 ** 31 + 8192)
+    f.truncate(BIG)
+st = os.stat(dat)
+sparse = hasattr(st, "st_blocks") and st.st_blocks * 512 < 1024 * 1024
+if sparse:
+    with open(os.path.join(out, "overprobe.dat"), "r+b") as f:
+        f.truncate(BIG)
+else:
+    with open(dat, "r+b") as f:
+        f.truncate(len(b"".join(parts)) + len(BODY))
 
 # The other body path: a negative offset leaves the bytes in a file beside the
 # cache, named by the "save" field, and the same two bounds apply there. That
@@ -100,7 +115,7 @@ for name, declared in (("diskgood", len(BODY)), ("diskbig", 4096),
     write("m/hts-cache/" + name, b"\0" * 8 + b"".join(field(f) for f in disk),
           pos=-8)
 
-print("sparse" if os.stat(dat).st_blocks * 512 < 1024 * 1024 else "dense")
+print("sparse" if sparse else "dense")
 PYEOF
 )
 
@@ -141,14 +156,27 @@ fi
 # Here the .dat is long enough, so the bytes-remaining bound passes it and the
 # declared size is refused on the format's ceiling alone. Without that ceiling
 # the allocator refuses it instead, and reports a bad size as a memory failure.
+#
+# A build whose long int is 32 bits cannot size a .dat that large: filesize()
+# wraps it negative and the record is refused before the ceiling is consulted,
+# so the case has nothing to observe there. The probe carries an honest body
+# and its verdict says which of the two this build is; a third answer is a
+# regression, not a reason to skip.
 if test "$sparse" != sparse; then
     echo "no sparse files here; skipping the 2 GB .dat case" >&2
 else
-    convert overbody
-    grep -qa 'Cache Read Error : Bad Size' "$dir/overbody.arc" ||
-        fail_dump "a body declared at the format ceiling was not refused" "$dir/overbody.log"
-    if grep -qaF "$BODY" "$dir/overbody.arc"; then
-        fail_dump "a body declared at the format ceiling still came back" "$dir/overbody.log"
+    convert overprobe
+    if grep -qaF "$BODY" "$dir/overprobe.arc"; then
+        convert overbody
+        grep -qa 'Cache Read Error : Bad Size' "$dir/overbody.arc" ||
+            fail_dump "a body declared at the format ceiling was not refused" "$dir/overbody.log"
+        if grep -qaF "$BODY" "$dir/overbody.arc"; then
+            fail_dump "a body declared at the format ceiling still came back" "$dir/overbody.log"
+        fi
+    elif grep -qaF "$refused" "$dir/overprobe.log"; then
+        echo "long int cannot size a 2 GB .dat here; skipping the ceiling case" >&2
+    else
+        fail_dump "the 2 GB .dat probe neither read nor refused its record" "$dir/overprobe.log"
     fi
 fi
 
