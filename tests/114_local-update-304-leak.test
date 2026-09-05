@@ -2,8 +2,8 @@
 #
 # Issue #782: a 304 during --update overwrote the whole response struct with the
 # cache entry, dropping the 8 KB header buffer it owned. Only a leak checker
-# sees it and the sanitized CI leg runs with detect_leaks off, so this one turns
-# it back on around a two-pass mini304 crawl; the fresh pass is the control.
+# sees it, so this one sets its own options around a two-pass mini304 crawl
+# rather than relying on the CI leg's; the fresh pass is the control.
 
 set -eu
 
@@ -11,8 +11,8 @@ set -eu
 . "${0%"${0##*/}"}./crawllib.sh"
 
 # help=1 alone, so the dump lands on stderr rather than the job's log_path;
-# detect_leaks=0 with it, since the job turns leak detection off and the probe
-# run would else leave a leak report in the stderr the harness now keeps.
+# detect_leaks=0 with it, or the probe run leaves a leak report in the stderr
+# the harness now keeps.
 probe=$(ASAN_OPTIONS=help=1:detect_leaks=0 httrack -O /dev/null --version 2>&1 || true)
 case "$probe" in
 *AddressSanitizer*) ;;

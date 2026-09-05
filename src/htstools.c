@@ -1212,8 +1212,8 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
     freet(toptemplate_body);
   if (toptemplate_footer)
     freet(toptemplate_footer);
-  if (toptemplate_body)
-    freet(toptemplate_body);
+  if (toptemplate_bodycat)
+    freet(toptemplate_bodycat);
 
   return retval;
 }

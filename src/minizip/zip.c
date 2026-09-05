@@ -1230,6 +1230,19 @@ extern int ZEXPORT zipOpenNewFileInZip4_64(zipFile file, const char* filename, c
 
     if (err==Z_OK)
         zi->in_opened_file_inzip = 1;
+    else {
+      /* httrack addition: no close or abandon runs on a member that never
+         opened, so this call owns what it allocated */
+      if (zi->ci.stream_initialised == Z_DEFLATED)
+        (void) deflateEnd(&zi->ci.stream);
+#ifdef HAVE_BZIP2
+      else if (zi->ci.stream_initialised == Z_BZIP2ED)
+        (void) BZ2_bzCompressEnd(&zi->ci.bstream);
+#endif
+      zi->ci.stream_initialised = 0;
+      free(zi->ci.central_header);
+      zi->ci.central_header = NULL;
+    }
     return err;
 }
 

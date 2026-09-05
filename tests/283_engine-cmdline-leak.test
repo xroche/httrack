@@ -2,8 +2,8 @@
 #
 # An early exit from hts_main_internal must release the rebuilt command line,
 # the token chunks plus the slot array (#1206). Only a leak checker sees this,
-# and the sanitized CI leg runs with detect_leaks off, so turn it back on around
-# two runs that bail out after the block is allocated.
+# so this pins it on any sanitized build rather than relying on the CI leg's
+# own options: two runs that bail out after the block is allocated.
 
 set -eu
 
@@ -11,8 +11,8 @@ set -eu
 . "${0%"${0##*/}"}./testlib.sh"
 
 # help=1 alone, so the dump lands on stderr rather than the job's log_path;
-# detect_leaks=0 with it, since the job turns leak detection off and the probe
-# run would else leave a leak report in the stderr the harness now keeps.
+# detect_leaks=0 with it, or the probe run leaves a leak report in the stderr
+# the harness now keeps.
 probe=$(ASAN_OPTIONS=help=1:detect_leaks=0 httrack -O /dev/null --version 2>&1 || true)
 case "$probe" in
 *AddressSanitizer*) ;;
