@@ -6579,6 +6579,7 @@ HTSEXT_API void hts_free_opt(httrackp * opt) {
     StringFree(opt->why_url);
     StringFree(opt->warc_file);
     StringFree(opt->sitemap_url);
+    StringFree(opt->state.mimemid);
     hts_sitemap_free(opt); /* backstop: httpmirror's early-return paths */
     singlefile_free(opt);
 

@@ -1994,6 +1994,9 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 #undef FMT
+  freet(buff);
+  freet(strings);
+  freet(snum);
   return 0;
 }
 

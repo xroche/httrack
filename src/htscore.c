@@ -171,6 +171,7 @@ RUN_CALLBACK0(opt, end); \
       cookie_save(opt->cookie,                                                 \
                   fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),           \
                           StringBuff(opt->path_log), "cookies.txt"));          \
+    bauth_free(&cookie);                                                       \
     if (makeindex_fp) {                                                        \
       fclose(makeindex_fp);                                                    \
       makeindex_fp = NULL;                                                     \
@@ -3625,12 +3626,16 @@ static char *hts_cancel_file_pop_(httrackp * opt) {
   if (opt->state.cancel != NULL) {
     htsoptstatecancel **cancel;
     htsoptstatecancel *ret;
+    char *url;
 
     for(cancel = &opt->state.cancel; (*cancel)->next != NULL;
         cancel = &((*cancel)->next)) ;
     ret = *cancel;
     *cancel = NULL;
-    return ret->url;
+    /* the string goes to the caller, the node does not outlive the pop */
+    url = ret->url;
+    freet(ret);
+    return url;
   }
   return NULL;                  /* no entry */
 }

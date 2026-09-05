@@ -88,9 +88,11 @@ static void selftest_close(cache_back *cache) {
     unzClose(cache->zipInput);
     cache->zipInput = NULL;
   }
-  /* hashtable is intentionally not coucal_delete()d: it would dump a stats
-     summary to stderr on every call, and this is a one-shot CLI subcommand
-     that exits right after (same choice as the other -# cache subcommands) */
+  /* the stats summary coucal_delete() logs is info level, which hts_init()'s
+     handler drops unless HTS_LOG asks for it */
+  coucal_delete(&cache->hashtable);
+  coucal_delete(&cache->cached_tests);
+  coucal_delete(&cache->kept);
 }
 
 /* Store one entry; the body is copied so callers may pass const data. */
@@ -580,6 +582,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
                NULL); /* best-effort; may fail on the backend */
       cache.zipOutput = NULL;
     }
+    coucal_delete(&cache.hashtable);
   }
 
   /* failures with successes in between reset the streak: never aborts */
@@ -620,6 +623,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     }
     zipClose(cache.zipOutput, NULL);
     cache.zipOutput = NULL;
+    coucal_delete(&cache.hashtable);
   }
 
   /* isolated failure: only that entry drops; a later sibling round-trips */
@@ -676,6 +680,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               n);
       fail++;
     }
+    coucal_delete(&cache.hashtable);
   }
 
   /* a backend with no truncate rolls back by rewinding: the entry still drops
@@ -727,6 +732,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               n);
       fail++;
     }
+    coucal_delete(&cache.hashtable);
   }
 
   /* >2GB bodies: in-memory drops the entry, on-disk degrades to headers-only */
@@ -777,6 +783,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               n);
       fail++;
     }
+    coucal_delete(&cache.hashtable);
   }
 
   freet(body);
@@ -2581,6 +2588,7 @@ int cache_readfail_selftest(httrackp *opt, const char *dir) {
         fail++;
       }
     }
+    coucal_delete(&cache.hashtable);
   }
 
   /* a truncated entry must not read back as a complete file */

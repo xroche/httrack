@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# The sanitize leg is the only thing in CI that sees a dropped free, and it saw
+# nothing for as long as its ASAN_OPTIONS carried detect_leaks=0. A leg told not
+# to look goes green either way, so nothing but this test notices the flip back.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+workflow="$top/.github/workflows/ci.yml"
+
+if ! test -r "$workflow"; then
+    test -d "$top/.github" && fail "$workflow is gone but $top/.github is not"
+    skip "no .github under $top (dist tarball), so the audit has nothing to read"
+fi
+
+py=$(find_python || true)
+if test -z "$py" || ! "$py" -c 'import yaml' 2>/dev/null; then
+    skip "no python3 with PyYAML here, so the workflow cannot be parsed"
+fi
+
+# Read out of the parsed workflow, so reformatting it moves no verdict.
+"$py" - "$workflow" <<'PY' || fail "the sanitize leg no longer looks for leaks"
+import sys
+
+import yaml
+
+with open(sys.argv[1], encoding="utf-8") as fp:
+    jobs = yaml.safe_load(fp)["jobs"]
+
+job = jobs.get("sanitize")
+if job is None:
+    sys.exit("no sanitize job in the workflow")
+
+seen = 0
+for step in job.get("steps", []):
+    opts = (step.get("env") or {}).get("ASAN_OPTIONS")
+    if opts is None:
+        continue
+    seen += 1
+    name = step.get("name")
+    # Last value wins in the sanitizer flag parser.
+    flags = [f for f in opts.split(":") if f.startswith("detect_leaks=")]
+    if not flags:
+        sys.exit("step %r sets ASAN_OPTIONS without detect_leaks" % name)
+    if flags[-1].split("=", 1)[1] == "0":
+        sys.exit("step %r runs with detect_leaks=0" % name)
+
+if seen == 0:
+    sys.exit("no step in the sanitize job sets ASAN_OPTIONS")
+PY
