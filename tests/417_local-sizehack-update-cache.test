@@ -70,6 +70,12 @@ loghost=$(nativepath "$host")
 kept_name() { # kept_name <mirror-relative path>
     count_matching_lines -F "Kept existing file ${loghost}/$1 (" "$log"
 }
+# The same line with its reason. Four arms keep a file and only one of them is
+# the cache-index one this option changed, so the name alone cannot say which
+# fired.
+kept_for() { # kept_for <mirror-relative path> <bytes> <reason>
+    count_matching_lines -F "Kept existing file ${loghost}/$1 ($2 bytes), $3" "$log"
+}
 
 cmp -s "${root}/leaf.html" "${host}/leaf.html" ||
     fail "leaf.html kept its cached body: $(cat "${host}/leaf.html")"
@@ -86,6 +92,7 @@ ok "a mirrored file that drifted from the cache is re-fetched, not dropped"
 # shortcut must still fire, or the two arms above pass on a disabled option.
 cmp -s "${tmpdir}/keep-v1.bin" "${host}/keep.bin" ||
     fail "keep.bin was re-fetched, so the sizehack shortcut is gone"
-test "$(kept_name keep.bin)" -ge 1 || fail "no log line names keep.bin as kept:
+test "$(kept_for keep.bin 1024 'matching the cached size')" -ge 1 ||
+    fail "keep.bin was not kept on the cached size:
 $(grep -a 'Kept existing' "$log" || true)"
 ok "an unchanged-size data file still takes the shortcut"

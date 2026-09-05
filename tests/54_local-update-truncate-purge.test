@@ -21,3 +21,15 @@ bash "$top_srcdir/tests/local-crawl.sh" \
     --file-matches 'uptrunc/stay.html' 'STAY-V2' \
     --file-not-matches 'uptrunc/stay.html' 'STAY-V1' \
     httrack 'BASEURL/uptrunc/index.html'
+
+# The half above cannot see the purge: page.html gives up before parsing, so
+# #1390 holds every file and the survival of file.bin is free. Here only the
+# binary comes in short, the purge runs, and gone.html proves it ran.
+bash "$top_srcdir/tests/local-crawl.sh" \
+    --rerun-args '--update' \
+    --log-found 'incomplete transfer.*uptruncbin/file\.bin' \
+    --file-matches 'uptruncbin/file.bin' 'MIRRORED-BIN-V1' \
+    --file-min-bytes 'uptruncbin/file.bin' 32768 \
+    --file-matches 'uptruncbin/stay.html' 'BINSTAY-V2' \
+    --not-found 'uptruncbin/gone.html' \
+    httrack 'BASEURL/uptruncbin/index.html'

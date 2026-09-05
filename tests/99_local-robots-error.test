@@ -6,12 +6,14 @@ set -eu
 
 : "${top_srcdir:=..}"
 
-# -Z: both the removed block's own log line and the failed probe that gates
-# this test's coverage are debug-level.
+# The placeholder block and its log line went with #783, so an absence check on
+# that line could only ever miss. What is left is the input that reached it: the
+# failed probe still drives the sitemap fallback and substitutes no body, and a
+# re-added block over-reads the heap, which the sanitizer legs catch here.
+# -Z: the failed probe that gates this test's coverage is debug-level.
 bash "$top_srcdir/tests/local-crawl.sh" --errors 0 \
     --found 'sitemapdir/orphan1.html' \
     --log-found 'No robots\.txt rules at' \
     --log-found 'listed by 127\.0\.0\.1:[0-9]+/sitemap\.xml' \
-    --log-not-found 'Creating GIF dummy file' \
     httrack 'BASEURL/sitemapdir/start.html' --sitemap -r2 -o1 -Z \
     --assume 'txt=image/gif' -F 'errorrobots-agent'
