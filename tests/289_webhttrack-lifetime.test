@@ -97,13 +97,34 @@ kill -0 "${bye_pid}" 2>/dev/null ||
 # 4. A flood of window ids must not push a real window out of the table: with
 # the last real one evicted, saying goodbye to the flood would end the session.
 # One more than the table holds, so the refusal itself is exercised.
+#
+# Both halves go through one interpreter each. Spawning one per window spent the
+# ping window on process startup, so a loaded box idled the server out and the
+# assertion below reported that honest exit as an eviction.
+# w2 is what holds the server open from here, so start its ping window at the
+# flood rather than inheriting what case 3 already spent of it. Before the
+# flood, never after: a refresh afterwards would re-register an evicted window
+# and the case would pass without testing anything.
+ping "${bye_port}" w2
+w2_at=${SECONDS}
+flood=()
 for i in $(seq 0 16); do
-    ping "${bye_port}" "f${i}"
+    flood+=(--path "/ping?w=f${i}&t=${RANDOM}")
 done
+"${HTS_PYTHON}" "${testdir}/httpclient.py" --port "${bye_port}" "${flood[@]}" >/dev/null
+flood=()
 for i in $(seq 0 16); do
-    bye "${bye_port}" "f${i}" "${sid}"
+    flood+=(--path "/ping?w=f${i}&t=${RANDOM}&e=bye")
 done
+"${HTS_PYTHON}" "${testdir}/httpclient.py" --port "${bye_port}" "${flood[@]}" \
+    --field "sid=${sid}" >/dev/null
 sleep $((grace + 2))
+# Read the clock as late as possible, next to the probe it guards: a box slow
+# enough to spend w2's window here idles the server out honestly, and the check
+# below would call that an eviction.
+elapsed=$((SECONDS - w2_at))
+test "${elapsed}" -lt "${timeout}" ||
+    fail "the flood and its grace took ${elapsed}s of w2's ${timeout}s window, so this proves nothing"
 kill -0 "${bye_pid}" 2>/dev/null ||
     fail "a flood of window ids evicted the real window and ended the session"
 
