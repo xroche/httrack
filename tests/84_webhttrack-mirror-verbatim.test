@@ -83,14 +83,19 @@ while :; do
         fail "the crawl never showed as running: $(<"${HTS_LOG}")"
     poll_wait 0.2
 done
-cp "${mirror}" "${work}/crawl/hostile.html"
+# The same payload, plus a line naming which project it came from: the profile
+# save left an identical hostile.html in proj, so comparing against that one
+# would pass even if /website/ never followed the crawl.
+crawled="${work}/crawl/hostile.html"
+cp "${mirror}" "${crawled}"
+echo "served from the crawl project" >>"${crawled}"
 
 htsserver_client --path /website/hostile.html --head-file "${hdr}" --body-file "${body}"
 grep -q '^HTTP/1\.0 200 ' "${hdr}" ||
     fail "running crawl: /website/ was not served: $(head -1 "${hdr}")"
 # cmp, not a "not the GUI page" check: that is only one of the wrong answers.
-cmp -s "${mirror}" "${body}" ||
-    fail "running crawl: /website/ did not serve the mirror byte for byte"
+cmp -s "${crawled}" "${body}" ||
+    fail "running crawl: /website/ served $(head -c 120 "${body}") instead of the crawl project"
 
 # A crawl ending mid-probe leaves the checks above reading the finished pane and
 # passing for the wrong reason, so pin the state they ran in.
