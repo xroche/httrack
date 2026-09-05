@@ -100,12 +100,32 @@ assert_steps_ran() { # assert_steps_ran WANT GOT
     assert_eq "$1" "$2" "steps the budget is paced against"
 }
 
+# Trailing newlines and CRs off a captured run. Windows stdout is text mode, so
+# the engine ends every line CRLF; MSYS eats the pair and a Linux shell under
+# wsl2 does not, which would make the two backends disagree on every comparison.
+# Interior CRs are lines mode's business.
+# Into STRIPPED, not echoed: macOS drives this under bash 3.2, which has no
+# namerefs, and a command substitution is a fork (#795).
+STRIPPED=
+strip_trailing_eol() { # strip_trailing_eol TEXT
+    STRIPPED=$1
+    while :; do
+        case $STRIPPED in
+        *"$TESTLIB_NL") STRIPPED=${STRIPPED%"$TESTLIB_NL"} ;;
+        *"$SELFTEST_CR") STRIPPED=${STRIPPED%"$SELFTEST_CR"} ;;
+        *) break ;;
+        esac
+    done
+}
+
 # Run engine self-test NAME: stdout must equal WANT, status must be 0 (which a
 # `test "$(...)" = ...` cannot see). expect_ok takes a command, for a real -O.
 assert_selftest() { # assert_selftest WANT NAME [ARGS...]
     local want=$1 name=$2 got rc=0
     shift 2
     got=$(httrack -O /dev/null "-#test=$name" "$@") || rc=$?
+    strip_trailing_eol "$got"
+    got=$STRIPPED
     test "$rc" -eq 0 || fail "-#test=$name $*: exited $rc, output: $got"
     test "$got" = "$want" || fail "-#test=$name $*: expected [$want], got [$got]"
 }
@@ -205,10 +225,30 @@ selftest_queue_mode() { # selftest_queue_mode exact|lines|tail|head WANT NAME [A
 # pipe: printf is a builtin, so this costs no fork of its own. Args travel on
 # stdin because the engine parses argv before it reaches the self-test dispatch,
 # and would take a case's '-*' for one of its own filters.
+# The queued arguments, NUL-separated, for -#test=batch to read back. This file
+# stands in for the command line, so a drvfs path in it needs the translation
+# the shim gives a real argument: the engine reads the file itself and the shim
+# never sees it. Left alone under the other backends, where the paths the tests
+# build are already native.
+selftest_write_argv() {
+    local a
+    if test "$(suite_backend)" != wsl2; then
+        printf '%s\0' "${SELFTEST_ARGV[@]}"
+        return
+    fi
+    for a in "${SELFTEST_ARGV[@]}"; do
+        case $a in
+        /mnt/[A-Za-z]/*) printf '%s\0' "$(drvfs_path -m "$a")" ;;
+        file:///mnt/[A-Za-z]/*) printf 'file://%s\0' "$(drvfs_path -m "${a#file://}")" ;;
+        *) printf '%s\0' "$a" ;;
+        esac
+    done
+}
+
 selftest_run_queued() {
     local n=${#SELFTEST_WANT[@]} out rest got want rc=0 i
     test "$n" -gt 0 || return 0
-    printf '%s\0' "${SELFTEST_ARGV[@]}" >"$SELFTEST_SCRIPT" ||
+    selftest_write_argv >"$SELFTEST_SCRIPT" ||
         fail "cannot write $SELFTEST_SCRIPT"
     # By path, not by name: make check's ../src is relative, so resolving it from
     # anywhere else finds an installed httrack and grades the wrong binary.
@@ -233,13 +273,8 @@ selftest_run_queued() {
         # so every case ends CRLF there and MSYS eats the pair. Stripping the
         # run rather than one terminator keeps the two platforms saying the
         # same thing. Interior CRs are lines mode's business.
-        while :; do
-            case $got in
-            *"$TESTLIB_NL") got=${got%"$TESTLIB_NL"} ;;
-            *"$SELFTEST_CR") got=${got%"$SELFTEST_CR"} ;;
-            *) break ;;
-            esac
-        done
+        strip_trailing_eol "$got"
+        got=$STRIPPED
         test "${SELFTEST_MODE[i]}" != lines ||
             got=${got//"$SELFTEST_CR$TESTLIB_NL"/"$TESTLIB_NL"}
         want=${SELFTEST_WANT[i]}
@@ -329,28 +364,45 @@ run_cleanups() {
 # Python 3 interpreter, or empty: Windows only installs python.exe, and a bare
 # "python" may be 2.x or the Store stub.
 find_python() {
-    local py names='python3 python'
+    local py names='python3 python' probe='sys.version_info[0] == 3'
     # Windows-side under wsl2, which is what keeps the fixture servers and
     # httrack.exe on one side of the boundary: no socket crosses it, and the
     # paths handed to them stay the native ones nativepath already produces.
     # A Linux python3 sitting in the distro would take the same arguments and
     # fail to open every one of them.
-    test "$(suite_backend)" != wsl2 || names='python3.exe python.exe'
+    # The bare names come first because the driver puts a shim there, which
+    # bridges the environment and converts drvfs paths the way it does for the
+    # engines; the .exe names are the fallback for a hand-run with no shim.
+    # Either way the probe demands a Windows interpreter, so the distro's own
+    # python3 cannot answer for a shim the runner had no python.exe to make.
+    if test "$(suite_backend)" = wsl2; then
+        names='python3 python python3.exe python.exe'
+        probe="$probe and sys.platform == 'win32'"
+    fi
     # shellcheck disable=SC2086 # the split is what makes it a candidate list
     for py in "${PYTHON:-}" $names; do
         test -n "$py" || continue
-        "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null || continue
+        "$py" -c "import sys; sys.exit(not ($probe))" 2>/dev/null || continue
         printf '%s\n' "$py"
         return 0
     done
     return 1
 }
 
+# curl, or empty. Windows-side under wsl2 for the same reason python is: the
+# distro's 127.0.0.1 is its own loopback, and the engine listens on Windows's.
+find_curl() {
+    local c=curl
+    test "$(suite_backend)" != wsl2 || c=curl.exe
+    command -v "$c" >/dev/null 2>&1 || return 1
+    printf '%s\n' "$c"
+}
+
 # WSL2's own drvfs mapping, done here rather than with wslpath, which a bare
 # imported rootfs does not ship: `wsl -- wslpath` answers ERROR_PATH_NOT_FOUND.
 # Only drvfs paths ever cross this boundary, since the suite keeps its files on
 # a Windows volume, so the two-way mapping is the whole of it.
-drvfs_path() { # drvfs_path -m|-u PATH
+drvfs_path() { # drvfs_path -m (to C:/...) | -u (to /mnt/c/...) PATH
     local p=$2 drive rest
     case "$1" in
     -u)
@@ -399,7 +451,8 @@ path_convert() { # path_convert -m|-u PATH
     fi
 }
 
-# Native form of a path: a non-MSYS binary cannot resolve Git Bash's /d/a/... ones.
+# Native form of a path. A non-MSYS binary cannot resolve Git Bash's /d/a/...
+# ones, and a native python cannot open the drvfs paths a wsl2 shell builds.
 nativepath() { path_convert -m "$1"; }
 
 # POSIX form of a path. Anything MSYS splits on a colon needs it, a PATH entry
@@ -1027,6 +1080,9 @@ kill_pid() {
         if test -n "$winpid"; then
             taskkill /F /PID "$winpid" >/dev/null 2>&1 || true
         fi
+        # The other half of the job under wsl2, as in kill_tree: $pid is a Linux
+        # process, and taskkill reached at most the native one it relays to.
+        test "$(suite_backend)" != wsl2 || kill -9 "$pid" 2>/dev/null || true
         return 0
     fi
     kill -9 "$pid" 2>/dev/null || true
@@ -1057,7 +1113,9 @@ kill_tree() {
         # the host, siblings of a parallel run included (HTTRACK_EXCLUSIVE_HOST).
         elif test -n "${HTTRACK_EXCLUSIVE_HOST:-}"; then
             taskkill_engines
+            # Both names: find_python prefers python3 where the runner has it.
             taskkill /F /IM python.exe >/dev/null 2>&1 || true
+            taskkill /F /IM python3.exe >/dev/null 2>&1 || true
         fi
         # Not a fallback under wsl2 but the other half of the job: the shell
         # there is Linux, so $pid is often a process that never had a Windows

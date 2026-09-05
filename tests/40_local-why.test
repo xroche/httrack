@@ -13,7 +13,8 @@ cleanup_push rm -rf "$tmpdir"
 why() {
     local want="$1" out
     shift
-    out="$(httrack -O "$tmpdir/p" -q "$@" |
+    # tr: the engine's LF macro is a literal CRLF, which only MSYS folds away.
+    out="$(httrack -O "$tmpdir/p" -q "$@" | tr -d '\r' |
         grep -E 'accepted|rejected|no filter|unable')"
     test "$out" == "$want" || {
         echo "want: $want"

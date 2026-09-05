@@ -6,7 +6,10 @@ set -euo pipefail
 
 ulimit -c 0 # a deliberate crash must not litter the box with cores
 
-if [ "$(uname -s)" != "Linux" ]; then
+# The shell is Linux under the wsl2 backend too, but the engine there is a
+# Windows exe that no LD_PRELOAD can reach. This file sources no testlib, so it
+# asks the backend directly rather than through target_is_linux.
+if [ "$(uname -s)" != "Linux" ] || [ "${HTTRACK_SUITE_BACKEND:-}" = wsl2 ]; then
     echo "LD_PRELOAD interposition is Linux-only here, skipping" >&2
     exit 77
 fi

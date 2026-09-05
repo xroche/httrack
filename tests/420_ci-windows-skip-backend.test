@@ -26,9 +26,58 @@ ci_skip_list=''
 ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown backend"
 test "$ci_skip_list" = "$expected_skips_wsl2" || fail "wsl2 did not select its own list"
 
-# The two lists agree today (wsl2's is a copy, not yet a measurement), so equal
-# output alone can't tell "read the right variable" from "always read msys".
-# Diverge them here so a wrong selection becomes visible.
+# --- the lists' CONTENT, not just which one is chosen ---------------------
+# A spot-check of the names that moved, not of all 29: a rename inside the part
+# no row pins is caught by the driver's own set compare on a live Windows leg,
+# and neither can see a listed test that in fact runs.
+# 420 compared each list against itself, so editing either one stayed green.
+# "neither" is a name that left a list: 386 ran once python stopped bypassing
+# the shim, and nothing must put it back without measuring it again.
+ci_expected_skips_for_backend msys || fail "msys was rejected"
+msys_list=$ci_skip_list
+ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected"
+wsl2_list=$ci_skip_list
+# Matched in the shell, not with grep: a whole-line test needs no external
+# tool, and the lists are newline-joined already.
+holds() { # holds LIST NAME
+    case "
+$1
+" in *"
+$2
+"*) return 0 ;; esac
+    return 1
+}
+while read -r name where; do
+    case $where in
+    msys-only)
+        holds "$msys_list" "$name" || fail "$name left the msys list"
+        ! holds "$wsl2_list" "$name" || fail "$name is in the wsl2 list"
+        ;;
+    wsl2-only)
+        holds "$wsl2_list" "$name" || fail "$name left the wsl2 list"
+        ! holds "$msys_list" "$name" || fail "$name is in the msys list"
+        ;;
+    both)
+        holds "$msys_list" "$name" || fail "$name left the msys list"
+        holds "$wsl2_list" "$name" || fail "$name left the wsl2 list"
+        ;;
+    neither)
+        ! holds "$msys_list" "$name" || fail "$name is in the msys list"
+        ! holds "$wsl2_list" "$name" || fail "$name is in the wsl2 list"
+        ;;
+    esac
+done <<'EOF'
+386_local-proxytrack-dav-tz.test neither
+294_local-wizard-eof.test wsl2-only
+24_local-resume-overlap.test wsl2-only
+241_local-single-file-gui.test both
+288_testlib-holdport.test both
+EOF
+ok "the two lists hold the names the runs measured moving"
+
+# The lists genuinely differ now, so the checks above already separate "read the
+# right variable" from "always read msys". Kept because it holds either way, and
+# because it is what caught that selection when the two lists were identical.
 expected_skips_wsl2="99_sentinel-only.test"
 ci_skip_list=''
 ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown backend"

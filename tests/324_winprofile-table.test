@@ -82,6 +82,7 @@ for i, line in enumerate(open(sys.argv[1], encoding="ascii"), 1):
             and not f[10] and f[7] != "none":
         sys.exit("line %d: %s states no empty_means" % (i, f[0]))
     n += 1
+sys.stdout.reconfigure(newline="\n")  # the count below is read as a number
 print(n)
 PY
 ) || fail "malformed table (see above)"

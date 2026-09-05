@@ -21,7 +21,7 @@ bad_size='Bad Size' # the reader's verdict on a size it refuses
 
 # X-In-Cache: 0 leaves the body on disk, which is the path that allocates it
 craft() { # craft X-SIZE
-    "$python" - "$zip" "$1" <<'EOF'
+    "$python" - "$(nativepath "$zip")" "$1" <<'EOF'
 import sys, zipfile
 
 meta = (

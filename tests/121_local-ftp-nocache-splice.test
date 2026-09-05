@@ -38,7 +38,7 @@ write_body() {
 path, tag, fill, stamp = sys.argv[1:5]
 with open(path, "wb") as fp:
     fp.write(("%s-BODY " % tag).encode() + tag[:1].encode() * int(fill))
-os.utime(path, (int(stamp), int(stamp)))' "${root}/a.bin" "$1" "$2" "$3"
+os.utime(path, (int(stamp), int(stamp)))' "$(nativepath "${root}/a.bin")" "$1" "$2" "$3"
 }
 # A copy this engine did not stamp: an archive restore, a cp without -p, or any
 # mirror predating the fix. Content is stale, so a splice fails cmp.
@@ -47,7 +47,7 @@ plant_stale() {
 path, fill, stamp = sys.argv[1:4]
 with open(path, "wb") as fp:
     fp.write(b"STALE-BODY " + b"S" * int(fill))
-os.utime(path, (int(stamp), int(stamp)))' "$mirror" "$1" "$2"
+os.utime(path, (int(stamp), int(stamp)))' "$(nativepath "$mirror")" "$1" "$2"
 }
 old_stamp=1767225600    # 2026-01-01Z
 new_stamp=1769904000    # 2026-02-01Z

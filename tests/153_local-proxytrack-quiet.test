@@ -13,7 +13,7 @@ set -euo pipefail
 . "${0%"${0##*/}"}./arclib.sh"
 
 python=$(find_python) || skip "python3 missing"
-command -v curl >/dev/null 2>&1 || skip "curl missing"
+curl=$(find_curl) || skip "curl missing"
 # A leak on a fully buffered stdout shows only through the pty below, and Windows
 # builds neither Python's pty module nor os.fork; proxytrack also skips the PID=
 # line, which request_log() cuts the banner off at.
@@ -65,7 +65,7 @@ os.execvp(sys.argv[2], sys.argv[2:])
 '
 
 propfind() { # port path
-    curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
+    "$curl" -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
         "http://127.0.0.1:$1/webdav/example.com/$2"
 }
 
@@ -119,7 +119,7 @@ wait_banner "$quietlog"
 # Both on one connection: the access log is written before send(), and only
 # proxytrack's keep-alive loop orders anything written after it, since the
 # second request is not read until the first one's teardown has run.
-resp=$(curl -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
+resp=$("$curl" -s -i --max-time 30 -X PROPFIND -H "Depth: 1" \
     "http://127.0.0.1:$quietport/webdav/example.com/" \
     "http://127.0.0.1:$quietport/webdav/example.com/page.html") ||
     fail_dump "the PROPFINDs did not answer" "$quietlog"

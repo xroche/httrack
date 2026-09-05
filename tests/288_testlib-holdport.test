@@ -35,6 +35,7 @@ dial() { # dial PORT
     "$real_python" -c 'import errno, socket, sys
 s = socket.socket()
 s.settimeout(2)
+sys.stdout.reconfigure(newline="\n")  # a native python would leave a CR on every word below
 try:
     s.connect(("127.0.0.1", int(sys.argv[1])))
     print("ACCEPTED")

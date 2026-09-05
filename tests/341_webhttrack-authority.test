@@ -52,7 +52,9 @@ echo "ok: the panel answers at every authority it is reachable at"
 # The name this host answers to, which is what `htsserver --bind <lan ip>`
 # browsed at http://myhost.lan:8080/ presents. Dropped when another rule would
 # accept it anyway, since it would then prove nothing.
-selfname=$(htsserver_python -c 'import socket; print(socket.gethostname())')
+selfname=$(htsserver_python -c 'import socket, sys
+sys.stdout.reconfigure(newline="\n")  # this name goes out in a Host header
+print(socket.gethostname())')
 # True for a name some other rule vouches for anyway: localhost, or anything
 # shaped like an address literal, which host_is_address() takes for whoever
 # opened the socket.

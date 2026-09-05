@@ -16,7 +16,8 @@ assert_selftest "zip-abandon-notrunc: OK" zip-abandon-notrunc "$tmp/"
 # Grade both archives with a reader that is not minizip: its own backscan is
 # what the leftover tail hides the directory from.
 if py=$(find_python); then
-    "$py" - "$tmp/zip-notrunc-ref.zip" "$tmp/zip-notrunc.zip" <<'EOF'
+    nat=$(nativepath "$tmp")
+    "$py" - "$nat/zip-notrunc-ref.zip" "$nat/zip-notrunc.zip" <<'EOF'
 import os
 import sys
 import zipfile

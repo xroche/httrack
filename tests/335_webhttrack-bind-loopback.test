@@ -18,6 +18,7 @@ cleanup_push htsserver_cleanup_dir "${work}"
 probe() { # $1 = host, $2 = port
     htsserver_python - "$1" "$2" <<'PY'
 import socket, sys
+sys.stdout.reconfigure(newline="\n")  # the word below is compared byte for byte
 try:
     socket.create_connection((sys.argv[1], int(sys.argv[2])), timeout=5).close()
     print("ok")
@@ -32,6 +33,7 @@ PY
 primary_ipv4() { # [address]
     htsserver_python - ${1+"$1"} <<'PY'
 import ipaddress, socket, sys
+sys.stdout.reconfigure(newline="\n")  # an empty answer must stay empty for test -z
 if len(sys.argv) > 1:
     raw = sys.argv[1]
 else:
