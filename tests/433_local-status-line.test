@@ -1,0 +1,125 @@
+#!/bin/bash
+#
+# treatfirstline() reads the first bytes a server sends, on a plain crawl with
+# no options. Every malformed shape it claims to handle is graded here on what
+# the engine recorded, not on surviving the reply.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/status-line-server.py")
+tmpdir=$(mktemp -d)
+out=$tmpdir/out
+serverpid=
+log=$tmpdir/crawl.log
+fail_dump_var log
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" >"$tmpdir/srv.out" 2>"$tmpdir/srv.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/srv.out" "$serverpid") || exit 1
+
+crawl() { # crawl CASE
+    local rc=0
+    mkdir -p "$out/$1"
+    run_with_timeout 60 httrack "http://127.0.0.1:$port/$1.html" \
+        -O "$out/$1" -c1 --robots=0 --retries=0 -%v0 -q >>"$log" 2>&1 || rc=$?
+    test "$rc" -ne 124 || fail "$1: crawl hit the deadline"
+    test "$rc" -le 128 || fail "$1: crawl ended abnormally ($rc)"
+}
+
+mirrored() { echo "$out/$1/127.0.0.1_$port/$1.html"; }
+
+# The cache index is the engine's own record of the reply: tab-separated
+# statuscode, "status ('server message')" and MIME, keyed by URL.
+cache_field() { # cache_field CASE COLUMN
+    local index=$out/$1/hts-cache/new.txt
+    test -f "$index" || return 0
+    awk -F'\t' -v u="http://127.0.0.1:$port/$1.html" -v c="$2" \
+        '$8 == u {print $c; exit}' "$index"
+}
+
+# refused: nothing mirrored, and the code and reason the engine logged
+assert_refused() { # assert_refused CASE MSG CODE
+    local case=$1 want="\"$2\" ($3) at link 127.0.0.1:$port/$1.html"
+    local logtext
+    test ! -f "$(mirrored "$case")" ||
+        fail "$case: a malformed status line was mirrored"
+    logtext=$(cat "$out/$case/hts-log.txt")
+    grep -qF "$want" <<<"$logtext" ||
+        fail_dump "$case: log lacks [$want]" "$out/$case/hts-log.txt"
+}
+
+# accepted: the file lands, under the code, message and MIME named here
+assert_accepted() { # assert_accepted CASE CODE SERVERMSG MIME
+    local case=$1
+    test -f "$(mirrored "$case")" || fail "$case: not mirrored"
+    assert_eq "$2" "$(cache_field "$case" 4)" "$case: statuscode"
+    assert_eq "added ('$3')" "$(cache_field "$case" 5)" "$case: status"
+    assert_eq "$4" "$(cache_field "$case" 6)" "$case: MIME"
+}
+
+for case in ok nocode nonnumeric signed twodigit fourdigit overflow \
+    versiononly noprefix noversion lonecr lonelf noterm emptyline \
+    spaces ltjunk huge; do
+    crawl "$case"
+done
+
+# Control: a well-formed line whose phrase infostatuscode() cannot produce, so a
+# case falling back to that table is never mistaken for one reading the wire.
+assert_accepted ok 200 "Fine%20Thanks" text/html
+
+# HTTP/ prefix, then no status code the parser will take
+assert_refused nocode "Unknown response structure" -1
+assert_refused nonnumeric "Unknown response structure" -1
+assert_refused signed "Unknown response structure" -1
+# nothing at all after the version token
+assert_refused versiononly "Unknown response structure" -1
+
+# RFC 9110 section 15: the code is exactly three digits
+assert_refused twodigit "Unknown response structure" -1
+assert_refused fourdigit "Unknown response structure" -1
+# 2**32 + 200, which a wrapping sscanf("%d") reads as a 200
+assert_refused overflow "Unknown response structure" -1
+
+# no HTTP/ prefix at all
+assert_refused noprefix "Unknown (not HTTP/xx) response structure" -1
+
+# no version, but the code is still where the parser looks: taken, not refused
+assert_accepted noversion 200 OK text/html
+
+# A lone CR does not end the line the reader stopped at, so the phrase runs on
+# to the CRLF. It must not reach the log, which is tab-separated and read by a
+# human, and the code before it still stands.
+assert_refused lonecr "Not Found" 404
+lonecrlog=$(cat "$out/lonecr/hts-log.txt")
+! grep -qF "INJECTED" <<<"$lonecrlog" ||
+    fail_dump "lonecr: the reason phrase forged a log line" \
+        "$out/lonecr/hts-log.txt"
+
+# a lone LF does end it
+assert_accepted lonelf 200 "Fine%20Thanks" text/html
+
+# no terminator anywhere, so the header block never ends
+assert_refused noterm "Interrupted transfer" -4
+
+# The junky-server arms mirror a body under a status line that named no code.
+# Deliberate ("This is dirty .."), pinned so a change to it is visible.
+assert_accepted emptyline 200 "Unknown,%20assuming%20junky%20server" unknown/unknown
+assert_accepted spaces 200 "Unknown,%20assuming%20junky%20server" unknown/unknown
+assert_accepted ltjunk 200 "Unknown,%20assuming%20junky%20server" unknown/unknown
+
+# 4000 bytes of reason phrase, past the reader's 1024-byte line buffer: the code
+# survives the truncation and the phrase falls back to the table
+assert_accepted huge 200 OK unknown/unknown
+
+ok "every malformed status-line arm recorded what it should"
