@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# With no argument the engine runs its interactive setup wizard, whose project
+# name prompt re-asks on an empty answer. On EOF the answer is empty forever, so
+# it re-asked and re-printed the whole option list until killed.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+# The wizard only runs when stdout is a terminal, and Windows builds Python with
+# neither pty nor os.fork.
+skip_on_windows "windows: python has no pty, so the wizard could not be reached"
+
+bin=$(command -v httrack) || fail "httrack not found on PATH"
+dir=$(mktemp -d)
+cleanup() {
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+# Runs the engine with a pty on stdout and an answerless stdin, and gives up
+# once it outruns a megabyte: the spin reaches that in well under a second.
+runner='
+import os, pty, select, sys, time
+
+prog, mode, out = sys.argv[1], sys.argv[2], sys.argv[3]
+master, slave = pty.openpty()
+pid = os.fork()
+if pid == 0:
+    os.close(master)
+    os.dup2(slave, 1)
+    os.dup2(slave, 2)
+    if slave > 2:
+        os.close(slave)
+    if mode == "closed":
+        os.close(0)
+    else:
+        fd = os.open(os.devnull, os.O_RDONLY)
+        os.dup2(fd, 0)
+        if fd != 0:
+            os.close(fd)
+    os.execv(prog, [prog])
+    os._exit(127)
+os.close(slave)
+deadline = time.time() + 60
+total = 0
+spun = False
+with open(out, "wb", 0) as log:
+    while True:
+        if time.time() > deadline or total > (1 << 20):
+            spun = True
+            break
+        if not select.select([master], [], [], 0.5)[0]:
+            continue
+        try:
+            data = os.read(master, 65536)
+        except OSError:
+            break
+        if not data:
+            break
+        log.write(data)
+        total += len(data)
+if spun:
+    os.kill(pid, 9)
+os.waitpid(pid, 0)
+sys.exit(1 if spun else 0)
+'
+
+# run MODE
+run() {
+    local mode=$1
+
+    "$python" -c "$runner" "$bin" "$mode" "${dir}/${mode}.out" ||
+        fail "$mode: the wizard never stopped asking for a project name"
+    local asked
+    asked=$(count_matching_lines "Enter project name" "${dir}/${mode}.out")
+    test "$asked" -eq 1 || fail "$mode: asked $asked times, expected 1"
+}
+
+run devnull
+# a closed descriptor sets only ferror, where EOF sets only feof
+run closed
