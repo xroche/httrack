@@ -50,7 +50,7 @@ EOF
 compile() { # compile OUT FLAGS...
     local out=$1
     shift
-    "${cc_argv[@]}" "${cflags_argv[@]}" "$@" -w -c -o "$out" "$tmp/probe.c" 2>"$tmp/cc.log" || {
+    "${cc_argv[@]}" ${cflags_argv[@]+"${cflags_argv[@]}"} "$@" -w -c -o "$out" "$tmp/probe.c" 2>"$tmp/cc.log" || {
         head -5 "$tmp/cc.log" >&2
         fail "the probe does not compile with $*"
     }
@@ -85,7 +85,8 @@ done
 # Assert on whichever artifact holds the engine: the library where one is built,
 # the binary on a static build. Summing instead would let a vendored subdirectory
 # that stayed fortified cover for an engine that did not.
-subject=${artifacts[-1]}
+# Spelled out because macOS runs the suite under bash 3.2, which has no [-1].
+subject=${artifacts[${#artifacts[@]} - 1]}
 [ "$(n_chk "$subject")" -gt 0 ] ||
     fail "$subject imports no __*_chk, so -D_FORTIFY_SOURCE=$FORTIFY_SOURCE_LEVEL bought nothing"
 

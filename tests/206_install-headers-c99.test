@@ -234,7 +234,7 @@ else
         b=$(basename "$h")
         argv=("${base_cpp_argv[@]}" -Wall -Wextra -Werror)
         printf '#include <httrack/%s>\nint main() { return 0; }\n' "$b" >"$tmp/tu.cpp"
-        for std in "${cxx_stds[@]}"; do
+        for std in ${cxx_stds[@]+"${cxx_stds[@]}"}; do
             for mode in -UHTS_INTERNAL_BYTECODE -DHTS_INTERNAL_BYTECODE; do
                 cxx_compile "$b does not compile as C++ under -std=$std ($mode)" \
                     "${argv[@]}" "-std=$std" "$mode"
