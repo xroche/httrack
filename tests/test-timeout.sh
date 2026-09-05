@@ -92,6 +92,8 @@ rm -f "$TESTLIB_DONE_FILE" 2>/dev/null || true
 # status with no mark is an abort. Sourcing it from `bash -c` keeps $0 the test's
 # own path, which many tests derive $testdir from, writes nothing beside a
 # read-only srcdir and leaves stdin alone. A subshell's exit is not the test's.
+# Two shapes would lose the mark and fail a healthy test: an `exec` at top level,
+# and removing the driver's TMPDIR before exiting. No test does either today.
 # shellcheck disable=SC2016 # the child expands it, not us
 TESTLIB_RUNNER='exit() {
     if test "$BASH_SUBSHELL" -eq 0; then : >"$TESTLIB_DONE_FILE" 2>/dev/null || true; fi
