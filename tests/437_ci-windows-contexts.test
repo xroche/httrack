@@ -9,8 +9,13 @@ set -euo pipefail
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
-wf="$top_srcdir/.github/workflows/windows-build.yml"
-test -r "$wf" || fail "no $wf"
+top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
+wf="$top/.github/workflows/windows-build.yml"
+
+if ! test -r "$wf"; then
+    test -d "$top/.github" && fail "$wf is gone but $top/.github is not"
+    skip "no .github under $top (dist tarball), so the audit has nothing to read"
+fi
 
 # The contexts named in the "Protect master" ruleset, pinned rather than derived,
 # because one file compared against itself proves nothing.
@@ -31,6 +36,11 @@ contexts() { # contexts <workflow>
         !injob { next }
         /^    name:/ { bad = 1; print "ERR: the job carries an explicit name:"; exit 1 }
         /^      matrix:/ { inmatrix = 1; next }
+        inmatrix && /^        (include|exclude):/ {
+            bad = 1
+            print "ERR: the matrix has include:/exclude:, which this guard cannot model"
+            exit 1
+        }
         inmatrix && /^        [A-Za-z0-9_-]+: *\[/ {
             sub(/^[^[]*\[/, ""); sub(/\].*/, "")
             gsub(/ /, "")
