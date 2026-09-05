@@ -263,6 +263,9 @@ jobs:
           key: wsl-rootfs-jammy-amd64-v1
 
       - name: Run the engine test suite (offline tests)
+        # Kept as the control that separates a wsl2 flake from a real
+        # regression, but the WSL2 step is what gates the job now.
+        continue-on-error: true
         shell: bash
         working-directory: tests
         timeout-minutes: 45
@@ -301,8 +304,9 @@ jobs:
       # MSYS's fork emulation is what breaks first under load (#1273).
       - name: Bring up WSL2
         if: always()
-        # Non-gating like the suite step it feeds: this runs inside a job whose
-        # context `Protect master` requires, so a flaky import must not red it.
+        # Still non-gating now that the suite step gates: a failed import
+        # reaches that step, which names it and reds there. Failing here too
+        # would report one cause twice, and less clearly.
         continue-on-error: true
         shell: pwsh
         timeout-minutes: 15
@@ -350,9 +354,6 @@ jobs:
 
       - name: Run the engine test suite (offline tests, WSL2)
         if: always()
-        # The harness is new: a red here must not gate the job until it has a
-        # few days of history to read it against. Flip this once it has.
-        continue-on-error: true
         shell: bash
         working-directory: tests
         # 45 like the msys step, and 226_watchdog-native.test enforces it: the
