@@ -62,11 +62,10 @@ done <<'EOF'
 386_local-proxytrack-dav-tz.test wsl2-only
 294_local-wizard-eof.test wsl2-only
 226_watchdog-native.test wsl2-only
-24_local-resume-overlap.test wsl2-only
 241_local-single-file-gui.test both
 288_testlib-holdport.test both
 EOF
-ok "the two lists differ by exactly the one name the runs measured"
+ok "each list holds exactly the names the runs measured for it"
 
 # The lists genuinely differ now, so the checks above already separate "read the
 # right variable" from "always read msys". Kept because it holds either way, and

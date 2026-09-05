@@ -2914,6 +2914,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         fprintf(fp,
                 "To pause the engine: create an empty file named 'hts-stop.lock'"
                 LF);
+        fprintf(fp, "To abort the mirror: create an empty file named "
+                    "'hts-abort.lock'" LF);
 #if USE_BEGINTHREAD
         fprintf(fp, "PID=%d\n", (int) getpid());
 #ifndef _WIN32

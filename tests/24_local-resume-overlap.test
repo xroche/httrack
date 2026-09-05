@@ -10,11 +10,6 @@ set -eu
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
 
-# No graceful stop crosses the boundary: a Linux signal reaches the interop
-# relay, and taskkill /F reaches the engine too hard to let pass 1 write the
-# temp-ref pass 2 resumes from. The spike left that gap open deliberately.
-test "$(suite_backend)" != wsl2 ||
-    skip "no graceful stop reaches a Windows exe from a WSL2 shell"
 root=$(nativepath "${testdir}/server-root")
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_198.XXXXXX") || exit 1
@@ -45,17 +40,12 @@ for _ in $(seq 1 300); do
     sleep 0.1
 done
 sleep 0.5
-# A Linux signal reaches the wsl2 interop relay, not the engine, and a pass 1
-# that runs on finishes the very fetch pass 2 has to resume.
-# The backend, not the binary: MSYS signals the engine directly and pass 1 gets
-# to write its temp-ref, so the harder kill_tree there takes it away.
-if test "$(suite_backend)" = wsl2; then
-    kill_tree "$crawlpid"
-else
-    kill -TERM "$crawlpid" 2>/dev/null || true
-fi
+# Not a signal: none reaches a Windows engine from the shell that started it.
+graceful_stop "$out"
 wait "$crawlpid" 2>/dev/null || true
 crawlpid=
+# Only if the engine exited before reading it; a survivor would abort pass 2.
+rm -f "${out}/hts-abort.lock"
 test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" || fail "no temp-ref survived pass 1; cannot drive the resume"
 echo "OK (temp-ref present)"
 

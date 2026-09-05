@@ -1117,6 +1117,13 @@ kill_tree() {
     kill -9 -"$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
 }
 
+# Ask a running engine to abort as SIGTERM does, keeping hts-cache/ref so a later
+# --continue can resume. Not a signal: Windows has no cross-process SIGTERM, and
+# one sent from a WSL2 shell stops at the interop relay. The caller still waits.
+graceful_stop() { # graceful_stop <engine output directory>
+    : >"$1/hts-abort.lock"
+}
+
 # The engine executables, one list so the kills here and the matchers proclib.sh
 # derives from it cannot drift apart again (#1067).
 ENGINE_EXES='httrack proxytrack htsserver webhttrack'

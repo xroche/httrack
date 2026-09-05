@@ -4038,6 +4038,19 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
   printf("\nBack test..\n");
 #endif
 
+  /* An abort request as a file, the only kind that reaches a Windows engine: it
+     has no cross-process SIGTERM, and one sent from a WSL2 shell stops at the
+     interop relay. Same effect as sig_finish, so hts-cache/ref survives. */
+  if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log), "hts-abort.lock"))) {
+    /* Unchecked: this run is leaving, and a survivor would abort the next. */
+    UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                   StringBuff(opt->path_log), "hts-abort.lock"));
+    hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+    *stre->exit_xh_ = 1;
+    XH_uninit;
+    return;
+  }
   // pause/lock files
   {
     int do_pause = 0;
