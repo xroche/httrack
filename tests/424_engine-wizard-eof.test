@@ -1,0 +1,122 @@
+#!/bin/bash
+#
+# With no argument the engine runs its interactive setup wizard, whose project
+# name prompt re-asks on an empty answer. On EOF the answer stays empty, so it
+# re-asks and re-prints the option list until something kills it.
+#
+# A blank line typed at a terminal must still print that list, since the wizard
+# offers it two lines earlier, so the arms below cover both sides of the guard.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+# The wizard only runs when stdout is a terminal, and Windows builds Python with
+# neither pty nor os.fork.
+skip_on_windows "windows: python has no pty, so the wizard could not be reached"
+
+bin=$(command -v httrack) || fail "httrack not found on PATH"
+dir=$(mktemp -d)
+cleanup() {
+    rm -rf "$dir"
+}
+cleanup_push cleanup
+
+# Runs the engine with a pty on stdout, reports how the child ended, and gives
+# up once it outruns a megabyte, because the spin reaches that in under a
+# second. The typed arm feeds the pty and stops at the next question.
+runner='
+import os, pty, select, sys, time
+
+prog, mode, out = sys.argv[1], sys.argv[2], sys.argv[3]
+master, slave = pty.openpty()
+pid = os.fork()
+if pid == 0:
+    os.close(master)
+    os.dup2(slave, 1)
+    os.dup2(slave, 2)
+    if mode == "eof":
+        fd = os.open(os.devnull, os.O_RDONLY)
+        os.dup2(fd, 0)
+        if fd != 0:
+            os.close(fd)
+    elif mode == "typed":
+        os.dup2(slave, 0)
+    elif mode != "ioerror":
+        os._exit(126)
+    if slave > 2:
+        os.close(slave)
+    # Last, so the two dup2 arms above still had a descriptor to copy from.
+    if mode == "ioerror":
+        os.close(0)
+    os.execv(prog, [prog])
+os.close(slave)
+if mode == "typed":
+    os.write(master, b"\n" + b"proj\n")
+# The byte budget catches a spin. This catches the other regression, an engine
+# that stops asking and then hangs without printing anything.
+deadline = time.time() + 60
+total = 0
+spun = False
+seen = b""
+with open(out, "wb", 0) as log:
+    while True:
+        if time.time() > deadline or total > (1 << 20):
+            spun = True
+            break
+        # The typed arm never reaches EOF, so stop at the question after this one.
+        if mode == "typed" and b"Base path" in seen:
+            break
+        if not select.select([master], [], [], 0.5)[0]:
+            continue
+        try:
+            data = os.read(master, 65536)
+        except OSError:
+            break
+        if not data:
+            break
+        log.write(data)
+        seen += data
+        total += len(data)
+if spun or mode == "typed":
+    os.kill(pid, 9)
+_, status = os.waitpid(pid, 0)
+if spun:
+    sys.exit(1)
+print("signal" if os.WIFSIGNALED(status) else os.waitstatus_to_exitcode(status))
+'
+
+run() { # run MODE
+    "$python" -c "$runner" "$bin" "$1" "${dir}/$1.out" ||
+        fail "$1: the wizard never stopped asking for a project name"
+}
+asked() { # asked MODE
+    count_matching_lines "Enter project name" "${dir}/$1.out"
+}
+
+# --- the stream is done: ask once, say so, and exit -------------------------
+
+for mode in eof ioerror; do
+    # 255 is what the caller already returns for every other give-up path, so a
+    # crash on the new one cannot pass as a clean exit.
+    status=$(run "$mode")
+    test "$status" = 255 || fail "$mode: the engine ended with [$status], want 255"
+    test "$(asked "$mode")" -eq 1 || fail "$mode: asked $(asked "$mode") times, expected 1"
+    grep -q "No project name given" "${dir}/${mode}.out" ||
+        fail "$mode: the engine gave up without saying why"
+done
+
+ok "an exhausted stdin ends the wizard after one prompt"
+
+# --- a blank line at a terminal still prints the option list ----------------
+# Without this the guard could fire on any empty answer and every arm above
+# would still pass, while the offer the wizard prints two lines earlier breaks.
+
+run typed >/dev/null
+test "$(asked typed)" -eq 2 || fail "typed: asked $(asked typed) times, expected 2"
+grep -q "No project name given" "${dir}/typed.out" &&
+    fail "typed: a blank line at a terminal was taken for the end of the stream"
+
+ok "a blank line still prints the option list and asks again"

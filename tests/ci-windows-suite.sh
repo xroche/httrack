@@ -277,7 +277,7 @@ expected_skips_msys="01_engine-footer-overflow.test
 355_local-write-error-not-eof.test
 377_engine-install-paths.test
 398_engine-build-features.test
-421_engine-wizard-eof.test"
+424_engine-wizard-eof.test"
 
 # A copy of the msys list above: testlib.sh's suite_backend split (shell_is_msys
 # vs target_is_windows) is designed so the same tests skip under either shell.

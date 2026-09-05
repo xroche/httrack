@@ -202,7 +202,7 @@ void help_wizard(httrackp * opt) {
     fflush(stdout);
     linput(stdin, projname, 250);
     if (strnotempty(projname) == 0) {
-      /* linput() reports neither EOF nor error, so this would otherwise spin */
+      /* linput() reports neither EOF nor error, so the retry loop would spin */
       if (feof(stdin) || ferror(stdin)) {
         printf("\nNo project name given, aborting\n");
         freet(buffers);
