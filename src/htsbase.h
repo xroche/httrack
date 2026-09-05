@@ -107,6 +107,10 @@ extern "C" {
 /* True if c is an ASCII uppercase letter. */
 #define isUpperLetter(a) ( ((a) >= 'A') && ((a) <= 'Z') )
 
+/* Created in the output directory to ask a running engine to stop and keep
+   its work; Windows, which has no cross-process SIGTERM, has no other way. */
+#define HTS_ABORT_LOCKNAME "hts-abort.lock"
+
 /* Library-internal only (engine translation units that define
    HTS_INTERNAL_BYTECODE); not part of the consumer surface. */
 #ifdef HTS_INTERNAL_BYTECODE

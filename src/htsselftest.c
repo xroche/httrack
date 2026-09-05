@@ -13026,6 +13026,101 @@ static int st_batch(httrackp *opt, int argc, char **argv) {
   return err;
 }
 
+// -#test=abortlock <dir>: hts_abort_request_taken() answers true only for an
+// abort request it could also delete, so a lock the engine cannot remove (a
+// Windows sharing violation) does not abort the mirror on every poll.
+static hts_boolean st_abortlock_touch(const char *path) {
+  FILE *const fp = FOPEN(path, "wb");
+
+  if (fp == NULL)
+    return HTS_FALSE;
+  fclose(fp);
+  return HTS_TRUE;
+}
+
+static int st_abortlock(httrackp *opt, int argc, char **argv) {
+  char BIGSTK base[HTS_URLMAXSIZE];
+  char BIGSTK lock[HTS_URLMAXSIZE * 2];
+  String saved = STRING_EMPTY;
+  int err = 0;
+
+  if (argc < 1) {
+    fprintf(stderr, "usage: -#test=abortlock <writable directory>\n");
+    return 1;
+  }
+  strcpybuff(base, argv[0]);
+  if (base[0] != '\0' && hts_lastchar(base) != '/')
+    strcatbuff(base, "/");
+  strlcpybuff(lock, base, sizeof(lock));
+  strlcatbuff(lock, HTS_ABORT_LOCKNAME, sizeof(lock));
+  structcheck(lock);
+  /* The engine still has to shut down through its own path_log. */
+  StringCopy(saved, StringBuff(opt->path_log));
+  StringCopy(opt->path_log, base);
+
+  if (hts_abort_request_taken(opt)) {
+    fprintf(stderr, "abortlock: a mirror with no request was told to stop\n");
+    err = 1;
+  }
+
+  if (!st_abortlock_touch(lock)) {
+    fprintf(stderr, "abortlock: cannot write %s\n", lock);
+    err = 1;
+  }
+  if (!hts_abort_request_taken(opt)) {
+    fprintf(stderr, "abortlock: a request the engine can delete was ignored\n");
+    err = 1;
+  }
+  if (fexist_utf8(lock)) {
+    fprintf(stderr, "abortlock: the request outlived the stop it caused\n");
+    err = 1;
+  }
+  if (hts_abort_request_taken(opt)) {
+    fprintf(stderr, "abortlock: one request stopped the mirror twice\n");
+    err = 1;
+  }
+
+  /* The delete has to really fail: root would still be allowed it, and nothing
+     portable here makes Windows refuse one. */
+#ifndef _WIN32
+  if (geteuid() != 0) {
+    char BIGSTK rodir[HTS_URLMAXSIZE];
+    char BIGSTK rolock[HTS_URLMAXSIZE * 2];
+    int poll;
+
+    strlcpybuff(rodir, base, sizeof(rodir));
+    strlcatbuff(rodir, "readonly/", sizeof(rodir));
+    strlcpybuff(rolock, rodir, sizeof(rolock));
+    strlcatbuff(rolock, HTS_ABORT_LOCKNAME, sizeof(rolock));
+    structcheck(rolock);
+    if (!st_abortlock_touch(rolock) || chmod(rodir, 0500) != 0) {
+      fprintf(stderr, "abortlock: cannot set up %s\n", rolock);
+      err = 1;
+    }
+    StringCopy(opt->path_log, rodir);
+    for (poll = 0; poll < 2; poll++) {
+      if (hts_abort_request_taken(opt)) {
+        fprintf(stderr,
+                "abortlock: a request that cannot be deleted stopped the "
+                "mirror (poll %d)\n",
+                poll);
+        err = 1;
+      }
+    }
+    if (!fexist_utf8(rolock)) {
+      fprintf(stderr, "abortlock: the undeletable request went away\n");
+      err = 1;
+    }
+    (void) chmod(rodir, 0700);
+  }
+#endif
+
+  StringCopy(opt->path_log, StringBuff(saved));
+  StringFree(saved);
+  printf("abortlock self-test: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
 // -#test=ioexact <dir>: the hts_fread_exact/hts_fwrite_exact contract - a
 // partial transfer is a failure, a zero-length one is not, and a short read
 // leaves the bytes it could not fill alone.
@@ -13191,6 +13286,9 @@ static const struct selftest_entry {
     {"addrport", "",
      "\"host:port\" of a peer address is bounded and complete (#1493)",
      st_addrport},
+    {"abortlock", "<writable directory>",
+     "an abort request stops the mirror only if it can also be deleted",
+     st_abortlock},
     {"simplify", "<path>", "collapse ./ and ../ in a path", st_simplify},
     {"expandhome", "<path>", "expand a leading ~/ into $HOME", st_expandhome},
     {"stripquery", "", "--strip-query pattern/key stripping self-test",

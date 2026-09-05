@@ -2819,6 +2819,10 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
       strcpybuff(n_lock,
                  fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                          StringBuff(opt->path_log), "hts-in_progress.lock"));
+      /* A request an earlier run left behind is not one for this mirror, and
+         clearing it keeps a fresh crawl from stopping with nothing saved. */
+      UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                     StringBuff(opt->path_log), HTS_ABORT_LOCKNAME));
       /*do {
          if (!n)
          sprintf(n_lock,fconcat(OPT_GET_BUFF(opt), StringBuff(opt->path_log),"hts-in_progress.lock"),n);
@@ -2914,6 +2918,8 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
         fprintf(fp,
                 "To pause the engine: create an empty file named 'hts-stop.lock'"
                 LF);
+        fprintf(fp, "To stop it and keep the mirror: create an empty file named"
+                    " '" HTS_ABORT_LOCKNAME "'" LF);
 #if USE_BEGINTHREAD
         fprintf(fp, "PID=%d\n", (int) getpid());
 #ifndef _WIN32

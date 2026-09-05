@@ -749,7 +749,13 @@ static int __cdecl htsshow_check_mime(t_hts_callbackarg * carg, httrackp * opt,
 }
 static void __cdecl htsshow_pause(t_hts_callbackarg * carg, httrackp * opt,
                                   const char *lockfile) {
-  while(fexist(lockfile)) {
+  char abortlock[HTS_CDLMAXSIZE + 256];
+
+  /* Leaving the wait is all this has to do: the engine takes the request at its
+     next check, and a paused engine could otherwise only be killed. */
+  snprintf(abortlock, sizeof(abortlock), "%s" HTS_ABORT_LOCKNAME,
+           StringBuff(opt->path_log));
+  while (fexist(lockfile) && !fexist(abortlock)) {
     Sleep(1000);
   }
 }
