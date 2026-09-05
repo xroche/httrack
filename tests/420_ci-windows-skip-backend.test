@@ -27,6 +27,9 @@ ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected as an unknown back
 test "$ci_skip_list" = "$expected_skips_wsl2" || fail "wsl2 did not select its own list"
 
 # --- the lists' CONTENT, not just which one is chosen ---------------------
+# A spot-check of the names that moved, not of all 29: a rename inside the part
+# no row pins is caught by the driver's own set compare on a live Windows leg,
+# and neither can see a listed test that in fact runs.
 # 420 compared each list against itself, so editing either one stayed green.
 # "neither" is a name that left a list: 386 ran once python stopped bypassing
 # the shim, and nothing must put it back without measuring it again.
@@ -70,7 +73,7 @@ done <<'EOF'
 241_local-single-file-gui.test both
 288_testlib-holdport.test both
 EOF
-ok "the two lists hold exactly the names the runs measured"
+ok "the two lists hold the names the runs measured moving"
 
 # The lists genuinely differ now, so the checks above already separate "read the
 # right variable" from "always read msys". Kept because it holds either way, and

@@ -28,7 +28,6 @@ done
 
 # Byte-level assertions in python: portable, and the shell cannot mangle them.
 have_feature iconv && hts_have_iconv=1 || hts_have_iconv=0
-# nativepath: a native python cannot open the drvfs paths this shell builds.
 # iconv rides argv, not the environment: only what WSLENV names crosses.
 "$python" - "$(nativepath "$tmpdir")" "$SRV_PORT" "$hts_have_iconv" <<'PY'
 import os

@@ -13,21 +13,54 @@ set -uo pipefail
 
 # The same drvfs mapping testlib.sh does, spelled again because this runs as its
 # own process inside the distro, and because a bare rootfs ships no wslpath.
+# Into TRANSLATED, not echoed: a command substitution strips trailing newlines,
+# and losing bytes off an argument is what the cut this replaced used to do.
+# Each comma-separated piece, because httrack's own -O takes `dir,cache` and
+# both halves are paths.
+TRANSLATED=
+translate_arg() { # translate_arg ARG
+    local rest=$1 piece drive
+    TRANSLATED=
+    while :; do
+        piece=${rest%%,*}
+        case $piece in
+        /mnt/[A-Za-z]/*)
+            # One character, so no newline can hide in the substitution.
+            drive=$(printf '%s' "${piece:5:1}" | tr '[:lower:]' '[:upper:]')
+            TRANSLATED=$TRANSLATED$drive:${piece:6}
+            ;;
+        *) TRANSLATED=$TRANSLATED$piece ;;
+        esac
+        case $rest in
+        *,*)
+            rest=${rest#*,}
+            TRANSLATED=$TRANSLATED,
+            ;;
+        *) break ;;
+        esac
+    done
+}
+
 args=()
-rest=
 for a in "$@"; do
     case "$a" in
     # A drvfs absolute path, which no URL and no option ever looks like.
     /mnt/[A-Za-z]/*)
-        drive=$(printf '%s' "$a" | cut -c6 | tr '[:lower:]' '[:upper:]')
-        args+=("$drive:$(printf '%s' "$a" | cut -c7-)")
+        translate_arg "$a"
+        args+=("$TRANSLATED")
         ;;
     # A file:// URL built from one of those paths. MSYS produced file://D:/...
     # here, because its own TMPDIR was already a drive-letter path.
     file:///mnt/[A-Za-z]/*)
-        rest=${a#file://}
-        drive=$(printf '%s' "$rest" | cut -c6 | tr '[:lower:]' '[:upper:]')
-        args+=("file://$drive:$(printf '%s' "$rest" | cut -c7-)")
+        translate_arg "${a#file://}"
+        args+=("file://$TRANSLATED")
+        ;;
+    # An option carrying a path as its value. Only when the argument starts
+    # with a dash, so a URL with /mnt/ after a ? or & is left alone. The glued
+    # -O/mnt/d/x form is not translated, and no test uses it.
+    -*=/mnt/[A-Za-z]/*)
+        translate_arg "${a#*=}"
+        args+=("${a%%=*}=$TRANSLATED")
         ;;
     *) args+=("$a") ;;
     esac
@@ -49,7 +82,7 @@ while IFS= read -r name; do
     # flag for that is /l, so leave those to cross verbatim as before.
     flag=
     case $value in
-    /mnt/[A-Za-z]/*) case $value in *:*) ;; *) flag=/p ;; esac ;;
+    /mnt/[A-Za-z]/*) case $value in *:* | *[[:space:]]*) ;; *) flag=/p ;; esac ;;
     esac
     bridged="${bridged:+$bridged:}$name$flag"
 done < <(compgen -e | grep -vxE 'PATH|WSLENV|_|SHLVL|PWD|OLDPWD|HOSTTYPE|IFS|LS_COLORS|TERM')

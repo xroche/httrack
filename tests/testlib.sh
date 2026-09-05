@@ -100,8 +100,6 @@ assert_steps_ran() { # assert_steps_ran WANT GOT
     assert_eq "$1" "$2" "steps the budget is paced against"
 }
 
-# Run engine self-test NAME: stdout must equal WANT, status must be 0 (which a
-# `test "$(...)" = ...` cannot see). expect_ok takes a command, for a real -O.
 # Trailing newlines and CRs off a captured run. Windows stdout is text mode, so
 # the engine ends every line CRLF; MSYS eats the pair and a Linux shell under
 # wsl2 does not, which would make the two backends disagree on every comparison.
@@ -120,6 +118,8 @@ strip_trailing_eol() { # strip_trailing_eol TEXT
     done
 }
 
+# Run engine self-test NAME: stdout must equal WANT, status must be 0 (which a
+# `test "$(...)" = ...` cannot see). expect_ok takes a command, for a real -O.
 assert_selftest() { # assert_selftest WANT NAME [ARGS...]
     local want=$1 name=$2 got rc=0
     shift 2
@@ -402,7 +402,7 @@ find_curl() {
 # imported rootfs does not ship: `wsl -- wslpath` answers ERROR_PATH_NOT_FOUND.
 # Only drvfs paths ever cross this boundary, since the suite keeps its files on
 # a Windows volume, so the two-way mapping is the whole of it.
-drvfs_path() { # drvfs_path -m|-u PATH
+drvfs_path() { # drvfs_path -m (to C:/...) | -u (to /mnt/c/...) PATH
     local p=$2 drive rest
     case "$1" in
     -u)
@@ -451,7 +451,8 @@ path_convert() { # path_convert -m|-u PATH
     fi
 }
 
-# Native form of a path: a non-MSYS binary cannot resolve Git Bash's /d/a/... ones.
+# Native form of a path. A non-MSYS binary cannot resolve Git Bash's /d/a/...
+# ones, and a native python cannot open the drvfs paths a wsl2 shell builds.
 nativepath() { path_convert -m "$1"; }
 
 # POSIX form of a path. Anything MSYS splits on a colon needs it, a PATH entry

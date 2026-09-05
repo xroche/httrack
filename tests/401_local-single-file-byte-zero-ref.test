@@ -36,7 +36,6 @@ page="${out}/127.0.0.1_${SRV_PORT}/index.html"
 test -f "$page" || fail "no mirrored page at $page"
 
 printf '[stylesheet inlined] ..\t'
-# nativepath: a native python cannot open the drvfs paths this shell builds.
 "$python" - "$(nativepath "$page")" "$(nativepath "${tmpdir}/got.css")" \
     <<'PY' || fail "no inlined stylesheet"
 import base64, re, sys

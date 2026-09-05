@@ -96,7 +96,7 @@ static hts_boolean scanHostPort(const char *str, char *host, int *port) {
 /* Windows opens stdout in text mode, so every \n leaves as \r\n. A shell
    reading that pipe sees the CR: MSYS folds it away, a Linux one under WSL2
    does not, and the test suite then compares against a byte it never wrote.
-   Set by tests/testlib.sh, so nothing changes for anyone else. */
+   Set by tests/ci-windows-suite.sh, so nothing changes for anyone else. */
 static void hts_binary_stdio(void) {
   if (getenv("HTS_BINARY_STDIO") != NULL) {
     _setmode(_fileno(stdout), _O_BINARY);

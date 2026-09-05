@@ -74,7 +74,6 @@ httrack -O "$tmp/out" "-#test=zip-abandon" "$tmp/"
 # Grade the archives with a reader that is not minizip: its own backscan is what
 # a leftover tail hides the central directory from.
 if py=$(find_python); then
-    # nativepath: a native python cannot open the drvfs paths this shell builds.
     nat=$(nativepath "$tmp")
     "$py" - "$nat/zip-abandon-ref.zip" "$nat/zip-abandon-70000.zip" \
         "$nat/zip-abandon-200000.zip" <<'EOF'

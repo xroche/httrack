@@ -81,7 +81,6 @@ test -f "$page" || fail "no mirrored page at $page"
 # --- what must be inlined, byte for byte ------------------------------------
 # The decoder is python, not httrack, so a broken encoder cannot agree with
 # itself here.
-# nativepath: a native python cannot open the drvfs paths this shell builds.
 extract() {
     "$python" - "$(nativepath "$1")" "$2" "$(nativepath "$3")" <<'PY'
 import base64, re, sys

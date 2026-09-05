@@ -33,6 +33,7 @@ run_shim() { # run_shim ARG...
         HTS_WS=/mnt/d/a/httrack \
         TMPDIR=/mnt/d/a/_temp/suite.94 \
         LISTY=/mnt/d/a/one:/mnt/d/a/two \
+        SUFFIXED='/mnt/d/a/one extra' \
         PLAIN=hello \
         bash "$tmp/stub" "$@"
 }
@@ -50,6 +51,29 @@ test "$got" = "$want" || fail "argv translation: got [$got], want [$want]"
 # Zero arguments: bash 3.2 on macOS makes an empty "${args[@]}" fatal under
 # set -u, and 257 calls the shim with none.
 run_shim >/dev/null || fail "the shim died on an empty argument list"
+
+# A newline inside an argument, which a line-oriented cut used to truncate. The
+# tail lands on its own line, so that line is what proves it survived.
+out=$(run_shim "$(printf '/mnt/d/a\nb')")
+printf '%s\n' "$out" | command grep -qx 'ARG=D:/a' ||
+    fail "the head of a path holding a newline is wrong: [$out]"
+printf '%s\n' "$out" | command grep -qx 'b' ||
+    fail "everything after a newline in a path was dropped: [$out]"
+
+# httrack's own -O takes dir,cache, and both halves are paths.
+out=$(run_shim '/mnt/d/a,/mnt/d/b')
+printf '%s\n' "$out" | command grep -qx 'ARG=D:/a,D:/b' ||
+    fail "a comma-joined pair left its second half untranslated: [$out]"
+
+# An option carrying a path, which is the shape 282 builds.
+out=$(run_shim '--list=/mnt/d/x')
+printf '%s\n' "$out" | command grep -qx 'ARG=--list=D:/x' ||
+    fail "an option value was not translated: [$out]"
+
+# A URL is not a path, whatever it happens to contain.
+out=$(run_shim 'http://host/mnt/d/x')
+printf '%s\n' "$out" | command grep -qx 'ARG=http://host/mnt/d/x' ||
+    fail "a URL carrying /mnt/ was rewritten: [$out]"
 
 ok "the shim translates drvfs paths and file:// URLs, and survives no arguments"
 
@@ -73,6 +97,8 @@ test "$(printf '%s\n' "${wslenv//:/$'\n'}" | command grep -cx 'HTS_WS')" = 1 ||
 # A colon-joined value may be a path list, whose flag is /l, so it crosses as
 # it did before rather than being mangled by /p.
 holds LISTY || fail "LISTY did not cross: [$wslenv]"
+# A path with something after it is not one path either, so /p would mangle it.
+! holds SUFFIXED/p || fail "a path with trailing text took /p: [$wslenv]"
 ! holds LISTY/p || fail "LISTY took /p, but a colon-joined value is not one path"
 holds PLAIN || fail "a plain value did not cross: [$wslenv]"
 # WSL owns it, and a bridged copy would point the exe at the distro's own.

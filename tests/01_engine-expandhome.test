@@ -45,9 +45,14 @@ exp 'foo~bar' 'foo~bar'
 unset_home=$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')
 if test "$(suite_backend)" = wsl2; then
     # The engine reads the Windows environment block, which the distro cannot
-    # unset: only the fallback the case is really about is assertable here.
-    test "$unset_home" != "expanded=/foo" ||
-        fail "unset HOME: expanded to the absolute /foo"
+    # unset, so HOME still resolves and ./foo is not what comes back. Pin the
+    # shape instead of the value, because an inequality alone also passes on an
+    # empty answer and on an unexpanded ~/foo.
+    case $unset_home in
+    expanded=/foo) fail "unset HOME: expanded to the absolute /foo" ;;
+    expanded=?*/foo) ;;
+    *) fail "unset HOME: [$unset_home] is not an expansion of ~/foo" ;;
+    esac
 else
     assert_eq "expanded=./foo" "$unset_home" 'unset HOME'
 fi

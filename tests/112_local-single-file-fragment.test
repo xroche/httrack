@@ -64,7 +64,6 @@ grep -Eq "srcset=\"data:image/svg\\+xml;base64,${b64}#icon-set 2x\"" "$page" ||
 echo OK
 
 printf '[fragment survives inside an inlined stylesheet] ..\t'
-# nativepath: a native python cannot open the drvfs paths this shell builds.
 "$python" - "$(nativepath "$page")" "$(nativepath "${tmpdir}/got.css")" \
     <<'PY' || fail "no inlined stylesheet"
 import base64, re, sys
