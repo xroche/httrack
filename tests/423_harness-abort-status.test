@@ -70,6 +70,11 @@ run_table() { # run_table SHELL
         check "$sh" readonly 1 no "$cleanup" 'readonly R=1; R=2' >/dev/null
         # The signal traps end on exit 1, which the marker wrapper now intercepts.
         check "$sh" signal 1 no "$cleanup" 'kill -TERM $$; sleep 5' >/dev/null
+        # 'builtin exit' walks past the runner's exit wrapper, so it leaves the
+        # state a 3.2.57 abort leaves: status 0 and no end mark. Every other case
+        # here is decided before the marker is consulted, so on a shell that
+        # reports an abort correctly this is the only one that reaches it.
+        check "$sh" nomark 1 no "$cleanup" 'builtin exit 0' >/dev/null
     done
 }
 
@@ -93,15 +98,20 @@ for sh in "${shells[@]}"; do
 done
 
 test -n "$buggy" ||
-    echo "note: no bash older than 4.2 patch 23 here, so the table only guards the marker" >&2
+    echo "note: no bash older than 4.2 patch 23 here, so the nomark case is what reaches the marker" >&2
 
 # The failure has to name itself: a bare 1 with nothing in the log sends the reader
-# looking for a test that never printed anything.
-if test -n "$buggy"; then
-    # shellcheck disable=SC2016 # the fixture expands it, not us
-    out=$(check "$buggy" unbound 1 no true 'echo "$HTTRACK_UNSET_ON_PURPOSE"')
+# looking for a test that never printed anything. Through the 3.2.57 shape where
+# there is such a shell, through the synthetic one otherwise.
+# shellcheck disable=SC2016 # the fixture expands it, not us
+for sh in "${shells[@]}"; do
+    if test "$sh" = "$buggy"; then
+        out=$(check "$sh" unbound 1 no true 'echo "$HTTRACK_UNSET_ON_PURPOSE"')
+    else
+        out=$(check "$sh" nomark 1 no true 'builtin exit 0')
+    fi
     case $out in
-    *"exited 0 without reaching its end"*) ok "the harness says why it turned a 0 into a failure" ;;
-    *) fail "the abort was reported with no explanation: $out" ;;
+    *"exited 0 without reaching its end"*) ok "$sh: the harness says why it turned a 0 into a failure" ;;
+    *) fail "$sh: the abort was reported with no explanation: $out" ;;
     esac
-fi
+done
