@@ -924,6 +924,9 @@ discover_server_port() {
         if test -r "$log"; then
             # Read in the shell: a grep per tick is a process per tick (#795).
             while read -r line; do
+                # A Windows python under wsl2 prints CRLF and the interop pipe
+                # keeps the CR, which then rides into the URL the caller builds.
+                line=${line%$'\r'}
                 case "$line" in 'PORT '*)
                     printf '%s\n' "${line#PORT }"
                     return 0
