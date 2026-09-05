@@ -228,8 +228,8 @@ assert_eq 20000 "$(lines_of "$tmp/heavy.err")" "heavy stderr reaching the caller
 [ -n "${HTTRACK_STDERR_WRAP_DIR:-}" ] || skip "HTTRACK_STDERR_WRAP_DIR unset, no automake environment"
 [ -r "$HTTRACK_STDERR_WRAP_DIR/httrack" ] || fail "no generated shim in $HTTRACK_STDERR_WRAP_DIR"
 PATH="$HTTRACK_STDERR_WRAP_DIR:$PATH"
-# Leaks at exit would _exit() past the flush of the pipe this reads, as the CI
-# job's own detect_leaks=0 says; last value wins in the flag parser.
+# Leaks at exit would _exit() past the flush of the pipe this reads; last value
+# wins in the flag parser.
 version=$(ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}detect_leaks=0" \
     httrack --version 2>/dev/null) || true
 case $version in

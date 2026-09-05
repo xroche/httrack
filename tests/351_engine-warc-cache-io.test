@@ -74,8 +74,9 @@ httrack -O "$tmp/out" "-#test=zip-abandon" "$tmp/"
 # Grade the archives with a reader that is not minizip: its own backscan is what
 # a leftover tail hides the central directory from.
 if py=$(find_python); then
-    "$py" - "$tmp/zip-abandon-ref.zip" "$tmp/zip-abandon-70000.zip" \
-        "$tmp/zip-abandon-200000.zip" <<'EOF'
+    nat=$(nativepath "$tmp")
+    "$py" - "$nat/zip-abandon-ref.zip" "$nat/zip-abandon-70000.zip" \
+        "$nat/zip-abandon-200000.zip" <<'EOF'
 import os
 import sys
 import zipfile

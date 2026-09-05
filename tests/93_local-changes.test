@@ -29,7 +29,7 @@ common=(--quiet --disable-security-limits --robots=0 --timeout=30 --changes --re
 field() { sed -n 's/.*"'"$1"'": \([a-z0-9]*\).*/\1/p' "${2:-$report}" | head -1; }
 # tr: python prints CRLF on Windows, and the expectations below are LF.
 listed() {
-    "$python" - "${2:-$report}" "$1" <<'EOF' | tr -d '\r'
+    "$python" - "$(nativepath "${2:-$report}")" "$1" <<'EOF' | tr -d '\r'
 import json
 import sys
 
@@ -169,7 +169,7 @@ expect "the moving body is still recognised as changed" \
     "$(listed changed "$ncreport" | sort)" "$ncreport"
 expect_counts_match "cache-off counts match its lists" "$ncreport"
 printf '[every entry carries its size] ..\t'
-"$python" - "$ncreport" <<'EOF' || exit 1
+"$python" - "$(nativepath "$ncreport")" <<'EOF' || exit 1
 import json
 import sys
 

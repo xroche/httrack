@@ -29,6 +29,9 @@ somebody has to move at every bump.
   [the optional dependencies are automagic](#the-optional-dependencies-are-automagic).
 - `--disable-auto-features` turns those four defaults into `no`. Pass it.
 - `--enable-https=yes|no|auto` selects OpenSSL. On by default.
+- `--enable-ipv6=yes|no|auto` selects IPv6, and probes for `getaddrinfo` by
+  default. It picks which arm of `SOCaddr` the installed headers declare, so pin
+  it rather than letting the build machine answer.
 - `--enable-online-unit-tests` is off by default, and `make check` reaches the
   network only when it is on. Nothing to pass.
 - `--disable-origin-rpath` exists, but configure already declines a

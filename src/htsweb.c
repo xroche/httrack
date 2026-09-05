@@ -299,16 +299,16 @@ int main(int argc, char *argv[]) {
 #ifdef HTS_HTTRACKDIR
   smallserver_setkey("HTTRACKDIR", HTS_HTTRACKDIR);
 #endif
-#ifdef HTS_INET6
+#if HTS_INET6
   smallserver_setkey("INET6", "1");
 #endif
-#ifdef HTS_USEOPENSSL
+#if HTS_USEOPENSSL
   smallserver_setkey("USEOPENSSL", "1");
 #endif
-#ifdef HTS_DLOPEN
+#if HTS_DLOPEN
   smallserver_setkey("DLOPEN", "1");
 #endif
-#ifdef HTS_USESWF
+#if HTS_USESWF
   smallserver_setkey("USESWF", "1");
 #endif
   smallserver_setkey("USEZLIB", "1");

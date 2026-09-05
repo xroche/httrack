@@ -88,7 +88,8 @@ refused "#152: over-cap --user-agent not refused cleanly"
 # can't be masked by an implicit one). A fully "-quoted URL has its surrounding
 # quotes stripped in place and is mirrored; a dangling opening quote, and a lone
 # quote (empty after the opening "), are refused cleanly and never crash.
-run_only "$tmp/q-ok" "\"file://$tmp/index.html\""
+# nativepath: the shim converts an argument that IS a URL, not one inside quotes.
+run_only "$tmp/q-ok" "\"file://$(nativepath "$tmp")/index.html\""
 accepted "$tmp/q-ok" "quoted URL not stripped/mirrored"
 run_only "$tmp/q-bad" '"foo'
 refused "dangling-quote argument not refused cleanly"

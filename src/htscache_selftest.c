@@ -88,9 +88,11 @@ static void selftest_close(cache_back *cache) {
     unzClose(cache->zipInput);
     cache->zipInput = NULL;
   }
-  /* hashtable is intentionally not coucal_delete()d: it would dump a stats
-     summary to stderr on every call, and this is a one-shot CLI subcommand
-     that exits right after (same choice as the other -# cache subcommands) */
+  /* the stats summary coucal_delete() logs is info level, which hts_init()'s
+     handler drops unless HTS_LOG asks for it */
+  coucal_delete(&cache->hashtable);
+  coucal_delete(&cache->cached_tests);
+  coucal_delete(&cache->kept);
 }
 
 /* Store one entry; the body is copied so callers may pass const data. */
@@ -580,6 +582,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
                NULL); /* best-effort; may fail on the backend */
       cache.zipOutput = NULL;
     }
+    coucal_delete(&cache.hashtable);
   }
 
   /* failures with successes in between reset the streak: never aborts */
@@ -620,6 +623,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
     }
     zipClose(cache.zipOutput, NULL);
     cache.zipOutput = NULL;
+    coucal_delete(&cache.hashtable);
   }
 
   /* isolated failure: only that entry drops; a later sibling round-trips */
@@ -676,6 +680,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               n);
       fail++;
     }
+    coucal_delete(&cache.hashtable);
   }
 
   /* a backend with no truncate rolls back by rewinding: the entry still drops
@@ -727,6 +732,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               n);
       fail++;
     }
+    coucal_delete(&cache.hashtable);
   }
 
   /* >2GB bodies: in-memory drops the entry, on-disk degrades to headers-only */
@@ -777,6 +783,7 @@ int cache_write_failure_selftest(httrackp *opt, const char *dir) {
               n);
       fail++;
     }
+    coucal_delete(&cache.hashtable);
   }
 
   freet(body);
@@ -2581,6 +2588,7 @@ int cache_readfail_selftest(httrackp *opt, const char *dir) {
         fail++;
       }
     }
+    coucal_delete(&cache.hashtable);
   }
 
   /* a truncated entry must not read back as a complete file */
@@ -2679,5 +2687,565 @@ int cache_readfail_selftest(httrackp *opt, const char *dir) {
 
   UNLINK(fconv(catbuff, sizeof(catbuff), srcpath));
   UNLINK(fconv(catbuff, sizeof(catbuff), zippath));
+  return fail;
+}
+
+/* --- the portable resume reference (.ref) --------------------------------- */
+
+/* The record ref_put_record() writes, one row per field, in order. The fixture
+   is assembled from this table rather than captured from the writer, so a
+   reviewer reads the format here instead of decoding 355 hex bytes. Every
+   value is distinct, so no swap of two fields can hide, and each multi-byte
+   number has all-different bytes so its order on disk is visible. */
+typedef enum {
+  REF_F_RAW, /* verbatim bytes, no length prefix (the magic) */
+  REF_F_U32, /* 4 bytes, little-endian */
+  REF_F_I32, /* 4 bytes, little-endian, two's complement */
+  REF_F_I64, /* 8 bytes, little-endian, two's complement */
+  REF_F_STR, /* u32 length, then that many bytes */
+  REF_F_BLOB /* u64 length, then that many bytes */
+} ref_field_kind;
+
+typedef struct {
+  const char *name;
+  ref_field_kind kind;
+  int64_t num;      /* value, for the numeric kinds */
+  const char *text; /* bytes, for REF_F_RAW / STR / BLOB */
+} ref_field;
+
+#define REF_ST_ADR "example.com"
+#define REF_ST_FIL "/partial.bin"
+#define REF_ST_SAV "example.com/partial.bin"
+#define REF_ST_BODY "twenty-three bytes here"
+#define REF_ST_HEADERS "HTTP/1.1 206 Partial Content\r\n\r\n"
+#define REF_ST_STATUS 0x11121314
+#define REF_ST_NOTMODIFIED 0x0102
+#define REF_ST_COMPRESSED 0x0304
+#define REF_ST_EMPTY 0x0506
+#define REF_ST_TOTALSIZE ((int64_t) 0x0102030405060708LL)
+#define REF_ST_CRANGE ((int64_t) 0x1112131415161718LL)
+#define REF_ST_CRANGE_START ((int64_t) -0x0e0d0c0b0a090808LL)
+#define REF_ST_CRANGE_END ((int64_t) 0x2122232425262728LL)
+
+static const ref_field ref_fields[] = {
+    {"magic", REF_F_RAW, 0, HTS_REF_MAGIC},
+    {"version", REF_F_U32, HTS_REF_VERSION, NULL},
+    {"url_adr", REF_F_STR, 0, REF_ST_ADR},
+    {"url_fil", REF_F_STR, 0, REF_ST_FIL},
+    {"url_sav", REF_F_STR, 0, REF_ST_SAV},
+    {"referer_adr", REF_F_STR, 0, "ref.example"},
+    {"referer_fil", REF_F_STR, 0, "/from.html"},
+    {"location", REF_F_STR, 0, "http://moved.example/elsewhere"},
+    {"statuscode", REF_F_I32, REF_ST_STATUS, NULL},
+    {"notmodified", REF_F_I32, REF_ST_NOTMODIFIED, NULL},
+    {"compressed", REF_F_I32, REF_ST_COMPRESSED, NULL},
+    {"empty", REF_F_I32, REF_ST_EMPTY, NULL},
+    {"size", REF_F_I64, sizeof(REF_ST_BODY) - 1, NULL},
+    {"totalsize", REF_F_I64, REF_ST_TOTALSIZE, NULL},
+    {"crange", REF_F_I64, REF_ST_CRANGE, NULL},
+    {"crange_start", REF_F_I64, REF_ST_CRANGE_START, NULL},
+    {"crange_end", REF_F_I64, REF_ST_CRANGE_END, NULL},
+    {"msg", REF_F_STR, 0, "Partial Content"},
+    {"contenttype", REF_F_STR, 0, "application/octet-stream"},
+    {"charset", REF_F_STR, 0, "utf-8"},
+    {"contentencoding", REF_F_STR, 0, "gzip"},
+    {"lastmodified", REF_F_STR, 0, "Wed, 03 Sep 2026 10:11:12 GMT"},
+    {"etag", REF_F_STR, 0, "\"abc-123\""},
+    {"cdispo", REF_F_STR, 0, "attachment; filename=partial.bin"},
+    {"body", REF_F_BLOB, 0, REF_ST_BODY},
+    {"headers", REF_F_STR, 0, REF_ST_HEADERS}};
+
+#define REF_FIELD_COUNT (sizeof(ref_fields) / sizeof(ref_fields[0]))
+
+/* Where each field's payload begins, filled by ref_st_build(): the length
+   prefix for STR and BLOB, the number itself otherwise. */
+static size_t ref_off[REF_FIELD_COUNT];
+static unsigned char *ref_golden;
+static size_t ref_golden_size;
+
+/* Field index by name, so a reordered table moves the offsets with it. */
+static size_t ref_st_field(const char *name) {
+  size_t i;
+
+  for (i = 0; i < REF_FIELD_COUNT; i++)
+    if (strcmp(ref_fields[i].name, name) == 0)
+      return i;
+  assertf(!"no such field");
+  return 0;
+}
+
+/* Low byte first, spelled out, so the fixture states the byte order rather
+   than inheriting the host's. */
+static size_t ref_st_num(unsigned char *dst, uint64_t v, size_t width) {
+  size_t i;
+
+  for (i = 0; i < width; i++)
+    dst[i] = (unsigned char) ((v >> (8 * i)) & 0xff);
+  return width;
+}
+
+/* Assemble the table into dst (NULL to measure), recording field offsets. */
+static size_t ref_st_build(unsigned char *dst) {
+  size_t off = 0;
+  size_t i;
+
+  for (i = 0; i < REF_FIELD_COUNT; i++) {
+    const ref_field *const f = &ref_fields[i];
+    const size_t len = f->text != NULL ? strlen(f->text) : 0;
+
+    ref_off[i] = off;
+    switch (f->kind) {
+    case REF_F_RAW:
+      if (dst != NULL)
+        memcpy(dst + off, f->text, len);
+      off += len;
+      break;
+    case REF_F_U32:
+    case REF_F_I32:
+      if (dst != NULL)
+        ref_st_num(dst + off, (uint64_t) (uint32_t) f->num, 4);
+      off += 4;
+      break;
+    case REF_F_I64:
+      if (dst != NULL)
+        ref_st_num(dst + off, (uint64_t) f->num, 8);
+      off += 8;
+      break;
+    case REF_F_STR:
+    case REF_F_BLOB: {
+      const size_t width = f->kind == REF_F_STR ? 4 : 8;
+
+      if (dst != NULL) {
+        ref_st_num(dst + off, (uint64_t) len, width);
+        memcpy(dst + off + width, f->text, len);
+      }
+      off += width + len;
+      break;
+    }
+    }
+  }
+  return off;
+}
+
+/* Copy the reference's path out of the option scratch buffer, which the very
+   next call reuses. */
+static void ref_st_refpath(httrackp *opt, char *dst, size_t size) {
+  strlcpybuff(dst, url_savename_refname_fullpath(opt, REF_ST_ADR, REF_ST_FIL),
+              size);
+}
+
+static void ref_st_put(const char *path, const void *data, size_t size) {
+  FILE *const fp = fopen(path, "wb");
+
+  assertf(fp != NULL);
+  assertf(hts_fwrite_exact(data, size, fp));
+  fclose(fp);
+}
+
+static int ref_st_str(const char *got, const char *want, const char *field) {
+  if (strcmp(got, want) != 0) {
+    fprintf(stderr, "%s: %s is '%s', expected '%s'\n", selftest_tag, field, got,
+            want);
+    return 1;
+  }
+  return 0;
+}
+
+static int ref_st_int(LLint got, LLint want, const char *field) {
+  if (got != want) {
+    fprintf(stderr, "%s: %s is " LLintP ", expected " LLintP "\n", selftest_tag,
+            field, got, want);
+    return 1;
+  }
+  return 0;
+}
+
+/* The bytes a field must occupy on disk, spelled out rather than derived, so
+   the check is independent of how the table was assembled. */
+static int ref_st_bytes(const unsigned char *file, const char *field,
+                        const unsigned char *want, size_t len) {
+  const size_t off = ref_off[ref_st_field(field)];
+
+  if (memcmp(file + off, want, len) != 0) {
+    size_t i;
+
+    fprintf(stderr, "%s: %s at offset %d reads", selftest_tag, field,
+            (int) off);
+    for (i = 0; i < len; i++)
+      fprintf(stderr, " %02x", file[off + i]);
+    fprintf(stderr, ", expected");
+    for (i = 0; i < len; i++)
+      fprintf(stderr, " %02x", want[i]);
+    fprintf(stderr, "\n");
+    return 1;
+  }
+  return 0;
+}
+
+/* Every field against the table, never against what the reader produced. */
+static int ref_st_check(const lien_back *back) {
+  int fail = 0;
+
+  fail += ref_st_str(back->url_adr, REF_ST_ADR, "url_adr");
+  fail += ref_st_str(back->url_fil, REF_ST_FIL, "url_fil");
+  fail += ref_st_str(back->url_sav, REF_ST_SAV, "url_sav");
+  fail += ref_st_str(back->referer_adr, "ref.example", "referer_adr");
+  fail += ref_st_str(back->referer_fil, "/from.html", "referer_fil");
+  fail += ref_st_str(back->r.location, "http://moved.example/elsewhere",
+                     "location");
+  fail += ref_st_int(back->r.statuscode, REF_ST_STATUS, "statuscode");
+  fail += ref_st_int(back->r.notmodified, REF_ST_NOTMODIFIED, "notmodified");
+  fail += ref_st_int(back->r.compressed, REF_ST_COMPRESSED, "compressed");
+  fail += ref_st_int(back->r.empty, REF_ST_EMPTY, "empty");
+  fail += ref_st_int(back->r.size, (LLint) (sizeof(REF_ST_BODY) - 1), "size");
+  fail += ref_st_int(back->r.totalsize, REF_ST_TOTALSIZE, "totalsize");
+  fail += ref_st_int(back->r.crange, REF_ST_CRANGE, "crange");
+  fail += ref_st_int(back->r.crange_start, REF_ST_CRANGE_START, "crange_start");
+  fail += ref_st_int(back->r.crange_end, REF_ST_CRANGE_END, "crange_end");
+  fail += ref_st_str(back->r.msg, "Partial Content", "msg");
+  fail += ref_st_str(back->r.contenttype, "application/octet-stream",
+                     "contenttype");
+  fail += ref_st_str(back->r.charset, "utf-8", "charset");
+  fail += ref_st_str(back->r.contentencoding, "gzip", "contentencoding");
+  fail += ref_st_str(back->r.lastmodified, "Wed, 03 Sep 2026 10:11:12 GMT",
+                     "lastmodified");
+  fail += ref_st_str(back->r.etag, "\"abc-123\"", "etag");
+  fail +=
+      ref_st_str(back->r.cdispo, "attachment; filename=partial.bin", "cdispo");
+  if (back->r.location != back->location_buffer) {
+    fprintf(stderr, "%s: location not restored into the entry's own buffer\n",
+            selftest_tag);
+    fail++;
+  }
+  if (back->r.adr == NULL ||
+      memcmp(back->r.adr, REF_ST_BODY, sizeof(REF_ST_BODY)) != 0) {
+    fprintf(stderr, "%s: body not restored\n", selftest_tag);
+    fail++;
+  }
+  if (back->r.headers == NULL || strcmp(back->r.headers, REF_ST_HEADERS) != 0) {
+    fprintf(stderr, "%s: headers not restored\n", selftest_tag);
+    fail++;
+  }
+  /* nothing that only means something inside the writing process */
+  if (back->r.soc != INVALID_SOCKET || back->r.out != NULL ||
+      back->r.fp != NULL || back->tmpfile != NULL ||
+      back->r.req.user_agent != NULL || back->send_too[0] != '\0') {
+    fprintf(stderr, "%s: a live handle or option pointer came off the file\n",
+            selftest_tag);
+    fail++;
+  }
+  return fail;
+}
+
+/* A reference the reader must turn down: no entry comes back, and none is
+   left half-built. */
+static int ref_st_refuse(httrackp *opt, const char *path, const void *data,
+                         size_t size, const char *what) {
+  lien_back *back = NULL;
+
+  ref_st_put(path, data, size);
+  if (back_unserialize_ref(opt, REF_ST_ADR, REF_ST_FIL, &back) == 0) {
+    fprintf(stderr, "%s: %s was accepted\n", selftest_tag, what);
+    back_clear_entry(back);
+    freet(back);
+    return 1;
+  }
+  if (back != NULL) {
+    fprintf(stderr, "%s: %s left an entry behind\n", selftest_tag, what);
+    return 1;
+  }
+  return 0;
+}
+
+/* Read the reference back, or count a failure and return NULL. */
+static lien_back *ref_st_accept(httrackp *opt, const char *what, int *fail) {
+  lien_back *back = NULL;
+
+  if (back_unserialize_ref(opt, REF_ST_ADR, REF_ST_FIL, &back) != 0) {
+    fprintf(stderr, "%s: %s was refused\n", selftest_tag, what);
+    (*fail)++;
+    return NULL;
+  }
+  return back;
+}
+
+/* Rebuild the record with one string field's declared length raised to len,
+   padded with 'A'. The caller frees. */
+static unsigned char *ref_st_oversize(const char *field, size_t len,
+                                      size_t *size) {
+  const size_t i = ref_st_field(field);
+  const size_t off = ref_off[i];
+  const size_t tail = off + 4 + strlen(ref_fields[i].text);
+  unsigned char *out;
+
+  assertf(ref_fields[i].kind == REF_F_STR);
+
+  *size = off + 4 + len + (ref_golden_size - tail);
+  out = malloct(*size);
+  memcpy(out, ref_golden, off);
+  ref_st_num(out + off, (uint64_t) len, 4);
+  memset(out + off + 4, 'A', len);
+  memcpy(out + off + 4 + len, ref_golden + tail, ref_golden_size - tail);
+  return out;
+}
+
+/* Everything between r.cdispo and r.req: the ABI's padding, then crange,
+   crange_start, crange_end and debugid. The reader fills the crange fields
+   earlier in the stream and never returns to them, so a stray write past
+   cdispo is still there at the assertion. The span makes no claim about which
+   field the byte lands in, which is what the cross legs need: 32-bit hppa,
+   armhf and powerpc pad between cdispo and crange where x86-64 does not. */
+#define REF_TAIL_FROM                                                          \
+  (offsetof(htsblk, cdispo) + sizeof(((htsblk *) 0)->cdispo))
+#define REF_TAIL_TO offsetof(htsblk, req)
+
+/* The image the span must hold: the three values the record carried, the rest
+   zero as calloct left it. Built rather than taken from a second read, which a
+   stray write would corrupt the same way and so hide. Nothing here can see a
+   stray terminator landing in the padding, which is zero either way; the
+   clipped length below is what catches that one, on every architecture. */
+static int ref_st_tail(const lien_back *back) {
+  const size_t len = REF_TAIL_TO - REF_TAIL_FROM;
+  const char *const got = (const char *) &back->r + REF_TAIL_FROM;
+  const LLint value[] = {REF_ST_CRANGE, REF_ST_CRANGE_START, REF_ST_CRANGE_END};
+  const size_t at[] = {offsetof(htsblk, crange) - REF_TAIL_FROM,
+                       offsetof(htsblk, crange_start) - REF_TAIL_FROM,
+                       offsetof(htsblk, crange_end) - REF_TAIL_FROM};
+  char *want = calloct(1, len);
+  int fail = 0;
+  size_t i;
+
+  for (i = 0; i < sizeof(at) / sizeof(at[0]); i++)
+    memcpy(want + at[i], &value[i], sizeof(value[i]));
+  for (i = 0; i < len; i++) {
+    if (got[i] != want[i]) {
+      fprintf(stderr,
+              "%s: byte %d past r.cdispo reads 0x%02x, expected 0x%02x\n",
+              selftest_tag, (int) (REF_TAIL_FROM + i), (unsigned char) got[i],
+              (unsigned char) want[i]);
+      fail = 1;
+      break;
+    }
+  }
+  freet(want);
+  return fail;
+}
+
+int ref_portable_selftest(httrackp *opt, const char *dir) {
+  int fail = 0;
+  char path[HTS_URLMAXSIZE * 2];
+  lien_back *back;
+
+  selftest_tag = "ref-portable";
+  selftest_setup_dir(opt, dir);
+#ifdef _WIN32
+  mkdir(reconcile_st_path(opt, "hts-cache"));
+  mkdir(reconcile_st_path(opt, CACHE_REFNAME));
+#else
+  mkdir(reconcile_st_path(opt, "hts-cache"), HTS_PROTECT_FOLDER);
+  mkdir(reconcile_st_path(opt, CACHE_REFNAME), HTS_PROTECT_FOLDER);
+#endif
+  ref_st_refpath(opt, path, sizeof(path));
+
+  ref_golden_size = ref_st_build(NULL);
+  ref_golden = malloct(ref_golden_size);
+  fail += ref_st_int((LLint) ref_st_build(ref_golden), (LLint) ref_golden_size,
+                     "assembled record size");
+
+  /* the writer emits the table, byte for byte */
+  {
+    lien_back *entry = calloct(1, sizeof(lien_back));
+    unsigned char *got;
+    LLint got_size;
+    FILE *fp;
+
+    hts_init_htsblk(&entry->r);
+    entry->r.location = entry->location_buffer;
+    strcpybuff(entry->url_adr, REF_ST_ADR);
+    strcpybuff(entry->url_fil, REF_ST_FIL);
+    strcpybuff(entry->url_sav, REF_ST_SAV);
+    strcpybuff(entry->referer_adr, "ref.example");
+    strcpybuff(entry->referer_fil, "/from.html");
+    strcpybuff(entry->location_buffer, "http://moved.example/elsewhere");
+    entry->r.statuscode = REF_ST_STATUS;
+    entry->r.notmodified = REF_ST_NOTMODIFIED;
+    entry->r.compressed = REF_ST_COMPRESSED;
+    entry->r.empty = REF_ST_EMPTY;
+    entry->r.size = (LLint) (sizeof(REF_ST_BODY) - 1);
+    entry->r.totalsize = REF_ST_TOTALSIZE;
+    entry->r.crange = REF_ST_CRANGE;
+    entry->r.crange_start = REF_ST_CRANGE_START;
+    entry->r.crange_end = REF_ST_CRANGE_END;
+    strcpybuff(entry->r.msg, "Partial Content");
+    strcpybuff(entry->r.contenttype, "application/octet-stream");
+    strcpybuff(entry->r.charset, "utf-8");
+    strcpybuff(entry->r.contentencoding, "gzip");
+    strcpybuff(entry->r.lastmodified, "Wed, 03 Sep 2026 10:11:12 GMT");
+    strcpybuff(entry->r.etag, "\"abc-123\"");
+    strcpybuff(entry->r.cdispo, "attachment; filename=partial.bin");
+    entry->r.adr = strdupt(REF_ST_BODY);
+    entry->r.headers = strdupt(REF_ST_HEADERS);
+    /* scaffolding that must not reach the file */
+    entry->status = STATUS_TRANSFER;
+    entry->r.soc = (T_SOC) 7;
+    entry->r.req.user_agent = "must-not-be-serialized";
+    strcpybuff(entry->send_too, "Range: bytes=11-\r\n");
+    if (back_serialize_ref(opt, entry) != 0) {
+      fprintf(stderr, "%s: cannot write the reference\n", selftest_tag);
+      fail++;
+    }
+    freet(entry->r.adr);
+    freet(entry->r.headers);
+    freet(entry);
+
+    got_size = fsize(path);
+    got = malloct(ref_golden_size + 1);
+    fp = fopen(path, "rb");
+    assertf(fp != NULL);
+    if (got_size != (LLint) ref_golden_size ||
+        !hts_fread_exact(got, ref_golden_size, fp)) {
+      fprintf(stderr, "%s: wrote " LLintP " bytes, expected %d\n", selftest_tag,
+              got_size, (int) ref_golden_size);
+      fail++;
+    } else if (memcmp(got, ref_golden, ref_golden_size) != 0) {
+      size_t i;
+
+      for (i = 0; i < ref_golden_size && got[i] == ref_golden[i]; i++)
+        ;
+      fprintf(stderr, "%s: byte %d is 0x%02x, expected 0x%02x\n", selftest_tag,
+              (int) i, got[i], ref_golden[i]);
+      fail++;
+    } else {
+      /* the order those bytes go out in, one field per width and sign */
+      static const unsigned char u32_le[4] = {0x14, 0x13, 0x12, 0x11};
+      static const unsigned char i64_le[8] = {0x08, 0x07, 0x06, 0x05,
+                                              0x04, 0x03, 0x02, 0x01};
+      static const unsigned char neg_le[8] = {0xf8, 0xf7, 0xf6, 0xf5,
+                                              0xf4, 0xf3, 0xf2, 0xf1};
+
+      fail += ref_st_bytes(got, "statuscode", u32_le, sizeof(u32_le));
+      fail += ref_st_bytes(got, "totalsize", i64_le, sizeof(i64_le));
+      fail += ref_st_bytes(got, "crange_start", neg_le, sizeof(neg_le));
+    }
+    fclose(fp);
+    freet(got);
+  }
+
+  /* and the reader takes them back, whatever host laid them down */
+  ref_st_put(path, ref_golden, ref_golden_size);
+  back = ref_st_accept(opt, "the golden reference", &fail);
+  if (back != NULL) {
+    fail += ref_st_check(back);
+    back_clear_entry(back);
+    freet(back);
+  }
+
+  /* exactly what 3.50.1 wrote: a host-native size_t, the raw structure, then
+     the two data blocks, here both empty */
+  {
+    const size_t blit = sizeof(lien_back);
+    const size_t size = sizeof(blit) * 3 + blit;
+    unsigned char *legacy = calloct(1, size);
+    lien_back *const old = (lien_back *) (legacy + sizeof(blit));
+
+    memcpy(legacy, &blit, sizeof(blit));
+    strcpybuff(old->url_adr, REF_ST_ADR);
+    strcpybuff(old->url_fil, REF_ST_FIL);
+    strcpybuff(old->url_sav, REF_ST_SAV);
+    old->r.statuscode = 206;
+    fail +=
+        ref_st_refuse(opt, path, legacy, size, "a legacy host-native record");
+    freet(legacy);
+  }
+
+  /* a wrong magic, a future version, and every truncation */
+  {
+    unsigned char *bad = malloct(ref_golden_size);
+    const size_t cut[] = {0,
+                          4,
+                          8,
+                          12,
+                          ref_off[ref_st_field("statuscode")] + 2,
+                          ref_off[ref_st_field("crange")] + 4,
+                          ref_off[ref_st_field("body")] + 6,
+                          ref_golden_size - 1};
+    size_t i;
+
+    memcpy(bad, ref_golden, ref_golden_size);
+    memset(bad, 'X', HTS_REF_MAGIC_SIZE);
+    fail += ref_st_refuse(opt, path, bad, ref_golden_size, "a wrong magic");
+
+    memcpy(bad, ref_golden, ref_golden_size);
+    bad[ref_off[ref_st_field("version")]] = HTS_REF_VERSION + 1;
+    fail +=
+        ref_st_refuse(opt, path, bad, ref_golden_size, "an unknown version");
+
+    for (i = 0; i < sizeof(cut) / sizeof(cut[0]); i++)
+      fail +=
+          ref_st_refuse(opt, path, ref_golden, cut[i], "a truncated record");
+    freet(bad);
+  }
+
+  /* the string cap, at its two boundary values, each file long enough that
+     only the cap can decide it */
+  {
+    size_t size;
+    unsigned char *at = ref_st_oversize("url_sav", HTS_REF_MAX_STR, &size);
+
+    ref_st_put(path, at, size);
+    freet(at);
+    back = ref_st_accept(opt, "a name declaring exactly the cap", &fail);
+    if (back != NULL) {
+      fail += ref_st_int((LLint) strlen(back->url_sav),
+                         (LLint) sizeof(back->url_sav) - 1, "clipped url_sav");
+      fail += ref_st_int(back->r.statuscode, REF_ST_STATUS, "statuscode");
+      back_clear_entry(back);
+      freet(back);
+    }
+  }
+  {
+    size_t size;
+    unsigned char *over =
+        ref_st_oversize("url_sav", HTS_REF_MAX_STR + 1, &size);
+
+    fail +=
+        ref_st_refuse(opt, path, over, size, "a name one byte past the cap");
+    freet(over);
+  }
+
+  /* a length past its destination clips, the reader stays in step with the
+     stream, and nothing beyond the destination moves */
+  {
+    size_t size;
+    unsigned char *bad = ref_st_oversize("cdispo", 3000, &size);
+
+    ref_st_put(path, bad, size);
+    freet(bad);
+    back = ref_st_accept(opt, "an over-long content-disposition", &fail);
+    if (back != NULL) {
+      const size_t want = sizeof(back->r.cdispo) - 1;
+
+      if (strlen(back->r.cdispo) != want ||
+          strspn(back->r.cdispo, "A") != want) {
+        fprintf(stderr, "%s: cdispo clipped to %d bytes of '%s'\n",
+                selftest_tag, (int) strlen(back->r.cdispo), back->r.cdispo);
+        fail++;
+      }
+      fail += ref_st_tail(back);
+      if (back->r.headers == NULL ||
+          strcmp(back->r.headers, REF_ST_HEADERS) != 0) {
+        fprintf(stderr, "%s: the clip lost the reader's place in the stream\n",
+                selftest_tag);
+        fail++;
+      }
+    }
+    if (back != NULL) {
+      back_clear_entry(back);
+      freet(back);
+    }
+  }
+
+  freet(ref_golden);
+  UNLINK(path);
   return fail;
 }

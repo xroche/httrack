@@ -43,7 +43,7 @@ python=$(find_python) || {
     exit 0
 }
 
-"$python" - "$dir/in.zip" <<'EOF'
+"$python" - "$(nativepath "$dir/in.zip")" <<'EOF'
 import sys, zipfile
 
 body = b"hello world"
@@ -87,7 +87,7 @@ EOF
 # Location became a valid-looking wrong target, an X-Save named a file that is
 # not the one recorded. The buffer now holds every line HTTrack can write, and
 # a longer one is dropped whole (#1294).
-"$python" - "$dir" <<'EOF'
+"$python" - "$(nativepath "$dir")" <<'EOF'
 import os, sys, zipfile
 
 body = b"hello world"

@@ -1,0 +1,83 @@
+#!/bin/bash
+#
+# Three things the tree defines but does not act on. htsglobal.h gives
+# HTS_DLOPEN a value on both arms, so htsweb.c's #ifdef was always true and a
+# build without dlopen still advertised DLOPEN=1 to the web UI (the #1552 class,
+# there for HTS_INET6). The -@ option set reported a bad option under the '%'
+# prefix, naming a character the user did not type. And HTS_PLATFORM_NAME was
+# used but defined nowhere, so --help printed no [compiled: ...] line.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_inert.XXXXXX") || exit 1
+cleanup_push rm -rf "$tmp"
+
+# --- the option set that refuses the option names itself ---------------------
+# 'Q' is in neither the '%' set nor the '@' set, so the same letter reaches both
+# default arms and the prefix is the only thing that can differ.
+refusal() { # refusal ARG
+    local rc=0
+    httrack "$1" http://127.0.0.1:1/ >"$tmp/refuse.out" 2>&1 || rc=$?
+    test "$rc" -ne 0 || fail_dump "$1 was accepted" "$tmp/refuse.out"
+    firstline "$(cat "$tmp/refuse.out")"
+}
+
+got=$(refusal -%Q)
+assert_eq "* invalid option %Q" "$got" "the % set"
+got=$(refusal -@Q)
+assert_eq "* invalid option @Q" "$got" "the @ set"
+
+# --- --help says which build it came from ------------------------------------
+httrack --help >"$tmp/help.out" 2>&1 || fail_dump "--help failed" "$tmp/help.out"
+compiled=$(sed -n 's/^\[compiled: \(.*\)\]$/\1/p' "$tmp/help.out")
+test -n "$compiled" || fail_dump "--help printed no [compiled: ...] line" "$tmp/help.out"
+# "unknown" is htshelp.c's last-resort fallback: reaching it means the build
+# passed no platform down, which is the state this pins against.
+test "$compiled" != unknown || fail "--help names the platform as \"unknown\""
+
+# --- a build without dlopen must not advertise DLOPEN ------------------------
+# Only the preprocessor can see this: nothing here can relink httrack without
+# libdl. Shadow the two headers that carry DLLIB, then preprocess htsweb.c.
+if [ -z "${abs_top_builddir:-}" ] || [ -z "${abs_top_srcdir:-}" ]; then
+    skip "no automake environment"
+fi
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+web=$abs_top_srcdir/src/htsweb.c
+[ -f "$web" ] || fail "$web is missing"
+
+mkdir -p "$tmp/nodl"
+for h in config.h htsfeatures.h; do
+    [ -f "$abs_top_builddir/$h" ] || skip "$abs_top_builddir/$h is missing"
+    sed 's|^#define DLLIB 1|/* #undef DLLIB */|' "$abs_top_builddir/$h" >"$tmp/nodl/$h"
+done
+grep -q '^/\* #undef DLLIB \*/$' "$tmp/nodl/config.h" ||
+    fail "config.h no longer defines DLLIB the way this test strips it"
+
+cpp_argv=(-E -I"$tmp/nodl" -I"$abs_top_builddir" -I"$abs_top_builddir/src"
+    -I"$abs_top_srcdir/src" -I"$abs_top_srcdir/src/coucal" -I"$abs_top_srcdir/src/minizip"
+    -DHTS_INTERNAL_BUILD -DHAVE_CONFIG_H)
+if [ -n "${TEST_CPPFLAGS:-}" ]; then
+    read -r -a extra_argv <<<"$TEST_CPPFLAGS"
+    cpp_argv+=("${extra_argv[@]}")
+fi
+"${cc_argv[@]}" "${cpp_argv[@]}" "$web" >"$tmp/nodl.i" 2>"$tmp/nodl.err" ||
+    skip "cannot preprocess htsweb.c here: $(firstline "$(cat "$tmp/nodl.err")")"
+
+# HTS_DLOPEN really is 0 in this shadow, and the block really was reached: an
+# empty or truncated preprocessor output would satisfy the DLOPEN check alone.
+printf '#include "htsglobal.h"\nPROBE HTS_DLOPEN\n' >"$tmp/probe.c"
+"${cc_argv[@]}" "${cpp_argv[@]}" "$tmp/probe.c" >"$tmp/probe.i" 2>/dev/null ||
+    fail "the probe TU did not preprocess"
+assert_eq "PROBE 0" "$(sed -n 's/^PROBE .*/&/p' "$tmp/probe.i" | tail -1)" "HTS_DLOPEN without DLLIB"
+grep -q 'smallserver_setkey("USEZLIB"' "$tmp/nodl.i" ||
+    fail "the preprocessed htsweb.c carries no key at all, so the check below proves nothing"
+
+! grep -q 'smallserver_setkey("DLOPEN"' "$tmp/nodl.i" ||
+    fail "a build without dlopen still publishes DLOPEN=1 to the web UI"
+
+echo "ok: the @ set, the platform name and the dlopen key all report what the build did"

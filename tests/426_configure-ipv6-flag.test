@@ -1,0 +1,172 @@
+#!/bin/bash
+# HTS_INET6 picks which arm of SOCaddr the installed htsnet.h declares, and it
+# used to be decided by an unoverridable getaddrinfo probe that only warned when
+# it failed. Two builds of one version could then ship different layouts under
+# the same soname, and htsfeatures.h recorded neither.
+
+# TEST_TIMEOUT_AT_LEAST: 900
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+srcdir="${abs_top_srcdir:?not run under make check}"
+test -r "${srcdir}/configure" || skip "no configure in ${srcdir}"
+
+read -r -a cc_argv <<<"${CC:-cc}"
+command -v "${cc_argv[0]}" >/dev/null 2>&1 || skip "no C compiler (${cc_argv[0]})"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/ipv6flag.XXXXXX") || fail "no tmpdir"
+cleanup_push rm -rf "${work}"
+
+# automake refuses an out-of-tree configure when srcdir holds a config.status,
+# which an in-tree build leaves there; a symlink farm without that one file is
+# the same tree to configure.
+shadow=${work}/srcdir
+mkdir -p "${shadow}"
+for entry in "${srcdir}"/*; do
+    test "${entry##*/}" = config.status || ln -s "${entry}" "${shadow}/"
+done
+test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
+
+n=0
+cases=9
+last_dir=
+
+# Pace against the costliest step so far, never against the last one: the two
+# rejections below give up early, and projecting a full configure off one of
+# them is how the s390x leg ran into its budget instead of skipping.
+costliest=0
+pace() { # pace <seconds the step took>
+    test "$1" -le "${costliest}" || costliest=$1
+    skip_if_out_of_budget "$((cases - n))" "${costliest}"
+}
+
+# Seeding the cache variable is the answer a host without getaddrinfo gives, and
+# AC_CHECK_LIB takes the same action-if-not-found branch either way. "have"
+# forces the other answer so every case below means the same on any host; the
+# real probe is exercised once, by the "probe" case.
+run_configure() { # run_configure DIR have|hide|probe ARG...
+    local dir=$1 seed=$2
+    shift 2
+    mkdir -p "${dir}"
+    last_dir=${dir}
+    case ${seed} in
+    have) seed=ac_cv_lib_c_getaddrinfo=yes ;;
+    hide) seed=ac_cv_lib_c_getaddrinfo=no ;;
+    probe) seed=IPV6_TEST_UNUSED= ;;
+    *) fail "unknown seed ${seed}" ;;
+    esac
+    # A keg-only openssl (brew) makes the default --enable-https a hard error,
+    # and TLS has nothing to do with the address family.
+    (cd "${dir}" && env "${seed}" bash "${shadow}/configure" --enable-https=auto "$@") \
+        >"${dir}/configure.log" 2>&1
+}
+
+# check_state DESC DIR 0|1: the macro, the summary qualifier and everything the
+# build carries onward must agree on one outcome.
+check_state() {
+    local desc=$1 dir=$2 want=$3 hdr line
+    for hdr in config.h htsfeatures.h; do
+        # The whole bug: an undefined HTS_INET6 lets htsglobal.h pick, so the
+        # installed header set never says which layout it was built with.
+        grep -qx "#define HTS_INET6 ${want}" "${dir}/${hdr}" ||
+            fail_dump "${desc}: ${hdr} does not define HTS_INET6 to ${want}" \
+                "${dir}/${hdr}" "${dir}/configure.log"
+    done
+    # What reaches the tests and the compile is the outcome, never the request.
+    line=$(sed -n 's/^V6_SUPPORT = *//p' "${dir}/tests/Makefile")
+    case ${want}:${line} in
+    1:yes | 0:no) ;;
+    *) fail "${desc}: HTS_INET6=${want} but V6_SUPPORT=${line}" ;;
+    esac
+    line=$(sed -n 's/^V6_FLAG = *//p' "${dir}/src/Makefile")
+    case ${want}:${line} in
+    1:-DINET6 | 0:) ;;
+    *) fail "${desc}: HTS_INET6=${want} but V6_FLAG=${line}" ;;
+    esac
+}
+
+expect() { # expect DESC SEED WANT-VALUE WANT-SUMMARY ARG...
+    local desc=$1 seed=$2 want=$3 summary=$4
+    shift 4
+    local began=${SECONDS}
+    n=$((n + 1))
+    run_configure "${work}/build${n}" "${seed}" "$@" ||
+        fail_dump "${desc}: configure failed" "${work}/build${n}/configure.log"
+    check_state "${desc}" "${last_dir}" "${want}"
+    grep -q "whether IPv6 support is enabled\.\.\. ${summary}\$" "${last_dir}/configure.log" ||
+        fail_dump "${desc}: configure did not report '${summary}'" "${last_dir}/configure.log"
+    echo "ok: ${desc}"
+    pace "$((SECONDS - began))"
+}
+
+expect_fail() { # expect_fail DESC SEED WANT-TEXT ARG...
+    local desc=$1 seed=$2 text=$3
+    shift 3
+    local began=${SECONDS}
+    n=$((n + 1))
+    ! run_configure "${work}/build${n}" "${seed}" "$@" ||
+        fail_dump "${desc}: configure succeeded" "${work}/build${n}/configure.log"
+    grep -q "${text}" "${last_dir}/configure.log" ||
+        fail_dump "${desc}: configure failed without saying '${text}'" "${last_dir}/configure.log"
+    echo "ok: ${desc}"
+    pace "$((SECONDS - began))"
+}
+
+# The probe must define the macro either way, and this is the case master
+# fails: it warned and left HTS_INET6 undefined. First, so a slow host's budget
+# cannot skip past the guard the test exists for, and so the pace above projects
+# against a full configure from the very first step.
+expect "the default probes and reports the loss" hide 0 "no (auto)"
+
+# The two rejections next: configure gives up on the flag itself, so these are
+# the cheapest steps here and a host that can afford few runs more of them.
+# The probe cannot overrule an explicit yes, and the diagnostic has to name the
+# flag that gets the packager past it.
+expect_fail "a value that is not yes/no/auto is rejected" have \
+    "bad value for ipv6, expected yes/no/auto" --enable-ipv6=bogus
+expect_fail "--enable-ipv6=yes without getaddrinfo is fatal" hide \
+    "no getaddrinfo in libc. Pass --disable-ipv6" --enable-ipv6=yes
+
+expect "the default probes and finds getaddrinfo" have 1 "yes (auto)"
+
+# An explicit request is answered by the request, and says which it was.
+expect "--enable-ipv6=yes is honoured" have 1 "yes (requested)" --enable-ipv6=yes
+expect "--disable-ipv6 is honoured" have 0 "no (requested)" --disable-ipv6
+
+# A build that asked for no IPv6 has no reason to care what the host has. It
+# reads the run above, so it stays attached to it.
+if grep -q "getaddrinfo" "${last_dir}/configure.log"; then
+    fail_dump "--disable-ipv6 still probed for getaddrinfo" "${last_dir}/configure.log"
+fi
+
+# Spelling the default out loud reaches the same place the default does.
+expect "--enable-ipv6=auto probes" have 1 "yes (auto)" --enable-ipv6=auto
+
+# IPv6 is deliberately not one of the automagic features: defaulting it off with
+# them would move SOCaddr under every recipe that passes that flag.
+expect "--disable-auto-features leaves IPv6 on auto" have 1 "yes (auto)" --disable-auto-features
+
+# Every case above seeds the cache, so one unseeded run is what proves the probe
+# still runs. Its answer is the host's, so assert only that a definite one was
+# reached and that everything downstream agrees with it. Two greps rather than
+# one alternation: \| is a GNU extension that BSD sed reads as a literal.
+n=$((n + 1))
+run_configure "${work}/build${n}" probe ||
+    fail_dump "an unseeded configure failed" "${work}/build${n}/configure.log"
+grep -q "checking for getaddrinfo in -lc" "${last_dir}/configure.log" ||
+    fail_dump "an unseeded configure ran no getaddrinfo probe" "${last_dir}/configure.log"
+if grep -q "whether IPv6 support is enabled\.\.\. yes (auto)$" "${last_dir}/configure.log"; then
+    probed=yes
+    check_state "the unseeded probe" "${last_dir}" 1
+elif grep -q "whether IPv6 support is enabled\.\.\. no (auto)$" "${last_dir}/configure.log"; then
+    probed=no
+    check_state "the unseeded probe" "${last_dir}" 0
+else
+    fail_dump "an unseeded configure reported no IPv6 outcome" "${last_dir}/configure.log"
+fi
+echo "ok: an unseeded configure reaches a definite outcome (${probed})"
+
+assert_steps_ran "${cases}" "${n}"

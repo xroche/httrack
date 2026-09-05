@@ -27,6 +27,8 @@ indextmpl="$srcroot/src/hts-indextmpl.h"
 # The body of one hts-indextmpl.h macro, on stdout.
 macro_body() { # macro_body MACRO
     awk -v macro="$1" '
+        # No eol pin on a .h, so a Windows checkout hands a Linux awk CRLF here.
+        { sub(/\r$/, "") }
         !inmacro {
             if ($0 == "#define " macro " \\") inmacro = 1
             next

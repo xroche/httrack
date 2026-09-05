@@ -128,7 +128,7 @@ try:
 except Exception:
     sys.exit(2)
 sys.exit(0 if any(n.endswith(sys.argv[2]) for n in names) else 1)
-' "${logroot}/hts-cache/new.zip" "$1"
+' "$(nativepath "${logroot}/hts-cache/new.zip")" "$1"
     rc=$?
     test "$rc" -le 1 || die "cannot read cache index ${logroot}/hts-cache/new.zip"
     return "$rc"
@@ -288,7 +288,8 @@ logroot="$out"
 odir="$out"
 if test -n "$html_subdir"; then
     mirrorroot="${out}/${html_subdir}"
-    odir="${mirrorroot},${out}"
+    # The shim converts a whole argument, never -O's second path past a comma.
+    odir="$(nativepath "$mirrorroot"),$(nativepath "$out")"
 elif test -n "$outdir_intl"; then
     mirrorroot="${out}/${outdir_intl}"
     logroot="$mirrorroot"

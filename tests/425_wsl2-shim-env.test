@@ -1,0 +1,127 @@
+#!/bin/bash
+#
+# wsl2-exe-shim.sh is what stands between a Linux shell and a native exe under
+# the wsl2 backend, and nothing exercised it. Both halves are pure shell, so
+# they run anywhere with a stub standing in for the .exe: argv translation
+# (drvfs paths and the file:// URLs built from them), and the WSLENV bridge,
+# which is the only channel by which a variable reaches a Windows process.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/httrack_shimenv.XXXXXX")
+cleanup_push rm -rf "$tmp"
+
+# shellcheck disable=SC2154 # testdir comes from testlib.sh
+cp "$testdir/wsl2-exe-shim.sh" "$tmp/stub"
+chmod u+wx "$tmp/stub" # distcheck's srcdir is read-only, and cp carries that over
+cat >"$tmp/stub.exe" <<'STUB'
+#!/bin/bash
+printf 'WSLENV=%s\n' "$WSLENV"
+printf 'ARG=%s\n' "$@"
+STUB
+chmod u+wx "$tmp/stub.exe"
+
+# env -i, so the shim bridges a known set and the caller's own environment
+# cannot supply a name the assertions below would read as the shim's doing.
+run_shim() { # run_shim ARG...
+    env -i PATH="$tmp:/usr/bin:/bin" \
+        WSLENV="GITHUB_STEP_SUMMARY/p:HTS_WS" \
+        GITHUB_STEP_SUMMARY=/mnt/d/a/sum.md \
+        HTS_WS=/mnt/d/a/httrack \
+        TMPDIR=/mnt/d/a/_temp/suite.94 \
+        LISTY=/mnt/d/a/one:/mnt/d/a/two \
+        SUFFIXED='/mnt/d/a/one extra' \
+        PLAIN=hello \
+        bash "$tmp/stub" "$@"
+}
+
+# --- argv: a drvfs path, the URL built from one, and everything else --------
+
+out=$(run_shim /mnt/d/a/in.zip file:///mnt/d/a/page.html --mirror -O)
+want='ARG=D:/a/in.zip
+ARG=file://D:/a/page.html
+ARG=--mirror
+ARG=-O'
+got=$(printf '%s\n' "$out" | command grep '^ARG=' || true)
+test "$got" = "$want" || fail "argv translation: got [$got], want [$want]"
+
+# Zero arguments: bash 3.2 on macOS makes an empty "${args[@]}" fatal under
+# set -u, and 257 calls the shim with none.
+run_shim >/dev/null || fail "the shim died on an empty argument list"
+
+# A newline inside an argument, which a line-oriented cut used to truncate. The
+# tail lands on its own line, so that line is what proves it survived.
+out=$(run_shim "$(printf '/mnt/d/a\nb')")
+printf '%s\n' "$out" | command grep -qx 'ARG=D:/a' ||
+    fail "the head of a path holding a newline is wrong: [$out]"
+printf '%s\n' "$out" | command grep -qx 'b' ||
+    fail "everything after a newline in a path was dropped: [$out]"
+
+# httrack's own -O takes dir,cache, and both halves are paths.
+out=$(run_shim '/mnt/d/a,/mnt/d/b')
+printf '%s\n' "$out" | command grep -qx 'ARG=D:/a,D:/b' ||
+    fail "a comma-joined pair left its second half untranslated: [$out]"
+
+# An option carrying a path, which is the shape 282 builds.
+out=$(run_shim '--list=/mnt/d/x')
+printf '%s\n' "$out" | command grep -qx 'ARG=--list=D:/x' ||
+    fail "an option value was not translated: [$out]"
+
+# A URL is not a path, whatever it happens to contain.
+out=$(run_shim 'http://host/mnt/d/x')
+printf '%s\n' "$out" | command grep -qx 'ARG=http://host/mnt/d/x' ||
+    fail "a URL carrying /mnt/ was rewritten: [$out]"
+
+ok "the shim translates drvfs paths and file:// URLs, and survives no arguments"
+
+# --- WSLENV: what reaches the Windows side, and with which flag ------------
+
+wslenv=$(run_shim | sed -n 's/^WSLENV=//p')
+holds() { # holds NAME[/FLAG]
+    case ":$wslenv:" in *":$1:"*) return 0 ;; esac
+    return 1
+}
+
+# A value that is wholly a drvfs path needs /p, or it crosses as a name the exe
+# cannot open. TMPDIR is the one the suite actually sets that way.
+holds TMPDIR/p || fail "TMPDIR crossed without /p: [$wslenv]"
+# Named once by the caller with a flag, so naming it again drops the flag or
+# leaves the two occurrences to an undocumented precedence. Neither is wanted.
+test "$(printf '%s\n' "${wslenv//:/$'\n'}" | command grep -cx 'GITHUB_STEP_SUMMARY\(/p\)\?')" = 1 ||
+    fail "GITHUB_STEP_SUMMARY is named twice: [$wslenv]"
+test "$(printf '%s\n' "${wslenv//:/$'\n'}" | command grep -cx 'HTS_WS')" = 1 ||
+    fail "HTS_WS is named twice: [$wslenv]"
+# A colon-joined value may be a path list, whose flag is /l, so it crosses as
+# it did before rather than being mangled by /p.
+holds LISTY || fail "LISTY did not cross: [$wslenv]"
+# A path with something after it is not one path either, so /p would mangle it.
+! holds SUFFIXED/p || fail "a path with trailing text took /p: [$wslenv]"
+! holds LISTY/p || fail "LISTY took /p, but a colon-joined value is not one path"
+holds PLAIN || fail "a plain value did not cross: [$wslenv]"
+# WSL owns it, and a bridged copy would point the exe at the distro's own.
+! holds PATH || fail "PATH crossed: [$wslenv]"
+
+ok "the bridge flags a drvfs value, leaves a list alone, and names nothing twice"
+
+# --- mutant: the unconditional append this replaced -------------------------
+# Spliced rather than sed-substituted: a newline in a replacement is a GNU
+# extension, and these scripts run under BSD sed too.
+
+sed -n '1,/^bridged=$/p' "$tmp/stub" | sed '$d' >"$tmp/mutant"
+cat >>"$tmp/mutant" <<'MUTANT'
+bridged=$(compgen -e |
+    grep -vxE 'PATH|WSLENV|_|SHLVL|PWD|OLDPWD|HOSTTYPE|IFS|LS_COLORS|TERM' |
+    paste -sd: -)
+MUTANT
+sed -n '/^test -z "\$bridged"/,$p' "$tmp/stub" >>"$tmp/mutant"
+cmp -s "$tmp/stub" "$tmp/mutant" && fail "the unconditional-append mutant changed nothing"
+mv "$tmp/mutant" "$tmp/stub"
+chmod u+wx "$tmp/stub"
+mutated=$(run_shim | sed -n 's/^WSLENV=//p')
+test "$mutated" != "$wslenv" ||
+    fail "the unconditional-append mutant produced the same WSLENV: undetected"
+
+ok "the mutant that appends every name unflagged is caught"

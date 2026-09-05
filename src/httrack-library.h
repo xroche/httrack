@@ -775,8 +775,13 @@ HTSEXT_API int hts_findclose(find_handle find);
     only until the next hts_findnext()/hts_findclose(). */
 HTSEXT_API char *hts_findgetname(find_handle find);
 
-/** Size in bytes of the current entry, or -1. Truncated to int, so unreliable
-    for files larger than 2 GB. */
+/** Size in bytes of the current entry, or -1 when there is none. */
+HTSEXT_API LLint hts_findgetsize64(find_handle find);
+
+/** @deprecated Use hts_findgetsize64(). An int cannot carry a size past 2 GB,
+   so this form reports -1 for anything above INT_MAX rather than handing back
+   truncated low bits a caller would size a buffer from. */
+HTS_DEPRECATED("use hts_findgetsize64(find)")
 HTSEXT_API int hts_findgetsize(find_handle find);
 
 /** 1 if the current entry is a directory, else 0 (a system/special entry, see

@@ -305,6 +305,92 @@ static hts_boolean optparam_dash_ok(const cmdl_argv *cmd, int na) {
   return na + 1 < cmd->argc && cmd->param[na + 1];
 }
 
+/* Print the headers -#C lists for `url`, read back out of the ZIP cache. */
+static void cmdl_print_cache_entry(httrackp *opt, cache_back *cache,
+                                   const char *url, int sendb) {
+  lien_adrfilsave afs;
+  htsblk r;
+  char msg[256], cdate[256];
+
+  memset(&afs, 0, sizeof(afs));
+  /* the entry name is read back from the cache: list an unparsable or
+     unreadable one anyway, since its presence is what -#C is asked about */
+  if (ident_url_absolute(url, &afs.af) == -1) {
+    fprintf(stdout, "X-URL: %s\r\nX-Cache-Entry-Unreadable: yes\r\n\r\n", url);
+    return;
+  }
+  r = cache_read_ro(opt, cache, afs.af.adr, afs.af.fil, "", NULL);
+  if (r.statuscode == STATUSCODE_INVALID) {
+    fprintf(stdout, "X-URL: %s\r\nX-Cache-Entry-Unreadable: yes\r\n\r\n", url);
+    freet(r.adr);
+    return;
+  }
+
+  infostatuscode(msg, r.statuscode);
+  time_gmt_rfc822(cdate);
+
+  fprintf(stdout, "HTTP/1.1 %d %s\r\n", r.statuscode, r.msg[0] ? r.msg : msg);
+  fprintf(stdout, "X-Host: %s\r\n", afs.af.adr);
+  fprintf(stdout, "X-File: %s\r\n", afs.af.fil);
+  fprintf(stdout, "X-URL: %s\r\n", url);
+  if (url_savename(&afs, /*former */ NULL, /*referer_adr */ NULL,
+                   /*referer_fil */ NULL, /*opt */ opt, /*sback */ NULL,
+                   /*cache */ cache, /*hash */ NULL, /*ptr */ 0,
+                   /*numero_passe */ 0, /*mime_type */ NULL) != -1) {
+    if (fexist_utf8(afs.save)) {
+      fprintf(stdout, "Content-location: %s\r\n", afs.save);
+    }
+  }
+  fprintf(stdout, "Date: %s\r\n", cdate);
+  fprintf(stdout, "Server: HTTrack Website Copier/" HTTRACK_VERSION "\r\n");
+  if (r.lastmodified[0]) {
+    fprintf(stdout, "Last-Modified: %s\r\n", r.lastmodified);
+  }
+  if (r.etag[0]) {
+    fprintf(stdout, "Etag: %s\r\n", r.etag);
+  }
+  if (r.totalsize >= 0) {
+    fprintf(stdout, "Content-Length: " LLintP "\r\n", r.totalsize);
+  }
+  fprintf(stdout, "X-Content-Length: " LLintP "\r\n",
+          (r.size >= 0) ? r.size : (-r.size));
+  if (r.contenttype[0]) {
+    fprintf(stdout, "Content-Type: %s\r\n", hts_effective_mime(r.contenttype));
+  }
+  if (r.cdispo[0]) {
+    fprintf(stdout, "Content-Disposition: %s\r\n", r.cdispo);
+  }
+  if (r.contentencoding[0]) {
+    fprintf(stdout, "Content-Encoding: %s\r\n", r.contentencoding);
+  }
+  if (r.is_chunk) {
+    fprintf(stdout, "Transfer-Encoding: chunked\r\n");
+  }
+#if HTS_USEOPENSSL
+  if (r.ssl) {
+    fprintf(stdout, "X-SSL: yes\r\n");
+  }
+#endif
+  if (r.is_write) {
+    fprintf(stdout, "X-Direct-To-Disk: yes\r\n");
+  }
+  if (r.compressed) {
+    fprintf(stdout, "X-Compressed: yes\r\n");
+  }
+  if (r.notmodified) {
+    fprintf(stdout, "X-Not-Modified: yes\r\n");
+  }
+  if (r.is_chunk) {
+    fprintf(stdout, "X-Chunked: yes\r\n");
+  }
+  fprintf(stdout, "\r\n");
+  /* Send the body */
+  if (sendb && r.adr) {
+    fprintf(stdout, "%s\r\n", r.adr);
+  }
+  freet(r.adr);
+}
+
 static int hts_main_internal(int argc, char **argv, httrackp * opt) {
   /* command line rebuilt from argv, config files and doit.log */
   cmdl_argv x_cmd = {NULL, NULL, NULL, 0, 0, {NULL, 0, 0}};
@@ -836,15 +922,15 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
             strlcpybuff(argv[i] + 1, "#P", strlen(argv[i] + 1) + 1);
             //
           } else if (strfield2(argv[i] + 2, "updatehttrack")) {
-#ifdef _WIN32
+            /* Never implemented anywhere, and refusing it stops the untouched
+               string being re-walked as the cluster -u -p -d -a -t -e -h, whose
+               h exits 0 with an empty mirror. */
             char s[HTS_CDLMAXSIZE + 256];
 
-            slprintfbuff_clip(s, sizeof(s), "%s not available in this version",
-                              argv[i]);
+            slprintfbuff_clip(s, sizeof(s), "%s is not implemented", argv[i]);
             HTS_PANIC_PRINTF(s);
             htsmain_free();
             return -1;
-#endif
           }
           //
           else {
@@ -2219,6 +2305,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               switch (*com) {
               case 'i':
 #if HTS_INET6==0
+                /* Or -@i2's 2 is read as an option and refused (#615). */
+                while (isdigit((unsigned char) *(com + 1)))
+                  com++;
                 printf
                   ("Warning, option @i has no effect (v6 routines not compiled)\n");
 #else
@@ -2258,7 +2347,7 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               default:{
                   char s[HTS_CDLMAXSIZE + 256];
 
-                  sprintf(s, "invalid option %%%c\n", *com);
+                  sprintf(s, "invalid option @%c\n", *com);
                   HTS_PANIC_PRINTF(s);
                   htsmain_free();
                   return -1;
@@ -2300,140 +2389,41 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
                   cache.hashtable = (void *) cache_hashtable;   /* copy backcache hash */
                   cache.ro = 1; /* read only */
                   if (cache.hashtable) {
-                    lien_adrfilsave afs;
-                    char BIGSTK url[HTS_URLMAXSIZE * 2];
-                    char linepos[256];
-                    int pos;
-                    LLint cacheNdxLen = 0;
-                    char *cacheNdx = readfile2(
-                        fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
-                                StringBuff(opt->path_log), "hts-cache/new.ndx"),
-                        &cacheNdxLen);
+                    /* CACHE_ENTRYNAME_SIZE bounds a stored entry name; the
+                       "http://" a schemeless one gets back needs the slack */
+                    char BIGSTK url[CACHE_ENTRYNAME_SIZE + 8];
+
                     cache_init(&cache, opt);    /* load cache */
-                    if (cacheNdx != NULL) {
-                      char firstline[256];
-                      char *a = cacheNdx;
-                      const char *const end = cacheNdx + cacheNdxLen;
+                    /* cache_init() indexed every ZIP member into
+                       cache.hashtable, keyed by the stored entry name minus any
+                       "http://"; walk that index rather than the .ndx dropped
+                       after 3.31 */
+                    if (cache.zipInput != NULL) {
+                      struct_coucal_enum e = coucal_enum_new(cache.hashtable);
+                      coucal_item *item;
 
-                      a += cache_brstr(a, firstline, sizeof(firstline));
-                      a += cache_brstr(a, firstline, sizeof(firstline));
-                      while (a != NULL && a < end) {
-                        a = strchr(a + 1, '\n');        /* start of line */
-                        if (a) {
-                          htsblk r;
+                      while ((item = coucal_enum_next(&e)) != NULL) {
+                        const char *const key = (const char *) item->name;
 
-                          /* */
-                          a++;
-                          /* read "host/file" */
-                          a += cache_binput(a, end, afs.af.adr, HTS_URLMAXSIZE);
-                          a += cache_binput(a, end, afs.af.fil, HTS_URLMAXSIZE);
-                          url[0] = '\0';
-                          if (!link_has_authority(afs.af.adr))
-                            strcatbuff(url, "http://");
-                          strcatbuff(url, afs.af.adr);
-                          strcatbuff(url, afs.af.fil);
-                          /* read position */
-                          a += cache_binput(a, end, linepos, 200);
-                          sscanf(linepos, "%d", &pos);
-                          if (!hasFilter
-                              || (strjoker(url, filter, NULL, NULL) != NULL)
-                            ) {
-                            r = cache_read_ro(opt, &cache, afs.af.adr, afs.af.fil, "", NULL); // lire entrée cache + data
-                            if (r.statuscode != -1) {   // No errors
-                              found++;
-                              if (!hasFilter) {
-                                fprintf(stdout, "%s%s%s\r\n",
-                                        (link_has_authority(afs.af.adr)) ? "" :
-                                        "http://", afs.af.adr, afs.af.fil);
-                              } else {
-                                char msg[256], cdate[256];
-
-                                infostatuscode(msg, r.statuscode);
-                                time_gmt_rfc822(cdate);
-
-                                fprintf(stdout, "HTTP/1.1 %d %s\r\n",
-                                        r.statuscode, r.msg[0] ? r.msg : msg);
-                                fprintf(stdout, "X-Host: %s\r\n", afs.af.adr);
-                                fprintf(stdout, "X-File: %s\r\n", afs.af.fil);
-                                fprintf(stdout, "X-URL: %s%s%s\r\n",
-                                        (link_has_authority(afs.af.adr)) ? "" :
-                                        "http://", afs.af.adr, afs.af.fil);
-                                if (url_savename
-                                    (&afs, /*former */ NULL,
-                                     /*referer_adr */
-                                     NULL, /*referer_fil */ NULL,
-                                     /*opt */ opt, /*sback */ NULL,
-                                     /*cache */ &cache, /*hash */ NULL, /*ptr */
-                                     0, /*numero_passe */ 0, /*mime_type */
-                                     NULL) != -1) {
-                                  if (fexist_utf8(afs.save)) {
-                                    fprintf(stdout, "Content-location: %s\r\n",
-                                            afs.save);
-                                  }
-                                }
-                                fprintf(stdout, "Date: %s\r\n", cdate);
-                                fprintf(stdout,
-                                        "Server: HTTrack Website Copier/"
-                                        HTTRACK_VERSION "\r\n");
-                                if (r.lastmodified[0]) {
-                                  fprintf(stdout, "Last-Modified: %s\r\n",
-                                          r.lastmodified);
-                                }
-                                if (r.etag[0]) {
-                                  fprintf(stdout, "Etag: %s\r\n", r.etag);
-                                }
-                                if (r.totalsize >= 0) {
-                                  fprintf(stdout,
-                                          "Content-Length: " LLintP "\r\n",
-                                          r.totalsize);
-                                }
-                                fprintf(stdout,
-                                        "X-Content-Length: " LLintP "\r\n",
-                                        (r.size >= 0) ? r.size : (-r.size));
-                                if (r.contenttype[0]) {
-                                  fprintf(stdout, "Content-Type: %s\r\n",
-                                          hts_effective_mime(r.contenttype));
-                                }
-                                if (r.cdispo[0]) {
-                                  fprintf(stdout, "Content-Disposition: %s\r\n",
-                                          r.cdispo);
-                                }
-                                if (r.contentencoding[0]) {
-                                  fprintf(stdout, "Content-Encoding: %s\r\n",
-                                          r.contentencoding);
-                                }
-                                if (r.is_chunk) {
-                                  fprintf(stdout,
-                                          "Transfer-Encoding: chunked\r\n");
-                                }
-#if HTS_USEOPENSSL
-                                if (r.ssl) {
-                                  fprintf(stdout, "X-SSL: yes\r\n");
-                                }
-#endif
-                                if (r.is_write) {
-                                  fprintf(stdout, "X-Direct-To-Disk: yes\r\n");
-                                }
-                                if (r.compressed) {
-                                  fprintf(stdout, "X-Compressed: yes\r\n");
-                                }
-                                if (r.notmodified) {
-                                  fprintf(stdout, "X-Not-Modified: yes\r\n");
-                                }
-                                if (r.is_chunk) {
-                                  fprintf(stdout, "X-Chunked: yes\r\n");
-                                }
-                                fprintf(stdout, "\r\n");
-                                /* Send the body */
-                                if (sendb && r.adr) {
-                                  fprintf(stdout, "%s\r\n", r.adr);
-                                }
-                              }
-                            }
-                          }
+                        /* a name read back from the cache can be anything, and
+                           strlncatbuff aborts rather than truncates: bound each
+                           append by what is left so an over-long one clips */
+                        url[0] = '\0';
+                        if (!link_has_authority(key))
+                          strlncatbuff(url, "http://", sizeof(url),
+                                       sizeof(url) - 1);
+                        strlncatbuff(url, key, sizeof(url),
+                                     sizeof(url) - 1 - strlen(url));
+                        if (hasFilter &&
+                            strjoker(url, filter, NULL, NULL) == NULL)
+                          continue;
+                        found++;
+                        if (!hasFilter) {
+                          fprintf(stdout, "%s\r\n", url);
+                        } else {
+                          cmdl_print_cache_entry(opt, &cache, url, sendb);
                         }
                       }
-                      freet(cacheNdx);
                     }
                   }
                   if (!found) {

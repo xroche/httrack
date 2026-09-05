@@ -1099,9 +1099,11 @@ class Handler(SimpleHTTPRequestHandler):
             '\t<a href="stay.html">stay</a>\n'
         )
 
-    def send_truncated(self, body, content_type):
+    def send_truncated(self, body, content_type, extra_headers=()):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
+        for name, value in extra_headers:
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         if self.command == "HEAD":
@@ -1128,6 +1130,36 @@ class Handler(SimpleHTTPRequestHandler):
     def route_uptrunc_stay(self):
         v = 1 if self.refetch_pass() == 1 else 2
         self.send_raw(b"<html><body><p>STAY-V%d</p></body></html>" % v, "text/html")
+
+    # Same, with nothing hypertext coming in short: a page that gave up before
+    # parsing holds the whole purge (#1390), which hides what #562 fixed.
+    def route_uptruncbin_index(self):
+        gone = '\t<a href="gone.html">gone</a>\n' if self.refetch_pass() == 1 else ""
+        self.send_html(
+            '\t<a href="file.bin">file</a>\n' '\t<a href="stay.html">stay</a>\n' + gone
+        )
+
+    # gzip-coded, so the fetch lands in a temporary and nothing notes the
+    # mirrored copy before the body comes in short.
+    def route_uptruncbin_file(self):
+        body = self.gzipped(self.BIN_V1)
+        if self.refetch_pass() == 1:
+            self.send_coded(body, "application/octet-stream")
+        else:
+            self.send_truncated(
+                body,
+                "application/octet-stream",
+                extra_headers=[("Content-Encoding", "gzip")],
+            )
+
+    def route_uptruncbin_stay(self):
+        v = 1 if self.refetch_pass() == 1 else 2
+        self.send_raw(b"<html><body><p>BINSTAY-V%d</p></body></html>" % v, "text/html")
+
+    # Linked on pass 1 only: the purge has to take it, or file.bin surviving
+    # says nothing about the purge having run.
+    def route_uptruncbin_gone(self):
+        self.send_raw(b"<html><body><p>GONE-V1</p></body></html>", "text/html")
 
     # --- re-fetch cut mid-header, so nothing is stored (#746, #748) ---------
     KEEP_PAGE = b"<html><body><p>KEEP-PAGE-V1</p></body></html>"
@@ -1763,7 +1795,9 @@ class Handler(SimpleHTTPRequestHandler):
         log = os.environ.get("CHARREF_LOG")
         if log:
             fields = [f for f in urlsplit(self.path).query.split("&") if f]
-            with open(log, "a") as fp:
+            # newline: the shell reads the count field, and a native python
+            # would leave a CR on it
+            with open(log, "a", newline="\n") as fp:
                 fp.write("%s\t%d\n" % (self.path, len(fields)))
 
     def route_charref(self):
@@ -3378,6 +3412,10 @@ class Handler(SimpleHTTPRequestHandler):
         "/uptrunc/page.html": route_uptrunc_page,
         "/uptrunc/file.bin": route_uptrunc_file,
         "/uptrunc/stay.html": route_uptrunc_stay,
+        "/uptruncbin/index.html": route_uptruncbin_index,
+        "/uptruncbin/file.bin": route_uptruncbin_file,
+        "/uptruncbin/stay.html": route_uptruncbin_stay,
+        "/uptruncbin/gone.html": route_uptruncbin_gone,
         "/keep/index.html": route_keep_index,
         "/keep/page.html": route_keep_page,
         "/keep/data.bin": route_keep_data,

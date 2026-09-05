@@ -27,6 +27,11 @@ def bind_ephemeral():
     return srv, srv.getsockname()[1]
 
 
+def logfile(logdir, name):
+    """Append handle on a log the shell greps: Windows text mode emits CRLF."""
+    return open(os.path.join(logdir, name), "a", newline="\n")
+
+
 def pipe(src, dst):
     """Relay bytes one way until EOF, then tear both ends down."""
     try:
@@ -49,7 +54,7 @@ def make_origin(logdir, body):
     class Origin(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
             # the request line proves origin-form vs absolute-URI (#564)
-            with open(os.path.join(logdir, ORIGIN_LOG), "a") as handle:
+            with logfile(logdir, ORIGIN_LOG) as handle:
                 handle.write(self.requestline + "\n")
                 for key in self.headers.keys():
                     handle.write(key + "\n")
@@ -88,7 +93,7 @@ def handle_client(conn, logdir, mode, default_port):
         key, _, value = line.partition(":")
         if key.strip().lower() == "proxy-authorization":
             auth = value.strip()
-    with open(os.path.join(logdir, PROXY_LOG), "a") as handle:
+    with logfile(logdir, PROXY_LOG) as handle:
         handle.write(request_line + "\n")
         if auth is not None:
             handle.write("AUTH " + auth + "\n")

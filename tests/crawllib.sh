@@ -84,9 +84,20 @@ local_server_start() {
     SRV_LOG=$log
     : >"$SRV_LOG"
 
+    # local-server.py runs native under wsl2: the shim never converts a path
+    # inside a value, and find_python's .exe fallback goes round it entirely.
+    local wslenv=() names='' e
+    if test "$(suite_backend)" = wsl2 && test ${#envs[@]} -gt 0; then
+        for e in "${!envs[@]}"; do
+            names="${names:+$names:}${envs[$e]%%=*}"
+            envs[e]="${envs[$e]%%=*}=$(nativepath "${envs[$e]#*=}")"
+        done
+        wslenv=("WSLENV=${WSLENV:+$WSLENV:}$names")
+    fi
+
     # Stdin off the terminal: run_with_timeout toggles job control, and a
     # background job that touches the tty is stopped with SIGTTIN.
-    env ${envs[@]+"${envs[@]}"} "$SRV_PYTHON" \
+    env ${wslenv[@]+"${wslenv[@]}"} ${envs[@]+"${envs[@]}"} "$SRV_PYTHON" \
         "$(nativepath "${testdir}/local-server.py")" \
         --root "$(nativepath "$root")" ${tls[@]+"${tls[@]}"} "$@" \
         >"$SRV_LOG" 2>&1 </dev/null &

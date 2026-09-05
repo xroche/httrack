@@ -74,7 +74,8 @@ static int linput(FILE * fp, char *s, int max);
 #include <sys/ioctl.h>
 #endif
 #ifdef _WIN32
-#include <io.h> /* _isatty */
+#include <io.h>    /* _isatty, _setmode */
+#include <fcntl.h> /* _O_BINARY */
 #endif
 #include <ctype.h>
 /* END specific definitions */
@@ -252,11 +253,25 @@ static httrackp *global_opt = NULL;
 
 static void signal_handlers(void);
 
+#ifdef _WIN32
+/* Windows opens stdout in text mode, so every \n leaves as \r\n. A shell
+   reading that pipe sees the CR: MSYS folds it away, a Linux one under WSL2
+   does not, and the test suite then compares against a byte it never wrote.
+   Set by tests/ci-windows-suite.sh, so nothing changes for anyone else. */
+static void hts_binary_stdio(void) {
+  if (getenv("HTS_BINARY_STDIO") != NULL) {
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
+  }
+}
+#endif
+
 int main(int argc, char **argv) {
   int ret = 0;
   httrackp *opt;
 
 #ifdef _WIN32
+  hts_binary_stdio();
   hts_argv_utf8(&argc, &argv);
   {
     WORD wVersionRequested;     // requested version WinSock API

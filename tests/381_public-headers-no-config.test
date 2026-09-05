@@ -108,13 +108,15 @@ diff -u "$tmp/library.out" "$tmp/consumer.out" ||
     fail "the installed headers lay the structs out differently from the library"
 
 # Force the layout switch to the wrong value: the probe has to notice, or none
-# of the above was measuring anything.
+# of the above was measuring anything. Which value is wrong depends on the
+# build, so flip it rather than writing 0 over a build that already has 0.
 chmod -R u+w "$inc"
-sed -i.bak 's|^#define HTS_INET6 .*|#define HTS_INET6 0|' "$inc/htsfeatures.h" && rm -f "$inc/htsfeatures.h.bak"
-grep -qx '#define HTS_INET6 0' "$inc/htsfeatures.h" || fail "the negative control did not rewrite HTS_INET6"
+grep -qx '#define HTS_INET6 1' "$inc/htsfeatures.h" && wrong=0 || wrong=1
+sed -i.bak "s|^#define HTS_INET6 .*|#define HTS_INET6 $wrong|" "$inc/htsfeatures.h" && rm -f "$inc/htsfeatures.h.bak"
+grep -qx "#define HTS_INET6 $wrong" "$inc/htsfeatures.h" || fail "the negative control did not rewrite HTS_INET6"
 probe "$tmp/wrong.out" || fail "the wrong-HTS_INET6 consumer did not build, so the diff below never ran"
 ! diff -q "$tmp/library.out" "$tmp/wrong.out" >/dev/null ||
-    fail "HTS_INET6=0 changed no size or offset, so this test cannot see the bug it guards"
+    fail "HTS_INET6=$wrong changed no size or offset, so this test cannot see the bug it guards"
 
 # And the downstream patch itself: dropping the header and its include, which is
 # what installing config.h was buying. Which way it breaks is decided, not

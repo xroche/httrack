@@ -254,12 +254,14 @@ jobs:
           bash tests/install-headers-sweep.sh --backend cl --srcdir . -- @inc
           if ($LASTEXITCODE -ne 0) { throw "the installed headers do not compile standalone and pairwise" }
 
-      # The engine ships ~90 tests and none had ever run on Windows: "make check"
-      # is Linux/macOS only. These are the offline ones, driven from Git Bash
-      # against the native httrack.exe. They subsume the self-tests this step
-      # used to run inline (codecs, cache, fsize).
-      # The *_local-* ones crawl the bundled Python server over loopback: the real
-      # TLS handshake, cache and file writer, which nothing else on Windows covers.
+      - name: Restore the WSL rootfs
+        id: wslrootfs
+        if: always()
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}\wsl-rootfs.tar.gz
+          key: wsl-rootfs-jammy-amd64-v1
+
       - name: Run the engine test suite (offline tests)
         shell: bash
         working-directory: tests
@@ -298,7 +300,7 @@ jobs:
       # It buys a real Linux shell against the same native httrack.exe, where
       # MSYS's fork emulation is what breaks first under load (#1273).
       - name: Bring up WSL2
-        if: always() && matrix.platform == 'x64'
+        if: always()
         # Non-gating like the suite step it feeds: this runs inside a job whose
         # context `Protect master` requires, so a flaky import must not red it.
         continue-on-error: true
@@ -311,8 +313,22 @@ jobs:
           $root = "$env:RUNNER_TEMP\wsl-rootfs.tar.gz"
           # jammy, not noble: the noble rootfs asset 404s as of 2026-09. The
           # jammy asset is named after its release, not "wsl.rootfs".
-          Invoke-WebRequest -UseBasicParsing -OutFile $root `
-            "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
+          # Cached above, because this host has answered 403 on a good URL and
+          # a whole leg then rests on one third-party request. Three tries with
+          # a pause, so a transient does not cost the round either.
+          if (Test-Path $root) {
+            Write-Host "rootfs restored from cache, $((Get-Item $root).Length) bytes"
+          } else {
+            $url = "https://cloud-images.ubuntu.com/wsl/jammy/current/ubuntu-jammy-wsl-amd64-ubuntu22.04lts.rootfs.tar.gz"
+            for ($i = 1; $i -le 3; $i++) {
+              try { Invoke-WebRequest -UseBasicParsing -OutFile $root $url; break }
+              catch {
+                Write-Host "rootfs download attempt $i failed: $($_.Exception.Message)"
+                if ($i -eq 3) { throw }
+                Start-Sleep -Seconds (5 * $i)
+              }
+            }
+          }
           wsl --import httrack-suite "$env:RUNNER_TEMP\wsl-distro" $root --version 2
           if ($LASTEXITCODE -ne 0) { throw "wsl --import failed" }
           # A distro that answers is the only proof the import is usable.
@@ -321,9 +337,19 @@ jobs:
           # For the record when a path stops converting: this rootfs has no
           # wslpath, which is why nothing in the suite calls one.
           wsl -d httrack-suite -- sh -c 'command -v wslpath || echo "no wslpath"'
+          # Recorded because a path error naming no path sent this looking in
+          # the wrong place: the automount is there, /mnt/c and /mnt/d included.
+          wsl -d httrack-suite -- sh -c 'echo mounts:; ls -d /mnt/*'
+
+      - name: Save the WSL rootfs
+        if: always() && steps.wslrootfs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}\wsl-rootfs.tar.gz
+          key: wsl-rootfs-jammy-amd64-v1
 
       - name: Run the engine test suite (offline tests, WSL2)
-        if: always() && matrix.platform == 'x64'
+        if: always()
         # The harness is new: a red here must not gate the job until it has a
         # few days of history to read it against. Flip this once it has.
         continue-on-error: true
@@ -340,10 +366,15 @@ jobs:
           WATCHDOG_CONTEXT: windows-suite-wsl2 (${{ matrix.platform }}, ${{ matrix.configuration }})
           WATCHDOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          # Git Bash rewrites anything shaped like a POSIX path on its way to a
+          # native exe, and wsl.exe is one: /mnt/d/... reached the distro as
+          # "C:/Program Files/Git/mnt/d/...". The driver sets these for the same
+          # reason on its own side.
+          export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
           # /p translates a value as a path on the way in; RUNNER_TEMP goes over
           # untranslated, since the driver takes the Windows form and converts it
           # itself for the two views it needs.
-          export WSLENV='HTTRACK_SUITE_BACKEND:HTTRACK_SUITE_JOBS:RUNNER_TEMP:WATCHDOG_TOKEN:WATCHDOG_REPO:WATCHDOG_SHA:WATCHDOG_CONTEXT:WATCHDOG_URL:GITHUB_STEP_SUMMARY/p'
+          export WSLENV='HTTRACK_SUITE_BACKEND:HTTRACK_SUITE_JOBS:RUNNER_TEMP:WATCHDOG_TOKEN:WATCHDOG_REPO:WATCHDOG_SHA:WATCHDOG_CONTEXT:WATCHDOG_URL:GITHUB_STEP_SUMMARY/p:HTS_WS:HTS_BIN'
           export HTTRACK_SUITE_BACKEND=wsl2
           # Mapped here rather than by wslpath, which a bare imported rootfs
           # does not ship: `wsl -- wslpath` answers ERROR_PATH_NOT_FOUND. MSYS
@@ -356,11 +387,27 @@ jobs:
             exit 1
             ;;
           esac
-          wsl -d httrack-suite --cd "$ws/tests" -- \
-            bash ./ci-windows-suite.sh \
-            "$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}" \
-            2>&1 | tee suite-console.log
+          # Through the environment, not argv: `wsl -- sh -c '...' _ "$ws"`
+          # delivered an empty $1, which is what the path error naming no path
+          # was. WSLENV already carries everything else this step needs.
+          # The bring-up is continue-on-error, so a failed import reaches here as
+          # "There is no distribution with the supplied name" and exit 127, which
+          # names neither the step that failed nor why. wsl -l writes UTF-16.
+          wsl -l -q | tr -d '\0\r' | grep -qx httrack-suite || {
+            echo "::error::no httrack-suite distro: the Bring up WSL2 step did not finish"
+            exit 1
+          }
+          export HTS_WS="$ws"
+          export HTS_BIN="$ws/src/${{ matrix.platform }}/${{ matrix.configuration }}"
+          wsl -d httrack-suite -- sh -c 'echo "ws=[$HTS_WS] bin=[$HTS_BIN]"; test -d "$HTS_WS/tests" || { echo "::error::$HTS_WS/tests is not visible in the distro"; exit 1; }'
+          wsl -d httrack-suite -- sh -c 'cd "$HTS_WS/tests" && exec bash ./ci-windows-suite.sh "$HTS_BIN"' 2>&1 | tee suite-console-wsl2.log
 
+      # The engine ships ~90 tests and none had ever run on Windows: "make check"
+      # is Linux/macOS only. These are the offline ones, driven from Git Bash
+      # against the native httrack.exe. They subsume the self-tests this step
+      # used to run inline (codecs, cache, fsize).
+      # The *_local-* ones crawl the bundled Python server over loopback: the real
+      # TLS handshake, cache and file writer, which nothing else on Windows covers.
       - name: Upload the test logs
         if: always()
         uses: actions/upload-artifact@v7

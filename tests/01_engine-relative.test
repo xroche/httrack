@@ -52,4 +52,19 @@ ident 'file://srv/share/../x' 'www.foo.com' '/p.html' 'adr=file:// fil=//srv/x'
 ident 'mailto:foo@bar.com' 'www.foo.com' '/p.html' 'error=-1' # unsupported scheme
 ident 'javascript:void(0)' 'www.foo.com' '/p.html' 'error=-1'
 
+# A build without TLS must drop an https link (-2), not fold it into the origin
+# host: the "https:" arm of the relative branch strips the scheme and the link
+# is then refetched from the origin in the clear.
+if test "${HTTPS_SUPPORT:-yes}" = "no"; then
+    ident 'https://secure.foo.com/a/b/../c.gif' 'www.foo.com' '/p.html' 'error=-2'
+    ident 'HTTPS://secure.foo.com/x' 'www.foo.com' '/p.html' 'error=-2'
+    ident 'https:/a/b.gif' 'www.foo.com' '/p.html' 'error=-2' # scheme-relative
+    ident 'https:x.gif' 'www.foo.com' '/p.html' 'error=-2'
+else
+    ident 'https://secure.foo.com/a/b/../c.gif' 'www.foo.com' '/p.html' 'adr=https://secure.foo.com fil=/a/c.gif'
+    ident 'HTTPS://secure.foo.com/x' 'www.foo.com' '/p.html' 'adr=https://secure.foo.com fil=/x'
+    ident 'https:/a/b.gif' 'www.foo.com' '/p.html' 'adr=https://www.foo.com fil=/a/b.gif'
+    ident 'https:x.gif' 'www.foo.com' '/p.html' 'adr=https://www.foo.com fil=/x.gif'
+fi
+
 selftest_run_queued

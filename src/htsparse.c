@@ -2500,7 +2500,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     afs.af.adr[0] = '\0';      // erreur
                     if (reponse == -2) {
                       hts_log_print(opt, LOG_WARNING,
-                                    "Link %s not caught (unknown protocol)",
+                                    "Link %s not caught (protocol not "
+                                    "supported by this build)",
                                     lien);
                     } else {
                       hts_log_print(opt, LOG_DEBUG,
@@ -3188,6 +3189,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             fp = NULL;
                           }
                         }
+                        TypedArrayFree(output_buffer);
                         XH_uninit;      // désallocation mémoire & buffers
                         return -1;
                       } else {  // noter le lien sur la listes des liens à charger
@@ -3263,6 +3265,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                             fp = NULL;
                                           }
                                         }
+                                        TypedArrayFree(output_buffer);
                                         XH_uninit;      // désallocation mémoire & buffers
                                         return -1;
                                       }
@@ -3303,6 +3306,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 fp = NULL;
                               }
                             }
+                            TypedArrayFree(output_buffer);
                             XH_uninit;  // désallocation mémoire & buffers
                             return -1;
                           }
@@ -3465,6 +3469,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           if (!hts_loop_tick(sback, opt, 0, ptr)) {
             hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
             *stre->exit_xh_ = 1;        // exit requested
+            TypedArrayFree(output_buffer);
             XH_uninit;
             return -1;
           } else if (opt->state._hts_cancel == 1) {
@@ -3512,8 +3517,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
               opt, cache, r, &fp, TypedArrayElts(output_buffer),
               TypedArraySize(output_buffer), urladr(), urlfil(), savename());
         }
-        TypedArrayFree(output_buffer);
       }
+      /* outside the write: mimehtml appends whatever the output mode is */
+      TypedArrayFree(output_buffer);
       //
       //
       //

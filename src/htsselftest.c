@@ -1994,6 +1994,9 @@ static int st_hashtable(httrackp *opt, int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 #undef FMT
+  freet(buff);
+  freet(strings);
+  freet(snum);
   return 0;
 }
 
@@ -2291,6 +2294,28 @@ static int st_copyopt(httrackp *opt, int argc, char **argv) {
   hts_free_opt(from);
   hts_free_opt(to);
   printf("copy-htsopt: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+/* The handler below pins the enumerator NAME; these pin the NUMBERS, which are
+   ABI in the installed htsopt.h and are what -C prints. */
+HTS_STATIC_ASSERT(HTS_CACHE_NONE == 0, cache_none_is_0);
+HTS_STATIC_ASSERT(HTS_CACHE_PRIORITY == 1, cache_priority_is_1);
+HTS_STATIC_ASSERT(HTS_CACHE_TEST_UPDATE == 2, cache_test_update_is_2);
+
+/* -C's own default (no -C given) is C1 cache-priority, not the C2 test-update
+   the man page and this enum's comment claimed for a long time. */
+static int st_cachedefault(httrackp *opt, int argc, char **argv) {
+  httrackp *const fresh = hts_create_opt();
+  int err = 0;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  if (fresh->cache != HTS_CACHE_PRIORITY)
+    err = 1;
+  hts_free_opt(fresh);
+  printf("cache-default: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -3395,6 +3420,158 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
   }
   if (gone != -1) {
     fprintf(stderr, "fsize: absent file is " LLintP ", expected -1\n", gone);
+    rc = 1;
+  }
+  return rc;
+}
+
+/* The deprecated form is what this test measures, so silence it here only. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+static int st_findsize_legacy(find_handle find) {
+  return hts_findgetsize(find);
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+/* Sparse file of exactly `size` bytes; 77 where the host cannot hold it. */
+static int st_findsize_make(const char *path, LLint size) {
+  FILE *fp = FOPEN(path, "wb");
+  hts_boolean ok;
+  int err;
+
+  if (fp == NULL) {
+    fprintf(stderr, "findsize: cannot create '%s': %s\n", path,
+            strerror(errno));
+    return 1;
+  }
+#ifdef _WIN32
+  {
+    /* NTFS allocates the hole unless asked not to; POSIX gives it for free. */
+    HANDLE fh = (HANDLE) _get_osfhandle(_fileno(fp));
+    DWORD ret;
+
+    if (fh != INVALID_HANDLE_VALUE)
+      (void) DeviceIoControl(fh, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &ret,
+                             NULL);
+  }
+#endif
+  ok = fseeko(fp, size - 1, SEEK_SET) == 0 && fputc(0, fp) != EOF ? HTS_TRUE
+                                                                  : HTS_FALSE;
+  err = errno;
+  if (fclose(fp) != 0 && ok) {
+    ok = HTS_FALSE;
+    err = errno;
+  }
+  if (ok)
+    return 0;
+  fprintf(stderr, "findsize: cannot extend '%s' to " LLintP ": %s\n", path,
+          size, strerror(err));
+  UNLINK(path);
+  /* the host cannot hold the probe (small file cap, full disk): skip */
+  return err == EFBIG || err == ENOSPC ? 77 : 1;
+}
+
+/* Three entries measured through both find-size forms. 6GB is the one that
+   catches a sign-extended low dword: bit 31 of 0x1_8000_0000 is set, where
+   5GB's 0x4000_0000 and 1234 both leave it clear. */
+static int st_findsize(httrackp *opt, int argc, char **argv) {
+  const LLint big_expected = 5 * 1024 * 1024 * 1024LL;
+  const LLint sign_expected = 6 * 1024 * 1024 * 1024LL;
+  const LLint small_expected = 1234;
+  char BIGSTK big[HTS_URLMAXSIZE * 2];
+  char BIGSTK sign[HTS_URLMAXSIZE * 2];
+  char BIGSTK small[HTS_URLMAXSIZE * 2];
+  const int width = (int) sizeof(hts_findgetsize64(NULL));
+  LLint big_got = -2, sign_got = -2, small_got = -2;
+  int big_got32 = -2, sign_got32 = -2, small_got32 = -2;
+  find_handle h;
+  int rc;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "findsize: needs a directory\n");
+    return 1;
+  }
+  concat(big, sizeof(big), argv[0], "/find-5g.bin");
+  concat(sign, sizeof(sign), argv[0], "/find-6g.bin");
+  concat(small, sizeof(small), argv[0], "/find-small.bin");
+
+  rc = st_findsize_make(big, big_expected);
+  if (rc == 0)
+    rc = st_findsize_make(sign, sign_expected);
+  if (rc == 0)
+    rc = st_findsize_make(small, small_expected);
+  if (rc != 0) {
+    UNLINK(big);
+    UNLINK(sign);
+    UNLINK(small);
+    return rc;
+  }
+
+  h = hts_findfirst(argv[0]);
+  if (h == NULL) {
+    fprintf(stderr, "findsize: cannot enumerate '%s'\n", argv[0]);
+    rc = 1;
+  } else {
+    do {
+      const char *const name = hts_findgetname(h);
+
+      if (name == NULL)
+        continue;
+      if (strcmp(name, "find-5g.bin") == 0) {
+        big_got = hts_findgetsize64(h);
+        big_got32 = st_findsize_legacy(h);
+      } else if (strcmp(name, "find-6g.bin") == 0) {
+        sign_got = hts_findgetsize64(h);
+        sign_got32 = st_findsize_legacy(h);
+      } else if (strcmp(name, "find-small.bin") == 0) {
+        small_got = hts_findgetsize64(h);
+        small_got32 = st_findsize_legacy(h);
+      }
+    } while (hts_findnext(h));
+    hts_findclose(h);
+  }
+  UNLINK(big);
+  UNLINK(sign);
+  UNLINK(small);
+  if (rc != 0)
+    return rc;
+
+  printf("findsize: width=%d big=" LLintP ",%d signbit=" LLintP
+         ",%d small=" LLintP ",%d\n",
+         width, big_got, big_got32, sign_got, sign_got32, small_got,
+         small_got32);
+  if (width != 8) {
+    fprintf(stderr, "findsize: return type is %d bytes, expected 8\n", width);
+    rc = 1;
+  }
+  if (big_got != big_expected || sign_got != sign_expected) {
+    fprintf(stderr,
+            "findsize: 5GB/6GB files are " LLintP "/" LLintP
+            ", expected " LLintP "/" LLintP "\n",
+            big_got, sign_got, big_expected, sign_expected);
+    rc = 1;
+  }
+  if (big_got32 != -1 || sign_got32 != -1) {
+    fprintf(stderr,
+            "findsize: deprecated form is %d/%d on the 5GB/6GB files, "
+            "expected the -1 sentinel\n",
+            big_got32, sign_got32);
+    rc = 1;
+  }
+  if (small_got != small_expected || small_got32 != (int) small_expected) {
+    fprintf(stderr, "findsize: " LLintP "-byte file is " LLintP ",%d\n",
+            small_expected, small_got, small_got32);
     rc = 1;
   }
   return rc;
@@ -4701,6 +4878,18 @@ static int st_cache_legacy(httrackp *opt, int argc, char **argv) {
   }
   err = cache_legacy_refused_selftest(opt, argv[0]);
   printf("cache-legacy: %s\n", err ? "FAIL" : "OK");
+  return err;
+}
+
+static int st_ref_portable(httrackp *opt, int argc, char **argv) {
+  int err;
+
+  if (argc < 1) {
+    fprintf(stderr, "ref-portable: needs a directory\n");
+    return 1;
+  }
+  err = ref_portable_selftest(opt, argv[0]);
+  printf("ref-portable: %s\n", err ? "FAIL" : "OK");
   return err;
 }
 
@@ -13257,6 +13446,8 @@ static const struct selftest_entry {
      "layout of the installed structs configure's switches decide",
      st_pubheaders},
     {"copyopt", "", "copy_htsopt option-copy self-test", st_copyopt},
+    {"cachedefault", "", "-C default is C1 cache-priority, not C2",
+     st_cachedefault},
     {"lastchar", "",
      "last-char helpers never index before the buffer (#770, #781, #821)",
      st_lastchar},
@@ -13336,6 +13527,9 @@ static const struct selftest_entry {
      "escape_remove_control() terminates at the compacted end",
      st_escape_control},
     {"fsize", "<dir>", "file size past the 2GB signed-32-bit wrap", st_fsize},
+    {"findsize", "<dir>",
+     "directory-enumeration file size past the 2GB signed-32-bit wrap",
+     st_findsize},
     {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
      st_growsize},
     {"addlink", "", "htsAddLink codebase walk over an empty current path",
@@ -13353,6 +13547,9 @@ static const struct selftest_entry {
      st_reconcile},
     {"cache-legacy", "<dir>", "pre-3.31 legacy cache refusal self-test",
      st_cache_legacy},
+    {"ref-portable", "<dir>",
+     "the .ref resume state is host-independent, and refuses a legacy one",
+     st_ref_portable},
     {"cache-corrupt", "<dir>", "cache read-side corruption self-test",
      st_cache_corrupt},
     {"cache-readfail", "<dir>",

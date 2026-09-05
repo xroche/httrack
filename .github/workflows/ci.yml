@@ -570,9 +570,9 @@ jobs:
         run: make -j"$(nproc)"
 
       - name: Test (sanitized)
-        # Leaks at exit are out of scope (the CLI frees little on the way out);
-        # we want memory-safety errors, so turn leak detection off and make every
-        # other finding abort the run.
+        # Leak detection is on, because nothing else in CI catches a dropped
+        # free. LSan only reports at a normal exit, so a test that kills the
+        # engine still contributes nothing. Every other finding aborts the run.
         #
         # Poison fresh allocations with 0xCA and freed blocks with 0xCB (decimal
         # 202/203) so memory never reads back as accidental zeros: a missing-NUL
@@ -582,7 +582,7 @@ jobs:
         # bytes by default, so max_malloc_fill_size lifts it to cover large cache
         # buffers; free_fill flags use-after-free reads.
         env:
-          ASAN_OPTIONS: detect_leaks=0:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647:log_path=${{ github.workspace }}/sanitizer-logs/asan
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1:halt_on_error=1:strict_string_checks=1:malloc_fill_byte=202:max_malloc_fill_size=2147483647:free_fill_byte=203:max_free_fill_size=2147483647:log_path=${{ github.workspace }}/sanitizer-logs/asan
           # No log_path here: gcc's UBSan ignores it and writes to stderr, which
           # most tests redirect away; the harness keeps a copy under the directory
           # below.

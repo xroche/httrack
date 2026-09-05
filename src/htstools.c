@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 /* String */
 #include <ctype.h>
+#include <limits.h>
 #include "htscore.h"
 #include "htstools.h"
 #include "htsio.h"
@@ -104,6 +105,13 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
       scheme = 1;
   }
 
+#if !HTS_USEOPENSSL
+  // Drop every https link: the relative arm below strips "https:" and refetches
+  // it from the origin host in the clear.
+  if (strfield(lien, "https:"))
+    return -2;
+#endif
+
   // filtrer les parazites (mailto & cie)
   // scheme+authority (//)
   if ((strfield(lien, "http://"))       // scheme+//
@@ -122,17 +130,13 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     } else {
       ok = -2;                  // non supporté
     }
-#if HTS_USEOPENSSL
   } else if (strfield(lien, "https://")) {
-    // Note: ftp:foobar.gif is not valid
     if (ident_url_absolute(lien, adrfil) == -1) {
       ok = -1;                // erreur URL
     }
-#endif
-  } else if ((scheme) && ((!strfield(lien, "http:"))
-                          && (!strfield(lien, "https:"))
-                          && (!strfield(lien, "ftp:"))
-             )) {
+  } else if ((scheme) &&
+             ((!strfield(lien, "http:")) && (!strfield(lien, "https:")) &&
+              (!strfield(lien, "ftp:")))) {
     ok = -1;                    // unknown scheme
   } else {                      // c'est un lien relatif
     // On forme l'URL complète à partie de l'url actuelle
@@ -211,7 +215,7 @@ int ident_url_relatif(const char *lien, const char *origin_adr,
     } else
       ok = -1;
 
-  }                             // test news: etc.
+  } // test news: etc.
 
   // case insensitive pour adresse
   {
@@ -1208,8 +1212,8 @@ HTSEXT_API int hts_buildtopindex(httrackp * opt, const char *path,
     freet(toptemplate_body);
   if (toptemplate_footer)
     freet(toptemplate_footer);
-  if (toptemplate_body)
-    freet(toptemplate_body);
+  if (toptemplate_bodycat)
+    freet(toptemplate_bodycat);
 
   return retval;
 }
@@ -1325,7 +1329,8 @@ find_handle h = hts_findfirst("/tmp");
 if (h) {
   do {
     if (hts_findisfile(h))
-      printf("File: %s (%d octets)\n",hts_findgetname(h),hts_findgetsize(h));
+      printf("File: %s, " LLintP " bytes\n",
+             hts_findgetname(h), hts_findgetsize64(h));
     else if (hts_findisdir(h))
       printf("Dir: %s\n",hts_findgetname(h));
   } while(hts_findnext(h));
@@ -1423,15 +1428,26 @@ HTSEXT_API char *hts_findgetname(find_handle find) {
   return NULL;
 }
 
-HTSEXT_API int hts_findgetsize(find_handle find) {
+HTSEXT_API LLint hts_findgetsize64(find_handle find) {
   if (find) {
 #ifdef _WIN32
-    return find->hdata.nFileSizeLow;
+    const uint64_t size =
+        ((uint64_t) find->hdata.nFileSizeHigh << 32) | find->hdata.nFileSizeLow;
+
+    return (LLint) size;
 #else
     return find->filestat.st_size;
 #endif
   }
   return -1;
+}
+
+HTSEXT_API int hts_findgetsize(find_handle find) {
+  const LLint size = hts_findgetsize64(find);
+
+  /* Report the error sentinel rather than the low bits: a caller sizing a
+     buffer off a plausible small number takes a heap overflow. */
+  return size >= 0 && size <= INT_MAX ? (int) size : -1;
 }
 
 HTSEXT_API hts_boolean hts_findisdir(find_handle find) {

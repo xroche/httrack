@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# -C defaults to C1 in htslib.c, not the C2 the docs claimed. Pins the code
+# side so changing it forces the docs to move too.
+assert_selftest "cache-default: OK" cachedefault
+
+exit 0

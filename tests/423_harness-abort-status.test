@@ -1,0 +1,117 @@
+#!/bin/bash
+#
+# bash before 4.2 patch 23 drops the exit status when an EXIT trap runs after a
+# fatal expansion error under errexit. macOS ships 3.2.57, so an aborted test was
+# recorded there as a PASS and 331_fortify-source.test ran vacuously for months.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+driver="${testdir}/test-timeout.sh"
+test -r "$driver" || fail "no test-timeout.sh next to $0"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_abortst.XXXXXX")
+# Hand-written, not cleanup_push: this test must not lose its own teardown to the
+# machinery it is looking at.
+trap 'set +e; rm -rf "$tmpdir"' EXIT
+
+# Does this shell forget the status of a fatal expansion error? Measured, not read
+# off $BASH_VERSION, because the patch level is what decides it.
+# shellcheck disable=SC2016 # the fixture expands it, not us
+loses_status() { # loses_status SHELL
+    local rc=0
+    # printf, so 103's scanner does not read this fixture's trap as our own.
+    {
+        echo 'set -eu'
+        printf 'trap %s EXIT\n' "'true'"
+        echo 'echo "$HTTRACK_UNSET_ON_PURPOSE"'
+    } >"$tmpdir/probe.sh"
+    "$1" "$tmpdir/probe.sh" >/dev/null 2>&1 || rc=$?
+    test "$rc" -eq 0
+}
+
+# One case, through the real harness. REACH pins whether the fixture's last line
+# runs, so a case built on an abort cannot pass once the abort stops happening.
+check() { # check SHELL NAME WANT REACH CLEANUP BODY
+    local sh=$1 name=$2 want=$3 reach=$4 cleanup=$5 body=$6 rc=0 out
+    rm -f "$tmpdir/reached"
+    {
+        printf 'set -euo pipefail\n. %s/testlib.sh\n' "$testdir"
+        printf 'cleanup_push %s\n' "$cleanup"
+        printf '%s\n' "$body"
+        printf ': >%s/reached\n' "$tmpdir"
+    } >"$tmpdir/$name.test"
+    out=$(TMPDIR="$tmpdir" "$sh" "$driver" "$tmpdir/$name.test" 2>&1) || rc=$?
+    test "$rc" -eq "$want" ||
+        fail "$sh: $name with a $cleanup cleanup exited $rc, wanted $want: $out"
+    case $reach in
+    yes) test -f "$tmpdir/reached" || fail "$sh: $name did not run to its end" ;;
+    *) test ! -f "$tmpdir/reached" || fail "$sh: $name ran past where it must stop" ;;
+    esac
+    printf '%s\n' "$out"
+}
+
+# WANT is what automake must record: 0 pass, 77 skip, 1 failure.
+# shellcheck disable=SC2016 # the fixtures expand these, not us
+run_table() { # run_table SHELL
+    local sh=$1 cleanup
+    # A cleanup that fails must not become the verdict (#773), so every case runs
+    # both ways.
+    for cleanup in true false; do
+        check "$sh" end 0 yes "$cleanup" 'echo body' >/dev/null
+        check "$sh" exit0 0 no "$cleanup" 'exit 0' >/dev/null
+        check "$sh" skip 77 no "$cleanup" 'exit 77' >/dev/null
+        check "$sh" exit1 1 no "$cleanup" 'exit 1' >/dev/null
+        check "$sh" badsubst 1 no "$cleanup" 'echo "${x!y}"' >/dev/null
+        check "$sh" badsub 1 no "$cleanup" 'a=(1 2 3); echo "${a[BAD@SUB]}"' >/dev/null
+        check "$sh" unbound 1 no "$cleanup" 'echo "$HTTRACK_UNSET_ON_PURPOSE"' >/dev/null
+        check "$sh" readonly 1 no "$cleanup" 'readonly R=1; R=2' >/dev/null
+        # The signal traps end on exit 1, which the marker wrapper now intercepts.
+        check "$sh" signal 1 no "$cleanup" 'kill -TERM $$; sleep 5' >/dev/null
+        # 'builtin exit' walks past the runner's exit wrapper, so it leaves the
+        # state a 3.2.57 abort leaves: status 0 and no end mark. Every other case
+        # here is decided before the marker is consulted, so on a shell that
+        # reports an abort correctly this is the only one that reaches it.
+        check "$sh" nomark 1 no "$cleanup" 'builtin exit 0' >/dev/null
+    done
+}
+
+# $BASH is the shell make check runs the suite with, and on macOS it is the 3.2.57
+# that has the bug. HTTRACK_BASH32 points a Linux run at one built by hand.
+shells=("${BASH:-bash}")
+for cand in ${HTTRACK_BASH32:+"$HTTRACK_BASH32"}; do
+    test -r "$cand" || fail "HTTRACK_BASH32=$cand is not readable"
+    case " ${shells[*]} " in *" $cand "*) continue ;; esac
+    shells+=("$cand")
+done
+
+buggy=
+for sh in "${shells[@]}"; do
+    if loses_status "$sh"; then
+        buggy=$sh
+        ok "$sh forgets the status of an aborted script, so the cases below bite"
+    fi
+    run_table "$sh"
+    ok "$sh: an aborted test fails, a clean one passes, a failing cleanup changes neither"
+done
+
+test -n "$buggy" ||
+    echo "note: no bash older than 4.2 patch 23 here, so the nomark case is what reaches the marker" >&2
+
+# The failure has to name itself: a bare 1 with nothing in the log sends the reader
+# looking for a test that never printed anything. Through the 3.2.57 shape where
+# there is such a shell, through the synthetic one otherwise.
+# shellcheck disable=SC2016 # the fixture expands it, not us
+for sh in "${shells[@]}"; do
+    if test "$sh" = "$buggy"; then
+        out=$(check "$sh" unbound 1 no true 'echo "$HTTRACK_UNSET_ON_PURPOSE"')
+    else
+        out=$(check "$sh" nomark 1 no true 'builtin exit 0')
+    fi
+    case $out in
+    *"exited 0 without reaching its end"*) ok "$sh: the harness says why it turned a 0 into a failure" ;;
+    *) fail "$sh: the abort was reported with no explanation: $out" ;;
+    esac
+done
