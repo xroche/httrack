@@ -41,7 +41,9 @@ done
 sleep 0.5
 # A Linux signal reaches the wsl2 interop relay, not the engine, and a pass 1
 # that runs on finishes the very fetch pass 2 has to resume.
-if target_is_windows; then
+# The backend, not the binary: MSYS signals the engine directly and pass 1 gets
+# to write its temp-ref, so the harder kill_tree there takes it away.
+if test "$(suite_backend)" = wsl2; then
     kill_tree "$crawlpid"
 else
     kill -TERM "$crawlpid" 2>/dev/null || true

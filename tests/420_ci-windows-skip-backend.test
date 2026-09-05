@@ -60,6 +60,8 @@ while read -r name where; do
     esac
 done <<'EOF'
 386_local-proxytrack-dav-tz.test wsl2-only
+294_local-wizard-eof.test wsl2-only
+226_watchdog-native.test wsl2-only
 241_local-single-file-gui.test both
 288_testlib-holdport.test both
 EOF
