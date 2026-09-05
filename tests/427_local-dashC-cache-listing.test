@@ -1,0 +1,134 @@
+#!/bin/bash
+#
+# -#C lists what the cache holds. It read hts-cache/new.ndx, which nothing has
+# written since the 3.31 ZIP cache, so it answered "No cache entry found" over
+# any cache at all.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_dashc.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+root="${tmpdir}/root"
+mkdir -p "${root}/site"
+cat >"${root}/site/index.html" <<'EOF'
+<html><body><a href="child.html">child</a></body></html>
+EOF
+cat >"${root}/site/child.html" <<'EOF'
+<html><body>DASHC-CHILD</body></html>
+EOF
+
+local_server_start --root "$root" --log "${tmpdir}/server.log"
+
+out="${tmpdir}/crawl"
+mkdir -p "$out"
+local_crawl --log "${tmpdir}/crawl.log" --quiet --robots=0 --retries=1 -c1 \
+    -O "$out" "${BASEURL}/site/index.html"
+
+# Control on the fixture, read without the tool on trial: an empty cache would
+# make every assertion below pass for the wrong reason.
+cached=$("${SRV_PYTHON:?}" -c '
+import sys, zipfile
+for i in sorted(zipfile.ZipFile(sys.argv[1]).infolist(), key=lambda i: i.filename):
+    print(i.filename)
+' "${out}/hts-cache/new.zip")
+test "$(grep -c . <<<"$cached")" = 2 || fail "want 2 cache entries, got: $cached"
+
+# -#C returns as soon as it has listed, so -O comes first; the listing is CRLF.
+listing=$(httrack -O "$out" -#C '*' 2>"${tmpdir}/dashc.err" | tr -d '\r')
+if grep -q 'No cache entry found' "${tmpdir}/dashc.err"; then
+    fail "-#C '*' found nothing in a cache holding: ${cached}"
+fi
+
+# size_of URL: the stored size the listing reported against that URL.
+size_of() {
+    awk -v u="$1" '/^X-URL: /{cur = $2} /^X-Content-Length: /{if (cur == u) print $2}' \
+        <<<"$listing"
+}
+for page in index child; do
+    want=$(wc -c <"${root}/site/${page}.html" | tr -d '[:space:]') # BSD wc pads
+    got=$(size_of "${BASEURL}/site/${page}.html")
+    test "$got" = "$want" ||
+        fail "${page}.html lists ${got} bytes, the file holds ${want}: ${listing}"
+done
+ok "-#C lists every entry of the ZIP cache, each with the size stored for it"
+
+# The filter still narrows, so the listing is not just "print everything".
+one=$(httrack -O "$out" -#C '*child*' 2>/dev/null | tr -d '\r')
+test "$(grep -c '^X-URL: ' <<<"$one")" = 1 ||
+    fail "-#C '*child*' matched more than child.html: ${one}"
+grep -q '^X-URL: .*/site/child\.html$' <<<"$one" ||
+    fail "-#C '*child*' listed the wrong entry: ${one}"
+ok "a filtered listing narrows to the entries the pattern matches"
+
+# What is listed comes out of the index cache_init() builds from the ZIP, not
+# out of anything the crawl left beside it. Graft one entry carrying the stored
+# header block the index requires, and one carrying none, which it refuses.
+grafted="${tmpdir}/grafted"
+cp -r "$out" "$grafted"
+graft=$("${SRV_PYTHON:?}" -c '
+import struct, sys, zipfile
+
+path = sys.argv[1]
+zf = zipfile.ZipFile(path)
+model = [i for i in zf.infolist() if i.filename.endswith("/site/index.html")][0]
+with open(path, "rb") as fp:
+    fp.seek(model.header_offset)
+    head = struct.unpack("<IHHHHHIIIHH", fp.read(30))
+    fp.seek(head[9], 1)
+    extra = fp.read(head[10])  # httrack keeps the entry headers here
+body = zf.read(model)
+zf.close()
+name = model.filename.replace("/site/index.html", "/site/grafted.html")
+with zipfile.ZipFile(path, "a", zipfile.ZIP_DEFLATED) as z:
+    zi = zipfile.ZipInfo(name, date_time=model.date_time)
+    zi.compress_type = zipfile.ZIP_DEFLATED
+    zi.extra = extra
+    z.writestr(zi, body)
+    zi.extra = b""  # only the local header carries them, as minizip writes it
+    z.writestr(name + ".noheaders", body)
+print(name)
+' "${grafted}/hts-cache/new.zip")
+
+listing=$(httrack -O "$grafted" -#C '*' 2>/dev/null | tr -d '\r')
+test "$(grep -c '^X-URL: ' <<<"$listing")" = 3 ||
+    fail "want the 2 crawled entries and the grafted one: ${listing}"
+grep -qF "X-URL: ${graft}" <<<"$listing" ||
+    fail "the entry grafted into the ZIP was not listed: ${listing}"
+if grep -q 'noheaders' <<<"$listing"; then
+    fail "an entry the index refuses was listed anyway: ${listing}"
+fi
+ok "the listing follows the ZIP index, and skips what that index refuses"
+
+# Controls: a result that is genuinely empty still reads as one, whether the
+# filter matched nothing or the index came back empty.
+rc=0
+none=$(httrack -O "$out" -#C '*no-such-url*' 2>&1) || rc=$?
+test "$rc" = 0 || fail "a filter matching nothing exited ${rc}"
+grep -q "No cache entry found for '\*no-such-url\*'" <<<"$none" ||
+    fail "a filter matching nothing did not say so: ${none}"
+
+# The cache has to OPEN for the empty-index branch to be the one that answers,
+# so this one holds a member and the index refuses it.
+drained="${tmpdir}/drained"
+cp -r "$out" "$drained"
+"${SRV_PYTHON:?}" -c '
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "w") as z:
+    z.writestr("http://example.com/only.html", "x")
+' "${drained}/hts-cache/new.zip"
+rc=0
+none=$(httrack -O "$drained" -#C '*' 2>"${tmpdir}/drained.err") || rc=$?
+test "$rc" = 0 || fail "-#C over an empty index exited ${rc}"
+# the warning rides cache.log, which -#C points at stdout
+grep -q 'Corrupted cache entry' <<<"$none" ||
+    fail "the ZIP never opened, so an empty index is not what answered: ${none}"
+grep -q 'No cache entry found' "${tmpdir}/drained.err" ||
+    fail "an empty index did not report itself empty: ${none}"
+ok "an empty result still reports no entry"
