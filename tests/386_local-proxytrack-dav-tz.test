@@ -17,8 +17,10 @@ curl=$(find_curl) || skip "curl missing"
 # A half-hour offset also catches an implementation that rounds to whole hours.
 TZ=IST-5:30
 export TZ
+# tr -d, as 147 does: a native python prints \r\n, and $( ) drops only the
+# \n, so the compare below sees a +0530 that is not the string +0530.
 offset=$("$python" -c 'import sys, time
-print(time.strftime("%z", time.localtime(0)))')
+print(time.strftime("%z", time.localtime(0)))' | tr -d '\r')
 test "$offset" = "+0530" ||
     skip "the host ignored TZ=IST-5:30 (localtime(0) is $offset), so a shift would be invisible"
 
