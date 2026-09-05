@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+# A mirror interrupted on one machine is resumed by whatever build picks it up,
+# so the .ref resume state must decode the same bytes everywhere: pinned in
+# both directions against a literal little-endian record, with a pre-3.50.2
+# host-native blit, a byte-swapped field and a truncated file all refused.
+
+dir=$(mktemp -d)
+cleanup_push rm -rf "$dir"
+
+assert_selftest 'ref-portable: OK' ref-portable "$dir"

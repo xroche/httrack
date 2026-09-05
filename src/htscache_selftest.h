@@ -89,6 +89,11 @@ int cache_corruption_selftest(httrackp *opt, const char *dir);
    commit a silently truncated body. */
 int cache_readfail_selftest(httrackp *opt, const char *dir);
 
+/* The .ref resume state must decode identically on every host: pins the bytes
+   in both directions against a literal record, and proves a legacy, truncated
+   or byte-swapped one is refused rather than misread. */
+int ref_portable_selftest(httrackp *opt, const char *dir);
+
 #endif
 
 #endif

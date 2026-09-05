@@ -41,6 +41,7 @@ Please visit our Website: http://www.httrack.com
 #include "htswarc.h"
 #include "htschanges.h"
 #include "htsthread.h"
+#include <limits.h>
 #include <stdint.h>
 #include <time.h>
 /* END specific definitions */
@@ -1581,6 +1582,9 @@ static int back_string_unserialize(FILE * fp, char **str) {
   return err;
 }
 
+/* Spools one slot for back_cleanup_background() to pick up later in the same
+   run, so it may hold pointers and the host's own layout. The resume reference
+   outlives the process and cannot: see back_serialize_ref() below. */
 int back_serialize(FILE * fp, const lien_back * src) {
   if (back_data_serialize(fp, src, sizeof(lien_back)) == 0
       && back_data_serialize(fp, src->r.adr,
@@ -1641,8 +1645,287 @@ int back_unserialize(FILE * fp, lien_back ** dst) {
   return 1;                     /* error */
 }
 
-/* serialize a reference ; used to store references of files being downloaded in case of broken download */
-/* Note: NOT utf-8 */
+/* --- the .ref resume state -------------------------------------------------
+
+   What an interrupted transfer resumes from: where its partial bytes landed,
+   and the validators the Range request must carry. Fields go out one by one in
+   little-endian fixed widths, because the build that resumes a mirror need not
+   be the one, nor on the machine, that interrupted it.
+
+   Up to 3.50.1 the record was a raw lien_back blit, so the magic refuses such a
+   file rather than misreading it and the transfer restarts from zero.
+
+   Only what a reader consumes goes out: sockets, file handles, request options
+   and scheduling state mean nothing in another process, and come back zeroed.
+ */
+
+#define REF_MAGIC "HTSREF1\n"
+#define REF_MAGIC_SIZE 8
+#define REF_VERSION 1
+
+/* No pre-3.50.2 file can be taken for one of these: it opened with a
+   host-native size_t holding sizeof(lien_back), which leaves a zero byte among
+   the first eight for every word size and byte order, and the magic has none.
+ */
+HTS_STATIC_ASSERT(sizeof(lien_back) < 0x10000, ref_magic_unambiguous);
+
+/* Caps a declared length must clear: one response's header block, and a body
+   only an in-memory transfer ever carries. */
+#define REF_MAX_STR (1024 * 1024)
+#define REF_MAX_BLOB ((uint64_t) 1024 * 1024 * 1024)
+
+static hts_boolean ref_put_u32(FILE *fp, uint32_t v) {
+  unsigned char b[4];
+
+  b[0] = (unsigned char) (v & 0xff);
+  b[1] = (unsigned char) ((v >> 8) & 0xff);
+  b[2] = (unsigned char) ((v >> 16) & 0xff);
+  b[3] = (unsigned char) ((v >> 24) & 0xff);
+  return hts_fwrite_exact(b, sizeof(b), fp);
+}
+
+static hts_boolean ref_put_u64(FILE *fp, uint64_t v) {
+  unsigned char b[8];
+  int i;
+
+  for (i = 0; i < 8; i++)
+    b[i] = (unsigned char) ((v >> (8 * i)) & 0xff);
+  return hts_fwrite_exact(b, sizeof(b), fp);
+}
+
+static hts_boolean ref_get_u32(FILE *fp, uint32_t *v) {
+  unsigned char b[4];
+
+  if (!hts_fread_exact(b, sizeof(b), fp))
+    return HTS_FALSE;
+  *v = (uint32_t) b[0] | ((uint32_t) b[1] << 8) | ((uint32_t) b[2] << 16) |
+       ((uint32_t) b[3] << 24);
+  return HTS_TRUE;
+}
+
+static hts_boolean ref_get_u64(FILE *fp, uint64_t *v) {
+  unsigned char b[8];
+  int i;
+
+  if (!hts_fread_exact(b, sizeof(b), fp))
+    return HTS_FALSE;
+  *v = 0;
+  for (i = 0; i < 8; i++)
+    *v |= (uint64_t) b[i] << (8 * i);
+  return HTS_TRUE;
+}
+
+/* Two's complement both ways, spelled out: a plain cast back is
+   implementation-defined above the signed maximum. */
+static hts_boolean ref_put_int(FILE *fp, int v) {
+  return ref_put_u32(fp, (uint32_t) v);
+}
+
+static hts_boolean ref_get_int(FILE *fp, int *v) {
+  uint32_t u;
+
+  if (!ref_get_u32(fp, &u))
+    return HTS_FALSE;
+  *v = u <= (uint32_t) INT32_MAX ? (int) u : -(int) (UINT32_MAX - u) - 1;
+  return HTS_TRUE;
+}
+
+static hts_boolean ref_put_llint(FILE *fp, LLint v) {
+  return ref_put_u64(fp, (uint64_t) v);
+}
+
+static hts_boolean ref_get_llint(FILE *fp, LLint *v) {
+  uint64_t u;
+
+  if (!ref_get_u64(fp, &u))
+    return HTS_FALSE;
+  *v =
+      u <= (uint64_t) INT64_MAX ? (int64_t) u : -(int64_t) (UINT64_MAX - u) - 1;
+  return HTS_TRUE;
+}
+
+/* A value outside the field's range is malformed, not something to truncate. */
+static hts_boolean ref_get_short(FILE *fp, short int *v) {
+  int i;
+
+  if (!ref_get_int(fp, &i) || i < SHRT_MIN || i > SHRT_MAX)
+    return HTS_FALSE;
+  *v = (short int) i;
+  return HTS_TRUE;
+}
+
+/* A NULL is written like an empty string; only the heap readers below tell the
+   two apart, and they are the only fields where the difference matters. */
+static hts_boolean ref_put_str(FILE *fp, const char *str) {
+  const size_t len = str != NULL ? strlen(str) : 0;
+
+  if (len > REF_MAX_STR)
+    return HTS_FALSE;
+  return ref_put_u32(fp, (uint32_t) len) &&
+         (len == 0 || hts_fwrite_exact(str, len, fp));
+}
+
+/* Clips into a fixed destination rather than aborting: the bytes come off a
+   file another build, or another machine, wrote. */
+static hts_boolean ref_get_str(FILE *fp, char *dst, size_t size) {
+  uint32_t len;
+  size_t copied = 0;
+  char chunk[1024];
+
+  assertf(size != 0);
+  dst[0] = '\0';
+  if (!ref_get_u32(fp, &len) || len > REF_MAX_STR)
+    return HTS_FALSE;
+  while (len != 0) {
+    const size_t n =
+        len < (uint32_t) sizeof(chunk) ? (size_t) len : sizeof(chunk);
+
+    if (!hts_fread_exact(chunk, n, fp))
+      return HTS_FALSE;
+    len -= (uint32_t) n;
+    if (copied < size - 1) {
+      const size_t room = size - 1 - copied;
+      const size_t take = n < room ? n : room;
+
+      memcpy(dst + copied, chunk, take);
+      copied += take;
+    }
+  }
+  dst[copied] = '\0';
+  return HTS_TRUE;
+}
+
+static hts_boolean ref_get_heapstr(FILE *fp, char **dst) {
+  uint32_t len;
+  char *buf;
+
+  *dst = NULL;
+  if (!ref_get_u32(fp, &len) || len > REF_MAX_STR)
+    return HTS_FALSE;
+  if (len == 0) /* a serialized NULL */
+    return HTS_TRUE;
+  buf = malloct((size_t) len + 1);
+  if (buf == NULL)
+    return HTS_FALSE;
+  buf[len] = '\0'; /* guard byte */
+  if (!hts_fread_exact(buf, (size_t) len, fp)) {
+    freet(buf);
+    return HTS_FALSE;
+  }
+  *dst = buf;
+  return HTS_TRUE;
+}
+
+static hts_boolean ref_put_blob(FILE *fp, const void *data, uint64_t len) {
+  if (len > REF_MAX_BLOB)
+    return HTS_FALSE;
+  return ref_put_u64(fp, len) &&
+         (len == 0 || hts_fwrite_exact(data, (size_t) len, fp));
+}
+
+static hts_boolean ref_get_blob(FILE *fp, char **dst, uint64_t *len) {
+  uint64_t size;
+  char *buf;
+
+  *dst = NULL;
+  *len = 0;
+  if (!ref_get_u64(fp, &size))
+    return HTS_FALSE;
+  if (size == 0) /* a serialized NULL */
+    return HTS_TRUE;
+  /* the guard byte must not wrap the allocation on a 32-bit size_t */
+  if (size > REF_MAX_BLOB || size > (uint64_t) (SIZE_MAX - 1))
+    return HTS_FALSE;
+  buf = malloct((size_t) size + 1);
+  if (buf == NULL)
+    return HTS_FALSE;
+  buf[size] = '\0'; /* guard byte */
+  if (!hts_fread_exact(buf, (size_t) size, fp)) {
+    freet(buf);
+    return HTS_FALSE;
+  }
+  *dst = buf;
+  *len = size;
+  return HTS_TRUE;
+}
+
+/* Fields the readers of a reference consume: what identifies the link, where
+   its partial bytes are, and the response metadata a resumed request or a
+   broken-cache read needs. */
+static hts_boolean ref_put_record(FILE *fp, const lien_back *src) {
+  const uint64_t body =
+      src->r.adr != NULL && src->r.size > 0 ? (uint64_t) src->r.size : 0;
+
+  return hts_fwrite_exact(REF_MAGIC, REF_MAGIC_SIZE, fp) &&
+         ref_put_u32(fp, REF_VERSION) && ref_put_str(fp, src->url_adr) &&
+         ref_put_str(fp, src->url_fil) && ref_put_str(fp, src->url_sav) &&
+         ref_put_str(fp, src->referer_adr) &&
+         ref_put_str(fp, src->referer_fil) &&
+         ref_put_str(fp, src->r.location) &&
+         ref_put_int(fp, src->r.statuscode) &&
+         ref_put_int(fp, src->r.notmodified) &&
+         ref_put_int(fp, src->r.compressed) && ref_put_int(fp, src->r.empty) &&
+         ref_put_llint(fp, src->r.size) &&
+         ref_put_llint(fp, src->r.totalsize) &&
+         ref_put_llint(fp, src->r.crange) &&
+         ref_put_llint(fp, src->r.crange_start) &&
+         ref_put_llint(fp, src->r.crange_end) && ref_put_str(fp, src->r.msg) &&
+         ref_put_str(fp, src->r.contenttype) &&
+         ref_put_str(fp, src->r.charset) &&
+         ref_put_str(fp, src->r.contentencoding) &&
+         ref_put_str(fp, src->r.lastmodified) && ref_put_str(fp, src->r.etag) &&
+         ref_put_str(fp, src->r.cdispo) && ref_put_blob(fp, src->r.adr, body) &&
+         ref_put_str(fp, src->r.headers);
+}
+
+/* Fills an entry whose in-memory scaffolding the caller already zeroed. */
+static hts_boolean ref_get_record(FILE *fp, lien_back *dst) {
+  char magic[REF_MAGIC_SIZE];
+  uint32_t version;
+  uint64_t body;
+
+  if (!hts_fread_exact(magic, sizeof(magic), fp) ||
+      memcmp(magic, REF_MAGIC, REF_MAGIC_SIZE) != 0)
+    return HTS_FALSE; /* a pre-3.50.2 blit, or not a reference */
+  if (!ref_get_u32(fp, &version) || version != REF_VERSION)
+    return HTS_FALSE;
+  if (!ref_get_str(fp, dst->url_adr, sizeof(dst->url_adr)) ||
+      !ref_get_str(fp, dst->url_fil, sizeof(dst->url_fil)) ||
+      !ref_get_str(fp, dst->url_sav, sizeof(dst->url_sav)) ||
+      !ref_get_str(fp, dst->referer_adr, sizeof(dst->referer_adr)) ||
+      !ref_get_str(fp, dst->referer_fil, sizeof(dst->referer_fil)) ||
+      !ref_get_str(fp, dst->location_buffer, sizeof(dst->location_buffer)) ||
+      !ref_get_int(fp, &dst->r.statuscode) ||
+      !ref_get_short(fp, &dst->r.notmodified) ||
+      !ref_get_short(fp, &dst->r.compressed) ||
+      !ref_get_short(fp, &dst->r.empty) || !ref_get_llint(fp, &dst->r.size) ||
+      !ref_get_llint(fp, &dst->r.totalsize) ||
+      !ref_get_llint(fp, &dst->r.crange) ||
+      !ref_get_llint(fp, &dst->r.crange_start) ||
+      !ref_get_llint(fp, &dst->r.crange_end) ||
+      !ref_get_str(fp, dst->r.msg, sizeof(dst->r.msg)) ||
+      !ref_get_str(fp, dst->r.contenttype, sizeof(dst->r.contenttype)) ||
+      !ref_get_str(fp, dst->r.charset, sizeof(dst->r.charset)) ||
+      !ref_get_str(fp, dst->r.contentencoding,
+                   sizeof(dst->r.contentencoding)) ||
+      !ref_get_str(fp, dst->r.lastmodified, sizeof(dst->r.lastmodified)) ||
+      !ref_get_str(fp, dst->r.etag, sizeof(dst->r.etag)) ||
+      !ref_get_str(fp, dst->r.cdispo, sizeof(dst->r.cdispo)))
+    return HTS_FALSE;
+  if (!ref_get_blob(fp, &dst->r.adr, &body))
+    return HTS_FALSE;
+  if (!ref_get_heapstr(fp, &dst->r.headers)) {
+    freet(dst->r.adr);
+    return HTS_FALSE;
+  }
+  /* A bodyless slot already wrote its bytes to url_sav (FTP, direct to disk);
+     keeping the recorded r.size makes the writer blank that file (#797). */
+  if (dst->r.adr != NULL)
+    dst->r.size = (LLint) body;
+  return HTS_TRUE;
+}
+
+/* Record the state an interrupted transfer resumes from. Not utf-8. */
 int back_serialize_ref(httrackp * opt, const lien_back * src) {
   const char *filename =
     url_savename_refname_fullpath(opt, src->url_adr, src->url_fil);
@@ -1665,7 +1948,7 @@ int back_serialize_ref(httrackp * opt, const lien_back * src) {
     }
   }
   if (fp != NULL) {
-    int ser = back_serialize(fp, src);
+    const int ser = ref_put_record(fp, src) && fflush(fp) == 0 ? 0 : 1;
 
     fclose(fp);
     return ser;
@@ -1673,24 +1956,37 @@ int back_serialize_ref(httrackp * opt, const lien_back * src) {
   return 1;
 }
 
-/* unserialize a reference ; used to store references of files being downloaded in case of broken download */
+/* Read one back into a fresh entry the caller owns (back_clear_entry, then
+   freet). Anything but a current record is refused, a pre-3.50.2 host-native
+   blit included, and *dst stays NULL. */
 int back_unserialize_ref(httrackp * opt, const char *adr, const char *fil,
                          lien_back ** dst) {
   const char *filename = url_savename_refname_fullpath(opt, adr, fil);
   FILE *fp = FOPEN(filename, "rb");
+  lien_back *back;
 
-  if (fp != NULL) {
-    int ser = back_unserialize(fp, dst);
-
+  *dst = NULL;
+  if (fp == NULL)
+    return 1;
+  back = calloct(1, sizeof(lien_back));
+  if (back == NULL) {
     fclose(fp);
-    if (ser != 0) {             /* back_unserialize_ref() != 0 does not need cleaning up */
-      back_clear_entry(*dst);   /* delete entry content */
-      freet(*dst);              /* delete item */
-      *dst = NULL;
-    }
-    return ser;
+    return 1;
   }
-  return 1;
+  hts_init_htsblk(&back->r);
+  back->r.location = back->location_buffer;
+  errno = 0;
+  if (!ref_get_record(fp, back)) {
+    hts_log_print(opt, LOG_DEBUG,
+                  "Ignoring an unreadable resume reference for %s%s", adr, fil);
+    fclose(fp);
+    back_clear_entry(back);
+    freet(back);
+    return 1;
+  }
+  fclose(fp);
+  *dst = back;
+  return 0;
 }
 
 // clear, or leave for keep-alive
