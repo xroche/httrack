@@ -10,6 +10,21 @@ srcdir=$(cd "$(dirname "$0")" && pwd)
 bld=${1:?usage: run-fuzzers.sh <build-fuzz-dir> [check|seconds]}
 mode=${2:-20}
 
+# libFuzzer starts its length limit at the largest seed and raises it only after
+# long stretches with no new coverage, so on a slow target it never gets there:
+# fuzz-htsparse sat at 488 bytes, where the link transforms need past 2048.
+# -len_control=0 takes the limit below straight away.
+fuzz_max_len() {
+    case "$1" in
+    fuzz-htsparse | fuzz-singlefile | fuzz-sitemap | fuzz-arc | fuzz-cachendx)
+        echo 16384
+        ;;
+    *)
+        echo 4096
+        ;;
+    esac
+}
+
 status=0
 for f in "$bld"/fuzz-*; do
     if [ ! -f "$f" ] || [ ! -r "$f" ]; then continue; fi
@@ -30,6 +45,7 @@ for f in "$bld"/fuzz-*; do
     [ -d "$corpus" ] && args+=("$corpus")
     echo "=== $name (${mode}s) ==="
     if ! "$f" -max_total_time="$mode" -timeout=25 -rss_limit_mb=2048 \
+        -max_len="$(fuzz_max_len "$name")" -len_control=0 \
         -artifact_prefix="$work/" -print_final_stats=1 "${args[@]}"; then
         echo "*** $name FAILED; artifacts:" >&2
         ls -l "$work" >&2
