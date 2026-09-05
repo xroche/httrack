@@ -201,8 +201,15 @@ void help_wizard(httrackp * opt) {
     printf("Enter project name :");
     fflush(stdout);
     linput(stdin, projname, 250);
-    if (strnotempty(projname) == 0)
+    if (strnotempty(projname) == 0) {
+      /* linput() reports neither EOF nor error, so this would otherwise spin */
+      if (feof(stdin) || ferror(stdin)) {
+        printf("\nNo project name given, aborting\n");
+        freet(buffers);
+        return;
+      }
       help("httrack", 1);
+    }
   }
   //
   // Path
