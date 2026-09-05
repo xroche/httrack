@@ -1079,6 +1079,9 @@ kill_pid() {
         if test -n "$winpid"; then
             taskkill /F /PID "$winpid" >/dev/null 2>&1 || true
         fi
+        # The other half of the job under wsl2, as in kill_tree: $pid is a Linux
+        # process, and taskkill reached at most the native one it relays to.
+        test "$(suite_backend)" != wsl2 || kill -9 "$pid" 2>/dev/null || true
         return 0
     fi
     kill -9 "$pid" 2>/dev/null || true
