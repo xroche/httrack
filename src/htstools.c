@@ -36,6 +36,7 @@ Please visit our Website: http://www.httrack.com
 
 /* String */
 #include <ctype.h>
+#include <limits.h>
 #include "htscore.h"
 #include "htstools.h"
 #include "htsio.h"
@@ -1325,7 +1326,8 @@ find_handle h = hts_findfirst("/tmp");
 if (h) {
   do {
     if (hts_findisfile(h))
-      printf("File: %s (%d octets)\n",hts_findgetname(h),hts_findgetsize(h));
+      printf("File: %s, " LLintP " bytes\n",
+             hts_findgetname(h), hts_findgetsize64(h));
     else if (hts_findisdir(h))
       printf("Dir: %s\n",hts_findgetname(h));
   } while(hts_findnext(h));
@@ -1423,15 +1425,26 @@ HTSEXT_API char *hts_findgetname(find_handle find) {
   return NULL;
 }
 
-HTSEXT_API int hts_findgetsize(find_handle find) {
+HTSEXT_API LLint hts_findgetsize64(find_handle find) {
   if (find) {
 #ifdef _WIN32
-    return find->hdata.nFileSizeLow;
+    const uint64_t size =
+        ((uint64_t) find->hdata.nFileSizeHigh << 32) | find->hdata.nFileSizeLow;
+
+    return (LLint) size;
 #else
     return find->filestat.st_size;
 #endif
   }
   return -1;
+}
+
+HTSEXT_API int hts_findgetsize(find_handle find) {
+  const LLint size = hts_findgetsize64(find);
+
+  /* Report the error sentinel rather than the low bits: a caller sizing a
+     buffer off a plausible small number takes a heap overflow. */
+  return size >= 0 && size <= INT_MAX ? (int) size : -1;
 }
 
 HTSEXT_API hts_boolean hts_findisdir(find_handle find) {

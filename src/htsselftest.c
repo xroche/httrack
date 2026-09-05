@@ -3400,6 +3400,132 @@ static int st_fsize(httrackp *opt, int argc, char **argv) {
   return rc;
 }
 
+/* The deprecated form is what this test measures, so silence it here only. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+static int st_findsize_legacy(find_handle find) {
+  return hts_findgetsize(find);
+}
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif
+
+/* A 5GB entry measured through both find-size forms, beside a sub-2GB one the
+   deprecated form must still answer. */
+static int st_findsize(httrackp *opt, int argc, char **argv) {
+  const LLint expected = 5 * 1024 * 1024 * 1024LL;
+  const LLint small_expected = 1234;
+  char BIGSTK big[HTS_URLMAXSIZE * 2];
+  char BIGSTK small[HTS_URLMAXSIZE * 2];
+  const int width = (int) sizeof(hts_findgetsize64(NULL));
+  LLint big_got = -2, small_got = -2;
+  int big_got32 = -2, small_got32 = -2;
+  find_handle h;
+  FILE *fp;
+  int rc = 0;
+
+  (void) opt;
+  if (argc < 1) {
+    fprintf(stderr, "findsize: needs a directory\n");
+    return 1;
+  }
+  concat(big, sizeof(big), argv[0], "/find-5g.bin");
+  concat(small, sizeof(small), argv[0], "/find-small.bin");
+
+  /* sparse: seek past 4GB and write the last byte */
+  fp = FOPEN(big, "wb");
+  if (fp == NULL) {
+    fprintf(stderr, "findsize: cannot create '%s': %s\n", big, strerror(errno));
+    return 1;
+  }
+#ifdef _WIN32
+  {
+    HANDLE fh = (HANDLE) _get_osfhandle(_fileno(fp));
+    DWORD ret;
+
+    if (fh != INVALID_HANDLE_VALUE)
+      (void) DeviceIoControl(fh, FSCTL_SET_SPARSE, NULL, 0, NULL, 0, &ret,
+                             NULL);
+  }
+#endif
+  if (fseeko(fp, expected - 1, SEEK_SET) != 0 || fputc(0, fp) == EOF ||
+      fclose(fp) != 0) {
+    const int err = errno;
+
+    fprintf(stderr, "findsize: cannot extend '%s' to " LLintP ": %s\n", big,
+            expected, strerror(err));
+    UNLINK(big);
+    /* the host cannot hold the probe (small file cap, full disk): skip */
+    return err == EFBIG || err == ENOSPC ? 77 : 1;
+  }
+
+  fp = FOPEN(small, "wb");
+  if (fp == NULL || fseeko(fp, small_expected - 1, SEEK_SET) != 0 ||
+      fputc(0, fp) == EOF || fclose(fp) != 0) {
+    fprintf(stderr, "findsize: cannot write '%s': %s\n", small,
+            strerror(errno));
+    UNLINK(big);
+    return 1;
+  }
+
+  h = hts_findfirst(argv[0]);
+  if (h == NULL) {
+    fprintf(stderr, "findsize: cannot enumerate '%s'\n", argv[0]);
+    UNLINK(big);
+    UNLINK(small);
+    return 1;
+  }
+  do {
+    const char *const name = hts_findgetname(h);
+
+    if (name == NULL)
+      continue;
+    if (strcmp(name, "find-5g.bin") == 0) {
+      big_got = hts_findgetsize64(h);
+      big_got32 = st_findsize_legacy(h);
+    } else if (strcmp(name, "find-small.bin") == 0) {
+      small_got = hts_findgetsize64(h);
+      small_got32 = st_findsize_legacy(h);
+    }
+  } while (hts_findnext(h));
+  hts_findclose(h);
+  UNLINK(big);
+  UNLINK(small);
+
+  printf("findsize: width=%d big=" LLintP ",%d small=" LLintP ",%d\n", width,
+         big_got, big_got32, small_got, small_got32);
+  if (width != 8) {
+    fprintf(stderr, "findsize: return type is %d bytes, expected 8\n", width);
+    rc = 1;
+  }
+  if (big_got != expected) {
+    fprintf(stderr, "findsize: 5GB file is " LLintP ", expected " LLintP "\n",
+            big_got, expected);
+    rc = 1;
+  }
+  if (big_got32 != -1) {
+    fprintf(stderr,
+            "findsize: deprecated form is %d on the 5GB file, "
+            "expected the -1 sentinel\n",
+            big_got32);
+    rc = 1;
+  }
+  if (small_got != small_expected || small_got32 != (int) small_expected) {
+    fprintf(stderr, "findsize: " LLintP "-byte file is " LLintP ",%d\n",
+            small_expected, small_got, small_got32);
+    rc = 1;
+  }
+  return rc;
+}
+
 /* 4GB+100KB wraps to ~108KB through an int, and needs 33 unsigned bits. A
    macro, not a static const: MSVC's C mode (/TC) rejects a const object
    used inside another object's static initializer below (C2099). */
@@ -13336,6 +13462,9 @@ static const struct selftest_entry {
      "escape_remove_control() terminates at the compacted end",
      st_escape_control},
     {"fsize", "<dir>", "file size past the 2GB signed-32-bit wrap", st_fsize},
+    {"findsize", "<dir>",
+     "directory-enumeration file size past the 2GB signed-32-bit wrap",
+     st_findsize},
     {"growsize", "", "buffer capacity for a 64-bit file size (no int wrap)",
      st_growsize},
     {"addlink", "", "htsAddLink codebase walk over an empty current path",
