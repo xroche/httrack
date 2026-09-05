@@ -13307,7 +13307,14 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
   }
 
   StringCopy(opt->path_log, rodir);
-  if (!fexist_utf8(rolock)) {
+  /* Probing by removal keeps no stat that could go stale before the engine's
+     own unlink, and ENOENT means the euid cannot reach the request at all. */
+  errno = 0;
+  if (UNLINK(rolock) == 0) {
+    printf("abortlock: undeletable request: NOT COVERED (euid %d could still"
+           " delete %s)\n",
+           (int) drop, rolock);
+  } else if (errno == ENOENT) {
     printf("abortlock: undeletable request: NOT COVERED (%s is out of reach of"
            " euid %d)\n",
            rodir, (int) drop);
@@ -13321,7 +13328,8 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
         err = 1;
       }
     }
-    if (!fexist_utf8(rolock)) {
+    errno = 0;
+    if (UNLINK(rolock) == 0 || errno == ENOENT) {
       fprintf(stderr, "abortlock: the undeletable request went away\n");
       err = 1;
     }
