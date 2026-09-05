@@ -1,0 +1,87 @@
+#!/bin/bash
+#
+# Two htsparse buffers whose width a page picks: the raw source span of an
+# <applet> code= attribute, and a link the page's charset inflates threefold
+# past the 1023-byte entry check. Both aborted instead of refusing.
+
+set -e
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+python=$(find_python) || skip "python3 not found"
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_pgabort.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+doc="${tmpdir}/doc"
+mkdir -p "$doc"
+
+# The span between "code" and "=" is copied verbatim into the rewritten tag.
+pad=$(printf '%2048s' '')
+printf '<html><body><a href="applet.html">a</a><a href="cp1252.html">c</a></body></html>\n' \
+    >"${doc}/index.html"
+printf '<html><body><applet code%s="x.class"></applet></body></html>\n' "$pad" \
+    >"${doc}/applet.html"
+printf '<html><body>class</body></html>\n' >"${doc}/x.class"
+
+# 683 cp1252 quotes decode to 2049 UTF-8 bytes, one past the link buffer.
+"$python" - "$(nativepath "${doc}/cp1252.html")" <<'PY'
+import sys
+
+href = b"\x93" * 683
+body = (b'<html><head><meta charset="windows-1252"></head><body>'
+        b'<a href="' + href + b'">x</a></body></html>\n')
+open(sys.argv[1], "wb").write(body)
+PY
+
+local_server_start --root "$doc"
+require_httrack
+
+out="${tmpdir}/crawl"
+mkdir "$out"
+rc=0
+local_crawl --log "${tmpdir}/log" -O "$out" --quiet --robots=0 --timeout=30 \
+    --retries=0 "${BASEURL}/index.html" || rc=$?
+test "$rc" -eq 0 || fail "crawl exited $rc: $(cat "${tmpdir}/log")"
+
+host="${out}/127.0.0.1_${SRV_PORT}"
+
+# The attribute span is not URL-shaped, so clipping it would emit a broken tag:
+# the fix must carry all 2048 bytes through to the mirror.
+printf '[applet code span kept whole] ..\t'
+"$python" - "$(nativepath "${host}/applet.html")" <<'PY' || fail "code= span was clipped"
+import sys
+
+d = open(sys.argv[1], "rb").read()
+i = d.find(b"<applet code")
+if i < 0:
+    sys.exit(1)
+j = i + len(b"<applet code")
+sys.exit(0 if d[j:j + 2048] == b" " * 2048 and d[j + 2048:j + 2049] == b"=" else 1)
+PY
+echo OK
+
+# A truncated URL names a different resource, so the inflated link is refused
+# and said so, not clipped and fetched.
+printf '[inflated link refused, not clipped] ..\t'
+grep -q 'Link is too long after charset conversion' "${out}/hts-log.txt" ||
+    fail "no charset-conversion refusal in $(cat "${out}/hts-log.txt")"
+echo OK
+
+printf '[nothing mirrored under the inflated name] ..\t'
+"$python" - "$(nativepath "$host")" <<'PY' || fail "mirrored a clipped URL"
+import os
+import sys
+
+for root, dirs, files in os.walk(os.fsencode(sys.argv[1])):
+    for name in dirs + files:
+        if not name.isascii():
+            sys.stderr.write("non-ascii mirror entry %r\n" % name)
+            sys.exit(1)
+PY
+test -s "${host}/cp1252.html" || fail "the page carrying the refused link is gone"
+echo OK

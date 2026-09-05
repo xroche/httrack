@@ -103,7 +103,8 @@ char *cookie_nextfield(char *a);
 
 /** Register credentials (auth = base-64 user:pass) for the prefix derived from
     adr (host) and fil (path). No-op returning 0 if cookie is NULL, allocation
-    fails, or a matching prefix is already stored; returns 1 on insertion. */
+    fails, a matching prefix is already stored, or either string is too long for
+    bauth_chain; returns 1 on insertion. */
 int bauth_add(t_cookie *cookie, const char *adr, const char *fil,
               const char *auth);
 

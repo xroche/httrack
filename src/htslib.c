@@ -1272,15 +1272,25 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
 
           if (!direct_url) {    // pas ftp:// par exemple
             char user_pass[256];
+            const size_t idlen = a > astart ? (size_t) (a - astart) - 1 : 0;
 
             user_pass[0] = '\0';
-            strncatbuff(user_pass, astart, (int) (a - astart) - 1);
-            strcpybuff(user_pass, 
-              unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt), user_pass));
-            code64((unsigned char *) user_pass, (int) strlen(user_pass),
-                   (unsigned char *) autorisation, 0);
-            if (strcmp(fil, "/robots.txt"))     /* pas robots.txt */
-              bauth_add(cookie, astart, fil, autorisation);
+            /* A clipped credential authenticates as somebody else. */
+            if (idlen < sizeof(user_pass)) {
+              strncatbuff(user_pass, astart, idlen);
+              strcpybuff(user_pass,
+                         unescape_http(OPT_GET_BUFF(opt),
+                                       OPT_GET_BUFF_SIZE(opt), user_pass));
+              code64((unsigned char *) user_pass, (int) strlen(user_pass),
+                     (unsigned char *) autorisation, 0);
+              if (strcmp(fil, "/robots.txt")) /* pas robots.txt */
+                bauth_add(cookie, astart, fil, autorisation);
+            } else {
+              /* 'a' is past the '@': the log gets the host, not the secret. */
+              hts_log_print(
+                  opt, LOG_WARNING,
+                  "authorization dropped, credentials too long for %s", a);
+            }
           }
         } else if ((a = bauth_check(cookie, real_adr, fil)))
           strcpybuff(autorisation, a);
