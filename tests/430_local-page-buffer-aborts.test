@@ -1,8 +1,9 @@
 #!/bin/bash
 #
 # Two htsparse buffers whose width a page picks: the raw source span of an
-# <applet> code= attribute, and a link the page's charset inflates threefold
-# past the 1023-byte entry check. Both aborted instead of refusing.
+# <applet> code= attribute, on both the in-scope and the off-host codebase
+# branch, and a link the page's charset inflates threefold past the 1023-byte
+# entry check. All three aborted instead of refusing.
 
 set -e
 
@@ -20,22 +21,33 @@ cleanup_push cleanup
 doc="${tmpdir}/doc"
 mkdir -p "$doc"
 
-# The span between "code" and "=" is copied verbatim into the rewritten tag.
+# The span between "code" and "=" is copied verbatim into the rewritten tag. An
+# off-host codebase puts the class out of scope, which is a second copy of the
+# same append against a second fixed buffer.
 pad=$(printf '%2048s' '')
-printf '<html><body><a href="applet.html">a</a><a href="cp1252.html">c</a></body></html>\n' \
-    >"${doc}/index.html"
+cat >"${doc}/index.html" <<'HTML'
+<html><body><a href="applet.html">a</a><a href="offhost.html">o</a>
+<a href="cp1252.html">c</a></body></html>
+HTML
 printf '<html><body><applet code%s="x.class"></applet></body></html>\n' "$pad" \
     >"${doc}/applet.html"
+printf '<html><body><applet codebase="http://elsewhere.invalid/" code%s="x.class"></applet></body></html>\n' \
+    "$pad" >"${doc}/offhost.html"
 printf '<html><body>class</body></html>\n' >"${doc}/x.class"
 
-# 683 cp1252 quotes decode to 2049 UTF-8 bytes, one past the link buffer.
-"$python" - "$(nativepath "${doc}/cp1252.html")" <<'PY'
+# Two cp1252 links off one page: 683 quotes decode to 2049 UTF-8 bytes, one past
+# the link buffer, while the short one has to keep working.
+"$python" - "$(nativepath "$doc")" <<'PY'
+import os
 import sys
 
-href = b"\x93" * 683
 body = (b'<html><head><meta charset="windows-1252"></head><body>'
-        b'<a href="' + href + b'">x</a></body></html>\n')
-open(sys.argv[1], "wb").write(body)
+        b'<a href="\x93s\x94.html">short</a>'
+        b'<a href="' + b"\x93" * 683 + b'">long</a></body></html>\n')
+open(os.path.join(sys.argv[1], "cp1252.html"), "wb").write(body)
+# str path, so Windows names it through the wide API rather than a codepage.
+open(os.path.join(sys.argv[1], "\u201cs\u201d.html"), "wb").write(
+    b"<html><body>SHORTCONVERTED</body></html>\n")
 PY
 
 local_server_start --root "$doc"
@@ -51,18 +63,33 @@ test "$rc" -eq 0 || fail "crawl exited $rc: $(cat "${tmpdir}/log")"
 host="${out}/127.0.0.1_${SRV_PORT}"
 
 # The attribute span is not URL-shaped, so clipping it would emit a broken tag:
-# the fix must carry all 2048 bytes through to the mirror.
-printf '[applet code span kept whole] ..\t'
-"$python" - "$(nativepath "${host}/applet.html")" <<'PY' || fail "code= span was clipped"
+# both branches must carry all 2048 bytes through to the mirror.
+span_kept() { # span_kept MIRRORED-PAGE
+    "$python" - "$(nativepath "$1")" <<'PY'
 import sys
 
 d = open(sys.argv[1], "rb").read()
-i = d.find(b"<applet code")
-if i < 0:
-    sys.exit(1)
-j = i + len(b"<applet code")
-sys.exit(0 if d[j:j + 2048] == b" " * 2048 and d[j + 2048:j + 2049] == b"=" else 1)
+i = 0
+while True:
+    i = d.find(b"code", i)
+    if i < 0:
+        sys.exit(1)
+    j = i + 4
+    n = 0
+    while d[j + n:j + n + 1] == b" ":
+        n += 1
+    if n == 2048 and d[j + n:j + n + 1] == b"=":
+        sys.exit(0)
+    i += 4
 PY
+}
+
+printf '[applet code span kept whole] ..\t'
+span_kept "${host}/applet.html" || fail "code= span was clipped"
+echo OK
+
+printf '[off-host codebase keeps it too] ..\t'
+span_kept "${host}/offhost.html" || fail "code= span was clipped off-host"
 echo OK
 
 # A truncated URL names a different resource, so the inflated link is refused
@@ -72,15 +99,33 @@ grep -q 'Link is too long after charset conversion' "${out}/hts-log.txt" ||
     fail "no charset-conversion refusal in $(cat "${out}/hts-log.txt")"
 echo OK
 
-printf '[nothing mirrored under the inflated name] ..\t'
+# The control the refusal message cannot give: a guard that refused every
+# converted link would print that warning more often, not less.
+# By content, not by name: what a platform makes of the converted name is a
+# different question from whether the link was followed at all.
+printf '[short converted link still mirrored] ..\t'
+"$python" - "$(nativepath "$host")" <<'PY' || fail "the short cp1252 link was not fetched"
+import os
+import sys
+
+for root, dirs, files in os.walk(sys.argv[1]):
+    for name in files:
+        with open(os.path.join(root, name), "rb") as fh:
+            if b"SHORTCONVERTED" in fh.read():
+                sys.exit(0)
+sys.exit(1)
+PY
+echo OK
+
+printf '[nothing mirrored under a clipped name] ..\t'
 "$python" - "$(nativepath "$host")" <<'PY' || fail "mirrored a clipped URL"
 import os
 import sys
 
 for root, dirs, files in os.walk(os.fsencode(sys.argv[1])):
     for name in dirs + files:
-        if not name.isascii():
-            sys.stderr.write("non-ascii mirror entry %r\n" % name)
+        if len(name) > 100:
+            sys.stderr.write("over-long mirror entry %r\n" % name[:60])
             sys.exit(1)
 PY
 test -s "${host}/cp1252.html" || fail "the page carrying the refused link is gone"

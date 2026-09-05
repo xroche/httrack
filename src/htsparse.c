@@ -2946,10 +2946,6 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                             // érire codebase="chemin"
                             if ((opt->getmode & HTS_GETMODE_HTML) &&
                                 (ptr > 0)) {
-                              char BIGSTK tempo4[HTS_URLMAXSIZE * 2];
-
-                              tempo4[0] = '\0';
-
                               if (strnotempty(tempo_pat)) {
                                 HT_ADD("codebase=\"http://");
                                 if (!opt->passprivacy) {
@@ -2963,8 +2959,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                                 HT_ADD("\" ");
                               }
 
-                              strncatbuff(tempo4, lastsaved, p_flush - lastsaved);
-                              HT_ADD(tempo4);   // refresh code="
+                              /* The page picks this span's width, so it goes
+                                 to the growable output, not a fixed buffer. */
+                              if (p_flush > lastsaved) {
+                                HT_ADD_BUF(lastsaved,
+                                           (size_t) (p_flush - lastsaved));
+                              }
                               HT_ADD(tempo);
                             }
                           }
