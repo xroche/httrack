@@ -1161,6 +1161,11 @@ jobs:
       - name: test file names
         run: bash tests/check-test-names.sh
 
+      # macOS runs the suite under bash 3.2, where a construct it does not
+      # know aborts the test and the EXIT trap turns that into a PASS.
+      - name: bash 3.2 constructs in tests
+        run: bash tests/check-bash32.sh
+
       # The corpus glob is what ships the vectors in a tarball, and it has no
       # oracle of its own: three were missing for exactly that reason.
       - name: fuzz corpus list

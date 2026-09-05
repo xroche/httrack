@@ -57,6 +57,15 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   socket, and SKIP when one answered: the powerpc and ppc64 buildds refuse
   TEST-NET-1 milliseconds after `connect()` where runners drop it.
   `tools/hostile-net.sh` runs a command on such a network.
+- macOS runs the suite under `/bin/bash`, which is bash 3.2. A construct it
+  does not know aborts the script, and the EXIT trap above then reports a PASS
+  (#1540). `tests/check-bash32.sh` (also a CI lint) rejects `mapfile`,
+  `readarray`, `${a[-1]}`, `declare -A`, `${v^^}` and namerefs, none of which
+  `bash -n` sees. It leaves out the empty-array case (`"${a[@]}"` under
+  `set -u`), because no static check can tell whether an array is empty there.
+- Never add a matrix axis to `windows-build.yml`. Its job has no `name:`, so an
+  axis renames the required contexts (`libhttrack (x64, Release)`, `libhttrack
+  (Win32, Release)`). They then stop reporting on every open PR in the repo.
 
 ## Hard invariants
 - **Generated autotools files are NOT in git.** `configure`, every
