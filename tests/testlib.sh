@@ -364,17 +364,25 @@ run_cleanups() {
 # Python 3 interpreter, or empty: Windows only installs python.exe, and a bare
 # "python" may be 2.x or the Store stub.
 find_python() {
-    local py names='python3 python'
+    local py names='python3 python' probe='sys.version_info[0] == 3'
     # Windows-side under wsl2, which is what keeps the fixture servers and
     # httrack.exe on one side of the boundary: no socket crosses it, and the
     # paths handed to them stay the native ones nativepath already produces.
     # A Linux python3 sitting in the distro would take the same arguments and
     # fail to open every one of them.
-    test "$(suite_backend)" != wsl2 || names='python3.exe python.exe'
+    # The bare names come first because the driver puts a shim there, which
+    # bridges the environment and converts drvfs paths the way it does for the
+    # engines; the .exe names are the fallback for a hand-run with no shim.
+    # Either way the probe demands a Windows interpreter, so the distro's own
+    # python3 cannot answer for a shim the runner had no python.exe to make.
+    if test "$(suite_backend)" = wsl2; then
+        names='python3 python python3.exe python.exe'
+        probe="$probe and sys.platform == 'win32'"
+    fi
     # shellcheck disable=SC2086 # the split is what makes it a candidate list
     for py in "${PYTHON:-}" $names; do
         test -n "$py" || continue
-        "$py" -c 'import sys; sys.exit(sys.version_info[0] != 3)' 2>/dev/null || continue
+        "$py" -c "import sys; sys.exit(not ($probe))" 2>/dev/null || continue
         printf '%s\n' "$py"
         return 0
     done

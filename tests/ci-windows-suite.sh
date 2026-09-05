@@ -330,10 +330,14 @@ if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
     rm -rf "$shimdir"
     mkdir -p "$shimdir"
     # Copied, not linked: the checkout's own mount may refuse to execute it.
-    for e in $ENGINE_EXES taskkill tasklist ping; do
+    # python too: the tests invoke it directly, so without a shim it gets no
+    # environment bridge and no path translation, which is what hid TZ from 386.
+    for e in $ENGINE_EXES taskkill tasklist ping python3 python; do
         # No shim for an engine this build never produced: `command -v` is how
         # 241 and 288 find htsserver, and a shim answers for a missing exe.
         case " $ENGINE_EXES " in *" $e "*) test -f "$bin/$e.exe" || continue ;; esac
+        # And no shim for an interpreter this runner does not have.
+        case $e in python3 | python) command -v "$e.exe" >/dev/null 2>&1 || continue ;; esac
         cp "$testdir/wsl2-exe-shim.sh" "$shimdir/$e"
         chmod +x "$shimdir/$e"
     done
