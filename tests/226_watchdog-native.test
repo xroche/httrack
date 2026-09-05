@@ -237,7 +237,7 @@ if test -x "$bin/pwsh"; then
     grep -qx -- "$(nativepath "$posixtmp/progress.log")" "$posixtmp/argv" ||
         fail "the launch did not pass the progress log"
 else
-    echo "note: $tmp is noexec, the driver wiring was not driven"
+    skip "$tmp is noexec, the stub bindir cannot be run"
 fi
 
 py=$(find_python || true)
