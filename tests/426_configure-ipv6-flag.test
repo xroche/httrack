@@ -31,7 +31,7 @@ done
 test -r "${shadow}/configure" || fail "the shadow source tree has no configure"
 
 n=0
-cases=8
+cases=9
 last_dir=
 
 # Seeding the cache variable is the answer a host without getaddrinfo gives, and
@@ -106,10 +106,11 @@ expect_fail() { # expect_fail DESC SEED WANT-TEXT ARG...
     skip_if_out_of_budget "$((cases - n))" "$((SECONDS - began))"
 }
 
-# The default is a probe and it must define the macro either way. The second
-# case is the one master fails: it warned and left HTS_INET6 undefined.
-expect "the default probes and finds getaddrinfo" have 1 "yes (auto)"
+# The probe must define the macro either way, and this is the case master
+# fails: it warned and left HTS_INET6 undefined. First, so a slow host's budget
+# cannot skip past the guard the test exists for.
 expect "the default probes and reports the loss" hide 0 "no (auto)"
+expect "the default probes and finds getaddrinfo" have 1 "yes (auto)"
 
 # An explicit request is answered by the request, and says which it was.
 expect "--enable-ipv6=yes is honoured" have 1 "yes (requested)" --enable-ipv6=yes
@@ -119,6 +120,9 @@ expect "--disable-ipv6 is honoured" have 0 "no (requested)" --disable-ipv6
 if grep -q "getaddrinfo" "${last_dir}/configure.log"; then
     fail_dump "--disable-ipv6 still probed for getaddrinfo" "${last_dir}/configure.log"
 fi
+
+# Spelling the default out loud reaches the same place the default does.
+expect "--enable-ipv6=auto probes" have 1 "yes (auto)" --enable-ipv6=auto
 
 # The probe cannot overrule an explicit yes, and the diagnostic has to name the
 # flag that gets the packager past it.
@@ -133,19 +137,22 @@ expect "--disable-auto-features leaves IPv6 on auto" have 1 "yes (auto)" --disab
 
 # Every case above seeds the cache, so one unseeded run is what proves the probe
 # still runs. Its answer is the host's, so assert only that a definite one was
-# reached and that everything downstream agrees with it.
+# reached and that everything downstream agrees with it. Two greps rather than
+# one alternation: \| is a GNU extension that BSD sed reads as a literal.
 n=$((n + 1))
 run_configure "${work}/build${n}" probe ||
     fail_dump "an unseeded configure failed" "${work}/build${n}/configure.log"
 grep -q "checking for getaddrinfo in -lc" "${last_dir}/configure.log" ||
     fail_dump "an unseeded configure ran no getaddrinfo probe" "${last_dir}/configure.log"
-probed=$(sed -n 's/.*whether IPv6 support is enabled\.\.\. \(yes\|no\) (auto)$/\1/p' \
-    "${last_dir}/configure.log")
-case ${probed} in
-yes) check_state "the unseeded probe" "${last_dir}" 1 ;;
-no) check_state "the unseeded probe" "${last_dir}" 0 ;;
-*) fail_dump "an unseeded configure reported no IPv6 outcome" "${last_dir}/configure.log" ;;
-esac
+if grep -q "whether IPv6 support is enabled\.\.\. yes (auto)$" "${last_dir}/configure.log"; then
+    probed=yes
+    check_state "the unseeded probe" "${last_dir}" 1
+elif grep -q "whether IPv6 support is enabled\.\.\. no (auto)$" "${last_dir}/configure.log"; then
+    probed=no
+    check_state "the unseeded probe" "${last_dir}" 0
+else
+    fail_dump "an unseeded configure reported no IPv6 outcome" "${last_dir}/configure.log"
+fi
 echo "ok: an unseeded configure reaches a definite outcome (${probed})"
 
 assert_steps_ran "${cases}" "${n}"

@@ -182,7 +182,7 @@ RESOLVES
         echo "skipped the pointed-here control: no ip6-localhost apart from the PTR"
     fi
 else
-    echo "skipped the IPv6 advert: no ::1 here"
+    echo "skipped the IPv6 advert: this build or this host has no ::1"
 fi
 
 cleanup
