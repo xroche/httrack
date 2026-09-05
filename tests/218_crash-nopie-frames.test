@@ -31,7 +31,7 @@ cleanup_push rm -rf "${work}"
 cflags=(-g -O0 -I"${builddir}" -I"${builddir}/src" -I"${srcdir}/src")
 if [ -n "${TEST_CPPFLAGS:-}" ]; then
     read -r -a extra_argv <<<"${TEST_CPPFLAGS}"
-    cflags+=("${extra_argv[@]}")
+    cflags+=(${extra_argv[@]+"${extra_argv[@]}"})
 fi
 sources=("${srcdir}/tests/nopieprobe.c" "${srcdir}/src/htsbacktrace.c")
 build() { # $1 output binary, rest extra flags

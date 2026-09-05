@@ -48,7 +48,7 @@ n_hidden=$(wc -l <"$tmp/hidden")
 cpp_argv=(-I"$tmp/include")
 if [ -n "${TEST_CPPFLAGS:-}" ]; then
     read -r -a extra_argv <<<"$TEST_CPPFLAGS"
-    cpp_argv+=("${extra_argv[@]}")
+    cpp_argv+=(${extra_argv[@]+"${extra_argv[@]}"})
 fi
 
 # volatile, or the compiler folds "address of a known symbol is non-null" to 1
@@ -111,7 +111,12 @@ for suffix in lto_priv constprop isra part cold llvm; do
         canaries+=("$sym")
     fi
 done
-mapfile -t canaries < <(printf '%s\n' "${canaries[@]}" | sort -u)
+# A read loop, not mapfile: macOS runs the suite under bash 3.2, which has none.
+sorted=()
+while read -r sym; do
+    sorted+=("$sym")
+done < <(printf '%s\n' "${canaries[@]}" | sort -u)
+canaries=("${sorted[@]}")
 
 for sym in "${canaries[@]}"; do
     printf 'extern void %s(void);\n' "$sym"
@@ -168,7 +173,7 @@ echo "linked $probed reachable symbol(s) from ${#headers[@]} installed headers" 
     "($n_hidden hidden, $n_exported exported)"
 [ "$probed" -ge 5 ] || fail "only $probed symbols reached the link probe, the candidate list is broken"
 for sym in "${canaries[@]}"; do
-    case " ${leaks[*]} " in
+    case " ${leaks[*]-} " in
     *" $canary:$sym "*) ;;
     *) fail "the synthetic $canary:$sym leak went unreported, the candidate list is broken" ;;
     esac

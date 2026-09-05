@@ -23,7 +23,7 @@ cflags=()
 for flags in "${TEST_CFLAGS:-}" "${TEST_CPPFLAGS:-}"; do
     if [ -n "${flags}" ]; then
         read -r -a extra_argv <<<"${flags}"
-        cflags+=("${extra_argv[@]}")
+        cflags+=(${extra_argv[@]+"${extra_argv[@]}"})
     fi
 done
 cflags+=(-g -O0 -I"${builddir}" -I"${builddir}/src" -I"${srcdir}/src")
