@@ -169,13 +169,7 @@ assert_state() { # assert_state DIR NAME on|off
 n=0
 planned=10 # steps below; the last one needs the libraries to be installed
 
-# Pace against the costliest step so far, never against the last one: these steps
-# are ordered by what they mean, so a cheap one under-projects the slow one after it.
-costliest=0
-pace() { # pace <seconds the step took>
-    test "$1" -le "${costliest}" || costliest=$1
-    skip_if_out_of_budget "$((planned - n))" "${costliest}"
-}
+pace_init
 
 # A GNU-libiconv-shaped prefix: a header that renames iconv_open the way the
 # real one does away from LIBICONV_PLUG, and a library under a subdirectory the
@@ -610,7 +604,7 @@ build:
 	false
 MUT
     echo "ok: every dh_auto_configure debian/rules runs asks for every feature"
-    pace "$((SECONDS - began))"
+    pace "$((planned - n))" "$((SECONDS - began))"
 else
     planned=$((planned - 1))
     echo "no debian/rules under ${srcdir}, so the packaging flag list is not read" >&2
@@ -626,7 +620,7 @@ n=$((n + 1))
 grep -q 'bad value for auto-features' "${work}/bogus/configure.log" ||
     fail_dump "configure refused the value without saying which flag" "${work}/bogus/configure.log"
 echo "ok: a value that is neither yes nor no is refused"
-pace "$((SECONDS - began))"
+pace "$((planned - n))" "$((SECONDS - began))"
 
 began=${SECONDS}
 n=$((n + 1))
@@ -636,7 +630,7 @@ n=$((n + 1))
 grep -q 'bad value for backtrace' "${work}/btbogus/configure.log" ||
     fail_dump "configure refused the value without saying which flag" "${work}/btbogus/configure.log"
 echo "ok: an unknown --enable-backtrace value is refused"
-pace "$((SECONDS - began))"
+pace "$((planned - n))" "$((SECONDS - began))"
 
 began=${SECONDS}
 n=$((n + 1))
@@ -647,7 +641,7 @@ mkdir -p "${work}/empty"
 grep -q 'brotli requested at' "${work}/reject/configure.log" ||
     fail_dump "configure failed without naming the prefix it was given" "${work}/reject/configure.log"
 echo "ok: an explicit prefix with no library still fails the build"
-pace "$((SECONDS - began))"
+pace "$((planned - n))" "$((SECONDS - began))"
 
 began=${SECONDS}
 n=$((n + 1))
@@ -665,7 +659,7 @@ case ${got} in
 *) fail_dump "a foreign host answered '${got}' rather than declining backtrace" \
     "${work}/foreign/configure.log" ;;
 esac
-pace "$((SECONDS - began))"
+pace "$((planned - n))" "$((SECONDS - began))"
 
 began=${SECONDS}
 n=$((n + 1))
@@ -693,7 +687,7 @@ grep -q 'iconv requested but no iconv.h with a linkable iconv_open' \
     fail_dump "configure failed without saying that iconv was the request" \
         "${work}/ic-bare/configure.log"
 echo "ok: a bare --with-iconv fails the build rather than falling back"
-pace "$((SECONDS - began))"
+pace "$((planned - n))" "$((SECONDS - began))"
 
 began=${SECONDS}
 n=$((n + 1))
@@ -734,7 +728,7 @@ else
     n=$((n - 1))
     echo "no shared library from ${cc_argv[0]}, so the iconv prefix case is skipped" >&2
 fi
-pace "$((SECONDS - began))"
+pace "$((planned - n))" "$((SECONDS - began))"
 
 began=${SECONDS}
 n=$((n + 1))
@@ -750,7 +744,7 @@ for f in ${features}; do
     assert_state "${work}/off" "${f}" off
 done
 echo "ok: the switch turns every feature off, whatever the host has installed"
-pace "$((SECONDS - began))"
+pace "$((planned - n))" "$((SECONDS - began))"
 
 began=${SECONDS}
 n=$((n + 1))
@@ -770,7 +764,7 @@ for f in ${features}; do
     esac
 done
 echo "ok: every feature answers the default run; auto-enabled here:${on:- none}"
-pace "$((SECONDS - began))"
+pace "$((planned - n))" "$((SECONDS - began))"
 
 if test -z "${on}"; then
     planned=$((planned - 1))

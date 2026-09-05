@@ -34,14 +34,9 @@ n=0
 cases=9
 last_dir=
 
-# Pace against the costliest step so far, never against the last one: the two
-# rejections below give up early, and projecting a full configure off one of
-# them is how the s390x leg ran into its budget instead of skipping.
-costliest=0
-pace() { # pace <seconds the step took>
-    test "$1" -le "${costliest}" || costliest=$1
-    skip_if_out_of_budget "$((cases - n))" "${costliest}"
-}
+# The two rejections below give up early, and projecting a full configure off one
+# of them is how the s390x leg ran into its budget instead of skipping.
+pace_init
 
 # Seeding the cache variable is the answer a host without getaddrinfo gives, and
 # AC_CHECK_LIB takes the same action-if-not-found branch either way. "have"
@@ -99,7 +94,7 @@ expect() { # expect DESC SEED WANT-VALUE WANT-SUMMARY ARG...
     grep -q "whether IPv6 support is enabled\.\.\. ${summary}\$" "${last_dir}/configure.log" ||
         fail_dump "${desc}: configure did not report '${summary}'" "${last_dir}/configure.log"
     echo "ok: ${desc}"
-    pace "$((SECONDS - began))"
+    pace "$((cases - n))" "$((SECONDS - began))"
 }
 
 expect_fail() { # expect_fail DESC SEED WANT-TEXT ARG...
@@ -112,7 +107,7 @@ expect_fail() { # expect_fail DESC SEED WANT-TEXT ARG...
     grep -q "${text}" "${last_dir}/configure.log" ||
         fail_dump "${desc}: configure failed without saying '${text}'" "${last_dir}/configure.log"
     echo "ok: ${desc}"
-    pace "$((SECONDS - began))"
+    pace "$((cases - n))" "$((SECONDS - began))"
 }
 
 # The probe must define the macro either way, and this is the case master
