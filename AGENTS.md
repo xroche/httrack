@@ -28,6 +28,10 @@ the operational checklist: toolchain, invariants, and how to ship a change.
 - `make check` prepends the build's `src/` to `PATH`, but a hand-run `.test` does
   not — an installed `/usr/bin/httrack` then shadows your build. Run via `make
   check`, or `PATH="<bld>/src:$PATH"` for a manual run.
+- `distcheck` is a required context and builds from the dist tarball, which has no
+  `.github/`. A test reading a file from there must skip when it is missing, not
+  fail. Fail only when the directory is present and the file is not, so a real
+  deletion is still caught. Tests 226, 278, 399, 432 and 437 carry the pattern.
 - Give new `.test` scripts `set -e`: the older ones predate the rule, so several
   `local-crawl.sh` calls with no `set -e` report PASS on any non-last failure.
 - Each test runs under a 600s wall-clock guard that reports a wedge as 124. A test
