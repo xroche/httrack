@@ -91,9 +91,11 @@ esac
 # Sections 2 and 3 only go red under a sanitizer: on a plain build the byte
 # below the buffer is usually not a digit, so a reverted scan stops anyway and
 # produces the same names. Pin the two sites at the source instead.
-command grep -q 'hts_rtrim(line, HTS_REALSPACES)' "$top_srcdir/src/htsalias.c" ||
+# Read out of a substitution: under bash 3.2 errexit kills the script whenever a
+# command-prefixed builtin returns non-zero, in a condition as much as anywhere.
+test -n "$(command grep -l 'hts_rtrim(line, HTS_REALSPACES)' "$top_srcdir/src/htsalias.c" || true)" ||
     fail "htsalias.c right trim no longer goes through hts_rtrim"
-command grep -q 'hts_rtrimlen(tempo, "0123456789")' "$top_srcdir/src/htsname.c" ||
+test -n "$(command grep -l 'hts_rtrimlen(tempo, "0123456789")' "$top_srcdir/src/htsname.c" || true)" ||
     fail "htsname.c collision-suffix scan no longer goes through hts_rtrimlen"
 
 exit 0

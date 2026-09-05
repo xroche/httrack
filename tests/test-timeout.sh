@@ -27,6 +27,8 @@ budget=$(budget_secs)
 # The test script is the last argument; automake passes no others today.
 for path in "$@"; do :; done
 name=$(basename "$path")
+# The runner sources this path, and a dot-command with no slash in it is a PATH lookup.
+case $path in */*) ;; *) path=./$path ;; esac
 
 # gcc's UBSan ignores log_path and reports on stderr, which most tests discard.
 # Route the engine through the shims that keep a copy (tests/stderrwrap.c)
@@ -63,6 +65,7 @@ fi
 # Exported so a test can pace itself against the same number (skip_if_out_of_budget)
 # instead of being killed halfway.
 export HTTRACK_TEST_TIMEOUT="$budget"
+# No marker with the guard off: nothing survives the exec to read one.
 test "$budget" -gt 0 || exec "$BASH" "$@"
 
 # Give the test its own TMPDIR, so the hang dump can salvage exactly this test's
@@ -75,7 +78,38 @@ if mkdir -p "$tmproot/ht.$$" 2>/dev/null; then
     TMPDIR="$tmproot/ht.$$"
     export TMPDIR
     trap 'rm -rf "$TMPDIR" 2>/dev/null || true' EXIT
+    TESTLIB_DONE_FILE="$TMPDIR/.testlib-done"
+else
+    TESTLIB_DONE_FILE="$tmproot/ht.done.$$"
+    trap 'rm -f "$TESTLIB_DONE_FILE" 2>/dev/null || true' EXIT
 fi
+export TESTLIB_DONE_FILE
+rm -f "$TESTLIB_DONE_FILE" 2>/dev/null || true
+
+# bash before 4.2 patch 23 forgets the exit status when an EXIT trap runs after a
+# fatal expansion error under errexit, so an aborted test reports 0 and automake
+# records a PASS. macOS ships 3.2.57. So the test marks its own end, and a zero
+# status with no mark is an abort. Sourcing it from `bash -c` keeps $0 the test's
+# own path, which many tests derive $testdir from, writes nothing beside a
+# read-only srcdir and leaves stdin alone. A subshell's exit is not the test's.
+# Two shapes would lose the mark and fail a healthy test: an `exec` at top level,
+# and removing the driver's TMPDIR before exiting. No test does either today.
+# shellcheck disable=SC2016 # the child expands it, not us
+TESTLIB_RUNNER='exit() {
+    if test "$BASH_SUBSHELL" -eq 0; then : >"$TESTLIB_DONE_FILE" 2>/dev/null || true; fi
+    builtin exit ${1+"$1"}
+}
+. "$0"
+TESTLIB_RUNNER_ST=$?
+: >"$TESTLIB_DONE_FILE" 2>/dev/null || true
+builtin exit "$TESTLIB_RUNNER_ST"'
+
+# Everything before the test path is an option for the shell that runs it.
+runopts=()
+while test "$#" -gt 1; do
+    runopts+=("$1")
+    shift
+done
 
 # Two questions, and they part company under the wsl2 backend: the shell there is
 # Linux while the binary under test is still a native .exe.
@@ -87,7 +121,7 @@ target_is_windows && windows=1
 had_m=
 case "$-" in *m*) had_m=1 ;; esac
 test -n "$msys_shell" || set -m # own process group, so kill_tree can signal the group
-"$BASH" "$@" &
+"$BASH" ${runopts[@]+"${runopts[@]}"} -c "$TESTLIB_RUNNER" "$path" &
 pid=$!
 test -n "$had_m" || test -n "$msys_shell" || set +m
 # Read while the test is certainly alive: by kill time /proc/<pid>/winpid is gone.
@@ -145,3 +179,9 @@ while kill -0 "$pid" 2>/dev/null; do
     exit 124
 done
 wait "$pid"
+status=$?
+if test "$status" -eq 0 && test ! -f "$TESTLIB_DONE_FILE"; then
+    echo "abort: $name exited 0 without reaching its end; the shell above says why"
+    status=1
+fi
+exit "$status"
