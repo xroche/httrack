@@ -33,11 +33,13 @@ local_crawl --log "${tmpdir}/crawl.log" --quiet --robots=0 --retries=1 -c1 \
 
 # Control on the fixture, read without the tool on trial: an empty cache would
 # make every assertion below pass for the wrong reason.
+# tr, here and below: Windows python's print leaves a CR that $() keeps, which
+# MSYS eats and a Linux shell under wsl2 does not.
 cached=$("${SRV_PYTHON:?}" -c '
 import sys, zipfile
 for i in sorted(zipfile.ZipFile(sys.argv[1]).infolist(), key=lambda i: i.filename):
     print(i.filename)
-' "${out}/hts-cache/new.zip")
+' "${out}/hts-cache/new.zip" | tr -d '\r')
 test "$(grep -c . <<<"$cached")" = 2 || fail "want 2 cache entries, got: $cached"
 
 # -#C returns as soon as it has listed, so -O comes first; the listing is CRLF.
@@ -94,7 +96,7 @@ with zipfile.ZipFile(path, "a", zipfile.ZIP_DEFLATED) as z:
     zi.extra = b""  # only the local header carries them, as minizip writes it
     z.writestr(name + ".noheaders", body)
 print(name)
-' "${grafted}/hts-cache/new.zip")
+' "${grafted}/hts-cache/new.zip" | tr -d '\r')
 
 listing=$(httrack -O "$grafted" -#C '*' 2>/dev/null | tr -d '\r')
 test "$(grep -c '^X-URL: ' <<<"$listing")" = 3 ||
