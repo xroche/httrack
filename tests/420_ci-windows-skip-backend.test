@@ -28,7 +28,7 @@ test "$ci_skip_list" = "$expected_skips_wsl2" || fail "wsl2 did not select its o
 
 # --- the lists' CONTENT, not just which one is chosen ---------------------
 # 420 compared each list against itself, so editing either one stayed green.
-# These three names are the whole measured difference between the backends.
+# 386 is the whole measured difference, and the htsserver pair holds on both.
 ci_expected_skips_for_backend msys || fail "msys was rejected"
 msys_list=$ci_skip_list
 ci_expected_skips_for_backend wsl2 || fail "wsl2 was rejected"
@@ -53,13 +53,17 @@ while read -r name where; do
         holds "$wsl2_list" "$name" || fail "$name left the wsl2 list"
         ! holds "$msys_list" "$name" || fail "$name is in the msys list"
         ;;
+    both)
+        holds "$msys_list" "$name" || fail "$name left the msys list"
+        holds "$wsl2_list" "$name" || fail "$name left the wsl2 list"
+        ;;
     esac
 done <<'EOF'
-241_local-single-file-gui.test msys-only
-288_testlib-holdport.test msys-only
 386_local-proxytrack-dav-tz.test wsl2-only
+241_local-single-file-gui.test both
+288_testlib-holdport.test both
 EOF
-ok "the two lists differ by exactly the three names the runs measured"
+ok "the two lists differ by exactly the one name the runs measured"
 
 # The lists genuinely differ now, so the checks above already separate "read the
 # right variable" from "always read msys". Kept because it holds either way, and

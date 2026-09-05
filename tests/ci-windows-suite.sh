@@ -277,11 +277,9 @@ expected_skips_msys="01_engine-footer-overflow.test
 398_engine-build-features.test"
 
 # Measured, not predicted: windows-build run 33927128153, both platforms alike.
-# The msys list, minus the two that a real Linux shell can run, plus the one
-# Windows python cannot: it ignores TZ=IST-5:30, so 386 guards itself out.
-expected_skips_wsl2=$(printf '%s\n' "$expected_skips_msys" |
-    grep -vxE '241_local-single-file-gui\.test|288_testlib-holdport\.test')
-expected_skips_wsl2="$expected_skips_wsl2
+# The msys list plus the one Windows python cannot run: it ignores TZ=IST-5:30,
+# so 386 guards itself out.
+expected_skips_wsl2="$expected_skips_msys
 386_local-proxytrack-dav-tz.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
@@ -322,6 +320,9 @@ if test "$HTTRACK_SUITE_BACKEND" = wsl2; then
     mkdir -p "$shimdir"
     # Copied, not linked: the checkout's own mount may refuse to execute it.
     for e in $ENGINE_EXES taskkill tasklist ping; do
+        # No shim for an engine this build never produced: `command -v` is how
+        # 241 and 288 find htsserver, and a shim answers for a missing exe.
+        case " $ENGINE_EXES " in *" $e "*) test -f "$bin/$e.exe" || continue ;; esac
         cp "$testdir/wsl2-exe-shim.sh" "$shimdir/$e"
         chmod +x "$shimdir/$e"
     done

@@ -194,7 +194,7 @@ chain "$dir/dnschain.arc" "$dir/quoting.body" yes
 # The record lines a scan has to recognise or place exactly, each in an archive
 # whose greedy record swallows it. A miss here is a page served under another
 # page's URL, so these are the shapes an archive in the wild actually carries.
-"$python" - "$dir" "$ARC_DATE" <<'EOF' || fail "could not craft the shape fixtures"
+"$python" - "$(nativepath "$dir")" "$ARC_DATE" <<'EOF' || fail "could not craft the shape fixtures"
 import sys
 
 d, date = sys.argv[1], sys.argv[2].encode()
@@ -369,7 +369,7 @@ EOF
 # Walks the record chain to return the body archive $1 stores for URL $2, rather
 # than trusting a declared length twice.
 body_of() { # body_of ARC URL
-    "$python" - "$1" "$2" <<'EOF'
+    "$python" - "$(nativepath "$1")" "$2" <<'EOF'
 import sys
 
 data = open(sys.argv[1], "rb").read()
@@ -473,7 +473,7 @@ done
 for class in overlong shorthdr; do
     convert "$dir/$class.arc" "$dir/$class-out.arc"
     # the record is kept, so what is asserted is the bytes it carries
-    "$python" - "$dir/$class-out.arc" "http://$class/a.html" <<'EOF' ||
+    "$python" - "$(nativepath "$dir/$class-out.arc")" "http://$class/a.html" <<'EOF' ||
 import sys
 
 # by declared length, because the leak this looks for starts with a record line
@@ -540,7 +540,7 @@ printf 'HTTP/1.1 200 OK\r\nContent-Type: text/tight\r\n' >"$dir/tight.head"
 } >"$dir/hdr.arc"
 
 convert "$dir/hdr.arc" "$dir/hdr-out.arc"
-"$python" - "$dir/hdr-out.arc" <<'EOF' || fail_dump "a record kept the next record's headers" "$dir/hdr-out.arc"
+"$python" - "$(nativepath "$dir/hdr-out.arc")" <<'EOF' || fail_dump "a record kept the next record's headers" "$dir/hdr-out.arc"
 import sys
 
 out = open(sys.argv[1], "rb").read().decode("latin-1")
