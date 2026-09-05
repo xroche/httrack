@@ -285,10 +285,13 @@ expected_skips_msys="01_engine-footer-overflow.test
 # file, which places the fault at EOF and closed stdin rather than the wizard.
 # 226: its own watchdog is a PowerShell process launched from a Linux shell, so
 # what reaps it differs and the timing assertions are about the msys shape.
+# 24: no graceful stop crosses the boundary, so pass 1 cannot be interrupted in
+# the state the resume needs. Each of these four skips itself, in the test.
 expected_skips_wsl2="$expected_skips_msys
 386_local-proxytrack-dav-tz.test
 294_local-wizard-eof.test
-226_watchdog-native.test"
+226_watchdog-native.test
+24_local-resume-overlap.test"
 
 # Sets ci_skip_list to the pinned skip set for backend $1, failing loudly if
 # there is none: an unknown backend must never fall back to an empty list,

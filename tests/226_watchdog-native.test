@@ -14,6 +14,11 @@ export WATCHDOG_CONTEXT='226_watchdog-native (never posted)'
 # shellcheck source=tests/testlib.sh
 . "${0%"${0##*/}"}./testlib.sh"
 
+# Its own watchdog is a PowerShell process launched from a Linux shell, so what
+# reaps it differs and these timings describe the msys shape.
+test "$(suite_backend)" != wsl2 ||
+    skip "the native watchdog is reaped differently from a WSL2 shell"
+
 top=${abs_top_srcdir:-$(cd "$testdir/.." && pwd)}
 wdscript="$testdir/ci-windows-watchdog.ps1"
 driver="$testdir/ci-windows-suite.sh"

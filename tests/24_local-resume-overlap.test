@@ -9,6 +9,12 @@ set -eu
 
 # shellcheck source=tests/crawllib.sh
 . "${0%"${0##*/}"}./crawllib.sh"
+
+# No graceful stop crosses the boundary: a Linux signal reaches the interop
+# relay, and taskkill /F reaches the engine too hard to let pass 1 write the
+# temp-ref pass 2 resumes from. The spike left that gap open deliberately.
+test "$(suite_backend)" != wsl2 ||
+    skip "no graceful stop reaches a Windows exe from a WSL2 shell"
 root=$(nativepath "${testdir}/server-root")
 
 tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_198.XXXXXX") || exit 1
