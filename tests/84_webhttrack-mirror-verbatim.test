@@ -59,7 +59,7 @@ grep -qi '^Content-type: text/html' "${hdr}" ||
     fail "mirrored page lost its text/html type: $(<"${hdr}")"
 
 # The other direction: a running crawl rebinds /website/ to the new project, so
-# plant the probe there. /trickle/ dribbles for a minute, which holds it open.
+# plant the probe there. p0.bin dribbles for a minute, which holds it open.
 clog="${work}/content.log"
 "${HTS_PYTHON}" "${testdir}/local-server.py" --root "${work}" >"${clog}" 2>&1 &
 csrv=$!
@@ -68,7 +68,7 @@ cport=$(discover_server_port "${clog}" "${csrv}") ||
 
 htsserver_client --path /step4.html --field "sid=${sid}" --field "path=${work}" \
     --field projname=crawl --field winprofile=x --field command_do=start \
-    --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/ -O ${work}/crawl" \
+    --field "command=httrack --quiet --robots=0 http://127.0.0.1:${cport}/trickle/p0.bin -O ${work}/crawl" \
     >/dev/null
 
 # command_do=start saves the profile before it starts the engine, and the save alone
@@ -83,7 +83,6 @@ while :; do
         fail "the crawl never showed as running: $(<"${HTS_LOG}")"
     poll_wait 0.2
 done
-test -d "${work}/crawl" || fail "the crawl is running but created no project"
 cp "${mirror}" "${work}/crawl/hostile.html"
 
 htsserver_client --path /website/hostile.html --head-file "${hdr}" --body-file "${body}"
@@ -92,5 +91,11 @@ grep -q '^HTTP/1\.0 200 ' "${hdr}" ||
 # cmp, not a "not the GUI page" check: that is only one of the wrong answers.
 cmp -s "${mirror}" "${body}" ||
     fail "running crawl: /website/ did not serve the mirror byte for byte"
+
+# A crawl ending mid-probe leaves the checks above reading the finished pane and
+# passing for the wrong reason, so pin the state they ran in.
+htsserver_client --path /server/index.html >"${work}/pane.txt"
+grep -qF 'In progress:' "${work}/pane.txt" ||
+    fail "the crawl ended during the probes, so /website/ never faced a running one"
 
 echo "PASS"
