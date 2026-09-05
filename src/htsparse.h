@@ -133,6 +133,14 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
                                        const char *moved_fil);
 
 /*
+  Take a pending stop request, deleting the request file, and answer whether the
+  mirror must now stop. True only for a request newer than this run's own
+  hts-in_progress.lock and deletable, so neither one inherited from an earlier
+  run nor one the engine cannot remove ever stops this mirror.
+*/
+hts_boolean hts_take_abort_request(httrackp *opt);
+
+/*
   Process user intercations: pause, add link, delete link..
 */
 void hts_mirror_process_user_interaction(htsmoduleStruct * str,

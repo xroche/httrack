@@ -4030,6 +4030,35 @@ int hts_mirror_check_moved(htsmoduleStruct * str,
 
 }
 
+/* Modification time of NAME in the output directory, (time_t) -1 if absent. */
+static time_t hts_lock_time(httrackp *opt, const char *name) {
+  return get_filetime(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                              StringBuff(opt->path_log), name));
+}
+
+hts_boolean hts_take_abort_request(httrackp *opt) {
+  time_t asked, started;
+
+  if (!fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                           StringBuff(opt->path_log), HTS_ABORT_LOCKNAME)))
+    return HTS_FALSE;
+  /* A request no newer than this run's progress lock was aimed at an earlier
+     mirror, so it neither stops this one nor is ours to delete. Whole seconds
+     everywhere, so a clock stepping back makes the file inert meanwhile. */
+  asked = hts_lock_time(opt, HTS_ABORT_LOCKNAME);
+  started = hts_lock_time(opt, "hts-in_progress.lock");
+  if (asked == (time_t) -1 || started == (time_t) -1 || asked <= started)
+    return HTS_FALSE;
+  UNLINK(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                 StringBuff(opt->path_log), HTS_ABORT_LOCKNAME));
+  /* A lock still there is one we may never be able to remove, and acting on it
+     would stop the mirror on this poll and on every one after it. */
+  if (fexist_utf8(fconcat(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
+                          StringBuff(opt->path_log), HTS_ABORT_LOCKNAME)))
+    return HTS_FALSE;
+  return HTS_TRUE;
+}
+
 /*
   Process pause, link adding..
 */
@@ -4043,6 +4072,14 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
 #if BDEBUG==1
   printf("\nBack test..\n");
 #endif
+
+  /* Windows has no cross-process SIGTERM: a stop request arrives as a file. */
+  if (hts_take_abort_request(opt)) {
+    hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+    *stre->exit_xh_ = 1;
+    XH_uninit;
+    return;
+  }
 
   // pause/lock files
   {
@@ -4202,6 +4239,12 @@ void hts_mirror_process_user_interaction(htsmoduleStruct * str,
         *stre->exit_xh_ = 1;    // exit requested
         XH_uninit;
         return;
+      }
+      /* Read here as well, or a mirror down to its last socket sees no stop
+         request until the transfer it waits on has ended. */
+      if (hts_take_abort_request(opt)) {
+        hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
+        *stre->exit_xh_ = 1;
       }
       /* Same omission as the wait for the current link: with every slot busy
          the mirror parks here instead, and the exit never lands (#1096). */
