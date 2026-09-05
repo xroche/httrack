@@ -27,7 +27,8 @@ mkdir -p "$doc"
 pad=$(printf '%2048s' '')
 cat >"${doc}/index.html" <<'HTML'
 <html><body><a href="applet.html">a</a><a href="offhost.html">o</a>
-<a href="cp1252.html">c</a></body></html>
+<a href="cp1252.html">c</a><a href="cp1252-2040.html">q</a>
+<a href="cp1252-2043.html">b</a></body></html>
 HTML
 printf '<html><body><applet code%s="x.class"></applet></body></html>\n' "$pad" \
     >"${doc}/applet.html"
@@ -35,8 +36,11 @@ printf '<html><body><applet codebase="http://elsewhere.invalid/" code%s="x.class
     "$pad" >"${doc}/offhost.html"
 printf '<html><body>class</body></html>\n' >"${doc}/x.class"
 
-# Two cp1252 links off one page: 683 quotes decode to 2049 UTF-8 bytes, one past
-# the link buffer, while the short one has to keep working.
+# Which buffer a converted link reaches is decided by its converted LENGTH
+# alone, so the lengths are what the fixtures pin. windows-1252 0x80 becomes
+# U+20AC, three bytes: 680 of them make 2040, which leaves an escape append
+# exactly sizeof(void *) of room; 681 make 2043, which no longer fits a
+# "http://" prepended to it; 683 make 2049, past the buffer itself.
 "$python" - "$(nativepath "$doc")" <<'PY'
 import os
 import sys
@@ -45,6 +49,11 @@ body = (b'<html><head><meta charset="windows-1252"></head><body>'
         b'<a href="\x93s\x94.html">short</a>'
         b'<a href="' + b"\x93" * 683 + b'">long</a></body></html>\n')
 open(os.path.join(sys.argv[1], "cp1252.html"), "wb").write(body)
+head = b'<html><head><meta charset="windows-1252"></head><body>'
+open(os.path.join(sys.argv[1], "cp1252-2040.html"), "wb").write(
+    head + b'<a href="' + b"\x80" * 680 + b'">q</a></body></html>\n')
+open(os.path.join(sys.argv[1], "cp1252-2043.html"), "wb").write(
+    head + b'<base href="' + b"\x80" * 681 + b'"></body></html>\n')
 # str path, so Windows names it through the wide API rather than a codepage.
 open(os.path.join(sys.argv[1], "\u201cs\u201d.html"), "wb").write(
     b"<html><body>SHORTCONVERTED</body></html>\n")
@@ -129,4 +138,19 @@ for root, dirs, files in os.walk(os.fsencode(sys.argv[1])):
             sys.exit(1)
 PY
 test -s "${host}/cp1252.html" || fail "the page carrying the refused link is gone"
+echo OK
+
+# Each length selects a different destination, so each fixture has to survive.
+printf '[every converted length survives] ..\t'
+for page in cp1252-2040.html cp1252-2043.html; do
+    test -s "${host}/${page}" || fail "$page is not mirrored"
+done
+test "$(grep -c 'Link is too long after charset conversion' "${out}/hts-log.txt")" -ge 3 ||
+    fail "not every over-long conversion was refused: $(cat "${out}/hts-log.txt")"
+echo OK
+
+# The append site is its own bug, reachable whenever a caller has that much
+# room left, so it is pinned away from the crawl as well.
+printf '[escape append tolerates a pointer-sized remainder] ..\t'
+assert_selftest "escape-append-room self-test OK" escape-append-room
 echo OK

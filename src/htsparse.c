@@ -81,6 +81,10 @@ Please visit our Website: http://www.httrack.com
 /** Append to the output buffer the string 'A'. **/
 #define HT_ADD(A) TypedArrayAppend(output_buffer, A, strlen(A))
 
+/* Room a later stage still needs inside lien[]: a scheme it may prepend
+   ("http://") plus a ".class" it may append, and the NUL. */
+#define HTS_LINK_TAIL_ROOM 16
+
 /** Append to the output buffer the first N bytes of 'A' (NUL-stopped). **/
 #define HT_ADD_BUF(A, N)                                                       \
   TypedArrayAppend(output_buffer, A, htssafe_strnlen_(A, N))
@@ -2171,7 +2175,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     char BIGSTK tempo[sizeof(lien)];
 
                     if (escape_control_url(lien, tempo, sizeof(tempo)) <
-                        sizeof(tempo)) {
+                        sizeof(tempo) - HTS_LINK_TAIL_ROOM) {
                       strcpybuff(lien, tempo);
                     } else {
                       error = 1;
@@ -2193,7 +2197,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                         charset, lien, s);
                       /* One byte can become three, and a clipped URL names
                          another resource, so drop the link instead. */
-                      if (strlen(s) < sizeof(lien)) {
+                      if (strlen(s) < sizeof(lien) - HTS_LINK_TAIL_ROOM) {
                         strcpybuff(lien, s);
                       } else {
                         error = 1;

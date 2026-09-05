@@ -3272,6 +3272,35 @@ static int st_sniff(httrackp *opt, int argc, char **argv) {
 
 /* escape_remove_control() compacts in place, so it has to terminate at the new
    end or the caller reads the compacted head plus the original tail (#974). */
+/* append_escape_*() hands on what is LEFT of dest, so a remainder equal to
+   sizeof(void *) used to trip the size heuristic meant for caller mistakes. */
+static int st_escape_append_room(httrackp *opt, int argc, char **argv) {
+  char buf[64];
+  size_t room;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (room = 1; room <= 2 * sizeof(void *); room++) {
+    const size_t used = sizeof(buf) - room;
+    size_t ret;
+
+    memset(buf, 'a', used);
+    buf[used] = '\0';
+    ret = append_escape_check_url("bc", buf, sizeof(buf));
+    /* "bc" plus its NUL needs three bytes; the ambiguous size reports full */
+    if (room < 3 || room == sizeof(void *)) {
+      assertf(ret == room);
+    } else {
+      assertf(ret == 2);
+      assertf(strlen(buf) == used + 2);
+    }
+    assertf(strlen(buf) <= used + 2);
+  }
+  printf("escape-append-room self-test OK\n");
+  return 0;
+}
+
 static int st_escape_control(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *in;
@@ -13520,6 +13549,9 @@ static const struct selftest_entry {
      st_savename_addtail},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
+    {"escape-append-room", "",
+     "append_escape_*() tolerates a pointer-sized remainder",
+     st_escape_append_room},
     {"escape-control", "[hex:..|string]",
      "escape_remove_control() terminates at the compacted end",
      st_escape_control},

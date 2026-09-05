@@ -4267,12 +4267,22 @@ HTSEXT_API char *escape_check_url_addr(const char *const src,
 
 // Same as above, but appending to "dest"
 #undef DECLARE_APPEND_ESCAPE_VERSION
+/* clang-format off: an edit realigns all backslashes, churning the macro. */
+/* clang-format off */
 #define DECLARE_APPEND_ESCAPE_VERSION(NAME) \
 HTSEXT_API size_t append_ ##NAME(const char *const src, char *const dest, const size_t size) { \
   const size_t len = strnlen(dest, size); \
   assertf(len < size); \
+  RUNTIME_TIME_CHECK_SIZE(size); \
+  /* The remainder is computed, so the one value the size heuristic reads as \
+     a caller mistake is a legitimate near-full buffer here: report it as the \
+     overflow the caller already tests for. */ \
+  if (size - len == sizeof(void *)) { \
+    return size - len; \
+  } \
   return NAME(src, dest + len, size - len); \
 }
+/* clang-format on */
 
 DECLARE_APPEND_ESCAPE_VERSION(escape_in_url)
 DECLARE_APPEND_ESCAPE_VERSION(escape_spc_url)
