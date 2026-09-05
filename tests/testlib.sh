@@ -1214,21 +1214,33 @@ REAP_GRACE=${REAP_GRACE:-10}
 # Has pid $1 died and not yet been collected? A killed process answers kill -0
 # until a parent waits on it, and a caller that is not that parent never can: the
 # reap falls to whoever inherits the orphan, prompt on a workstation and not on a
-# Debian buildd, where it reddened 250 twice. The state is the honest question, so
-# ask ps by its POSIX keyword, then /proc where a build root has no procps
-# (#1021). A host that answers neither way keeps waiting, as before.
+# Debian buildd, where it reddened 250 twice. The state is the honest question.
+# /proc first, and only then ps: reap_bounded polls this, and one caller polls it
+# with the broken tick of #1038 still on PATH, where the loop spins at full speed
+# and a forked ps would run thousands of times. Linux, which is where the failure
+# is reported, then forks nothing; macOS takes the ps route, whose POSIX keyword
+# is what ps_snapshot already relies on. Trimmed, since a padded column would
+# read as neither state.
 pid_is_zombie() { # pid_is_zombie PID
     local st
-    st=$(ps -o state= -p "$1" 2>/dev/null) || st=
-    if test -z "$st"; then
-        { read -r st <"/proc/$1/stat"; } 2>/dev/null || return 1
+    if { read -r st <"/proc/$1/stat"; } 2>/dev/null; then
         st=${st##*') '}
         st=${st%% *}
+    else
+        st=$(ps -o state= -p "$1" 2>/dev/null) || st=
+        st=${st//[[:space:]]/}
     fi
     case $st in
     Z*) return 0 ;;
     esac
     return 1
+}
+
+# Will this host say what pid $1 is doing? Neither route is a given: a build root
+# may have no procps, and a container or a hidepid mount no readable /proc. Asked
+# per pid, since hidepid answers for the caller's own and for nothing else.
+pid_state_readable() { # pid_state_readable PID
+    test -r "/proc/$1/stat" || test -n "$(ps -o state= -p "$1" 2>/dev/null)"
 }
 
 reap_bounded() {

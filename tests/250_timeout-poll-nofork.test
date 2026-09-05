@@ -63,25 +63,40 @@ run_timeout() {
 # The wedged child is killed but never waited on, since the guard exits without
 # reaping and this test is not its parent. reap_bounded must read that as stopped
 # and a running process as not, or the assertion below holds for any run at all.
-# Spin loops, not sleeps: self-limiting, and the stubbed sleep is on the PATH.
+# The parent waits for a file rather than a clock: a fixture that outlives the
+# grading by a fixed margin is the wall-clock assumption that caused this bug.
+# Spin loops, not sleeps, since the stubbed sleep is on the PATH; the minutes
+# below are leak insurance and a healthy run never reaches them.
 cat >"$tmp/zombie.sh" <<'EOF'
 #!/bin/bash
-bash -c 'end=$((SECONDS + 20)); while test "$SECONDS" -lt "$end"; do :; done' &
+bash -c 'end=$((SECONDS + 120)); while test "$SECONDS" -lt "$end"; do :; done' &
 echo "$!" >"$ZPIDFILE"
-exec bash -c 'end=$((SECONDS + 6)); while test "$SECONDS" -lt "$end"; do :; done'
+exec bash -c 'end=$((SECONDS + 120)); while test ! -f "$1" && test "$SECONDS" -lt "$end"; do :; done' _ "$2"
 EOF
 : >"$tmp/zpid"
-ZPIDFILE="$tmp/zpid" bash "$tmp/zombie.sh" &
+ZPIDFILE="$tmp/zpid" bash "$tmp/zombie.sh" _ "$tmp/release" &
 live=$!
 cleanup_push kill_pid "$live"
 while test ! -s "$tmp/zpid" && kill -0 "$live" 2>/dev/null; do :; done
 zombie=$(<"$tmp/zpid")
 test -n "$zombie" || fail "the zombie fixture never started"
-kill -9 "$zombie" 2>/dev/null || true
-REAP_GRACE=1 reap_bounded "$zombie" ||
-    fail "reap_bounded waited out its grace on a killed process nobody had collected"
-REAP_GRACE=1 reap_bounded "$live" && fail "reap_bounded called a running process reaped"
-ok "reap_bounded reads a killed-but-uncollected process as stopped, a live one as running"
+
+# Graded only where the host will answer for this very pid: with neither /proc nor
+# ps, reap_bounded degrades to the wait it always did and there is nothing here to
+# grade, so asserting would red a host master passes.
+if ! pid_state_readable "$zombie"; then
+    echo "no readable state for pid $zombie, so the reap probe cannot be graded" >&2
+else
+    kill -9 "$zombie" 2>/dev/null || true
+    REAP_GRACE=1 reap_bounded "$zombie" ||
+        fail "reap_bounded waited out its grace on a killed process nobody had collected"
+    # Named, not assumed: a parent that had already exited would make the arm below
+    # pass for the wrong reason.
+    kill -0 "$live" 2>/dev/null || fail "the live half of the fixture died before it was graded"
+    REAP_GRACE=1 reap_bounded "$live" && fail "reap_bounded called a running process reaped"
+    ok "reap_bounded reads a killed-but-uncollected process as stopped, a live one as running"
+fi
+: >"$tmp/release"
 
 : >"$tmp/progress"
 : >"$tmp/childpid"
