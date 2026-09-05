@@ -32,6 +32,9 @@ AC_CONFIG_HEADERS(config.h)
 # header we can install without handing a consumer our PACKAGE_* and HAVE_*.
 AC_CONFIG_HEADERS([htsfeatures.h:src/htsfeatures.h.in])
 AM_INIT_AUTOMAKE([subdir-objects])
+# 3:21:0: revision-only bump. hts_findgetsize64() arrived beside hts_findgetsize(),
+# which stays exported with the same signature; no installed struct moved and
+# nothing went away.
 # 3:20:0: revision-only bump. #1495 added an export (SOCaddr_inetntoa_port_) beside
 # SOCaddr_inetntoa_, the same shape as 3:11:0; no installed struct moved and nothing
 # went away.
@@ -69,7 +72,7 @@ AM_INIT_AUTOMAKE([subdir-objects])
 # moves nothing). Soname stays .so.3: HTTrackQt is the only consumer of the installed
 # headers, so a libhttrack4 rename isn't worth it.
 # (3:0:0 was the htsblk mime-buffer widening, the ABI break that moved .so.2 -> .so.3.)
-VERSION_INFO="3:20:0"
+VERSION_INFO="3:21:0"
 AM_MAINTAINER_MODE
 AC_USE_SYSTEM_EXTENSIONS
 
