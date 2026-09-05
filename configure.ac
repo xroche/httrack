@@ -388,12 +388,10 @@ AM_CFLAGS="$AM_CFLAGS $CFLAG_VISIBILITY"
 AC_SUBST([AM_CFLAGS])
 
 ### Check for platform
-#case $host in
-#AIX) AC_DEFINE(HTS_PLATFORM, 1, [Defined to build under AIX]);;
-#*-solaris*) AC_DEFINE(HTS_PLATFORM, 2, [Defined to build under solaris]);;
-#*-linux-gnu | *-irix6*) AC_DEFINE(HTS_PLATFORM, 3, [Defined to build under Linux]);;
-#*) AC_DEFINE(HTS_PLATFORM, 3, [Default value used]);;
-#esac
+dnl htshelp.c prints this, so a bug report names the build it came from. The
+dnl hand-written Makefile.in that used to supply it went away with autoconf.
+AC_DEFINE_UNQUOTED([HTS_PLATFORM_NAME], ["$host"],
+	[Canonical host triplet, printed by --help])
 
 ### Probe long long size for 64-bit integer support. SIZEOF_LONG is not probed:
 ### it varies by architecture and would break Multi-Arch co-installation of

@@ -53,6 +53,19 @@ Please visit our Website: http://www.httrack.com
 #endif
 /* END specific definitions */
 
+/* configure names the host triplet; MSVC has no config.h to carry one. */
+#ifndef HTS_PLATFORM_NAME
+#if defined(_M_ARM64)
+#define HTS_PLATFORM_NAME "windows-arm64"
+#elif defined(_M_AMD64)
+#define HTS_PLATFORM_NAME "windows-x64"
+#elif defined(_M_IX86)
+#define HTS_PLATFORM_NAME "windows-x86"
+#else
+#define HTS_PLATFORM_NAME "unknown"
+#endif
+#endif
+
 #define waitkey if (more) { char s[4]; printf("\nMORE.. q to quit\n"); linput(stdin,s,4); if (strcmp(s,"q")==0) quit=1; else printf("Page %d\n\n",++m); }
 void infomsg(const char *msg) {
   int l = 0;
@@ -183,16 +196,7 @@ void help_wizard(httrackp * opt) {
   printf("Note: You are running the commandline version,\n");
   printf("run 'WinHTTrack.exe' to get the GUI version.\n");
 #endif
-#ifdef HTTRACK_AFF_WARNING
-  printf("NOTE: " HTTRACK_AFF_WARNING "\n");
-#endif
-#ifdef HTS_PLATFORM_NAME
-#if USE_BEGINTHREAD
   printf("[compiled: " HTS_PLATFORM_NAME " - MT]\n");
-#else
-  printf("[compiled: " HTS_PLATFORM_NAME "]\n");
-#endif
-#endif
   printf("To see the option list, enter a blank line or try httrack --help\n");
   //
   // Project name
@@ -478,9 +482,6 @@ void help(const char *app, int more) {
             "HTTrack version " HTTRACK_VERSION "%s",
             hts_is_available());
     infomsg(info);
-#ifdef HTTRACK_AFF_WARNING
-    infomsg("NOTE: " HTTRACK_AFF_WARNING);
-#endif
     snprintf(info, sizeof(info),
             "\tusage: %s <URLs> [-option] [+<URL_FILTER>] [-<URL_FILTER>] [+<mime:MIME_FILTER>] [-<mime:MIME_FILTER>]",
             app);
@@ -824,8 +825,6 @@ void help(const char *app, int more) {
            "Copyright (C) 1998-%s Xavier Roche and other contributors",
            &__DATE__[7]);
   infomsg(info);
-#ifdef HTS_PLATFORM_NAME
   infomsg("[compiled: " HTS_PLATFORM_NAME "]");
-#endif
   infomsg(NULL);
 }

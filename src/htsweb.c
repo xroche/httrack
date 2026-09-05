@@ -305,10 +305,10 @@ int main(int argc, char *argv[]) {
 #if HTS_USEOPENSSL
   smallserver_setkey("USEOPENSSL", "1");
 #endif
-#ifdef HTS_DLOPEN
+#if HTS_DLOPEN
   smallserver_setkey("DLOPEN", "1");
 #endif
-#ifdef HTS_USESWF
+#if HTS_USESWF
   smallserver_setkey("USESWF", "1");
 #endif
   smallserver_setkey("USEZLIB", "1");
