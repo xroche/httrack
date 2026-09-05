@@ -134,6 +134,7 @@ usestub() {
 }
 usestub argvstub
 
+noexec_reason=''
 if test -x "$bin/pwsh"; then
     (
         cd "$posixtmp"
@@ -237,7 +238,8 @@ if test -x "$bin/pwsh"; then
     grep -qx -- "$(nativepath "$posixtmp/progress.log")" "$posixtmp/argv" ||
         fail "the launch did not pass the progress log"
 else
-    skip "$tmp is noexec, the stub bindir cannot be run"
+    # Deferred, not taken here: the workflow audits below need no exec.
+    noexec_reason="$tmp is noexec, the stub bindir cannot be run"
 fi
 
 py=$(find_python || true)
@@ -444,6 +446,8 @@ PY
     test "$maxsecs" -ge $((deadline + stuck)) ||
         fail "the watchdog stops at ${maxsecs}s, before the kill at $((deadline + stuck))s"
 fi
+
+test -z "$noexec_reason" || skip "$noexec_reason"
 
 psruns=()
 for c in pwsh powershell.exe powershell; do
