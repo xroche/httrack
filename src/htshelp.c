@@ -631,8 +631,8 @@ void help(const char *app, int more) {
   infomsg(" %X  additional HTTP header line (-%X \"X-Magic: 42\"");
   infomsg("");
   infomsg("Log, index, cache");
-  infomsg
-    ("  C  create/use a cache for updates and retries (C0 no cache,C1 cache is prioritary,* C2 test update before)");
+  infomsg("  C  create/use a cache for updates and retries (C0 no cache,* C1 "
+          "cache is prioritary,C2 test update before)");
   infomsg("  k  store all files in cache (not useful if files on disk)");
   infomsg(" %r  write an ISO-28500 WARC/1.1 archive; --warc-file NAME sets the "
           "output name, --warc-max-size N rotates segments past N bytes, "
