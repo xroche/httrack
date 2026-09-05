@@ -1109,7 +1109,9 @@ kill_tree() {
         # the host, siblings of a parallel run included (HTTRACK_EXCLUSIVE_HOST).
         elif test -n "${HTTRACK_EXCLUSIVE_HOST:-}"; then
             taskkill_engines
+            # Both names: find_python prefers python3 where the runner has it.
             taskkill /F /IM python.exe >/dev/null 2>&1 || true
+            taskkill /F /IM python3.exe >/dev/null 2>&1 || true
         fi
         # Not a fallback under wsl2 but the other half of the job: the shell
         # there is Linux, so $pid is often a process that never had a Windows
