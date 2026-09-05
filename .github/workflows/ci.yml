@@ -16,9 +16,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# The suite mostly sleeps: each test binds its own server and waits on it, so the
-# right width is not a core count. Measured on 4 cores: -j8 213s, -j16 121s,
-# -j24 123s. Every "make check" here takes it, distcheck and deb included.
+# The suite mostly sleeps because each test binds its own server and waits on it,
+# so the right width is not a core count. Measured on 4 cores: -j8 245s, -j16
+# 161s. Every "make check" here takes it, distcheck and deb included.
 env:
   CHECK_JOBS: 16
 
@@ -1000,8 +1000,8 @@ jobs:
       #
       # DEB_BUILD_OPTIONS trims work CI does not need (release builds via
       # mkdeb.sh are untouched): noautodbgsym drops the -dbgsym packages whose
-      # LTO payloads are slow to compress and that CI never ships; parallel carries
-      # $CHECK_JOBS into dh_auto_test, which is most of this job.
+      # LTO payloads are slow to compress and that CI never ships; parallel widens
+      # both dh_auto_build and dh_auto_test, and the test pass is nearly all of it.
       - name: Build and lint Debian packages
         run: |
           set -euo pipefail
@@ -1038,7 +1038,7 @@ jobs:
           set -euo pipefail
           autoreconf -fi
           ./configure
-          # -j reaches the inner "make check" through the jobserver, the cost here.
+          # -j reaches make check through the jobserver, which is the expensive part.
           make -j"$CHECK_JOBS" distcheck
 
   dco:

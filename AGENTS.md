@@ -12,10 +12,10 @@ the operational checklist: toolchain, invariants, and how to ship a change.
   server, so `-j` never contends and a multi-minute serial run drops to
   seconds. A new `.test` added to `$(TESTS)` is scheduled onto a free worker
   automatically; only a test slower than the current longest raises the floor.
-  The right width is not a core count: the tests spend most of their wall time
-  asleep (server trickles, httrack self-pacing), so an idle core covers a
-  sleeping one. Measured on 4 cores, `-j8` takes 213s, `-j16` 121s and `-j24`
-  123s, so CI passes a flat 16 through the `CHECK_JOBS` variable in `ci.yml`.
+  The right width is not a core count. Tests mostly sleep, waiting on a server
+  trickle or httrack's own pacing, so an idle core covers a sleeping one.
+  Measured on 4 cores, `-j8` takes 245s and `-j16` 161s, so CI passes a flat 16
+  through the `CHECK_JOBS` variable in `ci.yml`.
   That includes macOS, because the test server raises its listen backlog
   (`request_queue_size`) so macOS/BSD don't drop connections under a parallel
   `-c16` bigcrawl the way Python's default backlog of 5 did.
