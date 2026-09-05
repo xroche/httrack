@@ -33,6 +33,10 @@ fi
 
 nfiles=0
 fail=0
+# A sweep that could not run must not read as a pass: these reasons turn the
+# run into a skip.
+skipped=''
+defer_skip() { skipped="${skipped:+$skipped; }$1"; }
 for f in "$langdir"/*.txt; do
     nfiles=$((nfiles + 1))
     LC_ALL=C awk -v keys="$keys" -v name="${f##*/}" '
@@ -96,7 +100,7 @@ bytes_are_utf8() {
 
 py=$(find_python || true)
 if [ -z "$py" ]; then
-    echo "python3 not found; encoding check skipped" >&2
+    defer_skip "python3 not found, so the UTF-8 sweep did not run"
 else
     cat >"$tmp/utf8.py" <<'PYEOF'
 import sys
@@ -170,6 +174,82 @@ for f in "$langdir"/*.txt; do
     fi
 done
 
+# webhttrack turns the caller's locale into a lang.def number through
+# lang.indexes and hands it to htsserver, so a wrong number serves another
+# catalog silently. lang.def names the file behind each number and that file
+# declares its own LANGUAGE_ISO, which is the oracle here.
+indexes="$top_srcdir/lang.indexes"
+[ -f "$indexes" ] || fail "cannot find $indexes"
+LC_ALL=C awk '
+    { sub(/\r$/, "") }
+    NR % 2 == 1 { name = $0; next }
+    /^LANGUAGE_[0-9]+$/ {
+        n = $0
+        sub(/^LANGUAGE_/, "", n)
+        print n "\t" name
+    }
+' "$def" >"$tmp/bynum"
+ndef=$(wc -l <"$tmp/bynum")
+if [ "$ndef" -ne "$nfiles" ]; then
+    echo "lang.def numbers $ndef catalogs, but $langdir holds $nfiles"
+    exit 1
+fi
+
+# Complains on stdout; the status only says whether it did.
+indexes_agree() { # $1 = a lang.indexes to read
+    bad=0
+    nseen=0
+    seen=' '
+    while IFS=: read -r tag num || [ -n "$tag" ]; do
+        [ -n "$tag" ] || continue
+        case $seen in
+        *" $tag "*)
+            echo "lang.indexes: $tag is listed twice"
+            bad=1
+            continue
+            ;;
+        esac
+        seen="$seen$tag "
+        nseen=$((nseen + 1))
+        name=$(LC_ALL=C awk -F'\t' -v n="$num" '$1 == n { print $2; exit }' "$tmp/bynum")
+        if [ -z "$name" ]; then
+            echo "lang.indexes: $tag:$num names no LANGUAGE_$num in lang.def"
+            bad=1
+            continue
+        fi
+        iso=$(field "$langdir/$name.txt" LANGUAGE_ISO | LC_ALL=C tr '[:upper:]' '[:lower:]')
+        if [ "$iso" != "$tag" ]; then
+            echo "lang.indexes: $tag:$num is $name.txt, whose LANGUAGE_ISO is \"$iso\""
+            bad=1
+        fi
+    done <"$1"
+    # Tags are unique and each names one catalog, so a missing entry leaves a
+    # language nothing can select.
+    if [ "$nseen" -ne "$ndef" ]; then
+        echo "lang.indexes holds $nseen entries for $ndef catalogs"
+        bad=1
+    fi
+    return "$bad"
+}
+
+# Controls built out of the file itself: a hardcoded "es:3" would quietly become
+# a copy of the real thing the day Castellano is renumbered.
+tag1=$(LC_ALL=C sed -n '1s/:.*//p' "$indexes")
+num2=$(LC_ALL=C sed -n '2s/.*://p' "$indexes")
+if [ -z "$tag1" ] || [ -z "$num2" ]; then
+    fail "cannot read the first two entries of $indexes"
+fi
+LC_ALL=C sed "1s|.*|$tag1:$num2|" "$indexes" >"$tmp/wrongnum"
+LC_ALL=C sed "1s|.*|$tag1:9999|" "$indexes" >"$tmp/nodef"
+LC_ALL=C sed '1d' "$indexes" >"$tmp/dropped"
+for probe in wrongnum nodef dropped; do
+    if indexes_agree "$tmp/$probe" >/dev/null; then
+        echo "the lang.indexes check passed a deliberately wrong file ($probe)"
+        exit 1
+    fi
+done
+indexes_agree "$indexes" || fail=1
+
 # LANGUAGE_NAME must be the endonym, not English: the menu shows every catalog
 # together (#116). Two oracles rather than a copy of the current values, so the
 # name may repeat neither a word of the catalog's own English LANGUAGE_WINDOWSID
@@ -212,28 +292,24 @@ name_is_endonym() {
         }'
 }
 
-if ! command -v iconv >/dev/null 2>&1; then
-    echo "iconv not found; endonym check skipped" >&2
-else
-    # One control per oracle: an English name its own catalog does not name, then
-    # a word its LANGUAGE_WINDOWSID does but the list above does not. Match the
-    # complaint, not the status: an unreadable fixture also returns non-zero.
-    LC_ALL=C sed '2s/.*/Swedish/' "$langdir/Dansk.txt" >"$tmp/exonym.txt"
-    LC_ALL=C sed '2s/.*/Nynorsk/' "$langdir/Norsk.txt" >"$tmp/wid.txt"
-    for probe in exonym wid; do
-        said=$(name_is_endonym "$tmp/$probe.txt" || true)
-        case $said in
-        *"is the English name"*) ;;
-        *)
-            echo "the endonym check passed a deliberately English name ($probe): [$said]"
-            exit 1
-            ;;
-        esac
-    done
-    for f in "$langdir"/*.txt; do
-        name_is_endonym "$f" || fail=1
-    done
-fi
+# One control per oracle: an English name its own catalog does not name, then
+# a word its LANGUAGE_WINDOWSID does but the list above does not. Match the
+# complaint, not the status: an unreadable fixture also returns non-zero.
+LC_ALL=C sed '2s/.*/Swedish/' "$langdir/Dansk.txt" >"$tmp/exonym.txt"
+LC_ALL=C sed '2s/.*/Nynorsk/' "$langdir/Norsk.txt" >"$tmp/wid.txt"
+for probe in exonym wid; do
+    said=$(name_is_endonym "$tmp/$probe.txt" || true)
+    case $said in
+    *"is the English name"*) ;;
+    *)
+        echo "the endonym check passed a deliberately English name ($probe): [$said]"
+        exit 1
+        ;;
+    esac
+done
+for f in "$langdir"/*.txt; do
+    name_is_endonym "$f" || fail=1
+done
 
 # lang.def maps each LANG_* macro to the English string the GUI compiles in,
 # which is the lookup key into every lang/*.txt: no msgid, no translations.
@@ -372,68 +448,64 @@ unknown_escapes() {
     ' "$1"
 }
 
-if ! command -v iconv >/dev/null 2>&1; then
-    echo "iconv not found; escape check skipped" >&2
-else
-    # Controls: a lost n, then a dangling backslash. Match the complaint rather
-    # than the status, since an empty report also reads as success.
-    printf 'Two lines\nDeux lignes\\mTrois lignes\n' >"$tmp/lostn.txt"
-    printf 'Ends badly\nFinit mal\\\n' >"$tmp/dangling.txt"
-    escape_wanted() { [ "$1" = lostn ] && printf '\\m' || printf '\\<end of line>'; }
-    # An escaped backslash is legal and common (Windows paths in English.txt:812),
-    # so prove the check does not fire on one.
-    printf 'A path\nC:\\\\Temp\n' >"$tmp/legal.txt"
-    for probe in lostn dangling; do
-        case $(unknown_escapes "$tmp/$probe.txt" "$probe.txt" | LC_ALL=C sed '/^values=/d') in
-        *"$(escape_wanted "$probe") is not an escape"*) ;;
-        *)
-            echo "the escape check passed a deliberately broken value ($probe)"
-            exit 1
-            ;;
-        esac
-    done
-    if [ -n "$(unknown_escapes "$tmp/legal.txt" legal.txt | LC_ALL=C sed '/^values=/d')" ]; then
-        echo "the escape check rejects a legally escaped backslash"
+# Controls: a lost n, then a dangling backslash. Match the complaint rather
+# than the status, since an empty report also reads as success.
+printf 'Two lines\nDeux lignes\\mTrois lignes\n' >"$tmp/lostn.txt"
+printf 'Ends badly\nFinit mal\\\n' >"$tmp/dangling.txt"
+escape_wanted() { [ "$1" = lostn ] && printf '\\m' || printf '\\<end of line>'; }
+# An escaped backslash is legal and common (Windows paths in English.txt:812),
+# so prove the check does not fire on one.
+printf 'A path\nC:\\\\Temp\n' >"$tmp/legal.txt"
+for probe in lostn dangling; do
+    case $(unknown_escapes "$tmp/$probe.txt" "$probe.txt" | LC_ALL=C sed '/^values=/d') in
+    *"$(escape_wanted "$probe") is not an escape"*) ;;
+    *)
+        echo "the escape check passed a deliberately broken value ($probe)"
         exit 1
-    fi
-    # The set is the spec, mirroring conv_printf's switch: a probe can only ever
-    # name the letters it happens to use, so widening by any other one is invisible.
-    want_ok="abfnrtv?$(printf '\047\042\134')"
-    got_ok=$(printf 'x\ny\n' >"$tmp/ok.txt" && unknown_escapes "$tmp/ok.txt" ok.txt 1 | head -1)
-    if [ "$got_ok" != "$want_ok" ]; then
-        echo "the escape valid set is [$got_ok], expected [$want_ok]"
-        exit 1
-    fi
+        ;;
+    esac
+done
+if [ -n "$(unknown_escapes "$tmp/legal.txt" legal.txt | LC_ALL=C sed '/^values=/d')" ]; then
+    echo "the escape check rejects a legally escaped backslash"
+    exit 1
+fi
+# The set is the spec, mirroring conv_printf's switch: a probe can only ever
+# name the letters it happens to use, so widening by any other one is invisible.
+want_ok="abfnrtv?$(printf '\047\042\134')"
+got_ok=$(printf 'x\ny\n' >"$tmp/ok.txt" && unknown_escapes "$tmp/ok.txt" ok.txt 1 | head -1)
+if [ "$got_ok" != "$want_ok" ]; then
+    echo "the escape valid set is [$got_ok], expected [$want_ok]"
+    exit 1
+fi
 
-    # One probe per letter the catalogs actually got wrong, so a widened set
-    # also fails loudly rather than only through the pin above.
-    printf 'Five bad\na\\Pb\\Dc\\Kd\\he\\sf\n' >"$tmp/letters.txt"
-    nbad=$(unknown_escapes "$tmp/letters.txt" letters.txt | LC_ALL=C grep -c 'is not an escape') || true
-    if [ "${nbad:-0}" -ne 5 ]; then
-        echo "the escape check named ${nbad:-0} of 5 bad escape letters"
-        exit 1
-    fi
+# One probe per letter the catalogs actually got wrong, so a widened set
+# also fails loudly rather than only through the pin above.
+printf 'Five bad\na\\Pb\\Dc\\Kd\\he\\sf\n' >"$tmp/letters.txt"
+nbad=$(unknown_escapes "$tmp/letters.txt" letters.txt | LC_ALL=C grep -c 'is not an escape') || true
+if [ "${nbad:-0}" -ne 5 ]; then
+    echo "the escape check named ${nbad:-0} of 5 bad escape letters"
+    exit 1
+fi
 
-    nesc=0
-    for f in "$langdir"/*.txt; do
-        nesc=$((nesc + 1))
-        out=$(unknown_escapes "$f" "${f##*/}")
-        nval=$(printf '%s\n' "$out" | LC_ALL=C sed -n 's/^values=//p')
-        # A scan that stopped after the first pair would satisfy every control.
-        if [ "${nval:-0}" -lt $((nkeys * 9 / 10)) ]; then
-            echo "${f##*/}: escape scan read only ${nval:-0} of $nkeys values"
-            exit 1
-        fi
-        found=$(printf '%s\n' "$out" | LC_ALL=C sed '/^values=/d')
-        if [ -n "$found" ]; then
-            printf '%s\n' "$found"
-            fail=1
-        fi
-    done
-    if [ "$nesc" -ne "$nfiles" ]; then
-        echo "escape check saw $nesc of $nfiles language files"
+nesc=0
+for f in "$langdir"/*.txt; do
+    nesc=$((nesc + 1))
+    out=$(unknown_escapes "$f" "${f##*/}")
+    nval=$(printf '%s\n' "$out" | LC_ALL=C sed -n 's/^values=//p')
+    # A scan that stopped after the first pair would satisfy every control.
+    if [ "${nval:-0}" -lt $((nkeys * 9 / 10)) ]; then
+        echo "${f##*/}: escape scan read only ${nval:-0} of $nkeys values"
         exit 1
     fi
+    found=$(printf '%s\n' "$out" | LC_ALL=C sed '/^values=/d')
+    if [ -n "$found" ]; then
+        printf '%s\n' "$found"
+        fail=1
+    fi
+done
+if [ "$nesc" -ne "$nfiles" ]; then
+    echo "escape check saw $nesc of $nfiles language files"
+    exit 1
 fi
 
 # A value copied verbatim from its msgid, or left empty, passes every check above
@@ -687,7 +759,11 @@ LC_ALL=C awk -v pin="$lbpin" '
 # above cannot see it. Mojibake is exactly text that survives a trip back to
 # Latin-1 and reads as UTF-8 again. A byte pattern instead flags real
 # punctuation: French needs a no-break space after an accent before ! ? : ; ».
-if [ -n "$py" ]; then
+if [ -z "$py" ]; then
+    defer_skip "python3 not found, so the mojibake sweep did not run"
+elif ! command -v iconv >/dev/null 2>&1; then
+    defer_skip "iconv not found, so the mojibake control cannot be built"
+else
     cat >"$tmp/mojibake.py" <<'PYEOF'
 import sys
 
@@ -879,5 +955,6 @@ for f in "$langdir"/*.txt; do
 done
 
 [ "$fail" -eq 0 ] || exit 1
+[ -z "$skipped" ] || skip "$skipped"
 
 echo "$nfiles language files consistent with $nkeys English msgids"
