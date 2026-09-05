@@ -37,9 +37,22 @@ done
 # where under MSYS it inherited the whole environment. Tests rely on that: one
 # sets HOME inline to pin ~ expansion. So name them all, minus the ones WSL owns
 # or that mean nothing to a native exe.
-bridged=$(compgen -e |
-    grep -vxE 'PATH|WSLENV|_|SHLVL|PWD|OLDPWD|HOSTTYPE|IFS|LS_COLORS|TERM' |
-    paste -sd: -)
+bridged=
+while IFS= read -r name; do
+    # Already named by the caller: naming it again would drop the flags it
+    # carries there, and GITHUB_STEP_SUMMARY crosses with /p for a reason.
+    case ":${WSLENV:-}:" in *":$name:"* | *":$name/"*) continue ;; esac
+    value=${!name}
+    # /p for a value that is wholly a drvfs path, which argv translation above
+    # would have caught had it arrived as an argument. TMPDIR is one. A value
+    # holding a colon may be a list or a path with something after it, and the
+    # flag for that is /l, so leave those to cross verbatim as before.
+    flag=
+    case $value in
+    /mnt/[A-Za-z]/*) case $value in *:*) ;; *) flag=/p ;; esac ;;
+    esac
+    bridged="${bridged:+$bridged:}$name$flag"
+done < <(compgen -e | grep -vxE 'PATH|WSLENV|_|SHLVL|PWD|OLDPWD|HOSTTYPE|IFS|LS_COLORS|TERM')
 test -z "$bridged" || export WSLENV="${WSLENV:+$WSLENV:}$bridged"
 
 # The +"..." form: bash 3.2 on macOS treats "${args[@]}" as unbound when the
