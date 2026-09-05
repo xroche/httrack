@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+# -#C lists what the cache holds. It read hts-cache/new.ndx, which nothing has
+# written since the 3.31 ZIP cache, so it answered "No cache entry found" over
+# any cache at all.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_dashc.XXXXXX")
+cleanup() { rm -rf "$tmpdir"; }
+cleanup_push cleanup
+
+root="${tmpdir}/root"
+mkdir -p "${root}/site"
+cat >"${root}/site/index.html" <<'EOF'
+<html><body><a href="child.html">child</a></body></html>
+EOF
+cat >"${root}/site/child.html" <<'EOF'
+<html><body>DASHC-CHILD</body></html>
+EOF
+
+local_server_start --root "$root" --log "${tmpdir}/server.log"
+
+out="${tmpdir}/crawl"
+mkdir -p "$out"
+local_crawl --log "${tmpdir}/crawl.log" --quiet --robots=0 --retries=1 -c1 \
+    -O "$out" "${BASEURL}/site/index.html"
+
+# Control on the fixture, read without the tool on trial: an empty cache would
+# make every assertion below pass for the wrong reason.
+cached=$("${SRV_PYTHON:?}" -c '
+import sys, zipfile
+for i in sorted(zipfile.ZipFile(sys.argv[1]).infolist(), key=lambda i: i.filename):
+    print(i.filename)
+' "${out}/hts-cache/new.zip")
+test "$(grep -c . <<<"$cached")" = 2 || fail "want 2 cache entries, got: $cached"
+
+# -#C returns as soon as it has listed, so -O comes first; the listing is CRLF.
+listing=$(httrack -O "$out" -#C '*' 2>"${tmpdir}/dashc.err" | tr -d '\r')
+if grep -q 'No cache entry found' "${tmpdir}/dashc.err"; then
+    fail "-#C '*' found nothing in a cache holding: ${cached}"
+fi
+for urltail in /site/index.html /site/child.html; do
+    grep -q "^X-URL: .*${urltail}\$" <<<"$listing" ||
+        fail "-#C '*' did not list ${urltail}: ${listing}"
+done
+test "$(grep -c '^X-Content-Length: ' <<<"$listing")" = 2 ||
+    fail "-#C '*' listed no stored size for both entries: ${listing}"
+ok "-#C lists every entry of the ZIP cache"
+
+# The filter still narrows, so the listing is not just "print everything".
+one=$(httrack -O "$out" -#C '*child*' 2>/dev/null | tr -d '\r')
+test "$(grep -c '^X-URL: ' <<<"$one")" = 1 ||
+    fail "-#C '*child*' matched more than child.html: ${one}"
+grep -q '^X-URL: .*/site/child\.html$' <<<"$one" ||
+    fail "-#C '*child*' listed the wrong entry: ${one}"
+want=$(wc -c <"${root}/site/child.html" | tr -d '[:space:]') # BSD wc pads
+got=$(sed -n 's/^X-Content-Length: //p' <<<"$one")
+test "$got" = "$want" || fail "stored size is ${got}, the file is ${want} bytes"
+ok "a filtered listing narrows, and reports the size the cache stores"
+
+# A cache is a file on disk anyone can have mangled. An entry name no buffer
+# can hold must not take the listing down with it.
+hostile="${tmpdir}/hostile"
+cp -r "$out" "$hostile"
+"${SRV_PYTHON:?}" -c '
+import sys, zipfile
+with zipfile.ZipFile(sys.argv[1], "a") as z:
+    z.writestr("http://" + "a" * 6000 + "/x.html", "x")
+' "${hostile}/hts-cache/new.zip"
+rc=0
+survived=$(httrack -O "$hostile" -#C '*' 2>/dev/null | tr -d '\r') || rc=$?
+test "$rc" = 0 || fail "a 6000-byte cache entry name exited ${rc}"
+test "$(grep -c '^X-URL: ' <<<"$survived")" = 2 ||
+    fail "the real entries did not survive the mangled one: ${survived}"
+ok "a mangled entry name is skipped, not fatal"
+
+# Controls: a result that is genuinely empty still reads as one, whether the
+# filter matched nothing or the cache holds nothing.
+rc=0
+none=$(httrack -O "$out" -#C '*no-such-url*' 2>&1) || rc=$?
+test "$rc" = 0 || fail "a filter matching nothing exited ${rc}"
+grep -q "No cache entry found for '\*no-such-url\*'" <<<"$none" ||
+    fail "a filter matching nothing did not say so: ${none}"
+
+drained="${tmpdir}/drained"
+cp -r "$out" "$drained"
+"${SRV_PYTHON:?}" -c 'import sys, zipfile; zipfile.ZipFile(sys.argv[1], "w").close()' \
+    "${drained}/hts-cache/new.zip"
+rc=0
+none=$(httrack -O "$drained" -#C '*' 2>&1) || rc=$?
+test "$rc" = 0 || fail "-#C over an emptied cache exited ${rc}"
+grep -q 'No cache entry found' <<<"$none" ||
+    fail "an emptied cache did not report itself empty: ${none}"
+ok "an empty result still reports no entry"
