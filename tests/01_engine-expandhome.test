@@ -42,7 +42,15 @@ exp './~/x' './~/x'
 exp 'foo~bar' 'foo~bar'
 
 # an unset or empty $HOME must not turn ~/foo into the absolute /foo
-assert_eq "expanded=./foo" "$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')" 'unset HOME'
+unset_home=$(env -u HOME httrack -O /dev/null -#test=expandhome '~/foo')
+if test "$(suite_backend)" = wsl2; then
+    # The engine reads the Windows environment block, which the distro cannot
+    # unset: only the fallback the case is really about is assertable here.
+    test "$unset_home" != "expanded=/foo" ||
+        fail "unset HOME: expanded to the absolute /foo"
+else
+    assert_eq "expanded=./foo" "$unset_home" 'unset HOME'
+fi
 assert_eq "expanded=./foo" "$(HOME='' httrack -O /dev/null -#test=expandhome '~/foo')" 'empty HOME'
 
 # A $HOME past the 2 * HTS_URLMAXSIZE buffer is left alone: strcatbuff aborts
