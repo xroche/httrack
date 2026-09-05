@@ -552,11 +552,46 @@ AC_SUBST(OPENSSL_LIBS)
 fi
 
 ### Support IPv6
+# HTS_INET6 picks the SOCaddr arm in the installed htsnet.h, so a probe that
+# nobody can override lets two builds of one version ship different layouts.
+# Not wired to --disable-auto-features: getaddrinfo is a libc function, not an
+# optional dependency, and defaulting it off would move that layout.
+AC_MSG_CHECKING(whether to enable IPv6 support)
+AC_ARG_ENABLE([ipv6],
+	[AS_HELP_STRING([--enable-ipv6=@<:@yes/no/auto@:>@],[Enable IPv6 support @<:@default=auto@:>@])],
+	[
+	case "${enableval}" in
+	no|yes|auto)
+		ipv6_support=$enableval
+		AC_MSG_RESULT($ipv6_support)
+		;;
+	*)
+		AC_MSG_ERROR([bad value for ipv6, expected yes/no/auto])
+		;;
+	esac
+	],
+	[
+	ipv6_support=auto
+	AC_MSG_RESULT($ipv6_support)
+	])
 V6_SUPPORT=no
-AC_CHECK_LIB(c, getaddrinfo, [V6_FLAG="-DINET6"
-V6_SUPPORT=yes
-AC_DEFINE(HTS_INET6, 1, [Check for IPv6])], AC_MSG_WARN([*** IPv6 not found IPv6 compatibility disabled]))
+dnl Define it either way: htsglobal.h defaults an undefined HTS_INET6, so the
+dnl installed htsfeatures.h would not say which layout the library was built with.
+AS_IF([test x"$ipv6_support" = x"no"],
+	[AC_DEFINE(HTS_INET6, 0)],
+	[AC_CHECK_LIB(c, getaddrinfo,
+		[V6_FLAG="-DINET6"
+		V6_SUPPORT=yes
+		AC_DEFINE(HTS_INET6, 1, [Check for IPv6])],
+		[AS_IF([test x"$ipv6_support" = x"yes"],
+			[AC_MSG_ERROR([no getaddrinfo in libc. Pass --disable-ipv6 to build without IPv6])],
+			[AC_DEFINE(HTS_INET6, 0)])])])
 AC_SUBST(V6_FLAG)
+AC_MSG_CHECKING([whether IPv6 support is enabled])
+dnl Name who decided: "auto" is the build machine's answer, not the packager's.
+AS_IF([test x"$ipv6_support" = x"auto"],
+	[AC_MSG_RESULT([$V6_SUPPORT (auto)])],
+	[AC_MSG_RESULT([$V6_SUPPORT (requested)])])
 AC_SUBST(V6_SUPPORT)
 
 ### Check for LFS

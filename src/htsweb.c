@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
 #ifdef HTS_HTTRACKDIR
   smallserver_setkey("HTTRACKDIR", HTS_HTTRACKDIR);
 #endif
-#ifdef HTS_INET6
+#if HTS_INET6
   smallserver_setkey("INET6", "1");
 #endif
 #ifdef HTS_USEOPENSSL

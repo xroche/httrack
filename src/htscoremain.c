@@ -2219,6 +2219,9 @@ static int hts_main_internal(int argc, char **argv, httrackp * opt) {
               switch (*com) {
               case 'i':
 #if HTS_INET6==0
+                /* Or -@i2's 2 is read as an option and refused (#615). */
+                while (isdigit((unsigned char) *(com + 1)))
+                  com++;
                 printf
                   ("Warning, option @i has no effect (v6 routines not compiled)\n");
 #else

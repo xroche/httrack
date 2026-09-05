@@ -140,7 +140,9 @@ test "${got}" = 200 || fail "--bind 0.0.0.0 advertised ${HTS_URL}, which answere
 echo "ok: a wildcard bind advertises a loopback URL"
 htsserver_stop
 
-if htsserver_python - <<'PY'; then
+# The build has to speak IPv6 as well as the host: an IPv4-only httrack cannot
+# bind ::1 at all.
+if test "${V6_SUPPORT:-yes}" != no && htsserver_python - <<'PY'; then
 import socket, sys
 
 try:
