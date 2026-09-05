@@ -18,7 +18,6 @@ curl=$(find_curl) || skip "curl missing"
 TZ=IST-5:30
 export TZ
 offset=$("$python" -c 'import sys, time
-sys.stdout.reconfigure(newline="\n")  # the offset below is compared byte for byte
 print(time.strftime("%z", time.localtime(0)))')
 test "$offset" = "+0530" ||
     skip "the host ignored TZ=IST-5:30 (localtime(0) is $offset), so a shift would be invisible"

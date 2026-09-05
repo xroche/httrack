@@ -42,4 +42,6 @@ bridged=$(compgen -e |
     paste -sd: -)
 test -z "$bridged" || export WSLENV="${WSLENV:+$WSLENV:}$bridged"
 
-exec "$(basename "$0").exe" "${args[@]}"
+# The +"..." form: bash 3.2 on macOS treats "${args[@]}" as unbound when the
+# array is empty, and 257 calls this with no arguments at all.
+exec "$(basename "$0").exe" ${args[@]+"${args[@]}"}

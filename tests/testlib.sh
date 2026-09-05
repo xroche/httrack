@@ -234,7 +234,7 @@ selftest_write_argv() {
     local a
     if test "$(suite_backend)" != wsl2; then
         printf '%s\0' "${SELFTEST_ARGV[@]}"
-        return 0
+        return
     fi
     for a in "${SELFTEST_ARGV[@]}"; do
         case $a in
