@@ -45,6 +45,7 @@ cache_headers() {
     "${SRV_PYTHON:?}" -c '
 import struct, sys, zipfile
 
+sys.stdout.reconfigure(newline="\n")  # the callers anchor on the line end
 path, tail = sys.argv[1], sys.argv[2]
 with open(path, "rb") as fp:
     for info in zipfile.ZipFile(path).infolist():

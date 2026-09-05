@@ -1763,7 +1763,9 @@ class Handler(SimpleHTTPRequestHandler):
         log = os.environ.get("CHARREF_LOG")
         if log:
             fields = [f for f in urlsplit(self.path).query.split("&") if f]
-            with open(log, "a") as fp:
+            # newline: the shell reads the count field, and a native python
+            # would leave a CR on it
+            with open(log, "a", newline="\n") as fp:
                 fp.write("%s\t%d\n" % (self.path, len(fields)))
 
     def route_charref(self):
