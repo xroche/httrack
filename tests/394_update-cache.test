@@ -1,49 +1,78 @@
 #!/bin/bash
 #
+# The update path decides from the cache (cache_readex), which a one-shot crawl
+# never reaches. A file:// mirror writes no cache at all, so the re-run it used
+# to do could not tell a cache hit from a full re-fetch: both end with no error
+# and the changed file in the mirror. Over the local server the two differ, and
+# new.txt's status column is where.
 
-# Update path: re-mirroring a site reads the cache (cache_readex) to decide what
-# is up to date -- a path the one-shot crawl tests never exercise. Offline
-# (file://), so it always runs.
-#
-#   1. mirror, then re-mirror unchanged -> the cache-read pass must complete clean
-#      (guards against a crash/abort/error in cache_readex).
-#   2. change a source file, re-mirror -> the update must pick up the new content
-#      (guards the update decision that reads the cached metadata).
+set -eu
 
-set -euo pipefail
-# shellcheck source=tests/testlib.sh
-. "${0%"${0##*/}"}./testlib.sh"
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
 
-site=$(mktemp -d)
-out=$(mktemp -d)
-cleanup_push rm -rf "$site" "$out"
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_394.XXXXXX") || exit 1
+cleanup() {
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
 
-cat >"$site/index.html" <<EOF
-<a href="a.html">a</a> <a href="sub/b.html">b</a>
-EOF
-echo 'OLDCONTENT' >"$site/a.html"
-mkdir -p "$site/sub"
-echo '<p>bbb</p>' >"$site/sub/b.html"
+require_httrack
 
-url="file://$site/index.html"
+root="${tmpdir}/root"
+mkdir -p "${root}/sub"
+cat >"${root}/index.html" <<'HTML'
+<html><body><a href="a.html">a</a> <a href="sub/b.html">b</a></body></html>
+HTML
+echo 'OLDCONTENT' >"${root}/a.html"
+echo '<p>bbb</p>' >"${root}/sub/b.html"
 
-# count Error: lines in the log
-errors() { count_log_errors "$out/hts-log.txt"; }
+local_server_start --root "$root"
 
-# 1. fresh mirror writes the cache
-httrack "$url" -O "$out" -q -%v0 -r3 >/dev/null 2>&1
-test -e "$out/hts-cache/new.zip" || fail "no cache was written"
+out="${tmpdir}/out"
+host="${out}/127.0.0.1_${SRV_PORT}"
+log="${out}/hts-log.txt"
 
-# 2. re-mirror unchanged: the update reads the cache and must complete cleanly
-httrack "$url" -O "$out" -q -%v0 -r3 >/dev/null 2>&1
-test "$(errors)" = 0 || fail "update (unchanged) reported errors"
-for suffix in a.html sub/b.html; do
-    test -n "$(find "$out" -path "*/$suffix" -print -quit)" || fail "missing $suffix after update"
+crawl() { # crawl <label> [httrack args...]
+    local label=$1
+    shift
+    local_crawl --log "${tmpdir}/crawl-${label}.log" \
+        "${BASEURL}/index.html" -O "$out" --quiet --robots=0 --timeout=30 \
+        "$@" || fail "$label: crawl failed"
+}
+
+# What the run decided for one link: new.txt's status column, "added" on a
+# transfer and "untouched" where the cached entry answered instead.
+verdict() { # verdict <site-relative path>
+    awk -F'\t' -v u="${BASEURL}/$1" '$8 == u { sub(/ .*/, "", $5); print $5 }' \
+        "${out}/hts-cache/new.txt"
+}
+
+crawl ref
+for f in index.html a.html sub/b.html; do
+    assert_file "${host}/$f" "reference mirror"
 done
 
-# 3. change a source file: the update must pick up the new content
+# Unchanged: every link has to come out of the cache. With none of them read,
+# the mirror below is identical and the log still clean.
+crawl unchanged --update
+test "$(count_log_errors "$log")" = 0 || fail "update (unchanged) reported errors"
+for f in index.html a.html sub/b.html; do
+    assert_file "${host}/$f" "update mirror"
+    test "$(verdict "$f")" = untouched ||
+        fail "$f was re-fetched on an unchanged update: $(verdict "$f")"
+done
+ok "an unchanged update answers every link from the cache"
+
+# One changed source, and the cache still decides for the other two.
 sleep 1
-echo 'NEWCONTENT' >"$site/a.html"
-httrack "$url" -O "$out" -q -%v0 -r3 >/dev/null 2>&1
-test "$(errors)" = 0 || fail "update (changed) reported errors"
-grep -q NEWCONTENT "$(find "$out" -path '*/a.html')" || fail "update did not pick up the changed source"
+echo 'NEWCONTENT' >"${root}/a.html"
+crawl changed --update
+test "$(count_log_errors "$log")" = 0 || fail "update (changed) reported errors"
+grep -q NEWCONTENT "${host}/a.html" || fail "the update did not pick up the changed source"
+test "$(verdict a.html)" != untouched || fail "a.html was reported untouched after it changed"
+for f in index.html sub/b.html; do
+    test "$(verdict "$f")" = untouched ||
+        fail "$f was re-fetched though only a.html changed: $(verdict "$f")"
+done
+ok "a changed source comes through, the rest still from the cache"

@@ -201,7 +201,7 @@ for cand in "${CXX:-}" g++ clang++ c++; do
     }
 done
 if [ -z "$cxx" ]; then
-    echo "no C++ compiler found, skipping the C++ leg" >&2
+    skip "no C++ compiler found, so the C++ leg cannot run"
 else
     cxx_stds=()
     for std in c++11 c++17; do
@@ -209,7 +209,7 @@ else
         "$cxx" "${base_cpp_argv[@]}" "-std=$std" -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>/dev/null &&
             cxx_stds+=("$std")
     done
-    [ "${#cxx_stds[@]}" -gt 0 ] || echo "$cxx accepts neither -std=c++11 nor -std=c++17, skipping the C++ leg" >&2
+    [ "${#cxx_stds[@]}" -gt 0 ] || skip "$cxx accepts neither -std=c++11 nor -std=c++17"
     # Qt permits -fno-exceptions/-fno-rtti, so a consumer's TU may see the
     # headers that way. Additive: the default mode keeps its own coverage.
     noexc=()
@@ -222,9 +222,11 @@ else
         echo "$cxx rejects -fno-exceptions -fno-rtti, skipping that mode" >&2
     fi
     # Marks instead of failing, so one broken header does not cut the sweep short.
+    cxx_count=0
     cxx_compile() {
         local label=$1
         shift
+        cxx_count=$((cxx_count + 1))
         "$cxx" "$@" -c "$tmp/tu.cpp" -o "$tmp/tu.o" 2>"$tmp/cc.log" && return 0
         echo "$label:" >&2
         head -5 "$tmp/cc.log" >&2
@@ -244,8 +246,9 @@ else
             done
         done
     done
-    [ "${#cxx_stds[@]}" -eq 0 ] ||
-        echo "compiled ${#headers[@]} headers x ${#cxx_stds[@]} C++ std x 2 bytecode modes x $exc_modes exception modes with $cxx" >&2
+    echo "compiled ${#headers[@]} headers x ${#cxx_stds[@]} C++ std x 2 bytecode modes x $exc_modes exception modes = $cxx_count units with $cxx" >&2
+    [ "$cxx_count" -eq $((${#headers[@]} * ${#cxx_stds[@]} * 2 * exc_modes)) ] ||
+        fail "the C++ compile loop skipped units"
 fi
 [ "$bad" -eq 0 ] || fail "installed headers do not compile as C++"
 

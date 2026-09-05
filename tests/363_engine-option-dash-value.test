@@ -59,7 +59,15 @@ refused() { # refused LABEL RE...
     test "$rc" -ne 0 || fail "$label: the option took the token after it"
     test ! -e "$out" || fail "$label: created $out"
     test -n "$stderr" || fail "$label: refused with nothing on stderr"
-    ! grep -q 'Write --' <<<"$stderr" || fail "$label: suggests a spelling: $stderr"
+    # optparam_error() states the reason and stops, then the option's own help
+    # line: "Syntax error:", the reason, at most one more. Advice appended to
+    # either lands outside that shape.
+    if grep -qE 'takes a value|needs to be followed by a parameter' <<<"$stderr"; then
+        test "$(grep -c . <<<"$stderr")" -le 3 ||
+            fail "$label: the refusal says more than the reason and the help: $stderr"
+        grep -qE '(<param>|names an option|read as the next option)$' <<<"$stderr" ||
+            fail "$label: the refusal reason does not end where it should: $stderr"
+    fi
     while test $# -gt 0; do
         assert_match "$1" "$stderr" "$label"
         shift

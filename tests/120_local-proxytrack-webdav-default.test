@@ -108,10 +108,11 @@ until test "$(count_matching_lines_nocase ' \* log: HTTP [^ ]* 207 [0-9]* propfi
     waited=$((waited + 1))
 done
 
-# Neither what the client sent nor the generated body is echoed anywhere; the
-# two literals name the exact regression on top.
+# Neither what the client sent nor the generated body is echoed anywhere. The
+# markers the #911 traces printed are gone from the tree, so a grep for them
+# could only ever miss: these two are what a re-added trace would carry.
 log=$(<"$ptlog")
-for marker in "$sentinel" 'Default Document for the Folder' 'DEBUG: DAV-DATA' '^RESPONSE:'; do
+for marker in "$sentinel" 'Default Document for the Folder'; do
     if grep -q "$marker" <<<"$log"; then
         echo "FAIL: a PROPFIND echoed '$marker' into proxytrack's output"
         printf '%s\n' "$log"
