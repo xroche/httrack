@@ -24,7 +24,8 @@ root="$work/root"
 mkdir -p "$root/sub/j"
 
 cat >"$root/index.html" <<'EOF'
-<!DOCTYPE html><html><body><a href="sub/page.html">p</a></body></html>
+<!DOCTYPE html><html><body><a href="sub/page.html">p</a>
+<a href="sub/dot.html">d</a></body></html>
 EOF
 
 # The page carrying the base sits below the document root, so a base of "./"
@@ -39,6 +40,16 @@ cat >"$root/sub/page.html" <<'EOF'
 <applet codebase="j/" code="A.class" width="1" height="1"></applet>
 </body></html>
 EOF
+# A second base-bearing page, and the only other relative form that is
+# consumed. "./" is what a framework ships, and its resolved value is the
+# page's own directory rather than the site root, so a fix that writes the
+# attribute for a root base alone leaves this one hrefless. Its links are all
+# fragments, so nothing here depends on how the base itself resolves.
+cat >"$root/sub/dot.html" <<'EOF'
+<!DOCTYPE html><html><head><base href="./"><title>d</title></head>
+<body><a href="#f">f</a><a name="f">A</a></body></html>
+EOF
+
 cat >"$root/target.html" <<'EOF'
 <!DOCTYPE html><html><body>reached</body></html>
 EOF
@@ -48,6 +59,8 @@ bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
     --errors 0 \
     --found target.html \
     --file-matches sub/page.html '<base href="">' \
+    --file-matches sub/dot.html '<base href="">' \
+    --file-not-matches sub/dot.html '<base >' \
     --file-not-matches sub/page.html '<base >' \
     --file-not-matches sub/page.html '<base href="\./">' \
     --file-matches sub/page.html 'href="#f"' \
