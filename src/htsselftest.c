@@ -13275,6 +13275,7 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
   char BIGSTK rostop[HTS_URLMAXSIZE * 2];
   const uid_t self = geteuid();
   uid_t drop = self;
+  int rofd;
   int poll;
   int err = 0;
 
@@ -13286,10 +13287,17 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
     fprintf(stderr, "abortlock: cannot set up %s\n", rolock);
     return 1;
   }
+  /* One descriptor for both mode changes, so the name is resolved once. */
+  rofd = open(rodir, O_RDONLY | O_DIRECTORY);
+  if (rofd == -1) {
+    fprintf(stderr, "abortlock: cannot open %s\n", rodir);
+    return 1;
+  }
   /* Still readable, because an engine that saw no request at all would pass
      this for the wrong reason. */
-  if (chmod(rodir, 0555) != 0) {
+  if (fchmod(rofd, 0555) != 0) {
     fprintf(stderr, "abortlock: cannot make %s read-only\n", rodir);
+    close(rofd);
     return 1;
   }
   /* Root may write to a read-only directory, so borrow an unprivileged euid. */
@@ -13301,7 +13309,8 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
       printf("abortlock: undeletable request: NOT COVERED (root, and euid %d "
              "is not reachable)\n",
              (int) drop);
-      (void) chmod(rodir, 0700);
+      (void) fchmod(rofd, 0700);
+      close(rofd);
       return 0;
     }
   }
@@ -13342,7 +13351,8 @@ static int st_abortlock_undeletable(httrackp *opt, const char *base) {
     fprintf(stderr, "abortlock: cannot get euid %d back\n", (int) self);
     err = 1;
   }
-  (void) chmod(rodir, 0700);
+  (void) fchmod(rofd, 0700);
+  close(rofd);
   return err;
 #endif
 }
