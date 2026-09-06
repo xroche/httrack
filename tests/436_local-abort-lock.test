@@ -1,0 +1,140 @@
+#!/bin/bash
+# Windows has no cross-process SIGTERM, so a running engine takes a stop request
+# as a file: hts-abort.lock in the output directory, beside the hts-stop.lock
+# that asks for a pause. It acts on one only when the request is newer than the
+# run's own hts-in_progress.lock and it could also delete it.
+set -eu
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+# The C side has HTS_ABORT_LOCKNAME for these two.
+ABORTLOCK=hts-abort.lock
+PROGRESSLOCK=hts-in_progress.lock
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_abortlock.XXXXXX") || exit 1
+crawlpid=
+cleanup() {
+    if test -n "$crawlpid"; then kill -9 "$crawlpid" 2>/dev/null || true; fi
+    # The rule self-test leaves a directory it made read-only on purpose.
+    chmod -R u+w "$tmpdir" 2>/dev/null || true
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+# mktemp gives 0700, which the unprivileged euid the rule self-test borrows on a
+# root runner cannot walk through.
+chmod 0755 "$tmpdir"
+
+wait_until() { # wait_until <shell condition> <message> [tenths, default 300]
+    for _ in $(seq 1 "${3:-300}"); do
+        if eval "$1"; then return 0; fi
+        sleep 0.1
+    done
+    fail "$2"
+}
+
+stop_crawl() {
+    if test -n "$crawlpid"; then
+        kill -9 "$crawlpid" 2>/dev/null || true
+        wait "$crawlpid" 2>/dev/null || true
+        crawlpid=
+    fi
+}
+
+# The request has to land in a later whole second than the progress lock, which
+# is what the engine compares it against.
+next_second() { sleep 1; }
+
+require_httrack
+
+printf '[the rule itself] ..\t'
+st_out=$(httrack -O "${tmpdir}/st" "-#test=abortlock" \
+    "$(nativepath "${tmpdir}/rule")" 2>&1) ||
+    fail "the rule self-test exited non-zero: ${st_out}"
+case "$st_out" in
+*"abortlock self-test: OK"*) ;;
+*) fail "the rule self-test did not report OK: ${st_out}" ;;
+esac
+# Nothing portable makes a delete fail, so that arm names what covered it here
+# rather than skipping in silence.
+coverage=$(printf '%s\n' "$st_out" | command grep 'undeletable request: ') ||
+    fail "the rule self-test said nothing about an undeletable request"
+echo "OK (${coverage#*: })"
+
+local_server_start
+common=(--quiet --disable-security-limits --robots=0 --timeout=30 --retries=0 -c1)
+
+# /trickle/ hands out eight .bin pages, two bytes a second for a minute each, so
+# the single socket is busy and only the reading inside that wait can see this.
+printf '[a running engine takes the request] ..\t'
+out="${tmpdir}/running"
+httrack -O "$out" "${common[@]}" "${BASEURL}/trickle/index.html" \
+    >"${tmpdir}/log-running" 2>&1 &
+crawlpid=$!
+wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
+next_second
+: >"${out}/${ABORTLOCK}"
+wait_until "test ! -e '${out}/${ABORTLOCK}'" \
+    "30s on, a running engine had not read the request"
+stop_crawl
+echo "OK"
+
+# The point of the whole feature: an abort keeps hts-cache/ref, where the
+# interactive stop erases it. Both log "Exit requested by shell or user", and so
+# does the -E budget, so only the directory tells them apart.
+printf '[an abort keeps the cut transfers] ..\t'
+out="${tmpdir}/keep"
+httrack -O "$out" "${common[@]}" --max-rate=200000 \
+    "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-keep" 2>&1 &
+crawlpid=$!
+wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
+next_second
+: >"${out}/${ABORTLOCK}"
+wait_until "test ! -e '${out}/${ABORTLOCK}'" \
+    "30s on, a running engine had not read the request"
+# The erase happens at shutdown, and unwinding the cut transfer takes a while.
+wait_until "! kill -0 '$crawlpid' 2>/dev/null" "the engine never shut down" 900
+wait "$crawlpid" 2>/dev/null || true
+crawlpid=
+test -n "$(find "${out}/hts-cache/ref" -name '*.ref' 2>/dev/null)" ||
+    fail "the abort erased hts-cache/ref, so the cut transfers cannot resume"
+echo "OK"
+
+# The pause wait watches for it too, or a paused engine is unreachable.
+printf '[a paused engine takes the request] ..\t'
+out="${tmpdir}/paused"
+httrack -O "$out" "${common[@]}" --max-rate=200000 \
+    "${BASEURL}/bigfiles/index.html" >"${tmpdir}/log-paused" 2>&1 &
+crawlpid=$!
+wait_until "test -e '${out}/${PROGRESSLOCK}'" "the crawl never got going"
+next_second
+: >"${out}/hts-stop.lock"
+wait_until "test -e '${out}/hts-paused.lock'" "the engine never paused"
+# A frozen mirror writes nothing, and the wait re-reads once a second, so three
+# seconds cover an iteration that saw the file and a resumed 200KB/s transfer.
+frozen=$(du -sk "$out")
+touch -t 200001010000 "${out}/${ABORTLOCK}"
+sleep 3
+test "$(du -sk "$out")" = "$frozen" ||
+    fail "a request left by an earlier run lifted the pause"
+test -e "${out}/${ABORTLOCK}" ||
+    fail "the pause wait deleted a request that was never aimed at it"
+: >"${out}/${ABORTLOCK}"
+wait_until "test ! -e '${out}/${ABORTLOCK}'" \
+    "30s on, a paused engine had not read the request"
+stop_crawl
+echo "OK"
+
+# A request older than the mirror that finds it was aimed at an earlier run.
+printf '[a request left behind does not stop the next mirror] ..\t'
+out="${tmpdir}/stale"
+mkdir -p "$out"
+: >"${out}/${ABORTLOCK}"
+local_crawl --log "${tmpdir}/log-stale" -O "$out" "${common[@]}" \
+    "${BASEURL}/simple/basic.html" || fail "the mirror failed outright"
+test -n "$(find "$out" -name 'basic.html' 2>/dev/null)" ||
+    fail "the mirror saved nothing, so the request it inherited stopped it"
+test -e "${out}/${ABORTLOCK}" ||
+    fail "the mirror deleted a request that was never aimed at it"
+echo "OK"

@@ -4,6 +4,11 @@
 # reaches the status API, the process APIs it must never name, and the driver
 # wiring no .ps1 can check for itself.
 
+# Windows runs the whole body once per PowerShell flavour, and every leg runs the
+# watchdog for a window of real seconds: 248s on three pinned cores at -j16, the
+# shape of the macOS runner. Three legs re-run at 30s on a short first sample.
+# TEST_TIMEOUT_AT_LEAST: 900
+
 set -euo pipefail
 
 # Before the driver is sourced: with these set, anything it starts posts a commit
@@ -253,6 +258,7 @@ else
     # owns it, and an ordinary reformatting of the workflow must not move it.
     cat >"$tmp/wf.py" <<'PY'
 import re
+import copy
 import sys
 
 import yaml
@@ -283,6 +289,19 @@ for _run, _want in [("bash ./ci-windows-suite.sh $dir", True),
 
 def suite_steps(wf):
     return [s for s in steps_of(wf) if runs_suite(s)]
+
+# These three grade the LAST suite step, which one leg cannot be. With a single
+# step [-1] is [0], so they edit the step they compare against and emit an
+# unmutated workflow the audit rightly accepts. Add the second step they need,
+# under its own context, or every one of them also trips the shared-context rule
+# it is not testing.
+def second_suite_step(wf):
+    if len(suite_steps(wf)) < 2:
+        extra = copy.deepcopy(suite_steps(wf)[0])
+        extra["env"]["WATCHDOG_CONTEXT"] += " (second)"
+        suite_jobs(wf)[0]["steps"].append(extra)
+    return suite_steps(wf)[-1]
+
 
 def suite_jobs(wf):
     return [
@@ -365,12 +384,12 @@ def mutate(wf, kind):
     elif kind == "sha":
         suite_steps(wf)[0]["env"]["WATCHDOG_SHA"] = "${{ github.sha }}"
     elif kind == "lastenv":
-        suite_steps(wf)[-1]["env"]["WATCHDOG_TOKEN"] = "literal"
+        second_suite_step(wf)["env"]["WATCHDOG_TOKEN"] = "literal"
     elif kind == "sharedcontext":
-        suite_steps(wf)[-1]["env"]["WATCHDOG_CONTEXT"] = \
+        second_suite_step(wf)["env"]["WATCHDOG_CONTEXT"] = \
             suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"]
     elif kind == "lasttimeout":
-        suite_steps(wf)[-1].pop("timeout-minutes", None)
+        second_suite_step(wf).pop("timeout-minutes", None)
     elif kind == "context":
         suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"] = "windows-suite"
     elif kind == "url":
@@ -450,6 +469,7 @@ fi
 test -z "$noexec_reason" || skip "$noexec_reason"
 
 psruns=()
+psdead=()
 for c in pwsh powershell.exe powershell; do
     command -v "$c" >/dev/null 2>&1 || continue
     # powershell and powershell.exe are one interpreter under two names.
@@ -457,11 +477,22 @@ for c in pwsh powershell.exe powershell; do
     for p in ${psruns[@]+"${psruns[@]}"}; do
         test "${p%.exe}" != "${c%.exe}" || seen=1
     done
-    test "$seen" -eq 1 || psruns+=("$c")
+    test "$seen" -eq 1 && continue
+    # On PATH is not the same as able to start. An interpreter that dies in its
+    # own startup leaves every leg with no output, which reads here as a mutant
+    # that asserted nothing, and blames the test for the machine.
+    if ! psprobe=$(run_with_timeout 30 "$c" -NoProfile -Command 'exit 0' 2>&1); then
+        psdead+=("$c: $(firstline "$psprobe")")
+        continue
+    fi
+    psruns+=("$c")
 done
 if test "${#psruns[@]}" -eq 0; then
-    echo "SKIP: no PowerShell here, the watchdog's own self-test cannot run"
-    exit 77
+    # Two different states, and only one of them is about this machine having no
+    # PowerShell: say which, or a broken interpreter reads as an absent one.
+    test "${#psdead[@]}" -eq 0 ||
+        skip "PowerShell is on PATH but will not start: ${psdead[*]}"
+    skip "no PowerShell here, the watchdog's own self-test cannot run"
 fi
 
 # Bounded: a mutant that loops forever would otherwise be caught only by the step
@@ -638,8 +669,23 @@ throttle_leg() {
     sink_stop
     calls=$(count_matching_lines . "$posts")
     lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
+    # A starved box spends the window on a handful of turns, and a 3-core runner
+    # under -j16 reached 2 ticks in 8s. Widen once, as the backoff leg does,
+    # rather than refusing to grade the starved sample.
+    if test "$lines" -lt 3; then
+        sink_start 201
+        run_posting 120 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30 >"$legout" 2>&1 || {
+            sink_stop
+            echo "the loop exited nonzero over 30s: $(<"$legout")"
+            return 1
+        }
+        sink_stop
+        calls=$(count_matching_lines . "$posts")
+        lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
+    fi
     test "$lines" -ge 3 || {
-        echo "$lines due ticks over 8s at a 1s interval: too few to judge a throttle"
+        echo "$lines due ticks over 30s at a 1s interval: the box is too starved to judge a throttle"
         return 1
     }
     test $((calls * 4)) -ge $((lines * 3)) || {
@@ -648,8 +694,21 @@ throttle_leg() {
     }
 }
 
+# Calls a healthy backoff owes in $1 due ticks: it skips 1, then 2, 4, 8, 16,
+# doubling to a cap of 32, so its c-th call lands on tick 1, 3, 6, 11, 20, 37.
+backoff_calls_due() {
+    local due=1 skip=1 n=0
+    while test "$due" -le "$1"; do
+        n=$((n + 1))
+        due=$((due + skip + 1))
+        skip=$((skip * 2))
+        test "$skip" -le 32 || skip=32
+    done
+    echo "$n"
+}
+
 backoff_leg() {
-    local calls lines
+    local calls lines want
     sink_start 403
     printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
     run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
@@ -661,13 +720,29 @@ backoff_leg() {
     sink_stop
     calls=$(count_matching_lines . "$posts")
     lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
-    test "$calls" -ge 2 || {
-        echo "a rejecting API was called $calls times: the loop stopped trying"
+    # A starved box spends the window on a handful of turns, and at six ticks or
+    # fewer a doubling backoff and a flat one owe the same calls. Widen, don't
+    # grade. Six still admits that one tie, and the counts separate from seven.
+    if test "$lines" -lt 6; then
+        sink_start 403
+        run_posting 120 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30 >"$legout" 2>&1 || {
+            sink_stop
+            echo "the loop exited nonzero over 30s: $(<"$legout")"
+            return 1
+        }
+        sink_stop
+        calls=$(count_matching_lines . "$posts")
+        lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
+    fi
+    test "$lines" -ge 6 || {
+        echo "$lines due ticks over 30s at a 1s interval: too few to judge a backoff"
         return 1
     }
-    # One diagnosis for both: which one trips first depends on box speed. The
-    # backoff must thin the calls, not the log; a token-less run leaves only the log.
-    if test "$calls" -gt 5 || test "$lines" -lt $((2 * calls)); then
+    # Graded against the ticks that happened, so starvation shrinks both counts
+    # together: a loop that gives up posts fewer, one that never skips posts more.
+    want=$(backoff_calls_due "$lines")
+    if test "$calls" -ne "$want"; then
         echo "$calls calls and $lines log lines against an API rejecting every one: nothing backs off"
         return 1
     fi
@@ -766,6 +841,36 @@ for psrun in "${psruns[@]}"; do
     test "$spent" -ge 4 || fail "a 5s watchdog returned after ${spent}s: MaxSeconds is not seconds"
     test "$spent" -le 20 || fail "a 5s watchdog ran ${spent}s: it does not stop on its own"
     fast=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
+    # A turn of the loop costs whatever the box gives it, and a 3-core runner
+    # under -j16 spent the whole 5s window on one turn, so both legs came back
+    # with one line. Widen rather than grade that sample: 30s still outran a
+    # 160-way overcommit on three cores, where 5s lost at 48.
+    #
+    # Both legs widen together, or the comparison loosens: $slow is pinned at 1,
+    # so this reads "at least two posts in the window". A watchdog on a fixed
+    # cadence that ignores -IntervalSeconds posts the same count on both legs,
+    # so the re-run pin or the ratio rejects it whatever that cadence is.
+    #
+    # The wider pair does not reach a cadence proportional to the option,
+    # IntervalSeconds * k for k in (5, 30]: that posts once on the 100s leg and
+    # floor(30/k)+1 on the 1s leg, clearing both checks, where the 5s pair
+    # caught everything above k=5. Counting cannot close that band, because a
+    # healthy watchdog starved to a ~10s turn and a k=10 mutant both give
+    # slow=1 fast=4.
+    if test "$fast" -le "$slow"; then
+        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
+            -ProgressLog "$(nativepath "$tmp/progress.log")" \
+            -IntervalSeconds 100 -PollSeconds 1 -MaxSeconds 30) ||
+            fail "the $psrun slow-cadence loop exited nonzero over 30s: $out"
+        slow=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
+        test "$slow" -eq 1 ||
+            fail "$slow status lines at a 100s cadence over 30s, want 1: $out"
+        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
+            -ProgressLog "$(nativepath "$tmp/progress.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30) ||
+            fail "the $psrun loop exited nonzero over 30s: $out"
+        fast=$(count_matching_lines 't=[0-9]*s q=' <<<"$out")
+    fi
     # Against the slow leg, not a floor: a probe tick is not instant.
     test "$fast" -gt "$slow" || fail "$fast status lines at 1s against $slow at 100s: $out"
     grep -q '36_local-bigcrawl.test' <<<"$out" || fail "the status does not name the test in flight: $out"
@@ -778,6 +883,17 @@ for psrun in "${psruns[@]}"; do
         -ProgressLog "$(nativepath "$tmp/no-such.log")" \
         -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 3) ||
         fail "the $psrun loop exited nonzero on a missing log: $out"
+    # Three seconds is the tightest window here, and a starved box spent all of
+    # it on one turn: zero status lines, which is not a wrong staticness but no
+    # answer at all. Widen once, as the throttle and backoff legs do.
+    if ! grep -q 't=[0-9]*s q=' <<<"$out"; then
+        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
+            -ProgressLog "$(nativepath "$tmp/no-such.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30) ||
+            fail "the $psrun loop exited nonzero on a missing log over 30s: $out"
+    fi
+    grep -q 't=[0-9]*s q=' <<<"$out" ||
+        fail "the $psrun loop posted no status in 30s: the box is too starved to judge a missing log"
     grep -q 'q=?s' <<<"$out" || fail "a missing log reported a staticness: $out"
 
     # The legs below read the sink, not the loop, and they exercise the script's
@@ -801,29 +917,46 @@ for psrun in "${psruns[@]}"; do
     fi
     legs=(cadence throttle staticness backoff)
     test "$devfull" -eq 0 || legs+=(fullstdout)
+    # These legs, the leaky control under them and the eight mutant legs after it
+    # each run the watchdog for a window of its own, so a host too slow to finish
+    # them skips rather than meets the guard. The costliest so far is what the
+    # next one will take, since a cheap leg under-projects the slow one after it.
+    planned=$((${#legs[@]} + 1 + 8 + devfull))
+    ran=0
+    costliest=0
+    pace() { # pace <seconds the step took>
+        test "$1" -le "$costliest" || costliest=$1
+        ran=$((ran + 1))
+        skip_if_out_of_budget "$((planned - ran))" "$costliest"
+    }
     for leg in "${legs[@]}"; do
         : >"$legout"
+        leg_at=$SECONDS
         said=$("${leg}_leg" "$(nativepath "$wdscript")") ||
             fail "the $psrun watchdog fails the $leg leg: $said"
         token_free "$legout" || fail "the $leg leg logged the status token"
+        pace $((SECONDS - leg_at))
     done
     # Control: a catch block widened to the whole exception is how it would get out.
     leaky="$tmp/token-in-log.ps1"
     # shellcheck disable=SC2016 # PowerShell variables, quoted for sed
     sed '/status post failed/s/$_.Exception.Message/$script:Token/' "$wdscript" >"$leaky"
     cmp -s "$wdscript" "$leaky" && fail "the leaky mutant changed nothing, so it proves nothing"
+    leg_at=$SECONDS
     backoff_leg "$(nativepath "$leaky")" >/dev/null || true
     token_free "$legout" && fail "the token audit cannot see a logged token"
+    pace $((SECONDS - leg_at))
 
     # Same shape as mutate() above, graded by a leg instead of the self-test, and
     # on the diagnosis rather than the exit status for the same reason.
     mutate_leg() {
-        local name=$1 expr=$2 leg=$3 want=$4 m="$tmp/$1.ps1" said
+        local name=$1 expr=$2 leg=$3 want=$4 m="$tmp/$1.ps1" said at=$SECONDS
         sed "$expr" "$wdscript" >"$m"
         cmp -s "$wdscript" "$m" && fail "mutant $name changed nothing, so it proves nothing"
         said=$("${leg}_leg" "$(nativepath "$m")") &&
             fail "mutant $name passed the $leg leg"
         grep -q "$want" <<<"$said" || fail "mutant $name tripped no check of its own: $said"
+        pace $((SECONDS - at))
     }
     mutate_leg status-every-poll \
         "s/if ((Get-WatchdogAction \$now \$postedAt \$IntervalSeconds) -eq 'post')/if (\$true)/" \

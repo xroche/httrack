@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# http_sendhead sums the request path, the referer, the cookies, the
+# credentials and the extra-headers box into one 16 KB buffer, and nothing
+# bounds that sum. A full box aborted the crawler mid-request.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_reqhdr.XXXXXX") || exit 1
+wire=$tmpdir/wire
+serverpid=
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" "$(nativepath "$wire")" >"$tmpdir/server.out" \
+    2>"$tmpdir/server.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
+
+# htscoremain refuses an argv of HTS_CDLMAXSIZE, so the box is filled a line at
+# a time. At 980 bytes a line the request passes 16384 between 16 lines and 17,
+# and a whole line is the smallest step this fixture can take, so 16 lands 205
+# bytes short of the buffer and 17 lands 786 bytes past it.
+pad=$(printf '%0.sp' $(seq 980))
+box() { # box N -> BOX, the -%X arguments for N header lines
+    local i
+    BOX=()
+    for ((i = 0; i < $1; i++)); do
+        BOX+=(-%X "X-Pad$i: $pad")
+    done
+}
+
+requests() {
+    local n=0 f
+    for f in "$wire".*; do
+        test ! -e "$f" || n=$((n + 1))
+    done
+    printf '%s\n' "$n"
+}
+
+crawl() { # crawl TAG [args...]
+    local tag=$1 rc=0
+    shift
+    run_with_timeout 90 httrack "http://127.0.0.1:$port/plain.html" \
+        -O "$tmpdir/$tag" -c1 --robots=0 --retries=0 --quiet -%v0 \
+        "$@" >>"$tmpdir/$tag.out" 2>&1 || rc=$?
+    # 134 is the abort this test is about; name it rather than "not zero"
+    test "$rc" -ne 134 || fail "$tag: the crawl aborted"
+    test "$rc" -eq 0 || fail "$tag: the crawl exited $rc"
+}
+
+fits() { # fits TAG N: the box goes out and the page is mirrored
+    local sent
+    box "$2"
+    crawl "$1" "${BOX[@]}"
+    sent=$(requests)
+    test "$sent" -ge 1 || fail "$1: no request reached the server"
+    grep -q "^X-Pad0: $pad" "$wire.$sent" ||
+        fail "$1: the box line is missing from the request"
+    ! grep -q 'Request header too large' "$tmpdir/$1/hts-log.txt" ||
+        fail "$1: a request that fits was refused"
+    test -s "$tmpdir/$1/127.0.0.1_$port/plain.html" || fail "$1: nothing was mirrored"
+}
+
+# A clipped request is not the one the crawl meant to make, so the refusal has
+# to happen before the socket: the server must see nothing at all.
+over() { # over TAG N: the request is refused and never sent
+    local before
+    before=$(requests)
+    box "$2"
+    crawl "$1" "${BOX[@]}"
+    grep -q 'Request header too large' "$tmpdir/$1/hts-log.txt" ||
+        fail "$1: no refusal in $(cat "$tmpdir/$1/hts-log.txt")"
+    assert_eq "$before" "$(requests)" "$1: requests reaching the server"
+}
+
+printf '[a box that fits reaches the wire] ..\t'
+fits one 1
+echo OK
+
+# One line apart, so a guard that moved would take one of the two with it. A
+# guard tripping on any half-full buffer fails the first, one accepting a
+# request a byte too long fails the second.
+printf '[16 lines fit, 17 do not] ..\t'
+fits edge 16
+over past 17
+echo OK
+
+# A whole header line is the smallest step a crawl can take, so the byte the
+# guard turns on is pinned here instead: through http_append_custom_headers,
+# whose buffer size the case names. A line exactly filling it is dropped, and
+# one byte shorter still goes in.
+selftest_queue 'XXXXXXXXXXXXX' headerdedup AB XXXXXXXXXXXXX 16
+selftest_queue '' headerdedup AB XXXXXXXXXXXXXX 16
+selftest_run_queued

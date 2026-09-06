@@ -77,6 +77,9 @@ TESTS_ENVIRONMENT += BACKTRACE_LIBS="$(BACKTRACE_LIBS)"
 # 207_install-headers-symbols.test links a consumer probe against it; absent on a
 # static-only build and named .dylib on macOS, where that ELF-only test skips.
 TESTS_ENVIRONMENT += HTTRACK_SHLIB=$(abs_top_builddir)/src/$(LT_CV_OBJDIR)/libhttrack.so
+# 449_plugin-postprocess-example.test dlopen()s this shipped example, suffix
+# included by the test since libtool names it .dylib on macOS.
+TESTS_ENVIRONMENT += CHANGECONTENT_LIB=$(abs_top_builddir)/libtest/$(LT_CV_OBJDIR)/libchangecontent
 TESTS_ENVIRONMENT += RENAMEFAIL_LA=$(abs_builddir)/librenamefail.la
 TESTS_ENVIRONMENT += RENAMEFAIL_LIB=$(abs_builddir)/$(LT_CV_OBJDIR)/librenamefail.so
 TESTS_ENVIRONMENT += UNLINKFAIL_LA=$(abs_builddir)/libunlinkfail.la
