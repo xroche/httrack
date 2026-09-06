@@ -473,6 +473,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int intag = 0;            // on est dans un tag
       int incomment = 0;        // dans un <!--
       int inscript = 0;         // dans un scipt pour applets javascript)
+      int incss = 0;            /* stylesheet: url(x) may drop its quotes */
       int inscript_locked = 0;  // in locked script (ie. js file)
       signed char inscript_state[INSCRIPT_NSTATES][257];
       INSCRIPT inscript_state_pos = INSCRIPT_START;
@@ -546,6 +547,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                (compare_mime(opt, r->contenttype, str->url_file, "text/css") !=
                 0)) { /* JavaScript js file */
         inscript = 1;
+        incss =
+            (compare_mime(opt, r->contenttype, str->url_file, "text/css") != 0);
         inscript_locked = 1;    /* Don't exit js space upon </script> */
         if (opt->parsedebug) {
           HT_ADD("<@@ inscript @@>");
@@ -960,6 +963,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                   inscript_name = "script";
                 else
                   inscript_name = "style";
+                incss = (check_tag(intag_start, "script") == 0);
                 inscript = 1;
                 inscript_state_pos = INSCRIPT_START;
                 intag = 1;      // because après <script> on y est .. - pas utile
@@ -1261,10 +1265,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (p == 0 && !inscript     /* we don't want events inside document.write */
                       ) {
                       int i = 0;
+                      int is_style_attr = 0;
 
                       /* détection onLoad etc */
                       while((p == 0) && (strnotempty(hts_detect_js[i]))) {
                         p = rech_tageq(html, hts_detect_js[i]);
+                        if (p != 0)
+                          is_style_attr =
+                              (strfield2(hts_detect_js[i], "style") != 0);
                         i++;
                       }
                       /* non détecté - détecter également les onXxxxx= */
@@ -1293,6 +1301,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                            On est désormais dans du code javascript
                          */
                         inscript_name = "";
+                        /* style= is CSS, every other hts_detect_js[] entry is
+                         * JS. */
+                        incss = is_style_attr;
                         inscript = inscript_tag = 1;
                         inscript_state_pos = INSCRIPT_START;
                         if (opt->parsedebug) {
@@ -1501,7 +1512,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           html_prevc(html, r->adr) != '_') { // url(url)
                         expected = '('; // parenthèse
                         expected_end = ")";     // fin: parenthèse
-                        can_avoid_quotes = 1;
+                        /* CSS writes url(foo.png) unquoted, but JavaScript's
+                           new URL(x) matches the same token, so an unquoted
+                           operand there rewrites the expression itself. */
+                        can_avoid_quotes = !inscript || incss;
                         quotes_replacement = ')';
                       }
                       if (!nc)
