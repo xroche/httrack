@@ -21,32 +21,14 @@ concurrency:
 
 jobs:
   cross:
-    name: cross (${{ matrix.arch }})
+    name: cross (Debian ports)
     runs-on: ubuntu-24.04
     # sid, not stable: the point is to predict what the sid buildds will say.
     container: debian:sid
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # arch selects the hardening flags, triplet is the toolchain prefix.
-          # The first four are 3.49.17's failures.
-          - { arch: armhf, triplet: arm-linux-gnueabihf }
-          - { arch: powerpc, triplet: powerpc-linux-gnu }
-          - { arch: hppa, triplet: hppa-linux-gnu }
-          - { arch: loong64, triplet: loongarch64-linux-gnu }
-          - { arch: sh4, triplet: sh4-linux-gnu }
-          - { arch: m68k, triplet: m68k-linux-gnu }
-          - { arch: sparc64, triplet: sparc64-linux-gnu }
-          - { arch: riscv64, triplet: riscv64-linux-gnu }
-          - { arch: s390x, triplet: s390x-linux-gnu }
-    env:
-      DEB_HOST_ARCH: ${{ matrix.arch }}
-      TRIPLET: ${{ matrix.triplet }}
-      ZPREFIX: /tmp/zlib-${{ matrix.arch }}
+    # Nine ports in series, where one leg's budget was 30.
+    timeout-minutes: 60
     steps:
-      - name: Install the toolchain
+      - name: Install the toolchains
         run: |
           set -euo pipefail
           # deb-src, so zlib below comes from the archive and not a pinned URL.
@@ -55,62 +37,99 @@ jobs:
           sed -i 's/^Types: deb$/Types: deb deb-src/' \
             /etc/apt/sources.list.d/debian.sources
           apt-get update
+          # Every port in one call, since nine separate jobs paid this same
+          # apt-get nine times.
           apt-get install -y --no-install-recommends \
             build-essential autoconf automake libtool autoconf-archive \
             dpkg-dev git ca-certificates \
-            "gcc-$TRIPLET" "libc6-dev-$DEB_HOST_ARCH-cross"
+            gcc-arm-linux-gnueabihf libc6-dev-armhf-cross \
+            gcc-powerpc-linux-gnu libc6-dev-powerpc-cross \
+            gcc-hppa-linux-gnu libc6-dev-hppa-cross \
+            gcc-loongarch64-linux-gnu libc6-dev-loong64-cross \
+            gcc-sh4-linux-gnu libc6-dev-sh4-cross \
+            gcc-m68k-linux-gnu libc6-dev-m68k-cross \
+            gcc-sparc64-linux-gnu libc6-dev-sparc64-cross \
+            gcc-riscv64-linux-gnu libc6-dev-riscv64-cross \
+            gcc-s390x-linux-gnu libc6-dev-s390x-cross
 
       - uses: actions/checkout@v7
         with:
           submodules: recursive
 
-      - name: Cross-build zlib
+      - name: Cross-build every port
         run: |
-          set -euo pipefail
-          # Mandatory, and no ports arch has a zlib1g-dev:<arch> to
-          # multiarch-install. -fPIC because libhttrack.so links it.
-          mkdir -p /tmp/zsrc && cd /tmp/zsrc
-          # Unpatched: Debian's arch-specific patches expect its own rules to
-          # build them (s390x's vector CRC pulls a header they add), and we only
-          # need something to link -lz against.
-          apt-get source --download-only zlib1g
-          dpkg-source --skip-patches -x ./*.dsc src
-          cd src
-          CHOST="$TRIPLET" CC="$TRIPLET-gcc" CFLAGS="-O2 -fPIC" \
-            ./configure --prefix="$ZPREFIX" --static
-          # configure detects s390x's vector CRC, whose sources live in the
-          # contrib/ the .dfsg repack drops: drop the define and the object it
-          # would build. Nothing here needs a fast CRC.
-          sed -i -E 's/(-DHAVE_S390X_VX|crc32_vx\.l?o)//g' Makefile
-          make -j"$(nproc)"
-          make install
-
-      - name: Configure
-        run: |
-          set -euo pipefail
+          set -uo pipefail
           autoreconf -fi
-          mkdir -p /tmp/bld && cd /tmp/bld
-          # The buildd's own per-arch flags: -D_FILE_OFFSET_BITS=64 is the shim
-          # hazard, and -fstack-clash-protection is not offered everywhere.
-          eval "$(dpkg-buildflags --export=sh)"
-          # A cross AC_TRY_RUN answers "cross", which would swap in the bundled
-          # snprintf that no buildd ever builds. Every glibc passes these.
-          # --disable-https: no ports arch has a cross libssl, so the TLS paths
-          # are the one part of the tree this matrix does not compile.
-          "$GITHUB_WORKSPACE/configure" --host="$TRIPLET" \
-            --build="$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)" --disable-https \
-            ac_cv_have_working_snprintf=yes ac_cv_have_working_vsnprintf=yes \
-            CPPFLAGS="${CPPFLAGS:-} -I$ZPREFIX/include" \
-            LDFLAGS="${LDFLAGS:-} -L$ZPREFIX/lib"
+          # arch selects the hardening flags, triplet is the toolchain prefix.
+          # The first four are 3.49.17's failures.
+          ports="armhf:arm-linux-gnueabihf powerpc:powerpc-linux-gnu
+                 hppa:hppa-linux-gnu loong64:loongarch64-linux-gnu
+                 sh4:sh4-linux-gnu m68k:m68k-linux-gnu
+                 sparc64:sparc64-linux-gnu riscv64:riscv64-linux-gnu
+                 s390x:s390x-linux-gnu"
+          failed=
+          for port in $ports; do
+              arch=${port%%:*}
+              triplet=${port#*:}
+              echo "::group::$arch ($triplet)"
+              # A subshell per port, so a failure stops that port only and one
+              # red port cannot hide the next. Its status is read after it,
+              # never as the left side of ||, which would suppress the errexit
+              # inside it.
+              (
+                  set -euo pipefail
+                  export DEB_HOST_ARCH=$arch TRIPLET=$triplet
+                  zprefix=/tmp/zlib-$arch
+                  bld=/tmp/bld-$arch
 
-      - name: Build
-        run: make -C /tmp/bld -j"$(nproc)"
+                  # Mandatory, and no ports arch has a zlib1g-dev:<arch> to
+                  # multiarch-install. -fPIC because libhttrack.so links it.
+                  rm -rf /tmp/zsrc && mkdir -p /tmp/zsrc && cd /tmp/zsrc
+                  # Unpatched: Debian's arch-specific patches expect its own
+                  # rules to build them (s390x's vector CRC pulls a header they
+                  # add), and we only need something to link -lz against.
+                  apt-get source --download-only zlib1g
+                  dpkg-source --skip-patches -x ./*.dsc src
+                  cd src
+                  CHOST="$triplet" CC="$triplet-gcc" CFLAGS="-O2 -fPIC" \
+                    ./configure --prefix="$zprefix" --static
+                  # configure detects s390x's vector CRC, whose sources live in
+                  # the contrib/ the .dfsg repack drops: drop the define and the
+                  # object it would build. Nothing here needs a fast CRC.
+                  sed -i -E 's/(-DHAVE_S390X_VX|crc32_vx\.l?o)//g' Makefile
+                  make -j"$(nproc)"
+                  make install
 
-      - name: Build the test artifacts
-        # Nothing runs here, but the shims are where three of the four 3.49.17
-        # failures were: they only build under `check`. Asserted, because an
-        # empty TESTS= would otherwise pass having built nothing.
-        run: |
-          set -euo pipefail
-          make -C /tmp/bld -j"$(nproc)" check TESTS=
-          test -f /tmp/bld/tests/.libs/libaltstackprobe.so
+                  mkdir -p "$bld" && cd "$bld"
+                  # The buildd's own per-arch flags: -D_FILE_OFFSET_BITS=64 is
+                  # the shim hazard, and -fstack-clash-protection is not offered
+                  # everywhere.
+                  eval "$(dpkg-buildflags --export=sh)"
+                  # A cross AC_TRY_RUN answers "cross", which would swap in the
+                  # bundled snprintf that no buildd ever builds. Every glibc
+                  # passes these. --disable-https: no ports arch has a cross
+                  # libssl, so the TLS paths are the one part of the tree this
+                  # does not compile.
+                  "$GITHUB_WORKSPACE/configure" --host="$triplet" \
+                    --build="$(dpkg-architecture -qDEB_BUILD_GNU_TYPE)" \
+                    --disable-https \
+                    ac_cv_have_working_snprintf=yes \
+                    ac_cv_have_working_vsnprintf=yes \
+                    CPPFLAGS="${CPPFLAGS:-} -I$zprefix/include" \
+                    LDFLAGS="${LDFLAGS:-} -L$zprefix/lib"
+                  make -j"$(nproc)"
+                  # Nothing runs here, but the shims are where three of the four
+                  # 3.49.17 failures were: they only build under `check`.
+                  # Asserted, because an empty TESTS= would otherwise pass having
+                  # built nothing.
+                  make -j"$(nproc)" check TESTS=
+                  test -f "$bld/tests/.libs/libaltstackprobe.so"
+              )
+              rc=$?
+              echo "::endgroup::"
+              test "$rc" -eq 0 || failed="$failed $arch"
+          done
+          test -z "$failed" || {
+              echo "::error::cross-build failed on:$failed"
+              exit 1
+          }
