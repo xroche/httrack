@@ -1,0 +1,117 @@
+#!/bin/bash
+#
+# A stop asked to keep the resume data must leave hts-cache/ref behind. The
+# partial bodies survive a stop already, and without the byte-range metadata in
+# that directory a later --continue cannot use them.
+
+set -euo pipefail
+
+# shellcheck source=tests/crawllib.sh
+. "${0%"${0##*/}"}./crawllib.sh"
+
+target_is_linux ||
+    skip "the stop driver interposes through LD_PRELOAD, which is Linux-only here"
+# Anything else missing is a build problem, not a skip, or the test passes
+# vacuously.
+test -r "${STOPRESUME_LIB:-}" ||
+    fail "${STOPRESUME_LIB:-\$STOPRESUME_LIB} was not built"
+
+require_httrack
+
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_stopresume.XXXXXX") || exit 1
+crawlpid=
+cleanup() {
+    set +e
+    test -n "$crawlpid" && kill_tree "$crawlpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+local_server_start
+
+# An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
+# refuses by default. The shim allocates nothing, so the ordering is harmless.
+export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
+
+# Crawl trickled bodies until a temp-ref names one, stop the run the way the
+# caller asks, and leave in refs_left what hts-cache/ref still holds. The wait
+# is what makes that count mean something: a run stopped before any partial
+# exists has no resume data to keep either way. Not a command substitution: the
+# subshell would run the EXIT trap and reap the server for the next case.
+refs_left=0
+stop_and_report() { # stop_and_report <name> keep|drop|maxtime
+    local name=$1 how=$2
+    local out="${tmpdir}/${name}" trigger="${tmpdir}/${name}.trigger"
+    local refdir="${out}/hts-cache/ref" pre=(env) cap=(--max-time=0)
+    local waited
+
+    case $how in
+    keep | drop)
+        pre=(env "STOPRESUME_TRIGGER=${trigger}"
+            "STOPRESUME_KEEP=$(test "$how" = keep && echo 1 || echo 0)"
+            "LD_PRELOAD=${STOPRESUME_LIB}")
+        ;;
+    maxtime) cap=(--max-time=5) ;;
+    esac
+
+    mkdir -p "$out"
+    "${pre[@]}" httrack "${BASEURL}/trickle/index.html" -O "$out" --quiet \
+        --disable-security-limits --robots=0 --timeout=0 "${cap[@]}" -c2 \
+        >"${out}.log" 2>&1 &
+    crawlpid=$!
+
+    for waited in $(seq 1 600); do
+        test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" && break
+        kill -0 "$crawlpid" 2>/dev/null || break
+        poll_wait 0.1
+    done
+    test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" ||
+        fail "${name}: no temp-ref was written, so the stop decides nothing"
+
+    case $how in
+    keep | drop) : >"$trigger" ;;
+    esac
+
+    for waited in $(seq 1 900); do
+        kill -0 "$crawlpid" 2>/dev/null || break
+        poll_wait 0.2
+    done
+    if kill -0 "$crawlpid" 2>/dev/null; then
+        fail "${name}: the crawl never ended after the stop"
+    fi
+    wait "$crawlpid" 2>/dev/null || true
+    crawlpid=
+
+    # Guarded, not "2>/dev/null | wc -l": under pipefail the missing directory
+    # is find's own failure and would end the run rather than count zero.
+    refs_left=0
+    if test -d "$refdir"; then
+        refs_left=$(find "$refdir" -name '*.ref' | wc -l)
+    fi
+}
+
+assert_kept() { # assert_kept <name> <how> <why>
+    stop_and_report "$1" "$2"
+    test "$refs_left" -gt 0 || fail "$3"
+}
+
+assert_erased() { # assert_erased <name> <how> <why>
+    stop_and_report "$1" "$2"
+    test "$refs_left" -eq 0 || fail "$3"
+}
+
+printf '[a stop asked to keep the resume data keeps it] ..\t'
+assert_kept keep keep "hts-cache/ref was erased under a keep_resume stop"
+echo "PASS"
+
+# The control: the same stop asked the other way still erases, so the arm above
+# cannot pass on a fix that simply stopped erasing.
+printf '[a plain stop still erases it] ..\t'
+assert_erased drop drop "hts-cache/ref survived a stop that did not ask to keep it"
+echo "PASS"
+
+# The engine raises the stop flag itself when a cap is reached, and that run
+# ends as cleanly as a finished one: nothing to resume, nothing to keep.
+printf '[a --max-time cap still erases it] ..\t'
+assert_erased maxtime maxtime "hts-cache/ref survived the engine's own cap stop"
+echo "PASS"
