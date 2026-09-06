@@ -290,7 +290,7 @@ for _run, _want in [("bash ./ci-windows-suite.sh $dir", True),
 def suite_steps(wf):
     return [s for s in steps_of(wf) if runs_suite(s)]
 
-# These three grade the LAST suite step, which one leg cannot be: with a single
+# These three grade the LAST suite step, which one leg cannot be. With a single
 # step [-1] is [0], so they edit the step they compare against and emit an
 # unmutated workflow the audit rightly accepts. Add the second step they need,
 # under its own context, or every one of them also trips the shared-context rule
@@ -670,8 +670,8 @@ throttle_leg() {
     calls=$(count_matching_lines . "$posts")
     lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
     # A starved box spends the window on a handful of turns, and a 3-core runner
-    # under -j16 reached 2 ticks in 8s. Widen once, as the cadence and backoff
-    # legs do, rather than refusing to grade the starved sample.
+    # under -j16 reached 2 ticks in 8s. Widen once, as the backoff leg does,
+    # rather than refusing to grade the starved sample.
     if test "$lines" -lt 3; then
         sink_start 201
         run_posting 120 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
