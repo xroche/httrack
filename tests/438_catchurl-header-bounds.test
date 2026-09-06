@@ -10,6 +10,6 @@ set -euo pipefail
 . "${0%"${0##*/}"}./testlib.sh"
 
 selftest_queue "catchurl self-test OK (33 headers plus 11 bytes kept, 12 refused)" catchurl
-selftest_queue "catchurl over-long header self-test OK (9000 bytes refused: one request header line was over 8192 bytes)" catchurl-overlong
+selftest_queue "catchurl over-long header self-test OK (9000 bytes refused: one request header line was over 8191 bytes)" catchurl-overlong
 selftest_queue "urlbounds self-test OK (wizard 2025/2026, auth 2032/2033)" urlbounds
 selftest_run_queued

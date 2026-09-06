@@ -169,7 +169,7 @@ const char *catch_url_strerror(catch_url_status status) {
     return "the browser asked for a relative URL, not an absolute one";
   case CATCH_URL_ERR_HEADER:
     return "one request header line was over " CATCH_URL_STR(
-        CATCH_URL_LINE_SIZE) " bytes";
+        CATCH_URL_LINE_MAX) " bytes";
   case CATCH_URL_ERR_BLOCK:
     return "the request headers were over " CATCH_URL_STR(
         CATCH_URL_DATA_SIZE) " bytes in total";
