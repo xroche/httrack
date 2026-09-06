@@ -497,6 +497,8 @@ int bauth_add(t_cookie * cookie, const char *adr, const char *fil, const char *a
       bauth_chain *chain = &cookie->auth;
       char *prefix = bauth_prefix(buffer, adr, fil);
 
+      if (prefix == NULL)
+        return 0;
       /* fin de la chaine */
       while(chain->next)
         chain = chain->next;
@@ -537,6 +539,8 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
     bauth_chain *chain = &cookie->auth;
     char *prefix = bauth_prefix(buffer, adr, fil);
 
+    if (prefix == NULL)
+      return NULL;
     while(chain) {
       if (strnotempty(chain->prefix)) {
         if (strncmp(prefix, chain->prefix, strlen(chain->prefix)) == 0) {
@@ -549,13 +553,19 @@ char *bauth_check(t_cookie * cookie, const char *adr, const char *fil) {
   return NULL;
 }
 
-/* Build the auth prefix (host + path, query stripped) into prefix.
-   Callers pass a buffer of HTS_URLMAXSIZE * 2 bytes. */
+/* Build the auth prefix (host + path, query stripped) into prefix, or return
+   NULL if adr+fil does not fit. Callers pass HTS_URLMAXSIZE * 2 bytes. */
 char *bauth_prefix(char *prefix, const char *adr, const char *fil) {
+  const size_t size = HTS_URLMAXSIZE * 2;
+  const char *const host = jump_identification_const(adr);
+  const size_t used = strlen(host);
   char *a;
 
-  strlcpybuff(prefix, jump_identification_const(adr), HTS_URLMAXSIZE * 2);
-  strlcatbuff(prefix, fil, HTS_URLMAXSIZE * 2);
+  /* a clipped prefix matches URLs nobody authenticated, so refuse instead */
+  if (used >= size || strlen(fil) >= size - used)
+    return NULL;
+  strlcpybuff(prefix, host, size);
+  strlcatbuff(prefix, fil, size);
   a = strchr(prefix, '?');
   if (a)
     *a = '\0';

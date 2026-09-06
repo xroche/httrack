@@ -440,6 +440,21 @@ void hts_wizard_apply_verdict(httrackp *opt, int n, const char *adr,
     *forbidden_url = 0;
 }
 
+/* Does "adr" + '/' + "fil" fit the HTS_URLMAXSIZE*2 pair (l, lfull) that
+   hts_acceptlink_() and hts_testlinksize() build? Those two buffers gate what
+   url_savename_addstr may later append (#1269), so a link that overruns them is
+   refused rather than clipped into a URL nobody linked to. */
+static hts_boolean hts_wizard_url_fits(const char *adr, const char *fil) {
+  const size_t size = HTS_URLMAXSIZE * 2;
+  const size_t sep = (*fil != '/') ? 1 : 0;
+  const size_t l = strlen(jump_identification_const(adr)) + sep;
+  const size_t lfull =
+      (link_has_authority(adr) ? 0 : strlen("http://")) + strlen(adr) + sep;
+  const size_t head = (l > lfull) ? l : lfull;
+
+  return head < size && strlen(fil) < size - head ? HTS_TRUE : HTS_FALSE;
+}
+
 static int hts_acceptlink_(httrackp * opt, int ptr,
                            const char *adr, const char *fil, const char *tag,
                            const char *attribute, int *set_prio_to,
@@ -730,7 +745,11 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
   // Si wizard, il se peut qu'on autorise ou qu'on interdise 
   // un lien spécial avant même de tester sa position, sa hiérarchie etc.
   // peut court-circuiter le forbidden_url précédent
-  if (opt->wizard) {            // le wizard entre en action..
+  if (opt->wizard && !hts_wizard_url_fits(adr, fil)) {
+    hts_log_print(opt, LOG_WARNING,
+                  "link too long for the wizard, forbidden: %s%s", adr, fil);
+    forbidden_url = 1;      // URL interdite
+  } else if (opt->wizard) { // le wizard entre en action..
     //
     int question = 1;           // poser une question                            
     int force_mirror = 0;       // pour mirror links
@@ -978,7 +997,7 @@ static int hts_acceptlink_(httrackp * opt, int ptr,
       }
 
     }                           // test du wizard sur l'url
-  }                             // fin du test wizard..
+  } // fin du test wizard..
 
   // -------------------- PHASE 5 --------------------
 
@@ -1070,6 +1089,8 @@ hts_boolean hts_link_is_foreign_asset(httrackp *opt, int ptr) {
 int hts_testlinksize(httrackp * opt, const char *adr, const char *fil, LLint size) {
   int jok = 0;
 
+  if (!hts_wizard_url_fits(adr, fil))
+    return -1; // interdit
   if (size >= 0) {
     /* Don't enlarge: the abort gates url_savename_addstr's append (#1269). */
     char BIGSTK l[HTS_URLMAXSIZE * 2];

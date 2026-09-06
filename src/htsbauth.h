@@ -117,8 +117,9 @@ char *bauth_check(t_cookie *cookie, const char *adr, const char *fil);
 void bauth_free(t_cookie *cookie);
 
 /** Build the auth lookup key (host + path, query string stripped, truncated at
-    the last '/') from adr and fil into prefix; returns prefix. Caller must
-    supply a buffer of HTS_URLMAXSIZE * 2 bytes. */
+    the last '/') from adr and fil into prefix; returns prefix, or NULL when
+    adr+fil does not fit, since a clipped key would match URLs nobody
+    authenticated. Caller must supply a buffer of HTS_URLMAXSIZE * 2 bytes. */
 char *bauth_prefix(char *buffer, const char *adr, const char *fil);
 
 #endif
