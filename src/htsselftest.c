@@ -12445,6 +12445,60 @@ cleanup:
   return err;
 }
 
+/* back_new() sizes its slot table from -cN, so a user can ask for one that
+   does not fit. The contract is a NULL return, which httpmirror() turns into a
+   log line and a stopped mirror, where an abort loses that message. */
+static int st_backnew(httrackp *opt, int argc, char **argv) {
+  /* Too big to serve without the allocator asking the kernel for more. */
+  enum { slots = 4096 };
+
+  struct_back *sback;
+
+  (void) argc;
+  (void) argv;
+
+  /* Control: with memory available the same call hands back a whole table, so
+     a NULL below cannot be back_new refusing every size. */
+  sback = back_new(opt, slots);
+  if (sback == NULL || sback->count != slots || sback->lnk == NULL ||
+      sback->connect_fallback == NULL || sback->ready == NULL) {
+    printf("backnew: FAILED (control table incomplete)\n");
+    back_free(&sback);
+    return 1;
+  }
+  back_free(&sback);
+
+#ifndef _WIN32
+  {
+    struct rlimit saved, tight;
+
+    if (getrlimit(RLIMIT_AS, &saved) != 0) {
+      printf("backnew: cannot cap memory, skipped\n");
+      return 0;
+    }
+    tight = saved;
+    tight.rlim_cur = 1024 * 1024;
+    if (setrlimit(RLIMIT_AS, &tight) != 0) {
+      printf("backnew: cannot cap memory, skipped\n");
+      return 0;
+    }
+    sback = back_new(opt, slots);
+    (void) setrlimit(RLIMIT_AS, &saved);
+    if (sback != NULL) {
+      /* The cap is advisory here, so the run says nothing either way. */
+      back_free(&sback);
+      printf("backnew: cap did not bite, skipped\n");
+      return 0;
+    }
+    printf("backnew: oom OK\n");
+    return 0;
+  }
+#else
+  printf("backnew: cannot cap memory, skipped\n");
+  return 0;
+#endif
+}
+
 static int st_threadwait(httrackp *opt, int argc, char **argv) {
   int err = 0;
   int i, round;
@@ -13871,6 +13925,8 @@ static const struct selftest_entry {
      st_arrays},
     {"ucs2", "[oom]", "UCS2 to UTF-8 re-encoding, and its failure return",
      st_ucs2},
+    {"backnew", "",
+     "a backing table too big to allocate is a NULL, not an abort", st_backnew},
     {"pubheaders", "",
      "layout of the installed structs configure's switches decide",
      st_pubheaders},
