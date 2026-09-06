@@ -514,6 +514,8 @@ int url_savename(lien_adrfilsave *const afs,
   }
 
   /* Declare adr (IDNA-decoded if necessary) */
+  /* clang-format off: an edit realigns all backslashes, churning the macro. */
+  /* clang-format off */
 #define DECLARE_ADR(FINAL_ADR) \
   char *idna_adr =\
     /* http or https */\
@@ -525,8 +527,13 @@ int url_savename(lien_adrfilsave *const afs,
     && hts_isStringIDNA(adr_complete, strlen(print_adr))\
     ? hts_convertStringIDNAToUTF8(print_adr, strlen(print_adr))\
     : NULL;\
-  const char *const FINAL_ADR = idna_adr != NULL \
+  /* Punycode can quadruple the host, and a clipped one names another host,\
+     so an over-long decode keeps the ASCII form. The bound is the pre-IDNA\
+     one and not the save buffer, which still has a path to append. */\
+  const char *const FINAL_ADR = \
+    (idna_adr != NULL && strlen(idna_adr) < HTS_URLMAXSIZE) \
     ? idna_adr : ( protocol == PROTOCOL_FILE ? "file" : print_adr )
+  /* clang-format on */
 
   /* Release adr */
 #define RELEASE_ADR() do {\

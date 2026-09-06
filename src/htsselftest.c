@@ -2486,6 +2486,40 @@ static int st_ftpaddr(httrackp *opt, int argc, char **argv) {
 
 /* Split a URL into (adr, fil), or print "error" if rejected. A second arg pads
    the URL with that many 'a's to reach lengths a CLI arg can't. */
+/* Every ident_url_relatif() arm has to keep fil under HTS_URLMAXSIZE, because
+   callers rebuild "http://" + adr + "/" + fil into a buffer sized from that. */
+static int st_identrel(httrackp *opt, int argc, char **argv) {
+  static const char *const heads[] = {"?", "r", "/", ""};
+  const size_t nheads = sizeof(heads) / sizeof(heads[0]);
+  char BIGSTK origin[HTS_URLMAXSIZE * 2];
+  char BIGSTK lien[HTS_URLMAXSIZE * 2];
+  lien_adrfil af;
+  size_t k, pad;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* origin_fil just under the ceiling its own entry test allows */
+  origin[0] = '/';
+  memset(origin + 1, 'o', HTS_URLMAXSIZE - 3);
+  origin[HTS_URLMAXSIZE - 2] = '\0';
+  for (k = 0; k < nheads; k++) {
+    const size_t head = strlen(heads[k]);
+
+    for (pad = 0; head + pad + 2 < HTS_URLMAXSIZE; pad += 97) {
+      memcpy(lien, heads[k], head);
+      memset(lien + head, 'q', pad);
+      lien[head + pad] = '\0';
+      if (ident_url_relatif(lien, "www.example.com", origin, &af) >= 0) {
+        assertf(strlen(af.adr) < HTS_URLMAXSIZE);
+        assertf(strlen(af.fil) < HTS_URLMAXSIZE);
+      }
+    }
+  }
+  printf("identrel self-test OK\n");
+  return 0;
+}
+
 static int st_identurl(httrackp *opt, int argc, char **argv) {
   lien_adrfil af;
   char *url;
@@ -3275,6 +3309,35 @@ static int st_sniff(httrackp *opt, int argc, char **argv) {
 
 /* escape_remove_control() compacts in place, so it has to terminate at the new
    end or the caller reads the compacted head plus the original tail (#974). */
+/* append_escape_*() hands on what is LEFT of dest, so a remainder equal to
+   sizeof(void *) used to trip the size heuristic meant for caller mistakes. */
+static int st_escape_append_room(httrackp *opt, int argc, char **argv) {
+  char buf[64];
+  size_t room;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  for (room = 1; room <= 2 * sizeof(void *); room++) {
+    const size_t used = sizeof(buf) - room;
+    size_t ret;
+
+    memset(buf, 'a', used);
+    buf[used] = '\0';
+    ret = append_escape_check_url("bc", buf, sizeof(buf));
+    /* "bc" plus its NUL needs three bytes; the ambiguous size reports full */
+    if (room < 3 || room == sizeof(void *)) {
+      assertf(ret == room);
+    } else {
+      assertf(ret == 2);
+      assertf(strlen(buf) == used + 2);
+    }
+    assertf(strlen(buf) <= used + 2);
+  }
+  printf("escape-append-room self-test OK\n");
+  return 0;
+}
+
 static int st_escape_control(httrackp *opt, int argc, char **argv) {
   static const struct {
     const char *in;
@@ -13476,6 +13539,8 @@ static const struct selftest_entry {
     {"resolve", "<link> <adr> <fil>", "resolve a link against an origin",
      st_resolve},
     {"identurl", "<url>", "split an absolute URL into (adr, fil)", st_identurl},
+    {"identrel", "", "every relative-URL arm bounds the path it builds",
+     st_identrel},
     {"toport", "<url>...", "port separator found in a URL authority",
      st_toport},
     {"ftpaddr", "<url-address>...", "host/port the FTP path splits out",
@@ -13523,6 +13588,9 @@ static const struct selftest_entry {
      st_savename_addtail},
     {"sniff", "<content-type> <hex:..|text>", "MIME magic consistency",
      st_sniff},
+    {"escape-append-room", "",
+     "append_escape_*() tolerates a pointer-sized remainder",
+     st_escape_append_room},
     {"escape-control", "[hex:..|string]",
      "escape_remove_control() terminates at the compacted end",
      st_escape_control},
