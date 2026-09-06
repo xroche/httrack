@@ -3700,8 +3700,7 @@ HTSEXT_API int hts_request_stop(httrackp *opt, hts_boolean keep_resume) {
     hts_log_print(opt, LOG_ERROR, "Exit requested by shell or user");
     hts_mutexlock(&opt->state.lock);
     opt->state.stop = 1;
-    /* the value SIGTERM writes: it spares hts-cache/ref, which a later
-       --continue reads to resume the partial bodies the stop leaves behind */
+    /* 1, as SIGTERM writes, spares hts-cache/ref for a later --continue */
     if (keep_resume)
       opt->state.exit_xh = 1;
     hts_mutexrelease(&opt->state.lock);

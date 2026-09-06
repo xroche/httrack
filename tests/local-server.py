@@ -1975,6 +1975,63 @@ class Handler(SimpleHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(self.RESUME304_BODY)
 
+    # 444: the first GET stalls after a chunk, so a stop leaves a partial plus
+    # its temp-ref; the --continue that follows must come back with a Range.
+    STOPRESUME_BODY = b"STOPRSM-" + bytes((i * 13 + 7) % 256 for i in range(8192))
+    _stopresume_started = False
+
+    def route_stopresume_index(self):
+        self.send_html('\t<a href="blob.bin">blob</a>')
+
+    def route_stopresume(self):
+        counter = os.environ.get("STOPRESUME_COUNTER")
+        if counter:
+            with open(counter, "a") as fp:
+                fp.write("x")
+        body = self.STOPRESUME_BODY
+        m = re.match(r"bytes=(\d+)-", self.headers.get("Range", "") or "")
+        if m and int(m.group(1)) < len(body):
+            start = int(m.group(1))
+            mark = os.environ.get("STOPRESUME_MARK")
+            if mark:
+                with open(mark, "a") as fp:
+                    fp.write("%d\n" % start)
+            self.send_response(206, "Partial Content")
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header(
+                "Content-Range", "bytes %d-%d/%d" % (start, len(body) - 1, len(body))
+            )
+            self.send_header("Content-Length", str(len(body) - start))
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body[start:])
+            return
+        if not Handler._stopresume_started and self.command != "HEAD":
+            Handler._stopresume_started = True
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Last-Modified", BIG_LASTMOD)
+            self.send_header("ETag", '"444"')
+            self.end_headers()
+            self.wfile.write(body[:4096])
+            self.wfile.flush()
+            try:
+                while True:
+                    time.sleep(3600)
+            except OSError:
+                pass
+            return
+        # A range-less re-get, or one asking past the end: the whole body.
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Accept-Ranges", "bytes")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
     # 206 resume must honor the server's Content-Range, not the offset we asked
     # for (#198): a server resuming a few bytes *before* the request must not
     # leave httrack duplicating the overlap onto the partial. flaky.bin
@@ -3533,6 +3590,8 @@ class Handler(SimpleHTTPRequestHandler):
         "/resume/blob.txt": route_resume,
         "/resume304/index.html": route_resume304_index,
         "/resume304/blob.bin": route_resume304,
+        "/stopresume/index.html": route_stopresume_index,
+        "/stopresume/blob.bin": route_stopresume,
         "/overlap/index.html": route_overlap_index,
         "/overlap/flaky.bin": route_overlap,
         "/overlap/full.bin": route_overlap_full,

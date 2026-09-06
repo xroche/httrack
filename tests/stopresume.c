@@ -13,25 +13,24 @@
 /* The tree builds with -fvisibility=hidden, which would hide the interposer. */
 #define SHIM_EXPORT __attribute__((visibility("default")))
 
-/* The engine's own httrackp, opaque here. */
-SHIM_EXPORT void *hts_create_opt(void);
-
 static void *stopresume_opt = NULL;
 
-/* Polls for the trigger rather than sleeping a fixed delay: the test decides
-   when the transfer is really in flight. Gives up so a missed trigger fails
-   the test rather than pinning a core. */
+/* Polls rather than sleeping a fixed delay, and gives up on STOPRESUME_TIMEOUT,
+   the test's own wait plus a margin, so a missed trigger cannot pin a core. */
 static void *stopresume_thread(void *unused) {
   int (*request_stop)(void *, int) = NULL;
   const char *const trigger = getenv("STOPRESUME_TRIGGER");
   const char *const keep = getenv("STOPRESUME_KEEP");
-  int left = 600;
+  const char *const budget = getenv("STOPRESUME_TIMEOUT");
+  int left;
 
   (void) unused;
   *(void **) &request_stop = dlsym(RTLD_DEFAULT, "hts_request_stop");
-  if (trigger == NULL || keep == NULL || request_stop == NULL) {
+  if (trigger == NULL || keep == NULL || budget == NULL ||
+      request_stop == NULL) {
     return NULL;
   }
+  left = atoi(budget) * 10;
   while (left-- > 0) {
     if (access(trigger, R_OK) == 0) {
       request_stop(stopresume_opt, atoi(keep));

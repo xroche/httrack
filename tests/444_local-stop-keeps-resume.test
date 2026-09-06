@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# A stop asked to keep the resume data must leave hts-cache/ref behind. The
-# partial bodies survive a stop already, and without the byte-range metadata in
-# that directory a later --continue cannot use them.
+# A stop asked to keep the resume data must leave hts-cache/ref behind, and a
+# later --continue must use it. The partial bodies survive a stop already, but
+# without the byte ranges in that directory the refetch starts from zero.
 
 set -euo pipefail
 
@@ -27,40 +27,49 @@ cleanup() {
 }
 cleanup_push cleanup
 
-local_server_start
+# Where the /stopresume/ route records the byte offset of each Range it serves.
+resumed_at="${tmpdir}/resumed"
+local_server_start --env STOPRESUME_MARK="$resumed_at"
 
 # An LD_PRELOAD library loads ahead of the executable's own libasan, which ASan
 # refuses by default. The shim allocates nothing, so the ordering is harmless.
 export ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}verify_asan_link_order=0"
 
+# How long a body may take to leave its first temp-ref. The shim waits this
+# plus a margin, so it cannot give up before the trigger is written.
+ref_wait_s=60
+
 # Crawl trickled bodies until a temp-ref names one, stop the run the way the
-# caller asks, and leave in refs_left what hts-cache/ref still holds. The wait
-# is what makes that count mean something: a run stopped before any partial
-# exists has no resume data to keep either way. Not a command substitution: the
-# subshell would run the EXIT trap and reap the server for the next case.
+# caller asks, and leave in refs_left what hts-cache/ref still holds, in
+# crawl_rc what the engine exited with. The wait is what makes that count mean
+# something: a run stopped before any partial exists has no resume data to keep
+# either way. Not a command substitution: the subshell would run the EXIT trap
+# and reap the server for the next case.
 refs_left=0
-stop_and_report() { # stop_and_report <name> keep|drop|maxtime
-    local name=$1 how=$2
+crawl_rc=0
+stop_and_report() { # stop_and_report <name> keep|drop|maxtime [route]
+    local name=$1 how=$2 route=${3:-trickle}
     local out="${tmpdir}/${name}" trigger="${tmpdir}/${name}.trigger"
     local refdir="${out}/hts-cache/ref" pre=(env) cap=(--max-time=0)
-    local waited
+    local _
 
     case $how in
     keep | drop)
         pre=(env "STOPRESUME_TRIGGER=${trigger}"
             "STOPRESUME_KEEP=$(test "$how" = keep && echo 1 || echo 0)"
+            "STOPRESUME_TIMEOUT=$((ref_wait_s + 30))"
             "LD_PRELOAD=${STOPRESUME_LIB}")
         ;;
     maxtime) cap=(--max-time=5) ;;
     esac
 
     mkdir -p "$out"
-    "${pre[@]}" httrack "${BASEURL}/trickle/index.html" -O "$out" --quiet \
+    "${pre[@]}" httrack "${BASEURL}/${route}/index.html" -O "$out" --quiet \
         --disable-security-limits --robots=0 --timeout=0 "${cap[@]}" -c2 \
         >"${out}.log" 2>&1 &
     crawlpid=$!
 
-    for waited in $(seq 1 600); do
+    for _ in $(seq 1 $((ref_wait_s * 10))); do
         test -n "$(find "$refdir" -name '*.ref' 2>/dev/null)" && break
         kill -0 "$crawlpid" 2>/dev/null || break
         poll_wait 0.1
@@ -72,14 +81,15 @@ stop_and_report() { # stop_and_report <name> keep|drop|maxtime
     keep | drop) : >"$trigger" ;;
     esac
 
-    for waited in $(seq 1 900); do
+    for _ in $(seq 1 900); do
         kill -0 "$crawlpid" 2>/dev/null || break
         poll_wait 0.2
     done
     if kill -0 "$crawlpid" 2>/dev/null; then
         fail "${name}: the crawl never ended after the stop"
     fi
-    wait "$crawlpid" 2>/dev/null || true
+    crawl_rc=0
+    wait "$crawlpid" 2>/dev/null || crawl_rc=$?
     crawlpid=
 
     # Guarded, not "2>/dev/null | wc -l": under pipefail the missing directory
@@ -102,6 +112,12 @@ assert_erased() { # assert_erased <name> <how> <why>
 
 printf '[a stop asked to keep the resume data keeps it] ..\t'
 assert_kept keep keep "hts-cache/ref was erased under a keep_resume stop"
+# The two below pin exit_xh at 1 rather than at any non-zero value: -1 would
+# exit non-zero, and 2 would keep the directory without the banner.
+test "$crawl_rc" -eq 0 ||
+    fail "the keep_resume stop exited ${crawl_rc}, expected 0"
+assert_logged "${tmpdir}/keep" 'MIRROR ABORTED' \
+    "the run did not record an interrupted mirror"
 echo "PASS"
 
 # The control: the same stop asked the other way still erases, so the arm above
@@ -115,3 +131,23 @@ echo "PASS"
 printf '[a --max-time cap still erases it] ..\t'
 assert_erased maxtime maxtime "hts-cache/ref survived the engine's own cap stop"
 echo "PASS"
+
+# What the kept directory is for. /stopresume/blob.bin stalls its first GET
+# after 4096 bytes and answers a Range with a 206, so the refetch either
+# resumes or restarts, and the test can tell which.
+printf '[a --continue resumes from where the stop left off] ..\t'
+full=8200 # len(STOPRESUME_BODY) = len("STOPRSM-") + 8192
+out="${tmpdir}/resume"
+stop_and_report resume keep stopresume
+test "$refs_left" -gt 0 || fail "hts-cache/ref was erased; nothing left to resume from"
+blob=$(find "$out" -name blob.bin | head -1)
+test -s "$blob" || fail "the stop left no partial body to resume"
+local_crawl --log "${tmpdir}/resume.log2" -O "$out" --quiet \
+    --disable-security-limits --robots=0 --timeout=30 -c1 --continue \
+    "${BASEURL}/stopresume/index.html" || fail "the --continue crawl failed"
+test -s "$resumed_at" || fail "the --continue sent no usable Range; it restarted the file"
+at=$(head -1 "$resumed_at")
+test "$at" -gt 0 || fail "the --continue asked for the file from byte 0"
+got=$(wc -c <"$blob")
+test "$got" -eq "$full" || fail "blob.bin is ${got} bytes, expected ${full}"
+echo "PASS (resumed at ${at} of ${full})"
