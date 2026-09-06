@@ -6,7 +6,7 @@
 
 # Windows runs the whole body once per PowerShell flavour, and every leg runs the
 # watchdog for a window of real seconds: 248s on three pinned cores at -j16, the
-# shape of the macOS runner. The retry below can add 240s more per flavour.
+# shape of the macOS runner. Three legs re-run at 30s on a short first sample.
 # TEST_TIMEOUT_AT_LEAST: 900
 
 set -euo pipefail
@@ -258,6 +258,7 @@ else
     # owns it, and an ordinary reformatting of the workflow must not move it.
     cat >"$tmp/wf.py" <<'PY'
 import re
+import copy
 import sys
 
 import yaml
@@ -288,6 +289,19 @@ for _run, _want in [("bash ./ci-windows-suite.sh $dir", True),
 
 def suite_steps(wf):
     return [s for s in steps_of(wf) if runs_suite(s)]
+
+# These three grade the LAST suite step, which one leg cannot be. With a single
+# step [-1] is [0], so they edit the step they compare against and emit an
+# unmutated workflow the audit rightly accepts. Add the second step they need,
+# under its own context, or every one of them also trips the shared-context rule
+# it is not testing.
+def second_suite_step(wf):
+    if len(suite_steps(wf)) < 2:
+        extra = copy.deepcopy(suite_steps(wf)[0])
+        extra["env"]["WATCHDOG_CONTEXT"] += " (second)"
+        suite_jobs(wf)[0]["steps"].append(extra)
+    return suite_steps(wf)[-1]
+
 
 def suite_jobs(wf):
     return [
@@ -370,12 +384,12 @@ def mutate(wf, kind):
     elif kind == "sha":
         suite_steps(wf)[0]["env"]["WATCHDOG_SHA"] = "${{ github.sha }}"
     elif kind == "lastenv":
-        suite_steps(wf)[-1]["env"]["WATCHDOG_TOKEN"] = "literal"
+        second_suite_step(wf)["env"]["WATCHDOG_TOKEN"] = "literal"
     elif kind == "sharedcontext":
-        suite_steps(wf)[-1]["env"]["WATCHDOG_CONTEXT"] = \
+        second_suite_step(wf)["env"]["WATCHDOG_CONTEXT"] = \
             suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"]
     elif kind == "lasttimeout":
-        suite_steps(wf)[-1].pop("timeout-minutes", None)
+        second_suite_step(wf).pop("timeout-minutes", None)
     elif kind == "context":
         suite_steps(wf)[0]["env"]["WATCHDOG_CONTEXT"] = "windows-suite"
     elif kind == "url":
@@ -455,6 +469,7 @@ fi
 test -z "$noexec_reason" || skip "$noexec_reason"
 
 psruns=()
+psdead=()
 for c in pwsh powershell.exe powershell; do
     command -v "$c" >/dev/null 2>&1 || continue
     # powershell and powershell.exe are one interpreter under two names.
@@ -462,11 +477,22 @@ for c in pwsh powershell.exe powershell; do
     for p in ${psruns[@]+"${psruns[@]}"}; do
         test "${p%.exe}" != "${c%.exe}" || seen=1
     done
-    test "$seen" -eq 1 || psruns+=("$c")
+    test "$seen" -eq 1 && continue
+    # On PATH is not the same as able to start. An interpreter that dies in its
+    # own startup leaves every leg with no output, which reads here as a mutant
+    # that asserted nothing, and blames the test for the machine.
+    if ! psprobe=$(run_with_timeout 30 "$c" -NoProfile -Command 'exit 0' 2>&1); then
+        psdead+=("$c: $(firstline "$psprobe")")
+        continue
+    fi
+    psruns+=("$c")
 done
 if test "${#psruns[@]}" -eq 0; then
-    echo "SKIP: no PowerShell here, the watchdog's own self-test cannot run"
-    exit 77
+    # Two different states, and only one of them is about this machine having no
+    # PowerShell: say which, or a broken interpreter reads as an absent one.
+    test "${#psdead[@]}" -eq 0 ||
+        skip "PowerShell is on PATH but will not start: ${psdead[*]}"
+    skip "no PowerShell here, the watchdog's own self-test cannot run"
 fi
 
 # Bounded: a mutant that loops forever would otherwise be caught only by the step
@@ -643,8 +669,23 @@ throttle_leg() {
     sink_stop
     calls=$(count_matching_lines . "$posts")
     lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
+    # A starved box spends the window on a handful of turns, and a 3-core runner
+    # under -j16 reached 2 ticks in 8s. Widen once, as the backoff leg does,
+    # rather than refusing to grade the starved sample.
+    if test "$lines" -lt 3; then
+        sink_start 201
+        run_posting 120 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30 >"$legout" 2>&1 || {
+            sink_stop
+            echo "the loop exited nonzero over 30s: $(<"$legout")"
+            return 1
+        }
+        sink_stop
+        calls=$(count_matching_lines . "$posts")
+        lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
+    fi
     test "$lines" -ge 3 || {
-        echo "$lines due ticks over 8s at a 1s interval: too few to judge a throttle"
+        echo "$lines due ticks over 30s at a 1s interval: the box is too starved to judge a throttle"
         return 1
     }
     test $((calls * 4)) -ge $((lines * 3)) || {
@@ -842,6 +883,17 @@ for psrun in "${psruns[@]}"; do
         -ProgressLog "$(nativepath "$tmp/no-such.log")" \
         -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 3) ||
         fail "the $psrun loop exited nonzero on a missing log: $out"
+    # Three seconds is the tightest window here, and a starved box spent all of
+    # it on one turn: zero status lines, which is not a wrong staticness but no
+    # answer at all. Widen once, as the throttle and backoff legs do.
+    if ! grep -q 't=[0-9]*s q=' <<<"$out"; then
+        out=$(run_wd 120 -File "$(nativepath "$wdscript")" \
+            -ProgressLog "$(nativepath "$tmp/no-such.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30) ||
+            fail "the $psrun loop exited nonzero on a missing log over 30s: $out"
+    fi
+    grep -q 't=[0-9]*s q=' <<<"$out" ||
+        fail "the $psrun loop posted no status in 30s: the box is too starved to judge a missing log"
     grep -q 'q=?s' <<<"$out" || fail "a missing log reported a staticness: $out"
 
     # The legs below read the sink, not the loop, and they exercise the script's
