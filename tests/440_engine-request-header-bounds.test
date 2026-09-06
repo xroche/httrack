@@ -1,0 +1,80 @@
+#!/bin/bash
+#
+# http_sendhead sums the request path, the referer, the cookies, the
+# credentials and the extra-headers box into one 16 KB buffer, and nothing
+# bounds that sum. A full box aborted the crawler mid-request.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+python=$(find_python) || skip "python3 missing"
+
+server=$(nativepath "$top_srcdir/tests/header-injection-server.py")
+tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/httrack_reqhdr.XXXXXX") || exit 1
+wire=$tmpdir/wire
+serverpid=
+
+cleanup() {
+    stop_server "$serverpid"
+    rm -rf "$tmpdir"
+}
+cleanup_push cleanup
+
+"$python" "$server" "$(nativepath "$wire")" >"$tmpdir/server.out" \
+    2>"$tmpdir/server.err" &
+serverpid=$!
+port=$(discover_server_port "$tmpdir/server.out" "$serverpid") || exit 1
+
+# htscoremain refuses an argv of HTS_CDLMAXSIZE, so the box is filled a line at
+# a time; twenty of these pass 16384, one does not.
+pad=$(printf '%0.sp' $(seq 990))
+fit=(-%X "X-Pad0: $pad")
+big=()
+for i in $(seq 0 19); do
+    big+=(-%X "X-Pad$i: $pad")
+done
+
+requests() {
+    local n=0 f
+    for f in "$wire".*; do
+        test ! -e "$f" || n=$((n + 1))
+    done
+    printf '%s\n' "$n"
+}
+
+crawl() { # crawl TAG [args...]
+    local tag=$1 rc=0
+    shift
+    run_with_timeout 90 httrack "http://127.0.0.1:$port/plain.html" \
+        -O "$tmpdir/$tag" -c1 --robots=0 --retries=0 --quiet -%v0 \
+        "$@" >>"$tmpdir/$tag.out" 2>&1 || rc=$?
+    # 134 is the abort this test is about; name it rather than "not zero"
+    test "$rc" -ne 134 || fail "$tag: the crawl aborted"
+    test "$rc" -eq 0 || fail "$tag: the crawl exited $rc"
+}
+
+printf '[a box that fits reaches the wire] ..\t'
+crawl fits "${fit[@]}"
+sent=$(requests)
+test "$sent" -ge 1 || fail "no request reached the server"
+grep -q "^X-Pad0: $pad" "$wire.$sent" ||
+    fail "the box line is missing from the request"
+! grep -q 'Request header too large' "$tmpdir/fits/hts-log.txt" ||
+    fail "a request that fits was refused"
+test -s "$tmpdir/fits/127.0.0.1_$port/plain.html" || fail "nothing was mirrored"
+echo OK
+
+printf '[an over-long box refuses instead of aborting] ..\t'
+before=$(requests)
+crawl over "${big[@]}"
+grep -q 'Request header too large' "$tmpdir/over/hts-log.txt" ||
+    fail "no refusal in $(cat "$tmpdir/over/hts-log.txt")"
+echo OK
+
+# A clipped request is not the one the crawl meant to make, so the refusal has
+# to happen before the socket, not after it.
+printf '[nothing is sent once it does not fit] ..\t'
+assert_eq "$before" "$(requests)" "requests reaching the server"
+echo OK
