@@ -648,8 +648,21 @@ throttle_leg() {
     }
 }
 
+# Calls a healthy backoff owes in $1 due ticks: it skips 1, then 2, 4, 8, 16,
+# doubling to a cap of 32, so its c-th call lands on tick 1, 3, 6, 11, 20, 37.
+backoff_calls_due() {
+    local due=1 skip=1 n=0
+    while test "$due" -le "$1"; do
+        n=$((n + 1))
+        due=$((due + skip + 1))
+        skip=$((skip * 2))
+        test "$skip" -le 32 || skip=32
+    done
+    echo "$n"
+}
+
 backoff_leg() {
-    local calls lines
+    local calls lines want
     sink_start 403
     printf 'RUN 36_local-bigcrawl.test at 41s\n' >"$tmp/progress.log"
     run_posting 60 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
@@ -661,13 +674,29 @@ backoff_leg() {
     sink_stop
     calls=$(count_matching_lines . "$posts")
     lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
-    test "$calls" -ge 2 || {
-        echo "a rejecting API was called $calls times: the loop stopped trying"
+    # A starved box spends the window on a handful of turns, and at six ticks or
+    # fewer a doubling backoff and a flat one owe the same calls. Widen, don't
+    # grade. Six still admits that one tie, and the counts separate from seven.
+    if test "$lines" -lt 6; then
+        sink_start 403
+        run_posting 120 -File "$1" -ProgressLog "$(nativepath "$tmp/progress.log")" \
+            -IntervalSeconds 1 -PollSeconds 1 -MaxSeconds 30 >"$legout" 2>&1 || {
+            sink_stop
+            echo "the loop exited nonzero over 30s: $(<"$legout")"
+            return 1
+        }
+        sink_stop
+        calls=$(count_matching_lines . "$posts")
+        lines=$(count_matching_lines 't=[0-9]*s q=' "$legout")
+    fi
+    test "$lines" -ge 6 || {
+        echo "$lines due ticks over 30s at a 1s interval: too few to judge a backoff"
         return 1
     }
-    # One diagnosis for both: which one trips first depends on box speed. The
-    # backoff must thin the calls, not the log; a token-less run leaves only the log.
-    if test "$calls" -gt 5 || test "$lines" -lt $((2 * calls)); then
+    # Graded against the ticks that happened, so starvation shrinks both counts
+    # together: a loop that gives up posts fewer, one that never skips posts more.
+    want=$(backoff_calls_due "$lines")
+    if test "$calls" -ne "$want"; then
         echo "$calls calls and $lines log lines against an API rejecting every one: nothing backs off"
         return 1
     fi
