@@ -125,7 +125,9 @@ glob_contains() {
     grep -qF -- "$pattern" "$@"
 }
 coucal_names_gcc() {
-    grep -v '^[[:space:]]*#' "$top/src/coucal/Makefile" | grep -qw gcc
+    local live
+    live=$(grep -v '^[[:space:]]*#' "$top/src/coucal/Makefile")
+    grep -qw gcc <<<"$live"
 }
 
 # The Termux patches target generated files, so a checkout that skipped
