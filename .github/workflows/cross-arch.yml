@@ -4,9 +4,9 @@
 # first thing to see the code.
 name: Cross-arch
 
-# Not a required check and compile-only, so it rides master rather than every
-# pull request: nine jobs there delay the last job of every other run, and a
-# ports-only break costs a fix-forward rather than a bad release.
+# Not required and compile-only, so it rides master rather than every pull
+# request. Nine jobs here delay the last job of every other run. A ports-only
+# break costs a fix-forward, not a bad release.
 on:
   push:
     branches: [master]

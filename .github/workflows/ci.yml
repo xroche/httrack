@@ -236,7 +236,7 @@ jobs:
   # riscv64, when 25.10 made uutils the default coreutils (#1042).
   ubuntu-devel:
     name: build (Ubuntu devel, uutils coreutils)
-    # Off pull requests to shorten the queue: a rolling third-party image, so its failures track Ubuntu, not the diff.
+    # Skipped on pull requests. A rolling third-party image tracks Ubuntu, not the diff.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     container: ubuntu:devel
@@ -380,7 +380,7 @@ jobs:
   # job alone left that untested on Linux.
   webhttrack-linux:
     name: webhttrack smoke (Linux x86-64)
-    # Off pull requests to shorten the queue: the required macOS smoke covers the launcher; this is the cheap duplicate.
+    # Skipped on pull requests, since the required macOS smoke already covers the launcher.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     steps:
@@ -729,7 +729,7 @@ jobs:
   # sancov hooks the instrumentation calls, hiding a program left without one.
   fuzz-no-sanitizer:
     name: build (fuzzers, no sanitizer runtime, clang)
-    # Off pull requests to shorten the queue: compile-only, and the fuzzers build again on every master push.
+    # Skipped on pull requests. Compile-only, and every master push rebuilds the fuzzers.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     steps:
@@ -946,7 +946,7 @@ jobs:
   # day a distro moves. Compile-only, since the headers are what is under test.
   openssl-no-deprecated:
     name: build (OpenSSL, no deprecated API)
-    # Off pull requests to shorten the queue: compile-only, and the API it pins moves on OpenSSL’s clock.
+    # Skipped on pull requests. Compile-only, and the API it pins moves on OpenSSL's clock.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     steps:
