@@ -1984,10 +1984,6 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_html('\t<a href="blob.bin">blob</a>')
 
     def route_stopresume(self):
-        counter = os.environ.get("STOPRESUME_COUNTER")
-        if counter:
-            with open(counter, "a") as fp:
-                fp.write("x")
         body = self.STOPRESUME_BODY
         m = re.match(r"bytes=(\d+)-", self.headers.get("Range", "") or "")
         if m and int(m.group(1)) < len(body):
