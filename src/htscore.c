@@ -263,7 +263,7 @@ static size_t hts_record_link_alloc(httrackp *opt) {
 
   // Add new lien_url pointer to the array of links, plus the guard NULL
   TypedArrayEnsureRoom(liensbuf->ptr, 2);
-  if (TypedArrayFailed(liensbuf->ptr)) {
+  if (!TypedArrayHasRoom(liensbuf->ptr, 2)) {
     return (size_t) -1;
   }
   TypedArrayAdd(liensbuf->ptr, link);

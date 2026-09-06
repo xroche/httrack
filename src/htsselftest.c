@@ -2302,10 +2302,11 @@ static int st_arrays(httrackp *opt, int argc, char **argv) {
     TypedArrayAppend(a, "kept", 4);
     room = (size_t) -1 - TypedArraySize(a);
     TypedArrayEnsureRoom(a, room);
-    if (!TypedArrayFailed(a))
+    if (TypedArrayHasRoom(a, room))
       err = 1;
-    /* Sticky, and the bytes already there survive the failure. */
-    TypedArrayAppend(a, "lost", 4);
+    /* The bytes already there survive, and the append that cannot fit is a
+       no-op rather than a smash. */
+    TypedArrayAppend(a, "lost", room);
     if (TypedArraySize(a) != 4 || memcmp(TypedArrayElts(a), "kept", 4) != 0)
       err = 1;
     printf("arrays: growth failure %s\n", err ? "FAIL" : "OK");

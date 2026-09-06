@@ -67,32 +67,46 @@ Please visit our Website: http://www.httrack.com
 // arrays
 #include "htsarrays.h"
 
+/* clang-format off: an edit realigns all backslashes, churning the macro. */
+/* clang-format off */
+/** Append 'COUNT' bytes from 'PTR', latching output_oom if the buffer cannot
+    grow to hold them. **/
+#define HT_ADD_N(PTR, COUNT) do { \
+  const size_t want_ = (COUNT); \
+  TypedArrayEnsureRoom(output_buffer, want_); \
+  if (TypedArrayHasRoom(output_buffer, want_)) { \
+    TypedArrayAppend(output_buffer, (PTR), want_); \
+  } else { \
+    output_oom = HTS_TRUE; \
+  } \
+} while(0)
+
 /** Append bytes to the output buffer up to the pointer 'html'. **/
 #define HT_add_adr do { \
   if ( (opt->getmode & 1) != 0 && ptr > 0 ) { \
     const size_t sz_ = html - lastsaved; \
     if (sz_ != 0) { \
-      TypedArrayAppend(output_buffer, lastsaved, sz_); \
+      HT_ADD_N(lastsaved, sz_); \
       lastsaved = html; \
     } \
   } \
 } while(0)
 
 /** Append to the output buffer the string 'A'. **/
-#define HT_ADD(A) TypedArrayAppend(output_buffer, A, strlen(A))
+#define HT_ADD(A) HT_ADD_N(A, strlen(A))
 
-/* clang-format off: an edit realigns all backslashes, churning the macro. */
-/* clang-format off */
 /** Append 'A' to the output buffer, html-escaped; FACTOR = max byte expansion. **/
 #define HT_ADD_HTMLESCAPED_ANY(A, FUNCTION, FACTOR) do { \
   if ((opt->getmode & 1) != 0 && ptr>0) { \
     const char *const str_ = (A); \
-    size_t size_; \
-    TypedArrayEnsureRoom(output_buffer, strlen(str_) * (FACTOR) + 1024); \
-    if (!TypedArrayFailed(output_buffer)) { \
-      size_ = FUNCTION(str_, &TypedArrayTail(output_buffer), \
-                       TypedArrayRoom(output_buffer)); \
-      TypedArraySize(output_buffer) += size_; \
+    const size_t want_ = strlen(str_) * (FACTOR) + 1024; \
+    TypedArrayEnsureRoom(output_buffer, want_); \
+    if (TypedArrayHasRoom(output_buffer, want_)) { \
+      TypedArraySize(output_buffer) += \
+        FUNCTION(str_, &TypedArrayTail(output_buffer), \
+                 TypedArrayRoom(output_buffer)); \
+    } else { \
+      output_oom = HTS_TRUE; \
     } \
   } \
 } while(0)
@@ -441,6 +455,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
     if (!error) {
       // output HTML
       TypedArray(char) output_buffer = EMPTY_TYPED_ARRAY;
+      /* Latched by the HT_ADD_* macros when output_buffer cannot grow. */
+      hts_boolean output_oom = HTS_FALSE;
 
       time_t user_interact_timestamp = 0;
       int detect_title = 0;     // détection  du title
@@ -3451,7 +3467,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
         /* The rewritten page outgrew what we can allocate, so end the parse
            here and fail the page rather than the crawl. */
-        if (TypedArrayFailed(output_buffer)) {
+        if (output_oom) {
           html = r->adr + r->size;
         }
 
@@ -3496,7 +3512,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       opt->state._hts_cancel = 0;       // pas de cancel
 
       if ((opt->getmode & HTS_GETMODE_HTML) && (ptr > 0)) {
-        if (!TypedArrayFailed(output_buffer)) {
+        if (!output_oom) {
           char *cAddr = TypedArrayElts(output_buffer);
           int cSize = (int) TypedArraySize(output_buffer);
 
@@ -3512,7 +3528,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                the block out from under cAddr. */
             if (cAddr != TypedArrayElts(output_buffer)) {
               TypedArraySize(output_buffer) = 0;
-              TypedArrayAppend(output_buffer, cAddr, cSize);
+              HT_ADD_N(cAddr, (size_t) cSize);
             } else {
               TypedArraySize(output_buffer) = (size_t) cSize;
             }
@@ -3520,7 +3536,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
         }
 
         /* Flush and save to disk */
-        if (TypedArrayFailed(output_buffer)) {
+        if (output_oom) {
           hts_log_print(opt, LOG_ERROR,
                         "Not enough memory to rewrite %s%s, page skipped",
                         urladr(), urlfil());
