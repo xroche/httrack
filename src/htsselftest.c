@@ -13561,21 +13561,26 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   st_urlbounds_path(fil, wzfits + 1);
   assertf(hts_testlinksize(opt, adr, fil, 1) == -1);
 
-  /* bauth_prefix(): the key it keeps fills its buffer to the last byte */
-  st_urlbounds_path(fil, bafits);
-  assertf(bauth_prefix(prefix, adr, fil) == prefix);
-  assertf(strlen(prefix) == HTS_URLMAXSIZE * 2 - 1);
-  st_urlbounds_path(fil, bafits + 1);
-  assertf(bauth_prefix(prefix, adr, fil) == NULL);
-  assertf(bauth_check(cookie, adr, fil) == NULL);
-  assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 0);
-
-  /* control: an ordinary URL is still keyed, stored and matched */
+  /* An ordinary URL is still keyed, stored and matched. It goes first so the
+     refused lookups below actually read the key: against an empty jar
+     bauth_check() never touches it, and a missing NULL guard would show. */
   strcpybuff(fil, "/secure/page.html?a=b");
   assertf(bauth_prefix(prefix, adr, fil) == prefix);
   assertf(strcmp(prefix, "www.example.com/secure/") == 0);
   assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 1);
   assertf(bauth_check(cookie, adr, fil) != NULL);
+
+  /* bauth_prefix(): the key it keeps fills its buffer to the last byte, and
+     #1561's guard then refuses to store a key wider than bauth_chain */
+  st_urlbounds_path(fil, bafits);
+  assertf(bauth_prefix(prefix, adr, fil) == prefix);
+  assertf(strlen(prefix) == HTS_URLMAXSIZE * 2 - 1);
+  assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 0);
+  /* one byte more: no key at all, and both callers survive the NULL */
+  st_urlbounds_path(fil, bafits + 1);
+  assertf(bauth_prefix(prefix, adr, fil) == NULL);
+  assertf(bauth_check(cookie, adr, fil) == NULL);
+  assertf(bauth_add(cookie, adr, fil, "dXNlcjpwYXNz") == 0);
 
   /* hts_acceptlink_()'s wizard arm builds the same pair. A primary link (ptr
      0) resolves without asking the front end, so the verdict is the guard's:
@@ -13594,6 +13599,22 @@ static int st_urlbounds(httrackp *opt, int argc, char **argv) {
   filptr = 0; /* the primary link left its own filters */
   st_urlbounds_path(fil, wzfits + 1);
   assertf(hts_acceptlink(opt, 0, adr, fil, NULL, NULL, &prio, NULL) == 1);
+
+  /* #1561 bounds ident_url_relatif(), not ident_url_absolute(), which still
+     takes a scheme-less URL of HTS_URLMAXSIZE*2 - 1 bytes and splits off a
+     path past the wizard's limit. These bounds are defence in depth, not
+     dead code, and this case fails the day that stops being true. */
+  {
+    lien_adrfil af;
+    char BIGSTK url[HTS_URLMAXSIZE * 2];
+
+    memset(url, 'a', sizeof(url) - 1);
+    memcpy(url, "h.test/", 7);
+    url[sizeof(url) - 1] = '\0';
+    assertf(ident_url_absolute(url, &af) >= 0);
+    assertf(strcmp(af.adr, "h.test") == 0);
+    assertf(hts_testlinksize(opt, af.adr, af.fil, 1) == -1);
+  }
 
   opt->log = savedlog;
   opt->liens = savedliens;
