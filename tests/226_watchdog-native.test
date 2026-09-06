@@ -6,7 +6,7 @@
 
 # Windows runs the whole body once per PowerShell flavour, and every leg runs the
 # watchdog for a window of real seconds: 248s on three pinned cores at -j16, the
-# shape of the macOS runner. The retry below can add 240s more per flavour.
+# shape of the macOS runner. Three legs re-run at 30s on a short first sample.
 # TEST_TIMEOUT_AT_LEAST: 900
 
 set -euo pipefail
