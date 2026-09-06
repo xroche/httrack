@@ -166,18 +166,29 @@ echo OK
 
 # One byte apart, so the guard cannot drift without one of the two firing. The
 # refusal names the link as it arrived, before conversion, which is what tells
-# the two fixtures apart.
+# the two fixtures apart. Each run has to end where its log LINE ends, and that
+# line ends with CRLF on Windows, so the run is read off the split line rather
+# than matched up to a "\n".
 printf '[the threshold sits between 2031 and 2032] ..\t'
 "$python" - "$(nativepath "${out}/hts-log.txt")" <<'PY' || fail "the conversion guard moved"
+import re
 import sys
 
-log = open(sys.argv[1], "rb").read()
 tag = b"Link is too long after charset conversion: "
 run = b"\x80" * 677
-if tag + run + b"\n" in log:
+refused = set()
+for line in re.split(b"\r\n|\n|\r", open(sys.argv[1], "rb").read()):
+    i = line.find(tag)
+    if i >= 0:
+        refused.add(line[i + len(tag):])
+# Without this, a log that lost the message passes both tests below.
+if not refused:
+    sys.stderr.write("no refusal to read the threshold off\n")
+    sys.exit(1)
+if run in refused:
     sys.stderr.write("2031 was refused: the guard is a byte too tight\n")
     sys.exit(1)
-if tag + b"a" + run + b"\n" not in log:
+if b"a" + run not in refused:
     sys.stderr.write("2032 was accepted: the guard is a byte too loose\n")
     sys.exit(1)
 PY
