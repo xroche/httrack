@@ -130,9 +130,10 @@ HTSEXT_API T_SOC catch_url_init(int *port, /* 128 bytes */ char *adr) {
 }
 
 /* Accumulate the request headers into "data" (CATCH_URL_DATA_SIZE bytes, on
-   entry holding the request line) and feed them to treathead(). HTS_FALSE if
-   the block did not fit: a clipped header block is not the request the browser
-   sent, so the caller drops the capture rather than replay a prefix. */
+   entry holding the request line) and feed them to treathead(). HTS_FALSE if a
+   line or the whole block did not fit: a clipped header block is not the
+   request the browser sent, so the caller drops the capture rather than replay
+   a prefix. Every iteration charges "used", which is what ends the loop. */
 static hts_boolean catch_url_headers(T_SOC soc, char *data, htsblk *blkretour) {
   char line[1000];
   size_t used = strlen(data); /* invariant: used < CATCH_URL_DATA_SIZE */
@@ -140,10 +141,11 @@ static hts_boolean catch_url_headers(T_SOC soc, char *data, htsblk *blkretour) {
   do {
     size_t need;
 
-    /* a clipped header is not the one the browser sent: dropping it
-       beats replaying a prefix */
+    /* a line socinput() had to clip is not the header the browser sent, and
+       skipping one charges "used" nothing: a peer sending only such lines
+       would hold this loop open for free */
     if (socinput(soc, line, (int) sizeof(line)))
-      continue;
+      return HTS_FALSE;
     treathead(NULL, NULL, NULL, blkretour, line); // traiter
     need = strlen(line) + 2;                      // the CRLF this line carries
     if (need >= CATCH_URL_DATA_SIZE - used)
