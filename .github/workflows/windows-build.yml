@@ -373,7 +373,9 @@ jobs:
           # takes SIGPIPE, and pipefail would red a step whose distro was there.
           distros=$(wsl -l -q | tr -d '\0\r')
           grep -qx httrack-suite <<<"$distros" || {
-            echo "::error::no httrack-suite distro: the Bring up WSL2 step did not finish"
+            # One annotation is one line: a newline would drop all but the first.
+            seen=${distros//$'\n'/ }
+            echo "::error::no httrack-suite distro (wsl -l -q gave: ${seen:-(none)}): the Bring up WSL2 step did not finish"
             exit 1
           }
           export HTS_WS="$ws"
