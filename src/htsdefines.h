@@ -111,17 +111,23 @@ typedef int (*t_hts_htmlcheck_end)(t_hts_callbackarg *carg, httrackp *opt);
 typedef int (*t_hts_htmlcheck_chopt)(t_hts_callbackarg *carg, httrackp *opt);
 
 /* Rewrite hook over an in-memory page: the html and len arguments point at the
-   buffer and its length (the callback may reallocate and resize it),
-   url_adresse and url_fichier name it. */
+   buffer and its length, url_adresse and url_fichier name it. What the callback
+   may do with that buffer differs per hook, see the two aliases below. */
 typedef int (*t_hts_htmlcheck_process)(t_hts_callbackarg *carg, httrackp *opt,
                                        char **html, int *len,
                                        const char *url_adresse,
                                        const char *url_fichier);
 
-/* Same shape as process, run before HTML parsing. */
+/* Run before HTML parsing, over a NUL-terminated buffer. The engine adopts
+   whatever address comes back and frees it, so return heap memory from
+   hts_malloc()/hts_realloc()/hts_strdup(), and hts_free() the buffer you were
+   given unless you reallocated it. */
 typedef t_hts_htmlcheck_process t_hts_htmlcheck_preprocess;
 
-/* Same shape as process, run after HTML parsing. */
+/* Run after HTML parsing, over len bytes with no terminator. The engine keeps
+   this buffer and frees nothing, so never free or realloc it. Either edit it
+   where it is and return an address inside it, shrinking or keeping the length,
+   or return a scratch buffer of your own that you reuse for every page. */
 typedef t_hts_htmlcheck_process t_hts_htmlcheck_postprocess;
 
 /* Inspect a page (read-only html/len) without rewriting it. */

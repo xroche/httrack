@@ -81,6 +81,17 @@ Please visit our Website: http://www.httrack.com
   } \
 } while(0)
 
+/** Set the output buffer's size, latching output_oom rather than claiming
+    bytes it never had room for. **/
+#define HT_SET_SIZE(N) do { \
+  const size_t size_ = (N); \
+  if (size_ <= TypedArrayCapa(output_buffer)) { \
+    TypedArraySize(output_buffer) = size_; \
+  } else { \
+    output_oom = HTS_TRUE; \
+  } \
+} while(0)
+
 /** Append bytes to the output buffer up to the pointer 'html'. **/
 #define HT_add_adr do { \
   if ( (opt->getmode & 1) != 0 && ptr > 0 ) { \
@@ -473,6 +484,7 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
       int intag = 0;            // on est dans un tag
       int incomment = 0;        // dans un <!--
       int inscript = 0;         // dans un scipt pour applets javascript)
+      int incss = 0;            /* CSS lets url(x) go unquoted */
       int inscript_locked = 0;  // in locked script (ie. js file)
       signed char inscript_state[INSCRIPT_NSTATES][257];
       INSCRIPT inscript_state_pos = INSCRIPT_START;
@@ -546,6 +558,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                (compare_mime(opt, r->contenttype, str->url_file, "text/css") !=
                 0)) { /* JavaScript js file */
         inscript = 1;
+        incss =
+            (compare_mime(opt, r->contenttype, str->url_file, "text/css") != 0);
         inscript_locked = 1;    /* Don't exit js space upon </script> */
         if (opt->parsedebug) {
           HT_ADD("<@@ inscript @@>");
@@ -956,10 +970,13 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
               // ** while(is_realspace(*(--a)));
               if (*a == '<') {  // sûr que c'est un tag?
-                if (check_tag(intag_start, "script"))
+                if (check_tag(intag_start, "script")) {
                   inscript_name = "script";
-                else
+                  incss = 0;
+                } else {
                   inscript_name = "style";
+                  incss = 1;
+                }
                 inscript = 1;
                 inscript_state_pos = INSCRIPT_START;
                 intag = 1;      // because après <script> on y est .. - pas utile
@@ -1261,10 +1278,14 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                     if (p == 0 && !inscript     /* we don't want events inside document.write */
                       ) {
                       int i = 0;
+                      int is_style_attr = 0;
 
                       /* détection onLoad etc */
                       while((p == 0) && (strnotempty(hts_detect_js[i]))) {
                         p = rech_tageq(html, hts_detect_js[i]);
+                        if (p != 0)
+                          is_style_attr =
+                              (strfield2(hts_detect_js[i], "style") != 0);
                         i++;
                       }
                       /* non détecté - détecter également les onXxxxx= */
@@ -1293,6 +1314,8 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                            On est désormais dans du code javascript
                          */
                         inscript_name = "";
+                        /* Only style= means CSS in hts_detect_js[]. */
+                        incss = is_style_attr;
                         inscript = inscript_tag = 1;
                         inscript_state_pos = INSCRIPT_START;
                         if (opt->parsedebug) {
@@ -1501,7 +1524,10 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                           html_prevc(html, r->adr) != '_') { // url(url)
                         expected = '('; // parenthèse
                         expected_end = ")";     // fin: parenthèse
-                        can_avoid_quotes = 1;
+                        /* CSS writes url(foo.png) unquoted, but JavaScript's
+                           new URL(x) matches the same token, so an unquoted
+                           operand there rewrites the expression itself. */
+                        can_avoid_quotes = incss;
                         quotes_replacement = ')';
                       }
                       if (!nc)
@@ -1938,6 +1964,9 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
                    On est désormais dans du code javascript
                  */
                 inscript_name = "";
+                /* A javascript: URL is JavaScript, whatever an earlier
+                   <style> left in incss. */
+                incss = 0;
                 inscript_tag = inscript = 1;
                 inscript_state_pos = INSCRIPT_START;
                 inscript_tag_lastc = quote;     /* à attendre à la fin */
@@ -2714,6 +2743,12 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
 
                     // écrire lien
                     if ((p_type == 2) || (p_type == -2)) {      // base href ou codebase, sauter
+                      /* An emptied base href leaves <base >, which means "no
+                         base" and stops a framework that requires one (Angular
+                         throws). An empty href keeps the document itself as the
+                         base, so every reference resolves as it did. */
+                      if (p_type == 2)
+                        HT_ADD("href=\"\"");
                       lastsaved = eadr - 1 + 1; // sauter "
                     }
                     /* */
@@ -3547,16 +3582,28 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
           if (RUN_CALLBACK4(opt, postprocess, &cAddr, &cSize, urladr(), urlfil()) == 1) {
             hts_log_print(opt, LOG_DEBUG,
               "engine: postprocess-html: callback modified data, applying %d bytes", cSize);
-            /* The callback either edits output_buffer in place (cAddr
-               unchanged) or hands back its own buffer (cAddr changed). Only
-               the latter needs a copy: re-appending output_buffer onto itself
-               would read freed memory, as the append's realloc can relocate
-               the block out from under cAddr. */
-            if (cAddr != TypedArrayElts(output_buffer)) {
-              TypedArraySize(output_buffer) = 0;
-              HT_ADD_N(cAddr, (size_t) cSize);
+            /* A reply pointing anywhere into output_buffer edited it in
+               place and is moved down. Appending it onto itself instead would
+               memcpy overlapping bytes, after an EnsureRoom whose realloc can
+               relocate the block out from under cAddr. */
+            if (!hts_postprocess_reply_ok(cAddr, cSize,
+                                          TypedArrayElts(output_buffer),
+                                          TypedArraySize(output_buffer),
+                                          TypedArrayCapa(output_buffer))) {
+              hts_log_print(opt, LOG_ERROR,
+                            "engine: postprocess-html: callback returned %d "
+                            "bytes for %s%s, page skipped",
+                            cSize, urladr(), urlfil());
+              HT_SET_SIZE(0);
+              error = 1;
+            } else if (hts_postprocess_reply_inplace(
+                           cAddr, TypedArrayElts(output_buffer),
+                           TypedArrayCapa(output_buffer))) {
+              memmove(TypedArrayElts(output_buffer), cAddr, (size_t) cSize);
+              HT_SET_SIZE((size_t) cSize);
             } else {
-              TypedArraySize(output_buffer) = (size_t) cSize;
+              HT_SET_SIZE(0);
+              HT_ADD_N(cAddr, (size_t) cSize);
             }
           }
         }
@@ -3593,6 +3640,30 @@ int htsparse(htsmoduleStruct * str, htsmoduleStructExtended * stre) {
   ENGINE_SAVE_CONTEXT();
 
   return 0;
+}
+
+/* Contract in htsparse.h. */
+hts_boolean hts_postprocess_reply_inplace(const char *html, const char *buffer,
+                                          size_t capa) {
+  /* through uintptr_t: comparing pointers into unrelated objects is not
+     defined, and the callback's buffer is one */
+  const uintptr_t at = (uintptr_t) html, base = (uintptr_t) buffer;
+
+  return buffer != NULL && at >= base && at - base < capa;
+}
+
+/* Contract in htsparse.h. */
+hts_boolean hts_postprocess_reply_ok(const char *html, int len,
+                                     const char *buffer, size_t size,
+                                     size_t capa) {
+  if (len < 0 || html == NULL)
+    return HTS_FALSE;
+  if (hts_postprocess_reply_inplace(html, buffer, capa)) {
+    const size_t at = (size_t) (html - buffer);
+
+    return at <= size && (size_t) len <= size - at;
+  }
+  return HTS_TRUE;
 }
 
 /* Mirror the savename to tell whether a redirect saves to the same file (#159);

@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# htsparse spots a CSS url(...) by matching the token "url" before a "(" and
+# accepts an unquoted operand, because CSS is written that way. JavaScript's
+# new URL(x) matches the same token, so the operand was taken for a link and
+# rewritten, and a bundle whose new URL(e) became new URL(https://host/e) stops
+# parsing at the "//".
+#
+# The contract: inside a script an unquoted operand is an expression and must
+# survive untouched; in CSS it is a URL and must still be rewritten. Every place
+# the parser decides which of the two it is has a case here, because a fix that
+# keys on "inside a script" alone drops the CSS ones: htsparse sets that flag
+# for text/css documents too.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+work=$(mktemp -d)
+cleanup_push rm -rf "$work"
+root="$work/root"
+mkdir -p "$root"
+
+# One page carrying every context the parser decides between. The style=
+# attribute comes first, so it is the first CSS the parser meets and the <style>
+# block cannot cover for it. Each JavaScript context then follows a <style>
+# block of its own, so each one has to clear the "this is CSS" state itself and
+# none of them can ride on a neighbour having cleared it.
+cat >"$root/index.html" <<'EOF'
+<!DOCTYPE html><html><head>
+<link rel="stylesheet" href="sheet.css">
+</head><body>
+<div style="background:url(attr.png)">x</div>
+<style>body { background: url(inline.png); }</style>
+<script>var inlined = new URL(bare).href;</script>
+<style>p { background: url(two.png); }</style>
+<button onclick="go(new URL(evt).href)">b</button>
+<style>i { background: url(three.png); }</style>
+<a href="javascript:new URL(later).href">l</a>
+<script src="script.js"></script>
+</body></html>
+EOF
+
+# Operands a URL-shaped guess would still mangle: a bare name, a dotted
+# expression, and one carrying a slash.
+cat >"$root/script.js" <<'EOF'
+function f(e) { return new URL(e).href; }
+var here = new URL(location.href).href;
+var ratio = new URL(width/height).href;
+EOF
+
+printf 'div { background: url(sheet.png); }\n' >"$root/sheet.css"
+for img in inline attr sheet two three; do
+    printf '\211PNG\r\n\032\n' >"$root/$img.png"
+done
+
+bash "$top_srcdir/tests/local-crawl.sh" --root "$root" \
+    --errors 0 \
+    --found script.js --found sheet.css \
+    --found inline.png --found attr.png --found sheet.png \
+    --found two.png --found three.png \
+    --file-matches script.js 'new URL\(e\)' \
+    --file-matches script.js 'new URL\(location\.href\)' \
+    --file-matches script.js 'new URL\(width/height\)' \
+    --file-matches index.html 'onclick="go\(new URL\(evt\)' \
+    --file-matches index.html 'new URL\(bare\)' \
+    --file-matches index.html 'javascript:new URL\(later\)' \
+    httrack BASEURL/index.html -q -%v0 -r3

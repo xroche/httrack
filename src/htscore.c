@@ -1068,18 +1068,20 @@ int httpmirror(char *url1, httrackp *opt, hts_boolean *completed_out) {
 
   // backing
   if (opt->maxsoc > 0) {
+    /* How many HTML files may sit in memory at once. Sized generously: HTML
+       takes little room and everything else is written straight to disk. */
+    const int back_max = opt->maxsoc * 32 + 1024;
+
 #if BDEBUG==2
     _CLRSCR;
 #endif
-    // Nombre de fichiers HTML pouvant être présents en mémoire de manière simultannée
-    // On prévoit large: les fichiers HTML ne prennent que peu de place en mémoire, et les
-    // fichiers non html sont sauvés en direct sur disque.
-    // --> 1024 entrées + 32 entrées par socket en supplément
-    sback = back_new(opt, opt->maxsoc * 32 + 1024);
+    sback = back_new(opt, back_max);
     if (sback == NULL) {
       hts_log_print(opt, LOG_PANIC,
-                    "Not enough memory, can not allocate %d bytes",
-                    (int) ((opt->maxsoc + 1) * sizeof(lien_back)));
+                    "Not enough memory, can not allocate %d backing slots",
+                    back_max);
+      freet(primary);
+      XH_extuninit;
       return 0;
     }
   }

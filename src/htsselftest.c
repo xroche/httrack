@@ -3399,18 +3399,20 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
   char *req, *tmp, *headers;
   const char *appended;
   size_t i, reqlen, blocklen;
+  /* Only an exact capacity puts a line's last byte on the buffer's last byte */
+  size_t capacity = argc > 2 ? (size_t) atoi(argv[2]) : 2 * half;
 
   (void) opt;
   if (argc < 2) {
     fprintf(stderr, "headerdedup: needs a request and a header block\n");
     return 1;
   }
-  req = malloct(2 * half);
+  req = malloct(capacity > 2 * half ? capacity : 2 * half);
   tmp = malloct(half);
   reqlen = st_decode_body(argv[0], req, half);
   blocklen = st_decode_body(argv[1], tmp, half);
   /* st_decode_body clips, and a clipped case grades an input nobody wrote */
-  if (reqlen + 1 >= half || blocklen + 1 >= half) {
+  if (reqlen + 1 >= half || blocklen + 1 >= half || capacity <= reqlen) {
     fprintf(stderr, "headerdedup: argument longer than %d bytes\n",
             (int) half - 2);
     freet(tmp);
@@ -3421,7 +3423,7 @@ static int st_headerdedup(httrackp *opt, int argc, char **argv) {
   /* exact-size copy so a sanitizer traps an over-read of the block */
   headers = strdupt(tmp);
   freet(tmp);
-  http_append_custom_headers(req, 2 * half, headers);
+  http_append_custom_headers(req, capacity, headers);
   for (i = 0; appended[i] != '\0'; i++) {
     if (appended[i] == '\r')
       printf("\\r");
@@ -12411,8 +12413,11 @@ static int st_backstop(httrackp *opt, int argc, char **argv) {
     }                                                                          \
   } while (0)
 
-  cache.hashtable = coucal_new(0);
+  /* before the cleanup label has anything to free */
   sback = back_new(opt, SLOTS);
+  if (sback == NULL)
+    return 77;
+  cache.hashtable = coucal_new(0);
   back = sback->lnk;
   if (!st_backstop_arm(opt, sback, status, r, SLOTS, SLOT_DNS)) {
     skipped = 1;
@@ -12517,6 +12522,60 @@ cleanup:
 
   printf("backstop self-test: %s\n", err ? "FAIL" : "OK");
   return err;
+}
+
+/* back_new() sizes its slot table from -cN, so a user can ask for one that
+   does not fit. The contract is a NULL return, which httpmirror() turns into a
+   log line and a stopped mirror, where an abort loses that message. */
+static int st_backnew(httrackp *opt, int argc, char **argv) {
+  /* Too big to serve without the allocator asking the kernel for more. */
+  enum { slots = 4096 };
+
+  struct_back *sback;
+
+  (void) argc;
+  (void) argv;
+
+  /* Control: with memory available the same call hands back a whole table, so
+     a NULL below cannot be back_new refusing every size. */
+  sback = back_new(opt, slots);
+  if (sback == NULL || sback->count != slots || sback->lnk == NULL ||
+      sback->connect_fallback == NULL || sback->ready == NULL) {
+    printf("backnew: FAILED (control table incomplete)\n");
+    back_free(&sback);
+    return 1;
+  }
+  back_free(&sback);
+
+#ifndef _WIN32
+  {
+    struct rlimit saved, tight;
+
+    if (getrlimit(RLIMIT_AS, &saved) != 0) {
+      printf("backnew: cannot cap memory, skipped\n");
+      return 0;
+    }
+    tight = saved;
+    tight.rlim_cur = 1024 * 1024;
+    if (setrlimit(RLIMIT_AS, &tight) != 0) {
+      printf("backnew: cannot cap memory, skipped\n");
+      return 0;
+    }
+    sback = back_new(opt, slots);
+    (void) setrlimit(RLIMIT_AS, &saved);
+    if (sback != NULL) {
+      /* The cap is advisory here, so the run says nothing either way. */
+      back_free(&sback);
+      printf("backnew: cap did not bite, skipped\n");
+      return 0;
+    }
+    printf("backnew: oom OK\n");
+    return 0;
+  }
+#else
+  printf("backnew: cannot cap memory, skipped\n");
+  return 0;
+#endif
 }
 
 static int st_threadwait(httrackp *opt, int argc, char **argv) {
@@ -14059,6 +14118,48 @@ static int st_catchurl_overlong(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
+/* What a postprocess-html callback may claim, and out of whose storage. Two
+   capacities and every offset, or a bound that ignored "size" or looked only at
+   the base pointer would pass. */
+static int st_postprocsize(httrackp *opt, int argc, char **argv) {
+  char buf[16] = {0}, own[16] = {0};
+  const size_t capa = sizeof(buf);
+  size_t size;
+
+  (void) opt;
+  (void) argc;
+  (void) argv;
+  /* the engine's own storage, whatever the reply points at inside it */
+  assertf(hts_postprocess_reply_inplace(buf, buf, capa));
+  assertf(hts_postprocess_reply_inplace(buf + capa - 1, buf, capa));
+  assertf(!hts_postprocess_reply_inplace(buf + capa, buf, capa));
+  assertf(!hts_postprocess_reply_inplace(own, buf, capa));
+  assertf(!hts_postprocess_reply_inplace(buf, buf, 0));
+  for (size = 4; size <= capa; size *= 2) {
+    size_t at;
+
+    for (at = 0; at <= size; at++) {
+      /* in place, a reply owns what is left of "size" past its own offset */
+      assertf(hts_postprocess_reply_ok(buf + at, (int) (size - at), buf, size,
+                                       capa));
+      /* one past the storage is another object's business, not ours to bound */
+      if (at < capa)
+        assertf(!hts_postprocess_reply_ok(buf + at, (int) (size - at) + 1, buf,
+                                          size, capa));
+    }
+    /* in the buffer's slack, past every byte the engine handed out */
+    if (size < capa)
+      assertf(!hts_postprocess_reply_ok(buf + size + 1, 0, buf, size, capa));
+    /* a buffer of the callback's own is bounded by the callback */
+    assertf(hts_postprocess_reply_ok(own, (int) capa + 1, buf, size, capa));
+    /* neither may report a negative count */
+    assertf(!hts_postprocess_reply_ok(own, -1, buf, size, capa));
+    assertf(!hts_postprocess_reply_ok(buf, -1, buf, size, capa));
+  }
+  printf("postprocess reply self-test OK\n");
+  return 0;
+}
+
 /* A path of exactly "n" bytes, both ends '/' so bauth_prefix() keeps all of
    it: the key it builds is truncated at the last slash. */
 static void st_urlbounds_path(char *fil, size_t n) {
@@ -14219,6 +14320,9 @@ static const struct selftest_entry {
     {"catchurl-overlong", "",
      "a request header line the line buffer cannot hold fails the capture",
      st_catchurl_overlong},
+    {"postprocsize", "",
+     "a postprocess-html callback cannot claim bytes it was not handed",
+     st_postprocsize},
     {"postfile", "<short> <long> <embedded-nul> <empty>",
      "a >postfile: body is clipped to the request block and terminated",
      st_postfile},
@@ -14289,6 +14393,8 @@ static const struct selftest_entry {
      st_arrays},
     {"ucs2", "[oom]", "UCS2 to UTF-8 re-encoding, and its failure return",
      st_ucs2},
+    {"backnew", "",
+     "a backing table too big to allocate is a NULL, not an abort", st_backnew},
     {"pubheaders", "",
      "layout of the installed structs configure's switches decide",
      st_pubheaders},
@@ -14342,7 +14448,7 @@ static const struct selftest_entry {
     {"headerfield", "<headers> <field>",
      "is <field> already present in the custom request-header block",
      st_headerfield},
-    {"headerdedup", "<request> <headers>",
+    {"headerdedup", "<request> <headers> [capacity]",
      "what the custom header block adds to a request that has some (#1340)",
      st_headerdedup},
     {"headerlong", "[header-name:]",

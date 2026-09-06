@@ -843,12 +843,15 @@ typedef struct buff_struct {
   size_t capacity;
   /** Buffer write position ; MUST point to a valid \0. **/
   size_t pos;
+  /** Did a print not fit? Every later one is then skipped. **/
+  hts_boolean overflow;
 } buff_struct;
 
 static void print_buffer(buff_struct*const str, const char *format, ...)
   HTS_PRINTF_FUN(2, 3);
 
-/* Prints on a static buffer. asserts in case of overflow. */
+/* Prints on a static buffer, raising str->overflow rather than writing past
+   its end; what to do about a partial buffer is the caller's call. */
 static void print_buffer(buff_struct*const str, const char *format, ...) {
   size_t result;
   va_list args;
@@ -859,13 +862,20 @@ static void print_buffer(buff_struct*const str, const char *format, ...) {
   assertf(str != NULL);
   assertf(str->pos < str->capacity);
 
+  if (str->overflow)
+    return;
+
   /* Print */
   position = &str->buffer[str->pos];
   remaining = str->capacity - str->pos;
   va_start(args, format);
   result = (size_t) vsnprintf(position, remaining, format, args);
   va_end(args);
-  assertf(result < remaining);
+  if (result >= remaining) {
+    position[0] = '\0';
+    str->overflow = HTS_TRUE;
+    return;
+  }
 
   /* Increment. */
   str->pos += strlen(position);
@@ -1325,6 +1335,17 @@ int http_sendhead(httrackp * opt, t_cookie * cookie, int mode,
         print_buffer(&bstr, "%s",
                    unescape_http(OPT_GET_BUFF(opt), OPT_GET_BUFF_SIZE(opt),
                                  search_tag + strlen(POSTTOK) + 1));
+  }
+
+  /* Nothing sums the fields above against the request buffer. A clipped
+     request would fetch another resource, or drop the credentials. */
+  if (bstr.overflow) {
+    hts_log_print(opt, LOG_WARNING, "Request header too large for %s%s",
+                  jump_identification_const(adr), fil);
+    deletesoc_r(retour);
+    strcpybuff(retour->msg, "Request header too large");
+    retour->soc = INVALID_SOCKET;
+    return -1;
   }
 #if HDEBUG
 #endif

@@ -1,0 +1,13 @@
+#!/bin/bash
+#
+# A postprocess-html callback returns its byte count as an int, which the engine
+# used to store as the output buffer's size unchecked. 440 keeps that route from
+# reappearing; this pins what the check accepts.
+
+set -euo pipefail
+
+# shellcheck source=tests/testlib.sh
+. "${0%"${0##*/}"}./testlib.sh"
+
+selftest_queue "postprocess reply self-test OK" postprocsize
+selftest_run_queued
