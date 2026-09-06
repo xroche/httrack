@@ -423,6 +423,7 @@ void help_catchurl(const char *dest_path) {
     char BIGSTK url[HTS_URLMAXSIZE * 2];
     char method[32];
     char BIGSTK data[CATCH_URL_DATA_SIZE];
+    catch_url_status status;
 
     url[0] = method[0] = data[0] = '\0';
     //
@@ -431,7 +432,8 @@ void help_catchurl(const char *dest_path) {
     printf("\tProxy's address: \t%s\n\tProxy's port: \t%d\n", adr_prox,
            port_prox);
     //
-    if (catch_url(soc, url, method, data)) {
+    status = catch_url_capture(soc, url, method, data);
+    if (status == CATCH_URL_OK) {
       char BIGSTK dest[HTS_URLMAXSIZE * 2];
       int i = 0;
 
@@ -458,7 +460,7 @@ void help_catchurl(const char *dest_path) {
         printf("You can capture it through: httrack \"%s\"\n", finalurl);
       }
     } else
-      printf("Unable to analyse the URL\n");
+      printf("Unable to analyse the URL: %s\n", catch_url_strerror(status));
 #ifdef _WIN32
     closesocket(soc);
 #else

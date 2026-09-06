@@ -343,12 +343,12 @@ HTSEXT_API T_SOC catch_url_init(int *port, char *adr);
     the proxied HTTP request: write the absolute URL to @p url, the upper-cased
     method to @p method, and the rebuilt request (request line, headers, and any
     POST body) to @p data, then send a canned response and close.
-    @return 1 on success, 0 on error, a header block too large for @p data
-    being one such error. On error @p data is left empty and @p url holds the
-    peer's "ip:port", unless the request line had already parsed into it. The
-    buffers are caller-allocated and not bounds-checked: @p data must be
-    CATCH_URL_DATA_SIZE bytes, and @p url / @p method must fit the captured
-    request line. */
+    @return 1 on success, 0 on error. A header line, or a whole header block,
+    too large for the capture are two such errors. On error @p data is left
+    empty and @p url holds the peer's "ip:port", unless the request line had
+    already parsed into it. The buffers are caller-allocated and not
+    bounds-checked: @p data must be CATCH_URL_DATA_SIZE bytes, and @p url /
+    @p method must fit the captured request line. */
 HTSEXT_API hts_boolean catch_url(T_SOC soc, char *url, char *method,
                                  char *data);
 
