@@ -13955,26 +13955,43 @@ static int st_catchurl(httrackp *opt, int argc, char **argv) {
   return 0;
 }
 
-/* What a postprocess-html callback may claim. Two capacities, or a bound that
-   ignored "size" and hardcoded one would pass. */
+/* What a postprocess-html callback may claim, and out of whose storage. Two
+   capacities and every offset, or a bound that ignored "size" or looked only at
+   the base pointer would pass. */
 static int st_postprocsize(httrackp *opt, int argc, char **argv) {
-  char buf[16], own[16];
+  char buf[16] = {0}, own[16] = {0};
+  const size_t capa = sizeof(buf);
   size_t size;
 
   (void) opt;
   (void) argc;
   (void) argv;
-  for (size = 4; size <= sizeof(buf); size *= 4) {
-    /* an in-place edit may shrink or keep what it was handed, never grow */
-    assertf(hts_postprocess_reply_ok(buf, 0, buf, size));
-    assertf(hts_postprocess_reply_ok(buf, (int) size - 1, buf, size));
-    assertf(hts_postprocess_reply_ok(buf, (int) size, buf, size));
-    assertf(!hts_postprocess_reply_ok(buf, (int) size + 1, buf, size));
+  /* the engine's own storage, whatever the reply points at inside it */
+  assertf(hts_postprocess_reply_inplace(buf, buf, capa));
+  assertf(hts_postprocess_reply_inplace(buf + capa - 1, buf, capa));
+  assertf(!hts_postprocess_reply_inplace(buf + capa, buf, capa));
+  assertf(!hts_postprocess_reply_inplace(own, buf, capa));
+  assertf(!hts_postprocess_reply_inplace(buf, buf, 0));
+  for (size = 4; size <= capa; size *= 2) {
+    size_t at;
+
+    for (at = 0; at <= size; at++) {
+      /* in place, a reply owns what is left of "size" past its own offset */
+      assertf(hts_postprocess_reply_ok(buf + at, (int) (size - at), buf, size,
+                                       capa));
+      /* one past the storage is another object's business, not ours to bound */
+      if (at < capa)
+        assertf(!hts_postprocess_reply_ok(buf + at, (int) (size - at) + 1, buf,
+                                          size, capa));
+    }
+    /* in the buffer's slack, past every byte the engine handed out */
+    if (size < capa)
+      assertf(!hts_postprocess_reply_ok(buf + size + 1, 0, buf, size, capa));
     /* a buffer of the callback's own is bounded by the callback */
-    assertf(hts_postprocess_reply_ok(own, (int) size + 1, buf, size));
-    /* neither may be negative */
-    assertf(!hts_postprocess_reply_ok(buf, -1, buf, size));
-    assertf(!hts_postprocess_reply_ok(own, -1, buf, size));
+    assertf(hts_postprocess_reply_ok(own, (int) capa + 1, buf, size, capa));
+    /* neither may report a negative count */
+    assertf(!hts_postprocess_reply_ok(own, -1, buf, size, capa));
+    assertf(!hts_postprocess_reply_ok(buf, -1, buf, size, capa));
   }
   printf("postprocess reply self-test OK\n");
   return 0;

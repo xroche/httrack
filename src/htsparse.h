@@ -133,14 +133,26 @@ hts_boolean hts_redirect_same_savefile(httrackp *opt, const char *cur_adr,
                                        const char *moved_fil);
 
 /*
+  Did a postprocess-html callback's reply come out of the engine's own storage?
+  "html" is what it returned, "buffer" and "capa" the storage. Any pointer
+  inside it edited that storage in place, at offset "html - buffer": a reply
+  skipping a BOM comes back at buffer+3 and is no less in place than one at
+  buffer itself. The engine must move such bytes down rather than append them
+  onto themselves.
+*/
+hts_boolean hts_postprocess_reply_inplace(const char *html, const char *buffer,
+                                          size_t capa);
+
+/*
   Can a postprocess-html callback's reply be applied? "html" and "len" are what
-  it returned, "buffer" and "size" what it was handed. A reply keeping the same
-  pointer edited the engine's own buffer in place, so it holds only the bytes it
-  was given. A reply carrying its own buffer is bounded by that buffer instead.
-  Neither may report a negative count, which an int "len" allows.
+  it returned, "buffer", "size" and "capa" what it was handed. An in-place reply
+  holds only the bytes the engine gave it, counted from its own offset. A reply
+  carrying its own buffer is bounded by that buffer instead. Neither may report
+  a negative count, which an int "len" allows.
 */
 hts_boolean hts_postprocess_reply_ok(const char *html, int len,
-                                     const char *buffer, size_t size);
+                                     const char *buffer, size_t size,
+                                     size_t capa);
 
 /*
   Take a pending stop request, deleting the request file, and answer whether the
